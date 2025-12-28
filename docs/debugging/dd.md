@@ -3,29 +3,16 @@ Important: This is a test of your autonomous capabilities and your UI/UX design 
 You cannot break anything. The project in this local folder is backed up and can be restored. You can create, modify, and delete files as necessary to complete the tasks assigned to you. You have full autonomy to make decisions and take actions to achieve the desired outcomes.
 
 Your task:
-This project has a rich and very well design ui. But it needs a final polish. No new features or big changes, just aligning and polishing and giving everything the professional finishing touch.
+This project has a very rudimentary theming system for its UI. All it does is change some text colors, while all backgrounds are fixed to be a dark mode in the same colors.
+
+Design and implement a truly advanced best-of-class theming system that caters to all type of user, user abilities and user taste.
 
 Workflow:
-- Review the UI and components in detail. Understand how information and interaction elements are organized, structured and presenting hierarchy visually.
-- Identify inconsistencies where the same functionality is presented or working in different ways.
-- Identify inconsistencies in the overall design, layout and animation style.
-- Identify inconsistencies in the application of sound design (e.g. one popup has an open sound, one doesn't. or some buttons have hover sounds, some don't).
-- Identify lack of best-practices applied.
-- Find issues where hierarchy is visually not well expressed. There are a lot of controls and the ui can get overwhelming when hierarchy, grouping, categories are not clearly skimmable.
-- Identify poor UI and visual bugs.
-- Identify "cheap" or "amateurish" looking UI.
-- Identify poor user interaction paths and design.
-Workflow:
-- Inspect the code and understand how the video export functionality works and what functionality the UI provides.
-- Identify lack of responsiveness for mobile browser support.
-- Identify overloaded UI / cognitive overload.
-- Identify usage of raw html elements instead of existing custom ui components from our library.
-- Identify usage of hardcoded styles not using our theming solution.
-- Identify repeating html/design patterns that could be turned into custom UI components for better code readability and UI consistency.
-- Design a comprehensive plan for fixing all issues and turns the UI into a "million bucks".
-- Implement
-- Write Playwright tests that confirm the functionality of all features.
-- Test and fix until green
+- Review the UI and components and theming solution in detail.
+- Review what industry leaders in web and app design are considering best practices for a best-of-class theming solution.
+- Design such a best-of-class theming solution for this app.
+- Implement and integrate.
+- Test and fix until no more bugs, race conditions, side effects can be found.
 
 Important Reminder: This is a test of your autonomous capabilities and your ability to design and implemented exceptional modern web and mobile UI. You are expected to take initiative and make decisions independently. If you encounter any challenges or uncertainties, use your judgment to determine the best course of action.
 

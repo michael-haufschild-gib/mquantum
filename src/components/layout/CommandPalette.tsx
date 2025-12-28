@@ -103,10 +103,17 @@ export const CommandPalette: React.FC = () => {
     },
     {
         id: 'theme-blue',
-        label: 'Switch Theme: Blue (Default)',
+        label: 'Switch Theme: Blue',
         category: 'Theme',
         action: () => setTheme('blue'),
         icon: <div className="w-3 h-3 rounded-full bg-blue-500"/>
+    },
+    {
+        id: 'theme-cyan',
+        label: 'Switch Theme: Cyan (Default)',
+        category: 'Theme',
+        action: () => setTheme('cyan'),
+        icon: <div className="w-3 h-3 rounded-full bg-cyan-500"/>
     }
   ];
 

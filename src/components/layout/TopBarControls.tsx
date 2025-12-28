@@ -1,19 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ToggleButton } from '@/components/ui/ToggleButton';
-import {
-  canRenderFaces,
-  canRenderEdges,
-  isRaymarchingFractal as isRaymarchedFractal,
-} from '@/lib/geometry/registry';
-import { useGeometryStore, type GeometryState } from '@/stores/geometryStore';
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import { useUIStore, type UISlice } from '@/stores/uiStore';
-import { useAnimationStore } from '@/stores/animationStore';
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
-import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
+import {
+  canRenderEdges,
+  canRenderFaces,
+  isRaymarchingFractal as isRaymarchedFractal,
+} from '@/lib/geometry/registry';
+import { useAnimationStore } from '@/stores/animationStore';
+import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
+import { useGeometryStore, type GeometryState } from '@/stores/geometryStore';
+import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
+import { useUIStore, type UISlice } from '@/stores/uiStore';
+import React, { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 // Icons (internal to this component)
 const Icons = {
@@ -66,7 +66,7 @@ interface TopBarControlsProps {
 
 export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false }) => {
   const { addToast } = useToast();
-  
+
   // Visual Store
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
     edgesVisible: state.edgesVisible,
@@ -164,7 +164,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
   useEffect(() => {
     let nextFaces = facesVisible;
     let nextEdges = edgesVisible;
-    
+
     // Rule 1: If faces not supported, disable (track for restore)
     if (!facesSupported && facesVisible) {
       previousFacesState.current = true;
@@ -173,7 +173,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
       nextFaces = true;
       previousFacesState.current = false;
     }
-    
+
     // Rule 2: If edges not supported, disable (track for restore)
     if (!edgesSupported && edgesVisible) {
       previousEdgesState.current = true;
@@ -182,17 +182,17 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
       nextEdges = true;
       previousEdgesState.current = false;
     }
-    
+
     // Rule 3: Raymarched objects need faces when edges are on
     if (isRaymarched && nextEdges && !nextFaces) {
       nextFaces = true;
     }
-    
+
     // Rule 4: At least one mode must be active
     if (!nextEdges && !nextFaces) {
       nextEdges = true;
     }
-    
+
     // Apply changes only if needed (prevents unnecessary re-renders)
     if (nextFaces !== facesVisible) setFacesVisible(nextFaces);
     if (nextEdges !== edgesVisible) setEdgesVisible(nextEdges);
@@ -219,16 +219,16 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
   };
 
   // Helper for Icon Buttons
-  const IconButton = ({ 
-    icon: IconComponent, 
-    active, 
-    onClick, 
+  const IconButton = ({
+    icon: IconComponent,
+    active,
+    onClick,
     label,
-    className = "" 
-  }: { 
-    icon: React.FC, 
-    active: boolean, 
-    onClick: () => void, 
+    className = ""
+  }: {
+    icon: React.FC,
+    active: boolean,
+    onClick: () => void,
     label: string,
     className?: string
   }) => (
@@ -252,7 +252,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
   );
 
   return (
-    <div className={`flex items-center gap-1 ${compact ? '' : 'bg-black/20 p-1 rounded-lg border border-white/5 backdrop-blur-sm'}`}>
+    <div className={`flex items-center gap-1 ${compact ? '' : 'bg-black/20 p-1 rounded-lg '}`}>
       {/* Render Mode Toggles */}
       <div className={`flex gap-1 ${compact ? '' : 'mr-2'}`}>
         <div title={!edgesSupported ? 'Edges not available' : undefined}>
@@ -284,29 +284,29 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
           <div className="w-px h-4 bg-white/10 mx-1" />
 
           {/* App Controls */}
-          <IconButton 
-            icon={isSoundEnabled ? Icons.SoundOn : Icons.SoundOff} 
-            active={isSoundEnabled} 
-            onClick={toggleSound} 
-            label={isSoundEnabled ? "Mute Sound" : "Enable Sound"} 
+          <IconButton
+            icon={isSoundEnabled ? Icons.SoundOn : Icons.SoundOff}
+            active={isSoundEnabled}
+            onClick={toggleSound}
+            label={isSoundEnabled ? "Mute Sound" : "Enable Sound"}
           />
-          <IconButton 
-            icon={Icons.Perf} 
-            active={showPerfMonitor} 
-            onClick={() => { setShowPerfMonitor(!showPerfMonitor); soundManager.playClick(); }} 
-            label="Performance Monitor" 
+          <IconButton
+            icon={Icons.Perf}
+            active={showPerfMonitor}
+            onClick={() => { setShowPerfMonitor(!showPerfMonitor); soundManager.playClick(); }}
+            label="Performance Monitor"
           />
-          <IconButton 
-            icon={Icons.Fullscreen} 
-            active={isFullscreen} 
-            onClick={toggleFullscreen} 
-            label="Fullscreen" 
+          <IconButton
+            icon={Icons.Fullscreen}
+            active={isFullscreen}
+            onClick={toggleFullscreen}
+            label="Fullscreen"
           />
-          <IconButton 
-            icon={Icons.Cinematic} 
-            active={isCinematicMode} 
-            onClick={toggleCinematic} 
-            label="Cinematic Mode" 
+          <IconButton
+            icon={Icons.Cinematic}
+            active={isCinematicMode}
+            onClick={toggleCinematic}
+            label="Cinematic Mode"
           />
         </>
       )}

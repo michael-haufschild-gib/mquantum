@@ -1,13 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { useCameraStore } from '@/stores/cameraStore';
+import { useDropdownStore } from '@/stores/dropdownStore';
 import { useShallow } from 'zustand/react/shallow';
 
+const DROPDOWN_ID = 'canvas-context-menu';
+
+interface MenuItem {
+  label: string;
+  shortcut?: string;
+  action?: () => void;
+  type?: 'separator';
+}
+
 export const CanvasContextMenu: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const menuRef = useRef<HTMLDivElement>(null);
+
+  const { isOpen, openDropdown, closeDropdown } = useDropdownStore(
+    useShallow((state) => ({
+      isOpen: state.openDropdownId === DROPDOWN_ID,
+      openDropdown: state.openDropdown,
+      closeDropdown: state.closeDropdown,
+    }))
+  );
   
   const layoutSelector = useShallow((state: LayoutStore) => ({
     toggleCinematicMode: state.toggleCinematicMode,
@@ -19,55 +35,43 @@ export const CanvasContextMenu: React.FC = () => {
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
-      // Check if target is canvas or background
-      // We assume canvas is in the 'absolute inset-0 z-0' div
       const target = e.target as HTMLElement;
-      // Allow if it's the canvas container or canvas itself
       const isCanvas = target.tagName === 'CANVAS' || target.id === 'canvas-container' || target.closest('#canvas-container');
-      
+
       if (isCanvas) {
         e.preventDefault();
         setPosition({ x: e.clientX, y: e.clientY });
-        setIsVisible(true);
-      } else {
-         // Check if we clicked on empty space in layout
-         if (target.classList.contains('bg-background') || target.classList.contains('glass-panel')) {
-             // Maybe?
-         } else {
-             setIsVisible(false);
-         }
+        openDropdown(DROPDOWN_ID);
       }
     };
 
-    const handleClick = () => setIsVisible(false);
-    const handleScroll = () => setIsVisible(false);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        closeDropdown(DROPDOWN_ID);
+      }
+    };
 
-    // Global listener for simplicity, but filtered logic above
-    // Actually, we can attach to window and filter
     window.addEventListener('contextmenu', handleContextMenu);
-    window.addEventListener('click', handleClick);
-    window.addEventListener('scroll', handleScroll);
+    document.addEventListener('keydown', handleEscape);
 
     return () => {
       window.removeEventListener('contextmenu', handleContextMenu);
-      window.removeEventListener('click', handleClick);
-      window.removeEventListener('scroll', handleScroll);
+      document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [isOpen, openDropdown, closeDropdown]);
 
-  const items = [
+  const items: MenuItem[] = useMemo(() => [
     { label: 'Reset Camera', shortcut: 'R', action: resetCamera },
     { label: 'Toggle Cinematic Mode', shortcut: 'C', action: toggleCinematicMode },
-    { type: 'separator' },
+    { type: 'separator', label: '' },
     { label: 'Toggle Left Panel', shortcut: 'Shift+\\', action: toggleLeftPanel },
     { label: 'Toggle Right Panel', shortcut: '\\', action: toggleCollapsed },
-  ];
+  ], [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed]);
 
   return (
     <AnimatePresence>
-      {isVisible && (
+      {isOpen && (
         <m.div
-          ref={menuRef}
           initial={{ opacity: 0, scale: 0.9, x: -10, y: -10 }}
           animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
           exit={{ opacity: 0, scale: 0.9 }}
@@ -84,7 +88,7 @@ export const CanvasContextMenu: React.FC = () => {
                 key={index}
                 onClick={() => {
                     if (item.action) item.action();
-                    setIsVisible(false);
+                    closeDropdown(DROPDOWN_ID);
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-white/10 flex justify-between items-center transition-colors group"
               >

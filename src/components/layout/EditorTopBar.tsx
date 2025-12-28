@@ -1,6 +1,7 @@
 import { TopBarControls } from '@/components/layout/TopBarControls';
 import { SceneManager } from '@/components/presets/SceneManager';
 import { StyleManager } from '@/components/presets/StyleManager';
+import { Button } from '@/components/ui/Button';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { InputModal } from '@/components/ui/InputModal';
 import { Modal } from '@/components/ui/Modal';
@@ -19,10 +20,8 @@ import { usePresetManagerStore, type PresetManagerState, type SavedScene, type S
 import { useThemeStore } from '@/stores/themeStore';
 import { useTransformStore } from '@/stores/transformStore';
 import { useUIStore } from '@/stores/uiStore';
-import { m } from 'motion/react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Button } from '@/components/ui/Button';
 
 /** Props for EditorTopBar component */
 interface EditorTopBarProps {
@@ -36,6 +35,9 @@ interface EditorTopBarProps {
  * Top bar component for the editor layout.
  * Provides main navigation menus (File, View, Scenes, Styles), global controls,
  * and panel toggle buttons. Responsive design with mobile-friendly unified menu.
+ * @param root0
+ * @param root0.showRightPanel
+ * @param root0.toggleRightPanel
  */
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   showRightPanel,
@@ -123,6 +125,37 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
   const isDesktop = useMediaQuery(BREAKPOINTS.sm);
 
+  // Refs for measuring sections to determine center positioning
+  const topBarRef = useRef<HTMLDivElement>(null);
+  const leftSectionRef = useRef<HTMLDivElement>(null);
+  const centerSectionRef = useRef<HTMLDivElement>(null);
+
+  // Update CSS variables for center positioning - CSS handles the max() calculation
+  // This avoids React re-renders; only updates CSS custom properties
+  useLayoutEffect(() => {
+    const updateCSSVariables = () => {
+      if (!topBarRef.current || !leftSectionRef.current || !centerSectionRef.current) return;
+
+      const leftWidth = leftSectionRef.current.offsetWidth;
+      const centerWidth = centerSectionRef.current.offsetWidth;
+      const gap = 16;
+
+      // Set CSS variables on the topbar element
+      topBarRef.current.style.setProperty('--left-edge', `${leftWidth + gap}px`);
+      topBarRef.current.style.setProperty('--center-half-width', `${centerWidth / 2}px`);
+    };
+
+    updateCSSVariables();
+
+    // ResizeObserver is more efficient than resize event for element-level changes
+    const resizeObserver = new ResizeObserver(updateCSSVariables);
+    if (topBarRef.current) resizeObserver.observe(topBarRef.current);
+    if (leftSectionRef.current) resizeObserver.observe(leftSectionRef.current);
+    if (centerSectionRef.current) resizeObserver.observe(centerSectionRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
   // Sync sound state for menu toggle
   const [isSoundEnabled, setIsSoundEnabled] = useState(soundManager.isEnabled);
   useEffect(() => {
@@ -194,12 +227,11 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   // --- Memoized Submenu Definitions ---
 
   const themeItems = useMemo(() => [
-      { label: (theme === 'blue' ? '✓ ' : '  ') + 'Blue', onClick: () => setTheme('blue') },
       { label: (theme === 'cyan' ? '✓ ' : '  ') + 'Cyan', onClick: () => setTheme('cyan') },
+      { label: (theme === 'blue' ? '✓ ' : '  ') + 'Blue', onClick: () => setTheme('blue') },
       { label: (theme === 'green' ? '✓ ' : '  ') + 'Green', onClick: () => setTheme('green') },
       { label: (theme === 'magenta' ? '✓ ' : '  ') + 'Magenta', onClick: () => setTheme('magenta') },
       { label: (theme === 'orange' ? '✓ ' : '  ') + 'Orange', onClick: () => setTheme('orange') },
-      { label: (theme === 'rainbow' ? '✓ ' : '  ') + 'Rainbow', onClick: () => setTheme('rainbow') },
   ], [theme, setTheme]);
 
   const savedSceneItems = useMemo(() => savedScenes.map((s: SavedScene) => ({
@@ -320,9 +352,9 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
   return (
     <>
-      <div className="glass-panel h-12 flex items-center justify-between px-4 z-40 shrink-0 select-none relative mb-2 rounded-xl mx-2 mt-2" data-testid="top-bar">
+      <div ref={topBarRef} className="glass-panel h-12 flex items-center px-4 z-40 shrink-0 select-none relative mb-2 rounded-xl mx-2 mt-2" data-testid="top-bar">
         {/* Left: Branding & Menu */}
-        <div className="flex items-center gap-4">
+        <div ref={leftSectionRef} className="flex items-center gap-4 shrink-0">
           {/* Left Panel Toggle */}
           <Button
               variant={showLeftPanel ? 'primary' : 'ghost'}
@@ -340,18 +372,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
               </svg>
           </Button>
 
-          {/* Holographic Logo (Hidden on very small screens, visible on desktop) */}
-          <m.div
-            className="text-lg font-bold text-accent tracking-[0.2em] hidden md:block relative cursor-default group"
-            whileHover={{ scale: 1.05 }}
-            onMouseEnter={() => soundManager.playHover()}
-          >
-            <span className="text-glow relative z-10">MDIMENSION</span>
-            <div className="absolute inset-0 text-accent/50 blur-[2px] opacity-0 group-hover:opacity-100 group-hover:translate-x-[2px] transition-all duration-200" aria-hidden="true">MDIMENSION</div>
-            <div className="absolute inset-0 text-white/30 blur-[4px] opacity-0 group-hover:opacity-100 group-hover:-translate-x-[2px] transition-all duration-200" aria-hidden="true">MDIMENSION</div>
-          </m.div>
 
-          <div className="h-4 w-px bg-white/10 hidden md:block" />
 
           {/* Desktop Menus (Hidden on Mobile) */}
           <div className="hidden sm:flex items-center gap-2 text-xs text-text-secondary">
@@ -395,18 +416,20 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
           </div>
         </div>
 
-        {/* Center: Global Controls (Responsive Positioning) */}
-        {/* On Mobile: Relative flow. On Desktop: Absolute center. */}
-        <div className="flex-1 flex justify-center sm:absolute sm:left-1/2 sm:-translate-x-1/2 pointer-events-none">
-          <div className="pointer-events-auto">
-               <TopBarControls compact={!isDesktop} />
-          </div>
+        {/* Center: Global Controls - dynamically positioned via CSS max() */}
+        {/* Viewport-centered when space allows, shifts right to avoid overlap when needed */}
+        {/* CSS max() picks the larger of: left-edge (avoid overlap) or viewport-center */}
+        <div
+          ref={centerSectionRef}
+          className="absolute flex items-center"
+          style={{ left: 'max(var(--left-edge, 0px), calc(50% - var(--center-half-width, 0px)))' }}
+        >
+          <TopBarControls compact={!isDesktop} />
         </div>
 
-        {/* Right: Tools */}
-        <div className="flex items-center gap-2">
-           {/* Right Panel Toggle */}
-           <Button
+        {/* Right: Panel Toggle - always at far right */}
+        <div className="flex items-center shrink-0 ml-auto">
+          <Button
               variant={showRightPanel ? 'primary' : 'ghost'}
               size="icon"
               onClick={toggleRightPanel}

@@ -75,21 +75,6 @@
      --theme-accent-glow: oklch(70% 0.14 260);
   }
 
-  [data-theme='rainbow'] {
-    animation: rainbow 5s linear infinite;
-    --theme-accent: oklch(70% 0.2 0); /* Start red */
-    --theme-accent-glow: oklch(70% 0.2 0);
-  }
-
-  @keyframes rainbow {
-    0% { --theme-accent: oklch(70% 0.2 0); --theme-accent-glow: oklch(70% 0.2 0); }
-    20% { --theme-accent: oklch(70% 0.2 72); --theme-accent-glow: oklch(70% 0.2 72); }
-    40% { --theme-accent: oklch(70% 0.2 144); --theme-accent-glow: oklch(70% 0.2 144); }
-    60% { --theme-accent: oklch(70% 0.2 216); --theme-accent-glow: oklch(70% 0.2 216); }
-    80% { --theme-accent: oklch(70% 0.2 288); --theme-accent-glow: oklch(70% 0.2 288); }
-    100% { --theme-accent: oklch(70% 0.2 360); --theme-accent-glow: oklch(70% 0.2 360); }
-  }
-
   body {
     background-color: var(--color-background);
     color: var(--color-text-primary);

@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { m, AnimatePresence } from 'motion/react';
+import { useShallow } from 'zustand/react/shallow';
 import { soundManager } from '@/lib/audio/SoundManager';
+import { useDropdownStore } from '@/stores/dropdownStore';
 
 export interface DropdownMenuItem {
   label: string;
@@ -19,6 +21,8 @@ export interface DropdownMenuProps {
   align?: 'left' | 'right';
   maxHeight?: number;
   onClose?: () => void;
+  /** Optional unique identifier for this dropdown */
+  id?: string;
 }
 
 /**
@@ -78,6 +82,7 @@ const PortaledSubmenu: React.FC<{
   return createPortal(
     <m.div
       ref={menuRef}
+      data-dropdown-content="true"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: ready ? 1 : 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -155,7 +160,7 @@ const MenuItems: React.FC<{
         if (item.label === '---') {
           return <div key={index} className="h-px bg-white/10 my-1.5 mx-2" />;
         }
-        
+
         // Header (non-clickable, no children)
         if (!item.onClick && !item.items && !item.disabled) {
           return (
@@ -233,19 +238,68 @@ const MenuItems: React.FC<{
   );
 };
 
+/**
+ * A dropdown menu component with global state coordination.
+ * Only one dropdown can be open at a time across the entire app.
+ * Supports submenus, keyboard navigation, and click-outside closing.
+ *
+ * @param props - Component properties
+ * @param props.trigger - The element that triggers the dropdown
+ * @param props.items - Array of menu items to display
+ * @param props.className - Additional CSS classes for the trigger wrapper
+ * @param props.align - Alignment of the dropdown ('left' or 'right')
+ * @param props.maxHeight - Maximum height of the dropdown content
+ * @param props.onClose - Callback fired when the dropdown closes
+ * @param props.id - Optional unique identifier (auto-generated if not provided)
+ * @returns Rendered dropdown menu component
+ *
+ * @example
+ * ```tsx
+ * <DropdownMenu
+ *   trigger={<Button>Open Menu</Button>}
+ *   items={[
+ *     { label: 'Item 1', onClick: () => console.log('clicked') },
+ *     { label: '---' }, // Separator
+ *     { label: 'Item 2', shortcut: '⌘S', onClick: handleSave },
+ *   ]}
+ * />
+ * ```
+ */
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   trigger,
   items,
   className = '',
   align = 'left',
   maxHeight,
-  onClose
+  onClose,
+  id: providedId
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  // Auto-generate ID if not provided
+  const autoId = useId();
+  const dropdownId = providedId || `dropdown-${autoId}`;
+
+  // Subscribe to store - only re-render when THIS dropdown's open state changes
+  const { isOpen, toggleDropdown, closeDropdown } = useDropdownStore(
+    useShallow((state) => ({
+      isOpen: state.openDropdownId === dropdownId,
+      toggleDropdown: state.toggleDropdown,
+      closeDropdown: state.closeDropdown,
+    }))
+  );
+
   const triggerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const offset = 4;
+
+  // Track previous isOpen state to call onClose callback
+  const prevIsOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (prevIsOpenRef.current && !isOpen && onClose) {
+      onClose();
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen, onClose]);
 
   const updatePosition = useCallback(() => {
     if (triggerRef.current && isOpen && contentRef.current) {
@@ -256,7 +310,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
 
       let top = triggerRect.bottom + offset;
       const overflowsBottom = (triggerRect.bottom + offset + contentRect.height) > viewportHeight;
-      
+
       if (overflowsBottom) {
         const topSpace = triggerRect.top;
         const bottomSpace = viewportHeight - triggerRect.bottom;
@@ -289,46 +343,57 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Check if click is inside ANY dropdown menu (including submenus)
       const target = event.target as HTMLElement;
-      const isInsideMenu = target.closest('.glass-panel');
-      
-      if (
-        isOpen &&
-        triggerRef.current &&
-        !triggerRef.current.contains(target) &&
-        !isInsideMenu
-      ) {
-        setIsOpen(false);
-        if (onClose) onClose();
+
+      // Let trigger clicks be handled by their onClick handlers
+      if (target.closest('[data-dropdown-trigger]')) {
+        return;
+      }
+
+      // Don't close when clicking inside dropdown content (including submenus)
+      if (target.closest('[data-dropdown-content]')) {
+        return;
+      }
+
+      // Click is outside all dropdowns - close this one
+      if (isOpen && triggerRef.current && !triggerRef.current.contains(target)) {
+        closeDropdown(dropdownId);
       }
     };
 
-    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose]);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, dropdownId, closeDropdown]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-        if (onClose) onClose();
+        closeDropdown(dropdownId);
       }
     };
-    
-    if (isOpen) document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isOpen, dropdownId, closeDropdown]);
 
   const handleToggle = (e: React.MouseEvent) => {
-    if (!isOpen) soundManager.playClick();
-    setIsOpen(!isOpen);
+    if (!isOpen) {
+      soundManager.playClick();
+    }
+    toggleDropdown(dropdownId);
     e.stopPropagation();
   };
 
   const closeMenu = () => {
-    setIsOpen(false);
-    if (onClose) onClose();
+    closeDropdown(dropdownId);
   };
 
   const menuVariants = {
@@ -340,6 +405,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
     <>
       <div
         ref={triggerRef}
+        data-dropdown-trigger={dropdownId}
         onClick={handleToggle}
         role="button"
         className={`cursor-pointer ${className}`}
@@ -354,6 +420,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
           {isOpen && (
             <m.div
               ref={contentRef}
+              data-dropdown-content="true"
+              data-dropdown-id={dropdownId}
               initial="closed"
               animate="open"
               exit="closed"

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type Theme = 'cyan' | 'green' | 'magenta' | 'orange' | 'blue' | 'rainbow'
+export type Theme = 'cyan' | 'green' | 'magenta' | 'orange' | 'blue'
 
 /** Valid theme values for runtime validation */
 const VALID_THEMES: readonly Theme[] = [
@@ -10,7 +10,6 @@ const VALID_THEMES: readonly Theme[] = [
   'magenta',
   'orange',
   'blue',
-  'rainbow',
 ] as const
 
 /**
@@ -30,14 +29,14 @@ export interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      theme: 'blue', // Default to our new polished blue
+      theme: 'cyan', // Default cyan theme
       setTheme: (theme) => {
         // Runtime validation for safety (handles localStorage deserialization edge cases)
         if (!isValidTheme(theme)) {
           if (import.meta.env.DEV) {
-            console.warn(`Invalid theme value: "${theme}". Using default "blue".`)
+            console.warn(`Invalid theme value: "${theme}". Using default "cyan".`)
           }
-          set({ theme: 'blue' })
+          set({ theme: 'cyan' })
           return
         }
         set({ theme })

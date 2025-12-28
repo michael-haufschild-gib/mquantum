@@ -2,9 +2,21 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { defineConfig } from 'vite'
+import { viteStaticCopy } from 'vite-plugin-static-copy'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import wasm from 'vite-plugin-wasm'
 import wasmPack from 'vite-plugin-wasm-pack'
+
+// Favicon and meta image files to copy to dist root
+const faviconFiles = [
+  'favicon.ico',
+  'favicon-192.png',
+  'favicon-512.png',
+  'apple-touch-icon.png',
+  'og-image.jpg',
+  'twitter-card.jpg',
+  'manifest.webmanifest',
+]
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -14,6 +26,12 @@ export default defineConfig(({ mode }) => ({
     wasm(),
     topLevelAwait(),
     wasmPack('./src/wasm/mdimension_core'),
+    viteStaticCopy({
+      targets: faviconFiles.map(file => ({
+        src: `src/assets/logo/${file}`,
+        dest: '', // Copy to dist root
+      })),
+    }),
   ],
   esbuild: {
     // Keep component names in dev for better profiler output

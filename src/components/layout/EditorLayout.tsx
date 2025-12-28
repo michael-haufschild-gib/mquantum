@@ -4,7 +4,6 @@ import { ShortcutsOverlay } from '@/components/layout/ShortcutsOverlay';
 import { CropEditor } from '@/components/overlays/CropEditor';
 import { ExportModal } from '@/components/overlays/ExportModal';
 import { GlobalProgress } from '@/components/ui/GlobalProgress';
-import { useKonamiCode } from '@/hooks/useKonamiCode';
 import { useIsDesktop } from '@/hooks/useMediaQuery';
 import { soundManager } from '@/lib/audio/SoundManager';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
@@ -23,13 +22,7 @@ interface EditorLayoutProps {
 
 export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
   const theme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
   const spotlightRef = useRef<HTMLDivElement>(null);
-
-  useKonamiCode(() => {
-    setTheme('rainbow');
-    soundManager.playSuccess();
-  });
 
   const layoutSelector = useShallow((state: LayoutStore) => ({
     isCollapsed: state.isCollapsed,

@@ -47,7 +47,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     try {
       const stored = localStorage.getItem(HISTORY_KEY);
       if (stored) setHistory(JSON.parse(stored));
-    } catch { /* ignore */ }
+    } catch (error) {
+      // Log localStorage errors for debugging, but don't crash the picker
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn('ColorPicker: localStorage quota exceeded');
+      } else {
+        console.error('ColorPicker: failed to load color history', error);
+      }
+    }
   }, []);
 
   const addToHistory = (color: string) => {
@@ -168,19 +175,26 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
   // --- EyeDropper ---
   const handleEyedropper = async () => {
-    if (!('EyeDropper' in window)) return;
+    if (!window.EyeDropper) return;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const dropper = new (window as any).EyeDropper();
+      const dropper = new window.EyeDropper();
       const result = await dropper.open();
       handleHsvChange(parseColorToHsv(result.sRGBHex));
-    } catch { /* cancelled */ }
+    } catch (error) {
+      // AbortError is expected when user cancels the eyedropper
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        console.error('ColorPicker: EyeDropper error', error);
+      }
+    }
   };
 
   // --- Copy ---
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value);
-    // Could add visual feedback state here
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch (error) {
+      console.error('ColorPicker: Clipboard write failed', error);
+    }
   };
 
   // --- Palette ---

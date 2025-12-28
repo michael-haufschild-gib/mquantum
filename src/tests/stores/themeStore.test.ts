@@ -9,11 +9,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useThemeStore } from '@/stores/themeStore'
 
-type ThemeName = 'blue' | 'green' | 'magenta'
+type ThemeName = 'cyan' | 'green' | 'magenta' | 'orange' | 'blue'
 
 describe('themeStore', () => {
   beforeEach(() => {
-    useThemeStore.setState({ theme: 'blue' })
+    useThemeStore.setState({ theme: 'cyan' })
   })
 
   it('accepts a valid theme', () => {
@@ -21,9 +21,15 @@ describe('themeStore', () => {
     expect(useThemeStore.getState().theme).toBe('green')
   })
 
-  it('falls back to blue when setTheme receives an invalid runtime value', () => {
+  it('falls back to cyan when setTheme receives an invalid runtime value', () => {
     // Runtime values can be invalid (e.g. from persisted storage). Avoid `any` in tests.
     useThemeStore.getState().setTheme('invalid' as unknown as ThemeName)
-    expect(useThemeStore.getState().theme).toBe('blue')
+    expect(useThemeStore.getState().theme).toBe('cyan')
+  })
+
+  it('falls back to cyan when rainbow theme is set (removed theme)', () => {
+    // Rainbow theme was removed - ensure it falls back to cyan
+    useThemeStore.getState().setTheme('rainbow' as unknown as ThemeName)
+    expect(useThemeStore.getState().theme).toBe('cyan')
   })
 })

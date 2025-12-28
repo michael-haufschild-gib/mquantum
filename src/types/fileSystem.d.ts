@@ -1,8 +1,21 @@
 export {};
 
+interface EyeDropperResult {
+  sRGBHex: string;
+}
+
+interface EyeDropperConstructor {
+  new (): EyeDropperInstance;
+}
+
+interface EyeDropperInstance {
+  open(): Promise<EyeDropperResult>;
+}
+
 declare global {
   interface Window {
     showSaveFilePicker(options?: SaveFilePickerOptions): Promise<FileSystemFileHandle>;
+    EyeDropper?: EyeDropperConstructor;
   }
 
   interface SaveFilePickerOptions {

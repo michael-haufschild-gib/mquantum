@@ -49,69 +49,77 @@ export class VideoRecorder {
     this.options = options
   }
 
-  async initialize() {
-    // 0. Setup Composition Canvas if needed
-    const needsComposition = 
-        (this.options.textOverlay?.enabled) || 
-        (this.options.crop?.enabled)
+  async initialize(): Promise<void> {
+    try {
+      // 0. Setup Composition Canvas if needed
+      const needsComposition =
+          (this.options.textOverlay?.enabled) ||
+          (this.options.crop?.enabled)
 
-    let sourceCanvas = this.canvas
+      let sourceCanvas = this.canvas
 
-    if (needsComposition) {
-        this.compositionCanvas = document.createElement('canvas')
-        this.compositionCanvas.width = this.options.width
-        this.compositionCanvas.height = this.options.height
-        this.compositionCtx = this.compositionCanvas.getContext('2d', { 
-            willReadFrequently: false,
-            alpha: false 
-        }) as CanvasRenderingContext2D
-        sourceCanvas = this.compositionCanvas
+      if (needsComposition) {
+          this.compositionCanvas = document.createElement('canvas')
+          this.compositionCanvas.width = this.options.width
+          this.compositionCanvas.height = this.options.height
+          this.compositionCtx = this.compositionCanvas.getContext('2d', {
+              willReadFrequently: false,
+              alpha: false
+          }) as CanvasRenderingContext2D
+          sourceCanvas = this.compositionCanvas
+      }
+
+      // 1. Setup Target & Format Options
+      const format = this.options.format === 'webm'
+        ? new WebMOutputFormat()
+        : new Mp4OutputFormat()
+
+      if (this.options.streamHandle) {
+          // Stream Mode
+          const writable = await this.options.streamHandle.createWritable()
+          this.target = new StreamTarget(writable)
+      } else {
+          // Memory Mode
+          this.target = new BufferTarget()
+      }
+
+      // 2. Create Output
+      this.output = new Output({
+        format,
+        target: this.target
+      })
+
+      // 3. Configure Encoder with quality-optimized settings
+      const codec = this.options.codec || (this.options.format === 'webm' ? 'vp9' : 'avc')
+
+      const config: VideoEncodingConfig = {
+        codec,
+        bitrate: this.options.bitrate * 1_000_000, // Convert Mbps to bps
+        bitrateMode: this.options.bitrateMode || 'constant', // Default to CBR for consistency
+        latencyMode: 'quality', // Prioritize visual quality over encoding speed
+        keyFrameInterval: this.options.fps * 2, // Keyframe every 2 seconds for good seeking + quality
+        hardwareAcceleration: this.options.hardwareAcceleration || 'prefer-software',
+      }
+
+      // 4. Create Source
+      this.source = new CanvasSource(sourceCanvas, config)
+
+      // 5. Add Track
+      this.output.addVideoTrack(this.source, {
+          frameRate: this.options.fps
+      })
+
+      // 6. Start the output
+      await this.output.start()
+
+      this.isRecording = true
+    } catch (error) {
+      // Ensure resources are cleaned up on initialization failure
+      this.dispose()
+      throw new Error(
+        `Video initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
     }
-
-    // 1. Setup Target & Format Options
-    const format = this.options.format === 'webm' 
-      ? new WebMOutputFormat() 
-      : new Mp4OutputFormat()
-
-    if (this.options.streamHandle) {
-        // Stream Mode
-        const writable = await this.options.streamHandle.createWritable()
-        this.target = new StreamTarget(writable)
-    } else {
-        // Memory Mode
-        this.target = new BufferTarget()
-    }
-
-    // 2. Create Output
-    this.output = new Output({
-      format,
-      target: this.target
-    })
-
-    // 3. Configure Encoder with quality-optimized settings
-    const codec = this.options.codec || (this.options.format === 'webm' ? 'vp9' : 'avc')
-
-    const config: VideoEncodingConfig = {
-      codec, 
-      bitrate: this.options.bitrate * 1_000_000, // Convert Mbps to bps
-      bitrateMode: this.options.bitrateMode || 'constant', // Default to CBR for consistency
-      latencyMode: 'quality', // Prioritize visual quality over encoding speed
-      keyFrameInterval: this.options.fps * 2, // Keyframe every 2 seconds for good seeking + quality
-      hardwareAcceleration: this.options.hardwareAcceleration || 'prefer-software', 
-    }
-
-    // 4. Create Source
-    this.source = new CanvasSource(sourceCanvas, config)
-
-    // 5. Add Track
-    this.output.addVideoTrack(this.source, {
-        frameRate: this.options.fps
-    })
-
-    // 6. Start the output
-    await this.output.start()
-
-    this.isRecording = true
   }
 
   /**
@@ -120,115 +128,121 @@ export class VideoRecorder {
    * @param duration - The duration of the frame in seconds.
    * @param _globalTimestamp - Optional global video timestamp for fade calculations (reserved for future use).
    */
-  async captureFrame(timestamp: number, duration: number, _globalTimestamp?: number) {
+  async captureFrame(timestamp: number, duration: number, _globalTimestamp?: number): Promise<void> {
     if (!this.source || !this.isRecording) {
       throw new Error('Recorder not initialized or not recording')
     }
 
-    // Perform Composition if needed
-    if (this.compositionCanvas && this.compositionCtx) {
-        const ctx = this.compositionCtx
-        const { width, height, crop, textOverlay } = this.options
-        
-        // 1. Background (Clear)
-        ctx.globalCompositeOperation = 'source-over'
-        ctx.fillStyle = '#000000'
-        ctx.fillRect(0, 0, width, height)
+    try {
+      // Perform Composition if needed
+      if (this.compositionCanvas && this.compositionCtx) {
+          const ctx = this.compositionCtx
+          const { width, height, crop, textOverlay } = this.options
 
-        // 2. Draw Scene (with Crop)
-        // Reset filters for drawing the image (unless we want filters applied to the image source)
-        // We apply filters to the drawImage call context
-        
-        ctx.filter = 'none'
+          // 1. Background (Clear)
+          ctx.globalCompositeOperation = 'source-over'
+          ctx.fillStyle = '#000000'
+          ctx.fillRect(0, 0, width, height)
 
-        if (crop?.enabled) {
-            // Source coordinates (relative to original canvas)
-            const sx = crop.x * this.canvas.width
-            const sy = crop.y * this.canvas.height
-            const sw = crop.width * this.canvas.width
-            const sh = crop.height * this.canvas.height
+          // 2. Draw Scene (with Crop)
+          // Reset filters for drawing the image (unless we want filters applied to the image source)
+          // We apply filters to the drawImage call context
 
-            // Calculate aspect ratios to maintain proportions (no stretching)
-            const cropAspect = sw / sh
-            const exportAspect = width / height
+          ctx.filter = 'none'
 
-            let dw: number, dh: number, dx: number, dy: number
+          if (crop?.enabled) {
+              // Source coordinates (relative to original canvas)
+              const sx = crop.x * this.canvas.width
+              const sy = crop.y * this.canvas.height
+              const sw = crop.width * this.canvas.width
+              const sh = crop.height * this.canvas.height
 
-            if (Math.abs(cropAspect - exportAspect) < 0.01) {
-                // Aspect ratios match - fill entire frame
-                dx = 0
-                dy = 0
-                dw = width
-                dh = height
-            } else if (cropAspect > exportAspect) {
-                // Crop is wider than export - fit to width, letterbox top/bottom
-                dw = width
-                dh = width / cropAspect
-                dx = 0
-                dy = (height - dh) / 2
-            } else {
-                // Crop is taller than export - fit to height, pillarbox left/right
-                dh = height
-                dw = height * cropAspect
-                dx = (width - dw) / 2
-                dy = 0
-            }
+              // Calculate aspect ratios to maintain proportions (no stretching)
+              const cropAspect = sw / sh
+              const exportAspect = width / height
 
-            ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh)
-        } else {
-            // Fill
-            ctx.drawImage(this.canvas, 0, 0, width, height)
-        }
+              let dw: number, dh: number, dx: number, dy: number
 
-        // 3. Reset Filter for Overlays
-        ctx.filter = 'none'
+              if (Math.abs(cropAspect - exportAspect) < 0.01) {
+                  // Aspect ratios match - fill entire frame
+                  dx = 0
+                  dy = 0
+                  dw = width
+                  dh = height
+              } else if (cropAspect > exportAspect) {
+                  // Crop is wider than export - fit to width, letterbox top/bottom
+                  dw = width
+                  dh = width / cropAspect
+                  dx = 0
+                  dy = (height - dh) / 2
+              } else {
+                  // Crop is taller than export - fit to height, pillarbox left/right
+                  dh = height
+                  dw = height * cropAspect
+                  dx = (width - dw) / 2
+                  dy = 0
+              }
 
-        // 6. Text Overlay
-        if (textOverlay?.enabled && textOverlay.text.trim()) {
-            ctx.save()
-            
-            const fontSize = textOverlay.fontSize
-            const fontWeight = textOverlay.fontWeight || 700
-            const fontFamily = textOverlay.fontFamily || 'Inter, sans-serif'
-            
-            ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`
-            ctx.textAlign = textOverlay.textAlign || 'center'
-            ctx.textBaseline = 'middle'
-            
-            // Text Shadow
-            if (textOverlay.shadowBlur > 0) {
-                ctx.shadowColor = textOverlay.shadowColor
-                ctx.shadowBlur = textOverlay.shadowBlur
-                ctx.shadowOffsetX = 0
-                ctx.shadowOffsetY = 2
-            }
+              ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh)
+          } else {
+              // Fill
+              ctx.drawImage(this.canvas, 0, 0, width, height)
+          }
 
-            ctx.fillStyle = textOverlay.color
-            ctx.globalAlpha = textOverlay.opacity
-            
-            const x = textOverlay.positionX * width
-            const y = textOverlay.positionY * height
-            
-            // Letter Spacing support (modern browsers)
-            if (textOverlay.letterSpacing !== 0) {
-                // Use letterSpacing if available (Chrome 94+, Firefox 125+, Safari 17+)
-                const ctxAny = ctx as unknown as { letterSpacing?: string }
-                if (typeof ctxAny.letterSpacing !== 'undefined') {
-                    ctxAny.letterSpacing = `${textOverlay.letterSpacing}px`
-                }
-            }
-            ctx.fillText(textOverlay.text, x, y)
-            
-            ctx.restore()
-        }
-    }
+          // 3. Reset Filter for Overlays
+          ctx.filter = 'none'
 
-    await this.source.add(timestamp, duration)
-    
-    if (this.options.onProgress) {
-        const totalDuration = this.options.duration
-        const progress = Math.min((timestamp / totalDuration), 0.99)
-        this.options.onProgress(progress)
+          // 6. Text Overlay
+          if (textOverlay?.enabled && textOverlay.text.trim()) {
+              ctx.save()
+
+              const fontSize = textOverlay.fontSize
+              const fontWeight = textOverlay.fontWeight || 700
+              const fontFamily = textOverlay.fontFamily || 'Inter, sans-serif'
+
+              ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`
+              ctx.textAlign = textOverlay.textAlign || 'center'
+              ctx.textBaseline = 'middle'
+
+              // Text Shadow
+              if (textOverlay.shadowBlur > 0) {
+                  ctx.shadowColor = textOverlay.shadowColor
+                  ctx.shadowBlur = textOverlay.shadowBlur
+                  ctx.shadowOffsetX = 0
+                  ctx.shadowOffsetY = 2
+              }
+
+              ctx.fillStyle = textOverlay.color
+              ctx.globalAlpha = textOverlay.opacity
+
+              const x = textOverlay.positionX * width
+              const y = textOverlay.positionY * height
+
+              // Letter Spacing support (modern browsers)
+              if (textOverlay.letterSpacing !== 0) {
+                  // Use letterSpacing if available (Chrome 94+, Firefox 125+, Safari 17+)
+                  const ctxAny = ctx as unknown as { letterSpacing?: string }
+                  if (typeof ctxAny.letterSpacing !== 'undefined') {
+                      ctxAny.letterSpacing = `${textOverlay.letterSpacing}px`
+                  }
+              }
+              ctx.fillText(textOverlay.text, x, y)
+
+              ctx.restore()
+          }
+      }
+
+      await this.source.add(timestamp, duration)
+
+      if (this.options.onProgress) {
+          const totalDuration = this.options.duration
+          const progress = Math.min((timestamp / totalDuration), 0.99)
+          this.options.onProgress(progress)
+      }
+    } catch (error) {
+      throw new Error(
+        `Frame capture failed at ${timestamp.toFixed(2)}s: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
     }
   }
 
@@ -243,28 +257,34 @@ export class VideoRecorder {
     }
 
     this.isRecording = false
-    
-    // Finalize the output (writes atoms/headers)
-    await this.output.finalize()
-    
-    if (this.compositionCanvas) {
-        // Cleanup composition resources
-        this.compositionCanvas = null
-        this.compositionCtx = null
-    }
 
-    if (this.target instanceof BufferTarget) {
-        // Get the buffer
-        const buffer = this.target.buffer
-        if (!buffer) {
-            throw new Error('Buffer is empty after finalization')
-        }
-        const mimeType = this.options.format === 'webm' ? 'video/webm' : 'video/mp4'
-        return new Blob([buffer], { type: mimeType })
-    }
+    try {
+      // Finalize the output (writes atoms/headers)
+      await this.output.finalize()
 
-    // For StreamTarget, data is already written to disk
-    return null
+      if (this.compositionCanvas) {
+          // Cleanup composition resources
+          this.compositionCanvas = null
+          this.compositionCtx = null
+      }
+
+      if (this.target instanceof BufferTarget) {
+          // Get the buffer
+          const buffer = this.target.buffer
+          if (!buffer) {
+              throw new Error('Buffer is empty after finalization')
+          }
+          const mimeType = this.options.format === 'webm' ? 'video/webm' : 'video/mp4'
+          return new Blob([buffer], { type: mimeType })
+      }
+
+      // For StreamTarget, data is already written to disk
+      return null
+    } catch (error) {
+      throw new Error(
+        `Video finalization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      )
+    }
   }
 
   dispose() {

@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
+import { useToast } from '@/hooks/useToast';
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export';
 
 export interface ExportButtonProps {
@@ -17,6 +18,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [lastExport, setLastExport] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { addToast } = useToast();
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -38,11 +40,14 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
 
     if (success) {
       setLastExport(filename);
+      addToast(`Exported ${filename}.png`, 'success');
       // Clear the success message after 3 seconds
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
       timeoutRef.current = setTimeout(() => setLastExport(null), 3000);
+    } else {
+      addToast('Export failed. Please try again.', 'error');
     }
 
     setIsExporting(false);
