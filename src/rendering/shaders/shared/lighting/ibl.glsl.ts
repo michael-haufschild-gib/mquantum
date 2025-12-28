@@ -191,8 +191,9 @@ vec3 computeIBL(vec3 N, vec3 V, vec3 F0, float roughness, float metallic, vec3 a
     
     // Diffuse IBL - sample at max roughness (fully diffuse)
     // Energy conservation: diffuse is reduced by specular reflectance
+    // Lambertian BRDF = albedo/PI for proper energy normalization
     vec3 kD = (1.0 - F) * (1.0 - metallic);
-    vec3 diffuseIBL = textureCubeUV(uEnvMap, N, 1.0).rgb * kD * albedo;
+    vec3 diffuseIBL = textureCubeUV(uEnvMap, N, 1.0).rgb * kD * albedo / PI;
     
     return (specularIBL + diffuseIBL) * uIBLIntensity;
 }

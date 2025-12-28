@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useShallow } from 'zustand/react/shallow';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Button } from '@/components/ui/Button';
+import { InlineEdit } from '@/components/ui/InlineEdit';
 
 /** Props for SceneManager component */
 interface SceneManagerProps {
@@ -20,11 +21,12 @@ interface SceneManagerProps {
  * @returns The scene manager component
  */
 export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
-  const { savedScenes, loadScene, deleteScene, importScenes, exportScenes } = usePresetManagerStore(
+  const { savedScenes, loadScene, deleteScene, renameScene, importScenes, exportScenes } = usePresetManagerStore(
     useShallow((state: PresetManagerState) => ({
       savedScenes: state.savedScenes,
       loadScene: state.loadScene,
       deleteScene: state.deleteScene,
+      renameScene: state.renameScene,
       importScenes: state.importScenes,
       exportScenes: state.exportScenes
     }))
@@ -33,6 +35,11 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [sceneToDelete, setSceneToDelete] = useState<SavedScene | null>(null);
+
+  const handleRenameScene = (sceneId: string, newName: string) => {
+    renameScene(sceneId, newName);
+    addToast('Scene renamed', 'success');
+  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,22 +143,36 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
                 key={scene.id}
                 className="group flex items-center justify-between p-3 bg-[var(--bg-hover)] rounded-md hover:bg-[var(--bg-active)] transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
               >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 text-left justify-start p-0"
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="flex-1 text-left min-w-0 cursor-pointer"
                   onClick={() => {
                     loadScene(scene.id);
                     addToast(`Loaded scene: ${scene.name}`, 'info');
                     onClose();
                   }}
-                  ariaLabel={`Load scene "${scene.name}"`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      loadScene(scene.id);
+                      addToast(`Loaded scene: ${scene.name}`, 'info');
+                      onClose();
+                    }
+                  }}
+                  aria-label={`Load scene "${scene.name}"`}
                 >
-                  <div className="flex flex-col items-start">
-                    <div className="font-medium text-sm text-text-primary">{scene.name}</div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <InlineEdit
+                      value={scene.name}
+                      onSave={(newName) => handleRenameScene(scene.id, newName)}
+                      textClassName="font-medium text-sm text-text-primary"
+                      editButtonAriaLabel={`Rename scene "${scene.name}"`}
+                      placeholder="Scene name..."
+                    />
                     <div className="text-[10px] text-text-secondary">{formatDate(scene.timestamp)}</div>
                   </div>
-                </Button>
+                </div>
 
                 <Button
                   variant="ghost"

@@ -26,6 +26,7 @@ export {
 export { BloomPass, type BloomPassConfig } from './BloomPass'
 export { BokehPass, type BokehPassConfig } from './BokehPass'
 export { CinematicPass, type CinematicPassConfig } from './CinematicPass'
+export { FrameBlendingPass, type FrameBlendingPassConfig } from './FrameBlendingPass'
 export { PaperTexturePass, type PaperTexturePassConfig } from './PaperTexturePass'
 export {
   CompositePass,

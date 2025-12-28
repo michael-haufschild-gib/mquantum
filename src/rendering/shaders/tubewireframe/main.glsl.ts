@@ -62,8 +62,8 @@ void main() {
 #endif
 
     // Cook-Torrance BRDF
-    float NDF = distributionGGX(N, H, uRoughness);
-    float G = geometrySmith(N, V, L, uRoughness);
+    float NDF = distributionGGX(N, H, roughness);
+    float G = geometrySmith(N, V, L, roughness);
     vec3 F = fresnelSchlick(max(dot(H, V), 0.0), F0);
 
     // Specular term

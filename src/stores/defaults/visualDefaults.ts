@@ -210,6 +210,16 @@ export const DEFAULT_PAPER_QUALITY: PaperQuality = 'medium'
 export const DEFAULT_PAPER_INTENSITY = 1.0
 
 // ============================================================================
+// Frame Blending Defaults
+// ============================================================================
+
+/** Frame blending enabled by default */
+export const DEFAULT_FRAME_BLENDING_ENABLED = false
+
+/** Blend factor - how much previous frame is blended in (0-1, higher = more ghosting) */
+export const DEFAULT_FRAME_BLENDING_FACTOR = 0.3
+
+// ============================================================================
 // Lighting Defaults
 // ============================================================================
 

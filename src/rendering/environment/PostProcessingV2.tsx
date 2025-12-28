@@ -60,6 +60,7 @@ import {
   DebugOverlayPass,
   DepthPass,
   EnvironmentCompositePass,
+  FrameBlendingPass,
   FXAAPass,
   FullscreenPass,
   GTAOPass,
@@ -127,6 +128,7 @@ const RESOURCES = {
   LENSING_OUTPUT: 'lensingOutput',
   CINEMATIC_OUTPUT: 'cinematicOutput',
   TONEMAPPED_OUTPUT: 'tonemappedOutput',
+  FRAME_BLENDING_OUTPUT: 'frameBlendingOutput',
   PAPER_OUTPUT: 'paperOutput',
   AA_OUTPUT: 'aaOutput',
 } as const;
@@ -267,6 +269,9 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     paperColorBack: s.paperColorBack,
     paperQuality: s.paperQuality,
     paperIntensity: s.paperIntensity,
+    // Frame Blending
+    frameBlendingEnabled: s.frameBlendingEnabled,
+    frameBlendingFactor: s.frameBlendingFactor,
     // Depth selection
     objectOnlyDepth: s.objectOnlyDepth,
   }));
@@ -370,6 +375,9 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
   const bufferStatsTimeRef = useRef(0);
   const projectedBlackHole = useMemo(() => new THREE.Vector3(), []);
 
+  // Track previous frame blending enabled state for onEnabled() callback
+  const wasFrameBlendingEnabledRef = useRef(ppState.frameBlendingEnabled);
+
   // NOTE: Three.js renderer tone mapping (gl.toneMapping) is NOT used here.
   // It only applies when rendering directly to screen (null render target),
   // but our render graph renders everything to off-screen targets first.
@@ -401,6 +409,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     lensing?: ScreenSpaceLensingPass;
     cinematic?: CinematicPass;
     toneMapping?: ToneMappingPass;
+    frameBlending?: FrameBlendingPass;
     paper?: PaperTexturePass;
     fxaa?: FXAAPass;
     smaa?: SMAAPass;
@@ -721,6 +730,14 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
 
     g.addResource({
       id: RESOURCES.TONEMAPPED_OUTPUT,
+      type: 'renderTarget',
+      size: { mode: 'screen' },
+      format: THREE.RGBAFormat,
+      dataType: THREE.HalfFloatType,
+    });
+
+    g.addResource({
+      id: RESOURCES.FRAME_BLENDING_OUTPUT,
       type: 'renderTarget',
       size: { mode: 'screen' },
       format: THREE.RGBAFormat,
@@ -1182,11 +1199,24 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.toneMapping = toneMappingPass;
     g.addPass(toneMappingPass);
 
+    // Frame blending pass - blends current frame with previous for smoother motion
+    // Position: After tone mapping (LDR), before paper texture
+    const frameBlendingPass = new FrameBlendingPass({
+      id: 'frameBlending',
+      colorInput: RESOURCES.TONEMAPPED_OUTPUT,
+      outputResource: RESOURCES.FRAME_BLENDING_OUTPUT,
+      blendFactor: ppStateRef.current.frameBlendingFactor,
+      enabled: (frame) => frame?.stores.postProcessing.frameBlendingEnabled ?? false,
+      // Default skipPassthrough: false means automatic passthrough when disabled
+    });
+    passRefs.current.frameBlending = frameBlendingPass;
+    g.addPass(frameBlendingPass);
+
     // Paper texture pass - applies paper/cardboard texture overlay
-    // Position: After tone mapping (LDR), before AA
+    // Position: After frame blending, before AA
     const paperPass = new PaperTexturePass({
       id: 'paper',
-      colorInput: RESOURCES.TONEMAPPED_OUTPUT,
+      colorInput: RESOURCES.FRAME_BLENDING_OUTPUT,
       outputResource: RESOURCES.PAPER_OUTPUT,
       contrast: ppStateRef.current.paperContrast,
       roughness: ppStateRef.current.paperRoughness,
@@ -1373,6 +1403,16 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     if (toneMapping) {
       toneMapping.setToneMapping(TONE_MAPPING_TO_THREE[lightingState.toneMappingAlgorithm]);
       toneMapping.setExposure(lightingState.exposure);
+    }
+
+    const frameBlending = passRefs.current.frameBlending;
+    if (frameBlending) {
+      // Reset history when re-enabled to avoid stale frame blending
+      if (ppState.frameBlendingEnabled && !wasFrameBlendingEnabledRef.current) {
+        frameBlending.onEnabled();
+      }
+      wasFrameBlendingEnabledRef.current = ppState.frameBlendingEnabled;
+      frameBlending.setBlendFactor(ppState.frameBlendingFactor);
     }
 
     const paper = passRefs.current.paper;

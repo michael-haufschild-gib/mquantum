@@ -29,6 +29,8 @@ import {
   DEFAULT_BOKEH_SMOOTH_TIME,
   DEFAULT_BOKEH_WORLD_FOCUS_DISTANCE,
   DEFAULT_BOKEH_WORLD_FOCUS_RANGE,
+  DEFAULT_FRAME_BLENDING_ENABLED,
+  DEFAULT_FRAME_BLENDING_FACTOR,
   DEFAULT_GRAVITY_CHROMATIC_ABERRATION,
   DEFAULT_GRAVITY_DISTORTION_SCALE,
   DEFAULT_GRAVITY_ENABLED,
@@ -176,6 +178,12 @@ export interface PostProcessingSliceState {
   paperQuality: PaperQuality
   /** Intensity - overall effect blend intensity (0-1) */
   paperIntensity: number
+
+  // --- Frame Blending ---
+  /** Whether frame blending is enabled */
+  frameBlendingEnabled: boolean
+  /** Blend factor - how much previous frame is blended in (0-1) */
+  frameBlendingFactor: number
 }
 
 export interface PostProcessingSliceActions {
@@ -253,6 +261,10 @@ export interface PostProcessingSliceActions {
   setPaperColorBack: (color: string) => void
   setPaperQuality: (quality: PaperQuality) => void
   setPaperIntensity: (intensity: number) => void
+
+  // --- Frame Blending Actions ---
+  setFrameBlendingEnabled: (enabled: boolean) => void
+  setFrameBlendingFactor: (factor: number) => void
 }
 
 export type PostProcessingSlice = PostProcessingSliceState & PostProcessingSliceActions
@@ -337,6 +349,10 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   paperColorBack: DEFAULT_PAPER_COLOR_BACK,
   paperQuality: DEFAULT_PAPER_QUALITY,
   paperIntensity: DEFAULT_PAPER_INTENSITY,
+
+  // Frame Blending
+  frameBlendingEnabled: DEFAULT_FRAME_BLENDING_ENABLED,
+  frameBlendingFactor: DEFAULT_FRAME_BLENDING_FACTOR,
 }
 
 // ============================================================================
@@ -598,5 +614,14 @@ export const createPostProcessingSlice: StateCreator<
 
   setPaperIntensity: (intensity: number) => {
     set({ paperIntensity: Math.max(0, Math.min(1, intensity)) })
+  },
+
+  // --- Frame Blending Actions ---
+  setFrameBlendingEnabled: (enabled: boolean) => {
+    set({ frameBlendingEnabled: enabled })
+  },
+
+  setFrameBlendingFactor: (factor: number) => {
+    set({ frameBlendingFactor: Math.max(0, Math.min(1, factor)) })
   },
 })

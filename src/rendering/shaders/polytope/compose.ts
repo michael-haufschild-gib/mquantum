@@ -273,8 +273,8 @@ void main() {
       vec3 kS = F;
       vec3 kD = (vec3(1.0) - kS) * (1.0 - uMetallic);
 
-      // Diffuse (energy-conserved)
-      col += kD * baseColor * uLightColors[i] * NdotL * attenuation * shadow;
+      // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI)
+      col += kD * baseColor / PI * uLightColors[i] * NdotL * attenuation * shadow;
 
       // Specular (with artist-controlled color tint)
       vec3 specular = computePBRSpecular(faceNormal, viewDir, l, roughness, F0);

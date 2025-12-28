@@ -167,6 +167,9 @@ vec3 computeEmissionLit(float rho, float phase, vec3 p, vec3 gradient, vec3 view
 
     vec3 n = gradient / gradLen;
 
+    // Clamp roughness to prevent numerical issues (roughness=0 causes NDF=0)
+    float roughness = max(uRoughness, 0.04);
+
     // Loop through lights - exact same pattern as Mandelbulb lines 57-103
     for (int i = 0; i < MAX_LIGHTS; i++) {
         if (i >= uNumLights) break;
@@ -221,11 +224,11 @@ vec3 computeEmissionLit(float rho, float phase, vec3 p, vec3 gradient, vec3 view
         vec3 kS = F;
         vec3 kD = (vec3(1.0) - kS) * (1.0 - uMetallic);
 
-        // Diffuse (energy-conserved, with volumetric powder and phase)
-        col += kD * surfaceColor * uLightColors[i] * NdotL * attenuation * powder * phaseFactor;
+        // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI, with volumetric powder and phase)
+        col += kD * surfaceColor / PI * uLightColors[i] * NdotL * attenuation * powder * phaseFactor;
 
         // Specular (GGX) - uses Cook-Torrance BRDF
-        vec3 specular = computePBRSpecular(n, viewDir, l, uRoughness, F0);
+        vec3 specular = computePBRSpecular(n, viewDir, l, roughness, F0);
         
         // Volumetric Self-Shadowing (Raymarching towards light)
         float shadowFactor = 1.0;

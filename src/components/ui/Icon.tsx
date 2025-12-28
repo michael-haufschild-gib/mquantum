@@ -19,6 +19,7 @@ import LayersIcon from '@/assets/icons/layers.svg?react';
 import MenuIcon from '@/assets/icons/menu.svg?react';
 import MinusIcon from '@/assets/icons/minus.svg?react';
 import PauseIcon from '@/assets/icons/pause2.svg?react';
+import PencilIcon from '@/assets/icons/pencil.svg?react';
 import PlayIcon from '@/assets/icons/play3.svg?react';
 import PlusIcon from '@/assets/icons/plus.svg?react';
 import RedoIcon from '@/assets/icons/redo.svg?react';
@@ -38,6 +39,7 @@ const icons = {
   image: ImageIcon,
   play: PlayIcon,
   pause: PauseIcon,
+  pencil: PencilIcon,
   stop: StopIcon,
   undo: UndoIcon,
   redo: RedoIcon,

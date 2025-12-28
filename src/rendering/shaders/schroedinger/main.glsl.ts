@@ -325,6 +325,9 @@ void main() {
     vec3 viewDir = -rd;
     float totalNdotL = 0.0;
 
+    // Clamp roughness to prevent numerical issues (roughness=0 causes NDF=0)
+    float roughness = max(uRoughness, 0.04);
+
     for (int i = 0; i < MAX_LIGHTS; i++) {
         if (i >= uNumLights) break;
         if (!uLightsEnabled[i]) continue;
@@ -361,11 +364,11 @@ void main() {
         vec3 kS = F;
         vec3 kD = (vec3(1.0) - kS) * (1.0 - uMetallic);
 
-        // Diffuse (energy-conserved)
-        col += kD * surfaceColor * uLightColors[i] * NdotL * attenuation;
+        // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI)
+        col += kD * surfaceColor / PI * uLightColors[i] * NdotL * attenuation;
 
         // Specular (with artist-controlled color tint)
-        vec3 specular = computePBRSpecular(n, viewDir, l, uRoughness, F0);
+        vec3 specular = computePBRSpecular(n, viewDir, l, roughness, F0);
         col += specular * uSpecularColor * uLightColors[i] * NdotL * uSpecularIntensity * attenuation;
     }
 
@@ -381,7 +384,7 @@ void main() {
 
     // IBL (environment reflections)
     vec3 F0_ibl = mix(vec3(0.04), surfaceColor, uMetallic);
-    col += computeIBL(n, viewDir, F0_ibl, uRoughness, uMetallic, surfaceColor);
+    col += computeIBL(n, viewDir, F0_ibl, roughness, uMetallic, surfaceColor);
 
     // Depth
     vec4 worldHitPos = uModelMatrix * vec4(p, 1.0);

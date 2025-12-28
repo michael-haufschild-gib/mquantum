@@ -13,6 +13,7 @@
 
 import { ControlGroup } from '@/components/ui/ControlGroup';
 import { Select, type SelectOption } from '@/components/ui/Select';
+import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
 import { type AntiAliasingMethod } from '@/stores/defaults/visualDefaults';
@@ -41,12 +42,20 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({
     setAntiAliasingMethod: state.setAntiAliasingMethod,
     objectOnlyDepth: state.objectOnlyDepth,
     setObjectOnlyDepth: state.setObjectOnlyDepth,
+    frameBlendingEnabled: state.frameBlendingEnabled,
+    setFrameBlendingEnabled: state.setFrameBlendingEnabled,
+    frameBlendingFactor: state.frameBlendingFactor,
+    setFrameBlendingFactor: state.setFrameBlendingFactor,
   }));
   const {
     antiAliasingMethod,
     setAntiAliasingMethod,
     objectOnlyDepth,
     setObjectOnlyDepth,
+    frameBlendingEnabled,
+    setFrameBlendingEnabled,
+    frameBlendingFactor,
+    setFrameBlendingFactor,
   } = usePostProcessingStore(postProcessingSelector);
 
   return (
@@ -71,6 +80,31 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({
         />
         <p className="text-[10px] text-text-secondary mt-1">
           Exclude background from depth-based effects.
+        </p>
+      </ControlGroup>
+
+      {/* Frame Blending */}
+      <ControlGroup title="Frame Blending">
+        <Switch
+          checked={frameBlendingEnabled}
+          onCheckedChange={setFrameBlendingEnabled}
+          label="Enable Frame Blending"
+          data-testid="frame-blending-switch"
+        />
+        <div className={!frameBlendingEnabled ? 'opacity-50 pointer-events-none' : ''}>
+          <Slider
+            label="Blend Factor"
+            min={0}
+            max={1}
+            step={0.05}
+            value={frameBlendingFactor}
+            onChange={setFrameBlendingFactor}
+            showValue
+            data-testid="frame-blending-factor-slider"
+          />
+        </div>
+        <p className="text-[10px] text-text-secondary mt-1">
+          Blends frames for smoother motion. Higher values may cause ghosting.
         </p>
       </ControlGroup>
     </div>

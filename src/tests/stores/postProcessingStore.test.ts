@@ -348,4 +348,29 @@ describe('postProcessingStore', () => {
       expect(usePostProcessingStore.getState().gravityChromaticAberration).toBe(0.5);
     });
   });
+
+  describe('frame blending', () => {
+    it('should toggle frame blending enabled', () => {
+      const { setFrameBlendingEnabled } = usePostProcessingStore.getState();
+
+      setFrameBlendingEnabled(true);
+      expect(usePostProcessingStore.getState().frameBlendingEnabled).toBe(true);
+
+      setFrameBlendingEnabled(false);
+      expect(usePostProcessingStore.getState().frameBlendingEnabled).toBe(false);
+    });
+
+    it('should set frame blending factor with clamping', () => {
+      const { setFrameBlendingFactor } = usePostProcessingStore.getState();
+
+      setFrameBlendingFactor(0.5);
+      expect(usePostProcessingStore.getState().frameBlendingFactor).toBe(0.5);
+
+      setFrameBlendingFactor(-0.5);
+      expect(usePostProcessingStore.getState().frameBlendingFactor).toBe(0);
+
+      setFrameBlendingFactor(1.5);
+      expect(usePostProcessingStore.getState().frameBlendingFactor).toBe(1);
+    });
+  });
 });

@@ -162,6 +162,10 @@ export interface FrozenPostProcessingState {
   readonly paperColorBack: string
   readonly paperQuality: PostProcessingSliceState['paperQuality']
   readonly paperIntensity: number
+
+  // Frame Blending
+  readonly frameBlendingEnabled: boolean
+  readonly frameBlendingFactor: number
 }
 
 /**
@@ -481,6 +485,10 @@ function capturePostProcessingState(
     paperColorBack: state.paperColorBack,
     paperQuality: state.paperQuality,
     paperIntensity: state.paperIntensity,
+
+    // Frame Blending
+    frameBlendingEnabled: state.frameBlendingEnabled,
+    frameBlendingFactor: state.frameBlendingFactor,
   }
 }
 
@@ -713,6 +721,9 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         paperColorBack: '#ffffff',
         paperQuality: 'medium',
         paperIntensity: 1.0,
+        // Frame Blending
+        frameBlendingEnabled: false,
+        frameBlendingFactor: 0.3,
       },
       performance: {
         isInteracting: false,

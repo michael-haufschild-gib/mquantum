@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/useToast';
 import { useShallow } from 'zustand/react/shallow';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Button } from '@/components/ui/Button';
+import { InlineEdit } from '@/components/ui/InlineEdit';
 
 /** Props for StyleManager component */
 interface StyleManagerProps {
@@ -20,11 +21,12 @@ interface StyleManagerProps {
  * @returns The style manager component
  */
 export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
-  const { savedStyles, loadStyle, deleteStyle, importStyles, exportStyles } = usePresetManagerStore(
+  const { savedStyles, loadStyle, deleteStyle, renameStyle, importStyles, exportStyles } = usePresetManagerStore(
     useShallow((state: PresetManagerState) => ({
       savedStyles: state.savedStyles,
       loadStyle: state.loadStyle,
       deleteStyle: state.deleteStyle,
+      renameStyle: state.renameStyle,
       importStyles: state.importStyles,
       exportStyles: state.exportStyles
     }))
@@ -33,6 +35,11 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [styleToDelete, setStyleToDelete] = useState<SavedStyle | null>(null);
+
+  const handleRenameStyle = (styleId: string, newName: string) => {
+    renameStyle(styleId, newName);
+    addToast('Style renamed', 'success');
+  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -136,22 +143,36 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
                 key={style.id}
                 className="group flex items-center justify-between p-3 bg-[var(--bg-hover)] rounded-md hover:bg-[var(--bg-active)] transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
               >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 text-left justify-start p-0"
+                <div
+                  role="button"
+                  tabIndex={0}
+                  className="flex-1 text-left min-w-0 cursor-pointer"
                   onClick={() => {
                     loadStyle(style.id);
                     addToast(`Applied style: ${style.name}`, 'info');
                     onClose();
                   }}
-                  ariaLabel={`Apply style "${style.name}"`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      loadStyle(style.id);
+                      addToast(`Applied style: ${style.name}`, 'info');
+                      onClose();
+                    }
+                  }}
+                  aria-label={`Apply style "${style.name}"`}
                 >
-                  <div className="flex flex-col items-start">
-                    <div className="font-medium text-sm text-text-primary">{style.name}</div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <InlineEdit
+                      value={style.name}
+                      onSave={(newName) => handleRenameStyle(style.id, newName)}
+                      textClassName="font-medium text-sm text-text-primary"
+                      editButtonAriaLabel={`Rename style "${style.name}"`}
+                      placeholder="Style name..."
+                    />
                     <div className="text-[10px] text-text-secondary">{formatDate(style.timestamp)}</div>
                   </div>
-                </Button>
+                </div>
 
                 <Button
                   variant="ghost"

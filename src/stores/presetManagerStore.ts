@@ -85,6 +85,7 @@ export interface PresetManagerState {
   saveStyle: (name: string) => void
   loadStyle: (id: string) => void
   deleteStyle: (id: string) => void
+  renameStyle: (id: string, newName: string) => void
   importStyles: (jsonData: string) => boolean
   exportStyles: () => string
 
@@ -92,6 +93,7 @@ export interface PresetManagerState {
   saveScene: (name: string) => void
   loadScene: (id: string) => void
   deleteScene: (id: string) => void
+  renameScene: (id: string, newName: string) => void
   importScenes: (jsonData: string) => boolean
   exportScenes: () => string
 }
@@ -236,6 +238,19 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
       deleteStyle: (id) => {
         set((state) => ({ savedStyles: state.savedStyles.filter((s) => s.id !== id) }))
+      },
+
+      renameStyle: (id, newName) => {
+        const trimmedName = newName.trim()
+        if (!trimmedName) {
+          console.warn('Cannot rename style to empty name')
+          return
+        }
+        set((state) => ({
+          savedStyles: state.savedStyles.map((s) =>
+            s.id === id ? { ...s, name: trimmedName } : s
+          )
+        }))
       },
 
       importStyles: (jsonData) => {
@@ -424,6 +439,19 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
       deleteScene: (id) => {
         set((state) => ({ savedScenes: state.savedScenes.filter((s) => s.id !== id) }))
+      },
+
+      renameScene: (id, newName) => {
+        const trimmedName = newName.trim()
+        if (!trimmedName) {
+          console.warn('Cannot rename scene to empty name')
+          return
+        }
+        set((state) => ({
+          savedScenes: state.savedScenes.map((s) =>
+            s.id === id ? { ...s, name: trimmedName } : s
+          )
+        }))
       },
 
       importScenes: (jsonData) => {

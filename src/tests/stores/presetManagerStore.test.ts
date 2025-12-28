@@ -56,6 +56,55 @@ describe('presetManagerStore', () => {
       expect(usePresetManagerStore.getState().savedStyles).toHaveLength(0)
     })
 
+    it('should rename a style', () => {
+      usePresetManagerStore.getState().saveStyle('Original Name')
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+      expect(saved!.name).toBe('Original Name')
+
+      usePresetManagerStore.getState().renameStyle(saved!.id, 'New Name')
+
+      const [renamed] = usePresetManagerStore.getState().savedStyles
+      expect(renamed!.name).toBe('New Name')
+      expect(renamed!.id).toBe(saved!.id) // ID should remain the same
+    })
+
+    it('should trim whitespace when renaming a style', () => {
+      usePresetManagerStore.getState().saveStyle('Original')
+      const [saved] = usePresetManagerStore.getState().savedStyles
+
+      usePresetManagerStore.getState().renameStyle(saved!.id, '  Trimmed Name  ')
+
+      const [renamed] = usePresetManagerStore.getState().savedStyles
+      expect(renamed!.name).toBe('Trimmed Name')
+    })
+
+    it('should not rename style to empty name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      usePresetManagerStore.getState().saveStyle('Keep This Name')
+      const [saved] = usePresetManagerStore.getState().savedStyles
+
+      usePresetManagerStore.getState().renameStyle(saved!.id, '')
+
+      const [unchanged] = usePresetManagerStore.getState().savedStyles
+      expect(unchanged!.name).toBe('Keep This Name')
+      expect(warnSpy).toHaveBeenCalledWith('Cannot rename style to empty name')
+      warnSpy.mockRestore()
+    })
+
+    it('should not rename style to whitespace-only name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      usePresetManagerStore.getState().saveStyle('Keep This Name')
+      const [saved] = usePresetManagerStore.getState().savedStyles
+
+      usePresetManagerStore.getState().renameStyle(saved!.id, '   ')
+
+      const [unchanged] = usePresetManagerStore.getState().savedStyles
+      expect(unchanged!.name).toBe('Keep This Name')
+      expect(warnSpy).toHaveBeenCalledWith('Cannot rename style to empty name')
+      warnSpy.mockRestore()
+    })
+
     it('should not include transient state fields in saved styles', () => {
       // Set some transient state that shouldn't be saved
       useLightingStore.setState({ isDraggingLight: true })
@@ -137,6 +186,55 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().deleteScene(saved!.id)
       expect(usePresetManagerStore.getState().savedScenes).toHaveLength(0)
+    })
+
+    it('should rename a scene', () => {
+      usePresetManagerStore.getState().saveScene('Original Scene')
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+      expect(saved!.name).toBe('Original Scene')
+
+      usePresetManagerStore.getState().renameScene(saved!.id, 'Renamed Scene')
+
+      const [renamed] = usePresetManagerStore.getState().savedScenes
+      expect(renamed!.name).toBe('Renamed Scene')
+      expect(renamed!.id).toBe(saved!.id) // ID should remain the same
+    })
+
+    it('should trim whitespace when renaming a scene', () => {
+      usePresetManagerStore.getState().saveScene('Original')
+      const [saved] = usePresetManagerStore.getState().savedScenes
+
+      usePresetManagerStore.getState().renameScene(saved!.id, '  Trimmed Scene  ')
+
+      const [renamed] = usePresetManagerStore.getState().savedScenes
+      expect(renamed!.name).toBe('Trimmed Scene')
+    })
+
+    it('should not rename scene to empty name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      usePresetManagerStore.getState().saveScene('Keep This Name')
+      const [saved] = usePresetManagerStore.getState().savedScenes
+
+      usePresetManagerStore.getState().renameScene(saved!.id, '')
+
+      const [unchanged] = usePresetManagerStore.getState().savedScenes
+      expect(unchanged!.name).toBe('Keep This Name')
+      expect(warnSpy).toHaveBeenCalledWith('Cannot rename scene to empty name')
+      warnSpy.mockRestore()
+    })
+
+    it('should not rename scene to whitespace-only name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      usePresetManagerStore.getState().saveScene('Keep This Name')
+      const [saved] = usePresetManagerStore.getState().savedScenes
+
+      usePresetManagerStore.getState().renameScene(saved!.id, '   ')
+
+      const [unchanged] = usePresetManagerStore.getState().savedScenes
+      expect(unchanged!.name).toBe('Keep This Name')
+      expect(warnSpy).toHaveBeenCalledWith('Cannot rename scene to empty name')
+      warnSpy.mockRestore()
     })
   })
 
