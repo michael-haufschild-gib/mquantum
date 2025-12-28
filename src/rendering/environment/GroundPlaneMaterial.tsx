@@ -63,6 +63,11 @@ export const GroundPlaneMaterial = forwardRef<THREE.ShaderMaterial, GroundPlaneM
     const materialRef = useRef<THREE.ShaderMaterial>(null)
     const colorCacheRef = useRef(createColorCache())
 
+    // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+    const lastIblVersionRef = useRef(-1) // -1 forces full sync on first frame
+    const lastGroundVersionRef = useRef(-1)
+    const prevMaterialRef = useRef<THREE.ShaderMaterial | null>(null)
+
 
 
     // Get shadow settings for shader compilation
@@ -128,11 +133,26 @@ export const GroundPlaneMaterial = forwardRef<THREE.ShaderMaterial, GroundPlaneM
       const material = materialRef.current
       if (!material?.uniforms) return
 
+      // --- DIRTY-FLAG: Material change detection ---
+      const materialChanged = material !== prevMaterialRef.current
+      if (materialChanged) {
+        prevMaterialRef.current = material
+        lastIblVersionRef.current = -1 // Force full sync
+        lastGroundVersionRef.current = -1
+      }
+
+      // Get version counters from stores
+      const iblVersion = useEnvironmentStore.getState().iblVersion
+      const groundVersion = useEnvironmentStore.getState().groundVersion
+
+      const iblChanged = iblVersion !== lastIblVersionRef.current
+      const groundChanged = groundVersion !== lastGroundVersionRef.current
+
       const u = material.uniforms
       const cache = colorCacheRef.current
       const lightingState = useLightingStore.getState()
 
-      // Update material properties
+      // Update material properties (props-based, always update)
       // Note: PBR properties (uMetallic, uRoughness, uSpecularIntensity, uSpecularColor)
       // are applied via UniformManager using 'pbr-ground' source
       updateLinearColorUniform(cache.faceColor, u.uColor!.value as THREE.Color, color)
@@ -149,7 +169,7 @@ export const GroundPlaneMaterial = forwardRef<THREE.ShaderMaterial, GroundPlaneM
       // Update multi-light system and PBR
       UniformManager.applyToMaterial(material, ['lighting', 'pbr-ground'])
 
-      // Update shadow maps
+      // Update shadow maps (scene-dependent, always update)
       if (shadowEnabled && lightingState.shadowEnabled) {
         const shadowData = collectShadowDataFromScene(scene, lightingState.lights)
         const shadowQuality = lightingState.shadowQuality
@@ -164,7 +184,7 @@ export const GroundPlaneMaterial = forwardRef<THREE.ShaderMaterial, GroundPlaneM
         )
       }
 
-      // Update IBL
+      // Update IBL (env texture is per-frame, settings use dirty-flag)
       // Use scene.environment (PMREM texture) which is set at the END of each frame
       // by CubemapCapturePass. This means we read the PREVIOUS frame's environment,
       // which provides frame consistency and avoids feedback loops.
@@ -172,22 +192,29 @@ export const GroundPlaneMaterial = forwardRef<THREE.ShaderMaterial, GroundPlaneM
       const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping
       u.uEnvMap!.value = isPMREM ? env : null
 
-      const iblState = useEnvironmentStore.getState()
-      const qualityMap = { off: 0, low: 1, high: 2 } as const
-      // Force IBL off when no valid PMREM texture (prevents null texture sampling)
-      u.uIBLQuality!.value = isPMREM ? qualityMap[iblState.iblQuality] : 0
-      u.uIBLIntensity!.value = iblState.iblIntensity
+      // --- DIRTY-FLAG: IBL settings (only update when store changes) ---
+      if (iblChanged) {
+        const iblState = useEnvironmentStore.getState()
+        const qualityMap = { off: 0, low: 1, high: 2 } as const
+        // Force IBL off when no valid PMREM texture (prevents null texture sampling)
+        u.uIBLQuality!.value = isPMREM ? qualityMap[iblState.iblQuality] : 0
+        u.uIBLIntensity!.value = iblState.iblIntensity
+        lastIblVersionRef.current = iblVersion
+      }
 
-      // Update grid uniforms
-      u.uShowGrid!.value = showGrid
-      updateLinearColorUniform(cache.gridColor, u.uGridColor!.value as THREE.Color, gridColor)
-      updateLinearColorUniform(cache.sectionColor, u.uSectionColor!.value as THREE.Color, sectionColor)
-      u.uGridSpacing!.value = gridSpacing
-      u.uSectionSpacing!.value = gridSpacing * 5
-      u.uGridThickness!.value = gridThickness
-      u.uSectionThickness!.value = sectionThickness
-      u.uGridFadeDistance!.value = gridFadeDistance
-      u.uGridFadeStrength!.value = gridFadeStrength
+      // --- DIRTY-FLAG: Grid uniforms (only update when store changes) ---
+      if (groundChanged) {
+        u.uShowGrid!.value = showGrid
+        updateLinearColorUniform(cache.gridColor, u.uGridColor!.value as THREE.Color, gridColor)
+        updateLinearColorUniform(cache.sectionColor, u.uSectionColor!.value as THREE.Color, sectionColor)
+        u.uGridSpacing!.value = gridSpacing
+        u.uSectionSpacing!.value = gridSpacing * 5
+        u.uGridThickness!.value = gridThickness
+        u.uSectionThickness!.value = sectionThickness
+        u.uGridFadeDistance!.value = gridFadeDistance
+        u.uGridFadeStrength!.value = gridFadeStrength
+        lastGroundVersionRef.current = groundVersion
+      }
     }, FRAME_PRIORITY.RENDERER_UNIFORMS)
 
     return (

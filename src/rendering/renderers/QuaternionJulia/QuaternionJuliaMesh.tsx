@@ -78,6 +78,12 @@ const QuaternionJuliaMesh = () => {
   // PERF: Pre-allocated array for origin values to avoid allocation every frame
   const originValuesRef = useRef(new Array(MAX_DIMENSION).fill(0) as number[])
 
+  // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+  const lastQuaternionJuliaVersionRef = useRef(-1) // -1 forces full sync on first frame
+  const lastAppearanceVersionRef = useRef(-1)
+  const lastIblVersionRef = useRef(-1)
+  const prevMaterialRef = useRef<THREE.ShaderMaterial | null>(null)
+
   // Get dimension from geometry store (used for useEffect dependency)
   const dimension = useGeometryStore((state) => state.dimension)
 
@@ -222,11 +228,33 @@ const QuaternionJuliaMesh = () => {
     const u = material.uniforms as any;
     if (!u) return;
 
+    // ============================================
+    // DIRTY-FLAG: Detect material change and reset version refs
+    // ============================================
+    const materialChanged = material !== prevMaterialRef.current
+    if (materialChanged) {
+      prevMaterialRef.current = material
+      lastQuaternionJuliaVersionRef.current = -1 // Force full sync on material change
+      lastAppearanceVersionRef.current = -1
+      lastIblVersionRef.current = -1
+    }
+
     // Get current state directly from stores
     const geoStore = useGeometryStore.getState()
     const extStore = useExtendedObjectStore.getState()
     const appStore = useAppearanceStore.getState()
     const lightStore = useLightingStore.getState()
+
+    // ============================================
+    // DIRTY-FLAG: Get versions and check for changes
+    // ============================================
+    const quaternionJuliaVersion = extStore.quaternionJuliaVersion
+    const appearanceVersion = appStore.appearanceVersion
+    const iblVersion = useEnvironmentStore.getState().iblVersion
+
+    const quaternionJuliaChanged = quaternionJuliaVersion !== lastQuaternionJuliaVersionRef.current
+    const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current
+    const iblChanged = iblVersion !== lastIblVersionRef.current
 
     const currentDimension = geoStore.dimension
     const config = extStore.quaternionJulia
@@ -246,13 +274,21 @@ const QuaternionJuliaMesh = () => {
     // Update dimension
     u.uDimension.value = currentDimension
 
-    // Update fractal parameters
-    u.uPower.value = config.power
-    u.uIterations.value = config.maxIterations
-    u.uEscapeRadius.value = config.bailoutRadius
+    // ============================================
+    // DIRTY-FLAG: Only update quaternionJulia uniforms when settings change
+    // ============================================
+    if (quaternionJuliaChanged) {
+      // Update fractal parameters
+      u.uPower.value = config.power
+      u.uIterations.value = config.maxIterations
+      u.uEscapeRadius.value = config.bailoutRadius
 
-    // Julia constant (static)
-    u.uJuliaConstant.value.set(...config.juliaConstant)
+      // Julia constant
+      u.uJuliaConstant.value.set(...config.juliaConstant)
+
+      // Update version ref
+      lastQuaternionJuliaVersionRef.current = quaternionJuliaVersion
+    }
 
     // ============================================
     // D-dimensional Rotation & Basis Vectors (via shared hook)
@@ -288,12 +324,17 @@ const QuaternionJuliaMesh = () => {
       u.uOrigin.value.set(origin)
     }
 
-    // Update color
-    updateLinearColorUniform(
-      colorCacheRef.current.faceColor,
-      u.uColor.value as THREE.Color,
-      appStore.faceColor
-    )
+    // ============================================
+    // DIRTY-FLAG: Only update appearance uniforms when settings change
+    // ============================================
+    if (appearanceChanged) {
+      // Update color
+      updateLinearColorUniform(
+        colorCacheRef.current.faceColor,
+        u.uColor.value as THREE.Color,
+        appStore.faceColor
+      )
+    }
 
     // Update matrices
     u.uModelMatrix.value.copy(mesh.matrixWorld)
@@ -324,23 +365,28 @@ const QuaternionJuliaMesh = () => {
       u.uTemporalSafetyMargin.value = 0.33
     }
 
-    // SSS (Subsurface Scattering) properties
-    if (u.uSssEnabled) u.uSssEnabled.value = appStore.sssEnabled
-    if (u.uSssIntensity) u.uSssIntensity.value = appStore.sssIntensity
-    if (u.uSssColor) {
+    // SSS (Subsurface Scattering) and Fresnel properties - inside appearance conditional
+    if (appearanceChanged) {
+      if (u.uSssEnabled) u.uSssEnabled.value = appStore.sssEnabled
+      if (u.uSssIntensity) u.uSssIntensity.value = appStore.sssIntensity
+      if (u.uSssColor) {
         updateLinearColorUniform(colorCacheRef.current.faceColor /* reuse helper */, u.uSssColor.value as THREE.Color, appStore.sssColor || '#ff8844')
-    }
-    if (u.uSssThickness) u.uSssThickness.value = appStore.sssThickness
-    if (u.uSssJitter) u.uSssJitter.value = appStore.sssJitter
+      }
+      if (u.uSssThickness) u.uSssThickness.value = appStore.sssThickness
+      if (u.uSssJitter) u.uSssJitter.value = appStore.sssJitter
 
-    // Update fresnel
-    u.uFresnelEnabled.value = appStore.edgesVisible
-    u.uFresnelIntensity.value = appStore.fresnelIntensity
-    updateLinearColorUniform(
-      colorCacheRef.current.rimColor,
-      u.uRimColor.value as THREE.Color,
-      appStore.edgeColor
-    )
+      // Update fresnel
+      u.uFresnelEnabled.value = appStore.edgesVisible
+      u.uFresnelIntensity.value = appStore.fresnelIntensity
+      updateLinearColorUniform(
+        colorCacheRef.current.rimColor,
+        u.uRimColor.value as THREE.Color,
+        appStore.edgeColor
+      )
+
+      // Update version ref
+      lastAppearanceVersionRef.current = appearanceVersion
+    }
 
     // Quaternion Julia is always fully opaque (solid mode)
     if (material.transparent !== false) {
@@ -361,17 +407,25 @@ const QuaternionJuliaMesh = () => {
     // Update ambient occlusion (controlled by global SSAO toggle)
     u.uAoEnabled.value = usePostProcessingStore.getState().ssaoEnabled
 
-    // IBL (Image-Based Lighting) uniforms
-    // Compute isPMREM first to gate quality (prevents null texture sampling)
-    const env = state.scene.environment
-    const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping
-    u.uEnvMap.value = isPMREM ? env : null
+    // ============================================
+    // DIRTY-FLAG: Only update IBL uniforms when settings change
+    // ============================================
+    if (iblChanged) {
+      // IBL (Image-Based Lighting) uniforms
+      // Compute isPMREM first to gate quality (prevents null texture sampling)
+      const env = state.scene.environment
+      const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping
+      u.uEnvMap.value = isPMREM ? env : null
 
-    const iblState = useEnvironmentStore.getState()
-    const qualityMap = { off: 0, low: 1, high: 2 } as const
-    // Force IBL off when no valid PMREM texture
-    u.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0
-    u.uIBLIntensity.value = iblState.iblIntensity
+      const environmentState = useEnvironmentStore.getState()
+      const qualityMap = { off: 0, low: 1, high: 2 } as const
+      // Force IBL off when no valid PMREM texture
+      u.uIBLQuality.value = isPMREM ? qualityMap[environmentState.iblQuality] : 0
+      u.uIBLIntensity.value = environmentState.iblIntensity
+
+      // Update version ref
+      lastIblVersionRef.current = iblVersion
+    }
   }, FRAME_PRIORITY.RENDERER_UNIFORMS)
 
   // Generate unique key to force material recreation when shader changes or context is restored

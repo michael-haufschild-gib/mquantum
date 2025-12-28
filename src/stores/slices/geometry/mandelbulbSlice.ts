@@ -9,12 +9,27 @@ import { ExtendedObjectSlice, MandelbulbSlice } from './types'
 export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], MandelbulbSlice> = (
   set,
   get
-) => ({
+) => {
+  /**
+   * Wrapped setter that auto-increments mandelbulbVersion on any mandelbulb change.
+   * This avoids manually adding version increment to 40+ individual setters.
+   */
+  const setWithVersion: typeof set = (updater) => {
+    set((state) => {
+      const update = typeof updater === 'function' ? updater(state) : updater
+      if ('mandelbulb' in update) {
+        return { ...update, mandelbulbVersion: state.mandelbulbVersion + 1 }
+      }
+      return update
+    })
+  }
+
+  return {
   mandelbulb: { ...DEFAULT_MANDELBROT_CONFIG },
 
   setMandelbulbMaxIterations: (value) => {
     const clampedValue = Math.max(10, Math.min(500, Math.floor(value)))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, maxIterations: clampedValue },
     }))
   },
@@ -22,14 +37,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbEscapeRadius: (value) => {
     // Extended range to 16 for higher-dimensional Mandelbulb stability
     const clampedValue = Math.max(2.0, Math.min(16.0, value))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, escapeRadius: clampedValue },
     }))
   },
 
   setMandelbulbQualityPreset: (preset) => {
     const settings = MANDELBROT_QUALITY_PRESETS[preset]
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: {
         ...state.mandelbulb,
         qualityPreset: preset,
@@ -45,13 +60,13 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
     const closest = validResolutions.reduce((prev, curr) =>
       Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
     )
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, resolution: closest },
     }))
   },
 
   setMandelbulbVisualizationAxes: (axes) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, visualizationAxes: axes },
     }))
   },
@@ -62,7 +77,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
     const clampedDimIndex = Math.max(0, Math.min(10, Math.floor(dimIndex)))
     const current = [...get().mandelbulb.visualizationAxes] as [number, number, number]
     current[index] = clampedDimIndex
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, visualizationAxes: current },
     }))
   },
@@ -81,41 +96,41 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
     // Clamp to reasonable range for Mandelbulb exploration
     const clampedValue = Math.max(-2.0, Math.min(2.0, value))
     values[dimIndex] = clampedValue
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, parameterValues: values },
     }))
   },
 
   setMandelbulbParameterValues: (values) => {
     const clampedValues = values.map((v) => Math.max(-2.0, Math.min(2.0, v)))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, parameterValues: clampedValues },
     }))
   },
 
   resetMandelbulbParameters: () => {
     const len = get().mandelbulb.parameterValues.length
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, parameterValues: new Array(len).fill(0) },
     }))
   },
 
   setMandelbulbCenter: (center) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, center },
     }))
   },
 
   setMandelbulbExtent: (extent) => {
     const clampedExtent = Math.max(0.001, Math.min(10.0, extent))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, extent: clampedExtent },
     }))
   },
 
   fitMandelbulbToView: () => {
     const centerLen = get().mandelbulb.center.length
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: {
         ...state.mandelbulb,
         center: new Array(centerLen).fill(0),
@@ -125,51 +140,51 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   },
 
   setMandelbulbColorMode: (mode) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, colorMode: mode },
     }))
   },
 
   setMandelbulbPalette: (palette) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, palette },
     }))
   },
 
   setMandelbulbCustomPalette: (palette) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, customPalette: palette },
     }))
   },
 
   setMandelbulbInvertColors: (invert) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, invertColors: invert },
     }))
   },
 
   setMandelbulbInteriorColor: (color) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, interiorColor: color },
     }))
   },
 
   setMandelbulbPaletteCycles: (cycles) => {
     const clampedCycles = Math.max(1, Math.min(20, Math.floor(cycles)))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, paletteCycles: clampedCycles },
     }))
   },
 
   setMandelbulbRenderStyle: (style) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, renderStyle: style },
     }))
   },
 
   setMandelbulbPointSize: (size) => {
     const clampedSize = Math.max(1, Math.min(20, size))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, pointSize: clampedSize },
     }))
   },
@@ -179,7 +194,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
     const [min, max] = threshold
     const clampedMin = Math.max(0, Math.min(1, min))
     const clampedMax = Math.max(clampedMin, Math.min(1, max))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: {
         ...state.mandelbulb,
         boundaryThreshold: [clampedMin, clampedMax],
@@ -190,13 +205,13 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbMandelbulbPower: (power) => {
     // Clamp power to reasonable range (2-16)
     const clampedPower = Math.max(2, Math.min(16, Math.floor(power)))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, mandelbulbPower: clampedPower },
     }))
   },
 
   setMandelbulbConfig: (config) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, ...config },
     }))
   },
@@ -247,7 +262,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
     // Center at origin for all dimensions
     const center = new Array(dimension).fill(0)
 
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: {
         ...state.mandelbulb,
         parameterValues: new Array(paramCount).fill(0),
@@ -270,14 +285,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbScale: (scale) => {
     // Range 0.1 to 10.0
     const clampedScale = Math.max(0.1, Math.min(10.0, scale))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, scale: clampedScale },
     }))
   },
 
   // --- Power Animation Actions (Mandelbulb-specific) ---
   setMandelbulbPowerAnimationEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, powerAnimationEnabled: enabled },
     }))
   },
@@ -285,7 +300,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbPowerMin: (min) => {
     // Range 2.0 to 16.0 (expanded for more variety)
     const clampedMin = Math.max(2.0, Math.min(16.0, min))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, powerMin: clampedMin },
     }))
   },
@@ -293,7 +308,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbPowerMax: (max) => {
     // Range 3.0 to 24.0 (expanded for more variety)
     const clampedMax = Math.max(3.0, Math.min(24.0, max))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, powerMax: clampedMax },
     }))
   },
@@ -301,14 +316,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbPowerSpeed: (speed) => {
     // Range 0.01 to 0.2 (very slow for organic wandering)
     const clampedSpeed = Math.max(0.01, Math.min(0.2, speed))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, powerSpeed: clampedSpeed },
     }))
   },
 
   // --- Alternate Power Actions (Technique B variant) ---
   setMandelbulbAlternatePowerEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, alternatePowerEnabled: enabled },
     }))
   },
@@ -316,7 +331,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbAlternatePowerValue: (power) => {
     // Range 2.0 to 16.0
     const clampedPower = Math.max(2.0, Math.min(16.0, power))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, alternatePowerValue: clampedPower },
     }))
   },
@@ -324,14 +339,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbAlternatePowerBlend: (blend) => {
     // Range 0.0 to 1.0
     const clampedBlend = Math.max(0.0, Math.min(1.0, blend))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, alternatePowerBlend: clampedBlend },
     }))
   },
 
   // --- Dimension Mixing Actions (Technique A) ---
   setMandelbulbDimensionMixEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, dimensionMixEnabled: enabled },
     }))
   },
@@ -339,7 +354,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbMixIntensity: (intensity) => {
     // Range 0.0 to 0.3
     const clampedIntensity = Math.max(0.0, Math.min(0.3, intensity))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, mixIntensity: clampedIntensity },
     }))
   },
@@ -347,14 +362,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbMixFrequency: (frequency) => {
     // Range 0.1 to 2.0
     const clampedFrequency = Math.max(0.1, Math.min(2.0, frequency))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, mixFrequency: clampedFrequency },
     }))
   },
 
   // --- Origin Drift Actions (Technique C) ---
   setMandelbulbOriginDriftEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, originDriftEnabled: enabled },
     }))
   },
@@ -362,7 +377,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbDriftAmplitude: (amplitude) => {
     // Range 0.01 to 0.5
     const clampedAmplitude = Math.max(0.01, Math.min(0.5, amplitude))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, driftAmplitude: clampedAmplitude },
     }))
   },
@@ -370,7 +385,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbDriftBaseFrequency: (frequency) => {
     // Range 0.01 to 0.5 (allow very slow animations to avoid jitter)
     const clampedFrequency = Math.max(0.01, Math.min(0.5, frequency))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, driftBaseFrequency: clampedFrequency },
     }))
   },
@@ -378,14 +393,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbDriftFrequencySpread: (spread) => {
     // Range 0.0 to 1.0
     const clampedSpread = Math.max(0.0, Math.min(1.0, spread))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, driftFrequencySpread: clampedSpread },
     }))
   },
 
   // --- Slice Animation Actions (4D+ only) ---
   setMandelbulbSliceAnimationEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sliceAnimationEnabled: enabled },
     }))
   },
@@ -393,7 +408,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbSliceSpeed: (speed) => {
     // Range 0.01 to 0.1
     const clampedSpeed = Math.max(0.01, Math.min(0.1, speed))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sliceSpeed: clampedSpeed },
     }))
   },
@@ -401,14 +416,14 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbSliceAmplitude: (amplitude) => {
     // Range 0.1 to 1.0
     const clampedAmplitude = Math.max(0.1, Math.min(1.0, amplitude))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sliceAmplitude: clampedAmplitude },
     }))
   },
 
   // --- Angular Phase Shifts Actions ---
   setMandelbulbPhaseShiftEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, phaseShiftEnabled: enabled },
     }))
   },
@@ -416,7 +431,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbPhaseSpeed: (speed) => {
     // Range 0.01 to 0.2
     const clampedSpeed = Math.max(0.01, Math.min(0.2, speed))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, phaseSpeed: clampedSpeed },
     }))
   },
@@ -424,7 +439,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   setMandelbulbPhaseAmplitude: (amplitude) => {
     // Range 0.0 to PI/4 (~0.785)
     const clampedAmplitude = Math.max(0.0, Math.min(Math.PI / 4, amplitude))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, phaseAmplitude: clampedAmplitude },
     }))
   },
@@ -432,34 +447,34 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   // --- Advanced Rendering Actions ---
   setMandelbulbRoughness: (value) => {
     const clamped = Math.max(0.0, Math.min(1.0, value))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, roughness: clamped },
     }))
   },
 
   setMandelbulbSssEnabled: (value) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sssEnabled: value },
     }))
   },
 
   setMandelbulbSssIntensity: (value) => {
     const clamped = Math.max(0.0, Math.min(2.0, value))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sssIntensity: clamped },
     }))
   },
 
   setMandelbulbSssColor: (value) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sssColor: value },
     }))
   },
 
   setMandelbulbSssThickness: (value) => {
     const clamped = Math.max(0.1, Math.min(5.0, value))
-    set((state) => ({
+    setWithVersion((state) => ({
       mandelbulb: { ...state.mandelbulb, sssThickness: clamped },
     }))
   },
-})
+}}

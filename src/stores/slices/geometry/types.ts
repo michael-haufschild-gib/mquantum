@@ -567,7 +567,15 @@ export type ExtendedObjectSlice = PolytopeSlice &
   QuaternionJuliaSlice &
   SchroedingerSlice &
   BlackHoleSlice & {
+    /** Version counter for polytope state changes (dirty-flag tracking) */
+    polytopeVersion: number
     /** Version counter for blackhole state changes (dirty-flag tracking) */
     blackholeVersion: number
+    /** Version counter for schroedinger state changes (dirty-flag tracking) */
+    schroedingerVersion: number
+    /** Version counter for mandelbulb state changes (dirty-flag tracking) */
+    mandelbulbVersion: number
+    /** Version counter for quaternionJulia state changes (dirty-flag tracking) */
+    quaternionJuliaVersion: number
     reset: () => void
   }

@@ -92,6 +92,12 @@ const SchroedingerMesh = () => {
   // PERF: Pre-allocated array for origin values to avoid allocation every frame
   const originValuesRef = useRef(new Array(MAX_DIMENSION).fill(0) as number[]);
 
+  // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+  const lastSchroedingerVersionRef = useRef(-1); // -1 forces full sync on first frame
+  const lastAppearanceVersionRef = useRef(-1);
+  const lastIblVersionRef = useRef(-1);
+  const prevMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+
   // ============================================
   // PERFORMANCE OPTIMIZATION: Only subscribe to values that affect shader compilation
   // All other values are read via getState() in useFrame to avoid unnecessary re-renders
@@ -362,11 +368,34 @@ const SchroedingerMesh = () => {
       if (!material.uniforms) return;
 
       // ============================================
+      // DIRTY-FLAG: Detect material change and reset version refs
+      // ============================================
+      const materialChanged = material !== prevMaterialRef.current;
+      if (materialChanged) {
+        prevMaterialRef.current = material;
+        lastSchroedingerVersionRef.current = -1; // Force full sync on material change
+        lastAppearanceVersionRef.current = -1;
+        lastIblVersionRef.current = -1;
+      }
+
+      // ============================================
       // PERFORMANCE: Read all state via getState() to avoid re-render subscriptions
       // ============================================
-      const schroedinger = useExtendedObjectStore.getState().schroedinger;
-      const appearance = useAppearanceStore.getState();
+      const extendedState = useExtendedObjectStore.getState();
+      const schroedinger = extendedState.schroedinger;
+      const schroedingerVersion = extendedState.schroedingerVersion;
+      const appearanceState = useAppearanceStore.getState();
+      const appearanceVersion = appearanceState.appearanceVersion;
+      const environmentState = useEnvironmentStore.getState();
+      const iblVersion = environmentState.iblVersion;
       // Note: Lighting state available via useLightingStore.getState() when needed
+
+      // ============================================
+      // DIRTY-FLAG: Check which categories need updating
+      // ============================================
+      const schroedingerChanged = schroedingerVersion !== lastSchroedingerVersionRef.current;
+      const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current;
+      const iblChanged = iblVersion !== lastIblVersionRef.current;
 
       // Apply scale to mesh
       const scale = schroedinger.scale;
@@ -517,84 +546,109 @@ const SchroedingerMesh = () => {
         }
       }
 
-      // Volume rendering parameters
-      const { timeScale, fieldScale, densityGain, powderScale, erosionStrength, erosionScale, erosionTurbulence, erosionNoiseType, curlEnabled, curlStrength, curlScale, curlSpeed, curlBias, dispersionEnabled, dispersionStrength, dispersionDirection, dispersionQuality, shadowsEnabled, shadowStrength, shadowSteps, aoEnabled, aoStrength, aoQuality, aoRadius, aoColor, nodalEnabled, nodalColor, nodalStrength, energyColorEnabled, shimmerEnabled, shimmerStrength, isoThreshold, scatteringAnisotropy } = schroedinger;
+      // Global visuals from appearance store (version-tracked via appearanceChanged)
+      const { sssEnabled, sssIntensity, sssColor, sssThickness, sssJitter, faceEmission, faceEmissionThreshold, faceEmissionColorShift, faceEmissionPulsing, faceRimFalloff, faceColor, edgesVisible, fresnelIntensity, edgeColor } = appearanceState;
 
-      // Global visuals from appearance store
-      const { sssEnabled, sssIntensity, sssColor, sssThickness, sssJitter, faceEmission, faceEmissionThreshold, faceEmissionColorShift, faceEmissionPulsing, faceRimFalloff } = appearance;
+      // ============================================
+      // DIRTY-FLAG: Only update schroedinger uniforms when settings change
+      // ============================================
+      if (schroedingerChanged) {
+        // Volume rendering parameters
+        const { timeScale, fieldScale, densityGain, powderScale, erosionStrength, erosionScale, erosionTurbulence, erosionNoiseType, curlEnabled, curlStrength, curlScale, curlSpeed, curlBias, dispersionEnabled, dispersionStrength, dispersionDirection, dispersionQuality, shadowsEnabled, shadowStrength, shadowSteps, aoEnabled, aoStrength, aoQuality, aoRadius, aoColor, nodalEnabled, nodalColor, nodalStrength, energyColorEnabled, shimmerEnabled, shimmerStrength, isoThreshold, scatteringAnisotropy } = schroedinger;
 
-      // Note: We use faceRimFalloff from appearance store for uRimExponent if available (which it is now)
-      // We keep scatteringAnisotropy in schroedinger store for now.
+        if (material.uniforms.uTimeScale) material.uniforms.uTimeScale.value = timeScale;
+        if (material.uniforms.uFieldScale) material.uniforms.uFieldScale.value = fieldScale;
+        if (material.uniforms.uDensityGain) material.uniforms.uDensityGain.value = densityGain;
+        if (material.uniforms.uPowderScale) material.uniforms.uPowderScale.value = powderScale;
+        if (material.uniforms.uScatteringAnisotropy) material.uniforms.uScatteringAnisotropy.value = scatteringAnisotropy;
 
-      if (material.uniforms.uTimeScale) material.uniforms.uTimeScale.value = timeScale;
-      if (material.uniforms.uFieldScale) material.uniforms.uFieldScale.value = fieldScale;
-      if (material.uniforms.uDensityGain) material.uniforms.uDensityGain.value = densityGain;
-      if (material.uniforms.uPowderScale) material.uniforms.uPowderScale.value = powderScale;
+        // Erosion
+        if (material.uniforms.uErosionStrength) material.uniforms.uErosionStrength.value = erosionStrength;
+        if (material.uniforms.uErosionScale) material.uniforms.uErosionScale.value = erosionScale;
+        if (material.uniforms.uErosionTurbulence) material.uniforms.uErosionTurbulence.value = erosionTurbulence;
+        if (material.uniforms.uErosionNoiseType) material.uniforms.uErosionNoiseType.value = erosionNoiseType;
 
-      // Emission & Rim (Unified)
-      if (material.uniforms.uEmissionIntensity) material.uniforms.uEmissionIntensity.value = faceEmission;
-      if (material.uniforms.uEmissionThreshold) material.uniforms.uEmissionThreshold.value = faceEmissionThreshold;
-      if (material.uniforms.uEmissionColorShift) material.uniforms.uEmissionColorShift.value = faceEmissionColorShift;
-      if (material.uniforms.uEmissionPulsing) material.uniforms.uEmissionPulsing.value = faceEmissionPulsing;
+        // Curl
+        if (material.uniforms.uCurlEnabled) material.uniforms.uCurlEnabled.value = curlEnabled;
+        if (material.uniforms.uCurlStrength) material.uniforms.uCurlStrength.value = curlStrength;
+        if (material.uniforms.uCurlScale) material.uniforms.uCurlScale.value = curlScale;
+        if (material.uniforms.uCurlSpeed) material.uniforms.uCurlSpeed.value = curlSpeed;
+        if (material.uniforms.uCurlBias) material.uniforms.uCurlBias.value = curlBias;
 
-      // Use the global faceRimFalloff
-      if (material.uniforms.uRimExponent) material.uniforms.uRimExponent.value = faceRimFalloff;
+        // Dispersion
+        if (material.uniforms.uDispersionEnabled) material.uniforms.uDispersionEnabled.value = dispersionEnabled;
+        if (material.uniforms.uDispersionStrength) material.uniforms.uDispersionStrength.value = dispersionStrength;
+        if (material.uniforms.uDispersionDirection) material.uniforms.uDispersionDirection.value = dispersionDirection;
+        if (material.uniforms.uDispersionQuality) material.uniforms.uDispersionQuality.value = dispersionQuality;
 
-      if (material.uniforms.uScatteringAnisotropy) material.uniforms.uScatteringAnisotropy.value = scatteringAnisotropy;
+        // Shadows
+        if (material.uniforms.uShadowsEnabled) material.uniforms.uShadowsEnabled.value = shadowsEnabled;
+        if (material.uniforms.uShadowStrength) material.uniforms.uShadowStrength.value = shadowStrength;
+        if (material.uniforms.uShadowSteps) material.uniforms.uShadowSteps.value = shadowSteps;
 
-      // Note: PBR uniforms (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
-      // are now applied via UniformManager using 'pbr-face' source
-      if (material.uniforms.uSssEnabled) material.uniforms.uSssEnabled.value = sssEnabled;
-      if (material.uniforms.uSssIntensity) material.uniforms.uSssIntensity.value = sssIntensity;
-      if (material.uniforms.uSssColor) {
-          updateLinearColorUniform(cache.faceColor /* reuse helper */, material.uniforms.uSssColor.value as THREE.Color, sssColor || '#ff8844');
-      }
-      if (material.uniforms.uSssThickness) material.uniforms.uSssThickness.value = sssThickness;
-      if (material.uniforms.uSssJitter) material.uniforms.uSssJitter.value = sssJitter;
-
-      if (material.uniforms.uErosionStrength) material.uniforms.uErosionStrength.value = erosionStrength;
-      if (material.uniforms.uErosionScale) material.uniforms.uErosionScale.value = erosionScale;
-      if (material.uniforms.uErosionTurbulence) material.uniforms.uErosionTurbulence.value = erosionTurbulence;
-      if (material.uniforms.uErosionNoiseType) material.uniforms.uErosionNoiseType.value = erosionNoiseType;
-      if (material.uniforms.uCurlEnabled) material.uniforms.uCurlEnabled.value = curlEnabled;
-      if (material.uniforms.uCurlStrength) material.uniforms.uCurlStrength.value = curlStrength;
-      if (material.uniforms.uCurlScale) material.uniforms.uCurlScale.value = curlScale;
-      if (material.uniforms.uCurlSpeed) material.uniforms.uCurlSpeed.value = curlSpeed;
-      if (material.uniforms.uCurlBias) material.uniforms.uCurlBias.value = curlBias;
-      if (material.uniforms.uDispersionEnabled) material.uniforms.uDispersionEnabled.value = dispersionEnabled;
-      if (material.uniforms.uDispersionStrength) material.uniforms.uDispersionStrength.value = dispersionStrength;
-      if (material.uniforms.uDispersionDirection) material.uniforms.uDispersionDirection.value = dispersionDirection;
-      if (material.uniforms.uDispersionQuality) material.uniforms.uDispersionQuality.value = dispersionQuality;
-      if (material.uniforms.uShadowsEnabled) material.uniforms.uShadowsEnabled.value = shadowsEnabled;
-      if (material.uniforms.uShadowStrength) material.uniforms.uShadowStrength.value = shadowStrength;
-      if (material.uniforms.uShadowSteps) material.uniforms.uShadowSteps.value = shadowSteps;
-      // Schrödinger uses its own AO toggle (unified UI sets aoEnabled directly)
-      if (material.uniforms.uAoEnabled) {
-        material.uniforms.uAoEnabled.value = aoEnabled;
-      }
-      if (material.uniforms.uAoStrength) material.uniforms.uAoStrength.value = aoStrength;
-      if (material.uniforms.uAoSteps) material.uniforms.uAoSteps.value = aoQuality;
-      if (material.uniforms.uAoRadius) material.uniforms.uAoRadius.value = aoRadius;
-      if (material.uniforms.uAoColor) {
+        // Schrödinger uses its own AO toggle (unified UI sets aoEnabled directly)
+        if (material.uniforms.uAoEnabled) material.uniforms.uAoEnabled.value = aoEnabled;
+        if (material.uniforms.uAoStrength) material.uniforms.uAoStrength.value = aoStrength;
+        if (material.uniforms.uAoSteps) material.uniforms.uAoSteps.value = aoQuality;
+        if (material.uniforms.uAoRadius) material.uniforms.uAoRadius.value = aoRadius;
+        if (material.uniforms.uAoColor) {
           updateLinearColorUniform(cache.faceColor /* reuse helper */, material.uniforms.uAoColor.value as THREE.Color, aoColor || '#000000');
-      }
-      if (material.uniforms.uNodalEnabled) material.uniforms.uNodalEnabled.value = nodalEnabled;
-      if (material.uniforms.uNodalStrength) material.uniforms.uNodalStrength.value = nodalStrength;
-      if (material.uniforms.uNodalColor) {
+        }
+
+        // Quantum effects
+        if (material.uniforms.uNodalEnabled) material.uniforms.uNodalEnabled.value = nodalEnabled;
+        if (material.uniforms.uNodalStrength) material.uniforms.uNodalStrength.value = nodalStrength;
+        if (material.uniforms.uNodalColor) {
           updateLinearColorUniform(cache.faceColor /* reuse helper */, material.uniforms.uNodalColor.value as THREE.Color, nodalColor || '#00ffff');
+        }
+        if (material.uniforms.uEnergyColorEnabled) material.uniforms.uEnergyColorEnabled.value = energyColorEnabled;
+        if (material.uniforms.uShimmerEnabled) material.uniforms.uShimmerEnabled.value = shimmerEnabled;
+        if (material.uniforms.uShimmerStrength) material.uniforms.uShimmerStrength.value = shimmerStrength;
+
+        // Isosurface mode
+        if (material.uniforms.uIsoEnabled) material.uniforms.uIsoEnabled.value = isoEnabled;
+        if (material.uniforms.uIsoThreshold) material.uniforms.uIsoThreshold.value = isoThreshold;
+
+        // Update version ref
+        lastSchroedingerVersionRef.current = schroedingerVersion;
       }
-      if (material.uniforms.uEnergyColorEnabled) material.uniforms.uEnergyColorEnabled.value = energyColorEnabled;
-      if (material.uniforms.uShimmerEnabled) material.uniforms.uShimmerEnabled.value = shimmerEnabled;
-      if (material.uniforms.uShimmerStrength) material.uniforms.uShimmerStrength.value = shimmerStrength;
 
-      // Isosurface mode
-      if (material.uniforms.uIsoEnabled) material.uniforms.uIsoEnabled.value = isoEnabled;
-      if (material.uniforms.uIsoThreshold) material.uniforms.uIsoThreshold.value = isoThreshold;
+      // ============================================
+      // DIRTY-FLAG: Only update appearance uniforms when settings change
+      // ============================================
+      if (appearanceChanged) {
+        // Emission & Rim (from appearance store)
+        if (material.uniforms.uEmissionIntensity) material.uniforms.uEmissionIntensity.value = faceEmission;
+        if (material.uniforms.uEmissionThreshold) material.uniforms.uEmissionThreshold.value = faceEmissionThreshold;
+        if (material.uniforms.uEmissionColorShift) material.uniforms.uEmissionColorShift.value = faceEmissionColorShift;
+        if (material.uniforms.uEmissionPulsing) material.uniforms.uEmissionPulsing.value = faceEmissionPulsing;
+        if (material.uniforms.uRimExponent) material.uniforms.uRimExponent.value = faceRimFalloff;
 
-      // Color (cached linear conversion)
-      const { faceColor } = appearance;
-      if (material.uniforms.uColor) {
-        updateLinearColorUniform(cache.faceColor, material.uniforms.uColor.value as THREE.Color, faceColor);
+        // SSS (from appearance store)
+        // Note: PBR uniforms (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
+        // are now applied via UniformManager using 'pbr-face' source
+        if (material.uniforms.uSssEnabled) material.uniforms.uSssEnabled.value = sssEnabled;
+        if (material.uniforms.uSssIntensity) material.uniforms.uSssIntensity.value = sssIntensity;
+        if (material.uniforms.uSssColor) {
+          updateLinearColorUniform(cache.faceColor /* reuse helper */, material.uniforms.uSssColor.value as THREE.Color, sssColor || '#ff8844');
+        }
+        if (material.uniforms.uSssThickness) material.uniforms.uSssThickness.value = sssThickness;
+        if (material.uniforms.uSssJitter) material.uniforms.uSssJitter.value = sssJitter;
+
+        // Color (cached linear conversion)
+        if (material.uniforms.uColor) {
+          updateLinearColorUniform(cache.faceColor, material.uniforms.uColor.value as THREE.Color, faceColor);
+        }
+
+        // Fresnel
+        if (material.uniforms.uFresnelEnabled) material.uniforms.uFresnelEnabled.value = edgesVisible;
+        if (material.uniforms.uFresnelIntensity) material.uniforms.uFresnelIntensity.value = fresnelIntensity;
+        if (material.uniforms.uRimColor) {
+          updateLinearColorUniform(cache.rimColor, material.uniforms.uRimColor.value as THREE.Color, edgeColor);
+        }
+
+        // Update version ref
+        lastAppearanceVersionRef.current = appearanceVersion;
       }
 
       // Camera matrices
@@ -620,29 +674,28 @@ const SchroedingerMesh = () => {
       // Apply centralized uniform sources (including PBR via 'pbr-face')
       UniformManager.applyToMaterial(material, ['lighting', 'temporal', 'quality', 'color', 'pbr-face']);
 
-      // Fresnel
-      const { edgesVisible, fresnelIntensity, edgeColor } = appearance;
-      if (material.uniforms.uFresnelEnabled) material.uniforms.uFresnelEnabled.value = edgesVisible;
-      if (material.uniforms.uFresnelIntensity) material.uniforms.uFresnelIntensity.value = fresnelIntensity;
-      if (material.uniforms.uRimColor) {
-        updateLinearColorUniform(cache.rimColor, material.uniforms.uRimColor.value as THREE.Color, edgeColor);
-      }
+      // ============================================
+      // DIRTY-FLAG: Only update IBL uniforms when settings change
+      // ============================================
+      if (iblChanged) {
+        // IBL (Image-Based Lighting) uniforms
+        // Compute isPMREM first to gate quality (prevents null texture sampling)
+        const env = state.scene.environment;
+        const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
+        if (material.uniforms.uIBLQuality) {
+          const qualityMap = { off: 0, low: 1, high: 2 } as const;
+          // Force IBL off when no valid PMREM texture
+          material.uniforms.uIBLQuality.value = isPMREM ? qualityMap[environmentState.iblQuality] : 0;
+        }
+        if (material.uniforms.uIBLIntensity) {
+          material.uniforms.uIBLIntensity.value = environmentState.iblIntensity;
+        }
+        if (material.uniforms.uEnvMap) {
+          material.uniforms.uEnvMap.value = isPMREM ? env : null;
+        }
 
-      // IBL (Image-Based Lighting) uniforms
-      // Compute isPMREM first to gate quality (prevents null texture sampling)
-      const env = state.scene.environment;
-      const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
-      const iblState = useEnvironmentStore.getState();
-      if (material.uniforms.uIBLQuality) {
-        const qualityMap = { off: 0, low: 1, high: 2 } as const;
-        // Force IBL off when no valid PMREM texture
-        material.uniforms.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0;
-      }
-      if (material.uniforms.uIBLIntensity) {
-        material.uniforms.uIBLIntensity.value = iblState.iblIntensity;
-      }
-      if (material.uniforms.uEnvMap) {
-        material.uniforms.uEnvMap.value = isPMREM ? env : null;
+        // Update version ref
+        lastIblVersionRef.current = iblVersion;
       }
 
       // Animation bias from UI settings

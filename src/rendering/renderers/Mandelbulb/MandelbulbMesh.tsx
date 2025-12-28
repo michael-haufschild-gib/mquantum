@@ -55,6 +55,12 @@ const MandelbulbMesh = () => {
   // PERF: Pre-allocated array for origin values to avoid allocation every frame
   const originValuesRef = useRef(new Array(MAX_DIMENSION).fill(0) as number[]);
 
+  // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+  const lastMandelbulbVersionRef = useRef(-1); // -1 forces full sync on first frame
+  const lastAppearanceVersionRef = useRef(-1);
+  const lastIblVersionRef = useRef(-1);
+  const prevMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+
   // Assign main object layer for depth-based effects (SSR, refraction, bokeh)
   useLayerAssignment(meshRef);
 
@@ -277,6 +283,34 @@ const MandelbulbMesh = () => {
       // Skip uniform updates if material has no uniforms (placeholder material during shader compilation)
       if (!material.uniforms) return;
 
+      // ============================================
+      // DIRTY-FLAG: Detect material change and reset version refs
+      // ============================================
+      const materialChanged = material !== prevMaterialRef.current;
+      if (materialChanged) {
+        prevMaterialRef.current = material;
+        lastMandelbulbVersionRef.current = -1; // Force full sync on material change
+        lastAppearanceVersionRef.current = -1;
+        lastIblVersionRef.current = -1;
+      }
+
+      // ============================================
+      // PERFORMANCE: Read versions via getState() to avoid re-render subscriptions
+      // ============================================
+      const extendedState = useExtendedObjectStore.getState();
+      const mandelbulbVersion = extendedState.mandelbulbVersion;
+      const appearanceState = useAppearanceStore.getState();
+      const appearanceVersion = appearanceState.appearanceVersion;
+      const environmentState = useEnvironmentStore.getState();
+      const iblVersion = environmentState.iblVersion;
+
+      // ============================================
+      // DIRTY-FLAG: Check which categories need updating
+      // ============================================
+      const mandelbulbChanged = mandelbulbVersion !== lastMandelbulbVersionRef.current;
+      const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current;
+      const iblChanged = iblVersion !== lastIblVersionRef.current;
+
       // Update time and resolution
       // Use accumulatedTime which respects pause state and is synced globally
       if (material.uniforms.uTime) material.uniforms.uTime.value = accumulatedTime;
@@ -286,67 +320,68 @@ const MandelbulbMesh = () => {
       // Update dimension
       if (material.uniforms.uDimension) material.uniforms.uDimension.value = dimension;
 
-      // Update Mandelbulb parameters
-      // Always set these uniforms unconditionally to ensure they're updated after
-      // TrackedShaderMaterial transitions from placeholder to actual shader material.
-      // The prev ref optimization was causing uniforms to not update when material changed.
-      if (material.uniforms.uIterations) {
-        material.uniforms.uIterations.value = maxIterations;
-      }
-      if (material.uniforms.uEscapeRadius) {
-        material.uniforms.uEscapeRadius.value = escapeRadius;
-      }
+      // Cache for colors
+      const cache = colorCacheRef.current;
 
-      // Power: either animated or static
-      // When animated, directly set uPower (same as manually moving the slider)
-      if (material.uniforms.uPower) {
-        if (powerAnimationEnabled) {
-          // Use global accumulatedTime
-          // powerSpeed 0.03 = one full cycle (back and forth) every ~33 seconds
-          const t = accumulatedTime * powerSpeed * 2 * Math.PI;
-          const normalized = (Math.sin(t) + 1) / 2; // Maps [-1, 1] to [0, 1]
+      // ============================================
+      // DIRTY-FLAG: Only update mandelbulb uniforms when settings change
+      // ============================================
+      if (mandelbulbChanged) {
+        // Update Mandelbulb parameters
+        if (material.uniforms.uIterations) {
+          material.uniforms.uIterations.value = maxIterations;
+        }
+        if (material.uniforms.uEscapeRadius) {
+          material.uniforms.uEscapeRadius.value = escapeRadius;
+        }
 
-          const targetPower = powerMin + normalized * (powerMax - powerMin);
-          material.uniforms.uPower.value = targetPower;
-        } else {
-          // Always set power unconditionally to handle material transitions
+        // Power (static value - animation is handled separately)
+        if (!powerAnimationEnabled && material.uniforms.uPower) {
           material.uniforms.uPower.value = mandelbulbPower;
         }
+
+        // Disable the separate animation uniform system (not needed anymore)
+        if (material.uniforms.uPowerAnimationEnabled) {
+          material.uniforms.uPowerAnimationEnabled.value = false;
+        }
+
+        // Alternate Power (Technique B): blend between primary and alternate powers
+        if (material.uniforms.uAlternatePowerEnabled) {
+          material.uniforms.uAlternatePowerEnabled.value = alternatePowerEnabled;
+        }
+        if (material.uniforms.uAlternatePowerValue) {
+          material.uniforms.uAlternatePowerValue.value = alternatePowerValue;
+        }
+        if (material.uniforms.uAlternatePowerBlend) {
+          material.uniforms.uAlternatePowerBlend.value = alternatePowerBlend;
+        }
+
+        // Dimension Mixing (Technique A): update uniforms for shader-side mixing matrix
+        if (material.uniforms.uDimensionMixEnabled) {
+          material.uniforms.uDimensionMixEnabled.value = dimensionMixEnabled;
+        }
+        if (material.uniforms.uMixIntensity) {
+          material.uniforms.uMixIntensity.value = mixIntensity;
+        }
+
+        // Update version ref
+        lastMandelbulbVersionRef.current = mandelbulbVersion;
       }
 
-      // Disable the separate animation uniform system (not needed anymore)
-      if (material.uniforms.uPowerAnimationEnabled) {
-        material.uniforms.uPowerAnimationEnabled.value = false;
+      // ============================================
+      // TIME-DEPENDENT ANIMATIONS (run every frame when enabled)
+      // ============================================
+      // Power animation: compute power from time when animation is enabled
+      if (powerAnimationEnabled && material.uniforms.uPower) {
+        const t = accumulatedTime * powerSpeed * 2 * Math.PI;
+        const normalized = (Math.sin(t) + 1) / 2; // Maps [-1, 1] to [0, 1]
+        const targetPower = powerMin + normalized * (powerMax - powerMin);
+        material.uniforms.uPower.value = targetPower;
       }
 
-      // Alternate Power (Technique B): blend between primary and alternate powers
-      if (material.uniforms.uAlternatePowerEnabled) {
-        material.uniforms.uAlternatePowerEnabled.value = alternatePowerEnabled;
-      }
-      if (material.uniforms.uAlternatePowerValue) {
-        material.uniforms.uAlternatePowerValue.value = alternatePowerValue;
-      }
-      if (material.uniforms.uAlternatePowerBlend) {
-        material.uniforms.uAlternatePowerBlend.value = alternatePowerBlend;
-      }
-
-      // Dimension Mixing (Technique A): update uniforms for shader-side mixing matrix
-      if (material.uniforms.uDimensionMixEnabled) {
-        material.uniforms.uDimensionMixEnabled.value = dimensionMixEnabled;
-      }
-      if (material.uniforms.uMixIntensity) {
-        material.uniforms.uMixIntensity.value = mixIntensity;
-      }
-      if (material.uniforms.uMixTime) {
-        // Mix time advances based on animation time and frequency
-        // The shader will use this to compute sin/cos values for the mixing matrix
+      // Dimension mixing time (always update when mixing is enabled)
+      if (dimensionMixEnabled && material.uniforms.uMixTime) {
         material.uniforms.uMixTime.value = accumulatedTime * mixFrequency * 2 * Math.PI;
-      }
-
-      // Update color and palette (cached linear conversion - only converts when color changes)
-      const cache = colorCacheRef.current;
-      if (material.uniforms.uColor) {
-        updateLinearColorUniform(cache.faceColor, material.uniforms.uColor.value as THREE.Color, faceColor);
       }
 
       // Update camera matrices
@@ -374,21 +409,33 @@ const MandelbulbMesh = () => {
         material.uniforms.uTemporalSafetyMargin.value = 0.5;
       }
 
-      // SSS (Subsurface Scattering) properties
-      const visuals = useAppearanceStore.getState();
-      if (material.uniforms.uSssEnabled) material.uniforms.uSssEnabled.value = visuals.sssEnabled;
-      if (material.uniforms.uSssIntensity) material.uniforms.uSssIntensity.value = visuals.sssIntensity;
-      if (material.uniforms.uSssColor) {
-          updateLinearColorUniform(cache.faceColor /* reuse helper */, material.uniforms.uSssColor.value as THREE.Color, visuals.sssColor || '#ff8844');
-      }
-      if (material.uniforms.uSssThickness) material.uniforms.uSssThickness.value = visuals.sssThickness;
-      if (material.uniforms.uSssJitter) material.uniforms.uSssJitter.value = visuals.sssJitter;
+      // ============================================
+      // DIRTY-FLAG: Only update appearance uniforms when settings change
+      // ============================================
+      if (appearanceChanged) {
+        // SSS (Subsurface Scattering) properties
+        if (material.uniforms.uSssEnabled) material.uniforms.uSssEnabled.value = appearanceState.sssEnabled;
+        if (material.uniforms.uSssIntensity) material.uniforms.uSssIntensity.value = appearanceState.sssIntensity;
+        if (material.uniforms.uSssColor) {
+          updateLinearColorUniform(cache.faceColor /* reuse helper */, material.uniforms.uSssColor.value as THREE.Color, appearanceState.sssColor || '#ff8844');
+        }
+        if (material.uniforms.uSssThickness) material.uniforms.uSssThickness.value = appearanceState.sssThickness;
+        if (material.uniforms.uSssJitter) material.uniforms.uSssJitter.value = appearanceState.sssJitter;
 
-      // Fresnel rim lighting (controlled by Edges render mode, cached linear conversion)
-      if (material.uniforms.uFresnelEnabled) material.uniforms.uFresnelEnabled.value = edgesVisible;
-      if (material.uniforms.uFresnelIntensity) material.uniforms.uFresnelIntensity.value = fresnelIntensity;
-      if (material.uniforms.uRimColor) {
-        updateLinearColorUniform(cache.rimColor, material.uniforms.uRimColor.value as THREE.Color, edgeColor);
+        // Fresnel rim lighting (controlled by Edges render mode, cached linear conversion)
+        if (material.uniforms.uFresnelEnabled) material.uniforms.uFresnelEnabled.value = edgesVisible;
+        if (material.uniforms.uFresnelIntensity) material.uniforms.uFresnelIntensity.value = fresnelIntensity;
+        if (material.uniforms.uRimColor) {
+          updateLinearColorUniform(cache.rimColor, material.uniforms.uRimColor.value as THREE.Color, edgeColor);
+        }
+
+        // Color (from appearance)
+        if (material.uniforms.uColor) {
+          updateLinearColorUniform(cache.faceColor, material.uniforms.uColor.value as THREE.Color, faceColor);
+        }
+
+        // Update version ref
+        lastAppearanceVersionRef.current = appearanceVersion;
       }
 
       // Shadow System uniforms
@@ -413,21 +460,28 @@ const MandelbulbMesh = () => {
         material.uniforms.uAoEnabled.value = ssaoEnabled;
       }
 
-      // IBL (Image-Based Lighting) uniforms
-      // Compute isPMREM first to gate quality (prevents null texture sampling)
-      const env = state.scene.environment;
-      const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
-      const iblState = useEnvironmentStore.getState();
-      if (material.uniforms.uIBLQuality) {
-        const qualityMap = { off: 0, low: 1, high: 2 } as const;
-        // Force IBL off when no valid PMREM texture
-        material.uniforms.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0;
-      }
-      if (material.uniforms.uIBLIntensity) {
-        material.uniforms.uIBLIntensity.value = iblState.iblIntensity;
-      }
-      if (material.uniforms.uEnvMap) {
-        material.uniforms.uEnvMap.value = isPMREM ? env : null;
+      // ============================================
+      // DIRTY-FLAG: Only update IBL uniforms when settings change
+      // ============================================
+      if (iblChanged) {
+        // IBL (Image-Based Lighting) uniforms
+        // Compute isPMREM first to gate quality (prevents null texture sampling)
+        const env = state.scene.environment;
+        const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
+        if (material.uniforms.uIBLQuality) {
+          const qualityMap = { off: 0, low: 1, high: 2 } as const;
+          // Force IBL off when no valid PMREM texture
+          material.uniforms.uIBLQuality.value = isPMREM ? qualityMap[environmentState.iblQuality] : 0;
+        }
+        if (material.uniforms.uIBLIntensity) {
+          material.uniforms.uIBLIntensity.value = environmentState.iblIntensity;
+        }
+        if (material.uniforms.uEnvMap) {
+          material.uniforms.uEnvMap.value = isPMREM ? env : null;
+        }
+
+        // Update version ref
+        lastIblVersionRef.current = iblVersion;
       }
 
       // Mandelbulb is always fully opaque (solid mode)

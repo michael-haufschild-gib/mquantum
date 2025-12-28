@@ -7,6 +7,8 @@
  * @see docs/prd/mandelbulb_performance.md
  */
 
+import type { DeviceCapabilities, GPUTier } from '@/lib/deviceCapabilities'
+import { DEFAULT_CAPABILITIES } from '@/lib/deviceCapabilities'
 import type { ShaderDebugInfo } from '@/types/shaderDebug'
 import { create } from 'zustand'
 
@@ -45,6 +47,22 @@ export type RefinementStage = (typeof REFINEMENT_STAGES)[number]
 
 /** Performance state interface */
 interface PerformanceState {
+  // -------------------------------------------------------------------------
+  // Device Capabilities (detected once at startup)
+  // -------------------------------------------------------------------------
+
+  /** GPU performance tier (0=fallback, 1=low, 2=medium, 3=high) */
+  gpuTier: GPUTier
+
+  /** Whether device has a mobile GPU */
+  isMobileGPU: boolean
+
+  /** GPU name/identifier (for debugging) */
+  gpuName: string
+
+  /** Whether device capability detection has completed */
+  deviceCapabilitiesDetected: boolean
+
   // -------------------------------------------------------------------------
   // Interaction State
   // -------------------------------------------------------------------------
@@ -119,6 +137,9 @@ interface PerformanceState {
   // Actions
   // -------------------------------------------------------------------------
 
+  // Device Capabilities
+  setDeviceCapabilities: (capabilities: DeviceCapabilities) => void
+
   // Interaction State
   setIsInteracting: (interacting: boolean) => void
   setSceneTransitioning: (transitioning: boolean) => void
@@ -167,6 +188,12 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Initial State
   // -------------------------------------------------------------------------
 
+  // Device Capabilities (defaults until detection completes)
+  gpuTier: DEFAULT_CAPABILITIES.gpuTier,
+  isMobileGPU: DEFAULT_CAPABILITIES.isMobileGPU,
+  gpuName: DEFAULT_CAPABILITIES.gpuName,
+  deviceCapabilitiesDetected: false,
+
   // Interaction State
   isInteracting: false,
   sceneTransitioning: false,
@@ -200,6 +227,16 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // -------------------------------------------------------------------------
   // Actions
   // -------------------------------------------------------------------------
+
+  // Device Capabilities
+  setDeviceCapabilities: (capabilities: DeviceCapabilities) => {
+    set({
+      gpuTier: capabilities.gpuTier,
+      isMobileGPU: capabilities.isMobileGPU,
+      gpuName: capabilities.gpuName,
+      deviceCapabilitiesDetected: true,
+    })
+  },
 
   // Interaction State
   setIsInteracting: (interacting: boolean) => {

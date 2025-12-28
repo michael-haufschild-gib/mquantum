@@ -7,24 +7,13 @@
  * - GPU timer queries
  * - Advanced texture formats
  *
+ * WebGL2 support detection is now handled by the unified device capabilities
+ * module at @/lib/deviceCapabilities.ts
+ *
  * @module components/overlays/WebGL2UnsupportedOverlay
  */
 
 import React from 'react'
-
-/**
- * Check if the browser supports WebGL2.
- * @returns True if WebGL2 is supported
- */
-export function isWebGL2Supported(): boolean {
-  try {
-    const canvas = document.createElement('canvas')
-    const gl = canvas.getContext('webgl2')
-    return gl !== null
-  } catch {
-    return false
-  }
-}
 
 /**
  * Overlay shown when WebGL2 is not supported.

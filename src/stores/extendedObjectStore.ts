@@ -48,8 +48,12 @@ export const useExtendedObjectStore = create<ExtendedObjectSlice>()((...a) => {
   const [set] = a
 
   return {
-    // Version counter for blackhole dirty-flag tracking (initialized here, incremented by blackholeSlice)
+    // Version counters for dirty-flag tracking (initialized here, incremented by slices)
+    polytopeVersion: 0,
     blackholeVersion: 0,
+    schroedingerVersion: 0,
+    mandelbulbVersion: 0,
+    quaternionJuliaVersion: 0,
 
     ...createPolytopeSlice(...a),
     ...createWythoffPolytopeSlice(...a),
@@ -74,7 +78,11 @@ export const useExtendedObjectStore = create<ExtendedObjectSlice>()((...a) => {
         quaternionJulia: { ...DEFAULT_QUATERNION_JULIA_CONFIG },
         schroedinger: { ...DEFAULT_SCHROEDINGER_CONFIG },
         blackhole: { ...DEFAULT_BLACK_HOLE_CONFIG },
+        polytopeVersion: 0, // Reset version on full reset
         blackholeVersion: 0, // Reset version on full reset
+        schroedingerVersion: 0, // Reset version on full reset
+        mandelbulbVersion: 0, // Reset version on full reset
+        quaternionJuliaVersion: 0, // Reset version on full reset
       })
     },
   }

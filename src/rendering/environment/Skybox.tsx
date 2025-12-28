@@ -68,6 +68,11 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
   const matrix3Ref = useRef(new THREE.Matrix3());
   const matrix4Ref = useRef(new THREE.Matrix4());
 
+  // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+  const lastSkyboxVersionRef = useRef(-1); // -1 forces full sync on first frame
+  const lastAppearanceVersionRef = useRef(-1);
+  const prevMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+
   // CRITICAL: Use callback ref to set layer IMMEDIATELY when mesh is created
   // This ensures the layer is set before any render pass happens
   // useEffect/useLayoutEffect both run AFTER the mesh is added to scene
@@ -353,6 +358,21 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
 
     if (!material) return;
 
+    // --- DIRTY-FLAG: Material change detection ---
+    const materialChanged = material !== prevMaterialRef.current;
+    if (materialChanged) {
+      prevMaterialRef.current = material;
+      lastSkyboxVersionRef.current = -1; // Force full sync
+      lastAppearanceVersionRef.current = -1;
+    }
+
+    // Get version counters from stores
+    const skyboxVersion = useEnvironmentStore.getState().skyboxVersion;
+    const appearanceVersion = useAppearanceStore.getState().appearanceVersion;
+
+    const skyboxChanged = skyboxVersion !== lastSkyboxVersionRef.current;
+    const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current;
+
     // --- Animation Logic (Hybrid JS/Shader) ---
 
     if (isPlaying) {
@@ -431,67 +451,84 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
     // Direct uniform updates for performance
     const uniforms = material.uniforms;
 
+    // --- PER-FRAME UNIFORMS (time-dependent, always update) ---
     if (uniforms.uTex) uniforms.uTex.value = texture;
     if (uniforms.uRotation) uniforms.uRotation.value = rotationMatrix;
-    if (uniforms.uMode) uniforms.uMode.value = modeInt;
     if (uniforms.uTime) uniforms.uTime.value = t;
 
+    // Animation-driven uniforms (can change when animation is playing)
     if (uniforms.uBlur) uniforms.uBlur.value = finalBlur;
     if (uniforms.uIntensity) uniforms.uIntensity.value = finalIntensity * opacity;
     if (uniforms.uHue) uniforms.uHue.value = finalHue;
     if (uniforms.uSaturation) uniforms.uSaturation.value = finalSaturation;
-
-    if (uniforms.uScale) uniforms.uScale.value = proceduralSettings.scale;
-    if (uniforms.uComplexity) uniforms.uComplexity.value = proceduralSettings.complexity;
-    if (uniforms.uTimeScale) uniforms.uTimeScale.value = proceduralSettings.timeScale;
-    if (uniforms.uEvolution) uniforms.uEvolution.value = proceduralSettings.evolution;
-
-    if (uniforms.uColor1) uniforms.uColor1.value = color1Vec;
-    if (uniforms.uColor2) uniforms.uColor2.value = color2Vec;
-
-    if (uniforms.uPalA) uniforms.uPalA.value = paletteVecs.a;
-    if (uniforms.uPalB) uniforms.uPalB.value = paletteVecs.b;
-    if (uniforms.uPalC) uniforms.uPalC.value = paletteVecs.c;
-    if (uniforms.uPalD) uniforms.uPalD.value = paletteVecs.d;
-
-    if (uniforms.uUsePalette) {
-      const useSimpleInterpolation = proceduralSettings.syncWithObject &&
-        (colorAlgorithm === 'monochromatic' || colorAlgorithm === 'analogous');
-      uniforms.uUsePalette.value = useSimpleInterpolation ? 0.0 : 1.0;
-    }
-
+    // Distortion/aberration use animated values with store fallback
     if (uniforms.uDistortion) uniforms.uDistortion.value = finalDistortion || proceduralSettings.turbulence;
     if (uniforms.uAberration) uniforms.uAberration.value = finalAberration || proceduralSettings.chromaticAberration;
-    if (uniforms.uVignette) uniforms.uVignette.value = 0.15;
-    if (uniforms.uGrain) uniforms.uGrain.value = proceduralSettings.noiseGrain;
-    if (uniforms.uAtmosphere) uniforms.uAtmosphere.value = proceduralSettings.horizon;
-    if (uniforms.uTurbulence) uniforms.uTurbulence.value = proceduralSettings.turbulence;
-    if (uniforms.uDualTone) uniforms.uDualTone.value = proceduralSettings.dualToneContrast;
-    if (uniforms.uSunIntensity) uniforms.uSunIntensity.value = proceduralSettings.sunIntensity;
-    if (uniforms.uSunPosition?.value && typeof (uniforms.uSunPosition.value as THREE.Vector3).set === 'function') {
-      (uniforms.uSunPosition.value as THREE.Vector3).set(...proceduralSettings.sunPosition);
+
+    // --- DIRTY-FLAG: Static procedural settings (only update when store changes) ---
+    if (skyboxChanged || appearanceChanged) {
+      if (uniforms.uMode) uniforms.uMode.value = modeInt;
+
+      // Core procedural parameters
+      if (uniforms.uScale) uniforms.uScale.value = proceduralSettings.scale;
+      if (uniforms.uComplexity) uniforms.uComplexity.value = proceduralSettings.complexity;
+      if (uniforms.uTimeScale) uniforms.uTimeScale.value = proceduralSettings.timeScale;
+      if (uniforms.uEvolution) uniforms.uEvolution.value = proceduralSettings.evolution;
+
+      // Colors and palette
+      if (uniforms.uColor1) uniforms.uColor1.value = color1Vec;
+      if (uniforms.uColor2) uniforms.uColor2.value = color2Vec;
+      if (uniforms.uPalA) uniforms.uPalA.value = paletteVecs.a;
+      if (uniforms.uPalB) uniforms.uPalB.value = paletteVecs.b;
+      if (uniforms.uPalC) uniforms.uPalC.value = paletteVecs.c;
+      if (uniforms.uPalD) uniforms.uPalD.value = paletteVecs.d;
+      if (uniforms.uUsePalette) {
+        const useSimpleInterpolation = proceduralSettings.syncWithObject &&
+          (colorAlgorithm === 'monochromatic' || colorAlgorithm === 'analogous');
+        uniforms.uUsePalette.value = useSimpleInterpolation ? 0.0 : 1.0;
+      }
+
+      // Effects and atmosphere
+      if (uniforms.uVignette) uniforms.uVignette.value = 0.15;
+      if (uniforms.uGrain) uniforms.uGrain.value = proceduralSettings.noiseGrain;
+      if (uniforms.uAtmosphere) uniforms.uAtmosphere.value = proceduralSettings.horizon;
+      if (uniforms.uTurbulence) uniforms.uTurbulence.value = proceduralSettings.turbulence;
+      if (uniforms.uDualTone) uniforms.uDualTone.value = proceduralSettings.dualToneContrast;
+      if (uniforms.uSunIntensity) uniforms.uSunIntensity.value = proceduralSettings.sunIntensity;
+      if (uniforms.uSunPosition?.value && typeof (uniforms.uSunPosition.value as THREE.Vector3).set === 'function') {
+        (uniforms.uSunPosition.value as THREE.Vector3).set(...proceduralSettings.sunPosition);
+      }
+
+      // Starfield settings
+      if (uniforms.uStarDensity) uniforms.uStarDensity.value = proceduralSettings.starfield.density;
+      if (uniforms.uStarBrightness) uniforms.uStarBrightness.value = proceduralSettings.starfield.brightness;
+      if (uniforms.uStarSize) uniforms.uStarSize.value = proceduralSettings.starfield.size;
+      if (uniforms.uStarTwinkle) uniforms.uStarTwinkle.value = proceduralSettings.starfield.twinkle;
+      if (uniforms.uStarGlow) uniforms.uStarGlow.value = proceduralSettings.starfield.glow;
+      if (uniforms.uStarColorVariation) uniforms.uStarColorVariation.value = proceduralSettings.starfield.colorVariation;
+
+      // Aurora settings
+      if (uniforms.uAuroraCurtainHeight) uniforms.uAuroraCurtainHeight.value = proceduralSettings.aurora?.curtainHeight ?? 0.5;
+      if (uniforms.uAuroraWaveFrequency) uniforms.uAuroraWaveFrequency.value = proceduralSettings.aurora?.waveFrequency ?? 1.0;
+
+      // Horizon gradient settings
+      if (uniforms.uHorizonGradientContrast) uniforms.uHorizonGradientContrast.value = proceduralSettings.horizonGradient?.gradientContrast ?? 0.5;
+      if (uniforms.uHorizonSpotlightFocus) uniforms.uHorizonSpotlightFocus.value = proceduralSettings.horizonGradient?.spotlightFocus ?? 0.5;
+
+      // Ocean settings
+      if (uniforms.uOceanCausticIntensity) uniforms.uOceanCausticIntensity.value = proceduralSettings.ocean?.causticIntensity ?? 0.5;
+      if (uniforms.uOceanDepthGradient) uniforms.uOceanDepthGradient.value = proceduralSettings.ocean?.depthGradient ?? 0.5;
+      if (uniforms.uOceanBubbleDensity) uniforms.uOceanBubbleDensity.value = proceduralSettings.ocean?.bubbleDensity ?? 0.3;
+      if (uniforms.uOceanSurfaceShimmer) uniforms.uOceanSurfaceShimmer.value = proceduralSettings.ocean?.surfaceShimmer ?? 0.4;
+
+      // Parallax settings
+      if (uniforms.uParallaxEnabled) uniforms.uParallaxEnabled.value = proceduralSettings.parallaxEnabled ? 1.0 : 0.0;
+      if (uniforms.uParallaxStrength) uniforms.uParallaxStrength.value = proceduralSettings.parallaxStrength ?? 0.5;
+
+      // Update version refs after processing
+      lastSkyboxVersionRef.current = skyboxVersion;
+      lastAppearanceVersionRef.current = appearanceVersion;
     }
-
-    if (uniforms.uStarDensity) uniforms.uStarDensity.value = proceduralSettings.starfield.density;
-    if (uniforms.uStarBrightness) uniforms.uStarBrightness.value = proceduralSettings.starfield.brightness;
-    if (uniforms.uStarSize) uniforms.uStarSize.value = proceduralSettings.starfield.size;
-    if (uniforms.uStarTwinkle) uniforms.uStarTwinkle.value = proceduralSettings.starfield.twinkle;
-    if (uniforms.uStarGlow) uniforms.uStarGlow.value = proceduralSettings.starfield.glow;
-    if (uniforms.uStarColorVariation) uniforms.uStarColorVariation.value = proceduralSettings.starfield.colorVariation;
-
-    if (uniforms.uAuroraCurtainHeight) uniforms.uAuroraCurtainHeight.value = proceduralSettings.aurora?.curtainHeight ?? 0.5;
-    if (uniforms.uAuroraWaveFrequency) uniforms.uAuroraWaveFrequency.value = proceduralSettings.aurora?.waveFrequency ?? 1.0;
-
-    if (uniforms.uHorizonGradientContrast) uniforms.uHorizonGradientContrast.value = proceduralSettings.horizonGradient?.gradientContrast ?? 0.5;
-    if (uniforms.uHorizonSpotlightFocus) uniforms.uHorizonSpotlightFocus.value = proceduralSettings.horizonGradient?.spotlightFocus ?? 0.5;
-
-    if (uniforms.uOceanCausticIntensity) uniforms.uOceanCausticIntensity.value = proceduralSettings.ocean?.causticIntensity ?? 0.5;
-    if (uniforms.uOceanDepthGradient) uniforms.uOceanDepthGradient.value = proceduralSettings.ocean?.depthGradient ?? 0.5;
-    if (uniforms.uOceanBubbleDensity) uniforms.uOceanBubbleDensity.value = proceduralSettings.ocean?.bubbleDensity ?? 0.3;
-    if (uniforms.uOceanSurfaceShimmer) uniforms.uOceanSurfaceShimmer.value = proceduralSettings.ocean?.surfaceShimmer ?? 0.4;
-
-    if (uniforms.uParallaxEnabled) uniforms.uParallaxEnabled.value = proceduralSettings.parallaxEnabled ? 1.0 : 0.0;
-    if (uniforms.uParallaxStrength) uniforms.uParallaxStrength.value = proceduralSettings.parallaxStrength ?? 0.5;
   }, FRAME_PRIORITY.ANIMATION);
 
   if (opacity === 0 && fadeStartTime.current === null) {

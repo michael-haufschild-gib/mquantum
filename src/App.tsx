@@ -20,14 +20,12 @@ import { ContextLostOverlay } from '@/components/overlays/ContextLostOverlay';
 import { MsgBox } from '@/components/overlays/MsgBox';
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal';
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay';
-import {
-  isWebGL2Supported,
-  WebGL2UnsupportedOverlay,
-} from '@/components/overlays/WebGL2UnsupportedOverlay';
+import { WebGL2UnsupportedOverlay } from '@/components/overlays/WebGL2UnsupportedOverlay';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { GeometryLoadingIndicator } from '@/components/ui/GeometryLoadingIndicator';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { useAnimationLoop } from '@/hooks/useAnimationLoop';
+import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities';
 import { useDynamicFavicon } from '@/hooks/useDynamicFavicon';
 import { useFaceDepths } from '@/hooks/useFaceDepths';
 import { useFaceDetection } from '@/hooks/useFaceDetection';
@@ -194,8 +192,8 @@ function AppContent() {
   // Restore state after WebGL context recovery failure
   useStateRecovery();
 
-  // Check WebGL2 support once at mount
-  const webgl2Supported = useMemo(() => isWebGL2Supported(), []);
+  // Detect device capabilities (WebGL2 + GPU tier) and apply mobile defaults
+  const { webgl2Supported } = useDeviceCapabilities();
 
   // Get background color from visual store (PRD Story 6 AC7)
   const backgroundColor = useAppearanceStore((state) => state.backgroundColor);
