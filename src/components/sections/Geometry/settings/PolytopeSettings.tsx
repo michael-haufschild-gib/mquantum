@@ -1,6 +1,5 @@
 import { Section } from '@/components/sections/Section';
 import { Slider } from '@/components/ui/Slider';
-import { } from '@/lib/geometry/extended/types';
 import { getConfigStoreKey, getTypeName } from '@/lib/geometry/registry';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
