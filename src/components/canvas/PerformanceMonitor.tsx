@@ -10,6 +10,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useWebGLContextStore } from '@/stores/webglContextStore';
 import { AnimatePresence, LazyMotion, domMax, m, useMotionValue } from 'motion/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 // --- Icons ---
 const Icons = {
@@ -116,7 +117,7 @@ const CollapsedView = React.memo(function CollapsedView() {
   });
 
   // Direct DOM updates via SELECTIVE subscription
-  // CRITICAL: Only fires when fps/frameTime/history changes, NOT on sceneGpu (60Hz) updates
+  // Only fires when fps/frameTime/history changes (2Hz after throttle fix)
   useEffect(() => {
     const unsubscribe = usePerformanceMetricsStore.subscribe(
       (state, prevState) => {
@@ -263,102 +264,84 @@ const CollapsedView = React.memo(function CollapsedView() {
 });
 
 // ============================================================================
-// EXPANDED CONTENT - All store subscriptions isolated here
+// FPS HEADER - Isolated subscription for FPS graph area
 // ============================================================================
-interface ExpandedContentProps {
-  onCollapse: () => void;
-  didDrag: boolean;
-}
+const FPSHeader = React.memo(function FPSHeader() {
+  // Use useShallow for grouped subscription - only re-renders when these specific values change
+  const { fps, frameTime, minFps, maxFps, fpsHistory } = usePerformanceMetricsStore(
+    useShallow((s) => ({
+      fps: s.fps,
+      frameTime: s.frameTime,
+      minFps: s.minFps,
+      maxFps: s.maxFps,
+      fpsHistory: s.history.fps,
+    }))
+  );
 
-const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDrag }: ExpandedContentProps) {
-  // -- ALL store subscriptions are here, not in parent --
-  const objectType = useGeometryStore(state => state.objectType);
-  const mandelbulbConfig = useExtendedObjectStore(state => state.mandelbulb);
-  const quaternionJuliaConfig = useExtendedObjectStore(state => state.quaternionJulia);
-
-  const fps = usePerformanceMetricsStore((s) => s.fps);
-  const frameTime = usePerformanceMetricsStore((s) => s.frameTime);
-  const minFps = usePerformanceMetricsStore((s) => s.minFps);
-  const maxFps = usePerformanceMetricsStore((s) => s.maxFps);
-  const fpsHistory = usePerformanceMetricsStore((s) => s.history.fps);
-  const gpu = usePerformanceMetricsStore((s) => s.gpu);
-  const sceneGpu = usePerformanceMetricsStore((s) => s.sceneGpu);
-  const memory = usePerformanceMetricsStore((s) => s.memory);
-  const gpuName = usePerformanceMetricsStore((s) => s.gpuName);
-  const viewport = usePerformanceMetricsStore((s) => s.viewport);
-  const vram = usePerformanceMetricsStore((s) => s.vram);
-
-  const shaderDebugInfos = usePerformanceStore((state) => state.shaderDebugInfos);
-  const shaderOverrides = usePerformanceStore((state) => state.shaderOverrides);
-  const toggleShaderModule = usePerformanceStore((state) => state.toggleShaderModule);
-  const temporalReprojectionEnabled = usePerformanceStore((state) => state.temporalReprojectionEnabled);
-
-  const showDepthBuffer = useUIStore((state) => state.showDepthBuffer);
-  const setShowDepthBuffer = useUIStore((state) => state.setShowDepthBuffer);
-  const showNormalBuffer = useUIStore((state) => state.showNormalBuffer);
-  const setShowNormalBuffer = useUIStore((state) => state.setShowNormalBuffer);
-  const showTemporalDepthBuffer = useUIStore((state) => state.showTemporalDepthBuffer);
-  const setShowTemporalDepthBuffer = useUIStore((state) => state.setShowTemporalDepthBuffer);
-  const perfMonitorTab = useUIStore((state) => state.perfMonitorTab);
-  const setPerfMonitorTab = useUIStore((state) => state.setPerfMonitorTab);
-
-  const triggerContextLoss = useWebGLContextStore((state) => state.debugTriggerContextLoss);
-  const contextStatus = useWebGLContextStore((state) => state.status);
-
-  // -- Local state --
-  const [bufferStats, setBufferStats] = useState<BufferStats | null>(null);
-  const [selectedShaderKey, setSelectedShaderKey] = useState<string | null>(null);
-
-  const isDevelopment = import.meta.env.MODE !== 'production';
-
-  // Buffer Stats Refresh
-  const refreshBufferStats = useCallback(() => {
-    const currentStats = usePerformanceMetricsStore.getState().buffers;
-    setBufferStats({ ...currentStats });
-  }, []);
-
-  useEffect(() => {
-    if (perfMonitorTab === 'buffers') refreshBufferStats();
-  }, [perfMonitorTab, refreshBufferStats]);
-
-  // Shader Selection
-  useEffect(() => {
-    const keys = Object.keys(shaderDebugInfos);
-    if (keys.length > 0) {
-      if (!selectedShaderKey || !shaderDebugInfos[selectedShaderKey]) {
-        if (keys.includes('object')) setSelectedShaderKey('object');
-        else setSelectedShaderKey(keys[0]!);
-      }
-    } else {
-      setSelectedShaderKey(null);
-    }
-  }, [shaderDebugInfos, selectedShaderKey]);
-
-  // Derived values
   const fpsColor = getHealthColor(fps, 55, 30);
+
+  return (
+    <div className="px-5 py-5 space-y-4 bg-gradient-to-b from-[var(--bg-hover)] to-transparent">
+      <div className="flex justify-between items-end mb-2">
+        <div>
+          <div className={`text-4xl font-bold font-mono tracking-tighter ${fpsColor.text}`}>
+            {fps}
+            <span className="text-sm text-text-tertiary ml-2 font-sans tracking-normal font-medium">FPS</span>
+          </div>
+          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
+            Min {minFps} • Max {maxFps}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-mono text-text-secondary">{frameTime.toFixed(1)}<span className="text-xs text-text-tertiary ml-1">ms</span></div>
+          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">Frame Time</div>
+        </div>
+      </div>
+
+      <div className="h-16 w-full relative">
+        <Sparkline
+          data={fpsHistory}
+          width={320}
+          height={64}
+          color={fpsColor.stroke}
+          fill={true}
+          maxY={80}
+        />
+        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+          <div className="w-full border-t border-dashed border-border-subtle"></div>
+          <div className="w-full border-t border-dashed border-border-subtle"></div>
+          <div className="w-full border-t border-dashed border-border-subtle"></div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// STATS TAB - Isolated subscription for GPU/memory stats
+// ============================================================================
+const StatsTabContent = React.memo(function StatsTabContent() {
+  // Grouped subscription for stats data
+  const { gpu, sceneGpu, memory } = usePerformanceMetricsStore(
+    useShallow((s) => ({
+      gpu: s.gpu,
+      sceneGpu: s.sceneGpu,
+      memory: s.memory,
+    }))
+  );
+
+  const objectType = useGeometryStore((s) => s.objectType);
+  const mandelbulbConfig = useExtendedObjectStore((s) => s.mandelbulb);
+  const quaternionJuliaConfig = useExtendedObjectStore((s) => s.quaternionJulia);
+
   const sceneVertices = sceneGpu.triangles * 3 + sceneGpu.lines * 2 + sceneGpu.points;
   const totalVertices = gpu.triangles * 3 + gpu.lines * 2 + gpu.points;
   const isRaymarching = isRaymarchingType(objectType);
   const configKey = getConfigStoreKey(objectType);
   const raySteps = configKey === 'mandelbulb' ? mandelbulbConfig.maxIterations :
     configKey === 'quaternionJulia' ? quaternionJuliaConfig.maxIterations : 0;
-  const activeShaderInfo = selectedShaderKey ? shaderDebugInfos[selectedShaderKey] : null;
 
-  // Temporal preview is only available when:
-  // 1. Temporal reprojection is enabled in settings
-  // 2. AND current object type supports it (mandelbulb, julia, schroedinger)
-  const temporalPreviewAvailable = temporalReprojectionEnabled &&
-    (objectType === 'mandelbulb' || objectType === 'quaternion-julia' || objectType === 'schroedinger');
-
-  // Graceful handling: turn off temporal preview when object type changes to unsupported
-  useEffect(() => {
-    if (showTemporalDepthBuffer && !temporalPreviewAvailable) {
-      setShowTemporalDepthBuffer(false);
-    }
-  }, [temporalPreviewAvailable, showTemporalDepthBuffer, setShowTemporalDepthBuffer]);
-
-  // --- Content Panels ---
-  const PerfContent = (
+  return (
     <div className="grid grid-cols-1 gap-5 p-5">
       <div className="space-y-3">
         <SectionHeader icon={<Icons.Zap />} label="Scene Geometry" />
@@ -398,8 +381,21 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
       )}
     </div>
   );
+});
 
-  const SysContent = (
+// ============================================================================
+// SYSTEM TAB - Isolated subscription for system info
+// ============================================================================
+const SystemTabContent = React.memo(function SystemTabContent() {
+  const { gpuName, viewport, vram } = usePerformanceMetricsStore(
+    useShallow((s) => ({
+      gpuName: s.gpuName,
+      viewport: s.viewport,
+      vram: s.vram,
+    }))
+  );
+
+  return (
     <div className="space-y-5 p-5">
       <div className="space-y-3">
         <SectionHeader icon={<Icons.Chip />} label="GPU Info" />
@@ -429,75 +425,146 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
       </div>
     </div>
   );
+});
 
-  const ShaderContent = (
-    <div className="space-y-5 p-5">
-      {Object.keys(shaderDebugInfos).length === 0 ? (
+// ============================================================================
+// SHADER TAB - Isolated subscription for shader debug info
+// ============================================================================
+const ShaderTabContent = React.memo(function ShaderTabContent() {
+  const objectType = useGeometryStore((s) => s.objectType);
+  const shaderDebugInfos = usePerformanceStore((s) => s.shaderDebugInfos);
+  const shaderOverrides = usePerformanceStore((s) => s.shaderOverrides);
+  const toggleShaderModule = usePerformanceStore((s) => s.toggleShaderModule);
+
+  const [selectedShaderKey, setSelectedShaderKey] = useState<string | null>(null);
+
+  // Auto-select shader when available
+  useEffect(() => {
+    const keys = Object.keys(shaderDebugInfos);
+    if (keys.length > 0) {
+      if (!selectedShaderKey || !shaderDebugInfos[selectedShaderKey]) {
+        if (keys.includes('object')) setSelectedShaderKey('object');
+        else setSelectedShaderKey(keys[0]!);
+      }
+    } else {
+      setSelectedShaderKey(null);
+    }
+  }, [shaderDebugInfos, selectedShaderKey]);
+
+  const activeShaderInfo = selectedShaderKey ? shaderDebugInfos[selectedShaderKey] : null;
+
+  if (Object.keys(shaderDebugInfos).length === 0) {
+    return (
+      <div className="space-y-5 p-5">
         <div className="text-center text-text-tertiary py-8 text-xs">No shader data available</div>
-      ) : (
-        <>
-          <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
-            {Object.keys(shaderDebugInfos).map(key => (
-              <button
-                key={key}
-                onClick={() => setSelectedShaderKey(key)}
-                className={`
-                  flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border
-                  ${selectedShaderKey === key
-                    ? 'bg-accent/20 text-accent border-accent/30'
-                    : 'bg-[var(--bg-hover)] text-text-tertiary border-border-subtle hover:bg-[var(--bg-active)] hover:text-text-secondary'
-                  }
-                `}
-              >
-                {formatShaderName(key, objectType)}
-              </button>
-            ))}
-          </div>
-          {activeShaderInfo && (
-            <div className="animate-in fade-in duration-300 space-y-5">
-              <div className="space-y-3">
-                <SectionHeader icon={<Icons.Layers />} label="Stats" />
-                <div className="grid grid-cols-2 gap-2">
-                  <InfoCard label="Vertex" value={formatBytes(activeShaderInfo.vertexShaderLength)} />
-                  <InfoCard label="Fragment" value={formatBytes(activeShaderInfo.fragmentShaderLength)} />
-                </div>
-              </div>
-              <div className="space-y-3">
-                <SectionHeader icon={<Icons.Zap />} label="Features" />
-                <div className="flex flex-wrap gap-2">
-                  {activeShaderInfo.features.map(f => (
-                    <span key={f} className="px-2 py-1 bg-success border border-success-border text-success rounded text-[9px] font-mono uppercase tracking-wide">
-                      {f}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <SectionHeader icon={<Icons.Database />} label="Modules" />
-                <div className="border border-border-subtle rounded-lg overflow-hidden">
-                  {activeShaderInfo.activeModules.map((mod, i) => {
-                    const isEnabled = !shaderOverrides.includes(mod);
-                    return (
-                      <div key={i} className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] border-b border-border-subtle last:border-0 transition-colors">
-                        <span className={`text-[10px] font-mono ${isEnabled ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}>{mod}</span>
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={() => toggleShaderModule(mod)}
-                          className="scale-75 origin-right"
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5 p-5">
+      <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
+        {Object.keys(shaderDebugInfos).map(key => (
+          <button
+            key={key}
+            onClick={() => setSelectedShaderKey(key)}
+            className={`
+              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border
+              ${selectedShaderKey === key
+                ? 'bg-accent/20 text-accent border-accent/30'
+                : 'bg-[var(--bg-hover)] text-text-tertiary border-border-subtle hover:bg-[var(--bg-active)] hover:text-text-secondary'
+              }
+            `}
+          >
+            {formatShaderName(key, objectType)}
+          </button>
+        ))}
+      </div>
+      {activeShaderInfo && (
+        <div className="animate-in fade-in duration-300 space-y-5">
+          <div className="space-y-3">
+            <SectionHeader icon={<Icons.Layers />} label="Stats" />
+            <div className="grid grid-cols-2 gap-2">
+              <InfoCard label="Vertex" value={formatBytes(activeShaderInfo.vertexShaderLength)} />
+              <InfoCard label="Fragment" value={formatBytes(activeShaderInfo.fragmentShaderLength)} />
             </div>
-          )}
-        </>
+          </div>
+          <div className="space-y-3">
+            <SectionHeader icon={<Icons.Zap />} label="Features" />
+            <div className="flex flex-wrap gap-2">
+              {activeShaderInfo.features.map(f => (
+                <span key={f} className="px-2 py-1 bg-success border border-success-border text-success rounded text-[9px] font-mono uppercase tracking-wide">
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <SectionHeader icon={<Icons.Database />} label="Modules" />
+            <div className="border border-border-subtle rounded-lg overflow-hidden">
+              {activeShaderInfo.activeModules.map((mod) => {
+                const isEnabled = !shaderOverrides.includes(mod);
+                return (
+                  <div key={mod} className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] border-b border-border-subtle last:border-0 transition-colors">
+                    <span className={`text-[10px] font-mono ${isEnabled ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}>{mod}</span>
+                    <Switch
+                      checked={isEnabled}
+                      onCheckedChange={() => toggleShaderModule(mod)}
+                      className="scale-75 origin-right"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
+});
 
-  const BuffersContent = (
+// ============================================================================
+// BUFFERS TAB - Manual refresh, isolated subscriptions
+// ============================================================================
+const BuffersTabContent = React.memo(function BuffersTabContent() {
+  const objectType = useGeometryStore((s) => s.objectType);
+  const temporalReprojectionEnabled = usePerformanceStore((s) => s.temporalReprojectionEnabled);
+
+  const showDepthBuffer = useUIStore((s) => s.showDepthBuffer);
+  const setShowDepthBuffer = useUIStore((s) => s.setShowDepthBuffer);
+  const showNormalBuffer = useUIStore((s) => s.showNormalBuffer);
+  const setShowNormalBuffer = useUIStore((s) => s.setShowNormalBuffer);
+  const showTemporalDepthBuffer = useUIStore((s) => s.showTemporalDepthBuffer);
+  const setShowTemporalDepthBuffer = useUIStore((s) => s.setShowTemporalDepthBuffer);
+
+  const triggerContextLoss = useWebGLContextStore((s) => s.debugTriggerContextLoss);
+  const contextStatus = useWebGLContextStore((s) => s.status);
+
+  const [bufferStats, setBufferStats] = useState<BufferStats | null>(null);
+  const isDevelopment = import.meta.env.MODE !== 'production';
+
+  // Temporal preview availability
+  const temporalPreviewAvailable = temporalReprojectionEnabled &&
+    (objectType === 'mandelbulb' || objectType === 'quaternion-julia' || objectType === 'schroedinger');
+
+  // Graceful handling: turn off temporal preview when object type changes to unsupported
+  useEffect(() => {
+    if (showTemporalDepthBuffer && !temporalPreviewAvailable) {
+      setShowTemporalDepthBuffer(false);
+    }
+  }, [temporalPreviewAvailable, showTemporalDepthBuffer, setShowTemporalDepthBuffer]);
+
+  // Refresh buffer stats on mount
+  const refreshBufferStats = useCallback(() => {
+    const currentStats = usePerformanceMetricsStore.getState().buffers;
+    setBufferStats({ ...currentStats });
+  }, []);
+
+  useEffect(() => {
+    refreshBufferStats();
+  }, [refreshBufferStats]);
+
+  return (
     <div className="space-y-5 p-5">
       <div className="flex items-center justify-between">
         <SectionHeader icon={<Icons.Square />} label="Render Targets" />
@@ -559,6 +626,28 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
       )}
     </div>
   );
+});
+
+// ============================================================================
+// EXPANDED CONTENT - Minimal subscriptions, delegates to tab components
+// ============================================================================
+interface ExpandedContentProps {
+  onCollapse: () => void;
+  didDrag: boolean;
+}
+
+const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDrag }: ExpandedContentProps) {
+  // Only subscribe to tab state - not metrics
+  const perfMonitorTab = useUIStore((s) => s.perfMonitorTab);
+  const setPerfMonitorTab = useUIStore((s) => s.setPerfMonitorTab);
+
+  // Memoize tab definitions to prevent recreation
+  const tabs = useMemo(() => [
+    { id: 'perf', label: 'Stats', content: <StatsTabContent /> },
+    { id: 'sys', label: 'System', content: <SystemTabContent /> },
+    { id: 'shader', label: 'Shader', content: <ShaderTabContent /> },
+    { id: 'buffers', label: 'Buffers', content: <BuffersTabContent /> }
+  ], []);
 
   return (
     <>
@@ -576,40 +665,8 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
         </div>
       </div>
 
-      {/* Main Graph Area */}
-      <div className="px-5 py-5 space-y-4 bg-gradient-to-b from-[var(--bg-hover)] to-transparent">
-        <div className="flex justify-between items-end mb-2">
-          <div>
-            <div className={`text-4xl font-bold font-mono tracking-tighter ${fpsColor.text}`}>
-              {fps}
-              <span className="text-sm text-text-tertiary ml-2 font-sans tracking-normal font-medium">FPS</span>
-            </div>
-            <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
-              Min {minFps} • Max {maxFps}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-lg font-mono text-text-secondary">{frameTime.toFixed(1)}<span className="text-xs text-text-tertiary ml-1">ms</span></div>
-            <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">Frame Time</div>
-          </div>
-        </div>
-
-        <div className="h-16 w-full relative">
-          <Sparkline
-            data={fpsHistory}
-            width={320}
-            height={64}
-            color={fpsColor.stroke}
-            fill={true}
-            maxY={80}
-          />
-          <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-            <div className="w-full border-t border-dashed border-border-subtle"></div>
-            <div className="w-full border-t border-dashed border-border-subtle"></div>
-            <div className="w-full border-t border-dashed border-border-subtle"></div>
-          </div>
-        </div>
-      </div>
+      {/* FPS Header - isolated subscription */}
+      <FPSHeader />
 
       {/* Content Tabs */}
       <div className="border-t border-border-subtle h-[340px] flex flex-col">
@@ -618,14 +675,8 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
           fullWidth
           value={perfMonitorTab}
           onChange={(id) => setPerfMonitorTab(id as 'perf' | 'sys' | 'shader' | 'buffers')}
-          tabs={[
-            { id: 'perf', label: 'Stats', content: PerfContent },
-            { id: 'sys', label: 'System', content: SysContent },
-            { id: 'shader', label: 'Shader', content: ShaderContent },
-            { id: 'buffers', label: 'Buffers', content: BuffersContent }
-          ]}
+          tabs={tabs}
           className="h-full border-b border-border-subtle text-[10px]"
-
           contentClassName="h-full"
         />
       </div>
@@ -636,7 +687,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
 // ============================================================================
 // SPARKLINE COMPONENT
 // ============================================================================
-const Sparkline = ({
+const Sparkline = React.memo(function Sparkline({
   data,
   width = 100,
   height = 30,
@@ -652,7 +703,7 @@ const Sparkline = ({
   fill?: boolean,
   minY?: number,
   maxY?: number
-}) => {
+}) {
   const points = useMemo(() => {
     if (data.length < 2) return '';
     const range = maxY - minY;
@@ -676,7 +727,7 @@ const Sparkline = ({
       <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
     </svg>
   );
-};
+});
 
 // ============================================================================
 // MAIN COMPONENT - NO store subscriptions, minimal re-renders
@@ -687,13 +738,16 @@ const Sparkline = ({
  * PERFORMANCE OPTIMIZATION:
  * - Parent has ZERO store subscriptions to avoid re-renders when collapsed
  * - CollapsedView updates via refs (no React re-renders)
- * - ExpandedContent has all subscriptions isolated
- * - This prevents 60x/sec sceneGpu updates from causing layout recalcs
+ * - ExpandedContent delegates to memoized tab components
+ * - Each tab component has isolated subscriptions
+ * - sceneGpu updates throttled to 2Hz (was 60Hz)
  * @returns The performance monitor overlay component
  */
 export function PerformanceMonitor() {
-  // -- State (NO store subscriptions here) --
-  const [expanded, setExpanded] = useState(false);
+  // -- State --
+  // Use store for expanded state so PerformanceStatsCollector can read it
+  const expanded = useUIStore((s) => s.perfMonitorExpanded);
+  const setExpanded = useUIStore((s) => s.setPerfMonitorExpanded);
   const [isDragging, setIsDragging] = useState(false);
   const [didDrag, setDidDrag] = useState(false);
 

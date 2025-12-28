@@ -48,6 +48,8 @@ export interface UISliceState {
   // --- UI Helpers ---
   showAxisHelper: boolean
   showPerfMonitor: boolean
+  /** Whether the performance monitor is expanded (vs collapsed) */
+  perfMonitorExpanded: boolean
   /** Active tab in the performance monitor */
   perfMonitorTab: PerfMonitorTab
   showDepthBuffer: boolean
@@ -69,6 +71,7 @@ export interface UISliceActions {
   // --- UI Helper Actions ---
   setShowAxisHelper: (show: boolean) => void
   setShowPerfMonitor: (show: boolean) => void
+  setPerfMonitorExpanded: (expanded: boolean) => void
   setPerfMonitorTab: (tab: PerfMonitorTab) => void
   setShowDepthBuffer: (show: boolean) => void
   setShowNormalBuffer: (show: boolean) => void
@@ -102,6 +105,7 @@ export const UI_INITIAL_STATE: UISliceState = {
   // UI helpers
   showAxisHelper: DEFAULT_SHOW_AXIS_HELPER,
   showPerfMonitor: DEFAULT_SHOW_PERF_MONITOR,
+  perfMonitorExpanded: false,
   perfMonitorTab: 'perf',
   showDepthBuffer: DEFAULT_SHOW_DEPTH_BUFFER,
   showNormalBuffer: DEFAULT_SHOW_NORMAL_BUFFER,
@@ -132,6 +136,10 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set) => ({
 
   setShowPerfMonitor: (show: boolean) => {
     set({ showPerfMonitor: show })
+  },
+
+  setPerfMonitorExpanded: (expanded: boolean) => {
+    set({ perfMonitorExpanded: expanded })
   },
 
   setPerfMonitorTab: (tab: PerfMonitorTab) => {

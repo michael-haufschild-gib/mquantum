@@ -140,6 +140,24 @@ export interface FrozenPostProcessingState {
   readonly gravityDistortionScale: number
   readonly gravityFalloff: number
   readonly gravityChromaticAberration: number
+
+  // Paper Texture
+  readonly paperEnabled: boolean
+  readonly paperContrast: number
+  readonly paperRoughness: number
+  readonly paperFiber: number
+  readonly paperFiberSize: number
+  readonly paperCrumples: number
+  readonly paperCrumpleSize: number
+  readonly paperFolds: number
+  readonly paperFoldCount: number
+  readonly paperDrops: number
+  readonly paperFade: number
+  readonly paperSeed: number
+  readonly paperColorFront: string
+  readonly paperColorBack: string
+  readonly paperQuality: PostProcessingSliceState['paperQuality']
+  readonly paperIntensity: number
 }
 
 /**
@@ -435,6 +453,24 @@ function capturePostProcessingState(
     gravityDistortionScale: state.gravityDistortionScale,
     gravityFalloff: state.gravityFalloff,
     gravityChromaticAberration: state.gravityChromaticAberration,
+
+    // Paper Texture
+    paperEnabled: state.paperEnabled,
+    paperContrast: state.paperContrast,
+    paperRoughness: state.paperRoughness,
+    paperFiber: state.paperFiber,
+    paperFiberSize: state.paperFiberSize,
+    paperCrumples: state.paperCrumples,
+    paperCrumpleSize: state.paperCrumpleSize,
+    paperFolds: state.paperFolds,
+    paperFoldCount: state.paperFoldCount,
+    paperDrops: state.paperDrops,
+    paperFade: state.paperFade,
+    paperSeed: state.paperSeed,
+    paperColorFront: state.paperColorFront,
+    paperColorBack: state.paperColorBack,
+    paperQuality: state.paperQuality,
+    paperIntensity: state.paperIntensity,
   }
 }
 
@@ -647,6 +683,23 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         gravityDistortionScale: 1,
         gravityFalloff: 1.5,
         gravityChromaticAberration: 0,
+        // Paper Texture
+        paperEnabled: false,
+        paperContrast: 0.5,
+        paperRoughness: 0.3,
+        paperFiber: 0.4,
+        paperFiberSize: 0.5,
+        paperCrumples: 0.2,
+        paperCrumpleSize: 0.5,
+        paperFolds: 0.1,
+        paperFoldCount: 5,
+        paperDrops: 0,
+        paperFade: 0,
+        paperSeed: 42,
+        paperColorFront: '#f5f5dc',
+        paperColorBack: '#ffffff',
+        paperQuality: 'medium',
+        paperIntensity: 1.0,
       },
       performance: {
         isInteracting: false,

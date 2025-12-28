@@ -1,5 +1,3 @@
-import React from 'react';
-
 export interface SelectOption<T extends string = string> {
   value: T;
   label: string;
@@ -24,10 +22,6 @@ export const Select = <T extends string = string>({
   disabled = false,
   'data-testid': testId,
 }: SelectProps<T>) => {
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    onChange(e.target.value as T);
-  };
-
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       {label && (
@@ -38,8 +32,9 @@ export const Select = <T extends string = string>({
       <div className="relative group">
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value as T)}
         disabled={disabled}
+        data-testid={testId}
         className="glass-input w-full pl-3 pr-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
       >
           {options.map((option) => (

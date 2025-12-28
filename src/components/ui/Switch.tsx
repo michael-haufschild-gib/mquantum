@@ -61,7 +61,7 @@ export const Switch: React.FC<SwitchProps> = ({
 
         {/* Thumb */}
         <m.div
-          layout
+          initial={false}
           transition={{
             type: "spring",
             stiffness: 700,

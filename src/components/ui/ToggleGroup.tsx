@@ -34,6 +34,7 @@ export const ToggleGroup = <T extends string = string>({
     <div
       className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${className}`}
       role="group"
+      aria-label={ariaLabel}
     >
         {options.map((option) => {
           const isSelected = option.value === value;

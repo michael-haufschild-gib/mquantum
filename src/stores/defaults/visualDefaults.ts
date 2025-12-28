@@ -151,6 +151,61 @@ export const DEFAULT_GRAVITY_FALLOFF = 1.5
 export const DEFAULT_GRAVITY_CHROMATIC_ABERRATION = 0.0
 
 // ============================================================================
+// Paper Texture Effect Defaults
+// ============================================================================
+
+/** Paper texture quality level */
+export type PaperQuality = 'low' | 'medium' | 'high'
+
+/** Paper texture enabled by default */
+export const DEFAULT_PAPER_ENABLED = false
+
+/** Contrast - blending behavior, sharper vs smoother color transitions (0-1) */
+export const DEFAULT_PAPER_CONTRAST = 0.5
+
+/** Roughness - pixel noise intensity (0-1) */
+export const DEFAULT_PAPER_ROUGHNESS = 0.3
+
+/** Fiber - curly-shaped noise intensity (0-1) */
+export const DEFAULT_PAPER_FIBER = 0.4
+
+/** Fiber size - curly-shaped noise scale (0.1-2) */
+export const DEFAULT_PAPER_FIBER_SIZE = 0.5
+
+/** Crumples - cell-based crumple pattern intensity (0-1) */
+export const DEFAULT_PAPER_CRUMPLES = 0.2
+
+/** Crumple size - cell-based crumple pattern scale (0.1-2) */
+export const DEFAULT_PAPER_CRUMPLE_SIZE = 0.5
+
+/** Folds - depth of the folds (0-1) */
+export const DEFAULT_PAPER_FOLDS = 0.1
+
+/** Fold count - number of folds (1-15) */
+export const DEFAULT_PAPER_FOLD_COUNT = 5
+
+/** Drops - visibility of speckle/water drop pattern (0-1) */
+export const DEFAULT_PAPER_DROPS = 0.0
+
+/** Fade - big-scale noise mask applied to the pattern (0-1) */
+export const DEFAULT_PAPER_FADE = 0.0
+
+/** Seed - randomization seed for procedural patterns (0-1000) */
+export const DEFAULT_PAPER_SEED = 42
+
+/** Front color - foreground/highlight color (hex) */
+export const DEFAULT_PAPER_COLOR_FRONT = '#f5f5dc'
+
+/** Back color - background/shadow color (hex) */
+export const DEFAULT_PAPER_COLOR_BACK = '#ffffff'
+
+/** Quality level - controls feature complexity and performance */
+export const DEFAULT_PAPER_QUALITY: PaperQuality = 'medium'
+
+/** Intensity - overall effect blend intensity (0-1) */
+export const DEFAULT_PAPER_INTENSITY = 1.0
+
+// ============================================================================
 // Lighting Defaults
 // ============================================================================
 

@@ -66,6 +66,7 @@ import {
   GravitationalLensingPass,
   MainObjectMRTPass,
   NormalPass,
+  PaperTexturePass,
   RefractionPass,
   SMAAPass,
   SSRPass,
@@ -126,8 +127,32 @@ const RESOURCES = {
   LENSING_OUTPUT: 'lensingOutput',
   CINEMATIC_OUTPUT: 'cinematicOutput',
   TONEMAPPED_OUTPUT: 'tonemappedOutput',
+  PAPER_OUTPUT: 'paperOutput',
   AA_OUTPUT: 'aaOutput',
 } as const;
+
+// =============================================================================
+// Performance: Throttled Scene GPU Stats Update
+// =============================================================================
+
+/**
+ * Throttle sceneGpu updates to 500ms to match main metrics update frequency.
+ * Only updates when Stats tab is active to minimize overhead.
+ */
+let lastSceneGpuUpdateTime = 0;
+const SCENE_GPU_UPDATE_INTERVAL = 500; // ms
+
+function throttledUpdateSceneGpu(stats: { calls: number; triangles: number; points: number; lines: number }) {
+  // Only update when Stats tab is showing sceneGpu data
+  const { showPerfMonitor, perfMonitorExpanded, perfMonitorTab } = useUIStore.getState();
+  if (!showPerfMonitor || !perfMonitorExpanded || perfMonitorTab !== 'perf') return;
+
+  const now = performance.now();
+  if (now - lastSceneGpuUpdateTime >= SCENE_GPU_UPDATE_INTERVAL) {
+    usePerformanceMetricsStore.getState().updateSceneGpu(stats);
+    lastSceneGpuUpdateTime = now;
+  }
+}
 
 // =============================================================================
 // Helper: Object Type Temporal Support
@@ -225,6 +250,23 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     // SSAO (GTAO)
     ssaoEnabled: s.ssaoEnabled,
     ssaoIntensity: s.ssaoIntensity,
+    // Paper texture
+    paperEnabled: s.paperEnabled,
+    paperContrast: s.paperContrast,
+    paperRoughness: s.paperRoughness,
+    paperFiber: s.paperFiber,
+    paperFiberSize: s.paperFiberSize,
+    paperCrumples: s.paperCrumples,
+    paperCrumpleSize: s.paperCrumpleSize,
+    paperFolds: s.paperFolds,
+    paperFoldCount: s.paperFoldCount,
+    paperDrops: s.paperDrops,
+    paperFade: s.paperFade,
+    paperSeed: s.paperSeed,
+    paperColorFront: s.paperColorFront,
+    paperColorBack: s.paperColorBack,
+    paperQuality: s.paperQuality,
+    paperIntensity: s.paperIntensity,
     // Depth selection
     objectOnlyDepth: s.objectOnlyDepth,
   }));
@@ -355,6 +397,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     lensing?: ScreenSpaceLensingPass;
     cinematic?: CinematicPass;
     toneMapping?: ToneMappingPass;
+    paper?: PaperTexturePass;
     fxaa?: FXAAPass;
     smaa?: SMAAPass;
   }>({});
@@ -679,6 +722,14 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     });
 
     g.addResource({
+      id: RESOURCES.PAPER_OUTPUT,
+      type: 'renderTarget',
+      size: { mode: 'screen' },
+      format: THREE.RGBAFormat,
+      dataType: THREE.HalfFloatType, // Keep precision for AA input
+    });
+
+    g.addResource({
       id: RESOURCES.AA_OUTPUT,
       type: 'renderTarget',
       size: { mode: 'screen' },
@@ -782,9 +833,8 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
         // Disabled when gravity is enabled (use split rendering instead)
         enabled: (frame) => !(frame?.stores.postProcessing.gravityEnabled ?? false),
         // Capture scene-only GPU stats for performance monitoring (excludes post-processing)
-        onRenderStats: (stats) => {
-          usePerformanceMetricsStore.getState().updateSceneGpu(stats);
-        },
+        // Throttled to 500ms to prevent 60Hz store updates
+        onRenderStats: throttledUpdateSceneGpu,
       })
     );
 
@@ -822,9 +872,8 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
         forceOpaque: true, // Render opaque, let composite shader handle alpha
         enabled: (frame) => frame?.stores.postProcessing.gravityEnabled ?? false,
         // Capture scene-only GPU stats when gravity path is active (excludes post-processing)
-        onRenderStats: (stats) => {
-          usePerformanceMetricsStore.getState().updateSceneGpu(stats);
-        },
+        // Throttled to 500ms to prevent 60Hz store updates
+        onRenderStats: throttledUpdateSceneGpu,
       })
     );
 
@@ -1127,12 +1176,39 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.toneMapping = toneMappingPass;
     g.addPass(toneMappingPass);
 
+    // Paper texture pass - applies paper/cardboard texture overlay
+    // Position: After tone mapping (LDR), before AA
+    const paperPass = new PaperTexturePass({
+      id: 'paper',
+      colorInput: RESOURCES.TONEMAPPED_OUTPUT,
+      outputResource: RESOURCES.PAPER_OUTPUT,
+      contrast: ppStateRef.current.paperContrast,
+      roughness: ppStateRef.current.paperRoughness,
+      fiber: ppStateRef.current.paperFiber,
+      fiberSize: ppStateRef.current.paperFiberSize,
+      crumples: ppStateRef.current.paperCrumples,
+      crumpleSize: ppStateRef.current.paperCrumpleSize,
+      folds: ppStateRef.current.paperFolds,
+      foldCount: ppStateRef.current.paperFoldCount,
+      drops: ppStateRef.current.paperDrops,
+      fade: ppStateRef.current.paperFade,
+      seed: ppStateRef.current.paperSeed,
+      colorFront: ppStateRef.current.paperColorFront,
+      colorBack: ppStateRef.current.paperColorBack,
+      quality: ppStateRef.current.paperQuality,
+      intensity: ppStateRef.current.paperIntensity,
+      enabled: (frame) => frame?.stores.postProcessing.paperEnabled ?? false,
+      skipPassthrough: true,
+    });
+    passRefs.current.paper = paperPass;
+    g.addPass(paperPass);
+
     // Anti-aliasing pass (only add the active one to avoid multiple writers)
     // Graph is recreated when antiAliasingMethod changes (see dependency array)
     if (ppStateRef.current.antiAliasingMethod === 'fxaa') {
       const fxaaPass = new FXAAPass({
         id: 'fxaa',
-        colorInput: RESOURCES.TONEMAPPED_OUTPUT,
+        colorInput: RESOURCES.PAPER_OUTPUT,
         outputResource: RESOURCES.AA_OUTPUT,
       });
       passRefs.current.fxaa = fxaaPass;
@@ -1141,7 +1217,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     } else if (ppStateRef.current.antiAliasingMethod === 'smaa') {
       const smaaPass = new SMAAPass({
         id: 'smaa',
-        colorInput: RESOURCES.TONEMAPPED_OUTPUT,
+        colorInput: RESOURCES.PAPER_OUTPUT,
         outputResource: RESOURCES.AA_OUTPUT,
       });
       passRefs.current.smaa = smaaPass;
@@ -1151,7 +1227,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       // No AA - use efficient CopyPass instead of FXAAPass for passthrough
       const passthroughPass = new CopyPass({
         id: 'aaPassthrough',
-        colorInput: RESOURCES.TONEMAPPED_OUTPUT,
+        colorInput: RESOURCES.PAPER_OUTPUT,
         outputResource: RESOURCES.AA_OUTPUT,
       });
       passRefs.current.fxaa = undefined;
@@ -1291,6 +1367,25 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     if (toneMapping) {
       toneMapping.setToneMapping(TONE_MAPPING_TO_THREE[lightingState.toneMappingAlgorithm]);
       toneMapping.setExposure(lightingState.exposure);
+    }
+
+    const paper = passRefs.current.paper;
+    if (paper) {
+      paper.setContrast(ppState.paperContrast);
+      paper.setRoughness(ppState.paperRoughness);
+      paper.setFiber(ppState.paperFiber);
+      paper.setFiberSize(ppState.paperFiberSize);
+      paper.setCrumples(ppState.paperCrumples);
+      paper.setCrumpleSize(ppState.paperCrumpleSize);
+      paper.setFolds(ppState.paperFolds);
+      paper.setFoldCount(ppState.paperFoldCount);
+      paper.setDrops(ppState.paperDrops);
+      paper.setFade(ppState.paperFade);
+      paper.setSeed(ppState.paperSeed);
+      paper.setColorFront(ppState.paperColorFront);
+      paper.setColorBack(ppState.paperColorBack);
+      paper.setQuality(ppState.paperQuality);
+      paper.setIntensity(ppState.paperIntensity);
     }
 
     // Update photon shell (screen-space edge glow) settings

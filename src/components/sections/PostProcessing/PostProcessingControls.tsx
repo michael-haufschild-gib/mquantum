@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BloomControls } from './BloomControls';
 import { BokehControls } from './BokehControls';
 import { CinematicControls } from './CinematicControls';
+import { PaperControls } from './PaperControls';
 // NOTE: GravityControls moved to Advanced Rendering section (AdvancedObjectControls)
 import { Switch } from '@/components/ui/Switch';
 import { Tabs } from '@/components/ui/Tabs';
@@ -22,12 +23,15 @@ export const PostProcessingControls: React.FC = () => {
     setBokehEnabled: state.setBokehEnabled,
     refractionEnabled: state.refractionEnabled,
     setRefractionEnabled: state.setRefractionEnabled,
+    paperEnabled: state.paperEnabled,
+    setPaperEnabled: state.setPaperEnabled,
   }));
   const {
     bloomEnabled, setBloomEnabled,
     cinematicEnabled, setCinematicEnabled,
     bokehEnabled, setBokehEnabled,
     refractionEnabled, setRefractionEnabled,
+    paperEnabled, setPaperEnabled,
   } = usePostProcessingStore(postProcessingSelector);
 
   const tabs = [
@@ -91,6 +95,22 @@ export const PostProcessingControls: React.FC = () => {
           />
           <div className={!refractionEnabled ? 'opacity-50 pointer-events-none' : ''}>
             <RefractionControls />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'paper',
+      label: 'Paper',
+      content: (
+        <div className="space-y-4">
+          <Switch
+            checked={paperEnabled}
+            onCheckedChange={setPaperEnabled}
+            label="Enable Paper Texture"
+          />
+          <div className={!paperEnabled ? 'opacity-50 pointer-events-none' : ''}>
+            <PaperControls />
           </div>
         </div>
       ),
