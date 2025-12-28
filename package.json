@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "vite --port 3000",
-    "build": "tsc -b && vite build",
+    "build": "npm run wasm:build && tsc -b && vite build",
+    "build:web": "tsc -b && vite build",
+    "wasm:build": "wasm-pack build ./src/wasm/mdimension_core --target web",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
