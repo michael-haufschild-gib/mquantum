@@ -67,10 +67,16 @@ export const PRESETS = [
     description: 'Glowing 4D Cross-Polytope',
     apply: () => {
       useGeometryStore.getState().setDimension(4)
+      useGeometryStore.getState().setObjectType('cross-polytope')
       useAppearanceStore.getState().setFacesVisible(true)
       usePostProcessingStore.getState().setBloomEnabled(true)
-      usePostProcessingStore.getState().setBloomIntensity(2.5)
+      usePostProcessingStore.getState().setBloomIntensity(1.5)
       useAppearanceStore.getState().setEdgeColor('#00ffcc')
+      // Enable slow rotation for visual effect
+      useAnimationStore.getState().stopAll()
+      useAnimationStore.getState().setPlaneAnimating('XW', true)
+      useAnimationStore.getState().setSpeed(0.3)
+      useAnimationStore.getState().play()
     },
   },
 ]

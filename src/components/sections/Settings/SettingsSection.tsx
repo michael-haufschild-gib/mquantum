@@ -4,10 +4,13 @@
  */
 
 import { Section } from '@/components/sections/Section';
+import { Button } from '@/components/ui/Button';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
+import { useToast } from '@/hooks/useToast';
 import { useUIStore } from '@/stores/uiStore';
-import React from 'react';
+import React, { useState } from 'react';
 
 export interface SettingsSectionProps {
   defaultOpen?: boolean;
@@ -24,11 +27,49 @@ export interface SettingsSectionProps {
 export const SettingsSection: React.FC<SettingsSectionProps> = ({
   defaultOpen = true,
 }) => {
+  const [showClearIndexDBModal, setShowClearIndexDBModal] = useState(false);
+  const [showClearLocalStorageModal, setShowClearLocalStorageModal] = useState(false);
+  const { addToast } = useToast();
 
   const showAxisHelper = useUIStore((state) => state.showAxisHelper);
   const setShowAxisHelper = useUIStore((state) => state.setShowAxisHelper);
   const maxFps = useUIStore((state) => state.maxFps);
   const setMaxFps = useUIStore((state) => state.setMaxFps);
+
+  const handleClearIndexDB = async () => {
+    try {
+      // Check browser compatibility for indexedDB.databases()
+      if (typeof indexedDB.databases !== 'function') {
+        addToast('IndexDB clearing not supported in this browser', 'error');
+        return;
+      }
+      const databases = await indexedDB.databases();
+      await Promise.all(
+        databases.map((db) => {
+          if (db.name) {
+            return new Promise<void>((resolve, reject) => {
+              const request = indexedDB.deleteDatabase(db.name!);
+              request.onsuccess = () => resolve();
+              request.onerror = () => reject(request.error);
+            });
+          }
+          return Promise.resolve();
+        })
+      );
+      addToast('IndexDB cleared', 'success');
+    } catch (error) {
+      addToast('Failed to clear IndexDB', 'error');
+    }
+  };
+
+  const handleClearLocalStorage = () => {
+    try {
+      localStorage.clear();
+      addToast('localStorage cleared', 'success');
+    } catch (error) {
+      addToast('Failed to clear localStorage', 'error');
+    }
+  };
 
   return (
     <Section title="Settings" defaultOpen={defaultOpen}>
@@ -52,6 +93,44 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           data-testid="max-fps-slider"
         />
       </div>
+      <div className="mt-3 pt-3 border-t border-panel-border flex flex-col gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowClearIndexDBModal(true)}
+          data-testid="clear-indexdb-button"
+        >
+          Clear IndexDB
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowClearLocalStorageModal(true)}
+          data-testid="clear-localstorage-button"
+        >
+          Clear localStorage
+        </Button>
+      </div>
+
+      <ConfirmModal
+        isOpen={showClearIndexDBModal}
+        onClose={() => setShowClearIndexDBModal(false)}
+        onConfirm={handleClearIndexDB}
+        title="Clear IndexDB"
+        message="This will delete all IndexDB databases. This action cannot be undone."
+        confirmText="Clear"
+        isDestructive
+      />
+
+      <ConfirmModal
+        isOpen={showClearLocalStorageModal}
+        onClose={() => setShowClearLocalStorageModal(false)}
+        onConfirm={handleClearLocalStorage}
+        title="Clear localStorage"
+        message="This will clear all localStorage data. This action cannot be undone."
+        confirmText="Clear"
+        isDestructive
+      />
     </Section>
   );
 };

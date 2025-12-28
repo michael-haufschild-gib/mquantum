@@ -26,6 +26,30 @@ import { useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
 import { usePerformanceStore } from './performanceStore'
 import { useRotationStore } from './rotationStore'
+import { useTransformStore } from './transformStore'
+
+/**
+ * Pending rAF ID for scene transition completion.
+ * Used to cancel stale callbacks when rapid changes occur.
+ */
+let pendingTransitionRafId: number | null = null
+
+/**
+ * Schedules scene transition completion after React settles.
+ * Cancels any pending callback to prevent race conditions.
+ */
+function scheduleTransitionComplete(): void {
+  // Cancel any pending callback to prevent premature completion
+  if (pendingTransitionRafId !== null) {
+    cancelAnimationFrame(pendingTransitionRafId)
+  }
+
+  pendingTransitionRafId = requestAnimationFrame(() => {
+    pendingTransitionRafId = null
+    usePerformanceStore.getState().setSceneTransitioning(false)
+    usePerformanceStore.getState().setCameraTeleported(false)
+  })
+}
 
 /** Minimum supported dimension */
 export const MIN_DIMENSION = 3
@@ -33,37 +57,11 @@ export const MIN_DIMENSION = 3
 /** Maximum supported dimension */
 export const MAX_DIMENSION = 11
 
-/** Default dimension (4D tesseract) */
+/** Default dimension (3D) */
 export const DEFAULT_DIMENSION = 3
 
 /** Default object type */
 export const DEFAULT_OBJECT_TYPE: ObjectType = 'hypercube'
-
-/**
- * Dimension constraints for certain object types
- * @deprecated Use getDimensionConstraints from '@/lib/geometry/registry' instead
- */
-export const DIMENSION_CONSTRAINTS: Record<string, { min?: number; exact?: number }> = {
-  'root-system': { min: 3 },
-  'quaternion-julia': { min: 3 },
-  'nested-torus': { min: 4 },
-  mandelbulb: { min: 3 },
-}
-
-/**
- * Recommended dimensions for certain object types to get optimal visualization.
- * @deprecated Use getRecommendedDimension from '@/lib/geometry/registry' instead
- */
-export const RECOMMENDED_DIMENSIONS: Record<string, { dimension?: number; reason: string }> = {
-  mandelbulb: {
-    dimension: 4,
-    reason: 'Fractal structures reveal complex n-dimensional behavior',
-  },
-  'quaternion-julia': {
-    dimension: 4,
-    reason: 'Quaternion algebra reveals 4D rotation symmetry',
-  },
-}
 
 export interface GeometryState {
   /** Current dimension (3-11) */
@@ -159,10 +157,11 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
       usePerformanceStore.getState().setSceneTransitioning(true)
       usePerformanceStore.getState().setCameraTeleported(true)
 
-      // Update animation and rotation stores BEFORE setting geometry state
+      // Update all dimension-dependent stores BEFORE setting geometry state
       // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
       useAnimationStore.getState().setDimension(clampedDimension)
       useRotationStore.getState().setDimension(clampedDimension)
+      useTransformStore.getState().setDimension(clampedDimension)
 
       set({
         dimension: clampedDimension,
@@ -171,10 +170,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     })
 
     // Signal transition complete after React settles - triggers progressive refinement
-    requestAnimationFrame(() => {
-      usePerformanceStore.getState().setSceneTransitioning(false)
-      usePerformanceStore.getState().setCameraTeleported(false)
-    })
+    scheduleTransitionComplete()
   },
 
   setObjectType: (type: ObjectType) => {
@@ -232,10 +228,11 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
       usePerformanceStore.getState().setCameraTeleported(true)
 
       if (targetDimension !== currentDimension) {
-        // Update animation and rotation stores BEFORE setting geometry state
+        // Update all dimension-dependent stores BEFORE setting geometry state
         // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
         useAnimationStore.getState().setDimension(targetDimension)
         useRotationStore.getState().setDimension(targetDimension)
+        useTransformStore.getState().setDimension(targetDimension)
 
         // Auto-switch to recommended dimension for optimal visualization
         set({
@@ -248,10 +245,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     })
 
     // Signal transition complete after React settles - triggers progressive refinement
-    requestAnimationFrame(() => {
-      usePerformanceStore.getState().setSceneTransitioning(false)
-      usePerformanceStore.getState().setCameraTeleported(false)
-    })
+    scheduleTransitionComplete()
   },
 
   reset: () => {

@@ -61,8 +61,9 @@ describe('animationStore', () => {
 
   describe('togglePlane', () => {
     it('should add plane to animating set', () => {
-      useAnimationStore.getState().togglePlane('XZ')
-      expect(useAnimationStore.getState().animatingPlanes.has('XZ')).toBe(true)
+      // Use a plane not in the initial set (XY, YZ, XZ are in the initial set)
+      useAnimationStore.getState().togglePlane('XW')
+      expect(useAnimationStore.getState().animatingPlanes.has('XW')).toBe(true)
     })
 
     it('should remove plane from animating set', () => {

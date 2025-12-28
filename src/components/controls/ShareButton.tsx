@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/Button';
 import { generateShareUrl } from '@/lib/url';
 import { useGeometryStore } from '@/stores/geometryStore';
@@ -22,17 +23,24 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ className = '' }) => {
   const [shareUrl, setShareUrl] = useState('');
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const dimension = useGeometryStore((state) => state.dimension);
-  const objectType = useGeometryStore((state) => state.objectType);
-  const uniformScale = useTransformStore((state) => state.uniformScale);
+  // Geometry store values
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((s) => ({ dimension: s.dimension, objectType: s.objectType }))
+  );
+  const uniformScale = useTransformStore((s) => s.uniformScale);
 
   // Visual settings (PRD Story 1 AC6, Story 7 AC7)
-  const shaderType = useAppearanceStore((state) => state.shaderType);
-  const shaderSettings = useAppearanceStore((state) => state.shaderSettings);
-  const edgeColor = useAppearanceStore((state) => state.edgeColor);
-  const backgroundColor = useAppearanceStore((state) => state.backgroundColor);
-  const bloomEnabled = usePostProcessingStore((state) => state.bloomEnabled);
-  const bloomIntensity = usePostProcessingStore((state) => state.bloomIntensity);
+  const { shaderType, shaderSettings, edgeColor, backgroundColor } = useAppearanceStore(
+    useShallow((s) => ({
+      shaderType: s.shaderType,
+      shaderSettings: s.shaderSettings,
+      edgeColor: s.edgeColor,
+      backgroundColor: s.backgroundColor,
+    }))
+  );
+  const { bloomEnabled, bloomIntensity } = usePostProcessingStore(
+    useShallow((s) => ({ bloomEnabled: s.bloomEnabled, bloomIntensity: s.bloomIntensity }))
+  );
 
   // Cleanup timeout on unmount
   useEffect(() => {

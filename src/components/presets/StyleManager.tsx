@@ -3,20 +3,29 @@ import { usePresetManagerStore, type SavedStyle, type PresetManagerState } from 
 import { useToast } from '@/hooks/useToast';
 import { useShallow } from 'zustand/react/shallow';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { Button } from '@/components/ui/Button';
 
+/** Props for StyleManager component */
 interface StyleManagerProps {
+  /** Callback to close the style manager modal */
   onClose: () => void;
 }
 
+/**
+ * Style manager component for managing saved visual styles.
+ * Allows users to load, delete, import, and export style configurations
+ * (appearance, lighting, post-processing, environment, PBR settings).
+ */
 export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
-  const presetSelector = useShallow((state: PresetManagerState) => ({
-    savedStyles: state.savedStyles,
-    loadStyle: state.loadStyle,
-    deleteStyle: state.deleteStyle,
-    importStyles: state.importStyles,
-    exportStyles: state.exportStyles
-  }));
-  const { savedStyles, loadStyle, deleteStyle, importStyles, exportStyles } = usePresetManagerStore(presetSelector);
+  const { savedStyles, loadStyle, deleteStyle, importStyles, exportStyles } = usePresetManagerStore(
+    useShallow((state: PresetManagerState) => ({
+      savedStyles: state.savedStyles,
+      loadStyle: state.loadStyle,
+      deleteStyle: state.deleteStyle,
+      importStyles: state.importStyles,
+      exportStyles: state.exportStyles
+    }))
+  );
   const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,12 +37,19 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
+      const content = event.target?.result;
+      if (typeof content !== 'string') {
+        addToast('Failed to read file: invalid content', 'error');
+        return;
+      }
       if (importStyles(content)) {
         addToast('Styles imported successfully', 'success');
       } else {
-        addToast('Failed to import styles', 'error');
+        addToast('Failed to import styles: invalid format', 'error');
       }
+    };
+    reader.onerror = () => {
+      addToast('Failed to read file', 'error');
     };
     reader.readAsText(file);
     e.target.value = ''; // Reset
@@ -43,14 +59,17 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
     const data = exportStyles();
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `mdimension-styles-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    addToast('Styles exported', 'success');
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mdimension-styles-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      addToast('Styles exported', 'success');
+    } finally {
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleDeleteConfirm = () => {
@@ -72,25 +91,32 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <button 
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
-          className="flex-1 bg-panel-header hover:bg-white/10 text-xs py-2 rounded border border-panel-border transition-colors text-text-secondary hover:text-text-primary"
+          className="flex-1"
+          ariaLabel="Import styles from JSON file"
         >
           Import JSON
-        </button>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept=".json" 
-          onChange={handleImport} 
+        </Button>
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept=".json"
+          onChange={handleImport}
+          aria-label="Select JSON file to import"
         />
-        <button 
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleExport}
-          className="flex-1 bg-panel-header hover:bg-white/10 text-xs py-2 rounded border border-panel-border transition-colors text-text-secondary hover:text-text-primary"
+          className="flex-1"
+          ariaLabel="Export all styles to JSON file"
         >
           Export JSON
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -103,35 +129,42 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
         ) : (
           <div className="space-y-2">
             {savedStyles.map((style: SavedStyle) => (
-              <div 
-                key={style.id} 
-                className="group flex items-center justify-between p-3 bg-white/5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-panel-border"
+              <div
+                key={style.id}
+                className="group flex items-center justify-between p-3 bg-white/5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
               >
-                <div 
-                  className="flex-1 cursor-pointer"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 text-left justify-start p-0"
                   onClick={() => {
                     loadStyle(style.id);
                     addToast(`Applied style: ${style.name}`, 'info');
                     onClose();
                   }}
+                  ariaLabel={`Apply style "${style.name}"`}
                 >
-                  <div className="font-medium text-sm text-text-primary">{style.name}</div>
-                  <div className="text-[10px] text-text-secondary">{formatDate(style.timestamp)}</div>
-                </div>
-                
-                <button
+                  <div className="flex flex-col items-start">
+                    <div className="font-medium text-sm text-text-primary">{style.name}</div>
+                    <div className="text-[10px] text-text-secondary">{formatDate(style.timestamp)}</div>
+                  </div>
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={(e) => {
                     e.stopPropagation();
                     setStyleToDelete(style);
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 rounded transition-all"
-                  title="Delete"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 focus:opacity-100"
+                  ariaLabel={`Delete style "${style.name}"`}
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                   </svg>
-                </button>
+                </Button>
               </div>
             ))}
           </div>

@@ -7,7 +7,6 @@ import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedO
 import { DocumentationSection } from '@/components/sections/Documentation/DocumentationSection';
 import { EdgesSection } from '@/components/sections/Edges/EdgesSection';
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection';
-import { ExportSection } from '@/components/sections/Export/ExportSection';
 import { FacesSection } from '@/components/sections/Faces/FacesSection';
 import { LightsSection } from '@/components/sections/Lights/LightsSection';
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection';
@@ -70,7 +69,6 @@ export const EditorRightPanel: React.FC = () => {
           {/* The "App" - Settings, Meta, Output */}
           <SettingsSection defaultOpen={true} />
           <PerformanceSection defaultOpen={false} />
-          <ExportSection defaultOpen={false} />
           <DocumentationSection defaultOpen={false} />
         </div>
       ),

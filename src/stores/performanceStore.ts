@@ -55,6 +55,9 @@ interface PerformanceState {
   /** Whether a scene/style preset is being loaded (pauses animation, low quality) */
   sceneTransitioning: boolean
 
+  /** Whether a scene preset is currently being loaded (semantic flag for hooks to skip automatic behavior) */
+  isLoadingScene: boolean
+
   // -------------------------------------------------------------------------
   // Progressive Refinement (ALL objects)
   // -------------------------------------------------------------------------
@@ -112,6 +115,7 @@ interface PerformanceState {
   // Interaction State
   setIsInteracting: (interacting: boolean) => void
   setSceneTransitioning: (transitioning: boolean) => void
+  setIsLoadingScene: (loading: boolean) => void
 
   // Progressive Refinement
   setProgressiveRefinementEnabled: (enabled: boolean) => void
@@ -156,6 +160,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Interaction State
   isInteracting: false,
   sceneTransitioning: false,
+  isLoadingScene: false,
 
   // Progressive Refinement
   progressiveRefinementEnabled: true,
@@ -190,6 +195,10 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   setSceneTransitioning: (transitioning: boolean) => {
     set({ sceneTransitioning: transitioning })
+  },
+
+  setIsLoadingScene: (loading: boolean) => {
+    set({ isLoadingScene: loading })
   },
 
   // Progressive Refinement
@@ -304,6 +313,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({
       isInteracting: false,
       sceneTransitioning: false,
+      isLoadingScene: false,
       progressiveRefinementEnabled: true,
       refinementStage: 'final',
       refinementProgress: 100,

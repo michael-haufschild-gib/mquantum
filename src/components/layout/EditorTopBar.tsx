@@ -20,39 +20,39 @@ import { useThemeStore } from '@/stores/themeStore';
 import { useTransformStore } from '@/stores/transformStore';
 import { useUIStore } from '@/stores/uiStore';
 import { m } from 'motion/react';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/Button';
 
+/** Props for EditorTopBar component */
 interface EditorTopBarProps {
+  /** Whether the right panel (Inspector) is visible */
   showRightPanel: boolean;
+  /** Callback to toggle the right panel visibility */
   toggleRightPanel: () => void;
 }
 
+/**
+ * Top bar component for the editor layout.
+ * Provides main navigation menus (File, View, Scenes, Styles), global controls,
+ * and panel toggle buttons. Responsive design with mobile-friendly unified menu.
+ */
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   showRightPanel,
   toggleRightPanel,
 }) => {
   const { addToast } = useToast();
 
-  const layoutSelector = useShallow((state: LayoutStore) => ({
-    toggleShortcuts: state.toggleShortcuts,
-    showLeftPanel: state.showLeftPanel,
-    toggleLeftPanel: state.toggleLeftPanel,
-    isCinematicMode: state.isCinematicMode,
-    toggleCinematicMode: state.toggleCinematicMode,
-  }));
-  const { toggleShortcuts, showLeftPanel, toggleLeftPanel, toggleCinematicMode } = useLayoutStore(layoutSelector);
+  const { toggleShortcuts, showLeftPanel, toggleLeftPanel, toggleCinematicMode } = useLayoutStore(
+    useShallow((state: LayoutStore) => ({
+      toggleShortcuts: state.toggleShortcuts,
+      showLeftPanel: state.showLeftPanel,
+      toggleLeftPanel: state.toggleLeftPanel,
+      toggleCinematicMode: state.toggleCinematicMode,
+    }))
+  );
 
   // New Preset Manager Store
-  const presetSelector = useShallow((state: PresetManagerState) => ({
-    savedStyles: state.savedStyles,
-    saveStyle: state.saveStyle,
-    loadStyle: state.loadStyle,
-    savedScenes: state.savedScenes,
-    saveScene: state.saveScene,
-    loadScene: state.loadScene,
-  }));
   const {
     savedStyles,
     saveStyle,
@@ -60,10 +60,24 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     savedScenes,
     saveScene,
     loadScene
-  } = usePresetManagerStore(presetSelector);
+  } = usePresetManagerStore(
+    useShallow((state: PresetManagerState) => ({
+      savedStyles: state.savedStyles,
+      saveStyle: state.saveStyle,
+      loadStyle: state.loadStyle,
+      savedScenes: state.savedScenes,
+      saveScene: state.saveScene,
+      loadScene: state.loadScene,
+    }))
+  );
 
-  const theme = useThemeStore((state) => state.theme);
-  const setTheme = useThemeStore((state) => state.setTheme);
+  // Theme store - consolidated subscription
+  const { theme, setTheme } = useThemeStore(
+    useShallow((state) => ({
+      theme: state.theme,
+      setTheme: state.setTheme,
+    }))
+  );
 
   const [isStyleManagerOpen, setIsStyleManagerOpen] = useState(false);
   const [isSceneManagerOpen, setIsSceneManagerOpen] = useState(false);
@@ -74,19 +88,38 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   const [shareUrlOpen, setShareUrlOpen] = useState(false);
   const [currentShareUrl, setCurrentShareUrl] = useState('');
 
-  // Store access for Share URL generation
-  const dimension = useGeometryStore((state) => state.dimension);
-  const objectType = useGeometryStore((state) => state.objectType);
-  const uniformScale = useTransformStore((state) => state.uniformScale);
-  const shaderType = useAppearanceStore((state) => state.shaderType);
-  const shaderSettings = useAppearanceStore((state) => state.shaderSettings);
-  const edgeColor = useAppearanceStore((state) => state.edgeColor);
-  const backgroundColor = useAppearanceStore((state) => state.backgroundColor);
-  const bloomEnabled = usePostProcessingStore((state) => state.bloomEnabled);
-  const bloomIntensity = usePostProcessingStore((state) => state.bloomIntensity);
+  // Store access for Share URL generation - consolidated subscriptions
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({
+      dimension: state.dimension,
+      objectType: state.objectType,
+    }))
+  );
 
-  const showPerfMonitor = useUIStore((state) => state.showPerfMonitor);
-  const setShowPerfMonitor = useUIStore((state) => state.setShowPerfMonitor);
+  const uniformScale = useTransformStore((state) => state.uniformScale);
+
+  const { shaderType, shaderSettings, edgeColor, backgroundColor } = useAppearanceStore(
+    useShallow((state) => ({
+      shaderType: state.shaderType,
+      shaderSettings: state.shaderSettings,
+      edgeColor: state.edgeColor,
+      backgroundColor: state.backgroundColor,
+    }))
+  );
+
+  const { bloomEnabled, bloomIntensity } = usePostProcessingStore(
+    useShallow((state) => ({
+      bloomEnabled: state.bloomEnabled,
+      bloomIntensity: state.bloomIntensity,
+    }))
+  );
+
+  const { showPerfMonitor, setShowPerfMonitor } = useUIStore(
+    useShallow((state) => ({
+      showPerfMonitor: state.showPerfMonitor,
+      setShowPerfMonitor: state.setShowPerfMonitor,
+    }))
+  );
 
   const isDesktop = useMediaQuery(BREAKPOINTS.sm);
 
@@ -96,16 +129,15 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
      setIsSoundEnabled(soundManager.isEnabled);
   }, []);
 
-  const handleExport = async () => {
+  const handleExport = useCallback(async () => {
     soundManager.playSuccess();
     // Small delay to ensure UI updates if needed
     await new Promise((resolve) => setTimeout(resolve, 50));
     const filename = generateTimestampFilename('ndimensional');
     exportSceneToPNG({ filename });
+  }, []);
 
-  };
-
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     const url = generateShareUrl({
       dimension,
       objectType,
@@ -127,18 +159,18 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       setCurrentShareUrl(url);
       setShareUrlOpen(true);
     }
-  };
+  }, [dimension, objectType, uniformScale, shaderType, shaderSettings, edgeColor, backgroundColor, bloomEnabled, bloomIntensity, addToast]);
 
-  const handleApplyPreset = (preset: typeof PRESETS[0]) => {
+  const handleApplyPreset = useCallback((preset: typeof PRESETS[0]) => {
     preset.apply();
     soundManager.playClick();
     addToast(`Loaded example: ${preset.label}`, 'info');
-  };
+  }, [addToast]);
 
   const setExportModalOpen = useExportStore((state) => state.setModalOpen);
 
   // --- Utility Actions for Mobile Menu ---
-  const toggleSound = () => {
+  const toggleSound = useCallback(() => {
     const newState = !isSoundEnabled;
     soundManager.toggle(newState);
     setIsSoundEnabled(newState);
@@ -148,43 +180,43 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     } else {
         addToast('Sound Muted', 'info');
     }
-  };
+  }, [isSoundEnabled, addToast]);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     soundManager.playClick();
     if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
     } else {
         document.exitFullscreen();
     }
-  };
+  }, []);
 
-  // --- Submenu Definitions ---
+  // --- Memoized Submenu Definitions ---
 
-  const themeItems = [
+  const themeItems = useMemo(() => [
       { label: (theme === 'blue' ? '✓ ' : '  ') + 'Blue', onClick: () => setTheme('blue') },
       { label: (theme === 'cyan' ? '✓ ' : '  ') + 'Cyan', onClick: () => setTheme('cyan') },
       { label: (theme === 'green' ? '✓ ' : '  ') + 'Green', onClick: () => setTheme('green') },
       { label: (theme === 'magenta' ? '✓ ' : '  ') + 'Magenta', onClick: () => setTheme('magenta') },
       { label: (theme === 'orange' ? '✓ ' : '  ') + 'Orange', onClick: () => setTheme('orange') },
       { label: (theme === 'rainbow' ? '✓ ' : '  ') + 'Rainbow', onClick: () => setTheme('rainbow') },
-  ];
+  ], [theme, setTheme]);
 
-  const savedSceneItems = savedScenes.map((s: SavedScene) => ({
+  const savedSceneItems = useMemo(() => savedScenes.map((s: SavedScene) => ({
       label: s.name,
       onClick: () => {
           loadScene(s.id);
           soundManager.playClick();
           addToast(`Loaded scene: ${s.name}`, 'info');
       }
-  }));
+  })), [savedScenes, loadScene, addToast]);
 
-  const exampleSceneItems = PRESETS.map(p => ({
+  const exampleSceneItems = useMemo(() => PRESETS.map(p => ({
       label: p.label,
       onClick: () => handleApplyPreset(p)
-  }));
+  })), [handleApplyPreset]);
 
-  const sceneSubmenuItems = [
+  const sceneSubmenuItems = useMemo(() => [
       { label: 'Actions' },
       { label: '+ Save Current Scene...', onClick: () => setSaveSceneOpen(true) },
       { label: 'Manage Scenes...', onClick: () => { setIsSceneManagerOpen(true); soundManager.playClick(); } },
@@ -194,67 +226,83 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
       { label: '---' },
       { label: 'Examples' },
       ...exampleSceneItems
-  ];
+  ], [savedScenes, savedSceneItems, exampleSceneItems]);
 
-  const savedStyleItems = savedStyles.map((s: SavedStyle) => ({
+  const savedStyleItems = useMemo(() => savedStyles.map((s: SavedStyle) => ({
       label: s.name,
       onClick: () => {
           loadStyle(s.id);
           soundManager.playClick();
           addToast(`Applied style: ${s.name}`, 'info');
       }
-  }));
+  })), [savedStyles, loadStyle, addToast]);
 
-  const styleSubmenuItems = [
+  const styleSubmenuItems = useMemo(() => [
     { label: 'Actions' },
     { label: '+ Save Current Style...', onClick: () => setSaveStyleOpen(true) },
     { label: 'Manage Styles...', onClick: () => { setIsStyleManagerOpen(true); soundManager.playClick(); } },
     { label: '---' },
     { label: 'Saved Styles' },
     ...(savedStyles.length === 0 ? [{ label: '(None)', disabled: true }] : savedStyleItems)
-  ];
+  ], [savedStyles, savedStyleItems]);
 
-  // --- Menu Definitions ---
+  // --- Memoized Menu Handlers ---
+  const handleExportVideo = useCallback(() => {
+    setExportModalOpen(true);
+    soundManager.playClick();
+  }, [setExportModalOpen]);
 
-  const fileItems = [
+  const handleToggleLeftPanel = useCallback(() => {
+    toggleLeftPanel();
+    soundManager.playClick();
+  }, [toggleLeftPanel]);
+
+  const handleToggleRightPanel = useCallback(() => {
+    toggleRightPanel();
+    soundManager.playClick();
+  }, [toggleRightPanel]);
+
+  const handleTogglePerfMonitor = useCallback(() => {
+    setShowPerfMonitor(!showPerfMonitor);
+  }, [setShowPerfMonitor, showPerfMonitor]);
+
+  // --- Memoized Menu Definitions ---
+
+  const fileItems = useMemo(() => [
     { label: 'Export Image (PNG)', onClick: handleExport, shortcut: '⌘E', 'data-testid': 'menu-export' },
-    {
-        label: 'Export Video (MP4)',
-        onClick: () => { setExportModalOpen(true); soundManager.playClick(); },
-        shortcut: '⌘⇧E',
-        'data-testid': 'menu-export-video'
-    },
+    { label: 'Export Video (MP4)', onClick: handleExportVideo, shortcut: '⌘⇧E', 'data-testid': 'menu-export-video' },
     { label: 'Copy Share Link', onClick: handleShare, shortcut: '⌘S', 'data-testid': 'menu-share' },
-  ];
+  ], [handleExport, handleExportVideo, handleShare]);
 
-  const viewItems = [
-    { label: showLeftPanel ? 'Hide Explorer' : 'Show Explorer', onClick: () => { toggleLeftPanel(); soundManager.playClick(); } },
-    { label: showRightPanel ? 'Hide Inspector' : 'Show Inspector', onClick: () => { toggleRightPanel(); soundManager.playClick(); } },
+  const viewItems = useMemo(() => [
+    { label: showLeftPanel ? 'Hide Explorer' : 'Show Explorer', onClick: handleToggleLeftPanel },
+    { label: showRightPanel ? 'Hide Inspector' : 'Show Inspector', onClick: handleToggleRightPanel },
     { label: 'Cinematic Mode', onClick: toggleCinematicMode, shortcut: 'C' },
     { label: 'Keyboard Shortcuts', onClick: toggleShortcuts, shortcut: '?' },
     { label: '---' },
-    { label: 'Select Theme', items: themeItems }, // SUBMENU
-  ];
+    { label: 'Select Theme', items: themeItems },
+  ], [showLeftPanel, showRightPanel, handleToggleLeftPanel, handleToggleRightPanel, toggleCinematicMode, toggleShortcuts, themeItems]);
 
   // --- Mobile Unified Menu ---
-  const mobileMenuItems = [
-    { label: 'FILE', items: fileItems }, // Nested for cleaner mobile view
+  const mobileMenuItems = useMemo(() => [
+    { label: 'FILE', items: fileItems },
     { label: 'VIEW', items: viewItems },
     { label: 'SCENES', items: sceneSubmenuItems },
     { label: 'STYLES', items: styleSubmenuItems },
     { label: '---' },
     { label: 'TOOLS' },
     { label: isSoundEnabled ? 'Mute Sound' : 'Enable Sound', onClick: toggleSound },
-    { label: showPerfMonitor ? 'Hide Performance' : 'Show Performance', onClick: () => setShowPerfMonitor(!showPerfMonitor) },
+    { label: showPerfMonitor ? 'Hide Performance' : 'Show Performance', onClick: handleTogglePerfMonitor },
     { label: 'Toggle Fullscreen', onClick: toggleFullscreen },
-  ];
+  ], [fileItems, viewItems, sceneSubmenuItems, styleSubmenuItems, isSoundEnabled, toggleSound, showPerfMonitor, handleTogglePerfMonitor, toggleFullscreen]);
 
   // --- Style Menu ---
 
   const onConfirmSaveStyle = (name: string) => {
-    if (name) {
-      saveStyle(name);
-      addToast(`Style "${name}" saved!`, 'success');
+    const trimmedName = name.trim();
+    if (trimmedName) {
+      saveStyle(trimmedName);
+      addToast(`Style "${trimmedName}" saved!`, 'success');
       soundManager.playSuccess();
     }
   };
@@ -262,9 +310,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   // --- Scene Menu ---
 
   const onConfirmSaveScene = (name: string) => {
-    if (name) {
-      saveScene(name);
-      addToast(`Scene "${name}" saved!`, 'success');
+    const trimmedName = name.trim();
+    if (trimmedName) {
+      saveScene(trimmedName);
+      addToast(`Scene "${trimmedName}" saved!`, 'success');
       soundManager.playSuccess();
     }
   };

@@ -76,7 +76,9 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   isPlaying: true,
   speed: DEFAULT_SPEED,
   direction: 1,
-  animatingPlanes: new Set(['XY', 'YZ', 'ZW']),
+  // Initialize with 3D-valid planes (default dimension is 3D)
+  // ZW is 4D+ only, so use XZ for 3D compatibility
+  animatingPlanes: new Set(['XY', 'YZ', 'XZ']),
   accumulatedTime: 0,
 
   play: () => {
@@ -180,7 +182,8 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
       isPlaying: true,
       speed: DEFAULT_SPEED,
       direction: 1,
-      animatingPlanes: new Set(['XY', 'YZ', 'ZW']),
+      // Reset to 3D-valid planes (default dimension is 3D)
+      animatingPlanes: new Set(['XY', 'YZ', 'XZ']),
       accumulatedTime: 0,
     })
   },

@@ -12,6 +12,7 @@ import {
 } from '@/stores'
 import { useExportStore } from '@/stores/exportStore'
 import { useCallback, useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 export interface UseProgressiveRefinementOptions {
   /** Enable progressive refinement (default: true) */
@@ -46,15 +47,28 @@ export function useProgressiveRefinement(
 ): ProgressiveRefinementState {
   const { enabled: optionEnabled = true } = options
 
-  // Store state
-  const storeEnabled = usePerformanceStore((s) => s.progressiveRefinementEnabled)
-  const stage = usePerformanceStore((s) => s.refinementStage)
-  const progress = usePerformanceStore((s) => s.refinementProgress)
-  const qualityMultiplier = usePerformanceStore((s) => s.qualityMultiplier)
-  const isInteracting = usePerformanceStore((s) => s.isInteracting)
-  const sceneTransitioning = usePerformanceStore((s) => s.sceneTransitioning)
-  const setRefinementStage = usePerformanceStore((s) => s.setRefinementStage)
-  const setRefinementProgress = usePerformanceStore((s) => s.setRefinementProgress)
+  // Consolidated store subscriptions for better performance
+  const {
+    storeEnabled,
+    stage,
+    progress,
+    qualityMultiplier,
+    isInteracting,
+    sceneTransitioning,
+    setRefinementStage,
+    setRefinementProgress,
+  } = usePerformanceStore(
+    useShallow((s) => ({
+      storeEnabled: s.progressiveRefinementEnabled,
+      stage: s.refinementStage,
+      progress: s.refinementProgress,
+      qualityMultiplier: s.qualityMultiplier,
+      isInteracting: s.isInteracting,
+      sceneTransitioning: s.sceneTransitioning,
+      setRefinementStage: s.setRefinementStage,
+      setRefinementProgress: s.setRefinementProgress,
+    }))
+  )
 
   // Skybox loading state - keep low quality while loading
   const skyboxLoading = useEnvironmentStore((s) => s.skyboxLoading)

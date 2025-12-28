@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Popover } from './Popover';
-import { 
+import {
   parseColorToHsv, hsvToHex, hsvToHex8, hsvToRgb, isValidHex, rgbToHex, generatePalette,
-  type HSVA 
-} from '@/utils/colorUtils';
+  type HSVA
+} from '@/lib/colors/colorUtils';
 
 interface ColorPickerProps {
   value: string; // Hex, Hex8, or RGB string
