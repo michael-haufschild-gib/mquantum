@@ -12,6 +12,7 @@
  */
 
 import { Section } from '@/components/sections/Section';
+import { Button } from '@/components/ui/Button';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { Slider } from '@/components/ui/Slider';
 import { Tabs } from '@/components/ui/Tabs';
@@ -399,13 +400,14 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
                 disableAlpha={true}
               />
               {specularColor !== DEFAULT_FACE_PBR.specularColor && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setSpecularColor(DEFAULT_FACE_PBR.specularColor)}
-                  className="text-xs text-accent hover:text-accent/80 transition-colors"
-                  title="Reset to default"
+                  ariaLabel="Reset to default"
                 >
                   Reset
-                </button>
+                </Button>
               )}
           </div>
         </div>

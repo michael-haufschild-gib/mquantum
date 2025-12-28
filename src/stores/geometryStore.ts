@@ -25,6 +25,7 @@ import { create } from 'zustand'
 import { useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
 import { usePerformanceStore } from './performanceStore'
+import { usePostProcessingStore } from './postProcessingStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
 
@@ -221,6 +222,14 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
         if (!appearanceStore.facesVisible) {
           appearanceStore.setFacesVisible(true)
         }
+      }
+
+      // Gravitational lensing is only available for black holes - auto-toggle based on object type
+      const ppStore = usePostProcessingStore.getState()
+      if (type === 'blackhole') {
+        ppStore.setGravityEnabled(true)
+      } else {
+        ppStore.setGravityEnabled(false)
       }
 
       // Trigger progressive refinement: start at low quality during content type switch

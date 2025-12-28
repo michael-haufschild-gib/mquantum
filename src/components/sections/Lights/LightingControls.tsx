@@ -132,7 +132,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
   return (
     <div className={`space-y-4 ${className}`}>
       {/* Light List Group */}
-      <ControlGroup
+      <ControlGroup collapsible defaultOpen
         title="Scene Lights"
         rightElement={
           <div className="flex items-center gap-2" title="Show light indicators in scene">
@@ -149,7 +149,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
 
       {/* Light Editor (when light selected - includes ambient light) */}
       {hasSelectedLight && (
-        <ControlGroup title="Light Properties">
+        <ControlGroup title="Light Properties" collapsible defaultOpen>
           <LightEditor />
         </ControlGroup>
       )}
@@ -157,6 +157,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
       {/* Ambient Occlusion - Unified controls */}
       <ControlGroup
         title="Ambient Occlusion"
+        collapsible defaultOpen
         rightElement={
           <Switch
             checked={effectiveAoEnabled}

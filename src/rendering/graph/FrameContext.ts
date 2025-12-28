@@ -72,6 +72,10 @@ export interface FrozenEnvironmentState {
   readonly skyboxLoading: boolean
   readonly classicCubeTexture: THREE.CubeTexture | null
 
+  // Background color
+  readonly backgroundColor: string
+  readonly backgroundBlendMode: string
+
   // Ground (for environment capture decisions)
   readonly activeWalls: readonly WallPosition[]
 
@@ -378,6 +382,10 @@ function captureEnvironmentState(
     skyboxLoading: skybox.skyboxLoading,
     classicCubeTexture: skybox.classicCubeTexture,
 
+    // Background color
+    backgroundColor: skybox.backgroundColor,
+    backgroundBlendMode: skybox.backgroundBlendMode,
+
     // Ground
     activeWalls: [...ground.activeWalls],
 
@@ -639,6 +647,8 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         skyboxHighQuality: true,
         skyboxLoading: false,
         classicCubeTexture: null,
+        backgroundColor: '#0F0F1A',
+        backgroundBlendMode: 'normal',
         activeWalls: [],
         iblQuality: 'low',
         iblIntensity: 1.0,

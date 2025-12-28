@@ -1,6 +1,8 @@
 import { Section } from '@/components/sections/Section';
 import { ColorPicker } from '@/components/ui/ColorPicker';
 import { ControlGroup } from '@/components/ui/ControlGroup';
+import { NumberInput } from '@/components/ui/NumberInput';
+import { Select } from '@/components/ui/Select';
 import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
 import { ToggleButton } from '@/components/ui/ToggleButton';
@@ -57,6 +59,7 @@ export const AdvancedObjectControls: React.FC = () => {
 };
 
 const SharedAdvancedControls: React.FC = () => {
+  const objectType = useGeometryStore(state => state.objectType);
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
     sssEnabled: state.sssEnabled, setSssEnabled: state.setSssEnabled,
     sssIntensity: state.sssIntensity, setSssIntensity: state.setSssIntensity,
@@ -79,96 +82,87 @@ const SharedAdvancedControls: React.FC = () => {
 
   return (
     <div className="space-y-4 mb-4 pb-4">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-text-secondary font-semibold">Subsurface Scattering</label>
-          <ToggleButton
-            pressed={sssEnabled}
-            onToggle={() => setSssEnabled(!sssEnabled)}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle SSS"
+      {/* Subsurface Scattering */}
+      <ControlGroup
+        title="Subsurface Scattering"
+        collapsible
+        defaultOpen={false}
+        rightElement={
+          <Switch
+            checked={sssEnabled}
+            onCheckedChange={setSssEnabled}
             data-testid="global-sss-toggle"
-          >
-            {sssEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
+          />
+        }
+      >
+        <Slider
+          label="Intensity"
+          min={0.0}
+          max={2.0}
+          step={0.1}
+          value={sssIntensity}
+          onChange={setSssIntensity}
+          showValue
+          data-testid="global-sss-intensity"
+        />
+        <div className="flex items-center justify-between">
+          <label className="text-xs text-[var(--text-secondary)]">SSS Tint</label>
+          <ColorPicker
+            value={sssColor}
+            onChange={(c) => setSssColor(c)}
+            disableAlpha={true}
+            className="w-24"
+          />
         </div>
-        {sssEnabled && (
-          <div className="space-y-3 pl-2 border-l border-border-default">
-            <Slider
-              label="Intensity"
-              min={0.0}
-              max={2.0}
-              step={0.1}
-              value={sssIntensity}
-              onChange={setSssIntensity}
-              showValue
-              data-testid="global-sss-intensity"
-            />
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-text-secondary">SSS Tint</label>
-              <ColorPicker
-                value={sssColor}
-                onChange={(c) => setSssColor(c)}
-                disableAlpha={true}
-                className="w-24"
-              />
-            </div>
-            <Slider
-              label="Thickness"
-              min={0.1}
-              max={5.0}
-              step={0.1}
-              value={sssThickness}
-              onChange={setSssThickness}
-              showValue
-              data-testid="global-sss-thickness"
-            />
-            <Slider
-              label="Sample Jitter"
-              min={0.0}
-              max={1.0}
-              step={0.05}
-              value={sssJitter}
-              onChange={setSssJitter}
-              showValue
-              data-testid="global-sss-jitter"
-            />
-          </div>
-        )}
-      </div>
+        <Slider
+          label="Thickness"
+          min={0.1}
+          max={5.0}
+          step={0.1}
+          value={sssThickness}
+          onChange={setSssThickness}
+          showValue
+          data-testid="global-sss-thickness"
+        />
+        <Slider
+          label="Sample Jitter"
+          min={0.0}
+          max={1.0}
+          step={0.05}
+          value={sssJitter}
+          onChange={setSssJitter}
+          showValue
+          data-testid="global-sss-jitter"
+        />
+      </ControlGroup>
 
       {/* Fresnel Rim */}
-      <div className="space-y-2 pt-2 border-t border-border-subtle mt-2">
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-text-secondary font-semibold">Fresnel Rim</label>
-          <ToggleButton
-            pressed={fresnelEnabled}
-            onToggle={() => setSurfaceSettings({ fresnelEnabled: !fresnelEnabled })}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle Fresnel Rim"
+      <ControlGroup
+        title="Fresnel Rim"
+        collapsible
+        defaultOpen={false}
+        rightElement={
+          <Switch
+            checked={fresnelEnabled}
+            onCheckedChange={(checked) => setSurfaceSettings({ fresnelEnabled: checked })}
             data-testid="global-fresnel-toggle"
-          >
-            {fresnelEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
-        </div>
-        {fresnelEnabled && (
-          <div className="space-y-3 pl-2 border-l border-border-default">
-          <Slider
-            label="Intensity"
-            min={0.0}
-            max={1.0}
-            step={0.1}
-            value={fresnelIntensity}
-            onChange={setFresnelIntensity}
-            showValue
-            data-testid="global-fresnel-intensity"
           />
-          </div>
-        )}
-      </div>
-              {/* Gravitational Lensing - available for all objects */}
-      <GravityAdvanced />
+        }
+      >
+        <Slider
+          label="Intensity"
+          min={0.0}
+          max={1.0}
+          step={0.1}
+          value={fresnelIntensity}
+          onChange={setFresnelIntensity}
+          showValue
+          data-testid="global-fresnel-intensity"
+        />
+      </ControlGroup>
 
+      {/* Gravitational Lensing - only available for black hole */}
+      {objectType === 'blackhole' && <GravityAdvanced />}
     </div>
   );
 };
@@ -538,28 +532,28 @@ const SchroedingerAdvanced: React.FC = () => {
               />
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="text-xs text-text-secondary">Direction</label>
-                  <select
-                    className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
-                    value={config.dispersionDirection ?? 0}
-                    onChange={(e) => setDispersionDirection(parseInt(e.target.value))}
+                  <Select
+                    label="Direction"
+                    options={[
+                      { value: '0', label: 'Radial' },
+                      { value: '1', label: 'View' },
+                    ]}
+                    value={String(config.dispersionDirection ?? 0)}
+                    onChange={(v) => setDispersionDirection(parseInt(v))}
                     data-testid="schroedinger-dispersion-direction"
-                  >
-                    <option value={0}>Radial</option>
-                    <option value={1}>View</option>
-                  </select>
+                  />
                 </div>
                 <div className="flex-1">
-                  <label className="text-xs text-text-secondary">Quality</label>
-                  <select
-                    className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
-                    value={config.dispersionQuality ?? 0}
-                    onChange={(e) => setDispersionQuality(parseInt(e.target.value))}
+                  <Select
+                    label="Quality"
+                    options={[
+                      { value: '0', label: 'Fast (Grad)' },
+                      { value: '1', label: 'High (Sample)' },
+                    ]}
+                    value={String(config.dispersionQuality ?? 0)}
+                    onChange={(v) => setDispersionQuality(parseInt(v))}
                     data-testid="schroedinger-dispersion-quality"
-                  >
-                    <option value={0}>Fast (Grad)</option>
-                    <option value={1}>High (Sample)</option>
-                  </select>
+                  />
                 </div>
               </div>
             </div>
@@ -601,19 +595,17 @@ const SchroedingerAdvanced: React.FC = () => {
                 showValue
                 data-testid="schroedinger-erosion-turbulence"
               />
-              <div>
-                <label className="text-xs text-text-secondary">Noise Type</label>
-                <select
-                  className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
-                  value={config.erosionNoiseType ?? 0}
-                  onChange={(e) => setErosionNoiseType(parseInt(e.target.value))}
-                  data-testid="schroedinger-erosion-type"
-                >
-                  <option value={0}>Worley (Cloudy)</option>
-                  <option value={1}>Perlin (Smooth)</option>
-                  <option value={2}>Hybrid (Billowy)</option>
-                </select>
-              </div>
+              <Select
+                label="Noise Type"
+                options={[
+                  { value: '0', label: 'Worley (Cloudy)' },
+                  { value: '1', label: 'Perlin (Smooth)' },
+                  { value: '2', label: 'Hybrid (Billowy)' },
+                ]}
+                value={String(config.erosionNoiseType ?? 0)}
+                onChange={(v) => setErosionNoiseType(parseInt(v))}
+                data-testid="schroedinger-erosion-type"
+              />
             </div>
           )}
         </div>
@@ -629,14 +621,12 @@ const PolytopeAdvanced: React.FC = () => {
 };
 
 /**
- * Global Gravity Controls
- * Available for all object types. When black hole is selected, settings sync with internal lensing.
+ * Black Hole Gravity Controls
+ * Only rendered for black hole object type. Gravity is always enabled for black holes.
+ * Settings sync with internal black hole lensing parameters.
  * @returns React element for gravity controls
  */
 const GravityAdvanced: React.FC = () => {
-  const objectType = useGeometryStore(state => state.objectType);
-  const isBlackHole = objectType === 'blackhole';
-
   // Global gravity settings from postProcessingStore
   const ppSelector = useShallow((state: PostProcessingSlice) => ({
     gravityEnabled: state.gravityEnabled,
@@ -661,92 +651,81 @@ const GravityAdvanced: React.FC = () => {
   }));
   const bhState = useExtendedObjectStore(bhSelector);
 
-  // When black hole is selected, sync global gravity settings from black hole
+  // Sync global gravity settings from black hole on mount
   useEffect(() => {
-    if (isBlackHole) {
-      // Force gravity enabled when black hole is active
-      if (!ppState.gravityEnabled) {
-        ppState.setGravityEnabled(true);
-      }
-      // Sync from black hole to global on initial selection
-      ppState.setGravityStrength(bhState.gravityStrength);
-      ppState.setGravityDistortionScale(bhState.bendScale);
-      ppState.setGravityFalloff(bhState.lensingFalloff);
-      ppState.setGravityChromaticAberration(bhState.chromaticAberration);
+    // Force gravity enabled
+    if (!ppState.gravityEnabled) {
+      ppState.setGravityEnabled(true);
     }
-    // Only run when isBlackHole changes
+    // Sync from black hole to global
+    ppState.setGravityStrength(bhState.gravityStrength);
+    ppState.setGravityDistortionScale(bhState.bendScale);
+    ppState.setGravityFalloff(bhState.lensingFalloff);
+    ppState.setGravityChromaticAberration(bhState.chromaticAberration);
+    // Only run on mount (component only renders for blackhole)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBlackHole]);
-
-  // For black hole, gravity is always enabled
-  const isEnabled = isBlackHole ? true : ppState.gravityEnabled;
+  }, []);
 
   return (
     <ControlGroup title="Gravitational Lensing" collapsible defaultOpen>
       <div className="flex items-center justify-between">
         <label className="text-xs text-text-secondary">Enable</label>
         <ToggleButton
-          pressed={isEnabled}
-          onToggle={() => !isBlackHole && ppState.setGravityEnabled(!ppState.gravityEnabled)}
+          pressed={true}
+          onToggle={() => {}}
           className="text-xs px-2 py-1 h-auto"
           ariaLabel="Toggle gravitational lensing"
           data-testid="gravity-toggle"
-          disabled={isBlackHole}
+          disabled
         >
-          {isEnabled ? 'ON' : 'OFF'}
+          ON
         </ToggleButton>
       </div>
 
-      {isBlackHole && (
-        <p className="text-xs text-text-tertiary">
-          Gravity always active for Black Holes. Controls sync with internal lensing.
-        </p>
-      )}
+      <p className="text-xs text-text-tertiary">
+        Gravity always active for Black Holes. Controls sync with internal lensing.
+      </p>
 
-      {isEnabled && (
-        <>
-          <Slider
-            label="Strength"
-            min={0.1}
-            max={10}
-            step={0.1}
-            value={ppState.gravityStrength}
-            onChange={ppState.setGravityStrength}
-            showValue
-            data-testid="gravity-strength"
-          />
-          <Slider
-            label="Distortion Scale"
-            min={0.1}
-            max={5}
-            step={0.1}
-            value={ppState.gravityDistortionScale}
-            onChange={ppState.setGravityDistortionScale}
-            showValue
-            data-testid="gravity-distortion-scale"
-          />
-          <Slider
-            label="Falloff"
-            min={0.5}
-            max={4}
-            step={0.1}
-            value={ppState.gravityFalloff}
-            onChange={ppState.setGravityFalloff}
-            showValue
-            data-testid="gravity-falloff"
-          />
-          <Slider
-            label="Chromatic Aberration"
-            min={0}
-            max={1}
-            step={0.01}
-            value={ppState.gravityChromaticAberration}
-            onChange={ppState.setGravityChromaticAberration}
-            showValue
-            data-testid="gravity-chromatic-aberration"
-          />
-        </>
-      )}
+      <Slider
+        label="Strength"
+        min={0.1}
+        max={10}
+        step={0.1}
+        value={ppState.gravityStrength}
+        onChange={ppState.setGravityStrength}
+        showValue
+        data-testid="gravity-strength"
+      />
+      <Slider
+        label="Distortion Scale"
+        min={0.1}
+        max={5}
+        step={0.1}
+        value={ppState.gravityDistortionScale}
+        onChange={ppState.setGravityDistortionScale}
+        showValue
+        data-testid="gravity-distortion-scale"
+      />
+      <Slider
+        label="Falloff"
+        min={0.5}
+        max={4}
+        step={0.1}
+        value={ppState.gravityFalloff}
+        onChange={ppState.setGravityFalloff}
+        showValue
+        data-testid="gravity-falloff"
+      />
+      <Slider
+        label="Chromatic Aberration"
+        min={0}
+        max={1}
+        step={0.01}
+        value={ppState.gravityChromaticAberration}
+        onChange={ppState.setGravityChromaticAberration}
+        showValue
+        data-testid="gravity-chromatic-aberration"
+      />
     </ControlGroup>
   );
 };
@@ -1010,26 +989,25 @@ const BlackHoleAdvanced: React.FC = () => {
           />
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-xs text-text-secondary">Mode</label>
-              <select
-                className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+              <Select
+                label="Mode"
+                options={[
+                  { value: 'spiral', label: 'Spiral' },
+                  { value: 'orbital', label: 'Orbital' },
+                ]}
                 value={config.rayBendingMode}
-                onChange={(e) => setRayBendingMode(e.target.value as BlackHoleRayBendingMode)}
-              >
-                <option value="spiral">Spiral</option>
-                <option value="orbital">Orbital</option>
-              </select>
+                onChange={(v) => setRayBendingMode(v as BlackHoleRayBendingMode)}
+              />
             </div>
             <div className="flex-1">
-              <label className="text-xs text-text-secondary">Stability</label>
-              <input
-                type="number"
-                step="0.001"
-                min="0.0001"
-                max="0.5"
+              <NumberInput
+                label="Stability"
                 value={config.epsilonMul}
-                onChange={(e) => setEpsilonMul(parseFloat(e.target.value))}
-                className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+                onChange={setEpsilonMul}
+                min={0.0001}
+                max={0.5}
+                step={0.001}
+                precision={4}
               />
             </div>
           </div>

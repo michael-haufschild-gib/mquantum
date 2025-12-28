@@ -16,6 +16,7 @@ import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environment
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore';
 import React, { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
+import { BackgroundColorControls } from './BackgroundColorControls';
 import { SkyboxControls } from './SkyboxControls';
 
 /** Options for wall position toggle group */
@@ -40,7 +41,7 @@ export interface EnvironmentControlsProps {
 export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.memo(({
   className = '',
 }) => {
-  const [activeTab, setActiveTab] = useState('walls');
+  const [activeTab, setActiveTab] = useState('color');
 
   const environmentSelector = useShallow((state: EnvironmentStore) => ({
     activeWalls: state.activeWalls,
@@ -251,6 +252,7 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
         data-testid="env-controls"
         tabListClassName="mb-4"
         tabs={[
+          { id: 'color', label: 'Color', content: <BackgroundColorControls /> },
           { id: 'walls', label: 'Walls', content: wallsContent },
           { id: 'skybox', label: 'Skybox', content: <SkyboxControls /> },
         ]}

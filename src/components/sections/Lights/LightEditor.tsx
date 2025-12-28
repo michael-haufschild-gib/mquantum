@@ -14,10 +14,11 @@
  * - Range/Decay sliders (point/spot only)
  */
 
+import { Button } from '@/components/ui/Button';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Slider } from '@/components/ui/Slider';
-import { ToggleButton } from '@/components/ui/ToggleButton';
 import type { LightSource, LightType } from '@/rendering/lights/types';
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
 import React, { memo, useCallback } from 'react';
@@ -92,12 +93,6 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     },
     [selectedLightId, updateLight]
   );
-
-  const handleToggleEnabled = useCallback(() => {
-    if (selectedLightId && selectedLight) {
-      updateLight(selectedLightId, { enabled: !selectedLight.enabled });
-    }
-  }, [selectedLightId, selectedLight, updateLight]);
 
   const handleIntensityChange = useCallback(
     (intensity: number) => {
@@ -224,24 +219,23 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     <div className={`space-y-4 ${className}`}>
       {/* Header with name and duplicate */}
       <div className="flex items-center gap-2">
-        <input
-          type="text"
+        <Input
           value={selectedLight.name}
           onChange={handleNameChange}
-          className="flex-1 px-2 py-1 text-sm bg-panel-border/50 border border-panel-border rounded text-text-primary focus:outline-none focus:border-accent"
           aria-label="Light name"
+          containerClassName="flex-1"
         />
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleDuplicate}
-          className="p-1.5 rounded text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors"
-          aria-label="Duplicate light"
-          title="Duplicate (D key)"
+          ariaLabel="Duplicate light"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="9" y="9" width="13" height="13" rx="2" />
             <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       {/* Type and Enable row */}
@@ -254,13 +248,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
             onChange={handleTypeChange}
           />
         </div>
-        <ToggleButton
-          pressed={selectedLight.enabled}
-          onToggle={handleToggleEnabled}
-          ariaLabel={selectedLight.enabled ? 'Disable light' : 'Enable light'}
-        >
-          {selectedLight.enabled ? 'On' : 'Off'}
-        </ToggleButton>
+
       </div>
 
       {/* Color picker */}

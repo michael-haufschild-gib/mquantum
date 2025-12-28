@@ -282,6 +282,49 @@ describe('environmentStore', () => {
       });
     });
 
+    describe('background color', () => {
+      it('should set background color', () => {
+        const { setBackgroundColor } = useEnvironmentStore.getState();
+
+        setBackgroundColor('#ff0000');
+        expect(useEnvironmentStore.getState().backgroundColor).toBe('#ff0000');
+
+        setBackgroundColor('#00ff00');
+        expect(useEnvironmentStore.getState().backgroundColor).toBe('#00ff00');
+      });
+
+      it('should have default background color', () => {
+        expect(useEnvironmentStore.getState().backgroundColor).toBe(
+          SKYBOX_INITIAL_STATE.backgroundColor
+        );
+      });
+    });
+
+    describe('background blend mode', () => {
+      it('should set background blend mode', () => {
+        const { setBackgroundBlendMode } = useEnvironmentStore.getState();
+
+        setBackgroundBlendMode('screen');
+        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('screen');
+
+        setBackgroundBlendMode('multiply');
+        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('multiply');
+
+        setBackgroundBlendMode('overlay');
+        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('overlay');
+
+        setBackgroundBlendMode('add');
+        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('add');
+
+        setBackgroundBlendMode('normal');
+        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('normal');
+      });
+
+      it('should have default blend mode of normal', () => {
+        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('normal');
+      });
+    });
+
     describe('reset', () => {
       it('should reset skybox settings to defaults', () => {
         const { setSkyboxSelection, setSkyboxIntensity, resetSkyboxSettings } =
@@ -295,6 +338,20 @@ describe('environmentStore', () => {
         const state = useEnvironmentStore.getState();
         expect(state.skyboxSelection).toBe(SKYBOX_INITIAL_STATE.skyboxSelection);
         expect(state.skyboxIntensity).toBe(SKYBOX_INITIAL_STATE.skyboxIntensity);
+      });
+
+      it('should reset background color and blend mode to defaults', () => {
+        const { setBackgroundColor, setBackgroundBlendMode, resetSkyboxSettings } =
+          useEnvironmentStore.getState();
+
+        setBackgroundColor('#ff0000');
+        setBackgroundBlendMode('screen');
+
+        resetSkyboxSettings();
+
+        const state = useEnvironmentStore.getState();
+        expect(state.backgroundColor).toBe(SKYBOX_INITIAL_STATE.backgroundColor);
+        expect(state.backgroundBlendMode).toBe(SKYBOX_INITIAL_STATE.backgroundBlendMode);
       });
     });
   });

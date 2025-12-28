@@ -6,6 +6,7 @@
  * Only visible when edge thickness > 1 (tube rendering mode).
  */
 
+import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
@@ -95,13 +96,14 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
             disableAlpha={true}
           />
           {specularColor !== DEFAULT_EDGE_PBR.specularColor && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setSpecularColor(DEFAULT_EDGE_PBR.specularColor)}
-              className="text-xs text-accent hover:text-accent/80 transition-colors"
-              title="Reset to default"
+              ariaLabel="Reset to default"
             >
               Reset
-            </button>
+            </Button>
           )}
         </div>
 

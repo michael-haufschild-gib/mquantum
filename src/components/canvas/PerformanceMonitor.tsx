@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/Button';
 import { Switch } from '@/components/ui/Switch';
 import { Tabs } from '@/components/ui/Tabs';
 import { usePanelCollision } from '@/hooks/usePanelCollision';
@@ -465,19 +466,21 @@ const ShaderTabContent = React.memo(function ShaderTabContent() {
     <div className="space-y-5 p-5">
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
         {Object.keys(shaderDebugInfos).map(key => (
-          <button
+          <Button
             key={key}
+            variant={selectedShaderKey === key ? 'primary' : 'ghost'}
+            size="sm"
             onClick={() => setSelectedShaderKey(key)}
             className={`
-              flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border
+              rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap
               ${selectedShaderKey === key
                 ? 'bg-accent/20 text-accent border-accent/30'
-                : 'bg-[var(--bg-hover)] text-text-tertiary border-border-subtle hover:bg-[var(--bg-active)] hover:text-text-secondary'
+                : ''
               }
             `}
           >
             {formatShaderName(key, objectType)}
-          </button>
+          </Button>
         ))}
       </div>
       {activeShaderInfo && (
@@ -568,9 +571,9 @@ const BuffersTabContent = React.memo(function BuffersTabContent() {
     <div className="space-y-5 p-5">
       <div className="flex items-center justify-between">
         <SectionHeader icon={<Icons.Square />} label="Render Targets" />
-        <button onClick={refreshBufferStats} className="text-text-tertiary hover:text-text-primary transition-colors">
+        <Button variant="ghost" size="icon" onClick={refreshBufferStats} ariaLabel="Refresh buffer stats">
           <Icons.RefreshCw className="w-3 h-3" />
-        </button>
+        </Button>
       </div>
       {!bufferStats ? (
         <div className="text-center text-text-tertiary py-4 text-xs">Loading...</div>
@@ -599,26 +602,21 @@ const BuffersTabContent = React.memo(function BuffersTabContent() {
         <div className="space-y-3 pt-3 border-t border-border-subtle">
           <SectionHeader icon={<Icons.AlertTriangle />} label="Debug Tools" />
           <div className="space-y-2">
-            <button
+            <Button
+              variant="danger"
+              size="sm"
               onClick={triggerContextLoss}
               disabled={contextStatus !== 'active'}
-              className={`
-                w-full px-3 py-2 text-[10px] font-bold uppercase tracking-wider rounded-md border transition-all
-                flex items-center justify-center gap-2
-                ${contextStatus !== 'active'
-                  ? 'bg-surface text-text-tertiary border-border-subtle cursor-not-allowed'
-                  : 'bg-danger text-danger border-danger-border hover:bg-danger/80 hover:border-danger'
-                }
-              `}
+              className="w-full text-[10px] font-bold uppercase tracking-wider"
             >
               <Icons.AlertTriangle className="w-3 h-3" />
               Simulate Context Loss
-            </button>
-            <div className="text-[9px] text-text-tertiary text-center">
+            </Button>
+            <div className="text-[9px] text-[var(--text-tertiary)] text-center">
               Status: <span className={
                 contextStatus === 'active' ? 'text-success' :
                   contextStatus === 'restoring' ? 'text-warning' :
-                    contextStatus === 'failed' ? 'text-danger' : 'text-text-tertiary'
+                    contextStatus === 'failed' ? 'text-[var(--text-danger)]' : 'text-[var(--text-tertiary)]'
               }>{contextStatus}</span>
             </div>
           </div>
@@ -880,16 +878,13 @@ const BufferRow = ({ label, w, h, baseW, highlight }: { label: string, w: number
 );
 
 const DebugToggle = ({ label, active, onClick, disabled = false }: { label: string, active: boolean, onClick: () => void, disabled?: boolean }) => (
-  <button
+  <Button
+    variant={active ? 'primary' : 'ghost'}
+    size="sm"
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
-    className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider rounded-md border transition-all ${disabled
-      ? 'bg-surface text-text-tertiary border-border-subtle cursor-not-allowed opacity-50'
-      : active
-        ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm'
-        : 'bg-[var(--bg-hover)] text-text-tertiary border-border-subtle hover:bg-[var(--bg-active)] hover:text-text-primary'
-      }`}
+    className={`text-[10px] font-bold uppercase tracking-wider ${active ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm' : ''}`}
   >
     {label}
-  </button>
+  </Button>
 );

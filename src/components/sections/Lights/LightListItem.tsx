@@ -15,6 +15,7 @@ import SpotIcon from '@/assets/icons/light-spot.svg?react';
 import LightToggleOffIcon from '@/assets/icons/light-toggle-off.svg?react';
 import LightToggleOnIcon from '@/assets/icons/light-toggle-on.svg?react';
 import TrashIcon from '@/assets/icons/trash.svg?react';
+import { Button } from '@/components/ui/Button';
 import type { LightSource, LightType } from '@/rendering/lights/types';
 import React, { memo } from 'react';
 
@@ -94,47 +95,39 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       </span>
 
       {/* Enable/disable toggle */}
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={(e) => {
           e.stopPropagation();
           onToggle();
         }}
-        className={`
-          p-1 rounded transition-colors
-          ${light.enabled
-            ? 'text-accent hover:text-accent/80'
-            : 'text-text-tertiary hover:text-text-secondary'
-          }
-        `}
-        aria-label={light.enabled ? 'Disable light' : 'Enable light'}
-        title={light.enabled ? 'Disable light' : 'Enable light'}
+        className={light.enabled ? 'text-accent' : 'text-[var(--text-tertiary)]'}
+        ariaLabel={light.enabled ? 'Disable light' : 'Enable light'}
       >
         {light.enabled ? (
           <LightToggleOnIcon className="w-4 h-4" />
         ) : (
           <LightToggleOffIcon className="w-4 h-4" />
         )}
-      </button>
+      </Button>
 
       {/* Delete button */}
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={(e) => {
           e.stopPropagation();
           if (!isDeleteDisabled) {
             onRemove();
           }
         }}
-        className={`p-1 rounded transition-colors ${
-          isDeleteDisabled
-            ? 'text-text-tertiary/30 cursor-not-allowed'
-            : 'text-text-tertiary hover:text-error'
-        }`}
-        aria-label={isDeleteDisabled ? 'Cannot remove ambient light' : 'Remove light'}
-        title={isDeleteDisabled ? 'Ambient light cannot be removed' : 'Remove light (Delete key)'}
+        className={isDeleteDisabled ? 'text-[var(--text-tertiary)]/30' : 'text-[var(--text-tertiary)] hover:text-[var(--text-danger)]'}
+        ariaLabel={isDeleteDisabled ? 'Cannot remove ambient light' : 'Remove light'}
         disabled={isDeleteDisabled}
       >
         <TrashIcon className="w-4 h-4" />
-      </button>
+      </Button>
     </div>
   );
 });

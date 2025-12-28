@@ -15,7 +15,9 @@
  */
 
 import { useShallow } from 'zustand/react/shallow';
+import { Button } from '@/components/ui/Button';
 import { Slider } from '@/components/ui/Slider';
+import { ToggleGroup } from '@/components/ui/ToggleGroup';
 import { Section } from '@/components/sections/Section';
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets';
 import {
@@ -171,41 +173,17 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         {/* Physics Mode Selection */}
         <Section title="Physics Mode" defaultOpen={true}>
             <div className="space-y-3">
-                <div className="flex gap-1 p-0.5 bg-surface-tertiary rounded">
-                    <button
-                        onClick={() => setQuantumMode('harmonicOscillator')}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded transition-colors ${
-                            isHarmonicMode
-                                ? 'bg-accent text-white'
-                                : 'text-text-secondary hover:text-text-primary'
-                        }`}
-                        data-testid="mode-harmonic-oscillator"
-                    >
-                        Harmonic
-                    </button>
-                    <button
-                        onClick={() => setQuantumMode('hydrogenOrbital')}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded transition-colors ${
-                            isHydrogenMode
-                                ? 'bg-accent text-white'
-                                : 'text-text-secondary hover:text-text-primary'
-                        }`}
-                        data-testid="mode-hydrogen-orbital"
-                    >
-                        Hydrogen 3D
-                    </button>
-                    <button
-                        onClick={() => setQuantumMode('hydrogenND')}
-                        className={`flex-1 px-2 py-1.5 text-xs rounded transition-colors ${
-                            isHydrogenNDMode
-                                ? 'bg-accent text-white'
-                                : 'text-text-secondary hover:text-text-primary'
-                        }`}
-                        data-testid="mode-hydrogen-nd"
-                    >
-                        Hydrogen ND
-                    </button>
-                </div>
+                <ToggleGroup
+                    options={[
+                        { value: 'harmonicOscillator', label: 'Harmonic' },
+                        { value: 'hydrogenOrbital', label: 'Hydrogen 3D' },
+                        { value: 'hydrogenND', label: 'Hydrogen ND' },
+                    ]}
+                    value={config.quantumMode}
+                    onChange={(v) => setQuantumMode(v as 'harmonicOscillator' | 'hydrogenOrbital' | 'hydrogenND')}
+                    ariaLabel="Select physics mode"
+                    data-testid="mode-selector"
+                />
                 <p className="text-xs text-text-tertiary">
                     {isHydrogenMode
                         ? 'Electron orbitals from Coulomb potential (s, p, d, f shapes)'
@@ -315,22 +293,20 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     {/* Real vs Complex toggle */}
                     <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs text-text-secondary">
+                            <label className="text-xs text-[var(--text-secondary)]">
                                 Orbital Representation
                             </label>
-                            <button
+                            <Button
+                                variant={config.useRealOrbitals ? 'primary' : 'ghost'}
+                                size="sm"
                                 onClick={() => setUseRealOrbitals(!config.useRealOrbitals)}
-                                className={`px-2 py-1 text-xs rounded transition-colors ${
-                                    config.useRealOrbitals
-                                        ? 'bg-accent/20 text-accent'
-                                        : 'bg-surface-tertiary text-text-secondary'
-                                }`}
+                                className={config.useRealOrbitals ? 'bg-accent/20 text-accent' : ''}
                                 data-testid="hydrogen-real-toggle"
                             >
                                 {config.useRealOrbitals ? 'Real (px, py, pz)' : 'Complex (m)'}
-                            </button>
+                            </Button>
                         </div>
-                        <p className="text-xs text-text-tertiary">
+                        <p className="text-xs text-[var(--text-tertiary)]">
                             {config.useRealOrbitals
                                 ? 'Real spherical harmonics (chemistry convention)'
                                 : 'Complex spherical harmonics (physics convention)'
@@ -476,20 +452,18 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     {/* Real vs Complex toggle */}
                     <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs text-text-secondary">
+                            <label className="text-xs text-[var(--text-secondary)]">
                                 Orbital Representation
                             </label>
-                            <button
+                            <Button
+                                variant={config.useRealOrbitals ? 'primary' : 'ghost'}
+                                size="sm"
                                 onClick={() => setUseRealOrbitals(!config.useRealOrbitals)}
-                                className={`px-2 py-1 text-xs rounded transition-colors ${
-                                    config.useRealOrbitals
-                                        ? 'bg-accent/20 text-accent'
-                                        : 'bg-surface-tertiary text-text-secondary'
-                                }`}
+                                className={config.useRealOrbitals ? 'bg-accent/20 text-accent' : ''}
                                 data-testid="hydrogen-nd-real-toggle"
                             >
                                 {config.useRealOrbitals ? 'Real (px, py, pz)' : 'Complex (m)'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
 
@@ -542,16 +516,17 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     {/* Seed Control */}
                     <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs text-text-secondary">
+                            <label className="text-xs text-[var(--text-secondary)]">
                                 Seed: {config.seed}
                             </label>
-                            <button
+                            <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => randomizeSeed()}
-                                className="text-xs text-accent hover:underline"
                                 data-testid="schroedinger-randomize-seed"
                             >
                                 Randomize
-                            </button>
+                            </Button>
                         </div>
                         <Slider
                             label="Seed"

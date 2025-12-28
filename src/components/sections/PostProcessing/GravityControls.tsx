@@ -2,8 +2,9 @@
  * Gravity Controls Component
  *
  * Controls for gravitational lensing effect applied to the environment layer.
- * When a black hole is selected, gravity is always enabled and settings sync
- * with the black hole's internal lensing parameters.
+ * Only visible when a black hole is selected, as gravitational lensing
+ * is exclusive to black hole objects. Settings sync with the black hole's
+ * internal lensing parameters.
  */
 
 import { ControlGroup } from '@/components/ui/ControlGroup';
@@ -45,124 +46,108 @@ export const GravityControls: React.FC = () => {
   }));
   const ppState = usePostProcessingStore(ppSelector);
 
-  // Black Hole State - for syncing when black hole is active
+  // Black Hole State - for syncing
   const isBlackHole = useGeometryStore(s => s.objectType === 'blackhole');
   const bhSelector = useShallow(blackHoleSelector);
   const blackHoleState = useExtendedObjectStore(bhSelector);
 
-  // When black hole is selected, sync global gravity settings from black hole
+  // Sync global gravity settings from black hole on mount
   useEffect(() => {
-    if (isBlackHole) {
-      // Force gravity enabled when black hole is active
-      if (!ppState.gravityEnabled) {
-        ppState.setGravityEnabled(true);
-      }
-      // Sync from black hole to global on initial selection
-      ppState.setGravityStrength(blackHoleState.gravityStrength);
-      ppState.setGravityDistortionScale(blackHoleState.bendScale);
-      ppState.setGravityFalloff(blackHoleState.lensingFalloff);
-      ppState.setGravityChromaticAberration(blackHoleState.chromaticAberration);
+    // Force gravity enabled
+    if (!ppState.gravityEnabled) {
+      ppState.setGravityEnabled(true);
     }
-    // Only run when isBlackHole changes, not on every black hole state change
+    // Sync from black hole to global
+    ppState.setGravityStrength(blackHoleState.gravityStrength);
+    ppState.setGravityDistortionScale(blackHoleState.bendScale);
+    ppState.setGravityFalloff(blackHoleState.lensingFalloff);
+    ppState.setGravityChromaticAberration(blackHoleState.chromaticAberration);
+    // Only run on mount (isBlackHole change triggers component mount/unmount)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBlackHole]);
+  }, []);
 
   // Synced handlers that update both global AND black hole settings
   const handleStrengthChange = useCallback((value: number) => {
     ppState.setGravityStrength(value);
-    if (isBlackHole) {
-      blackHoleState.setGravityStrength(value);
-    }
-  }, [ppState, blackHoleState, isBlackHole]);
+    blackHoleState.setGravityStrength(value);
+  }, [ppState, blackHoleState]);
 
   const handleDistortionScaleChange = useCallback((value: number) => {
     ppState.setGravityDistortionScale(value);
-    if (isBlackHole) {
-      blackHoleState.setBendScale(value);
-    }
-  }, [ppState, blackHoleState, isBlackHole]);
+    blackHoleState.setBendScale(value);
+  }, [ppState, blackHoleState]);
 
   const handleFalloffChange = useCallback((value: number) => {
     ppState.setGravityFalloff(value);
-    if (isBlackHole) {
-      blackHoleState.setLensingFalloff(value);
-      blackHoleState.setDistanceFalloff(value);
-    }
-  }, [ppState, blackHoleState, isBlackHole]);
+    blackHoleState.setLensingFalloff(value);
+    blackHoleState.setDistanceFalloff(value);
+  }, [ppState, blackHoleState]);
 
   const handleChromaticAberrationChange = useCallback((value: number) => {
     ppState.setGravityChromaticAberration(value);
-    if (isBlackHole) {
-      blackHoleState.setChromaticAberration(value);
-    }
-  }, [ppState, blackHoleState, isBlackHole]);
+    blackHoleState.setChromaticAberration(value);
+  }, [ppState, blackHoleState]);
 
-  // For black hole, gravity is always enabled
-  const isEnabled = isBlackHole ? true : ppState.gravityEnabled;
+  // Only render for black hole objects
+  if (!isBlackHole) {
+    return null;
+  }
 
   return (
     <div className="space-y-4">
-      {/* Main Toggle - disabled for black hole (always on) */}
+      {/* Main Toggle - always on for black hole */}
       <Switch
-        checked={isEnabled}
+        checked={true}
         onCheckedChange={ppState.setGravityEnabled}
         label="Gravitational Lensing"
-        disabled={isBlackHole}
+        disabled
       />
 
-      {isBlackHole && (
-        <p className="text-[10px] text-text-secondary mt-1 mb-2">
-          Gravity is always active for Black Holes. Settings sync with internal lensing.
-        </p>
-      )}
+      <p className="text-[10px] text-text-secondary mt-1 mb-2">
+        Gravity is always active for Black Holes. Settings sync with internal lensing.
+      </p>
 
-      <div className={!isEnabled ? 'opacity-50 pointer-events-none' : ''}>
-        <ControlGroup title="Gravity Parameters">
-          {/* Gravity Strength */}
-          <Slider
-            label="Strength"
-            value={ppState.gravityStrength}
-            min={0.1}
-            max={10}
-            step={0.1}
-            onChange={handleStrengthChange}
-            showValue
-          />
+      <ControlGroup title="Gravity Parameters">
+        <Slider
+          label="Strength"
+          value={ppState.gravityStrength}
+          min={0.1}
+          max={10}
+          step={0.1}
+          onChange={handleStrengthChange}
+          showValue
+        />
 
-          {/* Distortion Scale */}
-          <Slider
-            label="Distortion Scale"
-            value={ppState.gravityDistortionScale}
-            min={0.1}
-            max={5}
-            step={0.1}
-            onChange={handleDistortionScaleChange}
-            showValue
-          />
+        <Slider
+          label="Distortion Scale"
+          value={ppState.gravityDistortionScale}
+          min={0.1}
+          max={5}
+          step={0.1}
+          onChange={handleDistortionScaleChange}
+          showValue
+        />
 
-          {/* Falloff */}
-          <Slider
-            label="Falloff"
-            value={ppState.gravityFalloff}
-            min={0.5}
-            max={4}
-            step={0.1}
-            onChange={handleFalloffChange}
-            showValue
-          />
+        <Slider
+          label="Falloff"
+          value={ppState.gravityFalloff}
+          min={0.5}
+          max={4}
+          step={0.1}
+          onChange={handleFalloffChange}
+          showValue
+        />
 
-          {/* Chromatic Aberration */}
-          <Slider
-            label="Chromatic Aberration"
-            value={ppState.gravityChromaticAberration}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={handleChromaticAberrationChange}
-            showValue
-          />
-        </ControlGroup>
-      </div>
+        <Slider
+          label="Chromatic Aberration"
+          value={ppState.gravityChromaticAberration}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={handleChromaticAberrationChange}
+          showValue
+        />
+      </ControlGroup>
     </div>
   );
 };

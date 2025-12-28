@@ -5,6 +5,7 @@
  * Shows collapsible advanced mode with individual RGB sliders.
  */
 
+import { Button } from '@/components/ui/Button';
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette';
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
 import React, { useState } from 'react';
@@ -50,9 +51,11 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = ({
   return (
     <div className={className}>
       {/* Toggle Button */}
-      <button
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-text-secondary bg-panel-bg rounded border border-panel-border hover:border-accent/50 transition-colors"
+        className="flex items-center justify-between w-full"
       >
         <span>Advanced Editor</span>
         <svg
@@ -68,18 +71,19 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = ({
             d="M19 9l-7 7-7-7"
           />
         </svg>
-      </button>
+      </Button>
 
       {/* Expanded Content */}
       {isExpanded && (
         <div className="mt-4 space-y-6">
           {/* Reset Button */}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleReset}
-            className="text-xs text-accent hover:text-accent/80 transition-colors"
           >
             Reset to Default
-          </button>
+          </Button>
 
           {/* Coefficient Groups */}
           {(['a', 'b', 'c', 'd'] as const).map((key) => (

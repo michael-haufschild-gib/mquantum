@@ -272,13 +272,14 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
   }));
   const ppState = usePostProcessingStore(postProcessingSelector);
 
-  // Store subscriptions - Environment (walls, skybox)
+  // Store subscriptions - Environment (walls, skybox, background color)
   const envSelector = useShallow((s: ReturnType<typeof useEnvironmentStore.getState>) => ({
     activeWalls: s.activeWalls,
     skyboxMode: s.skyboxMode,
     skyboxEnabled: s.skyboxEnabled,
     classicCubeTexture: s.classicCubeTexture,
     iblQuality: s.iblQuality,
+    backgroundColor: s.backgroundColor,
   }));
   const envState = useEnvironmentStore(envSelector);
 
@@ -380,6 +381,8 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
   const graphRef = useRef<RenderGraph | null>(null);
   const passRefs = useRef<{
     cubemapCapture?: CubemapCapturePass;
+    scenePass?: ScenePass;
+    environmentScene?: ScenePass;
     objectDepth?: DepthPass;
     temporalDepthCapture?: TemporalDepthCapturePass;
     temporalCloud?: TemporalCloudPass;
@@ -822,21 +825,21 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     // CRITICAL: renderBackground: false prevents Three.js from rendering scene.background
     // with its internal shader that only outputs to 1 location. The custom SkyboxMesh on
     // SKYBOX layer uses a proper 3-output shader and handles skybox rendering correctly.
-    g.addPass(
-      new ScenePass({
-        id: 'scene',
-        outputs: [{ resourceId: RESOURCES.SCENE_COLOR, access: 'write' }],
-        layers: [RENDER_LAYERS.MAIN_OBJECT, RENDER_LAYERS.ENVIRONMENT, RENDER_LAYERS.SKYBOX],
-        clearColor: 0x000000,
-        autoClear: true,
-        renderBackground: false,
-        // Disabled when gravity is enabled (use split rendering instead)
-        enabled: (frame) => !(frame?.stores.postProcessing.gravityEnabled ?? false),
-        // Capture scene-only GPU stats for performance monitoring (excludes post-processing)
-        // Throttled to 500ms to prevent 60Hz store updates
-        onRenderStats: throttledUpdateSceneGpu,
-      })
-    );
+    const scenePass = new ScenePass({
+      id: 'scene',
+      outputs: [{ resourceId: RESOURCES.SCENE_COLOR, access: 'write' }],
+      layers: [RENDER_LAYERS.MAIN_OBJECT, RENDER_LAYERS.ENVIRONMENT, RENDER_LAYERS.SKYBOX],
+      clearColor: 0x000000,
+      autoClear: true,
+      renderBackground: false,
+      // Disabled when gravity is enabled (use split rendering instead)
+      enabled: (frame) => !(frame?.stores.postProcessing.gravityEnabled ?? false),
+      // Capture scene-only GPU stats for performance monitoring (excludes post-processing)
+      // Throttled to 500ms to prevent 60Hz store updates
+      onRenderStats: throttledUpdateSceneGpu,
+    });
+    passRefs.current.scenePass = scenePass;
+    g.addPass(scenePass);
 
     // ========================================================================
     // Gravitational Lensing Pipeline (Split Scene Rendering)
@@ -845,17 +848,17 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     // so we can apply gravitational lensing only to the environment layer.
 
     // Environment scene pass - renders ENVIRONMENT + SKYBOX layers only
-    g.addPass(
-      new ScenePass({
-        id: 'environmentScene',
-        outputs: [{ resourceId: RESOURCES.ENVIRONMENT_COLOR, access: 'write' }],
-        layers: [RENDER_LAYERS.ENVIRONMENT, RENDER_LAYERS.SKYBOX],
-        clearColor: 0x000000,
-        autoClear: true,
-        renderBackground: false,
-        enabled: (frame) => frame?.stores.postProcessing.gravityEnabled ?? false,
-      })
-    );
+    const environmentScenePass = new ScenePass({
+      id: 'environmentScene',
+      outputs: [{ resourceId: RESOURCES.ENVIRONMENT_COLOR, access: 'write' }],
+      layers: [RENDER_LAYERS.ENVIRONMENT, RENDER_LAYERS.SKYBOX],
+      clearColor: 0x000000,
+      autoClear: true,
+      renderBackground: false,
+      enabled: (frame) => frame?.stores.postProcessing.gravityEnabled ?? false,
+    });
+    passRefs.current.environmentScene = environmentScenePass;
+    g.addPass(environmentScenePass);
 
     // Main object scene pass - renders MAIN_OBJECT layer only
     // forceOpaque: true ensures the object is rendered without blending
@@ -1467,6 +1470,14 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       objectDepthLayers.push(RENDER_LAYERS.VOLUMETRIC);
     }
     passRefs.current.objectDepth?.setLayers(objectDepthLayers);
+
+    // Update scene clear color based on background color setting
+    // When skybox is disabled, use the background color as clear color
+    // When skybox is enabled, clear to black (skybox will render on top)
+    const env = envStateRef.current;
+    const clearColor = env.skyboxEnabled ? 0x000000 : env.backgroundColor;
+    passRefs.current.scenePass?.setClearColor(clearColor);
+    passRefs.current.environmentScene?.setClearColor(clearColor);
 
     // Update temporal depth camera matrices before rendering
     temporalDepth.updateCameraMatrices(camera);

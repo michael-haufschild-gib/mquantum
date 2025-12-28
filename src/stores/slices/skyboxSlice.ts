@@ -1,11 +1,14 @@
 import type * as THREE from 'three'
 import type { StateCreator } from 'zustand'
 import {
+  type BackgroundBlendMode,
   type SkyboxAnimationMode,
   type SkyboxMode,
   type SkyboxProceduralSettings,
   type SkyboxSelection,
   type SkyboxTexture,
+  DEFAULT_BACKGROUND_BLEND_MODE,
+  DEFAULT_BACKGROUND_COLOR,
   DEFAULT_SKYBOX_ANIMATION_MODE,
   DEFAULT_SKYBOX_ANIMATION_SPEED,
   DEFAULT_SKYBOX_BLUR,
@@ -44,6 +47,10 @@ export interface SkyboxSliceState {
    * Used by CubemapCapturePass to set scene.background and generate PMREM.
    */
   classicCubeTexture: THREE.CubeTexture | null
+  /** Background color shown behind skybox */
+  backgroundColor: string
+  /** Blend mode for compositing skybox with background color */
+  backgroundBlendMode: BackgroundBlendMode
 }
 
 export interface SkyboxSliceActions {
@@ -62,6 +69,10 @@ export interface SkyboxSliceActions {
   setProceduralSettings: (settings: Partial<SkyboxProceduralSettings>) => void
   /** Set the loaded CubeTexture for classic skybox mode (used by render graph) */
   setClassicCubeTexture: (texture: THREE.CubeTexture | null) => void
+  /** Set background color */
+  setBackgroundColor: (color: string) => void
+  /** Set background blend mode */
+  setBackgroundBlendMode: (mode: BackgroundBlendMode) => void
   resetSkyboxSettings: () => void
 }
 
@@ -81,6 +92,8 @@ export const SKYBOX_INITIAL_STATE: SkyboxSliceState = {
   skyboxLoading: false,
   proceduralSettings: DEFAULT_SKYBOX_PROCEDURAL_SETTINGS,
   classicCubeTexture: null,
+  backgroundColor: DEFAULT_BACKGROUND_COLOR,
+  backgroundBlendMode: DEFAULT_BACKGROUND_BLEND_MODE,
 }
 
 /** All procedural mode prefixes */
@@ -160,6 +173,8 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
     })),
   setClassicCubeTexture: (texture: THREE.CubeTexture | null) =>
     set({ classicCubeTexture: texture }),
+  setBackgroundColor: (color: string) => set({ backgroundColor: color }),
+  setBackgroundBlendMode: (mode: BackgroundBlendMode) => set({ backgroundBlendMode: mode }),
   resetSkyboxSettings: () =>
     set({
       skyboxSelection: DEFAULT_SKYBOX_SELECTION,
@@ -172,5 +187,7 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
       skyboxHighQuality: DEFAULT_SKYBOX_HIGH_QUALITY,
       proceduralSettings: DEFAULT_SKYBOX_PROCEDURAL_SETTINGS,
       classicCubeTexture: null,
+      backgroundColor: DEFAULT_BACKGROUND_COLOR,
+      backgroundBlendMode: DEFAULT_BACKGROUND_BLEND_MODE,
     }),
 })

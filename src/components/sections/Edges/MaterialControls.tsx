@@ -9,6 +9,7 @@
  * We keep it for artistic control.
  */
 
+import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { useAppearanceStore } from '@/stores/appearanceStore'
@@ -53,13 +54,14 @@ export const MaterialControls: React.FC<MaterialControlsProps> = React.memo(
             disableAlpha={true}
           />
           {specularColor !== DEFAULT_EDGE_PBR.specularColor && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setSpecularColor(DEFAULT_EDGE_PBR.specularColor)}
-              className="text-xs text-accent hover:text-accent/80 transition-colors"
-              title="Reset to default"
+              ariaLabel="Reset to default"
             >
               Reset
-            </button>
+            </Button>
           )}
         </div>
 

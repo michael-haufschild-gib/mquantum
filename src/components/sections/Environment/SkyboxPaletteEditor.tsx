@@ -6,6 +6,7 @@
  * Always uses cosine algorithm - no algorithm selector exposed.
  */
 
+import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import {
   COSINE_PRESET_OPTIONS,
@@ -173,9 +174,11 @@ const SkyboxCoefficientEditor: React.FC<SkyboxCoefficientEditorProps> = ({
   return (
     <div>
       {/* Toggle Button */}
-      <button
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-text-secondary bg-panel-bg rounded border border-panel-border hover:border-accent/50 transition-colors"
+        className="flex items-center justify-between w-full"
       >
         <span>Advanced Editor</span>
         <svg
@@ -191,18 +194,19 @@ const SkyboxCoefficientEditor: React.FC<SkyboxCoefficientEditorProps> = ({
             d="M19 9l-7 7-7-7"
           />
         </svg>
-      </button>
+      </Button>
 
       {/* Expanded Content */}
       {isExpanded && (
         <div className="mt-4 space-y-6">
           {/* Reset Button */}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onReset}
-            className="text-xs text-accent hover:text-accent/80 transition-colors"
           >
             Reset to Default
-          </button>
+          </Button>
 
           {/* Coefficient Groups */}
           {(['a', 'b', 'c', 'd'] as const).map((key) => (

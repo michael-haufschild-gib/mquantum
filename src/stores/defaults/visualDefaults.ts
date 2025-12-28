@@ -28,6 +28,10 @@ export const DEFAULT_FACE_OPACITY = 1
 export const DEFAULT_FACE_COLOR = '#33cc9e'
 export const DEFAULT_BACKGROUND_COLOR = '#0F0F1A'
 
+/** Background blend mode for compositing skybox with background color */
+export type BackgroundBlendMode = 'normal' | 'screen' | 'multiply' | 'overlay' | 'add'
+export const DEFAULT_BACKGROUND_BLEND_MODE: BackgroundBlendMode = 'normal'
+
 // Unified PBR properties (single value for all objects: faces, edges, fractals)
 export const DEFAULT_ROUGHNESS = 0.3
 export const DEFAULT_METALLIC = 0.0

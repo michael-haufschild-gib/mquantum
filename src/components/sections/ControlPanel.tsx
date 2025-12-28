@@ -7,6 +7,7 @@
  * - side-by-side: Inline flex item next to canvas (desktop)
  */
 
+import { Button } from '@/components/ui/Button'
 import type { LayoutMode } from '@/stores/layoutStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import React from 'react'
@@ -98,12 +99,12 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             </h2>
           )}
 
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleCollapsed}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg text-text-secondary hover:text-accent hover:bg-[var(--bg-hover)] transition-colors ${isCollapsed ? 'w-full h-full rounded-full' : ''}`}
-            aria-label={isCollapsed ? 'Expand control panel' : 'Collapse control panel'}
-            aria-expanded={!isCollapsed}
+            className={isCollapsed ? 'w-full h-full rounded-full' : ''}
+            ariaLabel={isCollapsed ? 'Expand control panel' : 'Collapse control panel'}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -119,7 +120,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             >
               <path d="M18 15l-6-6-6 6" />
             </svg>
-          </button>
+          </Button>
         </div>
 
         {/* Content Area */}

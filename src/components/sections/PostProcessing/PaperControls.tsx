@@ -6,6 +6,7 @@
  */
 
 import React, { useState } from 'react'
+import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
@@ -31,11 +32,12 @@ const CollapsibleSection: React.FC<{
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
   return (
-    <div className="border-t border-panel-border mt-2 pt-2 first:mt-0 first:border-t-0 first:pt-0">
-      <button
-        type="button"
+    <div className="border-t border-[var(--border-subtle)] mt-2 pt-2 first:mt-0 first:border-t-0 first:pt-0">
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full text-xs font-semibold text-text-secondary uppercase tracking-wider pb-1 hover:text-text-primary transition-colors"
+        className="flex items-center justify-between w-full text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider pb-1"
       >
         <span>{title}</span>
         <svg
@@ -46,7 +48,7 @@ const CollapsibleSection: React.FC<{
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
-      </button>
+      </Button>
       {isOpen && <div className="space-y-3 pt-2">{children}</div>}
     </div>
   )

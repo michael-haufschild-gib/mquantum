@@ -120,6 +120,18 @@ export class ScenePass extends BasePass {
   }
 
   /**
+   * Dynamically set the clear color.
+   * @param color - The new clear color (hex, string, or THREE.Color)
+   */
+  setClearColor(color: THREE.ColorRepresentation): void {
+    if (this.clearColor === null) {
+      this.clearColor = new THREE.Color(color)
+    } else {
+      this.clearColor.set(color)
+    }
+  }
+
+  /**
    * Rebuild material cache by traversing the scene.
    * @param scene
    * @param camera
