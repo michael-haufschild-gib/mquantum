@@ -147,7 +147,7 @@ export const BlackHoleControls: React.FC<BlackHoleControlsProps> = React.memo(({
       )}
 
       {/* Rendering Info */}
-      <div className="px-4 py-2 text-xs text-text-secondary border-t border-white/5">
+      <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
         <p>Rendering: Volumetric Raymarching</p>
         <p className="text-text-tertiary mt-1">
           {dimension}D black hole with gravitational lensing

@@ -7,6 +7,8 @@
  * Optimized to avoid forced reflows and support "keep-alive" with "mount-on-demand" for tab content.
  */
 
+import ChevronLeftIcon from '@/assets/icons/chevron-left2.svg?react';
+import ChevronRightIcon from '@/assets/icons/chevron-right2.svg?react';
 import { soundManager } from '@/lib/audio/SoundManager';
 import { m } from 'motion/react';
 import React, { useCallback, useEffect, useId, useRef, useState, useTransition } from 'react';
@@ -40,38 +42,6 @@ export interface TabsProps {
   /** Test ID for testing */
   'data-testid'?: string;
 }
-
-const ChevronLeft = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="12"
-    height="12"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M15 18l-6-6 6-6" />
-  </svg>
-);
-
-const ChevronRight = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="12"
-    height="12"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M9 18l6-6-6-6" />
-  </svg>
-);
 
 export const Tabs: React.FC<TabsProps> = ({
   tabs,
@@ -111,33 +81,68 @@ export const Tabs: React.FC<TabsProps> = ({
   }, [value, activeIndex, prevIndex]);
 
   // Optimized Scroll Checking using ResizeObserver
+  // Wait for layout to stabilize before showing scroll indicators
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    let stableCheckCount = 0;
+    let lastScrollWidth = 0;
+    let lastClientWidth = 0;
+
     const checkScroll = () => {
       if (!container) return;
       const { scrollLeft, scrollWidth, clientWidth } = container;
-      setCanScrollLeft(scrollLeft > 1);
-      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth - 1);
+
+      // Only show scroll indicators if there's meaningful overflow (> 5px)
+      // This prevents false positives from sub-pixel rendering and animation timing
+      const overflowThreshold = 5;
+      const hasLeftOverflow = scrollLeft > overflowThreshold;
+      const hasRightOverflow = scrollWidth - clientWidth - scrollLeft > overflowThreshold;
+
+      setCanScrollLeft(hasLeftOverflow);
+      setCanScrollRight(hasRightOverflow);
     };
 
-    // Use ResizeObserver for size changes
+    // Stability check: wait for dimensions to stabilize before initial check
+    // This handles the Section open animation timing issue
+    const waitForStableLayout = () => {
+      const { scrollWidth, clientWidth } = container;
+
+      if (scrollWidth === lastScrollWidth && clientWidth === lastClientWidth) {
+        stableCheckCount++;
+        if (stableCheckCount >= 2) {
+          // Layout is stable, do the real check
+          checkScroll();
+          return;
+        }
+      } else {
+        stableCheckCount = 0;
+      }
+
+      lastScrollWidth = scrollWidth;
+      lastClientWidth = clientWidth;
+
+      // Check again in next frame
+      requestAnimationFrame(waitForStableLayout);
+    };
+
+    // Use ResizeObserver for size changes after initial mount
     const resizeObserver = new ResizeObserver(() => {
-        requestAnimationFrame(checkScroll);
+      requestAnimationFrame(checkScroll);
     });
     resizeObserver.observe(container);
 
-    // Initial check in RAF to avoid synchronous reflow on mount
-    requestAnimationFrame(checkScroll);
+    // Wait for stable layout before initial check
+    requestAnimationFrame(waitForStableLayout);
 
     // Check on scroll (throttled via RAF naturally)
     const handleScroll = () => requestAnimationFrame(checkScroll);
     container.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-        resizeObserver.disconnect();
-        container.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
+      container.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -191,89 +196,92 @@ export const Tabs: React.FC<TabsProps> = ({
 
   // Styling logic
   const listContainerStyles = variant === 'pills'
-    ? 'bg-black/20 rounded-lg p-1 gap-1'
-    : 'border-b border-white/5 pb-[1px]';
+    ? 'bg-[var(--bg-hover)] rounded-lg p-1 gap-1'
+    : 'border-b border-border-subtle pb-[1px]';
 
   const widthStyles = fullWidth ? 'w-full' : 'min-w-full w-max';
 
   return (
     <div className={`flex flex-col ${className}`} data-testid={testId}>
-      {/* Header Area */}
-      <div className="relative shrink-0 z-10">
-        {/* Scroll Indicators */}
-        {canScrollLeft && (
-          <button
-            type="button"
-            onClick={() => scroll('left')}
-            className="absolute left-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-r from-panel-bg to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <ChevronLeft />
-          </button>
-        )}
+      {/* Header Area - tabListClassName applied here for spacing, outside indicator context */}
+      <div className={`shrink-0 z-10 ${tabListClassName}`}>
+        {/* Inner wrapper for scroll indicator positioning - excludes margin */}
+        <div className="relative">
+          {/* Scroll Indicators */}
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => scroll('left')}
+              className="absolute left-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-r from-panel to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ChevronLeftIcon className="w-3 h-3" />
+            </button>
+          )}
 
-        {/* Tab List */}
-        <div
-          ref={scrollContainerRef}
-          className={`overflow-x-auto scrollbar-none ${fullWidth ? 'w-full' : ''}`}
-        >
+          {/* Tab List */}
           <div
-            className={`flex items-center ${listContainerStyles} ${widthStyles} ${tabListClassName}`}
-            role="tablist"
+            ref={scrollContainerRef}
+            className={`overflow-x-auto scrollbar-none ${fullWidth ? 'w-full' : ''}`}
           >
-            {tabs.map((tab, index) => {
-              const isActive = tab.id === value;
+            <div
+              className={`flex items-center ${listContainerStyles} ${widthStyles}`}
+              role="tablist"
+            >
+              {tabs.map((tab, index) => {
+                const isActive = tab.id === value;
 
-              return (
-                <button
-                  key={tab.id}
-                  ref={(el) => { tabRefs.current[index] = el; }}
-                  type="button"
-                  role="tab"
-                  id={`tab-${tab.id}`}
-                  aria-selected={isActive}
-                  aria-controls={`panel-${tab.id}`}
-                  tabIndex={isActive ? 0 : -1}
-                  onClick={() => handleTabChange(tab.id)}
-                  onMouseEnter={() => !isActive && soundManager.playHover()}
-                  onKeyDown={(e) => handleKeyDown(e, index)}
-                  className={`
-                    relative px-4 py-2 text-[10px] uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200 cursor-pointer
-                    outline-none focus:outline-none focus-visible:outline-none border-none focus:ring-0
-                    ${fullWidth ? 'flex-1' : ''}
-                    ${isActive ? 'text-accent text-glow-subtle' : 'text-text-secondary hover:text-text-primary'}
-                    ${variant === 'pills' && isActive ? 'bg-white/5 rounded shadow-sm' : ''}
-                    ${variant === 'pills' && !isActive ? 'hover:bg-white/5 rounded' : ''}
-                    ${isPending && !isActive ? 'opacity-50' : ''}
-                  `}
-                  data-testid={testId ? `${testId}-tab-${tab.id}` : undefined}
-                >
-                  {isActive && variant !== 'pills' && (
-                    <m.div
-                      layoutId={`activeTab-${instanceId}`}
-                      className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent shadow-[0_0_8px_var(--color-accent)]"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
-                    />
-                  )}
-                  {isActive && variant !== 'pills' && (
-                     <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent pointer-events-none" />
-                  )}
-                  <span className="relative z-10">{tab.label}</span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={tab.id}
+                    ref={(el) => { tabRefs.current[index] = el; }}
+                    type="button"
+                    role="tab"
+                    id={`tab-${tab.id}`}
+                    aria-selected={isActive}
+                    aria-controls={`panel-${tab.id}`}
+                    tabIndex={isActive ? 0 : -1}
+                    onClick={() => handleTabChange(tab.id)}
+                    onMouseEnter={() => !isActive && soundManager.playHover()}
+                    onKeyDown={(e) => handleKeyDown(e, index)}
+                    className={`
+                      relative px-4 py-2 text-[10px] uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200 cursor-pointer
+                      outline-none focus:outline-none focus-visible:outline-none border-none focus:ring-0
+                      ${fullWidth ? 'flex-1' : ''}
+                      ${isActive ? 'text-accent text-glow-subtle' : 'text-text-secondary hover:text-text-primary'}
+                      ${variant === 'pills' && isActive ? 'bg-[var(--bg-active)] rounded shadow-sm' : ''}
+                      ${variant === 'pills' && !isActive ? 'hover:bg-[var(--bg-hover)] rounded' : ''}
+                      ${isPending && !isActive ? 'opacity-50' : ''}
+                    `}
+                    data-testid={testId ? `${testId}-tab-${tab.id}` : undefined}
+                  >
+                    {isActive && variant !== 'pills' && (
+                      <m.div
+                        layoutId={`activeTab-${instanceId}`}
+                        className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent shadow-[0_0_8px_var(--color-accent)]"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
+                      />
+                    )}
+                    {isActive && variant !== 'pills' && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent pointer-events-none" />
+                    )}
+                    <span className="relative z-10">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        {/* Right Scroll Indicator */}
-        {canScrollRight && (
-          <button
-            type="button"
-            onClick={() => scroll('right')}
-            className="absolute right-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-l from-panel-bg to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <ChevronRight />
-          </button>
-        )}
+          {/* Right Scroll Indicator */}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={() => scroll('right')}
+              className="absolute right-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-l from-panel to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+            >
+              <ChevronRightIcon className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Content Panel - Keep Alive with Mount on Demand */}

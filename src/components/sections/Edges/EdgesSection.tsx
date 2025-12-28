@@ -26,7 +26,7 @@ export const EdgesSection: React.FC<EdgesSectionProps> = ({
         <EdgeControls />
         
         {!edgesVisible && (
-            <div className="text-center p-4 border border-dashed border-white/10 rounded-lg bg-black/20">
+            <div className="text-center p-4 border border-dashed border-border-default rounded-lg bg-[var(--bg-hover)]">
                 <p className="text-xs text-text-secondary">Enable Edges to edit settings</p>
             </div>
         )}

@@ -131,7 +131,7 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
             {savedScenes.map((scene: SavedScene) => (
               <div
                 key={scene.id}
-                className="group flex items-center justify-between p-3 bg-white/5 rounded-md hover:bg-white/10 transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
+                className="group flex items-center justify-between p-3 bg-[var(--bg-hover)] rounded-md hover:bg-[var(--bg-active)] transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
               >
                 <Button
                   variant="ghost"
@@ -157,7 +157,7 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
                     e.stopPropagation();
                     setSceneToDelete(scene);
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-text-secondary hover:text-red-400 hover:bg-red-400/10 focus:opacity-100"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-text-secondary hover:text-danger hover:bg-danger-bg focus:opacity-100"
                   ariaLabel={`Delete scene "${scene.name}"`}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

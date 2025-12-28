@@ -117,12 +117,12 @@ export const Input = ({
             w-full bg-glass border rounded-lg px-3 py-2 text-sm transition-all duration-200
             ${leftIcon ? 'pl-9' : ''}
             ${rightIcon || clearable || loading ? 'pr-9' : ''}
-            ${error 
-              ? 'border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 placeholder:text-red-500/30' 
-              : 'border-white/10 focus:border-accent focus:ring-1 focus:ring-accent/50 placeholder:text-white/20'
+            ${error
+              ? 'border-danger-border focus:border-danger focus:ring-1 focus:ring-danger-border placeholder:text-danger/30'
+              : 'border-[var(--border-subtle)] focus:border-accent focus:ring-1 focus:ring-accent/50 placeholder:text-[var(--text-muted)]'
             }
-            ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-white/20 hover:bg-white/5'}
-            focus:outline-none focus:bg-black/40
+            ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-[var(--border-highlight)] hover:bg-[var(--bg-hover)]'}
+            focus:outline-none focus:bg-[var(--bg-active)]
             ${className}
           `}
           {...props}
@@ -141,7 +141,7 @@ export const Input = ({
                   exit={{ opacity: 0, scale: 0.8 }}
                   type="button"
                   onClick={handleClear}
-                  className="text-text-tertiary hover:text-text-primary rounded-full p-0.5 hover:bg-white/10 transition-colors"
+                  className="text-text-tertiary hover:text-text-primary rounded-full p-0.5 hover:bg-[var(--bg-active)] transition-colors"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -167,7 +167,7 @@ export const Input = ({
             initial={{ opacity: 0, y: -5, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: -5, height: 0 }}
-            className="text-xs text-red-400 ml-1"
+            className="text-xs text-danger ml-1"
           >
             {error}
           </m.span>

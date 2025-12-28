@@ -104,7 +104,7 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
   );
 
   const axes = ['X', 'Y', 'Z'] as const;
-  const colors = ['text-red-400', 'text-green-400', 'text-blue-400'];
+  const colors = ['text-danger', 'text-success', 'text-accent'];
 
   return (
     <div className={`space-y-1 ${className}`}>

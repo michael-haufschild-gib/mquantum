@@ -87,7 +87,7 @@ const PortaledSubmenu: React.FC<{
       animate={{ opacity: ready ? 1 : 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.12 }}
-      className="glass-panel min-w-[180px] max-w-[280px] rounded-lg py-1 shadow-xl border border-white/10"
+      className="glass-panel min-w-[180px] max-w-[280px] rounded-lg py-1 shadow-xl border border-border-default"
       style={{
         position: 'fixed',
         top: coords.top,
@@ -158,7 +158,7 @@ const MenuItems: React.FC<{
       {items.map((item, index) => {
         // Separator
         if (item.label === '---') {
-          return <div key={index} className="h-px bg-white/10 my-1.5 mx-2" />;
+          return <div key={index} className="h-px bg-[var(--border-subtle)] my-1.5 mx-2" />;
         }
 
         // Header (non-clickable, no children)
@@ -203,8 +203,8 @@ const MenuItems: React.FC<{
               disabled={item.disabled}
               className={`
                 w-full text-left px-3 py-1.5 text-sm flex items-center justify-between group
-                ${item.disabled ? 'text-text-secondary/50 cursor-not-allowed' : 'text-text-secondary hover:text-text-primary hover:bg-white/5 cursor-pointer'}
-                ${isSubmenuOpen ? 'bg-white/5 text-text-primary' : ''}
+                ${item.disabled ? 'text-[var(--text-tertiary)] cursor-not-allowed' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer'}
+                ${isSubmenuOpen ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : ''}
               `}
               data-testid={item['data-testid']}
             >
@@ -212,7 +212,7 @@ const MenuItems: React.FC<{
               {hasSubmenu ? (
                 <span className="ml-2 opacity-50 text-xs">›</span>
               ) : item.shortcut ? (
-                <span className="text-xs text-text-secondary/50 group-hover:text-text-secondary font-mono ml-4">
+                <span className="text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] font-mono ml-4">
                   {item.shortcut}
                 </span>
               ) : null}
@@ -426,7 +426,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
               animate="open"
               exit="closed"
               variants={menuVariants}
-              className="glass-panel min-w-[180px] rounded-lg py-1 shadow-xl border border-white/10"
+              className="glass-panel min-w-[180px] rounded-lg py-1 shadow-xl border border-border-default"
               style={{
                 position: 'fixed',
                 top: coords.top,

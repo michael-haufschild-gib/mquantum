@@ -275,14 +275,14 @@ export const NumberInput: React.FC<NumberInputProps> = ({
       rightIcon={
         <div className="flex flex-col gap-[1px]">
            <button
-             className="h-2 w-3 hover:bg-white/20 rounded-sm flex items-center justify-center"
+             className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"
              onClick={() => onChange(Math.min(value + step, max))}
              tabIndex={-1}
            >
              <svg width="6" height="4" viewBox="0 0 8 4" fill="currentColor"><path d="M4 0L8 4H0L4 0Z"/></svg>
            </button>
            <button
-             className="h-2 w-3 hover:bg-white/20 rounded-sm flex items-center justify-center"
+             className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"
              onClick={() => onChange(Math.max(value - step, min))}
              tabIndex={-1}
            >

@@ -1,0 +1,154 @@
+/**
+ * DESIGN TOKENS - Single source of truth
+ *
+ * These are primitive color values - never use directly in components.
+ * Components should use semantic variables from theme.css instead.
+ *
+ * Color Space: OKLCH for perceptual uniformity
+ * - L (Lightness): 0-100%
+ * - C (Chroma): 0-0.4 (saturation)
+ * - H (Hue): 0-360 degrees
+ */
+
+@layer tokens {
+  :root {
+    /* ═══════════════════════════════════════════════════════════════════
+       NEUTRAL SCALE (Slate)
+       A carefully crafted gray scale with subtle blue undertones.
+       Used for backgrounds, text, and borders throughout the UI.
+       ═══════════════════════════════════════════════════════════════════ */
+    --token-slate-0: oklch(99% 0.003 245);
+    --token-slate-50: oklch(97% 0.004 245);
+    --token-slate-100: oklch(92% 0.006 245);
+    --token-slate-200: oklch(87% 0.008 245);
+    --token-slate-300: oklch(80% 0.012 245);
+    --token-slate-400: oklch(70% 0.02 245);
+    --token-slate-500: oklch(55% 0.03 245);
+    --token-slate-600: oklch(45% 0.03 245);
+    --token-slate-700: oklch(35% 0.03 245);
+    --token-slate-800: oklch(25% 0.025 245);
+    --token-slate-900: oklch(15% 0.02 245);
+    --token-slate-950: oklch(10% 0.02 245);
+    --token-slate-1000: oklch(5% 0.015 245);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATUS COLORS - DANGER (Red)
+       Used for errors, destructive actions, and critical warnings.
+       ═══════════════════════════════════════════════════════════════════ */
+    --token-red-300: oklch(72% 0.19 25);
+    --token-red-400: oklch(65% 0.22 25);
+    --token-red-500: oklch(60% 0.22 25);
+    --token-red-600: oklch(55% 0.22 25);
+    --token-red-700: oklch(45% 0.18 25);
+    --token-red-900: oklch(25% 0.08 25);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATUS COLORS - SUCCESS (Green)
+       Used for success states, confirmations, and positive indicators.
+       ═══════════════════════════════════════════════════════════════════ */
+    --token-green-300: oklch(78% 0.16 145);
+    --token-green-400: oklch(72% 0.18 145);
+    --token-green-500: oklch(65% 0.18 145);
+    --token-green-600: oklch(55% 0.16 145);
+    --token-green-900: oklch(25% 0.06 145);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATUS COLORS - WARNING (Amber)
+       Used for warnings, cautions, and attention-needed states.
+       ═══════════════════════════════════════════════════════════════════ */
+    --token-amber-300: oklch(85% 0.14 85);
+    --token-amber-400: oklch(80% 0.16 85);
+    --token-amber-500: oklch(75% 0.16 85);
+    --token-amber-600: oklch(65% 0.14 85);
+    --token-amber-900: oklch(30% 0.06 85);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       ACCENT TOKEN COMPONENTS
+       These are combined to form the dynamic accent color.
+       Default values are for cyan - overridden by [data-accent] selectors.
+       ═══════════════════════════════════════════════════════════════════ */
+    --token-accent-h: 200;    /* Hue (0-360) */
+    --token-accent-c: 0.14;   /* Chroma (saturation) */
+    --token-accent-l: 70%;    /* Lightness */
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ACCENT COLOR DEFINITIONS
+     Each accent overrides the token components to create a unique color.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  [data-accent='cyan'] {
+    --token-accent-h: 200;
+    --token-accent-c: 0.14;
+    --token-accent-l: 70%;
+  }
+
+  [data-accent='green'] {
+    --token-accent-h: 145;
+    --token-accent-c: 0.18;
+    --token-accent-l: 75%;
+  }
+
+  [data-accent='magenta'] {
+    --token-accent-h: 330;
+    --token-accent-c: 0.22;
+    --token-accent-l: 70%;
+  }
+
+  [data-accent='orange'] {
+    --token-accent-h: 40;
+    --token-accent-c: 0.18;
+    --token-accent-l: 75%;
+  }
+
+  [data-accent='blue'] {
+    --token-accent-h: 260;
+    --token-accent-c: 0.14;
+    --token-accent-l: 70%;
+  }
+
+  [data-accent='violet'] {
+    --token-accent-h: 290;
+    --token-accent-c: 0.18;
+    --token-accent-l: 70%;
+  }
+
+  [data-accent='red'] {
+    --token-accent-h: 25;
+    --token-accent-c: 0.20;
+    --token-accent-l: 65%;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LIGHT MODE ACCENT ADJUSTMENTS
+     Darker accents provide better contrast on light backgrounds.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  [data-mode='light'][data-accent='cyan'] {
+    --token-accent-l: 45%;
+  }
+
+  [data-mode='light'][data-accent='green'] {
+    --token-accent-l: 50%;
+  }
+
+  [data-mode='light'][data-accent='magenta'] {
+    --token-accent-l: 50%;
+  }
+
+  [data-mode='light'][data-accent='orange'] {
+    --token-accent-l: 55%;
+  }
+
+  [data-mode='light'][data-accent='blue'] {
+    --token-accent-l: 45%;
+  }
+
+  [data-mode='light'][data-accent='violet'] {
+    --token-accent-l: 50%;
+  }
+
+  [data-mode='light'][data-accent='red'] {
+    --token-accent-l: 50%;
+  }
+}

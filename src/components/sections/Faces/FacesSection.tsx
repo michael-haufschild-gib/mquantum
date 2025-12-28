@@ -159,7 +159,7 @@ export const FacesSection: React.FC<FacesSectionProps> = ({
           data-testid="faces-tabs"
         />
         {!facesVisible && (
-            <div className="text-center p-4 mt-2 border border-dashed border-white/10 rounded-lg bg-black/20">
+            <div className="text-center p-4 mt-2 border border-dashed border-border-default rounded-lg bg-[var(--bg-hover)]">
                 <p className="text-xs text-text-secondary">Enable Faces to edit settings</p>
             </div>
         )}
@@ -376,7 +376,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
             data-testid="slider-roughness"
           />
 
-          <div className="h-px bg-white/5 my-2" />
+          <div className="h-px bg-[var(--bg-hover)] my-2" />
 
           {/* Specular Intensity */}
           <Slider
@@ -412,7 +412,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
       )}
 
       {!showLightingControls && (
-        <div className="p-4 rounded-lg bg-black/20 border border-white/5 border-dashed text-center">
+        <div className="p-4 rounded-lg bg-[var(--bg-hover)] border border-border-subtle border-dashed text-center">
             <p className="text-xs text-text-secondary italic">
             Enable lighting in the Visual section to access PBR material settings.
             </p>

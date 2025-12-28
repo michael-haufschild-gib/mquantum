@@ -120,8 +120,7 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <div 
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/50 backdrop-blur-sm animate-in fade-in duration-200">      <div 
         ref={overlayRef}
         className="absolute inset-0"
         onClick={onClose}
@@ -132,7 +131,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative w-full ${width} bg-panel-bg border border-panel-border rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}
+        className={`relative w-full ${width} bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}
         data-testid={dataTestId}
       >
         {/* Header */}

@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { defineConfig } from 'vite'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
+import svgr from 'vite-plugin-svgr'
 import topLevelAwait from 'vite-plugin-top-level-await'
 import wasm from 'vite-plugin-wasm'
 import wasmPack from 'vite-plugin-wasm-pack'
@@ -23,6 +24,12 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     tailwindcss(),
     react(),
+    svgr({
+      svgrOptions: {
+        icon: true,
+        replaceAttrValues: { '#000': 'currentColor', '#000000': 'currentColor' },
+      },
+    }),
     wasm(),
     topLevelAwait(),
     wasmPack('./src/wasm/mdimension_core'),

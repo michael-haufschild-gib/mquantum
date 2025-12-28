@@ -23,14 +23,14 @@ const PresetCard = ({ label, description, iconSrc, aspectRatio, isActive, onClic
         onClick={onClick}
         className={`
             relative flex flex-col items-start text-left p-4 rounded-xl border transition-all duration-200 group
-            ${isActive 
-                ? 'bg-accent/10 border-accent shadow-[0_0_15px_rgba(var(--color-accent-rgb),0.1)]' 
-                : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/[0.07]'
+            ${isActive
+                ? 'bg-accent/10 border-accent glow-accent-sm'
+                : 'bg-[var(--bg-hover)] border-border-subtle hover:border-border-default hover:bg-[var(--bg-active)]'
             }
         `}
     >
         <div className="flex justify-between w-full mb-3">
-            <div className={`p-2 rounded-lg ${isActive ? 'bg-accent text-black' : 'bg-white/10 text-text-secondary group-hover:text-text-primary'}`}>
+            <div className={`p-2 rounded-lg ${isActive ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-active)] text-text-secondary group-hover:text-text-primary'}`}>
                 <img src={iconSrc} className="w-5 h-5" alt={label} />
             </div>
             {isActive && (

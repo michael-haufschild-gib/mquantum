@@ -132,7 +132,7 @@ export const SkyboxControls: React.FC = () => {
               )}
 
               {/* Label overlay */}
-              <div className="absolute bottom-0 left-0 right-0 p-1 bg-black/50 text-center backdrop-blur-sm">
+              <div className="absolute bottom-0 left-0 right-0 p-1 bg-[var(--bg-overlay)] text-center backdrop-blur-sm">
                 <span className="text-[10px] font-medium text-white block">{option.name}</span>
               </div>
             </button>

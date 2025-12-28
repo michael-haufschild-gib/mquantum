@@ -87,9 +87,9 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
       className={`fixed ${positionClasses[position]} z-[100] pointer-events-none transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}
       data-testid="refinement-indicator"
     >
-      <div className="bg-black/60 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/10 min-w-[80px]">
+      <div className="glass-panel px-3 py-2 rounded-lg border border-[var(--border-subtle)] min-w-[80px]">
         {/* Progress bar */}
-        <div className="relative h-1 bg-white/20 rounded-full overflow-hidden mb-1.5">
+        <div className="relative h-1 bg-[var(--bg-hover)] rounded-full overflow-hidden mb-1.5">
           <div
             className="absolute inset-y-0 left-0 bg-accent transition-all duration-100"
             style={{ width: `${progress}%` }}
@@ -98,10 +98,10 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
 
         {/* Stage label */}
         <div className="flex justify-between items-center gap-3">
-          <span className="text-xs text-white/60">
+          <span className="text-xs text-[var(--text-secondary)]">
             {stage === 'final' ? 'Complete' : 'Refining'}
           </span>
-          <span className="text-xs font-mono text-white/80">
+          <span className="text-xs font-mono text-[var(--text-primary)]">
             {Math.round(progress)}%
           </span>
         </div>

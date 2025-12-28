@@ -21,19 +21,8 @@ interface EditorLayoutProps {
 }
 
 export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
-  const theme = useThemeStore((state) => state.theme);
+  const { accent, mode } = useThemeStore(useShallow((state) => ({ accent: state.accent, mode: state.mode })));
   const spotlightRef = useRef<HTMLDivElement>(null);
-
-  const layoutSelector = useShallow((state: LayoutStore) => ({
-    isCollapsed: state.isCollapsed,
-    toggleCollapsed: state.toggleCollapsed,
-    isCinematicMode: state.isCinematicMode,
-    toggleCinematicMode: state.toggleCinematicMode,
-    setCinematicMode: state.setCinematicMode,
-    setCollapsed: state.setCollapsed,
-    showLeftPanel: state.showLeftPanel,
-    setLeftPanel: state.setLeftPanel,
-  }));
 
   const {
     isCollapsed,
@@ -44,14 +33,42 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
     setCollapsed,
     showLeftPanel,
     setLeftPanel
-  } = useLayoutStore(layoutSelector);
+  } = useLayoutStore(useShallow((state: LayoutStore) => ({
+    isCollapsed: state.isCollapsed,
+    toggleCollapsed: state.toggleCollapsed,
+    isCinematicMode: state.isCinematicMode,
+    toggleCinematicMode: state.toggleCinematicMode,
+    setCinematicMode: state.setCinematicMode,
+    setCollapsed: state.setCollapsed,
+    showLeftPanel: state.showLeftPanel,
+    setLeftPanel: state.setLeftPanel,
+  })));
 
   const isDesktop = useIsDesktop();
 
   // Apply theme
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    const applyTheme = () => {
+      document.documentElement.setAttribute('data-accent', accent);
+      
+      let resolvedMode = mode;
+      if (mode === 'system') {
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        resolvedMode = systemTheme;
+      }
+      document.documentElement.setAttribute('data-mode', resolvedMode);
+    };
+
+    applyTheme();
+
+    if (mode === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = () => applyTheme();
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+    return undefined;
+  }, [accent, mode]);
 
   // Spotlight Effect
   useEffect(() => {
@@ -152,21 +169,10 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
         ref={spotlightRef}
         className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-screen bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app"
     >
-      {/* 0. Spotlight & Vignette Layer */}
-      <div
-        className="absolute inset-0 z-0 pointer-events-none opacity-40 mix-blend-overlay"
-        style={{
-            background: `radial-gradient(800px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.06), transparent 40%)`
-        }}
-      />
-
       {/* 1. Full-screen Canvas Layer (The Curtain) */}
       <div className="absolute inset-0 z-0">
          {children}
       </div>
-
-      {/* Cinematic Background Gradient (Overlay on canvas if needed) */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/10 to-background/60 pointer-events-none z-0" />
 
       {/* 2. UI Overlay Layer */}
       <m.div
@@ -224,7 +230,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={handleOverlayClick}
-                        className="absolute inset-0 bg-black/60 backdrop-blur-sm z-20 pointer-events-auto"
+                        className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm z-20 pointer-events-auto"
                     />
                 )}
             </AnimatePresence>
@@ -267,7 +273,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
                      )}
                 </div>
                 {!isCinematicMode && isDesktop && (
-                    <div className="pointer-events-auto shrink-0 mt-2">
+                    <div className="pointer-events-auto shrink-0 mx-2">
                         <EditorBottomPanel />
                     </div>
                 )}
@@ -307,9 +313,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
             className="fixed bottom-0 left-0 right-0 z-30 pointer-events-auto pb-[env(safe-area-inset-bottom)]"
             data-testid="mobile-timeline-controls"
           >
-            <div className="glass-panel border-t border-white/10 shadow-2xl">
-              <EditorBottomPanel />
-            </div>
+            <EditorBottomPanel />
           </m.div>
         )}
       </AnimatePresence>

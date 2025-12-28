@@ -101,7 +101,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           <button
             type="button"
             onClick={toggleCollapsed}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg text-text-secondary hover:text-accent hover:bg-white/5 transition-colors ${isCollapsed ? 'w-full h-full rounded-full' : ''}`}
+            className={`flex items-center justify-center w-8 h-8 rounded-lg text-text-secondary hover:text-accent hover:bg-[var(--bg-hover)] transition-colors ${isCollapsed ? 'w-full h-full rounded-full' : ''}`}
             aria-label={isCollapsed ? 'Expand control panel' : 'Collapse control panel'}
             aria-expanded={!isCollapsed}
           >

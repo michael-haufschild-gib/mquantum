@@ -21,7 +21,7 @@ export const CommandPalette: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-    const layoutSelector = useShallow((state: LayoutStore) => ({
+    const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel, toggleShortcuts } = useLayoutStore(useShallow((state: LayoutStore) => ({
 
       toggleCinematicMode: state.toggleCinematicMode,
 
@@ -31,11 +31,9 @@ export const CommandPalette: React.FC = () => {
 
       toggleShortcuts: state.toggleShortcuts
 
-    }));
+    })));
 
-    const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel, toggleShortcuts } = useLayoutStore(layoutSelector);
-
-    const setTheme = useThemeStore((state) => state.setTheme);
+    const { setAccent, setMode } = useThemeStore(useShallow((state) => ({ setAccent: state.setAccent, setMode: state.setMode })));
 
   const resetCamera = useCameraStore(state => state.reset);
 
@@ -80,40 +78,70 @@ export const CommandPalette: React.FC = () => {
         action: () => toggleShortcuts(),
         icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     },
+    // Modes
     {
-        id: 'theme-green',
-        label: 'Switch Theme: Green',
+        id: 'mode-light',
+        label: 'Switch Mode: Light',
         category: 'Theme',
-        action: () => setTheme('green'),
+        action: () => setMode('light'),
+        icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    },
+    {
+        id: 'mode-dark',
+        label: 'Switch Mode: Dark',
+        category: 'Theme',
+        action: () => setMode('dark'),
+        icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    },
+    // Accents
+    {
+        id: 'accent-green',
+        label: 'Switch Accent: Green',
+        category: 'Theme',
+        action: () => setAccent('green'),
         icon: <div className="w-3 h-3 rounded-full bg-green-500"/>
     },
     {
-        id: 'theme-magenta',
-        label: 'Switch Theme: Magenta',
+        id: 'accent-magenta',
+        label: 'Switch Accent: Magenta',
         category: 'Theme',
-        action: () => setTheme('magenta'),
+        action: () => setAccent('magenta'),
         icon: <div className="w-3 h-3 rounded-full bg-pink-500"/>
     },
     {
-        id: 'theme-orange',
-        label: 'Switch Theme: Orange',
+        id: 'accent-orange',
+        label: 'Switch Accent: Orange',
         category: 'Theme',
-        action: () => setTheme('orange'),
+        action: () => setAccent('orange'),
         icon: <div className="w-3 h-3 rounded-full bg-orange-500"/>
     },
     {
-        id: 'theme-blue',
-        label: 'Switch Theme: Blue',
+        id: 'accent-blue',
+        label: 'Switch Accent: Blue',
         category: 'Theme',
-        action: () => setTheme('blue'),
+        action: () => setAccent('blue'),
         icon: <div className="w-3 h-3 rounded-full bg-blue-500"/>
     },
     {
-        id: 'theme-cyan',
-        label: 'Switch Theme: Cyan (Default)',
+        id: 'accent-cyan',
+        label: 'Switch Accent: Cyan (Default)',
         category: 'Theme',
-        action: () => setTheme('cyan'),
+        action: () => setAccent('cyan'),
         icon: <div className="w-3 h-3 rounded-full bg-cyan-500"/>
+    },
+     {
+        id: 'accent-violet',
+        label: 'Switch Accent: Violet',
+        category: 'Theme',
+        action: () => setAccent('violet'),
+        icon: <div className="w-3 h-3 rounded-full bg-violet-500"/>
+    },
+     {
+        id: 'accent-red',
+        label: 'Switch Accent: Red',
+        category: 'Theme',
+        action: () => setAccent('red'),
+        icon: <div className="w-3 h-3 rounded-full bg-red-500"/>
     }
   ];
 
@@ -177,7 +205,7 @@ export const CommandPalette: React.FC = () => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setIsOpen(false)}
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm"
           />
 
           <m.div
@@ -185,10 +213,10 @@ export const CommandPalette: React.FC = () => {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             transition={{ type: "spring", duration: 0.3 }}
-            className="w-full max-w-lg relative z-10 overflow-hidden rounded-xl border border-white/10 shadow-2xl glass-panel-dark"
+            className="w-full max-w-lg relative z-10 overflow-hidden rounded-xl border border-[var(--border-subtle)] shadow-2xl glass-panel-dark"
           >
-            <div className="relative border-b border-white/10">
-              <div className="absolute left-4 top-3.5 text-text-tertiary">
+            <div className="relative border-b border-[var(--border-subtle)]">
+              <div className="absolute left-4 top-3.5 text-[var(--text-tertiary)]">
                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </div>
               <input
@@ -198,16 +226,16 @@ export const CommandPalette: React.FC = () => {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 onKeyDown={handleListKeyDown}
-                className="w-full bg-transparent border-none py-3.5 pl-12 pr-4 text-text-primary placeholder:text-text-tertiary focus:ring-0 focus:outline-none text-base"
+                className="w-full bg-transparent border-none py-3.5 pl-12 pr-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:ring-0 focus:outline-none text-base"
               />
-              <div className="absolute right-3 top-3.5 px-2 py-0.5 rounded border border-white/10 text-[10px] font-mono text-text-tertiary">
+              <div className="absolute right-3 top-3.5 px-2 py-0.5 rounded border border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-tertiary)]">
                 ESC
               </div>
             </div>
 
             <div className="max-h-[300px] overflow-y-auto p-2" ref={listRef}>
                {filteredCommands.length === 0 ? (
-                 <div className="py-8 text-center text-text-tertiary text-sm">No results found.</div>
+                 <div className="py-8 text-center text-[var(--text-tertiary)] text-sm">No results found.</div>
                ) : (
                  <ul className="space-y-1">
                    {filteredCommands.map((cmd, index) => (
@@ -220,17 +248,17 @@ export const CommandPalette: React.FC = () => {
                          onMouseEnter={() => setSelectedIndex(index)}
                          className={`
                            w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors
-                           ${index === selectedIndex ? 'bg-accent/20 text-accent' : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'}
+                           ${index === selectedIndex ? 'bg-accent/20 text-accent' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}
                          `}
                        >
                          <div className="flex items-center gap-3">
-                           <span className={index === selectedIndex ? 'text-accent' : 'text-text-tertiary'}>
+                           <span className={index === selectedIndex ? 'text-accent' : 'text-[var(--text-tertiary)]'}>
                              {cmd.icon}
                            </span>
                            <span>{cmd.label}</span>
                          </div>
                          {cmd.shortcut && (
-                           <span className="text-[10px] font-mono opacity-50 border border-white/10 px-1.5 py-0.5 rounded">
+                           <span className="text-[10px] font-mono opacity-50 border border-[var(--border-subtle)] px-1.5 py-0.5 rounded">
                              {cmd.shortcut}
                            </span>
                          )}
@@ -241,7 +269,7 @@ export const CommandPalette: React.FC = () => {
                )}
             </div>
 
-            <div className="px-4 py-2 bg-black/20 border-t border-white/5 flex justify-between text-[10px] text-text-tertiary">
+            <div className="px-4 py-2 bg-[var(--bg-hover)] border-t border-[var(--border-subtle)] flex justify-between text-[10px] text-[var(--text-tertiary)]">
                 <span>Navigate <span className="font-mono">↑↓</span></span>
                 <span>Select <span className="font-mono">↵</span></span>
             </div>

@@ -93,7 +93,7 @@ const SharedAdvancedControls: React.FC = () => {
           </ToggleButton>
         </div>
         {sssEnabled && (
-          <div className="space-y-3 pl-2 border-l border-white/10">
+          <div className="space-y-3 pl-2 border-l border-border-default">
             <Slider
               label="Intensity"
               min={0.0}
@@ -138,7 +138,7 @@ const SharedAdvancedControls: React.FC = () => {
       </div>
 
       {/* Fresnel Rim */}
-      <div className="space-y-2 pt-2 border-t border-white/5 mt-2">
+      <div className="space-y-2 pt-2 border-t border-border-subtle mt-2">
         <div className="flex items-center justify-between">
           <label className="text-xs text-text-secondary font-semibold">Fresnel Rim</label>
           <ToggleButton
@@ -152,7 +152,7 @@ const SharedAdvancedControls: React.FC = () => {
           </ToggleButton>
         </div>
         {fresnelEnabled && (
-          <div className="space-y-3 pl-2 border-l border-white/10">
+          <div className="space-y-3 pl-2 border-l border-border-default">
           <Slider
             label="Intensity"
             min={0.0}
@@ -344,7 +344,7 @@ const SchroedingerAdvanced: React.FC = () => {
         />
 
         {/* Volumetric Shadows */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary">Volumetric Shadows</label>
           <ToggleButton
             pressed={config.shadowsEnabled ?? false}
@@ -392,7 +392,7 @@ const SchroedingerAdvanced: React.FC = () => {
         )}
 
         {/* Isosurface Mode */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary">Isosurface Mode</label>
           <ToggleButton
             pressed={config.isoEnabled}
@@ -441,7 +441,7 @@ const SchroedingerAdvanced: React.FC = () => {
             </ToggleButton>
           </div>
           {config.nodalEnabled && (
-            <div className="pl-2 border-l border-white/10">
+            <div className="pl-2 border-l border-border-default">
               <Slider
                 label="Strength"
                 min={0.0}
@@ -525,7 +525,7 @@ const SchroedingerAdvanced: React.FC = () => {
             </ToggleButton>
           </div>
           {config.dispersionEnabled && (
-            <div className="pl-2 border-l border-white/10 space-y-2">
+            <div className="pl-2 border-l border-border-default space-y-2">
               <Slider
                 label="Strength"
                 min={0.0}
@@ -540,7 +540,7 @@ const SchroedingerAdvanced: React.FC = () => {
                 <div className="flex-1">
                   <label className="text-xs text-text-secondary">Direction</label>
                   <select
-                    className="w-full bg-surface-dark border border-white/10 rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+                    className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
                     value={config.dispersionDirection ?? 0}
                     onChange={(e) => setDispersionDirection(parseInt(e.target.value))}
                     data-testid="schroedinger-dispersion-direction"
@@ -552,7 +552,7 @@ const SchroedingerAdvanced: React.FC = () => {
                 <div className="flex-1">
                   <label className="text-xs text-text-secondary">Quality</label>
                   <select
-                    className="w-full bg-surface-dark border border-white/10 rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+                    className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
                     value={config.dispersionQuality ?? 0}
                     onChange={(e) => setDispersionQuality(parseInt(e.target.value))}
                     data-testid="schroedinger-dispersion-quality"
@@ -567,7 +567,7 @@ const SchroedingerAdvanced: React.FC = () => {
         </div>
 
         {/* Edge Erosion */}
-        <div className="space-y-2 mt-3 pt-3 border-t border-white/5">
+        <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary font-medium">Edge Erosion</label>
           <Slider
             label="Strength"
@@ -580,7 +580,7 @@ const SchroedingerAdvanced: React.FC = () => {
             data-testid="schroedinger-erosion-strength"
           />
           {(config.erosionStrength ?? 0) > 0 && (
-            <div className="pl-2 border-l border-white/10 space-y-2">
+            <div className="pl-2 border-l border-border-default space-y-2">
               <Slider
                 label="Scale"
                 min={0.25}
@@ -604,7 +604,7 @@ const SchroedingerAdvanced: React.FC = () => {
               <div>
                 <label className="text-xs text-text-secondary">Noise Type</label>
                 <select
-                  className="w-full bg-surface-dark border border-white/10 rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+                  className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
                   value={config.erosionNoiseType ?? 0}
                   onChange={(e) => setErosionNoiseType(parseInt(e.target.value))}
                   data-testid="schroedinger-erosion-type"
@@ -838,7 +838,7 @@ const BlackHoleAdvanced: React.FC = () => {
         />
 
         {/* Turbulence */}
-        <div className="space-y-2 mt-3 pt-3 border-t border-white/5">
+        <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary font-medium">Turbulence</label>
           <Slider
             label="Noise Amount"
@@ -861,7 +861,7 @@ const BlackHoleAdvanced: React.FC = () => {
         </div>
 
         {/* Absorption */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary">Absorption</label>
           <ToggleButton
             pressed={config.enableAbsorption}
@@ -887,7 +887,7 @@ const BlackHoleAdvanced: React.FC = () => {
         )}
 
         {/* Motion Blur */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary">Motion Blur</label>
           <ToggleButton
             pressed={config.motionBlurEnabled}
@@ -997,7 +997,7 @@ const BlackHoleAdvanced: React.FC = () => {
         </p>
 
         {/* Advanced Lensing */}
-        <div className="space-y-2 mt-3 pt-3 border-t border-white/5">
+        <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary font-medium">Advanced Lensing</label>
           <Slider
             label="Dim. Emphasis"
@@ -1012,7 +1012,7 @@ const BlackHoleAdvanced: React.FC = () => {
             <div className="flex-1">
               <label className="text-xs text-text-secondary">Mode</label>
               <select
-                className="w-full bg-surface-dark border border-white/10 rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+                className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
                 value={config.rayBendingMode}
                 onChange={(e) => setRayBendingMode(e.target.value as BlackHoleRayBendingMode)}
               >
@@ -1029,7 +1029,7 @@ const BlackHoleAdvanced: React.FC = () => {
                 max="0.5"
                 value={config.epsilonMul}
                 onChange={(e) => setEpsilonMul(parseFloat(e.target.value))}
-                className="w-full bg-surface-dark border border-white/10 rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
+                className="w-full bg-surface-dark border border-border-default rounded px-2 py-1 text-xs text-text-primary mt-1 focus:outline-none focus:border-accent"
               />
             </div>
           </div>

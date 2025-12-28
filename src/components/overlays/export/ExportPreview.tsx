@@ -25,7 +25,7 @@ export const ExportPreview = () => {
     // We rely on CSS `aspect-ratio` and `max-w/max-h` centering.
 
     return (
-        <div className="relative w-full h-full bg-black/50 flex items-center justify-center p-4">
+        <div className="relative w-full h-full bg-[var(--bg-app)]/50 flex items-center justify-center p-4">
             
              {/* Aspect Ratio Container (Represents the Full Canvas) */}
              <div 
@@ -104,7 +104,7 @@ export const ExportPreview = () => {
                         </div>
                     </>
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-white/5 text-text-tertiary flex-col gap-2">
+                    <div className="w-full h-full flex items-center justify-center bg-[var(--bg-hover)] text-[var(--text-tertiary)] flex-col gap-2">
                          <Icon name="image" className="w-8 h-8 opacity-20" />
                         <span className="text-xs uppercase tracking-widest">Preview Unavailable</span>
                     </div>
@@ -113,7 +113,7 @@ export const ExportPreview = () => {
             
             {/* Status Overlays (Outside the aspect container) */}
             <div className="absolute top-4 left-4 flex gap-2">
-                 <div className="px-2 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded text-[10px] font-mono text-white/70">
+                 <div className="px-2 py-1 glass-panel rounded text-[10px] font-mono text-[var(--text-secondary)]">
                     PREVIEW
                  </div>
                  {crop.enabled && (

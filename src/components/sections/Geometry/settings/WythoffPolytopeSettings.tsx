@@ -157,7 +157,7 @@ export function WythoffPolytopeSettings() {
 
       <Section title="Math Details" defaultOpen={false}>
         {/* Information about vertex/edge counts */}
-        <div className="p-2 bg-white/5 rounded text-xs text-text-secondary border border-white/5">
+        <div className="p-2 bg-[var(--bg-hover)] rounded text-xs text-text-secondary border border-border-subtle">
             <p>
             <strong>Wythoff Construction:</strong> Creates uniform polytopes by
             reflecting a seed point through {dimension} mirrors arranged according

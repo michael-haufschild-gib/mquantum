@@ -36,14 +36,12 @@ export const Select = <T extends string = string>({
         </label>
       )}
       <div className="relative group">
-        <select
-          value={value}
-          onChange={handleChange}
-          disabled={disabled}
-          className="glass-input w-full pl-3 pr-8 py-1.5 text-xs text-text-primary rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-white/5 transition-colors"
-          aria-label={label}
-          data-testid={testId}
-        >
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="glass-input w-full pl-3 pr-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
+      >
           {options.map((option) => (
             <option key={option.value} value={option.value} className="bg-background text-text-primary">
               {option.label}

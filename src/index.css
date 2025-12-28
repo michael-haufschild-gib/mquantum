@@ -1,19 +1,67 @@
+@import './styles/theme.css';
 @import 'tailwindcss';
 
 @theme {
-  /* Custom Colors - Deeper, richer darks for that $599.99 feel */
-  --color-background: oklch(5% 0.01 260); /* Slightly cooler dark */
-  --color-glass: oklch(10% 0.02 260);
-  --color-panel-bg: oklch(8% 0.02 260 / 0.7); 
-  --color-panel-border: oklch(100% 0 0 / 0.08);
-  --color-border: oklch(100% 0 0 / 0.08);
+  /* ═══════════════════════════════════════════════════════════════════
+     TAILWIND THEME MAPPING
+     Maps CSS semantic variables to Tailwind utility classes.
+     e.g., --color-panel enables bg-panel, text-panel, border-panel
+     ═══════════════════════════════════════════════════════════════════ */
 
-  --color-text-primary: oklch(98% 0 0);
-  --color-text-secondary: oklch(75% 0.01 260);
-  --color-text-tertiary: oklch(50% 0.01 260);
+  /* Backgrounds */
+  --color-background: var(--bg-app);
+  --color-panel: var(--bg-panel);
+  --color-panel-bg: var(--bg-panel);
+  --color-panel-border: var(--panel-border);
+  --color-panel-header: var(--panel-header);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-glass: var(--bg-glass);
+  --color-overlay: var(--bg-overlay);
 
-  --color-accent: var(--theme-accent, oklch(70% 0.14 200)); /* Cyan-ish default */
-  --color-accent-glow: var(--theme-accent-glow, oklch(70% 0.14 200));
+  /* Text */
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+
+  /* Accent */
+  --color-accent: var(--theme-accent);
+  --color-accent-glow: var(--theme-accent-glow);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-muted: var(--accent-muted);
+
+  /* Status: Danger */
+  --color-danger: var(--text-danger);
+  --color-danger-bg: var(--bg-danger);
+  --color-danger-solid: var(--bg-danger-solid);
+  --color-danger-border: var(--border-danger);
+
+  /* Status: Success */
+  --color-success: var(--text-success);
+  --color-success-bg: var(--bg-success);
+  --color-success-solid: var(--bg-success-solid);
+  --color-success-border: var(--border-success);
+
+  /* Status: Warning */
+  --color-warning: var(--text-warning);
+  --color-warning-bg: var(--bg-warning);
+  --color-warning-solid: var(--bg-warning-solid);
+  --color-warning-border: var(--border-warning);
+
+  /* Health Indicators (Performance Monitor) */
+  --color-health-high: var(--health-high);
+  --color-health-high-bg: var(--health-high-bg);
+  --color-health-medium: var(--health-medium);
+  --color-health-medium-bg: var(--health-medium-bg);
+  --color-health-low: var(--health-low);
+  --color-health-low-bg: var(--health-low-bg);
+
+  /* Borders */
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
 
   /* Font Families */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -49,48 +97,25 @@
 }
 
 @layer base {
-  :root {
-    /* Theme accent colors - can be overridden by data-theme */
-    --theme-accent: oklch(70% 0.14 200);
-    --theme-accent-glow: oklch(70% 0.14 200);
-  }
-
-  [data-theme='green'] {
-    --theme-accent: oklch(75% 0.18 145);
-    --theme-accent-glow: oklch(75% 0.18 145);
-  }
-
-  [data-theme='magenta'] {
-    --theme-accent: oklch(70% 0.22 330);
-    --theme-accent-glow: oklch(70% 0.22 330);
-  }
-
-  [data-theme='orange'] {
-    --theme-accent: oklch(75% 0.18 40);
-    --theme-accent-glow: oklch(75% 0.18 40);
-  }
-
-  [data-theme='blue'] {
-     --theme-accent: oklch(70% 0.14 260);
-     --theme-accent-glow: oklch(70% 0.14 260);
-  }
-
   body {
-    background-color: var(--color-background);
-    color: var(--color-text-primary);
+    background-color: var(--bg-app);
+    color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow: hidden;
-    letter-spacing: -0.015em; /* Slightly tighter for modern feel */
-    font-feature-settings: "cv11", "ss01", "zero", "tnum"; /* Clean numbers & alts */
+    letter-spacing: -0.015em;
+    font-feature-settings: "cv11", "ss01", "zero", "tnum";
     
     /* Global subtle noise texture */
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
   }
+
+  /* In light mode, invert noise opacity or blend mode if needed. 
+     For now, 0.03 opacity black noise works on white too, just adds grain. */
   
   ::selection {
     background-color: color-mix(in oklch, var(--theme-accent) 30%, transparent);
-    color: white;
+    color: var(--text-primary);
     text-shadow: 0 0 8px var(--theme-accent-glow);
   }
 
@@ -109,7 +134,7 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(100% 0 0 / 0.1);
+    background: var(--border-default);
     border-radius: 9999px;
     border: 2px solid transparent; 
     background-clip: content-box;
@@ -117,10 +142,21 @@
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(100% 0 0 / 0.3);
+    background-color: var(--border-highlight);
     border-width: 1px;
   }
+}
 
+/* Hide scrollbar utility */
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
   /* Prevent text selection during resize drag */
   .resize-dragging {
     cursor: col-resize !important;
@@ -134,7 +170,8 @@
 
   /* Keyboard Key Style */
   kbd {
-    @apply font-mono text-xs px-1.5 py-0.5 rounded-md border border-b-2 border-white/10 bg-white/5 text-text-secondary;
+    @apply font-mono text-xs px-1.5 py-0.5 rounded-md border border-b-2 bg-white/5 text-text-secondary;
+    border-color: var(--border-subtle);
   }
 
   /* Global Input Styling */
@@ -175,23 +212,21 @@
 */
 
 @utility glass-panel {
-  background-color: oklch(8% 0.02 260 / 0.65);
+  background-color: var(--bg-panel);
   backdrop-filter: blur(24px) saturate(180%);
-  /* Double border trick for depth */
-  border: 1px solid oklch(100% 0 0 / 0.08);
+  border: 1px solid var(--border-subtle);
   box-shadow: 
-    0 4px 6px -1px oklch(0% 0 0 / 0.2),
-    0 2px 4px -1px oklch(0% 0 0 / 0.1),
+    var(--shadow-soft),
     inset 0 1px 0 0 oklch(100% 0 0 / 0.05), /* Inner Top Light */
     inset 0 0 0 1px oklch(100% 0 0 / 0.02); /* Inner Ring */
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 @utility glass-panel-dark {
-  background-color: oklch(5% 0.01 260 / 0.85);
+  background-color: var(--bg-panel); /* Unified */
   backdrop-filter: blur(32px);
-  border: 1px solid oklch(100% 0 0 / 0.05);
-  box-shadow: inset 0 0 20px oklch(0% 0 0 / 0.3);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 0 20px oklch(0% 0 0 / 0.1); /* Softer shadow */
 }
 
 @utility glass-separator {
@@ -199,66 +234,68 @@
   background: linear-gradient(
     90deg, 
     transparent 0%, 
-    oklch(100% 0 0 / 0.1) 20%, 
-    oklch(100% 0 0 / 0.1) 80%, 
+    var(--border-default) 20%, 
+    var(--border-default) 80%, 
     transparent 100%
   );
   border: none;
 }
 
 @utility glass-input {
-  background-color: oklch(0% 0 0 / 0.2);
-  border: 1px solid oklch(100% 0 0 / 0.08);
-  box-shadow: inset 0 1px 2px oklch(0% 0 0 / 0.1);
+  background-color: var(--color-glass);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 1px 2px oklch(0% 0 0 / 0.05);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   
   &:hover {
-    border-color: oklch(100% 0 0 / 0.15);
-    background-color: oklch(0% 0 0 / 0.25);
+    border-color: var(--border-default);
+    background-color: color-mix(in oklch, var(--color-glass), var(--text-primary) 5%);
   }
 
   &:focus {
     outline: none;
     border-color: var(--theme-accent);
-    background-color: oklch(0% 0 0 / 0.3);
+    background-color: color-mix(in oklch, var(--color-glass), var(--theme-accent) 5%);
     box-shadow: 
-      inset 0 1px 2px oklch(0% 0 0 / 0.1),
+      inset 0 1px 2px oklch(0% 0 0 / 0.05),
       0 0 0 1px var(--theme-accent),
       0 0 12px -2px color-mix(in oklch, var(--theme-accent-glow) 30%, transparent);
   }
   
   &::placeholder {
-    color: oklch(100% 0 0 / 0.2);
+    color: var(--text-tertiary);
   }
 }
 
 @utility glass-button {
   position: relative;
-  background: linear-gradient(to bottom, oklch(100% 0 0 / 0.08), oklch(100% 0 0 / 0.03));
-  border: 1px solid oklch(100% 0 0 / 0.1);
+  background: linear-gradient(to bottom, var(--border-subtle), transparent);
+  border: 1px solid var(--border-default);
   box-shadow: 
-    0 1px 2px oklch(0% 0 0 / 0.1),
-    inset 0 1px 0 0 oklch(100% 0 0 / 0.07),
+    0 1px 2px oklch(0% 0 0 / 0.05),
+    inset 0 1px 0 0 oklch(100% 0 0 / 0.1),
     inset 0 0 0 1px oklch(100% 0 0 / 0.02);
   backdrop-filter: blur(8px);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  color: var(--text-secondary);
   
   &:hover {
-    background: linear-gradient(to bottom, oklch(100% 0 0 / 0.12), oklch(100% 0 0 / 0.06));
-    border-color: oklch(100% 0 0 / 0.2);
+    background: linear-gradient(to bottom, var(--border-default), var(--border-subtle));
+    border-color: var(--border-highlight);
+    color: var(--text-primary);
     box-shadow: 
-        0 4px 12px -2px oklch(0% 0 0 / 0.2),
+        var(--shadow-soft),
         inset 0 1px 0 0 oklch(100% 0 0 / 0.1);
     transform: translateY(-0.5px);
   }
   
   &:active {
-    background: oklch(0% 0 0 / 0.1);
+    background: var(--border-subtle);
     transform: translateY(0.5px);
     box-shadow: inset 0 2px 4px oklch(0% 0 0 / 0.1);
-    border-color: oklch(100% 0 0 / 0.08);
+    border-color: var(--border-subtle);
   }
   
   /* Subtle shine effect on hover */
@@ -290,6 +327,7 @@
   background: linear-gradient(135deg, color-mix(in oklch, var(--theme-accent) 25%, transparent), color-mix(in oklch, var(--theme-accent) 10%, transparent));
   border: 1px solid color-mix(in oklch, var(--theme-accent) 30%, transparent);
   box-shadow: 0 4px 12px color-mix(in oklch, var(--theme-accent-glow) 20%, transparent);
+  color: white; /* Always white text on primary accent */
 
   &:hover {
     background: linear-gradient(135deg, color-mix(in oklch, var(--theme-accent) 35%, transparent), color-mix(in oklch, var(--theme-accent) 15%, transparent));
@@ -307,7 +345,7 @@
 }
 
 @utility text-muted {
-  color: var(--color-text-tertiary);
+  color: var(--text-tertiary);
 }
 
 @utility border-glow {
@@ -315,7 +353,7 @@
 }
 
 @utility shimmer-text {
-  background: linear-gradient(90deg, var(--color-text-secondary) 0%, white 50%, var(--color-text-secondary) 100%);
+  background: linear-gradient(90deg, var(--text-secondary) 0%, var(--text-primary) 50%, var(--text-secondary) 100%);
   background-size: 200% auto;
   color: transparent;
   background-clip: text;
@@ -327,7 +365,7 @@
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px -4px oklch(0% 0 0 / 0.3);
+    box-shadow: var(--shadow-hard);
   }
 }
 
@@ -335,4 +373,94 @@
 @utility led-glow {
   filter: blur(4px);
   opacity: 0.7;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATUS BADGE UTILITIES
+   Used for error, success, and warning states throughout the UI.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@utility status-danger {
+  background-color: var(--bg-danger);
+  color: var(--text-danger);
+  border: 1px solid var(--border-danger);
+}
+
+@utility status-success {
+  background-color: var(--bg-success);
+  color: var(--text-success);
+  border: 1px solid var(--border-success);
+}
+
+@utility status-warning {
+  background-color: var(--bg-warning);
+  color: var(--text-warning);
+  border: 1px solid var(--border-warning);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HEALTH INDICATOR UTILITIES (Performance Monitor)
+   Used for FPS and performance visualization with theme-aware colors.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@utility health-high {
+  color: var(--health-high);
+}
+
+@utility health-high-bg {
+  background-color: var(--health-high-bg);
+}
+
+@utility health-high-stroke {
+  stroke: var(--health-high-stroke);
+}
+
+@utility health-medium {
+  color: var(--health-medium);
+}
+
+@utility health-medium-bg {
+  background-color: var(--health-medium-bg);
+}
+
+@utility health-medium-stroke {
+  stroke: var(--health-medium-stroke);
+}
+
+@utility health-low {
+  color: var(--health-low);
+}
+
+@utility health-low-bg {
+  background-color: var(--health-low-bg);
+}
+
+@utility health-low-stroke {
+  stroke: var(--health-low-stroke);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   OVERLAY UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+
+@utility overlay-backdrop {
+  background-color: var(--bg-overlay);
+  backdrop-filter: blur(4px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACCENT GLOW UTILITIES
+   For accent-colored glow effects that adapt to the current theme.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@utility glow-accent-sm {
+  box-shadow: 0 0 8px color-mix(in oklch, var(--theme-accent) 20%, transparent);
+}
+
+@utility glow-accent-md {
+  box-shadow: 0 0 15px color-mix(in oklch, var(--theme-accent) 25%, transparent);
+}
+
+@utility glow-accent-lg {
+  box-shadow: 0 0 25px color-mix(in oklch, var(--theme-accent) 30%, transparent);
 }

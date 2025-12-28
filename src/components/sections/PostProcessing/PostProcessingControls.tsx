@@ -3,12 +3,12 @@ import { BloomControls } from './BloomControls';
 import { BokehControls } from './BokehControls';
 import { CinematicControls } from './CinematicControls';
 // NOTE: GravityControls moved to Advanced Rendering section (AdvancedObjectControls)
-import { MiscControls } from './MiscControls';
-import { RefractionControls } from './RefractionControls';
 import { Switch } from '@/components/ui/Switch';
 import { Tabs } from '@/components/ui/Tabs';
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
 import { useShallow } from 'zustand/react/shallow';
+import { MiscControls } from './MiscControls';
+import { RefractionControls } from './RefractionControls';
 
 export const PostProcessingControls: React.FC = () => {
   const [activeTab, setActiveTab] = useState('bloom');
@@ -36,8 +36,8 @@ export const PostProcessingControls: React.FC = () => {
       label: 'Bloom',
       content: (
         <div className="space-y-4">
-          <Switch 
-            checked={bloomEnabled} 
+          <Switch
+            checked={bloomEnabled}
             onCheckedChange={setBloomEnabled}
             label="Enable Bloom"
           />
@@ -52,8 +52,8 @@ export const PostProcessingControls: React.FC = () => {
       label: 'Cinematic',
       content: (
         <div className="space-y-4">
-          <Switch 
-            checked={cinematicEnabled} 
+          <Switch
+            checked={cinematicEnabled}
             onCheckedChange={setCinematicEnabled}
             label="Enable Cinematic"
           />
@@ -68,8 +68,8 @@ export const PostProcessingControls: React.FC = () => {
       label: 'DoF',
       content: (
         <div className="space-y-4">
-          <Switch 
-            checked={bokehEnabled} 
+          <Switch
+            checked={bokehEnabled}
             onCheckedChange={setBokehEnabled}
             label="Enable Depth of Field"
           />
@@ -84,8 +84,8 @@ export const PostProcessingControls: React.FC = () => {
       label: 'Refraction',
       content: (
         <div className="space-y-4">
-          <Switch 
-            checked={refractionEnabled} 
+          <Switch
+            checked={refractionEnabled}
             onCheckedChange={setRefractionEnabled}
             label="Enable Refraction"
           />
@@ -113,6 +113,7 @@ export const PostProcessingControls: React.FC = () => {
       onChange={setActiveTab}
       tabs={tabs}
       variant="default"
+      tabListClassName="mb-4"
     />
   );
 };

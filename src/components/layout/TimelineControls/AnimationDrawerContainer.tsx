@@ -50,7 +50,7 @@ export const AnimationDrawerContainer: React.FC<AnimationDrawerContainerProps> =
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: 20 }}
     transition={{ duration: 0.2 }}
-    className="absolute bottom-full left-0 right-0 bg-panel-bg/95 backdrop-blur-xl border-t border-b border-panel-border z-20 shadow-2xl max-h-[400px] overflow-y-auto"
+    className="absolute bottom-full left-0 right-0 mb-2 glass-panel rounded-xl z-20 max-h-[400px] overflow-y-auto"
     data-testid={dataTestId}
   >
     <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">

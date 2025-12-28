@@ -76,11 +76,11 @@ export const EditorRightPanel: React.FC = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col bg-panel-bg w-full shrink-0 overflow-hidden">
+    <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">
       {/* Header Section */}
-      <div className="p-4 border-b border-panel-border bg-panel-bg/50 backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
-        <Icon name="menu" className="text-text-secondary" />
-        <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest">Visuals</h2>
+      <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
+        <Icon name="menu" className="text-[var(--text-secondary)]" />
+        <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">Visuals</h2>
       </div>
 
       {/* Tabs & Content */}
@@ -92,7 +92,7 @@ export const EditorRightPanel: React.FC = () => {
           onChange={setActiveTab}
           className="flex-1 flex flex-col min-h-0"
           tabListClassName="px-3 pt-3 pb-0 bg-transparent"
-          contentClassName="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-panel-border hover:scrollbar-thumb-text-secondary/50"
+          contentClassName="flex-1 overflow-y-auto p-0 scrollbar-thin scrollbar-thumb-[var(--border-default)] hover:scrollbar-thumb-[var(--border-highlight)]"
           variant="default"
           fullWidth
         />

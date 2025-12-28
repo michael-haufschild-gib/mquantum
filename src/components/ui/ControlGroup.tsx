@@ -42,7 +42,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
 
   return (
     <div className={`
-      ${isCard ? 'border border-white/5 rounded-lg bg-white/2 overflow-hidden' : 'border-b border-white/5 pb-2 last:border-0'}
+      ${isCard ? 'border border-[var(--border-subtle)] rounded-lg bg-[var(--bg-hover)] overflow-hidden' : 'border-b border-[var(--border-subtle)] pb-2 last:border-0'}
       ${className}
     `}>
       {showTitleSection && (
@@ -53,8 +53,8 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
           aria-label={collapsible ? `${title} section, ${isOpen ? 'expanded' : 'collapsed'}` : undefined}
           className={`
             flex items-center justify-between py-1.5
-            ${isCard ? 'px-3 bg-white/3 border-b border-white/5' : ''}
-            ${collapsible ? 'cursor-pointer hover:text-text-primary transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset' : ''}
+            ${isCard ? 'px-3 bg-[var(--bg-active)] border-b border-[var(--border-subtle)]' : ''}
+            ${collapsible ? 'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset' : ''}
           `}
           onClick={toggle}
           onKeyDown={handleKeyDown}
@@ -91,7 +91,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className={`${isCard ? 'p-3' : 'pt-2'} space-y-3 ml-1 pl-2 border-l border-white/10`}>
+            <div className={`${isCard ? 'p-3' : 'pt-2'} space-y-3 ml-1 pl-2 border-l border-[var(--border-subtle)]`}>
               {children}
             </div>
           </m.div>

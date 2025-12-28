@@ -1,0 +1,223 @@
+/**
+ * THEME - Semantic Variables
+ *
+ * This file defines semantic color variables that components use.
+ * Variables are named by purpose, not color (e.g., --text-danger, not --red-400).
+ *
+ * Structure:
+ * 1. Import design tokens (primitives)
+ * 2. Define semantic variables for dark mode (default)
+ * 3. Light mode overrides
+ * 4. Accent color definitions (per data-accent attribute)
+ */
+
+@import './tokens.css';
+
+@layer theme {
+  :root {
+    /* ═══════════════════════════════════════════════════════════════════
+       BACKGROUNDS
+       ═══════════════════════════════════════════════════════════════════ */
+    --bg-app: var(--token-slate-1000);
+    --bg-panel: oklch(from var(--token-slate-950) l c h / 0.75);
+    --bg-surface: var(--token-slate-900);
+    --bg-elevated: var(--token-slate-800);
+    --bg-glass: oklch(from var(--token-slate-900) l c h / 0.6);
+    --bg-hover: oklch(100% 0 0 / 0.08);
+    --bg-active: oklch(100% 0 0 / 0.12);
+    --bg-overlay: oklch(0% 0 0 / 0.6);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       TEXT
+       ═══════════════════════════════════════════════════════════════════ */
+    --text-primary: var(--token-slate-50);
+    --text-secondary: var(--token-slate-400);
+    --text-tertiary: var(--token-slate-600);
+    --text-muted: var(--token-slate-500);
+    --text-inverse: var(--token-slate-950);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       BORDERS
+       ═══════════════════════════════════════════════════════════════════ */
+    --border-subtle: oklch(100% 0 0 / 0.08);
+    --border-default: oklch(100% 0 0 / 0.12);
+    --border-strong: oklch(100% 0 0 / 0.2);
+    --border-highlight: var(--border-strong); /* Legacy alias */
+
+    /* ═══════════════════════════════════════════════════════════════════
+       PANEL ALIASES (for backward compatibility)
+       These map to the semantic variables above.
+       ═══════════════════════════════════════════════════════════════════ */
+    --panel-bg: var(--bg-panel);
+    --panel-border: var(--border-default);
+    --panel-header: var(--bg-hover);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       SHADOWS
+       ═══════════════════════════════════════════════════════════════════ */
+    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px oklch(0% 0 0 / 0.2);
+    --shadow-lg: 0 4px 12px -2px oklch(0% 0 0 / 0.4);
+    --shadow-xl: 0 8px 24px -4px oklch(0% 0 0 / 0.5);
+
+    /* Legacy aliases */
+    --shadow-soft: var(--shadow-md);
+    --shadow-hard: var(--shadow-lg);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       ACCENT COLOR (computed from token components)
+       ═══════════════════════════════════════════════════════════════════ */
+    --theme-accent: oklch(var(--token-accent-l) var(--token-accent-c) var(--token-accent-h));
+    --theme-accent-glow: var(--theme-accent);
+    --accent-subtle: oklch(from var(--theme-accent) l c h / 0.15);
+    --accent-muted: oklch(from var(--theme-accent) l c h / 0.3);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATUS: DANGER (Red)
+       Used for errors, destructive actions, and critical warnings.
+       ═══════════════════════════════════════════════════════════════════ */
+    --bg-danger: oklch(from var(--token-red-500) l c h / 0.15);
+    --bg-danger-solid: var(--token-red-600);
+    --text-danger: var(--token-red-400);
+    --border-danger: oklch(from var(--token-red-500) l c h / 0.3);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATUS: SUCCESS (Green)
+       Used for success states, confirmations, and positive indicators.
+       ═══════════════════════════════════════════════════════════════════ */
+    --bg-success: oklch(from var(--token-green-500) l c h / 0.15);
+    --bg-success-solid: var(--token-green-500);
+    --text-success: var(--token-green-400);
+    --border-success: oklch(from var(--token-green-500) l c h / 0.3);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       STATUS: WARNING (Amber)
+       Used for warnings, cautions, and attention-needed states.
+       ═══════════════════════════════════════════════════════════════════ */
+    --bg-warning: oklch(from var(--token-amber-500) l c h / 0.15);
+    --bg-warning-solid: var(--token-amber-500);
+    --text-warning: var(--token-amber-400);
+    --border-warning: oklch(from var(--token-amber-500) l c h / 0.3);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       HEALTH INDICATORS (Performance Monitor)
+       Used for FPS and performance visualization.
+       ═══════════════════════════════════════════════════════════════════ */
+    --health-high: var(--token-green-400);
+    --health-high-bg: oklch(from var(--token-green-500) l c h / 0.1);
+    --health-high-stroke: var(--token-green-400);
+
+    --health-medium: var(--token-amber-400);
+    --health-medium-bg: oklch(from var(--token-amber-500) l c h / 0.1);
+    --health-medium-stroke: var(--token-amber-400);
+
+    --health-low: var(--token-red-400);
+    --health-low-bg: oklch(from var(--token-red-500) l c h / 0.1);
+    --health-low-stroke: var(--token-red-400);
+
+    /* ═══════════════════════════════════════════════════════════════════
+       LEGACY COMPATIBILITY
+       Old variable names that may still be referenced.
+       ═══════════════════════════════════════════════════════════════════ */
+    --color-slate-0: var(--token-slate-0);
+    --color-slate-50: var(--token-slate-50);
+    --color-slate-100: var(--token-slate-100);
+    --color-slate-200: var(--token-slate-200);
+    --color-slate-300: var(--token-slate-300);
+    --color-slate-400: var(--token-slate-400);
+    --color-slate-500: var(--token-slate-500);
+    --color-slate-600: var(--token-slate-600);
+    --color-slate-700: var(--token-slate-700);
+    --color-slate-800: var(--token-slate-800);
+    --color-slate-900: var(--token-slate-900);
+    --color-slate-950: var(--token-slate-950);
+    --color-slate-1000: var(--token-slate-1000);
+
+    /* Glass alias for legacy code */
+    --color-glass: var(--bg-glass);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     LIGHT MODE OVERRIDES
+     ═══════════════════════════════════════════════════════════════════ */
+  [data-mode='light'] {
+    /* Backgrounds */
+    --bg-app: var(--token-slate-50);
+    --bg-panel: oklch(from var(--token-slate-0) l c h / 0.85);
+    --bg-surface: var(--token-slate-100);
+    --bg-elevated: var(--token-slate-0);
+    --bg-glass: oklch(from var(--token-slate-100) l c h / 0.7);
+    --bg-hover: oklch(0% 0 0 / 0.05);
+    --bg-active: oklch(0% 0 0 / 0.1);
+    --bg-overlay: oklch(0% 0 0 / 0.4);
+
+    /* Text */
+    --text-primary: var(--token-slate-900);
+    --text-secondary: var(--token-slate-600);
+    --text-tertiary: var(--token-slate-500);
+    --text-muted: var(--token-slate-400);
+    --text-inverse: var(--token-slate-50);
+
+    /* Borders */
+    --border-subtle: oklch(0% 0 0 / 0.06);
+    --border-default: oklch(0% 0 0 / 0.12);
+    --border-strong: oklch(0% 0 0 / 0.2);
+
+    /* Shadows (lighter in light mode) */
+    --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px oklch(0% 0 0 / 0.08);
+    --shadow-lg: 0 8px 20px -4px oklch(0% 0 0 / 0.12);
+    --shadow-xl: 0 12px 32px -6px oklch(0% 0 0 / 0.15);
+
+    /* Status colors (slightly darker for light mode contrast) */
+    --text-danger: var(--token-red-600);
+    --text-success: var(--token-green-600);
+    --text-warning: var(--token-amber-600);
+
+    /* Health indicators (darker for light backgrounds) */
+    --health-high: var(--token-green-600);
+    --health-high-stroke: var(--token-green-600);
+    --health-medium: var(--token-amber-600);
+    --health-medium-stroke: var(--token-amber-600);
+    --health-low: var(--token-red-600);
+    --health-low-stroke: var(--token-red-600);
+
+    /* Glass alias update */
+    --color-glass: var(--bg-glass);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════
+     ACCENT DEFINITIONS
+     Kept for backward compatibility with existing [data-accent] usage.
+     The --theme-accent is now computed from token components above.
+     ═══════════════════════════════════════════════════════════════════ */
+
+  /* Explicit accent overrides ensure glow matches */
+  [data-accent='cyan'] {
+    --theme-accent-glow: oklch(70% 0.14 200);
+  }
+
+  [data-accent='green'] {
+    --theme-accent-glow: oklch(75% 0.18 145);
+  }
+
+  [data-accent='magenta'] {
+    --theme-accent-glow: oklch(70% 0.22 330);
+  }
+
+  [data-accent='orange'] {
+    --theme-accent-glow: oklch(75% 0.18 40);
+  }
+
+  [data-accent='blue'] {
+    --theme-accent-glow: oklch(70% 0.14 260);
+  }
+
+  [data-accent='violet'] {
+    --theme-accent-glow: oklch(70% 0.18 290);
+  }
+
+  [data-accent='red'] {
+    --theme-accent-glow: oklch(65% 0.20 25);
+  }
+}

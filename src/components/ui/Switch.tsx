@@ -54,7 +54,7 @@ export const Switch: React.FC<SwitchProps> = ({
             absolute inset-0 rounded-full border transition-all duration-300 ease-out
             ${checked 
               ? 'bg-accent/80 border-accent/50 shadow-[0_0_15px_var(--color-accent-glow)]' 
-              : 'glass-input border-white/10 group-hover/switch:bg-white/10'
+              : 'glass-input border-border-default group-hover/switch:bg-[var(--bg-hover)]'
             }
           `}
         />

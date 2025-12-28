@@ -228,7 +228,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                         </label>
                         <div className="relative">
                             <select
-                                className="w-full bg-surface-tertiary border border-white/10 rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
+                                className="w-full bg-surface-tertiary border border-border-default rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
                                 value={config.hydrogenPreset}
                                 onChange={(e) => setHydrogenPreset(e.target.value as HydrogenOrbitalPresetName)}
                                 data-testid="hydrogen-preset-select"
@@ -267,7 +267,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Quantum Numbers - shown when custom or for reference */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between mb-1">
                             <label className="text-xs text-text-secondary">Quantum Numbers</label>
                             <span className="text-xs text-text-tertiary">
@@ -313,7 +313,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Real vs Complex toggle */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between">
                             <label className="text-xs text-text-secondary">
                                 Orbital Representation
@@ -339,7 +339,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Bohr Radius Scale */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <Slider
                             label="Bohr Radius Scale"
                             min={0.5}
@@ -361,7 +361,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                         </label>
                         <div className="relative">
                             <select
-                                className="w-full bg-surface-tertiary border border-white/10 rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
+                                className="w-full bg-surface-tertiary border border-border-default rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
                                 value={config.hydrogenNDPreset}
                                 onChange={(e) => setHydrogenNDPreset(e.target.value as HydrogenNDPresetName)}
                                 data-testid="hydrogen-nd-preset-select"
@@ -387,7 +387,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* 3D Quantum Numbers (n, l, m) */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between mb-1">
                             <label className="text-xs text-text-secondary">3D Quantum Numbers</label>
                             <span className="text-xs text-text-tertiary">
@@ -434,7 +434,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
                     {/* Extra Dimension Quantum Numbers */}
                     {dimension >= 4 && (
-                        <div className="space-y-2 pt-2 border-t border-white/5">
+                        <div className="space-y-2 pt-2 border-t border-border-subtle">
                             <label className="text-xs text-text-secondary">
                                 Extra Dimension Quantum Numbers
                             </label>
@@ -459,7 +459,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
                     {/* Extra Dim Frequency Spread */}
                     {dimension >= 4 && (
-                        <div className="space-y-2 pt-2 border-t border-white/5">
+                        <div className="space-y-2 pt-2 border-t border-border-subtle">
                             <Slider
                                 label="Extra Dim Frequency Spread"
                                 min={0}
@@ -474,7 +474,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     )}
 
                     {/* Real vs Complex toggle */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between">
                             <label className="text-xs text-text-secondary">
                                 Orbital Representation
@@ -494,7 +494,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Bohr Radius Scale */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <Slider
                             label="Bohr Radius Scale"
                             min={0.5}
@@ -516,7 +516,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                         </label>
                         <div className="relative">
                             <select
-                                className="w-full bg-surface-tertiary border border-white/10 rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
+                                className="w-full bg-surface-tertiary border border-border-default rounded px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent appearance-none cursor-pointer"
                                 value={config.presetName}
                                 onChange={(e) => setPresetName(e.target.value as SchroedingerPresetName)}
                                 data-testid="schroedinger-preset-select"
@@ -540,7 +540,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Seed Control */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <div className="flex items-center justify-between">
                             <label className="text-xs text-text-secondary">
                                 Seed: {config.seed}
@@ -566,7 +566,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Quantum Parameters */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <Slider
                             label="Superposition Terms"
                             min={1}
@@ -602,7 +602,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
                     </div>
 
                     {/* Geometric Parameters */}
-                    <div className="space-y-2 pt-2 border-t border-white/5">
+                    <div className="space-y-2 pt-2 border-t border-border-subtle">
                         <Slider
                             label="Field Scale"
                             min={0.5}
@@ -645,7 +645,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         )}
 
         {/* Render Mode Info */}
-        <div className="px-4 py-2 text-xs text-text-secondary border-t border-white/5">
+        <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
             <p>Rendering: Volumetric (Beer-Lambert)</p>
             {isHydrogenMode && (
                 <p className="text-text-tertiary mt-1">

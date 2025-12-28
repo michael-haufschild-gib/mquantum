@@ -135,7 +135,7 @@ export const Popover: React.FC<PopoverProps> = ({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.1, ease: "easeOut" }}
-              className="fixed z-[9999] glass-panel rounded-lg shadow-2xl border border-white/10"
+              className="fixed z-[9999] glass-panel rounded-lg shadow-2xl border border-border-default"
               style={{ 
                 top: coords.top, 
                 left: coords.left,

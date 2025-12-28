@@ -109,7 +109,7 @@ export const ShaderCompilationOverlay: React.FC = () => {
         >
           {/* Subtle backdrop - doesn't fully block the view */}
           <m.div
-            className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-[var(--bg-active)] backdrop-blur-[2px]"
             aria-hidden="true"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

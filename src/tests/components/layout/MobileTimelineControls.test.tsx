@@ -32,15 +32,17 @@ vi.mock('@/stores/layoutStore', () => ({
   }),
 }));
 
-vi.mock('@/stores/themeStore', () => ({
-  useThemeStore: vi.fn((selector) => {
-    const state = {
-      theme: 'default',
-      setTheme: vi.fn(),
-    };
-    return selector ? selector(state) : state;
-  }),
-}));
+    vi.mock('@/stores/themeStore', () => ({
+      useThemeStore: vi.fn((selector) => {
+        const state = {
+          accent: 'cyan',
+          mode: 'dark',
+          setAccent: vi.fn(),
+          setMode: vi.fn(),
+        };
+        return selector(state);
+      }),
+    }));
 
 vi.mock('@/hooks/useMediaQuery', () => ({
   useIsDesktop: () => mockIsDesktop,

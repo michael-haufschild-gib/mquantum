@@ -9,6 +9,7 @@ import { BREAKPOINTS, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export';
+import { getModifierSymbols } from '@/lib/platform';
 import { PRESETS } from '@/lib/presets';
 import { generateShareUrl } from '@/lib/url';
 import { useAppearanceStore } from '@/stores/appearanceStore';
@@ -17,7 +18,7 @@ import { useGeometryStore } from '@/stores/geometryStore';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { usePostProcessingStore } from '@/stores/postProcessingStore';
 import { usePresetManagerStore, type PresetManagerState, type SavedScene, type SavedStyle } from '@/stores/presetManagerStore';
-import { useThemeStore } from '@/stores/themeStore';
+import { THEME_PRESETS, useThemeStore } from '@/stores/themeStore';
 import { useTransformStore } from '@/stores/transformStore';
 import { useUIStore } from '@/stores/uiStore';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -74,10 +75,13 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   );
 
   // Theme store - consolidated subscription
-  const { theme, setTheme } = useThemeStore(
+  const { accent, setAccent, mode, setMode, setPreset } = useThemeStore(
     useShallow((state) => ({
-      theme: state.theme,
-      setTheme: state.setTheme,
+      accent: state.accent,
+      setAccent: state.setAccent,
+      mode: state.mode,
+      setMode: state.setMode,
+      setPreset: state.setPreset,
     }))
   );
 
@@ -226,13 +230,36 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
   // --- Memoized Submenu Definitions ---
 
-  const themeItems = useMemo(() => [
-      { label: (theme === 'cyan' ? '✓ ' : '  ') + 'Cyan', onClick: () => setTheme('cyan') },
-      { label: (theme === 'blue' ? '✓ ' : '  ') + 'Blue', onClick: () => setTheme('blue') },
-      { label: (theme === 'green' ? '✓ ' : '  ') + 'Green', onClick: () => setTheme('green') },
-      { label: (theme === 'magenta' ? '✓ ' : '  ') + 'Magenta', onClick: () => setTheme('magenta') },
-      { label: (theme === 'orange' ? '✓ ' : '  ') + 'Orange', onClick: () => setTheme('orange') },
-  ], [theme, setTheme]);
+  const accentItems = useMemo(() => [
+      { label: (accent === 'cyan' ? '✓ ' : '  ') + 'Cyan', onClick: () => setAccent('cyan') },
+      { label: (accent === 'blue' ? '✓ ' : '  ') + 'Blue', onClick: () => setAccent('blue') },
+      { label: (accent === 'green' ? '✓ ' : '  ') + 'Green', onClick: () => setAccent('green') },
+      { label: (accent === 'magenta' ? '✓ ' : '  ') + 'Magenta', onClick: () => setAccent('magenta') },
+      { label: (accent === 'orange' ? '✓ ' : '  ') + 'Orange', onClick: () => setAccent('orange') },
+      { label: (accent === 'violet' ? '✓ ' : '  ') + 'Violet', onClick: () => setAccent('violet') },
+      { label: (accent === 'red' ? '✓ ' : '  ') + 'Red', onClick: () => setAccent('red') },
+  ], [accent, setAccent]);
+
+  const modeItems = useMemo(() => [
+      { label: (mode === 'light' ? '✓ ' : '  ') + 'Light', onClick: () => setMode('light') },
+      { label: (mode === 'dark' ? '✓ ' : '  ') + 'Dark', onClick: () => setMode('dark') },
+      { label: (mode === 'system' ? '✓ ' : '  ') + 'System', onClick: () => setMode('system') },
+  ], [mode, setMode]);
+
+  const presetItems = useMemo(() => [
+    ...THEME_PRESETS.map(p => ({
+      label: p.label,
+      onClick: () => {
+        setPreset(p.id);
+        soundManager.playClick();
+      }
+    })),
+    { label: '---' },
+    { label: 'Advanced', items: [
+      { label: 'Mode', items: modeItems },
+      { label: 'Accent', items: accentItems },
+    ]}
+  ], [setPreset, modeItems, accentItems]);
 
   const savedSceneItems = useMemo(() => savedScenes.map((s: SavedScene) => ({
       label: s.name,
@@ -300,11 +327,14 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
   // --- Memoized Menu Definitions ---
 
-  const fileItems = useMemo(() => [
-    { label: 'Export Image (PNG)', onClick: handleExport, shortcut: '⌘E', 'data-testid': 'menu-export' },
-    { label: 'Export Video (MP4)', onClick: handleExportVideo, shortcut: '⌘⇧E', 'data-testid': 'menu-export-video' },
-    { label: 'Copy Share Link', onClick: handleShare, shortcut: '⌘S', 'data-testid': 'menu-share' },
-  ], [handleExport, handleExportVideo, handleShare]);
+  const fileItems = useMemo(() => {
+    const m = getModifierSymbols();
+    return [
+      { label: 'Export Image (PNG)', onClick: handleExport, shortcut: `${m.ctrl}S`, 'data-testid': 'menu-export' },
+      { label: 'Export Video (MP4)', onClick: handleExportVideo, shortcut: `${m.ctrl}${m.shift}E`, 'data-testid': 'menu-export-video' },
+      { label: 'Copy Share Link', onClick: handleShare, 'data-testid': 'menu-share' },
+    ];
+  }, [handleExport, handleExportVideo, handleShare]);
 
   const viewItems = useMemo(() => [
     { label: showLeftPanel ? 'Hide Explorer' : 'Show Explorer', onClick: handleToggleLeftPanel },
@@ -312,8 +342,8 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     { label: 'Cinematic Mode', onClick: toggleCinematicMode, shortcut: 'C' },
     { label: 'Keyboard Shortcuts', onClick: toggleShortcuts, shortcut: '?' },
     { label: '---' },
-    { label: 'Select Theme', items: themeItems },
-  ], [showLeftPanel, showRightPanel, handleToggleLeftPanel, handleToggleRightPanel, toggleCinematicMode, toggleShortcuts, themeItems]);
+    { label: 'Theme', items: presetItems },
+  ], [showLeftPanel, showRightPanel, handleToggleLeftPanel, handleToggleRightPanel, toggleCinematicMode, toggleShortcuts, presetItems]);
 
   // --- Mobile Unified Menu ---
   const mobileMenuItems = useMemo(() => [
@@ -363,7 +393,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
               ariaLabel="Toggle Explorer"
               data-testid="toggle-left-panel"
               className={`p-1.5 ${
-                showLeftPanel ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                showLeftPanel ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:text-text-primary hover:bg-[var(--bg-hover)]'
               }`}
           >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -436,7 +466,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
               ariaLabel="Toggle Inspector"
               data-testid="toggle-right-panel"
               className={`p-1.5 ${
-                showRightPanel ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                showRightPanel ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:text-text-primary hover:bg-[var(--bg-hover)]'
               }`}
           >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

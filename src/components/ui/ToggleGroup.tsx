@@ -31,12 +31,10 @@ export const ToggleGroup = <T extends string = string>({
 
   return (
     <LayoutGroup id={layoutId}>
-      <div
-        className={`flex p-1 gap-1 bg-black/20 rounded-lg border border-white/5 ${className}`}
-        role="radiogroup"
-        aria-label={ariaLabel}
-        data-testid={testId}
-      >
+    <div
+      className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${className}`}
+      role="group"
+    >
         {options.map((option) => {
           const isSelected = option.value === value;
           const isDisabled = disabled || option.disabled;

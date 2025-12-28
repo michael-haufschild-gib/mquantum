@@ -18,19 +18,19 @@ export const MsgBox: React.FC = () => {
 
   const getColorClass = () => {
     switch (type) {
-      case 'error': return 'text-red-400';
-      case 'warning': return 'text-amber-400';
-      case 'success': return 'text-green-400';
-      case 'info': default: return 'text-blue-400';
+      case 'error': return 'text-danger';
+      case 'warning': return 'text-warning';
+      case 'success': return 'text-success';
+      case 'info': default: return 'text-accent';
     }
   };
 
   const getBgClass = () => {
     switch (type) {
-      case 'error': return 'bg-red-500/10 border-red-500/20';
-      case 'warning': return 'bg-amber-500/10 border-amber-500/20';
-      case 'success': return 'bg-green-500/10 border-green-500/20';
-      case 'info': default: return 'bg-blue-500/10 border-blue-500/20';
+      case 'error': return 'bg-danger-bg border-danger-border';
+      case 'warning': return 'bg-warning-bg border-warning-border';
+      case 'success': return 'bg-success-bg border-success-border';
+      case 'info': default: return 'bg-accent-subtle border-accent-muted';
     }
   };
 
@@ -43,7 +43,7 @@ export const MsgBox: React.FC = () => {
     >
       <div className="space-y-6">
         <div className={`flex items-start gap-4 p-4 rounded-xl border ${getBgClass()}`}>
-          <div className={`shrink-0 p-2 rounded-full bg-black/20 ${getColorClass()}`}>
+          <div className={`shrink-0 p-2 rounded-full bg-[var(--bg-hover)] ${getColorClass()}`}>
             <Icon name={getIcon()} size={24} />
           </div>
           <div className="flex-1">

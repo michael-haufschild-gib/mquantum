@@ -33,9 +33,9 @@ const LostState: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       {/* Warning icon (decorative) */}
-      <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center" aria-hidden="true">
+      <div className="w-16 h-16 rounded-full bg-warning-bg flex items-center justify-center" aria-hidden="true">
         <svg
-          className="w-8 h-8 text-amber-400"
+          className="w-8 h-8 text-warning"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -133,9 +133,9 @@ const FailedState: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       {/* Error icon (decorative) */}
-      <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center" aria-hidden="true">
+      <div className="w-16 h-16 rounded-full bg-danger-bg flex items-center justify-center" aria-hidden="true">
         <svg
-          className="w-8 h-8 text-red-400"
+          className="w-8 h-8 text-danger"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -203,7 +203,7 @@ export const ContextLostOverlay: React.FC = () => {
         transition={{ duration: OVERLAY_ANIMATION_DURATION }}
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" aria-hidden="true" />
+        <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" aria-hidden="true" />
 
         {/* Content card */}
         <m.div

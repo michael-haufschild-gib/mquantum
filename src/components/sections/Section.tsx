@@ -49,12 +49,12 @@ export const Section: React.FC<SectionProps> = ({
     <div 
       ref={sectionRef}
       className={`
-        group relative overflow-hidden border-b border-white/5 last:border-b-0
+        group relative overflow-hidden border-b border-[var(--border-subtle)] last:border-b-0
         ${className}
       `}
       data-testid={dataTestId}
     >
-      <div className="flex items-center justify-between bg-white/5 border-b border-white/5 hover:bg-white/10 transition-colors duration-200">
+      <div className="flex items-center justify-between bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-active)] transition-colors duration-200">
         <button
           type="button"
           onClick={() => {
@@ -81,11 +81,11 @@ export const Section: React.FC<SectionProps> = ({
             <div className="relative flex items-center justify-center w-2 h-2">
                 {isOpen && <div className="absolute inset-0 rounded-full bg-accent led-glow" />}
                 <div
-                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${isOpen ? 'bg-accent' : 'bg-white/20 group-hover:bg-white/40'}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${isOpen ? 'bg-accent' : 'bg-[var(--text-tertiary)] group-hover:bg-[var(--text-secondary)]'}`}
                 />
             </div>
 
-            <h3 className={`text-[11px] font-bold tracking-widest uppercase transition-colors duration-200 ${isOpen ? 'text-text-primary text-glow-subtle' : 'text-text-secondary group-hover:text-text-primary'}`}>
+            <h3 className={`text-[11px] font-bold tracking-widest uppercase transition-colors duration-200 ${isOpen ? 'text-[var(--text-primary)] text-glow-subtle' : 'text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]'}`}>
               {title}
             </h3>
           </div>
@@ -113,7 +113,7 @@ export const Section: React.FC<SectionProps> = ({
               e.stopPropagation();
               onReset();
             }}
-            className="mr-3 p-1 text-text-tertiary hover:text-accent transition-colors rounded hover:bg-white/10 relative z-20"
+            className="mr-3 p-1 text-[var(--text-tertiary)] hover:text-accent transition-colors rounded hover:bg-[var(--bg-hover)] relative z-20"
             title={`Reset ${title} settings`}
             data-testid={dataTestId ? `${dataTestId}-reset` : undefined}
           >
@@ -133,7 +133,7 @@ export const Section: React.FC<SectionProps> = ({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.8 }}
-            className="overflow-hidden bg-black/10"
+            className="overflow-hidden bg-[var(--bg-panel)]/30"
           >
             <div className="px-4 pb-4 pt-2 space-y-5">
               {children}

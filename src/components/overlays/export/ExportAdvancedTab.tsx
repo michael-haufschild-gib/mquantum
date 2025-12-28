@@ -40,7 +40,7 @@ export const ExportAdvancedTab = () => {
                 </div>
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-[var(--bg-hover)]" />
 
             {/* Codec */}
             <div className="space-y-3">
@@ -83,13 +83,13 @@ export const ExportAdvancedTab = () => {
                 />
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-[var(--bg-hover)]" />
 
             {/* Export Mode */}
             <div className="space-y-3">
                  <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-1">Processing Mode</label>
-                    <span className={`text-[10px] px-2 py-0.5 rounded ${exportModeOverride ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-white/5 text-text-tertiary'}`}>
+                    <span className={`text-[10px] px-2 py-0.5 rounded ${exportModeOverride ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-[var(--bg-hover)] text-text-tertiary'}`}>
                         {exportModeOverride ? 'Manual Override' : 'Auto-Selected'}
                     </span>
                 </div>
@@ -102,7 +102,7 @@ export const ExportAdvancedTab = () => {
                     value={exportModeOverride || exportMode}
                     onChange={(val) => setExportModeOverride(val as ExportMode)}
                 />
-                <p className="text-[10px] text-text-tertiary p-2 bg-white/5 rounded border border-white/5">
+                <p className="text-[10px] text-text-tertiary p-2 bg-[var(--bg-hover)] rounded border border-border-subtle">
                     {exportMode === 'in-memory' && "Best for short clips. Keeps video in RAM before download."}
                     {exportMode === 'stream' && "Best for long recordings. Writes directly to disk (Chrome/Edge only)."}
                     {exportMode === 'segmented' && "Fallback for large files. Downloads multiple parts to join later."}

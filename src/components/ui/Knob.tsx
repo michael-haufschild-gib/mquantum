@@ -187,7 +187,7 @@ export const Knob: React.FC<KnobProps> = ({
              <circle cx="20" cy="20" r="16" fill={`url(#shadow-grad-${id})`} />
 
              {/* Depression Ellipse (Simulates 3D bevel) */}
-             <circle cx="20" cy="21" r="14" fill="black" fillOpacity="0.3" />
+             <circle cx="20" cy="21" r="14" fill="var(--bg-overlay)" />
 
              {/* Main Body */}
              <circle cx="20" cy="20" r="14" fill={`url(#body-grad-${id})`} stroke="var(--color-border)" strokeOpacity="0.2" strokeWidth="1" />
@@ -196,7 +196,7 @@ export const Knob: React.FC<KnobProps> = ({
              <circle cx="20" cy="20" r="13" fill="none" stroke={`url(#highlight-grad-${id})`} strokeWidth="1" />
 
              {/* Hover Highlight Overlay */}
-             <circle cx="20" cy="20" r="14" fill="white" className="opacity-0 group-hover:opacity-5 transition-opacity duration-200" />
+             <circle cx="20" cy="20" r="14" fill="var(--text-primary)" className="opacity-0 group-hover:opacity-5 transition-opacity duration-200" />
           </m.g>
 
           {/* Indicator Dot (Rotates) */}

@@ -232,7 +232,7 @@ export const CropEditor = () => {
       <m.div
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="bg-black/40 backdrop-blur-xl p-4 flex justify-between items-center border-b border-white/10 z-10"
+        className="bg-[var(--bg-active)] backdrop-blur-xl p-4 flex justify-between items-center border-b border-border-default z-10"
       >
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-3">
@@ -240,12 +240,12 @@ export const CropEditor = () => {
               <Icon name="crop" className="text-accent w-4 h-4" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-white text-sm">Crop Selection</span>
-              <span className="text-[10px] text-white/50 uppercase tracking-widest">Cinematic Mode</span>
+              <span className="font-bold text-text-primary text-sm">Crop Selection</span>
+              <span className="text-[10px] text-text-tertiary uppercase tracking-widest">Cinematic Mode</span>
             </div>
           </div>
 
-          <div className="h-8 w-px bg-white/10" />
+          <div className="h-8 w-px bg-[var(--bg-active)]" />
 
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => setRatio(16 / 9)}>16:9</Button>
@@ -259,7 +259,7 @@ export const CropEditor = () => {
         <div className="flex gap-3">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-white/70 hover:text-white transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
           >
             Cancel
           </button>
@@ -278,18 +278,18 @@ export const CropEditor = () => {
         {/* Dark Overlay */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Top */}
-          <div className="absolute bg-black/70 backdrop-blur-[2px]" style={{ left: 0, top: 0, right: 0, height: `${selection.y * 100}%` }} />
+          <div className="absolute bg-[var(--bg-overlay)] backdrop-blur-[2px]" style={{ left: 0, top: 0, right: 0, height: `${selection.y * 100}%` }} />
           {/* Bottom */}
-          <div className="absolute bg-black/70 backdrop-blur-[2px]" style={{ left: 0, bottom: 0, right: 0, height: `${(1 - (selection.y + selection.h)) * 100}%` }} />
+          <div className="absolute bg-[var(--bg-overlay)] backdrop-blur-[2px]" style={{ left: 0, bottom: 0, right: 0, height: `${(1 - (selection.y + selection.h)) * 100}%` }} />
           {/* Left */}
-          <div className="absolute bg-black/70 backdrop-blur-[2px]" style={{ left: 0, top: `${selection.y * 100}%`, width: `${selection.x * 100}%`, height: `${selection.h * 100}%` }} />
+          <div className="absolute bg-[var(--bg-overlay)] backdrop-blur-[2px]" style={{ left: 0, top: `${selection.y * 100}%`, width: `${selection.x * 100}%`, height: `${selection.h * 100}%` }} />
           {/* Right */}
-          <div className="absolute bg-black/70 backdrop-blur-[2px]" style={{ right: 0, top: `${selection.y * 100}%`, width: `${(1 - (selection.x + selection.w)) * 100}%`, height: `${selection.h * 100}%` }} />
+          <div className="absolute bg-[var(--bg-overlay)] backdrop-blur-[2px]" style={{ right: 0, top: `${selection.y * 100}%`, width: `${(1 - (selection.x + selection.w)) * 100}%`, height: `${selection.h * 100}%` }} />
         </div>
 
         {/* Selection Box with Motion Drag */}
         <m.div
-          className="absolute border border-accent/50 shadow-[0_0_0_1px_rgba(255,255,255,0.1),0_0_40px_rgba(0,0,0,0.5)] bg-transparent box-content cursor-move"
+          className="absolute border border-accent/50 shadow-[0_0_0_1px_var(--border-subtle),0_0_40px_var(--bg-overlay)] bg-transparent box-content cursor-move"
           style={{
             left: `${selection.x * 100}%`,
             top: `${selection.y * 100}%`,
@@ -309,10 +309,10 @@ export const CropEditor = () => {
           <div className="absolute inset-0 border-[4px] border-accent/10 pointer-events-none" />
 
           {/* Grid Lines (Rule of Thirds) */}
-          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-white/20 pointer-events-none" />
-          <div className="absolute right-1/3 top-0 bottom-0 w-px bg-white/20 pointer-events-none" />
-          <div className="absolute top-1/3 left-0 right-0 h-px bg-white/20 pointer-events-none" />
-          <div className="absolute bottom-1/3 left-0 right-0 h-px bg-white/20 pointer-events-none" />
+          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-border-default pointer-events-none" />
+          <div className="absolute right-1/3 top-0 bottom-0 w-px bg-border-default pointer-events-none" />
+          <div className="absolute top-1/3 left-0 right-0 h-px bg-border-default pointer-events-none" />
+          <div className="absolute bottom-1/3 left-0 right-0 h-px bg-border-default pointer-events-none" />
 
           {/* Center Crosshair */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-px bg-accent/40 pointer-events-none" />
@@ -331,7 +331,7 @@ export const CropEditor = () => {
           ))}
 
           {/* Dimensions Label */}
-          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md text-white/90 text-[10px] px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-white/10 flex items-center gap-2">
+          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-[10px] px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2">
             <Icon name="image" className="w-3 h-3 text-accent" />
             <span>{Math.round(selection.w * 100)}% × {Math.round(selection.h * 100)}%</span>
           </div>
@@ -344,7 +344,7 @@ export const CropEditor = () => {
         animate={{ y: 0 }}
         className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none"
       >
-        <div className="bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white/50 text-xs">
+        <div className="bg-[var(--bg-overlay)] backdrop-blur-md px-4 py-2 rounded-full border border-border-default text-text-tertiary text-xs">
           Drag corners to resize • Drag center to move
         </div>
       </m.div>

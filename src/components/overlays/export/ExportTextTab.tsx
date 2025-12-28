@@ -19,7 +19,7 @@ export const ExportTextTab = () => {
             {/* Enable Toggle Card */}
             <div className={`
                 flex items-center justify-between p-4 rounded-xl border transition-colors
-                ${textOverlay.enabled ? 'bg-accent/5 border-accent/50' : 'bg-white/5 border-white/10'}
+                ${textOverlay.enabled ? 'bg-accent/5 border-accent/50' : 'bg-[var(--bg-hover)] border-border-default'}
             `}>
                  <div className="flex flex-col">
                     <span className="font-bold text-sm text-text-primary">Enable Overlay</span>
@@ -89,7 +89,7 @@ export const ExportTextTab = () => {
                         </div>
                     </div>
 
-                    <div className="space-y-4 pt-4 border-t border-white/5">
+                    <div className="space-y-4 pt-4 border-t border-border-subtle">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Text Color</label>
@@ -108,7 +108,7 @@ export const ExportTextTab = () => {
                         </div>
                     </div>
 
-                    <div className="space-y-6 pt-4 border-t border-white/5">
+                    <div className="space-y-6 pt-4 border-t border-border-subtle">
                         <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Position</label>
                         <Slider 
                             label="Horizontal (X)"

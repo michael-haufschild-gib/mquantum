@@ -144,12 +144,15 @@ describe('useKeyboardShortcuts', () => {
 });
 
 describe('getShortcutLabel', () => {
-  it('should format simple key', () => {
-    expect(getShortcutLabel({ key: 'r', description: '' })).toBe('r');
+  // Note: Tests run in Node.js where navigator is undefined, so isMac=false
+  // This means Windows/Linux symbols are used (Ctrl, Shift, Alt)
+
+  it('should format simple key (uppercase)', () => {
+    expect(getShortcutLabel({ key: 'r', description: '' })).toBe('R');
   });
 
   it('should format space key', () => {
-    expect(getShortcutLabel({ key: ' ', description: '' })).toBe('Space');
+    expect(getShortcutLabel({ key: ' ', description: '' })).toBe('SPACE');
   });
 
   it('should format arrow keys', () => {
@@ -157,20 +160,20 @@ describe('getShortcutLabel', () => {
     expect(getShortcutLabel({ key: 'ArrowDown', description: '' })).toBe('↓');
   });
 
-  it('should format ctrl + key', () => {
-    expect(getShortcutLabel({ key: 's', ctrl: true, description: '' })).toBe('Ctrl + s');
+  it('should format ctrl + key (space-separated)', () => {
+    expect(getShortcutLabel({ key: 's', ctrl: true, description: '' })).toBe('Ctrl S');
   });
 
-  it('should format shift + key', () => {
-    expect(getShortcutLabel({ key: 'a', shift: true, description: '' })).toBe('Shift + a');
+  it('should format shift + key (space-separated)', () => {
+    expect(getShortcutLabel({ key: 'a', shift: true, description: '' })).toBe('Shift A');
   });
 
-  it('should format alt + key', () => {
-    expect(getShortcutLabel({ key: 'a', alt: true, description: '' })).toBe('Alt + a');
+  it('should format alt + key (space-separated)', () => {
+    expect(getShortcutLabel({ key: 'a', alt: true, description: '' })).toBe('Alt A');
   });
 
-  it('should format multiple modifiers', () => {
-    expect(getShortcutLabel({ key: 's', ctrl: true, shift: true, description: '' })).toBe('Ctrl + Shift + s');
+  it('should format multiple modifiers (space-separated)', () => {
+    expect(getShortcutLabel({ key: 's', ctrl: true, shift: true, description: '' })).toBe('Ctrl Shift S');
   });
 });
 

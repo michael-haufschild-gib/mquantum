@@ -111,9 +111,9 @@ export const ExportModal = () => {
   // Get Tier Badge
   const getTierBadge = () => {
       switch (exportTier) {
-          case 'large': return <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold border border-red-500/30">LARGE EXPORT</span>
-          case 'medium': return <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold border border-amber-500/30">MEDIUM EXPORT</span>
-          default: return <span className="px-2 py-0.5 rounded bg-green-500/20 text-green-400 text-[10px] font-bold border border-green-500/30">OPTIMIZED</span>
+          case 'large': return <span className="px-2 py-0.5 rounded bg-danger-bg text-danger text-[10px] font-bold border border-danger-border">LARGE EXPORT</span>
+          case 'medium': return <span className="px-2 py-0.5 rounded bg-warning-bg text-warning text-[10px] font-bold border border-warning-border">MEDIUM EXPORT</span>
+          default: return <span className="px-2 py-0.5 rounded bg-success-bg text-success text-[10px] font-bold border border-success-border">OPTIMIZED</span>
       }
   }
 
@@ -142,7 +142,7 @@ export const ExportModal = () => {
                             <svg className="w-full h-full transform -rotate-90 relative z-10">
                                 <circle
                                     cx="80" cy="80" r="70"
-                                    className="stroke-white/5 fill-none"
+                                    className="stroke-border-subtle fill-none"
                                     strokeWidth="6"
                                 />
                                 <circle
@@ -166,7 +166,7 @@ export const ExportModal = () => {
                                  'Rendering Sequence...'}
                             </h3>
                              {eta && status !== 'previewing' && (
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--bg-hover)] border border-border-default">
                                     <Icon name="clock" className="w-3 h-3 text-text-tertiary" />
                                     <span className="text-xs font-mono text-text-secondary">Time Remaining: {eta}</span>
                                 </div>
@@ -203,7 +203,7 @@ export const ExportModal = () => {
                     <div className="animate-in fade-in zoom-in-95 duration-300">
                         {(!completionDetails || completionDetails?.type === 'in-memory') && previewUrl && (
                             <div className="space-y-6">
-                                <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video relative group shadow-2xl">
+                                <div className="rounded-xl overflow-hidden border border-border-default bg-black aspect-video relative group shadow-2xl">
                                     <video src={previewUrl} controls autoPlay loop className="w-full h-full object-contain" />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -219,8 +219,8 @@ export const ExportModal = () => {
                         
                         {completionDetails?.type === 'stream' && (
                             <div className="flex flex-col items-center justify-center gap-6 py-4">
-                                 <div className="w-20 h-20 bg-green-500/10 border border-green-500/20 rounded-full flex items-center justify-center">
-                                    <Icon name="check" className="text-green-400 w-10 h-10" />
+                                 <div className="w-20 h-20 bg-success border border-success-border rounded-full flex items-center justify-center">
+                                    <Icon name="check" className="text-success w-10 h-10" />
                                 </div>
                                 <div className="text-center space-y-2">
                                     <h3 className="text-2xl font-bold text-white">Export Successful</h3>
@@ -235,8 +235,8 @@ export const ExportModal = () => {
                         {completionDetails?.type === 'segmented' && (
                              <div className="flex flex-col gap-6 text-center">
                                 <div className="flex flex-col items-center gap-4">
-                                     <Icon name="layers" className="text-amber-400 w-12 h-12" />
-                                     <h3 className="text-xl font-bold text-amber-400">Segmented Export Complete</h3>
+                                     <Icon name="layers" className="text-warning w-12 h-12" />
+                                     <h3 className="text-xl font-bold text-warning">Segmented Export Complete</h3>
                                      <p className="text-sm text-text-secondary">{completionDetails.segmentCount} segments downloaded.</p>
                                 </div>
                                 <Button onClick={() => { reset(); setStatus('idle'); }} variant="secondary" size="lg" className="w-full">
@@ -251,13 +251,13 @@ export const ExportModal = () => {
             /* CONFIGURATION STATE (Split View) */
             <div className="flex flex-col lg:flex-row h-[70vh] lg:h-[600px] overflow-hidden">
                 {/* LEFT: Preview & Quick Stats */}
-                <div className="hidden lg:flex flex-col w-5/12 border-r border-white/5 bg-black/20 p-6 gap-6 relative">
-                    <div className="flex-1 min-h-0 relative rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-black/40">
+                <div className="hidden lg:flex flex-col w-5/12 border-r border-border-subtle bg-[var(--bg-hover)] p-6 gap-6 relative">
+                    <div className="flex-1 min-h-0 relative rounded-xl overflow-hidden shadow-2xl border border-border-default bg-[var(--bg-overlay)]">
                          <ExportPreview />
                     </div>
                     
                     {/* Summary Card */}
-                    <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-3">
+                    <div className="bg-[var(--bg-hover)] border border-border-subtle rounded-xl p-4 space-y-3">
                          <div className="flex justify-between items-center">
                              <span className="text-xs font-bold text-text-secondary uppercase">Estimated Size</span>
                              {getTierBadge()}
@@ -267,7 +267,7 @@ export const ExportModal = () => {
                              <span className="text-sm text-text-tertiary">MB</span>
                          </div>
                          
-                         <div className="h-px bg-white/5 w-full my-2" />
+                         <div className="h-px bg-border-subtle w-full my-2" />
                          
                          <div className="grid grid-cols-3 gap-2 text-center">
                              <div>
@@ -304,7 +304,7 @@ export const ExportModal = () => {
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-6 border-t border-white/5 bg-panel-bg/95 backdrop-blur z-10 flex justify-between items-center gap-4">
+                    <div className="p-6 border-t border-border-subtle bg-panel-bg/95 backdrop-blur z-10 flex justify-between items-center gap-4">
                         <div className="lg:hidden flex flex-col">
                              <span className="text-[10px] text-text-tertiary uppercase">Est. Size</span>
                              <span className="text-sm font-bold font-mono">~{estimatedSizeMB.toFixed(1)} MB</span>
@@ -314,7 +314,7 @@ export const ExportModal = () => {
                             onClick={handleExport}
                             variant="primary"
                             size="lg"
-                            className="flex-1 py-4 shadow-[0_0_20px_rgba(var(--color-accent-rgb),0.15)] hover:shadow-[0_0_30px_rgba(var(--color-accent-rgb),0.25)] transition-shadow"
+                            className="flex-1 py-4 glow-accent-md hover:glow-accent-lg transition-shadow"
                             glow
                         >
                             <div className="flex flex-col items-center">

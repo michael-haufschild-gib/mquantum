@@ -146,7 +146,7 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = ({
       {hasEnabledLights ? (
         <div className="space-y-4">
           {/* Shadow Type Label */}
-          <div className="px-2 py-1.5 rounded bg-white/5 border border-white/10">
+          <div className="px-2 py-1.5 rounded bg-[var(--bg-hover)] border border-border-default">
             <p className="text-[10px] font-medium text-text-primary">
               {shadowTypeInfo.label}
             </p>
@@ -277,7 +277,7 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = ({
           </div>
         </div>
       ) : (
-        <div className="p-4 rounded-lg bg-black/20 border border-white/5 border-dashed text-center">
+        <div className="p-4 rounded-lg bg-[var(--bg-hover)] border border-border-subtle border-dashed text-center">
           <p className="text-xs text-text-secondary italic">
             Add lights to enable shadows.
           </p>

@@ -192,10 +192,10 @@ export const Slider: React.FC<SliderProps> = ({
                   disabled={disabled}
                   className="
                     w-full h-full px-1.5 text-right font-mono text-[10px]
-                    bg-black/20 border border-white/8 rounded
+                    bg-[var(--bg-hover)] border border-border-subtle rounded
                     text-text-primary
-                    hover:border-white/15 hover:bg-black/25
-                    focus:outline-none focus:border-accent/50 focus:bg-black/30
+                    hover:border-border-default hover:bg-[var(--bg-active)]
+                    focus:outline-none focus:border-accent/50 focus:bg-[var(--bg-active)]
                     transition-colors duration-150
                   "
                   data-testid={dataTestId ? `${dataTestId}-input` : undefined}
@@ -218,7 +218,7 @@ export const Slider: React.FC<SliderProps> = ({
       <div className="relative h-5 flex items-center touch-none">
         
         {/* Track Background */}
-        <div className="absolute w-full h-[3px] bg-white/5 rounded-full overflow-hidden transition-colors duration-300 group-hover/slider:bg-white/10 backdrop-blur-sm shadow-inner">
+        <div className="absolute w-full h-[3px] bg-[var(--bg-hover)] rounded-full overflow-hidden transition-colors duration-300 group-hover/slider:bg-[var(--bg-active)] backdrop-blur-sm shadow-inner">
            {/* Active Fill Track - Gradient */}
            <div
              className="h-full bg-gradient-to-r from-accent/50 to-accent shadow-[0_0_10px_var(--color-accent-glow)] opacity-80 group-hover/slider:opacity-100 transition-all duration-100 ease-out"
@@ -263,7 +263,7 @@ export const Slider: React.FC<SliderProps> = ({
           `}
           style={{ left: `calc(${percentage}% - 7px)` }}
         >
-           <div className={`w-1 h-1 rounded-full bg-white transition-opacity duration-200 ${isDragging || isHovered ? 'opacity-100' : 'opacity-50'}`} />
+           <div className={`w-1 h-1 rounded-full bg-text-primary transition-opacity duration-200 ${isDragging || isHovered ? 'opacity-100' : 'opacity-50'}`} />
         </div>
 
         {/* Tooltip while dragging */}
@@ -273,7 +273,7 @@ export const Slider: React.FC<SliderProps> = ({
                initial={{ opacity: 0, y: 10, scale: 0.8 }}
                animate={{ opacity: 1, y: -20, scale: 1 }}
                exit={{ opacity: 0, y: 10, scale: 0.8 }}
-               className="absolute top-0 -translate-x-1/2 px-2 py-1 bg-black/90 backdrop-blur-xl border border-white/10 rounded text-[10px] font-mono text-accent pointer-events-none shadow-xl z-30 whitespace-nowrap"
+               className="absolute top-0 -translate-x-1/2 px-2 py-1 glass-panel-dark border border-border-default rounded text-[10px] font-mono text-accent pointer-events-none shadow-xl z-30 whitespace-nowrap"
                style={{ left: `${percentage}%` }}
              >
                {displayValue}{unit}

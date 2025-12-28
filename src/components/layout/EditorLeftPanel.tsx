@@ -18,7 +18,7 @@ export const EditorLeftPanel: React.FC = () => {
         </div>
       ),
       content: (
-        <div className="p-4 bg-black/10 min-h-full">
+        <div className="p-4 bg-[var(--bg-hover)] min-h-full">
            <ObjectTypeExplorer />
         </div>
       ),
@@ -41,23 +41,19 @@ export const EditorLeftPanel: React.FC = () => {
 
   return (
     <div
-      className="h-full flex flex-col bg-panel-bg/50 border-r border-panel-border shrink-0 overflow-hidden relative backdrop-blur-md w-full"
+      className="h-full flex flex-col w-full shrink-0 overflow-hidden"
     >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-panel-border bg-panel-bg/50 backdrop-blur-sm z-20 shrink-0 h-[60px]">
-            <div className="flex items-center gap-2 px-1 overflow-hidden whitespace-nowrap">
-                <Icon name="menu" className="text-accent" />
-                <h2 className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-                  Geometry
-                </h2>
-            </div>
-        </div>
+      <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
+        <Icon name="menu" className="text-[var(--text-secondary)]" />
+        <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">Geometry</h2>
+      </div>
 
         {/* Content Container */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
            {/* Fixed Header Section with Dimension Selector */}
-          <div className="border-b border-white/5 bg-black/10 shrink-0">
-             <div className="flex justify-between items-baseline px-4 py-2 bg-white/5 border-b border-white/5">
+          <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-hover)] shrink-0">
+             <div className="flex justify-between items-baseline px-4 py-2 border-b border-[var(--border-subtle)]">
                 <label className="text-[10px] text-accent font-bold uppercase tracking-wider text-glow-subtle flex items-center gap-2">
 
                     Dimensions
@@ -76,7 +72,7 @@ export const EditorLeftPanel: React.FC = () => {
                 onChange={setActiveTab}
                 className="flex-1 flex flex-col min-h-0"
                 tabListClassName="px-3 pt-0 pb-0 bg-transparent"
-                contentClassName="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-panel-border hover:scrollbar-thumb-text-secondary/50 p-0"
+                contentClassName="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--border-default)] hover:scrollbar-thumb-[var(--border-highlight)] p-0"
                 variant="default"
                 fullWidth
                 data-testid="left-panel-tabs"

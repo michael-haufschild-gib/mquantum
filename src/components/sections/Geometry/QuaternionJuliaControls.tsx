@@ -290,7 +290,7 @@ export const QuaternionJuliaControls: React.FC<QuaternionJuliaControlsProps> = R
       )}
 
       {/* Info */}
-      <div className="px-4 py-2 text-xs text-text-secondary border-t border-white/5">
+      <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
         <p>Rendering: GPU Ray Marching</p>
         <p className="text-text-tertiary">
           {`${dimension}D Quaternion Julia fractal (z = z^${config.power} + c)`}

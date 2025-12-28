@@ -43,7 +43,7 @@ export const MultiToggleGroup = <T extends string = string>({
         </label>
       )}
       <div
-        className="flex flex-wrap gap-1 p-1 bg-black/20 rounded-lg"
+        className="flex flex-wrap gap-1 p-1 bg-[var(--bg-hover)] rounded-lg"
         role="group"
         aria-label={ariaLabel || label}
         data-testid={testId}
@@ -60,7 +60,7 @@ export const MultiToggleGroup = <T extends string = string>({
                 disabled:opacity-50 disabled:cursor-not-allowed
                 ${isSelected
                   ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
-                  : 'bg-panel-border text-text-secondary border-panel-border hover:text-text-primary hover:bg-panel-border/80'
+                  : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
                 }
               `}
               role="checkbox"

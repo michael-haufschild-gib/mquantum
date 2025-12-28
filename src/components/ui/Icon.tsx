@@ -1,84 +1,82 @@
 import React from 'react';
 
-export type IconName =
-  | 'eye'
-  | 'sphere'
-  | 'cog'
-  | 'home'
-  | 'image'
-  | 'play'
-  | 'pause'
-  | 'stop'
-  | 'undo'
-  | 'redo'
-  | 'menu'
-  | 'arrow-left'
-  | 'arrow-right'
-  | 'plus'
-  | 'minus'
-  | 'check'
-  | 'cross'
-  | 'warning'
-  | 'info'
-  | 'download'
-  | 'copy'
-  | 'chevron-left'
-  | 'chevron-right'
-  | 'chevron-down'
-  | 'sparkles'
-  | 'crop'
-  | 'clock'
-  | 'settings'
-  | 'layers';
+// SVGR imports
+import CheckIcon from '@/assets/icons/checkmark.svg?react';
+import ChevronDownIcon from '@/assets/icons/chevron-down.svg?react';
+import ChevronLeftIcon from '@/assets/icons/chevron-left.svg?react';
+import ChevronRightIcon from '@/assets/icons/chevron-right.svg?react';
+import ClockIcon from '@/assets/icons/clock.svg?react';
+import CogIcon from '@/assets/icons/cog.svg?react';
+import CopyIcon from '@/assets/icons/copy.svg?react';
+import CropIcon from '@/assets/icons/crop.svg?react';
+import CrossIcon from '@/assets/icons/cross.svg?react';
+import DownloadIcon from '@/assets/icons/download.svg?react';
+import EyeIcon from '@/assets/icons/eye.svg?react';
+import HomeIcon from '@/assets/icons/home.svg?react';
+import ImageIcon from '@/assets/icons/image.svg?react';
+import InfoIcon from '@/assets/icons/info.svg?react';
+import LayersIcon from '@/assets/icons/layers.svg?react';
+import MenuIcon from '@/assets/icons/menu.svg?react';
+import MinusIcon from '@/assets/icons/minus.svg?react';
+import PauseIcon from '@/assets/icons/pause2.svg?react';
+import PlayIcon from '@/assets/icons/play3.svg?react';
+import PlusIcon from '@/assets/icons/plus.svg?react';
+import RedoIcon from '@/assets/icons/redo.svg?react';
+import SparklesIcon from '@/assets/icons/sparkles.svg?react';
+import SphereIcon from '@/assets/icons/sphere.svg?react';
+import StopIcon from '@/assets/icons/stop2.svg?react';
+import UndoIcon from '@/assets/icons/undo.svg?react';
+import WarningIcon from '@/assets/icons/warning.svg?react';
+import ArrowLeftIcon from '@/assets/icons/arrow-left-filled.svg?react';
+import ArrowRightIcon from '@/assets/icons/arrow-right-filled.svg?react';
 
-interface IconProps {
+const icons = {
+  eye: EyeIcon,
+  sphere: SphereIcon,
+  cog: CogIcon,
+  home: HomeIcon,
+  image: ImageIcon,
+  play: PlayIcon,
+  pause: PauseIcon,
+  stop: StopIcon,
+  undo: UndoIcon,
+  redo: RedoIcon,
+  menu: MenuIcon,
+  'arrow-left': ArrowLeftIcon,
+  'arrow-right': ArrowRightIcon,
+  plus: PlusIcon,
+  minus: MinusIcon,
+  check: CheckIcon,
+  cross: CrossIcon,
+  warning: WarningIcon,
+  info: InfoIcon,
+  download: DownloadIcon,
+  copy: CopyIcon,
+  'chevron-left': ChevronLeftIcon,
+  'chevron-right': ChevronRightIcon,
+  'chevron-down': ChevronDownIcon,
+  sparkles: SparklesIcon,
+  crop: CropIcon,
+  clock: ClockIcon,
+  settings: CogIcon,
+  layers: LayersIcon,
+} as const;
+
+export type IconName = keyof typeof icons;
+
+interface IconProps extends React.SVGProps<SVGSVGElement> {
   name: IconName;
-  className?: string;
   size?: number;
 }
 
-const icons: Record<IconName, React.ReactNode> = {
-  eye: <path d="M8 3c-3.489 0-6.514 2.032-8 5 1.486 2.968 4.511 5 8 5s6.514-2.032 8-5c-1.486-2.968-4.511-5-8-5zM11.945 5.652c0.94 0.6 1.737 1.403 2.335 2.348-0.598 0.946-1.395 1.749-2.335 2.348-1.181 0.753-2.545 1.152-3.944 1.152s-2.763-0.398-3.945-1.152c-0.94-0.6-1.737-1.403-2.335-2.348 0.598-0.946 1.395-1.749 2.335-2.348 0.061-0.039 0.123-0.077 0.185-0.114-0.156 0.427-0.241 0.888-0.241 1.369 0 2.209 1.791 4 4 4s4-1.791 4-4c0-0.481-0.085-0.942-0.241-1.369 0.062 0.037 0.124 0.075 0.185 0.114v0zM8 6.5c0 0.828-0.672 1.5-1.5 1.5s-1.5-0.672-1.5-1.5 0.672-1.5 1.5-1.5 1.5 0.672 1.5 1.5z" />,
-  sphere: <path d="M7.5 1c-4.142 0-7.5 3.358-7.5 7.5s3.358 7.5 7.5 7.5c4.142 0 7.5-3.358 7.5-7.5s-3.358-7.5-7.5-7.5zM11.744 11c0.134-0.632 0.219-1.303 0.246-2h1.991c-0.052 0.691-0.213 1.361-0.479 2h-1.758zM3.256 6c-0.134 0.632-0.219 1.303-0.246 2h-1.991c0.052-0.691 0.213-1.361 0.479-2h1.758zM10.719 6c0.15 0.64 0.241 1.31 0.27 2h-2.989v-2h2.719zM8 5v-2.927c0.228 0.066 0.454 0.178 0.675 0.334 0.415 0.293 0.813 0.744 1.149 1.304 0.233 0.388 0.434 0.819 0.601 1.289h-2.426zM5.176 3.711c0.336-0.561 0.734-1.012 1.149-1.304 0.222-0.156 0.447-0.268 0.675-0.334v2.927h-2.426c0.168-0.47 0.369-0.901 0.601-1.289zM7 6v2h-2.989c0.029-0.69 0.12-1.36 0.27-2h2.719zM1.498 11c-0.266-0.639-0.427-1.309-0.479-2h1.991c0.028 0.697 0.112 1.368 0.246 2h-1.758zM4.011 9h2.989v2h-2.719c-0.15-0.64-0.241-1.31-0.27-2zM7 12v2.927c-0.228-0.066-0.454-0.178-0.675-0.334-0.415-0.293-0.813-0.744-1.149-1.304-0.233-0.388-0.434-0.819-0.602-1.289h2.426zM9.825 13.289c-0.336 0.561-0.734 1.012-1.149 1.304-0.222 0.156-0.447 0.268-0.675 0.334v-2.927h2.426c-0.168 0.47-0.369 0.901-0.602 1.289zM8 11v-2h2.989c-0.029 0.69-0.12 1.36-0.27 2h-2.719zM11.99 8c-0.028-0.697-0.112-1.368-0.246-2h1.758c0.267 0.639 0.427 1.309 0.479 2h-1.991zM12.979 5h-1.498c-0.291-0.918-0.693-1.723-1.177-2.366 0.665 0.318 1.267 0.744 1.792 1.27 0.336 0.336 0.631 0.702 0.883 1.096zM2.904 3.904c0.526-0.526 1.128-0.952 1.792-1.27-0.483 0.643-0.886 1.448-1.177 2.366h-1.498c0.252-0.394 0.547-0.761 0.883-1.096zM2.021 12h1.498c0.291 0.918 0.693 1.723 1.177 2.366-0.665-0.318-1.267-0.744-1.792-1.27-0.336-0.336-0.631-0.702-0.883-1.096zM12.096 13.096c-0.526 0.526-1.128 0.952-1.792 1.27 0.483-0.643 0.886-1.448 1.177-2.366h1.498c-0.252 0.394-0.547 0.761-0.883 1.096z" />,
-  cog: <path d="M14.59 9.535c-0.839-1.454-0.335-3.317 1.127-4.164l-1.572-2.723c-0.449 0.263-0.972 0.414-1.529 0.414-1.68 0-3.042-1.371-3.042-3.062h-3.145c0.004 0.522-0.126 1.051-0.406 1.535-0.839 1.454-2.706 1.948-4.17 1.106l-1.572 2.723c0.453 0.257 0.845 0.634 1.123 1.117 0.838 1.452 0.336 3.311-1.12 4.16l1.572 2.723c0.448-0.261 0.967-0.41 1.522-0.41 1.675 0 3.033 1.362 3.042 3.046h3.145c-0.001-0.517 0.129-1.040 0.406-1.519 0.838-1.452 2.7-1.947 4.163-1.11l1.572-2.723c-0.45-0.257-0.839-0.633-1.116-1.113zM8 11.24c-1.789 0-3.24-1.45-3.24-3.24s1.45-3.24 3.24-3.24c1.789 0 3.24 1.45 3.24 3.24s-1.45 3.24-3.24 3.24z" />,
-  home: <path d="M16 9.226l-8-6.21-8 6.21v-2.532l8-6.21 8 6.21zM14 9v6h-4v-4h-4v4h-4v-6l6-4.5z" />,
-  image: <g><path d="M14.998 2c0.001 0.001 0.001 0.001 0.002 0.002v11.996c-0.001 0.001-0.001 0.001-0.002 0.002h-13.996c-0.001-0.001-0.001-0.001-0.002-0.002v-11.996c0.001-0.001 0.001-0.001 0.002-0.002h13.996zM15 1h-14c-0.55 0-1 0.45-1 1v12c0 0.55 0.45 1 1 1h14c0.55 0 1-0.45 1-1v-12c0-0.55-0.45-1-1-1v0z"></path><path d="M13 4.5c0 0.828-0.672 1.5-1.5 1.5s-1.5-0.672-1.5-1.5 0.672-1.5 1.5-1.5 1.5 0.672 1.5 1.5z"></path><path d="M14 13h-12v-2l3.5-6 4 5h1l3.5-3z"></path></g>,
-  play: <path d="M3 2l10 6-10 6z" />,
-  pause: <path d="M2 2h5v12h-5zM9 2h5v12h-5z" />,
-  stop: <path d="M2 2h12v12h-12z" />,
-  undo: <path d="M8 1c-2.209 0-4.209 0.896-5.657 2.343l-2.343-2.343v6h6l-2.243-2.243c1.086-1.086 2.586-1.757 4.243-1.757 3.314 0 6 2.686 6 6 0 1.792-0.786 3.401-2.032 4.5l1.323 1.5c1.661-1.466 2.709-3.611 2.709-6 0-4.418-3.582-8-8-8z" />,
-  redo: <path d="M0 9c0 2.389 1.048 4.534 2.709 6l1.323-1.5c-1.246-1.099-2.031-2.708-2.031-4.5 0-3.314 2.686-6 6-6 1.657 0 3.157 0.672 4.243 1.757l-2.243 2.243h6v-6l-2.343 2.343c-1.448-1.448-3.448-2.343-5.657-2.343-4.418 0-8 3.582-8 8z" />,
-  menu: <path d="M1 3h14v2h-14zM1 7h14v2h-14zM1 11h14v2h-14z" />,
-  'arrow-left': <path d="M10 2l-6 6 6 6z" />,
-  'arrow-right': <path d="M6 2l6 6-6 6z" />,
-  plus: <path d="M14 7h-6v-6h-2v6h-6v2h6v6h2v-6h6z" />,
-  minus: <path d="M14 7h-12v2h12z" />,
-  check: <path d="M5.5 11.3L2.2 8l-1.2 1.2 4.5 4.5L15 4.2 13.8 3z" />,
-  cross: <path d="M14.53 1.47L13.47 0.41 7.47 6.41 1.47 0.41 0.41 1.47 6.41 7.47 0.41 13.47 1.47 14.53 7.47 8.53 13.47 14.53 14.53 13.47 8.53 7.47z" />,
-  warning: <path d="M8 1L0 15h16L8 1zm0 2.8L13.7 13H2.3L8 3.8zM7 11v2h2v-2H7zm0-5v4h2V6H7z" />,
-  info: <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 12a5 5 0 110-10 5 5 0 010 10zm-1-8h2v2H7V5zm0 3h2v4H7V8z" />,
-  download: <path d="M14 11v2h-12v-2h-2v4h16v-4h-2zM12 6h-3v-6h-2v6h-3l4 5 4-5z" />,
-  copy: <path d="M10 0H2C0.9 0 0 0.9 0 2v10h2V2h8V0zm4 4H6C4.9 4 4 4.9 4 6v10c0 1.1 0.9 2 2 2h8c1.1 0 2-0.9 2-2V6c0-1.1-0.9-2-2-2zm0 12H6V6h8v10z" />,
-  'chevron-left': <path d="M10.5 3L5.5 8L10.5 13" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
-  'chevron-right': <path d="M5.5 3L10.5 8L5.5 13" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
-  'chevron-down': <path d="M3 5.5L8 10.5L13 5.5" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />,
-  sparkles: <path d="M10 1l1.5 3.5L15 6l-3.5 1.5L10 11l-1.5-3.5L5 6l3.5-1.5L10 1zm-5 7l.75 1.75L7.5 10.5l-1.75.75L5 13l-.75-1.75L2.5 10.5l1.75-.75L5 8zm10-7l.5 1.25L16.75 2.75l-1.25.5L15 4.5l-.5-1.25L13.25 2.75l1.25-.5L15 1z" />,
-  crop: <path d="M5 0v2H2v12h12v2h2v-2h2v-2H14V2h-2v10H4V2H2V0h3zm2 4v2h2V4H7z" />,
-  clock: <path d="M8 0C3.58 0 0 3.58 0 8s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm.5-10H7v5l4.25 2.55.75-1.23-3.5-2.08V4z" />,
-  settings: <path d="M14.59 9.535c-0.839-1.454-0.335-3.317 1.127-4.164l-1.572-2.723c-0.449 0.263-0.972 0.414-1.529 0.414-1.68 0-3.042-1.371-3.042-3.062h-3.145c0.004 0.522-0.126 1.051-0.406 1.535-0.839 1.454-2.706 1.948-4.17 1.106l-1.572 2.723c0.453 0.257 0.845 0.634 1.123 1.117 0.838 1.452 0.336 3.311-1.12 4.16l1.572 2.723c0.448-0.261 0.967-0.41 1.522-0.41 1.675 0 3.033 1.362 3.042 3.046h3.145c-0.001-0.517 0.129-1.040 0.406-1.519 0.838-1.452 2.7-1.947 4.163-1.11l1.572-2.723c-0.45-0.257-0.839-0.633-1.116-1.113zM8 11.24c-1.789 0-3.24-1.45-3.24-3.24s1.45-3.24 3.24-3.24c1.789 0 3.24 1.45 3.24 3.24s-1.45 3.24-3.24 3.24z" />,
-  layers: <path d="M8 0L0 4l8 4 8-4-8-4zM0 8l8 4 8-4M0 12l8 4 8-4" stroke="currentColor" fill="none" strokeWidth="1.5" strokeLinejoin="round" />
-};
-
-export const Icon: React.FC<IconProps> = ({ name, className = "", size = 16 }) => {
+export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16, ...props }) => {
+  const IconComponent = icons[name];
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 16 16" 
-      className={`fill-current ${className}`}
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {icons[name]}
-    </svg>
+    <IconComponent
+      width={size}
+      height={size}
+      className={className}
+      {...props}
+    />
   );
 };

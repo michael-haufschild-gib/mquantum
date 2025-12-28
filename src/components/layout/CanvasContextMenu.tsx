@@ -81,7 +81,7 @@ export const CanvasContextMenu: React.FC = () => {
         >
           {items.map((item, index) => {
             if (item.type === 'separator') {
-              return <div key={index} className="h-[1px] bg-white/10 my-1 mx-2" />;
+              return <div key={index} className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2" />;
             }
             return (
               <button
@@ -90,7 +90,7 @@ export const CanvasContextMenu: React.FC = () => {
                     if (item.action) item.action();
                     closeDropdown(DROPDOWN_ID);
                 }}
-                className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-white/10 flex justify-between items-center transition-colors group"
+                className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group"
               >
                 <span>{item.label}</span>
                 {item.shortcut && <span className="text-[9px] font-mono text-text-tertiary group-hover:text-text-secondary">{item.shortcut}</span>}

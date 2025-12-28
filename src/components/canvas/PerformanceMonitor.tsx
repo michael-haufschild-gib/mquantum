@@ -68,9 +68,9 @@ function formatBytes(bytes: number, decimals = 1): string {
 }
 
 function getHealthColor(fps: number, high: number, low: number) {
-  if (fps >= high) return { text: 'text-emerald-400', bg: 'bg-emerald-500', bgPulse: 'bg-emerald-400', stroke: '#34d399' };
-  if (fps >= low) return { text: 'text-amber-400', bg: 'bg-amber-500', bgPulse: 'bg-amber-400', stroke: '#fbbf24' };
-  return { text: 'text-rose-500', bg: 'bg-rose-500', bgPulse: 'bg-rose-400', stroke: '#f43f5e' };
+  if (fps >= high) return { text: 'health-high', bg: 'bg-health-high', bgPulse: 'bg-health-high', stroke: 'var(--health-high-stroke)' };
+  if (fps >= low) return { text: 'health-medium', bg: 'bg-health-medium', bgPulse: 'bg-health-medium', stroke: 'var(--health-medium-stroke)' };
+  return { text: 'health-low', bg: 'bg-health-low', bgPulse: 'bg-health-low', stroke: 'var(--health-low-stroke)' };
 }
 
 function formatShaderName(key: string, objectType: string): string {
@@ -87,9 +87,9 @@ function formatShaderName(key: string, objectType: string): string {
 // --- Color helper for collapsed view ---
 type FpsColorLevel = 'high' | 'medium' | 'low';
 const FPS_COLORS = {
-  high: { text: 'text-emerald-400', bg: 'bg-emerald-500', stroke: '#34d399' },
-  medium: { text: 'text-amber-400', bg: 'bg-amber-500', stroke: '#fbbf24' },
-  low: { text: 'text-rose-500', bg: 'bg-rose-500', stroke: '#f43f5e' },
+  high: { text: 'health-high', bg: 'bg-health-high', stroke: 'var(--health-high-stroke)' },
+  medium: { text: 'health-medium', bg: 'bg-health-medium', stroke: 'var(--health-medium-stroke)' },
+  low: { text: 'health-low', bg: 'bg-health-low', stroke: 'var(--health-low-stroke)' },
 } as const;
 
 function getFpsColorLevel(fps: number): FpsColorLevel {
@@ -231,11 +231,11 @@ const CollapsedView = React.memo(function CollapsedView() {
           <span ref={fpsContainerRef} className={`text-lg font-bold font-mono leading-none ${initialColor.text}`}>
             <span ref={fpsRef}>{initialState.fps}</span>
           </span>
-          <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">FPS</span>
+          <span className="text-[9px] uppercase tracking-wider text-text-tertiary font-bold">FPS</span>
         </div>
       </div>
 
-      <div className="w-px h-6 bg-white/10" />
+      <div className="w-px h-6 bg-[var(--bg-active)]" />
 
       <div className="w-16 h-6 flex items-center">
         <svg width={64} height={20} className="overflow-visible">
@@ -253,10 +253,10 @@ const CollapsedView = React.memo(function CollapsedView() {
       </div>
 
       <div className="flex flex-col items-end min-w-[32px]">
-        <span className="text-[10px] font-mono text-zinc-300">
+        <span className="text-[10px] font-mono text-text-secondary">
           <span ref={frameTimeRef}>{initialState.frameTime.toFixed(1)}</span>
         </span>
-        <span className="text-[8px] text-zinc-500">ms</span>
+        <span className="text-[8px] text-text-tertiary">ms</span>
       </div>
     </div>
   );
@@ -403,7 +403,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
     <div className="space-y-5 p-5">
       <div className="space-y-3">
         <SectionHeader icon={<Icons.Chip />} label="GPU Info" />
-        <div className="p-3 bg-white/5 rounded-lg border border-white/5 text-xs text-zinc-300 font-mono leading-relaxed">
+        <div className="p-3 bg-[var(--bg-hover)] rounded-lg border border-border-subtle text-xs text-text-secondary font-mono leading-relaxed">
           {gpuName}
         </div>
       </div>
@@ -416,10 +416,10 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
       </div>
       <div className="space-y-3">
         <SectionHeader icon={<Icons.Database />} label="VRAM Estimation" />
-        <div className="bg-white/5 rounded-lg p-3 space-y-3 border border-white/5">
+        <div className="bg-[var(--bg-hover)] rounded-lg p-3 space-y-3 border border-border-subtle">
           <div className="flex justify-between items-baseline">
-            <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Total</span>
-            <span className="text-sm font-bold font-mono text-zinc-200">{formatBytes(vram.total)}</span>
+            <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Total</span>
+            <span className="text-sm font-bold font-mono text-text-primary">{formatBytes(vram.total)}</span>
           </div>
           <div className="space-y-2">
             <ProgressBar label="Geometry" value={vram.geometries} total={vram.total} color="bg-indigo-500" />
@@ -433,7 +433,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
   const ShaderContent = (
     <div className="space-y-5 p-5">
       {Object.keys(shaderDebugInfos).length === 0 ? (
-        <div className="text-center text-zinc-500 py-8 text-xs">No shader data available</div>
+        <div className="text-center text-text-tertiary py-8 text-xs">No shader data available</div>
       ) : (
         <>
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
@@ -445,7 +445,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
                   flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-all border
                   ${selectedShaderKey === key
                     ? 'bg-accent/20 text-accent border-accent/30'
-                    : 'bg-white/5 text-zinc-500 border-white/5 hover:bg-white/10 hover:text-zinc-300'
+                    : 'bg-[var(--bg-hover)] text-text-tertiary border-border-subtle hover:bg-[var(--bg-active)] hover:text-text-secondary'
                   }
                 `}
               >
@@ -466,7 +466,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
                 <SectionHeader icon={<Icons.Zap />} label="Features" />
                 <div className="flex flex-wrap gap-2">
                   {activeShaderInfo.features.map(f => (
-                    <span key={f} className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded text-[9px] font-mono uppercase tracking-wide">
+                    <span key={f} className="px-2 py-1 bg-success border border-success-border text-success rounded text-[9px] font-mono uppercase tracking-wide">
                       {f}
                     </span>
                   ))}
@@ -474,12 +474,12 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
               </div>
               <div className="space-y-3">
                 <SectionHeader icon={<Icons.Database />} label="Modules" />
-                <div className="border border-white/5 rounded-lg overflow-hidden">
+                <div className="border border-border-subtle rounded-lg overflow-hidden">
                   {activeShaderInfo.activeModules.map((mod, i) => {
                     const isEnabled = !shaderOverrides.includes(mod);
                     return (
-                      <div key={i} className="flex items-center justify-between p-2 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors">
-                        <span className={`text-[10px] font-mono ${isEnabled ? 'text-zinc-300' : 'text-zinc-600 line-through'}`}>{mod}</span>
+                      <div key={i} className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] border-b border-border-subtle last:border-0 transition-colors">
+                        <span className={`text-[10px] font-mono ${isEnabled ? 'text-text-secondary' : 'text-text-tertiary line-through'}`}>{mod}</span>
                         <Switch
                           checked={isEnabled}
                           onCheckedChange={() => toggleShaderModule(mod)}
@@ -501,12 +501,12 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
     <div className="space-y-5 p-5">
       <div className="flex items-center justify-between">
         <SectionHeader icon={<Icons.Square />} label="Render Targets" />
-        <button onClick={refreshBufferStats} className="text-zinc-500 hover:text-white transition-colors">
+        <button onClick={refreshBufferStats} className="text-text-tertiary hover:text-text-primary transition-colors">
           <Icons.RefreshCw className="w-3 h-3" />
         </button>
       </div>
       {!bufferStats ? (
-        <div className="text-center text-zinc-500 py-4 text-xs">Loading...</div>
+        <div className="text-center text-text-tertiary py-4 text-xs">Loading...</div>
       ) : (
         <div className="space-y-2">
           <BufferRow label="Screen" w={bufferStats.screen.width} h={bufferStats.screen.height} baseW={bufferStats.screen.width} />
@@ -515,7 +515,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
           <BufferRow label="Temporal" w={bufferStats.temporal.width} h={bufferStats.temporal.height} baseW={bufferStats.screen.width} highlight={bufferStats.temporal.width !== bufferStats.screen.width * 0.5} />
         </div>
       )}
-      <div className="space-y-3 pt-3 border-t border-white/5">
+      <div className="space-y-3 pt-3 border-t border-border-subtle">
         <SectionHeader icon={<Icons.Monitor />} label="Debug View" />
         <div className="grid grid-cols-3 gap-2">
           <DebugToggle label="Depth" active={showDepthBuffer} onClick={() => setShowDepthBuffer(!showDepthBuffer)} />
@@ -529,7 +529,7 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
         </div>
       </div>
       {isDevelopment && (
-        <div className="space-y-3 pt-3 border-t border-white/5">
+        <div className="space-y-3 pt-3 border-t border-border-subtle">
           <SectionHeader icon={<Icons.AlertTriangle />} label="Debug Tools" />
           <div className="space-y-2">
             <button
@@ -539,19 +539,19 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
                 w-full px-3 py-2 text-[10px] font-bold uppercase tracking-wider rounded-md border transition-all
                 flex items-center justify-center gap-2
                 ${contextStatus !== 'active'
-                  ? 'bg-zinc-800/50 text-zinc-600 border-zinc-700/50 cursor-not-allowed'
-                  : 'bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20 hover:border-rose-500/50'
+                  ? 'bg-surface text-text-tertiary border-border-subtle cursor-not-allowed'
+                  : 'bg-danger text-danger border-danger-border hover:bg-danger/80 hover:border-danger'
                 }
               `}
             >
               <Icons.AlertTriangle className="w-3 h-3" />
               Simulate Context Loss
             </button>
-            <div className="text-[9px] text-zinc-600 text-center">
+            <div className="text-[9px] text-text-tertiary text-center">
               Status: <span className={
-                contextStatus === 'active' ? 'text-emerald-400' :
-                  contextStatus === 'restoring' ? 'text-amber-400' :
-                    contextStatus === 'failed' ? 'text-rose-400' : 'text-zinc-400'
+                contextStatus === 'active' ? 'text-success' :
+                  contextStatus === 'restoring' ? 'text-warning' :
+                    contextStatus === 'failed' ? 'text-danger' : 'text-text-tertiary'
               }>{contextStatus}</span>
             </div>
           </div>
@@ -565,32 +565,32 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
       {/* Header */}
       <div
         onClick={() => { if (!didDrag) onCollapse(); }}
-        className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-white/[0.02] cursor-pointer hover:bg-white/[0.04] transition-colors"
+        className="flex items-center justify-between px-5 py-4 border-b border-border-subtle bg-[var(--bg-hover)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors"
       >
         <div className="flex items-center gap-3">
-          <Icons.Activity className="w-4 h-4 text-zinc-400" />
-          <span className="text-xs font-bold uppercase tracking-widest text-zinc-300">System Monitor</span>
+          <Icons.Activity className="w-4 h-4 text-text-tertiary" />
+          <span className="text-xs font-bold uppercase tracking-widest text-text-secondary">System Monitor</span>
         </div>
-        <div className="p-1.5 -mr-1.5 rounded-full text-zinc-500">
+        <div className="p-1.5 -mr-1.5 rounded-full text-text-tertiary">
           <Icons.Minimize className="w-4 h-4" />
         </div>
       </div>
 
       {/* Main Graph Area */}
-      <div className="px-5 py-5 space-y-4 bg-gradient-to-b from-black/20 to-transparent">
+      <div className="px-5 py-5 space-y-4 bg-gradient-to-b from-[var(--bg-hover)] to-transparent">
         <div className="flex justify-between items-end mb-2">
           <div>
             <div className={`text-4xl font-bold font-mono tracking-tighter ${fpsColor.text}`}>
               {fps}
-              <span className="text-sm text-zinc-500 ml-2 font-sans tracking-normal font-medium">FPS</span>
+              <span className="text-sm text-text-tertiary ml-2 font-sans tracking-normal font-medium">FPS</span>
             </div>
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1 font-medium">
+            <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
               Min {minFps} • Max {maxFps}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-lg font-mono text-zinc-300">{frameTime.toFixed(1)}<span className="text-xs text-zinc-600 ml-1">ms</span></div>
-            <div className="text-[10px] text-zinc-500 uppercase tracking-wider mt-1 font-medium">Frame Time</div>
+            <div className="text-lg font-mono text-text-secondary">{frameTime.toFixed(1)}<span className="text-xs text-text-tertiary ml-1">ms</span></div>
+            <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">Frame Time</div>
           </div>
         </div>
 
@@ -604,15 +604,15 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
             maxY={80}
           />
           <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-            <div className="w-full border-t border-dashed border-zinc-500/50"></div>
-            <div className="w-full border-t border-dashed border-zinc-500/50"></div>
-            <div className="w-full border-t border-dashed border-zinc-500/50"></div>
+            <div className="w-full border-t border-dashed border-border-subtle"></div>
+            <div className="w-full border-t border-dashed border-border-subtle"></div>
+            <div className="w-full border-t border-dashed border-border-subtle"></div>
           </div>
         </div>
       </div>
 
       {/* Content Tabs */}
-      <div className="border-t border-white/5 h-[340px] flex flex-col">
+      <div className="border-t border-border-subtle h-[340px] flex flex-col">
         <Tabs
           variant="minimal"
           fullWidth
@@ -624,7 +624,8 @@ const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDra
             { id: 'shader', label: 'Shader', content: ShaderContent },
             { id: 'buffers', label: 'Buffers', content: BuffersContent }
           ]}
-          className="h-full border-b border-white/5 text-[10px]"
+          className="h-full border-b border-border-subtle text-[10px]"
+
           contentClassName="h-full"
         />
       </div>
@@ -748,10 +749,9 @@ export function PerformanceMonitor() {
           <div
             className="
               relative overflow-hidden rounded-full
-              backdrop-blur-xl border border-white/10
-              shadow-[0_8px_32px_-4px_rgba(0,0,0,0.5)]
-              bg-zinc-950/60 hover:bg-zinc-950/80 cursor-pointer
-              transition-colors duration-300
+              glass-panel hover:brightness-110 cursor-pointer
+              shadow-[var(--shadow-hard)]
+              transition-all duration-300
             "
           >
             <CollapsedView />
@@ -770,9 +770,8 @@ export function PerformanceMonitor() {
               className="
                 flex flex-col w-[360px]
                 relative overflow-hidden rounded-2xl
-                backdrop-blur-xl border border-white/10
-                shadow-[0_8px_32px_-4px_rgba(0,0,0,0.5)]
-                bg-zinc-950/90
+                glass-panel
+                shadow-[var(--shadow-hard)]
               "
             >
               <ExpandedContent onCollapse={() => setExpanded(false)} didDrag={didDrag} />
@@ -789,37 +788,37 @@ export function PerformanceMonitor() {
 // ============================================================================
 
 const SectionHeader = ({ icon, label }: { icon: React.ReactNode, label: string }) => (
-  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+  <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-text-tertiary">
     <span className="opacity-70">{icon}</span>
     <span>{label}</span>
   </div>
 );
 
 const InfoCard = ({ label, value, highlight = false }: { label: string, value: string | number, highlight?: boolean }) => (
-  <div className="bg-white/5 rounded-md p-2 border border-white/5">
-    <div className="text-[9px] text-zinc-500 uppercase tracking-wider mb-0.5">{label}</div>
-    <div className={`font-mono text-xs ${highlight ? 'text-accent font-bold' : 'text-zinc-200'}`}>{value}</div>
+  <div className="bg-[var(--bg-hover)] rounded-md p-2 border border-[var(--border-subtle)]">
+    <div className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider mb-0.5">{label}</div>
+    <div className={`font-mono text-xs ${highlight ? 'text-accent font-bold' : 'text-[var(--text-secondary)]'}`}>{value}</div>
   </div>
 );
 
 const ProgressBar = ({ label, value, total, color }: { label: string, value: number, total: number, color: string }) => (
   <div>
-    <div className="flex justify-between text-[9px] text-zinc-500 mb-1">
+    <div className="flex justify-between text-[9px] text-[var(--text-tertiary)] mb-1">
       <span>{label}</span>
       <span>{formatBytes(value)}</span>
     </div>
-    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+    <div className="h-1 bg-[var(--bg-hover)] rounded-full overflow-hidden">
       <div className={`h-full ${color}`} style={{ width: `${total > 0 ? (value / total) * 100 : 0}%` }} />
     </div>
   </div>
 );
 
 const BufferRow = ({ label, w, h, baseW, highlight }: { label: string, w: number, h: number, baseW: number, highlight?: boolean }) => (
-  <div className={`flex items-center justify-between p-2 rounded-md border ${highlight ? 'bg-amber-500/10 border-amber-500/20' : 'bg-white/5 border-white/5'}`}>
-    <span className="text-[10px] text-zinc-300 font-medium">{label}</span>
+  <div className={`flex items-center justify-between p-2 rounded-md border ${highlight ? 'bg-warning border-warning-border' : 'bg-[var(--bg-hover)] border-[var(--border-subtle)]'}`}>
+    <span className="text-[10px] text-[var(--text-secondary)] font-medium">{label}</span>
     <div className="flex items-center gap-3">
-      <span className="text-[10px] font-mono text-zinc-400">{w}×{h}</span>
-      <span className="text-[9px] font-mono text-zinc-600 w-8 text-right">
+      <span className="text-[10px] font-mono text-[var(--text-tertiary)]">{w}×{h}</span>
+      <span className="text-[9px] font-mono text-[var(--text-tertiary)] w-8 text-right">
         {baseW > 0 ? (w / baseW).toFixed(2) : '-'}x
       </span>
     </div>
@@ -831,10 +830,10 @@ const DebugToggle = ({ label, active, onClick, disabled = false }: { label: stri
     onClick={disabled ? undefined : onClick}
     disabled={disabled}
     className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider rounded-md border transition-all ${disabled
-      ? 'bg-zinc-800/50 text-zinc-600 border-zinc-700/50 cursor-not-allowed opacity-50'
+      ? 'bg-surface text-text-tertiary border-border-subtle cursor-not-allowed opacity-50'
       : active
-        ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_-2px_rgba(var(--accent-rgb),0.3)]'
-        : 'bg-white/5 text-zinc-400 border-white/5 hover:bg-white/10 hover:text-zinc-200'
+        ? 'bg-accent/20 text-accent border-accent/50 glow-accent-sm'
+        : 'bg-[var(--bg-hover)] text-text-tertiary border-border-subtle hover:bg-[var(--bg-active)] hover:text-text-primary'
       }`}
   >
     {label}

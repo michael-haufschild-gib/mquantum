@@ -215,9 +215,9 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
         onOpenChange={handleOpenChange}
         offset={8}
         trigger={
-          <div className={`flex items-center gap-2 group p-1 rounded-md hover:bg-white/5 transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className={`flex items-center gap-2 group p-1 rounded-md hover:bg-[var(--bg-hover)] transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Trigger Swatch */}
-            <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-white/10 group-hover:ring-white/30 transition-all">
+            <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-all">
               <div className="absolute inset-0 z-0" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />
               <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
             </div>
@@ -231,7 +231,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
           <div className="w-[260px] p-3 flex flex-col gap-3 select-none text-text-primary">
             {/* 1. Header: Compare + Actions */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 bg-black/20 rounded-full p-0.5 border border-white/5">
+              <div className="flex items-center gap-2 bg-[var(--bg-hover)] rounded-full p-0.5 border border-border-subtle">
                 {/* Compare Swatch */}
                 <div className="relative w-12 h-6 rounded-full overflow-hidden flex cursor-help" title="Original vs New">
                    <div className="absolute inset-0 -z-10" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />
@@ -243,12 +243,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               <div className="flex items-center gap-1">
                 {/* EyeDropper */}
                 {typeof window !== 'undefined' && 'EyeDropper' in window && (
-                  <button onClick={handleEyedropper} className="p-1.5 rounded hover:bg-white/10 text-text-tertiary hover:text-white transition-colors" title="Pick color">
+                  <button onClick={handleEyedropper} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors" title="Pick color">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 22l5-5 5-5 5 5-5 5-5-5z"/><path d="M17 7l-5 5"/><path d="M14 2l8 8"/></svg>
                   </button>
                 )}
                 {/* Copy */}
-                <button onClick={handleCopy} className="p-1.5 rounded hover:bg-white/10 text-text-tertiary hover:text-white transition-colors" title="Copy to clipboard">
+                <button onClick={handleCopy} className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors" title="Copy to clipboard">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                 </button>
               </div>
@@ -257,7 +257,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             {/* 2. Main Saturation/Value Area */}
             <div 
               ref={svRef}
-              className="w-full h-[160px] rounded-lg relative cursor-crosshair overflow-hidden shadow-lg ring-1 ring-white/10 group"
+              className="w-full h-[160px] rounded-lg relative cursor-crosshair overflow-hidden shadow-lg ring-1 ring-border-default group"
               onMouseDown={(e) => { e.preventDefault(); setIsDraggingSV(true); updateSV(e.clientX, e.clientY); }}
               style={{ backgroundColor: `hsl(${hsv.h * 360}, 100%, 50%)` }}
             >
@@ -267,12 +267,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               <div className="absolute inset-0 mix-blend-overlay opacity-30 pointer-events-none" style={{ backgroundImage: noiseBg }} />
               
               {/* Cursor */}
-              <div 
-                className="absolute w-4 h-4 rounded-full shadow-xl border-2 border-white pointer-events-none -translate-x-1/2 -translate-y-1/2 transform transition-transform duration-75 ease-out group-active:scale-75"
-                style={{ 
-                  left: `${hsv.s * 100}%`, 
-                  top: `${(1 - hsv.v) * 100}%`,
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
+              <div
+                className="absolute w-4 h-4 rounded-full shadow-lg border-2 border-text-primary pointer-events-none -translate-x-1/2 -translate-y-1/2 transform transition-transform duration-75 ease-out group-active:scale-75"
+                style={{
+                  left: `${hsv.s * 100}%`,
+                  top: `${(1 - hsv.v) * 100}%`
                 }}
               />
             </div>
@@ -280,7 +279,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             {/* 3. Sliders (Hue + Alpha) */}
             <div className="space-y-3">
               {/* Hue */}
-              <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-white/10 cursor-pointer group">
+              <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-border-default cursor-pointer group">
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)' }} />
                 <input 
                   type="range" min={0} max={1} step={0.001} value={hsv.h}
@@ -292,7 +291,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
               {/* Alpha (Hidden if disabled) */}
               {!disableAlpha && (
-                <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-white/10 cursor-pointer group">
+                <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-border-default cursor-pointer group">
                   <div className="absolute inset-0 z-0" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />
                   <div className="absolute inset-0 z-1" style={{ background: `linear-gradient(to right, transparent, ${hsvToHex(hsv.h, hsv.s, hsv.v)})` }} />
                   <input 
@@ -306,14 +305,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             </div>
 
             {/* 4. Inputs */}
-            <div className="flex flex-col gap-2 bg-black/20 p-2 rounded-lg border border-white/5">
+            <div className="flex flex-col gap-2 bg-[var(--bg-hover)] p-2 rounded-lg border border-border-subtle">
               <div className="flex items-center gap-2 mb-1">
                 {/* Mode Tabs */}
-                <div className="flex bg-black/30 rounded p-0.5">
+                <div className="flex bg-[var(--bg-active)] rounded p-0.5">
                   {(['HEX', 'RGB'] as const).map(m => (
                     <button
                       key={m} onClick={() => setMode(m)}
-                      className={`px-2 py-0.5 text-[9px] font-bold rounded-sm transition-all ${mode === m ? 'bg-white/20 text-white shadow-sm' : 'text-text-tertiary hover:text-text-secondary'}`}
+                      className={`px-2 py-0.5 text-[9px] font-bold rounded-sm transition-all ${mode === m ? 'bg-[var(--bg-active)] text-text-primary shadow-sm' : 'text-text-tertiary hover:text-text-secondary'}`}
                     >
                       {m}
                     </button>
@@ -323,7 +322,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
 
               {mode === 'HEX' && (
                 <div className="flex gap-2">
-                  <div className="flex-1 bg-black/20 border border-white/10 rounded px-2 py-1 flex items-center gap-2 group-focus-within:border-accent/50 transition-colors">
+                  <div className="flex-1 bg-[var(--bg-hover)] border border-border-default rounded px-2 py-1 flex items-center gap-2 group-focus-within:border-accent/50 transition-colors">
                     <span className="text-[10px] text-text-tertiary font-mono select-none">#</span>
                     <input
                       type="text"
@@ -340,7 +339,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                     />
                   </div>
                   {!disableAlpha && (
-                    <div className="w-14 bg-black/20 border border-white/10 rounded px-1 py-1 flex items-center gap-1 group-focus-within:border-accent/50 transition-colors">
+                    <div className="w-14 bg-[var(--bg-hover)] border border-border-default rounded px-1 py-1 flex items-center gap-1 group-focus-within:border-accent/50 transition-colors">
                       <span className="text-[9px] text-text-tertiary font-bold">%</span>
                       <input
                           type="number" min={0} max={100}
@@ -356,7 +355,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               {mode === 'RGB' && (
                 <div className="flex gap-1.5">
                   {(['r', 'g', 'b'] as const).map(c => (
-                    <div key={c} className="flex-1 bg-black/20 border border-white/10 rounded px-1 py-1 flex items-center gap-1">
+                    <div key={c} className="flex-1 bg-[var(--bg-hover)] border border-border-default rounded px-1 py-1 flex items-center gap-1">
                       <span className="text-[9px] text-text-tertiary uppercase font-bold">{c}</span>
                       <input
                         type="number" min={0} max={255}
@@ -383,7 +382,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                   <button
                     key={i}
                     onClick={() => handleHsvChange(parseColorToHsv(c))}
-                    className="w-6 h-6 rounded-md border border-white/5 hover:scale-110 hover:border-white/40 transition-all shadow-sm"
+                    className="w-6 h-6 rounded-md border border-border-subtle hover:scale-110 hover:border-border-strong transition-all shadow-sm"
                     style={{ backgroundColor: c }}
                     title={c}
                   />
@@ -392,12 +391,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               
               {/* History */}
               {history.length > 0 && (
-                <div className="flex gap-1.5 flex-wrap pt-2 border-t border-white/5">
+                <div className="flex gap-1.5 flex-wrap pt-2 border-t border-border-subtle">
                   {history.map((c, i) => (
                     <button
                       key={i}
                       onClick={() => handleHsvChange(parseColorToHsv(c))}
-                      className="w-5 h-5 rounded-full border border-white/10 hover:scale-110 hover:border-white/50 transition-all shadow-sm relative overflow-hidden"
+                      className="w-5 h-5 rounded-full border border-border-default hover:scale-110 hover:border-border-strong transition-all shadow-sm relative overflow-hidden"
                       title="History"
                     >
                         <div className="absolute inset-0 -z-10" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />

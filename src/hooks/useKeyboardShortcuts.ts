@@ -4,6 +4,8 @@
  */
 
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
+import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
+import { useCameraStore } from '@/stores/cameraStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import { useLightingStore } from '@/stores/lightingStore'
@@ -25,6 +27,11 @@ export interface UseKeyboardShortcutsOptions {
 
 /** Shortcut configuration for display (grouped by category) */
 export const SHORTCUTS: Omit<ShortcutConfig, 'action'>[] = [
+  // UI Navigation
+  { key: 'k', ctrl: true, description: 'Open command palette' },
+  { key: '?', description: 'Show keyboard shortcuts' },
+  { key: '\\', description: 'Toggle right sidebar' },
+  { key: '\\', shift: true, description: 'Toggle left sidebar' },
   // Camera Movement
   { key: 'w', description: 'Move camera forward' },
   { key: 'a', description: 'Strafe camera left' },
@@ -35,9 +42,10 @@ export const SHORTCUTS: Omit<ShortcutConfig, 'action'>[] = [
   { key: 'a', shift: true, description: 'Rotate camera left' },
   { key: 's', shift: true, description: 'Rotate camera down' },
   { key: 'd', shift: true, description: 'Rotate camera right' },
-  // Camera Origin
+  // Camera Origin & Reset
   { key: '0', description: 'Move camera to origin' },
   { key: '0', shift: true, description: 'Look at origin' },
+  { key: 'r', description: 'Reset camera view' },
   // Geometry
   { key: 'ArrowUp', description: 'Increase dimension' },
   { key: 'ArrowDown', description: 'Decrease dimension' },
@@ -69,6 +77,12 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
   const setObjectType = useGeometryStore((state) => state.setObjectType)
 
   const toggleCinematicMode = useLayoutStore((state) => state.toggleCinematicMode)
+  const toggleCollapsed = useLayoutStore((state) => state.toggleCollapsed)
+  const toggleLeftPanel = useLayoutStore((state) => state.toggleLeftPanel)
+  const toggleShortcuts = useLayoutStore((state) => state.toggleShortcuts)
+
+  // Camera reset
+  const resetCamera = useCameraStore((state) => state.reset)
 
   // Light-related state and actions
   const selectedLightId = useLightingStore((state) => state.selectedLightId)
@@ -144,6 +158,35 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         return
       }
 
+      // Toggle right sidebar: \
+      if (!isCtrlOrMeta && !shiftKey && key === '\\') {
+        event.preventDefault()
+        toggleCollapsed()
+        return
+      }
+
+      // Toggle left sidebar: Shift+\
+      if (!isCtrlOrMeta && shiftKey && key === '|') {
+        // Shift+\ produces '|' on most keyboards
+        event.preventDefault()
+        toggleLeftPanel()
+        return
+      }
+
+      // Reset camera: R (only when no light is selected)
+      if (!isCtrlOrMeta && !shiftKey && lowerKey === 'r' && !selectedLightId) {
+        event.preventDefault()
+        resetCamera()
+        return
+      }
+
+      // Show shortcuts: ? (Shift+/ on most keyboards)
+      if (!isCtrlOrMeta && key === '?') {
+        event.preventDefault()
+        toggleShortcuts()
+        return
+      }
+
       // 2. Simple Key Map (Modifiers ignored/allowed as per original implementation)
       // Note: Original implementation allowed modifiers for Arrows and Numbers
       const globalKeyMap: Record<string, () => void> = {
@@ -176,6 +219,10 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       removeLight,
       duplicateLight,
       toggleCinematicMode,
+      toggleCollapsed,
+      toggleLeftPanel,
+      toggleShortcuts,
+      resetCamera,
     ]
   )
 
@@ -193,22 +240,21 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
 
 /**
  * Get a human-readable label for a keyboard shortcut
+ * Uses platform-specific symbols (⌘/⇧/⌥ on Mac, Ctrl/Shift/Alt on Windows/Linux)
  * @param shortcut - The shortcut configuration
- * @returns Human-readable shortcut label (e.g., "Ctrl + Shift + A")
+ * @returns Human-readable shortcut label (e.g., "⌘ ⇧ A" on Mac, "Ctrl + Shift + A" on Windows)
  */
 export function getShortcutLabel(shortcut: Omit<ShortcutConfig, 'action'>): string {
+  const modifiers = getModifierSymbols()
   const parts: string[] = []
-  if (shortcut.ctrl) parts.push('Ctrl')
-  if (shortcut.shift) parts.push('Shift')
-  if (shortcut.alt) parts.push('Alt')
 
-  let keyLabel = shortcut.key
-  if (shortcut.key === ' ') keyLabel = 'Space'
-  if (shortcut.key === 'ArrowUp') keyLabel = '↑'
-  if (shortcut.key === 'ArrowDown') keyLabel = '↓'
-  if (shortcut.key === '+') keyLabel = '+'
-  if (shortcut.key === '-') keyLabel = '-'
+  if (shortcut.ctrl) parts.push(modifiers.ctrl)
+  if (shortcut.shift) parts.push(modifiers.shift)
+  if (shortcut.alt) parts.push(modifiers.alt)
 
-  parts.push(keyLabel)
-  return parts.join(' + ')
+  // Get platform-specific key label
+  const keyLabel = getPlatformKeyLabel(shortcut.key)
+  parts.push(keyLabel.toUpperCase())
+
+  return parts.join(' ')
 }

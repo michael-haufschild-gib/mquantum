@@ -6,8 +6,8 @@
  * - SSR (Screen-Space Reflections): Real-time reflections of scene objects
  */
 
-import { Section } from '@/components/sections/Section';
 import { SSRControls } from '@/components/sections/PostProcessing/SSRControls';
+import { Section } from '@/components/sections/Section';
 import { Select, type SelectOption } from '@/components/ui/Select';
 import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
@@ -69,7 +69,7 @@ export const ReflectionsSection: React.FC<ReflectionsSectionProps> = ({
       content: (
         <div className="space-y-4">
           {/* Info box */}
-          <div className="px-2 py-1.5 rounded bg-white/5 border border-white/10">
+          <div className="px-2 py-1.5 rounded bg-[var(--bg-hover)] border border-border-default">
             <p className="text-[10px] font-medium text-text-primary">
               Environment Reflections
             </p>
@@ -110,7 +110,7 @@ export const ReflectionsSection: React.FC<ReflectionsSectionProps> = ({
       content: (
         <div className="space-y-4">
           {/* Info box */}
-          <div className="px-2 py-1.5 rounded bg-white/5 border border-white/10">
+          <div className="px-2 py-1.5 rounded bg-[var(--bg-hover)] border border-border-default">
             <p className="text-[10px] font-medium text-text-primary">
               Screen-Space Reflections
             </p>
@@ -143,6 +143,7 @@ export const ReflectionsSection: React.FC<ReflectionsSectionProps> = ({
         onChange={setActiveTab}
         tabs={tabs}
         variant="default"
+        tabListClassName="mb-4"
       />
     </Section>
   );

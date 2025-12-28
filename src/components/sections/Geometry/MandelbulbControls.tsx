@@ -136,7 +136,7 @@ const MandelbulbControlsComponent: React.FC<MandelbulbControlsProps> = ({
             </div>
 
             {/* Alternate Power (Technique B) */}
-            <div className="space-y-3 pt-3 mt-3 border-t border-white/5">
+            <div className="space-y-3 pt-3 mt-3 border-t border-border-subtle">
               <div className="flex items-center justify-between">
                 <label className="text-xs text-text-secondary font-semibold">Alternate Power</label>
                 <ToggleButton
@@ -150,7 +150,7 @@ const MandelbulbControlsComponent: React.FC<MandelbulbControlsProps> = ({
                 </ToggleButton>
               </div>
               {config.alternatePowerEnabled && (
-                <div className="space-y-3 pl-2 border-l border-white/10">
+                <div className="space-y-3 pl-2 border-l border-border-default">
                   <Slider
                     label="Power 2"
                     min={2}
@@ -207,7 +207,7 @@ const MandelbulbControlsComponent: React.FC<MandelbulbControlsProps> = ({
         )}
 
       {/* Render Mode Info */}
-      <div className="px-4 py-2 text-xs text-text-secondary border-t border-white/5">
+      <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
         <p>Rendering: GPU Ray Marching</p>
       </div>
     </div>

@@ -73,8 +73,8 @@ export const Button: React.FC<ButtonProps> = ({
   const variantStyles = {
     primary: 'glass-button-primary text-white',
     secondary: 'glass-button text-text-primary',
-    ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-white/5 border border-transparent hover:border-white/5',
-    danger: 'bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+    ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-[var(--bg-hover)] border border-transparent hover:border-[var(--bg-hover)]',
+    danger: 'bg-[var(--bg-danger)] text-[var(--text-danger)] border border-[var(--border-danger)] hover:bg-[var(--bg-danger)] hover:brightness-110 shadow-[0_0_15px_var(--bg-danger)]'
   };
 
   const sizeStyles = {
@@ -110,7 +110,7 @@ export const Button: React.FC<ButtonProps> = ({
       {ripples.map((ripple) => (
         <span
           key={ripple.id}
-          className="absolute rounded-full bg-white/20 animate-ping pointer-events-none"
+          className="absolute rounded-full bg-[var(--bg-active)] animate-ping pointer-events-none"
           style={{
             left: ripple.x,
             top: ripple.y,

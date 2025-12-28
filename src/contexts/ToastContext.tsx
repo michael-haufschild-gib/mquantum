@@ -49,21 +49,21 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               }}
               className={`
                 pointer-events-auto relative overflow-hidden rounded-xl border backdrop-blur-xl shadow-2xl w-[320px]
-                ${toast.type === 'success' ? 'bg-green-950/40 border-green-500/20' : ''}
-                ${toast.type === 'error' ? 'bg-red-950/40 border-red-500/20' : ''}
-                ${toast.type === 'info' ? 'bg-panel-bg/90 border-white/10' : ''}
+                ${toast.type === 'success' ? 'bg-success-bg border-success-border' : ''}
+                ${toast.type === 'error' ? 'bg-danger-bg border-danger-border' : ''}
+                ${toast.type === 'info' ? 'bg-panel/90 border-border-subtle' : ''}
               `}
             >
                <div className="p-4 flex items-start gap-3">
                    <div className={`mt-1 shrink-0 w-2 h-2 rounded-full ${
-                     toast.type === 'success' ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' :
-                     toast.type === 'error' ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' :
-                     'bg-accent shadow-[0_0_10px_var(--color-accent)]'
+                     toast.type === 'success' ? 'bg-success-solid shadow-[0_0_10px_var(--bg-success-solid)]' :
+                     toast.type === 'error' ? 'bg-danger-solid shadow-[0_0_10px_var(--bg-danger-solid)]' :
+                     'bg-accent shadow-[0_0_10px_var(--theme-accent)]'
                    }`} />
                    <div className="flex-1">
                       <p className={`text-sm font-medium ${
-                         toast.type === 'success' ? 'text-green-100' :
-                         toast.type === 'error' ? 'text-red-100' :
+                         toast.type === 'success' ? 'text-success' :
+                         toast.type === 'error' ? 'text-danger' :
                          'text-text-primary'
                       }`}>
                         {toast.message}
@@ -77,8 +77,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                  animate={{ width: "0%" }}
                  transition={{ duration: 3, ease: "linear" }}
                  className={`h-[2px] absolute bottom-0 left-0 ${
-                    toast.type === 'success' ? 'bg-green-500/50' :
-                    toast.type === 'error' ? 'bg-red-500/50' :
+                    toast.type === 'success' ? 'bg-success-solid/50' :
+                    toast.type === 'error' ? 'bg-danger-solid/50' :
                     'bg-accent/50'
                  }`}
                />

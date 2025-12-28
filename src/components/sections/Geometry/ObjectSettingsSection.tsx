@@ -50,11 +50,11 @@ const ControlsSkeleton: React.FC = () => (
  */
 const ControlsError: React.FC = () => (
   <div
-    className="p-3 text-sm text-red-400 bg-red-900/20 rounded-md border border-red-900/50"
+    className="p-3 text-sm text-danger bg-danger rounded-md border border-danger-border"
     data-testid="controls-error"
   >
     <p className="font-medium">Failed to load controls</p>
-    <p className="text-xs text-red-500 mt-1">Please refresh the page</p>
+    <p className="text-xs text-danger mt-1">Please refresh the page</p>
   </div>
 );
 

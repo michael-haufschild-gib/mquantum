@@ -113,7 +113,7 @@ export const ExportGeneralTab = () => {
                 </AnimatePresence>
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-[var(--border-subtle)]" />
 
             {/* Timing & Quality */}
             <div className="space-y-4">
@@ -150,18 +150,18 @@ export const ExportGeneralTab = () => {
                 </div>
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-[var(--border-subtle)]" />
 
             {/* Crop Control - Visual Card Style */}
             <div 
                 className={`
                     flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
-                    ${settings.crop.enabled ? 'bg-accent/5 border-accent/50' : 'bg-white/5 border-white/10 hover:bg-white/10'}
+                    ${settings.crop.enabled ? 'bg-accent/5 border-accent/50' : 'glass-panel hover:bg-[var(--bg-hover)]'}
                 `}
                 onClick={() => updateSettings({ crop: { ...settings.crop, enabled: !settings.crop.enabled } })}
             >
                 <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-lg ${settings.crop.enabled ? 'bg-accent text-black' : 'bg-white/10 text-text-secondary'}`}>
+                    <div className={`p-2 rounded-lg ${settings.crop.enabled ? 'bg-accent text-black' : 'bg-[var(--bg-hover)] text-[var(--text-secondary)]'}`}>
                         <Icon name="crop" className="w-5 h-5" />
                     </div>
                     <div>

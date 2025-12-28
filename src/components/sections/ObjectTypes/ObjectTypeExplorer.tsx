@@ -1,21 +1,21 @@
-import React, { useMemo, useEffect } from 'react';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { useAppearanceStore } from '@/stores/appearanceStore';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
-import { useRotationStore } from '@/stores/rotationStore';
+import { soundManager } from '@/lib/audio/SoundManager';
 import { getAvailableTypesForDimension } from '@/lib/geometry';
+import { getConfigStoreKey, isRaymarchingType } from '@/lib/geometry/registry';
 import type { ObjectType } from '@/lib/geometry/types';
 import { isPolytopeType } from '@/lib/geometry/types';
-import { isRaymarchingType, getConfigStoreKey } from '@/lib/geometry/registry';
+import { useAppearanceStore } from '@/stores/appearanceStore';
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
+import { useGeometryStore } from '@/stores/geometryStore';
+import { useRotationStore } from '@/stores/rotationStore';
 import { m } from 'motion/react';
-import { soundManager } from '@/lib/audio/SoundManager';
+import React, { useEffect, useMemo } from 'react';
 
 export const ObjectTypeExplorer: React.FC = () => {
   const objectType = useGeometryStore((state) => state.objectType);
   const setObjectType = useGeometryStore((state) => state.setObjectType);
   const dimension = useGeometryStore((state) => state.dimension);
   const resetAllRotations = useRotationStore((state) => state.resetAllRotations);
-  
+
   const initializeMandelbulbForDimension = useExtendedObjectStore(
     (state) => state.initializeMandelbulbForDimension
   );
@@ -89,7 +89,7 @@ export const ObjectTypeExplorer: React.FC = () => {
   };
 
   return (
-    <m.div 
+    <m.div
         className="grid grid-cols-1 gap-2"
         variants={containerVariants}
         initial="hidden"
@@ -108,9 +108,9 @@ export const ObjectTypeExplorer: React.FC = () => {
                       disabled={isDisabled}
                       className={`
                         relative group flex flex-col p-3 rounded-lg border text-left transition-all duration-200
-                        ${isSelected 
-                          ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]' 
-                          : 'bg-panel-bg border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-panel-bg/80'
+                        ${isSelected
+                          ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
+                          : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
                         }
                         ${isDisabled ? 'opacity-50 cursor-not-allowed hover:border-panel-border' : 'cursor-pointer'}
                       `}
@@ -132,7 +132,7 @@ export const ObjectTypeExplorer: React.FC = () => {
                       <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
                           {type.description}
                       </span>
-          
+
                       {isDisabled && (
                           <div className="absolute inset-0 bg-background/50 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
                                <span className="text-xs font-bold bg-background px-2 py-1 rounded shadow-sm border border-panel-border">

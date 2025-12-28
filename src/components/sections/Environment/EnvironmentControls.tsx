@@ -4,13 +4,13 @@
  * Organized into tabs: Walls (surface/grid) and Misc (helpers)
  */
 
-import { MultiToggleGroup } from '@/components/ui/MultiToggleGroup';
+import { Button } from '@/components/ui/Button';
 import { ColorPicker } from '@/components/ui/ColorPicker';
+import { MultiToggleGroup } from '@/components/ui/MultiToggleGroup';
 import { Select } from '@/components/ui/Select';
 import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
 import { Tabs } from '@/components/ui/Tabs';
-import { Button } from '@/components/ui/Button';
 import { DEFAULT_GROUND_PBR, type GroundPlaneType, type WallPosition } from '@/stores/defaults/visualDefaults';
 import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore';
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore';
@@ -112,7 +112,7 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
         options={WALL_OPTIONS}
         value={activeWalls}
         onChange={setActiveWalls}
-        label="Visible Walls"
+        label=""
         ariaLabel="Select which walls to display"
       />
 
@@ -249,6 +249,7 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
         value={activeTab}
         onChange={setActiveTab}
         data-testid="env-controls"
+        tabListClassName="mb-4"
         tabs={[
           { id: 'walls', label: 'Walls', content: wallsContent },
           { id: 'skybox', label: 'Skybox', content: <SkyboxControls /> },

@@ -6,30 +6,26 @@
  * - rejecting/normalizing invalid runtime values (e.g. persisted garbage)
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
-import { useThemeStore } from '@/stores/themeStore'
-
-type ThemeName = 'cyan' | 'green' | 'magenta' | 'orange' | 'blue'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { useThemeStore, ThemeAccent } from '@/stores/themeStore'
 
 describe('themeStore', () => {
   beforeEach(() => {
-    useThemeStore.setState({ theme: 'cyan' })
+    useThemeStore.setState({ accent: 'cyan', mode: 'dark' })
   })
 
-  it('accepts a valid theme', () => {
-    useThemeStore.getState().setTheme('green')
-    expect(useThemeStore.getState().theme).toBe('green')
+  it('accepts a valid accent', () => {
+    useThemeStore.getState().setAccent('green')
+    expect(useThemeStore.getState().accent).toBe('green')
   })
 
-  it('falls back to cyan when setTheme receives an invalid runtime value', () => {
-    // Runtime values can be invalid (e.g. from persisted storage). Avoid `any` in tests.
-    useThemeStore.getState().setTheme('invalid' as unknown as ThemeName)
-    expect(useThemeStore.getState().theme).toBe('cyan')
+  it('rejects an invalid accent', () => {
+    useThemeStore.getState().setAccent('invalid' as unknown as ThemeAccent)
+    expect(useThemeStore.getState().accent).toBe('cyan')
   })
 
-  it('falls back to cyan when rainbow theme is set (removed theme)', () => {
-    // Rainbow theme was removed - ensure it falls back to cyan
-    useThemeStore.getState().setTheme('rainbow' as unknown as ThemeName)
-    expect(useThemeStore.getState().theme).toBe('cyan')
+  it('accepts a valid mode', () => {
+    useThemeStore.getState().setMode('light')
+    expect(useThemeStore.getState().mode).toBe('light')
   })
 })

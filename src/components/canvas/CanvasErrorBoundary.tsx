@@ -69,7 +69,7 @@ export class CanvasErrorBoundary extends Component<
           <div className="text-center p-6">
             <div className="text-4xl mb-4">
               <svg
-                className="w-16 h-16 mx-auto text-red-500"
+                className="w-16 h-16 mx-auto text-danger"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

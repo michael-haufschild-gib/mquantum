@@ -38,7 +38,7 @@ export const GlobalProgress: React.FC = () => {
           className="absolute top-0 left-0 right-0 h-[2px] z-[100] origin-left pointer-events-none overflow-hidden"
         >
           {/* Background Track */}
-          <div className="absolute inset-0 bg-white/10" />
+          <div className="absolute inset-0 bg-[var(--bg-active)]" />
 
           {/* Progress Bar */}
           {isIndeterminate ? (

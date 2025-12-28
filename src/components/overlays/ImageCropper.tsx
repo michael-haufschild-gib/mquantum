@@ -191,7 +191,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropChan
 
   return (
     <div
-      className="relative w-full h-full bg-black/50 overflow-hidden select-none flex items-center justify-center p-2 sm:p-4 md:p-8"
+      className="relative w-full h-full bg-[var(--bg-overlay)] overflow-hidden select-none flex items-center justify-center p-2 sm:p-4 md:p-8"
       data-testid="image-cropper"
     >
       <div ref={containerRef} className="relative inline-block shadow-2xl shadow-black group">
@@ -205,18 +205,18 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropChan
         />
 
         {/* Overlay Darkener */}
-        <div className="absolute inset-0 bg-black/60 pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[var(--bg-overlay)] pointer-events-none"></div>
 
         {/* CROP BOX - Only show after image loaded */}
         {imageLoaded && (
           <m.div
-            className="absolute border border-white/50 box-content cursor-move"
+            className="absolute border border-border-strong box-content cursor-move"
             style={{
               left: `${crop.x * 100}%`,
               top: `${crop.y * 100}%`,
               width: `${crop.w * 100}%`,
               height: `${crop.h * 100}%`,
-              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.6)',
+              boxShadow: '0 0 0 9999px var(--bg-overlay)',
               x,
               y,
             }}
@@ -230,13 +230,13 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropChan
           >
             {/* Rule of Thirds - Only visible on hover/drag */}
             <div className="absolute inset-0 flex flex-col pointer-events-none opacity-0 group-hover:opacity-40 transition-opacity">
-              <div className="flex-1 border-b border-white/30"></div>
-              <div className="flex-1 border-b border-white/30"></div>
+              <div className="flex-1 border-b border-border-strong"></div>
+              <div className="flex-1 border-b border-border-strong"></div>
               <div className="flex-1"></div>
             </div>
             <div className="absolute inset-0 flex pointer-events-none opacity-0 group-hover:opacity-40 transition-opacity">
-              <div className="flex-1 border-r border-white/30"></div>
-              <div className="flex-1 border-r border-white/30"></div>
+              <div className="flex-1 border-r border-border-strong"></div>
+              <div className="flex-1 border-r border-border-strong"></div>
               <div className="flex-1"></div>
             </div>
 
@@ -253,7 +253,7 @@ export const ImageCropper: React.FC<ImageCropperProps> = ({ imageSrc, onCropChan
             ].map((h) => (
               <div
                 key={h.id}
-                className={`absolute w-5 h-5 sm:w-3 sm:h-3 bg-white border border-black/30 rounded-full z-20 hover:scale-125 active:scale-110 transition-transform touch-none ${h.pos}`}
+                className={`absolute w-5 h-5 sm:w-3 sm:h-3 bg-white border border-border-default rounded-full z-20 hover:scale-125 active:scale-110 transition-transform touch-none ${h.pos}`}
                 style={{ cursor: h.cursor }}
                 onPointerDown={(e) => startResize(e, h.id)}
                 data-testid={`crop-handle-${h.id}`}

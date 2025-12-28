@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useThemeStore } from '@/stores/themeStore';
 
 export const useDynamicFavicon = () => {
-  const theme = useThemeStore((state) => state.theme);
+  const accent = useThemeStore((state) => state.accent);
 
   useEffect(() => {
     const canvas = document.createElement('canvas');
@@ -14,17 +14,18 @@ export const useDynamicFavicon = () => {
       // Get accent color from computed style or mapping
       let color = '#3b82f6'; // Default blue
       
-      const themeColors: Record<string, string> = {
+      const accentColors: Record<string, string> = {
           cyan: '#06b6d4',
           green: '#10b981',
           magenta: '#d946ef',
           orange: '#f97316',
           blue: '#3b82f6',
-          rainbow: '#f43f5e'
+          violet: '#8b5cf6',
+          red: '#ef4444'
       };
       
-      if (theme in themeColors) {
-          color = themeColors[theme] || color;
+      if (accent in accentColors) {
+          color = accentColors[accent] || color;
       }
 
       // Draw Circle
@@ -53,5 +54,5 @@ export const useDynamicFavicon = () => {
         document.head.appendChild(newLink);
       }
     }
-  }, [theme]);
+  }, [accent]);
 };

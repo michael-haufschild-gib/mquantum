@@ -190,7 +190,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
             className={`space-y-3 ${!isSchroedinger ? 'opacity-50 pointer-events-none' : ''}`}
             aria-disabled={!isSchroedinger}
           >
-            <p className="text-[10px] text-text-secondary border-t border-white/5 pt-2">
+            <p className="text-[10px] text-text-secondary border-t border-border-subtle pt-2">
               Volumetric AO Settings {!isSchroedinger && '(Schrödinger only)'}
             </p>
             <Select<string>

@@ -132,7 +132,7 @@ export const ScreenshotModal = () => {
     >
       <div className="flex flex-col gap-3 sm:gap-4 h-[55vh] sm:h-[65vh] md:h-[70vh]" data-testid="screenshot-modal-content">
         {/* Editor Area */}
-        <div className="flex-1 relative rounded-lg overflow-hidden bg-black border border-white/10 min-h-0">
+        <div className="flex-1 relative rounded-lg overflow-hidden bg-black border border-border-default min-h-0">
           <ImageCropper imageSrc={imageSrc} onCropChange={setCrop} />
         </div>
 

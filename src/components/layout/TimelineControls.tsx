@@ -70,34 +70,47 @@ export const TimelineControls: FC = () => {
     const planes = useMemo(() => getRotationPlanes(dimension), [dimension]);
     const hasAnimatingPlanes = animatingPlanes.size > 0;
 
-  // Check if any animation is active
-  const isAnimating = useMemo(() => {
-    // Mandelbulb: any of its animations
-    const mandelbulbAnimating = mandelbulbConfig.powerAnimationEnabled ||
-                               mandelbulbConfig.alternatePowerEnabled ||
-                               mandelbulbConfig.dimensionMixEnabled ||
-                               mandelbulbConfig.originDriftEnabled ||
-                               mandelbulbConfig.sliceAnimationEnabled ||
-                               mandelbulbConfig.phaseShiftEnabled;
+  // Count active animations per object type
+  const activeAnimationCount = useMemo(() => {
+    const configKey = getConfigStoreKey(objectType);
 
-    // Quaternion Julia: currently no animations (removed)
-    const qjAnimating = false;
+    switch (configKey) {
+      case 'mandelbulb':
+        return [
+          mandelbulbConfig.powerAnimationEnabled,
+          mandelbulbConfig.alternatePowerEnabled,
+          mandelbulbConfig.dimensionMixEnabled,
+          mandelbulbConfig.originDriftEnabled,
+          mandelbulbConfig.sliceAnimationEnabled,
+          mandelbulbConfig.phaseShiftEnabled,
+        ].filter(Boolean).length;
 
-    // Polytope: facet offset animation
-    const polytopeAnimating = polytopeConfig.facetOffsetEnabled;
+      case 'quaternionJulia':
+        return 0;
 
-    // Schroedinger: flow, drift, slice, spread
-    const schroedingerAnimating = schroedingerConfig.curlEnabled ||
-                                  schroedingerConfig.originDriftEnabled ||
-                                  schroedingerConfig.sliceAnimationEnabled ||
-                                  schroedingerConfig.spreadAnimationEnabled;
+      case 'schroedinger':
+        return [
+          schroedingerConfig.curlEnabled,
+          schroedingerConfig.originDriftEnabled,
+          schroedingerConfig.sliceAnimationEnabled,
+          schroedingerConfig.spreadAnimationEnabled,
+        ].filter(Boolean).length;
 
-    // Black hole: swirl, pulse
-    const blackholeAnimating = blackholeConfig.swirlAnimationEnabled ||
-                               blackholeConfig.pulseEnabled;
+      case 'blackhole':
+        return [
+          blackholeConfig.swirlAnimationEnabled,
+          blackholeConfig.pulseEnabled,
+        ].filter(Boolean).length;
 
-    return mandelbulbAnimating || qjAnimating || polytopeAnimating || schroedingerAnimating || blackholeAnimating;
+      default:
+        // Polytope category
+        if (isPolytopeCategory(objectType)) {
+          return polytopeConfig.facetOffsetEnabled ? 1 : 0;
+        }
+        return 0;
+    }
   }, [
+    objectType,
     mandelbulbConfig.powerAnimationEnabled,
     mandelbulbConfig.alternatePowerEnabled,
     mandelbulbConfig.dimensionMixEnabled,
@@ -113,6 +126,9 @@ export const TimelineControls: FC = () => {
     blackholeConfig.pulseEnabled,
   ]);
 
+  // Check if any animation is active
+  const isAnimating = activeAnimationCount > 0;
+
     // Animation should only be paused when NOTHING is animating
     const hasAnythingToAnimate = hasAnimatingPlanes || isAnimating;
 
@@ -120,7 +136,7 @@ export const TimelineControls: FC = () => {
     const [showFractalAnim, setShowFractalAnim] = useState(false);
 
     return (
-        <div className="flex flex-col w-full h-full bg-panel-bg relative">
+        <div className="flex flex-col w-full h-full relative">
             <AnimatePresence>
                 {/* Rotation Drawer */}
                 {showRotation && (
@@ -129,7 +145,7 @@ export const TimelineControls: FC = () => {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute bottom-full left-0 right-0 glass-panel border-b-0 border-x-0 border-t border-white/10 z-20"
+                        className="absolute bottom-full left-0 right-0 mb-2 glass-panel rounded-xl z-20"
                     >
                         <div className="p-4 flex flex-col gap-4">
                             <div className="flex items-center justify-between">
@@ -173,7 +189,7 @@ export const TimelineControls: FC = () => {
 
                             {/* Keplerian Differential - Black Hole Only */}
                             {isBlackHole && (
-                                <div className="mt-4 pt-4 border-t border-white/10">
+                                <div className="mt-4 pt-4 border-t border-border-default">
                                     <Slider
                                         label="Keplerian Differential"
                                         min={0}
@@ -218,109 +234,92 @@ export const TimelineControls: FC = () => {
             </AnimatePresence>
 
             {/* Main Timeline Bar */}
-            <div className="h-16 flex items-center px-6 gap-6 border-t border-white/5 shrink-0 overflow-x-auto no-scrollbar z-30 bg-panel-bg/80 backdrop-blur-md relative">
+            <div className="h-14 flex items-center px-4 gap-4 shrink-0 overflow-x-auto overflow-y-hidden scrollbar-none relative glass-panel rounded-t-xl sm:rounded-xl">
                 {/* Playback Controls */}
-                <div className="flex items-center gap-4 shrink-0">
-                     <Button
+                <div className="flex items-center gap-2 shrink-0">
+                    <Button
                         variant={isPlaying ? 'primary' : 'secondary'}
                         size="icon"
                         onClick={toggle}
                         disabled={!hasAnythingToAnimate}
                         ariaLabel={isPlaying ? "Pause" : "Play"}
                         glow={isPlaying}
-                        className={`
-                            w-10 h-10 rounded-full shrink-0
-                            ${isPlaying ? 'bg-accent text-black' : ''}
-                        `}
+                        className={`w-9 h-9 rounded-full ${isPlaying ? 'bg-accent text-text-inverse' : ''}`}
                     >
                         {isPlaying ? (
-                            <Icon name="pause" size={12} />
+                            <Icon name="pause" size={11} />
                         ) : (
-                            <Icon name="play" size={12} className="ml-0.5" />
+                            <Icon name="play" size={11} className="ml-0.5" />
                         )}
                     </Button>
-                </div>
 
-                <div className="h-8 w-px bg-white/5 shrink-0" />
-
-                {/* Speed & Direction */}
-                <div className="flex items-center gap-6 shrink-0">
-                    <div className="w-32 pt-3">
-                         <Slider
-                            label="SPEED"
-                            min={MIN_SPEED}
-                            max={MAX_SPEED}
-                            step={0.1}
-                            value={speed}
-                            onChange={setSpeed}
-                            showValue={true}
-                            unit="x"
-                        />
-                    </div>
-
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={toggleDirection}
-                        ariaLabel={direction === 1 ? 'Forward' : 'Reverse'}
-                        className="px-3 py-1 text-[10px] font-mono font-bold tracking-wider"
+                    <ToggleButton
+                        pressed={direction === -1}
+                        onToggle={() => toggleDirection()}
+                        ariaLabel={direction === 1 ? 'Enable reverse' : 'Disable reverse'}
+                        className="w-9 h-9 p-0 rounded-lg flex items-center justify-center"
                     >
-                        {direction === 1 ? (
-                            <>
-                                <span>FWD</span>
-                                <Icon name="arrow-right" size={10} />
-                            </>
-                        ) : (
-                            <>
-                                <Icon name="arrow-left" size={10} />
-                                <span>REV</span>
-                            </>
-                        )}
-                    </Button>
+                        <Icon name="redo" size={14} />
+                    </ToggleButton>
                 </div>
 
-                 <div className="h-8 w-px bg-white/5 shrink-0" />
-                 
-                 {/* Bias Control */}
-                  <div className="w-32 pt-3 shrink-0">
-                        <Slider
-                            label="BIAS"
-                            min={MIN_ANIMATION_BIAS}
-                            max={MAX_ANIMATION_BIAS}
-                            step={0.05}
-                            value={animationBias}
-                            onChange={setAnimationBias}
-                            showValue={true}
-                        />
-                  </div>
+                {/* Speed Slider */}
+                <div className="w-44 pt-2.5 pl-3 border-l border-border-subtle">
+                    <Slider
+                        label="SPEED"
+                        min={MIN_SPEED}
+                        max={MAX_SPEED}
+                        step={0.1}
+                        value={speed}
+                        onChange={setSpeed}
+                        showValue={true}
+                        unit="x"
+                    />
+                </div>
 
-                 <div className="flex-1 min-w-[20px]" />
+                {/* Bias Slider */}
+                <div className="w-44 pt-2.5 pl-3 border-l border-border-subtle">
+                    <Slider
+                        label="BIAS"
+                        min={MIN_ANIMATION_BIAS}
+                        max={MAX_ANIMATION_BIAS}
+                        step={0.05}
+                        value={animationBias}
+                        onChange={setAnimationBias}
+                        showValue={true}
+                    />
+                </div>
 
-                 {/* Advanced Toggles */}
-                 <div className="flex items-center gap-2 shrink-0">
+                <div className="flex-1 min-w-3" />
+
+                {/* Drawer Toggles */}
+                <div className="flex items-center gap-2">
                     {hasTimelineControls(objectType) && (
-                         <ToggleButton
+                        <ToggleButton
                             pressed={showFractalAnim}
                             onToggle={() => { setShowFractalAnim(!showFractalAnim); setShowRotation(false); }}
                             ariaLabel="Toggle animations drawer"
-                            className="text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full"
-                         >
-                            Animations
-                         </ToggleButton>
+                            className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+                        >
+                            Anim
+                            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] ${showFractalAnim ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-hover)] text-text-tertiary'}`}>
+                                {activeAnimationCount}
+                            </span>
+                        </ToggleButton>
                     )}
 
-                     <ToggleButton
+                    <ToggleButton
                         pressed={showRotation}
                         onToggle={() => { setShowRotation(!showRotation); setShowFractalAnim(false); }}
                         ariaLabel="Toggle rotation drawer"
-                        className="text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full"
-                     >
-                        Rotation
-                         <span className={`ml-2 px-1.5 py-0.5 rounded-full text-[9px] ${showRotation ? 'bg-accent text-black' : 'bg-white/10 text-text-tertiary'}`}>
-                             {animatingPlanes.size}
-                         </span>
-                     </ToggleButton>
-                 </div>
+                        className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+                    >
+                        Rotate
+                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] ${showRotation ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-hover)] text-text-tertiary'}`}>
+                            {animatingPlanes.size}
+                        </span>
+                    </ToggleButton>
+                </div>
             </div>
         </div>
     );

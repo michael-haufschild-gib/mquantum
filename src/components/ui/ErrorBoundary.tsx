@@ -33,19 +33,19 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex h-screen w-screen items-center justify-center bg-gray-950 p-4 text-white">
-          <div className="w-full max-w-md rounded-lg border border-red-500/30 bg-red-900/10 p-6 backdrop-blur-md">
-            <h2 className="mb-4 text-xl font-bold text-red-400">Something went wrong</h2>
-            <p className="mb-4 text-sm text-gray-300">
+        <div className="flex h-screen w-screen items-center justify-center bg-[var(--bg-app)] p-4 text-[var(--text-primary)]">
+          <div className="w-full max-w-md rounded-lg border border-danger-border bg-danger-bg p-6 backdrop-blur-md">
+            <h2 className="mb-4 text-xl font-bold text-danger">Something went wrong</h2>
+            <p className="mb-4 text-sm text-[var(--text-secondary)]">
               An error occurred while rendering the application.
             </p>
             {this.state.error && (
-              <pre className="mb-4 max-h-40 overflow-auto rounded bg-black/50 p-2 text-xs text-red-300">
+              <pre className="mb-4 max-h-40 overflow-auto rounded bg-[var(--bg-overlay)] p-2 text-xs text-danger">
                 {this.state.error.message}
               </pre>
             )}
             <button
-              className="rounded bg-red-600 px-4 py-2 text-sm font-semibold hover:bg-red-500 transition-colors"
+              className="rounded bg-danger-solid px-4 py-2 text-sm font-semibold text-text-inverse hover:brightness-110 transition-colors"
               onClick={() => window.location.reload()}
             >
               Reload Page
