@@ -251,6 +251,14 @@ export class RenderGraph {
   // Map: outputResourceId → inputResourceId
   private resourceAliases: Map<string, string> = new Map()
 
+  // Pass state tracking for lazy resource deallocation
+  // Tracks how many frames each pass has been disabled for grace period management
+  // Map: passId → disabledFrameCount
+  private passStateTracking = new Map<string, number>()
+
+  /** Default grace period in frames before resource deallocation (~1s at 60fps) */
+  private static readonly DEFAULT_DISABLE_GRACE_PERIOD = 60
+
   // ==========================================================================
   // Passthrough for disabled passes
   // ==========================================================================
@@ -699,6 +707,15 @@ export class RenderGraph {
       this.pool.enablePingPong(resourceId)
     }
 
+    // Clean up state tracking for passes no longer in the graph
+    // This prevents memory leaks when passes are removed
+    const currentPassIds = new Set(this.compiled.passes.map(p => p.id))
+    for (const passId of this.passStateTracking.keys()) {
+      if (!currentPassIds.has(passId)) {
+        this.passStateTracking.delete(passId)
+      }
+    }
+
     return this.compiled
   }
 
@@ -823,6 +840,30 @@ export class RenderGraph {
         (pass as unknown as { _debugDisabled?: boolean })._debugDisabled ?? false
       const enabled = !debugDisabled && (pass.config.enabled?.(frozenFrameContext) ?? true)
 
+      // ========================================================================
+      // Lazy Resource Deallocation: Track disabled frames and manage grace period
+      // ========================================================================
+      if (enabled) {
+        // Pass is enabled - reset disabled frame counter
+        this.passStateTracking.set(pass.id, 0)
+      } else {
+        // Pass is disabled - track how long it's been disabled
+        const disabledFrameCount = (this.passStateTracking.get(pass.id) ?? 0) + 1
+        this.passStateTracking.set(pass.id, disabledFrameCount)
+
+        // Check if grace period has elapsed and pass has releaseInternalResources
+        const gracePeriod = pass.config.disableGracePeriod ?? RenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
+        const keepResources = pass.config.keepResourcesWhenDisabled ?? false
+
+        // Only call releaseInternalResources exactly once when grace period elapses
+        if (!keepResources &&
+            disabledFrameCount === gracePeriod &&
+            pass.releaseInternalResources) {
+          pass.releaseInternalResources()
+        }
+      }
+      // ========================================================================
+
       if (!enabled) {
         // For disabled passes, maintain the resource chain
         const inputs = pass.config.inputs ?? []
@@ -946,6 +987,10 @@ export class RenderGraph {
       this.pool.swap(resourceId)
     }
 
+    // TBDR optimization: invalidate non-persistent framebuffers
+    // On mobile GPUs (Apple, Mali, Adreno), this allows skipping tile store operations
+    this.pool.invalidateFramebuffers(renderer, this.compiled.pingPongResources)
+
     // End frame
     this.pool.endFrame()
 
@@ -978,10 +1023,11 @@ export class RenderGraph {
    *
    * @param width - Screen width in pixels
    * @param height - Screen height in pixels
+   * @param resolutionScale - Resolution scale factor (0.5 = half res, 1.0 = full res)
    */
-  setSize(width: number, height: number): void {
-    this.width = Math.max(1, width)
-    this.height = Math.max(1, height)
+  setSize(width: number, height: number, resolutionScale = 1.0): void {
+    this.width = Math.max(1, Math.floor(width * resolutionScale))
+    this.height = Math.max(1, Math.floor(height * resolutionScale))
     // CRITICAL: Force resize on next ensureAllocated call
     // This ensures the pool actually resizes targets on the next frame
     this.pool.updateSize(this.width, this.height)
@@ -1083,6 +1129,63 @@ export class RenderGraph {
    */
   getResourceDimensions(): Map<string, { width: number; height: number }> {
     return this.pool.getResourceDimensions()
+  }
+
+  // ==========================================================================
+  // Lazy Resource Deallocation
+  // ==========================================================================
+
+  /**
+   * Get resource deallocation statistics.
+   *
+   * Useful for monitoring memory management and debugging.
+   *
+   * @returns Stats about pass states and pending deallocations
+   */
+  getResourceDeallocationStats(): {
+    enabledPasses: number
+    disabledPasses: number
+    pendingDeallocations: number
+  } {
+    let enabled = 0
+    let disabled = 0
+    let pending = 0
+
+    for (const [passId, disabledFrameCount] of this.passStateTracking) {
+      const pass = this.compiled?.passes.find(p => p.id === passId)
+      if (!pass) continue
+
+      if (disabledFrameCount === 0) {
+        enabled++
+      } else {
+        disabled++
+        const gracePeriod = pass.config.disableGracePeriod ?? RenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
+        const keepResources = pass.config.keepResourcesWhenDisabled ?? false
+        if (!keepResources && disabledFrameCount < gracePeriod && pass.releaseInternalResources) {
+          pending++
+        }
+      }
+    }
+
+    return { enabledPasses: enabled, disabledPasses: disabled, pendingDeallocations: pending }
+  }
+
+  /**
+   * Force immediate resource release for a disabled pass.
+   *
+   * Useful for memory-critical situations where waiting for the grace period
+   * is not acceptable.
+   *
+   * @param passId - Pass identifier
+   * @returns True if resources were released, false if pass not found or has no releaseInternalResources
+   */
+  forceReleasePassResources(passId: string): boolean {
+    const pass = this.compiled?.passes.find(p => p.id === passId)
+    if (pass?.releaseInternalResources) {
+      pass.releaseInternalResources()
+      return true
+    }
+    return false
   }
 
   // ==========================================================================

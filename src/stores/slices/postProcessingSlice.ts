@@ -140,6 +140,8 @@ export interface PostProcessingSliceState {
   gravityFalloff: number
   /** Chromatic aberration for lensing (0-1) */
   gravityChromaticAberration: number
+  /** Version counter for gravity settings (dirty-flag tracking) */
+  gravityVersion: number
 
   // --- Paper Texture Effect ---
   /** Whether paper texture effect is enabled */
@@ -316,6 +318,7 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   gravityDistortionScale: DEFAULT_GRAVITY_DISTORTION_SCALE,
   gravityFalloff: DEFAULT_GRAVITY_FALLOFF,
   gravityChromaticAberration: DEFAULT_GRAVITY_CHROMATIC_ABERRATION,
+  gravityVersion: 0, // Dirty-flag tracking for uniform updates
 
   // Paper Texture
   paperEnabled: DEFAULT_PAPER_ENABLED,
@@ -499,24 +502,37 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   // --- Gravity Actions ---
+  // All gravity setters increment gravityVersion for dirty-flag tracking
   setGravityEnabled: (enabled: boolean) => {
-    set({ gravityEnabled: enabled })
+    set((s) => ({ gravityEnabled: enabled, gravityVersion: s.gravityVersion + 1 }))
   },
 
   setGravityStrength: (strength: number) => {
-    set({ gravityStrength: Math.max(0.1, Math.min(10, strength)) })
+    set((s) => ({
+      gravityStrength: Math.max(0.1, Math.min(10, strength)),
+      gravityVersion: s.gravityVersion + 1,
+    }))
   },
 
   setGravityDistortionScale: (scale: number) => {
-    set({ gravityDistortionScale: Math.max(0.1, Math.min(5, scale)) })
+    set((s) => ({
+      gravityDistortionScale: Math.max(0.1, Math.min(5, scale)),
+      gravityVersion: s.gravityVersion + 1,
+    }))
   },
 
   setGravityFalloff: (falloff: number) => {
-    set({ gravityFalloff: Math.max(0.5, Math.min(4, falloff)) })
+    set((s) => ({
+      gravityFalloff: Math.max(0.5, Math.min(4, falloff)),
+      gravityVersion: s.gravityVersion + 1,
+    }))
   },
 
   setGravityChromaticAberration: (aberration: number) => {
-    set({ gravityChromaticAberration: Math.max(0, Math.min(1, aberration)) })
+    set((s) => ({
+      gravityChromaticAberration: Math.max(0, Math.min(1, aberration)),
+      gravityVersion: s.gravityVersion + 1,
+    }))
   },
 
   // --- Paper Texture Actions ---

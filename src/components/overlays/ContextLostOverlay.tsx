@@ -4,15 +4,17 @@
  * Displays different states based on WebGL context status:
  * - Lost: Shows "GPU Connection Lost" with spinner
  * - Restoring: Shows "Reconnecting..." with attempt counter
+ * - Escalated: Shows options to reduce quality or retry (after rapid failures)
  * - Failed: Shows "Unable to Recover" with reload button
  *
  * @module components/overlays/ContextLostOverlay
  */
 
 import { Z_INDEX } from '@/constants/zIndex'
+import { applySafeModeSettings } from '@/rendering/core/SafeModeSettings'
 import { useWebGLContextStore } from '@/stores/webglContextStore'
 import { AnimatePresence, m } from 'motion/react'
-import React from 'react'
+import React, { useCallback } from 'react'
 import { Button } from '../ui/Button'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 
@@ -176,6 +178,80 @@ const FailedState: React.FC = () => {
 }
 
 /**
+ * Escalated state - shown when rapid failures are detected.
+ * Gives user options to reduce quality or manually retry.
+ * @returns The escalated state UI
+ */
+const EscalatedState: React.FC = () => {
+  const retryFromEscalation = useWebGLContextStore((s) => s.retryFromEscalation)
+  const applySafeModeAndRetry = useWebGLContextStore((s) => s.applySafeModeAndRetry)
+
+  const handleReduceQuality = useCallback((): void => {
+    // Apply safe mode settings first
+    applySafeModeSettings()
+    // Then trigger retry with safe mode flag
+    applySafeModeAndRetry()
+  }, [applySafeModeAndRetry])
+
+  const handleManualRetry = useCallback((): void => {
+    retryFromEscalation()
+  }, [retryFromEscalation])
+
+  return (
+    <div className="flex flex-col items-center gap-6 text-center">
+      {/* Warning icon (decorative) */}
+      <div className="w-16 h-16 rounded-full bg-warning-bg flex items-center justify-center" aria-hidden="true">
+        <svg
+          className="w-8 h-8 text-warning"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+      </div>
+
+      <div>
+        <h2 id="context-lost-title" className="text-xl font-semibold text-text-primary mb-2">
+          Graphics Recovery Failed
+        </h2>
+        <p id="context-lost-description" className="text-sm text-text-secondary max-w-xs">
+          The GPU context was lost multiple times. This may be caused by memory pressure.
+        </p>
+      </div>
+
+      {/* Action buttons */}
+      <div className="flex flex-col sm:flex-row gap-3 w-full">
+        <Button
+          variant="primary"
+          onClick={handleReduceQuality}
+          className="flex-1 min-w-[140px]"
+        >
+          Reduce Quality & Retry
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handleManualRetry}
+          className="flex-1 min-w-[140px]"
+        >
+          Try Again
+        </Button>
+      </div>
+
+      {/* Help text */}
+      <p className="text-xs text-text-secondary/60 max-w-xs">
+        &ldquo;Reduce Quality&rdquo; lowers resolution to 50% and disables bloom, ambient occlusion, reflections, and shadows.
+      </p>
+    </div>
+  )
+}
+
+/**
  * Main overlay component that shows appropriate state.
  * @returns The context lost overlay component
  */
@@ -215,6 +291,7 @@ export const ContextLostOverlay: React.FC = () => {
         >
           {status === 'lost' && <LostState />}
           {status === 'restoring' && <RestoringState />}
+          {status === 'escalated' && <EscalatedState />}
           {status === 'failed' && <FailedState />}
         </m.div>
       </m.div>

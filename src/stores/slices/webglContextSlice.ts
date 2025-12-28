@@ -12,7 +12,7 @@ import type { StateCreator } from 'zustand'
 // ============================================================================
 
 /** WebGL context status states */
-export type WebGLContextStatus = 'active' | 'lost' | 'restoring' | 'failed'
+export type WebGLContextStatus = 'active' | 'lost' | 'restoring' | 'escalated' | 'failed'
 
 /** Recovery configuration with exponential backoff */
 export interface RecoveryConfig {
@@ -84,6 +84,12 @@ export interface WebGLContextSliceState {
 
   /** Debug: Counter for triggering context loss from UI (incremented to signal) */
   debugContextLossCounter: number
+
+  /** Whether recovery has escalated to user prompt (after repeated failures) */
+  escalated: boolean
+
+  /** Whether safe mode is active (reduced quality settings applied) */
+  safeMode: boolean
 }
 
 export interface WebGLContextSliceActions {
@@ -113,6 +119,15 @@ export interface WebGLContextSliceActions {
 
   /** Debug: Trigger context loss (only works in development) */
   debugTriggerContextLoss: () => void
+
+  /** Escalate to user prompt after repeated failures */
+  escalateToUserPrompt: () => void
+
+  /** User chose to retry from escalated state */
+  retryFromEscalation: () => void
+
+  /** User chose to apply safe mode and retry */
+  applySafeModeAndRetry: () => void
 }
 
 export type WebGLContextSlice = WebGLContextSliceState & WebGLContextSliceActions
@@ -134,6 +149,8 @@ export const WEBGL_CONTEXT_INITIAL_STATE: WebGLContextSliceState = {
   currentTimeout: DEFAULT_RECOVERY_CONFIG.initialTimeout,
   recoveryConfig: { ...DEFAULT_RECOVERY_CONFIG },
   debugContextLossCounter: 0,
+  escalated: false,
+  safeMode: false,
 }
 
 // ============================================================================
@@ -227,7 +244,11 @@ export const createWebGLContextSlice: StateCreator<
   },
 
   reset: () => {
-    set({ ...WEBGL_CONTEXT_INITIAL_STATE })
+    set({
+      ...WEBGL_CONTEXT_INITIAL_STATE,
+      // Preserve safeMode flag across resets if it was set
+      safeMode: get().safeMode,
+    })
   },
 
   getCurrentTimeout: () => {
@@ -263,5 +284,35 @@ export const createWebGLContextSlice: StateCreator<
     if (import.meta.env.MODE !== 'production') {
       set((state) => ({ debugContextLossCounter: state.debugContextLossCounter + 1 }))
     }
+  },
+
+  escalateToUserPrompt: () => {
+    set({
+      status: 'escalated',
+      escalated: true,
+    })
+  },
+
+  retryFromEscalation: () => {
+    // User clicked "Try Again" - go back to lost state to trigger retry
+    set({
+      status: 'lost',
+      escalated: false,
+      // Reset recovery attempts to give one more chance
+      recoveryAttempts: 0,
+    })
+  },
+
+  applySafeModeAndRetry: () => {
+    // User clicked "Reduce Quality & Retry"
+    // Note: The actual settings are applied by the overlay component
+    // which calls applySafeModeSettings() before triggering this action
+    set({
+      status: 'lost',
+      escalated: false,
+      safeMode: true,
+      // Reset recovery attempts for fresh start with reduced settings
+      recoveryAttempts: 0,
+    })
   },
 })

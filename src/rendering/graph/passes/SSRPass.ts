@@ -497,6 +497,24 @@ export class SSRPass extends BasePass {
     renderer.setRenderTarget(null);
   }
 
+  /**
+   * Release internal GPU resources when pass is disabled.
+   *
+   * Called by RenderGraph when this pass has been disabled for the grace period.
+   * Disposes of the half-resolution render target, but keeps materials and
+   * geometry to avoid shader recompilation on re-enable.
+   */
+  releaseInternalResources(): void {
+    // Dispose half-res target (the only significant internal resource)
+    if (this.halfResTarget) {
+      this.halfResTarget.dispose();
+      this.halfResTarget = null;
+    }
+
+    // Keep material, mesh, upsampleMaterial, upsampleMesh - they're cheap
+    // and keeping them avoids shader recompilation on re-enable
+  }
+
   dispose(): void {
     this.material.dispose();
     this.mesh.geometry.dispose();

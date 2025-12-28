@@ -45,7 +45,8 @@ describe('CanvasContextMenu', () => {
   });
 
   /**
-   * Helper to simulate right-click on canvas
+   * Helper to simulate right-click on canvas.
+   * @returns The simulated MouseEvent
    */
   const rightClickCanvas = () => {
     // Create a container with id for the selector

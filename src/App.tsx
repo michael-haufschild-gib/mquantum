@@ -20,6 +20,10 @@ import { ContextLostOverlay } from '@/components/overlays/ContextLostOverlay';
 import { MsgBox } from '@/components/overlays/MsgBox';
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal';
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay';
+import {
+  isWebGL2Supported,
+  WebGL2UnsupportedOverlay,
+} from '@/components/overlays/WebGL2UnsupportedOverlay';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { GeometryLoadingIndicator } from '@/components/ui/GeometryLoadingIndicator';
 import { ToastProvider } from '@/contexts/ToastContext';
@@ -48,7 +52,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { RECOVERY_STATE_KEY, RECOVERY_STATE_MAX_AGE } from '@/stores/webglContextStore';
 import { Html } from '@react-three/drei';
 import { Canvas, type RootState } from '@react-three/fiber';
-import { LazyMotion, domMax } from 'motion/react';
+import { domMax, LazyMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 
@@ -190,6 +194,9 @@ function AppContent() {
   // Restore state after WebGL context recovery failure
   useStateRecovery();
 
+  // Check WebGL2 support once at mount
+  const webgl2Supported = useMemo(() => isWebGL2Supported(), []);
+
   // Get background color from visual store (PRD Story 6 AC7)
   const backgroundColor = useAppearanceStore((state) => state.backgroundColor);
 
@@ -227,42 +234,46 @@ function AppContent() {
         {/* Performance indicators */}
         <RefinementIndicator position="bottom-right" />
 
-        <ErrorBoundary fallback={<div className="flex h-full w-full items-center justify-center text-red-400 bg-black/90">Renderer Crashed. Reload page.</div>}>
-          <Canvas
-            id="main-webgl-canvas"
-            frameloop="never"
-            camera={{
-              position: [0, 3.125, 7.5], // Closer angled view for prominent Interstellar look (25% further out)
-              fov: 60,
-            }}
-            raycaster={{
-              // Enable DEBUG layer for raycasting so gizmos on layer 4 are interactive.
-              // The raycaster's layers determine which objects receive pointer events.
-              // By default only layer 0 is enabled; we add layer 4 (DEBUG) for gizmo interaction.
-              layers: (() => {
-                const layers = new THREE.Layers();
-                layers.enableAll(); // Enable all layers for comprehensive event handling
-                return layers;
-              })(),
-            }}
-            shadows="soft"
-            flat
-            gl={{ alpha: false, antialias: false, preserveDrawingBuffer: true }}
-            style={{ background: backgroundColor }}
-            onPointerMissed={handlePointerMissed}
-            onCreated={handleCanvasCreated}
-          >
-            {/* WebGL Context Management */}
-            <ContextEventHandler />
-            <VisibilityHandler />
-            <UniformLifecycleController />
+        {webgl2Supported ? (
+          <ErrorBoundary fallback={<div className="flex h-full w-full items-center justify-center text-red-400 bg-black/90">Renderer Crashed. Reload page.</div>}>
+            <Canvas
+              id="main-webgl-canvas"
+              frameloop="never"
+              camera={{
+                position: [0, 3.125, 7.5], // Closer angled view for prominent Interstellar look (25% further out)
+                fov: 60,
+              }}
+              raycaster={{
+                // Enable DEBUG layer for raycasting so gizmos on layer 4 are interactive.
+                // The raycaster's layers determine which objects receive pointer events.
+                // By default only layer 0 is enabled; we add layer 4 (DEBUG) for gizmo interaction.
+                layers: (() => {
+                  const layers = new THREE.Layers();
+                  layers.enableAll(); // Enable all layers for comprehensive event handling
+                  return layers;
+                })(),
+              }}
+              shadows="soft"
+              flat
+              gl={{ alpha: false, antialias: false, preserveDrawingBuffer: true }}
+              style={{ background: backgroundColor }}
+              onPointerMissed={handlePointerMissed}
+              onCreated={handleCanvasCreated}
+            >
+              {/* WebGL Context Management */}
+              <ContextEventHandler />
+              <VisibilityHandler />
+              <UniformLifecycleController />
 
-            <FpsController />
-            <VideoExportController />
-            <Visualizer />
-            <PerformanceStatsCollector />
-          </Canvas>
-        </ErrorBoundary>
+              <FpsController />
+              <VideoExportController />
+              <Visualizer />
+              <PerformanceStatsCollector />
+            </Canvas>
+          </ErrorBoundary>
+        ) : (
+          <WebGL2UnsupportedOverlay />
+        )}
 
         {/* Context Lost Overlay - shown when WebGL context is lost */}
         <ContextLostOverlay />

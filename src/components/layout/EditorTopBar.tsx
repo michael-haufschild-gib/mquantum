@@ -36,9 +36,10 @@ interface EditorTopBarProps {
  * Top bar component for the editor layout.
  * Provides main navigation menus (File, View, Scenes, Styles), global controls,
  * and panel toggle buttons. Responsive design with mobile-friendly unified menu.
- * @param root0
- * @param root0.showRightPanel
- * @param root0.toggleRightPanel
+ * @param root0 - Component props
+ * @param root0.showRightPanel - Whether the right panel is visible
+ * @param root0.toggleRightPanel - Callback to toggle right panel visibility
+ * @returns The editor top bar component
  */
 export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   showRightPanel,

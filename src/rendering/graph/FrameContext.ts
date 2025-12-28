@@ -177,6 +177,7 @@ export interface FrozenPerformanceState {
   readonly cameraTeleported: boolean
   readonly fractalAnimationLowQuality: boolean
   readonly isShaderCompiling: boolean
+  readonly renderResolutionScale: number
 }
 
 /**
@@ -312,6 +313,7 @@ export interface StoreGetters {
     cameraTeleported: boolean
     fractalAnimationLowQuality: boolean
     isShaderCompiling: boolean
+    renderResolutionScale: number
   }
   getBlackHoleState: () => BlackHoleConfig
   getUIState: () => {
@@ -501,6 +503,7 @@ function capturePerformanceState(
     cameraTeleported: state.cameraTeleported,
     fractalAnimationLowQuality: state.fractalAnimationLowQuality,
     isShaderCompiling: state.isShaderCompiling,
+    renderResolutionScale: state.renderResolutionScale,
   }
 }
 
@@ -721,6 +724,7 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         cameraTeleported: false,
         fractalAnimationLowQuality: true,
         isShaderCompiling: false,
+        renderResolutionScale: 1.0,
       },
       blackHole: {
         horizonRadius: 1,

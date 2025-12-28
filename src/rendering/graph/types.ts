@@ -198,6 +198,27 @@ export interface RenderPassConfig {
    * @default false
    */
   skipPassthrough?: boolean
+
+  /**
+   * Number of frames to wait before deallocating internal resources when disabled.
+   *
+   * When a pass transitions from enabled to disabled, the render graph waits
+   * this many frames before calling releaseInternalResources(). This prevents
+   * thrashing when effects are toggled frequently (e.g., during UI interaction).
+   *
+   * @default 60 (~1 second at 60fps)
+   */
+  disableGracePeriod?: number
+
+  /**
+   * Skip automatic resource deallocation when disabled.
+   *
+   * Set to true for passes where reallocation cost exceeds memory savings,
+   * or where maintaining state between enable/disable cycles is important.
+   *
+   * @default false
+   */
+  keepResourcesWhenDisabled?: boolean
 }
 
 /**
@@ -229,6 +250,36 @@ export interface RenderPass {
    * Optional cleanup when pass is removed from graph.
    */
   dispose?(): void
+
+  /**
+   * Optional: Release internal GPU resources when pass is disabled.
+   *
+   * Called when a pass transitions from enabled to disabled state
+   * (after the grace period configured by disableGracePeriod).
+   *
+   * Should dispose of internal render targets and heavy resources,
+   * but NOT materials/geometry that are cheap to keep and expensive
+   * to recreate (shader recompilation).
+   *
+   * Resources will be lazily reallocated when the pass is re-enabled
+   * via the existing ensureInitialized() pattern in execute().
+   *
+   * @example
+   * ```typescript
+   * releaseInternalResources(): void {
+   *   // Dispose render targets (heavy)
+   *   this.internalTarget?.dispose();
+   *   this.internalTarget = null;
+   *
+   *   // Reset size tracking to trigger reallocation
+   *   this.lastWidth = 0;
+   *   this.lastHeight = 0;
+   *
+   *   // Keep materials/geometry - they're cheap and avoid recompilation
+   * }
+   * ```
+   */
+  releaseInternalResources?(): void
 }
 
 // =============================================================================

@@ -423,6 +423,29 @@ export class CubemapCapturePass extends BasePass {
     this.pmremGenerator = null;
   }
 
+  /**
+   * Release internal GPU resources when pass is disabled.
+   *
+   * Called by RenderGraph when this pass has been disabled for the grace period.
+   * Disposes of cubemap render targets, temporal history, and PMREM resources.
+   * State is reset to trigger fresh capture on re-enable.
+   */
+  releaseInternalResources(): void {
+    // Dispose all GPU resources using existing helper methods
+    this.disposeCubeCamera();
+    this.disposeTemporalHistory();
+    this.disposePMREM();
+
+    // Reset state to trigger fresh capture on re-enable
+    this.needsCapture = true;
+    this.lastExternalTextureUuid = null;
+    this.lastSkyboxMode = null;
+
+    // Reset frame counters
+    this.captureFrameCounter = 0;
+    this.pmremFrameCounter = 0;
+  }
+
   dispose(): void {
     this.disposeCubeCamera();
     this.disposeTemporalHistory();

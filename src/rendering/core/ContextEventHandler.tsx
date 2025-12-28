@@ -7,6 +7,10 @@
  *
  * IMPORTANT: Must be placed as a child of <Canvas>, not outside it.
  *
+ * For simulated context loss (debug), we must manually call restoreContext()
+ * since browsers only auto-restore real GPU crashes. The normal recovery flow
+ * handles this transparently.
+ *
  * @module rendering/core/ContextEventHandler
  */
 
@@ -28,56 +32,78 @@ interface WEBGL_lose_context {
  */
 export function ContextEventHandler(): null {
   const { gl } = useThree()
-  const debugRestoreTimeoutRef = useRef<number | null>(null)
   const recoveryTimeoutRef = useRef<number | null>(null)
   const loseContextExtRef = useRef<WEBGL_lose_context | null>(null)
 
-  // Subscribe to debug context loss trigger
+  // Subscribe to store state
   const debugContextLossCounter = useWebGLContextStore((s) => s.debugContextLossCounter)
+  const status = useWebGLContextStore((s) => s.status)
+  const prevStatusRef = useRef<string>(status)
 
-  // Debug: Force context loss for testing (only in development)
-  const forceContextLoss = useCallback(() => {
+  /**
+   * Get or cache the WEBGL_lose_context extension.
+   * Used for both debug context loss and manual restoration.
+   */
+  const getExtension = useCallback((): WEBGL_lose_context | null => {
     if (!loseContextExtRef.current) {
       loseContextExtRef.current = gl.getContext().getExtension(
         'WEBGL_lose_context'
       ) as WEBGL_lose_context | null
     }
+    return loseContextExtRef.current
+  }, [gl])
 
-    if (loseContextExtRef.current) {
+  /**
+   * Attempt to restore context.
+   * For simulated losses, we must call restoreContext() manually.
+   * For real GPU crashes, the browser handles restoration.
+   */
+  const attemptRestore = useCallback(() => {
+    const ext = getExtension()
+    if (ext) {
+      console.warn('[ContextEventHandler] Attempting context restoration')
+      ext.restoreContext()
+    }
+  }, [getExtension])
+
+  // Debug: Force context loss for testing (only in development)
+  const forceContextLoss = useCallback(() => {
+    const ext = getExtension()
+    if (ext) {
       console.warn('[ContextEventHandler] Forcing context loss for debugging')
-      loseContextExtRef.current.loseContext()
-
-      // Clear any existing timeout to prevent multiple restores
-      if (debugRestoreTimeoutRef.current !== null) {
-        window.clearTimeout(debugRestoreTimeoutRef.current)
-      }
-
-      // Simulated context loss requires manual restore - browser only auto-restores real GPU crashes
-      debugRestoreTimeoutRef.current = window.setTimeout(() => {
-        if (loseContextExtRef.current) {
-          console.warn('[ContextEventHandler] Restoring context after simulated loss')
-          loseContextExtRef.current.restoreContext()
-        }
-        debugRestoreTimeoutRef.current = null
-      }, 3000)
+      ext.loseContext()
+      // No special handling - let the normal flow handle everything
     } else {
       console.warn('[ContextEventHandler] WEBGL_lose_context extension not available')
     }
-  }, [gl])
+  }, [getExtension])
 
   // Trigger context loss when debugContextLossCounter changes
   useEffect(() => {
     if (debugContextLossCounter > 0) {
       forceContextLoss()
     }
-    // Cleanup timeout on unmount
-    return () => {
-      if (debugRestoreTimeoutRef.current !== null) {
-        window.clearTimeout(debugRestoreTimeoutRef.current)
-        debugRestoreTimeoutRef.current = null
+  }, [debugContextLossCounter, forceContextLoss])
+
+  // Watch for status transitions that require manual restore trigger
+  // When user clicks buttons in escalated state, status goes from 'escalated' to 'lost'
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current
+    prevStatusRef.current = status
+
+    // User clicked "Try Again" or "Reduce Quality & Retry" from escalated state
+    if (prevStatus === 'escalated' && status === 'lost') {
+      console.warn('[ContextEventHandler] User requested retry from escalated state')
+      // Small delay to let state settle, then trigger restore
+      const timeoutId = window.setTimeout(() => {
+        attemptRestore()
+      }, 100)
+      return () => {
+        window.clearTimeout(timeoutId)
       }
     }
-  }, [debugContextLossCounter, forceContextLoss])
+    return undefined
+  }, [status, attemptRestore])
 
   useEffect(() => {
     const canvas = gl.domElement
@@ -86,10 +112,8 @@ export function ContextEventHandler(): null {
     /**
      * Handle context lost event.
      * CRITICAL: event.preventDefault() allows the browser to attempt restoration.
-     * @param event
      */
     const handleContextLost = (event: Event): void => {
-      // Cast to WebGLContextEvent for type safety
       const contextEvent = event as WebGLContextEvent
       contextEvent.preventDefault() // CRITICAL: allows browser to restore context
 
@@ -101,6 +125,13 @@ export function ContextEventHandler(): null {
 
       store().onContextLost()
 
+      // Check for rapid failure - escalate to user prompt instead of auto-retry
+      if (store().isRapidFailure()) {
+        console.warn('[ContextEventHandler] Rapid failure detected, escalating to user prompt')
+        store().escalateToUserPrompt()
+        return // Don't set up auto-recovery, wait for user action
+      }
+
       // Set up recovery timeout with exponential backoff
       const timeout = store().getCurrentTimeout()
       recoveryTimeoutRef.current = window.setTimeout(() => {
@@ -109,6 +140,13 @@ export function ContextEventHandler(): null {
           // Check if we've exceeded max attempts
           if (state.recoveryAttempts >= state.recoveryConfig.maxAttempts) {
             store().onContextFailed('Maximum recovery attempts exceeded')
+          } else {
+            // Try to restore (needed for simulated context loss)
+            const ext = loseContextExtRef.current
+            if (ext) {
+              console.warn('[ContextEventHandler] Recovery timeout - attempting restore')
+              ext.restoreContext()
+            }
           }
         }
       }, timeout)
@@ -141,7 +179,6 @@ export function ContextEventHandler(): null {
     /**
      * iOS Safari specific: Handle page show event for bfcache.
      * When page is restored from bfcache, context may be lost.
-     * @param event
      */
     const handlePageShow = (event: PageTransitionEvent): void => {
       if (event.persisted) {

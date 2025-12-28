@@ -22,6 +22,14 @@ interface ModalProps {
  * Accessible modal dialog component with focus trapping.
  * Renders as a portal, handles escape key, prevents body scroll,
  * and manages focus for keyboard navigation.
+ * @param root0 - Component props
+ * @param root0.isOpen - Whether the modal is visible
+ * @param root0.onClose - Callback when the modal should be closed
+ * @param root0.title - Title displayed in the modal header
+ * @param root0.children - Modal content
+ * @param root0.width - Optional Tailwind width class
+ * @param root0.'data-testid' - Optional test ID for testing
+ * @returns The modal component or null if not open
  */
 export const Modal: React.FC<ModalProps> = ({
   isOpen,

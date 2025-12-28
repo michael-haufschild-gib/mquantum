@@ -15,6 +15,9 @@ interface SceneManagerProps {
  * Scene manager component for managing saved scenes.
  * Allows users to load, delete, import, and export scene configurations
  * (geometry, transforms, camera positions, etc.).
+ * @param root0 - Component props
+ * @param root0.onClose - Callback to close the scene manager modal
+ * @returns The scene manager component
  */
 export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
   const { savedScenes, loadScene, deleteScene, importScenes, exportScenes } = usePresetManagerStore(

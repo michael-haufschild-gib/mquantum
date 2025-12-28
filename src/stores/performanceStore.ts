@@ -91,6 +91,13 @@ interface PerformanceState {
   /** Whether to use lower quality during fractal animation for smoother interaction */
   fractalAnimationLowQuality: boolean
 
+  // -------------------------------------------------------------------------
+  // Render Resolution Scale
+  // -------------------------------------------------------------------------
+
+  /** Base render resolution scale (0.5 = half res, 1.0 = full res) */
+  renderResolutionScale: number
+
   // Shader Debugging
   shaderDebugInfos: Record<string, ShaderDebugInfo>
   shaderOverrides: string[]
@@ -129,6 +136,9 @@ interface PerformanceState {
 
   // Fractal Animation Quality
   setFractalAnimationLowQuality: (enabled: boolean) => void
+
+  // Render Resolution Scale
+  setRenderResolutionScale: (scale: number) => void
 
   // Shader Debugging
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => void
@@ -174,6 +184,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Fractal Animation Quality
   fractalAnimationLowQuality: true,
+
+  // Render Resolution Scale
+  renderResolutionScale: 1.0,
 
   // Shader Debugging
   shaderDebugInfos: {},
@@ -251,6 +264,11 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ fractalAnimationLowQuality: enabled })
   },
 
+  // Render Resolution Scale
+  setRenderResolutionScale: (scale: number) => {
+    set({ renderResolutionScale: Math.max(0.5, Math.min(1.0, scale)) })
+  },
+
   // Shader Debugging
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => {
     set((state) => {
@@ -321,6 +339,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       temporalReprojectionEnabled: true,
       cameraTeleported: false,
       fractalAnimationLowQuality: true,
+      renderResolutionScale: 1.0,
       shaderDebugInfos: {},
       shaderOverrides: [],
       compilingShaders: new Set<string>(),

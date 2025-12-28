@@ -299,10 +299,11 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
   }));
   const uiState = useUIStore(uiSelector);
 
-  // Store subscriptions - Performance (temporal reprojection)
+  // Store subscriptions - Performance (temporal reprojection, resolution scale)
   const perfSelector = useShallow((s: ReturnType<typeof usePerformanceStore.getState>) => ({
     temporalReprojectionEnabled: s.temporalReprojectionEnabled,
     qualityMultiplier: s.qualityMultiplier,
+    renderResolutionScale: s.renderResolutionScale,
   }));
   const perfState = usePerformanceStore(perfSelector);
 
@@ -403,6 +404,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     paper?: PaperTexturePass;
     fxaa?: FXAAPass;
     smaa?: SMAAPass;
+    toScreen?: ToScreenPass;
   }>({});
 
   // Create graph with all resources and passes
@@ -455,6 +457,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
           cameraTeleported: s.cameraTeleported,
           fractalAnimationLowQuality: s.fractalAnimationLowQuality,
           isShaderCompiling: s.isShaderCompiling,
+          renderResolutionScale: s.renderResolutionScale,
         };
       },
       getBlackHoleState: () => useExtendedObjectStore.getState().blackhole,
@@ -1271,19 +1274,19 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       })
     );
 
-    g.addPass(
-      new ToScreenPass({
-        id: 'finalToScreen',
-        inputs: [{ resourceId: RESOURCES.AA_OUTPUT, access: 'read' }],
-        gammaCorrection: false, // Let renderer handle it
-        toneMapping: false,
-        enabled: (frame) => {
-          if (!frame) return true; // Default to showing final output
-          const ui = frame.stores.ui;
-          return !(ui.showDepthBuffer || ui.showNormalBuffer || ui.showTemporalDepthBuffer);
-        },
-      })
-    );
+    const toScreenPass = new ToScreenPass({
+      id: 'finalToScreen',
+      inputs: [{ resourceId: RESOURCES.AA_OUTPUT, access: 'read' }],
+      gammaCorrection: false, // Let renderer handle it
+      toneMapping: false,
+      enabled: (frame) => {
+        if (!frame) return true; // Default to showing final output
+        const ui = frame.stores.ui;
+        return !(ui.showDepthBuffer || ui.showNormalBuffer || ui.showTemporalDepthBuffer);
+      },
+    });
+    passRefs.current.toScreen = toScreenPass;
+    g.addPass(toScreenPass);
 
     // Debug overlay pass - renders RENDER_LAYERS.DEBUG after all post-processing.
     // This allows standard Three.js materials (MeshBasicMaterial, LineBasicMaterial,
@@ -1411,8 +1414,29 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     const graphInstance = graphRef.current;
     if (!graphInstance) return;
 
-    graphInstance.setSize(size.width, size.height);
-  }, [graph, size.width, size.height]); // Still depend on graph to re-run when graph changes
+    graphInstance.setSize(size.width, size.height, perfState.renderResolutionScale);
+  }, [graph, size.width, size.height, perfState.renderResolutionScale]); // Still depend on graph to re-run when graph changes
+
+  // ==========================================================================
+  // Update CAS sharpening for upscaled content
+  // ==========================================================================
+
+  useEffect(() => {
+    const { toScreen } = passRefs.current;
+    if (!toScreen) return;
+
+    const scale = perfState.renderResolutionScale;
+
+    // Skip sharpening at near-full resolution (95%+)
+    if (scale >= 0.95) {
+      toScreen.setSharpness(0);
+    } else {
+      // Auto-calculate sharpness: lower resolution = stronger sharpening
+      // Formula: (1 - scale) * 1.5, clamped to max 0.7
+      const autoSharpness = Math.min(0.7, (1 - scale) * 1.5);
+      toScreen.setSharpness(autoSharpness);
+    }
+  }, [perfState.renderResolutionScale]);
 
   // ==========================================================================
   // CRITICAL: Initialize MRT state manager BEFORE any useFrame rendering

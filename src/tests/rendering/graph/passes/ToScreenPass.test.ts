@@ -119,6 +119,49 @@ describe('ToScreenPass', () => {
     })
   })
 
+  describe('CAS sharpening', () => {
+    it('should set sharpness and return it via getter', () => {
+      pass.setSharpness(0.5)
+      expect(pass.getSharpness()).toBeCloseTo(0.5)
+    })
+
+    it('should clamp sharpness to 0-1 range (upper bound)', () => {
+      pass.setSharpness(1.5)
+      expect(pass.getSharpness()).toBeCloseTo(1.0)
+    })
+
+    it('should clamp sharpness to 0-1 range (lower bound)', () => {
+      pass.setSharpness(-0.5)
+      expect(pass.getSharpness()).toBeCloseTo(0.0)
+    })
+
+    it('should default sharpness to 0 (disabled)', () => {
+      expect(pass.getSharpness()).toBeCloseTo(0.0)
+    })
+
+    it('should handle typical 50% resolution scaling', () => {
+      // At 50% resolution, sharpness should be high (~0.7)
+      const scale = 0.5
+      const autoSharpness = Math.min(0.7, (1 - scale) * 1.5)
+      pass.setSharpness(autoSharpness)
+      expect(pass.getSharpness()).toBeCloseTo(0.7)
+    })
+
+    it('should handle typical 75% resolution scaling', () => {
+      // At 75% resolution, sharpness should be moderate (~0.375)
+      const scale = 0.75
+      const autoSharpness = Math.min(0.7, (1 - scale) * 1.5)
+      pass.setSharpness(autoSharpness)
+      expect(pass.getSharpness()).toBeCloseTo(0.375)
+    })
+
+    it('should be disabled at full resolution', () => {
+      // At 100% resolution, sharpness should be 0
+      pass.setSharpness(0)
+      expect(pass.getSharpness()).toBeCloseTo(0.0)
+    })
+  })
+
   describe('disposal', () => {
     it('should dispose without error', () => {
       expect(() => pass.dispose()).not.toThrow()

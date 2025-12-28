@@ -15,6 +15,9 @@ interface StyleManagerProps {
  * Style manager component for managing saved visual styles.
  * Allows users to load, delete, import, and export style configurations
  * (appearance, lighting, post-processing, environment, PBR settings).
+ * @param root0 - Component props
+ * @param root0.onClose - Callback to close the style manager modal
+ * @returns The style manager component
  */
 export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
   const { savedStyles, loadStyle, deleteStyle, importStyles, exportStyles } = usePresetManagerStore(

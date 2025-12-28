@@ -100,6 +100,10 @@ function setUniform<T>(
  * - Lighting updates
  * - Temporal accumulation setup
  *
+ * OPTIMIZATION: Uses dirty-flag tracking to skip unchanged uniform categories.
+ * Categories: per-frame (always), blackhole-config (on version change),
+ * rotation (on rotation change), gravity (on gravity change).
+ *
  * @param options - Configuration options
  * @param options.meshRef - Reference to the black hole mesh
  */
@@ -113,8 +117,14 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
   // Use shared rotation updates hook for basis vector computation
   const rotationUpdates = useRotationUpdates({ dimension, parameterValues })
 
-  // Track rotation version changes for adaptive quality
-  const prevRotationVersionRef = useRef<number>(-1)
+  // ============================================
+  // DIRTY-FLAG TRACKING REFS
+  // ============================================
+  // Track versions to skip unchanged uniform categories
+  const lastBHVersionRef = useRef(-1)
+  const lastRotationVersionRef = useRef(-1)
+  const lastGravityVersionRef = useRef(-1)
+  const lastDimensionRef = useRef(-1)
 
   // PERF (OPT-BH-3): Camera velocity tracking for ultra-fast mode
   // When camera moves quickly, enable ultra-fast mode to skip noise computation
@@ -212,30 +222,11 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     if (materialChanged) {
       prevMaterialRef.current = material
 
-      // Force-sync all critical ray bending uniforms that affect bounding sphere and lensing
-      const bhState = useExtendedObjectStore.getState().blackhole
-      const ppState = usePostProcessingStore.getState()
-      setUniform(u, 'uHorizonRadius', bhState.horizonRadius)
-      // Compute visual event horizon on-demand from horizonRadius and spin (Kerr physics)
-      const initVisualHorizon = computeVisualEventHorizon(bhState.horizonRadius, bhState.spin)
-      setUniform(u, 'uVisualEventHorizon', initVisualHorizon)
-      setUniform(u, 'uFarRadius', bhState.farRadius)
-      // Use GLOBAL gravity settings from postProcessingStore (controlled by UI slider)
-      setUniform(u, 'uGravityStrength', ppState.gravityStrength)
-      setUniform(u, 'uBendScale', ppState.gravityDistortionScale)
-      setUniform(u, 'uBendMaxPerStep', bhState.bendMaxPerStep)
-      // ManifoldIntensity is for accretion disk, NOT gravity - keep from bhState
-      setUniform(u, 'uManifoldIntensity', bhState.manifoldIntensity)
-      setUniform(u, 'uDiskInnerRadiusMul', bhState.diskInnerRadiusMul)
-      setUniform(u, 'uDiskOuterRadiusMul', bhState.diskOuterRadiusMul)
-
-      // CRITICAL: Sync shell precomputed values on material change
-      // Without this, shell is invisible until user moves a slider
-      const initShellRp = initVisualHorizon * 1.15
-      const initShellDelta = initVisualHorizon * bhState.photonShellWidth
-      setUniform(u, 'uShellRpPrecomputed', initShellRp)
-      setUniform(u, 'uShellDeltaPrecomputed', initShellDelta)
-      setUniform(u, 'uShellGlowStrength', bhState.shellGlowStrength)
+      // DIRTY-FLAG: Reset all version refs to force full sync on material change
+      lastBHVersionRef.current = -1
+      lastRotationVersionRef.current = -1
+      lastGravityVersionRef.current = -1
+      lastDimensionRef.current = -1
 
       // Also check if scene.background is ready and sync envMap state
       // Read from frozen frame context for frame-consistent state
@@ -302,9 +293,22 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     const animState = useAnimationStore.getState()
 
     // Get black hole state for coverage and temporal calculations
-    const bhState = useExtendedObjectStore.getState().blackhole
+    const extendedState = useExtendedObjectStore.getState()
+    const bhState = extendedState.blackhole
+    const bhVersion = extendedState.blackholeVersion
     // Get GLOBAL gravity settings (controlled by UI slider)
     const ppState = usePostProcessingStore.getState()
+    const gravityVersion = ppState.gravityVersion
+    // Get rotation version for dirty tracking
+    const rotationVersion = useRotationStore.getState().version
+
+    // ============================================
+    // DIRTY-FLAG: Check which categories need updating
+    // ============================================
+    const bhChanged = bhVersion !== lastBHVersionRef.current
+    const gravityChanged = gravityVersion !== lastGravityVersionRef.current
+    const rotationChanged = rotationVersion !== lastRotationVersionRef.current
+    const dimensionChanged = dimension !== lastDimensionRef.current
 
     // Calculate actual black hole visual radius for accurate coverage estimation
     // The visual extent is farRadius * horizonRadius (scale is always 1.0 now)
@@ -366,36 +370,27 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     // D-dimensional Rotation & Basis Vectors (via shared hook)
     // Only recomputes when rotations, dimension, or params change
     // ============================================
-    // Note: rotationUpdates.getBasisVectors now accepts a boolean directly
-    // We can use the UniformManager's QualitySource to check for rotation changes if we wanted,
-    // but the hook uses internal state. The hook needs to know if rotations changed.
-    // We can re-derive it or pass true if we want always update?
-    // Actually useRotationUpdates manages 'changed' internally based on prev version.
-    // We just need to pass the current boolean trigger if we have one, or just call it?
-    // The hook signature is `getBasisVectors(rotationsChanged: boolean)`.
-    // We need to know if rotations changed.
-    // Use RotationStore directly for this specific check, similar to how QualitySource does it.
-    const rotationVersion = useRotationStore.getState().version
-    // We can use a ref to track local change detection for this hook call
-    // or just let useRotationUpdates handle it if it could... but it takes the boolean.
-    // Let's keep the rotation version tracking here for the hook input.
-    const rotationsChanged = rotationVersion !== prevRotationVersionRef.current
-    if (rotationsChanged) {
-        prevRotationVersionRef.current = rotationVersion
-    }
-
+    // Uses rotationChanged flag from dirty-flag tracking above
     const {
       basisX,
       basisY,
       basisZ,
       changed: basisChanged,
-    } = rotationUpdates.getBasisVectors(rotationsChanged)
+    } = rotationUpdates.getBasisVectors(rotationChanged || dimensionChanged)
 
     // Copy basis vectors to uniforms (with null guards)
     if (basisChanged) {
       if (u.uBasisX?.value) (u.uBasisX.value as Float32Array).set(basisX)
       if (u.uBasisY?.value) (u.uBasisY.value as Float32Array).set(basisY)
       if (u.uBasisZ?.value) (u.uBasisZ.value as Float32Array).set(basisZ)
+    }
+
+    // Update rotation/dimension version refs
+    if (rotationChanged) {
+      lastRotationVersionRef.current = rotationVersion
+    }
+    if (dimensionChanged) {
+      lastDimensionRef.current = dimension
     }
 
     // ============================================
@@ -420,115 +415,134 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       }
     }
 
-    // Update black hole uniforms (Kerr physics)
-    setUniform(u, 'uHorizonRadius', bhState.horizonRadius)
-    // Compute visual event horizon on-demand from horizonRadius and spin (Kerr physics)
-    setUniform(u, 'uVisualEventHorizon', computeVisualEventHorizon(bhState.horizonRadius, bhState.spin))
-    setUniform(u, 'uSpin', bhState.spin)
-    setUniform(u, 'uDiskTemperature', bhState.diskTemperature)
-    // Use GLOBAL gravity settings from postProcessingStore (controlled by UI slider)
-    setUniform(u, 'uGravityStrength', ppState.gravityStrength)
-    // ManifoldIntensity is for accretion disk, NOT gravity - keep from bhState
-    setUniform(u, 'uManifoldIntensity', bhState.manifoldIntensity)
-    setUniform(u, 'uManifoldThickness', bhState.manifoldThickness)
-    setUniform(u, 'uPhotonShellWidth', bhState.photonShellWidth)
-    setUniform(u, 'uTimeScale', bhState.timeScale)
-    setUniform(u, 'uBloomBoost', bhState.bloomBoost)
+    // ============================================
+    // BLACKHOLE CONFIG UNIFORMS (only on bhVersion change)
+    // ============================================
+    if (bhChanged) {
+      // Update black hole uniforms (Kerr physics)
+      setUniform(u, 'uHorizonRadius', bhState.horizonRadius)
+      // Compute visual event horizon on-demand from horizonRadius and spin (Kerr physics)
+      setUniform(u, 'uVisualEventHorizon', computeVisualEventHorizon(bhState.horizonRadius, bhState.spin))
+      setUniform(u, 'uSpin', bhState.spin)
+      setUniform(u, 'uDiskTemperature', bhState.diskTemperature)
+      // ManifoldIntensity is for accretion disk, NOT gravity - keep from bhState
+      setUniform(u, 'uManifoldIntensity', bhState.manifoldIntensity)
+      setUniform(u, 'uManifoldThickness', bhState.manifoldThickness)
+      setUniform(u, 'uPhotonShellWidth', bhState.photonShellWidth)
+      setUniform(u, 'uTimeScale', bhState.timeScale)
+      setUniform(u, 'uBloomBoost', bhState.bloomBoost)
 
-    // Update colors (with null guards) using Global Appearance Store
-    // Note: ColorSource handles algorithm uniforms, but these are material-specific colors
-    const appearanceState = useAppearanceStore.getState()
-    if (u.uBaseColor?.value) {
-      updateLinearColorUniform(
-        cache.baseColor,
-        u.uBaseColor.value as THREE.Color,
-        appearanceState.faceColor
-      )
+      // Update colors (with null guards) using Global Appearance Store
+      // Note: ColorSource handles algorithm uniforms, but these are material-specific colors
+      const appearanceState = useAppearanceStore.getState()
+      if (u.uBaseColor?.value) {
+        updateLinearColorUniform(
+          cache.baseColor,
+          u.uBaseColor.value as THREE.Color,
+          appearanceState.faceColor
+        )
+      }
+      if (u.uShellGlowColor?.value) {
+        updateLinearColorUniform(
+          cache.shellGlowColor,
+          u.uShellGlowColor.value as THREE.Color,
+          bhState.shellGlowColor
+        )
+      }
+
+      // Palette mode (still supported for black hole specific modes)
+      setUniform(u, 'uPaletteMode', PALETTE_MODE_MAP[bhState.paletteMode] ?? 0)
+
+      // Lensing - Use blackhole store's settings (except bendScale which uses global gravity)
+      setUniform(u, 'uDimensionEmphasis', bhState.dimensionEmphasis)
+      setUniform(u, 'uDistanceFalloff', bhState.distanceFalloff)
+      setUniform(u, 'uEpsilonMul', bhState.epsilonMul)
+      setUniform(u, 'uBendMaxPerStep', bhState.bendMaxPerStep)
+      setUniform(u, 'uLensingClamp', bhState.lensingClamp)
+      setUniform(u, 'uRayBendingMode', RAY_BENDING_MODE_MAP[bhState.rayBendingMode] ?? 0)
+
+      // Photon shell
+      setUniform(u, 'uPhotonShellRadiusMul', bhState.photonShellRadiusMul)
+      setUniform(u, 'uPhotonShellRadiusDimBias', bhState.photonShellRadiusDimBias)
+      setUniform(u, 'uShellGlowStrength', bhState.shellGlowStrength)
+      setUniform(u, 'uShellStepMul', bhState.shellStepMul)
+      setUniform(u, 'uShellContrastBoost', bhState.shellContrastBoost)
+
+      // PERF OPTIMIZATION (OPT-BH-5): Pre-compute photon shell values on CPU
+      const visualHorizon = computeVisualEventHorizon(bhState.horizonRadius, bhState.spin)
+      // Shell center 15% outside shadow radius (so the ring is clearly visible)
+      const shellCenterOffset = 1.15
+      const shellRp = visualHorizon * shellCenterOffset
+      // Shell width: use photonShellWidth directly (0.05 = 5% of horizon radius)
+      const shellDelta = visualHorizon * bhState.photonShellWidth
+      setUniform(u, 'uShellRpPrecomputed', shellRp)
+      setUniform(u, 'uShellDeltaPrecomputed', shellDelta)
+
+      // PERF OPTIMIZATION (OPT-BH-6): Pre-compute disk radii on CPU
+      const diskInnerR = bhState.horizonRadius * bhState.diskInnerRadiusMul
+      const diskOuterR = bhState.horizonRadius * bhState.diskOuterRadiusMul
+      setUniform(u, 'uDiskInnerR', diskInnerR)
+      setUniform(u, 'uDiskOuterR', diskOuterR)
+
+      // Manifold
+      setUniform(u, 'uManifoldType', MANIFOLD_TYPE_MAP[bhState.manifoldType] ?? 0)
+      setUniform(u, 'uDiskInnerRadiusMul', bhState.diskInnerRadiusMul)
+      setUniform(u, 'uDiskOuterRadiusMul', bhState.diskOuterRadiusMul)
+      setUniform(u, 'uRadialSoftnessMul', bhState.radialSoftnessMul)
+      setUniform(u, 'uThicknessPerDimMax', bhState.thicknessPerDimMax)
+      setUniform(u, 'uHighDimWScale', bhState.highDimWScale)
+      setUniform(u, 'uSwirlAmount', bhState.swirlAmount)
+      setUniform(u, 'uNoiseScale', bhState.noiseScale)
+      setUniform(u, 'uNoiseAmount', bhState.noiseAmount)
+      setUniform(u, 'uMultiIntersectionGain', bhState.multiIntersectionGain)
+
+      // Quality - Read from store (controlled by UI sliders in BlackHoleAdvanced)
+      setUniform(u, 'uMaxSteps', bhState.maxSteps)
+      setUniform(u, 'uStepBase', bhState.stepBase)
+      setUniform(u, 'uStepMin', bhState.stepMin)
+      setUniform(u, 'uStepMax', bhState.stepMax)
+      setUniform(u, 'uStepAdaptG', bhState.stepAdaptG)
+      setUniform(u, 'uStepAdaptR', bhState.stepAdaptR)
+      setUniform(u, 'uEnableAbsorption', bhState.enableAbsorption)
+      setUniform(u, 'uAbsorption', bhState.absorption)
+      setUniform(u, 'uTransmittanceCutoff', bhState.transmittanceCutoff)
+      setUniform(u, 'uFarRadius', bhState.farRadius)
+
+      // Lighting (from Global Lighting Store)
+      setUniform(u, 'uLightingMode', LIGHTING_MODE_MAP[bhState.lightingMode] ?? 0)
+      setUniform(u, 'uAmbientTint', bhState.ambientTint)
+
+      // Animation flags and speeds (static config, not per-frame)
+      setUniform(u, 'uDopplerEnabled', bhState.dopplerEnabled)
+      setUniform(u, 'uDopplerStrength', bhState.dopplerStrength)
+      setUniform(u, 'uSwirlAnimationEnabled', bhState.swirlAnimationEnabled)
+      setUniform(u, 'uSwirlAnimationSpeed', bhState.swirlAnimationSpeed)
+      setUniform(u, 'uPulseEnabled', bhState.pulseEnabled)
+      setUniform(u, 'uPulseSpeed', bhState.pulseSpeed)
+      setUniform(u, 'uPulseAmount', bhState.pulseAmount)
+      setUniform(u, 'uMotionBlurEnabled', bhState.motionBlurEnabled)
+      setUniform(u, 'uMotionBlurStrength', bhState.motionBlurStrength)
+      setUniform(u, 'uMotionBlurSamples', bhState.motionBlurSamples)
+      setUniform(u, 'uMotionBlurRadialFalloff', bhState.motionBlurRadialFalloff)
+      setUniform(u, 'uSliceSpeed', bhState.sliceSpeed)
+      setUniform(u, 'uSliceAmplitude', bhState.sliceAmplitude)
+      setUniform(u, 'uKeplerianDifferential', bhState.keplerianDifferential ?? 0.5)
+
+      // Update version ref
+      lastBHVersionRef.current = bhVersion
     }
-    if (u.uShellGlowColor?.value) {
-      updateLinearColorUniform(
-        cache.shellGlowColor,
-        u.uShellGlowColor.value as THREE.Color,
-        bhState.shellGlowColor
-      )
+
+    // ============================================
+    // GRAVITY UNIFORMS (only on gravityVersion change)
+    // ============================================
+    if (gravityChanged) {
+      // Use GLOBAL gravity settings from postProcessingStore (controlled by UI slider)
+      setUniform(u, 'uGravityStrength', ppState.gravityStrength)
+      setUniform(u, 'uBendScale', ppState.gravityDistortionScale)
+
+      // Update version ref
+      lastGravityVersionRef.current = gravityVersion
     }
-
-    // Palette mode (still supported for black hole specific modes)
-    setUniform(u, 'uPaletteMode', PALETTE_MODE_MAP[bhState.paletteMode] ?? 0)
-
-    // Lensing - Use blackhole store's settings (except bendScale which uses global gravity)
-    setUniform(u, 'uDimensionEmphasis', bhState.dimensionEmphasis)
-    setUniform(u, 'uDistanceFalloff', bhState.distanceFalloff)
-    setUniform(u, 'uEpsilonMul', bhState.epsilonMul)
-    // Use GLOBAL gravity distortion scale from postProcessingStore (controlled by UI slider)
-    setUniform(u, 'uBendScale', ppState.gravityDistortionScale)
-    setUniform(u, 'uBendMaxPerStep', bhState.bendMaxPerStep)
-    setUniform(u, 'uLensingClamp', bhState.lensingClamp)
-    setUniform(u, 'uRayBendingMode', RAY_BENDING_MODE_MAP[bhState.rayBendingMode] ?? 0)
-
-    // Photon shell
-    setUniform(u, 'uPhotonShellRadiusMul', bhState.photonShellRadiusMul)
-    setUniform(u, 'uPhotonShellRadiusDimBias', bhState.photonShellRadiusDimBias)
-    setUniform(u, 'uShellGlowStrength', bhState.shellGlowStrength)
-    setUniform(u, 'uShellStepMul', bhState.shellStepMul)
-    setUniform(u, 'uShellContrastBoost', bhState.shellContrastBoost)
-
-    // PERF OPTIMIZATION (OPT-BH-5): Pre-compute photon shell values on CPU
-    //
-    // CRITICAL FIX: The photon shell must be OUTSIDE the absorption zone.
-    // The shadow radius (~2.6 * rs for Schwarzschild) defines where rays are absorbed.
-    // If the shell is at or inside the shadow radius, it won't be visible.
-    //
-    // The visible "photon ring" in real black hole images is at the SHADOW EDGE.
-    // We position the shell CENTER 15% outside the shadow radius so the ring
-    // is clearly visible and extends both slightly inside and mostly outside.
-    //
-    const visualHorizon = computeVisualEventHorizon(bhState.horizonRadius, bhState.spin)
-    // Shell center 15% outside shadow radius (so the ring is clearly visible)
-    const shellCenterOffset = 1.15
-    const shellRp = visualHorizon * shellCenterOffset
-    // Shell width: use photonShellWidth directly (0.05 = 5% of horizon radius)
-    const shellDelta = visualHorizon * bhState.photonShellWidth
-    setUniform(u, 'uShellRpPrecomputed', shellRp)
-    setUniform(u, 'uShellDeltaPrecomputed', shellDelta)
-
-    // PERF OPTIMIZATION (OPT-BH-6): Pre-compute disk radii on CPU
-    // Avoids repeated uHorizonRadius * uDiskXxxRadiusMul per-pixel across multiple shader files
-    const diskInnerR = bhState.horizonRadius * bhState.diskInnerRadiusMul
-    const diskOuterR = bhState.horizonRadius * bhState.diskOuterRadiusMul
-    setUniform(u, 'uDiskInnerR', diskInnerR)
-    setUniform(u, 'uDiskOuterR', diskOuterR)
-
-    // Manifold
-    setUniform(u, 'uManifoldType', MANIFOLD_TYPE_MAP[bhState.manifoldType] ?? 0)
-
-    setUniform(u, 'uDiskInnerRadiusMul', bhState.diskInnerRadiusMul)
-    setUniform(u, 'uDiskOuterRadiusMul', bhState.diskOuterRadiusMul)
-    setUniform(u, 'uRadialSoftnessMul', bhState.radialSoftnessMul)
-    setUniform(u, 'uThicknessPerDimMax', bhState.thicknessPerDimMax)
-    setUniform(u, 'uHighDimWScale', bhState.highDimWScale)
-    setUniform(u, 'uSwirlAmount', bhState.swirlAmount)
-    setUniform(u, 'uNoiseScale', bhState.noiseScale)
-    setUniform(u, 'uNoiseAmount', bhState.noiseAmount)
-    setUniform(u, 'uMultiIntersectionGain', bhState.multiIntersectionGain)
-
-    // Quality - Read from store (controlled by UI sliders in BlackHoleAdvanced)
-    setUniform(u, 'uMaxSteps', bhState.maxSteps)
-    setUniform(u, 'uStepBase', bhState.stepBase)
-    setUniform(u, 'uStepMin', bhState.stepMin)
-    setUniform(u, 'uStepMax', bhState.stepMax)
-    setUniform(u, 'uStepAdaptG', bhState.stepAdaptG)
-    setUniform(u, 'uStepAdaptR', bhState.stepAdaptR)
-    setUniform(u, 'uEnableAbsorption', bhState.enableAbsorption)
-    setUniform(u, 'uAbsorption', bhState.absorption)
-    setUniform(u, 'uTransmittanceCutoff', bhState.transmittanceCutoff)
-    setUniform(u, 'uFarRadius', bhState.farRadius)
-
-    // Lighting (from Global Lighting Store)
-    // Note: uRoughness and uSpecular (specularIntensity) are now provided by 'pbr-face' source
-    // via UniformManager.applyToMaterial above
-    setUniform(u, 'uLightingMode', LIGHTING_MODE_MAP[bhState.lightingMode] ?? 0)
-    setUniform(u, 'uAmbientTint', bhState.ambientTint)
 
     // ========================================================================
     // Environment Map Update (Frame-Consistent via ExternalBridge)
@@ -568,34 +582,14 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       setUniform(u, 'uEnvMapReady', 0.0)
     }
 
-    // Doppler
-    setUniform(u, 'uDopplerEnabled', bhState.dopplerEnabled)
-    setUniform(u, 'uDopplerStrength', bhState.dopplerStrength)
-
-    // Animation
-    setUniform(u, 'uSwirlAnimationEnabled', bhState.swirlAnimationEnabled)
-    setUniform(u, 'uSwirlAnimationSpeed', bhState.swirlAnimationSpeed)
-    setUniform(u, 'uPulseEnabled', bhState.pulseEnabled)
-    setUniform(u, 'uPulseSpeed', bhState.pulseSpeed)
-    setUniform(u, 'uPulseAmount', bhState.pulseAmount)
-
-    // Motion blur
-    setUniform(u, 'uMotionBlurEnabled', bhState.motionBlurEnabled)
-    setUniform(u, 'uMotionBlurStrength', bhState.motionBlurStrength)
-    setUniform(u, 'uMotionBlurSamples', bhState.motionBlurSamples)
-    setUniform(u, 'uMotionBlurRadialFalloff', bhState.motionBlurRadialFalloff)
-
-    // Slice animation (for trueND mode)
-    setUniform(u, 'uSliceSpeed', bhState.sliceSpeed)
-    setUniform(u, 'uSliceAmplitude', bhState.sliceAmplitude)
-
-    // Keplerian disk rotation (from rotation system)
+    // Keplerian disk rotation (per-frame - disk angle animates)
     // Read rotation angle from rotationStore - XZ is the primary disk rotation plane
     const rotations = useRotationStore.getState().rotations
     const diskAngle = rotations.get('XZ') ?? 0
     setUniform(u, 'uDiskRotationAngle', diskAngle)
-    // Use keplerianDifferential from store (or default 0.5)
-    setUniform(u, 'uKeplerianDifferential', bhState.keplerianDifferential ?? 0.5)
+
+    // Note: Animation flags, Doppler, Motion blur, and keplerianDifferential
+    // are now in the bhChanged block above (they're static config, not per-frame)
 
     // Note: Lighting and PBR uniforms already applied at line ~301 via UniformManager
     // ['lighting', 'quality', 'color', 'pbr-face']

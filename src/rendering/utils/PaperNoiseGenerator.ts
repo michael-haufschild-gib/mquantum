@@ -43,6 +43,9 @@ class PaperNoise {
   /**
    * Simple hash function for 2D coordinates.
    * Returns value in [0, 1].
+   * @param x - X coordinate
+   * @param y - Y coordinate
+   * @returns Hash value in range [0, 1]
    */
   hash(x: number, y: number): number {
     const ix = Math.floor(x) & 255;
@@ -53,6 +56,9 @@ class PaperNoise {
   /**
    * Value noise for 2D coordinates.
    * Returns value in [0, 1].
+   * @param x - X coordinate
+   * @param y - Y coordinate
+   * @returns Noise value in range [0, 1]
    */
   noise2D(x: number, y: number): number {
     const ix = Math.floor(x);
@@ -75,6 +81,10 @@ class PaperNoise {
   /**
    * Fractal Brownian Motion for fiber-like noise.
    * Returns value in [0, 1].
+   * @param x - X coordinate
+   * @param y - Y coordinate
+   * @param octaves - Number of noise octaves (default: 4)
+   * @returns FBM noise value in range [0, 1]
    */
   fbm(x: number, y: number, octaves: number = 4): number {
     let total = 0;

@@ -646,6 +646,44 @@ export class GTAOPass extends BasePass {
     return this.useHalfRes;
   }
 
+  /**
+   * Release internal GPU resources when pass is disabled.
+   *
+   * Called by RenderGraph when this pass has been disabled for the grace period.
+   * Disposes of render targets and GTAOPass instances (which have internal buffers),
+   * but keeps materials and geometry to avoid shader recompilation on re-enable.
+   */
+  releaseInternalResources(): void {
+    // Dispose full-res resources
+    this.gtaoPass?.dispose?.();
+    this.gtaoPass = null;
+    this.readTarget?.dispose();
+    this.readTarget = null;
+    this.writeTarget?.dispose();
+    this.writeTarget = null;
+
+    // Dispose half-res resources
+    this.halfResGtaoPass?.dispose?.();
+    this.halfResGtaoPass = null;
+    this.halfResReadTarget?.dispose();
+    this.halfResReadTarget = null;
+    this.halfResWriteTarget?.dispose();
+    this.halfResWriteTarget = null;
+
+    // Reset size tracking to trigger reallocation on next execute()
+    this.lastWidth = 0;
+    this.lastHeight = 0;
+    this.lastHalfWidth = 0;
+    this.lastHalfHeight = 0;
+
+    // Clear scene/camera references to allow garbage collection
+    this.sceneRef = null;
+    this.cameraRef = null;
+
+    // Keep copyMaterial, copyMesh, copyScene, copyCamera - they're cheap
+    // Keep upsampleMaterial, upsampleMesh, upsampleScene - also cheap
+  }
+
   dispose(): void {
     // Dispose full-res resources
     this.gtaoPass?.dispose?.();

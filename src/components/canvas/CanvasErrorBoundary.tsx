@@ -9,7 +9,7 @@
  */
 
 import { useMsgBoxStore } from '@/stores/msgBoxStore';
-import { Component, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface CanvasErrorBoundaryProps {
   children: ReactNode;
@@ -20,6 +20,11 @@ interface CanvasErrorBoundaryState {
   error: Error | null;
 }
 
+/**
+ * Error boundary component for catching and handling Canvas/WebGL errors.
+ * Displays a user-friendly error message with recovery options when a
+ * rendering error occurs in the Three.js/WebGL canvas.
+ */
 export class CanvasErrorBoundary extends Component<
   CanvasErrorBoundaryProps,
   CanvasErrorBoundaryState
@@ -33,7 +38,7 @@ export class CanvasErrorBoundary extends Component<
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log error for debugging
     console.error('Canvas rendering error:', error);
     console.error('Component stack:', errorInfo.componentStack);

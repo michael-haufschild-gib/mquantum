@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/hooks/useToast';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
 import React, { useState } from 'react';
 
@@ -35,6 +36,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const setShowAxisHelper = useUIStore((state) => state.setShowAxisHelper);
   const maxFps = useUIStore((state) => state.maxFps);
   const setMaxFps = useUIStore((state) => state.setMaxFps);
+  const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale);
+  const setRenderResolutionScale = usePerformanceStore((state) => state.setRenderResolutionScale);
 
   const handleClearIndexDB = async () => {
     try {
@@ -57,7 +60,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         })
       );
       addToast('IndexDB cleared', 'success');
-    } catch (error) {
+    } catch {
       addToast('Failed to clear IndexDB', 'error');
     }
   };
@@ -66,7 +69,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     try {
       localStorage.clear();
       addToast('localStorage cleared', 'success');
-    } catch (error) {
+    } catch {
       addToast('Failed to clear localStorage', 'error');
     }
   };
@@ -91,6 +94,19 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           unit=" fps"
           tooltip="Limit frame rate to reduce power consumption"
           data-testid="max-fps-slider"
+        />
+      </div>
+      <div className="mt-3 pt-3 border-t border-panel-border">
+        <Slider
+          label="Render Resolution"
+          value={renderResolutionScale}
+          min={0.5}
+          max={1.0}
+          step={0.25}
+          onChange={setRenderResolutionScale}
+          formatValue={(v) => `${Math.round(v * 100)}%`}
+          tooltip="Lower resolution reduces GPU memory usage. Use 50-75% if experiencing graphics issues."
+          data-testid="render-resolution-slider"
         />
       </div>
       <div className="mt-3 pt-3 border-t border-panel-border flex flex-col gap-2">

@@ -541,6 +541,73 @@ export class ResourcePool {
     // No-op - resize is now handled lazily per-resource via dimensionsChanged check
   }
 
+  // Pre-allocated arrays for invalidateFramebuffer to avoid per-frame allocation
+  // WebGL constants: COLOR_ATTACHMENT0 = 0x8CE0, DEPTH_ATTACHMENT = 0x8D00
+  private static readonly INVALIDATE_COLOR_1 = [0x8CE0]
+  private static readonly INVALIDATE_COLOR_2 = [0x8CE0, 0x8CE1]
+  private static readonly INVALIDATE_COLOR_3 = [0x8CE0, 0x8CE1, 0x8CE2]
+  private static readonly INVALIDATE_COLOR_4 = [0x8CE0, 0x8CE1, 0x8CE2, 0x8CE3]
+  private static readonly INVALIDATE_DEPTH = [0x8D00]
+
+  /**
+   * Invalidate non-persistent framebuffers for TBDR GPU optimization.
+   *
+   * On Tile-Based Deferred Rendering GPUs (Apple, Mali, Adreno, PowerVR),
+   * this signals that intermediate render target data can be discarded,
+   * allowing the GPU to skip expensive tile store operations to main memory.
+   *
+   * @param renderer - The Three.js WebGL renderer
+   * @param pingPongResources - Set of resource IDs that need ping-pong (skip these)
+   */
+  invalidateFramebuffers(
+    renderer: THREE.WebGLRenderer,
+    pingPongResources: Set<string>
+  ): void {
+    const gl = renderer.getContext() as WebGL2RenderingContext
+
+    // Check WebGL2 availability - invalidateFramebuffer is WebGL2 only
+    if (!gl.invalidateFramebuffer) return
+
+    for (const [id, entry] of this.resources) {
+      // Skip ping-pong resources (need frame-to-frame history)
+      if (pingPongResources.has(id)) continue
+
+      // Skip persistent resources (temporal effects)
+      if (entry.config.persistent) continue
+
+      // Skip unallocated resources
+      if (!entry.target) continue
+
+      // Get Three.js internal framebuffer handle
+      // Three.js stores WebGL objects in renderer.properties (internal API)
+      const props = renderer.properties.get(entry.target) as
+        | { __webglFramebuffer?: WebGLFramebuffer }
+        | undefined
+      const framebuffer = props?.__webglFramebuffer
+      if (!framebuffer) continue
+
+      // Bind framebuffer
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer)
+
+      // Invalidate all color attachments (MRT targets may have 2-4)
+      const attachmentCount = entry.config.attachmentCount ?? 1
+      const colorAttachments =
+        attachmentCount === 1 ? ResourcePool.INVALIDATE_COLOR_1 :
+        attachmentCount === 2 ? ResourcePool.INVALIDATE_COLOR_2 :
+        attachmentCount === 3 ? ResourcePool.INVALIDATE_COLOR_3 :
+        ResourcePool.INVALIDATE_COLOR_4
+      gl.invalidateFramebuffer(gl.FRAMEBUFFER, colorAttachments)
+
+      // Also invalidate depth if present
+      if (entry.config.depthBuffer || entry.config.depthTexture) {
+        gl.invalidateFramebuffer(gl.FRAMEBUFFER, ResourcePool.INVALIDATE_DEPTH)
+      }
+    }
+
+    // Restore null binding to prevent state leakage
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  }
+
   /**
    * Dispose a single entry's GPU resources.
    * @param entry

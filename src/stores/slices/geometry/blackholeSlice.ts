@@ -58,7 +58,23 @@ import { BlackHoleSlice, ExtendedObjectSlice } from './types'
 export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], BlackHoleSlice> = (
   set,
   get
-) => ({
+) => {
+  /**
+   * Wrapped setter that auto-increments blackholeVersion when blackhole state changes.
+   * This avoids manually adding version increment to 80+ individual setters.
+   */
+  const setWithVersion: typeof set = (updater) => {
+    set((state) => {
+      const update = typeof updater === 'function' ? updater(state) : updater
+      // If updating blackhole, also bump version
+      if ('blackhole' in update) {
+        return { ...update, blackholeVersion: state.blackholeVersion + 1 }
+      }
+      return update
+    })
+  }
+
+  return {
   blackhole: { ...DEFAULT_BLACK_HOLE_CONFIG },
 
   // === Basic Parameters ===
@@ -81,7 +97,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     const diskInnerRadiusMul = kerr.iscoPrograde / clamped
     const photonShellRadiusMul = kerr.photonSpherePrograde / clamped
 
-    set((s) => ({
+    setWithVersion((s) => ({
       blackhole: {
         ...s.blackhole,
         horizonRadius: clamped,
@@ -118,7 +134,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     // Use prograde photon sphere (inner photon ring)
     const photonShellRadiusMul = kerr.photonSpherePrograde / horizonRadius
 
-    set((s) => ({
+    setWithVersion((s) => ({
       blackhole: {
         ...s.blackhole,
         spin: clamped,
@@ -137,7 +153,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   setBlackHoleDiskTemperature: (temperature) => {
     const clamped = clampWithWarning(temperature, 1000, 40000, 'diskTemperature')
     const baseColor = diskTemperatureToColor(clamped)
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: {
         ...state.blackhole,
         diskTemperature: clamped,
@@ -148,54 +164,54 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
 
   setBlackHoleGravityStrength: (strength) => {
     const clamped = clampWithWarning(strength, 0, 10, 'gravityStrength')
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, gravityStrength: clamped },
     }))
   },
 
   setBlackHoleManifoldIntensity: (intensity) => {
     const clamped = clampWithWarning(intensity, 0, 20, 'manifoldIntensity')
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, manifoldIntensity: clamped },
     }))
   },
 
   setBlackHoleManifoldThickness: (thickness) => {
     const clamped = Math.max(0, Math.min(2, thickness))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, manifoldThickness: clamped },
     }))
   },
 
   setBlackHolePhotonShellWidth: (width) => {
     const clamped = Math.max(0, Math.min(0.3, width))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, photonShellWidth: clamped },
     }))
   },
 
   setBlackHoleTimeScale: (scale) => {
     const clamped = Math.max(0, Math.min(5, scale))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, timeScale: clamped },
     }))
   },
 
   setBlackHoleBaseColor: (color) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, baseColor: color },
     }))
   },
 
   setBlackHolePaletteMode: (mode) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, paletteMode: mode },
     }))
   },
 
   setBlackHoleBloomBoost: (boost) => {
     const clamped = Math.max(0, Math.min(5, boost))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, bloomBoost: clamped },
     }))
   },
@@ -203,48 +219,48 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   // === Lensing ===
   setBlackHoleDimensionEmphasis: (emphasis) => {
     const clamped = Math.max(0, Math.min(2, emphasis))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, dimensionEmphasis: clamped },
     }))
   },
 
   setBlackHoleDistanceFalloff: (falloff) => {
     const clamped = Math.max(0.5, Math.min(4, falloff))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, distanceFalloff: clamped },
     }))
   },
 
   setBlackHoleEpsilonMul: (epsilon) => {
     const clamped = Math.max(1e-5, Math.min(0.5, epsilon))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, epsilonMul: clamped },
     }))
   },
 
   setBlackHoleBendScale: (scale) => {
     const clamped = Math.max(0, Math.min(5, scale))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, bendScale: clamped },
     }))
   },
 
   setBlackHoleBendMaxPerStep: (max) => {
     const clamped = Math.max(0, Math.min(0.8, max))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, bendMaxPerStep: clamped },
     }))
   },
 
   setBlackHoleLensingClamp: (clamp) => {
     const clamped = Math.max(0, Math.min(100, clamp))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, lensingClamp: clamped },
     }))
   },
 
   setBlackHoleRayBendingMode: (mode: BlackHoleRayBendingMode) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, rayBendingMode: mode },
     }))
   },
@@ -252,48 +268,48 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   // === Photon Shell ===
   setBlackHolePhotonShellRadiusMul: (mul) => {
     const clamped = Math.max(1.0, Math.min(2.0, mul))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, photonShellRadiusMul: clamped },
     }))
   },
 
   setBlackHolePhotonShellRadiusDimBias: (bias) => {
     const clamped = Math.max(0, Math.min(0.5, bias))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, photonShellRadiusDimBias: clamped },
     }))
   },
 
   setBlackHoleShellGlowStrength: (strength) => {
     const clamped = Math.max(0, Math.min(20, strength))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shellGlowStrength: clamped },
     }))
   },
 
   setBlackHoleShellGlowColor: (color) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shellGlowColor: color },
     }))
   },
 
   setBlackHoleShellStepMul: (mul) => {
     const clamped = Math.max(0.05, Math.min(1, mul))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shellStepMul: clamped },
     }))
   },
 
   setBlackHoleShellContrastBoost: (boost) => {
     const clamped = Math.max(0, Math.min(3, boost))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shellContrastBoost: clamped },
     }))
   },
 
   // === Manifold ===
   setBlackHoleManifoldType: (type) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, manifoldType: type },
     }))
   },
@@ -303,7 +319,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     // Ensure inner < outer with a minimum gap of 0.1
     const maxInner = Math.max(0, state.blackhole.diskOuterRadiusMul - 0.1)
     const clamped = Math.max(0, Math.min(Math.min(10, maxInner), mul))
-    set((s) => ({
+    setWithVersion((s) => ({
       blackhole: { ...s.blackhole, diskInnerRadiusMul: clamped },
     }))
   },
@@ -313,56 +329,56 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     // Ensure outer > inner with a minimum gap of 0.1
     const minOuter = state.blackhole.diskInnerRadiusMul + 0.1
     const clamped = Math.max(Math.max(0.1, minOuter), Math.min(200, mul))
-    set((s) => ({
+    setWithVersion((s) => ({
       blackhole: { ...s.blackhole, diskOuterRadiusMul: clamped },
     }))
   },
 
   setBlackHoleRadialSoftnessMul: (mul) => {
     const clamped = Math.max(0, Math.min(2, mul))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, radialSoftnessMul: clamped },
     }))
   },
 
   setBlackHoleThicknessPerDimMax: (max) => {
     const clamped = Math.max(1, Math.min(10, max))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, thicknessPerDimMax: clamped },
     }))
   },
 
   setBlackHoleHighDimWScale: (scale) => {
     const clamped = Math.max(1, Math.min(10, scale))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, highDimWScale: clamped },
     }))
   },
 
   setBlackHoleSwirlAmount: (amount) => {
     const clamped = Math.max(0, Math.min(2, amount))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, swirlAmount: clamped },
     }))
   },
 
   setBlackHoleNoiseScale: (scale) => {
     const clamped = Math.max(0.1, Math.min(10, scale))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, noiseScale: clamped },
     }))
   },
 
   setBlackHoleNoiseAmount: (amount) => {
     const clamped = Math.max(0, Math.min(1, amount))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, noiseAmount: clamped },
     }))
   },
 
   setBlackHoleMultiIntersectionGain: (gain) => {
     const clamped = Math.max(0, Math.min(3, gain))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, multiIntersectionGain: clamped },
     }))
   },
@@ -370,7 +386,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   // === Rendering Quality ===
   setBlackHoleRaymarchQuality: (quality) => {
     const preset = BLACK_HOLE_QUALITY_PRESETS[quality]
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: {
         ...state.blackhole,
         raymarchQuality: quality,
@@ -381,138 +397,138 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
 
   setBlackHoleMaxSteps: (steps) => {
     const clamped = Math.max(16, Math.min(512, Math.floor(steps)))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, maxSteps: clamped },
     }))
   },
 
   setBlackHoleStepBase: (step) => {
     const clamped = Math.max(0.001, Math.min(1, step))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, stepBase: clamped },
     }))
   },
 
   setBlackHoleStepMin: (step) => {
     const clamped = Math.max(0.0001, Math.min(0.5, step))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, stepMin: clamped },
     }))
   },
 
   setBlackHoleStepMax: (step) => {
     const clamped = Math.max(0.001, Math.min(5, step))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, stepMax: clamped },
     }))
   },
 
   setBlackHoleStepAdaptG: (adapt) => {
     const clamped = Math.max(0, Math.min(5, adapt))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, stepAdaptG: clamped },
     }))
   },
 
   setBlackHoleStepAdaptR: (adapt) => {
     const clamped = Math.max(0, Math.min(2, adapt))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, stepAdaptR: clamped },
     }))
   },
 
   setBlackHoleEnableAbsorption: (enable) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, enableAbsorption: enable },
     }))
   },
 
   setBlackHoleAbsorption: (absorption) => {
     const clamped = Math.max(0, Math.min(10, absorption))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, absorption: clamped },
     }))
   },
 
   setBlackHoleTransmittanceCutoff: (cutoff) => {
     const clamped = Math.max(0, Math.min(0.2, cutoff))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, transmittanceCutoff: clamped },
     }))
   },
 
   setBlackHoleFarRadius: (radius) => {
     const clamped = Math.max(1, Math.min(100, radius))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, farRadius: clamped },
     }))
   },
 
   // === Lighting ===
   setBlackHoleLightingMode: (mode) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, lightingMode: mode },
     }))
   },
 
   setBlackHoleRoughness: (roughness) => {
     const clamped = Math.max(0, Math.min(1, roughness))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, roughness: clamped },
     }))
   },
 
   setBlackHoleSpecular: (specular) => {
     const clamped = Math.max(0, Math.min(1, specular))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, specular: clamped },
     }))
   },
 
   setBlackHoleAmbientTint: (tint) => {
     const clamped = Math.max(0, Math.min(1, tint))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, ambientTint: clamped },
     }))
   },
 
   setBlackHoleShadowEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shadowEnabled: enabled },
     }))
   },
 
   setBlackHoleShadowSteps: (steps) => {
     const clamped = Math.max(4, Math.min(64, Math.floor(steps)))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shadowSteps: clamped },
     }))
   },
 
   setBlackHoleShadowDensity: (density) => {
     const clamped = Math.max(0, Math.min(10, density))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, shadowDensity: clamped },
     }))
   },
 
   // === Temporal ===
   setBlackHoleTemporalAccumulationEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, temporalAccumulationEnabled: enabled },
     }))
   },
 
   // === Doppler Effect ===
   setBlackHoleDopplerEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, dopplerEnabled: enabled },
     }))
   },
 
   setBlackHoleDopplerStrength: (strength) => {
     const clamped = Math.max(0, Math.min(2, strength))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, dopplerStrength: clamped },
     }))
   },
@@ -523,84 +539,84 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     if (index < 0 || index >= values.length) return
     const clamped = Math.max(-2, Math.min(2, value))
     values[index] = clamped
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, parameterValues: values },
     }))
   },
 
   setBlackHoleParameterValues: (values) => {
     const clamped = values.map((v) => Math.max(-2, Math.min(2, v)))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, parameterValues: clamped },
     }))
   },
 
   resetBlackHoleParameters: () => {
     const len = get().blackhole.parameterValues.length
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, parameterValues: new Array(len).fill(0) },
     }))
   },
 
   // === Motion Blur ===
   setBlackHoleMotionBlurEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, motionBlurEnabled: enabled },
     }))
   },
 
   setBlackHoleMotionBlurStrength: (strength) => {
     const clamped = Math.max(0, Math.min(2, strength))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, motionBlurStrength: clamped },
     }))
   },
 
   setBlackHoleMotionBlurSamples: (samples) => {
     const clamped = Math.max(1, Math.min(8, Math.floor(samples)))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, motionBlurSamples: clamped },
     }))
   },
 
   setBlackHoleMotionBlurRadialFalloff: (falloff) => {
     const clamped = Math.max(0, Math.min(5, falloff))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, motionBlurRadialFalloff: clamped },
     }))
   },
 
   // === Deferred Lensing ===
   setBlackHoleDeferredLensingEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, deferredLensingEnabled: enabled },
     }))
   },
 
   setBlackHoleDeferredLensingStrength: (strength) => {
     const clamped = Math.max(0, Math.min(2, strength))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, deferredLensingStrength: clamped },
     }))
   },
 
   setBlackHoleDeferredLensingRadius: (radius) => {
     const clamped = Math.max(0, Math.min(10, radius))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, deferredLensingRadius: clamped },
     }))
   },
 
   setBlackHoleDeferredLensingChromaticAberration: (amount) => {
     const clamped = Math.max(0, Math.min(1, amount))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, deferredLensingChromaticAberration: clamped },
     }))
   },
 
   setBlackHoleSkyCubemapResolution: (resolution) => {
     const snapped = snapToValidResolution(resolution)
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, skyCubemapResolution: snapped },
     }))
   },
@@ -610,75 +626,75 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
 
   setBlackHoleLensingFalloff: (falloff) => {
     const clamped = Math.max(0.5, Math.min(4, falloff))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, lensingFalloff: clamped },
     }))
   },
 
   // === Scene Object Lensing ===
   setBlackHoleSceneObjectLensingEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, sceneObjectLensingEnabled: enabled },
     }))
   },
 
   setBlackHoleSceneObjectLensingStrength: (strength) => {
     const clamped = Math.max(0, Math.min(2, strength))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, sceneObjectLensingStrength: clamped },
     }))
   },
 
   // === Animation ===
   setBlackHoleSwirlAnimationEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, swirlAnimationEnabled: enabled },
     }))
   },
 
   setBlackHoleSwirlAnimationSpeed: (speed) => {
     const clamped = Math.max(0, Math.min(2, speed))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, swirlAnimationSpeed: clamped },
     }))
   },
 
   setBlackHolePulseEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, pulseEnabled: enabled },
     }))
   },
 
   setBlackHolePulseSpeed: (speed) => {
     const clamped = Math.max(0, Math.min(2, speed))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, pulseSpeed: clamped },
     }))
   },
 
   setBlackHolePulseAmount: (amount) => {
     const clamped = Math.max(0, Math.min(1, amount))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, pulseAmount: clamped },
     }))
   },
 
   setBlackHoleSliceAnimationEnabled: (enabled) => {
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, sliceAnimationEnabled: enabled },
     }))
   },
 
   setBlackHoleSliceSpeed: (speed) => {
     const clamped = Math.max(0.01, Math.min(0.1, speed))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, sliceSpeed: clamped },
     }))
   },
 
   setBlackHoleSliceAmplitude: (amplitude) => {
     const clamped = Math.max(0.1, Math.min(1, amplitude))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, sliceAmplitude: clamped },
     }))
   },
@@ -686,7 +702,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   // === Keplerian Disk Rotation ===
   setBlackHoleKeplerianDifferential: (differential) => {
     const clamped = Math.max(0, Math.min(1, differential))
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, keplerianDifferential: clamped },
     }))
   },
@@ -782,7 +798,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     if (config.pulseEnabled !== undefined) validated.pulseEnabled = config.pulseEnabled
     if (config.parameterValues !== undefined) validated.parameterValues = config.parameterValues
 
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: { ...state.blackhole, ...validated },
     }))
   },
@@ -795,7 +811,7 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     const baseThickness = 0.15
     const thicknessMul = 1 + (dimension - 3) * 0.1 // Thicker in higher dimensions
 
-    set((state) => ({
+    setWithVersion((state) => ({
       blackhole: {
         ...state.blackhole,
         parameterValues,
@@ -805,4 +821,5 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   },
 
   getBlackHoleConfig: () => get().blackhole,
-})
+  }
+}

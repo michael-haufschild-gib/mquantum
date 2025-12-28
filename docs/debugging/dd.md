@@ -135,3 +135,33 @@ notes:
        * Tessellation Dependent: If the walls are simple cubes with few vertices, the distortion will look jagged unless highly subdivided.
 
 Do a full in-depth code review of the new feature(s). Is the implementation 100% complete. Is the integration 100% complete (you tend to forget to integrate features). Were any bugs, race conditions, performance issues or side effects introduced? Is legacy code removed? Is all code and all patterns in line with our current tech stack's abilities and constraints? Is everything fully functional and integrated and ready to be used in production?
+
+
+  Implementation Options
+
+  Option A: CAS in ToScreenPass (Simplest)
+
+  Render (scaled) → AA (scaled) → ToScreenPass+CAS (upscale + sharpen)
+
+  Just add CAS to the ToScreenPass fragment shader. One uniform for sharpness (0-1).
+
+  Option B: FSR 1.0 Upscaler (Better Quality)
+
+  Render (scaled) → AA (scaled) → EASU (smart upscale) → RCAS (sharpen) → Screen
+
+  Requires two new passes but gives best results. AMD provides the shader code under MIT license.
+
+  Option C: Full Pipeline
+
+  Render (scaled) → EASU upscale → FXAA (full res) → RCAS sharpen → Screen
+
+  Best quality but most passes.
+
+  ---
+  Recommendation: Start with Option A (CAS in ToScreenPass). It's:
+  - Single shader change
+  - ~0.1ms cost
+  - Significant quality improvement
+  - Easy to add sharpness slider
+
+  Want me to implement CAS in ToScreenPass with a sharpness control?

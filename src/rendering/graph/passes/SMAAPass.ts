@@ -162,6 +162,32 @@ export class SMAAPass extends BasePass {
     renderer.setRenderTarget(null);
   }
 
+  /**
+   * Release internal GPU resources when pass is disabled.
+   *
+   * Called by RenderGraph when this pass has been disabled for the grace period.
+   * Disposes of render targets and the SMAAPass (which has internal textures),
+   * but keeps materials and geometry to avoid shader recompilation on re-enable.
+   */
+  releaseInternalResources(): void {
+    // Dispose SMAAPass (has internal textures for edge/blend)
+    this.smaaPass?.dispose?.();
+    this.smaaPass = null;
+
+    // Dispose our read/write targets
+    this.readTarget?.dispose();
+    this.readTarget = null;
+    this.writeTarget?.dispose();
+    this.writeTarget = null;
+
+    // Reset size tracking to trigger reallocation on next execute()
+    this.lastWidth = 0;
+    this.lastHeight = 0;
+
+    // Keep copyMaterial, copyMesh, copyScene, copyCamera - they're cheap
+    // and keeping them avoids shader recompilation on re-enable
+  }
+
   dispose(): void {
     this.smaaPass?.dispose?.();
     this.smaaPass = null;

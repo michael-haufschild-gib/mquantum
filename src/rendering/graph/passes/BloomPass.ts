@@ -437,6 +437,36 @@ export class BloomPass extends BasePass {
     };
   }
 
+  /**
+   * Release internal GPU resources when pass is disabled.
+   *
+   * Called by RenderGraph when this pass has been disabled for the grace period.
+   * Disposes of render targets and the UnrealBloomPass (which has internal MIP chain),
+   * but keeps materials and geometry to avoid shader recompilation on re-enable.
+   */
+  releaseInternalResources(): void {
+    // Dispose UnrealBloomPass (has internal render targets for MIP chain)
+    this.bloomPass?.dispose();
+    this.bloomPass = null;
+
+    // Dispose HDR high pass material (will be recreated in ensureInitialized)
+    this.hdrHighPassMaterial?.dispose();
+    this.hdrHighPassMaterial = null;
+
+    // Dispose our read/write targets
+    this.bloomReadTarget?.dispose();
+    this.bloomReadTarget = null;
+    this.bloomWriteTarget?.dispose();
+    this.bloomWriteTarget = null;
+
+    // Reset size tracking to trigger reallocation on next execute()
+    this.lastWidth = 0;
+    this.lastHeight = 0;
+
+    // Keep copyMaterial, copyMesh, copyScene, copyCamera - they're cheap
+    // and keeping them avoids shader recompilation on re-enable
+  }
+
   dispose(): void {
     this.bloomPass?.dispose();
     this.bloomPass = null;

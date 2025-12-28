@@ -421,6 +421,8 @@ const MAX_POOL_SIZE = 8192
 /**
  * Get or create a pooled Float64Array of the requested size.
  * The returned array may contain stale data - caller must fill it.
+ * @param size - Requested array size
+ * @returns Float64Array of the requested size
  */
 function getPooledFloat64(size: number): Float64Array {
   if (size > MAX_POOL_SIZE) {
@@ -437,6 +439,8 @@ function getPooledFloat64(size: number): Float64Array {
 
 /**
  * Get or create a pooled Uint32Array of the requested size.
+ * @param size - Requested array size
+ * @returns Uint32Array of the requested size
  */
 function getPooledUint32(size: number): Uint32Array {
   if (size > MAX_POOL_SIZE) {

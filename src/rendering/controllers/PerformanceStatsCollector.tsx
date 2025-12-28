@@ -118,37 +118,106 @@ export function PerformanceStatsCollector() {
   const updateVRAM = () => {
     let geomMem = 0;
     let texMem = 0;
+    const countedTextures = new Set<string>(); // Track by UUID to avoid double-counting
+    const countedGeometries = new Set<string>(); // Track by UUID to avoid double-counting
+
+    /**
+     * Gets bytes per pixel based on texture type
+     */
+    const getBytesPerPixel = (tex: THREE.Texture): number => {
+      const type = tex.type;
+      switch (type) {
+        case THREE.FloatType: return 16;      // RGBA32F
+        case THREE.HalfFloatType: return 8;   // RGBA16F
+        default: return 4;                    // RGBA8
+      }
+    };
+
+    /**
+     * Calculates texture memory from a texture instance
+     */
+    const addTextureMemory = (tex: THREE.Texture) => {
+      if (countedTextures.has(tex.uuid)) return;
+      countedTextures.add(tex.uuid);
+
+      // Get dimensions from texture.image or texture.source.data
+      let w = 0;
+      let h = 0;
+
+      // Type guard for objects with width/height
+      const hasDimensions = (obj: unknown): obj is { width: number; height: number } =>
+        typeof obj === 'object' && obj !== null && 'width' in obj && 'height' in obj;
+
+      if (hasDimensions(tex.image)) {
+        // Standard textures (Image, Canvas, ImageBitmap, DataTexture image)
+        w = tex.image.width || 0;
+        h = tex.image.height || 0;
+      } else if (tex.source && hasDimensions(tex.source.data)) {
+        // Modern Three.js uses source.data
+        w = tex.source.data.width || 0;
+        h = tex.source.data.height || 0;
+      }
+
+      if (w === 0 || h === 0) return;
+
+      const bytesPerPixel = getBytesPerPixel(tex);
+      let size = w * h * bytesPerPixel;
+
+      // CubeTexture has 6 faces
+      if (tex instanceof THREE.CubeTexture) {
+        size *= 6;
+      }
+
+      // Add mipmap overhead (1.33x for full mipchain)
+      if (tex.generateMipmaps !== false) {
+        size *= 1.33;
+      }
+
+      texMem += size;
+    };
 
     scene.traverse((object) => {
       if (object instanceof THREE.Mesh) {
-        if (object.geometry) {
-           // Estimate attributes
-           const geom = object.geometry;
-           if (geom.attributes) {
-             Object.values(geom.attributes).forEach((attr) => {
-                const bufferAttr = attr as THREE.BufferAttribute;
-                if (bufferAttr.array) {
-                  // Approximate memory: bytes per element * count
-                  geomMem += bufferAttr.array.byteLength;
-                }
-             });
-           }
-           if (geom.index && geom.index.array) {
-             geomMem += geom.index.array.byteLength;
-           }
+        // Geometry memory (with deduplication)
+        if (object.geometry && !countedGeometries.has(object.geometry.uuid)) {
+          countedGeometries.add(object.geometry.uuid);
+          const geom = object.geometry;
+
+          if (geom.attributes) {
+            Object.values(geom.attributes).forEach((attr) => {
+              const bufferAttr = attr as THREE.BufferAttribute;
+              if (bufferAttr.array) {
+                geomMem += bufferAttr.array.byteLength;
+              }
+            });
+          }
+          if (geom.index?.array) {
+            geomMem += geom.index.array.byteLength;
+          }
         }
+
+        // Texture memory from materials
         if (object.material) {
-           const mats = Array.isArray(object.material) ? object.material : [object.material];
-           mats.forEach((mat) => {
-             Object.values(mat).forEach((prop) => {
-               if (prop && prop instanceof THREE.Texture && prop.image) {
-                 const w = prop.image.width || 0;
-                 const h = prop.image.height || 0;
-                 // RGBA = 4 bytes, estimate mips * 1.33
-                 texMem += (w * h * 4) * 1.33;
-               }
-             });
-           });
+          const mats = Array.isArray(object.material) ? object.material : [object.material];
+          mats.forEach((mat) => {
+            // Check direct texture properties (map, normalMap, etc.)
+            Object.values(mat).forEach((prop) => {
+              if (prop instanceof THREE.Texture) {
+                addTextureMemory(prop);
+              }
+            });
+
+            // Check uniforms for ShaderMaterial/RawShaderMaterial
+            const uniforms = (mat as THREE.ShaderMaterial).uniforms;
+            if (uniforms) {
+              Object.values(uniforms).forEach((uniform) => {
+                const value = (uniform as { value?: unknown }).value;
+                if (value instanceof THREE.Texture) {
+                  addTextureMemory(value);
+                }
+              });
+            }
+          });
         }
       }
     });

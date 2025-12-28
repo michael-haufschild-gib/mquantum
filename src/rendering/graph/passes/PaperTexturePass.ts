@@ -65,6 +65,9 @@ export interface PaperTexturePassConfig extends Omit<RenderPassConfig, 'inputs' 
 
 /**
  * Converts a hex color string to a THREE.Vector4 (RGBA).
+ * @param hex - Hex color string (e.g., '#ff0000')
+ * @param alpha - Alpha value (0-1), defaults to 1.0
+ * @returns THREE.Vector4 containing RGBA values
  */
 function hexToVector4(hex: string, alpha: number = 1.0): THREE.Vector4 {
   const color = new THREE.Color(hex);
@@ -73,6 +76,8 @@ function hexToVector4(hex: string, alpha: number = 1.0): THREE.Vector4 {
 
 /**
  * Converts quality level to numeric value.
+ * @param quality - Quality level ('low', 'medium', 'high')
+ * @returns Numeric representation (0, 1, or 2)
  */
 function qualityToNumber(quality: PaperQuality): number {
   switch (quality) {

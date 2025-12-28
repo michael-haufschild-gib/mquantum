@@ -418,7 +418,14 @@ export function projectVerticesToPositions(
   return len
 }
 
-/** 3D projection - no higher dims, just perspective divide */
+/**
+ * 3D projection - no higher dims, just perspective divide.
+ * @param vertices - Array of N-dimensional vertices
+ * @param positions - Output Float32Array for 3D positions
+ * @param projectionDistance - Distance for perspective projection
+ * @param offset - Starting offset in positions array
+ * @param len - Number of vertices to project
+ */
 function projectVertices3D(
   vertices: VectorND[],
   positions: Float32Array,
@@ -436,7 +443,14 @@ function projectVertices3D(
   }
 }
 
-/** 4D projection - single higher dim, unrolled */
+/**
+ * 4D projection - single higher dim, unrolled.
+ * @param vertices - Array of N-dimensional vertices
+ * @param positions - Output Float32Array for 3D positions
+ * @param projectionDistance - Distance for perspective projection
+ * @param offset - Starting offset in positions array
+ * @param len - Number of vertices to project
+ */
 function projectVertices4D(
   vertices: VectorND[],
   positions: Float32Array,
@@ -465,7 +479,14 @@ function projectVertices4D(
   }
 }
 
-/** 5D projection - two higher dims, unrolled */
+/**
+ * 5D projection - two higher dims, unrolled.
+ * @param vertices - Array of N-dimensional vertices
+ * @param positions - Output Float32Array for 3D positions
+ * @param projectionDistance - Distance for perspective projection
+ * @param offset - Starting offset in positions array
+ * @param len - Number of vertices to project
+ */
 function projectVertices5D(
   vertices: VectorND[],
   positions: Float32Array,
@@ -495,7 +516,15 @@ function projectVertices5D(
   }
 }
 
-/** Generic N-D projection fallback */
+/**
+ * Generic N-D projection fallback.
+ * @param vertices - Array of N-dimensional vertices
+ * @param positions - Output Float32Array for 3D positions
+ * @param projectionDistance - Distance for perspective projection
+ * @param offset - Starting offset in positions array
+ * @param len - Number of vertices to project
+ * @param dimension - The dimension of the source vertices
+ */
 function projectVerticesND(
   vertices: VectorND[],
   positions: Float32Array,

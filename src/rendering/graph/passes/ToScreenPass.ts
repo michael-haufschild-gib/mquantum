@@ -8,6 +8,7 @@
  * - Simple copy shader (no modifications)
  * - Gamma correction option
  * - Tone mapping option
+ * - CAS (Contrast Adaptive Sharpening) for upscaled content
  *
  * @module rendering/graph/passes/ToScreenPass
  */
@@ -32,7 +33,7 @@ export interface ToScreenPassConfig extends Omit<RenderPassConfig, 'outputs'> {
 }
 
 /**
- * Fragment shader for screen output.
+ * Fragment shader for screen output with CAS sharpening.
  */
 const FRAGMENT_SHADER = `
 precision highp float;
@@ -43,6 +44,7 @@ uniform sampler2D uInput;
 uniform bool uGammaCorrection;
 uniform bool uToneMapping;
 uniform float uExposure;
+uniform float uSharpness;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -57,8 +59,58 @@ vec3 linearToSRGB(vec3 color) {
   return pow(color, vec3(1.0 / 2.2));
 }
 
+/**
+ * CAS (Contrast Adaptive Sharpening) - adapted from AMD FidelityFX
+ *
+ * This is a simplified 3x3 version that provides good quality sharpening
+ * with minimal artifacts. The algorithm adapts sharpening strength based
+ * on local contrast to prevent halo artifacts in high-contrast areas.
+ *
+ * Returns vec4 to avoid extra texture fetch for alpha channel.
+ */
+vec4 casFilter(vec2 uv) {
+  // Sample center pixel once (reuse for both sharpening and alpha)
+  vec4 center = texture(uInput, uv);
+  vec3 e = center.rgb;
+
+  // Sample 4 cardinal neighbors using textureOffset (DPR-safe, uses integer texel offsets)
+  vec3 b = textureOffset(uInput, uv, ivec2( 0, -1)).rgb;
+  vec3 d = textureOffset(uInput, uv, ivec2(-1,  0)).rgb;
+  vec3 f = textureOffset(uInput, uv, ivec2( 1,  0)).rgb;
+  vec3 h = textureOffset(uInput, uv, ivec2( 0,  1)).rgb;
+
+  // Soft min/max across 4 cardinal neighbors + center
+  vec3 minRGB = min(min(min(d, e), min(f, b)), h);
+  vec3 maxRGB = max(max(max(d, e), max(f, b)), h);
+
+  // Calculate adaptive sharpening amount per channel
+  // Higher local contrast = less sharpening (prevents halo artifacts)
+  vec3 rcpM = 1.0 / (maxRGB - minRGB + 0.001);
+  vec3 amp = clamp(min(minRGB, 2.0 - maxRGB) * rcpM, 0.0, 1.0);
+  amp = sqrt(amp);  // Soft curve for smoother transition
+
+  // Sharpening kernel weight (negative Laplacian-like filter)
+  // Peak controls maximum sharpening strength
+  float peak = -1.0 / (8.0 - 3.0 * uSharpness);
+  vec3 w = amp * peak;
+
+  // Apply sharpening: weighted sum of cardinal neighbors + center
+  // Normalized to preserve overall brightness
+  vec3 sharpened = (b + d + f + h) * w + e;
+  sharpened /= (1.0 + 4.0 * w);
+
+  return vec4(sharpened, center.a);
+}
+
 void main() {
-  vec4 color = texture(uInput, vUv);
+  vec4 color;
+
+  // Apply CAS sharpening if enabled (sharpness > 0)
+  if (uSharpness > 0.001) {
+    color = casFilter(vUv);
+  } else {
+    color = texture(uInput, vUv);
+  }
 
   if (uToneMapping) {
     color.rgb = toneMap(color.rgb);
@@ -122,6 +174,7 @@ export class ToScreenPass extends BasePass {
         uGammaCorrection: { value: config.gammaCorrection ?? false },
         uToneMapping: { value: config.toneMapping ?? false },
         uExposure: { value: config.exposure ?? 1.0 },
+        uSharpness: { value: 0.0 },
       },
       depthTest: false,
       depthWrite: false,
@@ -180,6 +233,22 @@ export class ToScreenPass extends BasePass {
    */
   setExposure(exposure: number): void {
     this.material.uniforms['uExposure']!.value = exposure
+  }
+
+  /**
+   * Set CAS sharpening intensity.
+   *
+   * @param sharpness - Sharpening intensity (0-1, 0 = disabled)
+   */
+  setSharpness(sharpness: number): void {
+    this.material.uniforms['uSharpness']!.value = Math.max(0, Math.min(1, sharpness))
+  }
+
+  /**
+   * Get current sharpness value.
+   */
+  getSharpness(): number {
+    return this.material.uniforms['uSharpness']!.value as number
   }
 
   dispose(): void {
