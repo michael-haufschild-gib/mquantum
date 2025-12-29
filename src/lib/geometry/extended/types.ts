@@ -961,6 +961,8 @@ export interface SchroedingerConfig {
   erosionTurbulence: number
   /** Noise type for erosion (0=Worley, 1=Perlin, 2=Hybrid) */
   erosionNoiseType: number
+  /** High quality erosion mode (3×3×3 Worley + 4-sample curl vs 2×2×2 + 2-sample) */
+  erosionHQ: boolean
 
   // === Curl Noise Turbulence ===
   /** Enable curl noise flow animation */
@@ -1158,6 +1160,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   erosionScale: 1.0,
   erosionTurbulence: 0.5,
   erosionNoiseType: 0,
+  erosionHQ: false,
 
   // Curl Noise
   curlEnabled: false,

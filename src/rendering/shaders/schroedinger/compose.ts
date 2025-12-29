@@ -106,6 +106,7 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     shimmer: enableShimmer,
     erosion: enableErosion,
     erosionNoiseType,
+    erosionHQ,
   } = config
 
   // Determine which quantum modules to include
@@ -216,6 +217,12 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
       defines.push(`#define EROSION_NOISE_TYPE ${erosionNoiseType}`)
       const noiseNames = ['Worley', 'Perlin', 'Hybrid']
       features.push(`Erosion Noise: ${noiseNames[erosionNoiseType]} (compile-time)`)
+    }
+    // HQ mode: use original 3×3×3 Worley and 4-sample curl (slower but higher quality)
+    // Fast mode (default): uses optimized 2×2×2 Worley and 2-sample pseudo-curl
+    if (erosionHQ) {
+      defines.push('#define EROSION_HQ')
+      features.push('Erosion HQ (3×3×3 Worley, 4-sample curl)')
     }
   }
 

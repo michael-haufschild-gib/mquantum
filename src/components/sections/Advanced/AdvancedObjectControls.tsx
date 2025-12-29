@@ -196,6 +196,7 @@ const SchroedingerAdvanced: React.FC = () => {
     setErosionScale: state.setSchroedingerErosionScale,
     setErosionTurbulence: state.setSchroedingerErosionTurbulence,
     setErosionNoiseType: state.setSchroedingerErosionNoiseType,
+    setErosionHQ: state.setSchroedingerErosionHQ,
   }));
   const {
     config,
@@ -222,6 +223,7 @@ const SchroedingerAdvanced: React.FC = () => {
     setErosionScale,
     setErosionTurbulence,
     setErosionNoiseType,
+    setErosionHQ,
   } = useExtendedObjectStore(extendedObjectSelector);
 
   // Emission settings from appearance store
@@ -606,6 +608,18 @@ const SchroedingerAdvanced: React.FC = () => {
                 onChange={(v) => setErosionNoiseType(parseInt(v))}
                 data-testid="schroedinger-erosion-type"
               />
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-text-secondary">HQ Mode</label>
+                <ToggleButton
+                  pressed={config.erosionHQ ?? false}
+                  onToggle={() => setErosionHQ(!(config.erosionHQ ?? false))}
+                  className="text-xs px-2 py-1 h-auto"
+                  data-testid="schroedinger-erosion-hq"
+                  ariaLabel="Toggle high quality erosion mode"
+                >
+                  {config.erosionHQ ? 'ON' : 'OFF'}
+                </ToggleButton>
+              </div>
             </div>
           )}
         </div>

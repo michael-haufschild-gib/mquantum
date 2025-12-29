@@ -592,6 +592,12 @@ export const createSchroedingerSlice: StateCreator<ExtendedObjectSlice, [], [], 
     }))
   },
 
+  setSchroedingerErosionHQ: (hq: boolean) => {
+    setWithVersion((state) => ({
+      schroedinger: { ...state.schroedinger, erosionHQ: hq },
+    }))
+  },
+
   setSchroedingerCurlEnabled: (enabled) => {
     setWithVersion((state) => ({
       schroedinger: { ...state.schroedinger, curlEnabled: enabled },

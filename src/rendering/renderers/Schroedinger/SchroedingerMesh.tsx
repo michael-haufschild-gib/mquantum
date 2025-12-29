@@ -281,12 +281,13 @@ const SchroedingerMesh = () => {
   const energyColorEnabled = useExtendedObjectStore((state) => state.schroedinger.energyColorEnabled);
   const shimmerEnabled = useExtendedObjectStore((state) => state.schroedinger.shimmerEnabled);
   const erosionStrength = useExtendedObjectStore((state) => state.schroedinger.erosionStrength);
+  const erosionHQ = useExtendedObjectStore((state) => state.schroedinger.erosionHQ);
   const erosionEnabled = erosionStrength > 0;
 
   // Reset overrides when configuration changes
   useEffect(() => {
     resetShaderOverrides();
-  }, [dimension, temporalEnabled, isoEnabled, sssEnabled, edgesVisible, curlEnabled, dispersionEnabled, nodalEnabled, energyColorEnabled, shimmerEnabled, erosionEnabled, resetShaderOverrides]);
+  }, [dimension, temporalEnabled, isoEnabled, sssEnabled, edgesVisible, curlEnabled, dispersionEnabled, nodalEnabled, energyColorEnabled, shimmerEnabled, erosionEnabled, erosionHQ, resetShaderOverrides]);
 
   // Compile shader
   // For volumetric mode with temporal enabled, use temporal ACCUMULATION (Horizon-style)
@@ -312,9 +313,10 @@ const SchroedingerMesh = () => {
       energyColor: energyColorEnabled,
       shimmer: shimmerEnabled,
       erosion: erosionEnabled,
+      erosionHQ: erosionHQ,
     });
     return result;
-  }, [dimension, temporalEnabled, shaderOverrides, isoEnabled, useTemporalAccumulation, quantumMode, sssEnabled, edgesVisible, curlEnabled, dispersionEnabled, nodalEnabled, energyColorEnabled, shimmerEnabled, erosionEnabled]);
+  }, [dimension, temporalEnabled, shaderOverrides, isoEnabled, useTemporalAccumulation, quantumMode, sssEnabled, edgesVisible, curlEnabled, dispersionEnabled, nodalEnabled, energyColorEnabled, shimmerEnabled, erosionEnabled, erosionHQ]);
 
   // Update debug info
   useEffect(() => {

@@ -33,4 +33,10 @@ export interface ShaderConfig {
    * If undefined, falls back to runtime uniform uErosionNoiseType
    */
   erosionNoiseType?: 0 | 1 | 2;
+  /**
+   * High quality erosion mode
+   * true: Use 3×3×3 Worley and 4-sample curl (slower but higher quality)
+   * false/undefined: Use 2×2×2 Worley and 2-sample pseudo-curl (faster)
+   */
+  erosionHQ?: boolean;
 }

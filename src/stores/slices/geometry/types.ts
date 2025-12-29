@@ -366,6 +366,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerErosionScale: (scale: number) => void
   setSchroedingerErosionTurbulence: (turbulence: number) => void
   setSchroedingerErosionNoiseType: (type: number) => void
+  setSchroedingerErosionHQ: (hq: boolean) => void
 
   // Curl Noise Settings
   setSchroedingerCurlEnabled: (enabled: boolean) => void
