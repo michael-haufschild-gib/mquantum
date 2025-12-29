@@ -105,6 +105,7 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     energyColor: enableEnergyColor,
     shimmer: enableShimmer,
     erosion: enableErosion,
+    erosionNoiseType,
   } = config
 
   // Determine which quantum modules to include
@@ -210,6 +211,12 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
   if (useErosion) {
     defines.push('#define USE_EROSION')
     features.push('Edge Erosion')
+    // D4: Compile-time noise type selection for eliminating runtime branches
+    if (erosionNoiseType !== undefined) {
+      defines.push(`#define EROSION_NOISE_TYPE ${erosionNoiseType}`)
+      const noiseNames = ['Worley', 'Perlin', 'Hybrid']
+      features.push(`Erosion Noise: ${noiseNames[erosionNoiseType]} (compile-time)`)
+    }
   }
 
   if (isosurface) {

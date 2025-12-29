@@ -26,4 +26,11 @@ export interface ShaderConfig {
   shimmer?: boolean;
   /** Enable Edge erosion effect (conditionally compiled) */
   erosion?: boolean;
+  /**
+   * Erosion noise type for compile-time optimization (D4)
+   * 0=Worley (Billowy), 1=Perlin (Smooth), 2=Hybrid
+   * If provided, eliminates runtime branching in getErosionNoise()
+   * If undefined, falls back to runtime uniform uErosionNoiseType
+   */
+  erosionNoiseType?: 0 | 1 | 2;
 }
