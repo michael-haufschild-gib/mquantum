@@ -32,11 +32,12 @@ describe('Fractal Shader Optimizations', () => {
     })
 
     it('should include guard against zero-length normal', () => {
-      // Both GetNormalTetra and GetNormal should have this guard
-      const zeroGuardPattern = /len > 0\.0001/g
+      // All normal functions should guard against zero-length using lenSq check
+      // OPT-H9: Uses inversesqrt pattern with lenSq > 1e-8
+      const zeroGuardPattern = /lenSq > 1e-8/g
       const matches = normalBlock.match(zeroGuardPattern)
       expect(matches).not.toBeNull()
-      expect(matches!.length).toBeGreaterThanOrEqual(2) // At least GetNormal and GetNormalTetra
+      expect(matches!.length).toBeGreaterThanOrEqual(3) // GetNormal, GetNormalTetra, GetNormalFast
     })
 
     it('should still include GetNormal for ultra-high quality', () => {

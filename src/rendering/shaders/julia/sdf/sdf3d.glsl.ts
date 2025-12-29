@@ -2,6 +2,7 @@ export const sdf3dBlock = `
 // ============================================
 // Quaternion Julia SDF - 3D (using w=0 slice of 4D)
 // z = z^n + c where c is Julia constant
+// OPT-C5: Defer orbit trap sqrt (minAxisSq)
 // ============================================
 
 float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -20,8 +21,8 @@ float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float dr = 1.0;
     float r = 0.0;
 
-    // Orbit traps
-    float minPlane = 1000.0, minAxis = 1000.0, minSphere = 1000.0;
+    // Orbit traps - OPT-C5: minAxisSq instead of minAxis
+    float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
     int escIt = 0;
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {
@@ -30,9 +31,10 @@ float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         r = length(z);
         if (r > bail) { escIt = i; break; }
 
-        // Orbit traps
+        // Orbit traps - OPT-C5: Track squared for minAxis
+        float zxy_sq = z.x*z.x + z.y*z.y;
         minPlane = min(minPlane, abs(z.y));
-        minAxis = min(minAxis, sqrt(z.x*z.x + z.y*z.y));
+        minAxisSq = min(minAxisSq, zxy_sq);  // OPT-C5: Track squared
         minSphere = min(minSphere, abs(r - 0.8));
 
         // Derivative update for Julia: dr = n * r^(n-1) * dr
@@ -50,6 +52,8 @@ float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         escIt = i;
     }
 
+    // OPT-C5: Single sqrt after loop
+    float minAxis = sqrt(minAxisSq);
     trap = exp(-minPlane * 5.0) * 0.3 + exp(-minAxis * 3.0) * 0.2 +
            exp(-minSphere * 8.0) * 0.2 + float(escIt) / float(max(maxIt, 1)) * 0.3;
 
@@ -72,6 +76,7 @@ float sdfJulia3D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         r = length(z);
         if (r > bail) break;
 
+        // Derivative update for Julia: dr = n * r^(n-1) * dr
         dr = pwr * pow(max(r, EPS), pwr - 1.0) * dr;
 
         // Use integer comparison for robustness (pwr is typically a whole number)

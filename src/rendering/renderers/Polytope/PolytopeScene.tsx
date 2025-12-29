@@ -495,10 +495,11 @@ export const PolytopeScene = React.memo(function PolytopeScene({
         },
         vertexShader: buildFaceVertexShader(),
         fragmentShader: faceFragmentShader,
-        // Initial transparency state - updated dynamically in useFrame based on current opacity
-        transparent: true,
+        // Initialize transparency based on current opacity to avoid first-frame sorting issues.
+        // Still updated dynamically in useFrame for runtime changes.
+        transparent: surfaceSettings.faceOpacity < 1,
         side: DoubleSide,
-        depthWrite: false,
+        depthWrite: surfaceSettings.faceOpacity >= 1,
       });
     },
     // Note: faceOpacity removed from deps - it's updated via uniforms in useFrame.

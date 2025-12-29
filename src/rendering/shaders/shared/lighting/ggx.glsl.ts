@@ -38,8 +38,12 @@ float geometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
 }
 
 // Fresnel Schlick
+// OPT-H5: pow(x,5) -> multiplication chain (3 muls vs transcendental)
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float x = clamp(1.0 - cosTheta, 0.0, 1.0);
+    float x2 = x * x;
+    float x5 = x2 * x2 * x;  // x^5 = x^2 * x^2 * x
+    return F0 + (1.0 - F0) * x5;
 }
 
 // Compute PBR Specular contribution

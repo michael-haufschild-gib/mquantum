@@ -1,6 +1,8 @@
 export const sdf4dBlock = `
 // ============================================
 // 4D Hyperbulb - FULLY UNROLLED with rotated basis
+// OPT-C5: Defer orbit trap sqrt (minAxisSq)
+// OPT-M1: Cache zxzy_sq for minAxis and rxyw calculations
 // ============================================
 
 float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -13,8 +15,8 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float dr = 1.0;
     float r = 0.0;
 
-    // Orbit traps
-    float minPlane = 1000.0, minAxis = 1000.0, minSphere = 1000.0;
+    // Orbit traps - OPT-C5: minAxisSq instead of minAxis
+    float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
     int escIt = 0;
 
     // Pre-compute phase offsets outside loop (OPT: saves 2 comparisons per iteration)
@@ -24,13 +26,14 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        // Compute r first - needed for both bailout check and distance estimation
-        r = sqrt(zx*zx + zy*zy + zz*zz + zw*zw);
+        // OPT-M1: Cache zxzy_sq for minAxisSq and rxyw calculations
+        float zxzy_sq = zx*zx + zy*zy;
+        r = sqrt(zxzy_sq + zz*zz + zw*zw);
         if (r > bail) { escIt = i; break; }
 
         // Orbit traps (using z-axis primary convention)
         minPlane = min(minPlane, abs(zy));
-        minAxis = min(minAxis, sqrt(zx*zx + zy*zy));  // Distance from z-axis
+        minAxisSq = min(minAxisSq, zxzy_sq);  // OPT-C5: Track squared
         minSphere = min(minSphere, abs(r - 0.8));
 
         // Optimized power calculation
@@ -40,9 +43,10 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
         // To hyperspherical: z-axis primary (like Mandelbulb)
         float theta = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        
-        float rxyw = sqrt(max(0.0, zx*zx + zy*zy + zw*zw));
-        
+
+        // OPT-M1: Reuse zxzy_sq in rxyw calculation
+        float rxyw = sqrt(max(0.0, zxzy_sq + zw*zw));
+
         float phi = rxyw > EPS ? acos(clamp(zx / max(rxyw, EPS), -1.0, 1.0)) : 0.0;
         float psi = atan(zw, zy);
 
@@ -65,6 +69,8 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         escIt = i;
     }
 
+    // OPT-C5: Single sqrt after loop
+    float minAxis = sqrt(minAxisSq);
     trap = exp(-minPlane * 5.0) * 0.3 + exp(-minAxis * 3.0) * 0.2 +
            exp(-minSphere * 8.0) * 0.2 + float(escIt) / float(max(maxIt, 1)) * 0.3;
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
@@ -84,8 +90,10 @@ float sdf4D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
-        
-        r = sqrt(zx*zx + zy*zy + zz*zz + zw*zw);
+
+        // OPT-M1: Cache zxzy_sq for rxyw calculation
+        float zxzy_sq = zx*zx + zy*zy;
+        r = sqrt(zxzy_sq + zz*zz + zw*zw);
         if (r > bail) break;
 
         // Optimized power calculation
@@ -95,7 +103,8 @@ float sdf4D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
         // z-axis primary (like Mandelbulb)
         float theta = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float rxyw = sqrt(max(0.0, zx*zx + zy*zy + zw*zw));
+        // OPT-M1: Reuse zxzy_sq in rxyw calculation
+        float rxyw = sqrt(max(0.0, zxzy_sq + zw*zw));
         float phi = rxyw > EPS ? acos(clamp(zx / max(rxyw, EPS), -1.0, 1.0)) : 0.0;
         float psi = atan(zw, zy);
 

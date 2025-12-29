@@ -1,6 +1,9 @@
 export const sdf5dBlock = `
 // ============================================
 // 5D Hyperbulb - FULLY UNROLLED with rotated basis
+// OPT-C2/C3: Use optimizedPow for r^pwr and r^(pwr-1)
+// OPT-C5: Defer orbit trap sqrt (minASq)
+// OPT-M2: Cache zxzy_sq for minA and r1 calculations
 // ============================================
 
 float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -12,7 +15,7 @@ float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float c4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
     float zx = cx, zy = cy, zz = cz, z3 = c3, z4 = c4;
     float dr = 1.0, r = 0.0;
-    float minP = 1000.0, minA = 1000.0, minS = 1000.0;
+    float minP = 1000.0, minASq = 1000000.0, minS = 1000.0;  // OPT-C5: minASq
     int escIt = 0;
 
     // Pre-compute phase offsets
@@ -21,22 +24,29 @@ float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
-        r = sqrt(zx*zx + zy*zy + zz*zz + z3*z3 + z4*z4);
+        // OPT-M2: Cache zxzy_sq for minASq and r1 calculations
+        float zxzy_sq = zx*zx + zy*zy;
+        r = sqrt(zxzy_sq + zz*zz + z3*z3 + z4*z4);
         if (r > bail) { escIt = i; break; }
         minP = min(minP, abs(zy));
-        minA = min(minA, sqrt(zx*zx + zy*zy));
+        minASq = min(minASq, zxzy_sq);  // OPT-C5: Track squared
         minS = min(minS, abs(r - 0.8));
-        dr = pow(max(r, EPS), pwr - 1.0) * pwr * dr + 1.0;
+
+        // OPT-C2/C3: Use optimizedPow instead of two separate pow() calls
+        float rp, rpMinus1;
+        optimizedPow(r, pwr, rp, rpMinus1);
+        dr = rpMinus1 * pwr * dr + 1.0;
 
         // 5D: 4 angles, z-axis primary (like Mandelbulb)
         float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float r1 = sqrt(zx*zx + zy*zy + z3*z3 + z4*z4);
+        // OPT-M2: Reuse zxzy_sq in r1 calculation
+        float r1 = sqrt(zxzy_sq + z3*z3 + z4*z4);
         float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
         float r2 = sqrt(zy*zy + z3*z3 + z4*z4);
         float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
         float t3 = atan(z4, z3);
 
-        float rp = pow(max(r, EPS), pwr);
+        // rp already computed by optimizedPow
         float s0 = sin((t0+phaseT)*pwr), c0 = cos((t0+phaseT)*pwr);
         float s1 = sin((t1+phaseP)*pwr), c1 = cos((t1+phaseP)*pwr);
         float s2 = sin(t2*pwr), c2 = cos(t2*pwr);
@@ -51,6 +61,8 @@ float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         escIt = i;
     }
 
+    // OPT-C5: Single sqrt after loop
+    float minA = sqrt(minASq);
     trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 + exp(-minS * 8.0) * 0.2 + float(escIt) / float(max(maxIt, 1)) * 0.3;
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
 }
@@ -69,18 +81,25 @@ float sdf5D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
-        r = sqrt(zx*zx + zy*zy + zz*zz + z3*z3 + z4*z4);
+        // OPT-M2: Cache zxzy_sq for r1 calculation
+        float zxzy_sq = zx*zx + zy*zy;
+        r = sqrt(zxzy_sq + zz*zz + z3*z3 + z4*z4);
         if (r > bail) break;
-        dr = pow(max(r, EPS), pwr - 1.0) * pwr * dr + 1.0;
+
+        // OPT-C2/C3: Use optimizedPow instead of two separate pow() calls
+        float rp, rpMinus1;
+        optimizedPow(r, pwr, rp, rpMinus1);
+        dr = rpMinus1 * pwr * dr + 1.0;
 
         float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float r1 = sqrt(zx*zx + zy*zy + z3*z3 + z4*z4);
+        // OPT-M2: Reuse zxzy_sq in r1 calculation
+        float r1 = sqrt(zxzy_sq + z3*z3 + z4*z4);
         float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
         float r2 = sqrt(zy*zy + z3*z3 + z4*z4);
         float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
         float t3 = atan(z4, z3);
 
-        float rp = pow(max(r, EPS), pwr);
+        // rp already computed by optimizedPow
         float s0 = sin((t0+phaseT)*pwr), c0 = cos((t0+phaseT)*pwr);
         float s1 = sin((t1+phaseP)*pwr), c1 = cos((t1+phaseP)*pwr);
         float s2 = sin(t2*pwr), c2 = cos(t2*pwr);

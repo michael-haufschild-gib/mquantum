@@ -9,9 +9,9 @@ vec3 GetNormal(vec3 p) {
         GetDist(p + vec3(0, h, 0)) - GetDist(p - vec3(0, h, 0)),
         GetDist(p + vec3(0, 0, h)) - GetDist(p - vec3(0, 0, h))
     );
-    // Guard against zero-length normal (flat surface or numerical issues)
-    float len = length(n);
-    return len > 0.0001 ? n / len : vec3(0.0, 1.0, 0.0);
+    // OPT-H9: inversesqrt normalization (saves sqrt + divide)
+    float lenSq = dot(n, n);
+    return lenSq > 1e-8 ? n * inversesqrt(lenSq) : vec3(0.0, 1.0, 0.0);
 }
 
 // PERF (OPT-FR-1): Tetrahedron normal calculation (4 SDF evaluations)
@@ -24,18 +24,18 @@ vec3 GetNormalTetra(vec3 p) {
     const vec3 k1 = vec3(-1.0, -1.0,  1.0);
     const vec3 k2 = vec3(-1.0,  1.0, -1.0);
     const vec3 k3 = vec3( 1.0,  1.0,  1.0);
-    
+
     float h = 0.0005;
-    
+
     // Weighted sum of tetrahedron samples
     vec3 n = k0 * GetDist(p + h * k0) +
              k1 * GetDist(p + h * k1) +
              k2 * GetDist(p + h * k2) +
              k3 * GetDist(p + h * k3);
-    
-    // Guard against zero-length normal (flat surface or numerical issues)
-    float len = length(n);
-    return len > 0.0001 ? n / len : vec3(0.0, 1.0, 0.0);
+
+    // OPT-H9: inversesqrt normalization (saves sqrt + divide)
+    float lenSq = dot(n, n);
+    return lenSq > 1e-8 ? n * inversesqrt(lenSq) : vec3(0.0, 1.0, 0.0);
 }
 
 // Fast normal calculation using forward differences (4 SDF evaluations)
@@ -49,8 +49,8 @@ vec3 GetNormalFast(vec3 p) {
         GetDist(p + vec3(0, h, 0)) - d0,
         GetDist(p + vec3(0, 0, h)) - d0
     );
-    // Guard against zero-length normal (flat surface or numerical issues)
-    float len = length(n);
-    return len > 0.0001 ? n / len : vec3(0.0, 1.0, 0.0);
+    // OPT-H9: inversesqrt normalization (saves sqrt + divide)
+    float lenSq = dot(n, n);
+    return lenSq > 1e-8 ? n * inversesqrt(lenSq) : vec3(0.0, 1.0, 0.0);
 }
 `;

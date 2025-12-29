@@ -1,4 +1,9 @@
 export const sdf3dBlock = `
+// ============================================
+// 3D Mandelbulb - Standard with z-axis primary
+// OPT-C5: Defer orbit trap sqrt (minAxisSq)
+// ============================================
+
 float sdf3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float cx = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
     float cy = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
@@ -8,8 +13,8 @@ float sdf3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float dr = 1.0;
     float r = 0.0;
 
-    // Orbit traps
-    float minPlane = 1000.0, minAxis = 1000.0, minSphere = 1000.0;
+    // Orbit traps - OPT-C5: minAxisSq instead of minAxis
+    float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
     int escIt = 0;
 
     // Pre-compute phase offsets outside loop (OPT: saves 2 comparisons per iteration)
@@ -19,13 +24,14 @@ float sdf3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        // Compute r first - needed for both bailout check and distance estimation
-        r = sqrt(zx*zx + zy*zy + zz*zz);
+        // OPT-M1: Cache zxzy_sq for r and minAxisSq calculations
+        float zxzy_sq = zx*zx + zy*zy;
+        r = sqrt(zxzy_sq + zz*zz);
         if (r > bail) { escIt = i; break; }
 
         // Orbit traps (using z-axis primary convention)
         minPlane = min(minPlane, abs(zy));
-        minAxis = min(minAxis, sqrt(zx*zx + zy*zy));  // Distance from z-axis
+        minAxisSq = min(minAxisSq, zxzy_sq);  // OPT-C5: Track squared
         minSphere = min(minSphere, abs(r - 0.8));
 
         // Optimized power calculation
@@ -51,6 +57,8 @@ float sdf3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         escIt = i;
     }
 
+    // OPT-C5: Single sqrt after loop
+    float minAxis = sqrt(minAxisSq);
     trap = exp(-minPlane * 5.0) * 0.3 + exp(-minAxis * 3.0) * 0.2 +
            exp(-minSphere * 8.0) * 0.2 + float(escIt) / float(max(maxIt, 1)) * 0.3;
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
