@@ -109,6 +109,15 @@ vi.mock('zustand/react/shallow', () => ({
   useShallow: <T,>(selector: T) => selector,
 }));
 
+// Mock the sound manager
+vi.mock('@/lib/audio/SoundManager', () => ({
+  soundManager: {
+    playClick: vi.fn(),
+    playHover: vi.fn(),
+    playSwish: vi.fn(),
+  },
+}));
+
 describe('TimelineControls', () => {
   it('toggles Rotate drawer when button is clicked', async () => {
     render(<TimelineControls />);

@@ -297,7 +297,11 @@ export const TimelineControls: FC = () => {
                     {hasTimelineControls(objectType) && (
                         <ToggleButton
                             pressed={showFractalAnim}
-                            onToggle={() => { setShowFractalAnim(!showFractalAnim); setShowRotation(false); }}
+                            onToggle={() => {
+                                setShowFractalAnim(!showFractalAnim);
+                                setShowRotation(false);
+                            }}
+                            sound="swish"
                             ariaLabel="Toggle animations drawer"
                             className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
                         >
@@ -310,7 +314,11 @@ export const TimelineControls: FC = () => {
 
                     <ToggleButton
                         pressed={showRotation}
-                        onToggle={() => { setShowRotation(!showRotation); setShowFractalAnim(false); }}
+                        onToggle={() => {
+                            setShowRotation(!showRotation);
+                            setShowFractalAnim(false);
+                        }}
+                        sound="swish"
                         ariaLabel="Toggle rotation drawer"
                         className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
                     >

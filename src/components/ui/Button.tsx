@@ -91,6 +91,7 @@ export const Button: React.FC<ButtonProps> = ({
       ref={ref}
       type={type}
       onClick={handleClick}
+      onMouseEnter={() => !disabled && !loading && soundManager.playHover()}
       disabled={disabled || loading}
       className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${glowStyle} ${className}`}
       aria-label={ariaLabel}

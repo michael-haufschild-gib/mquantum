@@ -11,7 +11,9 @@ vi.mock('@/components/ui/Icon', () => ({
 vi.mock('@/lib/audio/SoundManager', () => ({
   soundManager: {
     playClick: vi.fn(),
-    playSuccess: vi.fn()
+    playSuccess: vi.fn(),
+    playHover: vi.fn(),
+    playSwish: vi.fn(),
   }
 }));
 

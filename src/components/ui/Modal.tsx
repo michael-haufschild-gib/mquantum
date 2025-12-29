@@ -87,10 +87,11 @@ export const Modal: React.FC<ModalProps> = ({
       ref={dialogRef}
       aria-labelledby={titleId}
       onClick={handleBackdropClick}
-      className={`${width} p-0 bg-transparent border-none rounded-lg backdrop:bg-[var(--bg-app)]/50 backdrop:backdrop-blur-sm open:animate-in open:zoom-in-95 open:fade-in duration-200`}
+      className={`${width} w-full p-0 bg-transparent border-none rounded-lg backdrop:bg-[var(--bg-app)]/50 backdrop:backdrop-blur-sm open:animate-in open:zoom-in-95 open:fade-in duration-200`}
+      style={{ margin: 'auto' }}
       data-testid={dataTestId}
     >
-      <div className="bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden">
+      <div className="bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden pointer-events-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-panel-border bg-panel-header/50">
           <h2 id={titleId} className="text-sm font-bold text-text-primary tracking-wide uppercase">

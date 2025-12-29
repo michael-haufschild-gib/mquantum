@@ -23,6 +23,15 @@ vi.mock('@/stores/cameraStore', () => ({
   ),
 }));
 
+// Mock the sound manager
+vi.mock('@/lib/audio/SoundManager', () => ({
+  soundManager: {
+    playClick: vi.fn(),
+    playHover: vi.fn(),
+    playSwish: vi.fn(),
+  },
+}));
+
 describe('CanvasContextMenu', () => {
   const DROPDOWN_ID = 'canvas-context-menu';
 

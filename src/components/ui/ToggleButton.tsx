@@ -7,23 +7,37 @@ export interface ToggleButtonProps extends Omit<React.ComponentPropsWithoutRef<'
   ariaLabel: string;
   className?: string;
   children: React.ReactNode;
+  /** Sound to play on click: 'click' (default) or 'swish' (for opening drawers/panels) */
+  sound?: 'click' | 'swish';
 }
 
-export const ToggleButton = ({ 
-  pressed, 
-  onToggle, 
-  ariaLabel, 
-  className = '', 
-  children, 
+export const ToggleButton = ({
+  pressed,
+  onToggle,
+  ariaLabel,
+  className = '',
+  children,
+  sound = 'click',
   ref,
-  ...props 
+  ...props
 }: ToggleButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
+    const handleClick = () => {
+      if (sound === 'swish') {
+        // Swish only on open, click on close
+        if (!pressed) soundManager.playSwish();
+        else soundManager.playClick();
+      } else {
+        soundManager.playClick();
+      }
+      onToggle(!pressed);
+    };
+
     return (
       <button
         ref={ref}
         type="button"
         aria-pressed={pressed}
-        onClick={() => { soundManager.playClick(); onToggle(!pressed); }}
+        onClick={handleClick}
         onMouseEnter={() => soundManager.playHover()}
         className={`
           px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-300 border

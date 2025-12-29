@@ -355,6 +355,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
 
   const handleToggle = (e: React.MouseEvent) => {
     if (!isOpen) {
+      soundManager.playSwish();
+    } else {
       soundManager.playClick();
     }
     toggleDropdown(dropdownId);

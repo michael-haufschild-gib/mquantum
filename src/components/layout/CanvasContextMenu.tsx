@@ -56,6 +56,7 @@ export const CanvasContextMenu: React.FC = () => {
       if (isCanvas) {
         e.preventDefault();
         setPosition({ x: e.clientX, y: e.clientY });
+        soundManager.playSwish();
         openDropdown(DROPDOWN_ID);
       }
     };

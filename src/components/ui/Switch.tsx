@@ -30,6 +30,7 @@ export const Switch: React.FC<SwitchProps> = ({
         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         ${className}
       `}
+      onMouseEnter={() => !disabled && soundManager.playHover()}
       data-testid={dataTestId}
     >
       <div className="relative isolate w-11 h-6">

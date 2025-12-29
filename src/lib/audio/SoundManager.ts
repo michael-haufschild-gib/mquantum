@@ -40,23 +40,41 @@ class SoundManager {
   
     public playClick() {
       if (!this.ctx || !this.enabled) return;
-      
-      const osc = this.ctx.createOscillator();
+
+      const now = this.ctx.currentTime;
+      const duration = 0.02;
+      const sampleRate = this.ctx.sampleRate;
+      const bufferSize = Math.floor(sampleRate * duration);
+
+      // Create short noise burst
+      const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+      const data = buffer.getChannelData(0);
+
+      // Sharp attack, fast decay - like a soft tap
+      for (let i = 0; i < bufferSize; i++) {
+        const t = i / bufferSize;
+        const envelope = Math.pow(1 - t, 3);
+        data[i] = (Math.random() * 2 - 1) * envelope;
+      }
+
+      const source = this.ctx.createBufferSource();
+      source.buffer = buffer;
+
+      // Bandpass to give it body without being harsh
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.value = 1000;
+      filter.Q.value = 0.5;
+
       const gain = this.ctx.createGain();
-      
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.05);
-      
-      gain.gain.setValueAtTime(0, this.ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.3, this.ctx.currentTime + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
-      
-      osc.connect(gain);
+      gain.gain.value = 0.15;
+
+      source.connect(filter);
+      filter.connect(gain);
       gain.connect(this.masterGain!);
-      
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.05);
+
+      source.start(now);
+      source.stop(now + duration);
     }
   
     public playHover() {
@@ -106,27 +124,71 @@ class SoundManager {
     
     public playSuccess() {
         if (!this.ctx || !this.enabled) return;
-        
+
         const now = this.ctx.currentTime;
-        
+
         // Arpeggio
         [440, 554, 659].forEach((freq, i) => {
             const osc = this.ctx!.createOscillator();
             const gain = this.ctx!.createGain();
-            
+
             osc.type = 'sine';
             osc.frequency.value = freq;
-            
+
             gain.gain.setValueAtTime(0, now + i * 0.05);
             gain.gain.linearRampToValueAtTime(0.1, now + i * 0.05 + 0.05);
             gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4);
-            
+
             osc.connect(gain);
             gain.connect(this.masterGain!);
-            
+
             osc.start(now + i * 0.05);
             osc.stop(now + i * 0.05 + 0.4);
         });
+    }
+
+    /**
+     * Plays a soft "reverse hihat/cymbal tail" sound for opening UI elements.
+     * Very subtle - like a whisper of air.
+     */
+    public playSwish() {
+        if (!this.ctx || !this.enabled) return;
+
+        const now = this.ctx.currentTime;
+        const duration = 0.08;
+        const sampleRate = this.ctx.sampleRate;
+        const bufferSize = Math.floor(sampleRate * duration);
+
+        // Create noise buffer
+        const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Very gentle rise and fall
+        for (let i = 0; i < bufferSize; i++) {
+            const t = i / bufferSize;
+            // Sine-shaped envelope for smoothness
+            const envelope = Math.sin(t * Math.PI) * 0.5;
+            data[i] = (Math.random() * 2 - 1) * envelope;
+        }
+
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+
+        // Soft bandpass - lower frequency, wider Q
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 1500;
+        filter.Q.value = 0.3;
+
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.06;
+
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain!);
+
+        source.start(now);
+        source.stop(now + duration);
     }
 
     public toggle(enabled: boolean) {

@@ -138,7 +138,6 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(({
               variant="ghost"
               size="icon"
               onClick={(e) => scroll(e, 'left')}
-              onMouseEnter={() => soundManager.playHover()}
               className="h-full rounded-l-lg rounded-r-none border-none bg-gradient-to-r from-panel-bg via-panel-bg/90 to-transparent hover:bg-gradient-to-r px-1 w-auto"
               ariaLabel="Scroll left"
             >
@@ -172,7 +171,6 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(({
               variant="ghost"
               size="icon"
               onClick={(e) => scroll(e, 'right')}
-              onMouseEnter={() => soundManager.playHover()}
               className="h-full rounded-r-lg rounded-l-none border-none bg-gradient-to-l from-panel-bg via-panel-bg/90 to-transparent hover:bg-gradient-to-l px-1 w-auto"
               ariaLabel="Scroll right"
             >

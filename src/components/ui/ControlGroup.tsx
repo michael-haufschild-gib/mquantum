@@ -57,6 +57,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
             ${collapsible ? 'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset' : ''}
           `}
           onClick={toggle}
+          onMouseEnter={() => collapsible && soundManager.playHover()}
           onKeyDown={handleKeyDown}
         >
           <div className="flex items-center gap-2">

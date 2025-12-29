@@ -1,4 +1,5 @@
 import React from 'react';
+import { soundManager } from '@/lib/audio/SoundManager';
 
 export interface SelectOption<T extends string = string> {
   value: T;
@@ -39,6 +40,7 @@ export const Select = <T extends string = string>({
         id={selectId}
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
+        onMouseEnter={() => !disabled && soundManager.playHover()}
         disabled={disabled}
         data-testid={testId}
         className="glass-input w-full pl-3 pr-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"

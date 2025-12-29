@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
 import { m, AnimatePresence } from 'motion/react';
+import { soundManager } from '@/lib/audio/SoundManager';
 
 export interface PopoverProps {
   trigger: React.ReactNode;
@@ -31,6 +32,15 @@ export const Popover: React.FC<PopoverProps> = ({
   const isOpen = isControlled ? controlledOpen : uncontrolledOpen;
 
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  // Track previous open state to play swish on open
+  const prevIsOpenRef = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen && !prevIsOpenRef.current) {
+      soundManager.playSwish();
+    }
+    prevIsOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const handleOpenChange = useCallback((newOpen: boolean) => {
     if (!isControlled) {
