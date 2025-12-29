@@ -45,6 +45,334 @@ const material = new THREE.ShaderMaterial({
 
 ---
 
+## Modern CSS Standard (2025 Baseline)
+
+**All CSS MUST use modern features with full browser support (Baseline 2024/2025).** These patterns replace older workarounds that are no longer necessary. Using outdated patterns when modern alternatives exist is a code review rejection.
+
+### Required vs Forbidden Patterns
+
+| Outdated Pattern (Forbidden) | Modern Pattern (Required) |
+|------------------------------|---------------------------|
+| Media queries for fluid typography | `clamp(min, preferred, max)` |
+| Media queries for component layouts | Container queries `@container` |
+| JavaScript for parent-based styling | `:has()` pseudo-class |
+| SCSS/Sass only for nesting | Native CSS nesting `& selector` |
+| Padding hack for aspect ratio | `aspect-ratio: width / height` |
+| `margin-left`/`margin-right` | `margin-inline` / `margin-inline-start` |
+| `padding-top`/`padding-bottom` | `padding-block` / `padding-block-start` |
+| `left`/`right`/`top`/`bottom` | `inset-inline` / `inset-block` |
+| Hex/RGB for design system colors | `oklch()` for perceptual uniformity |
+| Preprocessor color functions | `color-mix()` and relative colors |
+
+### Fluid Typography & Spacing
+
+Use `clamp()` to eliminate breakpoint-based media queries for sizing:
+
+```css
+/* ❌ Forbidden: Multiple media queries */
+.heading {
+  font-size: 1.5rem;
+}
+@media (min-width: 768px) {
+  .heading { font-size: 2rem; }
+}
+@media (min-width: 1200px) {
+  .heading { font-size: 2.5rem; }
+}
+
+/* ✅ Required: Single clamp() declaration */
+.heading {
+  font-size: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+}
+```
+
+**clamp() Best Practices:**
+- Use `rem` for min/max values (respects user font preferences)
+- Use `vw` or container units for the preferred value
+- Tool: [clampgenerator.com](https://clampgenerator.com) for calculating values
+
+Also use `min()` and `max()` for constrained layouts:
+
+```css
+/* Responsive container without media queries */
+.container {
+  width: min(100% - 2rem, 1200px);
+  padding: max(1rem, 2vw);
+}
+```
+
+### Container Queries
+
+Use container queries for component-level responsiveness instead of viewport-based media queries:
+
+```css
+/* ❌ Forbidden: Viewport-based component layout */
+.card { display: block; }
+@media (min-width: 600px) {
+  .card { display: grid; grid-template-columns: 200px 1fr; }
+}
+
+/* ✅ Required: Container-based component layout */
+.card-wrapper {
+  container-type: inline-size;
+}
+
+.card {
+  display: block;
+
+  @container (min-width: 400px) {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+  }
+}
+```
+
+**Container Query Guidelines:**
+- Use `container-type: inline-size` for width-based queries (most common)
+- Use `container-type: size` only when querying both dimensions
+- Name containers with `container-name` for complex nested layouts
+- Container query units: `cqw`, `cqh`, `cqi`, `cqb` available for sizing
+
+### The :has() Selector
+
+Use `:has()` for parent selection instead of JavaScript:
+
+```css
+/* ❌ Forbidden: JavaScript for parent styling */
+// card.classList.add('has-image') in JS
+
+/* ✅ Required: CSS :has() */
+.card:has(img) {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+}
+
+/* Form validation without JS */
+.form-group:has(:invalid) {
+  border-color: var(--color-error);
+}
+
+.form-group:has(:focus-visible) label {
+  color: var(--color-primary);
+}
+
+/* Conditional layouts */
+.sidebar:has(.widget:nth-child(4)) {
+  grid-template-rows: repeat(2, 1fr);
+}
+```
+
+### Native CSS Nesting
+
+Use native CSS nesting instead of preprocessors:
+
+```css
+/* ✅ Native CSS nesting */
+.card {
+  padding: 1rem;
+
+  & .title {
+    font-size: 1.25rem;
+
+    &:hover {
+      color: var(--color-primary);
+    }
+  }
+
+  & .content {
+    margin-block-start: 0.5rem;
+  }
+
+  /* Media queries nest too */
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+```
+
+**Note:** The `&` is required for element selectors in native nesting: `& p { }` not `p { }`
+
+### Aspect Ratio
+
+Use `aspect-ratio` instead of the padding hack:
+
+```css
+/* ❌ Forbidden: Padding hack */
+.video-container {
+  position: relative;
+  height: 0;
+  padding-top: 56.25%; /* 16:9 */
+}
+.video-container iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ✅ Required: aspect-ratio property */
+.video-container {
+  aspect-ratio: 16 / 9;
+
+  & iframe {
+    width: 100%;
+    height: 100%;
+  }
+}
+```
+
+### Logical Properties
+
+Use logical properties for internationalization-ready layouts:
+
+```css
+/* ❌ Forbidden: Physical properties */
+.element {
+  margin-left: 1rem;
+  margin-right: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-left: 2px solid;
+  text-align: left;
+}
+
+/* ✅ Required: Logical properties */
+.element {
+  margin-inline: 1rem;
+  padding-block: 0.5rem;
+  border-inline-start: 2px solid;
+  text-align: start;
+}
+```
+
+**Logical Property Mappings (LTR context):**
+| Physical | Logical |
+|----------|---------|
+| `left` / `right` | `inline-start` / `inline-end` |
+| `top` / `bottom` | `block-start` / `block-end` |
+| `width` / `height` | `inline-size` / `block-size` |
+| `margin-left` | `margin-inline-start` |
+| `padding-top` | `padding-block-start` |
+
+### Modern Color System
+
+Use `oklch()` for perceptually uniform colors in design systems:
+
+```css
+/* ❌ Forbidden: HSL for color scales (perceptually inconsistent) */
+:root {
+  --blue-50: hsl(210, 100%, 95%);
+  --blue-100: hsl(210, 100%, 90%);
+  /* Colors appear inconsistently bright */
+}
+
+/* ✅ Required: OKLCH for design system colors */
+:root {
+  --blue-50: oklch(97% 0.02 250);
+  --blue-100: oklch(93% 0.04 250);
+  --blue-500: oklch(55% 0.18 250);
+  --blue-900: oklch(25% 0.08 250);
+  /* Lightness is perceptually uniform */
+}
+```
+
+Use `color-mix()` for dynamic color manipulation:
+
+```css
+/* Dynamic hover states without preprocessors */
+.button {
+  background: var(--color-primary);
+
+  &:hover {
+    background: color-mix(in oklch, var(--color-primary) 85%, black);
+  }
+
+  &:disabled {
+    background: color-mix(in oklch, var(--color-primary) 50%, transparent);
+  }
+}
+```
+
+Use relative color syntax for advanced manipulation:
+
+```css
+/* Adjust lightness of any color */
+.overlay {
+  background: oklch(from var(--bg-color) calc(l * 0.8) c h / 0.9);
+}
+```
+
+### Popover API
+
+Use the native Popover API instead of custom JavaScript solutions:
+
+```html
+<!-- ✅ Native popover -->
+<button popovertarget="menu">Open Menu</button>
+<div id="menu" popover>
+  <nav><!-- menu content --></nav>
+</div>
+```
+
+```css
+[popover] {
+  /* Browser handles positioning, backdrop, focus trap, Escape key */
+  &::backdrop {
+    background: oklch(0% 0 0 / 0.5);
+  }
+}
+```
+
+### When Older Patterns Are Acceptable
+
+Some scenarios still require traditional approaches:
+
+| Scenario | Use This |
+|----------|----------|
+| Major layout restructuring (e.g., sidebar to stacked) | `@media` queries |
+| Print stylesheets | `@media print` |
+| User preference queries | `@media (prefers-reduced-motion)` |
+| Scroll-driven animations (partial support) | `@supports` guard |
+
+```css
+/* Layout restructuring still uses media queries */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+
+  @media (min-width: 1024px) {
+    grid-template-columns: 250px 1fr;
+  }
+}
+
+/* Feature detection for newer features */
+@supports (animation-timeline: scroll()) {
+  .scroll-indicator {
+    animation: progress linear;
+    animation-timeline: scroll();
+  }
+}
+```
+
+### Tailwind CSS Integration
+
+When using Tailwind, prefer these modern utilities:
+
+```html
+<!-- Container queries -->
+<div class="@container">
+  <div class="block @md:grid @md:grid-cols-2">...</div>
+</div>
+
+<!-- Logical properties -->
+<div class="ms-4 me-2 ps-4 pe-2">...</div>
+
+<!-- Fluid sizing with arbitrary values -->
+<h1 class="text-[clamp(1.5rem,1rem+2vw,2.5rem)]">...</h1>
+```
+
+---
+
 ## Core Engineering Principles
 
 - **Intentional architecture:** Every module should have a single responsibility, clearly expressed through its folder structure and exports. Domain-specific logic lives in hooks or services, while UI components stay presentational.
@@ -107,6 +435,7 @@ import { GeometrySection } from './Geometry'
 - Drive animations through a shared driver (Framer Motion or equivalent), providing a consistent API for timing and transitions.
 - Centralize layout tokens (spacing, radii, gradients) in the theme system, even when applying inline styles. Inline styles are acceptable for dynamic values but mirror them in Tailwind or CSS variables for consistency.
 - Apply memoization or `React.memo` to heavy child components, especially those rendering grids, lists, or SVG/Canvas primitives.
+- **Follow Modern CSS Standard:** All CSS must adhere to the Modern CSS Standard section above—use `clamp()` for fluid sizing, container queries for component responsiveness, `:has()` for parent selection, and `oklch()` for colors.
 
 #### Style Utilities (NEW)
 
@@ -207,6 +536,7 @@ import {
 - Are error states handled with user feedback and logged for telemetry?
 - Are tests covering both happy paths and failure scenarios, including reset flows?
 - Is documentation updated (inline comments + docs) for new concepts or refactors?
+- **Does CSS follow Modern CSS Standard?** Uses `clamp()` instead of media query breakpoints, container queries for component responsiveness, `:has()` instead of JS for parent styling, logical properties instead of physical, and `oklch()` for colors.
 
 ## Common Mistakes to Avoid
 
@@ -216,6 +546,10 @@ import {
 - **Custom platform detection hacks:** User-agent sniffing breaks easily. Prefer `matchMedia`, `ResizeObserver`, and progressive enhancement strategies with tested adapter layers.
 - **Insufficient testing depth:** Smoke tests alone miss race conditions. Add deterministic unit tests for domain logic, integration tests for state transitions, and targeted E2E coverage for critical user journeys.
 - **Opaque error handling:** Silent failures or generic alerts erode trust. Provide actionable user feedback and structured logs with context so on-call engineers can diagnose quickly.
+- **Outdated CSS patterns:** Using media queries for fluid typography when `clamp()` exists, JavaScript for parent-based styling when `:has()` is available, or the padding hack when `aspect-ratio` is supported. See the Modern CSS Standard section for required patterns.
+- **Physical CSS properties:** Using `margin-left`/`margin-right` instead of `margin-inline`, or `top`/`bottom` instead of `block-start`/`block-end`. Logical properties are mandatory for internationalization readiness.
+- **Viewport-dependent components:** Using `@media` queries for component layout changes that should use container queries. Components must respond to their container, not the viewport.
+- **Legacy color formats:** Using hex or HSL for design system color palettes. OKLCH provides perceptually uniform colors and is required for all new color definitions.
 
 ## Documentation Standards
 

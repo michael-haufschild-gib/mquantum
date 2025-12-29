@@ -64,13 +64,19 @@ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 gl_Position = vec4(position.xy, 0.0, 1.0);
 ```
 
-See: https://github.com/mrdoob/three.js/issues/27655
 
 **Use custom UI component library**: `src/components/ui`: Do not use default html controls. Use the custom components of this project.
 
 **Integrate UI components into theming solution**: Do not hardcode styles, always use the theme.
 
 **Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
+
+## MANDATORY TESTING RUEL
+1. Write unit tests in the style of Roy Osherove's "Art of Unit Testing" principles.
+2. READABLE: Tests should be easy to understand at a glance
+3. MAINTAINABLE: Tests should be easy to change without breaking others
+4. TRUSTWORTHY - Tests should be reliable and deterministic
+5. MEANINGFUL - NEVER test for trivial things like default values
 
 === END CIB-002 ===
 
@@ -169,7 +175,4 @@ node scripts/cleanup-vitest.mjs  # Clean up lingering workers
 - Development environment: `docs/testing.md`
 - Testing setup: `docs/testing.md`
 - Frontend setup: `docs/frontend.md`
-- Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
 - Understanding math used for object creation, transformation and projection: `docs/research/nd-dimensional-react-threejs-guide.md`
-- PRD: `docs/prd/ndimensional-visualizer.md`
-- Rendering pipeline PRD: `docs/prd/enhanced-visuals-rendering-pipeline.md`

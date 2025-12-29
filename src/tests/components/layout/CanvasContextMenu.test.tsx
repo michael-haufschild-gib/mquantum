@@ -192,8 +192,9 @@ describe('CanvasContextMenu', () => {
 
       rightClickCanvas();
 
-      // Should have a separator element
-      const separator = document.querySelector('.bg-white\\/10.h-\\[1px\\]');
+      // Should have a separator element with the correct CSS class
+      // The separator uses: h-[1px] bg-[var(--border-subtle)] my-1 mx-2
+      const separator = document.querySelector('.h-\\[1px\\]');
       expect(separator).toBeInTheDocument();
     });
 

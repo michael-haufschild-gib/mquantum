@@ -167,11 +167,6 @@ export const useTransformStore = create<TransformState>((set, get) => ({
     }))
   },
 
-  reset: () => {
-    set((state) => ({
-      uniformScale: DEFAULT_SCALE,
-      perAxisScale: createDefaultScales(state.dimension),
-      scaleLocked: true,
-    }))
-  },
+  // Alias for resetAll - provides consistent API across stores
+  reset: () => get().resetAll(),
 }))

@@ -11,7 +11,6 @@ import {
   DEFAULT_CAPABILITIES,
   MOBILE_DEFAULT_MAX_FPS,
   MOBILE_DEFAULT_RESOLUTION_SCALE,
-  type DeviceCapabilities,
 } from '@/lib/deviceCapabilities'
 
 // Mock detect-gpu module

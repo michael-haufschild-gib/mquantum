@@ -579,7 +579,8 @@ export function TubeWireframe({
 
     const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current
     const iblChanged = iblVersion !== lastIblVersionRef.current
-    const lightingChanged = lightingVersion !== lastLightingVersionRef.current
+    // Note: lightingChanged was previously tracked but lighting is now handled via UniformManager
+    void lightingVersion // Suppress unused variable warning while keeping version tracking
 
     // Update rotation matrix via shared hook (handles version tracking)
     // Note: Scale is now applied AFTER projection, so we don't pass scales to rotation

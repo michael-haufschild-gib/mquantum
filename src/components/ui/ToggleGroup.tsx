@@ -33,8 +33,9 @@ export const ToggleGroup = <T extends string = string>({
     <LayoutGroup id={layoutId}>
     <div
       className={`flex p-1 gap-1 glass-input rounded-lg border border-[var(--border-subtle)] ${className}`}
-      role="group"
+      role="radiogroup"
       aria-label={ariaLabel}
+      data-testid={testId}
     >
         {options.map((option) => {
           const isSelected = option.value === value;

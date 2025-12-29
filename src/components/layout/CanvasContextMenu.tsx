@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { useCameraStore } from '@/stores/cameraStore';
 import { useDropdownStore } from '@/stores/dropdownStore';
 import { useShallow } from 'zustand/react/shallow';
+import { soundManager } from '@/lib/audio/SoundManager';
 
 const DROPDOWN_ID = 'canvas-context-menu';
 
@@ -15,6 +16,7 @@ interface MenuItem {
 }
 
 export const CanvasContextMenu: React.FC = () => {
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
   const { isOpen, openDropdown, closeDropdown } = useDropdownStore(
@@ -24,7 +26,7 @@ export const CanvasContextMenu: React.FC = () => {
       closeDropdown: state.closeDropdown,
     }))
   );
-  
+
   const layoutSelector = useShallow((state: LayoutStore) => ({
     toggleCinematicMode: state.toggleCinematicMode,
     toggleCollapsed: state.toggleCollapsed,
@@ -33,6 +35,19 @@ export const CanvasContextMenu: React.FC = () => {
   const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel } = useLayoutStore(layoutSelector);
   const resetCamera = useCameraStore(state => state.reset);
 
+  // Sync popover visibility with store state
+  useEffect(() => {
+    const popover = popoverRef.current;
+    if (!popover) return;
+
+    if (isOpen && !popover.matches(':popover-open')) {
+      popover.showPopover();
+    } else if (!isOpen && popover.matches(':popover-open')) {
+      popover.hidePopover();
+    }
+  }, [isOpen]);
+
+  // Handle right-click to open context menu
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -45,20 +60,41 @@ export const CanvasContextMenu: React.FC = () => {
       }
     };
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+    window.addEventListener('contextmenu', handleContextMenu);
+    return () => window.removeEventListener('contextmenu', handleContextMenu);
+  }, [openDropdown]);
+
+  // Manual light-dismiss: close on click outside or Escape key
+  // We use popover="manual" because contextmenu events (right-click) don't
+  // interact well with popover="auto" light-dismiss timing
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const popover = popoverRef.current;
+      if (popover && !popover.contains(e.target as Node)) {
         closeDropdown(DROPDOWN_ID);
       }
     };
 
-    window.addEventListener('contextmenu', handleContextMenu);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeDropdown(DROPDOWN_ID);
+      }
+    };
+
+    // Delay adding click listener to avoid the opening click triggering close
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 0);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
-      window.removeEventListener('contextmenu', handleContextMenu);
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [isOpen, openDropdown, closeDropdown]);
+  }, [isOpen, closeDropdown]);
 
   const items: MenuItem[] = useMemo(() => [
     { label: 'Reset Camera', shortcut: 'R', action: resetCamera },
@@ -69,36 +105,45 @@ export const CanvasContextMenu: React.FC = () => {
   ], [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed]);
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <m.div
-          initial={{ opacity: 0, scale: 0.9, x: -10, y: -10 }}
-          animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9 }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          className="fixed z-50 min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1"
-          style={{ top: position.y, left: position.x }}
-        >
-          {items.map((item, index) => {
-            if (item.type === 'separator') {
-              return <div key={index} className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2" />;
-            }
-            return (
-              <button
-                key={index}
-                onClick={() => {
-                    if (item.action) item.action();
-                    closeDropdown(DROPDOWN_ID);
-                }}
-                className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group"
-              >
-                <span>{item.label}</span>
-                {item.shortcut && <span className="text-[9px] font-mono text-text-tertiary group-hover:text-text-secondary">{item.shortcut}</span>}
-              </button>
-            );
-          })}
-        </m.div>
-      )}
-    </AnimatePresence>
+    <div
+      ref={popoverRef}
+      popover="manual"
+      id={DROPDOWN_ID}
+      className="fixed z-50 min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1 m-0 p-0 border-none bg-transparent"
+      style={{ top: position.y, left: position.x }}
+    >
+      <AnimatePresence>
+        {isOpen && (
+          <m.div
+            initial={{ opacity: 0, scale: 0.9, x: -10, y: -10 }}
+            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="min-w-[180px] glass-panel rounded-lg shadow-xl overflow-hidden py-1"
+          >
+            {items.map((item, index) => {
+              if (item.type === 'separator') {
+                return <div key={index} className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2" />;
+              }
+              return (
+                <button
+                  key={index}
+                  onClick={() => {
+                      soundManager.playClick();
+                      if (item.action) item.action();
+                      closeDropdown(DROPDOWN_ID);
+                  }}
+                  onMouseEnter={() => soundManager.playHover()}
+                  className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group"
+                >
+                  <span>{item.label}</span>
+                  {item.shortcut && <span className="text-[9px] font-mono text-text-tertiary group-hover:text-text-secondary">{item.shortcut}</span>}
+                </button>
+              );
+            })}
+          </m.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };

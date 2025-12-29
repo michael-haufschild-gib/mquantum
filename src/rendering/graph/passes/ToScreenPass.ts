@@ -203,6 +203,10 @@ export class ToScreenPass extends BasePass {
     }
 
     const texture = ctx.getReadTexture(inputConfig.resourceId)
+    if (!texture) {
+      console.warn('ToScreenPass: Input texture not found:', inputConfig.resourceId)
+      return
+    }
 
     this.material.uniforms['uInput']!.value = texture
 

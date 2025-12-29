@@ -38,6 +38,48 @@ export const REFINEMENT_STAGE_QUALITY: Record<RefinementStage, number> = {
   final: 1.0,
 }
 
+/** localStorage key for persisting render resolution scale */
+const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
+
+/**
+ * Load persisted render resolution scale from localStorage.
+ * @returns The persisted value, or null if not set
+ */
+function loadPersistedResolutionScale(): number | null {
+  try {
+    const stored = localStorage.getItem(RESOLUTION_SCALE_KEY)
+    if (stored !== null) {
+      const value = parseFloat(stored)
+      if (!isNaN(value) && value >= 0.5 && value <= 1.0) {
+        return value
+      }
+    }
+  } catch {
+    // Silent fail - localStorage may not be available
+  }
+  return null
+}
+
+/**
+ * Persist render resolution scale to localStorage.
+ * @param scale - The resolution scale to persist
+ */
+function persistResolutionScale(scale: number): void {
+  try {
+    localStorage.setItem(RESOLUTION_SCALE_KEY, scale.toString())
+  } catch {
+    // Silent fail - localStorage may not be available
+  }
+}
+
+/**
+ * Check if user has previously set a resolution preference.
+ * Used by useDeviceCapabilities to avoid overriding user preferences.
+ */
+export function hasPersistedResolutionScale(): boolean {
+  return loadPersistedResolutionScale() !== null
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -212,8 +254,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Fractal Animation Quality
   fractalAnimationLowQuality: true,
 
-  // Render Resolution Scale
-  renderResolutionScale: 1.0,
+  // Render Resolution Scale (load from localStorage, default to 1.0)
+  renderResolutionScale: loadPersistedResolutionScale() ?? 1.0,
 
   // Shader Debugging
   shaderDebugInfos: {},
@@ -303,7 +345,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => {
-    set({ renderResolutionScale: Math.max(0.5, Math.min(1.0, scale)) })
+    const clampedScale = Math.max(0.5, Math.min(1.0, scale))
+    set({ renderResolutionScale: clampedScale })
+    persistResolutionScale(clampedScale)
   },
 
   // Shader Debugging

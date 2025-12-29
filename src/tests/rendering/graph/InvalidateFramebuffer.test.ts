@@ -3,6 +3,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { WebGLRenderer } from 'three'
 
 import { ResourcePool } from '@/rendering/graph/ResourcePool'
 
@@ -45,7 +46,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
       properties: { get: (obj: object) => propertiesMap.get(obj) },
     }
 
-    pool.invalidateFramebuffers(mockRenderer as any, new Set())
+    pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     expect(bindFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, mockFramebuffer)
     expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [mockGl.COLOR_ATTACHMENT0])
@@ -73,7 +74,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     }
 
     // Mark 'temporal' as ping-pong
-    pool.invalidateFramebuffers(mockRenderer as any, new Set(['temporal']))
+    pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set(['temporal']))
 
     expect(invalidateFramebuffer).not.toHaveBeenCalled()
   })
@@ -100,7 +101,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
       properties: { get: () => ({ __webglFramebuffer: {} }) },
     }
 
-    pool.invalidateFramebuffers(mockRenderer as any, new Set())
+    pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     expect(invalidateFramebuffer).not.toHaveBeenCalled()
   })
@@ -128,7 +129,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
       properties: { get: () => ({ __webglFramebuffer: {} }) },
     }
 
-    pool.invalidateFramebuffers(mockRenderer as any, new Set())
+    pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     // Should have called invalidateFramebuffer twice: color + depth
     expect(invalidateFramebuffer).toHaveBeenCalledTimes(2)
@@ -159,7 +160,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
       properties: { get: () => ({ __webglFramebuffer: {} }) },
     }
 
-    pool.invalidateFramebuffers(mockRenderer as any, new Set())
+    pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     // Should invalidate all 3 color attachments
     expect(invalidateFramebuffer).toHaveBeenCalledWith(
@@ -189,7 +190,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
 
     // Should not throw
     expect(() => {
-      pool.invalidateFramebuffers(mockRenderer as any, new Set())
+      pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
     }).not.toThrow()
   })
 
@@ -214,7 +215,7 @@ describe('ResourcePool.invalidateFramebuffers', () => {
       properties: { get: () => ({ __webglFramebuffer: {} }) },
     }
 
-    pool.invalidateFramebuffers(mockRenderer as any, new Set())
+    pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     // Last call should restore null binding
     const lastCall = bindFramebuffer.mock.calls[bindFramebuffer.mock.calls.length - 1]

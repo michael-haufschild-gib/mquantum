@@ -309,8 +309,8 @@ describe('DropdownMenu', () => {
 
       await user.click(screen.getByText('Open Menu'));
 
-      // Separator should be rendered as a div, not a button
-      const separator = document.querySelector('.bg-white\\/10.h-px');
+      // Separator uses: h-px bg-[var(--border-subtle)] my-1.5 mx-2
+      const separator = document.querySelector('.h-px');
       expect(separator).toBeInTheDocument();
     });
 

@@ -110,23 +110,23 @@ vi.mock('zustand/react/shallow', () => ({
 }));
 
 describe('TimelineControls', () => {
-  it('toggles Rotation drawer when button is clicked', async () => {
+  it('toggles Rotate drawer when button is clicked', async () => {
     render(<TimelineControls />);
-    
-    // Check initial state
-    const rotButton = screen.getByText(/Rotation/i);
+
+    // Check initial state - button text is "Rotate"
+    const rotButton = screen.getByText(/Rotate/i);
     expect(rotButton).toBeInTheDocument();
-    
+
     // Plane buttons should NOT be visible yet
     expect(screen.queryByText('XY', { selector: 'button' })).not.toBeInTheDocument();
 
-    // Click Rotation
+    // Click Rotate button
     fireEvent.click(rotButton);
 
     // Now drawer should be open, and "XY" button visible
     expect(screen.getByText('XY')).toBeInTheDocument();
-    
-    // Click Rotation again to close
+
+    // Click Rotate again to close
     fireEvent.click(rotButton);
     await waitFor(() => {
       expect(screen.queryByText('XY', { selector: 'button' })).not.toBeInTheDocument();
@@ -140,7 +140,7 @@ describe('TimelineControls', () => {
     expect(screen.queryByTitle("Stop All")).not.toBeInTheDocument();
 
     // Open drawer
-    const rotButton = screen.getByText(/Rotation/i);
+    const rotButton = screen.getByText(/Rotate/i);
     fireEvent.click(rotButton);
 
     // Deselect All button (functionally the stop button) should be in drawer

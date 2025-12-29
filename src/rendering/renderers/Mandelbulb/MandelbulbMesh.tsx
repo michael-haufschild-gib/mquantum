@@ -71,9 +71,8 @@ const MandelbulbMesh = () => {
   const restoreCount = useWebGLContextStore((state) => state.restoreCount);
 
   // Get Mandelbulb/Mandelbulb config from store
-  const mandelbulbPower = useExtendedObjectStore((state) => state.mandelbulb.mandelbulbPower);
-  const maxIterations = useExtendedObjectStore((state) => state.mandelbulb.maxIterations);
-  const escapeRadius = useExtendedObjectStore((state) => state.mandelbulb.escapeRadius);
+  // Note: mandelbulbPower, maxIterations, escapeRadius are read fresh via getState() in useFrame
+  // to avoid stale closure issues with dirty-flag optimization
   const scale = useExtendedObjectStore((state) => state.mandelbulb.scale);
   const parameterValues = useExtendedObjectStore((state) => state.mandelbulb.parameterValues);
 
@@ -86,10 +85,8 @@ const MandelbulbMesh = () => {
   const powerMax = useExtendedObjectStore((state) => state.mandelbulb.powerMax);
   const powerSpeed = useExtendedObjectStore((state) => state.mandelbulb.powerSpeed);
 
-  // Alternate power parameters (Technique B - blend between two powers)
-  const alternatePowerEnabled = useExtendedObjectStore((state) => state.mandelbulb.alternatePowerEnabled);
-  const alternatePowerValue = useExtendedObjectStore((state) => state.mandelbulb.alternatePowerValue);
-  const alternatePowerBlend = useExtendedObjectStore((state) => state.mandelbulb.alternatePowerBlend);
+  // Note: Alternate power parameters (alternatePowerEnabled, alternatePowerValue, alternatePowerBlend)
+  // are read fresh via getState() in useFrame to avoid stale closure issues
 
   // Origin drift parameters (Technique C - animate slice origin in extra dims)
   const originDriftEnabled = useExtendedObjectStore((state) => state.mandelbulb.originDriftEnabled);
@@ -98,8 +95,8 @@ const MandelbulbMesh = () => {
   const driftFrequencySpread = useExtendedObjectStore((state) => state.mandelbulb.driftFrequencySpread);
 
   // Dimension mixing parameters (Technique A - shear matrix inside iteration)
+  // Note: mixIntensity is read fresh via getState() in useFrame
   const dimensionMixEnabled = useExtendedObjectStore((state) => state.mandelbulb.dimensionMixEnabled);
-  const mixIntensity = useExtendedObjectStore((state) => state.mandelbulb.mixIntensity);
   const mixFrequency = useExtendedObjectStore((state) => state.mandelbulb.mixFrequency);
 
   // Slice Animation parameters (4D+ only - fly through higher-dimensional cross-sections)

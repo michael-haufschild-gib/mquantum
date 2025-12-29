@@ -17,9 +17,10 @@ import {
   MOBILE_DEFAULT_MAX_FPS,
   MOBILE_DEFAULT_RESOLUTION_SCALE,
 } from '@/lib/deviceCapabilities'
-import { usePerformanceStore } from '@/stores/performanceStore'
+import { hasPersistedResolutionScale, usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Hook to detect device capabilities and apply mobile defaults.
@@ -31,12 +32,16 @@ import { useEffect, useRef } from 'react'
  */
 export function useDeviceCapabilities(): { webgl2Supported: boolean } {
   const hasRun = useRef(false)
-  const deviceCapabilitiesDetected = usePerformanceStore(
-    (s) => s.deviceCapabilitiesDetected
+
+  // Combined selector with useShallow to prevent unnecessary re-renders (CIB-002)
+  const { deviceCapabilitiesDetected, gpuTier } = usePerformanceStore(
+    useShallow((s) => ({
+      deviceCapabilitiesDetected: s.deviceCapabilitiesDetected,
+      gpuTier: s.gpuTier,
+    }))
   )
 
   // Get webgl2 support from detection result, default to true until detected
-  const gpuTier = usePerformanceStore((s) => s.gpuTier)
   const webgl2Supported = deviceCapabilitiesDetected ? gpuTier > 0 : true
 
   useEffect(() => {
@@ -50,19 +55,28 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
       // Store capabilities
       usePerformanceStore.getState().setDeviceCapabilities(capabilities)
 
-      // Apply mobile defaults if detected
+      // Apply mobile defaults if detected AND user hasn't set a preference
+      // This ensures user's explicit resolution choice is preserved across page loads
       if (capabilities.isMobileGPU && capabilities.webgl2Supported) {
-        usePerformanceStore
-          .getState()
-          .setRenderResolutionScale(MOBILE_DEFAULT_RESOLUTION_SCALE)
-        useUIStore.getState().setMaxFps(MOBILE_DEFAULT_MAX_FPS)
+        const userHasPreference = hasPersistedResolutionScale()
+
+        if (!userHasPreference) {
+          usePerformanceStore
+            .getState()
+            .setRenderResolutionScale(MOBILE_DEFAULT_RESOLUTION_SCALE)
+          useUIStore.getState().setMaxFps(MOBILE_DEFAULT_MAX_FPS)
+        }
 
         if (import.meta.env.DEV) {
-          console.log('[DeviceCapabilities] Mobile GPU detected, applied defaults:', {
+          console.log('[DeviceCapabilities] Mobile GPU detected:', {
             tier: capabilities.gpuTier,
             gpu: capabilities.gpuName,
-            renderResolutionScale: MOBILE_DEFAULT_RESOLUTION_SCALE,
-            maxFps: MOBILE_DEFAULT_MAX_FPS,
+            userHasPreference,
+            appliedDefaults: !userHasPreference,
+            renderResolutionScale: userHasPreference
+              ? usePerformanceStore.getState().renderResolutionScale
+              : MOBILE_DEFAULT_RESOLUTION_SCALE,
+            maxFps: userHasPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
           })
         }
       } else if (import.meta.env.DEV) {

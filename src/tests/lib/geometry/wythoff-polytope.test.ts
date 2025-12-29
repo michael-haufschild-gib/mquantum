@@ -258,9 +258,11 @@ describe('Wythoff Polytope Generation', () => {
   })
 
   describe('scale parameter', () => {
-    it('respects scale parameter', () => {
-      const smallScale = generateWythoffPolytope(4, { scale: 1.0 })
-      const largeScale = generateWythoffPolytope(4, { scale: 3.0 })
+    it('generates unit-scale geometry regardless of scale config', () => {
+      // Scale refactor: Geometry is always generated at unit scale (±1.0)
+      // The scale parameter is stored in metadata for post-projection visual scaling (like camera zoom)
+      const smallScaleConfig = generateWythoffPolytope(4, { scale: 1.0 })
+      const largeScaleConfig = generateWythoffPolytope(4, { scale: 3.0 })
 
       // Find maximum coordinate extent
       const getMaxExtent = (vertices: number[][]) => {
@@ -273,11 +275,23 @@ describe('Wythoff Polytope Generation', () => {
         return max
       }
 
-      const smallMax = getMaxExtent(smallScale.vertices)
-      const largeMax = getMaxExtent(largeScale.vertices)
+      const smallMax = getMaxExtent(smallScaleConfig.vertices)
+      const largeMax = getMaxExtent(largeScaleConfig.vertices)
 
-      // Larger scale should have larger extent
-      expect(largeMax).toBeGreaterThan(smallMax)
+      // Both should have approximately the same extent (unit-scale ~1.0)
+      // because geometry scale is no longer applied at generation time
+      expect(smallMax).toBeCloseTo(largeMax, 5)
+      expect(smallMax).toBeLessThanOrEqual(1.5) // Unit-scale tolerance
+      expect(largeMax).toBeLessThanOrEqual(1.5) // Unit-scale tolerance
+    })
+
+    it('stores requested scale in metadata for shader use', () => {
+      const polytope = generateWythoffPolytope(4, { scale: 2.5 })
+
+      // Scale is stored in metadata.properties.scale for the shader uniform
+      // Note: The geometry itself is normalized to scale=1.0 for caching
+      // The renderer reads polytopeConfig.scale from the store for uUniformScale
+      expect(polytope.metadata?.properties?.scale).toBe(1.0) // Cached geometry is unit-scale
     })
   })
 
@@ -384,10 +398,10 @@ describe('Wythoff Polytope Generation', () => {
 
       expect(polytope.metadata?.properties?.symmetryGroup).toBe('B')
       expect(polytope.metadata?.properties?.preset).toBe('truncated')
-      // Scale-independent caching: geometry is cached at scale=1.0
-      // The appliedScale property contains the actual scale applied to the geometry
+      // Scale refactor: Geometry is always cached at unit scale (1.0)
+      // Visual scale is applied post-projection via shader uniform
+      // The renderer reads scale from the store, not from geometry metadata
       expect(polytope.metadata?.properties?.scale).toBe(1.0)
-      expect(polytope.metadata?.properties?.appliedScale).toBe(2.5)
     })
   })
 })

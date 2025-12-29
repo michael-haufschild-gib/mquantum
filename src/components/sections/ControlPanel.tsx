@@ -105,6 +105,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
             onClick={toggleCollapsed}
             className={isCollapsed ? 'w-full h-full rounded-full' : ''}
             ariaLabel={isCollapsed ? 'Expand control panel' : 'Collapse control panel'}
+            aria-expanded={!isCollapsed}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useId, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useId, useRef } from 'react';
 import { Button } from '@/components/ui/Button';
 
 /** Props for Modal component */
@@ -19,17 +18,9 @@ interface ModalProps {
 }
 
 /**
- * Accessible modal dialog component with focus trapping.
- * Renders as a portal, handles escape key, prevents body scroll,
- * and manages focus for keyboard navigation.
- * @param root0 - Component props
- * @param root0.isOpen - Whether the modal is visible
- * @param root0.onClose - Callback when the modal should be closed
- * @param root0.title - Title displayed in the modal header
- * @param root0.children - Modal content
- * @param root0.width - Optional Tailwind width class
- * @param root0.'data-testid' - Optional test ID for testing
- * @returns The modal component or null if not open
+ * Accessible modal dialog component using native HTML dialog element.
+ * Provides built-in focus trapping, Escape key handling, and backdrop.
+ * Manages body scroll prevention and focus restoration.
  */
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -39,81 +30,47 @@ export const Modal: React.FC<ModalProps> = ({
   width = 'max-w-md',
   'data-testid': dataTestId,
 }) => {
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const titleId = useId();
 
-  // Get all focusable elements within the modal
-  const getFocusableElements = useCallback(() => {
-    if (!dialogRef.current) return [];
-    const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-    return Array.from(dialogRef.current.querySelectorAll<HTMLElement>(focusableSelectors)).filter(
-      (el) => !el.hasAttribute('disabled') && el.offsetParent !== null
-    );
-  }, []);
-
-  // Focus trap handler
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-      return;
-    }
-
-    if (e.key !== 'Tab') return;
-
-    const focusableElements = getFocusableElements();
-    if (focusableElements.length === 0) return;
-
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
-    // Safety check - should never happen given length check above, but TypeScript needs it
-    if (!firstElement || !lastElement) return;
-
-    if (e.shiftKey) {
-      // Shift + Tab
-      if (document.activeElement === firstElement) {
-        e.preventDefault();
-        lastElement.focus();
-      }
-    } else {
-      // Tab
-      if (document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement.focus();
-      }
-    }
-  }, [getFocusableElements, onClose]);
-
-  // Handle focus management and escape key
+  // Sync dialog open state with isOpen prop
   useEffect(() => {
-    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-    // Store previously focused element
-    previousActiveElement.current = document.activeElement as HTMLElement;
+    if (isOpen && !dialog.open) {
+      previousActiveElement.current = document.activeElement as HTMLElement;
+      dialog.showModal();
+    } else if (!isOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [isOpen]);
 
-    // Focus first focusable element in modal
-    requestAnimationFrame(() => {
-      const focusableElements = getFocusableElements();
-      const firstElement = focusableElements[0];
-      if (firstElement) {
-        firstElement.focus();
-      } else {
-        dialogRef.current?.focus();
-      }
-    });
+  // Handle native dialog close event (Escape key, form submission)
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+    const handleClose = () => {
+      onClose();
       // Restore focus to previous element
       previousActiveElement.current?.focus();
     };
-  }, [isOpen, handleKeyDown, getFocusableElements]);
 
-  // Handle body overflow - track previous value to restore correctly
+    dialog.addEventListener('close', handleClose);
+    return () => dialog.removeEventListener('close', handleClose);
+  }, [onClose]);
+
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Only close if clicking directly on the dialog backdrop (not content)
+    if (e.target === dialogRef.current) {
+      onClose();
+    }
+  };
+
+  // Prevent body scroll when modal is open
   useEffect(() => {
     if (!isOpen) return;
 
@@ -125,26 +82,20 @@ export const Modal: React.FC<ModalProps> = ({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  return createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--bg-app)]/50 backdrop-blur-sm animate-in fade-in duration-200">      <div 
-        ref={overlayRef}
-        className="absolute inset-0"
-        onClick={onClose}
-      />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className={`relative w-full ${width} bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}
-        data-testid={dataTestId}
-      >
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      onClick={handleBackdropClick}
+      className={`${width} p-0 bg-transparent border-none rounded-lg backdrop:bg-[var(--bg-app)]/50 backdrop:backdrop-blur-sm open:animate-in open:zoom-in-95 open:fade-in duration-200`}
+      data-testid={dataTestId}
+    >
+      <div className="bg-panel border border-panel-border rounded-lg shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-panel-border bg-panel-header/50">
-          <h2 id={titleId} className="text-sm font-bold text-text-primary tracking-wide uppercase">{title}</h2>
+          <h2 id={titleId} className="text-sm font-bold text-text-primary tracking-wide uppercase">
+            {title}
+          </h2>
           <Button
             variant="ghost"
             size="icon"
@@ -158,13 +109,12 @@ export const Modal: React.FC<ModalProps> = ({
             </svg>
           </Button>
         </div>
-        
+
         {/* Body */}
         <div className="p-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
           {children}
         </div>
       </div>
-    </div>,
-    document.body
+    </dialog>
   );
 };

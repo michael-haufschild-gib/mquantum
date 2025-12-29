@@ -510,6 +510,130 @@ globalThis.AudioContext = MockAudioContext as any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ;(window as any).webkitAudioContext = MockAudioContext
 
+// Mock Popover API (not fully supported in happy-dom)
+// Track popover open state for each element
+const popoverOpenState = new WeakMap<HTMLElement, boolean>();
+const popoverEscapeListeners = new WeakMap<HTMLElement, (e: KeyboardEvent) => void>();
+const popoverClickListeners = new WeakMap<HTMLElement, (e: MouseEvent) => void>();
+
+HTMLElement.prototype.showPopover = vi.fn(function (this: HTMLElement) {
+  if (!this.hasAttribute('popover')) {
+    throw new DOMException('Element is not a popover', 'InvalidStateError');
+  }
+  const wasOpen = popoverOpenState.get(this) ?? false;
+  if (!wasOpen) {
+    popoverOpenState.set(this, true);
+    this.setAttribute('data-popover-open', '');
+
+    // Simulate native light-dismiss behavior for popover="auto"
+    if (this.getAttribute('popover') === 'auto') {
+      // Escape key handling
+      const escapeHandler = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && popoverOpenState.get(this)) {
+          this.hidePopover();
+        }
+      };
+      popoverEscapeListeners.set(this, escapeHandler);
+      document.addEventListener('keydown', escapeHandler);
+
+      // Click outside handling for light-dismiss
+      const clickHandler = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        // Don't close if clicking inside the popover
+        if (this.contains(target)) return;
+        // Don't close if clicking on a trigger that controls this popover
+        if (target.closest(`[popovertarget="${this.id}"]`)) return;
+        if (target.closest(`[data-dropdown-trigger="${this.id}"]`)) return;
+        // Don't close if clicking on another dropdown content (submenu)
+        if (target.closest('[data-dropdown-content]')) return;
+        // Close the popover
+        if (popoverOpenState.get(this)) {
+          this.hidePopover();
+        }
+      };
+      popoverClickListeners.set(this, clickHandler);
+      document.addEventListener('mousedown', clickHandler);
+    }
+
+    const event = new Event('toggle') as Event & { newState: string; oldState: string };
+    Object.defineProperty(event, 'newState', { value: 'open', writable: false });
+    Object.defineProperty(event, 'oldState', { value: 'closed', writable: false });
+    this.dispatchEvent(event);
+  }
+});
+
+HTMLElement.prototype.hidePopover = vi.fn(function (this: HTMLElement) {
+  if (!this.hasAttribute('popover')) {
+    throw new DOMException('Element is not a popover', 'InvalidStateError');
+  }
+  const wasOpen = popoverOpenState.get(this) ?? false;
+  if (wasOpen) {
+    popoverOpenState.set(this, false);
+    this.removeAttribute('data-popover-open');
+
+    // Clean up Escape key listener
+    const escapeHandler = popoverEscapeListeners.get(this);
+    if (escapeHandler) {
+      document.removeEventListener('keydown', escapeHandler);
+      popoverEscapeListeners.delete(this);
+    }
+
+    // Clean up click listener
+    const clickHandler = popoverClickListeners.get(this);
+    if (clickHandler) {
+      document.removeEventListener('mousedown', clickHandler);
+      popoverClickListeners.delete(this);
+    }
+
+    const event = new Event('toggle') as Event & { newState: string; oldState: string };
+    Object.defineProperty(event, 'newState', { value: 'closed', writable: false });
+    Object.defineProperty(event, 'oldState', { value: 'open', writable: false });
+    this.dispatchEvent(event);
+  }
+});
+
+HTMLElement.prototype.togglePopover = vi.fn(function (this: HTMLElement, force?: boolean): boolean {
+  if (!this.hasAttribute('popover')) {
+    throw new DOMException('Element is not a popover', 'InvalidStateError');
+  }
+  const isOpen = popoverOpenState.get(this) ?? false;
+  const shouldOpen = force !== undefined ? force : !isOpen;
+
+  if (shouldOpen && !isOpen) {
+    this.showPopover();
+    return true;
+  } else if (!shouldOpen && isOpen) {
+    this.hidePopover();
+    return false;
+  }
+  return isOpen;
+});
+
+// Override matches to support :popover-open pseudo-selector
+const originalMatches = HTMLElement.prototype.matches;
+HTMLElement.prototype.matches = function (this: HTMLElement, selector: string): boolean {
+  if (selector === ':popover-open') {
+    return popoverOpenState.get(this) ?? false;
+  }
+  return originalMatches.call(this, selector);
+};
+
+// Mock HTMLDialogElement methods (for Modal refactoring)
+HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+  this.setAttribute('open', '');
+  const event = new Event('open');
+  this.dispatchEvent(event);
+});
+
+HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement, returnValue?: string) {
+  this.removeAttribute('open');
+  if (returnValue !== undefined) {
+    this.returnValue = returnValue;
+  }
+  const event = new Event('close');
+  this.dispatchEvent(event);
+});
+
 // Cleanup after each test case
 afterEach(() => {
   cleanup()

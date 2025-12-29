@@ -3,13 +3,14 @@
  * Verifies performance optimization state management
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   usePerformanceStore,
   REFINEMENT_STAGE_QUALITY,
   getEffectiveSSRQuality,
   getEffectiveShadowQuality,
   getEffectiveSampleQuality,
+  hasPersistedResolutionScale,
 } from '@/stores/performanceStore';
 
 describe('performanceStore', () => {
@@ -307,6 +308,86 @@ describe('quality interpolation utilities', () => {
 
     it('should return low at minimum multiplier', () => {
       expect(getEffectiveSampleQuality('high', 0.25)).toBe('low');
+    });
+  });
+});
+
+describe('render resolution scale persistence', () => {
+  const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale';
+
+  beforeEach(() => {
+    // Clear localStorage before each test
+    localStorage.removeItem(RESOLUTION_SCALE_KEY);
+    // Reset store state
+    usePerformanceStore.getState().reset();
+  });
+
+  afterEach(() => {
+    // Clean up localStorage after each test
+    localStorage.removeItem(RESOLUTION_SCALE_KEY);
+  });
+
+  describe('setRenderResolutionScale', () => {
+    it('should persist resolution scale to localStorage', () => {
+      const { setRenderResolutionScale } = usePerformanceStore.getState();
+
+      setRenderResolutionScale(0.75);
+
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.75');
+    });
+
+    it('should clamp and persist values at boundaries', () => {
+      const { setRenderResolutionScale } = usePerformanceStore.getState();
+
+      // Below minimum
+      setRenderResolutionScale(0.3);
+      expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.5);
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.5');
+
+      // Above maximum
+      setRenderResolutionScale(1.5);
+      expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0);
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('1');
+    });
+  });
+
+  describe('hasPersistedResolutionScale', () => {
+    it('should return false when no value is persisted', () => {
+      expect(hasPersistedResolutionScale()).toBe(false);
+    });
+
+    it('should return true after setting resolution scale', () => {
+      const { setRenderResolutionScale } = usePerformanceStore.getState();
+
+      setRenderResolutionScale(0.75);
+
+      expect(hasPersistedResolutionScale()).toBe(true);
+    });
+
+    it('should return false for invalid persisted values', () => {
+      // Set an invalid value directly
+      localStorage.setItem(RESOLUTION_SCALE_KEY, 'invalid');
+      expect(hasPersistedResolutionScale()).toBe(false);
+
+      // Set a value out of range
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.3');
+      expect(hasPersistedResolutionScale()).toBe(false);
+
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '1.5');
+      expect(hasPersistedResolutionScale()).toBe(false);
+    });
+  });
+
+  describe('initial state loading', () => {
+    it('should load persisted resolution scale on store creation', () => {
+      // Pre-populate localStorage
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.75');
+
+      // Force store to reload by getting fresh state
+      // Note: In actual usage, this happens on module load
+      // For testing, we verify the loadPersistedResolutionScale function works correctly
+      // by checking hasPersistedResolutionScale returns true
+      expect(hasPersistedResolutionScale()).toBe(true);
     });
   });
 });

@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface SelectOption<T extends string = string> {
   value: T;
   label: string;
@@ -22,15 +24,19 @@ export const Select = <T extends string = string>({
   disabled = false,
   'data-testid': testId,
 }: SelectProps<T>) => {
+  // Generate a unique ID for the select element to associate with the label
+  const selectId = React.useId();
+
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       {label && (
-        <label className="text-sm font-medium text-text-secondary">
+        <label htmlFor={selectId} className="text-sm font-medium text-text-secondary">
           {label}
         </label>
       )}
       <div className="relative group">
       <select
+        id={selectId}
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
         disabled={disabled}

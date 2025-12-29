@@ -6,8 +6,7 @@ import { StateCreator } from 'zustand'
 import { ExtendedObjectSlice, PolytopeSlice } from './types'
 
 export const createPolytopeSlice: StateCreator<ExtendedObjectSlice, [], [], PolytopeSlice> = (
-  set,
-  get
+  set
 ) => {
   /**
    * Wrapped setter that auto-increments polytopeVersion on any polytope change.

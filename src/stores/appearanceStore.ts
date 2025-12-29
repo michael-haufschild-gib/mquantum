@@ -18,9 +18,6 @@ export type { AppearanceSlice };
  */
 export const useAppearanceStore = create<AppearanceStoreState>()(
   subscribeWithSelector((set, get, api) => {
-    // Get the base slice
-    const baseSlice = createAppearanceSlice(set, get, api);
-
     /**
      * Wrapped setter that auto-increments appearanceVersion on any change.
      * This avoids manually adding version increment to 50+ individual setters.
