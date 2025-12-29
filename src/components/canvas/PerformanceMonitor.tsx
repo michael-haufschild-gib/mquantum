@@ -433,9 +433,13 @@ const SystemTabContent = React.memo(function SystemTabContent() {
 // ============================================================================
 const ShaderTabContent = React.memo(function ShaderTabContent() {
   const objectType = useGeometryStore((s) => s.objectType);
-  const shaderDebugInfos = usePerformanceStore((s) => s.shaderDebugInfos);
-  const shaderOverrides = usePerformanceStore((s) => s.shaderOverrides);
-  const toggleShaderModule = usePerformanceStore((s) => s.toggleShaderModule);
+  const { shaderDebugInfos, shaderOverrides, toggleShaderModule } = usePerformanceStore(
+    useShallow((s) => ({
+      shaderDebugInfos: s.shaderDebugInfos,
+      shaderOverrides: s.shaderOverrides,
+      toggleShaderModule: s.toggleShaderModule,
+    }))
+  );
 
   const [selectedShaderKey, setSelectedShaderKey] = useState<string | null>(null);
 
@@ -533,15 +537,30 @@ const BuffersTabContent = React.memo(function BuffersTabContent() {
   const objectType = useGeometryStore((s) => s.objectType);
   const temporalReprojectionEnabled = usePerformanceStore((s) => s.temporalReprojectionEnabled);
 
-  const showDepthBuffer = useUIStore((s) => s.showDepthBuffer);
-  const setShowDepthBuffer = useUIStore((s) => s.setShowDepthBuffer);
-  const showNormalBuffer = useUIStore((s) => s.showNormalBuffer);
-  const setShowNormalBuffer = useUIStore((s) => s.setShowNormalBuffer);
-  const showTemporalDepthBuffer = useUIStore((s) => s.showTemporalDepthBuffer);
-  const setShowTemporalDepthBuffer = useUIStore((s) => s.setShowTemporalDepthBuffer);
+  const {
+    showDepthBuffer,
+    setShowDepthBuffer,
+    showNormalBuffer,
+    setShowNormalBuffer,
+    showTemporalDepthBuffer,
+    setShowTemporalDepthBuffer,
+  } = useUIStore(
+    useShallow((s) => ({
+      showDepthBuffer: s.showDepthBuffer,
+      setShowDepthBuffer: s.setShowDepthBuffer,
+      showNormalBuffer: s.showNormalBuffer,
+      setShowNormalBuffer: s.setShowNormalBuffer,
+      showTemporalDepthBuffer: s.showTemporalDepthBuffer,
+      setShowTemporalDepthBuffer: s.setShowTemporalDepthBuffer,
+    }))
+  );
 
-  const triggerContextLoss = useWebGLContextStore((s) => s.debugTriggerContextLoss);
-  const contextStatus = useWebGLContextStore((s) => s.status);
+  const { triggerContextLoss, contextStatus } = useWebGLContextStore(
+    useShallow((s) => ({
+      triggerContextLoss: s.debugTriggerContextLoss,
+      contextStatus: s.status,
+    }))
+  );
 
   const [bufferStats, setBufferStats] = useState<BufferStats | null>(null);
   const isDevelopment = import.meta.env.MODE !== 'production';

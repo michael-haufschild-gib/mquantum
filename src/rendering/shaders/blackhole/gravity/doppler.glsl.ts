@@ -95,6 +95,11 @@ float gravitationalRedshift(float r) {
  *
  * Based on the algorithm by Tanner Helland for temperatures 1000K - 40000K.
  *
+ * Note: Branching version is FASTER than branchless here because:
+ * - Temperature threshold (66.0) is uniform-coherent (all pixels same path)
+ * - Branching avoids computing unused pow()/log() calls
+ * - Called thousands of times per frame in raymarch loop
+ *
  * @param temperature - Temperature in Kelvin
  * @returns RGB color (normalized to peak intensity)
  */

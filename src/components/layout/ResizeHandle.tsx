@@ -15,6 +15,7 @@ import {
   useLayoutStore,
 } from '@/stores/layoutStore'
 import React, { useCallback, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 export interface ResizeHandleProps {
   /** Additional CSS classes */
@@ -38,8 +39,12 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ className = '' }) =>
   const startXRef = useRef(0)
   const startWidthRef = useRef(0)
 
-  const setSidebarWidth = useLayoutStore((state) => state.setSidebarWidth)
-  const sidebarWidth = useLayoutStore((state) => state.sidebarWidth)
+  const { setSidebarWidth, sidebarWidth } = useLayoutStore(
+    useShallow((state) => ({
+      setSidebarWidth: state.setSidebarWidth,
+      sidebarWidth: state.sidebarWidth,
+    }))
+  )
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {

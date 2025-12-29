@@ -49,8 +49,12 @@ export const TimelineControls: FC = () => {
         clearAllPlanes
     } = useAnimationStore(animationSelector);
 
-    const animationBias = useUIStore((state) => state.animationBias);
-    const setAnimationBias = useUIStore((state) => state.setAnimationBias);
+    const { animationBias, setAnimationBias } = useUIStore(
+        useShallow((state) => ({
+            animationBias: state.animationBias,
+            setAnimationBias: state.setAnimationBias,
+        }))
+    );
 
     // Extended object configs for animation state checking
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({

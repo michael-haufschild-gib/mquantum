@@ -13,6 +13,7 @@ import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
 import { clearMemoryCache } from '@/lib/geometry/wythoff/cache';
 import React, { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /** Database name - must match IndexedDBCache.ts */
 const GEOMETRY_CACHE_DB_NAME = 'mdimension-cache';
@@ -36,12 +37,20 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [showClearLocalStorageModal, setShowClearLocalStorageModal] = useState(false);
   const { addToast } = useToast();
 
-  const showAxisHelper = useUIStore((state) => state.showAxisHelper);
-  const setShowAxisHelper = useUIStore((state) => state.setShowAxisHelper);
-  const maxFps = useUIStore((state) => state.maxFps);
-  const setMaxFps = useUIStore((state) => state.setMaxFps);
-  const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale);
-  const setRenderResolutionScale = usePerformanceStore((state) => state.setRenderResolutionScale);
+  const { showAxisHelper, setShowAxisHelper, maxFps, setMaxFps } = useUIStore(
+    useShallow((state) => ({
+      showAxisHelper: state.showAxisHelper,
+      setShowAxisHelper: state.setShowAxisHelper,
+      maxFps: state.maxFps,
+      setMaxFps: state.setMaxFps,
+    }))
+  );
+  const { renderResolutionScale, setRenderResolutionScale } = usePerformanceStore(
+    useShallow((state) => ({
+      renderResolutionScale: state.renderResolutionScale,
+      setRenderResolutionScale: state.setRenderResolutionScale,
+    }))
+  );
 
   const handleClearGeometryCache = async () => {
     try {

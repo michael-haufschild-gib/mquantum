@@ -5,7 +5,7 @@ import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { m } from 'motion/react';
-import { useShallow } from 'zustand/shallow';
+import { useShallow } from 'zustand/react/shallow';
 import { CropBox, CropValues } from './CropBox';
 
 /**

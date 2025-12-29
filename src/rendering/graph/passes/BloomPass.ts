@@ -43,7 +43,8 @@ const HDRLuminosityHighPassShader = {
     out vec2 vUv;
     void main() {
       vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      // Direct NDC for fullscreen quad (PlaneGeometry(2,2)) - avoids DPR issues
+      gl_Position = vec4(position.xy, 0.0, 1.0);
     }
   `,
 

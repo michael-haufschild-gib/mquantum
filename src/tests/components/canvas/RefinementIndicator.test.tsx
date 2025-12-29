@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { act, render, screen } from '@testing-library/react'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
-import { usePerformanceStore } from '@/stores'
+import { usePerformanceStore } from '@/stores/performanceStore'
 
 const initialState = usePerformanceStore.getState()
 const resetStore = () => usePerformanceStore.setState(initialState, true)

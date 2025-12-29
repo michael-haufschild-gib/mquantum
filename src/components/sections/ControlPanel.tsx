@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button'
 import type { LayoutMode } from '@/stores/layoutStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { ResizeHandle } from '@/components/layout/ResizeHandle'
 
 export interface ControlPanelProps {
@@ -40,9 +41,13 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   className = '',
   layoutMode = 'overlay',
 }) => {
-  const isCollapsed = useLayoutStore((state) => state.isCollapsed)
-  const toggleCollapsed = useLayoutStore((state) => state.toggleCollapsed)
-  const sidebarWidth = useLayoutStore((state) => state.sidebarWidth)
+  const { isCollapsed, toggleCollapsed, sidebarWidth } = useLayoutStore(
+    useShallow((state) => ({
+      isCollapsed: state.isCollapsed,
+      toggleCollapsed: state.toggleCollapsed,
+      sidebarWidth: state.sidebarWidth,
+    }))
+  )
 
   const isSideBySide = layoutMode === 'side-by-side'
   const isSideBySideCollapsed = isSideBySide && isCollapsed

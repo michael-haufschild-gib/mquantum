@@ -212,7 +212,7 @@ export const Tabs: React.FC<TabsProps> = ({
             <button
               type="button"
               onClick={() => scroll('left')}
-              className="absolute left-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-r from-panel to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+              className="absolute start-0 inset-block-0 z-20 px-1 bg-gradient-to-r from-panel to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
             >
               <ChevronLeftIcon className="w-3 h-3" />
             </button>
@@ -257,7 +257,7 @@ export const Tabs: React.FC<TabsProps> = ({
                     {isActive && variant !== 'pills' && (
                       <m.div
                         layoutId={`activeTab-${instanceId}`}
-                        className="absolute bottom-[-1px] left-0 right-0 h-[2px] bg-accent shadow-[0_0_8px_var(--color-accent)]"
+                        className="absolute bottom-[-1px] inset-inline-0 h-[2px] bg-accent shadow-[0_0_8px_var(--color-accent)]"
                         transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
                       />
                     )}
@@ -276,7 +276,7 @@ export const Tabs: React.FC<TabsProps> = ({
             <button
               type="button"
               onClick={() => scroll('right')}
-              className="absolute right-0 top-0 bottom-0 z-20 px-1 bg-gradient-to-l from-panel to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
+              className="absolute end-0 inset-block-0 z-20 px-1 bg-gradient-to-l from-panel to-transparent flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors"
             >
               <ChevronRightIcon className="w-3 h-3" />
             </button>

@@ -4,8 +4,9 @@
  */
 
 import { Switch } from '@/components/ui/Switch';
-import { usePerformanceStore } from '@/stores';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Fractal animation quality controls for the Performance section.
@@ -14,8 +15,12 @@ import React from 'react';
  * @returns The quality controls UI component
  */
 export const FractalAnimationQualityControls: React.FC = () => {
-  const enabled = usePerformanceStore((s) => s.fractalAnimationLowQuality);
-  const setEnabled = usePerformanceStore((s) => s.setFractalAnimationLowQuality);
+  const { enabled, setEnabled } = usePerformanceStore(
+    useShallow((s) => ({
+      enabled: s.fractalAnimationLowQuality,
+      setEnabled: s.setFractalAnimationLowQuality,
+    }))
+  );
 
   return (
     <div className="space-y-2">

@@ -4,8 +4,9 @@
  */
 
 import { Switch } from '@/components/ui/Switch';
-import { usePerformanceStore } from '@/stores';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Temporal reprojection controls for the Performance section.
@@ -13,9 +14,11 @@ import React from 'react';
  * @returns The temporal reprojection controls UI component
  */
 export const TemporalReprojectionControls: React.FC = () => {
-  const enabled = usePerformanceStore((s) => s.temporalReprojectionEnabled);
-  const setEnabled = usePerformanceStore(
-    (s) => s.setTemporalReprojectionEnabled
+  const { enabled, setEnabled } = usePerformanceStore(
+    useShallow((s) => ({
+      enabled: s.temporalReprojectionEnabled,
+      setEnabled: s.setTemporalReprojectionEnabled,
+    }))
   );
 
   return (

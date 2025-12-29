@@ -4,8 +4,9 @@
  */
 
 import { Switch } from '@/components/ui/Switch';
-import { usePerformanceStore } from '@/stores';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Get stage label for display.
@@ -33,12 +34,14 @@ function getStageLabel(stage: string): string {
  * @returns The progressive refinement controls UI component
  */
 export const ProgressiveRefinementControls: React.FC = () => {
-  const enabled = usePerformanceStore((s) => s.progressiveRefinementEnabled);
-  const setEnabled = usePerformanceStore(
-    (s) => s.setProgressiveRefinementEnabled
+  const { enabled, setEnabled, stage, progress } = usePerformanceStore(
+    useShallow((s) => ({
+      enabled: s.progressiveRefinementEnabled,
+      setEnabled: s.setProgressiveRefinementEnabled,
+      stage: s.refinementStage,
+      progress: s.refinementProgress,
+    }))
   );
-  const stage = usePerformanceStore((s) => s.refinementStage);
-  const progress = usePerformanceStore((s) => s.refinementProgress);
 
   return (
     <div className="space-y-3">

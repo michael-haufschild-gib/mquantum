@@ -4,8 +4,8 @@
  */
 
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
-import { INTERACTION_RESTORE_DELAY, usePerformanceStore } from '@/stores'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { INTERACTION_RESTORE_DELAY, usePerformanceStore } from '@/stores/performanceStore'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useRef } from 'react'
 import { Euler, Vector3 } from 'three'

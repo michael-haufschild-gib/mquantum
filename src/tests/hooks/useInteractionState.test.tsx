@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { useInteractionState } from '@/hooks/useInteractionState';
-import { usePerformanceStore } from '@/stores';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import { useThree } from '@react-three/fiber';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { Vector3, Euler } from 'three';

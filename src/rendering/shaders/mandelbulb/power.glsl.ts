@@ -27,89 +27,74 @@ float getEffectivePower() {
 void optimizedPow(float r, float pwr, out float rPow, out float rPowMinus1) {
     // OPT-SDF-2: Check for integer powers and use multiplication chains
     // This avoids expensive pow() calls for common Mandelbulb powers
-    
+    // OPT-SDF-2b: Use else-if chain to avoid evaluating all comparisons
+
     // Power 2: r^2, r^1 (2 muls)
     if (pwr == 2.0) {
         rPowMinus1 = r;
         rPow = r * r;
-        return;
     }
-    
     // Power 3: r^3, r^2 (2 muls)
-    if (pwr == 3.0) {
+    else if (pwr == 3.0) {
         float r2 = r * r;
         rPowMinus1 = r2;
         rPow = r2 * r;
-        return;
     }
-    
     // Power 4: r^4, r^3 (3 muls)
-    if (pwr == 4.0) {
+    else if (pwr == 4.0) {
         float r2 = r * r;
         rPowMinus1 = r2 * r;
         rPow = r2 * r2;
-        return;
     }
-    
     // Power 5: r^5, r^4 (4 muls)
-    if (pwr == 5.0) {
+    else if (pwr == 5.0) {
         float r2 = r * r;
         float r4 = r2 * r2;
         rPowMinus1 = r4;
         rPow = r4 * r;
-        return;
     }
-    
     // Power 6: r^6, r^5 (4 muls)
-    if (pwr == 6.0) {
+    else if (pwr == 6.0) {
         float r2 = r * r;
         float r3 = r2 * r;
         rPowMinus1 = r3 * r2;
         rPow = r3 * r3;
-        return;
     }
-    
     // Power 7: r^7, r^6 (4 muls)
-    if (pwr == 7.0) {
+    else if (pwr == 7.0) {
         float r2 = r * r;
         float r3 = r2 * r;
         float r6 = r3 * r3;
         rPowMinus1 = r6;
         rPow = r6 * r;
-        return;
     }
-    
     // Power 8: r^8, r^7 (4 muls) - most common Mandelbulb power
-    if (pwr == 8.0) {
+    else if (pwr == 8.0) {
         float r2 = r * r;
         float r4 = r2 * r2;
         rPowMinus1 = r4 * r2 * r;  // r^7
         rPow = r4 * r4;             // r^8
-        return;
     }
-    
     // Power 9: r^9, r^8 (5 muls)
-    if (pwr == 9.0) {
+    else if (pwr == 9.0) {
         float r2 = r * r;
         float r4 = r2 * r2;
         float r8 = r4 * r4;
         rPowMinus1 = r8;
         rPow = r8 * r;
-        return;
     }
-    
     // Power 10: r^10, r^9 (5 muls)
-    if (pwr == 10.0) {
+    else if (pwr == 10.0) {
         float r2 = r * r;
         float r4 = r2 * r2;
         float r5 = r4 * r;
         rPowMinus1 = r5 * r4;
         rPow = r5 * r5;
-        return;
     }
-    
     // Fallback: Use pow() for non-integer or very high powers
-    rPow = pow(r, pwr);
-    rPowMinus1 = pow(max(r, EPS), pwr - 1.0);
+    else {
+        rPow = pow(r, pwr);
+        rPowMinus1 = pow(max(r, EPS), pwr - 1.0);
+    }
 }
 `;

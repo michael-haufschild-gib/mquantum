@@ -18,6 +18,7 @@ import { Z_INDEX } from '@/constants/zIndex';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { AnimatePresence, m } from 'motion/react';
 import React, { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 /** Animation duration for overlay fade in (seconds) */
@@ -50,8 +51,12 @@ const CARD_EXIT_EASE = [0.4, 0, 0.2, 1] as const;
  * @returns The shader compilation overlay component
  */
 export const ShaderCompilationOverlay: React.FC = () => {
-  const isCompiling = usePerformanceStore((s) => s.isShaderCompiling);
-  const message = usePerformanceStore((s) => s.shaderCompilationMessage);
+  const { isCompiling, message } = usePerformanceStore(
+    useShallow((s) => ({
+      isCompiling: s.isShaderCompiling,
+      message: s.shaderCompilationMessage,
+    }))
+  );
 
   // Track when overlay started showing for minimum display time
   const showStartTimeRef = useRef<number>(0);

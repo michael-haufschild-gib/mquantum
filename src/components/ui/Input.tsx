@@ -79,7 +79,7 @@ export const Input = ({
   return (
     <div className={`flex flex-col gap-1.5 ${containerClassName}`}>
       {label && (
-        <label className="text-xs font-medium text-text-secondary ml-1">
+        <label className="text-xs font-medium text-text-secondary ms-1">
           {label}
         </label>
       )}
@@ -93,7 +93,7 @@ export const Input = ({
       >
         {/* Left Icon */}
         {leftIcon && (
-          <div className={`absolute left-3 transition-colors ${isFocused ? 'text-accent' : 'text-text-tertiary'}`}>
+          <div className={`absolute start-3 transition-colors ${isFocused ? 'text-accent' : 'text-text-tertiary'}`}>
             {leftIcon}
           </div>
         )}
@@ -115,8 +115,8 @@ export const Input = ({
           }}
           className={`
             w-full bg-glass border rounded-lg px-3 py-2 text-sm transition-all duration-200
-            ${leftIcon ? 'pl-9' : ''}
-            ${rightIcon || clearable || loading ? 'pr-9' : ''}
+            ${leftIcon ? 'ps-9' : ''}
+            ${rightIcon || clearable || loading ? 'pe-9' : ''}
             ${error
               ? 'border-danger-border focus:border-danger focus:ring-1 focus:ring-danger-border placeholder:text-danger/30'
               : 'border-[var(--border-subtle)] focus:border-accent focus:ring-1 focus:ring-accent/50 placeholder:text-[var(--text-muted)]'

@@ -177,7 +177,7 @@ export const Slider: React.FC<SliderProps> = ({
         </label>
         
         {showValue && (
-          <div className="flex items-center shrink-0 ml-2">
+          <div className="flex items-center shrink-0 ms-2">
             <div className="relative w-[8ch] h-5 flex items-center">
                 <input
                   type="text"
@@ -191,17 +191,17 @@ export const Slider: React.FC<SliderProps> = ({
                   onKeyDown={handleKeyDown}
                   disabled={disabled}
                   className={`
-                    w-full h-full pl-1.5 text-right font-mono text-[10px]
+                    w-full h-full ps-1.5 text-right font-mono text-[10px]
                     bg-[var(--bg-hover)] border border-border-subtle rounded
                     text-text-primary
                     hover:border-border-default hover:bg-[var(--bg-active)]
                     focus:outline-none focus:border-accent/50 focus:bg-[var(--bg-active)]
                     transition-colors duration-150
-                    ${unit ? 'pr-7' : 'pr-1.5'}
+                    ${unit ? 'pe-7' : 'pe-1.5'}
                   `}
                   data-testid={dataTestId ? `${dataTestId}-input` : undefined}
                 />
-                {unit && <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-text-tertiary font-medium pointer-events-none">{unit}</span>}
+                {unit && <span className="absolute end-1.5 top-1/2 -translate-y-1/2 text-[9px] text-text-tertiary font-medium pointer-events-none">{unit}</span>}
             </div>
           </div>
         )}

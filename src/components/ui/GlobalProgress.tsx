@@ -2,10 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export const GlobalProgress: React.FC = () => {
-  const sceneTransitioning = usePerformanceStore((s) => s.sceneTransitioning);
-  const refinementProgress = usePerformanceStore((s) => s.refinementProgress);
+  const { sceneTransitioning, refinementProgress } = usePerformanceStore(
+    useShallow((s) => ({
+      sceneTransitioning: s.sceneTransitioning,
+      refinementProgress: s.refinementProgress,
+    }))
+  );
   const skyboxLoading = useEnvironmentStore((s) => s.skyboxLoading);
 
   // We show the bar if:

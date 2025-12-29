@@ -3,12 +3,12 @@
  */
 
 import { TemporalDepthState, invalidateAllTemporalDepth } from '@/rendering/core/temporalDepth'
-import { usePerformanceStore } from '@/stores'
+import { usePerformanceStore } from '@/stores/performanceStore'
 import * as THREE from 'three'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock stores
-vi.mock('@/stores', () => ({
+vi.mock('@/stores/performanceStore', () => ({
   usePerformanceStore: {
     getState: vi.fn(() => ({ temporalReprojectionEnabled: true })),
   },

@@ -437,7 +437,7 @@ const SchroedingerAdvanced: React.FC = () => {
             </ToggleButton>
           </div>
           {config.nodalEnabled && (
-            <div className="pl-2 border-l border-border-default">
+            <div className="ps-2 border-s border-border-default">
               <Slider
                 label="Strength"
                 min={0.0}
@@ -521,7 +521,7 @@ const SchroedingerAdvanced: React.FC = () => {
             </ToggleButton>
           </div>
           {config.dispersionEnabled && (
-            <div className="pl-2 border-l border-border-default space-y-2">
+            <div className="ps-2 border-s border-border-default space-y-2">
               <Slider
                 label="Strength"
                 min={0.0}
@@ -576,7 +576,7 @@ const SchroedingerAdvanced: React.FC = () => {
             data-testid="schroedinger-erosion-strength"
           />
           {(config.erosionStrength ?? 0) > 0 && (
-            <div className="pl-2 border-l border-border-default space-y-2">
+            <div className="ps-2 border-s border-border-default space-y-2">
               <Slider
                 label="Scale"
                 min={0.25}

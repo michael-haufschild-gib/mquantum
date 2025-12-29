@@ -9,7 +9,7 @@
 
 import * as THREE from 'three'
 
-import { usePerformanceStore } from '@/stores'
+import { usePerformanceStore } from '@/stores/performanceStore'
 import { useWebGLContextStore } from '@/stores/webglContextStore'
 
 // =============================================================================

@@ -92,7 +92,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
             transition={{ duration: 0.2, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-            <div className={`${isCard ? 'p-3' : 'pt-2'} space-y-3 ml-1 pl-2 border-l border-[var(--border-subtle)]`}>
+            <div className={`${isCard ? 'p-3' : 'pt-2'} space-y-3 ms-1 ps-2 border-s border-[var(--border-subtle)]`}>
               {children}
             </div>
           </m.div>

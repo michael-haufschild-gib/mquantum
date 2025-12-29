@@ -2,17 +2,45 @@ import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId
 import { m, AnimatePresence } from 'motion/react';
 import { soundManager } from '@/lib/audio/SoundManager';
 
+/** Props for the Popover component */
 export interface PopoverProps {
+  /** The trigger element that opens the popover on click */
   trigger: React.ReactNode;
+  /** The content to display inside the popover */
   content: React.ReactNode;
+  /** Additional CSS classes for the popover content container */
   className?: string;
+  /** Horizontal alignment relative to the trigger */
   align?: 'start' | 'end' | 'center';
+  /** Vertical side to display the popover */
   side?: 'top' | 'bottom';
+  /** Controlled open state */
   open?: boolean;
+  /** Callback when open state changes */
   onOpenChange?: (open: boolean) => void;
+  /** Pixel offset from the trigger element */
   offset?: number;
 }
 
+/**
+ * Floating popover component with automatic positioning and animations.
+ *
+ * Supports both controlled and uncontrolled modes. Automatically repositions
+ * to stay within viewport bounds. Closes on outside click or Escape key.
+ *
+ * @param props - Component props
+ * @returns The popover component with trigger and floating content
+ *
+ * @example
+ * ```tsx
+ * <Popover
+ *   trigger={<Button>Open Menu</Button>}
+ *   content={<div>Popover content</div>}
+ *   align="start"
+ *   side="bottom"
+ * />
+ * ```
+ */
 export const Popover: React.FC<PopoverProps> = ({
   trigger,
   content,

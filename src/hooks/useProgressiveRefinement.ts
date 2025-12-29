@@ -3,13 +3,13 @@
  * Manages quality stages after interaction stops
  */
 
-import type { RefinementStage } from '@/stores'
+import { useEnvironmentStore } from '@/stores/environmentStore'
 import {
   REFINEMENT_STAGE_TIMING,
   REFINEMENT_STAGES,
-  useEnvironmentStore,
   usePerformanceStore,
-} from '@/stores'
+  type RefinementStage,
+} from '@/stores/performanceStore'
 import { useExportStore } from '@/stores/exportStore'
 import { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'

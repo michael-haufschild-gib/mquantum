@@ -1,21 +1,51 @@
 import React from 'react';
 import { soundManager } from '@/lib/audio/SoundManager';
 
+/** Single option in a Select dropdown */
 export interface SelectOption<T extends string = string> {
+  /** The value used internally */
   value: T;
+  /** The label displayed to the user */
   label: string;
 }
 
+/** Props for the Select component */
 export interface SelectProps<T extends string = string> {
+  /** Optional label displayed above the select */
   label?: string;
+  /** Array of available options */
   options: SelectOption<T>[];
+  /** Currently selected value */
   value: T;
+  /** Callback when selection changes */
   onChange: (value: T) => void;
+  /** Additional CSS classes */
   className?: string;
+  /** Whether the select is disabled */
   disabled?: boolean;
+  /** Test ID for testing */
   'data-testid'?: string;
 }
 
+/**
+ * Styled dropdown select component with glass morphism design.
+ *
+ * Provides a native select element with custom styling, hover effects,
+ * and optional label. Supports generic string types for type-safe values.
+ *
+ * @param props - Component props
+ * @returns The styled select dropdown
+ *
+ * @example
+ * ```tsx
+ * <Select
+ *   label="Choose option"
+ *   options={[{ value: 'a', label: 'Option A' }]}
+ *   value={selected}
+ *   onChange={setSelected}
+ * />
+ * ```
+ */
 export const Select = <T extends string = string>({
   label,
   options,
@@ -43,7 +73,7 @@ export const Select = <T extends string = string>({
         onMouseEnter={() => !disabled && soundManager.playHover()}
         disabled={disabled}
         data-testid={testId}
-        className="glass-input w-full pl-3 pr-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
+        className="glass-input w-full ps-3 pe-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
       >
           {options.map((option) => (
             <option key={option.value} value={option.value} className="bg-background text-text-primary">
@@ -51,7 +81,7 @@ export const Select = <T extends string = string>({
             </option>
           ))}
         </select>
-        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200 group-hover:translate-y-[-40%]">
+        <div className="absolute end-2.5 top-1/2 -translate-y-1/2 pointer-events-none transition-transform duration-200 group-hover:translate-y-[-40%]">
           <svg
             className="w-3.5 h-3.5 text-text-tertiary group-hover:text-text-primary transition-colors"
             fill="none"

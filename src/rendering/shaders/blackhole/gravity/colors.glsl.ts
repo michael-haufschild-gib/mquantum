@@ -34,24 +34,27 @@ export const colorsBlock = /* glsl */ `
  * @return RGB color
  */
 vec3 getAlgorithmColor(float t, vec3 pos, vec3 normal) {
-  // 1. Monochromatic / Analogous / Complementary (Legacy Palette)
+  // OPT-BH-COLOR: Use else-if chain for proper mutual exclusion.
+  // Previously used separate if statements which ALL evaluated even after match.
+
+  // 1. Monochromatic / Analogous (Legacy Palette)
   if (uColorAlgorithm == ALGO_MONOCHROMATIC ||
       uColorAlgorithm == ALGO_ANALOGOUS) {
       vec3 baseHSL = rgb2hsl(uBaseColor);
       return getPaletteColor(baseHSL, t, uColorAlgorithm);
   }
-
   // 2. Cosine Gradient (Standard Radial)
-  if (uColorAlgorithm == ALGO_COSINE || uColorAlgorithm == ALGO_DISTANCE || uColorAlgorithm == ALGO_RADIAL) {
+  else if (uColorAlgorithm == ALGO_COSINE ||
+           uColorAlgorithm == ALGO_DISTANCE ||
+           uColorAlgorithm == ALGO_RADIAL) {
       return getCosinePaletteColor(
           t,
           uCosineA, uCosineB, uCosineC, uCosineD,
           1.0, 1.0, 0.0
       );
   }
-
   // 3. Normal Based
-  if (uColorAlgorithm == ALGO_NORMAL) {
+  else if (uColorAlgorithm == ALGO_NORMAL) {
       // Map normal Y (up/down) to gradient
       // Perturbed normal from turbulence gives nice variation
       float nt = normal.y * 0.5 + 0.5;
@@ -61,9 +64,8 @@ vec3 getAlgorithmColor(float t, vec3 pos, vec3 normal) {
           1.0, 1.0, 0.0
       );
   }
-
   // 4. Phase (Angular)
-  if (uColorAlgorithm == ALGO_PHASE) {
+  else if (uColorAlgorithm == ALGO_PHASE) {
       // Map angle to gradient
       float angle = atan(pos.z, pos.x);
       float pt = angle * 0.15915 + 0.5; // [-PI, PI] -> [0, 1]
@@ -73,34 +75,32 @@ vec3 getAlgorithmColor(float t, vec3 pos, vec3 normal) {
           1.0, 1.0, 0.0
       );
   }
-
   // 5. LCH
-  if (uColorAlgorithm == ALGO_LCH) {
+  else if (uColorAlgorithm == ALGO_LCH) {
       return lchColor(t, uLchLightness, uLchChroma);
   }
-
   // 6. Blackbody
-  if (uColorAlgorithm == ALGO_BLACKBODY) {
+  else if (uColorAlgorithm == ALGO_BLACKBODY) {
       // Guard against negative/zero base for pow with fractional exponent
       // t + 0.1 ensures minimum of 0.1, max guards against very small values
       float safeBase = max(t + 0.1, 0.01);
       float temp = uDiskTemperature * pow(safeBase, -0.5);
       return blackbodyColor(temp);
   }
-
-  // 7. Specific Algorithms
-  if (uColorAlgorithm == ALGO_ACCRETION_GRADIENT) {
+  // 7. Accretion Gradient
+  else if (uColorAlgorithm == ALGO_ACCRETION_GRADIENT) {
       vec3 deepGold = vec3(1.0, 0.5, 0.1);
       vec3 brightGold = vec3(1.0, 0.9, 0.7);
       return mix(brightGold, deepGold, t);
   }
-
-  if (uColorAlgorithm == ALGO_GRAVITATIONAL_REDSHIFT) {
+  // 8. Gravitational Redshift
+  else if (uColorAlgorithm == ALGO_GRAVITATIONAL_REDSHIFT) {
       float r = length(pos.xz);
       float redshift = gravitationalRedshift(r);
       return mix(vec3(1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), redshift);
   }
 
+  // Fallback
   return uBaseColor;
 }
 `

@@ -3,9 +3,10 @@
  * Displays progressive refinement progress
  */
 
-import { usePerformanceStore } from '@/stores';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface RefinementIndicatorProps {
   /** Position in the viewport */
@@ -26,10 +27,14 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
   position = 'bottom-right',
   autoHideDelay = 1000,
 }) => {
-  const enabled = usePerformanceStore((s) => s.progressiveRefinementEnabled);
-  const stage = usePerformanceStore((s) => s.refinementStage);
-  const progress = usePerformanceStore((s) => s.refinementProgress);
-  const isInteracting = usePerformanceStore((s) => s.isInteracting);
+  const { enabled, stage, progress, isInteracting } = usePerformanceStore(
+    useShallow((s) => ({
+      enabled: s.progressiveRefinementEnabled,
+      stage: s.refinementStage,
+      progress: s.refinementProgress,
+      isInteracting: s.isInteracting,
+    }))
+  );
 
   const [isVisible, setIsVisible] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);

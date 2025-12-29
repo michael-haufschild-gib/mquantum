@@ -11,14 +11,12 @@ import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import {
-  AuroraControls,
-  HorizonControls,
-  OceanControls,
-  SkyboxSharedClassicControls,
-  SkyboxSharedProceduralControls,
-  StarfieldControls,
-} from './skybox'
+import { AuroraControls } from './skybox/AuroraControls'
+import { HorizonControls } from './skybox/HorizonControls'
+import { OceanControls } from './skybox/OceanControls'
+import { SkyboxSharedClassicControls } from './skybox/SkyboxSharedClassicControls'
+import { SkyboxSharedProceduralControls } from './skybox/SkyboxSharedProceduralControls'
+import { StarfieldControls } from './skybox/StarfieldControls'
 
 // Import thumbnails
 import spaceBlueThumb from '@/assets/skyboxes/space_blue/thumbnail.png'
