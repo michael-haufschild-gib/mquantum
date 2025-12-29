@@ -8,7 +8,7 @@ import { Modal } from '@/components/ui/Modal';
 import { BREAKPOINTS, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
-import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export';
+import { exportSceneToPNG, findThreeCanvas, generateTimestampFilename } from '@/lib/export';
 import { getModifierSymbols } from '@/lib/platform';
 import { PRESETS } from '@/lib/presets';
 import { generateShareUrl } from '@/lib/url';
@@ -206,6 +206,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
   }, [addToast]);
 
   const setExportModalOpen = useExportStore((state) => state.setModalOpen);
+  const setPreviewImage = useExportStore((state) => state.setPreviewImage);
 
   // --- Utility Actions for Mobile Menu ---
   const toggleSound = useCallback(() => {
@@ -308,9 +309,20 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
   // --- Memoized Menu Handlers ---
   const handleExportVideo = useCallback(() => {
+    // Capture screenshot BEFORE opening modal (like image export does)
+    // This ensures we capture the canvas while it's still rendering normally
+    const canvas = findThreeCanvas();
+    if (canvas) {
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setPreviewImage(dataUrl);
+      } catch (e) {
+        console.error('Failed to capture preview for video export:', e);
+      }
+    }
     setExportModalOpen(true);
     soundManager.playClick();
-  }, [setExportModalOpen]);
+  }, [setExportModalOpen, setPreviewImage]);
 
   const handleToggleLeftPanel = useCallback(() => {
     toggleLeftPanel();

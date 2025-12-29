@@ -15,7 +15,7 @@ import * as THREE from 'three'
  * @returns null
  */
 export function VideoExportController() {
-  const { gl, advance } = useThree()
+  const { gl, advance, camera } = useThree()
   const {
     isExporting,
     settings,
@@ -34,7 +34,8 @@ export function VideoExportController() {
   const exportStartedRef = useRef<boolean>(false) // Prevents double-invocation of startExport
   const originalSizeRef = useRef<THREE.Vector2>(new THREE.Vector2())
   const originalPixelRatioRef = useRef<number>(1)
-  const originalPerfSettingsRef = useRef<{ quality: number; lowQualityAnim: boolean; progressiveRefinementEnabled: boolean }>({ quality: 1, lowQualityAnim: true, progressiveRefinementEnabled: true })
+  const originalCameraAspectRef = useRef<number>(1)
+  const originalPerfSettingsRef = useRef<{ quality: number; lowQualityAnim: boolean; progressiveRefinementEnabled: boolean; renderResolutionScale: number }>({ quality: 1, lowQualityAnim: true, progressiveRefinementEnabled: true, renderResolutionScale: 1.0 })
 
   // Rotation state snapshot for stream mode (save after warmup, restore before main recording)
   const rotationSnapshotRef = useRef<Record<string, number> | null>(null)
@@ -65,15 +66,22 @@ export function VideoExportController() {
         gl.setPixelRatio(originalPixelRatioRef.current)
     }
 
+    // Restore Camera Aspect Ratio
+    if (camera instanceof THREE.PerspectiveCamera && originalCameraAspectRef.current > 0) {
+        camera.aspect = originalCameraAspectRef.current
+        camera.updateProjectionMatrix()
+    }
+
     // Restore Performance Settings
     const perfStore = usePerformanceStore.getState()
     perfStore.setProgressiveRefinementEnabled(originalPerfSettingsRef.current.progressiveRefinementEnabled)
     perfStore.setRefinementStage('final')
     perfStore.setFractalAnimationLowQuality(originalPerfSettingsRef.current.lowQualityAnim)
+    perfStore.setRenderResolutionScale(originalPerfSettingsRef.current.renderResolutionScale)
 
     // Clear rotation snapshot
     rotationSnapshotRef.current = null
-  }, [gl])
+  }, [gl, camera])
 
   const handleError = useCallback((e: unknown) => {
       setError(e instanceof Error ? e.message : 'Export failed')
@@ -504,12 +512,18 @@ export function VideoExportController() {
     gl.getSize(originalSizeRef.current)
     originalPixelRatioRef.current = gl.getPixelRatio()
 
+    // Save Camera Aspect Ratio
+    if (camera instanceof THREE.PerspectiveCamera) {
+        originalCameraAspectRef.current = camera.aspect
+    }
+
     // Save Performance Settings
     const perfStore = usePerformanceStore.getState()
     originalPerfSettingsRef.current = {
         quality: perfStore.qualityMultiplier,
         lowQualityAnim: perfStore.fractalAnimationLowQuality,
-        progressiveRefinementEnabled: perfStore.progressiveRefinementEnabled
+        progressiveRefinementEnabled: perfStore.progressiveRefinementEnabled,
+        renderResolutionScale: perfStore.renderResolutionScale
     }
 
     try {
@@ -523,6 +537,7 @@ export function VideoExportController() {
       perfStore.setProgressiveRefinementEnabled(false)
       perfStore.setFractalAnimationLowQuality(false)
       perfStore.setRefinementStage('final')
+      perfStore.setRenderResolutionScale(1.0) // Force full resolution for export quality
 
       // Yield to allow UI to paint "Rendering..." state
       await new Promise(r => setTimeout(r, 100))
@@ -593,6 +608,18 @@ export function VideoExportController() {
         console.error('Renderer resize failed:', resizeError)
         throw new Error('Failed to resize renderer for export')
       }
+
+      // 3b. Update Camera Aspect Ratio to match new render dimensions
+      // This is critical to prevent scene distortion during export
+      if (camera instanceof THREE.PerspectiveCamera) {
+          camera.aspect = renderWidth / renderHeight
+          camera.updateProjectionMatrix()
+      }
+
+      // 3c. Yield to allow React to reconcile and update RenderGraph dimensions
+      // The RenderGraph in PostProcessingV2 uses useLayoutEffect to resize internal buffers.
+      // We need to give React a chance to process the resize before capturing frames.
+      await new Promise(r => setTimeout(r, 50))
 
       if (abortRef.current) {
           restoreState()
@@ -671,7 +698,7 @@ export function VideoExportController() {
       console.error('Export Start Error:', e)
       handleError(e)
     }
-  }, [gl, settings, exportMode, restoreState, handleError, setStatus, setProgress, processBatch, setError])
+  }, [gl, camera, settings, exportMode, restoreState, handleError, setStatus, setProgress, processBatch, setError])
 
   useEffect(() => {
     // Start export trigger

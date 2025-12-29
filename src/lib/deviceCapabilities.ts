@@ -163,7 +163,10 @@ export async function detectDeviceCapabilities(): Promise<DeviceCapabilities> {
 // ============================================================================
 
 /** Default render resolution scale for mobile devices */
-export const MOBILE_DEFAULT_RESOLUTION_SCALE = 0.75
+export const MOBILE_DEFAULT_RESOLUTION_SCALE = 0.5
+
+/** Default render resolution scale for desktop devices */
+export const DESKTOP_DEFAULT_RESOLUTION_SCALE = 0.75
 
 /** Default max FPS for mobile devices */
 export const MOBILE_DEFAULT_MAX_FPS = 30

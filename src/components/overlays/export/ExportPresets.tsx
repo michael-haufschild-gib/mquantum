@@ -21,6 +21,7 @@ interface PresetCardProps {
 const PresetCard = ({ label, description, iconSrc, aspectRatio, isActive, onClick }: PresetCardProps) => (
     <button
         onClick={onClick}
+        onMouseEnter={() => soundManager.playHover()}
         className={`
             relative flex flex-col items-start text-left p-4 rounded-xl border transition-all duration-200 group
             ${isActive
@@ -70,7 +71,7 @@ export const ExportPresets = () => {
 
     const handleSelect = (id: string) => {
         applyPreset(id)
-        soundManager.playSnap()
+        soundManager.playClick()
     }
 
     return (

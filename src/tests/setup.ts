@@ -478,20 +478,25 @@ HTMLCanvasElement.prototype.getContext = vi.fn((contextType: string) => {
   return webglContextMock
 }) as unknown as typeof HTMLCanvasElement.prototype.getContext
 
-// Mock AudioContext
+// Mock AudioContext with full SoundManager support
 const mockAudioParam = {
   value: 0,
-  setValueAtTime: vi.fn(),
-  linearRampToValueAtTime: vi.fn(),
-  exponentialRampToValueAtTime: vi.fn(),
-  cancelScheduledValues: vi.fn(),
+  setValueAtTime: vi.fn().mockReturnThis(),
+  linearRampToValueAtTime: vi.fn().mockReturnThis(),
+  exponentialRampToValueAtTime: vi.fn().mockReturnThis(),
+  cancelScheduledValues: vi.fn().mockReturnThis(),
 }
 
 class MockAudioContext {
-  createGain = vi.fn().mockReturnValue({ 
-    gain: { ...mockAudioParam, value: 1 }, 
-    connect: vi.fn() 
+  sampleRate = 44100
+  currentTime = 0
+  destination = {}
+
+  createGain = vi.fn().mockReturnValue({
+    gain: { ...mockAudioParam, value: 1 },
+    connect: vi.fn()
   })
+
   createOscillator = vi.fn().mockReturnValue({
     connect: vi.fn(),
     start: vi.fn(),
@@ -499,8 +504,30 @@ class MockAudioContext {
     frequency: { ...mockAudioParam },
     type: 'sine',
   })
-  destination = {}
-  currentTime = 0
+
+  // Buffer-based sound support (for noise-based sounds)
+  createBuffer = vi.fn().mockImplementation((channels: number, length: number, sampleRate: number) => ({
+    numberOfChannels: channels,
+    length,
+    sampleRate,
+    getChannelData: vi.fn().mockReturnValue(new Float32Array(length)),
+  }))
+
+  createBufferSource = vi.fn().mockReturnValue({
+    buffer: null,
+    connect: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    onended: null,
+  })
+
+  createBiquadFilter = vi.fn().mockReturnValue({
+    type: 'lowpass',
+    frequency: { ...mockAudioParam, value: 1000 },
+    Q: { ...mockAudioParam, value: 1 },
+    gain: { ...mockAudioParam, value: 0 },
+    connect: vi.fn(),
+  })
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

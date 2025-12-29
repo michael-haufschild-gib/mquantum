@@ -116,6 +116,10 @@ const TRANSIENT_FIELDS = new Set([
   'savedState',
   // UI - helper visibility (excluded per user specification)
   'showAxisHelper',
+  // UI - performance monitor state (user-specific, not scene/style config)
+  'showPerfMonitor',
+  'perfMonitorExpanded',
+  'perfMonitorTab',
 ])
 
 /**
@@ -400,7 +404,14 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           // Restore other scene components
           useExtendedObjectStore.setState(scene.data.extended)
           useTransformStore.setState(scene.data.transform)
-          useUIStore.setState(scene.data.ui)
+
+          // Filter out transient fields from UI data before restoring
+          // This ensures existing presets with these fields remain compatible
+          const uiData = { ...scene.data.ui }
+          for (const field of TRANSIENT_FIELDS) {
+            delete uiData[field]
+          }
+          useUIStore.setState(uiData)
 
           // Special handling for Rotation (Object -> Map)
           if (scene.data.rotation) {

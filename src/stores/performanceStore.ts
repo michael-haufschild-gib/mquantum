@@ -8,7 +8,7 @@
  */
 
 import type { DeviceCapabilities, GPUTier } from '@/lib/deviceCapabilities'
-import { DEFAULT_CAPABILITIES } from '@/lib/deviceCapabilities'
+import { DEFAULT_CAPABILITIES, DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
 import type { ShaderDebugInfo } from '@/types/shaderDebug'
 import { create } from 'zustand'
 
@@ -254,8 +254,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Fractal Animation Quality
   fractalAnimationLowQuality: true,
 
-  // Render Resolution Scale (load from localStorage, default to 1.0)
-  renderResolutionScale: loadPersistedResolutionScale() ?? 1.0,
+  // Render Resolution Scale (load from localStorage, default to desktop default)
+  renderResolutionScale: loadPersistedResolutionScale() ?? DESKTOP_DEFAULT_RESOLUTION_SCALE,
 
   // Shader Debugging
   shaderDebugInfos: {},
@@ -420,7 +420,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       temporalReprojectionEnabled: true,
       cameraTeleported: false,
       fractalAnimationLowQuality: true,
-      renderResolutionScale: 1.0,
+      renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
       shaderDebugInfos: {},
       shaderOverrides: [],
       compilingShaders: new Set<string>(),

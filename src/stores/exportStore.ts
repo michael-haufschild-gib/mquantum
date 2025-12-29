@@ -64,6 +64,7 @@ interface ExportStore {
   status: 'idle' | 'rendering' | 'previewing' | 'encoding' | 'completed' | 'error'
   progress: number // 0 to 1
   previewUrl: string | null
+  previewImage: string | null // Screenshot captured before modal opens
   eta: string | null
   error: string | null
   settings: ExportSettings
@@ -85,6 +86,7 @@ interface ExportStore {
   setStatus: (status: ExportStore['status']) => void
   setProgress: (progress: number) => void
   setPreviewUrl: (url: string | null) => void
+  setPreviewImage: (url: string | null) => void
   setEta: (eta: string | null) => void
   setError: (error: string | null) => void
   updateSettings: (settings: Partial<ExportSettings> | ((prev: ExportSettings) => Partial<ExportSettings>)) => void
@@ -244,6 +246,7 @@ export const useExportStore = create<ExportStore>()(
       status: 'idle',
       progress: 0,
       previewUrl: null,
+      previewImage: null,
       eta: null,
       error: null,
       settings: DEFAULT_SETTINGS,
@@ -275,6 +278,7 @@ export const useExportStore = create<ExportStore>()(
           }
           return { previewUrl: url }
         }),
+      setPreviewImage: (url) => set({ previewImage: url }),
       setEta: (eta) => set({ eta }),
       setError: (error) => set({ error }),
       updateSettings: (newSettingsOrFn) => {
@@ -446,6 +450,7 @@ export const useExportStore = create<ExportStore>()(
             status: 'idle',
             progress: 0,
             previewUrl: null,
+            previewImage: null,
             eta: null,
             error: null,
             // We don't reset settings as they are persisted

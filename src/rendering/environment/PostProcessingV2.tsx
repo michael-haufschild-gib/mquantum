@@ -191,7 +191,7 @@ function usesTemporalCloud(objectType: string): boolean {
  * dependencies. No manual pass ordering required.
  */
 export const PostProcessingV2 = memo(function PostProcessingV2() {
-  const { gl, scene, camera, size } = useThree();
+  const { gl, scene, camera, size, viewport } = useThree();
 
   // Get temporal depth state from context
   const temporalDepth = useTemporalDepth();
@@ -1454,8 +1454,16 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     const graphInstance = graphRef.current;
     if (!graphInstance) return;
 
-    graphInstance.setSize(size.width, size.height, perfState.renderResolutionScale);
-  }, [graph, size.width, size.height, perfState.renderResolutionScale]); // Still depend on graph to re-run when graph changes
+    // CRITICAL: Use DPR-adjusted dimensions for native resolution rendering
+    // useThree().size returns CSS pixels, but canvas renders at CSS × DPR physical pixels.
+    // Without DPR adjustment, render targets are at CSS resolution and get upscaled,
+    // causing blurry output on high-DPI displays (e.g., MacBook Pro M3 Max at DPR 2).
+    const dpr = viewport.dpr;
+    const nativeWidth = Math.floor(size.width * dpr);
+    const nativeHeight = Math.floor(size.height * dpr);
+
+    graphInstance.setSize(nativeWidth, nativeHeight, perfState.renderResolutionScale);
+  }, [graph, size.width, size.height, viewport.dpr, perfState.renderResolutionScale]); // Still depend on graph to re-run when graph changes
 
   // ==========================================================================
   // Update CAS sharpening for upscaled content

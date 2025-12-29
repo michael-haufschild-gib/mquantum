@@ -73,6 +73,12 @@ describe('MandelbulbAnimationDrawer', () => {
     render(<MandelbulbAnimationDrawer />);
 
     const toggleBtn = screen.getByRole('button', { name: /toggle phase shifts/i });
+    expect(toggleBtn).toBeInTheDocument();
+
+    // Initially off
+    expect(useExtendedObjectStore.getState().mandelbulb.phaseShiftEnabled).toBe(false);
+
+    // Click to enable
     fireEvent.click(toggleBtn);
     expect(useExtendedObjectStore.getState().mandelbulb.phaseShiftEnabled).toBe(true);
   });
@@ -82,6 +88,12 @@ describe('MandelbulbAnimationDrawer', () => {
     render(<MandelbulbAnimationDrawer />);
 
     const toggleBtn = screen.getByRole('button', { name: /toggle slice animation/i });
+    expect(toggleBtn).toBeInTheDocument();
+
+    // Initially off
+    expect(useExtendedObjectStore.getState().mandelbulb.sliceAnimationEnabled).toBe(false);
+
+    // Click to enable
     fireEvent.click(toggleBtn);
     expect(useExtendedObjectStore.getState().mandelbulb.sliceAnimationEnabled).toBe(true);
   });

@@ -101,12 +101,12 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         <Slider
           label="Render Resolution"
           value={renderResolutionScale}
-          min={0.5}
+          min={0.25}
           max={1.0}
-          step={0.25}
+          step={0.05}
           onChange={setRenderResolutionScale}
           formatValue={(v) => `${Math.round(v * 100)}%`}
-          tooltip="Lower resolution reduces GPU memory usage. Use 50-75% if experiencing graphics issues."
+          tooltip="100% = native resolution. Lower values reduce GPU load for mobile/low-end devices."
           data-testid="render-resolution-slider"
         />
       </div>

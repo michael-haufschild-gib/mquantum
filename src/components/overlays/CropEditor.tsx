@@ -1,5 +1,6 @@
 import { useExportStore } from '@/stores/exportStore';
 import { useLayoutStore } from '@/stores/layoutStore';
+import { findThreeCanvas } from '@/lib/export';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { useEffect, useRef, useState } from 'react';
@@ -12,13 +13,14 @@ import { CropBox, CropValues } from './CropBox';
  * Uses shared CropBox component for the crop UI.
  */
 export const CropEditor = () => {
-  const { isCropEditorOpen, setCropEditorOpen, settings, updateSettings, setModalOpen } = useExportStore(
+  const { isCropEditorOpen, setCropEditorOpen, settings, updateSettings, setModalOpen, setPreviewImage } = useExportStore(
     useShallow((state) => ({
       isCropEditorOpen: state.isCropEditorOpen,
       setCropEditorOpen: state.setCropEditorOpen,
       settings: state.settings,
       updateSettings: state.updateSettings,
       setModalOpen: state.setModalOpen,
+      setPreviewImage: state.setPreviewImage,
     }))
   );
   const setCinematicMode = useLayoutStore((state) => state.setCinematicMode);
@@ -38,6 +40,20 @@ export const CropEditor = () => {
     }
   }, [isCropEditorOpen, settings.crop]);
 
+  // Recapture screenshot before reopening modal
+  // (The modal's reset() clears previewImage when it closes for crop editor)
+  const recapturePreview = () => {
+    const canvas = findThreeCanvas();
+    if (canvas) {
+      try {
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setPreviewImage(dataUrl);
+      } catch (e) {
+        console.error('Failed to recapture preview:', e);
+      }
+    }
+  };
+
   if (!isCropEditorOpen) return null;
 
   const handleConfirm = () => {
@@ -51,12 +67,14 @@ export const CropEditor = () => {
       },
     });
     setCropEditorOpen(false);
+    recapturePreview();
     setModalOpen(true);
     setCinematicMode(false);
   };
 
   const handleCancel = () => {
     setCropEditorOpen(false);
+    recapturePreview();
     setModalOpen(true);
     setCinematicMode(false);
   };

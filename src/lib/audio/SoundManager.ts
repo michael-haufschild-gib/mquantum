@@ -104,22 +104,39 @@ class SoundManager {
 
     public playSnap() {
         if (!this.ctx || !this.enabled) return;
-        
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
 
-        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
-        
-        osc.connect(gain);
+        const now = this.ctx.currentTime;
+        const duration = 0.025;
+        const sampleRate = this.ctx.sampleRate;
+        const bufferSize = Math.floor(sampleRate * duration);
+
+        // Short low-frequency thud
+        const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+          const t = i / bufferSize;
+          const envelope = Math.pow(1 - t, 4);
+          data[i] = (Math.random() * 2 - 1) * envelope;
+        }
+
+        const source = this.ctx.createBufferSource();
+        source.buffer = buffer;
+
+        // Low bandpass for soft thud
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0.1;
+
+        source.connect(filter);
+        filter.connect(gain);
         gain.connect(this.masterGain!);
-        
-        osc.start();
-        osc.stop(this.ctx.currentTime + 0.1);
+
+        source.start(now);
+        source.stop(now + duration);
     }
     
     public playSuccess() {

@@ -177,7 +177,14 @@ export const CropBox = ({
       drag={!isResizing}
       dragMomentum={false}
       dragElastic={0}
-      dragConstraints={containerRef}
+      // Use explicit numeric constraints based on current crop dimensions
+      // (containerRef constraints become stale after resize operations)
+      dragConstraints={{
+        left: -crop.x * bounds.width,
+        right: (1 - crop.x - crop.width) * bounds.width,
+        top: -crop.y * bounds.height,
+        bottom: (1 - crop.y - crop.height) * bounds.height,
+      }}
       onDragEnd={onDragEnd}
       data-testid="crop-box"
     >

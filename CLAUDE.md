@@ -71,7 +71,7 @@ gl_Position = vec4(position.xy, 0.0, 1.0);
 
 **Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
 
-## MANDATORY TESTING RUEL
+## MANDATORY TESTING RULES
 1. Write unit tests in the style of Roy Osherove's "Art of Unit Testing" principles.
 2. READABLE: Tests should be easy to understand at a glance
 3. MAINTAINABLE: Tests should be easy to change without breaking others

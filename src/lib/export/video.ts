@@ -185,8 +185,33 @@ export class VideoRecorder {
 
               ctx.drawImage(this.canvas, sx, sy, sw, sh, dx, dy, dw, dh)
           } else {
-              // Fill
-              ctx.drawImage(this.canvas, 0, 0, width, height)
+              // No crop - preserve aspect ratio with letterbox/pillarbox if needed
+              const srcAspect = this.canvas.width / this.canvas.height
+              const dstAspect = width / height
+
+              let dw: number, dh: number, dx: number, dy: number
+
+              if (Math.abs(srcAspect - dstAspect) < 0.01) {
+                  // Aspect ratios match - fill entire frame
+                  dx = 0
+                  dy = 0
+                  dw = width
+                  dh = height
+              } else if (srcAspect > dstAspect) {
+                  // Source is wider than destination - fit to width, letterbox top/bottom
+                  dw = width
+                  dh = width / srcAspect
+                  dx = 0
+                  dy = (height - dh) / 2
+              } else {
+                  // Source is taller than destination - fit to height, pillarbox left/right
+                  dh = height
+                  dw = height * srcAspect
+                  dx = (width - dw) / 2
+                  dy = 0
+              }
+
+              ctx.drawImage(this.canvas, 0, 0, this.canvas.width, this.canvas.height, dx, dy, dw, dh)
           }
 
           // 3. Reset Filter for Overlays

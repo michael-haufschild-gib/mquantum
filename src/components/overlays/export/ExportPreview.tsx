@@ -1,23 +1,10 @@
-import { useEffect, useState } from 'react'
 import { useExportStore } from '@/stores/exportStore'
 import { Icon } from '@/components/ui/Icon'
 
 export const ExportPreview = () => {
-    const { settings, canvasAspectRatio } = useExportStore()
-    const [screenshot, setScreenshot] = useState<string | null>(null)
-
-    // Capture screenshot on mount
-    useEffect(() => {
-        const canvas = document.querySelector('canvas')
-        if (canvas) {
-            try {
-                const data = canvas.toDataURL('image/jpeg', 0.8)
-                setScreenshot(data)
-            } catch (e) {
-                console.error("Failed to capture canvas for preview", e)
-            }
-        }
-    }, [])
+    // Use previewImage captured BEFORE modal opened (in EditorTopBar)
+    // This avoids timing issues with frameloop="never" and render graph state
+    const { settings, canvasAspectRatio, previewImage } = useExportStore()
 
     const { crop, textOverlay } = settings
 
@@ -39,11 +26,11 @@ export const ExportPreview = () => {
                     height: 'auto'
                 }}
              >
-                {screenshot ? (
+                {previewImage ? (
                     <>
                         {/* Background Image (The Full Scene) */}
-                        <img 
-                            src={screenshot} 
+                        <img
+                            src={previewImage} 
                             className="w-full h-full object-cover" 
                             style={{
                                 // Dim the background if cropping is active to highlight the crop

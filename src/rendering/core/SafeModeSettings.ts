@@ -38,14 +38,14 @@ export interface SafeModeSnapshot {
  * - Disables shadows
  * - Disables temporal features (reprojection, progressive refinement)
  *
- * These changes can reduce VRAM usage by 75%+ by:
- * - Shrinking all render targets (50% resolution = 75% fewer pixels)
+ * These changes can reduce VRAM usage by 93%+ by:
+ * - Shrinking all render targets (25% resolution = 93.75% fewer pixels)
  * - Eliminating effect-specific buffers
  * - Removing temporal buffer chains
  */
 export function applySafeModeSettings(): void {
-  // Resolution - reduces all buffer sizes by ~75%
-  usePerformanceStore.getState().setRenderResolutionScale(0.5)
+  // Resolution - reduces all buffer sizes by ~93.75% (quarter resolution)
+  usePerformanceStore.getState().setRenderResolutionScale(0.25)
 
   // Disable expensive post-processing effects
   usePostProcessingStore.getState().setBloomEnabled(false)
