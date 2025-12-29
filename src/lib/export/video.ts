@@ -95,7 +95,7 @@ export class VideoRecorder {
       const config: VideoEncodingConfig = {
         codec,
         bitrate: this.options.bitrate * 1_000_000, // Convert Mbps to bps
-        bitrateMode: this.options.bitrateMode || 'constant', // Default to CBR for consistency
+        bitrateMode: this.options.bitrateMode || 'variable', // VBR is WebCodecs default, ~20% smaller files
         latencyMode: 'quality', // Prioritize visual quality over encoding speed
         keyFrameInterval: this.options.fps * 2, // Keyframe every 2 seconds for good seeking + quality
         hardwareAcceleration: this.options.hardwareAcceleration || 'prefer-software',

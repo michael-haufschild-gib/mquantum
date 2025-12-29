@@ -108,7 +108,7 @@ const DEFAULT_SETTINGS: ExportSettings = {
   fps: 60,
   duration: 30,
   bitrate: 12,
-  bitrateMode: 'constant',
+  bitrateMode: 'variable',
   hardwareAcceleration: 'prefer-software',
   warmupFrames: 5,
   

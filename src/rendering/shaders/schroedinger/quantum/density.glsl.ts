@@ -506,6 +506,45 @@ float sampleDensityAtFlowedPos(vec3 flowedPos, float t) {
 
     return rho;
 }
+
+// E1 OPTIMIZATION: Sample density WITHOUT erosion for gradient computation
+// Gradient samples only affect lighting direction, not density values.
+// Skipping erosion here saves 4 expensive noise evaluations per visible sample.
+// This reduces erosion calls by ~80% with zero visual impact on lighting.
+float sampleDensityAtFlowedPosNoErosion(vec3 flowedPos, float t) {
+    // Map pre-flowed 3D position to ND coordinates
+    float xND[MAX_DIM];
+    mapPosToND(flowedPos, xND);
+
+    // Evaluate wavefunction and density
+    vec2 psi = evalPsi(xND, t);
+    float rho = rhoFromPsi(psi);
+
+    // Hydrogen orbital density boost (still needed for correct gradient magnitude)
+#ifdef HYDROGEN_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
+        float fn = float(uPrincipalN);
+        float fl = float(uAzimuthalL);
+        float lBoost = pow(3.0, fl);
+        float hydrogenBoost = 50.0 * fn * fn * lBoost;
+        rho *= hydrogenBoost;
+    }
+#endif
+
+#ifdef HYDROGEN_ND_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+        float fn = float(uPrincipalN);
+        float fl = float(uAzimuthalL);
+        float lBoost = pow(3.0, fl);
+        float dimFactor = 1.0 + float(uDimension - 3) * 0.3;
+        float hydrogenNDBoost = 50.0 * fn * fn * lBoost * dimFactor;
+        rho *= hydrogenNDBoost;
+    }
+#endif
+
+    // NO erosion applied - gradient shape from base wavefunction is sufficient
+    return rho;
+}
 `
 
 /**
