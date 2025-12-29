@@ -17,6 +17,10 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float minPlane = 1000.0, minAxis = 1000.0, minSphere = 1000.0;
     int escIt = 0;
 
+    // Pre-compute phase offsets outside loop (OPT: saves 2 comparisons per iteration)
+    float phaseT = uPhaseEnabled ? uPhaseTheta : 0.0;
+    float phaseP = uPhaseEnabled ? uPhasePhi : 0.0;
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
@@ -42,9 +46,9 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         float phi = rxyw > EPS ? acos(clamp(zx / max(rxyw, EPS), -1.0, 1.0)) : 0.0;
         float psi = atan(zw, zy);
 
-        // Power map: angles * n (with optional phase shift)
-        float thetaN = (theta + (uPhaseEnabled ? uPhaseTheta : 0.0)) * pwr;
-        float phiN = (phi + (uPhaseEnabled ? uPhasePhi : 0.0)) * pwr;
+        // Power map: angles * n (with pre-computed phase shift)
+        float thetaN = (theta + phaseT) * pwr;
+        float phiN = (phi + phaseP) * pwr;
         float psiN = psi * pwr;
 
         // From hyperspherical: z-axis primary reconstruction
@@ -74,6 +78,10 @@ float sdf4D_simple(vec3 pos, float pwr, float bail, int maxIt) {
     float zx = cx, zy = cy, zz = cz, zw = cw;
     float dr = 1.0, r = 0.0;
 
+    // Pre-compute phase offsets outside loop
+    float phaseT = uPhaseEnabled ? uPhaseTheta : 0.0;
+    float phaseP = uPhaseEnabled ? uPhasePhi : 0.0;
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
         
@@ -91,8 +99,8 @@ float sdf4D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         float phi = rxyw > EPS ? acos(clamp(zx / max(rxyw, EPS), -1.0, 1.0)) : 0.0;
         float psi = atan(zw, zy);
 
-        float thetaN = (theta + (uPhaseEnabled ? uPhaseTheta : 0.0)) * pwr;
-        float phiN = (phi + (uPhaseEnabled ? uPhasePhi : 0.0)) * pwr;
+        float thetaN = (theta + phaseT) * pwr;
+        float phiN = (phi + phaseP) * pwr;
         float cTheta = cos(thetaN), sTheta = sin(thetaN);
         float cPhi = cos(phiN), sPhi = sin(phiN);
         float cPsi = cos(psi * pwr), sPsi = sin(psi * pwr);

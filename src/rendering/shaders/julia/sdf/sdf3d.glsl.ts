@@ -40,7 +40,8 @@ float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         dr = pwr * pow(max(r, EPS), pwr - 1.0) * dr;
 
         // Julia iteration: z = z^n + c
-        if (pwr == 2.0) {
+        // Use integer comparison for robustness (pwr is typically a whole number)
+        if (int(pwr) == 2) {
             z = quatSqr(z) + c;
         } else {
             z = quatPow(z, pwr) + c;
@@ -73,7 +74,8 @@ float sdfJulia3D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
         dr = pwr * pow(max(r, EPS), pwr - 1.0) * dr;
 
-        if (pwr == 2.0) {
+        // Use integer comparison for robustness (pwr is typically a whole number)
+        if (int(pwr) == 2) {
             z = quatSqr(z) + c;
         } else {
             z = quatPow(z, pwr) + c;

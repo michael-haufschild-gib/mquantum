@@ -12,6 +12,10 @@ float sdf3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float minPlane = 1000.0, minAxis = 1000.0, minSphere = 1000.0;
     int escIt = 0;
 
+    // Pre-compute phase offsets outside loop (OPT: saves 2 comparisons per iteration)
+    float phaseT = uPhaseEnabled ? uPhaseTheta : 0.0;
+    float phaseP = uPhaseEnabled ? uPhasePhi : 0.0;
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
@@ -33,9 +37,9 @@ float sdf3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         float theta = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
         float phi = atan(zy, zx);
 
-        // Power map: angles * n (with optional phase shift)
-        float thetaN = (theta + (uPhaseEnabled ? uPhaseTheta : 0.0)) * pwr;
-        float phiN = (phi + (uPhaseEnabled ? uPhasePhi : 0.0)) * pwr;
+        // Power map: angles * n (with pre-computed phase shift)
+        float thetaN = (theta + phaseT) * pwr;
+        float phiN = (phi + phaseP) * pwr;
 
         // From spherical: z-axis primary reconstruction
         float cTheta = cos(thetaN), sTheta = sin(thetaN);
@@ -59,6 +63,10 @@ float sdf3D_simple(vec3 pos, float pwr, float bail, int maxIt) {
     float zx = cx, zy = cy, zz = cz;
     float dr = 1.0, r = 0.0;
 
+    // Pre-compute phase offsets outside loop
+    float phaseT = uPhaseEnabled ? uPhaseTheta : 0.0;
+    float phaseP = uPhaseEnabled ? uPhasePhi : 0.0;
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
         
@@ -74,8 +82,8 @@ float sdf3D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         float theta = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
         float phi = atan(zy, zx);
 
-        float thetaN = (theta + (uPhaseEnabled ? uPhaseTheta : 0.0)) * pwr;
-        float phiN = (phi + (uPhaseEnabled ? uPhasePhi : 0.0)) * pwr;
+        float thetaN = (theta + phaseT) * pwr;
+        float phiN = (phi + phaseP) * pwr;
         float cTheta = cos(thetaN), sTheta = sin(thetaN);
         float cPhi = cos(phiN), sPhi = sin(phiN);
 
