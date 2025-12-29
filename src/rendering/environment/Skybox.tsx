@@ -327,6 +327,24 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
       return mat;
   }, [config]);
 
+  // ============ MATERIAL CLEANUP ============
+  // Dispose previous material when config changes or on unmount.
+  // Without this, shader programs leak when skybox mode changes.
+  const prevSkyboxMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+
+  useEffect(() => {
+    // Dispose previous material if it differs from current
+    if (prevSkyboxMaterialRef.current && prevSkyboxMaterialRef.current !== material) {
+      prevSkyboxMaterialRef.current.dispose();
+    }
+    prevSkyboxMaterialRef.current = material;
+
+    // Cleanup on unmount
+    return () => {
+      material.dispose();
+    };
+  }, [material]);
+
   // Update Debug Info
   useEffect(() => {
       const { modules, features } = composeSkyboxFragmentShader(config);

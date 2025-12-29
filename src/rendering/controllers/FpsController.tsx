@@ -50,16 +50,22 @@ export function FpsController(): null {
     const tick = (now: number): void => {
       rafRef.current = requestAnimationFrame(tick)
 
-      // Check WebGL context state - skip rendering if not active
+      // Batch all store reads at start of tick (avoids multiple getState() calls)
       const contextStore = useWebGLContextStore.getState()
-      if (contextStore.status !== 'active') {
+      const { status, isPageVisible, onContextLost } = contextStore
+      const { isExporting } = useExportStore.getState()
+      const { maxFps } = useUIStore.getState()
+      const { isPlaying } = useAnimationStore.getState()
+      const { isInteracting } = usePerformanceStore.getState()
+
+      // Check WebGL context state - skip rendering if not active
+      if (status !== 'active') {
         return
       }
 
       // Skip if page is not visible (power saving)
       // Also skip if exporting (manual control)
-      const isExporting = useExportStore.getState().isExporting
-      if (!contextStore.isPageVisible || isExporting) {
+      if (!isPageVisible || isExporting) {
         return
       }
 
@@ -68,16 +74,11 @@ export function FpsController(): null {
       const context = gl.getContext()
       if (context && context.isContextLost()) {
         // Trigger context lost handling if not already in progress
-        if (contextStore.status === 'active') {
-          contextStore.onContextLost()
+        if (status === 'active') {
+          onContextLost()
         }
         return
       }
-
-      // Determine target FPS based on state
-      const maxFps = useUIStore.getState().maxFps
-      const isPlaying = useAnimationStore.getState().isPlaying
-      const isInteracting = usePerformanceStore.getState().isInteracting
 
       // If idle (not playing and not interacting), cap at 10 FPS to save power
       // while still allowing UI updates to reflect reasonably fast.

@@ -80,7 +80,7 @@ export function useProgressiveRefinement(
 
   // Timer refs
   const stageTimersRef = useRef<number[]>([])
-  const progressIntervalRef = useRef<number | null>(null)
+  const progressRafRef = useRef<number | null>(null)
   const startTimeRef = useRef<number>(0)
 
   // Clear all timers
@@ -88,9 +88,9 @@ export function useProgressiveRefinement(
     stageTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     stageTimersRef.current = []
 
-    if (progressIntervalRef.current !== null) {
-      window.clearInterval(progressIntervalRef.current)
-      progressIntervalRef.current = null
+    if (progressRafRef.current !== null) {
+      cancelAnimationFrame(progressRafRef.current)
+      progressRafRef.current = null
     }
   }, [])
 
@@ -115,20 +115,20 @@ export function useProgressiveRefinement(
       stageTimersRef.current.push(timer)
     })
 
-    // Start progress animation
+    // Start progress animation using RAF for proper frame sync
     const totalDuration = REFINEMENT_STAGE_TIMING.final
-    progressIntervalRef.current = window.setInterval(() => {
+    const updateProgress = () => {
       const elapsed = performance.now() - startTimeRef.current
       const newProgress = Math.min(100, (elapsed / totalDuration) * 100)
       setRefinementProgress(newProgress)
 
-      if (newProgress >= 100) {
-        if (progressIntervalRef.current !== null) {
-          window.clearInterval(progressIntervalRef.current)
-          progressIntervalRef.current = null
-        }
+      if (newProgress < 100) {
+        progressRafRef.current = requestAnimationFrame(updateProgress)
+      } else {
+        progressRafRef.current = null
       }
-    }, 16) // ~60fps updates
+    }
+    progressRafRef.current = requestAnimationFrame(updateProgress)
   }, [enabled, clearTimers, setRefinementStage, setRefinementProgress])
 
   // Stop refinement (reset to low)

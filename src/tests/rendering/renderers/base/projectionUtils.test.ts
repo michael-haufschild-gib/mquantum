@@ -115,24 +115,29 @@ describe('projectionUtils', () => {
       })
     })
 
-    describe('scale adjustment', () => {
-      it('should apply scale multiplier when scales provided', () => {
+    describe('scale parameter (deprecated)', () => {
+      // NOTE: Scale is now applied AFTER projection to 3D (like camera zoom),
+      // so it no longer affects projection distance calculation. These tests
+      // verify the scale parameter is ignored.
+
+      it('should ignore scale parameter (scale is now applied post-projection)', () => {
         const vertices: VectorND[] = [[0, 0, 0, 1]]
 
         const noScale = calculateSafeProjectionDistance(vertices, 4)
         const withScale = calculateSafeProjectionDistance(vertices, 4, [2, 2, 2, 2])
 
-        expect(withScale).toBeGreaterThan(noScale)
+        // Scale should have no effect on projection distance
+        expect(withScale).toBe(noScale)
       })
 
-      it('should use max scale for adjustment', () => {
+      it('should return same result regardless of scale values', () => {
         const vertices: VectorND[] = [[0, 0, 0, 1]]
 
         const uniformScale = calculateSafeProjectionDistance(vertices, 4, [2, 2, 2, 2])
         const mixedScale = calculateSafeProjectionDistance(vertices, 4, [1, 1, 1, 2])
 
-        // Both should have same max scale (2), so similar result
-        expect(Math.abs(uniformScale - mixedScale)).toBeLessThan(0.01)
+        // Both should be equal since scale is ignored
+        expect(uniformScale).toBe(mixedScale)
       })
 
       it('should handle empty scales array', () => {

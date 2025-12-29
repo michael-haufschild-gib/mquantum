@@ -37,8 +37,8 @@ describe('NDTransformSource', () => {
       expect(uniforms.uRotationMatrix4D!.value).toBeInstanceOf(THREE.Matrix4)
       expect(uniforms.uExtraRotationCols!.value).toBeInstanceOf(Float32Array)
       expect(uniforms.uDepthRowSums!.value).toBeInstanceOf(Float32Array)
-      expect(uniforms.uScale4D!.value).toEqual([1, 1, 1, 1])
-      expect(uniforms.uExtraScales!.value).toBeInstanceOf(Float32Array)
+      // Scale is now applied AFTER projection (like camera zoom)
+      expect(uniforms.uUniformScale!.value).toBe(1.0)
       expect(uniforms.uProjectionDistance!.value).toBe(10.0)
     })
   })
@@ -54,28 +54,15 @@ describe('NDTransformSource', () => {
       expect(source.getUniforms().uDimension!.value).toBe(5)
     })
 
-    it('should update scales', () => {
+    it('should update uniform scale (applied after projection like camera zoom)', () => {
       source.updateFromStore({
         dimension: 4,
         rotations: new Map(),
         rotationVersion: 1,
-        scales: [2.0, 1.5, 1.0, 0.5],
-        uniformScale: 1.0,
-      })
-
-      expect(source.getUniforms().uScale4D!.value).toEqual([2.0, 1.5, 1.0, 0.5])
-    })
-
-    it('should use uniform scale as default for unset axes', () => {
-      source.updateFromStore({
-        dimension: 4,
-        rotations: new Map(),
-        rotationVersion: 1,
-        scales: [],
         uniformScale: 2.5,
       })
 
-      expect(source.getUniforms().uScale4D!.value).toEqual([2.5, 2.5, 2.5, 2.5])
+      expect(source.getUniforms().uUniformScale!.value).toBe(2.5)
     })
 
     it('should update projection distance', () => {
@@ -118,12 +105,12 @@ describe('NDTransformSource', () => {
       expect(source.version).toBeGreaterThan(version)
     })
 
-    it('should increment version on scale change', () => {
+    it('should increment version on uniform scale change', () => {
       source.updateFromStore({
         dimension: 4,
         rotations: new Map(),
         rotationVersion: 1,
-        scales: [1, 1, 1, 1],
+        uniformScale: 1.0,
       })
       const version = source.version
 
@@ -131,7 +118,7 @@ describe('NDTransformSource', () => {
         dimension: 4,
         rotations: new Map(),
         rotationVersion: 1,
-        scales: [2, 1, 1, 1],
+        uniformScale: 2.0,
       })
 
       expect(source.version).toBeGreaterThan(version)
@@ -142,7 +129,7 @@ describe('NDTransformSource', () => {
         dimension: 4,
         rotations: new Map(),
         rotationVersion: 1,
-        scales: [1, 1, 1, 1],
+        uniformScale: 1.0,
         projectionDistance: 10.0,
       })
       const version = source.version
@@ -151,7 +138,7 @@ describe('NDTransformSource', () => {
         dimension: 4,
         rotations: new Map(),
         rotationVersion: 1,
-        scales: [1, 1, 1, 1],
+        uniformScale: 1.0,
         projectionDistance: 10.0,
       })
 
@@ -200,7 +187,7 @@ describe('NDTransformSource', () => {
         dimension: 6,
         rotations: new Map([['XW', 1.5]]),
         rotationVersion: 5,
-        scales: [2, 2, 2, 2, 2, 2],
+        uniformScale: 2.0,
         projectionDistance: 20.0,
       })
 
@@ -209,7 +196,8 @@ describe('NDTransformSource', () => {
       expect(source.version).toBe(0)
       expect(source.getUniforms().uDimension!.value).toBe(4)
       expect(source.getUniforms().uProjectionDistance!.value).toBe(10.0)
-      expect(source.getUniforms().uScale4D!.value).toEqual([1, 1, 1, 1])
+      // Uniform scale is now applied AFTER projection
+      expect(source.getUniforms().uUniformScale!.value).toBe(1.0)
     })
   })
 
@@ -254,7 +242,7 @@ describe('NDTransformSource', () => {
         dimension: 5,
         rotations: new Map([['XY', 0.7]]),
         rotationVersion: 1,
-        scales: [1.5, 1.5, 1.5, 1.5, 1.5],
+        uniformScale: 1.5,
         projectionDistance: 12.0,
       })
 
@@ -264,8 +252,7 @@ describe('NDTransformSource', () => {
           uRotationMatrix4D: { value: new THREE.Matrix4() },
           uExtraRotationCols: { value: new Float32Array(28) },
           uDepthRowSums: { value: new Float32Array(11) },
-          uScale4D: { value: [0, 0, 0, 0] },
-          uExtraScales: { value: new Float32Array(7) },
+          uUniformScale: { value: 0 },
           uProjectionDistance: { value: 0 },
         },
       })
@@ -274,7 +261,8 @@ describe('NDTransformSource', () => {
 
       expect(material.uniforms['uDimension']!.value).toBe(5)
       expect(material.uniforms['uProjectionDistance']!.value).toBe(12.0)
-      expect(material.uniforms['uScale4D']!.value).toEqual([1.5, 1.5, 1.5, 1.5])
+      // Uniform scale is applied after projection (like camera zoom)
+      expect(material.uniforms['uUniformScale']!.value).toBe(1.5)
     })
 
     it('should skip uniforms not present on material', () => {
@@ -311,7 +299,7 @@ describe('NDTransformSource', () => {
           ['ZW', 0.6],
         ]),
         rotationVersion: 1,
-        scales: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        uniformScale: 1.0,
       })
 
       const gpuData = source.getGPUData()
@@ -321,20 +309,16 @@ describe('NDTransformSource', () => {
       expect(gpuData.depthRowSums.length).toBeGreaterThanOrEqual(11)
     })
 
-    it('should populate extra scales for 5D+', () => {
+    it('should use uniform scale for all dimensions (applied after projection)', () => {
       source.updateFromStore({
         dimension: 7,
         rotations: new Map(),
         rotationVersion: 1,
-        scales: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6],
+        uniformScale: 2.5,
       })
 
-      const extraScales = source.getUniforms().uExtraScales!.value as Float32Array
-
-      // Extra dimensions are indices 4, 5, 6 (W+1, W+2, W+3)
-      expect(extraScales[0]).toBeCloseTo(1.4)
-      expect(extraScales[1]).toBeCloseTo(1.5)
-      expect(extraScales[2]).toBeCloseTo(1.6)
+      // Uniform scale is applied after projection, like camera zoom
+      expect(source.getUniforms().uUniformScale!.value).toBe(2.5)
     })
   })
 

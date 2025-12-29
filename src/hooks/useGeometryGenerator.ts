@@ -18,6 +18,12 @@ import { inflateGeometry } from '@/lib/geometry/transfer'
 import type { GenerationStage } from '@/workers/types'
 import type { WythoffPolytopeConfig } from '@/lib/geometry/wythoff/types'
 import type { RootSystemConfig } from '@/lib/geometry/extended/types'
+import {
+  getCachedPolytope,
+  cachePolytope,
+  getCacheKey,
+} from '@/lib/geometry/wythoff/cache'
+import type { PolytopeGeometry } from '@/lib/geometry/types'
 
 /**
  * Return type for useGeometryGenerator hook
@@ -161,7 +167,43 @@ export function useGeometryGenerator(): GeometryGeneratorResult {
 
     // Parse config from stable JSON to avoid dependency on object reference
     const config = JSON.parse(configJson) as Partial<WythoffPolytopeConfig>
+    const fullConfig = config as WythoffPolytopeConfig
+    // Scale is stored in metadata for shader use - geometry is always unit-scale
+    const scale = fullConfig.scale ?? 1
 
+    // Check IndexedDB cache BEFORE triggering worker
+    const cacheKey = getCacheKey(dimension, fullConfig)
+    const cached = await getCachedPolytope(cacheKey)
+
+    if (cached) {
+      // Check generation before state mutation
+      if (generationRef.current !== thisGeneration) return
+
+      // Return unit-scale geometry - visual scale is applied post-projection via shader
+      // Scale is stored in metadata.properties.scale for the renderer to use
+      setAsyncGeometry({
+        ...cached,
+        type: 'wythoff-polytope',
+        metadata: {
+          ...cached.metadata,
+          properties: {
+            ...cached.metadata?.properties,
+            scale, // Store for shader uniform usage
+          },
+        },
+      } as NdGeometry)
+      setIsLoading(false)
+      setProgress(100)
+      setStage('complete')
+      setWarnings([])
+
+      if (import.meta.env.DEV) {
+        console.log('[useGeometryGenerator] Cache hit for Wythoff polytope')
+      }
+      return // Cache hit - skip worker
+    }
+
+    // Cache miss - proceed with worker generation
     // Cancel any previous request
     if (currentRequestId.current) {
       cancelRequest(currentRequestId.current)
@@ -205,7 +247,20 @@ export function useGeometryGenerator(): GeometryGeneratorResult {
 
       if (response.type === 'result' && response.geometry) {
         const inflated = inflateGeometry(response.geometry)
-        const scale = (config as WythoffPolytopeConfig).scale ?? 1
+
+        // Cache the normalized geometry (scale=1.0) for future use
+        const normalizedForCache: PolytopeGeometry = {
+          vertices: inflated.vertices,
+          edges: inflated.edges,
+          dimension: inflated.dimension,
+          type: 'wythoff-polytope',
+          metadata: inflated.metadata,
+        }
+        cachePolytope(cacheKey, normalizedForCache) // Fire-and-forget
+
+        if (import.meta.env.DEV) {
+          console.log('[useGeometryGenerator] Cached Wythoff polytope to IndexedDB')
+        }
 
         setAsyncGeometry({
           ...inflated,

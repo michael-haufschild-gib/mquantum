@@ -11,34 +11,41 @@ import type { PolytopeGeometry } from './types';
  * Generates a cross-polytope in n-dimensional space
  *
  * A cross-polytope has:
- * - Vertices: 2n (±scale along each axis)
+ * - Vertices: 2n (±1 along each axis)
  * - Edges: 2n(n-1) (connect vertices NOT on the same axis)
  *
  * For 2D, this generates a diamond (square rotated 45°) with 4 vertices at
  * (±1, 0) and (0, ±1), and 4 edges.
  *
+ * IMPORTANT: Geometry is always generated at UNIT SCALE (±1.0).
+ * Visual scaling is applied post-projection via the uUniformScale shader uniform.
+ * This prevents extreme vertex values during rotation animation.
+ *
  * @param dimension - Dimensionality of the cross-polytope (must be >= 2)
- * @param scale - Scale factor for vertex coordinates (default: 1.0)
+ * @param _scale - DEPRECATED: Scale parameter is ignored. Visual scale is applied post-projection.
  * @returns PolytopeGeometry representing the cross-polytope
  * @throws {Error} If dimension is less than 2
  */
-export function generateCrossPolytope(dimension: number, scale = 1.0): PolytopeGeometry {
+export function generateCrossPolytope(dimension: number, _scale = 1.0): PolytopeGeometry {
+  void _scale; // Scale is now applied post-projection via shader uniform
+
   if (dimension < 2) {
     throw new Error('Cross-polytope dimension must be at least 2');
   }
 
   const vertices: VectorND[] = [];
 
-  // Generate 2n vertices: ±scale along each axis
+  // Generate 2n vertices at UNIT SCALE: ±1 along each axis
+  // Visual scale is applied post-projection via uUniformScale uniform
   for (let axis = 0; axis < dimension; axis++) {
     // Positive vertex
     const posVertex = createVector(dimension, 0);
-    posVertex[axis] = scale;
+    posVertex[axis] = 1.0;
     vertices.push(posVertex);
 
     // Negative vertex
     const negVertex = createVector(dimension, 0);
-    negVertex[axis] = -scale;
+    negVertex[axis] = -1.0;
     vertices.push(negVertex);
   }
 

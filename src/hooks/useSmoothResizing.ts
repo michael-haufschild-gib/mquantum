@@ -21,11 +21,17 @@ const SPRING_CONFIG = { damping: 25, stiffness: 200 };
  * Then we spring-animate the zoom back to 1.0, creating a smooth "reveal" 
  * of the new vertical space instead of a snap.
  */
+/** Threshold for detecting when zoom has settled */
+const ZOOM_SETTLED_THRESHOLD = 0.001;
+
 export function useSmoothResizing() {
   const { size, camera } = useThree();
   const prevHeight = useRef(size.height);
   // Track pending RAF to cancel on rapid resizes
   const rafIdRef = useRef<number | null>(null);
+  // Track animation state to skip work when not animating
+  const isAnimatingRef = useRef(false);
+  const lastZoomRef = useRef(1);
 
   // Spring to animate zoom. Default 1.0.
   const zoomCorrection = useSpring(1, SPRING_CONFIG);
@@ -49,6 +55,9 @@ export function useSmoothResizing() {
        // OldHeight = NewHeight * Ratio
        // Ratio = OldHeight / NewHeight
        const compensationRatio = prevHeight.current / size.height;
+
+       // Mark that we're animating (for useFrame early-exit)
+       isAnimatingRef.current = true;
 
        // 1. Snap immediately to the compensated zoom level
        // This neutralizes the visual jump in the very next frame
@@ -81,13 +90,32 @@ export function useSmoothResizing() {
     if (!(camera instanceof PerspectiveCamera)) return;
 
     const scale = zoomCorrection.get();
-    
+
+    // Early exit if not animating, already at rest, AND spring is at 1
+    // We check the spring value to handle edge cases (e.g., spring set externally)
+    if (!isAnimatingRef.current && lastZoomRef.current === 1 && Math.abs(scale - 1) < ZOOM_SETTLED_THRESHOLD) {
+      return;
+    }
+
+    // Check if animation has settled (back to 1.0)
+    if (Math.abs(scale - 1) < ZOOM_SETTLED_THRESHOLD) {
+      isAnimatingRef.current = false;
+      lastZoomRef.current = 1;
+      // Ensure camera is exactly at 1.0 when settled
+      if (camera.zoom !== 1) {
+        camera.zoom = 1;
+        camera.updateProjectionMatrix();
+      }
+      return;
+    }
+
     // Apply zoom correction
     // We assume no other system is aggressively animating camera.zoom
     // If zoom is needed for other features (dolly), those usually move camera position, not zoom property.
     if (camera.zoom !== scale) {
-        camera.zoom = scale;
-        camera.updateProjectionMatrix();
+      camera.zoom = scale;
+      camera.updateProjectionMatrix();
     }
+    lastZoomRef.current = scale;
   }, FRAME_PRIORITY.ANIMATION);
 }

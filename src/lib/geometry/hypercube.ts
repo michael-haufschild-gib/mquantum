@@ -11,17 +11,23 @@ import type { PolytopeGeometry } from './types';
  * Generates a hypercube in n-dimensional space
  *
  * A hypercube has:
- * - Vertices: 2^n (all combinations of ±scale in each coordinate)
+ * - Vertices: 2^n (all combinations of ±1 in each coordinate)
  * - Edges: n * 2^(n-1) (connect vertices differing in exactly 1 coordinate)
  *
  * For 2D, this generates a square with 4 vertices and 4 edges.
  *
+ * IMPORTANT: Geometry is always generated at UNIT SCALE (±1.0).
+ * Visual scaling is applied post-projection via the uUniformScale shader uniform.
+ * This prevents extreme vertex values during rotation animation.
+ *
  * @param dimension - Dimensionality of the hypercube (must be >= 2)
- * @param scale - Scale factor for vertex coordinates (default: 1.0, range: ±scale)
+ * @param _scale - DEPRECATED: Scale parameter is ignored. Visual scale is applied post-projection.
  * @returns PolytopeGeometry representing the hypercube
  * @throws {Error} If dimension is less than 2
  */
-export function generateHypercube(dimension: number, scale = 1.0): PolytopeGeometry {
+export function generateHypercube(dimension: number, _scale = 1.0): PolytopeGeometry {
+  void _scale; // Scale is now applied post-projection via shader uniform
+
   if (dimension < 2) {
     throw new Error('Hypercube dimension must be at least 2');
   }
@@ -29,12 +35,13 @@ export function generateHypercube(dimension: number, scale = 1.0): PolytopeGeome
   const vertices: VectorND[] = [];
   const vertexCount = Math.pow(2, dimension);
 
-  // Generate all 2^n vertices (all combinations of ±scale)
+  // Generate all 2^n vertices at UNIT SCALE (±1.0)
+  // Visual scale is applied post-projection via uUniformScale uniform
   for (let i = 0; i < vertexCount; i++) {
     const vertex = createVector(dimension);
     for (let j = 0; j < dimension; j++) {
-      // Use bit j of i to determine sign, multiply by scale
-      vertex[j] = ((i & (1 << j)) ? 1 : -1) * scale;
+      // Use bit j of i to determine sign (always ±1.0 for unit geometry)
+      vertex[j] = (i & (1 << j)) ? 1.0 : -1.0;
     }
     vertices.push(vertex);
   }

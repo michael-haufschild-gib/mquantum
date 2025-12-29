@@ -36,17 +36,17 @@ import type { VectorND } from '@/lib/math/types'
 import { composeTubeWireframeFragmentShader, composeTubeWireframeVertexShader } from '@/rendering/shaders/tubewireframe/compose'
 import {
     blurToPCFSamples,
-    collectShadowDataFromScene,
+    collectShadowDataCached,
     createShadowMapUniforms,
     SHADOW_MAP_SIZES,
     updateShadowMapUniforms,
 } from '@/rendering/shadows'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useTransformStore } from '@/stores/transformStore'
-import { Vector4 } from 'three'
 
 // Maximum extra dimensions (beyond XYZ + W)
 const MAX_EXTRA_DIMS = 7
@@ -58,6 +58,9 @@ const CYLINDER_SEGMENTS = 8
  * GLSL code block containing the nD transformation for tube wireframe shadow materials.
  * This is injected into MeshDepthMaterial and MeshDistanceMaterial via onBeforeCompile.
  * Unlike the polytope version, this handles instanced tube geometry with start/end positions.
+ *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
  */
 const TUBE_ND_TRANSFORM_GLSL = `
 #define MAX_EXTRA_DIMS 7
@@ -65,8 +68,7 @@ const TUBE_ND_TRANSFORM_GLSL = `
 // N-D Transformation uniforms
 uniform mat4 uRotationMatrix4D;
 uniform int uDimension;
-uniform vec4 uScale4D;
-uniform float uExtraScales[MAX_EXTRA_DIMS];
+uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28];
 uniform float uDepthRowSums[11];
@@ -81,26 +83,30 @@ in vec4 instanceEndExtraA;
 in vec4 instanceEndExtraB;
 
 // Transform a single nD point to 3D
+// IMPORTANT: Scale is applied AFTER projection, not before rotation.
 vec3 ndTransformPoint(vec3 pos, vec4 extraA, vec4 extraB) {
-  float scaledInputs[11];
-  scaledInputs[0] = pos.x * uScale4D.x;
-  scaledInputs[1] = pos.y * uScale4D.y;
-  scaledInputs[2] = pos.z * uScale4D.z;
-  scaledInputs[3] = extraA.x * uScale4D.w; // W
-  scaledInputs[4] = extraA.y * uExtraScales[0];
-  scaledInputs[5] = extraA.z * uExtraScales[1];
-  scaledInputs[6] = extraA.w * uExtraScales[2];
-  scaledInputs[7] = extraB.x * uExtraScales[3];
-  scaledInputs[8] = extraB.y * uExtraScales[4];
-  scaledInputs[9] = extraB.z * uExtraScales[5];
-  scaledInputs[10] = 0.0;
+  // Build input array from raw (unscaled) coordinates
+  float inputs[11];
+  inputs[0] = pos.x;
+  inputs[1] = pos.y;
+  inputs[2] = pos.z;
+  inputs[3] = extraA.x; // W
+  inputs[4] = extraA.y;
+  inputs[5] = extraA.z;
+  inputs[6] = extraA.w;
+  inputs[7] = extraB.x;
+  inputs[8] = extraB.y;
+  inputs[9] = extraB.z;
+  inputs[10] = 0.0;
 
-  vec4 scaledPos = vec4(scaledInputs[0], scaledInputs[1], scaledInputs[2], scaledInputs[3]);
-  vec4 rotated = uRotationMatrix4D * scaledPos;
+  // Apply rotation to first 4 dimensions (unscaled)
+  vec4 pos4 = vec4(inputs[0], inputs[1], inputs[2], inputs[3]);
+  vec4 rotated = uRotationMatrix4D * pos4;
 
+  // Add contribution from extra dimensions (5D+)
   for (int i = 0; i < MAX_EXTRA_DIMS; i++) {
     if (i + 5 <= uDimension) {
-      float extraDimValue = scaledInputs[i + 4];
+      float extraDimValue = inputs[i + 4];
       rotated.x += uExtraRotationCols[i * 4 + 0] * extraDimValue;
       rotated.y += uExtraRotationCols[i * 4 + 1] * extraDimValue;
       rotated.z += uExtraRotationCols[i * 4 + 2] * extraDimValue;
@@ -108,20 +114,25 @@ vec3 ndTransformPoint(vec3 pos, vec4 extraA, vec4 extraB) {
     }
   }
 
+  // Perspective projection: compute effective depth from higher dimensions
   float effectiveDepth = rotated.w;
   for (int j = 0; j < 11; j++) {
     if (j < uDimension) {
-      effectiveDepth += uDepthRowSums[j] * scaledInputs[j];
+      effectiveDepth += uDepthRowSums[j] * inputs[j];
     }
   }
   // Normalize depth by sqrt(dimension - 3) for consistent visual scale.
   // See transforms/ndTransform.ts for mathematical justification.
   float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - 3))) : 1.0;
   effectiveDepth /= normFactor;
+
+  // Guard against division by zero
   float denom = uProjectionDistance - effectiveDepth;
   if (abs(denom) < 0.0001) denom = denom >= 0.0 ? 0.0001 : -0.0001;
   float factor = 1.0 / denom;
-  return rotated.xyz * factor;
+
+  // Project to 3D, then apply uniform scale (like camera zoom)
+  return rotated.xyz * factor * uUniformScale;
 }
 
 // Transform tube vertex position (cylinder mesh positioned between start and end)
@@ -155,6 +166,10 @@ vec3 tubeTransformVertex(vec3 localPos) {
 
 /**
  * Create shared uniforms for tube shadow materials.
+ *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
+ *
  * @param dimension - Current dimension
  * @param radius - Tube radius
  * @returns Record of tube shadow uniforms
@@ -163,8 +178,7 @@ function createTubeShadowUniforms(dimension: number, radius: number): Record<str
   return {
     uRotationMatrix4D: { value: new Matrix4() },
     uDimension: { value: dimension },
-    uScale4D: { value: new Vector4(1, 1, 1, 1) },
-    uExtraScales: { value: new Float32Array(MAX_EXTRA_DIMS).fill(1) },
+    uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
     uDepthRowSums: { value: new Float32Array(11) },
     uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
@@ -226,9 +240,6 @@ export function TubeWireframe({
   // Cached linear colors - avoid per-frame sRGB->linear conversion
   const colorCacheRef = useRef(createColorCache())
 
-  // Performance optimization: Cache objects to avoid per-frame allocation/calculation
-  const cachedScalesRef = useRef<number[]>([])
-
   // Projection distance caching - uses shared hook to avoid O(N) recalculation every frame
   const projDistCache = useProjectionDistanceCache()
 
@@ -250,6 +261,13 @@ export function TubeWireframe({
   const appearanceStateRef = useRef(useAppearanceStore.getState())
   const lightingStateRef = useRef(useLightingStore.getState())
   const environmentStateRef = useRef(useEnvironmentStore.getState())
+  const extendedObjectStateRef = useRef(useExtendedObjectStore.getState())
+
+  // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+  const lastAppearanceVersionRef = useRef(-1) // -1 forces full sync on first frame
+  const lastIblVersionRef = useRef(-1)
+  const lastLightingVersionRef = useRef(-1)
+  const prevMaterialRef = useRef<ShaderMaterial | null>(null)
 
   // Subscribe to store changes to update refs
   useEffect(() => {
@@ -257,11 +275,13 @@ export function TubeWireframe({
     const unsubApp = useAppearanceStore.subscribe((s) => { appearanceStateRef.current = s })
     const unsubLight = useLightingStore.subscribe((s) => { lightingStateRef.current = s })
     const unsubEnv = useEnvironmentStore.subscribe((s) => { environmentStateRef.current = s })
+    const unsubExt = useExtendedObjectStore.subscribe((s) => { extendedObjectStateRef.current = s })
     return () => {
       unsubTrans()
       unsubApp()
       unsubLight()
       unsubEnv()
+      unsubExt()
     }
   }, [])
 
@@ -305,11 +325,10 @@ export function TubeWireframe({
           uOpacity: { value: opacity },
           uRadius: { value: radius },
 
-          // N-D transformation
+          // N-D transformation (scale is applied AFTER projection, like camera zoom)
           uRotationMatrix4D: { value: new Matrix4() },
           uDimension: { value: dimension },
-          uScale4D: { value: [1, 1, 1, 1] },
-          uExtraScales: { value: new Float32Array(MAX_EXTRA_DIMS).fill(1) },
+          uUniformScale: { value: 1.0 },  // Applied AFTER projection
           uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
           uDepthRowSums: { value: new Float32Array(11) },
           uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
@@ -530,39 +549,51 @@ export function TubeWireframe({
     // Skip if material is not ready (still compiling)
     if (!material || !material.uniforms.uRotationMatrix4D) return
 
-    // Read state from cached refs (updated via subscriptions, not getState() per frame)
-    const transformState = transformStateRef.current
-    const { uniformScale, perAxisScale } = transformState
-    const appearanceState = appearanceStateRef.current
-    const lightingState = lightingStateRef.current
+    // ============================================
+    // DIRTY-FLAG: Material change detection
+    // ============================================
+    const materialChanged = material !== prevMaterialRef.current
+    if (materialChanged) {
+      prevMaterialRef.current = material
+      // Force full sync on material change
+      lastAppearanceVersionRef.current = -1
+      lastIblVersionRef.current = -1
+      lastLightingVersionRef.current = -1
+    }
 
-    // Build scales array (reuse cached array)
-    const scales = cachedScalesRef.current
-    if (scales.length !== dimension) {
-      scales.length = dimension
-    }
-    for (let i = 0; i < dimension; i++) {
-      scales[i] = perAxisScale[i] ?? uniformScale
-    }
+    // Read state from cached refs (updated via subscriptions, not getState() per frame)
+    const extendedObjectState = extendedObjectStateRef.current
+    const appearanceState = appearanceStateRef.current
+    // Visual scale is read from polytope config (applied post-projection via shader)
+    // Geometry is always unit-scale, this acts like camera zoom
+    const visualScale = extendedObjectState.polytope.scale
+    const lightingState = lightingStateRef.current
+    const environmentState = environmentStateRef.current
+
+    // ============================================
+    // DIRTY-FLAG: Get versions and check for changes
+    // ============================================
+    const appearanceVersion = appearanceState.appearanceVersion
+    const iblVersion = environmentState.iblVersion
+    const lightingVersion = lightingState.version
+
+    const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current
+    const iblChanged = iblVersion !== lastIblVersionRef.current
+    const lightingChanged = lightingVersion !== lastLightingVersionRef.current
 
     // Update rotation matrix via shared hook (handles version tracking)
-    ndTransform.update({ scales })
+    // Note: Scale is now applied AFTER projection, so we don't pass scales to rotation
+    ndTransform.update({})
     const gpuData = ndTransform.source.getGPUData()
 
-    // Get cached projection distance (recalculates only when vertex count or scales change)
-    const projectionDistance = projDistCache.getProjectionDistance(vertices, dimension, scales)
+    // Get projection distance (no longer needs scale adjustment since scale is post-projection)
+    const projectionDistance = projDistCache.getProjectionDistance(vertices, dimension, [])
 
-    // Update N-D transformation uniforms
+    // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
     const u = material.uniforms
     ;(u.uRotationMatrix4D!.value as Matrix4).copy(gpuData.rotationMatrix4D)
     u.uDimension!.value = dimension
-    u.uScale4D!.value = [scales[0] ?? 1, scales[1] ?? 1, scales[2] ?? 1, scales[3] ?? 1]
-
-    const extraScales = u.uExtraScales!.value as Float32Array
-    for (let i = 0; i < MAX_EXTRA_DIMS; i++) {
-      extraScales[i] = scales[i + 4] ?? 1
-    }
-
+    u.uUniformScale!.value = visualScale
     ;(u.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols)
     ;(u.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums)
     u.uProjectionDistance!.value = projectionDistance
@@ -587,37 +618,56 @@ export function TubeWireframe({
     // Note: Ambient and Specular uniforms are provided by UniformManager 'lighting' source below.
     // Do not set them manually here - they would be immediately overwritten.
 
-    // Fresnel (cached linear conversion)
-    u.uFresnelEnabled!.value = appearanceState.shaderSettings.surface.fresnelEnabled
-    u.uFresnelIntensity!.value = appearanceState.fresnelIntensity
-    updateLinearColorUniform(cache.rimColor, u.uRimColor!.value as Color, appearanceState.edgeColor)
+    // ============================================
+    // DIRTY-FLAG: Appearance uniforms (only update when changed)
+    // ============================================
+    if (appearanceChanged) {
+      // Fresnel (cached linear conversion)
+      u.uFresnelEnabled!.value = appearanceState.shaderSettings.surface.fresnelEnabled
+      u.uFresnelIntensity!.value = appearanceState.fresnelIntensity
+      updateLinearColorUniform(cache.rimColor, u.uRimColor!.value as Color, appearanceState.edgeColor)
 
-    // Rim SSS (shared with raymarched objects)
-    u.uSssEnabled!.value = appearanceState.sssEnabled
-    u.uSssIntensity!.value = appearanceState.sssIntensity
-    updateLinearColorUniform(cache.sssColor, u.uSssColor!.value as Color, appearanceState.sssColor)
-    u.uSssThickness!.value = appearanceState.sssThickness
-    if (u.uSssJitter) u.uSssJitter.value = appearanceState.sssJitter
+      // Rim SSS (shared with raymarched objects)
+      u.uSssEnabled!.value = appearanceState.sssEnabled
+      u.uSssIntensity!.value = appearanceState.sssIntensity
+      updateLinearColorUniform(cache.sssColor, u.uSssColor!.value as Color, appearanceState.sssColor)
+      u.uSssThickness!.value = appearanceState.sssThickness
+      if (u.uSssJitter) u.uSssJitter.value = appearanceState.sssJitter
+
+      lastAppearanceVersionRef.current = appearanceVersion
+    }
 
     // Update multi-light system and PBR (via UniformManager)
     UniformManager.applyToMaterial(material, ['lighting', 'pbr-edge'])
 
-    // IBL (Image-Based Lighting) uniforms - use cached ref for performance
-    // Compute isPMREM first to gate quality (prevents null texture sampling)
+    // ============================================
+    // IBL: Environment map updated every frame (changes with scene)
+    // ============================================
     const env = scene.environment
     const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping
     u.uEnvMap!.value = isPMREM ? env : null
 
-    const iblState = environmentStateRef.current
-    const qualityMap = { off: 0, low: 1, high: 2 } as const
-    // Force IBL off when no valid PMREM texture
-    u.uIBLQuality!.value = isPMREM ? qualityMap[iblState.iblQuality] : 0
-    u.uIBLIntensity!.value = iblState.iblIntensity
+    // ============================================
+    // DIRTY-FLAG: IBL settings (only update when changed)
+    // ============================================
+    if (iblChanged) {
+      const iblState = environmentStateRef.current
+      const qualityMap = { off: 0, low: 1, high: 2 } as const
+      // Force IBL off when no valid PMREM texture
+      u.uIBLQuality!.value = isPMREM ? qualityMap[iblState.iblQuality] : 0
+      u.uIBLIntensity!.value = iblState.iblIntensity
 
-    // Update shadow map uniforms if shadows are enabled
-    // Pass store lights to ensure shadow data ordering matches uniform indices
+      lastIblVersionRef.current = iblVersion
+    }
+
+    // ============================================
+    // Shadow uniforms - matrices must update every frame, but use cached scene traversal
+    // Note: Shadow matrices are references to Three.js objects that update every frame,
+    // so we must call updateShadowMapUniforms to copy fresh matrix values to GPU uniforms.
+    // The expensive scene traversal is cached by collectShadowDataCached.
+    // ============================================
     if (shadowEnabled && lightingState.shadowEnabled) {
-      const shadowData = collectShadowDataFromScene(scene, lightingState.lights)
+      const shadowData = collectShadowDataCached(scene, lightingState.lights)
       const shadowQuality = lightingState.shadowQuality
       const shadowMapSize = SHADOW_MAP_SIZES[shadowQuality]
       const pcfSamples = blurToPCFSamples(lightingState.shadowMapBlur)
@@ -636,17 +686,10 @@ export function TubeWireframe({
     if (shadowEnabled) {
       const su = shadowUniforms
 
-      // Update N-D transformation uniforms
+      // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
       ;(su.uRotationMatrix4D!.value as Matrix4).copy(gpuData.rotationMatrix4D)
       su.uDimension!.value = dimension
-      const s = su.uScale4D!.value
-      if (s instanceof Vector4) {
-        s.set(scales[0] ?? 1, scales[1] ?? 1, scales[2] ?? 1, scales[3] ?? 1)
-      }
-      const extraScales = su.uExtraScales!.value as Float32Array
-      for (let i = 0; i < MAX_EXTRA_DIMS; i++) {
-        extraScales[i] = scales[i + 4] ?? 1
-      }
+      su.uUniformScale!.value = visualScale
       ;(su.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols)
       ;(su.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums)
       su.uProjectionDistance!.value = projectionDistance

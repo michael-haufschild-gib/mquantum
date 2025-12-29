@@ -17,16 +17,22 @@ import type { PolytopeGeometry } from './types';
  * Construction uses standard simplex vertices then centers and normalizes:
  * - v_0 = origin
  * - v_i = unit vector along axis i (for i = 1 to n)
- * - Center at origin and scale to fit in [-scale, scale]
+ * - Center at origin and normalize to fit in [-1, 1]
+ *
+ * IMPORTANT: Geometry is always generated at UNIT SCALE (±1.0).
+ * Visual scaling is applied post-projection via the uUniformScale shader uniform.
+ * This prevents extreme vertex values during rotation animation.
  *
  * For 2D, this generates an equilateral triangle with 3 vertices and 3 edges.
  *
  * @param dimension - Dimensionality of the space (must be >= 2)
- * @param scale - Scale factor for vertex coordinates (default: 1.0, range: ±scale)
+ * @param _scale - DEPRECATED: Scale parameter is ignored. Visual scale is applied post-projection.
  * @returns PolytopeGeometry representing the simplex
  * @throws {Error} If dimension is less than 2
  */
-export function generateSimplex(dimension: number, scale = 1.0): PolytopeGeometry {
+export function generateSimplex(dimension: number, _scale = 1.0): PolytopeGeometry {
+  void _scale; // Scale is now applied post-projection via shader uniform
+
   if (dimension < 2) {
     throw new Error('Simplex dimension must be at least 2');
   }
@@ -65,9 +71,10 @@ export function generateSimplex(dimension: number, scale = 1.0): PolytopeGeometr
     }
   }
 
-  // Normalize to fit in [-scale, scale] using library function
+  // Normalize to fit in [-1, 1] (UNIT SCALE)
+  // Visual scale is applied post-projection via uUniformScale uniform
   if (maxCoord > 0) {
-    const normFactor = scale / maxCoord;
+    const normFactor = 1.0 / maxCoord;
     for (let i = 0; i < vertices.length; i++) {
       vertices[i] = scaleVector(vertices[i]!, normFactor);
     }

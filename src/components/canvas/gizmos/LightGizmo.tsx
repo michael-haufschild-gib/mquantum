@@ -263,6 +263,9 @@ const SpotLightGizmo = memo(function SpotLightGizmo({
 /** Reusable Vector3 for distance calculation (avoid per-frame allocation) */
 const tempLightPosition = new THREE.Vector3();
 
+/** Threshold for detecting distance changes (skip recalculation if below) */
+const DISTANCE_THRESHOLD = 0.1;
+
 export const LightGizmo = memo(function LightGizmo({
   light,
   isSelected,
@@ -270,12 +273,21 @@ export const LightGizmo = memo(function LightGizmo({
 }: LightGizmoProps) {
   const groupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
+  // Track last distance to skip unnecessary scale updates
+  const lastDistanceRef = useRef(0);
 
-  // Update scale based on camera distance
+  // Update scale based on camera distance (only when distance changes significantly)
   useFrame(() => {
     if (groupRef.current) {
       tempLightPosition.set(light.position[0], light.position[1], light.position[2]);
       const distance = camera.position.distanceTo(tempLightPosition);
+
+      // Skip if distance hasn't changed significantly
+      if (Math.abs(distance - lastDistanceRef.current) < DISTANCE_THRESHOLD) {
+        return;
+      }
+      lastDistanceRef.current = distance;
+
       const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, distance * 0.1)) * BASE_GIZMO_SIZE;
       groupRef.current.scale.setScalar(scale);
     }

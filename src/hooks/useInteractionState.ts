@@ -14,10 +14,16 @@ import { useShallow } from 'zustand/react/shallow'
 /** Threshold for detecting camera movement */
 const POSITION_THRESHOLD = 0.005
 const ROTATION_THRESHOLD = 0.002
+/** Pre-computed squared thresholds to avoid sqrt in hot path */
+const POSITION_THRESHOLD_SQ = POSITION_THRESHOLD * POSITION_THRESHOLD
+const ROTATION_THRESHOLD_SQ = ROTATION_THRESHOLD * ROTATION_THRESHOLD
 
 /** Threshold for detecting camera teleport (large sudden movement) */
 const TELEPORT_POSITION_THRESHOLD = 2.0
 const TELEPORT_ROTATION_THRESHOLD = 0.5
+/** Pre-computed squared thresholds to avoid sqrt in hot path */
+const TELEPORT_POSITION_THRESHOLD_SQ = TELEPORT_POSITION_THRESHOLD * TELEPORT_POSITION_THRESHOLD
+const TELEPORT_ROTATION_THRESHOLD_SQ = TELEPORT_ROTATION_THRESHOLD * TELEPORT_ROTATION_THRESHOLD
 
 /** Minimum size change to trigger interaction (pixels) */
 const SIZE_CHANGE_THRESHOLD = 1
@@ -183,7 +189,7 @@ export function useInteractionState(options: UseInteractionStateOptions = {}): I
     }
   }, [enabled, gl, startInteraction, stopInteraction])
 
-  // Per-frame camera movement detection
+  // Per-frame camera movement detection (optimized with squared distances)
   useFrame(() => {
     if (!enabled) return
 
@@ -192,18 +198,16 @@ export function useInteractionState(options: UseInteractionStateOptions = {}): I
     const prevPos = prevPositionRef.current
     const prevRot = prevRotationRef.current
 
-    // Calculate deltas
-    const posDelta = Math.sqrt(
+    // Use squared distances to avoid sqrt (cheaper comparison)
+    const posDistSq =
       (pos.x - prevPos.x) ** 2 + (pos.y - prevPos.y) ** 2 + (pos.z - prevPos.z) ** 2
-    )
 
-    const rotDelta = Math.sqrt(
+    const rotDistSq =
       (rot.x - prevRot.x) ** 2 + (rot.y - prevRot.y) ** 2 + (rot.z - prevRot.z) ** 2
-    )
 
-    // Check for teleport (large sudden movement)
+    // Check for teleport (large sudden movement) using squared thresholds
     const isTeleport =
-      posDelta > TELEPORT_POSITION_THRESHOLD || rotDelta > TELEPORT_ROTATION_THRESHOLD
+      posDistSq > TELEPORT_POSITION_THRESHOLD_SQ || rotDistSq > TELEPORT_ROTATION_THRESHOLD_SQ
 
     if (isTeleport) {
       usePerformanceStore.getState().setCameraTeleported(true)
@@ -218,8 +222,8 @@ export function useInteractionState(options: UseInteractionStateOptions = {}): I
       })
     }
 
-    // Check for movement
-    const hasMoved = posDelta > POSITION_THRESHOLD || rotDelta > ROTATION_THRESHOLD
+    // Check for movement using squared thresholds
+    const hasMoved = posDistSq > POSITION_THRESHOLD_SQ || rotDistSq > ROTATION_THRESHOLD_SQ
 
     if (hasMoved) {
       startInteraction()

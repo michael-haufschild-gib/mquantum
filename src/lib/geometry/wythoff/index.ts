@@ -61,7 +61,6 @@ import {
 import { generateEdgesByMinDistance } from './edges'
 
 import {
-  applyScaleToGeometry,
   cachePolytope,
   getCacheKey,
   getCachedPolytope,
@@ -103,10 +102,14 @@ function generateGenericPolytopeData(vertices: VectorND[]): PolytopeData {
  * - B_n: Generates hypercube/cross-polytope family
  * - D_n: Generates demihypercube family
  *
+ * IMPORTANT: Geometry is always generated at UNIT SCALE (±1.0).
+ * Visual scaling is applied post-projection via the uUniformScale shader uniform.
+ * The scale property in config is preserved in metadata but not applied to vertices.
+ *
  * @param dimension - Dimensionality of the space (3-11)
- * @param config - Configuration options
+ * @param config - Configuration options (scale is stored in metadata but not applied to vertices)
  * @param warnings - Optional warning collector for thread-safe warning collection
- * @returns PolytopeGeometry representing the Wythoff polytope
+ * @returns PolytopeGeometry at unit scale (visual scale applied via shader)
  * @throws {Error} If dimension is out of range
  *
  * @example
@@ -115,8 +118,8 @@ function generateGenericPolytopeData(vertices: VectorND[]): PolytopeData {
  * const polytope = generateWythoffPolytope(4, {
  *   symmetryGroup: 'B',
  *   preset: 'truncated',
- *   scale: 2.0,
  * });
+ * // Visual scale is applied via uUniformScale shader uniform
  * ```
  */
 export function generateWythoffPolytope(
@@ -133,13 +136,16 @@ export function generateWythoffPolytope(
     ...config,
   }
 
-  const { symmetryGroup, preset, scale, snub } = fullConfig
+  const { symmetryGroup, preset, snub } = fullConfig
+  // Note: scale is intentionally not destructured - geometry is always unit-scale
+  // Visual scale is applied post-projection via uUniformScale shader uniform
 
   // Check memory cache (sync, fastest path)
   const cacheKey = getCacheKey(dimension, fullConfig)
   const memoryCached = getFromMemoryCache(cacheKey)
   if (memoryCached) {
-    return applyScaleToGeometry(memoryCached, scale)
+    // Return unit-scale geometry - visual scale applied via shader
+    return memoryCached
   }
 
   // Validate D_n symmetry requires dimension >= 4
@@ -241,8 +247,8 @@ export function generateWythoffPolytope(
   // Cache normalized geometry to memory and IndexedDB
   cachePolytope(cacheKey, normalizedResult)
 
-  // Apply requested scale before returning
-  return applyScaleToGeometry(normalizedResult, scale)
+  // Return unit-scale geometry - visual scale is applied post-projection via shader uniform
+  return normalizedResult
 }
 
 /**
@@ -267,13 +273,15 @@ export async function generateWythoffPolytopeAsync(
     ...config,
   }
 
-  const { scale } = fullConfig
+  // Note: scale is not used - geometry is always unit-scale
+  // Visual scale is applied post-projection via uUniformScale shader uniform
   const cacheKey = getCacheKey(dimension, fullConfig)
 
   // Check memory and IndexedDB caches (getCachedPolytope handles memory cache population)
   const cached = await getCachedPolytope(cacheKey)
   if (cached) {
-    return applyScaleToGeometry(cached, scale)
+    // Return unit-scale geometry - visual scale applied via shader
+    return cached
   }
 
   // Generate new polytope (expensive)

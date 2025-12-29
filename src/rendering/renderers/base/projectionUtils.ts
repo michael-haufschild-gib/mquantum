@@ -39,17 +39,20 @@ const PROJECTION_MARGIN = 2.0
  * 1. Find the maximum N-dimensional norm of any vertex
  * 2. Use this as the worst-case effective depth after rotation
  * 3. Add safety margin
- * 4. Optionally scale by max scale factor
+ *
+ * NOTE: Scale is now applied AFTER projection to 3D (like camera zoom), so it
+ * no longer affects projection distance calculation. This prevents extreme values
+ * during rotation animation.
  *
  * @param vertices - Array of N-dimensional vertices
  * @param dimension - Current dimension of the object
- * @param scales - Per-axis scale factors (optional)
+ * @param _scales - DEPRECATED: Scale no longer affects projection distance
  * @returns Safe projection distance that works for any rotation state
  */
 export function calculateSafeProjectionDistance(
   vertices: VectorND[],
   dimension: number,
-  scales?: number[]
+  _scales?: number[]
 ): number {
   // Early exit for 3D objects or empty vertex arrays
   if (vertices.length === 0 || dimension <= 3) {
@@ -78,23 +81,10 @@ export function calculateSafeProjectionDistance(
   // The max effective depth after any rotation is bounded by the vertex norm
   const maxEffectiveDepth = maxNorm
 
-  // Calculate raw distance with margin
-  const rawDistance = Math.max(DEFAULT_PROJECTION_DISTANCE, maxEffectiveDepth + PROJECTION_MARGIN)
-
-  // Apply scale adjustment if scales provided
-  if (scales && scales.length > 0) {
-    let maxScale = 1
-    for (const s of scales) {
-      maxScale = Math.max(maxScale, s)
-    }
-
-    // Adjust projection distance by max scale to prevent near-clipping when object grows
-    // rawDistance includes the margin, so we scale the "content" part and add margin back
-    const contentRadius = Math.max(0, rawDistance - PROJECTION_MARGIN)
-    return contentRadius * maxScale + PROJECTION_MARGIN
-  }
-
-  return rawDistance
+  // Calculate distance with margin
+  // Note: Scale is applied AFTER projection (like camera zoom), so it doesn't
+  // affect projection distance calculation.
+  return Math.max(DEFAULT_PROJECTION_DISTANCE, maxEffectiveDepth + PROJECTION_MARGIN)
 }
 
 /**
@@ -105,8 +95,6 @@ interface ProjectionDistanceCache {
   count: number
   /** Cached projection distance */
   distance: number
-  /** Sum of scales for change detection */
-  scaleSum: number
 }
 
 /**
@@ -115,14 +103,17 @@ interface ProjectionDistanceCache {
 export interface UseProjectionDistanceCacheResult {
   /**
    * Get the current projection distance.
-   * Recalculates only when vertex count or scale sum changes significantly.
+   * Recalculates only when vertex count changes (geometry changed).
+   *
+   * NOTE: Scale no longer affects projection distance since it's applied
+   * AFTER projection to 3D (like camera zoom).
    *
    * @param vertices - Current vertices
    * @param dimension - Current dimension
-   * @param scales - Current scale factors
+   * @param _scales - DEPRECATED: Scale no longer affects projection distance
    * @returns Cached or newly calculated projection distance
    */
-  getProjectionDistance: (vertices: VectorND[], dimension: number, scales: number[]) => number
+  getProjectionDistance: (vertices: VectorND[], dimension: number, _scales?: number[]) => number
 
   /**
    * Force recalculation on next call.
@@ -133,9 +124,9 @@ export interface UseProjectionDistanceCacheResult {
 /**
  * Hook for caching projection distance calculations.
  *
- * Projection distance only needs to be recalculated when:
- * - Vertex count changes (geometry changed)
- * - Scale sum changes significantly (transform changed)
+ * Projection distance only needs to be recalculated when vertex count changes
+ * (geometry changed). Scale is now applied AFTER projection to 3D (like camera
+ * zoom), so it no longer affects projection distance.
  *
  * This avoids O(N) vertex iteration every frame.
  *
@@ -147,8 +138,7 @@ export interface UseProjectionDistanceCacheResult {
  *   const projCache = useProjectionDistanceCache();
  *
  *   useFrame(() => {
- *     const scales = [uniformScale, ...perAxisScale];
- *     const projectionDistance = projCache.getProjectionDistance(vertices, dimension, scales);
+ *     const projectionDistance = projCache.getProjectionDistance(vertices, dimension);
  *     // Use projectionDistance in uniform updates
  *   });
  * }
@@ -158,33 +148,23 @@ export function useProjectionDistanceCache(): UseProjectionDistanceCacheResult {
   const cacheRef = useRef<ProjectionDistanceCache>({
     count: -1,
     distance: DEFAULT_PROJECTION_DISTANCE,
-    scaleSum: 0,
   })
 
   const getProjectionDistance = (
     vertices: VectorND[],
     dimension: number,
-    scales: number[]
+    _scales?: number[]
   ): number => {
     const cache = cacheRef.current
     const numVertices = vertices.length
 
-    // Calculate current scale sum for change detection
-    let currentScaleSum = 0
-    for (const s of scales) {
-      currentScaleSum += s
-    }
-
-    // Check if we need to recalculate
-    const countChanged = numVertices !== cache.count
-    const scaleChanged = Math.abs(currentScaleSum - cache.scaleSum) > 0.01
-
-    if (countChanged || scaleChanged) {
-      const distance = calculateSafeProjectionDistance(vertices, dimension, scales)
+    // Check if we need to recalculate (only when vertex count changes)
+    // Scale is now applied AFTER projection, so it doesn't affect projection distance
+    if (numVertices !== cache.count) {
+      const distance = calculateSafeProjectionDistance(vertices, dimension)
 
       cache.count = numVertices
       cache.distance = distance
-      cache.scaleSum = currentScaleSum
 
       return distance
     }

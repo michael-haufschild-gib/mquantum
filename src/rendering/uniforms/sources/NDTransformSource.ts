@@ -54,14 +54,16 @@ export interface NDTransformConfig {
 
 /**
  * Uniform definitions for N-D transform shader material.
+ *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
  */
 interface NDTransformUniforms {
   uRotationMatrix4D: IUniform<Matrix4>
   uExtraRotationCols: IUniform<Float32Array>
   uDepthRowSums: IUniform<Float32Array>
   uDimension: IUniform<number>
-  uScale4D: IUniform<number[]>
-  uExtraScales: IUniform<Float32Array>
+  uUniformScale: IUniform<number>  // Applied AFTER projection (like camera zoom)
   uProjectionDistance: IUniform<number>
 }
 
@@ -107,7 +109,6 @@ export class NDTransformSource extends BaseUniformSource {
   // Change detection cache
   private cachedDimension = 0
   private cachedRotationVersion = -1
-  private cachedScales: number[] = []
   private cachedUniformScale = 1.0
   private cachedProjectionDistance = DEFAULT_PROJECTION_DISTANCE
 
@@ -126,13 +127,13 @@ export class NDTransformSource extends BaseUniformSource {
     }
 
     // Initialize uniforms
+    // Note: Scale is applied AFTER projection (like camera zoom)
     this.uniforms = {
       uRotationMatrix4D: { value: new Matrix4() },
       uExtraRotationCols: { value: new Float32Array(EXTRA_DIMS_SIZE * 4) },
       uDepthRowSums: { value: new Float32Array(MAX_GPU_DIMENSION) },
       uDimension: { value: 4 },
-      uScale4D: { value: [1, 1, 1, 1] },
-      uExtraScales: { value: new Float32Array(EXTRA_DIMS_SIZE).fill(1) },
+      uUniformScale: { value: 1.0 },  // Applied AFTER projection
       uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
     }
   }
@@ -141,6 +142,9 @@ export class NDTransformSource extends BaseUniformSource {
    * Update from store state (lazy evaluation).
    * Only recomputes rotation matrix when version changes.
    *
+   * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+   * This preserves N-D geometry and prevents extreme values during rotation.
+   *
    * @param config - Configuration with current state
    */
   updateFromStore(config: NDTransformConfig): void {
@@ -148,7 +152,6 @@ export class NDTransformSource extends BaseUniformSource {
       dimension,
       rotations,
       rotationVersion,
-      scales = [],
       uniformScale = 1.0,
       projectionDistance = DEFAULT_PROJECTION_DISTANCE,
     } = config
@@ -157,17 +160,14 @@ export class NDTransformSource extends BaseUniformSource {
     const rotationChanged =
       dimension !== this.cachedDimension || rotationVersion !== this.cachedRotationVersion
 
-    // Check if scales changed
-    const scalesChanged =
-      uniformScale !== this.cachedUniformScale ||
-      scales.length !== this.cachedScales.length ||
-      scales.some((s, i) => s !== this.cachedScales[i])
+    // Check if uniform scale changed (applied AFTER projection, like camera zoom)
+    const scaleChanged = uniformScale !== this.cachedUniformScale
 
     // Check if projection distance changed
     const projectionChanged = projectionDistance !== this.cachedProjectionDistance
 
     // Early exit if nothing changed
-    if (!rotationChanged && !scalesChanged && !projectionChanged) {
+    if (!rotationChanged && !scaleChanged && !projectionChanged) {
       return
     }
 
@@ -187,21 +187,9 @@ export class NDTransformSource extends BaseUniformSource {
       this.cachedRotationVersion = rotationVersion
     }
 
-    // Update scales if changed
-    if (scalesChanged) {
-      // Build scale array with uniform scale as default
-      const scale4D = this.uniforms.uScale4D.value
-      for (let i = 0; i < 4; i++) {
-        scale4D[i] = scales[i] ?? uniformScale
-      }
-
-      const extraScales = this.uniforms.uExtraScales.value
-      for (let i = 0; i < EXTRA_DIMS_SIZE; i++) {
-        extraScales[i] = scales[i + 4] ?? uniformScale
-      }
-
-      // Update cache
-      this.cachedScales = [...scales]
+    // Update uniform scale if changed (applied AFTER projection, like camera zoom)
+    if (scaleChanged) {
+      this.uniforms.uUniformScale.value = uniformScale
       this.cachedUniformScale = uniformScale
     }
 
@@ -242,7 +230,6 @@ export class NDTransformSource extends BaseUniformSource {
   reset(): void {
     this.cachedDimension = 0
     this.cachedRotationVersion = -1
-    this.cachedScales = []
     this.cachedUniformScale = 1.0
     this.cachedProjectionDistance = DEFAULT_PROJECTION_DISTANCE
     this._version = 0
@@ -258,8 +245,7 @@ export class NDTransformSource extends BaseUniformSource {
     this.uniforms.uExtraRotationCols.value.fill(0)
     this.uniforms.uDepthRowSums.value.fill(0)
     this.uniforms.uDimension.value = 4
-    this.uniforms.uScale4D.value = [1, 1, 1, 1]
-    this.uniforms.uExtraScales.value.fill(1)
+    this.uniforms.uUniformScale.value = 1.0
     this.uniforms.uProjectionDistance.value = DEFAULT_PROJECTION_DISTANCE
   }
 

@@ -11,7 +11,11 @@ import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/hooks/useToast';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
+import { clearMemoryCache } from '@/lib/geometry/wythoff/cache';
 import React, { useState } from 'react';
+
+/** Database name - must match IndexedDBCache.ts */
+const GEOMETRY_CACHE_DB_NAME = 'mdimension-cache';
 
 export interface SettingsSectionProps {
   defaultOpen?: boolean;
@@ -39,29 +43,26 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale);
   const setRenderResolutionScale = usePerformanceStore((state) => state.setRenderResolutionScale);
 
-  const handleClearIndexDB = async () => {
+  const handleClearGeometryCache = async () => {
     try {
-      // Check browser compatibility for indexedDB.databases()
-      if (typeof indexedDB.databases !== 'function') {
-        addToast('IndexDB clearing not supported in this browser', 'error');
-        return;
-      }
-      const databases = await indexedDB.databases();
-      await Promise.all(
-        databases.map((db) => {
-          if (db.name) {
-            return new Promise<void>((resolve, reject) => {
-              const request = indexedDB.deleteDatabase(db.name!);
-              request.onsuccess = () => resolve();
-              request.onerror = () => reject(request.error);
-            });
-          }
-          return Promise.resolve();
-        })
-      );
-      addToast('IndexDB cleared', 'success');
+      // Clear in-memory cache first
+      clearMemoryCache();
+
+      // Delete only our app's geometry cache database
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(GEOMETRY_CACHE_DB_NAME);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+        request.onblocked = () => {
+          // Database is in use - will be deleted on next app load
+          console.warn('[Settings] Database delete blocked, will clear on next load');
+          resolve();
+        };
+      });
+
+      addToast('Geometry cache cleared', 'success');
     } catch {
-      addToast('Failed to clear IndexDB', 'error');
+      addToast('Failed to clear geometry cache', 'error');
     }
   };
 
@@ -114,9 +115,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           variant="secondary"
           size="sm"
           onClick={() => setShowClearIndexDBModal(true)}
-          data-testid="clear-indexdb-button"
+          data-testid="clear-cache-button"
         >
-          Clear IndexDB
+          Clear Geometry Cache
         </Button>
         <Button
           variant="secondary"
@@ -131,10 +132,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       <ConfirmModal
         isOpen={showClearIndexDBModal}
         onClose={() => setShowClearIndexDBModal(false)}
-        onConfirm={handleClearIndexDB}
-        title="Clear IndexDB"
-        message="This will delete all IndexDB databases. This action cannot be undone."
-        confirmText="Clear"
+        onConfirm={handleClearGeometryCache}
+        title="Clear Geometry Cache"
+        message="This will delete all cached polytope geometry. Next loads will regenerate from scratch."
+        confirmText="Clear Cache"
         isDestructive
       />
 

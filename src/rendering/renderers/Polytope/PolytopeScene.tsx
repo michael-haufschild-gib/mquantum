@@ -25,7 +25,6 @@ import {
   Matrix4,
   ShaderMaterial,
   Vector3,
-  Vector4,
 } from 'three';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -39,7 +38,7 @@ import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette';
 import { matrixToGPUUniforms } from '@/rendering/shaders/transforms/ndTransform';
 import {
   blurToPCFSamples,
-  collectShadowDataFromScene,
+  collectShadowDataCached,
   createShadowMapUniforms,
   SHADOW_MAP_SIZES,
   updateShadowMapUniforms,
@@ -51,7 +50,6 @@ import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useLightingStore } from '@/stores/lightingStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
-import { useTransformStore } from '@/stores/transformStore';
 import { TubeWireframe } from '../TubeWireframe';
 import {
   buildEdgeFragmentShader,
@@ -81,14 +79,17 @@ export interface PolytopeSceneProps {
 
 /**
  * Create base uniforms for N-D transformation (shared by all materials)
+ *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
+ *
  * @returns Record of N-D transformation uniforms
  */
 function createNDUniforms(): Record<string, { value: unknown }> {
   return {
     uRotationMatrix4D: { value: new Matrix4() },
     uDimension: { value: 4 },
-    uScale4D: { value: new Vector4(1, 1, 1, 1) },
-    uExtraScales: { value: new Float32Array(MAX_EXTRA_DIMS).fill(1) },
+    uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
     uDepthRowSums: { value: new Float32Array(11) },
     uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
@@ -105,17 +106,21 @@ function createNDUniforms(): Record<string, { value: unknown }> {
  * Update N-D uniforms on a material.
  * Works with both ShaderMaterial (uniforms on material) and
  * MeshPhongMaterial with onBeforeCompile (uniforms in userData).
- * @param material
- * @param gpuData
- * @param dimension
- * @param scales
- * @param projectionDistance
+ *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
+ *
+ * @param material - The material to update
+ * @param gpuData - GPU data from matrixToGPUUniforms
+ * @param dimension - Current dimension
+ * @param uniformScale - Uniform scale factor (applied after projection)
+ * @param projectionDistance - Projection distance for perspective
  */
 function updateNDUniforms(
   material: THREE.Material,
   gpuData: ReturnType<typeof matrixToGPUUniforms>,
   dimension: number,
-  scales: number[],
+  uniformScale: number,
   projectionDistance: number
 ): void {
   // Get uniforms - either from ShaderMaterial directly or from userData for Phong
@@ -133,23 +138,7 @@ function updateNDUniforms(
 
   if (u.uRotationMatrix4D) (u.uRotationMatrix4D.value as Matrix4).copy(gpuData.rotationMatrix4D);
   if (u.uDimension) u.uDimension.value = dimension;
-  if (u.uScale4D) {
-    const s0 = scales[0] ?? 1;
-    const s1 = scales[1] ?? 1;
-    const s2 = scales[2] ?? 1;
-    const s3 = scales[3] ?? 1;
-    if (u.uScale4D.value instanceof Vector4) {
-      u.uScale4D.value.set(s0, s1, s2, s3);
-    } else {
-      u.uScale4D.value = [s0, s1, s2, s3];
-    }
-  }
-  if (u.uExtraScales) {
-    const extraScales = u.uExtraScales.value as Float32Array;
-    for (let i = 0; i < MAX_EXTRA_DIMS; i++) {
-      extraScales[i] = scales[i + 4] ?? 1;
-    }
-  }
+  if (u.uUniformScale) u.uUniformScale.value = uniformScale;
   if (u.uExtraRotationCols) {
     (u.uExtraRotationCols.value as Float32Array).set(gpuData.extraRotationCols);
   }
@@ -184,6 +173,9 @@ function createEdgeMaterial(edgeColor: string, opacity: number): ShaderMaterial 
 /**
  * GLSL code block containing the nD transformation functions for shadow materials.
  * This is injected into MeshDepthMaterial and MeshDistanceMaterial via onBeforeCompile.
+ *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
  */
 const ND_TRANSFORM_GLSL = `
 #define MAX_EXTRA_DIMS 7
@@ -191,8 +183,7 @@ const ND_TRANSFORM_GLSL = `
 // N-D Transformation uniforms
 uniform mat4 uRotationMatrix4D;
 uniform int uDimension;
-uniform vec4 uScale4D;
-uniform float uExtraScales[MAX_EXTRA_DIMS];
+uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28];
 uniform float uDepthRowSums[11];
@@ -209,25 +200,28 @@ in vec4 aExtraDims0_3;
 in vec3 aExtraDims4_6;
 
 vec3 ndTransformVertex(vec3 pos) {
-  float scaledInputs[11];
-  scaledInputs[0] = pos.x * uScale4D.x;
-  scaledInputs[1] = pos.y * uScale4D.y;
-  scaledInputs[2] = pos.z * uScale4D.z;
-  scaledInputs[3] = aExtraDims0_3.x * uScale4D.w;
-  scaledInputs[4] = aExtraDims0_3.y * uExtraScales[0];
-  scaledInputs[5] = aExtraDims0_3.z * uExtraScales[1];
-  scaledInputs[6] = aExtraDims0_3.w * uExtraScales[2];
-  scaledInputs[7] = aExtraDims4_6.x * uExtraScales[3];
-  scaledInputs[8] = aExtraDims4_6.y * uExtraScales[4];
-  scaledInputs[9] = aExtraDims4_6.z * uExtraScales[5];
-  scaledInputs[10] = 0.0;
+  // Build input array from raw (unscaled) coordinates
+  float inputs[11];
+  inputs[0] = pos.x;
+  inputs[1] = pos.y;
+  inputs[2] = pos.z;
+  inputs[3] = aExtraDims0_3.x;
+  inputs[4] = aExtraDims0_3.y;
+  inputs[5] = aExtraDims0_3.z;
+  inputs[6] = aExtraDims0_3.w;
+  inputs[7] = aExtraDims4_6.x;
+  inputs[8] = aExtraDims4_6.y;
+  inputs[9] = aExtraDims4_6.z;
+  inputs[10] = 0.0;
 
-  vec4 scaledPos = vec4(scaledInputs[0], scaledInputs[1], scaledInputs[2], scaledInputs[3]);
-  vec4 rotated = uRotationMatrix4D * scaledPos;
+  // Apply rotation to first 4 dimensions (unscaled)
+  vec4 pos4 = vec4(inputs[0], inputs[1], inputs[2], inputs[3]);
+  vec4 rotated = uRotationMatrix4D * pos4;
 
+  // Add contribution from extra dimensions (5D+)
   for (int i = 0; i < MAX_EXTRA_DIMS; i++) {
     if (i + 5 <= uDimension) {
-      float extraDimValue = scaledInputs[i + 4];
+      float extraDimValue = inputs[i + 4];
       rotated.x += uExtraRotationCols[i * 4 + 0] * extraDimValue;
       rotated.y += uExtraRotationCols[i * 4 + 1] * extraDimValue;
       rotated.z += uExtraRotationCols[i * 4 + 2] * extraDimValue;
@@ -235,22 +229,27 @@ vec3 ndTransformVertex(vec3 pos) {
     }
   }
 
+  // Perspective projection: compute effective depth from higher dimensions
   float effectiveDepth = rotated.w;
   for (int j = 0; j < 11; j++) {
     if (j < uDimension) {
-      effectiveDepth += uDepthRowSums[j] * scaledInputs[j];
+      effectiveDepth += uDepthRowSums[j] * inputs[j];
     }
   }
   // Normalize depth by sqrt(dimension - 3) for consistent visual scale.
   // See transforms/ndTransform.ts for mathematical justification.
   float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - 3))) : 1.0;
   effectiveDepth /= normFactor;
+
+  // Guard against division by zero
   float denom = uProjectionDistance - effectiveDepth;
   if (abs(denom) < 0.0001) denom = denom >= 0.0 ? 0.0001 : -0.0001;
   float factor = 1.0 / denom;
-  vec3 projected = rotated.xyz * factor;
 
-  // Apply vertex modulation
+  // Project to 3D, then apply uniform scale (like camera zoom)
+  vec3 projected = rotated.xyz * factor * uUniformScale;
+
+  // Apply vertex modulation (after scale, on 3D result)
   if (uModAmplitude > 0.001) {
     float extraSum = aExtraDims0_3.x + aExtraDims0_3.y + aExtraDims0_3.z + aExtraDims0_3.w + aExtraDims4_6.x + aExtraDims4_6.y + aExtraDims4_6.z;
     float t = uAnimTime * uModFrequency * 0.1;
@@ -259,8 +258,8 @@ vec3 ndTransformVertex(vec3 pos) {
     float vertexBias = (projected.x * 1.0 + projected.y * 1.618 + projected.z * 2.236) * uModBias;
     float dimensionBias = extraSum * uModBias * 0.5;
     float totalPhase = t + wavePhase + vertexBias + dimensionBias;
-    float scale = 1.0 + sin(totalPhase) * uModAmplitude * 0.05;
-    projected = projected * scale;
+    float modScale = 1.0 + sin(totalPhase) * uModAmplitude * 0.05;
+    projected = projected * modScale;
   }
 
   return projected;
@@ -356,11 +355,17 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   // Cached linear colors - avoid per-frame sRGB->linear conversion
   const colorCacheRef = useRef(createColorCache());
 
+  // DIRTY-FLAG TRACKING: Track store versions to skip unchanged uniform categories
+  const lastPolytopeVersionRef = useRef(-1); // -1 forces full sync on first frame
+  const lastAppearanceVersionRef = useRef(-1);
+  const lastIblVersionRef = useRef(-1);
+  const lastLightingVersionRef = useRef(-1);
+  const prevFaceMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+
   // Performance optimization: Cache store state in refs to avoid getState() calls every frame
   // Note: rotation state is handled by ndTransform hook
   const animationStateRef = useRef(useAnimationStore.getState());
   const extendedObjectStateRef = useRef(useExtendedObjectStore.getState());
-  const transformStateRef = useRef(useTransformStore.getState());
   const appearanceStateRef = useRef(useAppearanceStore.getState());
   const lightingStateRef = useRef(useLightingStore.getState());
   const environmentStateRef = useRef(useEnvironmentStore.getState());
@@ -369,14 +374,12 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   useEffect(() => {
     const unsubAnim = useAnimationStore.subscribe((s) => { animationStateRef.current = s; });
     const unsubExt = useExtendedObjectStore.subscribe((s) => { extendedObjectStateRef.current = s; });
-    const unsubTrans = useTransformStore.subscribe((s) => { transformStateRef.current = s; });
     const unsubApp = useAppearanceStore.subscribe((s) => { appearanceStateRef.current = s; });
     const unsubLight = useLightingStore.subscribe((s) => { lightingStateRef.current = s; });
     const unsubEnv = useEnvironmentStore.subscribe((s) => { environmentStateRef.current = s; });
     return () => {
       unsubAnim();
       unsubExt();
-      unsubTrans();
       unsubApp();
       unsubLight();
       unsubEnv();
@@ -385,9 +388,6 @@ export const PolytopeScene = React.memo(function PolytopeScene({
 
   // Projection distance caching - uses shared hook to avoid O(N) recalculation every frame
   const projDistCache = useProjectionDistanceCache();
-
-  // Cache scales array to avoid per-frame allocation
-  const cachedScalesRef = useRef<number[]>([]);
 
   // Simple callback ref for edge mesh - just assigns layer
   const setEdgeMeshRef = useCallback((lineSegments: THREE.LineSegments | null) => {
@@ -797,9 +797,37 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     // Note: rotation state is handled by ndTransform hook
     const animationState = animationStateRef.current;
     const extendedObjectState = extendedObjectStateRef.current;
-    const transformState = transformStateRef.current;
     const appearanceState = appearanceStateRef.current;
     const lightingState = lightingStateRef.current;
+    const environmentState = environmentStateRef.current;
+
+    // ============================================
+    // DIRTY-FLAG: Material change detection
+    // ============================================
+    const faceMesh = faceMeshRef.current;
+    const currentFaceMaterial = faceMesh?.material as ShaderMaterial | undefined;
+    const faceMaterialChanged = currentFaceMaterial !== prevFaceMaterialRef.current;
+    if (faceMaterialChanged && currentFaceMaterial) {
+      prevFaceMaterialRef.current = currentFaceMaterial;
+      // Force full sync on material change
+      lastPolytopeVersionRef.current = -1;
+      lastAppearanceVersionRef.current = -1;
+      lastIblVersionRef.current = -1;
+      lastLightingVersionRef.current = -1;
+    }
+
+    // ============================================
+    // DIRTY-FLAG: Get versions and check for changes
+    // ============================================
+    const polytopeVersion = extendedObjectState.polytopeVersion;
+    const appearanceVersion = appearanceState.appearanceVersion;
+    const iblVersion = environmentState.iblVersion;
+    const lightingVersion = lightingState.version;
+
+    const polytopeChanged = polytopeVersion !== lastPolytopeVersionRef.current;
+    const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current;
+    const iblChanged = iblVersion !== lastIblVersionRef.current;
+    const lightingChanged = lightingVersion !== lastLightingVersionRef.current;
 
     const isPlaying = animationState.isPlaying;
     const polytopeConfig = extendedObjectState.polytope;
@@ -810,6 +838,9 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     }
     const animTime = animTimeRef.current;
 
+    // ============================================
+    // DIRTY-FLAG: Polytope modulation config (only when polytope settings change)
+    // ============================================
     // Radial breathing modulation - uses facetOffset properties
     // facetOffsetEnabled: on/off, facetOffsetAmplitude: amplitude
     // facetOffsetFrequency: frequency, facetOffsetPhaseSpread: wave, facetOffsetBias: bias
@@ -819,8 +850,14 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     const modWave = polytopeConfig.facetOffsetPhaseSpread;
     const modBias = polytopeConfig.facetOffsetBias;
 
-    // Read current state from cached refs (rotation handled by ndTransform hook)
-    const { uniformScale, perAxisScale } = transformState;
+    // Update polytope version ref after reading config
+    if (polytopeChanged) {
+      lastPolytopeVersionRef.current = polytopeVersion;
+    }
+
+    // Visual scale is read from polytope config (applied post-projection via shader)
+    // Geometry is always unit-scale, this acts like camera zoom
+    const visualScale = polytopeConfig.scale;
 
     const fresnelEnabled = appearanceState.shaderSettings.surface.fresnelEnabled;
     const fresnelIntensity = appearanceState.fresnelIntensity;
@@ -845,23 +882,13 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     const lchChroma = appearanceState.lchChroma;
     const multiSourceWeights = appearanceState.multiSourceWeights;
 
-    // Build transformation data
-    const scales = cachedScalesRef.current;
-    // Resize array if needed (rare)
-    if (scales.length !== dimension) {
-      scales.length = dimension;
-    }
-    // Update values in place
-    for (let i = 0; i < dimension; i++) {
-      scales[i] = perAxisScale[i] ?? uniformScale;
-    }
-
     // Update rotation matrix via shared hook (handles version tracking and lazy evaluation)
-    ndTransform.update({ scales });
+    // Note: Scale is now applied AFTER projection, so we don't pass scales to rotation
+    ndTransform.update({});
     const gpuData = ndTransform.source.getGPUData();
 
-    // Get cached projection distance (recalculates only when vertex count or scales change)
-    const projectionDistance = projDistCache.getProjectionDistance(baseVertices, dimension, scales);
+    // Get projection distance (no longer needs scale adjustment since scale is post-projection)
+    const projectionDistance = projDistCache.getProjectionDistance(baseVertices, dimension, []);
 
 
 
@@ -881,8 +908,8 @@ export const PolytopeScene = React.memo(function PolytopeScene({
         // Skip if material is not ready (still compiling) or not a ShaderMaterial
         if (!material || !('uniforms' in material)) continue;
 
-        // Update N-D transformation uniforms
-        updateNDUniforms(material, gpuData, dimension, scales, projectionDistance);
+        // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
+        updateNDUniforms(material, gpuData, dimension, visualScale, projectionDistance);
 
         // Update vertex modulation uniforms
         const u = material.uniforms;
@@ -895,73 +922,84 @@ export const PolytopeScene = React.memo(function PolytopeScene({
         if (u.uModWave) u.uModWave.value = modWave;
         if (u.uModBias) u.uModBias.value = modBias;
 
-        // Update lighting uniforms (only for materials that have them)
-        // Colors use cached linear conversion for performance
+        // ============================================
+        // DIRTY-FLAG: Only update appearance uniforms when settings change
+        // ============================================
+        if (appearanceChanged) {
+          // Update surface color
+          if (u.uColor) updateLinearColorUniform(colorCache, u.uColor.value as Color, color);
 
-        // Update surface color
-        if (u.uColor) updateLinearColorUniform(colorCache, u.uColor.value as Color, color);
+          // Update opacity uniform (only for face material which has it)
+          // Also update material transparency state dynamically to avoid shader rebuild
+          if (u.uOpacity) {
+            u.uOpacity.value = faceOpacity;
+            // Update material transparency based on opacity (like Mandelbulb)
+            const isTransparent = faceOpacity < 1;
+            if (material.transparent !== isTransparent) {
+              material.transparent = isTransparent;
+              material.depthWrite = !isTransparent;
+              material.needsUpdate = true;
+            }
+          }
 
-        // Update opacity uniform (only for face material which has it)
-        // Also update material transparency state dynamically to avoid shader rebuild
-        if (u.uOpacity) {
-          u.uOpacity.value = faceOpacity;
-          // Update material transparency based on opacity (like Mandelbulb)
-          const isTransparent = faceOpacity < 1;
-          if (material.transparent !== isTransparent) {
-            material.transparent = isTransparent;
-            material.depthWrite = !isTransparent;
-            material.needsUpdate = true;
+          // Note: PBR material properties (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
+          // are applied via UniformManager using 'pbr-face' source
+          if (u.uFresnelEnabled) u.uFresnelEnabled.value = fresnelEnabled;
+          if (u.uFresnelIntensity) u.uFresnelIntensity.value = fresnelIntensity;
+          if (u.uRimColor) updateLinearColorUniform(cache.rimColor, u.uRimColor.value as Color, rimColor);
+
+          // Update rim SSS uniforms (shared with raymarched objects)
+          if (u.uSssEnabled) u.uSssEnabled.value = sssEnabled;
+          if (u.uSssIntensity) u.uSssIntensity.value = sssIntensity;
+          if (u.uSssColor) updateLinearColorUniform(cache.sssColor, u.uSssColor.value as Color, sssColor);
+          if (u.uSssThickness) u.uSssThickness.value = sssThickness;
+          if (u.uSssJitter) u.uSssJitter.value = sssJitter;
+
+          // Update advanced color system uniforms (only for face materials)
+          if (u.uColorAlgorithm) u.uColorAlgorithm.value = COLOR_ALGORITHM_TO_INT[colorAlgorithm];
+          if (u.uCosineA) (u.uCosineA.value as Vector3).set(cosineCoefficients.a[0], cosineCoefficients.a[1], cosineCoefficients.a[2]);
+          if (u.uCosineB) (u.uCosineB.value as Vector3).set(cosineCoefficients.b[0], cosineCoefficients.b[1], cosineCoefficients.b[2]);
+          if (u.uCosineC) (u.uCosineC.value as Vector3).set(cosineCoefficients.c[0], cosineCoefficients.c[1], cosineCoefficients.c[2]);
+          if (u.uCosineD) (u.uCosineD.value as Vector3).set(cosineCoefficients.d[0], cosineCoefficients.d[1], cosineCoefficients.d[2]);
+          if (u.uDistPower) u.uDistPower.value = distribution.power;
+          if (u.uDistCycles) u.uDistCycles.value = distribution.cycles;
+          if (u.uDistOffset) u.uDistOffset.value = distribution.offset;
+          if (u.uLchLightness) u.uLchLightness.value = lchLightness;
+          if (u.uLchChroma) u.uLchChroma.value = lchChroma;
+          if (u.uMultiSourceWeights) (u.uMultiSourceWeights.value as Vector3).set(multiSourceWeights.depth, multiSourceWeights.orbitTrap, multiSourceWeights.normal);
+        }
+
+        // ============================================
+        // DIRTY-FLAG: Only update IBL uniforms when settings change
+        // ============================================
+        if (iblChanged) {
+          // IBL (Image-Based Lighting) uniforms
+          // Compute isPMREM first to gate quality (prevents null texture sampling)
+          const env = scene.environment;
+          const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
+          const iblState = environmentStateRef.current;
+          if (u.uIBLQuality) {
+            const qualityMap = { off: 0, low: 1, high: 2 } as const;
+            // Force IBL off when no valid PMREM texture
+            u.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0;
+          }
+          if (u.uIBLIntensity) u.uIBLIntensity.value = iblState.iblIntensity;
+          if (u.uEnvMap) {
+            u.uEnvMap.value = isPMREM ? env : null;
           }
         }
 
-        // Note: PBR material properties (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
-        // are applied via UniformManager using 'pbr-face' source
-        if (u.uFresnelEnabled) u.uFresnelEnabled.value = fresnelEnabled;
-        if (u.uFresnelIntensity) u.uFresnelIntensity.value = fresnelIntensity;
-        if (u.uRimColor) updateLinearColorUniform(cache.rimColor, u.uRimColor.value as Color, rimColor);
-
-        // Update rim SSS uniforms (shared with raymarched objects)
-        if (u.uSssEnabled) u.uSssEnabled.value = sssEnabled;
-        if (u.uSssIntensity) u.uSssIntensity.value = sssIntensity;
-        if (u.uSssColor) updateLinearColorUniform(cache.sssColor, u.uSssColor.value as Color, sssColor);
-        if (u.uSssThickness) u.uSssThickness.value = sssThickness;
-        if (u.uSssJitter) u.uSssJitter.value = sssJitter;
-
-        // IBL (Image-Based Lighting) uniforms
-        // Compute isPMREM first to gate quality (prevents null texture sampling)
-        const env = scene.environment;
-        const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
-        const iblState = environmentStateRef.current;
-        if (u.uIBLQuality) {
-          const qualityMap = { off: 0, low: 1, high: 2 } as const;
-          // Force IBL off when no valid PMREM texture
-          u.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0;
-        }
-        if (u.uIBLIntensity) u.uIBLIntensity.value = iblState.iblIntensity;
-        if (u.uEnvMap) {
-          u.uEnvMap.value = isPMREM ? env : null;
-        }
-
-        // Update advanced color system uniforms (only for face materials)
-        if (u.uColorAlgorithm) u.uColorAlgorithm.value = COLOR_ALGORITHM_TO_INT[colorAlgorithm];
-        if (u.uCosineA) (u.uCosineA.value as Vector3).set(cosineCoefficients.a[0], cosineCoefficients.a[1], cosineCoefficients.a[2]);
-        if (u.uCosineB) (u.uCosineB.value as Vector3).set(cosineCoefficients.b[0], cosineCoefficients.b[1], cosineCoefficients.b[2]);
-        if (u.uCosineC) (u.uCosineC.value as Vector3).set(cosineCoefficients.c[0], cosineCoefficients.c[1], cosineCoefficients.c[2]);
-        if (u.uCosineD) (u.uCosineD.value as Vector3).set(cosineCoefficients.d[0], cosineCoefficients.d[1], cosineCoefficients.d[2]);
-        if (u.uDistPower) u.uDistPower.value = distribution.power;
-        if (u.uDistCycles) u.uDistCycles.value = distribution.cycles;
-        if (u.uDistOffset) u.uDistOffset.value = distribution.offset;
-        if (u.uLchLightness) u.uLchLightness.value = lchLightness;
-        if (u.uLchChroma) u.uLchChroma.value = lchChroma;
-        if (u.uMultiSourceWeights) (u.uMultiSourceWeights.value as Vector3).set(multiSourceWeights.depth, multiSourceWeights.orbitTrap, multiSourceWeights.normal);
-
-        // Lighting and PBR (via UniformManager)
+        // Lighting and PBR (via UniformManager) - uses internal version tracking
         UniformManager.applyToMaterial(material, ['lighting', 'pbr-face']);
 
-        // Update shadow map uniforms if shadows are enabled
-        // Pass store lights to ensure shadow data ordering matches uniform indices
+        // ============================================
+        // Shadow uniforms - matrices must update every frame, but use cached scene traversal
+        // Note: Shadow matrices are references to Three.js objects that update every frame,
+        // so we must call updateShadowMapUniforms to copy fresh matrix values to GPU uniforms.
+        // The expensive scene traversal is cached by collectShadowDataCached.
+        // ============================================
         if (shadowEnabled) {
-          const shadowData = collectShadowDataFromScene(scene, lightingState.lights);
+          const shadowData = collectShadowDataCached(scene, lightingState.lights);
           const shadowQuality = lightingState.shadowQuality;
           const shadowMapSize = SHADOW_MAP_SIZES[shadowQuality];
           const pcfSamples = blurToPCFSamples(lightingState.shadowMapBlur);
@@ -976,23 +1014,27 @@ export const PolytopeScene = React.memo(function PolytopeScene({
       }
     }
 
+    // Update version refs at end of frame
+    if (appearanceChanged) {
+      lastAppearanceVersionRef.current = appearanceVersion;
+    }
+    if (iblChanged) {
+      lastIblVersionRef.current = iblVersion;
+    }
+    if (lightingChanged) {
+      lastLightingVersionRef.current = lightingVersion;
+    }
+
     // Update shadow material uniforms for animated shadows
     // Patched MeshDepthMaterial and MeshDistanceMaterial share the same shadowUniforms object.
     // Updates to shadowUniforms are automatically reflected in the compiled shaders.
     if (shadowEnabled) {
       const u = shadowUniforms;
 
-      // Update N-D transformation uniforms
+      // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
       (u.uRotationMatrix4D!.value as Matrix4).copy(gpuData.rotationMatrix4D);
       u.uDimension!.value = dimension;
-      const s = u.uScale4D!.value;
-      if (s instanceof Vector4) {
-        s.set(scales[0] ?? 1, scales[1] ?? 1, scales[2] ?? 1, scales[3] ?? 1);
-      }
-      const extraScales = u.uExtraScales!.value as Float32Array;
-      for (let i = 0; i < MAX_EXTRA_DIMS; i++) {
-        extraScales[i] = scales[i + 4] ?? 1;
-      }
+      u.uUniformScale!.value = visualScale;
       (u.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols);
       (u.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums);
       u.uProjectionDistance!.value = projectionDistance;

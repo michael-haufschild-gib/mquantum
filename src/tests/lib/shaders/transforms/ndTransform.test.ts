@@ -250,9 +250,9 @@ describe('ndTransform', () => {
 
       expect(uniforms.rotationMatrix4D).toBeDefined();
       expect(uniforms.uDimension).toBeDefined();
-      expect(uniforms.uScale4D).toBeDefined();
-      expect(uniforms.uExtraScales).toBeDefined();
-      expect(uniforms.uExtraRotationCols).toBeDefined(); // Note: Was renamed from uExtraRotationData
+      // Scale is now applied AFTER projection (like camera zoom)
+      expect(uniforms.uUniformScale).toBeDefined();
+      expect(uniforms.uExtraRotationCols).toBeDefined();
       expect(uniforms.uDepthRowSums).toBeDefined();
       expect(uniforms.uProjectionDistance).toBeDefined();
       expect(uniforms.uColor).toBeDefined();
@@ -264,10 +264,9 @@ describe('ndTransform', () => {
       expect(uniforms.uDimension!.value).toBe(5);
     });
 
-    it('should initialize scales to 1', () => {
+    it('should initialize uniform scale to 1 (applied after projection)', () => {
       const uniforms = createNDTransformUniforms(4);
-      const scale4D = uniforms.uScale4D!.value as number[];
-      expect(scale4D).toEqual([1, 1, 1, 1]);
+      expect(uniforms.uUniformScale!.value).toBe(1.0);
     });
   });
 
@@ -280,15 +279,15 @@ describe('ndTransform', () => {
         uniforms,
         rotationMatrix,
         4,
-        [1, 1, 1, 1],
-        5.0
+        1.0, // uniformScale (applied after projection)
+        5.0  // projectionDistance
       );
 
       expect(uniforms.rotationMatrix4D!.value).toBeInstanceOf(Matrix4);
       expect(uniforms.uDimension!.value).toBe(4);
     });
 
-    it('should update scales correctly', () => {
+    it('should update uniform scale (applied after projection like camera zoom)', () => {
       const uniforms = createNDTransformUniforms(6);
       const rotationMatrix = createIdentityMatrix(6);
 
@@ -296,19 +295,12 @@ describe('ndTransform', () => {
         uniforms,
         rotationMatrix,
         6,
-        [1, 2, 3, 4, 5, 6],
-        5.0
+        2.5, // uniformScale
+        5.0  // projectionDistance
       );
 
-      const scale4D = uniforms.uScale4D!.value as number[];
-      expect(scale4D[0]).toBe(1);
-      expect(scale4D[1]).toBe(2);
-      expect(scale4D[2]).toBe(3);
-      expect(scale4D[3]).toBe(4);
-
-      const extraScales = uniforms.uExtraScales!.value as Float32Array;
-      expect(extraScales[0]).toBe(5);
-      expect(extraScales[1]).toBe(6);
+      // Uniform scale is now a single value applied after projection
+      expect(uniforms.uUniformScale!.value).toBe(2.5);
     });
 
     it('should update projection distance', () => {
@@ -319,8 +311,8 @@ describe('ndTransform', () => {
         uniforms,
         rotationMatrix,
         4,
-        [1, 1, 1, 1],
-        10.0
+        1.0, // uniformScale
+        10.0 // projectionDistance
       );
 
       expect(uniforms.uProjectionDistance!.value).toBe(10.0);

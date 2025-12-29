@@ -34,6 +34,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useSyncedDimension } from '@/hooks/useSyncedDimension';
 import { useToast } from '@/hooks/useToast';
 import { useUrlState } from '@/hooks/useUrlState';
+import { useCachePrewarming } from '@/hooks/useCachePrewarming';
 import type { Vector3D, VectorND } from '@/lib/math/types';
 import { FpsController } from '@/rendering/controllers/FpsController';
 import { PerformanceStatsCollector } from '@/rendering/controllers/PerformanceStatsCollector';
@@ -182,6 +183,9 @@ function useStateRecovery() {
 function AppContent() {
   // Initialize state from URL parameters (must be first)
   useUrlState();
+
+  // Pre-warm geometry cache from IndexedDB (non-blocking)
+  useCachePrewarming();
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts();

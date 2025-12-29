@@ -235,12 +235,15 @@ export function matrixToGPUUniforms(
 /**
  * Generates GLSL code for N-dimensional vertex transformation.
  *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
+ *
  * The shader expects:
  * - position: vec3 (first 3 components)
  * - extraDimensions: float[7] attribute (components 4-11)
  * - rotationMatrix4D: mat4 uniform
  * - extraRotationData: float[] uniform (for dims > 4)
- * - scale: vec4 uniform (first 4 scales) + extraScales for more
+ * - uUniformScale: float uniform (applied after projection)
  *
  * @param maxDimension - Maximum dimension to support (default: 11)
  * @returns GLSL vertex shader code for transformation
@@ -251,12 +254,12 @@ export function generateNDTransformVertexShader(maxDimension: number = MAX_GPU_D
   return `
 // N-Dimensional Transform Vertex Shader
 // Supports dimensions 3 to ${maxDimension}
+// IMPORTANT: Scale is applied AFTER projection (like camera zoom)
 
 // Uniforms
 uniform mat4 uRotationMatrix4D;
 uniform int uDimension;
-uniform vec4 uScale4D;
-uniform float uExtraScales[${extraDims}];
+uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 uniform float uExtraRotationCols[${extraDims * 4}];
 uniform float uDepthRowSums[11];
 
@@ -272,7 +275,7 @@ out vec3 vNormal;
 out float vDepth;
 
 vec4 applyNDRotation(vec3 pos3, float w, float extraDims[${extraDims}]) {
-  // Build full N-dimensional position vector
+  // Build full N-dimensional position vector (unscaled)
   vec4 pos4 = vec4(pos3, w);
 
   // Apply 4x4 rotation to first 4 dimensions
@@ -294,29 +297,20 @@ vec4 applyNDRotation(vec3 pos3, float w, float extraDims[${extraDims}]) {
 }
 
 void main() {
-  // Collect extra dimensions into array
+  // Collect extra dimensions into array (unscaled)
   float extraDims[${extraDims}];
   ${Array.from({ length: extraDims }, (_, i) => `extraDims[${i}] = aExtraDim${i};`).join('\n  ')}
 
-  // Apply scale
-  vec3 scaledPos = position * uScale4D.xyz;
-  float scaledW = aExtraDim0 * uScale4D.w;
-  for (int i = 0; i < ${extraDims}; i++) {
-    if (i + 5 <= uDimension) {
-      extraDims[i] *= uExtraScales[i];
-    }
-  }
-
-  // Apply Rotation
-  vec4 rotatedPos4 = applyNDRotation(scaledPos, scaledW, extraDims);
+  // Apply Rotation (no pre-scaling - scale is applied after projection)
+  vec4 rotatedPos4 = applyNDRotation(position, aExtraDim0, extraDims);
   vec3 rotatedPos = rotatedPos4.xyz;
 
-  // Calculate depth for projection
+  // Calculate depth for projection using unscaled inputs
   float inputs[11];
-  inputs[0] = scaledPos.x;
-  inputs[1] = scaledPos.y;
-  inputs[2] = scaledPos.z;
-  inputs[3] = scaledW;
+  inputs[0] = position.x;
+  inputs[1] = position.y;
+  inputs[2] = position.z;
+  inputs[3] = aExtraDim0;
   for(int i=0; i<${extraDims}; i++) inputs[4+i] = extraDims[i];
 
   // Initialize with W component (4th dimension)
@@ -332,17 +326,19 @@ void main() {
   // Uses max(1.0, ...) to safely handle dimension <= 4 edge cases.
   float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - ${DEPTH_NORMALIZATION_BASE_DIMENSION}))) : 1.0;
   float finalDepth = rotatedDepth / normFactor;
-  float factor = 1.0 / (uProjectionDistance - finalDepth);
 
   // Guard against division by zero
-  if (abs(uProjectionDistance - finalDepth) < 0.0001) factor = 1.0;
+  float denom = uProjectionDistance - finalDepth;
+  if (abs(denom) < 0.0001) denom = denom >= 0.0 ? 0.0001 : -0.0001;
+  float factor = 1.0 / denom;
 
-  vec3 projectedPos = rotatedPos * factor;
+  // Project to 3D, then apply uniform scale (like camera zoom)
+  vec3 projectedPos = rotatedPos * factor * uUniformScale;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(projectedPos, 1.0);
 
   // Pass depth for simple shading
-  vDepth = (scaledW + extraDims[0]) * 0.5 + 0.5;
+  vDepth = (aExtraDim0 + extraDims[0]) * 0.5 + 0.5;
 }
 `
 }
@@ -377,6 +373,9 @@ void main() {
 /**
  * Creates uniforms object for N-dimensional transform shader.
  *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
+ *
  * @param dimension - Current dimension
  * @returns Three.js uniforms object
  */
@@ -386,8 +385,7 @@ export function createNDTransformUniforms(dimension: number): Record<string, { v
   return {
     rotationMatrix4D: { value: new Matrix4() },
     uDimension: { value: dimension },
-    uScale4D: { value: [1, 1, 1, 1] },
-    uExtraScales: { value: new Float32Array(extraDims).fill(1) },
+    uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(extraDims * 4).fill(0) },
     uDepthRowSums: { value: new Float32Array(MAX_GPU_DIMENSION).fill(0) },
     uProjectionDistance: { value: 5.0 },
@@ -399,17 +397,20 @@ export function createNDTransformUniforms(dimension: number): Record<string, { v
 /**
  * Updates N-dimensional transform uniforms with current state.
  *
+ * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+ * This preserves N-D geometry and prevents extreme values during rotation.
+ *
  * @param uniforms - Uniforms object to update
  * @param rotationMatrix - Composed rotation matrix
  * @param dimension - Current dimension
- * @param scales - Per-axis scales
+ * @param uniformScale - Uniform scale (applied after projection)
  * @param projectionDistance - Projection distance
  */
 export function updateNDTransformUniforms(
   uniforms: Record<string, { value: unknown }>,
   rotationMatrix: MatrixND,
   dimension: number,
-  scales: number[],
+  uniformScale: number,
   projectionDistance: number
 ): void {
   // Note: This still creates garbage if not passed a target.
@@ -422,15 +423,5 @@ export function updateNDTransformUniforms(
   uniforms.uExtraRotationCols!.value = gpuData.extraRotationCols
   uniforms.uDepthRowSums!.value = gpuData.depthRowSums
   uniforms.uProjectionDistance!.value = projectionDistance
-
-  // Update scales
-  const scale4D = uniforms.uScale4D!.value as number[]
-  for (let i = 0; i < 4; i++) {
-    scale4D[i] = scales[i] ?? 1
-  }
-
-  const extraScales = uniforms.uExtraScales!.value as Float32Array
-  for (let i = 0; i < EXTRA_DIMS_SIZE; i++) {
-    extraScales[i] = scales[i + 4] ?? 1
-  }
+  uniforms.uUniformScale!.value = uniformScale
 }

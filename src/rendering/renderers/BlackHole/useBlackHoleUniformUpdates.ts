@@ -279,16 +279,6 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       ;(u.uProjectionMatrix.value as THREE.Matrix4).copy(camera.projectionMatrix)
     }
 
-    // Update matrices from mesh transform (handles position/rotation/scale)
-    // CRITICAL: Ensure matrixWorld is up-to-date before copying to avoid 1-frame lag
-    meshRef.current.updateMatrixWorld()
-    if (u.uModelMatrix?.value) {
-      ;(u.uModelMatrix.value as THREE.Matrix4).copy(meshRef.current.matrixWorld)
-    }
-    if (u.uInverseModelMatrix?.value) {
-      ;(u.uInverseModelMatrix.value as THREE.Matrix4).copy(meshRef.current.matrixWorld).invert()
-    }
-
     // Get current state from stores
     const animState = useAnimationStore.getState()
 
@@ -309,6 +299,19 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     const gravityChanged = gravityVersion !== lastGravityVersionRef.current
     const rotationChanged = rotationVersion !== lastRotationVersionRef.current
     const dimensionChanged = dimension !== lastDimensionRef.current
+
+    // Update matrices from mesh transform (handles position/rotation/scale)
+    // Only call expensive updateMatrixWorld when mesh might have moved
+    // (materialChanged already resets version refs to -1, triggering bhChanged)
+    if (bhChanged || dimensionChanged || materialChanged) {
+      meshRef.current.updateMatrixWorld()
+      if (u.uModelMatrix?.value) {
+        ;(u.uModelMatrix.value as THREE.Matrix4).copy(meshRef.current.matrixWorld)
+      }
+      if (u.uInverseModelMatrix?.value) {
+        ;(u.uInverseModelMatrix.value as THREE.Matrix4).copy(meshRef.current.matrixWorld).invert()
+      }
+    }
 
     // Calculate actual black hole visual radius for accurate coverage estimation
     // The visual extent is farRadius * horizonRadius (scale is always 1.0 now)

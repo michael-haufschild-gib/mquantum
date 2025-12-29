@@ -70,24 +70,35 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
     return undefined;
   }, [accent, mode]);
 
-  // Spotlight Effect
+  // Spotlight Effect - optimized to avoid RAF cancel/reschedule thrashing
   useEffect(() => {
-    let rafId: number;
+    let rafId: number | null = null;
+    let lastX = 0;
+    let lastY = 0;
+
     const handleMouseMove = (e: MouseEvent) => {
+      // Always capture latest position (cheap)
+      lastX = e.clientX;
+      lastY = e.clientY;
+
+      // Only queue RAF if not already pending
+      if (rafId !== null) return;
+
+      rafId = requestAnimationFrame(() => {
         if (spotlightRef.current) {
-            cancelAnimationFrame(rafId);
-            rafId = requestAnimationFrame(() => {
-                if (spotlightRef.current) {
-                    spotlightRef.current.style.setProperty('--mouse-x', `${e.clientX}px`);
-                    spotlightRef.current.style.setProperty('--mouse-y', `${e.clientY}px`);
-                }
-            });
+          spotlightRef.current.style.setProperty('--mouse-x', `${lastX}px`);
+          spotlightRef.current.style.setProperty('--mouse-y', `${lastY}px`);
         }
+        rafId = null;
+      });
     };
+
     window.addEventListener('mousemove', handleMouseMove);
     return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleMouseMove);
+      if (rafId !== null) {
         cancelAnimationFrame(rafId);
+      }
     };
   }, []);
 

@@ -325,19 +325,22 @@ const MandelbulbMesh = () => {
 
       // ============================================
       // DIRTY-FLAG: Only update mandelbulb uniforms when settings change
+      // CRITICAL: Read values from extendedState (fresh) NOT from closure captures (stale)
       // ============================================
       if (mandelbulbChanged) {
+        const mbConfig = extendedState.mandelbulb;
+
         // Update Mandelbulb parameters
         if (material.uniforms.uIterations) {
-          material.uniforms.uIterations.value = maxIterations;
+          material.uniforms.uIterations.value = mbConfig.maxIterations;
         }
         if (material.uniforms.uEscapeRadius) {
-          material.uniforms.uEscapeRadius.value = escapeRadius;
+          material.uniforms.uEscapeRadius.value = mbConfig.escapeRadius;
         }
 
         // Power (static value - animation is handled separately)
-        if (!powerAnimationEnabled && material.uniforms.uPower) {
-          material.uniforms.uPower.value = mandelbulbPower;
+        if (!mbConfig.powerAnimationEnabled && material.uniforms.uPower) {
+          material.uniforms.uPower.value = mbConfig.mandelbulbPower;
         }
 
         // Disable the separate animation uniform system (not needed anymore)
@@ -347,21 +350,21 @@ const MandelbulbMesh = () => {
 
         // Alternate Power (Technique B): blend between primary and alternate powers
         if (material.uniforms.uAlternatePowerEnabled) {
-          material.uniforms.uAlternatePowerEnabled.value = alternatePowerEnabled;
+          material.uniforms.uAlternatePowerEnabled.value = mbConfig.alternatePowerEnabled;
         }
         if (material.uniforms.uAlternatePowerValue) {
-          material.uniforms.uAlternatePowerValue.value = alternatePowerValue;
+          material.uniforms.uAlternatePowerValue.value = mbConfig.alternatePowerValue;
         }
         if (material.uniforms.uAlternatePowerBlend) {
-          material.uniforms.uAlternatePowerBlend.value = alternatePowerBlend;
+          material.uniforms.uAlternatePowerBlend.value = mbConfig.alternatePowerBlend;
         }
 
         // Dimension Mixing (Technique A): update uniforms for shader-side mixing matrix
         if (material.uniforms.uDimensionMixEnabled) {
-          material.uniforms.uDimensionMixEnabled.value = dimensionMixEnabled;
+          material.uniforms.uDimensionMixEnabled.value = mbConfig.dimensionMixEnabled;
         }
         if (material.uniforms.uMixIntensity) {
-          material.uniforms.uMixIntensity.value = mixIntensity;
+          material.uniforms.uMixIntensity.value = mbConfig.mixIntensity;
         }
 
         // Update version ref

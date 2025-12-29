@@ -330,14 +330,27 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   }, [isOpen, align]);
 
   useLayoutEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => updatePosition());
-      window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true);
-    }
+    if (!isOpen) return;
+
+    // Throttle scroll/resize handlers with RAF to avoid layout thrashing
+    let rafId: number | null = null;
+
+    const throttledUpdate = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        updatePosition();
+        rafId = null;
+      });
+    };
+
+    requestAnimationFrame(() => updatePosition());
+    window.addEventListener('resize', throttledUpdate);
+    window.addEventListener('scroll', throttledUpdate, true);
+
     return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', throttledUpdate);
+      window.removeEventListener('scroll', throttledUpdate, true);
     };
   }, [isOpen, updatePosition]);
 

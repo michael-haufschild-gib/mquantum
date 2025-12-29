@@ -2,6 +2,9 @@ import { expect, afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 
+// Polyfill IndexedDB for happy-dom test environment
+import 'fake-indexeddb/auto'
+
 // Note: mdimension-core WASM module is mocked via alias in vitest.config.ts
 // The alias points to src/tests/__mocks__/mdimension-core.ts
 

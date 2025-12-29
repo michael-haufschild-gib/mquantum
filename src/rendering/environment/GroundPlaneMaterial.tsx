@@ -9,7 +9,7 @@ import { createColorCache, updateLinearColorUniform } from '@/rendering/colors/l
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
 import {
   blurToPCFSamples,
-  collectShadowDataFromScene,
+  collectShadowDataCached,
   createShadowMapUniforms,
   SHADOW_MAP_SIZES,
   updateShadowMapUniforms,
@@ -169,9 +169,9 @@ export const GroundPlaneMaterial = forwardRef<THREE.ShaderMaterial, GroundPlaneM
       // Update multi-light system and PBR
       UniformManager.applyToMaterial(material, ['lighting', 'pbr-ground'])
 
-      // Update shadow maps (scene-dependent, always update)
+      // Update shadow maps - matrices must update every frame, but use cached scene traversal
       if (shadowEnabled && lightingState.shadowEnabled) {
-        const shadowData = collectShadowDataFromScene(scene, lightingState.lights)
+        const shadowData = collectShadowDataCached(scene, lightingState.lights)
         const shadowQuality = lightingState.shadowQuality
         const shadowMapSize = SHADOW_MAP_SIZES[shadowQuality]
         const pcfSamples = blurToPCFSamples(lightingState.shadowMapBlur)

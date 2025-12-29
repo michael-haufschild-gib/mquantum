@@ -1,6 +1,9 @@
 // ============================================
 // TubeWireframe Vertex Shader
 // N-dimensional tube rendering with instanced cylinders
+//
+// IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
+// This preserves N-D geometry and prevents extreme values during rotation.
 // ============================================
 
 export const vertexBlock = `
@@ -19,9 +22,8 @@ in vec4 instanceEndExtraB;
 // N-D Transformation uniforms
 uniform mat4 uRotationMatrix4D;
 uniform int uDimension;
-uniform vec4 uScale4D;
+uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 #define MAX_EXTRA_DIMS 7
-uniform float uExtraScales[MAX_EXTRA_DIMS];
 uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28]; // MAX_EXTRA_DIMS * 4
 uniform float uDepthRowSums[11];
@@ -35,27 +37,30 @@ out vec3 vWorldPosition;
 out vec3 vViewDirection;
 
 // Transform an N-dimensional point through rotation and projection
+// IMPORTANT: Scale is applied AFTER projection, not before rotation.
 vec3 transformNDPoint(vec3 pos, vec4 extraA, vec4 extraB) {
-  // Unpack: extraA = (W, Extra0, Extra1, Extra2), extraB = (Extra3, Extra4, Extra5, Extra6)
-  float scaledInputs[11];
-  scaledInputs[0] = pos.x * uScale4D.x;
-  scaledInputs[1] = pos.y * uScale4D.y;
-  scaledInputs[2] = pos.z * uScale4D.z;
-  scaledInputs[3] = extraA.x * uScale4D.w; // W
-  scaledInputs[4] = extraA.y * uExtraScales[0]; // Extra0
-  scaledInputs[5] = extraA.z * uExtraScales[1]; // Extra1
-  scaledInputs[6] = extraA.w * uExtraScales[2]; // Extra2
-  scaledInputs[7] = extraB.x * uExtraScales[3]; // Extra3
-  scaledInputs[8] = extraB.y * uExtraScales[4]; // Extra4
-  scaledInputs[9] = extraB.z * uExtraScales[5]; // Extra5
-  scaledInputs[10] = extraB.w * uExtraScales[6]; // Extra6
+  // Build input array from raw (unscaled) coordinates
+  float inputs[11];
+  inputs[0] = pos.x;
+  inputs[1] = pos.y;
+  inputs[2] = pos.z;
+  inputs[3] = extraA.x; // W
+  inputs[4] = extraA.y; // Extra0
+  inputs[5] = extraA.z; // Extra1
+  inputs[6] = extraA.w; // Extra2
+  inputs[7] = extraB.x; // Extra3
+  inputs[8] = extraB.y; // Extra4
+  inputs[9] = extraB.z; // Extra5
+  inputs[10] = extraB.w; // Extra6
 
-  vec4 scaledPos = vec4(scaledInputs[0], scaledInputs[1], scaledInputs[2], scaledInputs[3]);
-  vec4 rotated = uRotationMatrix4D * scaledPos;
+  // Apply rotation to first 4 dimensions (unscaled)
+  vec4 pos4 = vec4(inputs[0], inputs[1], inputs[2], inputs[3]);
+  vec4 rotated = uRotationMatrix4D * pos4;
 
+  // Add contribution from extra dimensions (5D+)
   for (int i = 0; i < MAX_EXTRA_DIMS; i++) {
     if (i + 5 <= uDimension) {
-      float extraDimValue = scaledInputs[i + 4];
+      float extraDimValue = inputs[i + 4];
       rotated.x += uExtraRotationCols[i * 4 + 0] * extraDimValue;
       rotated.y += uExtraRotationCols[i * 4 + 1] * extraDimValue;
       rotated.z += uExtraRotationCols[i * 4 + 2] * extraDimValue;
@@ -63,11 +68,11 @@ vec3 transformNDPoint(vec3 pos, vec4 extraA, vec4 extraB) {
     }
   }
 
-  // Perspective projection: apply depth-based scaling from higher dimensions
+  // Perspective projection: compute effective depth from higher dimensions
   float effectiveDepth = rotated.w;
   for (int j = 0; j < 11; j++) {
     if (j < uDimension) {
-      effectiveDepth += uDepthRowSums[j] * scaledInputs[j];
+      effectiveDepth += uDepthRowSums[j] * inputs[j];
     }
   }
   // Normalize depth by sqrt(dimension - 3) for consistent visual scale across dimensions.
@@ -75,10 +80,13 @@ vec3 transformNDPoint(vec3 pos, vec4 extraA, vec4 extraB) {
   // See src/rendering/shaders/transforms/ndTransform.ts for mathematical justification.
   float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - 3))) : 1.0;
   effectiveDepth /= normFactor;
-  // Add safety check for perspective denominator
+
+  // Guard against division by zero
   float denominator = uProjectionDistance - effectiveDepth;
   float factor = 1.0 / max(denominator, 0.0001);
-  vec3 projected = rotated.xyz * factor;
+
+  // Project to 3D, then apply uniform scale (like camera zoom)
+  vec3 projected = rotated.xyz * factor * uUniformScale;
 
   return projected;
 }

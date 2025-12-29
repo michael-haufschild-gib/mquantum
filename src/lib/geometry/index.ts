@@ -162,31 +162,34 @@ import { isPolytopeType } from './types'
 /**
  * Generates a polytope of the specified type and dimension
  *
+ * IMPORTANT: All polytopes are generated at UNIT SCALE (±1.0).
+ * Visual scaling is applied post-projection via the uUniformScale shader uniform.
+ * This prevents extreme vertex values during rotation animation.
+ *
  * @param type - Type of polytope to generate
  * @param dimension - Dimensionality (must be >= 3)
- * @param scale - Scale factor for the polytope (default: 1.0)
- * @param wythoffConfig
- * @returns PolytopeGeometry representing the polytope
+ * @param _scale - DEPRECATED: Scale is ignored. Visual scale is applied via shader.
+ * @param wythoffConfig - Configuration for Wythoff polytopes
+ * @returns PolytopeGeometry at unit scale
  * @throws {Error} If dimension is less than 3 or type is invalid
  */
 export function generatePolytope(
   type: PolytopeType,
   dimension: number,
-  scale = 1.0,
+  _scale = 1.0,
   wythoffConfig?: ExtendedObjectParams['wythoffPolytope']
 ): PolytopeGeometry {
+  void _scale // Scale is now applied post-projection via shader uniform
+
   switch (type) {
     case 'hypercube':
-      return generateHypercube(dimension, scale)
+      return generateHypercube(dimension)
     case 'simplex':
-      return generateSimplex(dimension, scale)
+      return generateSimplex(dimension)
     case 'cross-polytope':
-      return generateCrossPolytope(dimension, scale)
+      return generateCrossPolytope(dimension)
     case 'wythoff-polytope':
-      return generateWythoffPolytope(dimension, {
-        ...wythoffConfig,
-        scale,
-      })
+      return generateWythoffPolytope(dimension, wythoffConfig)
     default:
       throw new Error(`Unknown polytope type: ${type}`)
   }
@@ -199,25 +202,24 @@ export function generatePolytope(
  * consistent parameter handling. Both polytopes and extended objects
  * can be configured through the params object.
  *
+ * IMPORTANT: Polytopes are always generated at UNIT SCALE (±1.0).
+ * The scale property in params.polytope is stored in metadata for use
+ * by the renderer's uUniformScale shader uniform (post-projection visual scale).
+ *
  * @param type - Object type to generate
  * @param dimension - Dimensionality of the ambient space
  * @param params - Parameters for all object types (optional, uses defaults)
- * @returns NdGeometry representing the object
+ * @returns NdGeometry at unit scale (visual scale stored in metadata.properties.scale)
  * @throws {Error} If type is invalid or dimension constraints are violated
  *
  * @example
  * ```typescript
- * // Generate a hypercube with custom scale
+ * // Generate a hypercube - geometry is unit-scale, visual scale stored in metadata
  * const cube = generateGeometry('hypercube', 4, {
  *   ...DEFAULT_EXTENDED_OBJECT_PARAMS,
- *   polytope: { scale: 1.5 },
+ *   polytope: { scale: 1.5 }, // Visual scale, applied via shader
  * });
- *
- * // Generate a root system
- * const roots = generateGeometry('root-system', 4, {
- *   ...DEFAULT_EXTENDED_OBJECT_PARAMS,
- *   rootSystem: { rootType: 'D', scale: 2.0 },
- * });
+ * // cube.metadata.properties.scale = 1.5 (for shader uniform)
  * ```
  */
 export function generateGeometry(

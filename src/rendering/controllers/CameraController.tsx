@@ -161,9 +161,11 @@ export function CameraController({
   }, [isDraggingLight])
 
   // Update controls every frame (required for damping and auto-rotate)
+  // Skip update() when neither damping nor auto-rotate is enabled
   useFrame((state) => {
-    if (controlsRef.current) {
-      controlsRef.current.update()
+    const controls = controlsRef.current
+    if (controls && (controls.enableDamping || controls.autoRotate)) {
+      controls.update()
     }
     // DEBUG: Log camera state occasionally (development only)
     if (import.meta.env.DEV && state.clock.elapsedTime > 1.0 && state.clock.elapsedTime < 1.1) {

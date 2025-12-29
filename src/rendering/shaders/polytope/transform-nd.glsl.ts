@@ -8,6 +8,11 @@ import { DEPTH_NORMALIZATION_BASE_DIMENSION } from '../transforms/ndTransform'
  * and transformNDFromInputs() that can transform any vertex given its coordinates.
  * This enables computing face normals from all 3 triangle vertices in the vertex shader.
  *
+ * IMPORTANT: Scale is applied AFTER projection to 3D, not before rotation.
+ * This ensures scale acts like camera zoom and doesn't distort N-D geometry.
+ * During rotation animation, this prevents extreme vertex values that would occur
+ * if scaled coordinates rotated into depth dimensions.
+ *
  * IMPORTANT: WebGL has a 16 attribute slot limit. We pack extra dimensions into vec4/vec3
  * to stay within limits:
  *   - position (vec3) = 1 slot
@@ -29,8 +34,7 @@ export const transformNDBlock = `
     // N-D Transformation uniforms
     uniform mat4 uRotationMatrix4D;
     uniform int uDimension;
-    uniform vec4 uScale4D;
-    uniform float uExtraScales[${MAX_EXTRA_DIMS}];
+    uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
     uniform float uProjectionDistance;
     uniform float uExtraRotationCols[${MAX_EXTRA_DIMS * 4}];
     uniform float uDepthRowSums[11];
@@ -52,27 +56,33 @@ export const transformNDBlock = `
     /**
      * Transform an N-D vertex to 3D given explicit coordinates.
      * Used for transforming neighbor vertices for normal computation.
+     *
+     * IMPORTANT: Scale is applied AFTER projection, not before rotation.
+     * This preserves N-D geometry and prevents extreme values during rotation.
      */
     vec3 transformNDFromInputs(vec3 pos3d, float e0, float e1, float e2, float e3, float e4, float e5, float e6) {
-      float scaledInputs[11];
-      scaledInputs[0] = pos3d.x * uScale4D.x;
-      scaledInputs[1] = pos3d.y * uScale4D.y;
-      scaledInputs[2] = pos3d.z * uScale4D.z;
-      scaledInputs[3] = e0 * uScale4D.w;
-      scaledInputs[4] = e1 * uExtraScales[0];
-      scaledInputs[5] = e2 * uExtraScales[1];
-      scaledInputs[6] = e3 * uExtraScales[2];
-      scaledInputs[7] = e4 * uExtraScales[3];
-      scaledInputs[8] = e5 * uExtraScales[4];
-      scaledInputs[9] = e6 * uExtraScales[5];
-      scaledInputs[10] = 0.0;
+      // Build input array from raw (unscaled) coordinates
+      float inputs[11];
+      inputs[0] = pos3d.x;
+      inputs[1] = pos3d.y;
+      inputs[2] = pos3d.z;
+      inputs[3] = e0;
+      inputs[4] = e1;
+      inputs[5] = e2;
+      inputs[6] = e3;
+      inputs[7] = e4;
+      inputs[8] = e5;
+      inputs[9] = e6;
+      inputs[10] = 0.0;
 
-      vec4 scaledPos = vec4(scaledInputs[0], scaledInputs[1], scaledInputs[2], scaledInputs[3]);
-      vec4 rotated = uRotationMatrix4D * scaledPos;
+      // Apply rotation to first 4 dimensions (unscaled)
+      vec4 pos4 = vec4(inputs[0], inputs[1], inputs[2], inputs[3]);
+      vec4 rotated = uRotationMatrix4D * pos4;
 
+      // Add contribution from extra dimensions (5D+)
       for (int i = 0; i < ${MAX_EXTRA_DIMS}; i++) {
         if (i + 5 <= uDimension) {
-          float extraDimValue = scaledInputs[i + 4];
+          float extraDimValue = inputs[i + 4];
           rotated.x += uExtraRotationCols[i * 4 + 0] * extraDimValue;
           rotated.y += uExtraRotationCols[i * 4 + 1] * extraDimValue;
           rotated.z += uExtraRotationCols[i * 4 + 2] * extraDimValue;
@@ -80,23 +90,26 @@ export const transformNDBlock = `
         }
       }
 
-      // Perspective projection: apply depth-based scaling from higher dimensions
+      // Perspective projection: compute effective depth from higher dimensions
       float effectiveDepth = rotated.w;
       for (int j = 0; j < 11; j++) {
         if (j < uDimension) {
-          effectiveDepth += uDepthRowSums[j] * scaledInputs[j];
+          effectiveDepth += uDepthRowSums[j] * inputs[j];
         }
       }
       // Normalize depth by sqrt(dimension - 3) for consistent visual scale across dimensions.
       // See ndTransform.ts module documentation for mathematical justification.
       float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - ${DEPTH_NORMALIZATION_BASE_DIMENSION}))) : 1.0;
       effectiveDepth /= normFactor;
+
       // Guard against division by zero when effectiveDepth approaches projectionDistance
       float denom = uProjectionDistance - effectiveDepth;
       // Clamp denominator away from zero (preserve sign for correct projection direction)
       if (abs(denom) < 0.0001) denom = denom >= 0.0 ? 0.0001 : -0.0001;
       float factor = 1.0 / denom;
-      vec3 projected = rotated.xyz * factor;
+
+      // Project to 3D, then apply uniform scale (like camera zoom)
+      vec3 projected = rotated.xyz * factor * uUniformScale;
 
       return projected;
     }
