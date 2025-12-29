@@ -3,13 +3,12 @@
  * Allows users to select the number of dimensions (3D, 4D, 5D, 6D)
  */
 
-import { ToggleGroup } from '@/components/ui/ToggleGroup';
 import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
+import { ToggleGroup } from '@/components/ui/ToggleGroup';
 import { MAX_DIMENSION, MIN_DIMENSION, useGeometryStore, type GeometryState } from '@/stores/geometryStore';
 import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { Icon } from '@/components/ui/Icon';
-import { soundManager } from '@/lib/audio/SoundManager';
 
 export interface DimensionSelectorProps {
   className?: string;

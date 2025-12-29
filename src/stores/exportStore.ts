@@ -445,12 +445,13 @@ export const useExportStore = create<ExportStore>()(
           if (state.previewUrl) {
             URL.revokeObjectURL(state.previewUrl)
           }
+          // Note: previewImage is NOT cleared here - it should persist while modal is open
+          // Clear it explicitly via setPreviewImage(null) when the modal closes
           return {
             isExporting: false,
             status: 'idle',
             progress: 0,
             previewUrl: null,
-            previewImage: null,
             eta: null,
             error: null,
             // We don't reset settings as they are persisted

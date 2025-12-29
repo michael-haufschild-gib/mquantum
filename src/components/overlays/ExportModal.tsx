@@ -27,6 +27,7 @@ const exportModalSelector = (state: ReturnType<typeof useExportStore.getState>) 
   previewUrl: state.previewUrl,
   eta: state.eta,
   reset: state.reset,
+  setPreviewImage: state.setPreviewImage,
   estimatedSizeMB: state.estimatedSizeMB,
   exportTier: state.exportTier,
   exportMode: state.exportMode,
@@ -48,6 +49,7 @@ export const ExportModal = () => {
     previewUrl,
     eta,
     reset,
+    setPreviewImage,
     estimatedSizeMB,
     exportTier,
     exportMode,
@@ -81,6 +83,7 @@ export const ExportModal = () => {
   const closeModal = () => {
     setModalOpen(false)
     reset()
+    setPreviewImage(null) // Clear preview only when modal actually closes
     setActiveTab('presets')
   }
 
