@@ -6,7 +6,6 @@ import { constantsBlock } from '../shared/core/constants.glsl'
 import { precisionBlock } from '../shared/core/precision.glsl'
 import { uniformsBlock } from '../shared/core/uniforms.glsl'
 import { aoBlock } from '../shared/features/ao.glsl'
-import { opacityBlock } from '../shared/features/opacity.glsl'
 import { shadowsBlock } from '../shared/features/shadows.glsl'
 import { temporalBlock } from '../shared/features/temporal.glsl'
 import {
@@ -72,7 +71,6 @@ export function composeJuliaShader(config: ShaderConfig) {
     { name: 'Ambient Occlusion', content: aoBlock, condition: enableAO },
     { name: 'Shadows', content: shadowsBlock, condition: enableShadows },
     { name: 'Multi-Light System', content: multiLightBlock },
-    { name: 'Opacity System', content: opacityBlock },
     { name: 'Main', content: mainBlock },
   ]
 

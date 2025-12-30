@@ -1,7 +1,7 @@
 import { computeDriftedOrigin, type OriginDriftConfig } from '@/lib/animation/originDrift';
 import { createColorCache, updateLinearColorUniform } from '@/rendering/colors/linearCache';
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities';
-import { useTemporalDepth } from '@/rendering/core/temporalDepth';
+import { useTemporalDepthUniforms } from '@/rendering/core/useTemporalDepthUniforms';
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial';
 import {
     MAX_DIMENSION,
@@ -40,10 +40,10 @@ import vertexShader from './mandelbulb.vert?raw';
  */
 const MandelbulbMesh = () => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const { size, camera } = useThree();
+  const { size, camera, viewport } = useThree();
 
-  // Get temporal depth state from context for temporal reprojection
-  const temporalDepth = useTemporalDepth();
+  // Get temporal depth uniforms getter from render graph store
+  const getTemporalUniforms = useTemporalDepthUniforms();
 
   // Use shared quality tracking hook (replaces manual fast mode management)
   const { qualityMultiplier, rotationsChanged } = useQualityTracking();
@@ -210,11 +210,9 @@ const MandelbulbMesh = () => {
       // Ambient Occlusion uniforms
       uAoEnabled: { value: true },
 
-      // Temporal Reprojection - Texture must be manually handled as it comes from context
-      uPrevDepthTexture: { value: null },
-      // Conservative safety margin for Mandelbulb - surface moves during power/slice/drift animations
-      // 0.5 = start raymarching at 50% of previous depth (handles up to 50% surface movement)
-      uTemporalSafetyMargin: { value: 0.5 },
+      // Temporal Reprojection - Textures must be manually handled as they come from context
+      uPrevDepthTexture: { value: null },      // Legacy: kept for compatibility
+      uPrevPositionTexture: { value: null },   // Position buffer: xyz=world pos, w=model-space ray distance
 
       // IBL (Image-Based Lighting) uniforms - PMREM texture (sampler2D)
       uEnvMap: { value: null },
@@ -311,7 +309,15 @@ const MandelbulbMesh = () => {
       // Update time and resolution
       // Use accumulatedTime which respects pause state and is synced globally
       if (material.uniforms.uTime) material.uniforms.uTime.value = accumulatedTime;
-      if (material.uniforms.uResolution) material.uniforms.uResolution.value.set(size.width, size.height);
+      // CRITICAL: Use DPR-scaled resolution for raymarching
+      // The MRT targets are at native resolution (CSS × DPR), so the shader's
+      // gl_FragCoord.xy / uResolution.xy calculation must match.
+      // Without DPR scaling, fragments beyond CSS resolution get UV > 1.0 and miss the object.
+      const dpr = viewport.dpr;
+      if (material.uniforms.uResolution) material.uniforms.uResolution.value.set(
+        Math.floor(size.width * dpr),
+        Math.floor(size.height * dpr)
+      );
       if (material.uniforms.uCameraPosition) material.uniforms.uCameraPosition.value.copy(camera.position);
 
       // Update dimension
@@ -390,24 +396,39 @@ const MandelbulbMesh = () => {
       if (material.uniforms.uProjectionMatrix) material.uniforms.uProjectionMatrix.value.copy(camera.projectionMatrix);
       if (material.uniforms.uViewMatrix) material.uniforms.uViewMatrix.value.copy(camera.matrixWorldInverse);
 
-      // Update temporal reprojection uniforms
-      // uPrevDepthTexture comes from context and must be set manually
-      // Matrices and enabled state are handled by UniformManager (TemporalSource)
-      const temporalUniforms = temporalDepth.getUniforms();
-      if (material.uniforms.uPrevDepthTexture) {
-        material.uniforms.uPrevDepthTexture.value = temporalUniforms.uPrevDepthTexture;
+      // Update temporal reprojection uniforms from TemporalDepthCapturePass
+      // CRITICAL: Apply ALL temporal uniforms from the pass to ensure consistency.
+      // The pass tracks hasValidHistory and synchronizes matrices with the depth texture.
+      // Using TemporalSource (UniformManager) would provide unsynchronized matrices.
+      const temporalUniforms = getTemporalUniforms();
+      if (temporalUniforms) {
+        // Legacy depth texture (for compatibility)
+        if (material.uniforms.uPrevDepthTexture) {
+          material.uniforms.uPrevDepthTexture.value = temporalUniforms.uPrevDepthTexture;
+        }
+        // Position texture (xyz=world pos, w=model-space ray distance)
+        if (material.uniforms.uPrevPositionTexture) {
+          material.uniforms.uPrevPositionTexture.value = temporalUniforms.uPrevPositionTexture;
+        }
+        if (material.uniforms.uTemporalEnabled) {
+          material.uniforms.uTemporalEnabled.value = temporalUniforms.uTemporalEnabled;
+        }
+        if (material.uniforms.uPrevViewProjectionMatrix) {
+          material.uniforms.uPrevViewProjectionMatrix.value.copy(temporalUniforms.uPrevViewProjectionMatrix);
+        }
+        if (material.uniforms.uPrevInverseViewProjectionMatrix) {
+          material.uniforms.uPrevInverseViewProjectionMatrix.value.copy(temporalUniforms.uPrevInverseViewProjectionMatrix);
+        }
+        if (material.uniforms.uDepthBufferResolution) {
+          material.uniforms.uDepthBufferResolution.value.copy(temporalUniforms.uDepthBufferResolution);
+        }
       }
 
-      // Apply centralized uniform sources (Lighting, Temporal, Quality, Color, PBR)
-      // These sources auto-update from stores in UniformLifecycleController
-      UniformManager.applyToMaterial(material, ['lighting', 'temporal', 'quality', 'color', 'pbr-face']);
-
-      // IMPORTANT: Override temporal safety margin AFTER applyToMaterial
-      // TemporalSource uses 0.95 (aggressive), but Mandelbulb needs 0.5 (conservative)
-      // to handle surface movement during power/slice/drift animations
-      if (material.uniforms.uTemporalSafetyMargin) {
-        material.uniforms.uTemporalSafetyMargin.value = 0.5;
-      }
+      // Apply centralized uniform sources (Lighting, Quality, Color, PBR)
+      // NOTE: 'temporal' removed - temporal uniforms come from TemporalDepthCapturePass
+      // to ensure matrix/texture/enabled state are synchronized from the same source.
+      // uTemporalSafetyMargin uses the default value (0.95) from getCombinedUniforms(['temporal']).
+      UniformManager.applyToMaterial(material, ['lighting', 'quality', 'color', 'pbr-face']);
 
       // ============================================
       // DIRTY-FLAG: Only update appearance uniforms when settings change

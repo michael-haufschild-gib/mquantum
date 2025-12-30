@@ -3,6 +3,7 @@ export const sdf3dBlock = `
 // Quaternion Julia SDF - 3D (using w=0 slice of 4D)
 // z = z^n + c where c is Julia constant
 // OPT-C5: Defer orbit trap sqrt (minAxisSq)
+// OPT-PREC: mediump for orbit traps
 // ============================================
 
 float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -22,7 +23,8 @@ float sdfJulia3D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float r = 0.0;
 
     // Orbit traps - OPT-C5: minAxisSq instead of minAxis
-    float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
+    // OPT-PREC: mediump sufficient for coloring data
+    mediump float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
     int escIt = 0;
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {

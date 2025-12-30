@@ -4,6 +4,7 @@ export const sdf5dBlock = `
 // OPT-C2/C3: Use optimizedPow for r^pwr and r^(pwr-1)
 // OPT-C5: Defer orbit trap sqrt (minASq)
 // OPT-M2: Cache zxzy_sq for minA and r1 calculations
+// OPT-PREC: mediump for orbit traps
 // ============================================
 
 float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -15,7 +16,8 @@ float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float c4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
     float zx = cx, zy = cy, zz = cz, z3 = c3, z4 = c4;
     float dr = 1.0, r = 0.0;
-    float minP = 1000.0, minASq = 1000000.0, minS = 1000.0;  // OPT-C5: minASq
+    // OPT-PREC: mediump sufficient for coloring data
+    mediump float minP = 1000.0, minASq = 1000000.0, minS = 1000.0;
     int escIt = 0;
 
     // Pre-compute phase offsets

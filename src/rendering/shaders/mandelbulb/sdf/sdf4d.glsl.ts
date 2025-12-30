@@ -3,6 +3,7 @@ export const sdf4dBlock = `
 // 4D Hyperbulb - FULLY UNROLLED with rotated basis
 // OPT-C5: Defer orbit trap sqrt (minAxisSq)
 // OPT-M1: Cache zxzy_sq for minAxis and rxyw calculations
+// OPT-PREC: mediump for orbit traps
 // ============================================
 
 float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -16,7 +17,8 @@ float sdf4D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float r = 0.0;
 
     // Orbit traps - OPT-C5: minAxisSq instead of minAxis
-    float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
+    // OPT-PREC: mediump sufficient for coloring data
+    mediump float minPlane = 1000.0, minAxisSq = 1000000.0, minSphere = 1000.0;
     int escIt = 0;
 
     // Pre-compute phase offsets outside loop (OPT: saves 2 comparisons per iteration)

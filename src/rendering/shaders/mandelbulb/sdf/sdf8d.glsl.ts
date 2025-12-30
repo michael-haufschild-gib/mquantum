@@ -5,6 +5,7 @@ export const sdf8dBlock = `
 // OPT-C3: Use optimizedPow for r^pwr and r^(pwr-1)
 // OPT-C5: Defer orbit trap sqrt (minASq)
 // OPT-M3: Cache z01_sq for r and minA calculations
+// OPT-PREC: mediump for orbit traps
 // ============================================
 
 float sdf8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -18,7 +19,9 @@ float sdf8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float phaseT = uPhaseEnabled ? uPhaseTheta : 0.0;
     float phaseP = uPhaseEnabled ? uPhasePhi : 0.0;
 
-    float dr=1.0,r=0.0,minP=1000.0,minASq=1000000.0,minS=1000.0;  // OPT-C5: minASq instead of minA
+    float dr=1.0,r=0.0;
+    // OPT-PREC: mediump sufficient for coloring data
+    mediump float minP=1000.0,minASq=1000000.0,minS=1000.0;  // OPT-C5: minASq instead of minA
     int escIt=0;
 
     for(int i=0;i<MAX_ITER_HQ;i++){

@@ -45,7 +45,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { isPolytopeType } from '@/lib/geometry/types';
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities';
 import { RENDER_LAYERS, needsVolumetricSeparation } from '@/rendering/core/layers';
-import { useTemporalDepth } from '@/rendering/core/temporalDepth';
 import {
   createSceneBackgroundExport,
   createSceneEnvironmentExport,
@@ -91,6 +90,7 @@ import { useLightingStore } from '@/stores/lightingStore';
 import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore';
 import { getEffectiveSSRQuality, usePerformanceStore, type SSRQualityLevel } from '@/stores/performanceStore';
 import { usePostProcessingStore } from '@/stores/postProcessingStore';
+import { useRenderGraphStore } from '@/stores/renderGraphStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useWebGLContextStore } from '@/stores/webglContextStore';
 
@@ -192,9 +192,6 @@ function usesTemporalCloud(objectType: string): boolean {
  */
 export const PostProcessingV2 = memo(function PostProcessingV2() {
   const { gl, scene, camera, size, viewport } = useThree();
-
-  // Get temporal depth state from context
-  const temporalDepth = useTemporalDepth();
 
   // Context restore counter for recreation
   const restoreCount = useWebGLContextStore((s) => s.restoreCount);
@@ -781,14 +778,13 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       if (!frame) return false;
       const pp = frame.stores.postProcessing;
       const ui = frame.stores.ui;
-      const perf = frame.stores.performance;
-      const objectType = frame.stores.geometry?.objectType ?? '';
       const depthForEffects =
         pp.objectOnlyDepth && (pp.ssrEnabled || pp.refractionEnabled || pp.bokehEnabled);
-      // Only enable temporal depth for object types that actually use it (Mandelbulb/Julia)
-      const temporalDepthNeeded = (perf.temporalReprojectionEnabled || ui.showTemporalDepthBuffer) && usesTemporalDepth(objectType);
+      // NOTE: temporalDepthNeeded was removed from here because TemporalDepthCapturePass
+      // now reads from MAIN_OBJECT_MRT's depth texture instead of OBJECT_DEPTH.
+      // This eliminates the double-render issue for Mandelbulb/Julia temporal reprojection.
       const depthPreview = ui.showDepthBuffer && pp.objectOnlyDepth;
-      return depthForEffects || temporalDepthNeeded || depthPreview;
+      return depthForEffects || depthPreview;
     };
 
     const shouldRenderTemporalCloud = (frame: import('@/rendering/graph/FrameContext').FrozenFrameContext | null) => {
@@ -937,12 +933,16 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.objectDepth = objectDepthPass;
     g.addPass(objectDepthPass);
 
-    // Temporal depth capture pass
+    // Temporal position capture pass
+    // Captures gPosition buffer (xyz=world pos, w=model-space ray distance) for
+    // position-based temporal reprojection. This correctly handles camera rotation
+    // unlike the previous depth-only approach.
+    // The graph automatically orders this AFTER mainObjectMrt due to input dependency.
     const temporalDepthCapture = new TemporalDepthCapturePass({
       id: 'temporalDepthCapture',
-      depthInput: RESOURCES.OBJECT_DEPTH,
+      positionInput: RESOURCES.MAIN_OBJECT_MRT,
+      positionAttachment: 2,  // gPosition is MRT attachment 2 (0=gColor, 1=gNormal, 2=gPosition)
       outputResource: RESOURCES.TEMPORAL_DEPTH_OUTPUT,
-      temporalDepthState: temporalDepth,
       enabled: (frame) => {
         if (!frame) return false;
         const perf = frame.stores.performance;
@@ -1342,7 +1342,36 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
 
     return g;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restoreCount, isPolytope, isBlackHole, ppState.antiAliasingMethod, temporalDepth, lightingState.toneMappingEnabled]); // Recreate on context restore, object type, AA method, temporal depth, or tone mapping toggle
+  }, [restoreCount, isPolytope, isBlackHole, ppState.antiAliasingMethod, lightingState.toneMappingEnabled]); // Recreate on context restore, object type, AA method, or tone mapping toggle
+
+  // ==========================================================================
+  // Publish graph and pass references to store for external access
+  // ==========================================================================
+
+  // CRITICAL: useLayoutEffect ensures store is set BEFORE useFrame callbacks run.
+  // MandelbulbMesh/QuaternionJuliaMesh/SchroedingerMesh read temporal uniforms
+  // from this store in their useFrame at priority 1 (before PostProcessingV2's
+  // useFrame at priority 10). useEffect would run too late, causing textureValid=false.
+  //
+  // NOTE: We use graphRef.current instead of graph to avoid React StrictMode issues.
+  // In StrictMode, React unmounts/remounts components, which disposes the first graph.
+  // The graph variable from useMemo would capture the disposed first graph, while
+  // graphRef.current always points to the latest valid graph.
+  useLayoutEffect(() => {
+    const currentGraph = graphRef.current;
+    if (!currentGraph) return;
+
+    const { setGraph, setTemporalDepthPass, clear } = useRenderGraphStore.getState();
+
+    // Publish references when graph is created
+    setGraph(currentGraph);
+    setTemporalDepthPass(passRefs.current.temporalDepthCapture ?? null);
+
+    // Clear references on unmount or when graph changes
+    return () => {
+      clear();
+    };
+  }, [graph]);
 
   // ==========================================================================
   // Update pass parameters when store changes
@@ -1551,9 +1580,6 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.scenePass?.setClearColor(clearColor);
     passRefs.current.environmentScene?.setClearColor(clearColor);
 
-    // Update temporal depth camera matrices before rendering
-    temporalDepth.updateCameraMatrices(camera);
-
     // Update SSR quality based on performance refinement
     if (passRefs.current.ssr) {
       const effectiveQuality = getEffectiveSSRQuality(pp.ssrQuality as SSRQualityLevel, perf.qualityMultiplier);
@@ -1626,8 +1652,9 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
         // Show temporal depth buffer for Mandelbulb/Julia, temporal cloud for Schroedinger
         if (usesTemporalDepth(objectType)) {
           passRefs.current.bufferPreview.setBufferType('temporalDepth');
-          const temporalUniforms = temporalDepth.getUniforms(true);
-          passRefs.current.bufferPreview.setExternalTexture(temporalUniforms.uPrevDepthTexture);
+          // Get temporal uniforms from the self-contained pass (reads from graph's ping-pong buffer)
+          const temporalUniforms = passRefs.current.temporalDepthCapture?.getTemporalUniforms(graphInstance, true);
+          passRefs.current.bufferPreview.setExternalTexture(temporalUniforms?.uPrevDepthTexture ?? null);
         } else if (usesTemporalCloud(objectType)) {
           // Show temporal cloud accumulation buffer for Schroedinger
           passRefs.current.bufferPreview.setBufferType('temporalDepth');

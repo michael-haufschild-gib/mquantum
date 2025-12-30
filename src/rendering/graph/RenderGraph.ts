@@ -14,6 +14,17 @@
  * @module rendering/graph/RenderGraph
  */
 
+// =============================================================================
+// Debug Logging
+// =============================================================================
+const DEBUG_RENDER_GRAPH = () => (window as unknown as { _debugRenderGraph?: boolean })._debugRenderGraph ?? false;
+
+function debugLog(category: string, ...args: unknown[]): void {
+  if (DEBUG_RENDER_GRAPH()) {
+    console.log(`[RenderGraph:${category}]`, ...args);
+  }
+}
+
 import * as THREE from 'three'
 
 import { ExternalBridge, type ExportConfig, type PendingExport } from './ExternalBridge'
@@ -477,6 +488,39 @@ export class RenderGraph {
     return this.pool.getTexture(resourceId, attachment)
   }
 
+  /**
+   * Get a resource's read texture (ping-pong aware).
+   *
+   * For ping-pong resources, returns the texture from the current read buffer
+   * (i.e., data written in the previous frame). For non-ping-pong resources,
+   * returns the primary texture.
+   *
+   * Use this for temporal reprojection where you need the previous frame's data.
+   *
+   * @param resourceId - Resource identifier
+   * @param attachment - Optional attachment index for MRT, or 'depth' for depth texture
+   * @returns The read texture or null
+   */
+  getReadTexture(resourceId: string, attachment?: number | 'depth'): THREE.Texture | null {
+    // Check if this is a ping-pong resource
+    if (this.compiled?.pingPongResources.has(resourceId)) {
+      const target = this.pool.getReadTarget(resourceId)
+      if (!target) return null
+
+      // Handle attachment types
+      if (attachment === 'depth') {
+        return target.depthTexture ?? null
+      }
+      if (typeof attachment === 'number' && target.textures) {
+        return target.textures[attachment] ?? null
+      }
+      return target.texture ?? null
+    }
+
+    // Non-ping-pong: delegate to getTexture
+    return this.pool.getTexture(resourceId, attachment)
+  }
+
   // ==========================================================================
   // External Resource Management
   // ==========================================================================
@@ -709,7 +753,7 @@ export class RenderGraph {
 
     // Clean up state tracking for passes no longer in the graph
     // This prevents memory leaks when passes are removed
-    const currentPassIds = new Set(this.compiled.passes.map(p => p.id))
+    const currentPassIds = new Set(this.compiled.passes.map((p) => p.id))
     for (const passId of this.passStateTracking.keys()) {
       if (!currentPassIds.has(passId)) {
         this.passStateTracking.delete(passId)
@@ -833,12 +877,22 @@ export class RenderGraph {
     // Track resources written by enabled passes to prevent passthrough overwriting them
     const writtenByEnabledPass = new Set<string>()
 
+    debugLog('execute', '=== Frame', this.frameNumber, 'Start ===');
+    debugLog('execute', 'Compiled passes:', this.compiled.passes.map(p => p.id).join(', '));
+    debugLog('execute', 'PingPong resources:', [...this.compiled.pingPongResources].join(', '));
+
     for (const pass of this.compiled.passes) {
       // Check if pass is enabled (also check debug disable flag)
       // CRITICAL: Pass frozen frame context to enabled() so passes can read store state safely
       const debugDisabled =
         (pass as unknown as { _debugDisabled?: boolean })._debugDisabled ?? false
       const enabled = !debugDisabled && (pass.config.enabled?.(frozenFrameContext) ?? true)
+
+      debugLog('pass', `--- ${pass.id} ---`);
+      debugLog('pass', `  enabled: ${enabled}, debugDisabled: ${debugDisabled}`);
+      debugLog('pass', `  inputs: ${(pass.config.inputs ?? []).map(i => `${i.resourceId}[${i.attachment ?? 'default'}]`).join(', ')}`);
+      debugLog('pass', `  outputs: ${(pass.config.outputs ?? []).map(o => `${o.resourceId}`).join(', ')}`);
+      debugLog('pass', `  skipPassthrough: ${pass.config.skipPassthrough ?? false}`);
 
       // ========================================================================
       // Lazy Resource Deallocation: Track disabled frames and manage grace period
@@ -852,13 +906,12 @@ export class RenderGraph {
         this.passStateTracking.set(pass.id, disabledFrameCount)
 
         // Check if grace period has elapsed and pass has releaseInternalResources
-        const gracePeriod = pass.config.disableGracePeriod ?? RenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
+        const gracePeriod =
+          pass.config.disableGracePeriod ?? RenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
         const keepResources = pass.config.keepResourcesWhenDisabled ?? false
 
         // Only call releaseInternalResources exactly once when grace period elapses
-        if (!keepResources &&
-            disabledFrameCount === gracePeriod &&
-            pass.releaseInternalResources) {
+        if (!keepResources && disabledFrameCount === gracePeriod && pass.releaseInternalResources) {
           pass.releaseInternalResources()
         }
       }
@@ -900,10 +953,15 @@ export class RenderGraph {
             // Register alias: output → input
             // Downstream passes reading 'outputId' will resolve to 'inputId'
             this.resourceAliases.set(outputId, inputId)
+            debugLog('alias', `  Aliasing ${outputId} → ${inputId}`);
           } else {
             // Legacy behavior: copy input texture to output target
             const inputTexture = context.getReadTexture(inputId)
             const outputTarget = context.getWriteTarget(outputId)
+
+            debugLog('passthrough', `  Passthrough ${inputId} → ${outputId}`);
+            debugLog('passthrough', `    inputTexture: ${inputTexture ? 'exists' : 'NULL'}`);
+            debugLog('passthrough', `    outputTarget: ${outputTarget ? `${outputTarget.width}x${outputTarget.height}, textures: ${outputTarget.textures?.length ?? 1}` : 'NULL'}`);
 
             if (inputTexture && outputTarget) {
               this.executePassthrough(renderer, inputTexture, outputTarget)
@@ -925,6 +983,28 @@ export class RenderGraph {
       // Track outputs written by this enabled pass
       for (const output of pass.config.outputs ?? []) {
         writtenByEnabledPass.add(output.resourceId)
+      }
+
+      // Debug: Log resource state for this pass
+      if (DEBUG_RENDER_GRAPH()) {
+        for (const input of pass.config.inputs ?? []) {
+          const texture = context.getReadTexture(input.resourceId, input.attachment);
+          const target = context.getReadTarget(input.resourceId);
+          debugLog('resource', `  INPUT ${input.resourceId}[${input.attachment ?? 'default'}]:`);
+          debugLog('resource', `    texture: ${texture ? 'exists' : 'NULL'}`);
+          debugLog('resource', `    target: ${target ? `${target.width}x${target.height}, textures: ${target.textures?.length ?? 1}` : 'NULL'}`);
+          if (target?.textures && target.textures.length > 1) {
+            debugLog('resource', `    MRT textures: ${target.textures.map((t, i) => `[${i}]:${t ? 'exists' : 'NULL'}`).join(', ')}`);
+          }
+        }
+        for (const output of pass.config.outputs ?? []) {
+          const target = context.getWriteTarget(output.resourceId);
+          debugLog('resource', `  OUTPUT ${output.resourceId}:`);
+          debugLog('resource', `    target: ${target ? `${target.width}x${target.height}, textures: ${target.textures?.length ?? 1}` : 'NULL'}`);
+          if (target?.textures && target.textures.length > 1) {
+            debugLog('resource', `    MRT textures: ${target.textures.map((t, i) => `[${i}]:${t ? 'exists' : 'NULL'}`).join(', ')}`);
+          }
+        }
       }
 
       // CRITICAL: Capture Three.js state before pass execution
@@ -1152,14 +1232,15 @@ export class RenderGraph {
     let pending = 0
 
     for (const [passId, disabledFrameCount] of this.passStateTracking) {
-      const pass = this.compiled?.passes.find(p => p.id === passId)
+      const pass = this.compiled?.passes.find((p) => p.id === passId)
       if (!pass) continue
 
       if (disabledFrameCount === 0) {
         enabled++
       } else {
         disabled++
-        const gracePeriod = pass.config.disableGracePeriod ?? RenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
+        const gracePeriod =
+          pass.config.disableGracePeriod ?? RenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
         const keepResources = pass.config.keepResourcesWhenDisabled ?? false
         if (!keepResources && disabledFrameCount < gracePeriod && pass.releaseInternalResources) {
           pending++
@@ -1180,7 +1261,7 @@ export class RenderGraph {
    * @returns True if resources were released, false if pass not found or has no releaseInternalResources
    */
   forceReleasePassResources(passId: string): boolean {
-    const pass = this.compiled?.passes.find(p => p.id === passId)
+    const pass = this.compiled?.passes.find((p) => p.id === passId)
     if (pass?.releaseInternalResources) {
       pass.releaseInternalResources()
       return true

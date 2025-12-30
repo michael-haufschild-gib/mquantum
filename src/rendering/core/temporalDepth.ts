@@ -2,18 +2,16 @@
  * Temporal Depth Module
  *
  * Barrel file exporting all temporal depth related functionality.
- * Import from this file for most use cases.
+ * The pass is self-contained and manages its own state.
  *
  * @module rendering/core/temporalDepth
  */
 
-// State class and types
-export { TemporalDepthState, invalidateAllTemporalDepth } from './TemporalDepthState'
-export type { TemporalDepthUniforms } from './TemporalDepthState'
+// Re-export from the pass for backwards compatibility
+export {
+  invalidateAllTemporalDepth,
+  type TemporalDepthUniforms,
+} from '@/rendering/graph/passes/TemporalDepthCapturePass'
 
-// React hooks
-export { useTemporalDepth, useTemporalDepthOptional } from './useTemporalDepth'
-
-// React Provider
-export { TemporalDepthProvider } from './TemporalDepthContext'
-export type { TemporalDepthProviderProps } from './TemporalDepthContext'
+// New hook for accessing temporal uniforms from render graph
+export { useTemporalDepthUniforms, getTemporalDepthUniforms } from './useTemporalDepthUniforms'

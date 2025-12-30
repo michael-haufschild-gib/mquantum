@@ -7,7 +7,6 @@
  * Architecture:
  * - Scene: Lighting, camera, effects, ground plane
  * - UnifiedRenderer: Routes to appropriate high-performance renderer
- * - TemporalDepthProvider: Scopes temporal depth state to this scene
  */
 
 import { DebugLayerGroup } from '@/components/canvas/DebugLayerGroup'
@@ -20,7 +19,6 @@ import type { Vector3D } from '@/lib/math/types'
 import { CameraController } from '@/rendering/controllers/CameraController'
 import { LightGizmoManager } from '@/rendering/controllers/LightGizmoManager'
 import { PerformanceManager } from '@/rendering/controllers/PerformanceManager'
-import { TemporalDepthProvider } from '@/rendering/core/temporalDepth'
 import { GroundPlane } from '@/rendering/environment/GroundPlane'
 import { PostProcessingV2 } from '@/rendering/environment/PostProcessingV2'
 import { SceneLighting } from '@/rendering/environment/SceneLighting'
@@ -112,7 +110,7 @@ export const Scene = React.memo(function Scene({
   useWebGLCleanup()
 
   return (
-    <TemporalDepthProvider>
+    <>
       {/* Performance optimization manager */}
       <PerformanceManager />
 
@@ -167,6 +165,6 @@ export const Scene = React.memo(function Scene({
         gridColor={groundGridColor}
         gridSpacing={groundGridSpacing}
       />
-    </TemporalDepthProvider>
+    </>
   )
 })

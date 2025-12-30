@@ -20,6 +20,8 @@ export { TemporalCloudPass, type TemporalCloudPassConfig } from './TemporalCloud
 export {
   TemporalDepthCapturePass,
   type TemporalDepthCapturePassConfig,
+  type TemporalDepthUniforms,
+  invalidateAllTemporalDepth,
 } from './TemporalDepthCapturePass'
 
 // Effect passes

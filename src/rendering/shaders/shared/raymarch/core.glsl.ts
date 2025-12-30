@@ -91,9 +91,7 @@ float RayMarch(vec3 ro, vec3 rd, vec3 worldRayDir, out float trap, out bool used
     float temporalDepth = getTemporalDepth(ro, rd, worldRayDir);
     if (temporalDepth > 0.0 && temporalDepth < maxT) {
         // Start from the temporal hint, with safety margin
-        // uTemporalSafetyMargin controls how far back to step:
-        // - 0.95 = 5% back (aggressive, for stable geometry like Mandelbulb)
-        // - 0.50 = 50% back (conservative, for Julia where shape changes during rotation)
+        // uTemporalSafetyMargin controls how far back to step (default 0.95 = 5% back)
         dO = max(dO, temporalDepth * uTemporalSafetyMargin);
         usedTemporal = true;
     }

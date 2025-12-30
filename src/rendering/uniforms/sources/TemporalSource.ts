@@ -7,22 +7,22 @@
  * @module rendering/uniforms/sources/TemporalSource
  */
 
-import { Matrix4, Vector2 } from 'three';
+import { Matrix4, Vector2 } from 'three'
 
-import { usePerformanceStore } from '@/stores/performanceStore';
+import { usePerformanceStore } from '@/stores/performanceStore'
 
-import { BaseUniformSource, type IUniform, type UniformUpdateState } from '../UniformSource';
+import { BaseUniformSource, type IUniform, type UniformUpdateState } from '../UniformSource'
 
 /**
  * Configuration for TemporalSource.
  */
 export interface TemporalSourceConfig {
   /** Whether temporal reprojection is enabled */
-  enabled: boolean;
+  enabled: boolean
   /** Safety margin for temporal hints (0.5-1.0, default 0.95) */
-  safetyMargin?: number;
+  safetyMargin?: number
   /** Depth buffer resolution */
-  depthBufferResolution?: { width: number; height: number };
+  depthBufferResolution?: { width: number; height: number }
 }
 
 /**
@@ -47,23 +47,23 @@ export interface TemporalSourceConfig {
  * ```
  */
 export class TemporalSource extends BaseUniformSource {
-  readonly id = 'temporal';
+  readonly id = 'temporal'
 
   private temporalUniforms = {
     uTemporalEnabled: { value: false },
     uPrevViewProjectionMatrix: { value: new Matrix4() },
     uPrevInverseViewProjectionMatrix: { value: new Matrix4() },
     uDepthBufferResolution: { value: new Vector2(1920, 1080) },
-    uTemporalSafetyMargin: { value: 0.95 },
-  };
+    uTemporalSafetyMargin: { value: 0.5 },
+  }
 
   // Current frame matrices (to become previous next frame)
-  private currentViewProjection = new Matrix4();
-  private currentInverseViewProjection = new Matrix4();
+  private currentViewProjection = new Matrix4()
+  private currentInverseViewProjection = new Matrix4()
 
   // State tracking
-  private enabled = false;
-  private isFirstFrame = true;
+  private enabled = false
+  private isFirstFrame = true
 
   /**
    * Update from store state.
@@ -71,40 +71,40 @@ export class TemporalSource extends BaseUniformSource {
    * @param config - Temporal configuration
    */
   updateFromStore(config: TemporalSourceConfig): void {
-    let changed = false;
+    let changed = false
 
     if (this.enabled !== config.enabled) {
-      this.enabled = config.enabled;
-      this.temporalUniforms.uTemporalEnabled.value = config.enabled;
-      changed = true;
+      this.enabled = config.enabled
+      this.temporalUniforms.uTemporalEnabled.value = config.enabled
+      changed = true
 
       // Reset on disable->enable transition
       if (config.enabled) {
-        this.isFirstFrame = true;
+        this.isFirstFrame = true
       }
     }
 
     if (config.safetyMargin !== undefined) {
-      const current = this.temporalUniforms.uTemporalSafetyMargin.value;
+      const current = this.temporalUniforms.uTemporalSafetyMargin.value
       if (Math.abs(current - config.safetyMargin) > 0.001) {
-        this.temporalUniforms.uTemporalSafetyMargin.value = config.safetyMargin;
-        changed = true;
+        this.temporalUniforms.uTemporalSafetyMargin.value = config.safetyMargin
+        changed = true
       }
     }
 
     if (config.depthBufferResolution) {
-      const res = this.temporalUniforms.uDepthBufferResolution.value;
+      const res = this.temporalUniforms.uDepthBufferResolution.value
       if (
         res.x !== config.depthBufferResolution.width ||
         res.y !== config.depthBufferResolution.height
       ) {
-        res.set(config.depthBufferResolution.width, config.depthBufferResolution.height);
-        changed = true;
+        res.set(config.depthBufferResolution.width, config.depthBufferResolution.height)
+        changed = true
       }
     }
 
     if (changed) {
-      this.incrementVersion();
+      this.incrementVersion()
     }
   }
 
@@ -113,7 +113,7 @@ export class TemporalSource extends BaseUniformSource {
    * @returns Record of temporal uniforms
    */
   getUniforms(): Record<string, IUniform> {
-    return this.temporalUniforms as unknown as Record<string, IUniform>;
+    return this.temporalUniforms as unknown as Record<string, IUniform>
   }
 
   /**
@@ -125,48 +125,48 @@ export class TemporalSource extends BaseUniformSource {
    */
   update(state: UniformUpdateState): void {
     // Access store directly - this is the standard pattern in the codebase
-    const perfState = usePerformanceStore.getState();
+    const perfState = usePerformanceStore.getState()
 
     // Update enabled state from store
     this.updateFromStore({
       enabled: perfState.temporalReprojectionEnabled,
       depthBufferResolution: { width: state.size.width, height: state.size.height },
-    });
+    })
 
     if (!this.enabled) {
-      return;
+      return
     }
 
-    const { camera } = state;
+    const { camera } = state
 
     // Copy current to previous
-    this.temporalUniforms.uPrevViewProjectionMatrix.value.copy(this.currentViewProjection);
+    this.temporalUniforms.uPrevViewProjectionMatrix.value.copy(this.currentViewProjection)
     this.temporalUniforms.uPrevInverseViewProjectionMatrix.value.copy(
       this.currentInverseViewProjection
-    );
+    )
 
     // Compute new current matrices
-    this.currentViewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    this.currentInverseViewProjection.copy(this.currentViewProjection).invert();
+    this.currentViewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    this.currentInverseViewProjection.copy(this.currentViewProjection).invert()
 
     // On first frame, copy current to previous to avoid invalid reprojection
     if (this.isFirstFrame) {
-      this.temporalUniforms.uPrevViewProjectionMatrix.value.copy(this.currentViewProjection);
+      this.temporalUniforms.uPrevViewProjectionMatrix.value.copy(this.currentViewProjection)
       this.temporalUniforms.uPrevInverseViewProjectionMatrix.value.copy(
         this.currentInverseViewProjection
-      );
-      this.isFirstFrame = false;
+      )
+      this.isFirstFrame = false
     }
 
     // Always increment version since matrices change every frame
-    this.incrementVersion();
+    this.incrementVersion()
   }
 
   /**
    * Mark for reset on next frame (e.g., after camera teleport).
    */
   resetHistory(): void {
-    this.isFirstFrame = true;
+    this.isFirstFrame = true
   }
 
   /**
@@ -174,21 +174,21 @@ export class TemporalSource extends BaseUniformSource {
    * @returns True if enabled
    */
   isEnabled(): boolean {
-    return this.enabled;
+    return this.enabled
   }
 
   /**
    * Reset to initial state.
    */
   reset(): void {
-    this.temporalUniforms.uTemporalEnabled.value = false;
-    this.temporalUniforms.uPrevViewProjectionMatrix.value.identity();
-    this.temporalUniforms.uPrevInverseViewProjectionMatrix.value.identity();
-    this.temporalUniforms.uTemporalSafetyMargin.value = 0.95;
-    this.currentViewProjection.identity();
-    this.currentInverseViewProjection.identity();
-    this.enabled = false;
-    this.isFirstFrame = true;
-    this._version = 0;
+    this.temporalUniforms.uTemporalEnabled.value = false
+    this.temporalUniforms.uPrevViewProjectionMatrix.value.identity()
+    this.temporalUniforms.uPrevInverseViewProjectionMatrix.value.identity()
+    this.temporalUniforms.uTemporalSafetyMargin.value = 0.95
+    this.currentViewProjection.identity()
+    this.currentInverseViewProjection.identity()
+    this.enabled = false
+    this.isFirstFrame = true
+    this._version = 0
   }
 }

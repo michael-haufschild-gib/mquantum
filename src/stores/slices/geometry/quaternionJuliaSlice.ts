@@ -215,43 +215,6 @@ export const createQuaternionJuliaSlice: StateCreator<
     }))
   },
 
-  // === Opacity Parameters ===
-
-  setQuaternionJuliaOpacityMode: (value) => {
-    const clamped = Math.max(0, Math.min(3, Math.round(value)))
-    setWithVersion((state) => ({
-      quaternionJulia: { ...state.quaternionJulia, opacityMode: clamped },
-    }))
-  },
-
-  setQuaternionJuliaOpacity: (value) => {
-    const clamped = Math.max(0.0, Math.min(1.0, value))
-    setWithVersion((state) => ({
-      quaternionJulia: { ...state.quaternionJulia, opacity: clamped },
-    }))
-  },
-
-  setQuaternionJuliaLayerCount: (value) => {
-    const clamped = Math.max(2, Math.min(4, Math.round(value)))
-    setWithVersion((state) => ({
-      quaternionJulia: { ...state.quaternionJulia, layerCount: clamped },
-    }))
-  },
-
-  setQuaternionJuliaLayerOpacity: (value) => {
-    const clamped = Math.max(0.1, Math.min(0.9, value))
-    setWithVersion((state) => ({
-      quaternionJulia: { ...state.quaternionJulia, layerOpacity: clamped },
-    }))
-  },
-
-  setQuaternionJuliaVolumetricDensity: (value) => {
-    const clamped = Math.max(0.1, Math.min(2.0, value))
-    setWithVersion((state) => ({
-      quaternionJulia: { ...state.quaternionJulia, volumetricDensity: clamped },
-    }))
-  },
-
   // === Shadow Parameters ===
 
   setQuaternionJuliaShadowEnabled: (value) => {

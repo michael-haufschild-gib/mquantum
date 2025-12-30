@@ -29,10 +29,11 @@ void main() {
     bool usedTemporal;
     float d = RayMarch(ro, rd, worldRayDir, trap, usedTemporal);
 
-    if (d > maxDist && usedTemporal) {
-        usedTemporal = false;
-        d = RayMarchNoTemporal(ro, rd, trap);
-    }
+    // Fallback disabled for performance testing
+    // if (d > maxDist && usedTemporal) {
+    //     usedTemporal = false;
+    //     d = RayMarchNoTemporal(ro, rd, trap);
+    // }
 
     if (d > maxDist) discard;
 
@@ -150,15 +151,18 @@ void main() {
       : clipPos.w;
     gl_FragDepth = clamp((clipPos.z / clipW) * 0.5 + 0.5, 0.0, 1.0);
 
-    float alpha = calculateOpacityAlpha(d, sphereEntry, maxDist);
+    float alpha = 1.0;  // Raymarching fractals are always solid
     // Guard against zero-length view normal
     vec3 viewNormalRaw = (uViewMatrix * vec4(n, 0.0)).xyz;
     float vnLen = length(viewNormalRaw);
     vec3 viewNormal = vnLen > 0.0001 ? viewNormalRaw / vnLen : vec3(0.0, 0.0, 1.0);
+
     gColor = vec4(col, alpha);
     gNormal = vec4(viewNormal * 0.5 + 0.5, uMetallic);
     // CRITICAL: Always write to gPosition to prevent GL_INVALID_OPERATION
     // when rendering to MRT targets with 3 attachments.
-    gPosition = vec4(worldHitPos.xyz, 1.0);
+    // Store MODEL-SPACE position (p) so temporal reprojection works during object rotation.
+    // World-space position changes when model matrix rotates, breaking reprojection.
+    gPosition = vec4(p, d);
 }
 `

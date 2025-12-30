@@ -4,6 +4,7 @@ export const sdf11dBlock = `
 // OPT-C1: inversesqrt in tail calculations
 // OPT-C3: Use optimizedPow for r^pwr and r^(pwr-1)
 // OPT-C5: Defer orbit trap sqrt (minASq)
+// OPT-PREC: mediump for orbit traps
 // ============================================
 
 float sdf11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -21,7 +22,9 @@ float sdf11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     float coord10=uOrigin[10]+pos.x*uBasisX[10]+pos.y*uBasisY[10]+pos.z*uBasisZ[10];
     float z0=coord0, z1=coord1, z2=coord2, z3=coord3, z4=coord4, z5=coord5, z6=coord6, z7=coord7, z8=coord8, z9=coord9, z10=coord10;
 
-    float dr=1.0, r=0.0, minP=1000.0, minASq=1000000.0, minS=1000.0;  // OPT-C5: minASq
+    float dr=1.0, r=0.0;
+    // OPT-PREC: mediump sufficient for coloring data
+    mediump float minP=1000.0, minASq=1000000.0, minS=1000.0;  // OPT-C5: minASq
     int escIt=0;
     float phaseT = uPhaseEnabled ? uPhaseTheta : 0.0;
     float phaseP = uPhaseEnabled ? uPhasePhi : 0.0;

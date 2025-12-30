@@ -134,11 +134,11 @@ export class GraphCompiler {
   /**
    * Compile the graph into execution order.
    *
-   * @param options - Compilation options
+   * @param _options - Compilation options (reserved for future use)
    * @returns Compiled graph with execution order and metadata
    * @throws Error if graph contains cycles
    */
-  compile(options: CompileOptions = {}): CompiledGraph {
+  compile(_options: CompileOptions = {}): CompiledGraph {
     const warnings: string[] = []
 
     // Validate resources
@@ -168,13 +168,6 @@ export class GraphCompiler {
 
     // Validate unused resources
     this.validateUnusedResources(resourceUsage, warnings)
-
-    if (options.debug) {
-      console.log('[GraphCompiler] Compiled graph:')
-      console.log('  Pass order:', sortedPasses.map((p) => p.id).join(' -> '))
-      console.log('  Ping-pong resources:', Array.from(pingPongResources))
-      console.log('  Warnings:', warnings)
-    }
 
     return {
       passes: sortedPasses,
@@ -353,10 +346,7 @@ export class GraphCompiler {
    * @param sortedPasses - Passes in execution order
    * @param warnings - Array to collect warnings
    */
-  private simulateExecutionWithStateMachine(
-    sortedPasses: RenderPass[],
-    warnings: string[]
-  ): void {
+  private simulateExecutionWithStateMachine(sortedPasses: RenderPass[], warnings: string[]): void {
     const stateMachine = new ResourceStateMachine({ keepHistory: false })
 
     // Register all resources

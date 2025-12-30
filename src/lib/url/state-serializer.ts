@@ -7,27 +7,6 @@
 
 import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import {
-  DEFAULT_LAYER_COUNT,
-  DEFAULT_LAYER_OPACITY,
-  DEFAULT_OPACITY_MODE,
-  DEFAULT_SAMPLE_QUALITY,
-  DEFAULT_SIMPLE_ALPHA_OPACITY,
-  DEFAULT_VOLUMETRIC_ANIMATION_QUALITY,
-  DEFAULT_VOLUMETRIC_DENSITY,
-  URL_KEY_LAYER_COUNT,
-  URL_KEY_LAYER_OPACITY,
-  URL_KEY_OPACITY_MODE,
-  URL_KEY_SAMPLE_QUALITY,
-  URL_KEY_SIMPLE_ALPHA,
-  URL_KEY_VOLUMETRIC_ANIM_QUALITY,
-  URL_KEY_VOLUMETRIC_DENSITY,
-} from '@/rendering/opacity/constants'
-import type {
-  OpacityMode,
-  SampleQuality,
-  VolumetricAnimationQuality,
-} from '@/rendering/opacity/types'
 import type { AllShaderSettings, ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
 import {
   DEFAULT_SHADOW_ANIMATION_MODE,
@@ -85,14 +64,6 @@ export interface ShareableState {
   toneMappingEnabled?: boolean
   toneMappingAlgorithm?: ToneMappingAlgorithm
   exposure?: number
-  // Mandelbulb opacity settings
-  opacityMode?: OpacityMode
-  simpleAlphaOpacity?: number
-  layerCount?: 2 | 3 | 4
-  layerOpacity?: number
-  volumetricDensity?: number
-  sampleQuality?: SampleQuality
-  volumetricAnimationQuality?: VolumetricAnimationQuality
   // Shadow settings
   shadowEnabled?: boolean
   shadowQuality?: ShadowQuality
@@ -215,53 +186,6 @@ export function serializeState(state: ShareableState): string {
 
       if (settingsParts.length > 0) {
         params.set('ss', settingsParts.join(','))
-      }
-    }
-  }
-
-  // Mandelbulb opacity settings (only serialize non-default values)
-  if (state.opacityMode && state.opacityMode !== DEFAULT_OPACITY_MODE) {
-    // Map mode names to compact integers: 1=simpleAlpha, 2=layered, 3=volumetric
-    const modeMap: Record<OpacityMode, string> = {
-      solid: '0',
-      simpleAlpha: '1',
-      layeredSurfaces: '2',
-      volumetricDensity: '3',
-    }
-    params.set(URL_KEY_OPACITY_MODE, modeMap[state.opacityMode])
-
-    // Mode-specific settings
-    if (state.opacityMode === 'simpleAlpha') {
-      if (
-        state.simpleAlphaOpacity !== undefined &&
-        state.simpleAlphaOpacity !== DEFAULT_SIMPLE_ALPHA_OPACITY
-      ) {
-        params.set(URL_KEY_SIMPLE_ALPHA, state.simpleAlphaOpacity.toFixed(2))
-      }
-    } else if (state.opacityMode === 'layeredSurfaces') {
-      if (state.layerCount !== undefined && state.layerCount !== DEFAULT_LAYER_COUNT) {
-        params.set(URL_KEY_LAYER_COUNT, String(state.layerCount))
-      }
-      if (state.layerOpacity !== undefined && state.layerOpacity !== DEFAULT_LAYER_OPACITY) {
-        params.set(URL_KEY_LAYER_OPACITY, state.layerOpacity.toFixed(2))
-      }
-    } else if (state.opacityMode === 'volumetricDensity') {
-      if (
-        state.volumetricDensity !== undefined &&
-        state.volumetricDensity !== DEFAULT_VOLUMETRIC_DENSITY
-      ) {
-        params.set(URL_KEY_VOLUMETRIC_DENSITY, state.volumetricDensity.toFixed(2))
-      }
-      if (state.sampleQuality && state.sampleQuality !== DEFAULT_SAMPLE_QUALITY) {
-        const sqMap: Record<SampleQuality, string> = { low: '0', medium: '1', high: '2' }
-        params.set(URL_KEY_SAMPLE_QUALITY, sqMap[state.sampleQuality])
-      }
-      if (
-        state.volumetricAnimationQuality &&
-        state.volumetricAnimationQuality !== DEFAULT_VOLUMETRIC_ANIMATION_QUALITY
-      ) {
-        const vaqMap: Record<VolumetricAnimationQuality, string> = { reduce: '0', full: '1' }
-        params.set(URL_KEY_VOLUMETRIC_ANIM_QUALITY, vaqMap[state.volumetricAnimationQuality])
       }
     }
   }
@@ -496,69 +420,6 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     })
 
     state.shaderSettings = shaderSettings
-  }
-
-  // Mandelbulb opacity settings
-  const opacityModeStr = params.get(URL_KEY_OPACITY_MODE)
-  if (opacityModeStr) {
-    const modeMap: Record<string, OpacityMode> = {
-      '0': 'solid',
-      '1': 'simpleAlpha',
-      '2': 'layeredSurfaces',
-      '3': 'volumetricDensity',
-    }
-    const mode = modeMap[opacityModeStr]
-    if (mode) {
-      state.opacityMode = mode
-
-      // Parse mode-specific settings
-      if (mode === 'simpleAlpha') {
-        const sao = params.get(URL_KEY_SIMPLE_ALPHA)
-        if (sao) {
-          const value = parseFloat(sao)
-          if (!isNaN(value) && value >= 0 && value <= 1) {
-            state.simpleAlphaOpacity = value
-          }
-        }
-      } else if (mode === 'layeredSurfaces') {
-        const lc = params.get(URL_KEY_LAYER_COUNT)
-        if (lc) {
-          const value = parseInt(lc, 10)
-          if (value === 2 || value === 3 || value === 4) {
-            state.layerCount = value
-          }
-        }
-        const lo = params.get(URL_KEY_LAYER_OPACITY)
-        if (lo) {
-          const value = parseFloat(lo)
-          if (!isNaN(value) && value >= 0.1 && value <= 0.9) {
-            state.layerOpacity = value
-          }
-        }
-      } else if (mode === 'volumetricDensity') {
-        const vd = params.get(URL_KEY_VOLUMETRIC_DENSITY)
-        if (vd) {
-          const value = parseFloat(vd)
-          if (!isNaN(value) && value >= 0.1 && value <= 2.0) {
-            state.volumetricDensity = value
-          }
-        }
-        const sq = params.get(URL_KEY_SAMPLE_QUALITY)
-        if (sq) {
-          const sqMap: Record<string, SampleQuality> = { '0': 'low', '1': 'medium', '2': 'high' }
-          if (sqMap[sq]) {
-            state.sampleQuality = sqMap[sq]
-          }
-        }
-        const vaq = params.get(URL_KEY_VOLUMETRIC_ANIM_QUALITY)
-        if (vaq) {
-          const vaqMap: Record<string, VolumetricAnimationQuality> = { '0': 'reduce', '1': 'full' }
-          if (vaqMap[vaq]) {
-            state.volumetricAnimationQuality = vaqMap[vaq]
-          }
-        }
-      }
-    }
   }
 
   // Shadow settings

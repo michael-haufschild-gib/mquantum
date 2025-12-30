@@ -1,69 +1,96 @@
 export const temporalBlock = `
 // ============================================
-// Temporal Reprojection
+// Temporal Reprojection (Position-Based)
 // ============================================
+// Uses actual per-pixel world position from previous frame's gPosition buffer
+// and RECALCULATES the distance along the CURRENT ray. This correctly handles
+// camera rotation where the ray at UV (0.5, 0.5) points in a different
+// direction than it did last frame.
 
 /**
- * Reproject current pixel to previous frame and sample ray distance.
- * Returns the reprojected ray distance, or -1.0 if invalid.
+ * Get temporal depth hint for raymarching acceleration.
+ *
+ * Algorithm:
+ * 1. Sample previous frame's gPosition at current UV to get model-space position
+ * 2. Calculate distance along the CURRENT ray to that point
+ * 3. Validate that the point is actually on the current ray (perpendicular distance check)
+ * 4. Return distance as skip hint
+ *
+ * Returns model-space ray distance, or -1.0 if invalid/unavailable.
  */
 float getTemporalDepth(vec3 ro, vec3 rd, vec3 worldRayDir) {
-    if (!uTemporalEnabled) return -1.0;
-
-    // Estimate a world-space point along the ray at an average expected distance
-    // Use the bounding sphere radius as a reasonable estimate
-    float estimatedWorldDist = BOUND_R * 1.5;
-    vec3 estimatedWorldHit = uCameraPosition + worldRayDir * estimatedWorldDist;
-
-    // Transform estimated hit point to previous frame's clip space
-    vec4 prevClipPos = uPrevViewProjectionMatrix * vec4(estimatedWorldHit, 1.0);
-
-    // Perspective divide to get NDC - guard against w=0 while preserving sign
-    float safeW = abs(prevClipPos.w) < 0.0001
-      ? (prevClipPos.w >= 0.0 ? 0.0001 : -0.0001)
-      : prevClipPos.w;
-    vec2 prevNDC = prevClipPos.xy / safeW;
-
-    // Convert from NDC [-1, 1] to UV [0, 1]
-    vec2 prevUV = prevNDC * 0.5 + 0.5;
-
-    // Check if point is visible in previous frame
-    if (prevUV.x < 0.0 || prevUV.x > 1.0 || prevUV.y < 0.0 || prevUV.y > 1.0) {
-        return -1.0;  // Off-screen in previous frame
-    }
-
-    // Sample previous ray distance (stored as unnormalized world-space distance)
-    float rayDistance = texture(uPrevDepthTexture, prevUV).r;
-
-    // Validate ray distance (0 or very small means no hit, cleared, or sky)
-    // Very large values indicate potential issues
-    if (rayDistance <= 0.01 || rayDistance > 1000.0) {
+    if (!uTemporalEnabled) {
         return -1.0;
     }
 
-    // Disocclusion detection: check for depth discontinuities
+    // CRITICAL: Use screen coordinates for sampling the previous frame's MRT
+    // vUv is the mesh texture coordinate (per-face UV on the box geometry)
+    // but uPrevPositionTexture is a screen-space render target
+    // Must use gl_FragCoord to get actual screen position
+    // Use uDepthBufferResolution (temporal buffer size) not uResolution (may differ)
+    vec2 screenUV = gl_FragCoord.xy / uDepthBufferResolution;
+
+    // Sample previous frame's position buffer at current screen position
+    // gPosition.xyz = model-space position, gPosition.w = model-space ray distance
+    vec4 prevPositionData = texture(uPrevPositionTexture, screenUV);
+
+    // Check if we have valid position data (.w > 0 indicates valid hit)
+    // Discarded fragments or sky will have .w = 0
+    float storedDist = prevPositionData.w;
+    if (storedDist <= 0.01) {
+        return -1.0;  // No valid hit in previous frame at this pixel
+    }
+
+    // Get the MODEL-SPACE position that was hit at this screen location in the previous frame
+    vec3 prevModelPos = prevPositionData.xyz;
+
+    // Calculate distance along CURRENT ray to the previous hit point
+    // Project the hit point onto the current ray: d = dot(P - O, D) for normalized D
+    vec3 toHit = prevModelPos - ro;
+    float projDistance = dot(toHit, rd);
+
+    // Early rejection: point is behind the camera
+    if (projDistance <= 0.0) {
+        return -1.0;
+    }
+
+    // Validation: Is the previous hit actually ON the current ray?
+    // Calculate perpendicular distance from hit point to ray
+    vec3 closestOnRay = ro + rd * projDistance;
+    float perpDist = length(prevModelPos - closestOnRay);
+
+    // Reject if perpendicular distance is too large
+    // This happens when camera rotates - the old hit is no longer along the new ray
+    // Threshold: 5% of distance or 0.1 minimum, whichever is larger
+    float threshold = max(0.1, projDistance * 0.05);
+
+    if (perpDist > threshold) {
+        return -1.0;  // Previous hit not along current ray (camera rotated too much)
+    }
+
+    // Disocclusion detection: check for depth discontinuities at current location
     // Large differences with neighbors indicate unreliable temporal data
     vec2 texelSize = 1.0 / uDepthBufferResolution;
-    float depthLeft = texture(uPrevDepthTexture, prevUV - vec2(texelSize.x, 0.0)).r;
-    float depthRight = texture(uPrevDepthTexture, prevUV + vec2(texelSize.x, 0.0)).r;
-    float depthUp = texture(uPrevDepthTexture, prevUV + vec2(0.0, texelSize.y)).r;
-    float depthDown = texture(uPrevDepthTexture, prevUV - vec2(0.0, texelSize.y)).r;
+    float distLeft = texture(uPrevPositionTexture, screenUV - vec2(texelSize.x, 0.0)).w;
+    float distRight = texture(uPrevPositionTexture, screenUV + vec2(texelSize.x, 0.0)).w;
+    float distUp = texture(uPrevPositionTexture, screenUV + vec2(0.0, texelSize.y)).w;
+    float distDown = texture(uPrevPositionTexture, screenUV - vec2(0.0, texelSize.y)).w;
 
+    // Use relative threshold for discontinuity detection
+    float avgDist = (distLeft + distRight + distUp + distDown) * 0.25;
     float maxNeighborDiff = max(
-        max(abs(rayDistance - depthLeft), abs(rayDistance - depthRight)),
-        max(abs(rayDistance - depthUp), abs(rayDistance - depthDown))
+        max(abs(storedDist - distLeft), abs(storedDist - distRight)),
+        max(abs(storedDist - distUp), abs(storedDist - distDown))
     );
 
-    // Threshold for disocclusion detection (absolute distance threshold)
-    // 0.2 world units is roughly 10% of bounding sphere radius (BOUND_R = 2.0)
-    // This catches edges where depth jumps significantly between neighbors
-    if (maxNeighborDiff > 0.2) {
+    // Threshold: 20% relative difference indicates edge/discontinuity
+    float relativeThreshold = max(0.20 * avgDist, 0.05);  // At least 0.05 absolute
+    if (maxNeighborDiff > relativeThreshold) {
         return -1.0;  // Depth discontinuity - temporal data unreliable
     }
 
-    // Ray distance is already in world-space units
+    // Return the stored distance directly
     // Safety margin is applied in core.glsl.ts via uTemporalSafetyMargin uniform
-    // This allows per-object-type tuning (e.g., 0.5 for Mandelbulb, 0.33 for Julia)
-    return max(0.0, rayDistance);
+    return max(0.0, storedDist);
 }
-`;
+`

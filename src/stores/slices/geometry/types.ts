@@ -235,12 +235,6 @@ export interface QuaternionJuliaSliceActions {
   setQuaternionJuliaColorOffset: (value: number) => void
   setQuaternionJuliaLchLightness: (value: number) => void
   setQuaternionJuliaLchChroma: (value: number) => void
-  // Opacity parameters
-  setQuaternionJuliaOpacityMode: (value: number) => void
-  setQuaternionJuliaOpacity: (value: number) => void
-  setQuaternionJuliaLayerCount: (value: number) => void
-  setQuaternionJuliaLayerOpacity: (value: number) => void
-  setQuaternionJuliaVolumetricDensity: (value: number) => void
   // Shadow parameters
   setQuaternionJuliaShadowEnabled: (value: boolean) => void
   setQuaternionJuliaShadowQuality: (value: number) => void

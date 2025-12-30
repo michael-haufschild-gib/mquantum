@@ -1,9 +1,3 @@
-/**
- * @deprecated OpacityMode is no longer used for raymarching fractals (mandelbulb, julia, schroedinger, blackhole).
- * These types are always rendered as fully opaque (solid mode).
- */
-export type OpacityMode = 'solid' | 'simpleAlpha' | 'layeredSurfaces' | 'volumetricDensity';
-
 export interface ShaderConfig {
   dimension: number;
   shadows: boolean;

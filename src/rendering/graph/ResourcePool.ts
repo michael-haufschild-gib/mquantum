@@ -13,6 +13,17 @@
  * @module rendering/graph/ResourcePool
  */
 
+// =============================================================================
+// Debug Logging
+// =============================================================================
+const DEBUG_RESOURCE_POOL = () => (window as unknown as { _debugResourcePool?: boolean })._debugResourcePool ?? false;
+
+function debugLog(category: string, ...args: unknown[]): void {
+  if (DEBUG_RESOURCE_POOL()) {
+    console.log(`[ResourcePool:${category}]`, ...args);
+  }
+}
+
 import * as THREE from 'three'
 
 import type { RenderResourceConfig, ResourceSize } from './types'
@@ -427,6 +438,8 @@ export class ResourcePool {
 
     // Handle MRT
     if (config.type === 'mrt' && config.attachmentCount && config.attachmentCount > 1) {
+      debugLog('createMRT', `Creating MRT '${config.id}' with ${config.attachmentCount} attachments, ${width}x${height}`);
+
       const target = new THREE.WebGLRenderTarget(width, height, {
         ...options,
         count: config.attachmentCount,
@@ -435,9 +448,12 @@ export class ResourcePool {
       const count = config.attachmentCount
       const textures = target.textures ?? []
 
+      debugLog('createMRT', `  Initial textures array length: ${textures.length}`);
+
       // Ensure textures array has the correct length
       if (textures.length < count) {
         target.textures = new Array(count).fill(null).map(() => new THREE.Texture())
+        debugLog('createMRT', `  Created new textures array with ${count} textures`);
       }
 
       for (let i = 0; i < count; i++) {
@@ -452,6 +468,7 @@ export class ResourcePool {
           texture.internalFormat = internalFormat
         }
         target.textures[i] = texture
+        debugLog('createMRT', `  Texture[${i}]: format=${texture.format}, type=${texture.type}, uuid=${texture.uuid.substring(0, 8)}`);
       }
 
       // Ensure target.texture points to attachment 0
@@ -467,6 +484,8 @@ export class ResourcePool {
       if (config.depthTexture) {
         target.depthTexture = this.createDepthTexture(config, width, height)
       }
+
+      debugLog('createMRT', `  Final textures array: ${target.textures.map((t, i) => `[${i}]:${t ? t.uuid.substring(0, 8) : 'NULL'}`).join(', ')}`);
 
       return target
     }

@@ -23,12 +23,6 @@ export const constantsBlock = `
 #define LIGHT_TYPE_DIRECTIONAL 1
 #define LIGHT_TYPE_SPOT 2
 
-// Opacity modes
-#define OPACITY_SOLID 0
-#define OPACITY_SIMPLE_ALPHA 1
-#define OPACITY_LAYERED 2
-#define OPACITY_VOLUMETRIC 3
-
 // Palette modes
 #define PAL_MONO 0
 #define PAL_ANALOG 1

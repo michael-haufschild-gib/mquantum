@@ -1315,19 +1315,6 @@ export interface QuaternionJuliaConfig {
   /** LCH chroma (0.0-0.4) */
   lchChroma: number
 
-  // === Opacity Configuration ===
-
-  /** Opacity mode: 0=Solid, 1=SimpleAlpha, 2=Layered, 3=Volumetric */
-  opacityMode: number
-  /** Global opacity for SimpleAlpha mode (0.0-1.0) */
-  opacity: number
-  /** Number of layers for Layered mode (2-4) */
-  layerCount: number
-  /** Per-layer opacity for Layered mode (0.1-0.9) */
-  layerOpacity: number
-  /** Density for Volumetric mode (0.1-2.0) */
-  volumetricDensity: number
-
   // === Shadow Configuration ===
 
   /** Enable shadow calculation */
@@ -1409,13 +1396,6 @@ export const DEFAULT_QUATERNION_JULIA_CONFIG: QuaternionJuliaConfig = {
   colorOffset: 0.0,
   lchLightness: 0.7,
   lchChroma: 0.15,
-
-  // Opacity defaults
-  opacityMode: 0, // Solid
-  opacity: 1.0,
-  layerCount: 2,
-  layerOpacity: 0.5,
-  volumetricDensity: 1.0,
 
   // Shadow defaults
   shadowEnabled: false,

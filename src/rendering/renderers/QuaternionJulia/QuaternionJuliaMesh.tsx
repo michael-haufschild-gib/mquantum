@@ -12,7 +12,7 @@ import {
     updateLinearColorUniform,
 } from '@/rendering/colors/linearCache'
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
-import { useTemporalDepth } from '@/rendering/core/temporalDepth'
+import { useTemporalDepthUniforms } from '@/rendering/core/useTemporalDepthUniforms'
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial'
 import {
     MAX_DIMENSION,
@@ -48,10 +48,10 @@ import vertexShader from './quaternion-julia.vert?raw'
  */
 const QuaternionJuliaMesh = () => {
   const meshRef = useRef<THREE.Mesh>(null)
-  const { camera, size } = useThree()
+  const { camera, size, viewport } = useThree()
 
-  // Get temporal depth state from context for temporal reprojection
-  const temporalDepth = useTemporalDepth()
+  // Get temporal depth uniforms getter from render graph store
+  const getTemporalUniforms = useTemporalDepthUniforms()
 
   // Get scale for mesh scaling
   const scale = useExtendedObjectStore((state) => state.quaternionJulia.scale)
@@ -201,8 +201,9 @@ const QuaternionJuliaMesh = () => {
       // Ambient Occlusion
       uAoEnabled: { value: true },
 
-      // Temporal Reprojection - Texture must be manually handled as it comes from context
-      uPrevDepthTexture: { value: null },
+      // Temporal Reprojection - Textures must be manually handled as they come from context
+      uPrevDepthTexture: { value: null },      // Legacy: kept for compatibility
+      uPrevPositionTexture: { value: null },   // Position buffer: xyz=world pos, w=model-space ray distance
 
       // IBL (Image-Based Lighting) uniforms - PMREM texture (sampler2D)
       uEnvMap: { value: null },
@@ -344,26 +345,49 @@ const QuaternionJuliaMesh = () => {
     u.uCameraPosition.value.copy(camera.position)
 
     // Update resolution
+    // CRITICAL: Use DPR-scaled resolution for raymarching
+    // The MRT targets are at native resolution (CSS × DPR), so the shader's
+    // gl_FragCoord.xy / uResolution.xy calculation must match.
     if (u.uResolution) {
-      u.uResolution.value.set(size.width, size.height)
+      const dpr = viewport.dpr
+      u.uResolution.value.set(
+        Math.floor(size.width * dpr),
+        Math.floor(size.height * dpr)
+      )
     }
 
-    // Update temporal reprojection uniforms from context
-    // Only uPrevDepthTexture comes from context; matrices/enabled are handled by UniformManager
-    const temporalUniforms = temporalDepth.getUniforms()
-    if (u.uPrevDepthTexture) {
-      u.uPrevDepthTexture.value = temporalUniforms.uPrevDepthTexture
+    // Update temporal reprojection uniforms from TemporalDepthCapturePass
+    // CRITICAL: Apply ALL temporal uniforms from the pass to ensure consistency.
+    // The pass tracks hasValidHistory and synchronizes matrices with the depth texture.
+    // Using TemporalSource (UniformManager) would provide unsynchronized matrices.
+    const temporalUniforms = getTemporalUniforms()
+    if (temporalUniforms) {
+      // Legacy depth texture (for compatibility)
+      if (u.uPrevDepthTexture) {
+        u.uPrevDepthTexture.value = temporalUniforms.uPrevDepthTexture
+      }
+      // Position texture (xyz=world pos, w=model-space ray distance)
+      if (u.uPrevPositionTexture) {
+        u.uPrevPositionTexture.value = temporalUniforms.uPrevPositionTexture
+      }
+      if (u.uTemporalEnabled) {
+        u.uTemporalEnabled.value = temporalUniforms.uTemporalEnabled
+      }
+      if (u.uPrevViewProjectionMatrix) {
+        u.uPrevViewProjectionMatrix.value.copy(temporalUniforms.uPrevViewProjectionMatrix)
+      }
+      if (u.uPrevInverseViewProjectionMatrix) {
+        u.uPrevInverseViewProjectionMatrix.value.copy(temporalUniforms.uPrevInverseViewProjectionMatrix)
+      }
+      if (u.uDepthBufferResolution) {
+        u.uDepthBufferResolution.value.copy(temporalUniforms.uDepthBufferResolution)
+      }
     }
 
-    // Update centralized uniform sources (Lighting, Temporal, Quality, Color, PBR)
-    UniformManager.applyToMaterial(material, ['lighting', 'temporal', 'quality', 'color', 'pbr-face'])
-
-    // IMPORTANT: Override temporal safety margin AFTER applyToMaterial
-    // TemporalSource uses 0.95 (aggressive), but Julia needs 0.33 (very conservative)
-    // because shape changes significantly during N-dimensional rotation
-    if (u.uTemporalSafetyMargin) {
-      u.uTemporalSafetyMargin.value = 0.33
-    }
+    // Apply centralized uniform sources (Lighting, Quality, Color, PBR)
+    // NOTE: 'temporal' removed - temporal uniforms come from TemporalDepthCapturePass
+    // to ensure matrix/texture/enabled state are synchronized from the same source
+    UniformManager.applyToMaterial(material, ['lighting', 'quality', 'color', 'pbr-face'])
 
     // SSS (Subsurface Scattering) and Fresnel properties - inside appearance conditional
     if (appearanceChanged) {

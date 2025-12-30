@@ -71,21 +71,16 @@ uniform mat4 uViewProjectionMatrix;
 uniform mat4 uInverseViewProjectionMatrix;
 
 // Temporal Reprojection uniforms
-uniform sampler2D uPrevDepthTexture;
+uniform sampler2D uPrevDepthTexture;      // Legacy: depth-only buffer (kept for compatibility)
+uniform sampler2D uPrevPositionTexture;   // Position buffer: xyz=world pos, w=model-space ray distance
 uniform mat4 uPrevViewProjectionMatrix;
 uniform mat4 uPrevInverseViewProjectionMatrix;
 uniform bool uTemporalEnabled;
 uniform vec2 uDepthBufferResolution;
 uniform float uTemporalSafetyMargin;  // How far back to step from temporal hint (0.95 = 5% back, 0.50 = 50% back)
 
-// Opacity Mode System uniforms
-uniform int uOpacityMode;
-uniform float uSimpleAlpha;
-uniform int uLayerCount;
-uniform float uLayerOpacity;
-uniform float uVolumetricDensity;
+// Sample quality (used by volumetric effects like blackhole disk)
 uniform int uSampleQuality;
-uniform bool uVolumetricReduceOnAnim;
 
 // Shadow System uniforms
 uniform bool uShadowEnabled;

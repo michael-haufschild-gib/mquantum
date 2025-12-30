@@ -233,6 +233,7 @@ export class ScenePass extends BasePass {
 
       // Render - MRTStateManager automatically configures drawBuffers via patched setRenderTarget
       renderer.setRenderTarget(target)
+
       renderer.render(scene, camera)
 
       // Capture render stats after scene render (for performance monitoring)

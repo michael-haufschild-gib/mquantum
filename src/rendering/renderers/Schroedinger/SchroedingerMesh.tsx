@@ -1,20 +1,20 @@
 import { computeDriftedOrigin, type OriginDriftConfig } from '@/lib/animation/originDrift';
 import {
-  flattenPresetForUniforms,
-  generateQuantumPreset,
-  getNamedPreset,
-  type QuantumPreset,
+    flattenPresetForUniforms,
+    generateQuantumPreset,
+    getNamedPreset,
+    type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets';
 // Note: Schrödinger uses fixed sample counts (64 HQ, 32 fast) directly in shader
 import { createColorCache, updateLinearColorUniform } from '@/rendering/colors/linearCache';
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities';
 import { needsVolumetricSeparation, RENDER_LAYERS } from '@/rendering/core/layers';
-import { useTemporalDepth } from '@/rendering/core/temporalDepth';
+import { useTemporalDepthUniforms } from '@/rendering/core/useTemporalDepthUniforms';
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial';
 import {
-  MAX_DIMENSION,
-  useQualityTracking,
-  useRotationUpdates,
+    MAX_DIMENSION,
+    useQualityTracking,
+    useRotationUpdates,
 } from '@/rendering/renderers/base';
 import { composeSchroedingerShader } from '@/rendering/shaders/schroedinger/compose';
 import { MAX_DIM, MAX_TERMS } from '@/rendering/shaders/schroedinger/uniforms.glsl';
@@ -64,8 +64,8 @@ const SchroedingerMesh = () => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { size, camera } = useThree();
 
-  // Get temporal depth state from context for temporal reprojection
-  const temporalDepth = useTemporalDepth();
+  // Get temporal depth uniforms getter from render graph store
+  const getTemporalUniforms = useTemporalDepthUniforms();
 
   // Use shared quality tracking hook
   const { rotationsChanged } = useQualityTracking();
@@ -664,8 +664,8 @@ const SchroedingerMesh = () => {
       }
 
       // Temporal reprojection (depth-skip for isosurface mode)
-      const temporalUniforms = temporalDepth.getUniforms();
-      if (material.uniforms.uPrevDepthTexture) {
+      const temporalUniforms = getTemporalUniforms();
+      if (temporalUniforms && material.uniforms.uPrevDepthTexture) {
         material.uniforms.uPrevDepthTexture.value = temporalUniforms.uPrevDepthTexture;
       }
 

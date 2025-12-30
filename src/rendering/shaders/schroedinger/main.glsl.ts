@@ -134,16 +134,8 @@ void main() {
         discard;
     }
 
-    // Apply opacity mode adjustments
+    // Alpha comes directly from Beer-Lambert integration
     float alpha = volumeResult.alpha;
-
-    if (uOpacityMode == OPACITY_SOLID) {
-        alpha = 1.0;
-    } else if (uOpacityMode == OPACITY_SIMPLE_ALPHA) {
-        alpha = min(volumeResult.alpha * uSimpleAlpha * 2.0, 1.0);
-    } else if (uOpacityMode == OPACITY_VOLUMETRIC) {
-        alpha = volumeResult.alpha * uVolumetricDensity;
-    }
 
     // Depth for gl_FragDepth:
     // When temporal was used, keep using the temporal depth (prevents drift)
@@ -395,7 +387,7 @@ void main() {
       : clipPos.w;
     gl_FragDepth = clamp((clipPos.z / clipW2) * 0.5 + 0.5, 0.0, 1.0);
 
-    float alpha = calculateOpacityAlpha(hitT, tSphere.x, tFar + 1.0);
+    float alpha = 1.0;  // Isosurface is always solid
     // Guard against zero-length view normal
     vec3 viewNormalRaw = (uViewMatrix * vec4(n, 0.0)).xyz;
     float vnLen2 = length(viewNormalRaw);
