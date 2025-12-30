@@ -118,6 +118,20 @@ describe('presetManagerStore', () => {
       expect(saved!.data.environment.skyboxLoading).toBeUndefined()
       expect(saved!.data.environment.classicCubeTexture).toBeUndefined()
     })
+
+    it('should not include version counters in saved styles', () => {
+      // Version counters are auto-incremented by stores and should never be persisted
+      usePresetManagerStore.getState().saveStyle('Test Style')
+      const [saved] = usePresetManagerStore.getState().savedStyles
+
+      // Version fields should be excluded from all store data
+      expect(saved!.data.appearance.appearanceVersion).toBeUndefined()
+      expect(saved!.data.environment.iblVersion).toBeUndefined()
+      expect(saved!.data.environment.groundVersion).toBeUndefined()
+      expect(saved!.data.environment.skyboxVersion).toBeUndefined()
+      expect(saved!.data.lighting.version).toBeUndefined()
+      expect(saved!.data.postProcessing.gravityVersion).toBeUndefined()
+    })
   })
 
   describe('scene management', () => {
@@ -235,6 +249,26 @@ describe('presetManagerStore', () => {
       expect(unchanged!.name).toBe('Keep This Name')
       expect(warnSpy).toHaveBeenCalledWith('Cannot rename scene to empty name')
       warnSpy.mockRestore()
+    })
+
+    it('should not include version counters in saved scenes', () => {
+      // Version counters are auto-incremented by stores and should never be persisted
+      usePresetManagerStore.getState().saveScene('Test Scene')
+      const [saved] = usePresetManagerStore.getState().savedScenes
+
+      // Version fields should be excluded from all store data
+      expect(saved!.data.appearance.appearanceVersion).toBeUndefined()
+      expect(saved!.data.environment.iblVersion).toBeUndefined()
+      expect(saved!.data.environment.groundVersion).toBeUndefined()
+      expect(saved!.data.environment.skyboxVersion).toBeUndefined()
+      expect(saved!.data.lighting.version).toBeUndefined()
+      expect(saved!.data.postProcessing.gravityVersion).toBeUndefined()
+      expect(saved!.data.rotation.version).toBeUndefined()
+      expect(saved!.data.extended.polytopeVersion).toBeUndefined()
+      expect(saved!.data.extended.blackholeVersion).toBeUndefined()
+      expect(saved!.data.extended.schroedingerVersion).toBeUndefined()
+      expect(saved!.data.extended.mandelbulbVersion).toBeUndefined()
+      expect(saved!.data.extended.quaternionJuliaVersion).toBeUndefined()
     })
   })
 
@@ -542,6 +576,69 @@ describe('presetManagerStore', () => {
 
       // Should have set skyboxEnabled to false as fallback
       expect(useEnvironmentStore.getState().skyboxEnabled).toBe(false)
+    })
+
+    it('should strip version fields when importing styles', () => {
+      // Import a style that contains version fields (e.g., from an older export)
+      const styleWithVersions = {
+        id: 'version-style-id',
+        name: 'Style With Versions',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#ff0000', appearanceVersion: 42 },
+          lighting: { lightEnabled: true, version: 10 },
+          postProcessing: { bloomEnabled: false, gravityVersion: 5 },
+          environment: { skyboxEnabled: false, iblVersion: 3, groundVersion: 2 },
+        },
+      }
+
+      usePresetManagerStore.getState().importStyles(JSON.stringify([styleWithVersions]))
+      const [imported] = usePresetManagerStore.getState().savedStyles
+
+      // Version fields should be stripped during import
+      expect(imported!.data.appearance.appearanceVersion).toBeUndefined()
+      expect(imported!.data.lighting.version).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityVersion).toBeUndefined()
+      expect(imported!.data.environment.iblVersion).toBeUndefined()
+      expect(imported!.data.environment.groundVersion).toBeUndefined()
+      // Actual data should be preserved
+      expect(imported!.data.appearance.edgeColor).toBe('#ff0000')
+      expect(imported!.data.lighting.lightEnabled).toBe(true)
+    })
+
+    it('should strip version fields when importing scenes', () => {
+      // Import a scene that contains version fields
+      const sceneWithVersions = {
+        id: 'version-scene-id',
+        name: 'Scene With Versions',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#ff0000', appearanceVersion: 42 },
+          lighting: { lightEnabled: true, version: 10 },
+          postProcessing: { bloomEnabled: false, gravityVersion: 5 },
+          environment: { skyboxEnabled: false, iblVersion: 3 },
+          geometry: { dimension: 4, objectType: 'hypercube' },
+          extended: { polytopeVersion: 7, blackholeVersion: 2 },
+          transform: {},
+          rotation: { rotations: {}, version: 15 },
+          animation: { speed: 1, animatingPlanes: [] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      usePresetManagerStore.getState().importScenes(JSON.stringify([sceneWithVersions]))
+      const [imported] = usePresetManagerStore.getState().savedScenes
+
+      // Version fields should be stripped during import
+      expect(imported!.data.appearance.appearanceVersion).toBeUndefined()
+      expect(imported!.data.lighting.version).toBeUndefined()
+      expect(imported!.data.extended.polytopeVersion).toBeUndefined()
+      expect(imported!.data.extended.blackholeVersion).toBeUndefined()
+      expect(imported!.data.rotation.version).toBeUndefined()
+      // Actual data should be preserved
+      expect(imported!.data.appearance.edgeColor).toBe('#ff0000')
+      expect(imported!.data.geometry.dimension).toBe(4)
     })
   })
 

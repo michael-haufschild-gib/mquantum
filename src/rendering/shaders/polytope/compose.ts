@@ -92,7 +92,7 @@ export function composeFaceVertexShader(): string {
       vViewDir = viewLen > 0.0001 ? viewDiff / viewLen : vec3(0.0, 0.0, 1.0);
 
       // Compute face depth from higher dimension coordinates
-      // With flat interpolation, first vertex of each triangle sets the value
+      // With flat interpolation, provoking vertex (last vertex) sets the value
       // Map to roughly 0-1 range (coordinates typically in -1 to 1)
       vFaceDepth = clamp(extraSum * 0.15 + 0.5, 0.0, 1.0);
     }

@@ -24,24 +24,24 @@
  * @see https://github.com/mrdoob/three.js/blob/dev/src/extras/PMREMGenerator.js
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { RENDER_LAYERS } from '@/rendering/core/layers';
+import { RENDER_LAYERS } from '@/rendering/core/layers'
 
-import { BasePass } from '../BasePass';
-import { getGlobalMRTManager } from '../MRTStateManager';
-import { TemporalResource } from '../TemporalResource';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import { getGlobalMRTManager } from '../MRTStateManager'
+import { TemporalResource } from '../TemporalResource'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 export interface CubemapCapturePassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Resolution per cube face for scene.background (default 256) */
-  backgroundResolution?: number;
+  backgroundResolution?: number
   /** Resolution for PMREM environment map (default 256) - reserved for future use */
-  environmentResolution?: number;
+  environmentResolution?: number
   /** Whether to generate PMREM for scene.environment (for wall reflections) */
-  generatePMREM?: () => boolean;
+  generatePMREM?: () => boolean
   /** Callback to get external CubeTexture for classic skybox mode */
-  getExternalCubeTexture?: () => THREE.CubeTexture | null;
+  getExternalCubeTexture?: () => THREE.CubeTexture | null
 }
 
 /**
@@ -59,69 +59,70 @@ export interface CubemapCapturePassConfig extends Omit<RenderPassConfig, 'inputs
  */
 export class CubemapCapturePass extends BasePass {
   // Background capture
-  private cubeRenderTarget: THREE.WebGLCubeRenderTarget | null = null;
-  private cubeCamera: THREE.CubeCamera | null = null;
-  private backgroundResolution: number;
+  private cubeRenderTarget: THREE.WebGLCubeRenderTarget | null = null
+  private cubeCamera: THREE.CubeCamera | null = null
+  private backgroundResolution: number
 
   // PMREM for environment (for walls)
-  private pmremGenerator: THREE.PMREMGenerator | null = null;
-  private pmremRenderTarget: THREE.WebGLRenderTarget | null = null;
-  private generatePMREM: () => boolean;
+  private pmremGenerator: THREE.PMREMGenerator | null = null
+  private pmremRenderTarget: THREE.WebGLRenderTarget | null = null
+  private generatePMREM: () => boolean
 
   // External texture tracking
-  private getExternalCubeTexture: () => THREE.CubeTexture | null;
-  private lastExternalTextureUuid: string | null = null;
+  private getExternalCubeTexture: () => THREE.CubeTexture | null
+  private lastExternalTextureUuid: string | null = null
   // Track skybox mode to detect procedural/classic changes
-  private lastSkyboxMode: string | null = null;
+  private lastSkyboxMode: string | null = null
 
   // Temporal cubemap history (2-frame buffer for proper initialization)
-  private cubemapHistory: TemporalResource<THREE.WebGLCubeRenderTarget> | null = null;
+  private cubemapHistory: TemporalResource<THREE.WebGLCubeRenderTarget> | null = null
 
   // Capture control
-  private needsCapture = true;
-  private didCaptureThisFrame = false;
-  private pendingPMREMDispose: THREE.WebGLRenderTarget | null = null;
-  
+  private needsCapture = true
+  private didCaptureThisFrame = false
+  private pendingPMREMDispose: THREE.WebGLRenderTarget | null = null
+
   // Capture throttling - update every N frames for performance
   // Lower = smoother but more expensive, Higher = cheaper but staccato
-  private captureFrameCounter = 0;
-  private pmremFrameCounter = 0;
-  private static readonly CAPTURE_UPDATE_INTERVAL = 1; // Capture cubemap every frame for smooth animation
-  private static readonly PMREM_UPDATE_INTERVAL = 2; // Update PMREM every 2 captures for balance
+  private captureFrameCounter = 0
+  private pmremFrameCounter = 0
+  // Capture every 3 frames (~20 FPS) - IBL reflections still look smooth at this rate
+  private static readonly CAPTURE_UPDATE_INTERVAL = 3
+  private static readonly PMREM_UPDATE_INTERVAL = 2 // Update PMREM every 2 captures for balance
 
   constructor(config: CubemapCapturePassConfig) {
     super({
       ...config,
       inputs: [],
       outputs: [],
-    });
+    })
 
-    this.backgroundResolution = config.backgroundResolution ?? 256;
-    this.generatePMREM = config.generatePMREM ?? (() => false);
-    this.getExternalCubeTexture = config.getExternalCubeTexture ?? (() => null);
+    this.backgroundResolution = config.backgroundResolution ?? 256
+    this.generatePMREM = config.generatePMREM ?? (() => false)
+    this.getExternalCubeTexture = config.getExternalCubeTexture ?? (() => null)
   }
 
   /**
    * Initialize the cube camera and render target for background capture.
    */
   private ensureCubeCamera(): void {
-    if (this.cubeRenderTarget && this.cubeCamera) return;
+    if (this.cubeRenderTarget && this.cubeCamera) return
 
     this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(this.backgroundResolution, {
       format: THREE.RGBAFormat,
       generateMipmaps: true,
       minFilter: THREE.LinearMipmapLinearFilter,
       magFilter: THREE.LinearFilter,
-    });
+    })
 
     // Set mapping for black hole shader compatibility (samplerCube)
-    this.cubeRenderTarget.texture.mapping = THREE.CubeReflectionMapping;
+    this.cubeRenderTarget.texture.mapping = THREE.CubeReflectionMapping
 
-    this.cubeCamera = new THREE.CubeCamera(0.1, 1000, this.cubeRenderTarget);
+    this.cubeCamera = new THREE.CubeCamera(0.1, 1000, this.cubeRenderTarget)
 
     // Only capture SKYBOX layer - exclude MAIN_OBJECT (black hole itself)
-    this.cubeCamera.layers.disableAll();
-    this.cubeCamera.layers.enable(RENDER_LAYERS.SKYBOX);
+    this.cubeCamera.layers.disableAll()
+    this.cubeCamera.layers.enable(RENDER_LAYERS.SKYBOX)
   }
 
   /**
@@ -129,10 +130,10 @@ export class CubemapCapturePass extends BasePass {
    * @param renderer
    */
   private ensurePMREMGenerator(renderer: THREE.WebGLRenderer): void {
-    if (this.pmremGenerator) return;
+    if (this.pmremGenerator) return
 
-    this.pmremGenerator = new THREE.PMREMGenerator(renderer);
-    this.pmremGenerator.compileEquirectangularShader();
+    this.pmremGenerator = new THREE.PMREMGenerator(renderer)
+    this.pmremGenerator.compileEquirectangularShader()
   }
 
   /**
@@ -140,8 +141,8 @@ export class CubemapCapturePass extends BasePass {
    * Call this when skybox settings change.
    */
   requestCapture(): void {
-    this.needsCapture = true;
-    this.cubemapHistory?.invalidateHistory();
+    this.needsCapture = true
+    this.cubemapHistory?.invalidateHistory()
   }
 
   /**
@@ -150,9 +151,9 @@ export class CubemapCapturePass extends BasePass {
    */
   setBackgroundResolution(resolution: number): void {
     if (resolution !== this.backgroundResolution) {
-      this.backgroundResolution = resolution;
-      this.disposeTemporalHistory();
-      this.requestCapture();
+      this.backgroundResolution = resolution
+      this.disposeTemporalHistory()
+      this.requestCapture()
     }
   }
 
@@ -162,9 +163,9 @@ export class CubemapCapturePass extends BasePass {
    */
   getCubemapTexture(): THREE.CubeTexture | null {
     if (this.cubemapHistory?.hasValidHistory(1)) {
-      return this.cubemapHistory.getRead(1).texture;
+      return this.cubemapHistory.getRead(1).texture
     }
-    return null;
+    return null
   }
 
   /**
@@ -172,46 +173,93 @@ export class CubemapCapturePass extends BasePass {
    * @returns The PMREM texture or null
    */
   getPMREMTexture(): THREE.Texture | null {
-    return this.pmremRenderTarget?.texture ?? null;
+    return this.pmremRenderTarget?.texture ?? null
   }
 
   execute(ctx: RenderContext): void {
-    
     // Reset frame state
-    this.didCaptureThisFrame = false;
-    
-    const { renderer, scene } = ctx;
+    this.didCaptureThisFrame = false
+
+    const { renderer, scene } = ctx
+
+    // Get environment state for smart capture throttling
+    const env = ctx.frame?.stores?.environment
+    const currentSkyboxMode = env?.skyboxMode ?? null
 
     // Check for skybox mode changes (procedural <-> classic)
-    const currentSkyboxMode = ctx.frame?.stores?.environment?.skyboxMode ?? null;
     if (currentSkyboxMode !== this.lastSkyboxMode) {
-      this.lastSkyboxMode = currentSkyboxMode;
-      this.requestCapture();
+      this.lastSkyboxMode = currentSkyboxMode
+      this.requestCapture()
     }
 
     // Check for external texture changes (classic mode)
     // If UUID changes, we need to recapture (re-render SkyboxMesh to cube target)
-    const externalTexture = this.getExternalCubeTexture();
+    const externalTexture = this.getExternalCubeTexture()
     if (externalTexture) {
       if (externalTexture.uuid !== this.lastExternalTextureUuid) {
-        this.lastExternalTextureUuid = externalTexture.uuid;
-        this.requestCapture();
+        this.lastExternalTextureUuid = externalTexture.uuid
+        this.requestCapture()
       }
     } else {
       if (this.lastExternalTextureUuid !== null) {
-        this.lastExternalTextureUuid = null;
-        this.requestCapture();
+        this.lastExternalTextureUuid = null
+        this.requestCapture()
       }
     }
 
     // Always use capture path - unifies Procedural and Classic modes
     // This ensures scene.background is always a mipmapped WebGLCubeRenderTarget
-    this.executeCapture(ctx, renderer, scene);
-    
-    // Skyboxes can animate (rotation, color, procedural effects)
-    // Always request capture for next frame to keep IBL in sync
-    // This MUST be after executeCapture so it's not immediately cleared
-    this.needsCapture = true;
+    this.executeCapture(ctx, renderer, scene)
+
+    // SMART CAPTURE THROTTLING: Only request continuous capture if skybox is animating
+    // This optimization recovers ~8ms per frame for static skyboxes
+    const isPlaying = ctx.frame?.stores?.animation?.isPlaying ?? false
+    const isAnimating = this.isSkyboxAnimating(env, isPlaying)
+    if (isAnimating) {
+      // Animated skybox - request capture for next frame
+      this.needsCapture = true
+    }
+    // Static skybox - needsCapture stays false until settings change via requestCapture()
+  }
+
+  /**
+   * Determine if the skybox is currently animating.
+   * Static skyboxes don't need continuous cubemap capture.
+   * @param env - Environment state from FrameContext
+   * @param isPlaying - Global animation state
+   * @returns true if skybox is animating, false if static
+   */
+  private isSkyboxAnimating(
+    env:
+      | {
+          skyboxMode?: string
+          skyboxAnimationMode?: string
+          skyboxAnimationSpeed?: number
+          skyboxTimeScale?: number
+        }
+      | undefined,
+    isPlaying: boolean
+  ): boolean {
+    if (!env) return true // Default to animating if no state available
+
+    // If global animation is paused, skybox doesn't animate
+    if (!isPlaying) return false
+
+    const isClassic = env.skyboxMode === 'classic'
+
+    if (isClassic) {
+      // Classic KTX2 skybox: only animating if animation mode is active AND speed > 0
+      const hasAnimationMode = env.skyboxAnimationMode !== 'none'
+      const hasAnimationSpeed = (env.skyboxAnimationSpeed ?? 0) > 0
+      return hasAnimationMode && hasAnimationSpeed
+    } else {
+      // Procedural skybox: animating if timeScale > 0 OR rotation speed > 0
+      // Note: Procedural skyboxes use timeScale, not skyboxAnimationSpeed
+      const hasTimeScale = (env.skyboxTimeScale ?? 0) > 0
+      // Also check animation speed for rotation animations
+      const hasRotation = (env.skyboxAnimationSpeed ?? 0) > 0 && env.skyboxAnimationMode !== 'none'
+      return hasTimeScale || hasRotation
+    }
   }
 
   /**
@@ -226,75 +274,75 @@ export class CubemapCapturePass extends BasePass {
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene
   ): void {
-    this.ensureTemporalHistory();
-    if (!this.cubemapHistory) return;
+    this.ensureTemporalHistory()
+    if (!this.cubemapHistory) return
 
-    this.ensureCubeCamera();
-    if (!this.cubeCamera) return;
+    this.ensureCubeCamera()
+    if (!this.cubeCamera) return
 
     // 1. Capture Logic (Conditional, with throttling)
-    this.captureFrameCounter++;
-    const shouldCapture = this.needsCapture && (
-      !this.cubemapHistory?.hasValidHistory(0) || // First time - need valid history
-      this.captureFrameCounter >= CubemapCapturePass.CAPTURE_UPDATE_INTERVAL
-    );
-    
+    this.captureFrameCounter++
+    const shouldCapture =
+      this.needsCapture &&
+      (!this.cubemapHistory?.hasValidHistory(0) || // First time - need valid history
+        this.captureFrameCounter >= CubemapCapturePass.CAPTURE_UPDATE_INTERVAL)
+
     if (shouldCapture) {
-      this.captureFrameCounter = 0;
-      
+      this.captureFrameCounter = 0
+
       // Count objects on SKYBOX layer - don't capture if skybox isn't ready yet
-      let skyboxObjectCount = 0;
+      let skyboxObjectCount = 0
       scene.traverse((obj) => {
-        if (obj.layers.test(this.cubeCamera!.layers)) skyboxObjectCount++;
-      });
-      
+        if (obj.layers.test(this.cubeCamera!.layers)) skyboxObjectCount++
+      })
+
       // Skip capture if no skybox objects yet - will retry next frame
       if (skyboxObjectCount === 0) {
-        return;
+        return
       }
 
       // Get the current write target from temporal buffer
-      const writeTarget = this.cubemapHistory.getWrite();
+      const writeTarget = this.cubemapHistory.getWrite()
 
-      this.cubeCamera.position.set(0, 0, 0);
+      this.cubeCamera.position.set(0, 0, 0)
 
       // CRITICAL: Clear background/environment before capture to avoid feedback loop
-      const previousBackground = scene.background;
-      const previousEnvironment = scene.environment;
-      scene.background = null;
-      scene.environment = null;
+      const previousBackground = scene.background
+      const previousEnvironment = scene.environment
+      scene.background = null
+      scene.environment = null
 
       // Render to cubemap
-      const originalTarget = this.cubeCamera.renderTarget;
-      this.cubeCamera.renderTarget = writeTarget;
-      this.cubeCamera.update(renderer, scene);
-      this.cubeCamera.renderTarget = originalTarget;
+      const originalTarget = this.cubeCamera.renderTarget
+      this.cubeCamera.renderTarget = writeTarget
+      this.cubeCamera.update(renderer, scene)
+      this.cubeCamera.renderTarget = originalTarget
 
       // Restore scene state
-      scene.background = previousBackground;
-      scene.environment = previousEnvironment;
+      scene.background = previousBackground
+      scene.environment = previousEnvironment
 
       // Mark capture as occurred
-      this.didCaptureThisFrame = true;
-      this.needsCapture = false;
+      this.didCaptureThisFrame = true
+      this.needsCapture = false
 
       // Generate PMREM if needed (throttled for performance)
       // PMREM generation is expensive, so we only do it every N frames
-      this.pmremFrameCounter++;
-      const shouldRegeneratePMREM = this.generatePMREM() && (
-        !this.pmremRenderTarget || // First time
-        this.pmremFrameCounter >= CubemapCapturePass.PMREM_UPDATE_INTERVAL
-      );
-      
+      this.pmremFrameCounter++
+      const shouldRegeneratePMREM =
+        this.generatePMREM() &&
+        (!this.pmremRenderTarget || // First time
+          this.pmremFrameCounter >= CubemapCapturePass.PMREM_UPDATE_INTERVAL)
+
       if (shouldRegeneratePMREM) {
-        this.pmremFrameCounter = 0;
-        this.ensurePMREMGenerator(renderer);
+        this.pmremFrameCounter = 0
+        this.ensurePMREMGenerator(renderer)
 
         if (this.pmremGenerator) {
           // DEFERRED DISPOSAL: Don't dispose immediately.
           // Store current as pending dispose, generate new one, assign new to current.
           if (this.pmremRenderTarget) {
-            this.pendingPMREMDispose = this.pmremRenderTarget;
+            this.pendingPMREMDispose = this.pmremRenderTarget
           }
 
           // Generate new PMREM target
@@ -310,10 +358,10 @@ export class CubemapCapturePass extends BasePass {
           // If we use 'writeTarget', we are effectively using "Frame 0" data while scene.background uses "Frame -1".
           // Let's stick to using 'writeTarget' for PMREM to minimize latency, as it's a separate effect.
           // actually, let's use the same logic as before: create from the just-rendered cubemap.
-          this.pmremRenderTarget = this.pmremGenerator.fromCubemap(writeTarget.texture);
+          this.pmremRenderTarget = this.pmremGenerator.fromCubemap(writeTarget.texture)
 
           // Force sync after PMREM generation
-          getGlobalMRTManager().forceSync();
+          getGlobalMRTManager().forceSync()
         }
       }
     }
@@ -323,23 +371,23 @@ export class CubemapCapturePass extends BasePass {
     // hasValidHistory(1) = needs framesSinceReset > 1 (2 frames - for black hole)
     // For IBL, 1 frame is enough. For Black Hole, 2 frames are needed.
     // Use hasValidHistory(0) for faster IBL startup
-    const hasValidHistory = this.cubemapHistory.hasValidHistory(0);
-    
+    const hasValidHistory = this.cubemapHistory.hasValidHistory(0)
+
     if (hasValidHistory) {
-      const readTarget = this.cubemapHistory.getRead(1);
+      const readTarget = this.cubemapHistory.getRead(1)
 
       // Export scene.background for black hole gravitational lensing
       ctx.queueExport({
         id: 'scene.background',
         value: readTarget.texture,
-      });
+      })
 
       // Queue export for scene.environment (for IBL reflections)
       if (this.pmremRenderTarget) {
         ctx.queueExport({
           id: 'scene.environment',
           value: this.pmremRenderTarget.texture,
-        });
+        })
       }
     }
   }
@@ -348,9 +396,9 @@ export class CubemapCapturePass extends BasePass {
    * Initialize temporal cubemap history with 2-frame buffer.
    */
   private ensureTemporalHistory(): void {
-    if (this.cubemapHistory) return;
+    if (this.cubemapHistory) return
 
-    const resolution = this.backgroundResolution;
+    const resolution = this.backgroundResolution
     this.cubemapHistory = new TemporalResource<THREE.WebGLCubeRenderTarget>({
       historyLength: 2,
       factory: () => {
@@ -365,13 +413,13 @@ export class CubemapCapturePass extends BasePass {
           generateMipmaps: false,
           minFilter: THREE.LinearFilter,
           magFilter: THREE.LinearFilter,
-        });
-        target.texture.mapping = THREE.CubeReflectionMapping;
-        return target;
+        })
+        target.texture.mapping = THREE.CubeReflectionMapping
+        return target
       },
       dispose: (target) => target.dispose(),
       debugName: 'skyboxCubemap',
-    });
+    })
   }
 
   /**
@@ -381,15 +429,15 @@ export class CubemapCapturePass extends BasePass {
     // 1. Dispose old PMREM target if one is pending
     // Safe to do now because scene.environment has been updated to the NEW target (if any)
     if (this.pendingPMREMDispose) {
-      this.pendingPMREMDispose.dispose();
-      this.pendingPMREMDispose = null;
+      this.pendingPMREMDispose.dispose()
+      this.pendingPMREMDispose = null
     }
 
     // 2. Advance history ONLY if we captured a new frame
     // This prevents the read pointer from advancing into stale/empty buffers
     // when needsCapture is false (static skybox).
     if (this.didCaptureThisFrame) {
-      this.cubemapHistory?.advanceFrame();
+      this.cubemapHistory?.advanceFrame()
     }
   }
 
@@ -398,29 +446,29 @@ export class CubemapCapturePass extends BasePass {
    * @returns True if valid history exists
    */
   hasValidCubemap(): boolean {
-    return this.cubemapHistory?.hasValidHistory(1) ?? false;
+    return this.cubemapHistory?.hasValidHistory(1) ?? false
   }
 
   getFramesSinceReset(): number {
-    return this.cubemapHistory?.getFramesSinceReset() ?? 0;
+    return this.cubemapHistory?.getFramesSinceReset() ?? 0
   }
 
   private disposeCubeCamera(): void {
-    this.cubeRenderTarget?.dispose();
-    this.cubeRenderTarget = null;
-    this.cubeCamera = null;
+    this.cubeRenderTarget?.dispose()
+    this.cubeRenderTarget = null
+    this.cubeCamera = null
   }
 
   private disposeTemporalHistory(): void {
-    this.cubemapHistory?.dispose();
-    this.cubemapHistory = null;
+    this.cubemapHistory?.dispose()
+    this.cubemapHistory = null
   }
 
   private disposePMREM(): void {
-    this.pmremRenderTarget?.dispose();
-    this.pmremRenderTarget = null;
-    this.pmremGenerator?.dispose();
-    this.pmremGenerator = null;
+    this.pmremRenderTarget?.dispose()
+    this.pmremRenderTarget = null
+    this.pmremGenerator?.dispose()
+    this.pmremGenerator = null
   }
 
   /**
@@ -431,24 +479,30 @@ export class CubemapCapturePass extends BasePass {
    * State is reset to trigger fresh capture on re-enable.
    */
   releaseInternalResources(): void {
+    // Dispose pending PMREM target first (prevents memory leak when pass disabled during capture)
+    if (this.pendingPMREMDispose) {
+      this.pendingPMREMDispose.dispose()
+      this.pendingPMREMDispose = null
+    }
+
     // Dispose all GPU resources using existing helper methods
-    this.disposeCubeCamera();
-    this.disposeTemporalHistory();
-    this.disposePMREM();
+    this.disposeCubeCamera()
+    this.disposeTemporalHistory()
+    this.disposePMREM()
 
     // Reset state to trigger fresh capture on re-enable
-    this.needsCapture = true;
-    this.lastExternalTextureUuid = null;
-    this.lastSkyboxMode = null;
+    this.needsCapture = true
+    this.lastExternalTextureUuid = null
+    this.lastSkyboxMode = null
 
     // Reset frame counters
-    this.captureFrameCounter = 0;
-    this.pmremFrameCounter = 0;
+    this.captureFrameCounter = 0
+    this.pmremFrameCounter = 0
   }
 
   dispose(): void {
-    this.disposeCubeCamera();
-    this.disposeTemporalHistory();
-    this.disposePMREM();
+    this.disposeCubeCamera()
+    this.disposeTemporalHistory()
+    this.disposePMREM()
   }
 }

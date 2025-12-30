@@ -1,11 +1,10 @@
-import { useRef, useEffect } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import * as THREE from 'three'
 import { useCameraMovement } from '@/hooks/useCameraMovement'
-import { useLightingStore } from '@/stores/lightingStore';
-import { useCameraStore } from '@/stores/cameraStore';
-import { FRAME_PRIORITY } from '@/rendering/core/framePriorities';
+import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
+import { useCameraStore } from '@/stores/cameraStore'
+import { useLightingStore } from '@/stores/lightingStore'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useEffect, useRef } from 'react'
+import { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 /**
  * Props for the CameraController component.
@@ -167,17 +166,7 @@ export function CameraController({
     if (controls && (controls.enableDamping || controls.autoRotate)) {
       controls.update()
     }
-    // DEBUG: Log camera state occasionally (development only)
-    if (import.meta.env.DEV && state.clock.elapsedTime > 1.0 && state.clock.elapsedTime < 1.1) {
-        const perspCam = state.camera as THREE.PerspectiveCamera;
-        console.log('[CameraController] Camera State:', {
-            position: state.camera.position.toArray(),
-            rotation: state.camera.rotation.toArray(),
-            fov: perspCam.fov,
-            zoom: perspCam.zoom,
-            projectionMatrix: state.camera.projectionMatrix.elements.slice(0, 16)
-        });
-    }
+
   }, FRAME_PRIORITY.CAMERA)
 
   // Reset camera when onReset callback is provided and changes

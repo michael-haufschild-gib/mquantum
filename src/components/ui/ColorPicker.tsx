@@ -255,11 +255,15 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             </div>
 
             {/* 2. Main Saturation/Value Area */}
-            <div 
+            <div
               ref={svRef}
               className="w-full h-[160px] rounded-lg relative cursor-crosshair overflow-hidden shadow-lg ring-1 ring-border-default group"
               onMouseDown={(e) => { e.preventDefault(); setIsDraggingSV(true); updateSV(e.clientX, e.clientY); }}
               style={{ backgroundColor: `hsl(${hsv.h * 360}, 100%, 50%)` }}
+              role="slider"
+              aria-label="Saturation and brightness"
+              aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, Brightness ${Math.round(hsv.v * 100)}%`}
+              tabIndex={0}
             >
               {/* Layers */}
               <div className="absolute inset-0 bg-gradient-to-r from-white to-transparent" />
@@ -281,10 +285,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
               {/* Hue */}
               <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-border-default cursor-pointer group">
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)' }} />
-                <input 
+                <input
                   type="range" min={0} max={1} step={0.001} value={hsv.h}
                   onChange={(e) => handleHsvChange({ ...hsv, h: parseFloat(e.target.value) })}
                   className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                  aria-label="Hue"
                 />
                 <div className="absolute top-0 bottom-0 w-2 h-full bg-white shadow-md rounded-full pointer-events-none -translate-x-1/2 transition-transform group-active:scale-110" style={{ left: `${hsv.h * 100}%` }} />
               </div>
@@ -294,10 +299,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
                 <div className="h-3 rounded-full relative overflow-hidden ring-1 ring-border-default cursor-pointer group">
                   <div className="absolute inset-0 z-0" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />
                   <div className="absolute inset-0 z-1" style={{ background: `linear-gradient(to right, transparent, ${hsvToHex(hsv.h, hsv.s, hsv.v)})` }} />
-                  <input 
+                  <input
                     type="range" min={0} max={1} step={0.01} value={hsv.a}
                     onChange={(e) => handleHsvChange({ ...hsv, a: parseFloat(e.target.value) })}
                     className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-20"
+                    aria-label="Opacity"
                   />
                   <div className="absolute top-0 bottom-0 w-2 h-full bg-white shadow-md rounded-full pointer-events-none -translate-x-1/2 z-30 transition-transform group-active:scale-110" style={{ left: `${hsv.a * 100}%` }} />
                 </div>

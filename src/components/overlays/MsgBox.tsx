@@ -1,11 +1,35 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMsgBoxStore } from '@/stores/msgBoxStore';
+import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Icon, type IconName } from '@/components/ui/Icon';
 
 export const MsgBox: React.FC = () => {
-  const { isOpen, title, message, type, actions, closeMsgBox } = useMsgBoxStore();
+  const { isOpen, title, message, type, actions, dismissible, dismissId, closeMsgBox } =
+    useMsgBoxStore();
+  const dismiss = useDismissedDialogsStore((state) => state.dismiss);
+
+  // Local state for the "don't show again" checkbox
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
+  // Reset checkbox state when dialog opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setDontShowAgain(false);
+    }
+  }, [isOpen]);
+
+  /**
+   * Handles action button click.
+   * If checkbox is checked, persists the dismiss state before executing the action.
+   */
+  const handleAction = (action: { onClick: () => void }) => {
+    if (dontShowAgain && dismissId) {
+      dismiss(dismissId);
+    }
+    action.onClick();
+  };
 
   const getIcon = (): IconName => {
     switch (type) {
@@ -47,27 +71,47 @@ export const MsgBox: React.FC = () => {
             <Icon name={getIcon()} size={24} />
           </div>
           <div className="flex-1">
-            <p className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed">
+            <p
+              id="msgbox-message"
+              className="text-sm text-text-primary whitespace-pre-wrap leading-relaxed"
+            >
               {message}
             </p>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
-          {actions.map((action, index) => (
-            <Button
-              key={index}
-              onClick={() => {
-                action.onClick();
-                // We don't auto-close here to allow actions to chain or keep open if needed,
-                // but default actions usually close it.
-              }}
-              variant={action.variant || 'secondary'}
-              size="md"
-            >
-              {action.label}
-            </Button>
-          ))}
+        <div className="flex items-center justify-between gap-4">
+          {/* "Don't show again" checkbox - only shown when dismissible */}
+          {dismissible && dismissId ? (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none group">
+              <input
+                type="checkbox"
+                checked={dontShowAgain}
+                onChange={(e) => setDontShowAgain(e.target.checked)}
+                className="w-4 h-4 rounded border-panel-border bg-bg-input accent-[var(--accent)] cursor-pointer"
+                aria-describedby="msgbox-message"
+              />
+              <span className="text-text-secondary group-hover:text-text-primary transition-colors">
+                Don't show again
+              </span>
+            </label>
+          ) : (
+            <div /> // Spacer to keep buttons right-aligned
+          )}
+
+          {/* Action buttons */}
+          <div className="flex justify-end gap-3">
+            {actions.map((action, index) => (
+              <Button
+                key={index}
+                onClick={() => handleAction(action)}
+                variant={action.variant || 'secondary'}
+                size="md"
+              >
+                {action.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
     </Modal>

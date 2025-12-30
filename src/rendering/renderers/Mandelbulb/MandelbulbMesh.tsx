@@ -4,10 +4,10 @@ import { FRAME_PRIORITY } from '@/rendering/core/framePriorities';
 import { useTemporalDepthUniforms } from '@/rendering/core/useTemporalDepthUniforms';
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial';
 import {
-    MAX_DIMENSION,
-    useLayerAssignment,
-    useQualityTracking,
-    useRotationUpdates,
+  MAX_DIMENSION,
+  useLayerAssignment,
+  useQualityTracking,
+  useRotationUpdates,
 } from '@/rendering/renderers/base';
 import { composeMandelbulbShader } from '@/rendering/shaders/mandelbulb/compose';
 import { SHADOW_QUALITY_TO_INT } from '@/rendering/shadows/types';
@@ -20,8 +20,8 @@ import { useGeometryStore } from '@/stores/geometryStore';
 import { useLightingStore } from '@/stores/lightingStore';
 import { useMsgBoxStore } from '@/stores/msgBoxStore';
 import {
-    getEffectiveShadowQuality,
-    usePerformanceStore,
+  getEffectiveShadowQuality,
+  usePerformanceStore,
 } from '@/stores/performanceStore';
 import { usePostProcessingStore } from '@/stores/postProcessingStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -210,6 +210,9 @@ const MandelbulbMesh = () => {
       // Ambient Occlusion uniforms
       uAoEnabled: { value: true },
 
+      // GPU Profiling mode (0=normal, 1=raymarch only, 2=raymarch+normal, 3=no AO, 4=no shadows)
+      uProfileMode: { value: 0 },
+
       // Temporal Reprojection - Textures must be manually handled as they come from context
       uPrevDepthTexture: { value: null },      // Legacy: kept for compatibility
       uPrevPositionTexture: { value: null },   // Position buffer: xyz=world pos, w=model-space ray distance
@@ -265,6 +268,25 @@ const MandelbulbMesh = () => {
     });
     return () => setShaderDebugInfo('object', null);
   }, [shaderString, modules, features, setShaderDebugInfo]);
+
+  // GPU Profiling: Expose profile mode setter on window for performance analysis
+  // Mode 0: Normal rendering
+  // Mode 1: Raymarch only (SDF iteration cost)
+  // Mode 2: Raymarch + normals (SDF + normal cost)
+  // Mode 3: Raymarch + normals + AO (before lighting)
+  useEffect(() => {
+    const win = window as unknown as { setProfileMode?: (mode: number) => void };
+    win.setProfileMode = (mode: number) => {
+      if (meshRef.current) {
+        const material = meshRef.current.material as THREE.ShaderMaterial;
+        if (material.uniforms?.uProfileMode) {
+          material.uniforms.uProfileMode.value = mode;
+          console.log(`Profile mode set to ${mode}: ${['Normal', 'Raymarch only', 'Raymarch+Normal', 'Raymarch+Normal+AO'][mode] || 'Unknown'}`);
+        }
+      }
+    };
+    return () => { delete win.setProfileMode; };
+  }, []);
 
   useFrame((state) => {
     if (hasErroredRef.current) return;

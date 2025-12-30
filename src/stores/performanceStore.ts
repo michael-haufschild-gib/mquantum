@@ -118,6 +118,9 @@ interface PerformanceState {
   /** Whether a scene preset is currently being loaded (semantic flag for hooks to skip automatic behavior) */
   isLoadingScene: boolean
 
+  /** Counter incremented on each scene/style preset load. Used to trigger material recreation. */
+  presetLoadVersion: number
+
   // -------------------------------------------------------------------------
   // Progressive Refinement (ALL objects)
   // -------------------------------------------------------------------------
@@ -186,6 +189,7 @@ interface PerformanceState {
   setIsInteracting: (interacting: boolean) => void
   setSceneTransitioning: (transitioning: boolean) => void
   setIsLoadingScene: (loading: boolean) => void
+  incrementPresetLoadVersion: () => void
 
   // Progressive Refinement
   setProgressiveRefinementEnabled: (enabled: boolean) => void
@@ -240,6 +244,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   isInteracting: false,
   sceneTransitioning: false,
   isLoadingScene: false,
+  presetLoadVersion: 0,
 
   // Progressive Refinement
   progressiveRefinementEnabled: true,
@@ -291,6 +296,10 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   setIsLoadingScene: (loading: boolean) => {
     set({ isLoadingScene: loading })
+  },
+
+  incrementPresetLoadVersion: () => {
+    set((state) => ({ presetLoadVersion: state.presetLoadVersion + 1 }))
   },
 
   // Progressive Refinement

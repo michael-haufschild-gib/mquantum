@@ -572,5 +572,7 @@ export type ExtendedObjectSlice = PolytopeSlice &
     mandelbulbVersion: number
     /** Version counter for quaternionJulia state changes (dirty-flag tracking) */
     quaternionJuliaVersion: number
+    /** Manually bump all version counters (used after direct setState calls) */
+    bumpAllVersions: () => void
     reset: () => void
   }

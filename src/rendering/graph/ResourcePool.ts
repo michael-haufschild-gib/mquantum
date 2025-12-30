@@ -155,10 +155,13 @@ export class ResourcePool {
    * @param width - Screen width in pixels
    * @param height - Screen height in pixels
    */
+  // Maximum texture dimension (WebGL guaranteed minimum is 4096, most GPUs support 16384)
+  private static readonly MAX_DIMENSION = 16384
+
   updateSize(width: number, height: number): void {
     if (width !== this.screenWidth || height !== this.screenHeight) {
-      this.screenWidth = Math.max(1, width)
-      this.screenHeight = Math.max(1, height)
+      this.screenWidth = Math.max(1, Math.min(width, ResourcePool.MAX_DIMENSION))
+      this.screenHeight = Math.max(1, Math.min(height, ResourcePool.MAX_DIMENSION))
     }
   }
 

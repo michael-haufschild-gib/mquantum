@@ -182,7 +182,7 @@ describe('deviceCapabilities', () => {
     })
 
     it('should have correct mobile defaults', () => {
-      expect(MOBILE_DEFAULT_RESOLUTION_SCALE).toBe(0.75)
+      expect(MOBILE_DEFAULT_RESOLUTION_SCALE).toBe(0.5)
       expect(MOBILE_DEFAULT_MAX_FPS).toBe(30)
     })
   })

@@ -184,7 +184,7 @@ export class TemporalSource extends BaseUniformSource {
     this.temporalUniforms.uTemporalEnabled.value = false
     this.temporalUniforms.uPrevViewProjectionMatrix.value.identity()
     this.temporalUniforms.uPrevInverseViewProjectionMatrix.value.identity()
-    this.temporalUniforms.uTemporalSafetyMargin.value = 0.95
+    this.temporalUniforms.uTemporalSafetyMargin.value = 0.5
     this.currentViewProjection.identity()
     this.currentInverseViewProjection.identity()
     this.enabled = false

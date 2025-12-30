@@ -9,6 +9,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Slider } from '@/components/ui/Slider';
 import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/hooks/useToast';
+import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
 import { clearMemoryCache } from '@/lib/geometry/wythoff/cache';
@@ -36,6 +37,13 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [showClearIndexDBModal, setShowClearIndexDBModal] = useState(false);
   const [showClearLocalStorageModal, setShowClearLocalStorageModal] = useState(false);
   const { addToast } = useToast();
+
+  const { dismissedCount, resetAllDismissed } = useDismissedDialogsStore(
+    useShallow((state) => ({
+      dismissedCount: state.getDismissedCount(),
+      resetAllDismissed: state.resetAll,
+    }))
+  );
 
   const { showAxisHelper, setShowAxisHelper, maxFps, setMaxFps } = useUIStore(
     useShallow((state) => ({
@@ -84,6 +92,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     }
   };
 
+  const handleRestoreDismissedHints = () => {
+    resetAllDismissed();
+    addToast('All hints restored', 'success');
+  };
+
   return (
     <Section title="Settings" defaultOpen={defaultOpen}>
       <div className="mt-3 pt-3 border-t border-panel-border">
@@ -120,6 +133,15 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         />
       </div>
       <div className="mt-3 pt-3 border-t border-panel-border flex flex-col gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleRestoreDismissedHints}
+          disabled={dismissedCount === 0}
+          data-testid="restore-hints-button"
+        >
+          Restore Dismissed Hints{dismissedCount > 0 ? ` (${dismissedCount})` : ''}
+        </Button>
         <Button
           variant="secondary"
           size="sm"

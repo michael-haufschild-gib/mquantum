@@ -38,9 +38,28 @@ void main() {
     if (d > maxDist) discard;
 
     vec3 p = ro + rd * d;
+
+    // PROFILE MODE 1: Raymarch only - measure pure SDF iteration cost
+    if (uProfileMode == 1) {
+        gColor = vec4(vec3(trap), 1.0);
+        gNormal = vec4(0.5, 0.5, 1.0, 0.0);
+        gPosition = vec4(p, d);
+        gl_FragDepth = 0.5;
+        return;
+    }
+
     // PERF (OPT-FR-1): Use tetrahedron normals - 4 SDF evals with quality
     // comparable to 6-eval central differences. Saves 33% on normal calculation.
     vec3 n = GetNormalTetra(p);
+
+    // PROFILE MODE 2: Raymarch + normals - measure SDF + normal cost
+    if (uProfileMode == 2) {
+        gColor = vec4(n * 0.5 + 0.5, 1.0);
+        gNormal = vec4(n * 0.5 + 0.5, 0.0);
+        gPosition = vec4(p, d);
+        gl_FragDepth = 0.5;
+        return;
+    }
 
     float ao = 1.0;
     #ifdef USE_AO
@@ -48,6 +67,15 @@ void main() {
         ao = uFastMode ? 1.0 : calcAO(p, n);
     }
     #endif
+
+    // PROFILE MODE 3: Raymarch + normals + AO - measure before lighting
+    if (uProfileMode == 3) {
+        gColor = vec4(vec3(ao), 1.0);
+        gNormal = vec4(n * 0.5 + 0.5, 0.0);
+        gPosition = vec4(p, d);
+        gl_FragDepth = 0.5;
+        return;
+    }
 
     vec3 baseHSL = rgb2hsl(uColor);
     float t = 1.0 - trap;

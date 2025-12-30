@@ -79,6 +79,10 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
   const setMeshRef = React.useCallback((mesh: THREE.Mesh | null) => {
     if (mesh) {
       mesh.layers.set(RENDER_LAYERS.SKYBOX);
+      // Skybox is semantically background - must render before other transparent objects.
+      // Without explicit renderOrder, Three.js sort is unstable when z-distances match,
+      // causing incorrect ordering when SkyboxMesh remounts (e.g., skybox type change).
+      mesh.renderOrder = -1;
     }
     // Update the ref for other hooks to use
     (meshRef as React.MutableRefObject<THREE.Mesh | null>).current = mesh;

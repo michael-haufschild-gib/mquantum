@@ -129,6 +129,10 @@ export interface LightingSliceActions {
   setShadowMapBias: (bias: number) => void
   setShadowMapBlur: (blur: number) => void
 
+  // --- Version Bump (for preset loading) ---
+  /** Manually bump version counter (used after direct setState calls) */
+  bumpVersion: () => void
+
   reset: () => void
 }
 
@@ -347,6 +351,10 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   setShadowMapBlur: (blur: number) => {
     set({ shadowMapBlur: Math.max(0, Math.min(10, blur)) })
+  },
+
+  bumpVersion: () => {
+    set((state) => ({ version: state.version + 1 }))
   },
 
   reset: () => {

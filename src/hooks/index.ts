@@ -1,5 +1,10 @@
 export { useAnimationLoop } from './useAnimationLoop'
 export { useAsyncFaceDetection, type AsyncFaceDetectionResult } from './useAsyncFaceDetection'
+export {
+  useConditionalMsgBox,
+  showConditionalMsgBox,
+  type UseConditionalMsgBoxResult,
+} from './useConditionalMsgBox'
 export { useFaceDepths } from './useFaceDepths'
 export { useFaceDetection, type FaceDetectionResult } from './useFaceDetection'
 export { useGeometryGenerator, type GeometryGeneratorResult } from './useGeometryGenerator'

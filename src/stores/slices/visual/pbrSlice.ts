@@ -65,6 +65,10 @@ export interface PBRSliceActions {
   setGroundSpecularColor: (color: string) => void
   setGroundPBR: (config: Partial<PBRConfig>) => void
 
+  // Version bump (for preset loading)
+  /** Manually bump version counter (used after direct setState calls) */
+  bumpVersion: () => void
+
   // Reset
   resetPBR: () => void
 }
@@ -230,6 +234,10 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
       },
       pbrVersion: state.pbrVersion + 1,
     })),
+
+  // --- Version Bump ---
+  bumpVersion: () =>
+    set((state) => ({ pbrVersion: state.pbrVersion + 1 })),
 
   // --- Reset ---
   resetPBR: () =>

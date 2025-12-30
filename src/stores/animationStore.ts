@@ -138,7 +138,9 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   clearAllPlanes: () => {
-    set({ animatingPlanes: new Set() })
+    // Clear all planes and stop animation to prevent invalid state
+    // where isPlaying=true but animatingPlanes is empty
+    set({ animatingPlanes: new Set(), isPlaying: false })
   },
 
   stopAll: () => {

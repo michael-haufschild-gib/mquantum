@@ -165,4 +165,3 @@ Do a full in-depth code review of the new feature(s). Is the implementation 100%
   - Easy to add sharpness slider
 
   Want me to implement CAS in ToScreenPass with a sharpness control?
-

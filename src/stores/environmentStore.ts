@@ -11,6 +11,8 @@ export interface EnvironmentStore extends GroundSlice, SkyboxSlice {
   groundVersion: number;
   /** Version counter for skybox/procedural setting changes */
   skyboxVersion: number;
+  /** Manually bump all version counters (used after direct setState calls) */
+  bumpAllVersions: () => void;
 }
 
 /**
@@ -73,6 +75,13 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
       iblVersion: 0,
       groundVersion: 0,
       skyboxVersion: 0,
+      bumpAllVersions: () => {
+        set((state) => ({
+          iblVersion: state.iblVersion + 1,
+          groundVersion: state.groundVersion + 1,
+          skyboxVersion: state.skyboxVersion + 1,
+        }));
+      },
     };
   })
 );

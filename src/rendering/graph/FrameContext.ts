@@ -71,6 +71,8 @@ export interface FrozenEnvironmentState {
   readonly skyboxHighQuality: boolean
   readonly skyboxLoading: boolean
   readonly classicCubeTexture: THREE.CubeTexture | null
+  /** Procedural skybox time scale (0 = frozen, >0 = animating) */
+  readonly skyboxTimeScale: number
 
   // Background color
   readonly backgroundColor: string
@@ -336,9 +338,7 @@ export interface StoreGetters {
  * @param getter - Store getter function
  * @returns Frozen animation state
  */
-function captureAnimationState(
-  getter: StoreGetters['getAnimationState']
-): FrozenAnimationState {
+function captureAnimationState(getter: StoreGetters['getAnimationState']): FrozenAnimationState {
   const state = getter()
   return {
     accumulatedTime: state.accumulatedTime,
@@ -355,9 +355,7 @@ function captureAnimationState(
  * @param getter - Store getter function
  * @returns Frozen geometry state
  */
-function captureGeometryState(
-  getter: StoreGetters['getGeometryState']
-): FrozenGeometryState {
+function captureGeometryState(getter: StoreGetters['getGeometryState']): FrozenGeometryState {
   const state = getter()
   return {
     objectType: state.objectType,
@@ -387,6 +385,7 @@ function captureEnvironmentState(
     skyboxHighQuality: skybox.skyboxHighQuality,
     skyboxLoading: skybox.skyboxLoading,
     classicCubeTexture: skybox.classicCubeTexture,
+    skyboxTimeScale: skybox.proceduralSettings?.timeScale ?? 0,
 
     // Background color
     backgroundColor: skybox.backgroundColor,
@@ -520,9 +519,7 @@ function capturePerformanceState(
  * @param getter - Store getter function
  * @returns Frozen black hole state
  */
-function captureBlackHoleState(
-  getter: StoreGetters['getBlackHoleState']
-): FrozenBlackHoleState {
+function captureBlackHoleState(getter: StoreGetters['getBlackHoleState']): FrozenBlackHoleState {
   const state = getter()
   return {
     horizonRadius: state.horizonRadius,
@@ -549,9 +546,7 @@ function captureBlackHoleState(
  * @param getter - Store getter function
  * @returns Frozen UI state
  */
-function captureUIState(
-  getter: StoreGetters['getUIState']
-): FrozenUIState {
+function captureUIState(getter: StoreGetters['getUIState']): FrozenUIState {
   const state = getter()
   return {
     showDepthBuffer: state.showDepthBuffer,
@@ -658,6 +653,7 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         skyboxHighQuality: true,
         skyboxLoading: false,
         classicCubeTexture: null,
+        skyboxTimeScale: 0.2,
         backgroundColor: '#0F0F1A',
         backgroundBlendMode: 'normal',
         activeWalls: [],

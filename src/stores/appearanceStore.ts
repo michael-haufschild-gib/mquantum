@@ -6,6 +6,8 @@ import { createAppearanceSlice, AppearanceSlice } from './slices/appearanceSlice
 export interface AppearanceStoreState extends AppearanceSlice {
   /** Version counter for dirty-flag tracking (incremented on any appearance change) */
   appearanceVersion: number;
+  /** Manually bump version counter (used after direct setState calls) */
+  bumpVersion: () => void;
 }
 
 export type { AppearanceSlice };
@@ -36,6 +38,9 @@ export const useAppearanceStore = create<AppearanceStoreState>()(
     return {
       ...wrappedSlice,
       appearanceVersion: 0,
+      bumpVersion: () => {
+        set((state) => ({ appearanceVersion: state.appearanceVersion + 1 }));
+      },
     };
   })
 );

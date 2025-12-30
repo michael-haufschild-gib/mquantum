@@ -140,7 +140,7 @@ describe('TemporalSource', () => {
       expect(uniforms.uPrevViewProjectionMatrix!.value).toBeInstanceOf(THREE.Matrix4)
       expect(uniforms.uPrevInverseViewProjectionMatrix!.value).toBeInstanceOf(THREE.Matrix4)
       expect(uniforms.uDepthBufferResolution!.value).toBeInstanceOf(THREE.Vector2)
-      expect(uniforms.uTemporalSafetyMargin!.value).toBe(0.95)
+      expect(uniforms.uTemporalSafetyMargin!.value).toBe(0.5)
     })
   })
 
@@ -251,7 +251,7 @@ describe('TemporalSource', () => {
       source.reset()
 
       expect(source.isEnabled()).toBe(false)
-      expect(source.getUniforms().uTemporalSafetyMargin!.value).toBe(0.95)
+      expect(source.getUniforms().uTemporalSafetyMargin!.value).toBe(0.5)
       expect(source.version).toBe(0)
     })
   })

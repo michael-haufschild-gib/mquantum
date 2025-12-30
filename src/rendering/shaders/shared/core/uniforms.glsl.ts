@@ -89,4 +89,7 @@ uniform float uShadowSoftness;
 
 // Ambient Occlusion uniforms
 uniform bool uAoEnabled;
+
+// GPU Profiling mode (0=normal, 1=raymarch only, 2=raymarch+normal, 3=no shadows, 4=no lighting)
+uniform int uProfileMode;
 `

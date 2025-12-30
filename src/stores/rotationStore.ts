@@ -58,6 +58,9 @@ export interface RotationState {
 
   /** Update state when dimension changes */
   setDimension: (dimension: number) => void
+
+  /** Manually bump version counter (used after direct setState calls) */
+  bumpVersion: () => void
 }
 
 /**
@@ -135,5 +138,9 @@ export const useRotationStore = create<RotationState>((set) => ({
       }
       return state
     })
+  },
+
+  bumpVersion: () => {
+    set((state) => ({ version: state.version + 1 }))
   },
 }))

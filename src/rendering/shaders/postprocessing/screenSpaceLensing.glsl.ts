@@ -154,10 +154,13 @@ export const screenSpaceLensingFragmentShader = /* glsl */ `
 
   /**
    * Linearize depth from depth buffer.
+   * Returns linear depth value clamped to [near, far] range.
    */
   float linearizeDepth(float depth, float near, float far) {
     float z = depth * 2.0 - 1.0;
-    return (2.0 * near * far) / (far + near - z * (far - near));
+    float denominator = far + near - z * (far - near);
+    // Guard against division by zero (can occur with degenerate near/far values)
+    return (2.0 * near * far) / max(denominator, 0.0001);
   }
 
   void main() {

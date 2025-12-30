@@ -65,6 +65,17 @@ export const useExtendedObjectStore = create<ExtendedObjectSlice>()((...a) => {
     ...createSchroedingerSlice(...a),
     ...createBlackHoleSlice(...a),
 
+    // --- Version Bump Action (for preset loading) ---
+    bumpAllVersions: () => {
+      set((state) => ({
+        polytopeVersion: state.polytopeVersion + 1,
+        blackholeVersion: state.blackholeVersion + 1,
+        schroedingerVersion: state.schroedingerVersion + 1,
+        mandelbulbVersion: state.mandelbulbVersion + 1,
+        quaternionJuliaVersion: state.quaternionJuliaVersion + 1,
+      }))
+    },
+
     // --- Reset Action ---
     reset: () => {
       set({

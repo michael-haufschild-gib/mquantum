@@ -80,22 +80,24 @@ export const transformNDBlock = `
       vec4 rotated = uRotationMatrix4D * pos4;
 
       // Add contribution from extra dimensions (5D+)
+      // OPTIMIZATION: Use early break instead of conditional inside loop
+      // This allows GPU to skip remaining iterations entirely
       for (int i = 0; i < ${MAX_EXTRA_DIMS}; i++) {
-        if (i + 5 <= uDimension) {
-          float extraDimValue = inputs[i + 4];
-          rotated.x += uExtraRotationCols[i * 4 + 0] * extraDimValue;
-          rotated.y += uExtraRotationCols[i * 4 + 1] * extraDimValue;
-          rotated.z += uExtraRotationCols[i * 4 + 2] * extraDimValue;
-          rotated.w += uExtraRotationCols[i * 4 + 3] * extraDimValue;
-        }
+        if (i + 5 > uDimension) break;  // Early exit when we've processed all dims
+        float extraDimValue = inputs[i + 4];
+        int baseIdx = i * 4;
+        rotated.x += uExtraRotationCols[baseIdx] * extraDimValue;
+        rotated.y += uExtraRotationCols[baseIdx + 1] * extraDimValue;
+        rotated.z += uExtraRotationCols[baseIdx + 2] * extraDimValue;
+        rotated.w += uExtraRotationCols[baseIdx + 3] * extraDimValue;
       }
 
       // Perspective projection: compute effective depth from higher dimensions
       float effectiveDepth = rotated.w;
+      // OPTIMIZATION: Use early break for depth sum loop
       for (int j = 0; j < 11; j++) {
-        if (j < uDimension) {
-          effectiveDepth += uDepthRowSums[j] * inputs[j];
-        }
+        if (j >= uDimension) break;  // Early exit when we've processed all dims
+        effectiveDepth += uDepthRowSums[j] * inputs[j];
       }
       // Normalize depth by sqrt(dimension - 3) for consistent visual scale across dimensions.
       // See ndTransform.ts module documentation for mathematical justification.

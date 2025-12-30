@@ -243,6 +243,8 @@ export interface PostProcessingSliceActions {
   setGravityDistortionScale: (scale: number) => void
   setGravityFalloff: (falloff: number) => void
   setGravityChromaticAberration: (aberration: number) => void
+  /** Manually bump gravity version counter (used after direct setState calls) */
+  bumpGravityVersion: () => void
 
   // --- Paper Texture Actions ---
   setPaperEnabled: (enabled: boolean) => void
@@ -549,6 +551,10 @@ export const createPostProcessingSlice: StateCreator<
       gravityChromaticAberration: Math.max(0, Math.min(1, aberration)),
       gravityVersion: s.gravityVersion + 1,
     }))
+  },
+
+  bumpGravityVersion: () => {
+    set((s) => ({ gravityVersion: s.gravityVersion + 1 }))
   },
 
   // --- Paper Texture Actions ---

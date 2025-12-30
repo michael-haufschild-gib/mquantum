@@ -10,21 +10,21 @@
 
 import { useTrackedShaderMaterial } from '@/rendering/materials/useTrackedShaderMaterial';
 import {
-  useNDTransformUpdates,
-  useProjectionDistanceCache,
-  useShadowPatching,
+    useNDTransformUpdates,
+    useProjectionDistanceCache,
+    useShadowPatching,
 } from '@/rendering/renderers/base';
 import { useFrame } from '@react-three/fiber';
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import {
-  BufferGeometry,
-  Color,
-  DoubleSide,
-  Float32BufferAttribute,
-  Matrix4,
-  ShaderMaterial,
-  Vector3,
+    BufferGeometry,
+    Color,
+    DoubleSide,
+    Float32BufferAttribute,
+    Matrix4,
+    ShaderMaterial,
+    Vector3,
 } from 'three';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -37,11 +37,11 @@ import { RENDER_LAYERS } from '@/rendering/core/layers';
 import { COLOR_ALGORITHM_TO_INT } from '@/rendering/shaders/palette';
 import { matrixToGPUUniforms } from '@/rendering/shaders/transforms/ndTransform';
 import {
-  blurToPCFSamples,
-  collectShadowDataCached,
-  createShadowMapUniforms,
-  SHADOW_MAP_SIZES,
-  updateShadowMapUniforms,
+    blurToPCFSamples,
+    collectShadowDataCached,
+    createShadowMapUniforms,
+    SHADOW_MAP_SIZES,
+    updateShadowMapUniforms,
 } from '@/rendering/shadows';
 import { UniformManager } from '@/rendering/uniforms/UniformManager';
 import { useAnimationStore } from '@/stores/animationStore';
@@ -52,11 +52,11 @@ import { useLightingStore } from '@/stores/lightingStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { TubeWireframe } from '../TubeWireframe';
 import {
-  buildEdgeFragmentShader,
-  buildEdgeVertexShader,
-  buildFaceFragmentShader,
-  buildFaceVertexShader,
-  MAX_EXTRA_DIMS,
+    buildEdgeFragmentShader,
+    buildEdgeVertexShader,
+    buildFaceFragmentShader,
+    buildFaceVertexShader,
+    MAX_EXTRA_DIMS,
 } from './index';
 
 /**
@@ -360,6 +360,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   const lastAppearanceVersionRef = useRef(-1);
   const lastIblVersionRef = useRef(-1);
   const lastLightingVersionRef = useRef(-1);
+  const lastSkyboxVersionRef = useRef(-1); // DEBUG: track skybox changes
   const prevFaceMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
 
   // Performance optimization: Cache store state in refs to avoid getState() calls every frame
@@ -422,6 +423,9 @@ export const PolytopeScene = React.memo(function PolytopeScene({
 
   const shadowEnabled = useLightingStore((state) => state.shadowEnabled);
 
+  // Subscribe to preset load version to trigger material recreation on scene/style load
+  // This ensures material properties (transparent, depthWrite) match loaded state
+  const presetLoadVersion = usePerformanceStore((state) => state.presetLoadVersion);
 
   const surfaceSettings = shaderSettings.surface;
   // Use TubeWireframe for thick lines (>1), native lineSegments for thin lines (1)
@@ -446,6 +450,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   const { material: faceMaterial, isCompiling: isFaceShaderCompiling } = useTrackedShaderMaterial(
     'Polytope Face Shader',
     () => {
+
 
       return new ShaderMaterial({
         glslVersion: THREE.GLSL3,
@@ -505,7 +510,9 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     // Note: faceOpacity removed from deps - it's updated via uniforms in useFrame.
     // Changing opacity value should NOT trigger shader rebuild, only feature toggles should.
     // faceColor is also updated via uniforms.
-    [surfaceSettings.fresnelEnabled, sssEnabled, faceFragmentShader]
+    // presetLoadVersion: triggers material recreation on scene/style load to ensure
+    // transparent/depthWrite properties match the loaded state (fixes skybox visibility bug).
+    [surfaceSettings.fresnelEnabled, sssEnabled, faceFragmentShader, presetLoadVersion]
   );
 
 
@@ -735,7 +742,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
 
 
     return geo;
-  }, [numFaces, faces, baseVertices, dimension]);
+  }, [numFaces, faces, baseVertices]);
 
   // ============ EDGE GEOMETRY ============
   const edgeGeometry = useMemo(() => {
@@ -824,6 +831,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     const appearanceVersion = appearanceState.appearanceVersion;
     const iblVersion = environmentState.iblVersion;
     const lightingVersion = lightingState.version;
+    const skyboxVersion = environmentState.skyboxVersion;
 
     const polytopeChanged = polytopeVersion !== lastPolytopeVersionRef.current;
     const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current;

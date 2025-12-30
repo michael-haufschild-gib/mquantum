@@ -1,9 +1,11 @@
+import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
 import { flushSync } from 'react-dom'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
 import { useCameraStore } from './cameraStore'
+import { DIALOG_IDS } from './dismissedDialogsStore'
 import { useEnvironmentStore } from './environmentStore'
 import { useExtendedObjectStore } from './extendedObjectStore'
 import { useGeometryStore } from './geometryStore'
@@ -120,6 +122,21 @@ const TRANSIENT_FIELDS = new Set([
   'showPerfMonitor',
   'perfMonitorExpanded',
   'perfMonitorTab',
+
+  // Version counters - internal dirty-flag optimization state
+  // These are auto-incremented for render optimization and should never be persisted
+  'appearanceVersion',
+  'iblVersion',
+  'groundVersion',
+  'skyboxVersion',
+  'version', // Used by rotationStore and lightingSlice
+  'gravityVersion',
+  'pbrVersion',
+  'polytopeVersion',
+  'blackholeVersion',
+  'schroedingerVersion',
+  'mandelbulbVersion',
+  'quaternionJuliaVersion',
 ])
 
 /**
@@ -171,6 +188,55 @@ const serializeRotationState = <T extends object>(state: T) => {
   return clean
 }
 
+/**
+ * Strips transient/internal fields from loaded data.
+ * Ensures legacy presets containing version fields don't overwrite current state.
+ * @param state - The state object loaded from a preset.
+ * @returns A sanitized copy with transient fields removed.
+ */
+const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T): T => {
+  const clean = { ...state }
+  for (const field of TRANSIENT_FIELDS) {
+    delete clean[field]
+  }
+  return clean
+}
+
+/**
+ * Recursively sanitizes all data sections of a saved style.
+ * Removes transient fields from each store's data.
+ * @param data - The SavedStyle data object.
+ * @returns Sanitized data object.
+ */
+const sanitizeStyleData = (data: SavedStyle['data']): SavedStyle['data'] => ({
+  appearance: sanitizeLoadedState(data.appearance),
+  lighting: sanitizeLoadedState(data.lighting),
+  postProcessing: sanitizeLoadedState(data.postProcessing),
+  environment: sanitizeLoadedState(data.environment),
+  pbr: sanitizeLoadedState(data.pbr),
+})
+
+/**
+ * Recursively sanitizes all data sections of a saved scene.
+ * Removes transient fields from each store's data.
+ * @param data - The SavedScene data object.
+ * @returns Sanitized data object.
+ */
+const sanitizeSceneData = (data: SavedScene['data']): SavedScene['data'] => ({
+  appearance: sanitizeLoadedState(data.appearance),
+  lighting: sanitizeLoadedState(data.lighting),
+  postProcessing: sanitizeLoadedState(data.postProcessing),
+  environment: sanitizeLoadedState(data.environment),
+  pbr: sanitizeLoadedState(data.pbr),
+  geometry: sanitizeLoadedState(data.geometry),
+  extended: sanitizeLoadedState(data.extended),
+  transform: sanitizeLoadedState(data.transform),
+  rotation: sanitizeLoadedState(data.rotation),
+  animation: sanitizeLoadedState(data.animation),
+  camera: sanitizeLoadedState(data.camera),
+  ui: sanitizeLoadedState(data.ui),
+})
+
 export const usePresetManagerStore = create<PresetManagerState>()(
   persist(
     (set, get) => ({
@@ -181,10 +247,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
       saveStyle: (name) => {
         // Validate and sanitize name
-        const trimmedName = name.trim();
+        const trimmedName = name.trim()
         if (!trimmedName) {
-          console.warn('Cannot save style with empty name');
-          return;
+          console.warn('Cannot save style with empty name')
+          return
         }
 
         // Deep clone all states to prevent reference sharing
@@ -208,6 +274,21 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         }
 
         set((state) => ({ savedStyles: [...state.savedStyles, newStyle] }))
+
+        // Show localStorage warning (can be dismissed permanently)
+        showConditionalMsgBox(
+          DIALOG_IDS.PRESET_SAVE_STYLE_WARNING,
+          'Style Saved Locally',
+          "Your style preset is stored in your browser's localStorage. This data may be lost if you clear browser data or use private browsing.\n\nFor permanent backup, use the Export function to save your styles as a JSON file.",
+          'info',
+          [
+            {
+              label: 'Got it',
+              variant: 'primary',
+              onClick: () => useMsgBoxStore.getState().closeMsgBox(),
+            },
+          ]
+        )
       },
 
       loadStyle: (id) => {
@@ -217,14 +298,14 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // Signal scene transition start
         usePerformanceStore.getState().setSceneTransitioning(true)
 
-        // Restore states
-        // NOTE: We assume these are plain objects and arrays which Zustand handles fine
-        useAppearanceStore.setState(style.data.appearance)
-        useLightingStore.setState(style.data.lighting)
-        usePostProcessingStore.setState(style.data.postProcessing)
+        // Restore states with transient fields stripped
+        // This ensures legacy presets with version fields don't corrupt current counters
+        useAppearanceStore.setState(sanitizeLoadedState(style.data.appearance))
+        useLightingStore.setState(sanitizeLoadedState(style.data.lighting))
+        usePostProcessingStore.setState(sanitizeLoadedState(style.data.postProcessing))
 
         // Handle legacy environment data (fallback to no skybox)
-        const envData = { ...style.data.environment }
+        const envData = sanitizeLoadedState({ ...style.data.environment })
         if (envData.skyboxEnabled === undefined) {
           envData.skyboxEnabled = false
         }
@@ -232,8 +313,20 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
         // Restore PBR settings (handle legacy presets without pbr)
         if (style.data.pbr) {
-          usePBRStore.setState(style.data.pbr)
+          usePBRStore.setState(sanitizeLoadedState(style.data.pbr))
         }
+
+        // Bump version counters to trigger re-renders after direct setState calls
+        // This is necessary because setState bypasses the wrapped setters that auto-increment versions
+        useAppearanceStore.getState().bumpVersion()
+        useLightingStore.getState().bumpVersion()
+        usePostProcessingStore.getState().bumpGravityVersion()
+        useEnvironmentStore.getState().bumpAllVersions()
+        usePBRStore.getState().bumpVersion()
+
+        // Increment preset load version to trigger material recreation in renderers
+        // This ensures material properties (transparent, depthWrite) match loaded state
+        usePerformanceStore.getState().incrementPresetLoadVersion()
 
         requestAnimationFrame(() => {
           usePerformanceStore.getState().setSceneTransitioning(false)
@@ -253,7 +346,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         set((state) => ({
           savedStyles: state.savedStyles.map((s) =>
             s.id === id ? { ...s, name: trimmedName } : s
-          )
+          ),
         }))
       },
 
@@ -261,28 +354,37 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         try {
           const imported = JSON.parse(jsonData)
           if (!Array.isArray(imported)) {
-            useMsgBoxStore.getState().showMsgBox('Import Failed', 'Invalid format: expected an array of styles.', 'error');
+            useMsgBoxStore
+              .getState()
+              .showMsgBox('Import Failed', 'Invalid format: expected an array of styles.', 'error')
             return false
           }
           // Comprehensive validation: Check all required SavedStyle fields
-          const valid = imported.every(i =>
-            i.id &&
-            i.name &&
-            i.timestamp &&
-            i.data &&
-            i.data.appearance &&
-            i.data.lighting &&
-            i.data.postProcessing &&
-            i.data.environment
+          const valid = imported.every(
+            (i) =>
+              i.id &&
+              i.name &&
+              i.timestamp &&
+              i.data &&
+              i.data.appearance &&
+              i.data.lighting &&
+              i.data.postProcessing &&
+              i.data.environment
           )
           if (!valid) {
-            useMsgBoxStore.getState().showMsgBox('Import Failed', 'The style data is corrupted or incompatible. Styles must contain appearance, lighting, postProcessing, and environment data.', 'error');
+            useMsgBoxStore
+              .getState()
+              .showMsgBox(
+                'Import Failed',
+                'The style data is corrupted or incompatible. Styles must contain appearance, lighting, postProcessing, and environment data.',
+                'error'
+              )
             return false
           }
 
-          // Regenerate IDs to prevent duplicates
-          const existingNames = get().savedStyles.map(s => s.name)
-          const processedStyles = imported.map(style => {
+          // Regenerate IDs to prevent duplicates and sanitize data
+          const existingNames = get().savedStyles.map((s) => s.name)
+          const processedStyles = imported.map((style) => {
             // Always generate a new ID to ensure uniqueness
             const newId = crypto.randomUUID()
             // Check if this is a name duplicate and append "(imported)" if so
@@ -294,6 +396,8 @@ export const usePresetManagerStore = create<PresetManagerState>()(
               id: newId,
               name: newName,
               timestamp: Date.now(), // Update timestamp to import time
+              // Sanitize data to remove any transient fields (version counters, etc.)
+              data: sanitizeStyleData(style.data),
             }
           })
 
@@ -301,7 +405,13 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           return true
         } catch (e) {
           console.error('Failed to import styles', e)
-          useMsgBoxStore.getState().showMsgBox('Import Error', `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+          useMsgBoxStore
+            .getState()
+            .showMsgBox(
+              'Import Error',
+              `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`,
+              'error'
+            )
           return false
         }
       },
@@ -314,10 +424,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
       saveScene: (name) => {
         // Validate and sanitize name
-        const trimmedName = name.trim();
+        const trimmedName = name.trim()
         if (!trimmedName) {
-          console.warn('Cannot save scene with empty name');
-          return;
+          console.warn('Cannot save scene with empty name')
+          return
         }
 
         // Style components
@@ -361,6 +471,21 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         }
 
         set((state) => ({ savedScenes: [...state.savedScenes, newScene] }))
+
+        // Show localStorage warning (can be dismissed permanently)
+        showConditionalMsgBox(
+          DIALOG_IDS.PRESET_SAVE_SCENE_WARNING,
+          'Scene Saved Locally',
+          "Your scene preset is stored in your browser's localStorage. This data may be lost if you clear browser data or use private browsing.\n\nFor permanent backup, use the Export function to save your scenes as a JSON file.",
+          'info',
+          [
+            {
+              label: 'Got it',
+              variant: 'primary',
+              onClick: () => useMsgBoxStore.getState().closeMsgBox(),
+            },
+          ]
+        )
       },
 
       loadScene: (id) => {
@@ -374,13 +499,14 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           usePerformanceStore.getState().setIsLoadingScene(true)
           usePerformanceStore.getState().setSceneTransitioning(true)
 
-          // Restore Style components (no validation needed)
-          useAppearanceStore.setState(scene.data.appearance)
-          useLightingStore.setState(scene.data.lighting)
-          usePostProcessingStore.setState(scene.data.postProcessing)
+          // Restore Style components with transient fields stripped
+          // This ensures legacy presets with version fields don't corrupt current counters
+          useAppearanceStore.setState(sanitizeLoadedState(scene.data.appearance))
+          useLightingStore.setState(sanitizeLoadedState(scene.data.lighting))
+          usePostProcessingStore.setState(sanitizeLoadedState(scene.data.postProcessing))
 
           // Handle legacy environment data
-          const envData = { ...scene.data.environment }
+          const envData = sanitizeLoadedState({ ...scene.data.environment })
           if (envData.skyboxEnabled === undefined) {
             envData.skyboxEnabled = false
           }
@@ -388,44 +514,50 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
           // Restore PBR settings (handle legacy presets without pbr)
           if (scene.data.pbr) {
-            usePBRStore.setState(scene.data.pbr)
+            usePBRStore.setState(sanitizeLoadedState(scene.data.pbr))
           }
 
           // Restore Geometry using validated setters to ensure dimension/type constraints
           // IMPORTANT: Set dimension FIRST to enable more object types, then set objectType
-          const geometryData = scene.data.geometry as { dimension?: number; objectType?: string }
+          const geometryData = sanitizeLoadedState(scene.data.geometry) as {
+            dimension?: number
+            objectType?: string
+          }
           if (geometryData.dimension !== undefined) {
             useGeometryStore.getState().setDimension(geometryData.dimension)
           }
           if (geometryData.objectType !== undefined) {
-            useGeometryStore.getState().setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
+            useGeometryStore
+              .getState()
+              .setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
           }
 
-          // Restore other scene components
-          useExtendedObjectStore.setState(scene.data.extended)
-          useTransformStore.setState(scene.data.transform)
+          // Restore other scene components with transient fields stripped
+          useExtendedObjectStore.setState(sanitizeLoadedState(scene.data.extended))
+          useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
 
-          // Filter out transient fields from UI data before restoring
-          // This ensures existing presets with these fields remain compatible
-          const uiData = { ...scene.data.ui }
-          for (const field of TRANSIENT_FIELDS) {
-            delete uiData[field]
-          }
-          useUIStore.setState(uiData)
+          // Sanitize UI data (already strips transient fields)
+          useUIStore.setState(sanitizeLoadedState(scene.data.ui))
 
           // Special handling for Rotation (Object -> Map)
           if (scene.data.rotation) {
-            const rotState = { ...scene.data.rotation }
-            if (rotState.rotations && typeof rotState.rotations === 'object' && !Array.isArray(rotState.rotations)) {
+            const rotState = sanitizeLoadedState({ ...scene.data.rotation })
+            if (
+              rotState.rotations &&
+              typeof rotState.rotations === 'object' &&
+              !Array.isArray(rotState.rotations)
+            ) {
               // Convert Object back to Map
-              rotState.rotations = new Map(Object.entries(rotState.rotations as Record<string, number>))
+              rotState.rotations = new Map(
+                Object.entries(rotState.rotations as Record<string, number>)
+              )
             }
             useRotationStore.setState(rotState)
           }
 
           // Special handling for Animation (Array -> Set)
           if (scene.data.animation) {
-            const animState = { ...scene.data.animation }
+            const animState = sanitizeLoadedState({ ...scene.data.animation })
             if (Array.isArray(animState.animatingPlanes)) {
               animState.animatingPlanes = new Set(animState.animatingPlanes)
             }
@@ -434,7 +566,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
           // Special handling for Camera
           if (scene.data.camera && Object.keys(scene.data.camera).length > 0) {
-            const cameraData = scene.data.camera as { position?: [number, number, number]; target?: [number, number, number] }
+            const cameraData = sanitizeLoadedState(scene.data.camera) as {
+              position?: [number, number, number]
+              target?: [number, number, number]
+            }
             if (cameraData.position && cameraData.target) {
               useCameraStore.getState().applyState({
                 position: cameraData.position,
@@ -443,6 +578,24 @@ export const usePresetManagerStore = create<PresetManagerState>()(
             }
           }
         })
+
+        // Bump version counters to trigger re-renders after direct setState calls
+        // This is necessary because setState bypasses the wrapped setters that auto-increment versions
+        useAppearanceStore.getState().bumpVersion()
+        useLightingStore.getState().bumpVersion()
+        usePostProcessingStore.getState().bumpGravityVersion()
+        useEnvironmentStore.getState().bumpAllVersions()
+        usePBRStore.getState().bumpVersion()
+        useRotationStore.getState().bumpVersion()
+        useExtendedObjectStore.getState().bumpAllVersions()
+
+        // Increment preset load version to trigger material recreation in renderers
+        // This ensures material properties (transparent, depthWrite) match loaded state
+        console.log(
+          '[loadScene] incrementPresetLoadVersion, faceOpacity:',
+          useAppearanceStore.getState().shaderSettings?.surface?.faceOpacity
+        )
+        usePerformanceStore.getState().incrementPresetLoadVersion()
 
         // Signal load complete after React settles - uses helper to prevent race conditions
         scheduleSceneLoadComplete()
@@ -461,7 +614,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         set((state) => ({
           savedScenes: state.savedScenes.map((s) =>
             s.id === id ? { ...s, name: trimmedName } : s
-          )
+          ),
         }))
       },
 
@@ -469,37 +622,46 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         try {
           const imported = JSON.parse(jsonData)
           if (!Array.isArray(imported)) {
-            useMsgBoxStore.getState().showMsgBox('Import Failed', 'Invalid format: expected an array of scenes.', 'error');
+            useMsgBoxStore
+              .getState()
+              .showMsgBox('Import Failed', 'Invalid format: expected an array of scenes.', 'error')
             return false
           }
           // Comprehensive validation: Check all required SavedScene fields
-          const valid = imported.every(i =>
-            i.id &&
-            i.name &&
-            i.timestamp &&
-            i.data &&
-            // Style components
-            i.data.appearance &&
-            i.data.lighting &&
-            i.data.postProcessing &&
-            i.data.environment &&
-            // Scene components
-            i.data.geometry &&
-            i.data.extended &&
-            i.data.transform &&
-            i.data.rotation &&
-            i.data.animation &&
-            i.data.camera &&
-            i.data.ui
+          const valid = imported.every(
+            (i) =>
+              i.id &&
+              i.name &&
+              i.timestamp &&
+              i.data &&
+              // Style components
+              i.data.appearance &&
+              i.data.lighting &&
+              i.data.postProcessing &&
+              i.data.environment &&
+              // Scene components
+              i.data.geometry &&
+              i.data.extended &&
+              i.data.transform &&
+              i.data.rotation &&
+              i.data.animation &&
+              i.data.camera &&
+              i.data.ui
           )
           if (!valid) {
-            useMsgBoxStore.getState().showMsgBox('Import Failed', 'The scene data is corrupted or incompatible. Scenes must contain all required data fields (geometry, appearance, lighting, etc.).', 'error');
+            useMsgBoxStore
+              .getState()
+              .showMsgBox(
+                'Import Failed',
+                'The scene data is corrupted or incompatible. Scenes must contain all required data fields (geometry, appearance, lighting, etc.).',
+                'error'
+              )
             return false
           }
 
-          // Regenerate IDs to prevent duplicates
-          const existingNames = get().savedScenes.map(s => s.name)
-          const processedScenes = imported.map(scene => {
+          // Regenerate IDs to prevent duplicates and sanitize data
+          const existingNames = get().savedScenes.map((s) => s.name)
+          const processedScenes = imported.map((scene) => {
             // Always generate a new ID to ensure uniqueness
             const newId = crypto.randomUUID()
             // Check if this is a name duplicate and append "(imported)" if so
@@ -511,6 +673,8 @@ export const usePresetManagerStore = create<PresetManagerState>()(
               id: newId,
               name: newName,
               timestamp: Date.now(), // Update timestamp to import time
+              // Sanitize data to remove any transient fields (version counters, etc.)
+              data: sanitizeSceneData(scene.data),
             }
           })
 
@@ -518,7 +682,13 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           return true
         } catch (e) {
           console.error('Failed to import scenes', e)
-          useMsgBoxStore.getState().showMsgBox('Import Error', `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
+          useMsgBoxStore
+            .getState()
+            .showMsgBox(
+              'Import Error',
+              `Failed to parse JSON data: ${e instanceof Error ? e.message : 'Unknown error'}`,
+              'error'
+            )
           return false
         }
       },

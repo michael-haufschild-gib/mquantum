@@ -59,8 +59,8 @@ import {
   DebugOverlayPass,
   DepthPass,
   EnvironmentCompositePass,
-  FrameBlendingPass,
   FXAAPass,
+  FrameBlendingPass,
   FullscreenPass,
   GTAOPass,
   GravitationalLensingPass,
@@ -74,8 +74,8 @@ import {
   ScreenSpaceLensingPass,
   TemporalCloudPass,
   TemporalDepthCapturePass,
-  ToneMappingPass,
   ToScreenPass,
+  ToneMappingPass,
 } from '@/rendering/graph/passes';
 import { RenderGraph } from '@/rendering/graph/RenderGraph';
 import { cloudCompositeFragmentShader } from '@/rendering/shaders/postprocessing/cloudComposite.glsl';
@@ -1334,11 +1334,6 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     }
 
     graphRef.current = g;
-
-    // Expose for debugging (development only)
-    if (typeof window !== 'undefined') {
-      (window as unknown as { __RENDER_GRAPH__: typeof g }).__RENDER_GRAPH__ = g;
-    }
 
     return g;
     // eslint-disable-next-line react-hooks/exhaustive-deps

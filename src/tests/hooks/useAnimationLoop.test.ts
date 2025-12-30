@@ -170,9 +170,9 @@ describe('useAnimationLoop', () => {
       expect(maxFps).toBeLessThanOrEqual(120);
     });
 
-    it('should default to 60 FPS', () => {
+    it('should default to 120 FPS', () => {
       useUIStore.setState(UI_INITIAL_STATE);
-      expect(useUIStore.getState().maxFps).toBe(60);
+      expect(useUIStore.getState().maxFps).toBe(120);
     });
 
     it('should allow changing maxFps', () => {
@@ -184,13 +184,13 @@ describe('useAnimationLoop', () => {
     });
 
     it('should calculate frame interval from maxFps', () => {
-      // Reset to ensure default of 60 FPS
+      // Reset to ensure default of 120 FPS
       useUIStore.setState(UI_INITIAL_STATE);
       const maxFps = useUIStore.getState().maxFps;
       const frameInterval = 1000 / maxFps;
 
-      // At 60 FPS, frame interval should be ~16.67ms
-      expect(frameInterval).toBeCloseTo(16.67, 1);
+      // At 120 FPS, frame interval should be ~8.33ms
+      expect(frameInterval).toBeCloseTo(8.33, 1);
     });
 
     it('should have correct frame interval at different FPS values', () => {

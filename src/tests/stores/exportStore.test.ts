@@ -142,10 +142,10 @@ describe('exportStore', () => {
       // Force a known browser type for deterministic mode selection
       useExportStore.setState({ browserType: 'standard' })
 
-      // Default codec is 'avc' with CBR => compression factor 0.55
+      // Set avc with CBR => compression factor 0.55
       // Theoretical: (bitrate * duration)/8, then multiply by compression factor
       // With bitrate=160, duration=10: theoretical=200MB, compressed=200*0.55=110MB
-      useExportStore.getState().updateSettings({ bitrate: 160, duration: 10 })
+      useExportStore.getState().updateSettings({ bitrate: 160, duration: 10, bitrateMode: 'constant' })
       useExportStore.getState().setModalOpen(true) // triggers recalculateMode
 
       const theoreticalSize = (160 * 10) / 8 // 200MB
