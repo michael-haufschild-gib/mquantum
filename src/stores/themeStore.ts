@@ -30,7 +30,7 @@ export const VALID_ACCENTS: readonly ThemeAccent[] = [
   'orange',
   'blue',
   'violet',
-  'red'
+  'red',
 ] as const
 
 function isValidAccent(value: unknown): value is ThemeAccent {
@@ -52,8 +52,8 @@ export interface ThemeState {
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
-      mode: 'dark', // Default to dark for that "cosmic" feel
-      accent: 'cyan',
+      mode: 'dark', // Default to dark for that "amethyst" feel
+      accent: 'magenta',
       setMode: (mode) => {
         if (!isValidMode(mode)) return
         set({ mode })
@@ -67,11 +67,11 @@ export const useThemeStore = create<ThemeState>()(
         set({ accent })
       },
       setPreset: (presetId) => {
-        const preset = THEME_PRESETS.find(p => p.id === presetId)
+        const preset = THEME_PRESETS.find((p) => p.id === presetId)
         if (preset) {
           set({ mode: preset.mode, accent: preset.accent })
         }
-      }
+      },
     }),
     {
       name: 'mdimension-theme-storage',

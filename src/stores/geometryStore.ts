@@ -73,6 +73,22 @@ export interface GeometryState {
   // Actions
   setDimension: (dimension: number) => void
   setObjectType: (type: ObjectType) => void
+  /**
+   * Loads geometry state from a saved scene.
+   *
+   * Unlike setDimension/setObjectType, this action:
+   * - Sets both dimension and objectType atomically
+   * - Does NOT auto-switch to "recommended" dimension
+   * - Does NOT trigger internal flushSync (caller handles batching)
+   * - Does NOT schedule transition completion (caller handles it)
+   *
+   * This is specifically for scene loading where we want to restore
+   * exact saved state without any auto-adjustments.
+   *
+   * @param dimension - The saved dimension value
+   * @param objectType - The saved object type
+   */
+  loadGeometry: (dimension: number, objectType: ObjectType) => void
   reset: () => void
 }
 
@@ -255,6 +271,70 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
 
     // Signal transition complete after React settles - triggers progressive refinement
     scheduleTransitionComplete()
+  },
+
+  loadGeometry: (dimension: number, objectType: ObjectType) => {
+    const clampedDimension = clampDimension(dimension)
+    const currentDimension = get().dimension
+    const currentType = get().objectType
+
+    // Validate that objectType is valid for dimension
+    if (!isValidObjectType(objectType)) {
+      console.warn(`Invalid object type for scene load: ${objectType}, using hypercube`)
+      objectType = 'hypercube'
+    }
+
+    const validation = validateObjectTypeForDimension(objectType, clampedDimension)
+    if (!validation.valid) {
+      console.warn(
+        `Object type ${objectType} is not valid for dimension ${clampedDimension} during scene load: ${validation.message}`
+      )
+      objectType = validation.fallbackType ?? 'hypercube'
+    }
+
+    // Skip if nothing changed
+    if (clampedDimension === currentDimension && objectType === currentType) {
+      return
+    }
+
+    // Invalidate temporal depth data
+    invalidateAllTemporalDepth()
+
+    // Update dimension-dependent stores for new dimension
+    if (clampedDimension !== currentDimension) {
+      useAnimationStore.getState().setDimension(clampedDimension)
+      useRotationStore.getState().setDimension(clampedDimension)
+      useTransformStore.getState().setDimension(clampedDimension)
+    }
+
+    // Validate color algorithm for new object type
+    const appearanceStore = useAppearanceStore.getState()
+    if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, objectType)) {
+      appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
+    }
+
+    // Raymarched fractals require facesVisible=true
+    if (isRaymarchingFractal(objectType, clampedDimension)) {
+      if (!appearanceStore.facesVisible) {
+        appearanceStore.setFacesVisible(true)
+      }
+    }
+
+    // Gravitational lensing toggle based on object type
+    const ppStore = usePostProcessingStore.getState()
+    if (objectType === 'blackhole') {
+      ppStore.setGravityEnabled(true)
+    } else {
+      ppStore.setGravityEnabled(false)
+    }
+
+    // Set both atomically - no auto-adjustments
+    set({
+      dimension: clampedDimension,
+      objectType: objectType,
+    })
+
+    // Note: Caller (loadScene) handles flushSync and scheduleSceneLoadComplete
   },
 
   reset: () => {

@@ -477,4 +477,21 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
       mandelbulb: { ...state.mandelbulb, sssThickness: clamped },
     }))
   },
+
+  // --- SDF Render Quality Actions ---
+  setMandelbulbSdfMaxIterations: (value) => {
+    // Range 5-100, clamped to integer
+    const clamped = Math.max(5, Math.min(100, Math.floor(value)))
+    setWithVersion((state) => ({
+      mandelbulb: { ...state.mandelbulb, sdfMaxIterations: clamped },
+    }))
+  },
+
+  setMandelbulbSdfSurfaceDistance: (value) => {
+    // Range 0.00005-0.01
+    const clamped = Math.max(0.00005, Math.min(0.01, value))
+    setWithVersion((state) => ({
+      mandelbulb: { ...state.mandelbulb, sdfSurfaceDistance: clamped },
+    }))
+  },
 }}

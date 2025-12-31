@@ -53,12 +53,12 @@ describe('SkyboxSlice', () => {
   });
 
   it('setSkyboxSelection sets procedural mode correctly', () => {
-    useEnvironmentStore.getState().setSkyboxSelection('procedural_void');
+    useEnvironmentStore.getState().setSkyboxSelection('procedural_nebula');
 
     const state = useEnvironmentStore.getState();
-    expect(state.skyboxSelection).toBe('procedural_void');
+    expect(state.skyboxSelection).toBe('procedural_nebula');
     expect(state.skyboxEnabled).toBe(true);
-    expect(state.skyboxMode).toBe('procedural_void');
+    expect(state.skyboxMode).toBe('procedural_nebula');
   });
 
 

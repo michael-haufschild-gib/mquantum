@@ -36,12 +36,11 @@ export {
   SKYBOX_MODE_HORIZON,
   SKYBOX_MODE_NEBULA,
   SKYBOX_MODE_OCEAN,
-  SKYBOX_MODE_STARFIELD,
   SKYBOX_MODE_TWILIGHT,
-  SKYBOX_MODE_VOID,
   createSkyboxShaderDefaults,
   skyboxGlslVersion,
 } from './skybox/SkyboxShader'
+
 
 
 

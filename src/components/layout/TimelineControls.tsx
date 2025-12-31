@@ -11,9 +11,8 @@ import { Slider } from '@/components/ui/Slider';
 import { BlackHoleAnimationDrawer } from './TimelineControls/BlackHoleAnimationDrawer';
 import { JuliaAnimationDrawer } from './TimelineControls/JuliaAnimationDrawer';
 import { MandelbulbAnimationDrawer } from './TimelineControls/MandelbulbAnimationDrawer';
-import { PolytopeAnimationDrawer } from './TimelineControls/PolytopeAnimationDrawer';
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer';
-import { hasTimelineControls, isPolytopeCategory, getConfigStoreKey } from '@/lib/geometry/registry';
+import { hasTimelineControls, getConfigStoreKey } from '@/lib/geometry/registry';
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/Button';
 import { ToggleButton } from '@/components/ui/ToggleButton';
@@ -33,6 +32,7 @@ export const TimelineControls: FC = () => {
         toggleDirection: state.toggleDirection,
         togglePlane: state.togglePlane,
         animateAll: state.animateAll,
+        randomizePlanes: state.randomizePlanes,
         clearAllPlanes: state.clearAllPlanes,
     }));
     
@@ -46,6 +46,7 @@ export const TimelineControls: FC = () => {
         toggleDirection,
         togglePlane,
         animateAll,
+        randomizePlanes,
         clearAllPlanes
     } = useAnimationStore(animationSelector);
 
@@ -60,12 +61,11 @@ export const TimelineControls: FC = () => {
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
         mandelbulbConfig: state.mandelbulb,
         quaternionJuliaConfig: state.quaternionJulia,
-        polytopeConfig: state.polytope,
         schroedingerConfig: state.schroedinger,
         blackholeConfig: state.blackhole,
     }));
 
-    const { mandelbulbConfig, polytopeConfig, schroedingerConfig, blackholeConfig } = useExtendedObjectStore(extendedObjectSelector);
+    const { mandelbulbConfig, schroedingerConfig, blackholeConfig } = useExtendedObjectStore(extendedObjectSelector);
 
     // Black hole specific: Keplerian differential control
     const setKeplerianDifferential = useExtendedObjectStore((state) => state.setBlackHoleKeplerianDifferential);
@@ -107,10 +107,6 @@ export const TimelineControls: FC = () => {
         ].filter(Boolean).length;
 
       default:
-        // Polytope category
-        if (isPolytopeCategory(objectType)) {
-          return polytopeConfig.facetOffsetEnabled ? 1 : 0;
-        }
         return 0;
     }
   }, [
@@ -121,7 +117,6 @@ export const TimelineControls: FC = () => {
     mandelbulbConfig.originDriftEnabled,
     mandelbulbConfig.sliceAnimationEnabled,
     mandelbulbConfig.phaseShiftEnabled,
-    polytopeConfig.facetOffsetEnabled,
     schroedingerConfig.curlEnabled,
     schroedingerConfig.originDriftEnabled,
     schroedingerConfig.sliceAnimationEnabled,
@@ -151,10 +146,21 @@ export const TimelineControls: FC = () => {
                         transition={{ duration: 0.2 }}
                         className="absolute bottom-full left-0 right-0 mb-2 glass-panel rounded-xl z-20"
                     >
+                        <div className="absolute top-0 right-3 -translate-y-1/2 z-10">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setShowRotation(false)}
+                                ariaLabel="Close drawer"
+                                className="w-6 h-6 p-0 rounded-full glass-panel flex items-center justify-center text-text-tertiary hover:text-text-primary"
+                            >
+                                <Icon name="chevron-down" size={12} />
+                            </Button>
+                        </div>
                         <div className="p-4 flex flex-col gap-4">
                             <div className="flex items-center justify-between">
                                 <h3 className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Rotation Planes</h3>
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 items-center">
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -170,6 +176,15 @@ export const TimelineControls: FC = () => {
                                         className="text-[10px] uppercase font-bold px-2 py-1"
                                     >
                                         Deselect All
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => randomizePlanes(dimension)}
+                                        ariaLabel="Randomize rotation planes"
+                                        className="w-7 h-7 p-0 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent"
+                                    >
+                                        <Icon name="dice" size={14} />
                                     </Button>
                                 </div>
                             </div>
@@ -213,27 +228,22 @@ export const TimelineControls: FC = () => {
 
       {/* Quaternion Julia Animation Drawer */}
       {showFractalAnim && getConfigStoreKey(objectType) === 'quaternionJulia' && (
-        <JuliaAnimationDrawer />
+        <JuliaAnimationDrawer onClose={() => setShowFractalAnim(false)} />
       )}
 
       {/* Mandelbulb/Mandelbulb Fractal Animation Drawer */}
       {showFractalAnim && getConfigStoreKey(objectType) === 'mandelbulb' && (
-        <MandelbulbAnimationDrawer />
-      )}
-
-      {/* Polytope Animation Drawer */}
-      {showFractalAnim && isPolytopeCategory(objectType) && (
-        <PolytopeAnimationDrawer />
+        <MandelbulbAnimationDrawer onClose={() => setShowFractalAnim(false)} />
       )}
 
       {/* Schroedinger Animation Drawer */}
       {showFractalAnim && getConfigStoreKey(objectType) === 'schroedinger' && (
-        <SchroedingerAnimationDrawer />
+        <SchroedingerAnimationDrawer onClose={() => setShowFractalAnim(false)} />
       )}
 
       {/* Black Hole Animation Drawer */}
       {showFractalAnim && getConfigStoreKey(objectType) === 'blackhole' && (
-        <BlackHoleAnimationDrawer />
+        <BlackHoleAnimationDrawer onClose={() => setShowFractalAnim(false)} />
       )}
             </AnimatePresence>
 
@@ -310,7 +320,7 @@ export const TimelineControls: FC = () => {
                             className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
                         >
                             Anim
-                            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] ${showFractalAnim ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-hover)] text-text-tertiary'}`}>
+                            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showFractalAnim ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}>
                                 {activeAnimationCount}
                             </span>
                         </ToggleButton>
@@ -327,7 +337,7 @@ export const TimelineControls: FC = () => {
                         className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
                     >
                         Rotate
-                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] ${showRotation ? 'bg-accent text-text-inverse' : 'bg-[var(--bg-hover)] text-text-tertiary'}`}>
+                        <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showRotation ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}>
                             {animatingPlanes.size}
                         </span>
                     </ToggleButton>

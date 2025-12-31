@@ -65,28 +65,14 @@ export const ExportTextTab = () => {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                         <div className="space-y-2">
-                            <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Alignment</label>
-                            <ToggleGroup
-                                options={[
-                                    { value: 'left', label: 'Left' },
-                                    { value: 'center', label: 'Center' },
-                                    { value: 'right', label: 'Right' }
-                                ]}
-                                value={textOverlay.textAlign}
-                                onChange={(val) => update({ textAlign: val as 'left' | 'center' | 'right' })}
-                            />
-                        </div>
-                         <div className="space-y-2">
-                             <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Opacity</label>
-                             <Slider
-                                label="Opacity"
-                                value={textOverlay.opacity}
-                                onChange={(val) => update({ opacity: val })}
-                                min={0} max={1} step={0.1}
-                             />
-                        </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Opacity</label>
+                        <Slider
+                            label="Opacity"
+                            value={textOverlay.opacity}
+                            onChange={(val) => update({ opacity: val })}
+                            min={0} max={1} step={0.1}
+                        />
                     </div>
 
                     <div className="space-y-4 pt-4 border-t border-border-subtle">
@@ -108,19 +94,39 @@ export const ExportTextTab = () => {
                         </div>
                     </div>
 
-                    <div className="space-y-6 pt-4 border-t border-border-subtle">
-                        <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Position</label>
-                        <Slider 
-                            label="Horizontal (X)"
-                            value={textOverlay.positionX}
-                            onChange={(val) => update({ positionX: val })}
-                            min={0} max={1} step={0.01}
-                        />
-                        <Slider 
-                            label="Vertical (Y)"
-                            value={textOverlay.positionY}
-                            onChange={(val) => update({ positionY: val })}
-                            min={0} max={1} step={0.01}
+                    <div className="space-y-4 pt-4 border-t border-border-subtle">
+                        <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Placement</label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-text-tertiary uppercase tracking-wide">Vertical</label>
+                                <ToggleGroup
+                                    options={[
+                                        { value: 'top', label: 'Top' },
+                                        { value: 'center', label: 'Center' },
+                                        { value: 'bottom', label: 'Bottom' }
+                                    ]}
+                                    value={textOverlay.verticalPlacement}
+                                    onChange={(val) => update({ verticalPlacement: val as 'top' | 'center' | 'bottom' })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-text-tertiary uppercase tracking-wide">Horizontal</label>
+                                <ToggleGroup
+                                    options={[
+                                        { value: 'left', label: 'Left' },
+                                        { value: 'center', label: 'Center' },
+                                        { value: 'right', label: 'Right' }
+                                    ]}
+                                    value={textOverlay.horizontalPlacement}
+                                    onChange={(val) => update({ horizontalPlacement: val as 'left' | 'center' | 'right' })}
+                                />
+                            </div>
+                        </div>
+                        <Slider
+                            label="Padding"
+                            value={textOverlay.padding}
+                            onChange={(val) => update({ padding: val })}
+                            min={0} max={100} step={1}
                         />
                     </div>
                 </div>

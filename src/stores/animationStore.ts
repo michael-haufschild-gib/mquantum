@@ -43,6 +43,7 @@ export interface AnimationState {
   togglePlane: (plane: string) => void
   setPlaneAnimating: (plane: string, animating: boolean) => void
   animateAll: (dimension: number) => void
+  randomizePlanes: (dimension: number) => void
   resetToFirstPlane: (dimension: number) => void
   clearAllPlanes: () => void
   stopAll: () => void
@@ -128,6 +129,21 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   animateAll: (dimension: number) => {
     const planes = getAllPlaneNames(dimension)
     set({ animatingPlanes: new Set(planes), isPlaying: true })
+  },
+
+  randomizePlanes: (dimension: number) => {
+    const planeNames = getAllPlaneNames(dimension)
+
+    // Each plane has 50% chance of being selected
+    const selected = planeNames.filter(() => Math.random() < 0.5)
+
+    // Ensure at least one plane is selected
+    if (selected.length === 0) {
+      const randomIndex = Math.floor(Math.random() * planeNames.length)
+      selected.push(planeNames[randomIndex])
+    }
+
+    set({ animatingPlanes: new Set(selected), isPlaying: true })
   },
 
   resetToFirstPlane: (dimension: number) => {

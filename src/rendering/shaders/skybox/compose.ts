@@ -15,9 +15,7 @@ import { crystallineBlock } from './modes/crystalline.glsl'
 import { horizonBlock } from './modes/horizon.glsl'
 import { nebulaBlock } from './modes/nebula.glsl'
 import { oceanBlock } from './modes/ocean.glsl'
-import { starfieldBlock } from './modes/starfield.glsl'
 import { twilightBlock } from './modes/twilight.glsl'
-import { voidBlock } from './modes/void.glsl'
 
 import { aberrationBlock } from './effects/aberration.glsl'
 import { atmosphereBlock } from './effects/atmosphere.glsl'
@@ -60,9 +58,6 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
     case 'nebula':
       modeBlock = nebulaBlock
       break
-    case 'void':
-      modeBlock = voidBlock
-      break
     case 'crystalline':
       modeBlock = crystallineBlock
       break
@@ -74,9 +69,6 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
       break
     case 'twilight':
       modeBlock = twilightBlock
-      break
-    case 'starfield':
-      modeBlock = starfieldBlock
       break
   }
 

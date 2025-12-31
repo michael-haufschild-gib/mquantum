@@ -100,12 +100,10 @@ export const SKYBOX_INITIAL_STATE: SkyboxSliceState = {
 const PROCEDURAL_MODES = [
   'procedural_aurora',
   'procedural_nebula',
-  'procedural_void',
   'procedural_crystalline',
   'procedural_horizon',
   'procedural_ocean',
   'procedural_twilight',
-  'procedural_starfield',
 ] as const
 
 /**

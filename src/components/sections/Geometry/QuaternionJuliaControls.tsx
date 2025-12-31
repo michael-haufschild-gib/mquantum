@@ -7,10 +7,11 @@
  * Features:
  * - Julia constant controls with presets (4D quaternion components)
  * - Power slider (quadratic to octave)
- * - Max iterations slider
  * - Bailout radius slider
  * - Scale parameter for auto-positioning
  * - Slice parameters for 4D+ dimensions
+ *
+ * Note: Render Quality controls (SDF iterations, surface distance) are in AdvancedObjectControls.
  *
  * The Quaternion Julia fractal uses the iteration z = z^n + c where c is a
  * fixed constant (unlike Mandelbulb where c varies with sample position).
@@ -52,15 +53,6 @@ const powerPresets = [
   { value: 8, label: 'Octave' },
 ];
 
-/**
- * Quality preset options
- */
-const qualityOptions = [
-  { value: 'draft', label: 'Draft (Fast)' },
-  { value: 'standard', label: 'Standard' },
-  { value: 'high', label: 'High Quality' },
-  { value: 'ultra', label: 'Ultra (Slow)' },
-];
 
 /**
  * QuaternionJuliaControls component
@@ -85,10 +77,8 @@ export const QuaternionJuliaControls: React.FC<QuaternionJuliaControlsProps> = R
     config: state.quaternionJulia,
     setJuliaConstant: state.setQuaternionJuliaConstant,
     setPower: state.setQuaternionJuliaPower,
-    setMaxIterations: state.setQuaternionJuliaMaxIterations,
     setBailoutRadius: state.setQuaternionJuliaBailoutRadius,
     setScale: state.setQuaternionJuliaScale,
-    setQualityPreset: state.setQuaternionJuliaQualityPreset,
     setParameterValue: state.setQuaternionJuliaParameterValue,
     resetParameters: state.resetQuaternionJuliaParameters,
   }));
@@ -96,10 +86,8 @@ export const QuaternionJuliaControls: React.FC<QuaternionJuliaControlsProps> = R
     config,
     setJuliaConstant,
     setPower,
-    setMaxIterations,
     setBailoutRadius,
     setScale,
-    setQualityPreset,
     setParameterValue,
     resetParameters,
   } = useExtendedObjectStore(extendedObjectSelector);
@@ -216,31 +204,6 @@ export const QuaternionJuliaControls: React.FC<QuaternionJuliaControlsProps> = R
             data-testid="julia-power-slider"
             />
         </div>
-
-        {/* Quality Preset */}
-        <Select
-            label="Quality Preset"
-            options={qualityOptions}
-            value={
-            config.maxIterations <= 32 ? 'draft' :
-            config.maxIterations <= 64 ? 'standard' :
-            config.maxIterations <= 128 ? 'high' : 'ultra'
-            }
-            onChange={(v) => setQualityPreset(v as 'draft' | 'standard' | 'high' | 'ultra')}
-            data-testid="julia-quality"
-        />
-
-        {/* Max Iterations */}
-        <Slider
-            label="Max Iterations"
-            min={32}
-            max={256}
-            step={16}
-            value={config.maxIterations}
-            onChange={setMaxIterations}
-            showValue
-            data-testid="julia-iterations"
-        />
 
         {/* Bailout Radius */}
         <Slider

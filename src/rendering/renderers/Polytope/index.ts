@@ -13,6 +13,9 @@ export { composeEdgeFragmentShader as buildEdgeFragmentShader } from '../../shad
 export { composeEdgeVertexShader as buildEdgeVertexShader } from '../../shaders/polytope/compose'
 export { composeFaceFragmentShader as buildFaceFragmentShader } from '../../shaders/polytope/compose'
 export { composeFaceVertexShader as buildFaceVertexShader } from '../../shaders/polytope/compose'
+// Screen-space normal variants (for high-dimensional polytopes)
+export { composeFaceFragmentShaderScreenSpace as buildFaceFragmentShaderScreenSpace } from '../../shaders/polytope/compose'
+export { composeFaceVertexShaderScreenSpace as buildFaceVertexShaderScreenSpace } from '../../shaders/polytope/compose'
 export type { PolytopeShaderConfig } from '../../shaders/polytope/compose'
 export { PolytopeScene } from './PolytopeScene'
 export type { PolytopeSceneProps } from './PolytopeScene'

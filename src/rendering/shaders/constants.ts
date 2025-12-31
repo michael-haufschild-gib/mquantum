@@ -148,3 +148,30 @@ export const RIM_NDOTL_FACTOR = 0.7
 // NOTE: Face rendering defaults (color, opacity, specular settings) are
 // centralized in @/stores/appearanceStore.ts to avoid duplicate/conflicting values.
 // Import defaults from appearanceSlice for face color, opacity, specular settings.
+
+// ============================================================================
+// Normal Calculation Strategy Constants
+// ============================================================================
+
+/**
+ * Minimum dimension for screen-space normal calculation (dFdx/dFdy).
+ *
+ * Below this threshold: Geometry-based normals computed in vertex shader
+ * from neighbor vertex data. Accurate but requires 9 attribute slots and
+ * 3x N-D transforms per vertex.
+ *
+ * At or above threshold: Screen-space normals computed in fragment shader
+ * via dFdx/dFdy derivatives. Faster (67% fewer transforms, 67% less memory)
+ * but may have minor 1-2 pixel edge artifacts at face boundaries.
+ *
+ * NOTE: Modulation (breathing animation) is disabled when using screen-space
+ * normals to ensure stable normal computation.
+ *
+ * Set to 3 for testing worst-case visual artifacts.
+ * Recommended production value: 7 (based on performance/quality tradeoff).
+ *
+ * Performance impact for hypercubes:
+ * - 7D (1,344 triangles): Saves 8,064 transforms, 323 KB/frame
+ * - 11D (56,320 triangles): Saves 337,920 transforms, 13.5 MB/frame
+ */
+export const SCREEN_SPACE_NORMAL_MIN_DIMENSION = 5

@@ -2,12 +2,10 @@ export type SkyboxMode =
   | 'classic'
   | 'aurora'
   | 'nebula'
-  | 'void'
   | 'crystalline'
   | 'horizon'
   | 'ocean'
-  | 'twilight'
-  | 'starfield';
+  | 'twilight';
 
 export interface SkyboxEffects {
   atmosphere: boolean;

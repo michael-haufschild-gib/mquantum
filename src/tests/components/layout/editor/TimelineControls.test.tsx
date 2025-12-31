@@ -12,6 +12,8 @@ vi.mock('@/stores/geometryStore', () => ({
   }),
 }));
 
+const mockRandomizePlanes = vi.fn();
+
 vi.mock('@/stores/animationStore', () => ({
   useAnimationStore: vi.fn((selector) => {
     const state = {
@@ -25,6 +27,7 @@ vi.mock('@/stores/animationStore', () => ({
       togglePlane: vi.fn(),
       stopAll: vi.fn(),
       animateAll: vi.fn(),
+      randomizePlanes: mockRandomizePlanes,
       resetToFirstPlane: vi.fn(),
       clearAllPlanes: vi.fn(),
     };
@@ -154,5 +157,52 @@ describe('TimelineControls', () => {
 
     // Deselect All button (functionally the stop button) should be in drawer
     expect(screen.getByText("Deselect All")).toBeInTheDocument();
+  });
+
+  it('shows randomize button in rotation drawer', () => {
+    render(<TimelineControls />);
+
+    // Open rotation drawer
+    const rotButton = screen.getByText(/Rotate/i);
+    fireEvent.click(rotButton);
+
+    // Check for dice/randomize button
+    const randomizeButton = screen.getByRole('button', { name: /randomize rotation planes/i });
+    expect(randomizeButton).toBeInTheDocument();
+  });
+
+  it('calls randomizePlanes when dice button is clicked', () => {
+    render(<TimelineControls />);
+
+    // Open rotation drawer
+    const rotButton = screen.getByText(/Rotate/i);
+    fireEvent.click(rotButton);
+
+    // Click randomize button
+    const randomizeButton = screen.getByRole('button', { name: /randomize rotation planes/i });
+    fireEvent.click(randomizeButton);
+
+    // Verify randomizePlanes was called with the current dimension (4)
+    expect(mockRandomizePlanes).toHaveBeenCalledWith(4);
+  });
+
+  it('closes rotation drawer when close button is clicked', async () => {
+    render(<TimelineControls />);
+
+    // Open rotation drawer
+    const rotButton = screen.getByText(/Rotate/i);
+    fireEvent.click(rotButton);
+
+    // Drawer should be open
+    expect(screen.getByText('XY')).toBeInTheDocument();
+
+    // Click close button (floating close button uses "Close drawer" aria label)
+    const closeButton = screen.getByRole('button', { name: /close drawer/i });
+    fireEvent.click(closeButton);
+
+    // Drawer should be closed
+    await waitFor(() => {
+      expect(screen.queryByText('XY', { selector: 'button' })).not.toBeInTheDocument();
+    });
   });
 });

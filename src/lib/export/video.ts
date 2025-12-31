@@ -24,6 +24,8 @@ export interface VideoExportOptions {
   bitrateMode?: 'constant' | 'variable'
   onProgress?: (progress: number) => void
   streamHandle?: FileSystemFileHandle // Optional: for Stream-to-File mode
+  /** Video rotation metadata for vertical/portrait video support (0, 90, 180, 270 degrees) */
+  rotation?: 0 | 90 | 180 | 270
 
   // New Features
   textOverlay?: TextOverlaySettings
@@ -70,14 +72,26 @@ export class VideoRecorder {
       }
 
       // 1. Setup Target & Format Options
+      const isStreaming = !!this.options.streamHandle
+
+      // Configure format with appropriate options for web playability
+      // MP4: fastStart moves moov atom for streaming; fragmented for disk streaming
+      // WebM: appendOnly avoids seeking in stream mode for efficient writes
       const format = this.options.format === 'webm'
-        ? new WebMOutputFormat()
-        : new Mp4OutputFormat()
+        ? new WebMOutputFormat({
+            appendOnly: isStreaming // Enable append-only for streaming (no seeking)
+          })
+        : new Mp4OutputFormat({
+            fastStart: isStreaming ? 'fragmented' : 'in-memory'
+          })
 
       if (this.options.streamHandle) {
-          // Stream Mode
+          // Stream Mode - use chunked writes for batched disk I/O
           const writable = await this.options.streamHandle.createWritable()
-          this.target = new StreamTarget(writable)
+          this.target = new StreamTarget(writable, {
+            chunked: true,
+            chunkSize: 16 * 1024 * 1024 // 16 MiB chunks
+          })
       } else {
           // Memory Mode
           this.target = new BufferTarget()
@@ -104,9 +118,10 @@ export class VideoRecorder {
       // 4. Create Source
       this.source = new CanvasSource(sourceCanvas, config)
 
-      // 5. Add Track
+      // 5. Add Track with metadata
       this.output.addVideoTrack(this.source, {
-          frameRate: this.options.fps
+          frameRate: this.options.fps,
+          rotation: this.options.rotation ?? 0 // Rotation metadata for vertical video support
       })
 
       // 6. Start the output
@@ -224,10 +239,35 @@ export class VideoRecorder {
               const fontSize = textOverlay.fontSize
               const fontWeight = textOverlay.fontWeight || 700
               const fontFamily = textOverlay.fontFamily || 'Inter, sans-serif'
+              const { verticalPlacement, horizontalPlacement, padding } = textOverlay
 
               ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`
-              ctx.textAlign = textOverlay.textAlign || 'center'
-              ctx.textBaseline = 'middle'
+
+              // Horizontal position and alignment
+              let x: number
+              if (horizontalPlacement === 'left') {
+                  x = padding
+                  ctx.textAlign = 'left'
+              } else if (horizontalPlacement === 'right') {
+                  x = width - padding
+                  ctx.textAlign = 'right'
+              } else {
+                  x = width / 2
+                  ctx.textAlign = 'center'
+              }
+
+              // Vertical position and baseline
+              let y: number
+              if (verticalPlacement === 'top') {
+                  y = padding
+                  ctx.textBaseline = 'top'
+              } else if (verticalPlacement === 'bottom') {
+                  y = height - padding
+                  ctx.textBaseline = 'bottom'
+              } else {
+                  y = height / 2
+                  ctx.textBaseline = 'middle'
+              }
 
               // Text Shadow
               if (textOverlay.shadowBlur > 0) {
@@ -239,9 +279,6 @@ export class VideoRecorder {
 
               ctx.fillStyle = textOverlay.color
               ctx.globalAlpha = textOverlay.opacity
-
-              const x = textOverlay.positionX * width
-              const y = textOverlay.positionY * height
 
               // Letter Spacing support (modern browsers)
               if (textOverlay.letterSpacing !== 0) {
@@ -299,7 +336,9 @@ export class VideoRecorder {
           if (!buffer) {
               throw new Error('Buffer is empty after finalization')
           }
-          const mimeType = this.options.format === 'webm' ? 'video/webm' : 'video/mp4'
+          // Use codec-qualified MIME type for better browser/player compatibility
+          // e.g., 'video/mp4; codecs="avc1.42E01E"' instead of just 'video/mp4'
+          const mimeType = await this.output.getMimeType()
           return new Blob([buffer], { type: mimeType })
       }
 
@@ -309,6 +348,25 @@ export class VideoRecorder {
       throw new Error(
         `Video finalization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       )
+    }
+  }
+
+  /**
+   * Cancels the recording and frees all resources.
+   * Use this instead of finalize() when aborting an export.
+   * Does not write a partial file - properly terminates the encoding.
+   */
+  async cancel(): Promise<void> {
+    if (!this.output) {
+      return
+    }
+
+    this.isRecording = false
+
+    try {
+      await this.output.cancel()
+    } finally {
+      this.dispose()
     }
   }
 

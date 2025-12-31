@@ -152,6 +152,10 @@ const QuaternionJuliaMesh = () => {
       uIterations: { value: 64.0 },
       uEscapeRadius: { value: 4.0 },
 
+      // SDF Render Quality (user-configurable, default = LQ for animation)
+      uSdfMaxIterations: { value: 30.0 },
+      uSdfSurfaceDistance: { value: 0.002 },
+
       // Julia constant (unique to this fractal type)
       uJuliaConstant: { value: new THREE.Vector4(0.3, 0.5, 0.4, 0.2) },
 
@@ -283,6 +287,10 @@ const QuaternionJuliaMesh = () => {
       u.uPower.value = config.power
       u.uIterations.value = config.maxIterations
       u.uEscapeRadius.value = config.bailoutRadius
+
+      // SDF Render Quality (user-configurable)
+      u.uSdfMaxIterations.value = config.sdfMaxIterations
+      u.uSdfSurfaceDistance.value = config.sdfSurfaceDistance
 
       // Julia constant
       u.uJuliaConstant.value.set(...config.juliaConstant)

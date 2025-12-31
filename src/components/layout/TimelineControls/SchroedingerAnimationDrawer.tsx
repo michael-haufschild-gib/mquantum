@@ -26,6 +26,11 @@ import { ToggleButton } from '@/components/ui/ToggleButton';
 import { Slider } from '@/components/ui/Slider';
 import { AnimationDrawerContainer } from './AnimationDrawerContainer';
 
+export interface SchroedingerAnimationDrawerProps {
+  /** Callback to close the drawer */
+  onClose?: () => void;
+}
+
 /**
  * SchroedingerAnimationDrawer component
  *
@@ -35,7 +40,7 @@ import { AnimationDrawerContainer } from './AnimationDrawerContainer';
  *
  * @returns React component
  */
-export const SchroedingerAnimationDrawer: React.FC = React.memo(() => {
+export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerProps> = React.memo(({ onClose }) => {
   const dimension = useGeometryStore((state) => state.dimension);
 
   // Get config and setters from store
@@ -94,7 +99,7 @@ export const SchroedingerAnimationDrawer: React.FC = React.memo(() => {
   const isHydrogenNDMode = config.quantumMode === 'hydrogenND';
 
   return (
-    <AnimationDrawerContainer data-testid="schroedinger-animation-drawer">
+    <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
       {/* Time Evolution (Always Active) */}
       <div className="space-y-4" data-testid="animation-panel-timeEvolution">
         <div className="flex items-center justify-between">

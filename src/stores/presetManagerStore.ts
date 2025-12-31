@@ -17,6 +17,7 @@ import { usePostProcessingStore } from './postProcessingStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
 import { useUIStore } from './uiStore'
+import { mergeExtendedObjectState } from './utils/mergeWithDefaults'
 
 /**
  * Pending rAF ID for scene load completion.
@@ -517,23 +518,31 @@ export const usePresetManagerStore = create<PresetManagerState>()(
             usePBRStore.setState(sanitizeLoadedState(scene.data.pbr))
           }
 
-          // Restore Geometry using validated setters to ensure dimension/type constraints
-          // IMPORTANT: Set dimension FIRST to enable more object types, then set objectType
+          // Restore Geometry atomically using loadGeometry
+          // This sets both dimension and objectType without auto-adjustments
+          // (e.g., won't auto-switch to "recommended" dimension for fractals)
           const geometryData = sanitizeLoadedState(scene.data.geometry) as {
             dimension?: number
             objectType?: string
           }
-          if (geometryData.dimension !== undefined) {
+          if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
+            useGeometryStore.getState().loadGeometry(
+              geometryData.dimension,
+              geometryData.objectType as import('@/lib/geometry/types').ObjectType
+            )
+          } else if (geometryData.dimension !== undefined) {
             useGeometryStore.getState().setDimension(geometryData.dimension)
-          }
-          if (geometryData.objectType !== undefined) {
+          } else if (geometryData.objectType !== undefined) {
             useGeometryStore
               .getState()
               .setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
           }
 
           // Restore other scene components with transient fields stripped
-          useExtendedObjectStore.setState(sanitizeLoadedState(scene.data.extended))
+          // Merge with defaults to ensure new parameters added after scene was saved get default values
+          useExtendedObjectStore.setState(
+            mergeExtendedObjectState(sanitizeLoadedState(scene.data.extended))
+          )
           useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
 
           // Sanitize UI data (already strips transient fields)

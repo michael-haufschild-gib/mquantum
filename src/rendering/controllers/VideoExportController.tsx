@@ -114,7 +114,12 @@ export function VideoExportController() {
     try {
       const { exportMode, setCompletionDetails } = useExportStore.getState()
 
+      // If aborted, cancel properly instead of finalizing (avoids partial files)
       if (abortRef.current) {
+        if (recorderRef.current) {
+          await recorderRef.current.cancel()
+          recorderRef.current = null
+        }
         setStatus('idle')
         restoreState()
         exportStartedRef.current = false
@@ -243,7 +248,8 @@ export function VideoExportController() {
                           hardwareAcceleration: settings.hardwareAcceleration,
                           bitrateMode: settings.bitrateMode,
                           textOverlay: settings.textOverlay,
-                          crop: settings.crop
+                          crop: settings.crop,
+                          rotation: settings.rotation
                       })
                       await recorder.initialize()
                       recorderRef.current = recorder
@@ -310,7 +316,8 @@ export function VideoExportController() {
                       hardwareAcceleration: settings.hardwareAcceleration,
                       bitrateMode: settings.bitrateMode,
                       textOverlay: settings.textOverlay,
-                      crop: settings.crop
+                      crop: settings.crop,
+                      rotation: settings.rotation
                   })
                   await recorder.initialize()
                   recorderRef.current = recorder
@@ -382,7 +389,8 @@ export function VideoExportController() {
                       hardwareAcceleration: settings.hardwareAcceleration,
                       bitrateMode: settings.bitrateMode,
                       textOverlay: settings.textOverlay,
-                      crop: settings.crop
+                      crop: settings.crop,
+                      rotation: settings.rotation
                   })
                   await recorder.initialize()
                   recorderRef.current = recorder
@@ -679,7 +687,8 @@ export function VideoExportController() {
             hardwareAcceleration: settings.hardwareAcceleration,
             bitrateMode: settings.bitrateMode,
             textOverlay: settings.textOverlay,
-            crop: settings.crop
+            crop: settings.crop,
+            rotation: settings.rotation
           })
 
           recorderRef.current = recorder

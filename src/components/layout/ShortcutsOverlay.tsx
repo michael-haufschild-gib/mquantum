@@ -4,14 +4,21 @@ import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/Button';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 
 export const ShortcutsOverlay: React.FC = () => {
+  const isMobile = useIsMobile();
   const { showShortcuts, setShowShortcuts } = useLayoutStore(
     useShallow((state: LayoutStore) => ({
       showShortcuts: state.showShortcuts,
       setShowShortcuts: state.setShowShortcuts
     }))
   );
+
+  // Don't render on mobile devices - keyboard shortcuts are not useful without a physical keyboard
+  if (isMobile) {
+    return null;
+  }
 
   // Close on Escape
   useEffect(() => {

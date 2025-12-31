@@ -149,6 +149,54 @@ describe('animationStore', () => {
     })
   })
 
+  describe('randomizePlanes', () => {
+    it('should select at least one plane', () => {
+      // Run multiple times to ensure constraint holds
+      for (let i = 0; i < 50; i++) {
+        useAnimationStore.getState().randomizePlanes(4)
+        expect(useAnimationStore.getState().animatingPlanes.size).toBeGreaterThanOrEqual(1)
+      }
+    })
+
+    it('should only select planes valid for the given dimension', () => {
+      // Test for 3D (only XY, YZ, XZ are valid)
+      useAnimationStore.getState().randomizePlanes(3)
+      const selected3D = Array.from(useAnimationStore.getState().animatingPlanes)
+      const valid3D = ['XY', 'YZ', 'XZ']
+      selected3D.forEach(plane => {
+        expect(valid3D).toContain(plane)
+      })
+
+      // Test for 4D
+      useAnimationStore.getState().randomizePlanes(4)
+      const selected4D = Array.from(useAnimationStore.getState().animatingPlanes)
+      const valid4D = ['XY', 'YZ', 'XZ', 'XW', 'YW', 'ZW']
+      selected4D.forEach(plane => {
+        expect(valid4D).toContain(plane)
+      })
+    })
+
+    it('should auto-start animation', () => {
+      useAnimationStore.getState().pause()
+      expect(useAnimationStore.getState().isPlaying).toBe(false)
+
+      useAnimationStore.getState().randomizePlanes(4)
+      expect(useAnimationStore.getState().isPlaying).toBe(true)
+    })
+
+    it('should select between 1 and n*(n-1)/2 planes', () => {
+      const dim = 5
+      const maxPlanes = (dim * (dim - 1)) / 2
+
+      for (let i = 0; i < 50; i++) {
+        useAnimationStore.getState().randomizePlanes(dim)
+        const count = useAnimationStore.getState().animatingPlanes.size
+        expect(count).toBeGreaterThanOrEqual(1)
+        expect(count).toBeLessThanOrEqual(maxPlanes)
+      }
+    })
+  })
+
   describe('setDimension', () => {
     it('should filter out invalid planes when dimension decreases', () => {
       // Simulate the bug: animate 10D planes, then switch to 6D

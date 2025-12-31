@@ -137,69 +137,28 @@ describe('exportStore', () => {
     })
   })
 
-  describe('Mode/tier selection (recalculateMode)', () => {
-    it('computes estimatedSizeMB with compression factor and selects tier/mode', () => {
-      // Force a known browser type for deterministic mode selection
-      useExportStore.setState({ browserType: 'standard' })
-
-      // Set avc with CBR => compression factor 0.55
-      // Theoretical: (bitrate * duration)/8, then multiply by compression factor
-      // With bitrate=160, duration=10: theoretical=200MB, compressed=200*0.55=110MB
-      useExportStore.getState().updateSettings({ bitrate: 160, duration: 10, bitrateMode: 'constant' })
-      useExportStore.getState().setModalOpen(true) // triggers recalculateMode
-
-      const theoreticalSize = (160 * 10) / 8 // 200MB
-      const expectedSize = theoreticalSize * getCompressionFactor('avc', 'constant') // 200 * 0.55 = 110MB
-      expect(useExportStore.getState().estimatedSizeMB).toBeCloseTo(expectedSize)
-
-      // Standard browser => segmented for >=100MB
-      expect(useExportStore.getState().exportMode).toBe('segmented')
-      // 110MB => medium tier (50-150)
-      expect(useExportStore.getState().exportTier).toBe('medium')
-
-      useExportStore.setState({ browserType: 'chromium-capable' })
-      useExportStore.getState().recalculateMode()
-      expect(useExportStore.getState().exportMode).toBe('stream')
-
-      // Large tier: bitrate=280, duration=10 => theoretical=350MB, compressed=192.5MB (>=150)
-      useExportStore.getState().updateSettings({ bitrate: 280, duration: 10 })
-      expect(useExportStore.getState().exportTier).toBe('large')
+  describe('Export mode selection', () => {
+    it('defaults to in-memory mode', () => {
+      expect(useExportStore.getState().exportMode).toBe('in-memory')
     })
 
-    it('applies different compression factors for different codecs', () => {
-      // AVC CBR: 0.55
-      useExportStore.getState().updateSettings({ codec: 'avc', bitrateMode: 'constant', bitrate: 80, duration: 10 })
-      const avcSize = useExportStore.getState().estimatedSizeMB
-      expect(avcSize).toBeCloseTo((80 * 10) / 8 * 0.55) // 55MB
-
-      // AV1 CBR: 0.32 (most efficient)
-      useExportStore.getState().updateSettings({ codec: 'av1' })
-      const av1Size = useExportStore.getState().estimatedSizeMB
-      expect(av1Size).toBeCloseTo((80 * 10) / 8 * 0.32) // 32MB
-
-      // AV1 is more efficient than AVC
-      expect(av1Size).toBeLessThan(avcSize)
-    })
-
-    it('applies VBR mode reduction to compression factor', () => {
-      useExportStore.getState().updateSettings({ codec: 'avc', bitrateMode: 'constant', bitrate: 80, duration: 10 })
-      const cbrSize = useExportStore.getState().estimatedSizeMB
-
-      useExportStore.getState().updateSettings({ bitrateMode: 'variable' })
-      const vbrSize = useExportStore.getState().estimatedSizeMB
-
-      // VBR should be ~20% smaller (factor *= 0.80)
-      expect(vbrSize).toBeCloseTo(cbrSize * 0.80)
-    })
-
-    it('exportModeOverride wins over auto selection', () => {
-      useExportStore.setState({ browserType: 'chromium-capable' })
-      // Use high bitrate to exceed auto threshold
-      useExportStore.getState().updateSettings({ bitrate: 200, duration: 10 }) // would choose stream
+    it('setExportModeOverride changes the export mode', () => {
+      useExportStore.getState().setExportModeOverride('stream')
       expect(useExportStore.getState().exportMode).toBe('stream')
 
       useExportStore.getState().setExportModeOverride('segmented')
       expect(useExportStore.getState().exportMode).toBe('segmented')
+
+      useExportStore.getState().setExportModeOverride('in-memory')
+      expect(useExportStore.getState().exportMode).toBe('in-memory')
+    })
+
+    it('setting override to null reverts to in-memory', () => {
+      useExportStore.getState().setExportModeOverride('stream')
+      expect(useExportStore.getState().exportMode).toBe('stream')
+
+      useExportStore.getState().setExportModeOverride(null)
+      expect(useExportStore.getState().exportMode).toBe('in-memory')
     })
   })
 

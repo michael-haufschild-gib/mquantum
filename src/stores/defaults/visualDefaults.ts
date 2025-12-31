@@ -355,12 +355,10 @@ export type SkyboxMode =
   | 'classic'
   | 'procedural_aurora'
   | 'procedural_nebula'
-  | 'procedural_void'
   | 'procedural_crystalline'
   | 'procedural_horizon'
   | 'procedural_ocean'
   | 'procedural_twilight'
-  | 'procedural_starfield'
 
 /** Unified skybox selection - combines disabled, classic textures, and procedural modes */
 export type SkyboxSelection =
@@ -370,12 +368,10 @@ export type SkyboxSelection =
   | 'space_red'
   | 'procedural_aurora'
   | 'procedural_nebula'
-  | 'procedural_void'
   | 'procedural_crystalline'
   | 'procedural_horizon'
   | 'procedural_ocean'
   | 'procedural_twilight'
-  | 'procedural_starfield'
 
 export const DEFAULT_SKYBOX_ENABLED = true
 export const DEFAULT_SKYBOX_TEXTURE: SkyboxTexture = 'space_blue'
@@ -397,25 +393,6 @@ export const DEFAULT_SKYBOX_ANIMATION_MODE: SkyboxAnimationMode = 'heatwave'
 export const DEFAULT_SKYBOX_ANIMATION_SPEED = 0.01
 
 // --- Procedural Skybox Defaults ---
-
-/** Starfield-specific settings for the procedural starfield mode */
-export interface StarfieldSettings {
-  density: number // 0-1, how many stars appear (default 0.5)
-  brightness: number // 0-2, overall star brightness (default 1.0)
-  size: number // 0-1, base star size (default 0.5)
-  twinkle: number // 0-1, scintillation intensity (default 0.3)
-  glow: number // 0-1, halo around bright stars (default 0.5)
-  colorVariation: number // 0-1, spectral color range (default 0.5)
-}
-
-export const DEFAULT_STARFIELD_SETTINGS: StarfieldSettings = {
-  density: 0.5,
-  brightness: 1.0,
-  size: 0.5,
-  twinkle: 0.3,
-  glow: 0.5,
-  colorVariation: 0.5,
-}
 
 /** Aurora-specific settings for the procedural aurora mode */
 export interface AuroraSettings {
@@ -478,7 +455,6 @@ export interface SkyboxProceduralSettings {
   evolution: number // 0-1 (The "Seed" / W-coordinate)
 
   // Mode-specific settings
-  starfield: StarfieldSettings
   aurora: AuroraSettings
   horizonGradient: HorizonSettings
   ocean: OceanSettings
@@ -507,7 +483,6 @@ export const DEFAULT_SKYBOX_PROCEDURAL_SETTINGS: SkyboxProceduralSettings = {
   sunPosition: [10, 10, 10],
   noiseGrain: 0,
   evolution: 0.0,
-  starfield: { ...DEFAULT_STARFIELD_SETTINGS },
   aurora: { ...DEFAULT_AURORA_SETTINGS },
   horizonGradient: { ...DEFAULT_HORIZON_SETTINGS },
   ocean: { ...DEFAULT_OCEAN_SETTINGS },

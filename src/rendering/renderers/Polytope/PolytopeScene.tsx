@@ -50,12 +50,15 @@ import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useLightingStore } from '@/stores/lightingStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
+import { SCREEN_SPACE_NORMAL_MIN_DIMENSION } from '@/rendering/shaders/constants';
 import { TubeWireframe } from '../TubeWireframe';
 import {
     buildEdgeFragmentShader,
     buildEdgeVertexShader,
     buildFaceFragmentShader,
+    buildFaceFragmentShaderScreenSpace,
     buildFaceVertexShader,
+    buildFaceVertexShaderScreenSpace,
     MAX_EXTRA_DIMS,
 } from './index';
 
@@ -93,12 +96,6 @@ function createNDUniforms(): Record<string, { value: unknown }> {
     uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
     uDepthRowSums: { value: new Float32Array(11) },
     uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
-    // Vertex modulation uniforms - radial breathing with bias
-    uAnimTime: { value: 0.0 },       // Time in seconds
-    uModAmplitude: { value: 0.0 },   // Displacement amplitude (0-1)
-    uModFrequency: { value: 0.05 },  // Oscillation frequency (0.01-0.20)
-    uModWave: { value: 0.0 },        // Distance-based phase offset (wave effect)
-    uModBias: { value: 0.0 },        // Per-vertex/dimension phase variation
   };
 }
 
@@ -188,13 +185,6 @@ uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28];
 uniform float uDepthRowSums[11];
 
-// Vertex modulation uniforms
-uniform float uAnimTime;
-uniform float uModAmplitude;
-uniform float uModFrequency;
-uniform float uModWave;
-uniform float uModBias;
-
 // Packed extra dimension inputs (WebGL2 GLSL ES 3.00)
 in vec4 aExtraDims0_3;
 in vec3 aExtraDims4_6;
@@ -248,19 +238,6 @@ vec3 ndTransformVertex(vec3 pos) {
 
   // Project to 3D, then apply uniform scale (like camera zoom)
   vec3 projected = rotated.xyz * factor * uUniformScale;
-
-  // Apply vertex modulation (after scale, on 3D result)
-  if (uModAmplitude > 0.001) {
-    float extraSum = aExtraDims0_3.x + aExtraDims0_3.y + aExtraDims0_3.z + aExtraDims0_3.w + aExtraDims4_6.x + aExtraDims4_6.y + aExtraDims4_6.z;
-    float t = uAnimTime * uModFrequency * 0.1;
-    float dist = length(projected);
-    float wavePhase = dist * uModWave * 2.0;
-    float vertexBias = (projected.x * 1.0 + projected.y * 1.618 + projected.z * 2.236) * uModBias;
-    float dimensionBias = extraSum * uModBias * 0.5;
-    float totalPhase = t + wavePhase + vertexBias + dimensionBias;
-    float modScale = 1.0 + sin(totalPhase) * uModAmplitude * 0.05;
-    projected = projected * modScale;
-  }
 
   return projected;
 }
@@ -349,9 +326,6 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   // N-D transform hook - handles rotation matrix computation with version tracking
   const ndTransform = useNDTransformUpdates();
 
-  // Animation time accumulator for polytope animations
-  const animTimeRef = useRef(0.0);
-
   // Cached linear colors - avoid per-frame sRGB->linear conversion
   const colorCacheRef = useRef(createColorCache());
 
@@ -431,6 +405,12 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   // Use TubeWireframe for thick lines (>1), native lineSegments for thin lines (1)
   const useFatWireframe = edgeThickness > 1;
 
+  // ============ NORMAL COMPUTATION STRATEGY ============
+  // For high-dimensional polytopes (7D+), use screen-space normals (dFdx/dFdy)
+  // for better performance (67% fewer transforms, 67% less memory).
+  // Modulation is disabled when using screen-space normals.
+  const useScreenSpaceNormals = dimension >= SCREEN_SPACE_NORMAL_MIN_DIMENSION;
+
   // ============ MATERIALS ============
   // Uses custom ShaderMaterial with lighting (same approach as Mandelbulb)
   // DoubleSide handles both front and back faces - two-pass rendering disabled
@@ -438,13 +418,24 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   // Feature flags in deps trigger shader recompilation when features are toggled
 
   // Compute shader composition separately to get modules/features for debug info
+  // Use screen-space variant for high dimensions
   const { glsl: faceFragmentShader, modules: faceShaderModules, features: faceShaderFeatures } = useMemo(() => {
-    return buildFaceFragmentShader({
+    const config = {
       shadows: shadowEnabled,
       sss: sssEnabled,
       fresnel: surfaceSettings.fresnelEnabled,
-    });
-  }, [shadowEnabled, sssEnabled, surfaceSettings.fresnelEnabled]);
+    };
+    return useScreenSpaceNormals
+      ? buildFaceFragmentShaderScreenSpace(config)
+      : buildFaceFragmentShader(config);
+  }, [shadowEnabled, sssEnabled, surfaceSettings.fresnelEnabled, useScreenSpaceNormals]);
+
+  // Build vertex shader based on normal computation mode
+  const faceVertexShader = useMemo(() => {
+    return useScreenSpaceNormals
+      ? buildFaceVertexShaderScreenSpace()
+      : buildFaceVertexShader();
+  }, [useScreenSpaceNormals]);
 
   // Create face material with tracking - shows overlay during shader compilation
   const { material: faceMaterial, isCompiling: isFaceShaderCompiling } = useTrackedShaderMaterial(
@@ -498,7 +489,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
           uIBLIntensity: { value: 1.0 },
           uIBLQuality: { value: 0 }, // 0=off, 1=low, 2=high
         },
-        vertexShader: buildFaceVertexShader(),
+        vertexShader: faceVertexShader,
         fragmentShader: faceFragmentShader,
         // Initialize transparency based on current opacity to avoid first-frame sorting issues.
         // Still updated dynamically in useFrame for runtime changes.
@@ -512,7 +503,8 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     // faceColor is also updated via uniforms.
     // presetLoadVersion: triggers material recreation on scene/style load to ensure
     // transparent/depthWrite properties match the loaded state (fixes skybox visibility bug).
-    [surfaceSettings.fresnelEnabled, sssEnabled, faceFragmentShader, presetLoadVersion]
+    // useScreenSpaceNormals: triggers shader rebuild when dimension crosses threshold
+    [surfaceSettings.fresnelEnabled, sssEnabled, faceFragmentShader, faceVertexShader, presetLoadVersion]
   );
 
 
@@ -556,12 +548,15 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     let features: string[];
     if (facesVisible) {
         // Use the actual modules from shader composition
-        modules = ['ND Transform', 'Modulation', ...faceShaderModules];
+        modules = useScreenSpaceNormals
+          ? ['ND Transform (Simple)', ...faceShaderModules]
+          : ['ND Transform', ...faceShaderModules];
         // Start with shader-compiled features (Multi-Light, Shadow Maps, Fog/SSS/Fresnel if enabled)
         features = [...faceShaderFeatures];
         features.push(`Opacity: ${surfaceSettings.faceOpacity < 1 ? 'Transparent' : 'Solid'}`);
+        features.push(`Normals: ${useScreenSpaceNormals ? 'Screen-Space (dFdx/dFdy)' : 'Geometry-Based'}`);
     } else {
-        modules = ['ND Transform', 'Modulation'];
+        modules = ['ND Transform'];
         features = ['Edges'];
     }
 
@@ -574,15 +569,15 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     });
 
     return () => setShaderDebugInfo('object', null);
-  }, [faceMaterial, edgeMaterial, facesVisible, faceShaderModules, faceShaderFeatures, surfaceSettings.faceOpacity, setShaderDebugInfo]);
+  }, [faceMaterial, edgeMaterial, facesVisible, faceShaderModules, faceShaderFeatures, surfaceSettings.faceOpacity, setShaderDebugInfo, useScreenSpaceNormals]);
 
-  // ============ FACE GEOMETRY (NON-INDEXED with neighbor data for GPU normal computation) ============
-  // Each triangle has 3 unique vertices, each with full nD coords + neighbor vertex coords.
-  // This enables computing face normals in the vertex shader after nD transformation.
-  // IMPORTANT: WebGL has a 16 attribute limit. We pack extra dims into vec4/vec3:
-  //   - position (vec3) + aExtraDims0_3 (vec4) + aExtraDims4_6 (vec3) = 3 slots for this vertex
-  //   - Same pattern for neighbor1 and neighbor2 = 6 more slots
-  //   Total: 9 attribute slots (under 16 limit)
+  // ============ FACE GEOMETRY ============
+  // Two modes based on useScreenSpaceNormals:
+  // 1. Geometry-based normals: Each triangle has 3 unique vertices + neighbor coords (9 attribute slots)
+  // 2. Screen-space normals: Each triangle has 3 unique vertices only (3 attribute slots, 67% reduction)
+  //
+  // Screen-space mode uses dFdx/dFdy in fragment shader for normal computation,
+  // which is faster for high-dimensional polytopes but may have minor edge artifacts.
   const faceGeometry = useMemo(() => {
     if (numFaces === 0 || baseVertices.length === 0) return null;
 
@@ -594,50 +589,26 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     }
     if (triangleCount === 0) return null;
 
-    // Debug logging for high-dimension face geometry
-    if (dimension >= 6) {
-      // Check vertex coordinate ranges
-      let minCoord = Infinity, maxCoord = -Infinity;
-      let maxNorm = 0;
-      for (const v of baseVertices) {
-        let norm = 0;
-        for (let d = 0; d < v.length; d++) {
-          const val = v[d] ?? 0;
-          minCoord = Math.min(minCoord, val);
-          maxCoord = Math.max(maxCoord, val);
-          norm += val * val;
-        }
-        maxNorm = Math.max(maxNorm, Math.sqrt(norm));
-      }
-
-    }
-
     const geo = new BufferGeometry();
     const vertexCount = triangleCount * 3; // 3 vertices per triangle, non-indexed
 
-    // Allocate attribute arrays - PACKED into vec4/vec3 to stay under WebGL 16 attribute limit
-    // Primary vertex data
+    // Primary vertex data (always needed)
     const positions = new Float32Array(vertexCount * 3);
     const extraDims0_3 = new Float32Array(vertexCount * 4);  // vec4: dims 4-7
     const extraDims4_6 = new Float32Array(vertexCount * 3);  // vec3: dims 8-10
 
-    // Neighbor 1 data (packed)
-    const neighbor1Pos = new Float32Array(vertexCount * 3);
-    const neighbor1Extra0_3 = new Float32Array(vertexCount * 4);
-    const neighbor1Extra4_6 = new Float32Array(vertexCount * 3);
-
-    // Neighbor 2 data (packed)
-    const neighbor2Pos = new Float32Array(vertexCount * 3);
-    const neighbor2Extra0_3 = new Float32Array(vertexCount * 4);
-    const neighbor2Extra4_6 = new Float32Array(vertexCount * 3);
+    // Neighbor data only needed for geometry-based normals (not screen-space)
+    const neighbor1Pos = useScreenSpaceNormals ? null : new Float32Array(vertexCount * 3);
+    const neighbor1Extra0_3 = useScreenSpaceNormals ? null : new Float32Array(vertexCount * 4);
+    const neighbor1Extra4_6 = useScreenSpaceNormals ? null : new Float32Array(vertexCount * 3);
+    const neighbor2Pos = useScreenSpaceNormals ? null : new Float32Array(vertexCount * 3);
+    const neighbor2Extra0_3 = useScreenSpaceNormals ? null : new Float32Array(vertexCount * 4);
+    const neighbor2Extra4_6 = useScreenSpaceNormals ? null : new Float32Array(vertexCount * 3);
 
     /**
      * Helper to write vertex data at a given output index.
-     * Each vertex gets its own position + the positions of its 2 neighbors.
-     * @param outIdx
-     * @param thisIdx
-     * @param neighbor1Idx
-     * @param neighbor2Idx
+     * For screen-space mode: only writes this vertex data (faster, less memory)
+     * For geometry mode: writes this vertex + 2 neighbors (for vertex shader normal computation)
      */
     const writeTriangleVertex = (
       outIdx: number,
@@ -646,9 +617,6 @@ export const PolytopeScene = React.memo(function PolytopeScene({
       neighbor2Idx: number
     ) => {
       const v = baseVertices[thisIdx]!;
-      const n1 = baseVertices[neighbor1Idx]!;
-      const n2 = baseVertices[neighbor2Idx]!;
-
       const i3 = outIdx * 3;
       const i4 = outIdx * 4;
 
@@ -665,34 +633,40 @@ export const PolytopeScene = React.memo(function PolytopeScene({
       extraDims4_6[i3 + 1] = v[8] ?? 0;
       extraDims4_6[i3 + 2] = v[9] ?? 0;
 
+      // Skip neighbor data for screen-space normals mode (67% memory reduction)
+      if (useScreenSpaceNormals) return;
+
+      const n1 = baseVertices[neighbor1Idx]!;
+      const n2 = baseVertices[neighbor2Idx]!;
+
       // Neighbor 1 position (vec3)
-      neighbor1Pos[i3] = n1[0] ?? 0;
-      neighbor1Pos[i3 + 1] = n1[1] ?? 0;
-      neighbor1Pos[i3 + 2] = n1[2] ?? 0;
+      neighbor1Pos![i3] = n1[0] ?? 0;
+      neighbor1Pos![i3 + 1] = n1[1] ?? 0;
+      neighbor1Pos![i3 + 2] = n1[2] ?? 0;
       // Neighbor 1 extra dims packed
-      neighbor1Extra0_3[i4] = n1[3] ?? 0;
-      neighbor1Extra0_3[i4 + 1] = n1[4] ?? 0;
-      neighbor1Extra0_3[i4 + 2] = n1[5] ?? 0;
-      neighbor1Extra0_3[i4 + 3] = n1[6] ?? 0;
-      neighbor1Extra4_6[i3] = n1[7] ?? 0;
-      neighbor1Extra4_6[i3 + 1] = n1[8] ?? 0;
-      neighbor1Extra4_6[i3 + 2] = n1[9] ?? 0;
+      neighbor1Extra0_3![i4] = n1[3] ?? 0;
+      neighbor1Extra0_3![i4 + 1] = n1[4] ?? 0;
+      neighbor1Extra0_3![i4 + 2] = n1[5] ?? 0;
+      neighbor1Extra0_3![i4 + 3] = n1[6] ?? 0;
+      neighbor1Extra4_6![i3] = n1[7] ?? 0;
+      neighbor1Extra4_6![i3 + 1] = n1[8] ?? 0;
+      neighbor1Extra4_6![i3 + 2] = n1[9] ?? 0;
 
       // Neighbor 2 position (vec3)
-      neighbor2Pos[i3] = n2[0] ?? 0;
-      neighbor2Pos[i3 + 1] = n2[1] ?? 0;
-      neighbor2Pos[i3 + 2] = n2[2] ?? 0;
+      neighbor2Pos![i3] = n2[0] ?? 0;
+      neighbor2Pos![i3 + 1] = n2[1] ?? 0;
+      neighbor2Pos![i3 + 2] = n2[2] ?? 0;
       // Neighbor 2 extra dims packed
-      neighbor2Extra0_3[i4] = n2[3] ?? 0;
-      neighbor2Extra0_3[i4 + 1] = n2[4] ?? 0;
-      neighbor2Extra0_3[i4 + 2] = n2[5] ?? 0;
-      neighbor2Extra0_3[i4 + 3] = n2[6] ?? 0;
-      neighbor2Extra4_6[i3] = n2[7] ?? 0;
-      neighbor2Extra4_6[i3 + 1] = n2[8] ?? 0;
-      neighbor2Extra4_6[i3 + 2] = n2[9] ?? 0;
+      neighbor2Extra0_3![i4] = n2[3] ?? 0;
+      neighbor2Extra0_3![i4 + 1] = n2[4] ?? 0;
+      neighbor2Extra0_3![i4 + 2] = n2[5] ?? 0;
+      neighbor2Extra0_3![i4 + 3] = n2[6] ?? 0;
+      neighbor2Extra4_6![i3] = n2[7] ?? 0;
+      neighbor2Extra4_6![i3 + 1] = n2[8] ?? 0;
+      neighbor2Extra4_6![i3 + 2] = n2[9] ?? 0;
     };
 
-    // Build non-indexed geometry with neighbor data
+    // Build non-indexed geometry
     let outIdx = 0;
     const vertexBound = baseVertices.length;
 
@@ -705,20 +679,15 @@ export const PolytopeScene = React.memo(function PolytopeScene({
       if (!hasValidIndices) continue;
 
       if (vis.length === 3) {
-        // Triangle: each vertex needs to know its 2 neighbors
-        // Vertex 0: neighbors are 1, 2
+        // Triangle: each vertex needs to know its 2 neighbors (for geometry-based normals)
         writeTriangleVertex(outIdx++, vis[0]!, vis[1]!, vis[2]!);
-        // Vertex 1: neighbors are 2, 0 (maintain winding order for normal)
         writeTriangleVertex(outIdx++, vis[1]!, vis[2]!, vis[0]!);
-        // Vertex 2: neighbors are 0, 1
         writeTriangleVertex(outIdx++, vis[2]!, vis[0]!, vis[1]!);
       } else if (vis.length === 4) {
         // Quad: split into 2 triangles (0,1,2) and (0,2,3)
-        // Triangle 1: (0, 1, 2)
         writeTriangleVertex(outIdx++, vis[0]!, vis[1]!, vis[2]!);
         writeTriangleVertex(outIdx++, vis[1]!, vis[2]!, vis[0]!);
         writeTriangleVertex(outIdx++, vis[2]!, vis[0]!, vis[1]!);
-        // Triangle 2: (0, 2, 3)
         writeTriangleVertex(outIdx++, vis[0]!, vis[2]!, vis[3]!);
         writeTriangleVertex(outIdx++, vis[2]!, vis[3]!, vis[0]!);
         writeTriangleVertex(outIdx++, vis[3]!, vis[0]!, vis[2]!);
@@ -730,19 +699,18 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     geo.setAttribute('aExtraDims0_3', new Float32BufferAttribute(extraDims0_3, 4));
     geo.setAttribute('aExtraDims4_6', new Float32BufferAttribute(extraDims4_6, 3));
 
-    // Neighbor 1 attributes (packed)
-    geo.setAttribute('aNeighbor1Pos', new Float32BufferAttribute(neighbor1Pos, 3));
-    geo.setAttribute('aNeighbor1Extra0_3', new Float32BufferAttribute(neighbor1Extra0_3, 4));
-    geo.setAttribute('aNeighbor1Extra4_6', new Float32BufferAttribute(neighbor1Extra4_6, 3));
-
-    // Neighbor 2 attributes (packed)
-    geo.setAttribute('aNeighbor2Pos', new Float32BufferAttribute(neighbor2Pos, 3));
-    geo.setAttribute('aNeighbor2Extra0_3', new Float32BufferAttribute(neighbor2Extra0_3, 4));
-    geo.setAttribute('aNeighbor2Extra4_6', new Float32BufferAttribute(neighbor2Extra4_6, 3));
-
+    // Neighbor attributes only for geometry-based normals mode
+    if (!useScreenSpaceNormals) {
+      geo.setAttribute('aNeighbor1Pos', new Float32BufferAttribute(neighbor1Pos!, 3));
+      geo.setAttribute('aNeighbor1Extra0_3', new Float32BufferAttribute(neighbor1Extra0_3!, 4));
+      geo.setAttribute('aNeighbor1Extra4_6', new Float32BufferAttribute(neighbor1Extra4_6!, 3));
+      geo.setAttribute('aNeighbor2Pos', new Float32BufferAttribute(neighbor2Pos!, 3));
+      geo.setAttribute('aNeighbor2Extra0_3', new Float32BufferAttribute(neighbor2Extra0_3!, 4));
+      geo.setAttribute('aNeighbor2Extra4_6', new Float32BufferAttribute(neighbor2Extra4_6!, 3));
+    }
 
     return geo;
-  }, [numFaces, faces, baseVertices]);
+  }, [numFaces, faces, baseVertices, useScreenSpaceNormals]);
 
   // ============ EDGE GEOMETRY ============
   const edgeGeometry = useMemo(() => {
@@ -838,26 +806,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     const iblChanged = iblVersion !== lastIblVersionRef.current;
     const lightingChanged = lightingVersion !== lastLightingVersionRef.current;
 
-    const isPlaying = animationState.isPlaying;
     const polytopeConfig = extendedObjectState.polytope;
-
-    // Update animation time only when playing
-    if (isPlaying) {
-      animTimeRef.current += delta;
-    }
-    const animTime = animTimeRef.current;
-
-    // ============================================
-    // DIRTY-FLAG: Polytope modulation config (only when polytope settings change)
-    // ============================================
-    // Radial breathing modulation - uses facetOffset properties
-    // facetOffsetEnabled: on/off, facetOffsetAmplitude: amplitude
-    // facetOffsetFrequency: frequency, facetOffsetPhaseSpread: wave, facetOffsetBias: bias
-    const modEnabled = polytopeConfig.facetOffsetEnabled;
-    const modAmplitude = modEnabled ? polytopeConfig.facetOffsetAmplitude : 0.0;
-    const modFrequency = polytopeConfig.facetOffsetFrequency;
-    const modWave = polytopeConfig.facetOffsetPhaseSpread;
-    const modBias = polytopeConfig.facetOffsetBias;
 
     // Update polytope version ref after reading config
     if (polytopeChanged) {
@@ -920,16 +869,10 @@ export const PolytopeScene = React.memo(function PolytopeScene({
         // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
         updateNDUniforms(material, gpuData, dimension, visualScale, projectionDistance);
 
-        // Update vertex modulation uniforms
         const u = material.uniforms;
 
         // Update view matrix for normal transformation (needed for SSR)
         if (u.uViewMatrix) (u.uViewMatrix.value as Matrix4).copy(camera.matrixWorldInverse);
-        if (u.uAnimTime) u.uAnimTime.value = animTime;
-        if (u.uModAmplitude) u.uModAmplitude.value = modAmplitude;
-        if (u.uModFrequency) u.uModFrequency.value = modFrequency;
-        if (u.uModWave) u.uModWave.value = modWave;
-        if (u.uModBias) u.uModBias.value = modBias;
 
         // ============================================
         // DIRTY-FLAG: Only update appearance uniforms when settings change
@@ -1047,13 +990,6 @@ export const PolytopeScene = React.memo(function PolytopeScene({
       (u.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols);
       (u.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums);
       u.uProjectionDistance!.value = projectionDistance;
-
-      // Update modulation uniforms
-      u.uAnimTime!.value = animTime;
-      u.uModAmplitude!.value = modAmplitude;
-      u.uModFrequency!.value = modFrequency;
-      u.uModWave!.value = modWave;
-      u.uModBias!.value = modBias;
     }
   }, FRAME_PRIORITY.RENDERER_UNIFORMS);
 

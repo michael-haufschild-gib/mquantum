@@ -5,22 +5,23 @@ import { Button } from '@/components/ui/Button';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { InputModal } from '@/components/ui/InputModal';
 import { Modal } from '@/components/ui/Modal';
-import { BREAKPOINTS, useMediaQuery } from '@/hooks/useMediaQuery';
+import { BREAKPOINTS, useMediaQuery, useIsMobile } from '@/hooks/useMediaQuery';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
 import { exportSceneToPNG, findThreeCanvas, generateTimestampFilename } from '@/lib/export';
+import { OBJECT_TYPE_REGISTRY } from '@/lib/geometry/registry/registry';
 import { getModifierSymbols } from '@/lib/platform';
 import { PRESETS } from '@/lib/presets';
 import { generateShareUrl } from '@/lib/url';
 import { useAppearanceStore } from '@/stores/appearanceStore';
 import { useExportStore } from '@/stores/exportStore';
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { usePostProcessingStore } from '@/stores/postProcessingStore';
 import { usePresetManagerStore, type PresetManagerState, type SavedScene, type SavedStyle } from '@/stores/presetManagerStore';
 import { THEME_PRESETS, useThemeStore } from '@/stores/themeStore';
 import { useTransformStore } from '@/stores/transformStore';
-import { useUIStore } from '@/stores/uiStore';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -121,14 +122,10 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     }))
   );
 
-  const { showPerfMonitor, setShowPerfMonitor } = useUIStore(
-    useShallow((state) => ({
-      showPerfMonitor: state.showPerfMonitor,
-      setShowPerfMonitor: state.setShowPerfMonitor,
-    }))
-  );
+  const quantumMode = useExtendedObjectStore((state) => state.schroedinger.quantumMode);
 
   const isDesktop = useMediaQuery(BREAKPOINTS.sm);
+  const isMobile = useIsMobile();
 
   // Refs for measuring sections to determine center positioning
   const topBarRef = useRef<HTMLDivElement>(null);
@@ -207,6 +204,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
 
   const setExportModalOpen = useExportStore((state) => state.setModalOpen);
   const setPreviewImage = useExportStore((state) => state.setPreviewImage);
+  const updateExportSettings = useExportStore((state) => state.updateSettings);
 
   // --- Utility Actions for Mobile Menu ---
   const toggleSound = useCallback(() => {
@@ -220,15 +218,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         addToast('Sound Muted', 'info');
     }
   }, [isSoundEnabled, addToast]);
-
-  const toggleFullscreen = useCallback(() => {
-    soundManager.playClick();
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-  }, []);
 
   // --- Memoized Submenu Definitions ---
 
@@ -320,9 +309,30 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
         console.error('Failed to capture preview for video export:', e);
       }
     }
+
+    // Generate dynamic default text based on object type
+    let defaultText = '';
+    if (objectType === 'schroedinger') {
+      // For Schroedinger, use the quantum mode name
+      const modeName = quantumMode === 'harmonicOscillator'
+        ? 'Harmonic Oscillator'
+        : 'Hydrogen Orbitals';
+      defaultText = `${dimension}D ${modeName}`;
+    } else {
+      // For other types, use the registry name
+      const entry = OBJECT_TYPE_REGISTRY.get(objectType);
+      const typeName = entry?.name ?? objectType;
+      defaultText = `${dimension}D ${typeName}`;
+    }
+
+    // Set the dynamic text in export settings (using function form for deep merge)
+    updateExportSettings((prev) => ({
+      textOverlay: { ...prev.textOverlay, text: defaultText }
+    }));
+
     setExportModalOpen(true);
     soundManager.playClick();
-  }, [setExportModalOpen, setPreviewImage]);
+  }, [setExportModalOpen, setPreviewImage, dimension, objectType, quantumMode, updateExportSettings]);
 
   const handleToggleLeftPanel = useCallback(() => {
     toggleLeftPanel();
@@ -333,10 +343,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     toggleRightPanel();
     soundManager.playClick();
   }, [toggleRightPanel]);
-
-  const handleTogglePerfMonitor = useCallback(() => {
-    setShowPerfMonitor(!showPerfMonitor);
-  }, [setShowPerfMonitor, showPerfMonitor]);
 
   // --- Memoized Menu Definitions ---
 
@@ -349,16 +355,26 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     ];
   }, [handleExport, handleExportVideo, handleShare]);
 
-  const viewItems = useMemo(() => [
-    { label: showLeftPanel ? 'Hide Explorer' : 'Show Explorer', onClick: handleToggleLeftPanel },
-    { label: showRightPanel ? 'Hide Inspector' : 'Show Inspector', onClick: handleToggleRightPanel },
-    { label: 'Cinematic Mode', onClick: toggleCinematicMode, shortcut: 'C' },
-    { label: 'Keyboard Shortcuts', onClick: toggleShortcuts, shortcut: '?' },
-    { label: '---' },
-    { label: 'Theme', items: presetItems },
-  ], [showLeftPanel, showRightPanel, handleToggleLeftPanel, handleToggleRightPanel, toggleCinematicMode, toggleShortcuts, presetItems]);
+  const viewItems = useMemo(() => {
+    const items = [
+      { label: showLeftPanel ? 'Hide Explorer' : 'Show Explorer', onClick: handleToggleLeftPanel },
+      { label: showRightPanel ? 'Hide Inspector' : 'Show Inspector', onClick: handleToggleRightPanel },
+      { label: 'Cinematic Mode', onClick: toggleCinematicMode, shortcut: 'C' },
+    ];
+    
+    // Only show keyboard shortcuts option on desktop (not useful on mobile)
+    if (!isMobile) {
+      items.push({ label: 'Keyboard Shortcuts', onClick: toggleShortcuts, shortcut: '?' });
+    }
+    
+    items.push({ label: '---' });
+    items.push({ label: 'Theme', items: presetItems });
+    
+    return items;
+  }, [showLeftPanel, showRightPanel, handleToggleLeftPanel, handleToggleRightPanel, toggleCinematicMode, toggleShortcuts, presetItems, isMobile]);
 
   // --- Mobile Unified Menu ---
+  // Note: Performance Monitor and Fullscreen are now icon buttons in the top bar (not text menu items)
   const mobileMenuItems = useMemo(() => [
     { label: 'FILE', items: fileItems },
     { label: 'VIEW', items: viewItems },
@@ -367,9 +383,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = ({
     { label: '---' },
     { label: 'TOOLS' },
     { label: isSoundEnabled ? 'Mute Sound' : 'Enable Sound', onClick: toggleSound },
-    { label: showPerfMonitor ? 'Hide Performance' : 'Show Performance', onClick: handleTogglePerfMonitor },
-    { label: 'Toggle Fullscreen', onClick: toggleFullscreen },
-  ], [fileItems, viewItems, sceneSubmenuItems, styleSubmenuItems, isSoundEnabled, toggleSound, showPerfMonitor, handleTogglePerfMonitor, toggleFullscreen]);
+  ], [fileItems, viewItems, sceneSubmenuItems, styleSubmenuItems, isSoundEnabled, toggleSound]);
 
   // --- Style Menu ---
 

@@ -57,20 +57,21 @@ describe('ExportModal', () => {
         bitrateMode: 'constant',
         hardwareAcceleration: 'prefer-software',
         warmupFrames: 5,
+        rotation: 0,
         textOverlay: {
           enabled: false,
           text: 'mdimension',
           fontFamily: 'Inter, sans-serif',
           fontSize: 48,
           fontWeight: 700,
-          textAlign: 'center',
           letterSpacing: 0,
           color: '#ffffff',
           opacity: 1,
           shadowColor: 'rgba(0,0,0,0.5)',
           shadowBlur: 10,
-          positionX: 0.5,
-          positionY: 0.9,
+          verticalPlacement: 'bottom',
+          horizontalPlacement: 'center',
+          padding: 20,
         },
         crop: {
           enabled: false,
@@ -107,8 +108,8 @@ describe('ExportModal', () => {
     render(<ExportModal />);
     const wrapper = screen.getByTestId('export-tabs-wrapper');
     expect(wrapper).toBeInTheDocument();
-    expect(wrapper).toHaveClass('overflow-hidden');
     expect(wrapper).toHaveClass('flex-col');
+    expect(wrapper).toHaveClass('min-h-0');
     // Ensure it does NOT have the old scrolling class
     expect(wrapper).not.toHaveClass('overflow-y-auto');
   });

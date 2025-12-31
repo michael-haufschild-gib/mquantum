@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react'
-import { useExportStore, VideoCodec, ExportResolution } from '@/stores/exportStore'
-import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
 import { NumberInput } from '@/components/ui/NumberInput'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { Button } from '@/components/ui/Button'
-import { Icon } from '@/components/ui/Icon'
-import { AnimatePresence, m } from 'motion/react'
+import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { ExportResolution, useExportStore, VideoCodec } from '@/stores/exportStore'
 import { useLayoutStore } from '@/stores/layoutStore'
+import { AnimatePresence, m } from 'motion/react'
+import { useEffect, useState } from 'react'
 
 export const ExportGeneralTab = () => {
     const { settings, updateSettings, setCropEditorOpen, setModalOpen } = useExportStore()
@@ -52,7 +52,7 @@ export const ExportGeneralTab = () => {
                         Output Format
                     </h3>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Container</label>
@@ -68,7 +68,7 @@ export const ExportGeneralTab = () => {
                             }}
                         />
                     </div>
-                    
+
                     <div className="space-y-2">
                         <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Resolution</label>
                         <ToggleGroup
@@ -127,15 +127,15 @@ export const ExportGeneralTab = () => {
                         <label className="text-[10px] text-text-tertiary uppercase font-bold tracking-widest">Framerate</label>
                         <ToggleGroup
                             options={[
-                                { value: '24', label: '24 FPS' },
-                                { value: '30', label: '30 FPS' },
-                                { value: '60', label: '60 FPS' }
+                                { value: '24', label: '24' },
+                                { value: '30', label: '30' },
+                                { value: '60', label: '60' }
                             ]}
                             value={settings.fps.toString()}
                             onChange={(val) => updateSettings({ fps: Number(val) })}
                         />
                     </div>
-                    
+
                     <div className="space-y-1">
                          <Slider
                             label="Duration"
@@ -153,7 +153,7 @@ export const ExportGeneralTab = () => {
             <div className="h-px bg-[var(--border-subtle)]" />
 
             {/* Crop Control - Visual Card Style */}
-            <div 
+            <div
                 className={`
                     flex items-center justify-between p-4 rounded-xl border transition-colors cursor-pointer
                     ${settings.crop.enabled ? 'bg-accent/5 border-accent/50' : 'glass-panel hover:bg-[var(--bg-hover)]'}
@@ -174,14 +174,14 @@ export const ExportGeneralTab = () => {
 
                 <div className="flex items-center gap-3">
                     <div onClick={(e) => e.stopPropagation()}>
-                        <Switch 
-                            checked={settings.crop.enabled} 
+                        <Switch
+                            checked={settings.crop.enabled}
                             onCheckedChange={(c) => updateSettings({ crop: { ...settings.crop, enabled: c } })}
                         />
                     </div>
-                    <Button 
-                        size="sm" 
-                        variant="secondary" 
+                    <Button
+                        size="sm"
+                        variant="secondary"
                         disabled={!settings.crop.enabled}
                         onClick={(e) => {
                             e.stopPropagation()

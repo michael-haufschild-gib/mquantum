@@ -26,24 +26,24 @@ export function generateDispatch(dimension: number): string {
 
 /**
  * Get distance to Mandelbulb surface (simple version).
- * Fixed values: iterations 32 (fast) / 64 (HQ), escape radius 8.0
+ * Uses uSdfMaxIterations from store (user-configurable).
  */
 float GetDist(vec3 pos) {
     float pwr = getEffectivePower();
-    float bail = 8.0;  // Fixed escape radius for optimal quality
-    int maxIt = uFastMode ? 32 : 64;
+    float bail = max(uEscapeRadius, 2.0);
+    int maxIt = int(uSdfMaxIterations);
 
     return ${simpleSdfName}(${args});
 }
 
 /**
  * Get distance to Mandelbulb surface with trap value output.
- * Fixed values: iterations 32 (fast) / 64 (HQ), escape radius 8.0
+ * Uses uSdfMaxIterations from store (user-configurable).
  */
 float GetDistWithTrap(vec3 pos, out float trap) {
     float pwr = getEffectivePower();
-    float bail = 8.0;  // Fixed escape radius for optimal quality
-    int maxIt = uFastMode ? 32 : 64;
+    float bail = max(uEscapeRadius, 2.0);
+    int maxIt = int(uSdfMaxIterations);
 
     return ${sdfName}(${argsTrap});
 }

@@ -1,94 +1,159 @@
 import { useExportStore } from '@/stores/exportStore'
 import { Icon } from '@/components/ui/Icon'
+import { useRef, useState, useLayoutEffect } from 'react'
+
+/** Get export width in pixels based on resolution setting */
+const getExportWidth = (resolution: string, customWidth: number): number => {
+    switch (resolution) {
+        case '720p': return 1280
+        case '1080p': return 1920
+        case '4k': return 3840
+        case 'custom': return customWidth
+        default: return 1920
+    }
+}
 
 export const ExportPreview = () => {
-    // Use previewImage captured BEFORE modal opened (in EditorTopBar)
-    // This avoids timing issues with frameloop="never" and render graph state
     const { settings, canvasAspectRatio, previewImage } = useExportStore()
+    const { crop, textOverlay, resolution, customWidth } = settings
 
-    const { crop, textOverlay } = settings
+    const containerRef = useRef<HTMLDivElement>(null)
+    const outputRef = useRef<HTMLDivElement>(null)
+    const [previewScale, setPreviewScale] = useState(1 / 3)
+    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
 
-    // Logic to constrain preview to aspect ratio within the container
-    // We rely on CSS `aspect-ratio` and `max-w/max-h` centering.
+    useLayoutEffect(() => {
+        const updateSize = () => {
+            if (containerRef.current) {
+                setContainerSize({
+                    width: containerRef.current.clientWidth,
+                    height: containerRef.current.clientHeight
+                })
+            }
+            if (outputRef.current) {
+                const previewWidth = outputRef.current.offsetWidth
+                const exportWidth = getExportWidth(resolution, customWidth)
+                setPreviewScale(previewWidth / exportWidth)
+            }
+        }
+        updateSize()
+        const observer = new ResizeObserver(updateSize)
+        if (containerRef.current) observer.observe(containerRef.current)
+        return () => observer.disconnect()
+    }, [resolution, customWidth, crop.enabled, crop.width, crop.height])
+
+    // Calculate the OUTPUT aspect ratio (what will be exported)
+    // When crop is enabled, this is the cropped area's aspect ratio
+    const outputAspectRatio = crop.enabled
+        ? canvasAspectRatio * (crop.width / crop.height)
+        : canvasAspectRatio
+
+    // Calculate dimensions to fill container while maintaining output aspect ratio
+    const getOutputDimensions = () => {
+        if (containerSize.width === 0 || containerSize.height === 0) {
+            return { width: '100%', height: '100%' }
+        }
+        const containerRatio = containerSize.width / containerSize.height
+        if (containerRatio > outputAspectRatio) {
+            return { width: 'auto', height: '100%' }
+        } else {
+            return { width: '100%', height: 'auto' }
+        }
+    }
+
+    const dimensions = getOutputDimensions()
+
+    // When crop is enabled, we need to scale and position the image
+    // so the crop area fills the container exactly
+    const getImageTransform = () => {
+        if (!crop.enabled) {
+            return { scale: 1, translateX: 0, translateY: 0 }
+        }
+        // Scale: the image needs to be enlarged so crop area = 100%
+        const scaleX = 1 / crop.width
+        const scaleY = 1 / crop.height
+        // Use the larger scale to ensure coverage (they should be equal for proper aspect ratio)
+        const scale = Math.max(scaleX, scaleY)
+        // Translate: offset so crop area is centered at origin
+        // crop.x and crop.y are in 0-1 range relative to canvas
+        const translateX = -crop.x * scale * 100
+        const translateY = -crop.y * scale * 100
+        return { scale, translateX, translateY }
+    }
+
+    const imageTransform = getImageTransform()
 
     return (
-        <div className="relative w-full h-full bg-[var(--bg-app)]/50 flex items-center justify-center p-4">
-            
-             {/* Aspect Ratio Container (Represents the Full Canvas) */}
-             <div 
+        <div ref={containerRef} className="relative w-full h-full bg-[var(--bg-app)]/50 flex items-center justify-center overflow-hidden">
+
+             {/* Output Frame Container - uses OUTPUT aspect ratio */}
+             <div
+                ref={outputRef}
                 className="relative shadow-2xl overflow-hidden"
                 style={{
-                    aspectRatio: canvasAspectRatio,
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    // Fallback width if aspect-ratio fails or content is small
-                    width: 'auto', 
-                    height: 'auto'
+                    aspectRatio: outputAspectRatio,
+                    width: dimensions.width,
+                    height: dimensions.height,
                 }}
              >
                 {previewImage ? (
                     <>
-                        {/* Background Image (The Full Scene) */}
+                        {/* Background Image - scaled and positioned to show crop area */}
                         <img
-                            src={previewImage} 
-                            className="w-full h-full object-cover" 
+                            src={previewImage}
+                            className="absolute origin-top-left"
                             style={{
-                                // Dim the background if cropping is active to highlight the crop
-                                opacity: crop.enabled ? 0.3 : 1
+                                width: `${imageTransform.scale * 100}%`,
+                                height: `${imageTransform.scale * 100}%`,
+                                transform: `translate(${imageTransform.translateX}%, ${imageTransform.translateY}%)`,
                             }}
-                            alt="Scene Preview" 
+                            alt="Scene Preview"
                         />
 
-                        {/* Crop Box / Output Frame */}
-                        {/* If crop is disabled, this fills the container (0,0,100%,100%) */}
-                        <div 
-                            className={`absolute border-2 transition-all duration-300 ${crop.enabled ? 'border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]' : 'border-transparent'}`}
-                            style={{
-                                left: crop.enabled ? `${crop.x * 100}%` : '0%',
-                                top: crop.enabled ? `${crop.y * 100}%` : '0%',
-                                width: crop.enabled ? `${crop.width * 100}%` : '100%',
-                                height: crop.enabled ? `${crop.height * 100}%` : '100%',
-                            }}
-                        >
-                            {/* Inner Image (Normal Brightness) - strictly inside the crop box */}
-                            {/* We simulate "seeing through" the crop window by using the same image, 
-                                inversely scaled and positioned? 
-                                No, simpler: Just let the background be dim, and this box be "empty" but with a border.
-                                BUT if we want the "Output" to look clean (filters applied, full opacity), 
-                                we might want to render the image AGAIN inside here?
-                                
-                                Actually, "shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]" on the Crop Box 
-                                effectively masks the outside! This is a clever CSS trick.
-                                So the background image can be full opacity, and the shadow darkens the outside.
-                            */}
-                            
-                            {/* Text Overlay - Positioned RELATIVE TO THIS BOX (The Output) */}
-                            {textOverlay.enabled && (
-                                <div 
-                                    className="absolute pointer-events-none w-full h-full overflow-hidden"
-                                >
-                                    <div 
+                        {/* Text Overlay - Positioned relative to output frame */}
+                        {textOverlay.enabled && (() => {
+                            const { verticalPlacement, horizontalPlacement, padding } = textOverlay
+                            const scaledPadding = padding * previewScale
+                            const scaledFontSize = textOverlay.fontSize * previewScale
+                            const scaledLetterSpacing = textOverlay.letterSpacing * previewScale
+                            const scaledShadowBlur = textOverlay.shadowBlur * previewScale
+
+                            const left = horizontalPlacement === 'left' ? `${scaledPadding}px`
+                                : horizontalPlacement === 'right' ? `calc(100% - ${scaledPadding}px)`
+                                : '50%'
+                            const translateX = horizontalPlacement === 'left' ? '0%'
+                                : horizontalPlacement === 'right' ? '-100%'
+                                : '-50%'
+                            const top = verticalPlacement === 'top' ? `${scaledPadding}px`
+                                : verticalPlacement === 'bottom' ? `calc(100% - ${scaledPadding}px)`
+                                : '50%'
+                            const translateY = verticalPlacement === 'top' ? '0%'
+                                : verticalPlacement === 'bottom' ? '-100%'
+                                : '-50%'
+
+                            return (
+                                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                                    <div
                                         className="absolute"
                                         style={{
-                                            left: `${textOverlay.positionX * 100}%`,
-                                            top: `${textOverlay.positionY * 100}%`,
-                                            transform: `translate(${textOverlay.textAlign === 'center' ? '-50%' : textOverlay.textAlign === 'right' ? '-100%' : '0%'}, -50%)`,
+                                            left,
+                                            top,
+                                            transform: `translate(${translateX}, ${translateY})`,
                                             color: textOverlay.color,
-                                            fontFamily: 'Inter, sans-serif', // Using system font for preview safe-guard
-                                            fontSize: `${textOverlay.fontSize / (crop.enabled ? 3 * crop.width : 3)}px`, // Approx scale
+                                            fontFamily: 'Inter, sans-serif',
+                                            fontSize: `${scaledFontSize}px`,
                                             fontWeight: textOverlay.fontWeight,
-                                            textAlign: textOverlay.textAlign,
-                                            letterSpacing: `${textOverlay.letterSpacing}px`,
+                                            letterSpacing: `${scaledLetterSpacing}px`,
                                             opacity: textOverlay.opacity,
-                                            textShadow: `0px 0px ${textOverlay.shadowBlur}px ${textOverlay.shadowColor}`,
+                                            textShadow: `0px 0px ${scaledShadowBlur}px ${textOverlay.shadowColor}`,
                                             whiteSpace: 'nowrap'
                                         }}
                                     >
                                         {textOverlay.text}
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            )
+                        })()}
                     </>
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-[var(--bg-hover)] text-[var(--text-tertiary)] flex-col gap-2">
@@ -97,18 +162,7 @@ export const ExportPreview = () => {
                     </div>
                 )}
              </div>
-            
-            {/* Status Overlays (Outside the aspect container) */}
-            <div className="absolute top-4 left-4 flex gap-2">
-                 <div className="px-2 py-1 glass-panel rounded text-[10px] font-mono text-[var(--text-secondary)]">
-                    PREVIEW
-                 </div>
-                 {crop.enabled && (
-                     <div className="px-2 py-1 bg-accent/20 border border-accent/30 rounded text-[10px] font-mono text-accent">
-                        CROP ON
-                     </div>
-                 )}
-            </div>
+
         </div>
     )
 }

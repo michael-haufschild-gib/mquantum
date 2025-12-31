@@ -6,7 +6,7 @@
  *
  * Features:
  * - Classic: Cube texture sampling with effects
- * - Procedural Modes: Aurora, Nebula, Void, Crystalline, Horizon, Ocean, Twilight, Starfield
+ * - Procedural Modes: Aurora, Nebula, Crystalline, Horizon, Ocean, Twilight
  * - "Atmospheric Resonance" system (10 delight features)
  * - Cosine Palette Integration
  * - Smooth crossfade transitions
@@ -16,17 +16,15 @@ import * as THREE from 'three'
 
 /**
  * Skybox mode constants matching shader uniforms
- * 0=Classic, 1=Aurora, 2=Nebula, 3=Void, 4=Crystalline, 5=Horizon, 6=Ocean, 7=Twilight, 8=Starfield
+ * 0=Classic, 1=Aurora, 2=Nebula, 3=Crystalline, 4=Horizon, 5=Ocean, 6=Twilight
  */
 export const SKYBOX_MODE_CLASSIC = 0
 export const SKYBOX_MODE_AURORA = 1
 export const SKYBOX_MODE_NEBULA = 2
-export const SKYBOX_MODE_VOID = 3
-export const SKYBOX_MODE_CRYSTALLINE = 4
-export const SKYBOX_MODE_HORIZON = 5
-export const SKYBOX_MODE_OCEAN = 6
-export const SKYBOX_MODE_TWILIGHT = 7
-export const SKYBOX_MODE_STARFIELD = 8
+export const SKYBOX_MODE_CRYSTALLINE = 3
+export const SKYBOX_MODE_HORIZON = 4
+export const SKYBOX_MODE_OCEAN = 5
+export const SKYBOX_MODE_TWILIGHT = 6
 
 /**
  * Default uniform values for the skybox shader.
@@ -70,14 +68,6 @@ export function createSkyboxShaderDefaults(): Record<string, { value: any }> {
     uSunIntensity: { value: 0.0 },
     uSunPosition: { value: new THREE.Vector3(10, 10, 10) },
 
-    // Starfield defaults
-    uStarDensity: { value: 0.5 },
-    uStarBrightness: { value: 1.0 },
-    uStarSize: { value: 0.5 },
-    uStarTwinkle: { value: 0.3 },
-    uStarGlow: { value: 0.5 },
-    uStarColorVariation: { value: 0.5 },
-
     // Parallax defaults
     uParallaxEnabled: { value: 0 },
     uParallaxStrength: { value: 0.5 },
@@ -102,6 +92,7 @@ export function createSkyboxShaderDefaults(): Record<string, { value: any }> {
  * GLSL version for WebGL2 - Three.js will handle the #version directive
  */
 export const skyboxGlslVersion = THREE.GLSL3
+
 
 
 

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useExportStore, VideoCodec, ExportMode } from '@/stores/exportStore'
+import { useExportStore, VideoCodec } from '@/stores/exportStore'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { Slider } from '@/components/ui/Slider'
 
 export const ExportAdvancedTab = () => {
-    const { settings, updateSettings, exportMode, exportModeOverride, setExportModeOverride } = useExportStore()
+    const { settings, updateSettings } = useExportStore()
     const [supportedCodecs, setSupportedCodecs] = useState<Record<VideoCodec, boolean>>({
         avc: true, hevc: false, vp9: true, av1: false
     })
@@ -83,31 +83,6 @@ export const ExportAdvancedTab = () => {
                 />
             </div>
 
-            <div className="h-px bg-[var(--bg-hover)]" />
-
-            {/* Export Mode */}
-            <div className="space-y-3">
-                 <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-text-secondary uppercase tracking-widest pl-1">Processing Mode</label>
-                    <span className={`text-[10px] px-2 py-0.5 rounded ${exportModeOverride ? 'bg-accent/20 text-accent border border-accent/30' : 'bg-[var(--bg-hover)] text-text-tertiary'}`}>
-                        {exportModeOverride ? 'Manual Override' : 'Auto-Selected'}
-                    </span>
-                </div>
-                <ToggleGroup
-                    options={[
-                        { value: 'in-memory', label: 'In-Memory' },
-                        { value: 'stream', label: 'Stream to Disk' },
-                        { value: 'segmented', label: 'Segmented' }
-                    ]}
-                    value={exportModeOverride || exportMode}
-                    onChange={(val) => setExportModeOverride(val as ExportMode)}
-                />
-                <p className="text-[10px] text-text-tertiary p-2 bg-[var(--bg-hover)] rounded border border-border-subtle">
-                    {exportMode === 'in-memory' && "Best for short clips. Keeps video in RAM before download."}
-                    {exportMode === 'stream' && "Best for long recordings. Writes directly to disk (Chrome/Edge only)."}
-                    {exportMode === 'segmented' && "Fallback for large files. Downloads multiple parts to join later."}
-                </p>
-            </div>
         </div>
     )
 }

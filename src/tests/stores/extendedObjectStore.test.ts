@@ -11,17 +11,12 @@ describe('extendedObjectStore (invariants)', () => {
     useExtendedObjectStore.getState().reset()
   })
 
-  it('polytope modulation settings clamp to safe ranges', () => {
-    useExtendedObjectStore.getState().setPolytopeFacetOffsetAmplitude(999)
-    useExtendedObjectStore.getState().setPolytopeFacetOffsetFrequency(0)
-    useExtendedObjectStore.getState().setPolytopeFacetOffsetPhaseSpread(-1)
-    useExtendedObjectStore.getState().setPolytopeFacetOffsetBias(2)
+  it('polytope scale setting clamps to safe range', () => {
+    useExtendedObjectStore.getState().setPolytopeScale(999)
+    expect(useExtendedObjectStore.getState().polytope.scale).toBe(8.0)
 
-    const s = useExtendedObjectStore.getState().polytope
-    expect(s.facetOffsetAmplitude).toBe(1)
-    expect(s.facetOffsetFrequency).toBe(0.01)
-    expect(s.facetOffsetPhaseSpread).toBe(0)
-    expect(s.facetOffsetBias).toBe(1)
+    useExtendedObjectStore.getState().setPolytopeScale(0.1)
+    expect(useExtendedObjectStore.getState().polytope.scale).toBe(0.5)
   })
 
   it('wythoff preset updates scale and initializeWythoffForDimension downgrades D->B for <4D', () => {

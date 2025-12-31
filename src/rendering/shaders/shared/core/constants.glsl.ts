@@ -7,8 +7,8 @@ export const constantsBlock = `
 
 // Low quality mode (during animation)
 #define MAX_MARCH_STEPS_LQ 64
-#define MAX_ITER_LQ 32
-#define SURF_DIST_LQ 0.004
+#define MAX_ITER_LQ 30
+#define SURF_DIST_LQ 0.002
 
 #define BOUND_R 2.0
 #define EPS 1e-6

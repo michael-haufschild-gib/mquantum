@@ -35,6 +35,7 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [sceneToDelete, setSceneToDelete] = useState<SavedScene | null>(null);
+  const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 
   const handleRenameScene = (sceneId: string, newName: string) => {
     renameScene(sceneId, newName);
@@ -138,59 +139,91 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
           </div>
         ) : (
           <div className="space-y-2">
-            {savedScenes.map((scene: SavedScene) => (
-              <div
-                key={scene.id}
-                className="group flex items-center justify-between p-3 bg-[var(--bg-hover)] rounded-md hover:bg-[var(--bg-active)] transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
-              >
+            {savedScenes.map((scene: SavedScene) => {
+              const isEditingThis = editingSceneId === scene.id;
+              return (
                 <div
-                  role="button"
-                  tabIndex={0}
-                  className="flex-1 text-left min-w-0 cursor-pointer"
-                  onClick={() => {
-                    loadScene(scene.id);
-                    addToast(`Loaded scene: ${scene.name}`, 'info');
-                    onClose();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
+                  key={scene.id}
+                  className="group flex items-center justify-between p-3 bg-[var(--bg-hover)] rounded-md hover:bg-[var(--bg-active)] transition-colors border border-transparent hover:border-panel-border focus-within:border-panel-border"
+                >
+                  <div
+                    role="button"
+                    tabIndex={isEditingThis ? -1 : 0}
+                    className={`flex-1 text-left min-w-0 ${isEditingThis ? '' : 'cursor-pointer'}`}
+                    onClick={() => {
+                      if (isEditingThis) return;
                       loadScene(scene.id);
                       addToast(`Loaded scene: ${scene.name}`, 'info');
                       onClose();
-                    }
-                  }}
-                  aria-label={`Load scene "${scene.name}"`}
-                >
-                  <div className="flex flex-col items-start min-w-0">
-                    <InlineEdit
-                      value={scene.name}
-                      onSave={(newName) => handleRenameScene(scene.id, newName)}
-                      textClassName="font-medium text-sm text-text-primary"
-                      editButtonAriaLabel={`Rename scene "${scene.name}"`}
-                      placeholder="Scene name..."
-                    />
-                    <div className="text-[10px] text-text-secondary">{formatDate(scene.timestamp)}</div>
+                    }}
+                    onKeyDown={(e) => {
+                      if (isEditingThis) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        loadScene(scene.id);
+                        addToast(`Loaded scene: ${scene.name}`, 'info');
+                        onClose();
+                      }
+                    }}
+                    aria-label={`Load scene "${scene.name}"`}
+                  >
+                    <div className="flex flex-col items-start min-w-0">
+                      <InlineEdit
+                        value={scene.name}
+                        onSave={(newName) => {
+                          handleRenameScene(scene.id, newName);
+                          setEditingSceneId(null);
+                        }}
+                        onCancel={() => setEditingSceneId(null)}
+                        textClassName="font-medium text-sm text-text-primary"
+                        editButtonAriaLabel={`Rename scene "${scene.name}"`}
+                        placeholder="Scene name..."
+                        hideEditButton
+                        isEditing={isEditingThis}
+                        onEditingChange={(editing) => {
+                          if (!editing) setEditingSceneId(null);
+                        }}
+                      />
+                      <div className="text-[10px] text-text-secondary">{formatDate(scene.timestamp)}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingSceneId(scene.id);
+                      }}
+                      className={`p-1.5 text-text-secondary hover:text-accent hover:bg-accent/10 ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                      ariaLabel={`Rename scene "${scene.name}"`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSceneToDelete(scene);
+                      }}
+                      className={`p-1.5 text-text-secondary hover:text-danger hover:bg-danger-bg ${isEditingThis ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                      ariaLabel={`Delete scene "${scene.name}"`}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </Button>
                   </div>
                 </div>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSceneToDelete(scene);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 text-text-secondary hover:text-danger hover:bg-danger-bg focus:opacity-100"
-                  ariaLabel={`Delete scene "${scene.name}"`}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                </Button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

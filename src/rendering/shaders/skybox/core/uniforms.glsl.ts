@@ -36,14 +36,6 @@ uniform float uDualTone;
 uniform float uSunIntensity;
 uniform vec3 uSunPosition;
 
-// Starfield
-uniform float uStarDensity;
-uniform float uStarBrightness;
-uniform float uStarSize;
-uniform float uStarTwinkle;
-uniform float uStarGlow;
-uniform float uStarColorVariation;
-
 // Parallax
 uniform float uParallaxEnabled;
 uniform float uParallaxStrength;

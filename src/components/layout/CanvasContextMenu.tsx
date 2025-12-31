@@ -5,6 +5,7 @@ import { useCameraStore } from '@/stores/cameraStore';
 import { useDropdownStore } from '@/stores/dropdownStore';
 import { useShallow } from 'zustand/react/shallow';
 import { soundManager } from '@/lib/audio/SoundManager';
+import { getModifierSymbols } from '@/lib/platform';
 
 const DROPDOWN_ID = 'canvas-context-menu';
 
@@ -97,13 +98,16 @@ export const CanvasContextMenu: React.FC = () => {
     };
   }, [isOpen, closeDropdown]);
 
-  const items: MenuItem[] = useMemo(() => [
-    { label: 'Reset Camera', shortcut: 'R', action: resetCamera },
-    { label: 'Toggle Cinematic Mode', shortcut: 'C', action: toggleCinematicMode },
-    { type: 'separator', label: '' },
-    { label: 'Toggle Left Panel', shortcut: 'Shift+\\', action: toggleLeftPanel },
-    { label: 'Toggle Right Panel', shortcut: '\\', action: toggleCollapsed },
-  ], [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed]);
+  const items: MenuItem[] = useMemo(() => {
+    const m = getModifierSymbols();
+    return [
+      { label: 'Reset Camera', shortcut: 'R', action: resetCamera },
+      { label: 'Toggle Cinematic Mode', shortcut: 'C', action: toggleCinematicMode },
+      { type: 'separator', label: '' },
+      { label: 'Toggle Left Panel', shortcut: `${m.shift}+\\`, action: toggleLeftPanel },
+      { label: 'Toggle Right Panel', shortcut: '\\', action: toggleCollapsed },
+    ];
+  }, [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed]);
 
   return (
     <div

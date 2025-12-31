@@ -315,4 +315,21 @@ export const createQuaternionJuliaSlice: StateCreator<
       quaternionJulia: { ...state.quaternionJulia, internalFogDensity: clamped },
     }))
   },
+
+  // --- SDF Render Quality Actions ---
+  setQuaternionJuliaSdfMaxIterations: (value: number) => {
+    // Range 5-100, clamped to integer
+    const clamped = Math.max(5, Math.min(100, Math.floor(value)))
+    setWithVersion((state) => ({
+      quaternionJulia: { ...state.quaternionJulia, sdfMaxIterations: clamped },
+    }))
+  },
+
+  setQuaternionJuliaSdfSurfaceDistance: (value: number) => {
+    // Range 0.00005-0.01
+    const clamped = Math.max(0.00005, Math.min(0.01, value))
+    setWithVersion((state) => ({
+      quaternionJulia: { ...state.quaternionJulia, sdfSurfaceDistance: clamped },
+    }))
+  },
 }}

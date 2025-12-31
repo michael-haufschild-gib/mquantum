@@ -1,9 +1,17 @@
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useId, useContext, createContext } from 'react';
 import { createPortal } from 'react-dom';
 import { m, AnimatePresence } from 'motion/react';
 import { useShallow } from 'zustand/react/shallow';
 import { soundManager } from '@/lib/audio/SoundManager';
 import { useDropdownStore } from '@/stores/dropdownStore';
+import { useIsMobile } from '@/hooks/useMediaQuery';
+
+/**
+ * Context to provide portal container for submenus.
+ * When inside a popover (top layer), submenus should portal to the popover element
+ * rather than document.body to maintain correct stacking.
+ */
+const SubmenuPortalContext = createContext<React.RefObject<HTMLDivElement | null> | null>(null);
 
 export interface DropdownMenuItem {
   label: string;
@@ -41,6 +49,12 @@ const PortaledSubmenu: React.FC<{
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [ready, setReady] = useState(false);
+  
+  // Use the portal container from context (popover element) if available,
+  // otherwise fall back to document.body. This ensures submenus stay in the
+  // same stacking context as the parent menu when using native popover API.
+  const portalContainerRef = useContext(SubmenuPortalContext);
+  const portalTarget = portalContainerRef?.current ?? document.body;
 
   useLayoutEffect(() => {
     if (menuRef.current) {
@@ -73,7 +87,7 @@ const PortaledSubmenu: React.FC<{
     }
   }, [triggerRect]);
 
-  return createPortal(
+  const submenuContent = (
     <m.div
       ref={menuRef}
       data-dropdown-content="true"
@@ -96,9 +110,10 @@ const PortaledSubmenu: React.FC<{
       onMouseLeave={onMouseLeave}
     >
       <MenuItems items={items} onClose={onClose} depth={depth + 1} />
-    </m.div>,
-    document.body
+    </m.div>
   );
+
+  return createPortal(submenuContent, portalTarget);
 };
 
 /**
@@ -109,6 +124,7 @@ const MenuItems: React.FC<{
   onClose: () => void;
   depth?: number;
 }> = ({ items, onClose, depth = 0 }) => {
+  const isMobile = useIsMobile();
   const [activeSubmenuIndex, setActiveSubmenuIndex] = useState<number | null>(null);
   const [submenuTriggerRect, setSubmenuTriggerRect] = useState<DOMRect | null>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -197,10 +213,10 @@ const MenuItems: React.FC<{
               `}
               data-testid={item['data-testid']}
             >
-              <span>{item.label}</span>
-              {hasSubmenu ? (
+            <span>{item.label}</span>
+                              {hasSubmenu ? (
                 <span className="ml-2 opacity-50 text-xs">›</span>
-              ) : item.shortcut ? (
+                          ) : (!isMobile && item.shortcut) ? (
                 <span className="text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] font-mono ml-4">
                   {item.shortcut}
                 </span>
@@ -399,25 +415,27 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
           left: coords.left,
         }}
       >
-        <AnimatePresence>
-          {isOpen && (
-            <m.div
-              initial="closed"
-              animate="open"
-              exit="closed"
-              variants={menuVariants}
-              className="glass-panel min-w-[180px] rounded-lg py-1 shadow-xl border border-border-default"
-              style={{
-                maxHeight: maxHeight || '80vh',
-                overflowY: 'auto',
-                backdropFilter: 'blur(16px)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MenuItems items={items} onClose={closeMenu} />
-            </m.div>
-          )}
-        </AnimatePresence>
+        <SubmenuPortalContext.Provider value={popoverRef}>
+          <AnimatePresence>
+            {isOpen && (
+              <m.div
+                initial="closed"
+                animate="open"
+                exit="closed"
+                variants={menuVariants}
+                className="glass-panel min-w-[180px] rounded-lg py-1 shadow-xl border border-border-default"
+                style={{
+                  maxHeight: maxHeight || '80vh',
+                  overflowY: 'auto',
+                  backdropFilter: 'blur(16px)',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MenuItems items={items} onClose={closeMenu} />
+              </m.div>
+            )}
+          </AnimatePresence>
+        </SubmenuPortalContext.Provider>
       </div>
     </>
   );

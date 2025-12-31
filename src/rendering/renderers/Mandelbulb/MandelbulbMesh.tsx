@@ -144,6 +144,10 @@ const MandelbulbMesh = () => {
       uIterations: { value: 48.0 },
       uEscapeRadius: { value: 8.0 },
 
+      // SDF Render Quality (user-configurable, default = LQ for animation)
+      uSdfMaxIterations: { value: 30.0 },
+      uSdfSurfaceDistance: { value: 0.002 },
+
       // Power Animation uniforms (Technique B - power oscillation)
       uPowerAnimationEnabled: { value: false },
       uAnimatedPower: { value: 8.0 },  // Computed power = center + amplitude * sin(time * speed)
@@ -361,6 +365,14 @@ const MandelbulbMesh = () => {
         }
         if (material.uniforms.uEscapeRadius) {
           material.uniforms.uEscapeRadius.value = mbConfig.escapeRadius;
+        }
+
+        // SDF Render Quality (user-configurable)
+        if (material.uniforms.uSdfMaxIterations) {
+          material.uniforms.uSdfMaxIterations.value = mbConfig.sdfMaxIterations;
+        }
+        if (material.uniforms.uSdfSurfaceDistance) {
+          material.uniforms.uSdfSurfaceDistance.value = mbConfig.sdfSurfaceDistance;
         }
 
         // Power (static value - animation is handled separately)

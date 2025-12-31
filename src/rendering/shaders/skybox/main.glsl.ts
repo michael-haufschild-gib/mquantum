@@ -18,10 +18,6 @@ export function generateMain(mode: SkyboxMode, effects: SkyboxEffects): string {
     case 'nebula':
       modeCall = 'color = getNebula(dir, time) * uIntensity;'
       break
-    case 'void':
-      modeCall = 'color = getVoid(dir, time);'
-      break // Void handles intensity internally? Checked void.glsl.ts, it doesn't mult by uIntensity at end. skybox.frag did NOT mult Void by uIntensity?
-    // skybox.frag line 1145: } else if (uMode < 3.5) { // Void ... color = getVoid(dir, time); } (No * uIntensity!)
     case 'crystalline':
       modeCall = 'color = getCrystalline(dir, time) * uIntensity;'
       break
@@ -33,9 +29,6 @@ export function generateMain(mode: SkyboxMode, effects: SkyboxEffects): string {
       break
     case 'twilight':
       modeCall = 'color = getTwilight(dir, time) * uIntensity;'
-      break
-    case 'starfield':
-      modeCall = 'color = getStarfield(dir, time) * uIntensity;'
       break
   }
 

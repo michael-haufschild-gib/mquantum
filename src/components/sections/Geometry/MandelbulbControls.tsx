@@ -9,8 +9,7 @@
  * - Alternate Power (dual-power morphing)
  * - Slice parameters for 4D+
  *
- * Note: Max iterations (32 fast / 64 HQ) and escape radius (8.0) are fixed
- * in the shader for optimal quality/performance balance.
+ * Note: Render Quality controls (SDF iterations, surface distance) are in AdvancedObjectControls.
  */
 
 import { useShallow } from 'zustand/react/shallow';

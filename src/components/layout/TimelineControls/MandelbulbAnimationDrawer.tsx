@@ -20,6 +20,11 @@ import { ToggleButton } from '@/components/ui/ToggleButton';
 import { Slider } from '@/components/ui/Slider';
 import { AnimationDrawerContainer } from './AnimationDrawerContainer';
 
+export interface MandelbulbAnimationDrawerProps {
+  /** Callback to close the drawer */
+  onClose?: () => void;
+}
+
 /**
  * MandelbulbAnimationDrawer component
  *
@@ -29,7 +34,7 @@ import { AnimationDrawerContainer } from './AnimationDrawerContainer';
  *
  * @returns React component
  */
-export const MandelbulbAnimationDrawer: React.FC = React.memo(() => {
+export const MandelbulbAnimationDrawer: React.FC<MandelbulbAnimationDrawerProps> = React.memo(({ onClose }) => {
   const dimension = useGeometryStore((state) => state.dimension);
 
   // Get config and setters from store
@@ -82,7 +87,7 @@ export const MandelbulbAnimationDrawer: React.FC = React.memo(() => {
   } = useExtendedObjectStore(extendedObjectSelector);
 
   return (
-    <AnimationDrawerContainer data-testid="mandelbulb-animation-drawer">
+    <AnimationDrawerContainer onClose={onClose} data-testid="mandelbulb-animation-drawer">
       {/* Power Animation */}
       <div className="space-y-4" data-testid="animation-panel-powerAnimation">
         <div className="flex items-center justify-between">

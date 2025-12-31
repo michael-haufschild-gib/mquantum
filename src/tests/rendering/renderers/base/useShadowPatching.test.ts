@@ -70,19 +70,6 @@ describe('useShadowPatching', () => {
       expect(uniforms.uUniformScale!.value).toBe(1.0)
     })
 
-    it('should support modulation uniforms for polytope', () => {
-      const uniforms: Record<string, { value: unknown }> = {
-        uAnimTime: { value: 0.0 },
-        uModAmplitude: { value: 0.0 },
-        uModFrequency: { value: 0.05 },
-        uModWave: { value: 0.0 },
-        uModBias: { value: 0.0 },
-      }
-
-      expect(uniforms.uAnimTime!.value).toBe(0.0)
-      expect(uniforms.uModFrequency!.value).toBe(0.05)
-    })
-
     it('should support tube-specific uniforms', () => {
       const uniforms: Record<string, { value: unknown }> = {
         uRadius: { value: 0.02 },
@@ -92,6 +79,7 @@ describe('useShadowPatching', () => {
     })
   })
 })
+
 
 
 

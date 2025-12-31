@@ -44,13 +44,6 @@ export interface PolytopeSliceState {
 export interface PolytopeSliceActions {
   setPolytopeScale: (scale: number) => void
   initializePolytopeForType: (polytopeType: string) => void
-
-  // Modulation / Breathing Animation
-  setPolytopeFacetOffsetEnabled: (enabled: boolean) => void
-  setPolytopeFacetOffsetAmplitude: (amplitude: number) => void
-  setPolytopeFacetOffsetFrequency: (frequency: number) => void
-  setPolytopeFacetOffsetPhaseSpread: (spread: number) => void
-  setPolytopeFacetOffsetBias: (bias: number) => void
 }
 
 export type PolytopeSlice = PolytopeSliceState & PolytopeSliceActions
@@ -196,6 +189,10 @@ export interface MandelbulbSliceActions {
   setMandelbulbSssIntensity: (value: number) => void
   setMandelbulbSssColor: (value: string) => void
   setMandelbulbSssThickness: (value: number) => void
+
+  // SDF Render Quality
+  setMandelbulbSdfMaxIterations: (value: number) => void
+  setMandelbulbSdfSurfaceDistance: (value: number) => void
 }
 
 export type MandelbulbSlice = MandelbulbSliceState & MandelbulbSliceActions
@@ -255,6 +252,10 @@ export interface QuaternionJuliaSliceActions {
   setQuaternionJuliaFogEnabled: (value: boolean) => void
   setQuaternionJuliaFogContribution: (value: number) => void
   setQuaternionJuliaInternalFogDensity: (value: number) => void
+
+  // SDF Render Quality
+  setQuaternionJuliaSdfMaxIterations: (value: number) => void
+  setQuaternionJuliaSdfSurfaceDistance: (value: number) => void
 }
 
 export type QuaternionJuliaSlice = QuaternionJuliaSliceState & QuaternionJuliaSliceActions

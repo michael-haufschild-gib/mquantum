@@ -25,6 +25,12 @@ export interface InlineEditProps {
   validate?: (value: string) => string | undefined;
   /** Whether to select all text when entering edit mode */
   selectAllOnEdit?: boolean;
+  /** Hide the built-in edit button (use with onEditingChange for external trigger) */
+  hideEditButton?: boolean;
+  /** Controlled editing state - when provided, component becomes controlled */
+  isEditing?: boolean;
+  /** Callback when editing state changes (for controlled mode or external awareness) */
+  onEditingChange?: (isEditing: boolean) => void;
 }
 
 /**
@@ -43,8 +49,18 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
   editButtonAriaLabel = 'Edit',
   validate,
   selectAllOnEdit = true,
+  hideEditButton = false,
+  isEditing: controlledIsEditing,
+  onEditingChange,
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const [internalIsEditing, setInternalIsEditing] = useState(false);
+  // Support both controlled and uncontrolled modes
+  const isEditing = controlledIsEditing ?? internalIsEditing;
+  const setIsEditing = useCallback((editing: boolean) => {
+    setInternalIsEditing(editing);
+    onEditingChange?.(editing);
+  }, [onEditingChange]);
+
   const [editValue, setEditValue] = useState(value);
   const [error, setError] = useState<string | undefined>();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -56,6 +72,21 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
     }
   }, [value, isEditing]);
 
+  // Handle controlled editing state - initialize editValue when entering edit mode externally
+  // Only sync when in controlled mode (controlledIsEditing is explicitly provided)
+  useEffect(() => {
+    // Only act when in controlled mode (controlledIsEditing is explicitly true or false, not undefined)
+    if (controlledIsEditing === undefined) return;
+
+    if (controlledIsEditing && !internalIsEditing) {
+      setEditValue(value);
+      setError(undefined);
+      setInternalIsEditing(true);
+    } else if (!controlledIsEditing && internalIsEditing) {
+      setInternalIsEditing(false);
+    }
+  }, [controlledIsEditing, internalIsEditing, value]);
+
   // Focus and select input when entering edit mode
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -66,6 +97,30 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
     }
   }, [isEditing, selectAllOnEdit]);
 
+  // Native capture-phase keyboard listener to intercept events before they reach
+  // window-level listeners (useKeyboardShortcuts, useCameraMovement).
+  // This is necessary because those listeners fire during the bubbling phase,
+  // but React's synthetic events might not stop them in time.
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const input = inputRef.current;
+    if (!input) return;
+
+    const handleNativeKeyDown = (e: KeyboardEvent) => {
+      // Stop all keyboard events from propagating when editing
+      // This prevents global shortcuts from firing while typing
+      e.stopPropagation();
+    };
+
+    // Use capture phase to intercept before bubbling phase listeners
+    input.addEventListener('keydown', handleNativeKeyDown, { capture: true });
+
+    return () => {
+      input.removeEventListener('keydown', handleNativeKeyDown, { capture: true });
+    };
+  }, [isEditing]);
+
   const handleStartEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -74,7 +129,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
     setEditValue(value);
     setError(undefined);
     setIsEditing(true);
-  }, [disabled, value]);
+  }, [disabled, value, setIsEditing]);
 
   const handleSave = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -106,7 +161,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
     if (trimmedValue !== value) {
       onSave(trimmedValue);
     }
-  }, [editValue, validate, value, onSave]);
+  }, [editValue, validate, value, onSave, setIsEditing]);
 
   const handleCancel = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -116,9 +171,14 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
     setEditValue(value);
     setError(undefined);
     onCancel?.();
-  }, [value, onCancel]);
+  }, [value, onCancel, setIsEditing]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Stop propagation for ALL keys to prevent global shortcuts from firing
+    // This is critical because window-level keyboard listeners (useKeyboardShortcuts,
+    // useCameraMovement) would otherwise intercept keys even when typing in input
+    e.stopPropagation();
+
     if (e.key === 'Enter') {
       e.preventDefault();
       handleSave();
@@ -228,7 +288,7 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(({
               {value}
             </span>
 
-            {!disabled && (
+            {!disabled && !hideEditButton && (
               <Button
                 variant="ghost"
                 size="icon"

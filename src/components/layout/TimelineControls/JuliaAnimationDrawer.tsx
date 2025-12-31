@@ -12,6 +12,11 @@
 import React from 'react';
 import { AnimationDrawerContainer } from './AnimationDrawerContainer';
 
+export interface JuliaAnimationDrawerProps {
+  /** Callback to close the drawer */
+  onClose?: () => void;
+}
+
 /**
  * JuliaAnimationDrawer component
  *
@@ -20,9 +25,9 @@ import { AnimationDrawerContainer } from './AnimationDrawerContainer';
  *
  * @returns React component
  */
-export const JuliaAnimationDrawer: React.FC = React.memo(() => {
+export const JuliaAnimationDrawer: React.FC<JuliaAnimationDrawerProps> = React.memo(({ onClose }) => {
   return (
-    <AnimationDrawerContainer data-testid="julia-animation-drawer">
+    <AnimationDrawerContainer onClose={onClose} data-testid="julia-animation-drawer">
       <div className="text-xs text-text-secondary text-center py-4">
         No animations configured
       </div>

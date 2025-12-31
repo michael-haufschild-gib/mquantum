@@ -16,7 +16,6 @@ import { HorizonControls } from './skybox/HorizonControls'
 import { OceanControls } from './skybox/OceanControls'
 import { SkyboxSharedClassicControls } from './skybox/SkyboxSharedClassicControls'
 import { SkyboxSharedProceduralControls } from './skybox/SkyboxSharedProceduralControls'
-import { StarfieldControls } from './skybox/StarfieldControls'
 
 // Import thumbnails
 import spaceBlueThumb from '@/assets/skyboxes/space_blue/thumbnail.png'
@@ -42,13 +41,11 @@ const ALL_SKYBOX_OPTIONS: SkyboxOption[] = [
   // Original procedural
   { id: 'procedural_aurora', name: 'Aurora', thumbnail: null, gradientClass: 'bg-gradient-to-b from-cyan-400 via-emerald-600 to-slate-900', description: 'Northern lights effect', type: 'procedural' },
   { id: 'procedural_nebula', name: 'Cosmic Nebula', thumbnail: null, gradientClass: 'bg-gradient-to-br from-purple-500 via-fuchsia-600 to-slate-900', description: 'Volumetric clouds', type: 'procedural' },
-  { id: 'procedural_void', name: 'The Void', thumbnail: null, gradientClass: 'bg-[radial-gradient(circle_at_30%_30%,_#475569_0%,_#0f172a_50%,_#000_100%)]', description: 'Dark gradient with glow', type: 'procedural' },
   // Premium procedural skyboxes
   { id: 'procedural_crystalline', name: 'Crystalline', thumbnail: null, gradientClass: 'bg-[conic-gradient(from_45deg,_#0ea5e9_0%,_#8b5cf6_25%,_#ec4899_50%,_#0ea5e9_75%,_#8b5cf6_100%)]', description: 'Geometric Voronoi patterns with iridescence', type: 'procedural' },
   { id: 'procedural_horizon', name: 'Horizon', thumbnail: null, gradientClass: 'bg-gradient-to-b from-slate-900 via-slate-700 to-slate-400', description: 'Cinematic studio gradient', type: 'procedural' },
   { id: 'procedural_ocean', name: 'Deep Ocean', thumbnail: null, gradientClass: 'bg-gradient-to-b from-cyan-300 via-blue-600 to-slate-900', description: 'Underwater atmosphere with caustics', type: 'procedural' },
   { id: 'procedural_twilight', name: 'Twilight', thumbnail: null, gradientClass: 'bg-gradient-to-b from-amber-400 via-rose-500 to-indigo-900', description: 'Sunset gradient with atmosphere', type: 'procedural' },
-  { id: 'procedural_starfield', name: 'Starfield', thumbnail: null, gradientClass: 'bg-[radial-gradient(circle,_#1e293b_0%,_#020617_70%,_#000_100%)]', description: 'Minimal elegant stars', type: 'procedural' },
 ]
 
 export const SkyboxControls: React.FC = () => {
@@ -88,7 +85,6 @@ export const SkyboxControls: React.FC = () => {
   const selectedOption = ALL_SKYBOX_OPTIONS.find((opt) => opt.id === skyboxSelection)
   const isClassicMode = selectedOption?.type === 'classic'
   const isProceduralMode = selectedOption?.type === 'procedural'
-  const isStarfieldMode = skyboxSelection === 'procedural_starfield'
   const isAuroraMode = skyboxSelection === 'procedural_aurora'
   const isHorizonMode = skyboxSelection === 'procedural_horizon'
   const isOceanMode = skyboxSelection === 'procedural_ocean'
@@ -170,13 +166,6 @@ export const SkyboxControls: React.FC = () => {
               />
 
               {/* Mode-specific controls */}
-              {isStarfieldMode && (
-                <StarfieldControls
-                  proceduralSettings={proceduralSettings}
-                  setProceduralSettings={setProceduralSettings}
-                />
-              )}
-
               {isAuroraMode && (
                 <AuroraControls
                   proceduralSettings={proceduralSettings}

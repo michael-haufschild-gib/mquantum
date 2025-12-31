@@ -103,39 +103,6 @@ export interface PolytopeConfig {
    * Default varies by type: hypercube 1.8, simplex 4.0, cross-polytope 1.8
    */
   scale: number
-
-  // === Modulation Animation (organic breathing) ===
-
-  /**
-   * Enable modulation animation.
-   * Creates gentle breathing effect using layered sine waves
-   * with irrational frequency ratios for smooth, non-repeating motion.
-   */
-  facetOffsetEnabled: boolean
-
-  /**
-   * Intensity of modulation animation (0.0-1.0, default 0.3).
-   * Controls the amplitude of organic breathing modulation.
-   */
-  facetOffsetAmplitude: number
-
-  /**
-   * Base frequency modifier for modulation animation (0.1-2.0, default 0.3).
-   * Note: Actual frequencies are determined by layered sine waves in shader.
-   */
-  facetOffsetFrequency: number
-
-  /**
-   * Distance-based phase offset for wave effect (0.0-1.0, default 0.2).
-   * Creates radial waves emanating from center.
-   */
-  facetOffsetPhaseSpread: number
-
-  /**
-   * Per-vertex/dimension phase bias (0.0-1.0, default 0.0).
-   * Creates variation so vertices move at different times.
-   */
-  facetOffsetBias: number
 }
 
 /**
@@ -154,14 +121,6 @@ export const DEFAULT_POLYTOPE_SCALES: Record<string, number> = {
  */
 export const DEFAULT_POLYTOPE_CONFIG: PolytopeConfig = {
   scale: 1.8,
-
-  // Modulation Animation defaults (radial breathing)
-  // Enabled by default with smooth, organic motion
-  facetOffsetEnabled: true,
-  facetOffsetAmplitude: 0.2,
-  facetOffsetFrequency: 0.01,
-  facetOffsetPhaseSpread: 0.12, // Wave effect
-  facetOffsetBias: 1.0, // Full per-vertex/dimension variation
 }
 
 // ============================================================================
@@ -618,6 +577,21 @@ export interface MandelbulbConfig {
    */
   phaseAmplitude: number
 
+  // === SDF Render Quality ===
+  /**
+   * Maximum SDF iterations for fractal calculation (10-200, default 30).
+   * Higher values produce more detail but reduce performance.
+   * This value is used directly by the shader.
+   */
+  sdfMaxIterations: number
+
+  /**
+   * Surface distance threshold for raymarching hit detection (0.0005-0.01, default 0.002).
+   * Lower values produce sharper edges but require more steps.
+   * This value is used directly by the shader.
+   */
+  sdfSurfaceDistance: number
+
   // === Advanced Rendering ===
   /** Surface roughness for GGX specular (0.0-1.0) */
   roughness: number
@@ -696,6 +670,10 @@ export const DEFAULT_MANDELBROT_CONFIG: MandelbulbConfig = {
   phaseShiftEnabled: false,
   phaseSpeed: 0.03, // Slow phase evolution
   phaseAmplitude: 0.3, // ~17 degrees max phase shift
+
+  // SDF Render Quality (animation-friendly defaults = current LQ values)
+  sdfMaxIterations: 30,
+  sdfSurfaceDistance: 0.002,
 
   // Advanced Rendering
   roughness: 0.3,
@@ -1272,6 +1250,7 @@ export interface QuaternionJuliaConfig {
 
   /**
    * Surface distance threshold for raymarching (0.0005-0.004).
+   * @deprecated Use sdfSurfaceDistance instead
    */
   surfaceThreshold: number
 
@@ -1279,6 +1258,21 @@ export interface QuaternionJuliaConfig {
    * Maximum raymarch steps (64-512).
    */
   maxRaymarchSteps: number
+
+  // === SDF Render Quality ===
+  /**
+   * Maximum SDF iterations for fractal calculation (10-200, default 30).
+   * Higher values produce more detail but reduce performance.
+   * This value is used directly by the shader.
+   */
+  sdfMaxIterations: number
+
+  /**
+   * Surface distance threshold for raymarching hit detection (0.0005-0.01, default 0.002).
+   * Lower values produce sharper edges but require more steps.
+   * This value is used directly by the shader.
+   */
+  sdfSurfaceDistance: number
 
   /**
    * Quality multiplier for fine-tuning (0.25-1.0, default 1.0).
@@ -1379,6 +1373,9 @@ export const DEFAULT_QUATERNION_JULIA_CONFIG: QuaternionJuliaConfig = {
   scale: 1.0,
   surfaceThreshold: 0.002,
   maxRaymarchSteps: 128,
+  // SDF Render Quality (animation-friendly defaults = current LQ values)
+  sdfMaxIterations: 30,
+  sdfSurfaceDistance: 0.002,
   qualityMultiplier: 1.0,
   parameterValues: [],
 

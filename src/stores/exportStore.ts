@@ -15,14 +15,14 @@ export interface TextOverlaySettings {
   fontFamily: string
   fontSize: number
   fontWeight: number // 100-900
-  textAlign: 'left' | 'center' | 'right'
   letterSpacing: number
   color: string
   opacity: number
   shadowColor: string
   shadowBlur: number
-  positionX: number // 0-1 (percentage)
-  positionY: number // 0-1 (percentage)
+  verticalPlacement: 'top' | 'center' | 'bottom'
+  horizontalPlacement: 'left' | 'center' | 'right'
+  padding: number // pixels
 }
 
 export interface CropSettings {
@@ -45,7 +45,9 @@ export interface ExportSettings {
   bitrateMode: 'constant' | 'variable'
   hardwareAcceleration: 'no-preference' | 'prefer-hardware' | 'prefer-software'
   warmupFrames: number
-  
+  /** Video rotation metadata for vertical/portrait video (0, 90, 180, 270 degrees) */
+  rotation: 0 | 90 | 180 | 270
+
   // New Features
   textOverlay: TextOverlaySettings
   crop: CropSettings
@@ -56,6 +58,9 @@ export interface CompletionDetails {
   segmentCount?: number
   filename?: string
 }
+
+/** Configuration for export presets with optional crop ratio */
+export type PresetConfig = Partial<ExportSettings> & { cropRatio?: number }
 
 interface ExportStore {
   isExporting: boolean
@@ -94,9 +99,8 @@ interface ExportStore {
   setCompletionDetails: (details: CompletionDetails | null) => void
   reset: () => void
 
-  // Computed helpers
-  recalculateMode: () => void
-  applyPreset: (presetName: string) => void // New
+  // Helpers
+  applyPreset: (presetName: string) => void
 }
 
 const DEFAULT_SETTINGS: ExportSettings = {
@@ -111,21 +115,22 @@ const DEFAULT_SETTINGS: ExportSettings = {
   bitrateMode: 'variable',
   hardwareAcceleration: 'prefer-software',
   warmupFrames: 5,
-  
+  rotation: 0,
+
   textOverlay: {
     enabled: false,
-    text: 'mdimension',
+    text: '',
     fontFamily: 'Inter, sans-serif',
-    fontSize: 48,
-    fontWeight: 700,
-    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: 300,
     letterSpacing: 0,
     color: '#ffffff',
     opacity: 1,
     shadowColor: 'rgba(0,0,0,0.5)',
     shadowBlur: 10,
-    positionX: 0.5,
-    positionY: 0.9,
+    verticalPlacement: 'bottom',
+    horizontalPlacement: 'center',
+    padding: 20,
   },
   crop: {
     enabled: false,
@@ -252,20 +257,14 @@ export const useExportStore = create<ExportStore>()(
       settings: DEFAULT_SETTINGS,
 
       browserType: detectBrowser(),
-      exportMode: 'in-memory', // Default, updated by recalculateMode
+      exportMode: 'in-memory',
       exportModeOverride: null,
       exportTier: 'small',
       estimatedSizeMB: 0,
       completionDetails: null,
       canvasAspectRatio: 16 / 9, // Default assumption
 
-      setModalOpen: (isOpen) => {
-        set({ isModalOpen: isOpen })
-        // Recalculate on open to ensure fresh state
-        if (isOpen) {
-          get().recalculateMode()
-        }
-      },
+      setModalOpen: (isOpen) => set({ isModalOpen: isOpen }),
       setCropEditorOpen: (isOpen) => set({ isCropEditorOpen: isOpen }),
       setCanvasAspectRatio: (ratio) => set({ canvasAspectRatio: ratio }),
       setIsExporting: (isExporting) => set({ isExporting }),
@@ -315,11 +314,9 @@ export const useExportStore = create<ExportStore>()(
         }
 
         set({ settings: updatedSettings })
-        get().recalculateMode()
       },
       setExportModeOverride: (mode) => {
-        set({ exportModeOverride: mode })
-        get().recalculateMode()
+        set({ exportModeOverride: mode, exportMode: mode ?? 'in-memory' })
       },
       setCompletionDetails: (details) => set({ completionDetails: details }),
       
@@ -327,117 +324,95 @@ export const useExportStore = create<ExportStore>()(
           const defaults = DEFAULT_SETTINGS
           const canvasRatio = get().canvasAspectRatio
 
-          // Helper to calculate crop for target aspect ratio based on canvas aspect ratio
           const calculateCropForRatio = (targetRatio: number) => {
               if (canvasRatio > targetRatio) {
-                  // Canvas is wider than target - crop width
                   const cropWidth = targetRatio / canvasRatio
                   return { x: (1 - cropWidth) / 2, y: 0, width: cropWidth, height: 1 }
-              } else {
-                  // Canvas is taller than target - crop height
-                  const cropHeight = canvasRatio / targetRatio
-                  return { x: 0, y: (1 - cropHeight) / 2, width: 1, height: cropHeight }
               }
+              const cropHeight = canvasRatio / targetRatio
+              return { x: 0, y: (1 - cropHeight) / 2, width: 1, height: cropHeight }
           }
 
-          if (presetName === 'instagram-story') {
-              const crop = calculateCropForRatio(9 / 16)
-              get().updateSettings({
-                  resolution: 'custom',
-                  customWidth: 1080,
-                  customHeight: 1920,
-                  duration: 15,
+          const presets: Record<string, PresetConfig> = {
+              'landscape-1080p': {
+                  resolution: '1080p',
+                  fps: 60,
+                  duration: 30,
+                  bitrate: 12,
+              },
+              'landscape-720p': {
+                  resolution: '720p',
                   fps: 30,
+                  duration: 30,
                   bitrate: 8,
-                  crop: { ...defaults.crop, enabled: true, ...crop }
-              })
-          } else if (presetName === 'instagram-post') {
-              const crop = calculateCropForRatio(1) // Square
-              get().updateSettings({
+              },
+              'instagram': {
                   resolution: 'custom',
                   customWidth: 1080,
                   customHeight: 1080,
-                  duration: 15,
                   fps: 30,
+                  duration: 60,
                   bitrate: 10,
-                  crop: { ...defaults.crop, enabled: true, ...crop }
-              })
-          } else if (presetName === 'youtube-shorts') {
-              const crop = calculateCropForRatio(9 / 16)
-              get().updateSettings({
+                  cropRatio: 1,
+              },
+              'tiktok': {
                   resolution: 'custom',
                   customWidth: 1080,
                   customHeight: 1920,
-                  duration: 60,
-                  fps: 60,
-                  bitrate: 15,
-                  crop: { ...defaults.crop, enabled: true, ...crop }
-              })
-          } else if (presetName === 'twitter-video') {
-              get().updateSettings({
-                  resolution: '1080p',
+                  fps: 30,
                   duration: 30,
+                  bitrate: 8,
+                  cropRatio: 9 / 16,
+              },
+              'youtube-shorts': {
+                  resolution: 'custom',
+                  customWidth: 1080,
+                  customHeight: 1920,
                   fps: 60,
-                  bitrate: 12,
-                  crop: { ...defaults.crop, enabled: false }
-              })
-          } else if (presetName === 'cinematic') {
-               get().updateSettings({
+                  duration: 30,
+                  bitrate: 15,
+                  cropRatio: 9 / 16,
+              },
+              'twitter-video': {
+                  resolution: '720p',
+                  fps: 30,
+                  duration: 30,
+                  bitrate: 8,
+              },
+              'cinematic': {
                   resolution: '4k',
                   fps: 24,
-                  bitrate: 40
-              })
-          } else if (presetName === 'default') {
-              get().updateSettings({
-                  resolution: '1080p',
+                  bitrate: 40,
+                  cropRatio: 21 / 9,
+              },
+              'square-60fps': {
+                  resolution: 'custom',
+                  customWidth: 1080,
+                  customHeight: 1080,
                   fps: 60,
-                  duration: 30,
-                  bitrate: 12,
-                  crop: { ...defaults.crop, enabled: false },
-                  textOverlay: { ...defaults.textOverlay, enabled: false }
-              })
+                  duration: 60,
+                  bitrate: 15,
+                  cropRatio: 1,
+              },
+              'high-q': {
+                  resolution: '4k',
+                  format: 'webm',
+                  codec: 'vp9',
+                  fps: 60,
+                  duration: 120,
+                  bitrate: 50,
+              },
           }
-      },
 
-      recalculateMode: () => {
-        const state = get()
-        const s = state.settings
+          const config = presets[presetName]
+          if (!config) return
 
-        // Calculate Size with compression factor for realistic estimation
-        // Theoretical max: bitrate (Mbps) * duration (s) / 8 = MB
-        // Then apply codec/bitrate-mode compression factor
-        const theoreticalSizeMB = (s.bitrate * s.duration) / 8
-        const compressionFactor = getCompressionFactor(s.codec, s.bitrateMode)
-        const sizeMB = theoreticalSizeMB * compressionFactor
+          const { cropRatio, ...settings } = config
+          const crop = cropRatio
+              ? { ...defaults.crop, enabled: true, ...calculateCropForRatio(cropRatio) }
+              : { ...defaults.crop, enabled: false }
 
-        // Determine Tier
-        let tier: ExportTier = 'small'
-        if (sizeMB >= 150) tier = 'large'
-        else if (sizeMB >= 50) tier = 'medium'
-
-        // Determine Mode
-        let mode: ExportMode = 'in-memory'
-
-        if (state.exportModeOverride) {
-          mode = state.exportModeOverride
-        } else {
-          // Auto selection logic
-          if (sizeMB < 100) {
-            mode = 'in-memory'
-          } else {
-            if (state.browserType === 'chromium-capable') {
-              mode = 'stream'
-            } else {
-              mode = 'segmented'
-            }
-          }
-        }
-
-        set({
-          estimatedSizeMB: sizeMB,
-          exportTier: tier,
-          exportMode: mode,
-        })
+          get().updateSettings({ ...settings, crop })
       },
 
       reset: () =>

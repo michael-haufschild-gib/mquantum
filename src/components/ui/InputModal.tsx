@@ -52,6 +52,9 @@ export const InputModal: React.FC<InputModalProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Stop propagation for all keys to prevent global shortcuts from firing
+    e.stopPropagation();
+
     if (e.key === 'Enter') {
       handleConfirm();
     }

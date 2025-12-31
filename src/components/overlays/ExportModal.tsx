@@ -1,7 +1,9 @@
 import { Icon } from '@/components/ui/Icon'
+import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { soundManager } from '@/lib/audio/SoundManager'
-import { useExportStore } from '@/stores/exportStore'
-import { useState, useEffect } from 'react'
+import { ExportMode, useExportStore } from '@/stores/exportStore'
+import { useState, useEffect, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
@@ -13,7 +15,7 @@ import { ExportGeneralTab } from './export/ExportGeneralTab'
 import { ExportTextTab } from './export/ExportTextTab'
 import { ExportAdvancedTab } from './export/ExportAdvancedTab'
 
-type ExportTabId = 'presets' | 'general' | 'text' | 'advanced'
+type ExportTabId = 'preview' | 'presets' | 'general' | 'text' | 'advanced'
 
 // Create selector outside component to avoid hook rules violation
 const exportModalSelector = (state: ReturnType<typeof useExportStore.getState>) => ({
@@ -28,9 +30,10 @@ const exportModalSelector = (state: ReturnType<typeof useExportStore.getState>) 
   eta: state.eta,
   reset: state.reset,
   setPreviewImage: state.setPreviewImage,
-  estimatedSizeMB: state.estimatedSizeMB,
-  exportTier: state.exportTier,
   exportMode: state.exportMode,
+  exportModeOverride: state.exportModeOverride,
+  setExportModeOverride: state.setExportModeOverride,
+  browserType: state.browserType,
   completionDetails: state.completionDetails,
   setCanvasAspectRatio: state.setCanvasAspectRatio,
   settings: state.settings
@@ -50,16 +53,48 @@ export const ExportModal = () => {
     eta,
     reset,
     setPreviewImage,
-    estimatedSizeMB,
-    exportTier,
     exportMode,
+    exportModeOverride,
+    setExportModeOverride,
+    browserType,
     completionDetails,
     setCanvasAspectRatio,
     settings
   } = useExportStore(selector)
 
+  const isDesktop = useIsDesktop()
   const [activeTab, setActiveTab] = useState<ExportTabId>('presets')
   const [showStopConfirm, setShowStopConfirm] = useState(false)
+
+  // Build tabs list - include Preview tab only on mobile
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      { id: 'presets' as const, label: 'Presets', content: <div className="pt-4"><ExportPresets /></div> },
+      { id: 'general' as const, label: 'Settings', content: <div className="pt-4"><ExportGeneralTab /></div> },
+      { id: 'text' as const, label: 'Text', content: <div className="pt-4"><ExportTextTab /></div> },
+      { id: 'advanced' as const, label: 'Advanced', content: <div className="pt-4"><ExportAdvancedTab /></div> }
+    ]
+
+    if (!isDesktop) {
+      // Add Preview tab at the beginning for mobile
+      return [
+        {
+          id: 'preview' as const,
+          label: 'Preview',
+          content: (
+            <div className="pt-4">
+              <div className="aspect-video rounded-lg overflow-hidden border border-border-default bg-[var(--bg-overlay)]">
+                <ExportPreview />
+              </div>
+            </div>
+          )
+        },
+        ...baseTabs
+      ]
+    }
+
+    return baseTabs
+  }, [isDesktop])
 
   // Update canvas aspect ratio when modal opens
   useEffect(() => {
@@ -111,13 +146,20 @@ export const ExportModal = () => {
     }
   }
 
-  // Get Tier Badge
-  const getTierBadge = () => {
-      switch (exportTier) {
-          case 'large': return <span className="px-2 py-0.5 rounded bg-danger-bg text-danger text-[10px] font-bold border border-danger-border">LARGE EXPORT</span>
-          case 'medium': return <span className="px-2 py-0.5 rounded bg-warning-bg text-warning text-[10px] font-bold border border-warning-border">MEDIUM EXPORT</span>
-          default: return <span className="px-2 py-0.5 rounded bg-success-bg text-success text-[10px] font-bold border border-success-border">OPTIMIZED</span>
-      }
+  // Check if stream mode is available (Chromium browsers only)
+  const isStreamAvailable = browserType === 'chromium-capable'
+
+  // Get contextual guidance based on selected mode
+  const getModeGuidance = () => {
+    const effectiveMode = exportModeOverride || exportMode
+
+    if (effectiveMode === 'in-memory') {
+      return 'Video stays in memory until download. Best for short exports.'
+    }
+    if (effectiveMode === 'stream') {
+      return 'Writes directly to disk. Recommended for long exports.'
+    }
+    return 'Downloads multiple segments. Combine with video editor after.'
   }
 
   // Determine modal width based on state
@@ -252,27 +294,35 @@ export const ExportModal = () => {
             </div>
         ) : (
             /* CONFIGURATION STATE (Split View) */
-            <div className="flex flex-col lg:flex-row h-[70vh] lg:h-[600px] overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:h-[560px] lg:overflow-hidden">
                 {/* LEFT: Preview & Quick Stats */}
                 <div className="hidden lg:flex flex-col w-5/12 border-r border-border-subtle bg-[var(--bg-hover)] p-6 gap-6 relative">
                     <div className="flex-1 min-h-0 relative rounded-xl overflow-hidden shadow-2xl border border-border-default bg-[var(--bg-overlay)]">
                          <ExportPreview />
                     </div>
                     
-                    {/* Summary Card */}
-                    <div className="bg-[var(--bg-hover)] border border-border-subtle rounded-xl p-4 space-y-3">
-                         <div className="flex justify-between items-center">
-                             <span className="text-xs font-bold text-text-secondary uppercase">Estimated Size</span>
-                             {getTierBadge()}
-                         </div>
-                         <div className="flex items-baseline gap-2">
-                             <span className="text-2xl font-mono font-bold text-white">~{estimatedSizeMB.toFixed(1)}</span>
-                             <span className="text-sm text-text-tertiary">MB</span>
-                         </div>
-                         
-                         <div className="h-px bg-border-subtle w-full my-2" />
-                         
-                         <div className="grid grid-cols-3 gap-2 text-center">
+                    {/* Processing Mode & Stats */}
+                    <div className="space-y-4">
+                         <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Processing Mode</span>
+
+                         <ToggleGroup
+                            options={[
+                                { value: 'in-memory', label: 'Memory' },
+                                { value: 'stream', label: 'Stream', disabled: !isStreamAvailable },
+                                { value: 'segmented', label: 'Segmented' }
+                            ]}
+                            value={exportModeOverride || exportMode}
+                            onChange={(val) => setExportModeOverride(val as ExportMode)}
+                         />
+
+                         <p className="text-[11px] text-text-tertiary leading-relaxed">
+                           {getModeGuidance()}
+                           {!isStreamAvailable && (
+                             <span className="block mt-1">Stream mode requires Chrome or Edge.</span>
+                           )}
+                         </p>
+
+                         <div className="grid grid-cols-3 gap-2 text-center pt-2">
                              <div>
                                  <div className="text-[10px] text-text-tertiary uppercase">Res</div>
                                  <div className="font-bold text-sm text-text-primary">{settings.resolution === 'custom' ? 'Custom' : settings.resolution}</div>
@@ -291,33 +341,45 @@ export const ExportModal = () => {
 
                 {/* RIGHT: Controls */}
                 <div className="flex-1 flex flex-col bg-panel-bg min-w-0">
-                    <div className="flex-1 overflow-hidden flex flex-col min-h-0 p-6" data-testid="export-tabs-wrapper">
+                    {/* Mobile Header: Processing Mode & Stats (hidden on desktop) */}
+                    <div className="lg:hidden p-4 pb-0 space-y-3 border-b border-border-subtle">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-text-secondary uppercase tracking-wider">Processing Mode</span>
+                            <span className="text-[10px] text-text-tertiary">
+                                {settings.resolution === 'custom' ? 'Custom' : settings.resolution} • {settings.fps}fps • {settings.duration}s
+                            </span>
+                        </div>
+                        <ToggleGroup
+                            options={[
+                                { value: 'in-memory', label: 'Memory' },
+                                { value: 'stream', label: 'Stream', disabled: !isStreamAvailable },
+                                { value: 'segmented', label: 'Segmented' }
+                            ]}
+                            value={exportModeOverride || exportMode}
+                            onChange={(val) => setExportModeOverride(val as ExportMode)}
+                        />
+                        <p className="text-[10px] text-text-tertiary pb-3">
+                            {getModeGuidance()}
+                        </p>
+                    </div>
+
+                    <div className="flex-1 flex flex-col min-h-0 p-4 lg:p-6" data-testid="export-tabs-wrapper">
                         <Tabs
                             className="flex-1 flex flex-col min-h-0"
                             value={activeTab}
                             onChange={(id) => setActiveTab(id as ExportTabId)}
                             fullWidth
-                            tabs={[
-                                { id: 'presets', label: 'Presets', content: <div className="pt-6"><ExportPresets /></div> },
-                                { id: 'general', label: 'Settings', content: <div className="pt-6"><ExportGeneralTab /></div> },
-                                { id: 'text', label: 'Text', content: <div className="pt-6"><ExportTextTab /></div> },
-                                { id: 'advanced', label: 'Advanced', content: <div className="pt-6"><ExportAdvancedTab /></div> }
-                            ]}
+                            tabs={tabs}
                         />
                     </div>
 
                     {/* Footer Actions */}
-                    <div className="p-6 border-t border-border-subtle bg-panel-bg/95 backdrop-blur z-10 flex justify-between items-center gap-4">
-                        <div className="lg:hidden flex flex-col">
-                             <span className="text-[10px] text-text-tertiary uppercase">Est. Size</span>
-                             <span className="text-sm font-bold font-mono">~{estimatedSizeMB.toFixed(1)} MB</span>
-                        </div>
-                        
+                    <div className="p-4 lg:p-6 border-t border-border-subtle bg-panel-bg/95 backdrop-blur z-10">
                         <Button
                             onClick={handleExport}
                             variant="primary"
                             size="lg"
-                            className="flex-1 py-4 glow-accent-md hover:glow-accent-lg transition-shadow"
+                            className="w-full py-4 glow-accent-md hover:glow-accent-lg transition-shadow"
                             glow
                         >
                             <div className="flex flex-col items-center">

@@ -25,15 +25,26 @@ float RayMarchCore(vec3 ro, vec3 rd, float startDist, float maxT, float maxDist,
     float surfDist;
     float omega;
 
+    #ifdef USE_SDF_QUALITY_UNIFORMS
+    // Mandelbulb/Julia: use user-configurable surface distance directly (no FastMode override)
+    surfDist = uSdfSurfaceDistance;
+    #endif
+
     if (uFastMode) {
         maxSteps = MAX_MARCH_STEPS_LQ;
+        #ifndef USE_SDF_QUALITY_UNIFORMS
+        // Schroedinger: use constant
         surfDist = SURF_DIST_LQ;
+        #endif
         omega = 1.0;  // No overrelaxation in fast mode (already fast)
     } else {
         // Progressive refinement: interpolate based on quality multiplier
         float t = clamp((uQualityMultiplier - 0.25) / 0.75, 0.0, 1.0);
         maxSteps = int(mix(float(MAX_MARCH_STEPS_LQ), float(MAX_MARCH_STEPS_HQ), t));
+        #ifndef USE_SDF_QUALITY_UNIFORMS
+        // Schroedinger: interpolate between constants
         surfDist = mix(SURF_DIST_LQ, SURF_DIST_HQ, t);
+        #endif
         omega = mix(1.0, 1.2, t);  // Gradually enable overrelaxation as quality increases
     }
 

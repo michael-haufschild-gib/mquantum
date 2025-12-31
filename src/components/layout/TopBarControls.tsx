@@ -1,4 +1,3 @@
-import { Button } from '@/components/ui/Button';
 import { ToggleButton } from '@/components/ui/ToggleButton';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
@@ -182,28 +181,32 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
     }
   };
 
-  // Helper for Icon Buttons - styled consistently with ToggleButton
+  // Helper for Icon Buttons - uses native button with identical styles to ToggleButton
   const IconButton = ({
     icon: IconComponent,
     active,
     onClick,
     label,
+    small = false,
     className = ""
   }: {
-    icon: React.FC,
+    icon: React.FC<{ className?: string }>,
     active: boolean,
     onClick: () => void,
     label: string,
+    small?: boolean,
     className?: string
   }) => (
-    <Button
-      variant={active ? 'primary' : 'ghost'}
-      size="icon"
+    <button
+      type="button"
       onClick={onClick}
-      ariaLabel={label}
+      onMouseEnter={() => soundManager.playHover()}
+      aria-label={label}
+      aria-pressed={active}
       data-testid={`control-${label.toLowerCase().replace(/\s+/g, '-')}`}
       className={`
-        p-1.5 transition-all duration-300 border
+        rounded-md text-sm font-medium transition-all duration-300 border cursor-pointer
+        ${small ? 'py-1 px-2' : 'px-3 py-1.5'}
         ${active
           ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
           : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
@@ -211,49 +214,82 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
         ${className}
       `}
     >
-      <IconComponent />
-    </Button>
+      <IconComponent className="w-4 h-4" />
+    </button>
   );
 
   return (
-    <div className={`flex items-center gap-1 ${compact ? '' : ''}`}>
-      {/* Render Mode Toggles */}
-      <div className={`flex gap-1 ${compact ? '' : 'mr-2'}`}>
-        <div title={!edgesSupported ? 'Edges not available' : undefined}>
+    <div className="flex items-center gap-1">
+      {/* Mobile: All 4 icon buttons in a unified group */}
+      {compact ? (
+        <div className="flex gap-1">
+          <div title={!edgesSupported ? 'Edges not available' : undefined}>
             <ToggleButton
+              pressed={edgesVisible}
+              onToggle={handleEdgeToggle}
+              ariaLabel="Toggle edges"
+              disabled={!edgesSupported}
+              className="!text-xs !py-1 !px-2 cursor-pointer"
+            >
+              <EdgesIcon className="w-4 h-4" />
+            </ToggleButton>
+          </div>
+          <div title={!facesSupported ? 'Faces not available' : undefined}>
+            <ToggleButton
+              pressed={facesVisible}
+              onToggle={handleFaceToggle}
+              ariaLabel="Toggle faces"
+              disabled={!facesSupported}
+              className="!text-xs !py-1 !px-2 cursor-pointer"
+            >
+              <FacesIcon className="w-4 h-4" />
+            </ToggleButton>
+          </div>
+          <IconButton
+            icon={PerfIcon}
+            active={showPerfMonitor}
+            onClick={() => { setShowPerfMonitor(!showPerfMonitor); soundManager.playClick(); }}
+            label="Performance Monitor"
+            small
+          />
+          <IconButton
+            icon={FullscreenIcon}
+            active={isFullscreen}
+            onClick={toggleFullscreen}
+            label="Fullscreen"
+            small
+          />
+        </div>
+      ) : (
+        /* Desktop: Edges/Faces text buttons, separator, then icon buttons */
+        <>
+          <div className="flex gap-1 mr-2">
+            <div title={!edgesSupported ? 'Edges not available' : undefined}>
+              <ToggleButton
                 pressed={edgesVisible}
                 onToggle={handleEdgeToggle}
                 ariaLabel="Toggle edges"
                 disabled={!edgesSupported}
                 className="!text-xs !py-1 !px-2 cursor-pointer"
-            >
-                {compact ? <EdgesIcon className="w-4 h-4" /> : 'Edges'}
-            </ToggleButton>
-        </div>
-        <div title={!facesSupported ? 'Faces not available' : undefined}>
-            <ToggleButton
+              >
+                Edges
+              </ToggleButton>
+            </div>
+            <div title={!facesSupported ? 'Faces not available' : undefined}>
+              <ToggleButton
                 pressed={facesVisible}
                 onToggle={handleFaceToggle}
                 ariaLabel="Toggle faces"
                 disabled={!facesSupported}
                 className="!text-xs !py-1 !px-2 cursor-pointer"
-            >
-                {compact ? <FacesIcon className="w-4 h-4" /> : 'Faces'}
-            </ToggleButton>
-        </div>
-      </div>
+              >
+                Faces
+              </ToggleButton>
+            </div>
+          </div>
 
-      {!compact && (
-        <>
           <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
 
-          {/* App Controls */}
-          <IconButton
-            icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
-            active={isSoundEnabled}
-            onClick={toggleSound}
-            label={isSoundEnabled ? "Mute Sound" : "Enable Sound"}
-          />
           <IconButton
             icon={PerfIcon}
             active={showPerfMonitor}
@@ -265,6 +301,15 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
             active={isFullscreen}
             onClick={toggleFullscreen}
             label="Fullscreen"
+          />
+
+          <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+
+          <IconButton
+            icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
+            active={isSoundEnabled}
+            onClick={toggleSound}
+            label={isSoundEnabled ? "Mute Sound" : "Enable Sound"}
           />
           <IconButton
             icon={CinematicIcon}

@@ -456,17 +456,15 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
     );
 
     // Determine numeric mode (must match shader constants)
-    // 0=Classic, 1=Aurora, 2=Nebula, 3=Void, 4=Crystalline, 5=Horizon, 6=Ocean, 7=Twilight, 8=Starfield
+    // 0=Classic, 1=Aurora, 2=Nebula, 3=Crystalline, 4=Horizon, 5=Ocean, 6=Twilight
     let modeInt = 0;
     switch (skyboxMode) {
       case 'procedural_aurora': modeInt = 1; break;
       case 'procedural_nebula': modeInt = 2; break;
-      case 'procedural_void': modeInt = 3; break;
-      case 'procedural_crystalline': modeInt = 4; break;
-      case 'procedural_horizon': modeInt = 5; break;
-      case 'procedural_ocean': modeInt = 6; break;
-      case 'procedural_twilight': modeInt = 7; break;
-      case 'procedural_starfield': modeInt = 8; break;
+      case 'procedural_crystalline': modeInt = 3; break;
+      case 'procedural_horizon': modeInt = 4; break;
+      case 'procedural_ocean': modeInt = 5; break;
+      case 'procedural_twilight': modeInt = 6; break;
       default: modeInt = 0; // classic
     }
 
@@ -520,14 +518,6 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
       if (uniforms.uSunPosition?.value && typeof (uniforms.uSunPosition.value as THREE.Vector3).set === 'function') {
         (uniforms.uSunPosition.value as THREE.Vector3).set(...proceduralSettings.sunPosition);
       }
-
-      // Starfield settings
-      if (uniforms.uStarDensity) uniforms.uStarDensity.value = proceduralSettings.starfield.density;
-      if (uniforms.uStarBrightness) uniforms.uStarBrightness.value = proceduralSettings.starfield.brightness;
-      if (uniforms.uStarSize) uniforms.uStarSize.value = proceduralSettings.starfield.size;
-      if (uniforms.uStarTwinkle) uniforms.uStarTwinkle.value = proceduralSettings.starfield.twinkle;
-      if (uniforms.uStarGlow) uniforms.uStarGlow.value = proceduralSettings.starfield.glow;
-      if (uniforms.uStarColorVariation) uniforms.uStarColorVariation.value = proceduralSettings.starfield.colorVariation;
 
       // Aurora settings
       if (uniforms.uAuroraCurtainHeight) uniforms.uAuroraCurtainHeight.value = proceduralSettings.aurora?.curtainHeight ?? 0.5;

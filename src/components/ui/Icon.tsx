@@ -30,6 +30,7 @@ import UndoIcon from '@/assets/icons/undo.svg?react';
 import WarningIcon from '@/assets/icons/warning.svg?react';
 import ArrowLeftIcon from '@/assets/icons/arrow-left-filled.svg?react';
 import ArrowRightIcon from '@/assets/icons/arrow-right-filled.svg?react';
+import DiceIcon from '@/assets/icons/dice.svg?react';
 
 const icons = {
   eye: EyeIcon,
@@ -62,6 +63,7 @@ const icons = {
   clock: ClockIcon,
   settings: CogIcon,
   layers: LayersIcon,
+  dice: DiceIcon,
 } as const;
 
 export type IconName = keyof typeof icons;

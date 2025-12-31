@@ -178,11 +178,11 @@ describe('Object Type Registry', () => {
       expect(hasTimelineControls('quaternion-julia')).toBe(true);
       expect(hasTimelineControls('schroedinger')).toBe(true);
       expect(hasTimelineControls('blackhole')).toBe(true);
-      // Polytopes have timeline controls (modulation animation)
-      expect(hasTimelineControls('hypercube')).toBe(true);
-      expect(hasTimelineControls('simplex')).toBe(true);
-      expect(hasTimelineControls('cross-polytope')).toBe(true);
-      expect(hasTimelineControls('wythoff-polytope')).toBe(true);
+      // Polytopes no longer have timeline controls (modulation removed)
+      expect(hasTimelineControls('hypercube')).toBe(false);
+      expect(hasTimelineControls('simplex')).toBe(false);
+      expect(hasTimelineControls('cross-polytope')).toBe(false);
+      expect(hasTimelineControls('wythoff-polytope')).toBe(false);
       // Extended objects without animations
       expect(hasTimelineControls('clifford-torus')).toBe(false);
       expect(hasTimelineControls('nested-torus')).toBe(false);

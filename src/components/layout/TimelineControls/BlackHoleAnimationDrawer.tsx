@@ -20,6 +20,11 @@ import { ToggleButton } from '@/components/ui/ToggleButton';
 import { Slider } from '@/components/ui/Slider';
 import { AnimationDrawerContainer } from './AnimationDrawerContainer';
 
+export interface BlackHoleAnimationDrawerProps {
+  /** Callback to close the drawer */
+  onClose?: () => void;
+}
+
 /**
  * BlackHoleAnimationDrawer component
  *
@@ -29,7 +34,7 @@ import { AnimationDrawerContainer } from './AnimationDrawerContainer';
  *
  * @returns React component
  */
-export const BlackHoleAnimationDrawer: React.FC = React.memo(() => {
+export const BlackHoleAnimationDrawer: React.FC<BlackHoleAnimationDrawerProps> = React.memo(({ onClose }) => {
   const dimension = useGeometryStore((state) => state.dimension);
 
   // Get config and setters from store
@@ -66,7 +71,7 @@ export const BlackHoleAnimationDrawer: React.FC = React.memo(() => {
   } = useExtendedObjectStore(extendedObjectSelector);
 
   return (
-    <AnimationDrawerContainer data-testid="blackhole-animation-drawer">
+    <AnimationDrawerContainer onClose={onClose} data-testid="blackhole-animation-drawer">
       {/* Time Scale (Always Active) */}
       <div className="space-y-4" data-testid="animation-panel-timeScale">
         <div className="flex items-center justify-between">
