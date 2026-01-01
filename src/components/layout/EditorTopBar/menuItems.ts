@@ -8,15 +8,16 @@
 import { soundManager } from '@/lib/audio/SoundManager';
 import { getModifierSymbols } from '@/lib/platform';
 import { PRESETS } from '@/lib/presets';
-import { THEME_PRESETS } from '@/stores/themeStore';
+import { THEME_PRESETS, type ThemeAccent, type ThemeMode } from '@/stores/themeStore';
 import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore';
+import type { ToastType } from '@/contexts/ToastContextInstance';
 import type { MenuItem, MenuContext } from './types';
 
 /**
  * Build accent color menu items
  */
-export function buildAccentItems(accent: string, setAccent: (accent: string) => void): MenuItem[] {
-  const accents = ['cyan', 'blue', 'green', 'magenta', 'orange', 'violet', 'red'];
+export function buildAccentItems(accent: ThemeAccent, setAccent: (accent: ThemeAccent) => void): MenuItem[] {
+  const accents: ThemeAccent[] = ['cyan', 'blue', 'green', 'magenta', 'orange', 'violet', 'red'];
   return accents.map(a => ({
     label: (accent === a ? '\u2713 ' : '  ') + a.charAt(0).toUpperCase() + a.slice(1),
     onClick: () => setAccent(a),
@@ -27,10 +28,10 @@ export function buildAccentItems(accent: string, setAccent: (accent: string) => 
  * Build theme mode menu items
  */
 export function buildModeItems(
-  mode: string,
-  setMode: (mode: string) => void
+  mode: ThemeMode,
+  setMode: (mode: ThemeMode) => void
 ): MenuItem[] {
-  const modes = ['light', 'dark', 'system'];
+  const modes: ThemeMode[] = ['light', 'dark', 'system'];
   return modes.map(m => ({
     label: (mode === m ? '\u2713 ' : '  ') + m.charAt(0).toUpperCase() + m.slice(1),
     onClick: () => setMode(m),
@@ -70,7 +71,7 @@ export function buildPresetItems(
 export function buildSavedSceneItems(
   savedScenes: SavedScene[],
   loadScene: (id: string) => void,
-  addToast: (message: string, type: string) => void
+  addToast: (message: string, type?: ToastType) => void
 ): MenuItem[] {
   return savedScenes.map((s: SavedScene) => ({
     label: s.name,
@@ -131,7 +132,7 @@ export function buildSceneSubmenuItems(
 export function buildSavedStyleItems(
   savedStyles: SavedStyle[],
   loadStyle: (id: string) => void,
-  addToast: (message: string, type: string) => void
+  addToast: (message: string, type?: ToastType) => void
 ): MenuItem[] {
   return savedStyles.map((s: SavedStyle) => ({
     label: s.name,

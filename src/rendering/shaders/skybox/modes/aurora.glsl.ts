@@ -37,10 +37,6 @@ vec3 getAurora(vec3 dir, float time) {
     // Combined intensity
     float intensity = curtain * verticalFade * bottomFade * pulseGlow * uScale;
 
-    // Add edge variation using cheap directional hash
-    float edgeVar = fract(sin(dot(dir.xz, vec2(12.9898, 78.233))) * 43758.5453) * 0.1;
-    intensity += edgeVar * curtain * uComplexity;
-
     float v = clamp(intensity, 0.0, 1.0);
 
     // Dark sky background

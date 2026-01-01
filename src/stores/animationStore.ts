@@ -138,9 +138,12 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
     const selected = planeNames.filter(() => Math.random() < 0.5)
 
     // Ensure at least one plane is selected
-    if (selected.length === 0) {
+    if (selected.length === 0 && planeNames.length > 0) {
       const randomIndex = Math.floor(Math.random() * planeNames.length)
-      selected.push(planeNames[randomIndex])
+      const randomPlane = planeNames[randomIndex]
+      if (randomPlane) {
+        selected.push(randomPlane)
+      }
     }
 
     set({ animatingPlanes: new Set(selected), isPlaying: true })

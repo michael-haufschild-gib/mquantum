@@ -11,7 +11,6 @@ import {
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_SKYBOX_ANIMATION_MODE,
   DEFAULT_SKYBOX_ANIMATION_SPEED,
-  DEFAULT_SKYBOX_BLUR,
   DEFAULT_SKYBOX_ENABLED,
   DEFAULT_SKYBOX_HIGH_QUALITY,
   DEFAULT_SKYBOX_INTENSITY,
@@ -31,7 +30,6 @@ export interface SkyboxSliceState {
   skyboxMode: SkyboxMode
   /** Derived: current texture for classic mode */
   skyboxTexture: SkyboxTexture
-  skyboxBlur: number
   skyboxIntensity: number
   skyboxRotation: number
   skyboxAnimationMode: SkyboxAnimationMode
@@ -59,7 +57,6 @@ export interface SkyboxSliceActions {
   setSkyboxEnabled: (enabled: boolean) => void
   setSkyboxMode: (mode: SkyboxMode) => void
   setSkyboxTexture: (texture: SkyboxTexture) => void
-  setSkyboxBlur: (blur: number) => void
   setSkyboxIntensity: (intensity: number) => void
   setSkyboxRotation: (rotation: number) => void
   setSkyboxAnimationMode: (mode: SkyboxAnimationMode) => void
@@ -83,7 +80,6 @@ export const SKYBOX_INITIAL_STATE: SkyboxSliceState = {
   skyboxEnabled: DEFAULT_SKYBOX_ENABLED,
   skyboxMode: DEFAULT_SKYBOX_MODE,
   skyboxTexture: DEFAULT_SKYBOX_TEXTURE,
-  skyboxBlur: DEFAULT_SKYBOX_BLUR,
   skyboxIntensity: DEFAULT_SKYBOX_INTENSITY,
   skyboxRotation: DEFAULT_SKYBOX_ROTATION,
   skyboxAnimationMode: DEFAULT_SKYBOX_ANIMATION_MODE,
@@ -152,7 +148,6 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
   setSkyboxEnabled: (enabled: boolean) => set({ skyboxEnabled: enabled }),
   setSkyboxMode: (mode: SkyboxMode) => set({ skyboxMode: mode }),
   setSkyboxTexture: (texture: SkyboxTexture) => set({ skyboxTexture: texture }),
-  setSkyboxBlur: (blur: number) => set({ skyboxBlur: Math.max(0, Math.min(1, blur)) }),
   setSkyboxIntensity: (intensity: number) =>
     set({ skyboxIntensity: Math.max(0, Math.min(10, intensity)) }),
   setSkyboxRotation: (rotation: number) => {
@@ -177,7 +172,6 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
     set({
       skyboxSelection: DEFAULT_SKYBOX_SELECTION,
       ...deriveStateFromSelection(DEFAULT_SKYBOX_SELECTION),
-      skyboxBlur: DEFAULT_SKYBOX_BLUR,
       skyboxIntensity: DEFAULT_SKYBOX_INTENSITY,
       skyboxRotation: DEFAULT_SKYBOX_ROTATION,
       skyboxAnimationMode: DEFAULT_SKYBOX_ANIMATION_MODE,

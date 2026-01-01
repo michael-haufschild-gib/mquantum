@@ -33,12 +33,8 @@ export function generateMain(mode: SkyboxMode, effects: SkyboxEffects): string {
   }
 
   const effectCalls = []
-  if (effects.atmosphere) effectCalls.push('color = applyHorizon(color, dir);')
   if (effects.sun) effectCalls.push('color = applySun(color, dir);')
   if (effects.vignette) effectCalls.push('color = applyVignette(color, vScreenUV);')
-  if (effects.grain) effectCalls.push('color = applyGrain(color, vScreenUV, uTime);')
-  if (effects.aberration && mode !== 'classic')
-    effectCalls.push('color = applyAberration(color, vScreenUV);')
 
   return `
 void main() {

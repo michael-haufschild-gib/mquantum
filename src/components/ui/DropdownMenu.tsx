@@ -123,7 +123,6 @@ PortaledSubmenu.displayName = 'PortaledSubmenu';
  */
 const MenuItemButton = React.memo(({
   item,
-  index,
   hasSubmenu,
   isSubmenuOpen,
   isMobile,
@@ -132,7 +131,6 @@ const MenuItemButton = React.memo(({
   itemRef,
 }: {
   item: DropdownMenuItem;
-  index: number;
   hasSubmenu: boolean;
   isSubmenuOpen: boolean;
   isMobile: boolean;
@@ -262,7 +260,6 @@ const MenuItems: React.FC<{
           <React.Fragment key={index}>
             <MenuItemButton
               item={item}
-              index={index}
               hasSubmenu={hasSubmenu}
               isSubmenuOpen={isSubmenuOpen}
               isMobile={isMobile}

@@ -119,7 +119,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
   const dimension = useGeometryStore((state) => state.dimension);
 
   // Check current mode
-  const isHarmonicMode = config.quantumMode === 'harmonicOscillator';
   const isHydrogenMode = config.quantumMode === 'hydrogenOrbital';
   const isHydrogenNDMode = config.quantumMode === 'hydrogenND';
 

@@ -51,14 +51,12 @@ const ALL_SKYBOX_OPTIONS: SkyboxOption[] = [
 export const SkyboxControls: React.FC = React.memo(() => {
   const environmentSelector = useShallow((state: EnvironmentStore) => ({
     skyboxSelection: state.skyboxSelection,
-    skyboxBlur: state.skyboxBlur,
     skyboxIntensity: state.skyboxIntensity,
     skyboxAnimationMode: state.skyboxAnimationMode,
     skyboxAnimationSpeed: state.skyboxAnimationSpeed,
     skyboxHighQuality: state.skyboxHighQuality,
     proceduralSettings: state.proceduralSettings,
     setSkyboxSelection: state.setSkyboxSelection,
-    setSkyboxBlur: state.setSkyboxBlur,
     setSkyboxIntensity: state.setSkyboxIntensity,
     setSkyboxAnimationMode: state.setSkyboxAnimationMode,
     setSkyboxAnimationSpeed: state.setSkyboxAnimationSpeed,
@@ -67,14 +65,12 @@ export const SkyboxControls: React.FC = React.memo(() => {
   }));
   const {
     skyboxSelection,
-    skyboxBlur,
     skyboxIntensity,
     skyboxAnimationMode,
     skyboxAnimationSpeed,
     skyboxHighQuality,
     proceduralSettings,
     setSkyboxSelection,
-    setSkyboxBlur,
     setSkyboxIntensity,
     setSkyboxAnimationMode,
     setSkyboxAnimationSpeed,
@@ -89,9 +85,13 @@ export const SkyboxControls: React.FC = React.memo(() => {
   const isClassicMode = selectedOption?.type === 'classic'
   const isProceduralMode = selectedOption?.type === 'procedural'
   const isAuroraMode = skyboxSelection === 'procedural_aurora'
+  const isCrystallineMode = skyboxSelection === 'procedural_crystalline'
+  const isTwilightMode = skyboxSelection === 'procedural_twilight'
   const isHorizonMode = skyboxSelection === 'procedural_horizon'
   const isOceanMode = skyboxSelection === 'procedural_ocean'
   const hasControls = skyboxSelection !== 'none'
+  // Aurora, crystalline, and twilight don't use complexity
+  const hideComplexity = isAuroraMode || isCrystallineMode || isTwilightMode
 
   const handleSkyboxSelect = useCallback((id: SkyboxSelection) => {
     setSkyboxSelection(id);
@@ -147,13 +147,11 @@ export const SkyboxControls: React.FC = React.memo(() => {
           {/* Classic Mode Controls */}
           {isClassicMode && (
             <SkyboxSharedClassicControls
-              skyboxBlur={skyboxBlur}
               skyboxIntensity={skyboxIntensity}
               skyboxAnimationMode={skyboxAnimationMode}
               skyboxAnimationSpeed={skyboxAnimationSpeed}
               skyboxHighQuality={skyboxHighQuality}
               proceduralSettings={proceduralSettings}
-              setSkyboxBlur={setSkyboxBlur}
               setSkyboxIntensity={setSkyboxIntensity}
               setSkyboxAnimationMode={setSkyboxAnimationMode}
               setSkyboxAnimationSpeed={setSkyboxAnimationSpeed}
@@ -170,6 +168,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
                 skyboxIntensity={skyboxIntensity}
                 setProceduralSettings={setProceduralSettings}
                 setSkyboxIntensity={setSkyboxIntensity}
+                hideComplexity={hideComplexity}
               />
 
               {/* Mode-specific controls */}

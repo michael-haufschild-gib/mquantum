@@ -2,7 +2,7 @@ import { soundManager } from '@/lib/audio/SoundManager';
 import { getAvailableTypesForDimension } from '@/lib/geometry';
 import type { ObjectType } from '@/lib/geometry/types';
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization';
-import { useGeometryStore, type GeometrySlice } from '@/stores/geometryStore';
+import { useGeometryStore, type GeometryState } from '@/stores/geometryStore';
 import { useRotationStore } from '@/stores/rotationStore';
 import { m } from 'motion/react';
 import React, { useCallback, useMemo } from 'react';
@@ -11,7 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   // Consolidate geometry store selectors with useShallow
   const { objectType, setObjectType, dimension } = useGeometryStore(
-    useShallow((state: GeometrySlice) => ({
+    useShallow((state: GeometryState) => ({
       objectType: state.objectType,
       setObjectType: state.setObjectType,
       dimension: state.dimension,

@@ -212,8 +212,6 @@ describe('Tabs', () => {
 
       // Wait for the stability check to complete and indicators to appear
       await waitFor(() => {
-        // Right scroll indicator should be visible (we're at the start, can scroll right)
-        const rightChevron = container.querySelector('[data-testid="chevron-right"]');
         // This will show if the indicator logic is triggered
         expect(scrollContainer).toBeInTheDocument();
       }, { timeout: 500 });
@@ -226,7 +224,7 @@ describe('Tabs', () => {
         content: <div>Content {i + 1}</div>,
       }));
 
-      const { container } = render(
+      render(
         <Tabs tabs={manyTabs} value="tab5" onChange={() => {}} />
       );
 

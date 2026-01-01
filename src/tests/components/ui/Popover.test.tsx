@@ -148,39 +148,8 @@ describe('Popover', () => {
       Object.defineProperty(window, 'innerHeight', { value: height, writable: true });
     };
 
-    const mockTriggerRect = (rect: Partial<DOMRect>) => {
-      const defaultRect = {
-        top: 100,
-        bottom: 130,
-        left: 100,
-        right: 200,
-        width: 100,
-        height: 30,
-        x: 100,
-        y: 100,
-        toJSON: () => ({})
-      };
-      return { ...defaultRect, ...rect };
-    };
-
-    const mockPopoverRect = (rect: Partial<DOMRect>) => {
-      const defaultRect = {
-        top: 0,
-        bottom: 400,
-        left: 0,
-        right: 260,
-        width: 260,
-        height: 400,
-        x: 0,
-        y: 0,
-        toJSON: () => ({})
-      };
-      return { ...defaultRect, ...rect };
-    };
-
     it('should clamp left position when popup would overflow right edge', async () => {
       mockViewport(800, 600);
-      const user = userEvent.setup();
 
       render(
         <Popover

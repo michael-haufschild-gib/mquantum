@@ -107,10 +107,10 @@ export const MultiToggleGroup = React.memo(<T extends string = string>({
           return (
             <MultiToggleButton
               key={option.value}
-              option={option}
+              option={option as MultiToggleOption<string>}
               isSelected={isSelected}
               disabled={disabled}
-              onToggle={handleToggle}
+              onToggle={handleToggle as (value: string) => void}
               testId={testId}
             />
           );

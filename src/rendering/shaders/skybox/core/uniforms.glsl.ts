@@ -5,7 +5,6 @@ uniform float uMode; // 0=Classic, 1=Aurora, 2=Nebula, 3=Void
 uniform float uTime;
 
 // Basic
-uniform float uBlur;
 uniform float uIntensity;
 uniform float uHue;
 uniform float uSaturation;
@@ -27,18 +26,11 @@ uniform float uUsePalette;
 
 // Delight
 uniform float uDistortion;
-uniform float uAberration;
 uniform float uVignette;
-uniform float uGrain;
-uniform float uAtmosphere; // Horizon
 uniform float uTurbulence;
 uniform float uDualTone;
 uniform float uSunIntensity;
 uniform vec3 uSunPosition;
-
-// Parallax
-uniform float uParallaxEnabled;
-uniform float uParallaxStrength;
 
 // Aurora-specific
 uniform float uAuroraCurtainHeight;

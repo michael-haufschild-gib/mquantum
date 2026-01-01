@@ -49,7 +49,6 @@ import { computeKerrRadii, diskTemperatureToColor } from '@/lib/geometry/extende
 import {
   BLACK_HOLE_QUALITY_PRESETS,
   BlackHoleConfig,
-  BlackHoleRayBendingMode,
   DEFAULT_BLACK_HOLE_CONFIG,
 } from '@/lib/geometry/extended/types'
 import { StateCreator } from 'zustand'
@@ -432,8 +431,6 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
         validated.enableAbsorption = config.enableAbsorption
       if (config.temporalAccumulationEnabled !== undefined)
         validated.temporalAccumulationEnabled = config.temporalAccumulationEnabled
-      if (config.swirlAnimationEnabled !== undefined)
-        validated.swirlAnimationEnabled = config.swirlAnimationEnabled
       if (config.pulseEnabled !== undefined) validated.pulseEnabled = config.pulseEnabled
       if (config.parameterValues !== undefined) validated.parameterValues = config.parameterValues
 

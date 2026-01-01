@@ -40,7 +40,6 @@ export function createSkyboxShaderDefaults(): Record<string, { value: any }> {
     uTime: { value: 0 },
     uIsCapture: { value: 0 },
 
-    uBlur: { value: 0 },
     uIntensity: { value: 1 },
     uHue: { value: 0 },
     uSaturation: { value: 1 },
@@ -59,18 +58,11 @@ export function createSkyboxShaderDefaults(): Record<string, { value: any }> {
     uUsePalette: { value: 0 },
 
     uDistortion: { value: 0 },
-    uAberration: { value: 0 },
     uVignette: { value: 0.15 },
-    uGrain: { value: 0.02 },
-    uAtmosphere: { value: 0.0 },
     uTurbulence: { value: 0.0 },
     uDualTone: { value: 0.5 },
     uSunIntensity: { value: 0.0 },
     uSunPosition: { value: new THREE.Vector3(10, 10, 10) },
-
-    // Parallax defaults
-    uParallaxEnabled: { value: 0 },
-    uParallaxStrength: { value: 0.5 },
 
     // Aurora defaults
     uAuroraCurtainHeight: { value: 0.5 },

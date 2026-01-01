@@ -161,7 +161,7 @@ export function CameraController({
 
   // Update controls every frame (required for damping and auto-rotate)
   // Skip update() when neither damping nor auto-rotate is enabled
-  useFrame((state) => {
+  useFrame(() => {
     const controls = controlsRef.current
     if (controls && (controls.enableDamping || controls.autoRotate)) {
       controls.update()

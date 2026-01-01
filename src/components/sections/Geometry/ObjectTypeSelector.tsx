@@ -10,7 +10,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { Select } from '@/components/ui/Select';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { useGeometryStore, type GeometrySlice } from '@/stores/geometryStore';
+import { useGeometryStore, type GeometryState } from '@/stores/geometryStore';
 import { useRotationStore } from '@/stores/rotationStore';
 import { getAvailableTypesForDimension } from '@/lib/geometry';
 import type { ObjectType } from '@/lib/geometry/types';
@@ -28,7 +28,7 @@ export const ObjectTypeSelector: React.FC<ObjectTypeSelectorProps> = React.memo(
 }) => {
   // Consolidate geometry store selectors with useShallow
   const { objectType, setObjectType, dimension } = useGeometryStore(
-    useShallow((state: GeometrySlice) => ({
+    useShallow((state: GeometryState) => ({
       objectType: state.objectType,
       setObjectType: state.setObjectType,
       dimension: state.dimension,

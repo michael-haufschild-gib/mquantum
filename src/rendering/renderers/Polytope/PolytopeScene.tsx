@@ -334,7 +334,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   const lastAppearanceVersionRef = useRef(-1);
   const lastIblVersionRef = useRef(-1);
   const lastLightingVersionRef = useRef(-1);
-  const lastSkyboxVersionRef = useRef(-1); // DEBUG: track skybox changes
+  // Note: skybox version tracking removed - no longer used for dirty-flag optimization
   const prevFaceMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
 
   // Performance optimization: Cache store state in refs to avoid getState() calls every frame
@@ -766,12 +766,12 @@ export const PolytopeScene = React.memo(function PolytopeScene({
   // Note: Shadow material cleanup and runtime toggle are handled by useShadowPatching hook
 
   // ============ USEFRAME: UPDATE UNIFORMS ONLY ============
-  useFrame(({ camera, scene }, delta) => {
+  useFrame(({ camera, scene }) => {
     if (numVertices === 0) return;
 
     // Read state from cached refs (updated via subscriptions, not getState() per frame)
     // Note: rotation state is handled by ndTransform hook
-    const animationState = animationStateRef.current;
+    // Note: animationState ref is kept for future use but not currently read in useFrame
     const extendedObjectState = extendedObjectStateRef.current;
     const appearanceState = appearanceStateRef.current;
     const lightingState = lightingStateRef.current;
@@ -799,7 +799,6 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     const appearanceVersion = appearanceState.appearanceVersion;
     const iblVersion = environmentState.iblVersion;
     const lightingVersion = lightingState.version;
-    const skyboxVersion = environmentState.skyboxVersion;
 
     const polytopeChanged = polytopeVersion !== lastPolytopeVersionRef.current;
     const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current;

@@ -8,6 +8,8 @@ import { useMemo } from 'react';
 import { PRESETS } from '@/lib/presets';
 import { soundManager } from '@/lib/audio/SoundManager';
 import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore';
+import type { ThemeAccent, ThemeMode } from '@/stores/themeStore';
+import type { ToastType } from '@/contexts/ToastContextInstance';
 import type { MenuItem } from './types';
 import {
   buildAccentItems,
@@ -27,10 +29,10 @@ import {
  * Hook for theme-related menu items (accent, mode, presets)
  */
 export function useThemeMenuItems(
-  accent: string,
-  setAccent: (accent: string) => void,
-  mode: string,
-  setMode: (mode: string) => void,
+  accent: ThemeAccent,
+  setAccent: (accent: ThemeAccent) => void,
+  mode: ThemeMode,
+  setMode: (mode: ThemeMode) => void,
   setPreset: (presetId: string) => void
 ) {
   const accentItems = useMemo(
@@ -57,7 +59,7 @@ export function useThemeMenuItems(
 export function useSceneMenuItems(
   savedScenes: SavedScene[],
   loadScene: (id: string) => void,
-  addToast: (message: string, type: string) => void,
+  addToast: (message: string, type?: ToastType) => void,
   setSaveSceneOpen: (open: boolean) => void,
   setIsSceneManagerOpen: (open: boolean) => void
 ) {
@@ -101,7 +103,7 @@ export function useSceneMenuItems(
 export function useStyleMenuItems(
   savedStyles: SavedStyle[],
   loadStyle: (id: string) => void,
-  addToast: (message: string, type: string) => void,
+  addToast: (message: string, type?: ToastType) => void,
   setSaveStyleOpen: (open: boolean) => void,
   setIsStyleManagerOpen: (open: boolean) => void
 ) {

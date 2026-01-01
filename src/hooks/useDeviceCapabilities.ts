@@ -17,6 +17,7 @@ import {
   MOBILE_DEFAULT_MAX_FPS,
   MOBILE_DEFAULT_RESOLUTION_SCALE,
 } from '@/lib/deviceCapabilities'
+import { useLightingStore } from '@/stores/lightingStore'
 import {
   hasPersistedMaxFps,
   hasPersistedResolutionScale,
@@ -72,6 +73,13 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
           perfStore.setMaxFps(MOBILE_DEFAULT_MAX_FPS)
         }
 
+        // Remove spotlight on mobile - keep only point light for performance
+        const lightingStore = useLightingStore.getState()
+        const spotlights = lightingStore.lights.filter((l) => l.type === 'spot')
+        for (const spotlight of spotlights) {
+          lightingStore.removeLight(spotlight.id)
+        }
+
         if (import.meta.env.DEV) {
           console.log('[DeviceCapabilities] Mobile GPU detected:', {
             tier: capabilities.gpuTier,
@@ -82,6 +90,7 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
               ? perfStore.renderResolutionScale
               : MOBILE_DEFAULT_RESOLUTION_SCALE,
             maxFps: userHasFpsPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
+            spotlightsRemoved: spotlights.length,
           })
         }
       } else if (import.meta.env.DEV) {

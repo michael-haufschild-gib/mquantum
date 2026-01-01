@@ -13,6 +13,8 @@ interface SkyboxSharedProceduralControlsProps {
   skyboxIntensity: number
   setProceduralSettings: (settings: Partial<SkyboxProceduralSettings>) => void
   setSkyboxIntensity: (value: number) => void
+  /** Hide complexity slider for modes that don't use it (aurora, crystalline, twilight) */
+  hideComplexity?: boolean
 }
 
 export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralControlsProps> = React.memo(({
@@ -20,16 +22,14 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
   skyboxIntensity,
   setProceduralSettings,
   setSkyboxIntensity,
+  hideComplexity = false,
 }) => {
   const handleScaleChange = useCallback((v: number) => setProceduralSettings({ scale: v }), [setProceduralSettings]);
   const handleComplexityChange = useCallback((v: number) => setProceduralSettings({ complexity: v }), [setProceduralSettings]);
   const handleEvolutionChange = useCallback((v: number) => setProceduralSettings({ evolution: v }), [setProceduralSettings]);
   const handleSyncChange = useCallback((v: boolean) => setProceduralSettings({ syncWithObject: v }), [setProceduralSettings]);
   const handleTimeScaleChange = useCallback((v: number) => setProceduralSettings({ timeScale: v }), [setProceduralSettings]);
-  const handleHorizonChange = useCallback((v: number) => setProceduralSettings({ horizon: v }), [setProceduralSettings]);
   const handleTurbulenceChange = useCallback((v: number) => setProceduralSettings({ turbulence: v }), [setProceduralSettings]);
-  const handleAberrationChange = useCallback((v: number) => setProceduralSettings({ chromaticAberration: v }), [setProceduralSettings]);
-  const handleGrainChange = useCallback((v: number) => setProceduralSettings({ noiseGrain: v }), [setProceduralSettings]);
   const handleSunIntensityChange = useCallback((v: number) => setProceduralSettings({ sunIntensity: v }), [setProceduralSettings]);
 
   return (
@@ -47,14 +47,16 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           step={0.1}
           onChange={handleScaleChange}
         />
-        <Slider
-          label="Complexity"
-          value={proceduralSettings.complexity}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={handleComplexityChange}
-        />
+        {!hideComplexity && (
+          <Slider
+            label="Complexity"
+            value={proceduralSettings.complexity}
+            min={0}
+            max={1}
+            step={0.01}
+            onChange={handleComplexityChange}
+          />
+        )}
         <Slider
           label="Evolution (Seed)"
           value={proceduralSettings.evolution}
@@ -104,40 +106,14 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           Features
         </span>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Slider
-            label="Atmosphere"
-            value={proceduralSettings.horizon}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={handleHorizonChange}
-          />
-          <Slider
-            label="Turbulence"
-            value={proceduralSettings.turbulence}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={handleTurbulenceChange}
-          />
-          <Slider
-            label="Aberration"
-            value={proceduralSettings.chromaticAberration}
-            min={0}
-            max={1}
-            step={0.01}
-            onChange={handleAberrationChange}
-          />
-          <Slider
-            label="Grain"
-            value={proceduralSettings.noiseGrain}
-            min={0}
-            max={0.1}
-            step={0.005}
-            onChange={handleGrainChange}
-          />
-        </div>
+        <Slider
+          label="Turbulence"
+          value={proceduralSettings.turbulence}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={handleTurbulenceChange}
+        />
 
         <Slider
           label="Sun Intensity"

@@ -187,19 +187,6 @@ describe('environmentStore', () => {
     });
 
     describe('skybox properties', () => {
-      it('should set skybox blur with clamping', () => {
-        const { setSkyboxBlur } = useEnvironmentStore.getState();
-
-        setSkyboxBlur(0.5);
-        expect(useEnvironmentStore.getState().skyboxBlur).toBe(0.5);
-
-        setSkyboxBlur(-0.5);
-        expect(useEnvironmentStore.getState().skyboxBlur).toBe(0);
-
-        setSkyboxBlur(1.5);
-        expect(useEnvironmentStore.getState().skyboxBlur).toBe(1);
-      });
-
       it('should set skybox intensity with clamping', () => {
         const { setSkyboxIntensity } = useEnvironmentStore.getState();
 

@@ -7,7 +7,7 @@ import { getRotationPlanes } from '@/lib/math';
 import { MAX_SPEED, MIN_SPEED, useAnimationStore, type AnimationState } from '@/stores/animationStore';
 import { MAX_ANIMATION_BIAS, MIN_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults';
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore, type GeometrySlice } from '@/stores/geometryStore';
+import { useGeometryStore, type GeometryState } from '@/stores/geometryStore';
 import { useUIStore } from '@/stores/uiStore';
 import { AnimatePresence, m } from 'motion/react';
 import { useMemo, useState, type FC } from 'react';
@@ -19,7 +19,7 @@ import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnim
 export const TimelineControls: FC = () => {
     // Consolidated geometry store subscription
     const { dimension, objectType } = useGeometryStore(
-        useShallow((state: GeometrySlice) => ({
+        useShallow((state: GeometryState) => ({
             dimension: state.dimension,
             objectType: state.objectType,
         }))

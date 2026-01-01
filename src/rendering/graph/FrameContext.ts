@@ -63,7 +63,6 @@ export interface FrozenEnvironmentState {
   readonly skyboxEnabled: boolean
   readonly skyboxMode: SkyboxSliceState['skyboxMode']
   readonly skyboxTexture: SkyboxSliceState['skyboxTexture']
-  readonly skyboxBlur: number
   readonly skyboxIntensity: number
   readonly skyboxRotation: number
   readonly skyboxAnimationMode: SkyboxSliceState['skyboxAnimationMode']
@@ -377,7 +376,6 @@ function captureEnvironmentState(
     skyboxEnabled: skybox.skyboxEnabled,
     skyboxMode: skybox.skyboxMode,
     skyboxTexture: skybox.skyboxTexture,
-    skyboxBlur: skybox.skyboxBlur,
     skyboxIntensity: skybox.skyboxIntensity,
     skyboxRotation: skybox.skyboxRotation,
     skyboxAnimationMode: skybox.skyboxAnimationMode,
@@ -645,7 +643,6 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         skyboxEnabled: false,
         skyboxMode: 'classic',
         skyboxTexture: 'none',
-        skyboxBlur: 0,
         skyboxIntensity: 1,
         skyboxRotation: 0,
         skyboxAnimationMode: 'none',
@@ -654,10 +651,10 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         skyboxLoading: false,
         classicCubeTexture: null,
         skyboxTimeScale: 0.2,
-        backgroundColor: '#0F0F1A',
+        backgroundColor: '#232323',
         backgroundBlendMode: 'normal',
         activeWalls: [],
-        iblQuality: 'low',
+        iblQuality: 'off',
         iblIntensity: 1.0,
       },
       postProcessing: {

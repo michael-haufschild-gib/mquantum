@@ -11,7 +11,6 @@ import { useAnimationStore } from '@/stores/animationStore';
 import { useRotationStore } from '@/stores/rotationStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
-import { UI_INITIAL_STATE } from '@/stores/slices/uiSlice';
 import { DEFAULT_MAX_FPS } from '@/stores/defaults/visualDefaults';
 
 describe('useAnimationLoop', () => {

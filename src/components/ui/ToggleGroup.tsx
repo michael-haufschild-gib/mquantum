@@ -103,10 +103,10 @@ export const ToggleGroup = React.memo(<T extends string = string>({
           return (
             <ToggleGroupButton
               key={option.value}
-              option={option}
+              option={option as ToggleOption<string>}
               isSelected={isSelected}
               isDisabled={isDisabled ?? false}
-              onChange={onChange}
+              onChange={onChange as (value: string) => void}
               layoutId={layoutId}
               testId={testId}
             />

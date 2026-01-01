@@ -24,7 +24,6 @@ const skyboxAssets = import.meta.glob('/src/assets/skyboxes/**/*.ktx2', { eager:
 const skyboxMeshEnvSelector = (state: ReturnType<typeof useEnvironmentStore.getState>) => ({
   skyboxMode: state.skyboxMode,
   skyboxIntensity: state.skyboxIntensity,
-  skyboxBlur: state.skyboxBlur,
   skyboxRotation: state.skyboxRotation,
   skyboxAnimationMode: state.skyboxAnimationMode,
   skyboxAnimationSpeed: state.skyboxAnimationSpeed,
@@ -92,7 +91,6 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
   const {
     skyboxMode,
     skyboxIntensity,
-    skyboxBlur,
     skyboxRotation,
     skyboxAnimationMode,
     skyboxAnimationSpeed,
@@ -306,13 +304,9 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
       return {
           mode: modeStr,
           effects: {
-              atmosphere: proceduralSettings.horizon > 0,
               sun: proceduralSettings.sunIntensity > 0,
               vignette: true,
-              grain: proceduralSettings.noiseGrain > 0,
-              aberration: proceduralSettings.chromaticAberration > 0
           },
-          parallax: proceduralSettings.parallaxEnabled
       };
   }, [skyboxMode, proceduralSettings]);
 
@@ -413,11 +407,9 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
     let finalRotY = baseRotY;
     let finalRotZ = 0;
     let finalIntensity = skyboxIntensity;
-    let finalBlur = skyboxBlur;
     let finalHue = proceduralSettings.hue ?? 0;
     let finalSaturation = proceduralSettings.saturation ?? 1;
     let finalDistortion = 0;
-    let finalAberration = 0;
 
     // Classic Animations
     if (skyboxMode === 'classic' && isPlaying && skyboxAnimationMode !== 'none') {
@@ -477,13 +469,11 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
     if (uniforms.uTime) uniforms.uTime.value = t;
 
     // Animation-driven uniforms (can change when animation is playing)
-    if (uniforms.uBlur) uniforms.uBlur.value = finalBlur;
     if (uniforms.uIntensity) uniforms.uIntensity.value = finalIntensity * opacity;
     if (uniforms.uHue) uniforms.uHue.value = finalHue;
     if (uniforms.uSaturation) uniforms.uSaturation.value = finalSaturation;
-    // Distortion/aberration use animated values with store fallback
+    // Distortion uses animated value with store fallback
     if (uniforms.uDistortion) uniforms.uDistortion.value = finalDistortion || proceduralSettings.turbulence;
-    if (uniforms.uAberration) uniforms.uAberration.value = finalAberration || proceduralSettings.chromaticAberration;
 
     // --- DIRTY-FLAG: Static procedural settings (only update when store changes) ---
     if (skyboxChanged || appearanceChanged) {
@@ -508,10 +498,8 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
         uniforms.uUsePalette.value = useSimpleInterpolation ? 0.0 : 1.0;
       }
 
-      // Effects and atmosphere
+      // Effects
       if (uniforms.uVignette) uniforms.uVignette.value = 0.15;
-      if (uniforms.uGrain) uniforms.uGrain.value = proceduralSettings.noiseGrain;
-      if (uniforms.uAtmosphere) uniforms.uAtmosphere.value = proceduralSettings.horizon;
       if (uniforms.uTurbulence) uniforms.uTurbulence.value = proceduralSettings.turbulence;
       if (uniforms.uDualTone) uniforms.uDualTone.value = proceduralSettings.dualToneContrast;
       if (uniforms.uSunIntensity) uniforms.uSunIntensity.value = proceduralSettings.sunIntensity;
@@ -532,10 +520,6 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
       if (uniforms.uOceanDepthGradient) uniforms.uOceanDepthGradient.value = proceduralSettings.ocean?.depthGradient ?? 0.5;
       if (uniforms.uOceanBubbleDensity) uniforms.uOceanBubbleDensity.value = proceduralSettings.ocean?.bubbleDensity ?? 0.3;
       if (uniforms.uOceanSurfaceShimmer) uniforms.uOceanSurfaceShimmer.value = proceduralSettings.ocean?.surfaceShimmer ?? 0.4;
-
-      // Parallax settings
-      if (uniforms.uParallaxEnabled) uniforms.uParallaxEnabled.value = proceduralSettings.parallaxEnabled ? 1.0 : 0.0;
-      if (uniforms.uParallaxStrength) uniforms.uParallaxStrength.value = proceduralSettings.parallaxStrength ?? 0.5;
 
       // Update version refs after processing
       lastSkyboxVersionRef.current = skyboxVersion;

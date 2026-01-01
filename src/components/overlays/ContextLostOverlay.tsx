@@ -12,7 +12,7 @@
 
 import { Z_INDEX } from '@/constants/zIndex'
 import { applySafeModeSettings } from '@/rendering/core/SafeModeSettings'
-import { useWebGLContextStore, type WebGLContextState } from '@/stores/webglContextStore'
+import { useWebGLContextStore, type WebGLContextSlice } from '@/stores/webglContextStore'
 import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -72,7 +72,7 @@ const LostState: React.FC = () => {
  */
 const RestoringState: React.FC = React.memo(() => {
   const { recoveryAttempts, maxAttempts } = useWebGLContextStore(
-    useShallow((s: WebGLContextState) => ({
+    useShallow((s: WebGLContextSlice) => ({
       recoveryAttempts: s.recoveryAttempts,
       maxAttempts: s.recoveryConfig.maxAttempts,
     }))
@@ -193,7 +193,7 @@ FailedState.displayName = 'FailedState'
  */
 const EscalatedState: React.FC = React.memo(() => {
   const { retryFromEscalation, applySafeModeAndRetry } = useWebGLContextStore(
-    useShallow((s: WebGLContextState) => ({
+    useShallow((s: WebGLContextSlice) => ({
       retryFromEscalation: s.retryFromEscalation,
       applySafeModeAndRetry: s.applySafeModeAndRetry,
     }))

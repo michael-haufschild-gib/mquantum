@@ -45,7 +45,6 @@ describe('FrameContext', () => {
           skyboxEnabled: true,
           skyboxMode: 'classic',
           skyboxTexture: 'space_blue',
-          skyboxBlur: 0.5,
           skyboxIntensity: 1.2,
           skyboxRotation: Math.PI / 4,
           skyboxAnimationMode: 'rotate',
@@ -165,7 +164,7 @@ describe('FrameContext', () => {
       expect(context.stores.environment.skyboxEnabled).toBe(true)
       expect(context.stores.environment.skyboxMode).toBe('classic')
       expect(context.stores.environment.skyboxTexture).toBe('space_blue')
-      expect(context.stores.environment.skyboxBlur).toBe(0.5)
+      expect(context.stores.environment.skyboxIntensity).toBe(1.2)
     })
 
     it('should capture post-processing state', () => {

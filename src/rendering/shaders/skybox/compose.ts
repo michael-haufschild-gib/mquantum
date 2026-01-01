@@ -17,9 +17,6 @@ import { nebulaBlock } from './modes/nebula.glsl'
 import { oceanBlock } from './modes/ocean.glsl'
 import { twilightBlock } from './modes/twilight.glsl'
 
-import { aberrationBlock } from './effects/aberration.glsl'
-import { atmosphereBlock } from './effects/atmosphere.glsl'
-import { grainBlock } from './effects/grain.glsl'
 import { sunBlock } from './effects/sun.glsl'
 import { vignetteBlock } from './effects/vignette.glsl'
 
@@ -37,17 +34,11 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
   const features = [`Mode: ${mode}`]
 
   // Apply overrides to effects
-  const useAtmosphere = effects.atmosphere && !overrides.includes('Atmosphere')
   const useSun = effects.sun && !overrides.includes('Sun Glow')
   const useVignette = effects.vignette && !overrides.includes('Vignette')
-  const useGrain = effects.grain && !overrides.includes('Film Grain')
-  const useAberration = effects.aberration && !overrides.includes('Aberration')
 
-  if (useAtmosphere) features.push('Atmosphere')
   if (useSun) features.push('Sun Glow')
   if (useVignette) features.push('Vignette')
-  if (useGrain) features.push('Film Grain')
-  if (useAberration) features.push('Aberration')
 
   // Select Mode Block
   let modeBlock = classicBlock
@@ -91,19 +82,13 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
     { name: 'Rotation Utils', content: rotationBlock },
     { name: 'Noise Utils', content: noiseBlock, condition: needsNoise },
     { name: `Mode: ${mode}`, content: modeBlock },
-    { name: 'Atmosphere Effect', content: atmosphereBlock, condition: useAtmosphere },
     { name: 'Sun Effect', content: sunBlock, condition: useSun },
     { name: 'Vignette Effect', content: vignetteBlock, condition: useVignette },
-    { name: 'Grain Effect', content: grainBlock, condition: useGrain },
-    { name: 'Aberration Effect', content: aberrationBlock, condition: useAberration },
     {
       name: 'Main',
       content: generateMain(mode, {
-        atmosphere: useAtmosphere,
         sun: useSun,
         vignette: useVignette,
-        grain: useGrain,
-        aberration: useAberration,
       }),
     },
   ]

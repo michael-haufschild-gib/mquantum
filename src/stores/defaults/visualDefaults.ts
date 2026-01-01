@@ -24,7 +24,7 @@ export const DEFAULT_EDGE_COLOR = '#19e697'
 export const DEFAULT_EDGE_THICKNESS = 1
 export const DEFAULT_FACE_OPACITY = 1
 export const DEFAULT_FACE_COLOR = '#33cc9e'
-export const DEFAULT_BACKGROUND_COLOR = '#0F0F1A'
+export const DEFAULT_BACKGROUND_COLOR = '#232323'
 
 /** Background blend mode for compositing skybox with background color */
 export type BackgroundBlendMode = 'normal' | 'screen' | 'multiply' | 'overlay' | 'add'
@@ -282,9 +282,7 @@ export const ALL_WALL_POSITIONS: WallPosition[] = ['floor', 'back', 'left', 'rig
 
 /** Ground plane surface type */
 export type GroundPlaneType = 'two-sided' | 'plane'
-//export const DEFAULT_ACTIVE_WALLS: WallPosition[] = ['floor']
-
-export const DEFAULT_ACTIVE_WALLS: WallPosition[] = ['floor']
+export const DEFAULT_ACTIVE_WALLS: WallPosition[] = []
 export const DEFAULT_GROUND_PLANE_OFFSET = 10
 export const DEFAULT_GROUND_PLANE_COLOR = '#ead6e8'
 export const DEFAULT_GROUND_PLANE_TYPE: GroundPlaneType = 'plane'
@@ -340,7 +338,7 @@ export const DEFAULT_GROUND_PBR: PBRConfig = {
 export type IBLQuality = 'off' | 'low' | 'high'
 
 /** Default IBL quality - high for testing */
-export const DEFAULT_IBL_QUALITY: IBLQuality = 'low'
+export const DEFAULT_IBL_QUALITY: IBLQuality = 'off'
 
 /** IBL intensity multiplier */
 export const DEFAULT_IBL_INTENSITY = 0.5
@@ -373,10 +371,9 @@ export type SkyboxSelection =
   | 'procedural_ocean'
   | 'procedural_twilight'
 
-export const DEFAULT_SKYBOX_ENABLED = true
+export const DEFAULT_SKYBOX_ENABLED = false
 export const DEFAULT_SKYBOX_TEXTURE: SkyboxTexture = 'space_blue'
-export const DEFAULT_SKYBOX_SELECTION: SkyboxSelection = 'procedural_aurora'
-export const DEFAULT_SKYBOX_BLUR = 0
+export const DEFAULT_SKYBOX_SELECTION: SkyboxSelection = 'none'
 export const DEFAULT_SKYBOX_INTENSITY = 1
 export const DEFAULT_SKYBOX_ROTATION = 0
 export const DEFAULT_SKYBOX_HIGH_QUALITY = false
@@ -444,24 +441,17 @@ export interface SkyboxProceduralSettings {
   hue: number // -0.5 to 0.5 (color rotation)
   saturation: number // 0-2 (color intensity)
 
-  // Delight Features (The 10 "Wow" Factors)
-  chromaticAberration: number // 0-1 (Radial/Lens style)
-  horizon: number // 0-1 (0 = none, 1 = strong plane)
+  // Delight Features
   turbulence: number // 0-1
   dualToneContrast: number // 0-1 (Shadow intensity)
   sunIntensity: number // 0-1
   sunPosition: [number, number, number]
-  noiseGrain: number // 0-1
   evolution: number // 0-1 (The "Seed" / W-coordinate)
 
   // Mode-specific settings
   aurora: AuroraSettings
   horizonGradient: HorizonSettings
   ocean: OceanSettings
-
-  // Parallax depth (for classic textures)
-  parallaxEnabled: boolean
-  parallaxStrength: number // 0-1
 }
 
 export const DEFAULT_SKYBOX_MODE: SkyboxMode = 'procedural_aurora'
@@ -475,19 +465,14 @@ export const DEFAULT_SKYBOX_PROCEDURAL_SETTINGS: SkyboxProceduralSettings = {
   distribution: { ...DEFAULT_DISTRIBUTION },
   hue: 0,
   saturation: 1,
-  chromaticAberration: 0.1,
-  horizon: 0.0,
   turbulence: 0.3,
   dualToneContrast: 0.5,
   sunIntensity: 0.0,
   sunPosition: [10, 10, 10],
-  noiseGrain: 0,
   evolution: 0.0,
   aurora: { ...DEFAULT_AURORA_SETTINGS },
   horizonGradient: { ...DEFAULT_HORIZON_SETTINGS },
   ocean: { ...DEFAULT_OCEAN_SETTINGS },
-  parallaxEnabled: false,
-  parallaxStrength: 0.5,
 }
 
 // ============================================================================

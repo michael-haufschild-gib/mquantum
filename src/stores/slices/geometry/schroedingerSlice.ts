@@ -5,7 +5,6 @@ import {
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
   SchroedingerPresetName,
-  SchroedingerQuantumMode,
   HydrogenOrbitalPresetName,
   HydrogenNDPresetName,
 } from '@/lib/geometry/extended/types'
@@ -52,20 +51,6 @@ export const createSchroedingerSlice: StateCreator<ExtendedObjectSlice, [], [], 
     const clamped = Math.max(min, Math.min(max, value))
     setWithVersion((state) => ({
       schroedinger: { ...state.schroedinger, [key]: clamped },
-    }))
-  }
-
-  /** Factory for clamped numeric setters that also set presetName to 'custom' */
-  const clampedCustomSetter = <K extends keyof typeof DEFAULT_SCHROEDINGER_CONFIG>(
-    key: K,
-    min: number,
-    max: number,
-    floor = false
-  ) => (value: number) => {
-    let clamped = Math.max(min, Math.min(max, value))
-    if (floor) clamped = Math.floor(clamped)
-    setWithVersion((state) => ({
-      schroedinger: { ...state.schroedinger, [key]: clamped, presetName: 'custom' },
     }))
   }
 
