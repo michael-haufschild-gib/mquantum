@@ -60,15 +60,9 @@ vi.mock('@/stores/extendedObjectStore', () => ({
             sliceAnimationEnabled: false,
             phaseShiftEnabled: false,
             alternatePowerEnabled: false,
-            dimensionMixEnabled: false,
-            originDriftEnabled: false,
         },
-        quaternionJulia: {
-            juliaConstantAnimation: { enabled: false },
-            powerAnimation: { enabled: false },
-            originDriftEnabled: false,
-            dimensionMixEnabled: false,
-        },
+        // NOTE: quaternionJulia has no animations - shape morphing via 4D+ rotation
+        quaternionJulia: {},
         polytope: {
             truncationEnabled: false,
             facetOffsetEnabled: false,
@@ -77,7 +71,6 @@ vi.mock('@/stores/extendedObjectStore', () => ({
         },
         schroedinger: {
             curlEnabled: false,
-            originDriftEnabled: false,
             sliceAnimationEnabled: false,
             spreadAnimationEnabled: false,
         },

@@ -401,64 +401,6 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
             },
           },
 
-          dimensionMix: {
-            name: 'Dimension Mixing',
-            description: 'Applies time-varying shear matrix for morphing during rotation',
-            enabledByDefault: false,
-            enabledKey: 'dimensionMixEnabled',
-            params: {
-              mixIntensity: {
-                min: 0.0,
-                max: 0.3,
-                default: 0.1,
-                step: 0.01,
-                label: 'Intensity',
-                description: 'Strength of cross-dimensional coupling',
-              },
-              mixFrequency: {
-                min: 0.1,
-                max: 2.0,
-                default: 0.5,
-                step: 0.1,
-                label: 'Frequency',
-                description: 'How fast the mixing matrix evolves',
-              },
-            },
-          },
-
-          originDrift: {
-            name: 'Origin Drift',
-            description: 'Slow multi-frequency wandering in extra dimensions',
-            enabledByDefault: false,
-            enabledKey: 'originDriftEnabled',
-            params: {
-              driftAmplitude: {
-                min: 0.01,
-                max: 0.5,
-                default: 0.03,
-                step: 0.01,
-                label: 'Amplitude',
-                description: 'Maximum displacement in extra dimensions',
-              },
-              driftBaseFrequency: {
-                min: 0.01,
-                max: 0.5,
-                default: 0.04,
-                step: 0.01,
-                label: 'Base Freq',
-                description: 'Base oscillation frequency in Hz',
-              },
-              driftFrequencySpread: {
-                min: 0.0,
-                max: 1.0,
-                default: 0.2,
-                step: 0.05,
-                label: 'Spread',
-                description: 'Per-dimension frequency variation (creates beating)',
-              },
-            },
-          },
-
           sliceAnimation: {
             name: 'Slice Animation',
             description: 'Animates which 3D cross-section is visible (4D+ only)',
@@ -552,112 +494,11 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
         edgesAreFresnelRim: true,
       },
 
+      // NOTE: Julia fractals have no type-specific animations.
+      // Smooth shape morphing is achieved via 4D+ rotation (handled by the rotation system).
       animation: {
-        hasTypeSpecificAnimations: true,
-        systems: {
-          // Julia Constant Animation uses nested store structure
-          // Amplitude/frequency are 4-element arrays controlled via single setters
-          // FractalAnimationDrawer needs custom handling for array params
-          juliaConstantAnimation: {
-            name: 'Julia Constant Path',
-            description: 'Per-component oscillation of the Julia constant c',
-            enabledByDefault: false,
-            // Nested path - FractalAnimationDrawer will handle this
-            enabledKey: 'juliaConstantAnimation.enabled',
-            // Note: amplitude[0-3] and frequency[0-3] require array setters
-            // which need custom UI handling - not included in generic params
-            params: {},
-          },
-
-          // Power Animation uses nested store structure
-          powerAnimation: {
-            name: 'Power Animation',
-            description: 'Morphs the iteration power parameter',
-            enabledByDefault: false,
-            enabledKey: 'powerAnimation.enabled',
-            params: {
-              // These use nested paths - FractalAnimationDrawer handles extraction
-              'powerAnimation.minPower': {
-                min: 2.0,
-                max: 10.0,
-                default: 2.0,
-                step: 0.5,
-                label: 'Min Power',
-              },
-              'powerAnimation.maxPower': {
-                min: 2.0,
-                max: 16.0,
-                default: 8.0,
-                step: 0.5,
-                label: 'Max Power',
-              },
-              'powerAnimation.speed': {
-                min: 0.01,
-                max: 0.2,
-                default: 0.03,
-                step: 0.01,
-                label: 'Speed',
-              },
-            },
-          },
-
-          // Origin Drift uses flat store keys
-          originDrift: {
-            name: 'Origin Drift',
-            description: 'Extra dimension wandering for feature evolution',
-            enabledByDefault: false,
-            minDimension: 4,
-            enabledKey: 'originDriftEnabled',
-            params: {
-              originDriftAmplitude: {
-                min: 0.01,
-                max: 0.5,
-                default: 0.03,
-                step: 0.01,
-                label: 'Amplitude',
-              },
-              originDriftBaseFrequency: {
-                min: 0.01,
-                max: 0.5,
-                default: 0.04,
-                step: 0.01,
-                label: 'Base Freq',
-              },
-              originDriftFrequencySpread: {
-                min: 0.0,
-                max: 1.0,
-                default: 0.2,
-                step: 0.05,
-                label: 'Spread',
-              },
-            },
-          },
-
-          // Dimension Mixing uses flat store keys
-          dimensionMix: {
-            name: 'Dimension Mixing',
-            description: 'Cross-dimensional coupling via time-varying shear',
-            enabledByDefault: false,
-            minDimension: 4,
-            enabledKey: 'dimensionMixEnabled',
-            params: {
-              mixIntensity: {
-                min: 0.0,
-                max: 0.3,
-                default: 0.1,
-                step: 0.01,
-                label: 'Intensity',
-              },
-              mixFrequency: {
-                min: 0.1,
-                max: 2.0,
-                default: 0.5,
-                step: 0.1,
-                label: 'Frequency',
-              },
-            },
-          },
-        },
+        hasTypeSpecificAnimations: false,
+        systems: {},
       },
 
       urlSerialization: {
@@ -667,7 +508,7 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
 
       ui: {
         controlsComponentKey: 'QuaternionJuliaControls',
-        hasTimelineControls: true,
+        hasTimelineControls: false,
         qualityPresets: ['draft', 'standard', 'high', 'ultra'],
       },
 
@@ -704,39 +545,6 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
       animation: {
         hasTypeSpecificAnimations: true,
         systems: {
-          originDrift: {
-            name: 'Origin Drift',
-            description: 'Wander through higher dimensions for evolving quantum patterns',
-            enabledByDefault: false,
-            enabledKey: 'originDriftEnabled',
-            params: {
-              driftAmplitude: {
-                min: 0.01,
-                max: 0.5,
-                default: 0.03,
-                step: 0.01,
-                label: 'Amplitude',
-                description: 'Maximum displacement in extra dimensions',
-              },
-              driftBaseFrequency: {
-                min: 0.01,
-                max: 0.5,
-                default: 0.04,
-                step: 0.01,
-                label: 'Frequency',
-                description: 'Base oscillation frequency',
-              },
-              driftFrequencySpread: {
-                min: 0.0,
-                max: 1.0,
-                default: 0.2,
-                step: 0.05,
-                label: 'Spread',
-                description: 'Per-dimension frequency variation',
-              },
-            },
-          },
-
           sliceAnimation: {
             name: 'Slice Animation',
             description: 'Animate through higher-dimensional slices (4D+ only)',

@@ -1,26 +1,25 @@
-import { useMemo, useState, type FC } from 'react';
-import { useAnimationStore, MIN_SPEED, MAX_SPEED, type AnimationState } from '@/stores/animationStore';
-import { useUIStore } from '@/stores/uiStore';
-import { MIN_ANIMATION_BIAS, MAX_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { getRotationPlanes } from '@/lib/math';
-import { useShallow } from 'zustand/react/shallow';
-import { AnimatePresence, m } from 'motion/react';
+import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
 import { Slider } from '@/components/ui/Slider';
+import { ToggleButton } from '@/components/ui/ToggleButton';
+import { getConfigStoreKey, hasTimelineControls } from '@/lib/geometry/registry';
+import { getRotationPlanes } from '@/lib/math';
+import { MAX_SPEED, MIN_SPEED, useAnimationStore, type AnimationState } from '@/stores/animationStore';
+import { MAX_ANIMATION_BIAS, MIN_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults';
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
+import { useGeometryStore } from '@/stores/geometryStore';
+import { useUIStore } from '@/stores/uiStore';
+import { AnimatePresence, m } from 'motion/react';
+import { useMemo, useState, type FC } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { BlackHoleAnimationDrawer } from './TimelineControls/BlackHoleAnimationDrawer';
-import { JuliaAnimationDrawer } from './TimelineControls/JuliaAnimationDrawer';
 import { MandelbulbAnimationDrawer } from './TimelineControls/MandelbulbAnimationDrawer';
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer';
-import { hasTimelineControls, getConfigStoreKey } from '@/lib/geometry/registry';
-import { Icon } from '@/components/ui/Icon';
-import { Button } from '@/components/ui/Button';
-import { ToggleButton } from '@/components/ui/ToggleButton';
 
 export const TimelineControls: FC = () => {
     const dimension = useGeometryStore((state) => state.dimension);
     const objectType = useGeometryStore((state) => state.objectType);
-    
+
     // Animation Store
     const animationSelector = useShallow((state: AnimationState) => ({
         isPlaying: state.isPlaying,
@@ -35,7 +34,7 @@ export const TimelineControls: FC = () => {
         randomizePlanes: state.randomizePlanes,
         clearAllPlanes: state.clearAllPlanes,
     }));
-    
+
     const {
         isPlaying,
         speed,
@@ -58,9 +57,9 @@ export const TimelineControls: FC = () => {
     );
 
     // Extended object configs for animation state checking
+    // NOTE: quaternionJulia has no animations - shape morphing is achieved via 4D+ rotation
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
         mandelbulbConfig: state.mandelbulb,
-        quaternionJuliaConfig: state.quaternionJulia,
         schroedingerConfig: state.schroedinger,
         blackholeConfig: state.blackhole,
     }));
@@ -83,8 +82,6 @@ export const TimelineControls: FC = () => {
         return [
           mandelbulbConfig.powerAnimationEnabled,
           mandelbulbConfig.alternatePowerEnabled,
-          mandelbulbConfig.dimensionMixEnabled,
-          mandelbulbConfig.originDriftEnabled,
           mandelbulbConfig.sliceAnimationEnabled,
           mandelbulbConfig.phaseShiftEnabled,
         ].filter(Boolean).length;
@@ -95,14 +92,12 @@ export const TimelineControls: FC = () => {
       case 'schroedinger':
         return [
           schroedingerConfig.curlEnabled,
-          schroedingerConfig.originDriftEnabled,
           schroedingerConfig.sliceAnimationEnabled,
           schroedingerConfig.spreadAnimationEnabled,
         ].filter(Boolean).length;
 
       case 'blackhole':
         return [
-          blackholeConfig.swirlAnimationEnabled,
           blackholeConfig.pulseEnabled,
         ].filter(Boolean).length;
 
@@ -113,15 +108,11 @@ export const TimelineControls: FC = () => {
     objectType,
     mandelbulbConfig.powerAnimationEnabled,
     mandelbulbConfig.alternatePowerEnabled,
-    mandelbulbConfig.dimensionMixEnabled,
-    mandelbulbConfig.originDriftEnabled,
     mandelbulbConfig.sliceAnimationEnabled,
     mandelbulbConfig.phaseShiftEnabled,
     schroedingerConfig.curlEnabled,
-    schroedingerConfig.originDriftEnabled,
     schroedingerConfig.sliceAnimationEnabled,
     schroedingerConfig.spreadAnimationEnabled,
-    blackholeConfig.swirlAnimationEnabled,
     blackholeConfig.pulseEnabled,
   ]);
 
@@ -188,7 +179,7 @@ export const TimelineControls: FC = () => {
                                     </Button>
                                 </div>
                             </div>
-                            
+
                             <div className="flex flex-wrap gap-2 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-panel-border">
                                 {planes.map((plane) => {
                                     const isActive = animatingPlanes.has(plane.name);
@@ -226,10 +217,8 @@ export const TimelineControls: FC = () => {
                 )}
 
 
-      {/* Quaternion Julia Animation Drawer */}
-      {showFractalAnim && getConfigStoreKey(objectType) === 'quaternionJulia' && (
-        <JuliaAnimationDrawer onClose={() => setShowFractalAnim(false)} />
-      )}
+      {/* NOTE: Quaternion Julia has no animation drawer - smooth shape morphing
+          is achieved via 4D+ rotation (handled by the rotation system) */}
 
       {/* Mandelbulb/Mandelbulb Fractal Animation Drawer */}
       {showFractalAnim && getConfigStoreKey(objectType) === 'mandelbulb' && (

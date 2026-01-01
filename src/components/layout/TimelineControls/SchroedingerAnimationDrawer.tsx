@@ -12,7 +12,6 @@
  * - Time Evolution: Controls the speed of quantum phase evolution (both modes)
  * - Animated Flow: Curl noise turbulence (both modes)
  * - Wavepacket Dispersion: Animates frequency spread (HO mode only)
- * - Origin Drift: Animates the origin in extra dimensions (HO mode only)
  * - Slice Animation: 4D+ only, animates the 4D slice position (HO mode only)
  *
  * @see docs/prd/ndimensional-visualizer.md
@@ -56,11 +55,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     // Spread Animation
     setSpreadAnimationEnabled: state.setSchroedingerSpreadAnimationEnabled,
     setSpreadAnimationSpeed: state.setSchroedingerSpreadAnimationSpeed,
-    // Origin Drift Animation
-    setOriginDriftEnabled: state.setSchroedingerOriginDriftEnabled,
-    setDriftAmplitude: state.setSchroedingerDriftAmplitude,
-    setDriftBaseFrequency: state.setSchroedingerDriftBaseFrequency,
-    setDriftFrequencySpread: state.setSchroedingerDriftFrequencySpread,
     // Slice Animation
     setSliceAnimationEnabled: state.setSchroedingerSliceAnimationEnabled,
     setSliceSpeed: state.setSchroedingerSliceSpeed,
@@ -81,11 +75,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     // Spread Animation (Dispersion) - HO mode only
     setSpreadAnimationEnabled,
     setSpreadAnimationSpeed,
-    // Origin Drift Animation - HO mode only
-    setOriginDriftEnabled,
-    setDriftAmplitude,
-    setDriftBaseFrequency,
-    setDriftFrequencySpread,
     // Slice Animation - HO mode only, 4D+
     setSliceAnimationEnabled,
     setSliceSpeed,
@@ -195,55 +184,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
              />
         </div>
       </div>
-
-      {/* Origin Drift Animation - HO mode only */}
-      {!isHydrogenMode && (
-        <div className="space-y-4" data-testid="animation-panel-originDrift">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Origin Drift
-            </label>
-            <ToggleButton
-              pressed={config.originDriftEnabled}
-              onToggle={() => setOriginDriftEnabled(!config.originDriftEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle origin drift"
-            >
-              {config.originDriftEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-
-          <div className={`space-y-3 ${!config.originDriftEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              <Slider
-                label="Amplitude"
-                min={0.01}
-                max={0.5}
-                step={0.01}
-                value={config.driftAmplitude}
-                onChange={setDriftAmplitude}
-                showValue
-              />
-              <Slider
-                label="Frequency"
-                min={0.01}
-                max={0.5}
-                step={0.01}
-                value={config.driftBaseFrequency}
-                onChange={setDriftBaseFrequency}
-                showValue
-              />
-              <Slider
-                label="Spread"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.driftFrequencySpread}
-                onChange={setDriftFrequencySpread}
-                showValue
-              />
-          </div>
-        </div>
-      )}
 
       {/* Slice Animation - 4D+ and HO mode only */}
       {!isHydrogenMode && dimension >= 4 && (

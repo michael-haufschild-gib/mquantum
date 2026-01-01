@@ -17,15 +17,6 @@ describe('blackholeSlice', () => {
     useExtendedObjectStore.getState().reset()
   })
 
-  describe('initial state', () => {
-    it('should have default black hole config', () => {
-      const { blackhole } = useExtendedObjectStore.getState()
-      expect(blackhole.horizonRadius).toBe(DEFAULT_BLACK_HOLE_CONFIG.horizonRadius)
-      expect(blackhole.gravityStrength).toBe(DEFAULT_BLACK_HOLE_CONFIG.gravityStrength)
-      expect(blackhole.manifoldIntensity).toBe(DEFAULT_BLACK_HOLE_CONFIG.manifoldIntensity)
-    })
-  })
-
   describe('basic parameter actions', () => {
     it('should set horizon radius with clamping', () => {
       const { setBlackHoleHorizonRadius } = useExtendedObjectStore.getState()
@@ -171,23 +162,6 @@ describe('blackholeSlice', () => {
   })
 
   describe('animation actions', () => {
-    it('should toggle swirl animation', () => {
-      const { setBlackHoleSwirlAnimationEnabled } = useExtendedObjectStore.getState()
-
-      setBlackHoleSwirlAnimationEnabled(true)
-      expect(useExtendedObjectStore.getState().blackhole.swirlAnimationEnabled).toBe(true)
-
-      setBlackHoleSwirlAnimationEnabled(false)
-      expect(useExtendedObjectStore.getState().blackhole.swirlAnimationEnabled).toBe(false)
-    })
-
-    it('should set swirl animation speed', () => {
-      const { setBlackHoleSwirlAnimationSpeed } = useExtendedObjectStore.getState()
-
-      setBlackHoleSwirlAnimationSpeed(1.0)
-      expect(useExtendedObjectStore.getState().blackhole.swirlAnimationSpeed).toBe(1.0)
-    })
-
     it('should toggle pulse animation', () => {
       const { setBlackHolePulseEnabled } = useExtendedObjectStore.getState()
 

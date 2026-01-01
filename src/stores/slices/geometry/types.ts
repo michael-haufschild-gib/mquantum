@@ -165,15 +165,6 @@ export interface MandelbulbSliceActions {
   setMandelbulbAlternatePowerEnabled: (enabled: boolean) => void
   setMandelbulbAlternatePowerValue: (power: number) => void
   setMandelbulbAlternatePowerBlend: (blend: number) => void
-  // Dimension Mixing (Technique A)
-  setMandelbulbDimensionMixEnabled: (enabled: boolean) => void
-  setMandelbulbMixIntensity: (intensity: number) => void
-  setMandelbulbMixFrequency: (frequency: number) => void
-  // Origin Drift (Technique C)
-  setMandelbulbOriginDriftEnabled: (enabled: boolean) => void
-  setMandelbulbDriftAmplitude: (amplitude: number) => void
-  setMandelbulbDriftBaseFrequency: (frequency: number) => void
-  setMandelbulbDriftFrequencySpread: (spread: number) => void
   // Slice Animation (4D+ only)
   setMandelbulbSliceAnimationEnabled: (enabled: boolean) => void
   setMandelbulbSliceSpeed: (speed: number) => void
@@ -256,6 +247,8 @@ export interface QuaternionJuliaSliceActions {
   // SDF Render Quality
   setQuaternionJuliaSdfMaxIterations: (value: number) => void
   setQuaternionJuliaSdfSurfaceDistance: (value: number) => void
+  // NOTE: Julia fractals have no animation actions.
+  // Smooth shape morphing is achieved via 4D+ rotation (handled by the rotation system).
 }
 
 export type QuaternionJuliaSlice = QuaternionJuliaSliceState & QuaternionJuliaSliceActions
@@ -400,12 +393,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerIsoEnabled: (enabled: boolean) => void
   setSchroedingerIsoThreshold: (threshold: number) => void
 
-  // Origin Drift Animation
-  setSchroedingerOriginDriftEnabled: (enabled: boolean) => void
-  setSchroedingerDriftAmplitude: (amplitude: number) => void
-  setSchroedingerDriftBaseFrequency: (frequency: number) => void
-  setSchroedingerDriftFrequencySpread: (spread: number) => void
-
   // Slice Animation (4D+ only)
   setSchroedingerSliceAnimationEnabled: (enabled: boolean) => void
   setSchroedingerSliceSpeed: (speed: number) => void
@@ -531,8 +518,6 @@ export interface BlackHoleSliceActions {
   setBlackHoleSceneObjectLensingStrength: (strength: number) => void
 
   // Animation
-  setBlackHoleSwirlAnimationEnabled: (enabled: boolean) => void
-  setBlackHoleSwirlAnimationSpeed: (speed: number) => void
   setBlackHolePulseEnabled: (enabled: boolean) => void
   setBlackHolePulseSpeed: (speed: number) => void
   setBlackHolePulseAmount: (amount: number) => void

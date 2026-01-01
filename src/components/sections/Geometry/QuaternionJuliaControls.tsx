@@ -2,7 +2,6 @@
  * QuaternionJuliaControls Component
  *
  * Controls for configuring n-dimensional Quaternion Julia fractal visualization.
- * Animation controls are located in the TimelineControls drawer (JuliaAnimationDrawer).
  *
  * Features:
  * - Julia constant controls with presets (4D quaternion components)
@@ -16,8 +15,10 @@
  * The Quaternion Julia fractal uses the iteration z = z^n + c where c is a
  * fixed constant (unlike Mandelbulb where c varies with sample position).
  *
+ * NOTE: Julia fractals have no type-specific animations. Smooth shape morphing
+ * is achieved via 4D+ rotation (handled by the rotation system).
+ *
  * @see docs/prd/quaternion-julia-fractal.md
- * @see JuliaAnimationDrawer for animation controls
  */
 
 import React from 'react';

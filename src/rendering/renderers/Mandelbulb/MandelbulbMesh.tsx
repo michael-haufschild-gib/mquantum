@@ -1,4 +1,3 @@
-import { computeDriftedOrigin, type OriginDriftConfig } from '@/lib/animation/originDrift';
 import { createColorCache, updateLinearColorUniform } from '@/rendering/colors/linearCache';
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities';
 import { useTemporalDepthUniforms } from '@/rendering/core/useTemporalDepthUniforms';
@@ -24,7 +23,6 @@ import {
   usePerformanceStore,
 } from '@/stores/performanceStore';
 import { usePostProcessingStore } from '@/stores/postProcessingStore';
-import { useUIStore } from '@/stores/uiStore';
 import { useWebGLContextStore } from '@/stores/webglContextStore';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
@@ -88,17 +86,6 @@ const MandelbulbMesh = () => {
   // Note: Alternate power parameters (alternatePowerEnabled, alternatePowerValue, alternatePowerBlend)
   // are read fresh via getState() in useFrame to avoid stale closure issues
 
-  // Origin drift parameters (Technique C - animate slice origin in extra dims)
-  const originDriftEnabled = useExtendedObjectStore((state) => state.mandelbulb.originDriftEnabled);
-  const driftAmplitude = useExtendedObjectStore((state) => state.mandelbulb.driftAmplitude);
-  const driftBaseFrequency = useExtendedObjectStore((state) => state.mandelbulb.driftBaseFrequency);
-  const driftFrequencySpread = useExtendedObjectStore((state) => state.mandelbulb.driftFrequencySpread);
-
-  // Dimension mixing parameters (Technique A - shear matrix inside iteration)
-  // Note: mixIntensity is read fresh via getState() in useFrame
-  const dimensionMixEnabled = useExtendedObjectStore((state) => state.mandelbulb.dimensionMixEnabled);
-  const mixFrequency = useExtendedObjectStore((state) => state.mandelbulb.mixFrequency);
-
   // Slice Animation parameters (4D+ only - fly through higher-dimensional cross-sections)
   const sliceAnimationEnabled = useExtendedObjectStore((state) => state.mandelbulb.sliceAnimationEnabled);
   const sliceSpeed = useExtendedObjectStore((state) => state.mandelbulb.sliceSpeed);
@@ -108,9 +95,6 @@ const MandelbulbMesh = () => {
   const phaseShiftEnabled = useExtendedObjectStore((state) => state.mandelbulb.phaseShiftEnabled);
   const phaseSpeed = useExtendedObjectStore((state) => state.mandelbulb.phaseSpeed);
   const phaseAmplitude = useExtendedObjectStore((state) => state.mandelbulb.phaseAmplitude);
-
-  // Animation bias for per-dimension variation
-  const animationBias = useUIStore((state) => state.animationBias);
 
   // Get color state from visual store
   const faceColor = useAppearanceStore((state) => state.faceColor);
@@ -156,11 +140,6 @@ const MandelbulbMesh = () => {
       uAlternatePowerEnabled: { value: false },
       uAlternatePowerValue: { value: 4.0 },
       uAlternatePowerBlend: { value: 0.5 },
-
-      // Dimension Mixing uniforms (Technique A - shear matrix)
-      uDimensionMixEnabled: { value: false },
-      uMixIntensity: { value: 0.1 },
-      uMixTime: { value: 0 },  // Animated mix time = animTime * mixFrequency
 
       // Phase Shift uniforms (angular twisting)
       uPhaseEnabled: { value: false },
@@ -396,14 +375,6 @@ const MandelbulbMesh = () => {
           material.uniforms.uAlternatePowerBlend.value = mbConfig.alternatePowerBlend;
         }
 
-        // Dimension Mixing (Technique A): update uniforms for shader-side mixing matrix
-        if (material.uniforms.uDimensionMixEnabled) {
-          material.uniforms.uDimensionMixEnabled.value = mbConfig.dimensionMixEnabled;
-        }
-        if (material.uniforms.uMixIntensity) {
-          material.uniforms.uMixIntensity.value = mbConfig.mixIntensity;
-        }
-
         // Update version ref
         lastMandelbulbVersionRef.current = mandelbulbVersion;
       }
@@ -417,11 +388,6 @@ const MandelbulbMesh = () => {
         const normalized = (Math.sin(t) + 1) / 2; // Maps [-1, 1] to [0, 1]
         const targetPower = powerMin + normalized * (powerMax - powerMin);
         material.uniforms.uPower.value = targetPower;
-      }
-
-      // Dimension mixing time (always update when mixing is enabled)
-      if (dimensionMixEnabled && material.uniforms.uMixTime) {
-        material.uniforms.uMixTime.value = accumulatedTime * mixFrequency * 2 * Math.PI;
       }
 
       // Update camera matrices
@@ -569,9 +535,9 @@ const MandelbulbMesh = () => {
 
       // ============================================
       // Origin Update (separate from basis vectors)
-      // Must update every frame when origin drift or slice animation is enabled
+      // Must update every frame when slice animation is enabled
       // ============================================
-      const needsOriginUpdate = basisChanged || originDriftEnabled || sliceAnimationEnabled;
+      const needsOriginUpdate = basisChanged || sliceAnimationEnabled;
       const { rotationMatrix: cachedRotationMatrix } = rotationUpdates;
 
       if (needsOriginUpdate && cachedRotationMatrix) {
@@ -580,28 +546,7 @@ const MandelbulbMesh = () => {
         // Clear the array before reuse
         originValues.fill(0);
 
-        // Apply origin drift if enabled (Technique C)
-        if (originDriftEnabled && D > 3) {
-          const driftConfig: OriginDriftConfig = {
-            enabled: true,
-            amplitude: driftAmplitude,
-            baseFrequency: driftBaseFrequency,
-            frequencySpread: driftFrequencySpread,
-          };
-          // Get animation speed from store for consistent drift timing
-          const animationSpeed = useAnimationStore.getState().speed;
-          const driftedOrigin = computeDriftedOrigin(
-            parameterValues,
-            accumulatedTime,
-            driftConfig,
-            animationSpeed,
-            animationBias
-          );
-          // Set drifted values for extra dimensions
-          for (let i = 3; i < D; i++) {
-            originValues[i] = driftedOrigin[i - 3] ?? 0;
-          }
-        } else if (sliceAnimationEnabled && D > 3) {
+        if (sliceAnimationEnabled && D > 3) {
           // Slice Animation: animate through higher-dimensional cross-sections
           // Use sine waves with golden ratio phase offsets for organic motion
           const PHI = 1.618033988749895; // Golden ratio
@@ -618,7 +563,7 @@ const MandelbulbMesh = () => {
             originValues[i] = (parameterValues[extraDimIndex] ?? 0) + offset;
           }
         } else {
-          // No drift or slice animation - use static parameter values
+          // No slice animation - use static parameter values
           for (let i = 3; i < D; i++) {
             originValues[i] = parameterValues[i - 3] ?? 0;
           }

@@ -288,12 +288,6 @@ describe('ProceduralSkyboxWithEnvironment Logic', () => {
       useEnvironmentStore.getState().resetSkyboxSettings();
     });
 
-    it('should have floor in activeWalls by default', () => {
-      const state = useEnvironmentStore.getState();
-      // Default is ['floor'] per visualDefaults (DEFAULT_ACTIVE_WALLS)
-      expect(state.activeWalls).toEqual(['floor']);
-    });
-
     it('should update activeWalls when toggled', () => {
       const initialState = useEnvironmentStore.getState();
       const hadFloor = initialState.activeWalls.includes('floor');

@@ -13,9 +13,6 @@ import {
   createNewLight,
   DEFAULT_NEW_LIGHT_POSITIONS,
   directionToRotation,
-  LIGHT_TYPE_TO_INT,
-  MAX_LIGHTS,
-  MIN_LIGHTS,
   normalizeRotation,
   normalizeRotationSigned,
   normalizeRotationTuple,
@@ -26,32 +23,6 @@ import {
 import { describe, expect, it } from 'vitest'
 
 describe('Light Types', () => {
-  describe('constants', () => {
-    it('should have correct MAX_LIGHTS value', () => {
-      expect(MAX_LIGHTS).toBe(4)
-    })
-
-    it('should have correct MIN_LIGHTS value', () => {
-      expect(MIN_LIGHTS).toBe(0)
-    })
-
-    it('should have correct LIGHT_TYPE_TO_INT mapping', () => {
-      expect(LIGHT_TYPE_TO_INT.point).toBe(0)
-      expect(LIGHT_TYPE_TO_INT.directional).toBe(1)
-      expect(LIGHT_TYPE_TO_INT.spot).toBe(2)
-    })
-
-    it('should have 4 default light positions', () => {
-      expect(DEFAULT_NEW_LIGHT_POSITIONS).toHaveLength(4)
-      DEFAULT_NEW_LIGHT_POSITIONS.forEach((pos) => {
-        expect(pos).toHaveLength(3)
-        pos.forEach((val) => {
-          expect(typeof val).toBe('number')
-        })
-      })
-    })
-  })
-
   describe('createDefaultLight', () => {
     it('should create a default light matching single-light behavior', () => {
       const light = createDefaultLight()

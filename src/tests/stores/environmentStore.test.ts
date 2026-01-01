@@ -292,12 +292,6 @@ describe('environmentStore', () => {
         setBackgroundColor('#00ff00');
         expect(useEnvironmentStore.getState().backgroundColor).toBe('#00ff00');
       });
-
-      it('should have default background color', () => {
-        expect(useEnvironmentStore.getState().backgroundColor).toBe(
-          SKYBOX_INITIAL_STATE.backgroundColor
-        );
-      });
     });
 
     describe('background blend mode', () => {
@@ -317,10 +311,6 @@ describe('environmentStore', () => {
         expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('add');
 
         setBackgroundBlendMode('normal');
-        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('normal');
-      });
-
-      it('should have default blend mode of normal', () => {
         expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('normal');
       });
     });

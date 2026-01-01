@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
-import { m, AnimatePresence } from 'motion/react';
-import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts';
-import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
-import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/Button';
+import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
+import { AnimatePresence, m } from 'motion/react';
+import React, { useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 export const ShortcutsOverlay: React.FC = () => {
   const isMobile = useIsMobile();
@@ -14,11 +14,6 @@ export const ShortcutsOverlay: React.FC = () => {
       setShowShortcuts: state.setShowShortcuts
     }))
   );
-
-  // Don't render on mobile devices - keyboard shortcuts are not useful without a physical keyboard
-  if (isMobile) {
-    return null;
-  }
 
   // Close on Escape
   useEffect(() => {
@@ -30,6 +25,11 @@ export const ShortcutsOverlay: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showShortcuts, setShowShortcuts]);
+
+  // Don't render on mobile devices - keyboard shortcuts are not useful without a physical keyboard
+  if (isMobile) {
+    return null;
+  }
 
   return (
     <AnimatePresence>

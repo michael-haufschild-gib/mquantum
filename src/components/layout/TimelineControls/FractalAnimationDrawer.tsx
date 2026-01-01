@@ -30,7 +30,7 @@ import { AnimationSystemPanel } from './AnimationSystemPanel';
 
 /**
  * Gets a value from a nested path in an object
- * Supports paths like 'powerAnimation.minPower' and 'originDriftEnabled'
+ * Supports paths like 'powerAnimation.minPower' and 'sliceAnimationEnabled'
  * @param obj - The object to read from
  * @param path - Dot-separated path to the value
  * @returns The value at the path or undefined if not found
@@ -53,7 +53,7 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
  * Maps animation system parameters to store values
  *
  * The registry defines parameter keys which may be:
- * - Flat keys like 'originDriftAmplitude'
+ * - Flat keys like 'sliceAmplitude'
  * - Nested paths like 'powerAnimation.minPower'
  *
  * This function extracts current values from the config store.
@@ -80,7 +80,7 @@ function extractParamValues(
 
 /**
  * Gets the enabled state for an animation system from config
- * Supports both flat keys (e.g., 'originDriftEnabled')
+ * Supports both flat keys (e.g., 'sliceAnimationEnabled')
  * and nested paths (e.g., 'juliaConstantAnimation.enabled')
  * @param config - Animation configuration object
  * @param system - Animation system definition
@@ -141,23 +141,6 @@ export const FractalAnimationDrawer: React.FC = React.memo(() => {
         if (currentConfigKey === 'mandelbulb') {
           // Mandelbulb uses flat keys: 'powerMin' → 'setMandelbulbPowerMin'
           setterName = `setMandelbulb${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-        } else if (currentConfigKey === 'quaternionJulia') {
-          // Quaternion Julia has both flat and nested keys
-          // Nested: 'juliaConstantAnimation.enabled' → 'setQuaternionJuliaConstantAnimationEnabled'
-          // Nested: 'powerAnimation.minPower' → 'setQuaternionJuliaPowerAnimationMinPower'
-          // Flat: 'originDriftEnabled' → 'setQuaternionJuliaOriginDriftEnabled'
-
-          if (key.includes('.')) {
-            // Nested path - convert 'powerAnimation.minPower' to 'PowerAnimationMinPower'
-            const parts = key.split('.');
-            const camelParts = parts.map(
-              (part) => part.charAt(0).toUpperCase() + part.slice(1)
-            );
-            setterName = `setQuaternionJulia${camelParts.join('')}`;
-          } else {
-            // Flat key
-            setterName = `setQuaternionJulia${key.charAt(0).toUpperCase()}${key.slice(1)}`;
-          }
         } else if (currentConfigKey === 'schroedinger') {
           // Schroedinger uses flat keys like mandelbulb
           setterName = `setSchroedinger${key.charAt(0).toUpperCase()}${key.slice(1)}`;

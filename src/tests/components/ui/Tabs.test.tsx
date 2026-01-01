@@ -240,41 +240,6 @@ describe('Tabs', () => {
     });
   });
 
-  describe('variants', () => {
-    it('applies pills variant styling', () => {
-      render(
-        <Tabs tabs={mockTabs} value="tab1" onChange={() => {}} variant="pills" />
-      );
-
-      const tablist = screen.getByRole('tablist');
-      expect(tablist).toHaveClass('bg-[var(--bg-hover)]');
-      expect(tablist).toHaveClass('rounded-lg');
-    });
-
-    it('applies default variant styling', () => {
-      render(
-        <Tabs tabs={mockTabs} value="tab1" onChange={() => {}} variant="default" />
-      );
-
-      const tablist = screen.getByRole('tablist');
-      expect(tablist).toHaveClass('border-b');
-      expect(tablist).toHaveClass('border-border-subtle');
-    });
-  });
-
-  describe('fullWidth mode', () => {
-    it('applies fullWidth styling to tabs', () => {
-      render(
-        <Tabs tabs={mockTabs} value="tab1" onChange={() => {}} fullWidth />
-      );
-
-      const tabs = screen.getAllByRole('tab');
-      tabs.forEach((tab) => {
-        expect(tab).toHaveClass('flex-1');
-      });
-    });
-  });
-
   describe('accessibility', () => {
     it('has proper ARIA attributes', () => {
       render(

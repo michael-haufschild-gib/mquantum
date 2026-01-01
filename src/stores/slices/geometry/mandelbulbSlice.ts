@@ -344,60 +344,6 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
     }))
   },
 
-  // --- Dimension Mixing Actions (Technique A) ---
-  setMandelbulbDimensionMixEnabled: (enabled) => {
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, dimensionMixEnabled: enabled },
-    }))
-  },
-
-  setMandelbulbMixIntensity: (intensity) => {
-    // Range 0.0 to 0.3
-    const clampedIntensity = Math.max(0.0, Math.min(0.3, intensity))
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, mixIntensity: clampedIntensity },
-    }))
-  },
-
-  setMandelbulbMixFrequency: (frequency) => {
-    // Range 0.1 to 2.0
-    const clampedFrequency = Math.max(0.1, Math.min(2.0, frequency))
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, mixFrequency: clampedFrequency },
-    }))
-  },
-
-  // --- Origin Drift Actions (Technique C) ---
-  setMandelbulbOriginDriftEnabled: (enabled) => {
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, originDriftEnabled: enabled },
-    }))
-  },
-
-  setMandelbulbDriftAmplitude: (amplitude) => {
-    // Range 0.01 to 0.5
-    const clampedAmplitude = Math.max(0.01, Math.min(0.5, amplitude))
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, driftAmplitude: clampedAmplitude },
-    }))
-  },
-
-  setMandelbulbDriftBaseFrequency: (frequency) => {
-    // Range 0.01 to 0.5 (allow very slow animations to avoid jitter)
-    const clampedFrequency = Math.max(0.01, Math.min(0.5, frequency))
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, driftBaseFrequency: clampedFrequency },
-    }))
-  },
-
-  setMandelbulbDriftFrequencySpread: (spread) => {
-    // Range 0.0 to 1.0
-    const clampedSpread = Math.max(0.0, Math.min(1.0, spread))
-    setWithVersion((state) => ({
-      mandelbulb: { ...state.mandelbulb, driftFrequencySpread: clampedSpread },
-    }))
-  },
-
   // --- Slice Animation Actions (4D+ only) ---
   setMandelbulbSliceAnimationEnabled: (enabled) => {
     setWithVersion((state) => ({

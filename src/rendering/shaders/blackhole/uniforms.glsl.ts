@@ -106,8 +106,6 @@ uniform int uMotionBlurSamples;     // Blur sample count
 uniform float uMotionBlurRadialFalloff; // Radial falloff
 
 // Animation state
-uniform bool uSwirlAnimationEnabled; // Enable swirl animation
-uniform float uSwirlAnimationSpeed;  // Swirl animation speed
 uniform bool uPulseEnabled;          // Enable pulse animation
 uniform float uPulseSpeed;           // Pulse speed
 uniform float uPulseAmount;          // Pulse amount

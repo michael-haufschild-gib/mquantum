@@ -332,4 +332,6 @@ export const createQuaternionJuliaSlice: StateCreator<
       quaternionJulia: { ...state.quaternionJulia, sdfSurfaceDistance: clamped },
     }))
   },
+  // NOTE: Julia fractals have no animation actions.
+  // Smooth shape morphing is achieved via 4D+ rotation (handled by the rotation system).
 }}

@@ -128,17 +128,33 @@ export const Popover: React.FC<PopoverProps> = ({
         left = triggerRect.left + (triggerRect.width / 2) - (popoverRect.width / 2);
       }
 
-      // Viewport Collision Detection (Basic)
+      // Viewport Collision Detection
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
+      const margin = 8;
 
-      // Flip to top if bottom overflows
-      if (side === 'bottom' && top + popoverRect.height > viewportHeight) {
-        top = triggerRect.top - popoverRect.height - offset;
+      // Calculate available space in each direction
+      const spaceBelow = viewportHeight - triggerRect.bottom - offset;
+      const spaceAbove = triggerRect.top - offset;
+
+      // Smart vertical positioning: flip if needed and beneficial
+      if (side === 'bottom') {
+        if (popoverRect.height > spaceBelow && spaceAbove > spaceBelow) {
+          // Flip to top if more space available above
+          top = triggerRect.top - popoverRect.height - offset;
+        }
+      } else {
+        if (popoverRect.height > spaceAbove && spaceBelow > spaceAbove) {
+          // Flip to bottom if more space available below
+          top = triggerRect.bottom + offset;
+        }
       }
 
-      // Clamp left
-      left = Math.max(8, Math.min(left, viewportWidth - popoverRect.width - 8));
+      // Clamp vertical position to keep within viewport bounds
+      top = Math.max(margin, Math.min(top, viewportHeight - popoverRect.height - margin));
+
+      // Clamp horizontal position to keep within viewport bounds
+      left = Math.max(margin, Math.min(left, viewportWidth - popoverRect.width - margin));
 
       setCoords({ top, left });
     }
@@ -146,9 +162,39 @@ export const Popover: React.FC<PopoverProps> = ({
 
   useLayoutEffect(() => {
     if (isOpen) {
+      // Initial position (may have zero dimensions)
       updatePosition();
+
+      // Re-position after content renders and has actual dimensions
+      // Use double rAF to ensure content is painted before measuring
+      let rafId: number;
+      const reposition = () => {
+        rafId = requestAnimationFrame(() => {
+          rafId = requestAnimationFrame(() => {
+            updatePosition();
+          });
+        });
+      };
+      reposition();
+
+      // Use ResizeObserver to reposition when content dimensions change
+      let resizeObserver: ResizeObserver | null = null;
+      if (popoverRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          updatePosition();
+        });
+        resizeObserver.observe(popoverRef.current);
+      }
+
       window.addEventListener('resize', updatePosition);
       window.addEventListener('scroll', updatePosition, true); // Capture phase for nested scrolls
+
+      return () => {
+        cancelAnimationFrame(rafId);
+        resizeObserver?.disconnect();
+        window.removeEventListener('resize', updatePosition);
+        window.removeEventListener('scroll', updatePosition, true);
+      };
     }
     return () => {
       window.removeEventListener('resize', updatePosition);

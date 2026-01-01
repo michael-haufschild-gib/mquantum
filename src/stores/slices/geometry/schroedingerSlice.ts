@@ -760,34 +760,6 @@ export const createSchroedingerSlice: StateCreator<ExtendedObjectSlice, [], [], 
     }))
   },
 
-  // === Origin Drift Animation ===
-  setSchroedingerOriginDriftEnabled: (enabled) => {
-    setWithVersion((state) => ({
-      schroedinger: { ...state.schroedinger, originDriftEnabled: enabled },
-    }))
-  },
-
-  setSchroedingerDriftAmplitude: (amplitude) => {
-    const clampedAmplitude = Math.max(0.01, Math.min(0.5, amplitude))
-    setWithVersion((state) => ({
-      schroedinger: { ...state.schroedinger, driftAmplitude: clampedAmplitude },
-    }))
-  },
-
-  setSchroedingerDriftBaseFrequency: (frequency) => {
-    const clampedFrequency = Math.max(0.05, Math.min(0.5, frequency))
-    setWithVersion((state) => ({
-      schroedinger: { ...state.schroedinger, driftBaseFrequency: clampedFrequency },
-    }))
-  },
-
-  setSchroedingerDriftFrequencySpread: (spread) => {
-    const clampedSpread = Math.max(0.0, Math.min(1.0, spread))
-    setWithVersion((state) => ({
-      schroedinger: { ...state.schroedinger, driftFrequencySpread: clampedSpread },
-    }))
-  },
-
   // === Slice Animation (4D+ only) ===
   setSchroedingerSliceAnimationEnabled: (enabled) => {
     setWithVersion((state) => ({

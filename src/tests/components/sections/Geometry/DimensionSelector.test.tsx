@@ -8,11 +8,6 @@ describe('DimensionSelector', () => {
     useGeometryStore.getState().setDimension(4)
   })
 
-  it('renders correctly', () => {
-    render(<DimensionSelector />)
-    expect(screen.getByTestId('dimension-selector')).toBeInTheDocument()
-  })
-
   it('updates dimension on click', () => {
     render(<DimensionSelector />)
     

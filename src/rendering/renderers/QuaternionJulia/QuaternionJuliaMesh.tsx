@@ -283,7 +283,7 @@ const QuaternionJuliaMesh = () => {
     // DIRTY-FLAG: Only update quaternionJulia uniforms when settings change
     // ============================================
     if (quaternionJuliaChanged) {
-      // Update fractal parameters
+      // Update fractal parameters (may be overridden by animation below)
       u.uPower.value = config.power
       u.uIterations.value = config.maxIterations
       u.uEscapeRadius.value = config.bailoutRadius
@@ -314,6 +314,8 @@ const QuaternionJuliaMesh = () => {
 
     // ============================================
     // Origin Update (separate from basis vectors)
+    // NOTE: Julia fractals have no animation - smooth shape morphing
+    // is achieved via 4D+ rotation (handled by the rotation system).
     // ============================================
     if (basisChanged) {
       // Build origin values array for rotation (using pre-allocated array)

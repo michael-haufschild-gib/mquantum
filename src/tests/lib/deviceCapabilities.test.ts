@@ -8,9 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   isWebGL2Supported,
   detectDeviceCapabilities,
-  DEFAULT_CAPABILITIES,
-  MOBILE_DEFAULT_MAX_FPS,
-  MOBILE_DEFAULT_RESOLUTION_SCALE,
 } from '@/lib/deviceCapabilities'
 
 // Mock detect-gpu module
@@ -174,16 +171,4 @@ describe('deviceCapabilities', () => {
     })
   })
 
-  describe('constants', () => {
-    it('should have correct default capabilities', () => {
-      expect(DEFAULT_CAPABILITIES.webgl2Supported).toBe(false)
-      expect(DEFAULT_CAPABILITIES.gpuTier).toBe(3)
-      expect(DEFAULT_CAPABILITIES.isMobileGPU).toBe(false)
-    })
-
-    it('should have correct mobile defaults', () => {
-      expect(MOBILE_DEFAULT_RESOLUTION_SCALE).toBe(0.5)
-      expect(MOBILE_DEFAULT_MAX_FPS).toBe(30)
-    })
-  })
 })

@@ -25,10 +25,10 @@ import { useFrame, useThree } from '@react-three/fiber'
 import React, { useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
 import {
-    LIGHTING_MODE_MAP,
-    MANIFOLD_TYPE_MAP,
-    PALETTE_MODE_MAP,
-    RAY_BENDING_MODE_MAP,
+  LIGHTING_MODE_MAP,
+  MANIFOLD_TYPE_MAP,
+  PALETTE_MODE_MAP,
+  RAY_BENDING_MODE_MAP,
 } from './types'
 
 /**
@@ -157,7 +157,11 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     // Sync critical ray bending uniforms from store
     setUniform(u, 'uHorizonRadius', bhState.horizonRadius)
     // Compute visual event horizon on-demand from horizonRadius and spin (Kerr physics)
-    setUniform(u, 'uVisualEventHorizon', computeVisualEventHorizon(bhState.horizonRadius, bhState.spin))
+    setUniform(
+      u,
+      'uVisualEventHorizon',
+      computeVisualEventHorizon(bhState.horizonRadius, bhState.spin)
+    )
     setUniform(u, 'uSpin', bhState.spin)
     setUniform(u, 'uDiskTemperature', bhState.diskTemperature)
     // Use GLOBAL gravity settings from postProcessingStore (controlled by UI slider)
@@ -425,7 +429,11 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       // Update black hole uniforms (Kerr physics)
       setUniform(u, 'uHorizonRadius', bhState.horizonRadius)
       // Compute visual event horizon on-demand from horizonRadius and spin (Kerr physics)
-      setUniform(u, 'uVisualEventHorizon', computeVisualEventHorizon(bhState.horizonRadius, bhState.spin))
+      setUniform(
+        u,
+        'uVisualEventHorizon',
+        computeVisualEventHorizon(bhState.horizonRadius, bhState.spin)
+      )
       setUniform(u, 'uSpin', bhState.spin)
       setUniform(u, 'uDiskTemperature', bhState.diskTemperature)
       // ManifoldIntensity is for accretion disk, NOT gravity - keep from bhState
@@ -518,8 +526,6 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       // Animation flags and speeds (static config, not per-frame)
       setUniform(u, 'uDopplerEnabled', bhState.dopplerEnabled)
       setUniform(u, 'uDopplerStrength', bhState.dopplerStrength)
-      setUniform(u, 'uSwirlAnimationEnabled', bhState.swirlAnimationEnabled)
-      setUniform(u, 'uSwirlAnimationSpeed', bhState.swirlAnimationSpeed)
       setUniform(u, 'uPulseEnabled', bhState.pulseEnabled)
       setUniform(u, 'uPulseSpeed', bhState.pulseSpeed)
       setUniform(u, 'uPulseAmount', bhState.pulseAmount)

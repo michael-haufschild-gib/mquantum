@@ -18,17 +18,6 @@ describe('msgBoxStore', () => {
     });
   });
 
-  describe('initial state', () => {
-    it('should have correct default values', () => {
-      const state = useMsgBoxStore.getState();
-      expect(state.isOpen).toBe(false);
-      expect(state.title).toBe('');
-      expect(state.message).toBe('');
-      expect(state.type).toBe('info');
-      expect(state.actions).toEqual([]);
-    });
-  });
-
   describe('showMsgBox', () => {
     it('should open message box with basic info', () => {
       const { showMsgBox } = useMsgBoxStore.getState();

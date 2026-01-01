@@ -5,19 +5,18 @@
  * TimelineControls bottom drawer.
  *
  * Animation Systems:
- * - Swirl Animation: Animates the manifold swirl pattern
  * - Pulse Animation: Pulsating manifold intensity
  * - Slice Animation: 4D+ only, animates dimensional slices
  *
  * @see docs/prd/ndimensional-visualizer.md
  */
 
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Slider } from '@/components/ui/Slider';
+import { ToggleButton } from '@/components/ui/ToggleButton';
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
-import { ToggleButton } from '@/components/ui/ToggleButton';
-import { Slider } from '@/components/ui/Slider';
+import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { AnimationDrawerContainer } from './AnimationDrawerContainer';
 
 export interface BlackHoleAnimationDrawerProps {
@@ -42,9 +41,7 @@ export const BlackHoleAnimationDrawer: React.FC<BlackHoleAnimationDrawerProps> =
     config: state.blackhole,
     // Time Scale
     setTimeScale: state.setBlackHoleTimeScale,
-    // Swirl Animation
-    setSwirlAnimationEnabled: state.setBlackHoleSwirlAnimationEnabled,
-    setSwirlAnimationSpeed: state.setBlackHoleSwirlAnimationSpeed,
+    // Swirl Amount (visual pattern intensity)
     setSwirlAmount: state.setBlackHoleSwirlAmount,
     // Pulse Animation
     setPulseEnabled: state.setBlackHolePulseEnabled,
@@ -59,8 +56,6 @@ export const BlackHoleAnimationDrawer: React.FC<BlackHoleAnimationDrawerProps> =
   const {
     config,
     setTimeScale,
-    setSwirlAnimationEnabled,
-    setSwirlAnimationSpeed,
     setSwirlAmount,
     setPulseEnabled,
     setPulseSpeed,
@@ -131,31 +126,14 @@ export const BlackHoleAnimationDrawer: React.FC<BlackHoleAnimationDrawerProps> =
         </div>
       )}
 
-      {/* Swirl Animation (Manifold Rotation) */}
+      {/* Swirl Amount (Spiral pattern intensity) */}
       <div className="space-y-4" data-testid="animation-panel-swirl">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-            Manifold Swirl
+            Swirl Pattern
           </label>
-          <ToggleButton
-            pressed={config.swirlAnimationEnabled}
-            onToggle={() => setSwirlAnimationEnabled(!config.swirlAnimationEnabled)}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle swirl animation"
-          >
-            {config.swirlAnimationEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
         </div>
-        <div className={`space-y-3 ${!config.swirlAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-          <Slider
-            label="Speed"
-            min={0.1}
-            max={2.0}
-            step={0.1}
-            value={config.swirlAnimationSpeed}
-            onChange={setSwirlAnimationSpeed}
-            showValue
-          />
+        <div className="space-y-3">
           <Slider
             label="Amount"
             min={0}

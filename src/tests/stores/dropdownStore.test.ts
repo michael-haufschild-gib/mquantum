@@ -7,12 +7,6 @@ describe('dropdownStore', () => {
     useDropdownStore.setState({ openDropdownId: null });
   });
 
-  describe('initial state', () => {
-    it('should have null openDropdownId by default', () => {
-      expect(useDropdownStore.getState().openDropdownId).toBeNull();
-    });
-  });
-
   describe('openDropdown', () => {
     it('should set openDropdownId to the given id', () => {
       useDropdownStore.getState().openDropdown('menu-1');

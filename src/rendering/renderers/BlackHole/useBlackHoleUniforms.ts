@@ -152,8 +152,6 @@ export function useBlackHoleUniforms() {
       uDopplerHueShift: { value: 0.1 },
 
       // Animation
-      uSwirlAnimationEnabled: { value: false },
-      uSwirlAnimationSpeed: { value: 0.5 },
       uPulseEnabled: { value: false },
       uPulseSpeed: { value: 0.3 },
       uPulseAmount: { value: 0.2 },

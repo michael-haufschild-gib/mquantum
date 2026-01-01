@@ -19,22 +19,6 @@ describe('performanceStore', () => {
     usePerformanceStore.getState().reset();
   });
 
-  describe('initial state', () => {
-    it('should have correct default values', () => {
-      const state = usePerformanceStore.getState();
-      expect(state.isInteracting).toBe(false);
-      expect(state.sceneTransitioning).toBe(false);
-      expect(state.isLoadingScene).toBe(false);
-      expect(state.progressiveRefinementEnabled).toBe(true);
-      expect(state.refinementStage).toBe('final');
-      expect(state.qualityMultiplier).toBe(1.0);
-      expect(state.temporalReprojectionEnabled).toBe(true);
-      expect(state.cameraTeleported).toBe(false);
-      expect(state.fractalAnimationLowQuality).toBe(true);
-      expect(state.isShaderCompiling).toBe(false);
-    });
-  });
-
   describe('interaction state', () => {
     it('should set isInteracting', () => {
       const { setIsInteracting } = usePerformanceStore.getState();

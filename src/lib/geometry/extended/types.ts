@@ -490,51 +490,6 @@ export interface MandelbulbConfig {
    */
   alternatePowerBlend: number
 
-  // === Dimension Mixing Animation (Technique A) ===
-
-  /**
-   * Enable/disable dimension mixing inside iteration.
-   * Applies a time-varying shear matrix to create morphing during rotation.
-   */
-  dimensionMixEnabled: boolean
-
-  /**
-   * Strength of off-diagonal mixing (0.0 to 0.3, default 0.1).
-   * Higher values create more dramatic cross-dimensional coupling.
-   */
-  mixIntensity: number
-
-  /**
-   * How fast the mixing matrix evolves (0.1 to 2.0, default 0.5).
-   * Multiplied by global animation speed.
-   */
-  mixFrequency: number
-
-  // === Origin Drift Animation (Technique C) ===
-
-  /**
-   * Enable/disable origin drift in extra dimensions.
-   * Creates slow multi-frequency wandering for feature birth/death effects.
-   */
-  originDriftEnabled: boolean
-
-  /**
-   * Maximum displacement in extra dimensions (0.01 to 0.5, default 0.1).
-   */
-  driftAmplitude: number
-
-  /**
-   * Base oscillation frequency in Hz (0.05 to 0.5, default 0.1).
-   * Multiplied by global animation speed.
-   */
-  driftBaseFrequency: number
-
-  /**
-   * Per-dimension frequency variation (0.0 to 1.0, default 0.3).
-   * Higher values create more beating patterns between dimensions.
-   */
-  driftFrequencySpread: number
-
   // === Slice Animation (4D+ only) ===
 
   /**
@@ -652,16 +607,6 @@ export const DEFAULT_MANDELBROT_CONFIG: MandelbulbConfig = {
   alternatePowerEnabled: false,
   alternatePowerValue: 4.0,
   alternatePowerBlend: 0.5,
-  // Dimension Mixing defaults (Technique A)
-  dimensionMixEnabled: false,
-  mixIntensity: 0.1,
-  mixFrequency: 0.5,
-  // Origin Drift defaults (Technique C)
-  // NOTE: Conservative defaults for smooth, slow morphing
-  originDriftEnabled: false,
-  driftAmplitude: 0.03, // Very subtle displacement to avoid jitter
-  driftBaseFrequency: 0.04, // Slow oscillation (~25 second cycle)
-  driftFrequencySpread: 0.2, // Moderate phase spread
   // Slice Animation defaults (4D+ only)
   sliceAnimationEnabled: false,
   sliceSpeed: 0.02, // Slow movement through slices
@@ -1004,16 +949,6 @@ export interface SchroedingerConfig {
   /** Log-density threshold for isosurface (-6 to 0) */
   isoThreshold: number
 
-  // === Origin Drift Animation ===
-  /** Enable multi-frequency wandering in extra dimensions */
-  originDriftEnabled: boolean
-  /** Drift amplitude (0.01-0.5) */
-  driftAmplitude: number
-  /** Base frequency for drift (0.05-0.5) */
-  driftBaseFrequency: number
-  /** Frequency spread between dimensions (0-1) */
-  driftFrequencySpread: number
-
   // === Slice Animation (4D+ only) ===
   /** Enable slice animation through extra dimensions */
   sliceAnimationEnabled: boolean
@@ -1177,12 +1112,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   isoEnabled: false,
   isoThreshold: -0.76,
 
-  // Origin Drift
-  originDriftEnabled: false,
-  driftAmplitude: 0.03,
-  driftBaseFrequency: 0.04,
-  driftFrequencySpread: 0.2,
-
   // Slice Animation
   sliceAnimationEnabled: false,
   sliceSpeed: 0.02,
@@ -1339,6 +1268,8 @@ export interface QuaternionJuliaConfig {
   fogContribution: number
   /** Internal fog density (0.0-1.0) */
   internalFogDensity: number
+  // NOTE: Julia fractals have no animation properties.
+  // Smooth shape morphing is achieved via 4D+ rotation (handled by the rotation system).
 }
 
 /**
@@ -1411,6 +1342,8 @@ export const DEFAULT_QUATERNION_JULIA_CONFIG: QuaternionJuliaConfig = {
   fogEnabled: false,
   fogContribution: 1.0,
   internalFogDensity: 0.0,
+  // NOTE: Julia fractals have no animation properties.
+  // Smooth shape morphing is achieved via 4D+ rotation (handled by the rotation system).
 }
 
 // ============================================================================
@@ -1672,10 +1605,6 @@ export interface BlackHoleConfig {
   sceneObjectLensingStrength: number
 
   // === ANIMATION ===
-  /** Swirl animation enabled */
-  swirlAnimationEnabled: boolean
-  /** Swirl animation speed (0-2, default 0.5) */
-  swirlAnimationSpeed: number
   /** Manifold pulse animation enabled */
   pulseEnabled: boolean
   /** Pulse animation speed (0-2, default 0.3) */
@@ -1697,7 +1626,6 @@ export interface BlackHoleConfig {
    * 1 = full Keplerian (ω ∝ r^-1.5, inner ~3x faster than outer)
    */
   keplerianDifferential: number
-
 }
 
 /**
@@ -1846,8 +1774,6 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
   sceneObjectLensingStrength: 1.0,
 
   // Animation
-  swirlAnimationEnabled: false,
-  swirlAnimationSpeed: 0.5,
   pulseEnabled: false,
   pulseSpeed: 0.3,
   pulseAmount: 0.2,

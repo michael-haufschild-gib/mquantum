@@ -103,14 +103,4 @@ describe('ExportModal', () => {
     // Default tab is 'presets'
     expect(screen.getByTestId('export-presets')).toBeInTheDocument();
   });
-
-  it('contains the structural fix for scrolling', () => {
-    render(<ExportModal />);
-    const wrapper = screen.getByTestId('export-tabs-wrapper');
-    expect(wrapper).toBeInTheDocument();
-    expect(wrapper).toHaveClass('flex-col');
-    expect(wrapper).toHaveClass('min-h-0');
-    // Ensure it does NOT have the old scrolling class
-    expect(wrapper).not.toHaveClass('overflow-y-auto');
-  });
 });

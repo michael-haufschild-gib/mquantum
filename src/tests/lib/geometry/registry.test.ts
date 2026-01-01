@@ -144,9 +144,11 @@ describe('Object Type Registry', () => {
   });
 
   describe('Animation Capabilities', () => {
-    it('hasTypeSpecificAnimations returns true for fractals', () => {
+    it('hasTypeSpecificAnimations returns true for fractals with animations', () => {
       expect(hasTypeSpecificAnimations('mandelbulb')).toBe(true);
-      expect(hasTypeSpecificAnimations('quaternion-julia')).toBe(true);
+      // NOTE: quaternion-julia has no type-specific animations
+      // Smooth shape morphing is achieved via 4D+ rotation
+      expect(hasTypeSpecificAnimations('quaternion-julia')).toBe(false);
       expect(hasTypeSpecificAnimations('hypercube')).toBe(false);
     });
 
@@ -173,9 +175,11 @@ describe('Object Type Registry', () => {
     });
 
     it('hasTimelineControls returns true for types with animations', () => {
-      // Fractals have timeline controls
+      // Fractals with type-specific animations have timeline controls
       expect(hasTimelineControls('mandelbulb')).toBe(true);
-      expect(hasTimelineControls('quaternion-julia')).toBe(true);
+      // NOTE: quaternion-julia has no type-specific animations
+      // Smooth shape morphing is achieved via 4D+ rotation
+      expect(hasTimelineControls('quaternion-julia')).toBe(false);
       expect(hasTimelineControls('schroedinger')).toBe(true);
       expect(hasTimelineControls('blackhole')).toBe(true);
       // Polytopes no longer have timeline controls (modulation removed)

@@ -1,4 +1,3 @@
-import { computeDriftedOrigin, type OriginDriftConfig } from '@/lib/animation/originDrift';
 import {
     flattenPresetForUniforms,
     generateQuantumPreset,
@@ -26,7 +25,6 @@ import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
-import { useUIStore } from '@/stores/uiStore';
 import { useWebGLContextStore } from '@/stores/webglContextStore';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
@@ -402,7 +400,6 @@ const SchroedingerMesh = () => {
       // Apply scale to mesh
       const scale = schroedinger.scale;
       meshRef.current.scale.set(scale, scale, scale);
-      const uiState = useUIStore.getState();
 
       // Cache for colors
       const cache = colorCacheRef.current;
@@ -700,9 +697,6 @@ const SchroedingerMesh = () => {
         lastIblVersionRef.current = iblVersion;
       }
 
-      // Animation bias from UI settings
-      const { animationBias } = uiState;
-
       // Configure transparency
       // Schrödinger is always fully opaque (solid mode) unless temporal accumulation requires transparency
       // When temporal accumulation is active, we MUST treat the material as transparent
@@ -733,15 +727,15 @@ const SchroedingerMesh = () => {
         }
       }
 
-      // Get origin drift/slice animation settings from schroedinger store (already retrieved)
-      const { parameterValues: schroedingerParamValues, originDriftEnabled, driftAmplitude, driftBaseFrequency, driftFrequencySpread,
+      // Get slice animation settings from schroedinger store (already retrieved)
+      const { parameterValues: schroedingerParamValues,
               sliceAnimationEnabled, sliceSpeed, sliceAmplitude } = schroedinger;
 
       // ============================================
       // Origin Update (separate from basis vectors)
-      // Must update every frame when origin drift or slice animation is enabled
+      // Must update every frame when slice animation is enabled
       // ============================================
-      const needsOriginUpdate = basisChanged || originDriftEnabled || sliceAnimationEnabled;
+      const needsOriginUpdate = basisChanged || sliceAnimationEnabled;
       const { rotationMatrix: cachedRotationMatrix } = rotationUpdates;
 
       if (needsOriginUpdate && cachedRotationMatrix) {
@@ -750,25 +744,7 @@ const SchroedingerMesh = () => {
         // Clear the array before reuse
         originValues.fill(0);
 
-        if (originDriftEnabled && D > 3) {
-          const driftConfig: OriginDriftConfig = {
-            enabled: true,
-            amplitude: driftAmplitude,
-            baseFrequency: driftBaseFrequency,
-            frequencySpread: driftFrequencySpread,
-          };
-          const animationSpeed = useAnimationStore.getState().speed;
-          const driftedOrigin = computeDriftedOrigin(
-            schroedingerParamValues,
-            accumulatedTime,
-            driftConfig,
-            animationSpeed,
-            animationBias
-          );
-          for (let i = 3; i < D; i++) {
-            originValues[i] = driftedOrigin[i - 3] ?? 0;
-          }
-        } else if (sliceAnimationEnabled && D > 3) {
+        if (sliceAnimationEnabled && D > 3) {
           const PHI = 1.618033988749895;
           // Use tracked animation time for proper pause support
           const timeInSeconds = accumulatedTime;
@@ -782,6 +758,7 @@ const SchroedingerMesh = () => {
             originValues[i] = (schroedingerParamValues[extraDimIndex] ?? 0) + offset;
           }
         } else {
+          // No slice animation - use static parameter values
           for (let i = 3; i < D; i++) {
             originValues[i] = schroedingerParamValues[i - 3] ?? 0;
           }

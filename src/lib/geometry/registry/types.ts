@@ -162,7 +162,7 @@ export interface AnimationCapabilities {
   hasTypeSpecificAnimations: boolean
   /**
    * Animation systems available for this type.
-   * Keys are system identifiers (e.g., "powerAnimation", "originDrift")
+   * Keys are system identifiers (e.g., "powerAnimation", "sliceAnimation")
    */
   systems: Record<string, AnimationSystemDef>
 }

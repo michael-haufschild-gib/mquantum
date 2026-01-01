@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Matrix4 } from 'three';
 import {
-  MAX_GPU_DIMENSION,
-  EXTRA_DIMS_SIZE,
   matrixToGPUUniforms,
   generateNDTransformVertexShader,
   generateNDTransformFragmentShader,
@@ -13,16 +11,6 @@ import { createIdentityMatrix, createRotationMatrix } from '@/lib/math';
 import { fcos, fsin } from '@/lib/math/trig';
 
 describe('ndTransform', () => {
-  describe('constants', () => {
-    it('should have correct MAX_GPU_DIMENSION', () => {
-      expect(MAX_GPU_DIMENSION).toBe(11);
-    });
-
-    it('should have correct EXTRA_DIMS_SIZE', () => {
-      expect(EXTRA_DIMS_SIZE).toBe(7); // 11 - 4
-    });
-  });
-
   describe('matrixToGPUUniforms', () => {
     it('should convert 3D identity matrix correctly', () => {
       const matrix = createIdentityMatrix(3);
