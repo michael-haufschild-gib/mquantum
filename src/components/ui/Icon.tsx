@@ -73,7 +73,7 @@ interface IconProps extends React.SVGProps<SVGSVGElement> {
   size?: number;
 }
 
-export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16, ...props }) => {
+export const Icon: React.FC<IconProps> = React.memo(({ name, className = '', size = 16, ...props }) => {
   const IconComponent = icons[name];
   return (
     <IconComponent
@@ -83,4 +83,6 @@ export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16, ...
       {...props}
     />
   );
-};
+});
+
+Icon.displayName = 'Icon';

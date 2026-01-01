@@ -14,7 +14,7 @@ export interface GeometrySectionProps {
   defaultOpen?: boolean;
 }
 
-export const GeometrySection: React.FC<GeometrySectionProps> = ({
+export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(({
   defaultOpen = true,
 }) => {
   return (
@@ -23,7 +23,7 @@ export const GeometrySection: React.FC<GeometrySectionProps> = ({
         <ControlGroup title="Dimensions" collapsible defaultOpen>
             <DimensionSelector />
         </ControlGroup>
-        
+
         <ControlGroup title="Object Type" collapsible defaultOpen>
             <ObjectTypeSelector />
         </ControlGroup>
@@ -32,4 +32,6 @@ export const GeometrySection: React.FC<GeometrySectionProps> = ({
       </div>
     </Section>
   );
-};
+});
+
+GeometrySection.displayName = 'GeometrySection';

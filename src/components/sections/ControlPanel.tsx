@@ -10,7 +10,7 @@
 import { Button } from '@/components/ui/Button'
 import type { LayoutMode } from '@/stores/layoutStore'
 import { useLayoutStore } from '@/stores/layoutStore'
-import React from 'react'
+import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { ResizeHandle } from '@/components/layout/ResizeHandle'
 
@@ -35,7 +35,7 @@ export interface ControlPanelProps {
  * @param props.layoutMode - Layout mode ('overlay' | 'side-by-side')
  * @returns React component
  */
-export const ControlPanel: React.FC<ControlPanelProps> = ({
+export const ControlPanel: React.FC<ControlPanelProps> = React.memo(({
   children,
   title = 'CONTROLS',
   className = '',
@@ -54,20 +54,28 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   // Styles vary based on layout mode and collapsed state
   // When side-by-side AND collapsed, the parent handles positioning, so use simpler styles
-  const asideStyles = isSideBySideCollapsed
-    ? 'relative pointer-events-auto' // Collapsed in side-by-side: parent handles positioning
-    : isSideBySide
-      ? 'relative flex flex-col h-full pointer-events-auto' // Expanded in side-by-side: flex item
-      : 'fixed right-4 top-4 bottom-4 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] z-50 flex flex-col items-end pointer-events-none' // Overlay mode
+  const asideStyles = useMemo(() => {
+    if (isSideBySideCollapsed) {
+      return 'relative pointer-events-auto' // Collapsed in side-by-side: parent handles positioning
+    }
+    if (isSideBySide) {
+      return 'relative flex flex-col h-full pointer-events-auto' // Expanded in side-by-side: flex item
+    }
+    return 'fixed right-4 top-4 bottom-4 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] z-50 flex flex-col items-end pointer-events-none' // Overlay mode
+  }, [isSideBySide, isSideBySideCollapsed])
 
-  const containerStyles = isSideBySideCollapsed
-    ? 'pointer-events-auto glass-panel rounded-full flex flex-col overflow-hidden transition-all duration-300' // Collapsed: circular button
-    : isSideBySide
-      ? 'glass-panel rounded-2xl flex flex-col overflow-hidden h-full transition-all duration-300' // Expanded side-by-side
-      : 'pointer-events-auto glass-panel rounded-2xl flex flex-col overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]' // Overlay mode
+  const containerStyles = useMemo(() => {
+    if (isSideBySideCollapsed) {
+      return 'pointer-events-auto glass-panel rounded-full flex flex-col overflow-hidden transition-all duration-300' // Collapsed: circular button
+    }
+    if (isSideBySide) {
+      return 'glass-panel rounded-2xl flex flex-col overflow-hidden h-full transition-all duration-300' // Expanded side-by-side
+    }
+    return 'pointer-events-auto glass-panel rounded-2xl flex flex-col overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]' // Overlay mode
+  }, [isSideBySide, isSideBySideCollapsed])
 
   // Width handling
-  const getContainerWidth = () => {
+  const containerWidth = useMemo(() => {
     if (isCollapsed) {
       return 'w-14 h-14' // Collapsed: small circular button
     }
@@ -75,17 +83,23 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       return '' // Width set via inline style
     }
     return 'w-80 h-full'
-  }
+  }, [isCollapsed, isSideBySide])
 
-  const containerWidth = getContainerWidth()
-  const inlineWidth =
-    isSideBySide && !isCollapsed ? { width: `${sidebarWidth}px` } : undefined
+  const inlineWidth = useMemo(() =>
+    isSideBySide && !isCollapsed ? { width: `${sidebarWidth}px` } : undefined,
+    [isSideBySide, isCollapsed, sidebarWidth]
+  )
+
+  const asideStyle = useMemo(() =>
+    isSideBySide && !isCollapsed ? { width: `${sidebarWidth}px` } : undefined,
+    [isSideBySide, isCollapsed, sidebarWidth]
+  )
 
   return (
     <aside
       className={`${asideStyles} ${className}`}
       aria-label="Control Panel"
-      style={isSideBySide && !isCollapsed ? { width: `${sidebarWidth}px` } : undefined}
+      style={asideStyle}
     >
       {/* Resize handle - only in side-by-side mode when expanded */}
       {isSideBySide && !isCollapsed && <ResizeHandle />}
@@ -139,4 +153,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
     </aside>
   )
-}
+});
+
+ControlPanel.displayName = 'ControlPanel';

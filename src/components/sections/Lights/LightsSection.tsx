@@ -11,7 +11,7 @@ export interface LightsSectionProps {
   defaultOpen?: boolean;
 }
 
-export const LightsSection: React.FC<LightsSectionProps> = ({
+export const LightsSection: React.FC<LightsSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   return (
@@ -19,4 +19,6 @@ export const LightsSection: React.FC<LightsSectionProps> = ({
       <LightingControls />
     </Section>
   );
-};
+});
+
+LightsSection.displayName = 'LightsSection';

@@ -20,7 +20,7 @@ export interface ColorPreviewProps {
   height?: number;
 }
 
-export const ColorPreview: React.FC<ColorPreviewProps> = ({
+export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(({
   className = '',
   width = 200,
   height = 24,
@@ -165,4 +165,6 @@ export const ColorPreview: React.FC<ColorPreviewProps> = ({
       />
     </div>
   );
-};
+});
+
+ColorPreview.displayName = 'ColorPreview';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 
 export interface SectionProps {
@@ -10,7 +10,7 @@ export interface SectionProps {
   'data-testid'?: string;
 }
 
-export const Section: React.FC<SectionProps> = ({
+export const Section: React.FC<SectionProps> = React.memo(({
   title,
   defaultOpen = false,
   children,
@@ -45,8 +45,29 @@ export const Section: React.FC<SectionProps> = ({
     localStorage.setItem(storageKey, JSON.stringify(isOpen));
   }, [isOpen, storageKey]);
 
+  const handleToggle = useCallback(() => {
+    const willOpen = !isOpen;
+    setIsOpen(willOpen);
+    if (willOpen && sectionRef.current) {
+      // Clear any pending scroll timer
+      if (scrollTimerRef.current !== null) {
+        window.clearTimeout(scrollTimerRef.current);
+      }
+      // Instant scroll start, but smooth behavior
+      scrollTimerRef.current = window.setTimeout(() => {
+        sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        scrollTimerRef.current = null;
+      }, 100);
+    }
+  }, [isOpen]);
+
+  const handleResetClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onReset?.();
+  }, [onReset]);
+
   return (
-    <div 
+    <div
       ref={sectionRef}
       className={`
         group relative overflow-hidden border-b border-[var(--border-subtle)] last:border-b-0
@@ -57,21 +78,7 @@ export const Section: React.FC<SectionProps> = ({
       <div className="flex items-center justify-between bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-active)] transition-colors duration-200">
         <button
           type="button"
-          onClick={() => {
-            const willOpen = !isOpen;
-            setIsOpen(willOpen);
-            if (willOpen && sectionRef.current) {
-                // Clear any pending scroll timer
-                if (scrollTimerRef.current !== null) {
-                  window.clearTimeout(scrollTimerRef.current);
-                }
-                // Instant scroll start, but smooth behavior
-                scrollTimerRef.current = window.setTimeout(() => {
-                    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                    scrollTimerRef.current = null;
-                }, 100);
-            }
-          }}
+          onClick={handleToggle}
           className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none focus:outline-none focus-visible:outline-none border-none focus:ring-0 z-10"
           aria-expanded={isOpen}
           data-testid={dataTestId ? `${dataTestId}-header` : undefined}
@@ -89,10 +96,10 @@ export const Section: React.FC<SectionProps> = ({
               {title}
             </h3>
           </div>
-          
+
           {/* Chevron */}
           <m.div
-            animate={{ 
+            animate={{
               rotate: isOpen ? 180 : 0,
             }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
@@ -109,10 +116,7 @@ export const Section: React.FC<SectionProps> = ({
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onReset();
-            }}
+            onClick={handleResetClick}
             className="mr-3 p-1 text-[var(--text-tertiary)] hover:text-accent transition-colors rounded hover:bg-[var(--bg-hover)] relative z-20"
             title={`Reset ${title} settings`}
             data-testid={dataTestId ? `${dataTestId}-reset` : undefined}
@@ -124,7 +128,7 @@ export const Section: React.FC<SectionProps> = ({
           </m.button>
         )}
       </div>
-      
+
       <AnimatePresence initial={false}>
         {isOpen && (
           <m.div
@@ -143,4 +147,6 @@ export const Section: React.FC<SectionProps> = ({
       </AnimatePresence>
     </div>
   );
-};
+});
+
+Section.displayName = 'Section';

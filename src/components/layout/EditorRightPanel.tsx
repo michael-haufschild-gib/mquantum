@@ -1,6 +1,6 @@
 import { Icon } from '@/components/ui/Icon';
 import { Tab, Tabs } from '@/components/ui/Tabs';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 // Import existing sidebar sections
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls';
@@ -15,11 +15,11 @@ import { ReflectionsSection } from '@/components/sections/Reflections/Reflection
 import { SettingsSection } from '@/components/sections/Settings/SettingsSection';
 import { ShadowsSection } from '@/components/sections/Shadows/ShadowsSection';
 
-export const EditorRightPanel: React.FC = () => {
+export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
   const [activeTab, setActiveTab] = useState('object');
 
-  const tabs: Tab[] = [
+  const tabs: Tab[] = useMemo(() => [
     {
       id: 'object',
       label: (
@@ -73,7 +73,7 @@ export const EditorRightPanel: React.FC = () => {
         </div>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">
@@ -99,4 +99,6 @@ export const EditorRightPanel: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+EditorRightPanel.displayName = 'EditorRightPanel';

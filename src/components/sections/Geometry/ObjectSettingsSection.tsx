@@ -69,7 +69,7 @@ const ControlsError: React.FC = () => (
  * @param root0.className - Optional CSS class name
  * @returns React element displaying object-specific settings controls
  */
-export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = ({
+export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = React.memo(({
   className = '',
 }) => {
   const objectType = useGeometryStore((state) => state.objectType);
@@ -99,4 +99,6 @@ export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = ({
       )}
     </div>
   );
-};
+});
+
+ObjectSettingsSection.displayName = 'ObjectSettingsSection';

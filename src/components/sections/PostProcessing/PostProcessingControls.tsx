@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { BloomControls } from './BloomControls';
 import { BokehControls } from './BokehControls';
 import { CinematicControls } from './CinematicControls';
@@ -11,7 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { MiscControls } from './MiscControls';
 import { RefractionControls } from './RefractionControls';
 
-export const PostProcessingControls: React.FC = () => {
+export const PostProcessingControls: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('bloom');
 
   const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
@@ -34,7 +34,11 @@ export const PostProcessingControls: React.FC = () => {
     paperEnabled, setPaperEnabled,
   } = usePostProcessingStore(postProcessingSelector);
 
-  const tabs = [
+  const handleTabChange = useCallback((id: string) => {
+    setActiveTab(id);
+  }, []);
+
+  const tabs = useMemo(() => [
     {
       id: 'bloom',
       label: 'Bloom',
@@ -125,15 +129,21 @@ export const PostProcessingControls: React.FC = () => {
       ),
     },
     // NOTE: Gravity tab removed - controls moved to Advanced Rendering section
-  ];
+  ], [
+    bloomEnabled, setBloomEnabled, cinematicEnabled, setCinematicEnabled,
+    bokehEnabled, setBokehEnabled, refractionEnabled, setRefractionEnabled,
+    paperEnabled, setPaperEnabled
+  ]);
 
   return (
     <Tabs
       value={activeTab}
-      onChange={setActiveTab}
+      onChange={handleTabChange}
       tabs={tabs}
       variant="default"
       tabListClassName="mb-4"
     />
   );
-};
+});
+
+PostProcessingControls.displayName = 'PostProcessingControls';

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { soundManager } from '@/lib/audio/SoundManager';
 
 export interface ToggleButtonProps extends Omit<React.ComponentPropsWithoutRef<'button'>, 'onToggle'> {
@@ -11,7 +11,7 @@ export interface ToggleButtonProps extends Omit<React.ComponentPropsWithoutRef<'
   sound?: 'click' | 'swish';
 }
 
-export const ToggleButton = ({
+export const ToggleButton = React.memo(({
   pressed,
   onToggle,
   ariaLabel,
@@ -21,36 +21,42 @@ export const ToggleButton = ({
   ref,
   ...props
 }: ToggleButtonProps & { ref?: React.Ref<HTMLButtonElement> }) => {
-    const handleClick = () => {
-      if (sound === 'swish') {
-        // Swish only on open, click on close
-        if (!pressed) soundManager.playSwish();
-        else soundManager.playClick();
-      } else {
-        soundManager.playClick();
-      }
-      onToggle(!pressed);
-    };
+  const handleClick = useCallback(() => {
+    if (sound === 'swish') {
+      // Swish only on open, click on close
+      if (!pressed) soundManager.playSwish();
+      else soundManager.playClick();
+    } else {
+      soundManager.playClick();
+    }
+    onToggle(!pressed);
+  }, [sound, pressed, onToggle]);
 
-    return (
-      <button
-        ref={ref}
-        type="button"
-        aria-pressed={pressed}
-        onClick={handleClick}
-        onMouseEnter={() => soundManager.playHover()}
-        className={`
-          px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-300 border
-          ${pressed
-            ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
-            : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
-          }
-          ${className}
-        `}
-        aria-label={ariaLabel}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-};
+  const handleMouseEnter = useCallback(() => {
+    soundManager.playHover();
+  }, []);
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      aria-pressed={pressed}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      className={`
+        px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-300 border
+        ${pressed
+          ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
+          : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
+        }
+        ${className}
+      `}
+      aria-label={ariaLabel}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+
+ToggleButton.displayName = 'ToggleButton';

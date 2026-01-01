@@ -17,8 +17,11 @@ import {
   MOBILE_DEFAULT_MAX_FPS,
   MOBILE_DEFAULT_RESOLUTION_SCALE,
 } from '@/lib/deviceCapabilities'
-import { hasPersistedResolutionScale, usePerformanceStore } from '@/stores/performanceStore'
-import { useUIStore } from '@/stores/uiStore'
+import {
+  hasPersistedMaxFps,
+  hasPersistedResolutionScale,
+  usePerformanceStore,
+} from '@/stores/performanceStore'
 import { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -56,27 +59,29 @@ export function useDeviceCapabilities(): { webgl2Supported: boolean } {
       usePerformanceStore.getState().setDeviceCapabilities(capabilities)
 
       // Apply mobile defaults if detected AND user hasn't set a preference
-      // This ensures user's explicit resolution choice is preserved across page loads
+      // This ensures user's explicit choices are preserved across page loads
       if (capabilities.isMobileGPU && capabilities.webgl2Supported) {
-        const userHasPreference = hasPersistedResolutionScale()
+        const userHasResolutionPreference = hasPersistedResolutionScale()
+        const userHasFpsPreference = hasPersistedMaxFps()
+        const perfStore = usePerformanceStore.getState()
 
-        if (!userHasPreference) {
-          usePerformanceStore
-            .getState()
-            .setRenderResolutionScale(MOBILE_DEFAULT_RESOLUTION_SCALE)
-          useUIStore.getState().setMaxFps(MOBILE_DEFAULT_MAX_FPS)
+        if (!userHasResolutionPreference) {
+          perfStore.setRenderResolutionScale(MOBILE_DEFAULT_RESOLUTION_SCALE)
+        }
+        if (!userHasFpsPreference) {
+          perfStore.setMaxFps(MOBILE_DEFAULT_MAX_FPS)
         }
 
         if (import.meta.env.DEV) {
           console.log('[DeviceCapabilities] Mobile GPU detected:', {
             tier: capabilities.gpuTier,
             gpu: capabilities.gpuName,
-            userHasPreference,
-            appliedDefaults: !userHasPreference,
-            renderResolutionScale: userHasPreference
-              ? usePerformanceStore.getState().renderResolutionScale
+            userHasResolutionPreference,
+            userHasFpsPreference,
+            renderResolutionScale: userHasResolutionPreference
+              ? perfStore.renderResolutionScale
               : MOBILE_DEFAULT_RESOLUTION_SCALE,
-            maxFps: userHasPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
+            maxFps: userHasFpsPreference ? 'preserved' : MOBILE_DEFAULT_MAX_FPS,
           })
         }
       } else if (import.meta.env.DEV) {

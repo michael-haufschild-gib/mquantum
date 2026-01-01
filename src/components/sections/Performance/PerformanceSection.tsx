@@ -22,7 +22,7 @@ export interface PerformanceSectionProps {
  * @param props.defaultOpen - Whether the section is initially expanded
  * @returns Performance section with all optimization controls
  */
-export const PerformanceSection: React.FC<PerformanceSectionProps> = ({
+export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   return (
@@ -41,4 +41,6 @@ export const PerformanceSection: React.FC<PerformanceSectionProps> = ({
       <TemporalReprojectionControls />
     </Section>
   );
-};
+});
+
+PerformanceSection.displayName = 'PerformanceSection';

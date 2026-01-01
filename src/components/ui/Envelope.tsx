@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import React, { useId, useMemo } from 'react';
 
 export type EnvelopeMode = 'AD' | 'AR' | 'ADSR' | 'AHDSR';
 
@@ -16,7 +16,7 @@ export interface EnvelopeProps {
   strokeWidth?: number;
 }
 
-export const Envelope: React.FC<EnvelopeProps> = ({
+export const Envelope: React.FC<EnvelopeProps> = React.memo(({
   mode = 'ADSR',
   delay = 0,
   attack,
@@ -113,13 +113,13 @@ export const Envelope: React.FC<EnvelopeProps> = ({
   }
 
   // Points for circles
-  const points = [
+  const points = useMemo(() => [
     { x: xDelay, y: yBottom, label: 'delay', hidden: pDelay <= 0 },
     { x: xAttack, y: yTop, label: 'attack', hidden: false },
     { x: xHold, y: yTop, label: 'hold', hidden: pHold <= 0 },
     { x: xDecay, y: (mode === 'AD' || mode === 'AR') ? yBottom : ySustain, label: 'decay', hidden: (mode === 'AD' || mode === 'AR') },
     { x: xRelease, y: yBottom, label: 'release', hidden: false },
-  ];
+  ], [xDelay, yBottom, pDelay, xAttack, yTop, xHold, pHold, xDecay, mode, ySustain, xRelease]);
 
   return (
     <div className={`relative ${className}`} style={{ width, height }}>
@@ -175,4 +175,6 @@ export const Envelope: React.FC<EnvelopeProps> = ({
       </svg>
     </div>
   );
-};
+});
+
+Envelope.displayName = 'Envelope';

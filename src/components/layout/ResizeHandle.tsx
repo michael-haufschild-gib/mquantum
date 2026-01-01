@@ -32,7 +32,7 @@ export interface ResizeHandleProps {
  * @param props.className - Additional CSS classes
  * @returns React component
  */
-export const ResizeHandle: React.FC<ResizeHandleProps> = ({ className = '' }) => {
+export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className = '' }) => {
   const handleRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const rafIdRef = useRef<number | null>(null)
@@ -140,4 +140,6 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ className = '' }) =>
       <div className="absolute inset-0 -left-1 -right-1" />
     </div>
   )
-}
+});
+
+ResizeHandle.displayName = 'ResizeHandle';

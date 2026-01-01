@@ -355,6 +355,60 @@ describe('blackholeSlice', () => {
     })
   })
 
+  describe('integer parameter actions', () => {
+    it('should floor maxSteps to integer and clamp', () => {
+      const { setBlackHoleMaxSteps } = useExtendedObjectStore.getState()
+
+      // Float should be floored
+      setBlackHoleMaxSteps(64.9)
+      expect(useExtendedObjectStore.getState().blackhole.maxSteps).toBe(64)
+
+      setBlackHoleMaxSteps(100.1)
+      expect(useExtendedObjectStore.getState().blackhole.maxSteps).toBe(100)
+
+      // Clamping should still work
+      setBlackHoleMaxSteps(10) // below min 16
+      expect(useExtendedObjectStore.getState().blackhole.maxSteps).toBe(16)
+
+      setBlackHoleMaxSteps(600) // above max 512
+      expect(useExtendedObjectStore.getState().blackhole.maxSteps).toBe(512)
+
+      // Edge case: clamp then floor
+      setBlackHoleMaxSteps(520.9) // clamped to 512, then floored to 512
+      expect(useExtendedObjectStore.getState().blackhole.maxSteps).toBe(512)
+    })
+
+    it('should floor shadowSteps to integer and clamp', () => {
+      const { setBlackHoleShadowSteps } = useExtendedObjectStore.getState()
+
+      // Float should be floored
+      setBlackHoleShadowSteps(32.7)
+      expect(useExtendedObjectStore.getState().blackhole.shadowSteps).toBe(32)
+
+      // Clamping should still work
+      setBlackHoleShadowSteps(2) // below min 4
+      expect(useExtendedObjectStore.getState().blackhole.shadowSteps).toBe(4)
+
+      setBlackHoleShadowSteps(100) // above max 64
+      expect(useExtendedObjectStore.getState().blackhole.shadowSteps).toBe(64)
+    })
+
+    it('should floor motionBlurSamples to integer and clamp', () => {
+      const { setBlackHoleMotionBlurSamples } = useExtendedObjectStore.getState()
+
+      // Float should be floored
+      setBlackHoleMotionBlurSamples(4.9)
+      expect(useExtendedObjectStore.getState().blackhole.motionBlurSamples).toBe(4)
+
+      // Clamping should still work
+      setBlackHoleMotionBlurSamples(0) // below min 1
+      expect(useExtendedObjectStore.getState().blackhole.motionBlurSamples).toBe(1)
+
+      setBlackHoleMotionBlurSamples(20) // above max 8
+      expect(useExtendedObjectStore.getState().blackhole.motionBlurSamples).toBe(8)
+    })
+  })
+
   describe('lighting actions', () => {
     it('should set lighting mode', () => {
       const { setBlackHoleLightingMode } = useExtendedObjectStore.getState()

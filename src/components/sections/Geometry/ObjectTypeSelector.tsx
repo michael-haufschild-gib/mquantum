@@ -7,65 +7,37 @@
  * - Extended: Root System, Clifford Torus, Mandelbulb, Quaternion Julia
  */
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { Select } from '@/components/ui/Select';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
+import { useGeometryStore, type GeometrySlice } from '@/stores/geometryStore';
 import { useRotationStore } from '@/stores/rotationStore';
 import { getAvailableTypesForDimension } from '@/lib/geometry';
 import type { ObjectType } from '@/lib/geometry/types';
-import { isPolytopeType } from '@/lib/geometry/types';
-import { getConfigStoreKey } from '@/lib/geometry/registry';
+import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface ObjectTypeSelectorProps {
   className?: string;
   disabled?: boolean;
 }
 
-export const ObjectTypeSelector: React.FC<ObjectTypeSelectorProps> = ({
+export const ObjectTypeSelector: React.FC<ObjectTypeSelectorProps> = React.memo(({
   className = '',
   disabled = false,
 }) => {
-  const objectType = useGeometryStore((state) => state.objectType);
-  const setObjectType = useGeometryStore((state) => state.setObjectType);
-  const dimension = useGeometryStore((state) => state.dimension);
+  // Consolidate geometry store selectors with useShallow
+  const { objectType, setObjectType, dimension } = useGeometryStore(
+    useShallow((state: GeometrySlice) => ({
+      objectType: state.objectType,
+      setObjectType: state.setObjectType,
+      dimension: state.dimension,
+    }))
+  );
   const resetAllRotations = useRotationStore((state) => state.resetAllRotations);
-  const initializeMandelbulbForDimension = useExtendedObjectStore(
-    (state) => state.initializeMandelbulbForDimension
-  );
-  const initializeSchroedingerForDimension = useExtendedObjectStore(
-    (state) => state.initializeSchroedingerForDimension
-  );
-  const initializeQuaternionJuliaForDimension = useExtendedObjectStore(
-    (state) => state.initializeQuaternionJuliaForDimension
-  );
-  const initializePolytopeForType = useExtendedObjectStore(
-    (state) => state.initializePolytopeForType
-  );
 
-  // Map config store keys to their initializer functions (for fractal types)
-  const fractalInitializers = useMemo(() => ({
-    mandelbulb: initializeMandelbulbForDimension,
-    schroedinger: initializeSchroedingerForDimension,
-    quaternionJulia: initializeQuaternionJuliaForDimension,
-  }), [initializeMandelbulbForDimension, initializeSchroedingerForDimension, initializeQuaternionJuliaForDimension]);
-
-  // Initialize fractal settings when objectType changes (data-driven via registry)
-  useEffect(() => {
-    const configKey = getConfigStoreKey(objectType);
-    if (configKey && configKey in fractalInitializers) {
-      const initializer = fractalInitializers[configKey as keyof typeof fractalInitializers];
-      initializer(dimension);
-    }
-  }, [objectType, dimension, fractalInitializers]);
-
-  // Initialize polytope scale when switching to a polytope type
-  useEffect(() => {
-    if (isPolytopeType(objectType)) {
-      initializePolytopeForType(objectType);
-    }
-  }, [objectType, initializePolytopeForType]);
+  // Handle object type initialization (fractals, polytopes, raymarching visibility)
+  useObjectTypeInitialization(objectType, dimension);
 
   // Get available types based on current dimension
   const availableTypes = useMemo(() => getAvailableTypesForDimension(dimension), [dimension]);
@@ -85,7 +57,7 @@ export const ObjectTypeSelector: React.FC<ObjectTypeSelectorProps> = ({
     return found?.description ?? '';
   }, [availableTypes, objectType]);
 
-  const handleChange = (value: string) => {
+  const handleChange = useCallback((value: string) => {
     // Only set if the type is available for current dimension
     const typeInfo = availableTypes.find((t) => t.type === value);
     if (typeInfo?.available) {
@@ -94,7 +66,7 @@ export const ObjectTypeSelector: React.FC<ObjectTypeSelectorProps> = ({
       resetAllRotations();
       setObjectType(value as ObjectType);
     }
-  };
+  }, [availableTypes, resetAllRotations, setObjectType]);
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -122,4 +94,6 @@ export const ObjectTypeSelector: React.FC<ObjectTypeSelectorProps> = ({
       </p>
     </div>
   );
-};
+});
+
+ObjectTypeSelector.displayName = 'ObjectTypeSelector';

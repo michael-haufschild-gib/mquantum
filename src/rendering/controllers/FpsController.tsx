@@ -18,7 +18,6 @@
 import { useAnimationStore } from '@/stores/animationStore'
 import { useExportStore } from '@/stores/exportStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useWebGLContextStore } from '@/stores/webglContextStore'
 import { useThree } from '@react-three/fiber'
 import { useLayoutEffect, useRef } from 'react'
@@ -54,9 +53,8 @@ export function FpsController(): null {
       const contextStore = useWebGLContextStore.getState()
       const { status, isPageVisible, onContextLost } = contextStore
       const { isExporting } = useExportStore.getState()
-      const { maxFps } = useUIStore.getState()
       const { isPlaying } = useAnimationStore.getState()
-      const { isInteracting } = usePerformanceStore.getState()
+      const { isInteracting, maxFps } = usePerformanceStore.getState()
 
       // Check WebGL context state - skip rendering if not active
       if (status !== 'active') {

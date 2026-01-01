@@ -7,14 +7,14 @@
 
 import { Slider } from '@/components/ui/Slider';
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export interface DistributionControlsProps {
   className?: string;
 }
 
-export const DistributionControls: React.FC<DistributionControlsProps> = ({
+export const DistributionControls: React.FC<DistributionControlsProps> = React.memo(({
   className = '',
 }) => {
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -22,6 +22,18 @@ export const DistributionControls: React.FC<DistributionControlsProps> = ({
     setDistribution: state.setDistribution,
   }));
   const { distribution, setDistribution } = useAppearanceStore(appearanceSelector);
+
+  const handlePowerChange = useCallback((value: number) => {
+    setDistribution({ power: value });
+  }, [setDistribution]);
+
+  const handleCyclesChange = useCallback((value: number) => {
+    setDistribution({ cycles: value });
+  }, [setDistribution]);
+
+  const handleOffsetChange = useCallback((value: number) => {
+    setDistribution({ offset: value });
+  }, [setDistribution]);
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -35,7 +47,7 @@ export const DistributionControls: React.FC<DistributionControlsProps> = ({
         max={4}
         step={0.05}
         value={distribution.power}
-        onChange={(value) => setDistribution({ power: value })}
+        onChange={handlePowerChange}
         showValue
         tooltip="Power curve: < 1 expands dark tones, > 1 expands light tones"
       />
@@ -46,7 +58,7 @@ export const DistributionControls: React.FC<DistributionControlsProps> = ({
         max={5}
         step={0.1}
         value={distribution.cycles}
-        onChange={(value) => setDistribution({ cycles: value })}
+        onChange={handleCyclesChange}
         showValue
         tooltip="Number of times the palette repeats across the surface"
       />
@@ -57,10 +69,12 @@ export const DistributionControls: React.FC<DistributionControlsProps> = ({
         max={1}
         step={0.01}
         value={distribution.offset}
-        onChange={(value) => setDistribution({ offset: value })}
+        onChange={handleOffsetChange}
         showValue
         tooltip="Shifts the starting point of the color gradient"
       />
     </div>
   );
-};
+});
+
+DistributionControls.displayName = 'DistributionControls';

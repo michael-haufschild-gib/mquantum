@@ -166,6 +166,12 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     }
   }, [selectedLightId, duplicateLight, selectLight]);
 
+  const handleColorChange = useCallback((val: string) => {
+    if (selectedLightId) {
+      updateLight(selectedLightId, { color: val });
+    }
+  }, [selectedLightId, updateLight]);
+
   // Show ambient light editor if ambient is selected
   if (isAmbientLightSelected) {
     return (
@@ -255,11 +261,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       <ColorPicker
         label="Color"
         value={selectedLight.color}
-        onChange={(val) => {
-            if (selectedLightId) {
-                updateLight(selectedLightId, { color: val });
-            }
-        }}
+        onChange={handleColorChange}
         disableAlpha={true}
       />
 

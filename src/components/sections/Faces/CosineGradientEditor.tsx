@@ -8,7 +8,7 @@
 import { Button } from '@/components/ui/Button';
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette';
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export interface CosineGradientEditorProps {
@@ -31,7 +31,7 @@ const COEFFICIENT_TOOLTIPS: Record<'a' | 'b' | 'c' | 'd', string> = {
 
 const CHANNEL_LABELS = ['R', 'G', 'B'] as const;
 
-export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = ({
+export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.memo(({
   className = '',
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -44,9 +44,13 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = ({
   const { cosineCoefficients, setCosineCoefficient, setCosineCoefficients } =
     useAppearanceStore(appearanceSelector);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setCosineCoefficients(DEFAULT_COSINE_COEFFICIENTS);
-  };
+  }, [setCosineCoefficients]);
+
+  const handleToggleExpand = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
 
   return (
     <div className={className}>
@@ -54,7 +58,7 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = ({
       <Button
         variant="secondary"
         size="sm"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleToggleExpand}
         className="flex items-center justify-between w-full"
       >
         <span>Advanced Editor</span>
@@ -124,4 +128,6 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = ({
       )}
     </div>
   );
-};
+});
+
+CosineGradientEditor.displayName = 'CosineGradientEditor';

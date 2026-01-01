@@ -1,7 +1,8 @@
 import { Select } from '@/components/ui/Select';
 import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Nested Torus settings component.
@@ -10,15 +11,27 @@ import { useGeometryStore } from '@/stores/geometryStore';
  */
 export function NestedTorusSettings() {
   const dimension = useGeometryStore((state) => state.dimension);
-  const config = useExtendedObjectStore((state) => state.nestedTorus);
 
-  // Nested torus actions
-  const setRadius = useExtendedObjectStore((state) => state.setNestedTorusRadius);
-  const setEta = useExtendedObjectStore((state) => state.setNestedTorusEta);
-  const setResolutionXi1 = useExtendedObjectStore((state) => state.setNestedTorusResolutionXi1);
-  const setResolutionXi2 = useExtendedObjectStore((state) => state.setNestedTorusResolutionXi2);
-  const setShowNestedTori = useExtendedObjectStore((state) => state.setNestedTorusShowNestedTori);
-  const setNumberOfTori = useExtendedObjectStore((state) => state.setNestedTorusNumberOfTori);
+  // Consolidate extended object store selectors with useShallow
+  const {
+    config,
+    setRadius,
+    setEta,
+    setResolutionXi1,
+    setResolutionXi2,
+    setShowNestedTori,
+    setNumberOfTori,
+  } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      config: state.nestedTorus,
+      setRadius: state.setNestedTorusRadius,
+      setEta: state.setNestedTorusEta,
+      setResolutionXi1: state.setNestedTorusResolutionXi1,
+      setResolutionXi2: state.setNestedTorusResolutionXi2,
+      setShowNestedTori: state.setNestedTorusShowNestedTori,
+      setNumberOfTori: state.setNestedTorusNumberOfTori,
+    }))
+  );
 
   // Calculate point count
   const getPointCount = () => {

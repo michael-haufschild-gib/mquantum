@@ -9,7 +9,7 @@
  */
 import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore'
-import React from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { AuroraControls } from './skybox/AuroraControls'
 import { HorizonControls } from './skybox/HorizonControls'
@@ -48,7 +48,7 @@ const ALL_SKYBOX_OPTIONS: SkyboxOption[] = [
   { id: 'procedural_twilight', name: 'Twilight', thumbnail: null, gradientClass: 'bg-gradient-to-b from-amber-400 via-rose-500 to-indigo-900', description: 'Sunset gradient with atmosphere', type: 'procedural' },
 ]
 
-export const SkyboxControls: React.FC = () => {
+export const SkyboxControls: React.FC = React.memo(() => {
   const environmentSelector = useShallow((state: EnvironmentStore) => ({
     skyboxSelection: state.skyboxSelection,
     skyboxBlur: state.skyboxBlur,
@@ -82,13 +82,20 @@ export const SkyboxControls: React.FC = () => {
     setProceduralSettings,
   } = useEnvironmentStore(environmentSelector);
 
-  const selectedOption = ALL_SKYBOX_OPTIONS.find((opt) => opt.id === skyboxSelection)
+  const selectedOption = useMemo(
+    () => ALL_SKYBOX_OPTIONS.find((opt) => opt.id === skyboxSelection),
+    [skyboxSelection]
+  );
   const isClassicMode = selectedOption?.type === 'classic'
   const isProceduralMode = selectedOption?.type === 'procedural'
   const isAuroraMode = skyboxSelection === 'procedural_aurora'
   const isHorizonMode = skyboxSelection === 'procedural_horizon'
   const isOceanMode = skyboxSelection === 'procedural_ocean'
   const hasControls = skyboxSelection !== 'none'
+
+  const handleSkyboxSelect = useCallback((id: SkyboxSelection) => {
+    setSkyboxSelection(id);
+  }, [setSkyboxSelection]);
 
   return (
     <div className="space-y-6">
@@ -100,7 +107,7 @@ export const SkyboxControls: React.FC = () => {
             <button
               key={option.id}
               data-testid={`skybox-option-${option.id}`}
-              onClick={() => setSkyboxSelection(option.id)}
+              onClick={() => handleSkyboxSelect(option.id)}
               className={`
                 group relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 ease-out
                 hover:scale-105 hover:shadow-lg
@@ -192,4 +199,6 @@ export const SkyboxControls: React.FC = () => {
       )}
     </div>
   )
-}
+});
+
+SkyboxControls.displayName = 'SkyboxControls';

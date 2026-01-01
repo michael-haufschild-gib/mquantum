@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState, useRef } from 'react';
+import React, { useEffect, useId, useState, useRef, useCallback } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { soundManager } from '@/lib/audio/SoundManager';
 
@@ -27,7 +27,7 @@ export interface SliderProps {
   'data-testid'?: string;
 }
 
-export const Slider: React.FC<SliderProps> = ({
+export const Slider: React.FC<SliderProps> = React.memo(({
   label,
   value,
   min,
@@ -82,7 +82,7 @@ export const Slider: React.FC<SliderProps> = ({
   }, []);
 
   // Label Drag Logic
-  const handleLabelMouseDown = (e: React.MouseEvent) => {
+  const handleLabelMouseDown = useCallback((e: React.MouseEvent) => {
     if (disabled) return;
     setIsLabelDragging(true);
     soundManager.playClick();
@@ -106,7 +106,7 @@ export const Slider: React.FC<SliderProps> = ({
       }
 
       newValue = Math.min(Math.max(newValue, min), max);
-      
+
       // Use startTransition to prioritize UI responsiveness over store updates
       React.startTransition(() => {
         onChange(newValue);
@@ -129,13 +129,13 @@ export const Slider: React.FC<SliderProps> = ({
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  };
+  }, [disabled, value, min, max, step, onChange]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-  };
+  }, []);
 
-  const handleInputBlur = () => {
+  const handleInputBlur = useCallback(() => {
     let newValue = parseFloat(inputValue);
     if (isNaN(newValue)) {
       newValue = value;
@@ -144,22 +144,65 @@ export const Slider: React.FC<SliderProps> = ({
     }
     onChange(newValue);
     setInputValue(newValue.toFixed(decimals));
-  };
+  }, [inputValue, value, min, max, onChange, decimals]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleInputBlur();
       (e.target as HTMLInputElement).blur();
     }
-  };
-  
+  }, [handleInputBlur]);
+
+  const handleMouseEnter = useCallback(() => {
+    setIsHovered(true);
+    soundManager.playHover();
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovered(false);
+  }, []);
+
+  const handleInputFocus = useCallback(() => {
+    setIsInputFocused(true);
+  }, []);
+
+  const handleInputBlurWrapper = useCallback(() => {
+    setIsInputFocused(false);
+    handleInputBlur();
+  }, [handleInputBlur]);
+
+  const handleRangeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Number(e.target.value);
+    React.startTransition(() => {
+      onChange(val);
+    });
+  }, [onChange]);
+
+  const handleRangeMouseDown = useCallback(() => {
+    setIsDragging(true);
+    soundManager.playClick();
+  }, []);
+
+  const handleRangeMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  const handleRangeTouchStart = useCallback(() => {
+    setIsDragging(true);
+    soundManager.playClick();
+  }, []);
+
+  const handleRangeTouchEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   const displayValue = formatValue ? formatValue(value) : value.toFixed(decimals);
 
   return (
-    <div 
+    <div
       className={`group/slider relative select-none w-full ${className} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-      onMouseEnter={() => { setIsHovered(true); soundManager.playHover(); }}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       data-testid={dataTestId}
     >
       {/* Header: Label and Value */}
@@ -175,7 +218,7 @@ export const Slider: React.FC<SliderProps> = ({
         >
           {label}
         </label>
-        
+
         {showValue && (
           <div className="flex items-center shrink-0 ms-2">
             <div className="relative w-[8ch] h-5 flex items-center">
@@ -183,11 +226,8 @@ export const Slider: React.FC<SliderProps> = ({
                   type="text"
                   value={inputValue}
                   onChange={handleInputChange}
-                  onFocus={() => setIsInputFocused(true)}
-                  onBlur={() => {
-                    setIsInputFocused(false);
-                    handleInputBlur();
-                  }}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlurWrapper}
                   onKeyDown={handleKeyDown}
                   disabled={disabled}
                   className={`
@@ -217,7 +257,7 @@ export const Slider: React.FC<SliderProps> = ({
 
       {/* Slider Track Area */}
       <div className="relative h-5 flex items-center touch-none">
-        
+
         {/* Track Background */}
         <div className="absolute w-full h-[3px] bg-[var(--bg-hover)] rounded-full overflow-hidden transition-colors duration-300 group-hover/slider:bg-[var(--bg-active)] backdrop-blur-sm shadow-inner">
            {/* Active Fill Track - Gradient */}
@@ -235,16 +275,11 @@ export const Slider: React.FC<SliderProps> = ({
           max={max}
           step={step}
           value={value}
-          onChange={(e) => {
-            const val = Number(e.target.value);
-            React.startTransition(() => {
-              onChange(val);
-            });
-          }}
-          onMouseDown={() => { setIsDragging(true); soundManager.playClick(); }}
-          onMouseUp={() => setIsDragging(false)}
-          onTouchStart={() => { setIsDragging(true); soundManager.playClick(); }}
-          onTouchEnd={() => setIsDragging(false)}
+          onChange={handleRangeChange}
+          onMouseDown={handleRangeMouseDown}
+          onMouseUp={handleRangeMouseUp}
+          onTouchStart={handleRangeTouchStart}
+          onTouchEnd={handleRangeTouchEnd}
           disabled={disabled}
           className="absolute w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-20"
           style={{ WebkitAppearance: 'none' }}
@@ -254,10 +289,10 @@ export const Slider: React.FC<SliderProps> = ({
         {/* Custom Thumb */}
         <div
           className={`
-            absolute h-3.5 w-3.5 rounded-full 
-            bg-background border border-accent 
-            shadow-[0_0_12px_var(--color-accent-glow)] 
-            pointer-events-none z-10 
+            absolute h-3.5 w-3.5 rounded-full
+            bg-background border border-accent
+            shadow-[0_0_12px_var(--color-accent-glow)]
+            pointer-events-none z-10
             transition-transform duration-100 ease-out
             flex items-center justify-center
             ${isDragging || isLabelDragging ? 'scale-125 bg-accent' : 'scale-100 group-hover/slider:scale-110'}
@@ -284,4 +319,6 @@ export const Slider: React.FC<SliderProps> = ({
       </div>
     </div>
   );
-};
+});
+
+Slider.displayName = 'Slider';

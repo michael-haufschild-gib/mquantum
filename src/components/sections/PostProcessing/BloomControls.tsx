@@ -138,3 +138,5 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({
     </div>
   );
 });
+
+BloomControls.displayName = 'BloomControls';

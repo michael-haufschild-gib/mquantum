@@ -15,7 +15,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import type { IBLQuality } from '@/stores/defaults/visualDefaults';
 import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore';
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export interface ReflectionsSectionProps {
@@ -29,7 +29,7 @@ const IBL_QUALITY_OPTIONS: SelectOption<IBLQuality>[] = [
   { value: 'high', label: 'High Quality' },
 ];
 
-export const ReflectionsSection: React.FC<ReflectionsSectionProps> = ({
+export const ReflectionsSection: React.FC<ReflectionsSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   const [activeTab, setActiveTab] = useState('ibl');
@@ -62,7 +62,11 @@ export const ReflectionsSection: React.FC<ReflectionsSectionProps> = ({
 
   const isIBLEnabled = iblQuality !== 'off';
 
-  const tabs = [
+  const handleTabChange = useCallback((id: string) => {
+    setActiveTab(id);
+  }, []);
+
+  const tabs = useMemo(() => [
     {
       id: 'ibl',
       label: 'IBL',
@@ -134,17 +138,19 @@ export const ReflectionsSection: React.FC<ReflectionsSectionProps> = ({
         </div>
       ),
     },
-  ];
+  ], [iblQuality, iblIntensity, setIBLQuality, setIBLIntensity, isIBLEnabled, ssrEnabled, setSSREnabled]);
 
   return (
     <Section title="Reflections" defaultOpen={defaultOpen} data-testid="section-reflections">
       <Tabs
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         tabs={tabs}
         variant="default"
         tabListClassName="mb-4"
       />
     </Section>
   );
-};
+});
+
+ReflectionsSection.displayName = 'ReflectionsSection';

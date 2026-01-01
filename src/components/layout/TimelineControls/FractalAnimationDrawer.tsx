@@ -103,8 +103,12 @@ function getSystemEnabled(
  * for hardcoded per-type UI sections.
  */
 export const FractalAnimationDrawer: React.FC = React.memo(() => {
-  const objectType = useGeometryStore((state) => state.objectType);
-  const dimension = useGeometryStore((state) => state.dimension);
+  const { objectType, dimension } = useGeometryStore(
+    useShallow((state) => ({
+      objectType: state.objectType,
+      dimension: state.dimension,
+    }))
+  );
 
   // Get the config store key from registry
   const configKey = useMemo(() => getConfigStoreKey(objectType), [objectType]);

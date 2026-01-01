@@ -1,67 +1,13 @@
 /**
- * Tests for Visual Store FPS Actions
+ * Tests for UI Store
  *
- * Tests the maxFps state and setMaxFps action in the UI slice.
+ * Tests the UI-related state and actions in the UI slice.
+ * Note: maxFps tests have been moved to performanceStore.test.ts
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import {
-  DEFAULT_MAX_FPS,
-  MAX_MAX_FPS,
-  MIN_MAX_FPS,
-} from '@/stores/defaults/visualDefaults'
 import { useUIStore } from '@/stores/uiStore';
 import { UI_INITIAL_STATE } from '@/stores/slices/uiSlice';
-
-describe('uiStore.fps', () => {
-  beforeEach(() => {
-    useUIStore.setState(UI_INITIAL_STATE);
-  });
-
-  afterEach(() => {
-    useUIStore.setState(UI_INITIAL_STATE)
-  })
-
-
-
-  describe('setMaxFps', () => {
-    it('should set maxFps to a valid value', () => {
-      useUIStore.getState().setMaxFps(30)
-      expect(useUIStore.getState().maxFps).toBe(30)
-    })
-
-    it('clamps to the allowed range', () => {
-      const cases: Array<{ input: number; expected: number }> = [
-        { input: MIN_MAX_FPS - 1, expected: MIN_MAX_FPS },
-        { input: MIN_MAX_FPS, expected: MIN_MAX_FPS },
-        { input: MIN_MAX_FPS + 1, expected: MIN_MAX_FPS + 1 },
-        { input: MAX_MAX_FPS - 1, expected: MAX_MAX_FPS - 1 },
-        { input: MAX_MAX_FPS, expected: MAX_MAX_FPS },
-        { input: MAX_MAX_FPS + 1, expected: MAX_MAX_FPS },
-        { input: -30, expected: MIN_MAX_FPS },
-        { input: 999, expected: MAX_MAX_FPS },
-      ]
-
-      for (const { input, expected } of cases) {
-        useUIStore.setState(UI_INITIAL_STATE)
-        useUIStore.getState().setMaxFps(input)
-        expect(useUIStore.getState().maxFps).toBe(expected)
-      }
-    })
-  })
-
-  describe('reset', () => {
-    it('should reset maxFps to default value', () => {
-      // Change from default
-      useUIStore.getState().setMaxFps(90)
-      expect(useUIStore.getState().maxFps).toBe(90)
-
-      // Reset
-      useUIStore.setState(UI_INITIAL_STATE)
-      expect(useUIStore.getState().maxFps).toBe(DEFAULT_MAX_FPS)
-    })
-  })
-})
 
 describe('uiStore.bufferVisualization', () => {
   beforeEach(() => {
@@ -71,8 +17,6 @@ describe('uiStore.bufferVisualization', () => {
   afterEach(() => {
     useUIStore.setState(UI_INITIAL_STATE)
   })
-
-
 
   describe('Mutual Exclusivity', () => {
     it('enabling showDepthBuffer should disable other buffer visualizations', () => {

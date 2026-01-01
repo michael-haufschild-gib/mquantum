@@ -9,6 +9,11 @@
 
 import type { DeviceCapabilities, GPUTier } from '@/lib/deviceCapabilities'
 import { DEFAULT_CAPABILITIES, DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
+import {
+  DEFAULT_MAX_FPS,
+  MAX_MAX_FPS,
+  MIN_MAX_FPS,
+} from './defaults/visualDefaults'
 import type { ShaderDebugInfo } from '@/types/shaderDebug'
 import { create } from 'zustand'
 
@@ -40,6 +45,9 @@ export const REFINEMENT_STAGE_QUALITY: Record<RefinementStage, number> = {
 
 /** localStorage key for persisting render resolution scale */
 const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
+
+/** localStorage key for persisting max FPS */
+const MAX_FPS_KEY = 'mdim_max_fps'
 
 /**
  * Load persisted render resolution scale from localStorage.
@@ -78,6 +86,45 @@ function persistResolutionScale(scale: number): void {
  */
 export function hasPersistedResolutionScale(): boolean {
   return loadPersistedResolutionScale() !== null
+}
+
+/**
+ * Load persisted max FPS from localStorage.
+ * @returns The persisted value, or null if not set
+ */
+function loadPersistedMaxFps(): number | null {
+  try {
+    const stored = localStorage.getItem(MAX_FPS_KEY)
+    if (stored !== null) {
+      const value = parseInt(stored, 10)
+      if (!isNaN(value) && value >= MIN_MAX_FPS && value <= MAX_MAX_FPS) {
+        return value
+      }
+    }
+  } catch {
+    // Silent fail - localStorage may not be available
+  }
+  return null
+}
+
+/**
+ * Persist max FPS to localStorage.
+ * @param fps - The max FPS to persist
+ */
+function persistMaxFps(fps: number): void {
+  try {
+    localStorage.setItem(MAX_FPS_KEY, fps.toString())
+  } catch {
+    // Silent fail - localStorage may not be available
+  }
+}
+
+/**
+ * Check if user has previously set a max FPS preference.
+ * Used by useDeviceCapabilities to avoid overriding user preferences.
+ */
+export function hasPersistedMaxFps(): boolean {
+  return loadPersistedMaxFps() !== null
 }
 
 // ============================================================================
@@ -161,6 +208,13 @@ interface PerformanceState {
   /** Base render resolution scale (0.5 = half res, 1.0 = full res) */
   renderResolutionScale: number
 
+  // -------------------------------------------------------------------------
+  // FPS Limiting
+  // -------------------------------------------------------------------------
+
+  /** Maximum frames per second (device-specific preference) */
+  maxFps: number
+
   // Shader Debugging
   shaderDebugInfos: Record<string, ShaderDebugInfo>
   shaderOverrides: string[]
@@ -206,6 +260,9 @@ interface PerformanceState {
 
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => void
+
+  // FPS Limiting
+  setMaxFps: (fps: number) => void
 
   // Shader Debugging
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => void
@@ -261,6 +318,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Render Resolution Scale (load from localStorage, default to desktop default)
   renderResolutionScale: loadPersistedResolutionScale() ?? DESKTOP_DEFAULT_RESOLUTION_SCALE,
+
+  // FPS Limiting (load from localStorage, default to DEFAULT_MAX_FPS)
+  maxFps: loadPersistedMaxFps() ?? DEFAULT_MAX_FPS,
 
   // Shader Debugging
   shaderDebugInfos: {},
@@ -359,6 +419,13 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     persistResolutionScale(clampedScale)
   },
 
+  // FPS Limiting
+  setMaxFps: (fps: number) => {
+    const clampedFps = Math.max(MIN_MAX_FPS, Math.min(MAX_MAX_FPS, fps))
+    set({ maxFps: clampedFps })
+    persistMaxFps(clampedFps)
+  },
+
   // Shader Debugging
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => {
     set((state) => {
@@ -430,6 +497,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       cameraTeleported: false,
       fractalAnimationLowQuality: true,
       renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
+      maxFps: DEFAULT_MAX_FPS,
       shaderDebugInfos: {},
       shaderOverrides: [],
       compilingShaders: new Set<string>(),

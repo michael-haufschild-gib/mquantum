@@ -13,7 +13,7 @@ import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
 import { clearMemoryCache } from '@/lib/geometry/wythoff/cache';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 /** Database name - must match IndexedDBCache.ts */
@@ -31,7 +31,7 @@ export interface SettingsSectionProps {
  * @param props.defaultOpen - Whether the section is initially expanded
  * @returns Settings section
  */
-export const SettingsSection: React.FC<SettingsSectionProps> = ({
+export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(({
   defaultOpen = true,
 }) => {
   const [showClearIndexDBModal, setShowClearIndexDBModal] = useState(false);
@@ -45,22 +45,22 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     }))
   );
 
-  const { showAxisHelper, setShowAxisHelper, maxFps, setMaxFps } = useUIStore(
+  const { showAxisHelper, setShowAxisHelper } = useUIStore(
     useShallow((state) => ({
       showAxisHelper: state.showAxisHelper,
       setShowAxisHelper: state.setShowAxisHelper,
+    }))
+  );
+  const { renderResolutionScale, setRenderResolutionScale, maxFps, setMaxFps } = usePerformanceStore(
+    useShallow((state) => ({
+      renderResolutionScale: state.renderResolutionScale,
+      setRenderResolutionScale: state.setRenderResolutionScale,
       maxFps: state.maxFps,
       setMaxFps: state.setMaxFps,
     }))
   );
-  const { renderResolutionScale, setRenderResolutionScale } = usePerformanceStore(
-    useShallow((state) => ({
-      renderResolutionScale: state.renderResolutionScale,
-      setRenderResolutionScale: state.setRenderResolutionScale,
-    }))
-  );
 
-  const handleClearGeometryCache = async () => {
+  const handleClearGeometryCache = useCallback(async () => {
     try {
       // Clear in-memory cache first
       clearMemoryCache();
@@ -81,21 +81,37 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     } catch {
       addToast('Failed to clear geometry cache', 'error');
     }
-  };
+  }, [addToast]);
 
-  const handleClearLocalStorage = () => {
+  const handleClearLocalStorage = useCallback(() => {
     try {
       localStorage.clear();
       addToast('localStorage cleared', 'success');
     } catch {
       addToast('Failed to clear localStorage', 'error');
     }
-  };
+  }, [addToast]);
 
-  const handleRestoreDismissedHints = () => {
+  const handleRestoreDismissedHints = useCallback(() => {
     resetAllDismissed();
     addToast('All hints restored', 'success');
-  };
+  }, [resetAllDismissed, addToast]);
+
+  const handleOpenClearIndexDBModal = useCallback(() => {
+    setShowClearIndexDBModal(true);
+  }, []);
+
+  const handleCloseClearIndexDBModal = useCallback(() => {
+    setShowClearIndexDBModal(false);
+  }, []);
+
+  const handleOpenClearLocalStorageModal = useCallback(() => {
+    setShowClearLocalStorageModal(true);
+  }, []);
+
+  const handleCloseClearLocalStorageModal = useCallback(() => {
+    setShowClearLocalStorageModal(false);
+  }, []);
 
   return (
     <Section title="Settings" defaultOpen={defaultOpen}>
@@ -145,7 +161,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setShowClearIndexDBModal(true)}
+          onClick={handleOpenClearIndexDBModal}
           data-testid="clear-cache-button"
         >
           Clear Geometry Cache
@@ -153,7 +169,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => setShowClearLocalStorageModal(true)}
+          onClick={handleOpenClearLocalStorageModal}
           data-testid="clear-localstorage-button"
         >
           Clear localStorage
@@ -162,7 +178,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
       <ConfirmModal
         isOpen={showClearIndexDBModal}
-        onClose={() => setShowClearIndexDBModal(false)}
+        onClose={handleCloseClearIndexDBModal}
         onConfirm={handleClearGeometryCache}
         title="Clear Geometry Cache"
         message="This will delete all cached polytope geometry. Next loads will regenerate from scratch."
@@ -172,7 +188,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
       <ConfirmModal
         isOpen={showClearLocalStorageModal}
-        onClose={() => setShowClearLocalStorageModal(false)}
+        onClose={handleCloseClearLocalStorageModal}
         onConfirm={handleClearLocalStorage}
         title="Clear localStorage"
         message="This will clear all localStorage data. This action cannot be undone."
@@ -181,4 +197,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       />
     </Section>
   );
-};
+});
+
+SettingsSection.displayName = 'SettingsSection';

@@ -9,8 +9,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useAnimationStore } from '@/stores/animationStore';
 import { useRotationStore } from '@/stores/rotationStore';
+import { usePerformanceStore } from '@/stores/performanceStore';
 import { useUIStore } from '@/stores/uiStore';
 import { UI_INITIAL_STATE } from '@/stores/slices/uiSlice';
+import { DEFAULT_MAX_FPS } from '@/stores/defaults/visualDefaults';
 
 describe('useAnimationLoop', () => {
   beforeEach(() => {
@@ -18,7 +20,7 @@ describe('useAnimationLoop', () => {
     useAnimationStore.getState().reset();
     useRotationStore.getState().resetAllRotations();
     useRotationStore.getState().setDimension(4);
-    useUIStore.getState().setMaxFps(60);
+    usePerformanceStore.getState().setMaxFps(60);
     useUIStore.getState().setAnimationBias(0);
   });
 
@@ -163,30 +165,30 @@ describe('useAnimationLoop', () => {
   });
 
   describe('FPS limiting', () => {
-    it('should read maxFps from visual store', () => {
-      const maxFps = useUIStore.getState().maxFps;
+    it('should read maxFps from performance store', () => {
+      const maxFps = usePerformanceStore.getState().maxFps;
       expect(typeof maxFps).toBe('number');
       expect(maxFps).toBeGreaterThanOrEqual(15);
       expect(maxFps).toBeLessThanOrEqual(120);
     });
 
     it('should default to 120 FPS', () => {
-      useUIStore.setState(UI_INITIAL_STATE);
-      expect(useUIStore.getState().maxFps).toBe(120);
+      usePerformanceStore.getState().reset();
+      expect(usePerformanceStore.getState().maxFps).toBe(DEFAULT_MAX_FPS);
     });
 
     it('should allow changing maxFps', () => {
-      useUIStore.getState().setMaxFps(30);
-      expect(useUIStore.getState().maxFps).toBe(30);
+      usePerformanceStore.getState().setMaxFps(30);
+      expect(usePerformanceStore.getState().maxFps).toBe(30);
 
-      useUIStore.getState().setMaxFps(90);
-      expect(useUIStore.getState().maxFps).toBe(90);
+      usePerformanceStore.getState().setMaxFps(90);
+      expect(usePerformanceStore.getState().maxFps).toBe(90);
     });
 
     it('should calculate frame interval from maxFps', () => {
       // Reset to ensure default of 120 FPS
-      useUIStore.setState(UI_INITIAL_STATE);
-      const maxFps = useUIStore.getState().maxFps;
+      usePerformanceStore.getState().reset();
+      const maxFps = usePerformanceStore.getState().maxFps;
       const frameInterval = 1000 / maxFps;
 
       // At 120 FPS, frame interval should be ~8.33ms
@@ -195,16 +197,16 @@ describe('useAnimationLoop', () => {
 
     it('should have correct frame interval at different FPS values', () => {
       // 30 FPS = 33.33ms per frame
-      useUIStore.getState().setMaxFps(30);
-      expect(1000 / useUIStore.getState().maxFps).toBeCloseTo(33.33, 1);
+      usePerformanceStore.getState().setMaxFps(30);
+      expect(1000 / usePerformanceStore.getState().maxFps).toBeCloseTo(33.33, 1);
 
       // 120 FPS = 8.33ms per frame
-      useUIStore.getState().setMaxFps(120);
-      expect(1000 / useUIStore.getState().maxFps).toBeCloseTo(8.33, 1);
+      usePerformanceStore.getState().setMaxFps(120);
+      expect(1000 / usePerformanceStore.getState().maxFps).toBeCloseTo(8.33, 1);
 
       // 15 FPS = 66.67ms per frame
-      useUIStore.getState().setMaxFps(15);
-      expect(1000 / useUIStore.getState().maxFps).toBeCloseTo(66.67, 1);
+      usePerformanceStore.getState().setMaxFps(15);
+      expect(1000 / usePerformanceStore.getState().maxFps).toBeCloseTo(66.67, 1);
     });
   });
 });

@@ -1,6 +1,6 @@
 import { soundManager } from '@/lib/audio/SoundManager';
 import { AnimatePresence, m } from 'motion/react';
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 
 export interface ControlGroupProps {
   title: string;
@@ -12,7 +12,7 @@ export interface ControlGroupProps {
   variant?: 'default' | 'card'; // Added variant
 }
 
-export const ControlGroup: React.FC<ControlGroupProps> = ({
+export const ControlGroup: React.FC<ControlGroupProps> = React.memo(({
   title,
   children,
   defaultOpen = true,
@@ -23,19 +23,30 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     if (collapsible) {
-      setIsOpen(!isOpen);
+      setIsOpen((prev) => !prev);
       soundManager.playClick();
     }
-  };
+  }, [collapsible]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (collapsible && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
-      toggle();
+      setIsOpen((prev) => !prev);
+      soundManager.playClick();
     }
-  };
+  }, [collapsible]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (collapsible) {
+      soundManager.playHover();
+    }
+  }, [collapsible]);
+
+  const handleRightElementClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   const isCard = variant === 'card';
   const showTitleSection = collapsible || title.trim() !== '';
@@ -57,7 +68,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
             ${collapsible ? 'cursor-pointer hover:text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-1 focus:ring-accent/50 focus:ring-inset' : ''}
           `}
           onClick={toggle}
-          onMouseEnter={() => collapsible && soundManager.playHover()}
+          onMouseEnter={handleMouseEnter}
           onKeyDown={handleKeyDown}
         >
           <div className="flex items-center gap-2">
@@ -76,7 +87,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
           </div>
 
           {rightElement && (
-            <div onClick={(e) => e.stopPropagation()}>
+            <div onClick={handleRightElementClick}>
               {rightElement}
             </div>
           )}
@@ -100,4 +111,6 @@ export const ControlGroup: React.FC<ControlGroupProps> = ({
       </AnimatePresence>
     </div>
   );
-};
+});
+
+ControlGroup.displayName = 'ControlGroup';

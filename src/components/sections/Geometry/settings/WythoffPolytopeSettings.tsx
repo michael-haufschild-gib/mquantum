@@ -19,9 +19,10 @@ import {
   WythoffSymmetryGroup,
 } from '@/lib/geometry/extended/types'
 import { getWythoffPresetName } from '@/lib/geometry/wythoff'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Wythoff Polytope settings controls.
@@ -31,13 +32,18 @@ import React from 'react'
  * through a system of mirrors.
  * @returns The Wythoff polytope settings UI component
  */
-export function WythoffPolytopeSettings() {
+export const WythoffPolytopeSettings: React.FC = React.memo(() => {
   const dimension = useGeometryStore((state) => state.dimension)
-  const config = useExtendedObjectStore((state) => state.wythoffPolytope)
-  const setSymmetryGroup = useExtendedObjectStore((state) => state.setWythoffSymmetryGroup)
-  const setPreset = useExtendedObjectStore((state) => state.setWythoffPreset)
-  const setScale = useExtendedObjectStore((state) => state.setWythoffScale)
-  const setSnub = useExtendedObjectStore((state) => state.setWythoffSnub)
+
+  const { config, setSymmetryGroup, setPreset, setScale, setSnub } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      config: state.wythoffPolytope,
+      setSymmetryGroup: state.setWythoffSymmetryGroup,
+      setPreset: state.setWythoffPreset,
+      setScale: state.setWythoffScale,
+      setSnub: state.setWythoffSnub,
+    }))
+  )
 
   // Build symmetry group options
   const symmetryGroupOptions = React.useMemo(() => {
@@ -176,7 +182,9 @@ export function WythoffPolytopeSettings() {
       </Section>
     </div>
   )
-}
+})
+
+WythoffPolytopeSettings.displayName = 'WythoffPolytopeSettings'
 
 // Helper function for factorial
 function factorial(n: number): number {

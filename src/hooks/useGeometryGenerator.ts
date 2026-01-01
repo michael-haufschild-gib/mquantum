@@ -24,6 +24,7 @@ import {
   getCacheKey,
 } from '@/lib/geometry/wythoff/cache'
 import type { PolytopeGeometry } from '@/lib/geometry/types'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Return type for useGeometryGenerator hook
@@ -55,8 +56,13 @@ export interface GeometryGeneratorResult {
  * @returns The generated geometry object with loading state.
  */
 export function useGeometryGenerator(): GeometryGeneratorResult {
-  const dimension = useGeometryStore((state) => state.dimension)
-  const objectType = useGeometryStore((state) => state.objectType)
+  // Grouped geometry store subscription
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({
+      dimension: state.dimension,
+      objectType: state.objectType,
+    }))
+  )
   const { addToast } = useToast()
   const { sendRequest, cancelRequest } = useGeometryWorker()
 
@@ -75,14 +81,28 @@ export function useGeometryGenerator(): GeometryGeneratorResult {
   // Only the most recent generation is allowed to update React state
   const generationRef = useRef(0)
 
-  const polytopeConfig = useExtendedObjectStore((state) => state.polytope)
-  const wythoffPolytopeConfig = useExtendedObjectStore((state) => state.wythoffPolytope)
-  const rootSystemConfig = useExtendedObjectStore((state) => state.rootSystem)
-  const cliffordTorusConfig = useExtendedObjectStore((state) => state.cliffordTorus)
-  const nestedTorusConfig = useExtendedObjectStore((state) => state.nestedTorus)
-  const mandelbulbConfig = useExtendedObjectStore((state) => state.mandelbulb)
-  const quaternionJuliaConfig = useExtendedObjectStore((state) => state.quaternionJulia)
-  const schroedingerConfig = useExtendedObjectStore((state) => state.schroedinger)
+  // Grouped extended object store subscription for all configs
+  const {
+    polytopeConfig,
+    wythoffPolytopeConfig,
+    rootSystemConfig,
+    cliffordTorusConfig,
+    nestedTorusConfig,
+    mandelbulbConfig,
+    quaternionJuliaConfig,
+    schroedingerConfig,
+  } = useExtendedObjectStore(
+    useShallow((state) => ({
+      polytopeConfig: state.polytope,
+      wythoffPolytopeConfig: state.wythoffPolytope,
+      rootSystemConfig: state.rootSystem,
+      cliffordTorusConfig: state.cliffordTorus,
+      nestedTorusConfig: state.nestedTorus,
+      mandelbulbConfig: state.mandelbulb,
+      quaternionJuliaConfig: state.quaternionJulia,
+      schroedingerConfig: state.schroedinger,
+    }))
+  )
 
   // Optimization: Only subscribe to the config relevant to the current object type
   const relevantConfig = useMemo(() => {

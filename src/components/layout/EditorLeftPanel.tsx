@@ -3,12 +3,12 @@ import { ObjectSettingsSection } from '@/components/sections/Geometry/ObjectSett
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer';
 import { Icon } from '@/components/ui/Icon';
 import { Tab, Tabs } from '@/components/ui/Tabs';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
-export const EditorLeftPanel: React.FC = () => {
+export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type');
 
-  const tabs: Tab[] = [
+  const tabs: Tab[] = useMemo(() => [
     {
       id: 'type',
       label: (
@@ -37,7 +37,7 @@ export const EditorLeftPanel: React.FC = () => {
         </div>
       ),
     },
-  ];
+  ], []);
 
   return (
     <div
@@ -81,4 +81,6 @@ export const EditorLeftPanel: React.FC = () => {
         </div>
     </div>
   );
-};
+});
+
+EditorLeftPanel.displayName = 'EditorLeftPanel';

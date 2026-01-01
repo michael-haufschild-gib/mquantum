@@ -17,7 +17,7 @@ import LightToggleOnIcon from '@/assets/icons/light-toggle-on.svg?react';
 import TrashIcon from '@/assets/icons/trash.svg?react';
 import { Button } from '@/components/ui/Button';
 import type { LightSource, LightType } from '@/rendering/lights/types';
-import React, { memo } from 'react';
+import React, { memo, useCallback } from 'react';
 
 /** Special ID for the virtual ambient light entry */
 export const AMBIENT_LIGHT_ID = '__ambient__';
@@ -62,6 +62,24 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
   // Determine the icon type - use 'ambient' for ambient light entries
   const iconType: LightType | 'ambient' = light.id === AMBIENT_LIGHT_ID ? 'ambient' : light.type;
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      onSelect();
+    }
+  }, [onSelect]);
+
+  const handleToggleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggle();
+  }, [onToggle]);
+
+  const handleRemoveClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isDeleteDisabled) {
+      onRemove();
+    }
+  }, [isDeleteDisabled, onRemove]);
+
   return (
     <div
       className={`
@@ -74,7 +92,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       onClick={onSelect}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && onSelect()}
+      onKeyDown={handleKeyDown}
       aria-pressed={isSelected}
     >
       {/* Light type icon with color */}
@@ -98,10 +116,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       <Button
         variant="ghost"
         size="icon"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
+        onClick={handleToggleClick}
         className={light.enabled ? 'text-accent' : 'text-[var(--text-tertiary)]'}
         ariaLabel={light.enabled ? 'Disable light' : 'Enable light'}
       >
@@ -116,12 +131,7 @@ export const LightListItem: React.FC<LightListItemProps> = memo(function LightLi
       <Button
         variant="ghost"
         size="icon"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!isDeleteDisabled) {
-            onRemove();
-          }
-        }}
+        onClick={handleRemoveClick}
         className={isDeleteDisabled ? 'text-[var(--text-tertiary)]/30' : 'text-[var(--text-tertiary)] hover:text-[var(--text-danger)]'}
         ariaLabel={isDeleteDisabled ? 'Cannot remove ambient light' : 'Remove light'}
         disabled={isDeleteDisabled}

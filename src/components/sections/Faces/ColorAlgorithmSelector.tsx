@@ -13,19 +13,24 @@ import {
   type ColorAlgorithm,
   isColorAlgorithmAvailable,
 } from '@/rendering/shaders/palette';
-import { useAppearanceStore } from '@/stores/appearanceStore';
+import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
 import { useGeometryStore } from '@/stores/geometryStore';
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface ColorAlgorithmSelectorProps {
   className?: string;
 }
 
-export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = ({
+export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = React.memo(({
   className = '',
 }) => {
-  const colorAlgorithm = useAppearanceStore((state) => state.colorAlgorithm);
-  const setColorAlgorithm = useAppearanceStore((state) => state.setColorAlgorithm);
+  const { colorAlgorithm, setColorAlgorithm } = useAppearanceStore(
+    useShallow((state: AppearanceSlice) => ({
+      colorAlgorithm: state.colorAlgorithm,
+      setColorAlgorithm: state.setColorAlgorithm,
+    }))
+  );
   const objectType = useGeometryStore((state) => state.objectType);
 
   // Filter algorithms based on object type
@@ -35,16 +40,28 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = ({
     });
   }, [objectType]);
 
+  // Transform options for Select component
+  const selectOptions = useMemo(() =>
+    availableOptions.map((opt) => ({
+      value: opt.value,
+      label: opt.label,
+    })),
+    [availableOptions]
+  );
+
+  const handleChange = useCallback((v: string) => {
+    setColorAlgorithm(v as ColorAlgorithm);
+  }, [setColorAlgorithm]);
+
   return (
     <div className={className}>
       <Select
-        options={availableOptions.map((opt) => ({
-          value: opt.value,
-          label: opt.label,
-        }))}
+        options={selectOptions}
         value={colorAlgorithm}
-        onChange={(v) => setColorAlgorithm(v as ColorAlgorithm)}
+        onChange={handleChange}
       />
     </div>
   );
-};
+});
+
+ColorAlgorithmSelector.displayName = 'ColorAlgorithmSelector';

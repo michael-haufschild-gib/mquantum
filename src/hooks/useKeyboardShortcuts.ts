@@ -11,6 +11,7 @@ import { useLayoutStore } from '@/stores/layoutStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { useExportStore } from '@/stores/exportStore'
 import { useCallback, useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 export interface ShortcutConfig {
   key: string
@@ -72,24 +73,38 @@ export const SHORTCUTS: Omit<ShortcutConfig, 'action'>[] = [
 export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}): void {
   const { enabled = true } = options
 
-  const dimension = useGeometryStore((state) => state.dimension)
-  const setDimension = useGeometryStore((state) => state.setDimension)
-  const setObjectType = useGeometryStore((state) => state.setObjectType)
+  // Grouped geometry store subscription
+  const { dimension, setDimension, setObjectType } = useGeometryStore(
+    useShallow((state) => ({
+      dimension: state.dimension,
+      setDimension: state.setDimension,
+      setObjectType: state.setObjectType,
+    }))
+  )
 
-  const toggleCinematicMode = useLayoutStore((state) => state.toggleCinematicMode)
-  const toggleCollapsed = useLayoutStore((state) => state.toggleCollapsed)
-  const toggleLeftPanel = useLayoutStore((state) => state.toggleLeftPanel)
-  const toggleShortcuts = useLayoutStore((state) => state.toggleShortcuts)
+  // Grouped layout store subscription
+  const { toggleCinematicMode, toggleCollapsed, toggleLeftPanel, toggleShortcuts } = useLayoutStore(
+    useShallow((state) => ({
+      toggleCinematicMode: state.toggleCinematicMode,
+      toggleCollapsed: state.toggleCollapsed,
+      toggleLeftPanel: state.toggleLeftPanel,
+      toggleShortcuts: state.toggleShortcuts,
+    }))
+  )
 
   // Camera reset
   const resetCamera = useCameraStore((state) => state.reset)
 
-  // Light-related state and actions
-  const selectedLightId = useLightingStore((state) => state.selectedLightId)
-  const setTransformMode = useLightingStore((state) => state.setTransformMode)
-  const selectLight = useLightingStore((state) => state.selectLight)
-  const removeLight = useLightingStore((state) => state.removeLight)
-  const duplicateLight = useLightingStore((state) => state.duplicateLight)
+  // Grouped lighting store subscription
+  const { selectedLightId, setTransformMode, selectLight, removeLight, duplicateLight } = useLightingStore(
+    useShallow((state) => ({
+      selectedLightId: state.selectedLightId,
+      setTransformMode: state.setTransformMode,
+      selectLight: state.selectLight,
+      removeLight: state.removeLight,
+      duplicateLight: state.duplicateLight,
+    }))
+  )
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {

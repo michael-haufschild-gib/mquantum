@@ -1,10 +1,19 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { usePresetManagerStore, type SavedStyle, type PresetManagerState } from '@/stores/presetManagerStore';
 import { useToast } from '@/hooks/useToast';
 import { useShallow } from 'zustand/react/shallow';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Button } from '@/components/ui/Button';
 import { InlineEdit } from '@/components/ui/InlineEdit';
+
+/** Format a timestamp to a readable date string */
+const formatDate = (timestamp: number): string => {
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
 
 /** Props for StyleManager component */
 interface StyleManagerProps {
@@ -20,7 +29,7 @@ interface StyleManagerProps {
  * @param root0.onClose - Callback to close the style manager modal
  * @returns The style manager component
  */
-export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
+export const StyleManager: React.FC<StyleManagerProps> = React.memo(({ onClose }) => {
   const { savedStyles, loadStyle, deleteStyle, renameStyle, importStyles, exportStyles } = usePresetManagerStore(
     useShallow((state: PresetManagerState) => ({
       savedStyles: state.savedStyles,
@@ -37,12 +46,12 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
   const [styleToDelete, setStyleToDelete] = useState<SavedStyle | null>(null);
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
 
-  const handleRenameStyle = (styleId: string, newName: string) => {
+  const handleRenameStyle = useCallback((styleId: string, newName: string) => {
     renameStyle(styleId, newName);
     addToast('Style renamed', 'success');
-  };
+  }, [renameStyle, addToast]);
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -64,9 +73,9 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
     };
     reader.readAsText(file);
     e.target.value = ''; // Reset
-  };
+  }, [importStyles, addToast]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const data = exportStyles();
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -81,23 +90,15 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
     } finally {
       URL.revokeObjectURL(url);
     }
-  };
+  }, [exportStyles, addToast]);
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = useCallback(() => {
     if (styleToDelete) {
       deleteStyle(styleToDelete.id);
       addToast('Style deleted', 'info');
       setStyleToDelete(null);
     }
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  }, [styleToDelete, deleteStyle, addToast]);
 
   return (
     <div className="space-y-4">
@@ -239,4 +240,6 @@ export const StyleManager: React.FC<StyleManagerProps> = ({ onClose }) => {
       />
     </div>
   );
-};
+});
+
+StyleManager.displayName = 'StyleManager';

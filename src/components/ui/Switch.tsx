@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { m } from 'motion/react';
 import { soundManager } from '@/lib/audio/SoundManager';
 
@@ -13,7 +13,7 @@ export interface SwitchProps {
   'data-testid'?: string;
 }
 
-export const Switch: React.FC<SwitchProps> = ({
+export const Switch: React.FC<SwitchProps> = React.memo(({
   checked,
   onCheckedChange,
   label,
@@ -23,6 +23,19 @@ export const Switch: React.FC<SwitchProps> = ({
   iconOff,
   'data-testid': dataTestId,
 }) => {
+  const handleMouseEnter = useCallback(() => {
+    if (!disabled) {
+      soundManager.playHover();
+    }
+  }, [disabled]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!disabled) {
+      onCheckedChange(e.target.checked);
+      soundManager.playClick();
+    }
+  }, [disabled, onCheckedChange]);
+
   return (
     <label
       className={`
@@ -30,7 +43,7 @@ export const Switch: React.FC<SwitchProps> = ({
         ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         ${className}
       `}
-      onMouseEnter={() => !disabled && soundManager.playHover()}
+      onMouseEnter={handleMouseEnter}
       data-testid={dataTestId}
     >
       <div className="relative isolate w-11 h-6">
@@ -38,23 +51,18 @@ export const Switch: React.FC<SwitchProps> = ({
           type="checkbox"
           className="sr-only"
           checked={checked}
-          onChange={(e) => {
-             if (!disabled) {
-                onCheckedChange(e.target.checked);
-                soundManager.playClick();
-             }
-          }}
+          onChange={handleChange}
           disabled={disabled}
           role="switch"
           aria-checked={checked}
         />
-        
+
         {/* Track */}
         <div
           className={`
             absolute inset-0 rounded-full border transition-all duration-300 ease-out
-            ${checked 
-              ? 'bg-accent/80 border-accent/50 shadow-[0_0_15px_var(--color-accent-glow)]' 
+            ${checked
+              ? 'bg-accent/80 border-accent/50 shadow-[0_0_15px_var(--color-accent-glow)]'
               : 'glass-input border-border-default group-hover/switch:bg-[var(--bg-hover)]'
             }
           `}
@@ -72,7 +80,7 @@ export const Switch: React.FC<SwitchProps> = ({
             x: checked ? 22 : 2,
           }}
           className={`
-            absolute top-0.5 left-0 w-5 h-5 rounded-full shadow-md z-10 
+            absolute top-0.5 left-0 w-5 h-5 rounded-full shadow-md z-10
             flex items-center justify-center overflow-hidden
             transition-colors duration-200 pointer-events-none
             ${checked ? 'bg-white' : 'bg-text-secondary group-hover/switch:bg-text-primary'}
@@ -101,7 +109,7 @@ export const Switch: React.FC<SwitchProps> = ({
           </div>
         </m.div>
       </div>
-      
+
       {label && (
         <span className="text-xs font-medium text-text-secondary group-hover/switch:text-text-primary transition-colors tracking-wide">
           {label}
@@ -109,4 +117,6 @@ export const Switch: React.FC<SwitchProps> = ({
       )}
     </label>
   );
-};
+});
+
+Switch.displayName = 'Switch';

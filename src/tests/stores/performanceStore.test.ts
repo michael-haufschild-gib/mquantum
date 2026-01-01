@@ -11,7 +11,13 @@ import {
   getEffectiveShadowQuality,
   getEffectiveSampleQuality,
   hasPersistedResolutionScale,
+  hasPersistedMaxFps,
 } from '@/stores/performanceStore';
+import {
+  DEFAULT_MAX_FPS,
+  MAX_MAX_FPS,
+  MIN_MAX_FPS,
+} from '@/stores/defaults/visualDefaults';
 
 describe('performanceStore', () => {
   beforeEach(() => {
@@ -372,6 +378,110 @@ describe('render resolution scale persistence', () => {
       // For testing, we verify the loadPersistedResolutionScale function works correctly
       // by checking hasPersistedResolutionScale returns true
       expect(hasPersistedResolutionScale()).toBe(true);
+    });
+  });
+});
+
+describe('max FPS persistence', () => {
+  const MAX_FPS_KEY = 'mdim_max_fps';
+
+  beforeEach(() => {
+    // Clear localStorage before each test
+    localStorage.removeItem(MAX_FPS_KEY);
+    // Reset store state
+    usePerformanceStore.getState().reset();
+  });
+
+  afterEach(() => {
+    // Clean up localStorage after each test
+    localStorage.removeItem(MAX_FPS_KEY);
+  });
+
+  describe('setMaxFps', () => {
+    it('should set maxFps to a valid value', () => {
+      usePerformanceStore.getState().setMaxFps(30);
+      expect(usePerformanceStore.getState().maxFps).toBe(30);
+    });
+
+    it('should persist maxFps to localStorage', () => {
+      const { setMaxFps } = usePerformanceStore.getState();
+
+      setMaxFps(60);
+
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60');
+    });
+
+    it('should clamp and persist values at boundaries', () => {
+      const { setMaxFps } = usePerformanceStore.getState();
+
+      // Below minimum
+      setMaxFps(5);
+      expect(usePerformanceStore.getState().maxFps).toBe(MIN_MAX_FPS);
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe(String(MIN_MAX_FPS));
+
+      // Above maximum
+      setMaxFps(999);
+      expect(usePerformanceStore.getState().maxFps).toBe(MAX_MAX_FPS);
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe(String(MAX_MAX_FPS));
+    });
+
+    it('clamps to the allowed range', () => {
+      const cases: Array<{ input: number; expected: number }> = [
+        { input: MIN_MAX_FPS - 1, expected: MIN_MAX_FPS },
+        { input: MIN_MAX_FPS, expected: MIN_MAX_FPS },
+        { input: MIN_MAX_FPS + 1, expected: MIN_MAX_FPS + 1 },
+        { input: MAX_MAX_FPS - 1, expected: MAX_MAX_FPS - 1 },
+        { input: MAX_MAX_FPS, expected: MAX_MAX_FPS },
+        { input: MAX_MAX_FPS + 1, expected: MAX_MAX_FPS },
+        { input: -30, expected: MIN_MAX_FPS },
+        { input: 999, expected: MAX_MAX_FPS },
+      ];
+
+      for (const { input, expected } of cases) {
+        usePerformanceStore.getState().reset();
+        usePerformanceStore.getState().setMaxFps(input);
+        expect(usePerformanceStore.getState().maxFps).toBe(expected);
+      }
+    });
+  });
+
+  describe('hasPersistedMaxFps', () => {
+    it('should return false when no value is persisted', () => {
+      expect(hasPersistedMaxFps()).toBe(false);
+    });
+
+    it('should return true after setting maxFps', () => {
+      const { setMaxFps } = usePerformanceStore.getState();
+
+      setMaxFps(60);
+
+      expect(hasPersistedMaxFps()).toBe(true);
+    });
+
+    it('should return false for invalid persisted values', () => {
+      // Set an invalid value directly
+      localStorage.setItem(MAX_FPS_KEY, 'invalid');
+      expect(hasPersistedMaxFps()).toBe(false);
+
+      // Set a value out of range (below MIN)
+      localStorage.setItem(MAX_FPS_KEY, '5');
+      expect(hasPersistedMaxFps()).toBe(false);
+
+      // Set a value out of range (above MAX)
+      localStorage.setItem(MAX_FPS_KEY, '999');
+      expect(hasPersistedMaxFps()).toBe(false);
+    });
+  });
+
+  describe('reset', () => {
+    it('should reset maxFps to default value', () => {
+      // Change from default
+      usePerformanceStore.getState().setMaxFps(90);
+      expect(usePerformanceStore.getState().maxFps).toBe(90);
+
+      // Reset
+      usePerformanceStore.getState().reset();
+      expect(usePerformanceStore.getState().maxFps).toBe(DEFAULT_MAX_FPS);
     });
   });
 });

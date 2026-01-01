@@ -5,7 +5,7 @@
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
-import React from 'react'
+import React, { useCallback } from 'react'
 import { SkyboxPaletteEditor } from '../SkyboxPaletteEditor'
 
 interface SkyboxSharedProceduralControlsProps {
@@ -15,12 +15,23 @@ interface SkyboxSharedProceduralControlsProps {
   setSkyboxIntensity: (value: number) => void
 }
 
-export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralControlsProps> = ({
+export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralControlsProps> = React.memo(({
   proceduralSettings,
   skyboxIntensity,
   setProceduralSettings,
   setSkyboxIntensity,
 }) => {
+  const handleScaleChange = useCallback((v: number) => setProceduralSettings({ scale: v }), [setProceduralSettings]);
+  const handleComplexityChange = useCallback((v: number) => setProceduralSettings({ complexity: v }), [setProceduralSettings]);
+  const handleEvolutionChange = useCallback((v: number) => setProceduralSettings({ evolution: v }), [setProceduralSettings]);
+  const handleSyncChange = useCallback((v: boolean) => setProceduralSettings({ syncWithObject: v }), [setProceduralSettings]);
+  const handleTimeScaleChange = useCallback((v: number) => setProceduralSettings({ timeScale: v }), [setProceduralSettings]);
+  const handleHorizonChange = useCallback((v: number) => setProceduralSettings({ horizon: v }), [setProceduralSettings]);
+  const handleTurbulenceChange = useCallback((v: number) => setProceduralSettings({ turbulence: v }), [setProceduralSettings]);
+  const handleAberrationChange = useCallback((v: number) => setProceduralSettings({ chromaticAberration: v }), [setProceduralSettings]);
+  const handleGrainChange = useCallback((v: number) => setProceduralSettings({ noiseGrain: v }), [setProceduralSettings]);
+  const handleSunIntensityChange = useCallback((v: number) => setProceduralSettings({ sunIntensity: v }), [setProceduralSettings]);
+
   return (
     <div className="space-y-6">
       {/* Structure Settings */}
@@ -34,7 +45,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           min={0.1}
           max={3.0}
           step={0.1}
-          onChange={(v) => setProceduralSettings({ scale: v })}
+          onChange={handleScaleChange}
         />
         <Slider
           label="Complexity"
@@ -42,7 +53,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           min={0}
           max={1}
           step={0.01}
-          onChange={(v) => setProceduralSettings({ complexity: v })}
+          onChange={handleComplexityChange}
         />
         <Slider
           label="Evolution (Seed)"
@@ -50,7 +61,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           min={0}
           max={10}
           step={0.01}
-          onChange={(v) => setProceduralSettings({ evolution: v })}
+          onChange={handleEvolutionChange}
         />
       </div>
 
@@ -62,7 +73,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
         <Switch
           data-testid="skybox-sync-toggle"
           checked={proceduralSettings.syncWithObject}
-          onCheckedChange={(v) => setProceduralSettings({ syncWithObject: v })}
+          onCheckedChange={handleSyncChange}
           label="Sync Color with Object"
         />
 
@@ -83,7 +94,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           min={0}
           max={2.0}
           step={0.01}
-          onChange={(v) => setProceduralSettings({ timeScale: v })}
+          onChange={handleTimeScaleChange}
         />
       </div>
 
@@ -100,7 +111,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             min={0}
             max={1}
             step={0.01}
-            onChange={(v) => setProceduralSettings({ horizon: v })}
+            onChange={handleHorizonChange}
           />
           <Slider
             label="Turbulence"
@@ -108,7 +119,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             min={0}
             max={1}
             step={0.01}
-            onChange={(v) => setProceduralSettings({ turbulence: v })}
+            onChange={handleTurbulenceChange}
           />
           <Slider
             label="Aberration"
@@ -116,7 +127,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             min={0}
             max={1}
             step={0.01}
-            onChange={(v) => setProceduralSettings({ chromaticAberration: v })}
+            onChange={handleAberrationChange}
           />
           <Slider
             label="Grain"
@@ -124,7 +135,7 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             min={0}
             max={0.1}
             step={0.005}
-            onChange={(v) => setProceduralSettings({ noiseGrain: v })}
+            onChange={handleGrainChange}
           />
         </div>
 
@@ -134,9 +145,11 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
           min={0}
           max={2}
           step={0.01}
-          onChange={(v) => setProceduralSettings({ sunIntensity: v })}
+          onChange={handleSunIntensityChange}
         />
       </div>
     </div>
   )
-}
+});
+
+SkyboxSharedProceduralControls.displayName = 'SkyboxSharedProceduralControls';

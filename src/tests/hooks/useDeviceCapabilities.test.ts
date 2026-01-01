@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import { useUIStore } from '@/stores/uiStore'
 import {
   MOBILE_DEFAULT_MAX_FPS,
   MOBILE_DEFAULT_RESOLUTION_SCALE,
@@ -35,8 +34,8 @@ describe('useDeviceCapabilities', () => {
       gpuName: 'unknown',
       deviceCapabilitiesDetected: false,
       renderResolutionScale: 1.0,
+      maxFps: 60,
     })
-    useUIStore.getState().setMaxFps(60)
   })
 
   afterEach(() => {
@@ -77,7 +76,7 @@ describe('useDeviceCapabilities', () => {
 
     // Should NOT apply mobile defaults
     expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0)
-    expect(useUIStore.getState().maxFps).toBe(60)
+    expect(usePerformanceStore.getState().maxFps).toBe(60)
     expect(usePerformanceStore.getState().isMobileGPU).toBe(false)
     expect(usePerformanceStore.getState().gpuTier).toBe(3)
   })
@@ -102,7 +101,7 @@ describe('useDeviceCapabilities', () => {
     expect(usePerformanceStore.getState().renderResolutionScale).toBe(
       MOBILE_DEFAULT_RESOLUTION_SCALE
     )
-    expect(useUIStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
+    expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
     expect(usePerformanceStore.getState().isMobileGPU).toBe(true)
     expect(usePerformanceStore.getState().gpuTier).toBe(2)
   })

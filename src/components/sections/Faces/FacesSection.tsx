@@ -22,7 +22,7 @@ import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults';
 import { useGeometryStore } from '@/stores/geometryStore';
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore';
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ColorAlgorithmSelector } from './ColorAlgorithmSelector';
 import { ColorPreview } from './ColorPreview';
@@ -31,20 +31,38 @@ import { DistributionControls } from './DistributionControls';
 import { LchPresetSelector } from './LchPresetSelector';
 import { PresetSelector } from './PresetSelector';
 
+/**
+ * Color algorithms that share the same cosine gradient controls:
+ * PresetSelector, CosineGradientEditor, and DistributionControls.
+ */
+const COSINE_GRADIENT_ALGORITHMS = new Set([
+  'cosine',
+  'normal',
+  'distance',
+  'radial',
+  'phase',
+  'mixed',
+  'blackbody',
+]);
+
 export interface FacesSectionProps {
   defaultOpen?: boolean;
 }
 
 type FacesTabId = 'colors' | 'material';
 
-export const FacesSection: React.FC<FacesSectionProps> = ({
+export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   const [activeTab, setActiveTab] = React.useState<FacesTabId>('colors');
 
   // Get object type and dimension to check rendering mode
-  const objectType = useGeometryStore((state) => state.objectType);
-  const dimension = useGeometryStore((state) => state.dimension);
+  const { objectType, dimension } = useGeometryStore(
+    useShallow((state) => ({
+      objectType: state.objectType,
+      dimension: state.dimension,
+    }))
+  );
 
   // Raymarching fractals (mandelbulb, julia, schroedinger, blackhole) are always fully opaque
   const isRaymarchingFractalType = isRaymarchingFractal(objectType, dimension);
@@ -110,7 +128,15 @@ export const FacesSection: React.FC<FacesSectionProps> = ({
   // Check if lighting controls should be shown
   const showLightingControls = shaderType === 'surface' && lightEnabled;
 
-  const tabs = [
+  const handleTabChange = useCallback((id: string) => {
+    setActiveTab(id as FacesTabId);
+  }, []);
+
+  const handleFaceOpacityChange = useCallback((value: number) => {
+    setSurfaceSettings({ faceOpacity: value });
+  }, [setSurfaceSettings]);
+
+  const tabs = useMemo(() => [
     {
       id: 'colors' as const,
       label: 'Colors',
@@ -132,7 +158,7 @@ export const FacesSection: React.FC<FacesSectionProps> = ({
       content: (
         <MaterialTabContent
           faceOpacity={surfaceSettings.faceOpacity}
-          setFaceOpacity={(value) => setSurfaceSettings({ faceOpacity: value })}
+          setFaceOpacity={handleFaceOpacityChange}
           showLightingControls={showLightingControls}
           specularColor={specularColor}
           setSpecularColor={setSpecularColor}
@@ -147,7 +173,13 @@ export const FacesSection: React.FC<FacesSectionProps> = ({
         />
       ),
     },
-  ];
+  ], [
+    colorAlgorithm, faceColor, setFaceColor, lchLightness, setLchLightness,
+    lchChroma, setLchChroma, surfaceSettings.faceOpacity, handleFaceOpacityChange,
+    showLightingControls, specularColor, setSpecularColor, specularIntensity,
+    setSpecularIntensity, roughness, setRoughness, metallic, setMetallic,
+    isRaymarchingFractalType
+  ]);
 
   return (
     <Section title="Faces" defaultOpen={defaultOpen} data-testid="section-faces">
@@ -155,7 +187,7 @@ export const FacesSection: React.FC<FacesSectionProps> = ({
         <Tabs
           tabs={tabs}
           value={activeTab}
-          onChange={(id) => setActiveTab(id as FacesTabId)}
+          onChange={handleTabChange}
           tabListClassName="mb-4"
           data-testid="faces-tabs"
         />
@@ -167,7 +199,9 @@ export const FacesSection: React.FC<FacesSectionProps> = ({
       </div>
     </Section>
   );
-};
+});
+
+FacesSection.displayName = 'FacesSection';
 
 // =============================================================================
 // Colors Tab Content
@@ -183,7 +217,7 @@ interface ColorsTabContentProps {
   setLchChroma: (value: number) => void;
 }
 
-const ColorsTabContent: React.FC<ColorsTabContentProps> = ({
+const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(({
   colorAlgorithm,
   faceColor,
   setFaceColor,
@@ -214,24 +248,8 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = ({
           />
         )}
 
-
-        {colorAlgorithm === 'cosine' && (
-          <div className="space-y-4">
-            <PresetSelector />
-            <CosineGradientEditor />
-            <DistributionControls />
-          </div>
-        )}
-
-        {colorAlgorithm === 'normal' && (
-          <div className="space-y-4">
-            <PresetSelector />
-            <CosineGradientEditor />
-            <DistributionControls />
-          </div>
-        )}
-
-        {colorAlgorithm === 'distance' && (
+        {/* Cosine gradient algorithms share the same controls */}
+        {COSINE_GRADIENT_ALGORITHMS.has(colorAlgorithm) && (
           <div className="space-y-4">
             <PresetSelector />
             <CosineGradientEditor />
@@ -273,27 +291,11 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = ({
           </div>
         )}
 
-        {colorAlgorithm === 'radial' && (
-          <div className="space-y-4">
-            <PresetSelector />
-            <CosineGradientEditor />
-            <DistributionControls />
-          </div>
-        )}
-
-        {(colorAlgorithm === 'phase' ||
-          colorAlgorithm === 'mixed' ||
-          colorAlgorithm === 'blackbody') && (
-          <div className="space-y-4">
-            <PresetSelector />
-            <CosineGradientEditor />
-            <DistributionControls />
-          </div>
-        )}
-
     </div>
   );
-};
+});
+
+ColorsTabContent.displayName = 'ColorsTabContent';
 
 // =============================================================================
 // Material Tab Content
@@ -315,7 +317,7 @@ interface MaterialTabContentProps {
   hideOpacity?: boolean;
 }
 
-const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
+const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(({
   faceOpacity,
   setFaceOpacity,
   showLightingControls,
@@ -329,6 +331,10 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
   setMetallic,
   hideOpacity = false,
 }) => {
+  const handleResetSpecularColor = useCallback(() => {
+    setSpecularColor(DEFAULT_FACE_PBR.specularColor);
+  }, [setSpecularColor]);
+
   return (
     <div className="space-y-4">
       {/* Face Opacity - Hidden for raymarching fractals (always fully opaque) */}
@@ -403,7 +409,7 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSpecularColor(DEFAULT_FACE_PBR.specularColor)}
+                  onClick={handleResetSpecularColor}
                   ariaLabel="Reset to default"
                 >
                   Reset
@@ -422,7 +428,9 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
       )}
     </div>
   );
-};
+});
+
+MaterialTabContent.displayName = 'MaterialTabContent';
 
 // =============================================================================
 // Multi-Source Weights Editor
@@ -432,13 +440,25 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = ({
  * Multi-Source Weights Editor for multiSource algorithm
  * @returns The weights editor component
  */
-const MultiSourceWeightsEditor: React.FC = () => {
+const MultiSourceWeightsEditor: React.FC = React.memo(() => {
   const { multiSourceWeights, setMultiSourceWeights } = useAppearanceStore(
     useShallow((state) => ({
       multiSourceWeights: state.multiSourceWeights,
       setMultiSourceWeights: state.setMultiSourceWeights,
     }))
   );
+
+  const handleDepthChange = useCallback((value: number) => {
+    setMultiSourceWeights({ depth: value });
+  }, [setMultiSourceWeights]);
+
+  const handleOrbitTrapChange = useCallback((value: number) => {
+    setMultiSourceWeights({ orbitTrap: value });
+  }, [setMultiSourceWeights]);
+
+  const handleNormalChange = useCallback((value: number) => {
+    setMultiSourceWeights({ normal: value });
+  }, [setMultiSourceWeights]);
 
   return (
     <div className="space-y-4">
@@ -452,7 +472,7 @@ const MultiSourceWeightsEditor: React.FC = () => {
         max={1}
         step={0.1}
         value={multiSourceWeights.depth}
-        onChange={(value) => setMultiSourceWeights({ depth: value })}
+        onChange={handleDepthChange}
         showValue
         tooltip="Weight for depth/iteration-based coloring"
       />
@@ -463,7 +483,7 @@ const MultiSourceWeightsEditor: React.FC = () => {
         max={1}
         step={0.1}
         value={multiSourceWeights.orbitTrap}
-        onChange={(value) => setMultiSourceWeights({ orbitTrap: value })}
+        onChange={handleOrbitTrapChange}
         showValue
         tooltip="Weight for orbit trap coloring (fractals)"
       />
@@ -474,10 +494,12 @@ const MultiSourceWeightsEditor: React.FC = () => {
         max={1}
         step={0.1}
         value={multiSourceWeights.normal}
-        onChange={(value) => setMultiSourceWeights({ normal: value })}
+        onChange={handleNormalChange}
         showValue
         tooltip="Weight for normal direction-based coloring"
       />
     </div>
   );
-};
+});
+
+MultiSourceWeightsEditor.displayName = 'MultiSourceWeightsEditor';

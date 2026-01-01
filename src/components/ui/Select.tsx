@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { soundManager } from '@/lib/audio/SoundManager';
 
 /** Single option in a Select dropdown */
@@ -46,7 +46,7 @@ export interface SelectProps<T extends string = string> {
  * />
  * ```
  */
-export const Select = <T extends string = string>({
+export const Select = React.memo(<T extends string = string>({
   label,
   options,
   value,
@@ -58,6 +58,16 @@ export const Select = <T extends string = string>({
   // Generate a unique ID for the select element to associate with the label
   const selectId = React.useId();
 
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    onChange(e.target.value as T);
+  }, [onChange]);
+
+  const handleMouseEnter = useCallback(() => {
+    if (!disabled) {
+      soundManager.playHover();
+    }
+  }, [disabled]);
+
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       {label && (
@@ -66,15 +76,15 @@ export const Select = <T extends string = string>({
         </label>
       )}
       <div className="relative group">
-      <select
-        id={selectId}
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        onMouseEnter={() => !disabled && soundManager.playHover()}
-        disabled={disabled}
-        data-testid={testId}
-        className="glass-input w-full ps-3 pe-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
-      >
+        <select
+          id={selectId}
+          value={value}
+          onChange={handleChange}
+          onMouseEnter={handleMouseEnter}
+          disabled={disabled}
+          data-testid={testId}
+          className="glass-input w-full ps-3 pe-8 py-1.5 text-xs text-[var(--text-primary)] rounded-lg appearance-none cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-hover)] transition-colors"
+        >
           {options.map((option) => (
             <option key={option.value} value={option.value} className="bg-background text-text-primary">
               {option.label}
@@ -99,4 +109,6 @@ export const Select = <T extends string = string>({
       </div>
     </div>
   );
-};
+}) as <T extends string = string>(props: SelectProps<T>) => React.ReactElement;
+
+(Select as React.FC).displayName = 'Select';

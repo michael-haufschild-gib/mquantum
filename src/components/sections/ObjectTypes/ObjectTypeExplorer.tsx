@@ -1,77 +1,37 @@
 import { soundManager } from '@/lib/audio/SoundManager';
 import { getAvailableTypesForDimension } from '@/lib/geometry';
-import { getConfigStoreKey, isRaymarchingType } from '@/lib/geometry/registry';
 import type { ObjectType } from '@/lib/geometry/types';
-import { isPolytopeType } from '@/lib/geometry/types';
-import { useAppearanceStore } from '@/stores/appearanceStore';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
+import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization';
+import { useGeometryStore, type GeometrySlice } from '@/stores/geometryStore';
 import { useRotationStore } from '@/stores/rotationStore';
 import { m } from 'motion/react';
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
-export const ObjectTypeExplorer: React.FC = () => {
-  const objectType = useGeometryStore((state) => state.objectType);
-  const setObjectType = useGeometryStore((state) => state.setObjectType);
-  const dimension = useGeometryStore((state) => state.dimension);
+export const ObjectTypeExplorer: React.FC = React.memo(() => {
+  // Consolidate geometry store selectors with useShallow
+  const { objectType, setObjectType, dimension } = useGeometryStore(
+    useShallow((state: GeometrySlice) => ({
+      objectType: state.objectType,
+      setObjectType: state.setObjectType,
+      dimension: state.dimension,
+    }))
+  );
   const resetAllRotations = useRotationStore((state) => state.resetAllRotations);
 
-  const initializeMandelbulbForDimension = useExtendedObjectStore(
-    (state) => state.initializeMandelbulbForDimension
-  );
-  const initializeSchroedingerForDimension = useExtendedObjectStore(
-    (state) => state.initializeSchroedingerForDimension
-  );
-  const initializeQuaternionJuliaForDimension = useExtendedObjectStore(
-    (state) => state.initializeQuaternionJuliaForDimension
-  );
-  const initializePolytopeForType = useExtendedObjectStore(
-    (state) => state.initializePolytopeForType
-  );
-
-  // Map config store keys to their initializer functions (for fractal types)
-  const fractalInitializers = useMemo(() => ({
-    mandelbulb: initializeMandelbulbForDimension,
-    schroedinger: initializeSchroedingerForDimension,
-    quaternionJulia: initializeQuaternionJuliaForDimension,
-  }), [initializeMandelbulbForDimension, initializeSchroedingerForDimension, initializeQuaternionJuliaForDimension]);
-
-  // Ensure faces are visible for raymarched fractals so render mode isn't 'none'
-  useEffect(() => {
-    if (isRaymarchingType(objectType)) {
-      const store = useAppearanceStore.getState();
-      if (!store.facesVisible) {
-        store.setFacesVisible(true);
-      }
-    }
-  }, [objectType]);
-
-  // Initialize fractal settings when objectType changes (data-driven via registry)
-  useEffect(() => {
-    const configKey = getConfigStoreKey(objectType);
-    if (configKey && configKey in fractalInitializers) {
-      const initializer = fractalInitializers[configKey as keyof typeof fractalInitializers];
-      initializer(dimension);
-    }
-  }, [objectType, dimension, fractalInitializers]);
-
-  // Initialize polytope scale when switching to a polytope type
-  useEffect(() => {
-    if (isPolytopeType(objectType)) {
-      initializePolytopeForType(objectType);
-    }
-  }, [objectType, initializePolytopeForType]);
+  // Handle object type initialization (fractals, polytopes, raymarching visibility)
+  useObjectTypeInitialization(objectType, dimension);
 
   // Get available types based on current dimension
   const availableTypes = useMemo(() => getAvailableTypesForDimension(dimension), [dimension]);
 
-  const handleSelect = (value: ObjectType) => {
+  const handleSelect = useCallback((value: ObjectType) => {
      soundManager.playClick();
      // Reset rotation angles to prevent accumulated rotations from previous
      // object type causing visual artifacts (e.g., spikes/distortion)
      resetAllRotations();
      setObjectType(value);
-  };
+  }, [resetAllRotations, setObjectType]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -144,4 +104,6 @@ export const ObjectTypeExplorer: React.FC = () => {
       })}
     </m.div>
   );
-};
+});
+
+ObjectTypeExplorer.displayName = 'ObjectTypeExplorer';

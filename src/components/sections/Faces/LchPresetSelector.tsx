@@ -8,14 +8,14 @@
 import { Select } from '@/components/ui/Select';
 import { LCH_PRESET_OPTIONS } from '@/rendering/shaders/palette';
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export interface LchPresetSelectorProps {
   className?: string;
 }
 
-export const LchPresetSelector: React.FC<LchPresetSelectorProps> = ({
+export const LchPresetSelector: React.FC<LchPresetSelectorProps> = React.memo(({
   className = '',
 }) => {
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -40,15 +40,15 @@ export const LchPresetSelector: React.FC<LchPresetSelectorProps> = ({
     return 'custom';
   }, [lchLightness, lchChroma]);
 
-  const options = [
+  const options = useMemo(() => [
     ...LCH_PRESET_OPTIONS.map((opt) => ({
       value: opt.value,
       label: opt.label,
     })),
     { value: 'custom', label: 'Custom' },
-  ];
+  ], []);
 
-  const handleChange = (value: string) => {
+  const handleChange = useCallback((value: string) => {
     if (value === 'custom') return;
 
     const preset = LCH_PRESET_OPTIONS.find((p) => p.value === value);
@@ -56,7 +56,7 @@ export const LchPresetSelector: React.FC<LchPresetSelectorProps> = ({
       setLchLightness(preset.lightness);
       setLchChroma(preset.chroma);
     }
-  };
+  }, [setLchLightness, setLchChroma]);
 
   return (
     <div className={className}>
@@ -68,4 +68,6 @@ export const LchPresetSelector: React.FC<LchPresetSelectorProps> = ({
       />
     </div>
   );
-};
+});
+
+LchPresetSelector.displayName = 'LchPresetSelector';

@@ -1,8 +1,10 @@
 import { Section } from '@/components/sections/Section';
 import { Slider } from '@/components/ui/Slider';
 import { getConfigStoreKey, getTypeName } from '@/lib/geometry/registry';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
+import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Polytope settings controls.
@@ -12,10 +14,15 @@ import { useGeometryStore } from '@/stores/geometryStore';
  * a unified configuration interface.
  * @returns The polytope settings UI component
  */
-export function PolytopeSettings() {
+export const PolytopeSettings: React.FC = React.memo(() => {
   const objectType = useGeometryStore((state) => state.objectType);
-  const config = useExtendedObjectStore((state) => state.polytope);
-  const setScale = useExtendedObjectStore((state) => state.setPolytopeScale);
+
+  const { config, setScale } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      config: state.polytope,
+      setScale: state.setPolytopeScale,
+    }))
+  );
 
   // Get display name from registry (data-driven)
   const typeName = getTypeName(objectType);
@@ -46,4 +53,6 @@ export function PolytopeSettings() {
       </Section>
     </div>
   );
-}
+});
+
+PolytopeSettings.displayName = 'PolytopeSettings';

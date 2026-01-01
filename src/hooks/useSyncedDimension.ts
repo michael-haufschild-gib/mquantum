@@ -6,6 +6,7 @@ import { useAnimationStore } from '@/stores/animationStore';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useAppearanceStore } from '@/stores/appearanceStore';
 import { usePerformanceStore } from '@/stores/performanceStore';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Synchronizes the dimension across all relevant stores and resets rotations
@@ -17,10 +18,22 @@ import { usePerformanceStore } from '@/stores/performanceStore';
  * refinement and is set during any dimension/object type change).
  */
 export function useSyncedDimension() {
-  const dimension = useGeometryStore((state) => state.dimension);
-  const objectType = useGeometryStore((state) => state.objectType);
-  const setRotationDimension = useRotationStore((state) => state.setDimension);
-  const resetAllRotations = useRotationStore((state) => state.resetAllRotations);
+  // Grouped geometry store subscription
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({
+      dimension: state.dimension,
+      objectType: state.objectType,
+    }))
+  );
+
+  // Grouped rotation store subscription
+  const { setRotationDimension, resetAllRotations } = useRotationStore(
+    useShallow((state) => ({
+      setRotationDimension: state.setDimension,
+      resetAllRotations: state.resetAllRotations,
+    }))
+  );
+
   const setTransformDimension = useTransformStore((state) => state.setDimension);
   const setAnimationDimension = useAnimationStore((state) => state.setDimension);
 

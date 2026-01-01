@@ -15,7 +15,7 @@ export interface EdgesSectionProps {
   defaultOpen?: boolean;
 }
 
-export const EdgesSection: React.FC<EdgesSectionProps> = ({
+export const EdgesSection: React.FC<EdgesSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   const edgesVisible = useAppearanceStore((state) => state.edgesVisible);
@@ -24,7 +24,7 @@ export const EdgesSection: React.FC<EdgesSectionProps> = ({
     <Section title="Edges" defaultOpen={defaultOpen}>
       <div className={`space-y-6 transition-opacity duration-300 ${!edgesVisible ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
         <EdgeControls />
-        
+
         {!edgesVisible && (
             <div className="text-center p-4 border border-dashed border-border-default rounded-lg bg-[var(--bg-hover)]">
                 <p className="text-xs text-text-secondary">Enable Edges to edit settings</p>
@@ -33,4 +33,6 @@ export const EdgesSection: React.FC<EdgesSectionProps> = ({
       </div>
     </Section>
   );
-};
+});
+
+EdgesSection.displayName = 'EdgesSection';

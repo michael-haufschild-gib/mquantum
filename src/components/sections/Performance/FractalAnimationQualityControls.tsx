@@ -14,7 +14,7 @@ import { useShallow } from 'zustand/react/shallow';
  * Only affects fractal objects (Mandelbulb, Julia, Schroedinger).
  * @returns The quality controls UI component
  */
-export const FractalAnimationQualityControls: React.FC = () => {
+export const FractalAnimationQualityControls: React.FC = React.memo(() => {
   const { enabled, setEnabled } = usePerformanceStore(
     useShallow((s) => ({
       enabled: s.fractalAnimationLowQuality,
@@ -35,4 +35,6 @@ export const FractalAnimationQualityControls: React.FC = () => {
       </p>
     </div>
   );
-};
+});
+
+FractalAnimationQualityControls.displayName = 'FractalAnimationQualityControls';

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { m, HTMLMotionProps } from 'motion/react';
 import { LoadingSpinner } from './LoadingSpinner';
 import { soundManager } from '@/lib/audio/SoundManager';
@@ -16,7 +16,23 @@ export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref"> {
   glow?: boolean;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+const baseStyles = 'relative overflow-hidden font-medium rounded-lg focus:outline-none focus:ring-1 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors gap-2';
+
+const variantStyles = {
+  primary: 'glass-button-primary text-white',
+  secondary: 'glass-button text-text-primary',
+  ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-[var(--bg-hover)] border border-transparent hover:border-[var(--bg-hover)]',
+  danger: 'bg-[var(--bg-danger)] text-[var(--text-danger)] border border-[var(--border-danger)] hover:bg-[var(--bg-danger)] hover:brightness-110 shadow-[0_0_15px_var(--bg-danger)]'
+} as const;
+
+const sizeStyles = {
+  sm: 'px-3 py-1.5 text-xs',
+  md: 'px-4 py-2 text-sm',
+  lg: 'px-6 py-3 text-base',
+  icon: 'p-2'
+} as const;
+
+export const Button: React.FC<ButtonProps> = React.memo(({
   variant = 'primary',
   size = 'md',
   children,
@@ -31,7 +47,7 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const ref = useRef<HTMLButtonElement>(null);
-  
+
   // Ripple State
   const [ripples, setRipples] = useState<{ x: number; y: number; id: number }[]>([]);
   const rippleTimersRef = useRef<Set<number>>(new Set());
@@ -45,9 +61,9 @@ export const Button: React.FC<ButtonProps> = ({
     };
   }, []);
 
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     if (disabled || loading) return;
-    
+
     // Sound
     soundManager.playClick();
 
@@ -56,7 +72,7 @@ export const Button: React.FC<ButtonProps> = ({
     const rippleX = e.clientX - rect.left;
     const rippleY = e.clientY - rect.top;
     const newRipple = { x: rippleX, y: rippleY, id: Date.now() };
-    
+
     setRipples((prev) => [...prev, newRipple]);
     const timer = window.setTimeout(() => {
         setRipples((prev) => prev.filter((r) => r.id !== newRipple.id));
@@ -65,39 +81,43 @@ export const Button: React.FC<ButtonProps> = ({
     rippleTimersRef.current.add(timer);
 
     onClick?.(e);
-  };
+  }, [disabled, loading, onClick]);
 
-  const baseStyles = 'relative overflow-hidden font-medium rounded-lg focus:outline-none focus:ring-1 focus:ring-accent/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors gap-2';
-
-  // We rely on our new CSS utilities for the heavy lifting of gradients and shadows
-  const variantStyles = {
-    primary: 'glass-button-primary text-white',
-    secondary: 'glass-button text-text-primary',
-    ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-[var(--bg-hover)] border border-transparent hover:border-[var(--bg-hover)]',
-    danger: 'bg-[var(--bg-danger)] text-[var(--text-danger)] border border-[var(--border-danger)] hover:bg-[var(--bg-danger)] hover:brightness-110 shadow-[0_0_15px_var(--bg-danger)]'
-  };
-
-  const sizeStyles = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
-    icon: 'p-2'
-  };
+  const handleMouseEnter = useCallback(() => {
+    if (!disabled && !loading) {
+      soundManager.playHover();
+    }
+  }, [disabled, loading]);
 
   const glowStyle = glow ? 'shadow-[0_0_25px_var(--color-accent)] ring-1 ring-accent/50' : '';
+
+  const combinedClassName = useMemo(() =>
+    `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${glowStyle} ${className}`,
+    [variant, size, glowStyle, className]
+  );
+
+  const whileHoverAnimation = useMemo(() =>
+    !disabled && !loading ? { scale: 1.02, filter: 'brightness(1.1)' } : undefined,
+    [disabled, loading]
+  );
+
+  const whileTapAnimation = useMemo(() =>
+    !disabled && !loading ? { scale: 0.96 } : undefined,
+    [disabled, loading]
+  );
 
   return (
     <m.button
       ref={ref}
       type={type}
       onClick={handleClick}
-      onMouseEnter={() => !disabled && !loading && soundManager.playHover()}
+      onMouseEnter={handleMouseEnter}
       disabled={disabled || loading}
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${glowStyle} ${className}`}
+      className={combinedClassName}
       aria-label={ariaLabel}
       data-testid={testId}
-      whileHover={!disabled && !loading ? { scale: 1.02, filter: 'brightness(1.1)' } : undefined}
-      whileTap={!disabled && !loading ? { scale: 0.96 } : undefined}
+      whileHover={whileHoverAnimation}
+      whileTap={whileTapAnimation}
       {...props}
     >
       {/* Loading State Overlay */}
@@ -106,7 +126,7 @@ export const Button: React.FC<ButtonProps> = ({
           <LoadingSpinner size={size === 'sm' ? 12 : 16} />
         </div>
       )}
-      
+
       {/* Ripples */}
       {ripples.map((ripple) => (
         <span
@@ -122,7 +142,7 @@ export const Button: React.FC<ButtonProps> = ({
           }}
         />
       ))}
-      
+
       {/* Content - faded when loading */}
       <div className={`flex items-center justify-center gap-2 ${loading ? 'opacity-0' : 'opacity-100'} transition-opacity relative z-10`}>
         {children}
@@ -134,4 +154,6 @@ export const Button: React.FC<ButtonProps> = ({
       )}
     </m.button>
   );
-};
+});
+
+Button.displayName = 'Button';

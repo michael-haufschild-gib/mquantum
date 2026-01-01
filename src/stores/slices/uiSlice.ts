@@ -10,14 +10,11 @@
 import type { StateCreator } from 'zustand'
 import {
   DEFAULT_ANIMATION_BIAS,
-  DEFAULT_MAX_FPS,
   DEFAULT_SHOW_AXIS_HELPER,
   DEFAULT_SHOW_DEPTH_BUFFER,
   DEFAULT_SHOW_NORMAL_BUFFER,
   DEFAULT_SHOW_PERF_MONITOR,
   DEFAULT_SHOW_TEMPORAL_DEPTH_BUFFER,
-  MAX_MAX_FPS,
-  MIN_MAX_FPS,
 } from '../defaults/visualDefaults'
 
 // ============================================================================
@@ -45,9 +42,6 @@ export interface UISliceState {
 
   // --- Animation ---
   animationBias: number
-
-  // --- FPS Limiting ---
-  maxFps: number
 }
 
 export interface UISliceActions {
@@ -62,9 +56,6 @@ export interface UISliceActions {
 
   // --- Animation Actions ---
   setAnimationBias: (bias: number) => void
-
-  // --- FPS Limiting Actions ---
-  setMaxFps: (fps: number) => void
 }
 
 export type UISlice = UISliceState & UISliceActions
@@ -85,9 +76,6 @@ export const UI_INITIAL_STATE: UISliceState = {
 
   // Animation
   animationBias: DEFAULT_ANIMATION_BIAS,
-
-  // FPS limiting
-  maxFps: DEFAULT_MAX_FPS,
 }
 
 // ============================================================================
@@ -139,10 +127,5 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set) => ({
   // --- Animation Actions ---
   setAnimationBias: (bias: number) => {
     set({ animationBias: Math.max(0, Math.min(1, bias)) })
-  },
-
-  // --- FPS Limiting Actions ---
-  setMaxFps: (fps: number) => {
-    set({ maxFps: Math.max(MIN_MAX_FPS, Math.min(MAX_MAX_FPS, fps)) })
   },
 })

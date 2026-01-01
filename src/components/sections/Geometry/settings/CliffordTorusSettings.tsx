@@ -1,7 +1,8 @@
 import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Clifford Torus settings controls
@@ -12,14 +13,25 @@ import React from 'react';
  */
 export function CliffordTorusSettings() {
   const dimension = useGeometryStore((state) => state.dimension);
-  const config = useExtendedObjectStore((state) => state.cliffordTorus);
 
-  // Flat mode actions
-  const setRadius = useExtendedObjectStore((state) => state.setCliffordTorusRadius);
-  const setMode = useExtendedObjectStore((state) => state.setCliffordTorusMode);
-  const setResolutionU = useExtendedObjectStore((state) => state.setCliffordTorusResolutionU);
-  const setResolutionV = useExtendedObjectStore((state) => state.setCliffordTorusResolutionV);
-  const setStepsPerCircle = useExtendedObjectStore((state) => state.setCliffordTorusStepsPerCircle);
+  // Consolidate extended object store selectors with useShallow
+  const {
+    config,
+    setRadius,
+    setMode,
+    setResolutionU,
+    setResolutionV,
+    setStepsPerCircle,
+  } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      config: state.cliffordTorus,
+      setRadius: state.setCliffordTorusRadius,
+      setMode: state.setCliffordTorusMode,
+      setResolutionU: state.setCliffordTorusResolutionU,
+      setResolutionV: state.setCliffordTorusResolutionV,
+      setStepsPerCircle: state.setCliffordTorusStepsPerCircle,
+    }))
+  );
 
   // Calculate max k for flat/generalized mode
   const maxK = Math.floor(dimension / 2);

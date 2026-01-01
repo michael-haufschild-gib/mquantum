@@ -12,7 +12,7 @@ import { Select, type SelectOption } from '@/components/ui/Select';
 import type { LightSource, LightType } from '@/rendering/lights/types';
 import { MAX_LIGHTS } from '@/rendering/lights/types';
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { AMBIENT_LIGHT_ID, LightListItem } from './LightListItem';
 
@@ -73,19 +73,27 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({
   }), [ambientColor, ambientIntensity, ambientEnabled]);
 
   // Toggle ambient light using the enabled boolean (consistent with other lights)
-  const handleAmbientToggle = () => {
+  const handleAmbientToggle = useCallback(() => {
     setAmbientEnabled(!ambientEnabled);
-  };
+  }, [ambientEnabled, setAmbientEnabled]);
+
+  const handleAmbientSelect = useCallback(() => {
+    selectLight(AMBIENT_LIGHT_ID);
+  }, [selectLight]);
+
+  const handleAmbientRemove = useCallback(() => {
+    // No-op, ambient can't be removed
+  }, []);
 
   const canAddLight = lights.length < MAX_LIGHTS;
 
-  const handleAddLight = (type: LightType | '') => {
+  const handleAddLight = useCallback((type: LightType | '') => {
     if (!type) return; // Ignore placeholder selection
     const newId = addLight(type as LightType);
     if (newId) {
       selectLight(newId);
     }
-  };
+  }, [addLight, selectLight]);
 
   // Check if ambient light is selected
   const isAmbientSelected = selectedLightId === AMBIENT_LIGHT_ID;
@@ -99,9 +107,9 @@ export const LightList: React.FC<LightListProps> = memo(function LightList({
           key={AMBIENT_LIGHT_ID}
           light={ambientLightEntry}
           isSelected={isAmbientSelected}
-          onSelect={() => selectLight(AMBIENT_LIGHT_ID)}
+          onSelect={handleAmbientSelect}
           onToggle={handleAmbientToggle}
-          onRemove={() => {}} // No-op, ambient can't be removed
+          onRemove={handleAmbientRemove}
           isDeleteDisabled={true}
         />
 

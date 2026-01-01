@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef } from 'react';
+import React, { useEffect, useId, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/Button';
 
 /** Props for Modal component */
@@ -22,7 +22,7 @@ interface ModalProps {
  * Provides built-in focus trapping, Escape key handling, and backdrop.
  * Manages body scroll prevention and focus restoration.
  */
-export const Modal: React.FC<ModalProps> = ({
+export const Modal: React.FC<ModalProps> = React.memo(({
   isOpen,
   onClose,
   title,
@@ -63,12 +63,12 @@ export const Modal: React.FC<ModalProps> = ({
   }, [onClose]);
 
   // Handle backdrop click
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
     // Only close if clicking directly on the dialog backdrop (not content)
     if (e.target === dialogRef.current) {
       onClose();
     }
-  };
+  }, [onClose]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -118,4 +118,6 @@ export const Modal: React.FC<ModalProps> = ({
       </div>
     </dialog>
   );
-};
+});
+
+Modal.displayName = 'Modal';

@@ -14,7 +14,7 @@ import { useAppearanceStore } from '@/stores/appearanceStore'
 import { DEFAULT_EDGE_PBR } from '@/stores/defaults/visualDefaults'
 import { useLightingStore } from '@/stores/lightingStore'
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore'
-import React from 'react'
+import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 export interface EdgeMaterialControlsProps {
@@ -49,6 +49,10 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
     } = usePBRStore(pbrSelector)
 
     const showMaterialControls = edgeThickness > 1 && lightEnabled
+
+    const handleResetSpecularColor = useCallback(() => {
+      setSpecularColor(DEFAULT_EDGE_PBR.specularColor);
+    }, [setSpecularColor]);
 
     if (!showMaterialControls) return null
 
@@ -99,7 +103,7 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSpecularColor(DEFAULT_EDGE_PBR.specularColor)}
+              onClick={handleResetSpecularColor}
               ariaLabel="Reset to default"
             >
               Reset
@@ -111,4 +115,6 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
       </ControlGroup>
     )
   }
-)
+);
+
+EdgeMaterialControls.displayName = 'EdgeMaterialControls';

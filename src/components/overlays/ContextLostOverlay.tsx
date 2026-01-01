@@ -12,9 +12,10 @@
 
 import { Z_INDEX } from '@/constants/zIndex'
 import { applySafeModeSettings } from '@/rendering/core/SafeModeSettings'
-import { useWebGLContextStore } from '@/stores/webglContextStore'
+import { useWebGLContextStore, type WebGLContextState } from '@/stores/webglContextStore'
 import { AnimatePresence, m } from 'motion/react'
 import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { Button } from '../ui/Button'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 
@@ -69,9 +70,13 @@ const LostState: React.FC = () => {
  * Restoring state - shown during recovery attempts.
  * @returns The restoring state UI
  */
-const RestoringState: React.FC = () => {
-  const recoveryAttempts = useWebGLContextStore((s) => s.recoveryAttempts)
-  const maxAttempts = useWebGLContextStore((s) => s.recoveryConfig.maxAttempts)
+const RestoringState: React.FC = React.memo(() => {
+  const { recoveryAttempts, maxAttempts } = useWebGLContextStore(
+    useShallow((s: WebGLContextState) => ({
+      recoveryAttempts: s.recoveryAttempts,
+      maxAttempts: s.recoveryConfig.maxAttempts,
+    }))
+  )
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
@@ -119,13 +124,15 @@ const RestoringState: React.FC = () => {
       </div>
     </div>
   )
-}
+})
+
+RestoringState.displayName = 'RestoringState'
 
 /**
  * Failed state - shown when recovery fails after max attempts.
  * @returns The failed state UI
  */
-const FailedState: React.FC = () => {
+const FailedState: React.FC = React.memo(() => {
   const lastError = useWebGLContextStore((s) => s.lastError)
 
   const handleReload = (): void => {
@@ -175,16 +182,22 @@ const FailedState: React.FC = () => {
       </Button>
     </div>
   )
-}
+})
+
+FailedState.displayName = 'FailedState'
 
 /**
  * Escalated state - shown when rapid failures are detected.
  * Gives user options to reduce quality or manually retry.
  * @returns The escalated state UI
  */
-const EscalatedState: React.FC = () => {
-  const retryFromEscalation = useWebGLContextStore((s) => s.retryFromEscalation)
-  const applySafeModeAndRetry = useWebGLContextStore((s) => s.applySafeModeAndRetry)
+const EscalatedState: React.FC = React.memo(() => {
+  const { retryFromEscalation, applySafeModeAndRetry } = useWebGLContextStore(
+    useShallow((s: WebGLContextState) => ({
+      retryFromEscalation: s.retryFromEscalation,
+      applySafeModeAndRetry: s.applySafeModeAndRetry,
+    }))
+  )
 
   const handleReduceQuality = useCallback((): void => {
     // Apply safe mode settings first
@@ -249,13 +262,15 @@ const EscalatedState: React.FC = () => {
       </p>
     </div>
   )
-}
+})
+
+EscalatedState.displayName = 'EscalatedState'
 
 /**
  * Main overlay component that shows appropriate state.
  * @returns The context lost overlay component
  */
-export const ContextLostOverlay: React.FC = () => {
+export const ContextLostOverlay: React.FC = React.memo(() => {
   const status = useWebGLContextStore((s) => s.status)
 
   // Don't render anything when context is active
@@ -297,4 +312,6 @@ export const ContextLostOverlay: React.FC = () => {
       </m.div>
     </AnimatePresence>
   )
-}
+})
+
+ContextLostOverlay.displayName = 'ContextLostOverlay'

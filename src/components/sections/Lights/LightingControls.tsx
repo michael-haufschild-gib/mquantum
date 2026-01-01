@@ -18,7 +18,7 @@ import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/exten
 import { useGeometryStore } from '@/stores/geometryStore';
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { LightEditor } from './LightEditor';
 import { LightList } from './LightList';
@@ -101,21 +101,25 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
   const effectiveAoIntensity = isSchroedinger ? schroedingerAoStrength : ssaoIntensity;
 
   // Handlers that update the appropriate store
-  const handleAoToggle = (enabled: boolean) => {
+  const handleAoToggle = useCallback((enabled: boolean) => {
     if (isSchroedinger) {
       setSchroedingerAoEnabled(enabled);
     } else {
       setSSAOEnabled(enabled);
     }
-  };
+  }, [isSchroedinger, setSchroedingerAoEnabled, setSSAOEnabled]);
 
-  const handleAoIntensityChange = (intensity: number) => {
+  const handleAoIntensityChange = useCallback((intensity: number) => {
     if (isSchroedinger) {
       setSchroedingerAoStrength(intensity);
     } else {
       setSSAOIntensity(intensity);
     }
-  };
+  }, [isSchroedinger, setSchroedingerAoStrength, setSSAOIntensity]);
+
+  const handleAoQualityChange = useCallback((val: string) => {
+    setSchroedingerAoQuality(parseInt(val, 10));
+  }, [setSchroedingerAoQuality]);
 
   // Get AO type label
   const aoTypeLabel = isSchroedinger
@@ -198,7 +202,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
               label="Quality"
               options={AO_QUALITY_OPTIONS}
               value={String(schroedingerAoQuality ?? 4)}
-              onChange={(val) => setSchroedingerAoQuality(parseInt(val, 10))}
+              onChange={handleAoQualityChange}
               data-testid="ao-quality-select"
             />
             <Slider
@@ -228,3 +232,5 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
     </div>
   );
 });
+
+LightingControls.displayName = 'LightingControls';

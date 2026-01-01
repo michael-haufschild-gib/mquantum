@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { useThemeStore } from '@/stores/themeStore';
@@ -14,7 +14,7 @@ interface Command {
   icon?: React.ReactNode;
 }
 
-export const CommandPalette: React.FC = () => {
+export const CommandPalette: React.FC = React.memo(() => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -37,7 +37,7 @@ export const CommandPalette: React.FC = () => {
 
   const resetCamera = useCameraStore(state => state.reset);
 
-  const commands: Command[] = [
+  const commands: Command[] = useMemo(() => [
     {
       id: 'cinematic',
       label: 'Toggle Cinematic Mode',
@@ -143,7 +143,7 @@ export const CommandPalette: React.FC = () => {
         action: () => setAccent('red'),
         icon: <div className="w-3 h-3 rounded-full bg-red-500"/>
     }
-  ];
+  ], [toggleCinematicMode, toggleCollapsed, toggleLeftPanel, toggleShortcuts, resetCamera, setMode, setAccent]);
 
   const filteredCommands = commands.filter(cmd =>
     cmd.label.toLowerCase().includes(query.toLowerCase()) ||
@@ -278,4 +278,6 @@ export const CommandPalette: React.FC = () => {
       )}
     </AnimatePresence>
   );
-};
+});
+
+CommandPalette.displayName = 'CommandPalette';

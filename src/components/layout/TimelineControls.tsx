@@ -7,7 +7,7 @@ import { getRotationPlanes } from '@/lib/math';
 import { MAX_SPEED, MIN_SPEED, useAnimationStore, type AnimationState } from '@/stores/animationStore';
 import { MAX_ANIMATION_BIAS, MIN_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults';
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
+import { useGeometryStore, type GeometrySlice } from '@/stores/geometryStore';
 import { useUIStore } from '@/stores/uiStore';
 import { AnimatePresence, m } from 'motion/react';
 import { useMemo, useState, type FC } from 'react';
@@ -17,8 +17,13 @@ import { MandelbulbAnimationDrawer } from './TimelineControls/MandelbulbAnimatio
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer';
 
 export const TimelineControls: FC = () => {
-    const dimension = useGeometryStore((state) => state.dimension);
-    const objectType = useGeometryStore((state) => state.objectType);
+    // Consolidated geometry store subscription
+    const { dimension, objectType } = useGeometryStore(
+        useShallow((state: GeometrySlice) => ({
+            dimension: state.dimension,
+            objectType: state.objectType,
+        }))
+    );
 
     // Animation Store
     const animationSelector = useShallow((state: AnimationState) => ({

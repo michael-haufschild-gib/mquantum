@@ -14,7 +14,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { DEFAULT_GROUND_PBR, type GroundPlaneType, type WallPosition } from '@/stores/defaults/visualDefaults';
 import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore';
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore';
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { BackgroundColorControls } from './BackgroundColorControls';
 import { SkyboxControls } from './SkyboxControls';
@@ -102,11 +102,19 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
     setSpecularColor,
   } = usePBRStore(pbrSelector);
 
+  const handleTabChange = useCallback((id: string) => {
+    setActiveTab(id);
+  }, []);
+
+  const handleResetSpecularColor = useCallback(() => {
+    setSpecularColor(DEFAULT_GROUND_PBR.specularColor);
+  }, [setSpecularColor]);
+
   /**
    * Walls tab content - ground plane and grid settings
    * @returns JSX element for walls tab
    */
-  const wallsContent = (
+  const wallsContent = useMemo(() => (
     <div className="space-y-4">
       {/* Wall Selection Toggle Group */}
       <MultiToggleGroup
@@ -222,7 +230,7 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setSpecularColor(DEFAULT_GROUND_PBR.specularColor)}
+            onClick={handleResetSpecularColor}
             className="h-6 px-2 text-xs text-accent hover:text-accent/80"
             title="Reset to default"
           >
@@ -242,21 +250,32 @@ export const EnvironmentControls: React.FC<EnvironmentControlsProps> = React.mem
         showValue
       />
     </div>
-  );
+  ), [
+    activeWalls, groundPlaneOffset, groundPlaneColor, groundPlaneType,
+    groundPlaneSizeScale, showGroundGrid, groundGridColor, groundGridSpacing,
+    roughness, metallic, specularColor, specularIntensity,
+    setActiveWalls, setGroundPlaneOffset, setGroundPlaneColor, setGroundPlaneType,
+    setGroundPlaneSizeScale, setShowGroundGrid, setGroundGridColor, setGroundGridSpacing,
+    setRoughness, setMetallic, setSpecularColor, setSpecularIntensity, handleResetSpecularColor
+  ]);
+
+  const tabs = useMemo(() => [
+    { id: 'color', label: 'Color', content: <BackgroundColorControls /> },
+    { id: 'walls', label: 'Walls', content: wallsContent },
+    { id: 'skybox', label: 'Skybox', content: <SkyboxControls /> },
+  ], [wallsContent]);
 
   return (
     <div className={className}>
       <Tabs
         value={activeTab}
-        onChange={setActiveTab}
+        onChange={handleTabChange}
         data-testid="env-controls"
         tabListClassName="mb-4"
-        tabs={[
-          { id: 'color', label: 'Color', content: <BackgroundColorControls /> },
-          { id: 'walls', label: 'Walls', content: wallsContent },
-          { id: 'skybox', label: 'Skybox', content: <SkyboxControls /> },
-        ]}
+        tabs={tabs}
       />
     </div>
   );
 });
+
+EnvironmentControls.displayName = 'EnvironmentControls';

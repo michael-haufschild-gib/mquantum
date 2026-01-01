@@ -30,7 +30,7 @@ const blackHoleSelector = (s: ReturnType<typeof useExtendedObjectStore.getState>
   setChromaticAberration: s.setBlackHoleDeferredLensingChromaticAberration,
 });
 
-export const GravityControls: React.FC = () => {
+export const GravityControls: React.FC = React.memo(() => {
   // Global State
   const ppSelector = useShallow((state: PostProcessingSlice) => ({
     gravityEnabled: state.gravityEnabled,
@@ -150,4 +150,6 @@ export const GravityControls: React.FC = () => {
       </ControlGroup>
     </div>
   );
-};
+});
+
+GravityControls.displayName = 'GravityControls';

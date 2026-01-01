@@ -21,7 +21,7 @@ type ColorMode = 'HEX' | 'RGB' | 'CSS';
 const HISTORY_KEY = 'mdimension_color_history';
 const MAX_HISTORY = 8;
 
-export const ColorPicker: React.FC<ColorPickerProps> = ({
+export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
   value,
   onChange,
   label,
@@ -418,4 +418,6 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       />
     </div>
   );
-};
+});
+
+ColorPicker.displayName = 'ColorPicker';

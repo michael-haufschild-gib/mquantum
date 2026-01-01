@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGeometryStore } from '@/stores/geometryStore';
 import {
   getDimensionInfo,
@@ -16,11 +17,15 @@ export interface EducationPanelProps {
   className?: string;
 }
 
-export const EducationPanel: React.FC<EducationPanelProps> = ({
+export const EducationPanel: React.FC<EducationPanelProps> = React.memo(({
   className = '',
 }) => {
-  const dimension = useGeometryStore((state) => state.dimension);
-  const objectType = useGeometryStore((state) => state.objectType);
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({
+      dimension: state.dimension,
+      objectType: state.objectType,
+    }))
+  );
 
   const dimensionInfo = useMemo(
     () => getDimensionInfo(dimension),
@@ -98,4 +103,6 @@ export const EducationPanel: React.FC<EducationPanelProps> = ({
       </div>
     </div>
   );
-};
+});
+
+EducationPanel.displayName = 'EducationPanel';

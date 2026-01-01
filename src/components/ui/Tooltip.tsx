@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { createPortal } from 'react-dom';
 
@@ -10,7 +10,7 @@ export interface TooltipProps {
   className?: string;
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({
+export const Tooltip: React.FC<TooltipProps> = React.memo(({
   content,
   children,
   position = 'top',
@@ -23,18 +23,18 @@ export const Tooltip: React.FC<TooltipProps> = ({
   const triggerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
-  const showTooltip = () => {
+  const showTooltip = useCallback(() => {
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true);
     }, delay);
-  };
+  }, [delay]);
 
-  const hideTooltip = () => {
+  const hideTooltip = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
     setIsVisible(false);
-  };
+  }, []);
 
   useEffect(() => {
     if (isVisible && triggerRef.current && tooltipRef.current) {
@@ -115,4 +115,6 @@ export const Tooltip: React.FC<TooltipProps> = ({
       )}
     </div>
   );
-};
+});
+
+Tooltip.displayName = 'Tooltip';

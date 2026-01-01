@@ -20,7 +20,7 @@ interface EditorLayoutProps {
   children?: React.ReactNode;
 }
 
-export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
+export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children }) => {
   const { accent, mode } = useThemeStore(useShallow((state) => ({ accent: state.accent, mode: state.mode })));
   const spotlightRef = useRef<HTMLDivElement>(null);
 
@@ -334,4 +334,6 @@ export const EditorLayout: React.FC<EditorLayoutProps> = ({ children }) => {
       {!isCinematicMode && <ShortcutsOverlay />}
     </div>
   );
-};
+});
+
+EditorLayout.displayName = 'EditorLayout';

@@ -13,7 +13,7 @@ export interface KnobProps {
   sensitivity?: number;
 }
 
-export const Knob: React.FC<KnobProps> = ({
+export const Knob: React.FC<KnobProps> = React.memo(({
   value,
   min = 0,
   max = 100,
@@ -87,6 +87,12 @@ export const Knob: React.FC<KnobProps> = ({
     onChange(min);
   }, [min, onChange]);
 
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') onChange(Math.min(value + step, max));
+    if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') onChange(Math.max(value - step, min));
+  }, [value, step, min, max, onChange]);
+
   // Generate tick marks
   const ticks = Array.from({ length: 11 }).map((_, i) => {
     const tickAngle = minRotation + (i / 10) * (maxRotation - minRotation);
@@ -118,10 +124,7 @@ export const Knob: React.FC<KnobProps> = ({
         aria-valuenow={value}
         aria-label={label}
         tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowUp' || e.key === 'ArrowRight') onChange(Math.min(value + step, max));
-          if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') onChange(Math.max(value - step, min));
-        }}
+        onKeyDown={handleKeyDown}
         whileTap={{ scale: 0.95 }}
       >
         <svg viewBox="0 0 40 40" className="w-full h-full overflow-visible">
@@ -221,4 +224,6 @@ export const Knob: React.FC<KnobProps> = ({
       )}
     </div>
   );
-};
+});
+
+Knob.displayName = 'Knob';

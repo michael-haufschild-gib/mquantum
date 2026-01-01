@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 
@@ -13,7 +13,7 @@ interface ConfirmModalProps {
   isDestructive?: boolean;
 }
 
-export const ConfirmModal: React.FC<ConfirmModalProps> = ({
+export const ConfirmModal: React.FC<ConfirmModalProps> = React.memo(({
   isOpen,
   onClose,
   onConfirm,
@@ -23,10 +23,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   cancelText = 'Cancel',
   isDestructive = false,
 }) => {
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     onConfirm();
     onClose();
-  };
+  }, [onConfirm, onClose]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} width="max-w-sm">
@@ -38,8 +38,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <Button variant="ghost" onClick={onClose} size="sm">
             {cancelText}
           </Button>
-          <Button 
-            variant={isDestructive ? 'danger' : 'primary'} 
+          <Button
+            variant={isDestructive ? 'danger' : 'primary'}
             onClick={handleConfirm}
             size="sm"
           >
@@ -49,4 +49,6 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
       </div>
     </Modal>
   );
-};
+});
+
+ConfirmModal.displayName = 'ConfirmModal';

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { ToggleGroup } from '@/components/ui/ToggleGroup';
 import { MAX_DIMENSION, MIN_DIMENSION, useGeometryStore, type GeometryState } from '@/stores/geometryStore';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export interface DimensionSelectorProps {
@@ -105,24 +105,41 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(({
     };
   }, [dimension]);
 
-  const scroll = (e: React.MouseEvent, direction: 'left' | 'right') => {
+  const scrollLeft = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (scrollContainerRef.current) {
       const scrollAmount = 150;
       scrollContainerRef.current.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        left: -scrollAmount,
         behavior: 'smooth',
       });
     }
-  };
+  }, []);
 
-  const handleChange = (value: string) => {
+  const scrollRight = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (scrollContainerRef.current) {
+      const scrollAmount = 150;
+      scrollContainerRef.current.scrollBy({
+        left: scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+
+  const handleChange = useCallback((value: string) => {
     const newDimension = parseInt(value, 10);
     if (!isNaN(newDimension)) {
       setDimension(newDimension);
     }
-  };
+  }, [setDimension]);
+
+  const handlePreventDefault = useCallback((e: React.PointerEvent | React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+  }, []);
 
   return (
     <div className={`${className}`}>
@@ -130,13 +147,13 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(({
         {canScrollLeft && (
           <div
             className="absolute left-0 top-0 bottom-0 z-20 flex items-center"
-            onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onPointerDown={handlePreventDefault}
+            onMouseDown={handlePreventDefault}
           >
             <Button
               variant="ghost"
               size="icon"
-              onClick={(e) => scroll(e, 'left')}
+              onClick={scrollLeft}
               className="h-full rounded-l-lg rounded-r-none border-none bg-gradient-to-r from-panel-bg via-panel-bg/90 to-transparent hover:bg-gradient-to-r px-1 w-auto"
               ariaLabel="Scroll left"
             >
@@ -163,13 +180,13 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(({
         {canScrollRight && (
           <div
             className="absolute right-0 top-0 bottom-0 z-20 flex items-center"
-            onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onPointerDown={handlePreventDefault}
+            onMouseDown={handlePreventDefault}
           >
             <Button
               variant="ghost"
               size="icon"
-              onClick={(e) => scroll(e, 'right')}
+              onClick={scrollRight}
               className="h-full rounded-r-lg rounded-l-none border-none bg-gradient-to-l from-panel-bg via-panel-bg/90 to-transparent hover:bg-gradient-to-l px-1 w-auto"
               ariaLabel="Scroll right"
             >
@@ -182,3 +199,5 @@ export const DimensionSelector: React.FC<DimensionSelectorProps> = React.memo(({
     </div>
   );
 });
+
+DimensionSelector.displayName = 'DimensionSelector';

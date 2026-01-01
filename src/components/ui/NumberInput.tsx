@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Input, InputProps } from './Input';
 
 export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'> {
@@ -181,7 +181,7 @@ function parseExpression(expression: string): number | null {
   }
 }
 
-export const NumberInput: React.FC<NumberInputProps> = ({
+export const NumberInput: React.FC<NumberInputProps> = React.memo(({
   value,
   onChange,
   min = -Infinity,
@@ -213,16 +213,16 @@ export const NumberInput: React.FC<NumberInputProps> = ({
     }
   }, [value, precision, isFocused]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalValue(e.target.value);
     setError(null);
-  };
+  }, []);
 
-  const handleFocus = () => {
+  const handleFocus = useCallback(() => {
     setIsFocused(true);
-  };
+  }, []);
 
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false);
     const parsed = parseExpression(localValue);
 
@@ -253,14 +253,22 @@ export const NumberInput: React.FC<NumberInputProps> = ({
     }
 
     if (onBlur) onBlur(e);
-  };
+  }, [localValue, min, max, onChange, precision, value, onBlur]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.currentTarget.blur();
     }
     props.onKeyDown?.(e);
-  };
+  }, [props]);
+
+  const handleIncrement = useCallback(() => {
+    onChange(Math.min(value + step, max));
+  }, [onChange, value, step, max]);
+
+  const handleDecrement = useCallback(() => {
+    onChange(Math.max(value - step, min));
+  }, [onChange, value, step, min]);
 
   return (
     <Input
@@ -276,14 +284,14 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         <div className="flex flex-col gap-[1px]">
            <button
              className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"
-             onClick={() => onChange(Math.min(value + step, max))}
+             onClick={handleIncrement}
              tabIndex={-1}
            >
              <svg width="6" height="4" viewBox="0 0 8 4" fill="currentColor"><path d="M4 0L8 4H0L4 0Z"/></svg>
            </button>
            <button
              className="h-2 w-3 hover:bg-[var(--bg-active)] rounded-sm flex items-center justify-center"
-             onClick={() => onChange(Math.max(value - step, min))}
+             onClick={handleDecrement}
              tabIndex={-1}
            >
              <svg width="6" height="4" viewBox="0 0 8 4" fill="currentColor"><path d="M4 4L0 0H8L4 4Z"/></svg>
@@ -292,4 +300,6 @@ export const NumberInput: React.FC<NumberInputProps> = ({
       }
     />
   );
-};
+});
+
+NumberInput.displayName = 'NumberInput';

@@ -45,11 +45,11 @@ const PortaledSubmenu: React.FC<{
   depth: number;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-}> = ({ items, triggerRect, onClose, depth, onMouseEnter, onMouseLeave }) => {
+}> = React.memo(({ items, triggerRect, onClose, depth, onMouseEnter, onMouseLeave }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   const [ready, setReady] = useState(false);
-  
+
   // Use the portal container from context (popover element) if available,
   // otherwise fall back to document.body. This ensures submenus stay in the
   // same stacking context as the parent menu when using native popover API.
@@ -114,7 +114,58 @@ const PortaledSubmenu: React.FC<{
   );
 
   return createPortal(submenuContent, portalTarget);
-};
+});
+
+PortaledSubmenu.displayName = 'PortaledSubmenu';
+
+/**
+ * Individual menu item button with proper memoization
+ */
+const MenuItemButton = React.memo(({
+  item,
+  index,
+  hasSubmenu,
+  isSubmenuOpen,
+  isMobile,
+  onItemClick,
+  onMouseEnter,
+  itemRef,
+}: {
+  item: DropdownMenuItem;
+  index: number;
+  hasSubmenu: boolean;
+  isSubmenuOpen: boolean;
+  isMobile: boolean;
+  onItemClick: () => void;
+  onMouseEnter: () => void;
+  itemRef: (el: HTMLButtonElement | null) => void;
+}) => {
+  return (
+    <button
+      ref={itemRef}
+      onClick={onItemClick}
+      onMouseEnter={onMouseEnter}
+      disabled={item.disabled}
+      className={`
+        w-full text-left px-3 py-1.5 text-sm flex items-center justify-between group
+        ${item.disabled ? 'text-[var(--text-tertiary)] cursor-not-allowed' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer'}
+        ${isSubmenuOpen ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : ''}
+      `}
+      data-testid={item['data-testid']}
+    >
+      <span>{item.label}</span>
+      {hasSubmenu ? (
+        <span className="ml-2 opacity-50 text-xs">›</span>
+      ) : (!isMobile && item.shortcut) ? (
+        <span className="text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] font-mono ml-4">
+          {item.shortcut}
+        </span>
+      ) : null}
+    </button>
+  );
+});
+
+MenuItemButton.displayName = 'MenuItemButton';
 
 /**
  * Renders menu items with submenu support
@@ -123,39 +174,43 @@ const MenuItems: React.FC<{
   items: DropdownMenuItem[];
   onClose: () => void;
   depth?: number;
-}> = ({ items, onClose, depth = 0 }) => {
+}> = React.memo(({ items, onClose, depth = 0 }) => {
   const isMobile = useIsMobile();
   const [activeSubmenuIndex, setActiveSubmenuIndex] = useState<number | null>(null);
   const [submenuTriggerRect, setSubmenuTriggerRect] = useState<DOMRect | null>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearCloseTimeout = () => {
+  const clearCloseTimeout = useCallback(() => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
-  };
+  }, []);
 
-  const scheduleClose = () => {
+  const scheduleClose = useCallback(() => {
     clearCloseTimeout();
     closeTimeoutRef.current = setTimeout(() => {
       setActiveSubmenuIndex(null);
       setSubmenuTriggerRect(null);
     }, 100);
-  };
+  }, [clearCloseTimeout]);
 
-  const openSubmenu = (index: number) => {
+  const openSubmenu = useCallback((index: number) => {
     clearCloseTimeout();
     const button = itemRefs.current[index];
     if (button) {
       setSubmenuTriggerRect(button.getBoundingClientRect());
       setActiveSubmenuIndex(index);
     }
-  };
+  }, [clearCloseTimeout]);
 
   useEffect(() => {
     return () => clearCloseTimeout();
+  }, [clearCloseTimeout]);
+
+  const getItemRef = useCallback((index: number) => (el: HTMLButtonElement | null) => {
+    itemRefs.current[index] = el;
   }, []);
 
   return (
@@ -178,50 +233,43 @@ const MenuItems: React.FC<{
         const hasSubmenu = !!item.items;
         const isSubmenuOpen = activeSubmenuIndex === index;
 
+        const handleClick = () => {
+          if (hasSubmenu) {
+            if (isSubmenuOpen) {
+              setActiveSubmenuIndex(null);
+              setSubmenuTriggerRect(null);
+            } else {
+              openSubmenu(index);
+            }
+          } else if (!item.disabled && item.onClick) {
+            soundManager.playClick();
+            item.onClick();
+            onClose();
+          }
+        };
+
+        const handleMouseEnter = () => {
+          if (!item.disabled) soundManager.playHover();
+          if (hasSubmenu) {
+            openSubmenu(index);
+          } else {
+            // Close any open submenu when hovering a non-submenu item
+            scheduleClose();
+          }
+        };
+
         return (
           <React.Fragment key={index}>
-            <button
-              ref={el => { itemRefs.current[index] = el; }}
-              onClick={() => {
-                if (hasSubmenu) {
-                  if (isSubmenuOpen) {
-                    setActiveSubmenuIndex(null);
-                    setSubmenuTriggerRect(null);
-                  } else {
-                    openSubmenu(index);
-                  }
-                } else if (!item.disabled && item.onClick) {
-                  soundManager.playClick();
-                  item.onClick();
-                  onClose();
-                }
-              }}
-              onMouseEnter={() => {
-                if (!item.disabled) soundManager.playHover();
-                if (hasSubmenu) {
-                  openSubmenu(index);
-                } else {
-                  // Close any open submenu when hovering a non-submenu item
-                  scheduleClose();
-                }
-              }}
-              disabled={item.disabled}
-              className={`
-                w-full text-left px-3 py-1.5 text-sm flex items-center justify-between group
-                ${item.disabled ? 'text-[var(--text-tertiary)] cursor-not-allowed' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer'}
-                ${isSubmenuOpen ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : ''}
-              `}
-              data-testid={item['data-testid']}
-            >
-            <span>{item.label}</span>
-                              {hasSubmenu ? (
-                <span className="ml-2 opacity-50 text-xs">›</span>
-                          ) : (!isMobile && item.shortcut) ? (
-                <span className="text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)] font-mono ml-4">
-                  {item.shortcut}
-                </span>
-              ) : null}
-            </button>
+            <MenuItemButton
+              item={item}
+              index={index}
+              hasSubmenu={hasSubmenu}
+              isSubmenuOpen={isSubmenuOpen}
+              isMobile={isMobile}
+              onItemClick={handleClick}
+              onMouseEnter={handleMouseEnter}
+              itemRef={getItemRef(index)}
+            />
 
             {/* Portaled Submenu */}
             <AnimatePresence>
@@ -241,6 +289,13 @@ const MenuItems: React.FC<{
       })}
     </>
   );
+});
+
+MenuItems.displayName = 'MenuItems';
+
+const menuVariants = {
+  closed: { opacity: 0, y: -8, scale: 0.95, transition: { duration: 0.1 } },
+  open: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring' as const, damping: 25, stiffness: 400, mass: 0.5 } }
 };
 
 /**
@@ -249,7 +304,7 @@ const MenuItems: React.FC<{
  * Only one dropdown can be open at a time across the entire app.
  * Supports submenus, keyboard navigation, and click-outside closing.
  */
-export const DropdownMenu: React.FC<DropdownMenuProps> = ({
+export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(({
   trigger,
   items,
   className = '',
@@ -369,7 +424,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
     };
   }, [isOpen, updatePosition]);
 
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleToggle = useCallback((e: React.MouseEvent) => {
     if (!isOpen) {
       soundManager.playSwish();
     } else {
@@ -377,16 +432,15 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
     }
     toggleDropdown(dropdownId);
     e.stopPropagation();
-  };
+  }, [isOpen, toggleDropdown, dropdownId]);
 
-  const closeMenu = () => {
+  const closeMenu = useCallback(() => {
     closeDropdown(dropdownId);
-  };
+  }, [closeDropdown, dropdownId]);
 
-  const menuVariants = {
-    closed: { opacity: 0, y: -8, scale: 0.95, transition: { duration: 0.1 } },
-    open: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring' as const, damping: 25, stiffness: 400, mass: 0.5 } }
-  };
+  const handleContentClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   return (
     <>
@@ -429,7 +483,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
                   overflowY: 'auto',
                   backdropFilter: 'blur(16px)',
                 }}
-                onClick={(e) => e.stopPropagation()}
+                onClick={handleContentClick}
               >
                 <MenuItems items={items} onClose={closeMenu} />
               </m.div>
@@ -439,4 +493,6 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
       </div>
     </>
   );
-};
+});
+
+DropdownMenu.displayName = 'DropdownMenu';

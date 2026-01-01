@@ -1,8 +1,9 @@
 import { Select } from '@/components/ui/Select';
 import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * Root System settings controls
@@ -11,11 +12,16 @@ import React from 'react';
  * Provides scale control (0.5-2.0) for adjusting the size of the root system.
  * @returns The root system settings UI component
  */
-export function RootSystemSettings() {
+export const RootSystemSettings: React.FC = React.memo(() => {
   const dimension = useGeometryStore((state) => state.dimension);
-  const config = useExtendedObjectStore((state) => state.rootSystem);
-  const setRootType = useExtendedObjectStore((state) => state.setRootSystemType);
-  const setScale = useExtendedObjectStore((state) => state.setRootSystemScale);
+
+  const { config, setRootType, setScale } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      config: state.rootSystem,
+      setRootType: state.setRootSystemType,
+      setScale: state.setRootSystemScale,
+    }))
+  );
 
   // Build available root types based on dimension
   const rootTypeOptions = React.useMemo(() => {
@@ -63,4 +69,6 @@ export function RootSystemSettings() {
       />
     </div>
   );
-}
+});
+
+RootSystemSettings.displayName = 'RootSystemSettings';

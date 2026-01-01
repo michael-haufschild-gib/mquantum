@@ -8,10 +8,11 @@ import { useAnimationStore } from '@/stores/animationStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useRotationStore } from '@/stores/rotationStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useExportStore } from '@/stores/exportStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { useUIStore } from '@/stores/uiStore'
 import { useCallback, useEffect, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Hook that runs the animation loop when animation is playing
@@ -19,9 +20,16 @@ import { useCallback, useEffect, useRef } from 'react'
  * Pauses during skybox loading or scene transitions to avoid visual artifacts
  */
 export function useAnimationLoop(): void {
-  const isPlaying = useAnimationStore((state) => state.isPlaying)
-  const animatingPlanes = useAnimationStore((state) => state.animatingPlanes)
-  const getRotationDelta = useAnimationStore((state) => state.getRotationDelta)
+  // Grouped animation store subscription
+  const { isPlaying, animatingPlanes, getRotationDelta } = useAnimationStore(
+    useShallow((state) => ({
+      isPlaying: state.isPlaying,
+      animatingPlanes: state.animatingPlanes,
+      getRotationDelta: state.getRotationDelta,
+    }))
+  )
+
+  // Environment and performance checks (grouped where possible)
   const skyboxLoading = useEnvironmentStore((state) => state.skyboxLoading)
   const sceneTransitioning = usePerformanceStore((state) => state.sceneTransitioning)
   const isExporting = useExportStore((state) => state.isExporting)
@@ -54,9 +62,9 @@ export function useAnimationLoop(): void {
         }
 
         // Batch all store reads at start of callback (avoids multiple getState() calls)
-        const uiState = useUIStore.getState()
+        const { animationBias } = useUIStore.getState()
+        const { maxFps } = usePerformanceStore.getState()
         const animState = useAnimationStore.getState()
-        const { maxFps, animationBias } = uiState
         const { animatingPlanes: currentAnimatingPlanes, updateAccumulatedTime } = animState
 
         // Throttle based on maxFps setting

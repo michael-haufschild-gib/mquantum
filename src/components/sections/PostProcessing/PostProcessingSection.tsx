@@ -11,7 +11,7 @@ export interface PostProcessingSectionProps {
   defaultOpen?: boolean;
 }
 
-export const PostProcessingSection: React.FC<PostProcessingSectionProps> = ({
+export const PostProcessingSection: React.FC<PostProcessingSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   return (
@@ -19,4 +19,6 @@ export const PostProcessingSection: React.FC<PostProcessingSectionProps> = ({
       <PostProcessingControls />
     </Section>
   );
-};
+});
+
+PostProcessingSection.displayName = 'PostProcessingSection';

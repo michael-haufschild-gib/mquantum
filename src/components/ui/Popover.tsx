@@ -41,7 +41,7 @@ export interface PopoverProps {
  * />
  * ```
  */
-export const Popover: React.FC<PopoverProps> = ({
+export const Popover: React.FC<PopoverProps> = React.memo(({
   trigger,
   content,
   className = '',
@@ -76,6 +76,10 @@ export const Popover: React.FC<PopoverProps> = ({
     }
     onOpenChange?.(newOpen);
   }, [isControlled, onOpenChange]);
+
+  const handleTriggerClick = useCallback(() => {
+    handleOpenChange(!isOpen);
+  }, [handleOpenChange, isOpen]);
 
   // Sync popover visibility with React state
   useEffect(() => {
@@ -206,7 +210,7 @@ export const Popover: React.FC<PopoverProps> = ({
     <>
       <div
         ref={triggerRef}
-        onClick={() => handleOpenChange(!isOpen)}
+        onClick={handleTriggerClick}
         className={`inline-block cursor-pointer ${className}`}
         role="button"
         aria-haspopup="dialog"
@@ -243,4 +247,6 @@ export const Popover: React.FC<PopoverProps> = ({
       </div>
     </>
   );
-};
+});
+
+Popover.displayName = 'Popover';

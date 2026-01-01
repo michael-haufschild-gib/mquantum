@@ -27,7 +27,48 @@ interface TopBarControlsProps {
   compact?: boolean;
 }
 
-export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false }) => {
+interface IconButtonProps {
+  icon: React.FC<{ className?: string }>;
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  small?: boolean;
+  className?: string;
+}
+
+/** Reusable icon button - extracted for memoization stability */
+const IconButton: React.FC<IconButtonProps> = React.memo(({
+  icon: IconComponent,
+  active,
+  onClick,
+  label,
+  small = false,
+  className = ''
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    onMouseEnter={() => soundManager.playHover()}
+    aria-label={label}
+    aria-pressed={active}
+    data-testid={`control-${label.toLowerCase().replace(/\s+/g, '-')}`}
+    className={`
+      rounded-md text-sm font-medium transition-all duration-300 border cursor-pointer
+      ${small ? 'py-1 px-2' : 'px-3 py-1.5'}
+      ${active
+        ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
+        : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
+      }
+      ${className}
+    `}
+  >
+    <IconComponent className="w-4 h-4" />
+  </button>
+));
+
+IconButton.displayName = 'IconButton';
+
+export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compact = false }) => {
   const { addToast } = useToast();
 
   // Visual Store
@@ -181,43 +222,6 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
     }
   };
 
-  // Helper for Icon Buttons - uses native button with identical styles to ToggleButton
-  const IconButton = ({
-    icon: IconComponent,
-    active,
-    onClick,
-    label,
-    small = false,
-    className = ""
-  }: {
-    icon: React.FC<{ className?: string }>,
-    active: boolean,
-    onClick: () => void,
-    label: string,
-    small?: boolean,
-    className?: string
-  }) => (
-    <button
-      type="button"
-      onClick={onClick}
-      onMouseEnter={() => soundManager.playHover()}
-      aria-label={label}
-      aria-pressed={active}
-      data-testid={`control-${label.toLowerCase().replace(/\s+/g, '-')}`}
-      className={`
-        rounded-md text-sm font-medium transition-all duration-300 border cursor-pointer
-        ${small ? 'py-1 px-2' : 'px-3 py-1.5'}
-        ${active
-          ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
-          : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
-        }
-        ${className}
-      `}
-    >
-      <IconComponent className="w-4 h-4" />
-    </button>
-  );
-
   return (
     <div className="flex items-center gap-1">
       {/* Mobile: All 4 icon buttons in a unified group */}
@@ -321,4 +325,6 @@ export const TopBarControls: React.FC<TopBarControlsProps> = ({ compact = false 
       )}
     </div>
   );
-};
+});
+
+TopBarControls.displayName = 'TopBarControls';

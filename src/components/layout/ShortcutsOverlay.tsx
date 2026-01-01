@@ -3,10 +3,10 @@ import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { AnimatePresence, m } from 'motion/react';
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
-export const ShortcutsOverlay: React.FC = () => {
+export const ShortcutsOverlay: React.FC = React.memo(() => {
   const isMobile = useIsMobile();
   const { showShortcuts, setShowShortcuts } = useLayoutStore(
     useShallow((state: LayoutStore) => ({
@@ -26,6 +26,18 @@ export const ShortcutsOverlay: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [showShortcuts, setShowShortcuts]);
 
+  const handleClose = useCallback(() => {
+    setShowShortcuts(false);
+  }, [setShowShortcuts]);
+
+  const handleOverlayClick = useCallback(() => {
+    setShowShortcuts(false);
+  }, [setShowShortcuts]);
+
+  const handlePropagationStop = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   // Don't render on mobile devices - keyboard shortcuts are not useful without a physical keyboard
   if (isMobile) {
     return null;
@@ -40,7 +52,7 @@ export const ShortcutsOverlay: React.FC = () => {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] backdrop-blur-sm p-4"
-          onClick={() => setShowShortcuts(false)}
+          onClick={handleOverlayClick}
           data-testid="shortcuts-overlay"
         >
           <m.div
@@ -49,14 +61,14 @@ export const ShortcutsOverlay: React.FC = () => {
             exit={{ scale: 0.9, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="glass-panel rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto custom-scrollbar flex flex-col"
-            onClick={(e) => e.stopPropagation()}
+            onClick={handlePropagationStop}
           >
             <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)] sticky top-0 bg-[var(--bg-panel)] backdrop-blur z-10">
               <h2 className="text-xl font-bold text-accent tracking-tight">Keyboard Shortcuts</h2>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowShortcuts(false)}
+                onClick={handleClose}
                 ariaLabel="Close"
                 data-testid="shortcuts-close"
                 className="p-1.5"
@@ -93,4 +105,6 @@ export const ShortcutsOverlay: React.FC = () => {
       )}
     </AnimatePresence>
   );
-};
+});
+
+ShortcutsOverlay.displayName = 'ShortcutsOverlay';

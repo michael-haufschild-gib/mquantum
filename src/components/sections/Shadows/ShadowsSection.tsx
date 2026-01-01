@@ -23,7 +23,7 @@ import type { ShadowQuality } from '@/rendering/shadows/types';
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 
 export interface ShadowsSectionProps {
@@ -49,7 +49,7 @@ const SHADOW_STEPS_OPTIONS: SelectOption<string>[] = [
   { value: '8', label: '8 steps (High)' },
 ];
 
-export const ShadowsSection: React.FC<ShadowsSectionProps> = ({
+export const ShadowsSection: React.FC<ShadowsSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   // Get current object type
@@ -111,9 +111,17 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = ({
 
   // For Schrödinger, use its own shadow toggle; for others, use global shadowEnabled
   const effectiveShadowEnabled = isSchroedinger ? schroedingerShadowsEnabled : shadowEnabled;
-  const handleShadowToggle = isSchroedinger
-    ? (enabled: boolean) => setSchroedingerShadowsEnabled(enabled)
-    : setShadowEnabled;
+  const handleShadowToggle = useCallback((enabled: boolean) => {
+    if (isSchroedinger) {
+      setSchroedingerShadowsEnabled(enabled);
+    } else {
+      setShadowEnabled(enabled);
+    }
+  }, [isSchroedinger, setSchroedingerShadowsEnabled, setShadowEnabled]);
+
+  const handleShadowStepsChange = useCallback((val: string) => {
+    setSchroedingerShadowSteps(parseInt(val, 10));
+  }, [setSchroedingerShadowSteps]);
 
   // Get shadow type info for description (memoized)
   const shadowTypeInfo = useMemo(() => {
@@ -222,7 +230,7 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = ({
                       label="Steps"
                       options={SHADOW_STEPS_OPTIONS}
                       value={String(schroedingerShadowSteps)}
-                      onChange={(val) => setSchroedingerShadowSteps(parseInt(val, 10))}
+                      onChange={handleShadowStepsChange}
                       data-testid="schroedinger-shadow-steps"
                     />
                     <p className="text-[10px] text-text-secondary">
@@ -285,4 +293,6 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = ({
       )}
     </Section>
   );
-};
+});
+
+ShadowsSection.displayName = 'ShadowsSection';

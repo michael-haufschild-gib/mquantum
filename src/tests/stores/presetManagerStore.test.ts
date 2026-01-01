@@ -5,6 +5,7 @@ import { useAnimationStore } from '@/stores/animationStore'
 import { useRotationStore } from '@/stores/rotationStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
+import { useUIStore } from '@/stores/uiStore'
 
 // Mock msgBoxStore to prevent actual dialog displays
 vi.mock('@/stores/msgBoxStore', () => ({
@@ -269,6 +270,24 @@ describe('presetManagerStore', () => {
       expect(saved!.data.extended.schroedingerVersion).toBeUndefined()
       expect(saved!.data.extended.mandelbulbVersion).toBeUndefined()
       expect(saved!.data.extended.quaternionJuliaVersion).toBeUndefined()
+    })
+
+    it('should not include device-specific UI settings in saved scenes', () => {
+      // Set device-specific UI state that should NOT be saved
+      // Note: maxFps is now in performanceStore, not uiStore
+      useUIStore.setState({
+        showDepthBuffer: true,
+        showNormalBuffer: true,
+        showTemporalDepthBuffer: true,
+      })
+
+      usePresetManagerStore.getState().saveScene('Test Scene')
+      const [saved] = usePresetManagerStore.getState().savedScenes
+
+      // Device-specific settings should be excluded from ui data
+      expect(saved!.data.ui.showDepthBuffer).toBeUndefined()
+      expect(saved!.data.ui.showNormalBuffer).toBeUndefined()
+      expect(saved!.data.ui.showTemporalDepthBuffer).toBeUndefined()
     })
   })
 

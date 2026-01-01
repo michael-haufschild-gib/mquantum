@@ -72,3 +72,5 @@ export const EdgeControls: React.FC<EdgesControlsProps> = React.memo(({
     </div>
   );
 });
+
+EdgeControls.displayName = 'EdgeControls';

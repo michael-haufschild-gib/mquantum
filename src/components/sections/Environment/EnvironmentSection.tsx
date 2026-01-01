@@ -11,7 +11,7 @@ export interface EnvironmentSectionProps {
   defaultOpen?: boolean;
 }
 
-export const EnvironmentSection: React.FC<EnvironmentSectionProps> = ({
+export const EnvironmentSection: React.FC<EnvironmentSectionProps> = React.memo(({
   defaultOpen = false,
 }) => {
   return (
@@ -19,4 +19,6 @@ export const EnvironmentSection: React.FC<EnvironmentSectionProps> = ({
       <EnvironmentControls />
     </Section>
   );
-};
+});
+
+EnvironmentSection.displayName = 'EnvironmentSection';

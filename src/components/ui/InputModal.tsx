@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 
@@ -16,7 +16,7 @@ interface InputModalProps {
   readOnly?: boolean;
 }
 
-export const InputModal: React.FC<InputModalProps> = ({
+export const InputModal: React.FC<InputModalProps> = React.memo(({
   isOpen,
   onClose,
   onConfirm,
@@ -45,20 +45,28 @@ export const InputModal: React.FC<InputModalProps> = ({
     }
   }, [isOpen, initialValue, readOnly]);
 
-  const handleConfirm = () => {
+  const handleConfirm = useCallback(() => {
     if (!allowEmpty && !value.trim()) return;
     onConfirm(value);
     onClose();
-  };
+  }, [allowEmpty, value, onConfirm, onClose]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Stop propagation for all keys to prevent global shortcuts from firing
     e.stopPropagation();
 
     if (e.key === 'Enter') {
-      handleConfirm();
+      if (!allowEmpty && !value.trim()) return;
+      onConfirm(value);
+      onClose();
     }
-  };
+  }, [allowEmpty, value, onConfirm, onClose]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!readOnly) {
+      setValue(e.target.value);
+    }
+  }, [readOnly]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} width="max-w-md">
@@ -75,7 +83,7 @@ export const InputModal: React.FC<InputModalProps> = ({
             className={`w-full bg-[var(--bg-hover)] border border-panel-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all placeholder:text-text-muted ${readOnly ? 'cursor-text' : ''}`}
             placeholder={placeholder}
             value={value}
-            onChange={(e) => !readOnly && setValue(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
             readOnly={readOnly}
           />
@@ -96,4 +104,6 @@ export const InputModal: React.FC<InputModalProps> = ({
       </div>
     </Modal>
   );
-};
+});
+
+InputModal.displayName = 'InputModal';

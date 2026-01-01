@@ -1,10 +1,19 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { usePresetManagerStore, type SavedScene, type PresetManagerState } from '@/stores/presetManagerStore';
 import { useToast } from '@/hooks/useToast';
 import { useShallow } from 'zustand/react/shallow';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { Button } from '@/components/ui/Button';
 import { InlineEdit } from '@/components/ui/InlineEdit';
+
+/** Format a timestamp to a readable date string */
+const formatDate = (timestamp: number): string => {
+  return new Date(timestamp).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
 
 /** Props for SceneManager component */
 interface SceneManagerProps {
@@ -20,7 +29,7 @@ interface SceneManagerProps {
  * @param root0.onClose - Callback to close the scene manager modal
  * @returns The scene manager component
  */
-export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
+export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }) => {
   const { savedScenes, loadScene, deleteScene, renameScene, importScenes, exportScenes } = usePresetManagerStore(
     useShallow((state: PresetManagerState) => ({
       savedScenes: state.savedScenes,
@@ -37,12 +46,12 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
   const [sceneToDelete, setSceneToDelete] = useState<SavedScene | null>(null);
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
 
-  const handleRenameScene = (sceneId: string, newName: string) => {
+  const handleRenameScene = useCallback((sceneId: string, newName: string) => {
     renameScene(sceneId, newName);
     addToast('Scene renamed', 'success');
-  };
+  }, [renameScene, addToast]);
 
-  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -64,9 +73,9 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
     };
     reader.readAsText(file);
     e.target.value = ''; // Reset
-  };
+  }, [importScenes, addToast]);
 
-  const handleExport = () => {
+  const handleExport = useCallback(() => {
     const data = exportScenes();
     const blob = new Blob([data], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -81,23 +90,15 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
     } finally {
       URL.revokeObjectURL(url);
     }
-  };
+  }, [exportScenes, addToast]);
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = useCallback(() => {
     if (sceneToDelete) {
       deleteScene(sceneToDelete.id);
       addToast('Scene deleted', 'info');
       setSceneToDelete(null);
     }
-  };
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  }, [sceneToDelete, deleteScene, addToast]);
 
   return (
     <div className="space-y-4">
@@ -239,4 +240,6 @@ export const SceneManager: React.FC<SceneManagerProps> = ({ onClose }) => {
       />
     </div>
   );
-};
+});
+
+SceneManager.displayName = 'SceneManager';

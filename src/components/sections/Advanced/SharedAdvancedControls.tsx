@@ -1,0 +1,128 @@
+import { ColorPicker } from '@/components/ui/ColorPicker';
+import { ControlGroup } from '@/components/ui/ControlGroup';
+import { Slider } from '@/components/ui/Slider';
+import { Switch } from '@/components/ui/Switch';
+import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
+import { useGeometryStore } from '@/stores/geometryStore';
+import React, { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
+import { GravityAdvanced } from './GravityAdvanced';
+
+export const SharedAdvancedControls: React.FC = React.memo(() => {
+  const objectType = useGeometryStore(state => state.objectType);
+  const appearanceSelector = useShallow((state: AppearanceSlice) => ({
+    sssEnabled: state.sssEnabled, setSssEnabled: state.setSssEnabled,
+    sssIntensity: state.sssIntensity, setSssIntensity: state.setSssIntensity,
+    sssColor: state.sssColor, setSssColor: state.setSssColor,
+    sssThickness: state.sssThickness, setSssThickness: state.setSssThickness,
+    sssJitter: state.sssJitter, setSssJitter: state.setSssJitter,
+    fresnelEnabled: state.shaderSettings.surface.fresnelEnabled,
+    setSurfaceSettings: state.setSurfaceSettings,
+    fresnelIntensity: state.fresnelIntensity, setFresnelIntensity: state.setFresnelIntensity,
+  }));
+  const {
+    sssEnabled, setSssEnabled,
+    sssIntensity, setSssIntensity,
+    sssColor, setSssColor,
+    sssThickness, setSssThickness,
+    sssJitter, setSssJitter,
+    fresnelEnabled, setSurfaceSettings,
+    fresnelIntensity, setFresnelIntensity,
+  } = useAppearanceStore(appearanceSelector);
+
+  const handleSssColorChange = useCallback((c: string) => {
+    setSssColor(c);
+  }, [setSssColor]);
+
+  const handleFresnelToggle = useCallback((checked: boolean) => {
+    setSurfaceSettings({ fresnelEnabled: checked });
+  }, [setSurfaceSettings]);
+
+  return (
+    <div className="space-y-4 mb-4 pb-4">
+      {/* Subsurface Scattering */}
+      <ControlGroup
+        title="Subsurface Scattering"
+        collapsible
+        defaultOpen={false}
+        rightElement={
+          <Switch
+            checked={sssEnabled}
+            onCheckedChange={setSssEnabled}
+            data-testid="global-sss-toggle"
+          />
+        }
+      >
+        <Slider
+          label="Intensity"
+          min={0.0}
+          max={2.0}
+          step={0.1}
+          value={sssIntensity}
+          onChange={setSssIntensity}
+          showValue
+          data-testid="global-sss-intensity"
+        />
+        <div className="flex items-center justify-between">
+          <label className="text-xs text-[var(--text-secondary)]">SSS Tint</label>
+          <ColorPicker
+            value={sssColor}
+            onChange={handleSssColorChange}
+            disableAlpha={true}
+            className="w-24"
+          />
+        </div>
+        <Slider
+          label="Thickness"
+          min={0.1}
+          max={5.0}
+          step={0.1}
+          value={sssThickness}
+          onChange={setSssThickness}
+          showValue
+          data-testid="global-sss-thickness"
+        />
+        <Slider
+          label="Sample Jitter"
+          min={0.0}
+          max={1.0}
+          step={0.05}
+          value={sssJitter}
+          onChange={setSssJitter}
+          showValue
+          data-testid="global-sss-jitter"
+        />
+      </ControlGroup>
+
+      {/* Fresnel Rim */}
+      <ControlGroup
+        title="Fresnel Rim"
+        collapsible
+        defaultOpen={false}
+        rightElement={
+          <Switch
+            checked={fresnelEnabled}
+            onCheckedChange={handleFresnelToggle}
+            data-testid="global-fresnel-toggle"
+          />
+        }
+      >
+        <Slider
+          label="Intensity"
+          min={0.0}
+          max={1.0}
+          step={0.1}
+          value={fresnelIntensity}
+          onChange={setFresnelIntensity}
+          showValue
+          data-testid="global-fresnel-intensity"
+        />
+      </ControlGroup>
+
+      {/* Gravitational Lensing - only available for black hole */}
+      {objectType === 'blackhole' && <GravityAdvanced />}
+    </div>
+  );
+});
+
+SharedAdvancedControls.displayName = 'SharedAdvancedControls';

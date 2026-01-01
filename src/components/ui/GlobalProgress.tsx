@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { usePerformanceStore } from '@/stores/performanceStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useShallow } from 'zustand/react/shallow';
 
-export const GlobalProgress: React.FC = () => {
+export const GlobalProgress: React.FC = React.memo(() => {
   const { sceneTransitioning, refinementProgress } = usePerformanceStore(
     useShallow((s) => ({
       sceneTransitioning: s.sceneTransitioning,
@@ -30,8 +30,8 @@ export const GlobalProgress: React.FC = () => {
     return () => clearTimeout(timer);
   }, [sceneTransitioning, skyboxLoading, refinementProgress]);
 
-  // If indeterminate
-  const isIndeterminate = sceneTransitioning || skyboxLoading;
+  // If indeterminate - memoize to prevent recalculation
+  const isIndeterminate = useMemo(() => sceneTransitioning || skyboxLoading, [sceneTransitioning, skyboxLoading]);
 
   return (
     <AnimatePresence>
@@ -60,4 +60,6 @@ export const GlobalProgress: React.FC = () => {
       )}
     </AnimatePresence>
   );
-};
+});
+
+GlobalProgress.displayName = 'GlobalProgress';

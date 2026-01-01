@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { m, AnimatePresence } from 'motion/react';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { useCameraStore } from '@/stores/cameraStore';
@@ -16,7 +16,7 @@ interface MenuItem {
   type?: 'separator';
 }
 
-export const CanvasContextMenu: React.FC = () => {
+export const CanvasContextMenu: React.FC = React.memo(() => {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
@@ -109,6 +109,16 @@ export const CanvasContextMenu: React.FC = () => {
     ];
   }, [resetCamera, toggleCinematicMode, toggleLeftPanel, toggleCollapsed]);
 
+  const handleItemClick = useCallback((action?: () => void) => {
+    soundManager.playClick();
+    if (action) action();
+    closeDropdown(DROPDOWN_ID);
+  }, [closeDropdown]);
+
+  const handleItemHover = useCallback(() => {
+    soundManager.playHover();
+  }, []);
+
   return (
     <div
       ref={popoverRef}
@@ -133,12 +143,8 @@ export const CanvasContextMenu: React.FC = () => {
               return (
                 <button
                   key={index}
-                  onClick={() => {
-                      soundManager.playClick();
-                      if (item.action) item.action();
-                      closeDropdown(DROPDOWN_ID);
-                  }}
-                  onMouseEnter={() => soundManager.playHover()}
+                  onClick={() => handleItemClick(item.action)}
+                  onMouseEnter={handleItemHover}
                   className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group"
                 >
                   <span>{item.label}</span>
@@ -151,4 +157,6 @@ export const CanvasContextMenu: React.FC = () => {
       </AnimatePresence>
     </div>
   );
-};
+});
+
+CanvasContextMenu.displayName = 'CanvasContextMenu';
