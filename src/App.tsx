@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/useToast';
 import { useUrlState } from '@/hooks/useUrlState';
 import { useCachePrewarming } from '@/hooks/useCachePrewarming';
 import type { Vector3D, VectorND } from '@/lib/math/types';
+import { ProdDevDiagnostics } from '@/dev-tools/ProdDevDiagnostics';
 import { FpsController } from '@/rendering/controllers/FpsController';
 import { PerformanceStatsCollector } from '@/rendering/controllers/PerformanceStatsCollector';
 import { VideoExportController } from '@/rendering/controllers/VideoExportController';
@@ -271,6 +272,7 @@ function AppContent() {
               <VideoExportController />
               <Visualizer />
               <PerformanceStatsCollector />
+              <ProdDevDiagnostics />
             </Canvas>
           </ErrorBoundary>
         ) : (

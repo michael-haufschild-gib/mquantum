@@ -41,8 +41,10 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
   esbuild: {
-    // Keep component names in dev for better profiler output
-    keepNames: mode === 'development',
+    // Keep function/class names in both dev and prod
+    // This prevents potential V8 deoptimization from name mangling
+    // and ensures Three.js/R3F internal checks work correctly
+    keepNames: true,
   },
   resolve: {
     alias: {
@@ -64,25 +66,27 @@ export default defineConfig(({ mode }) => ({
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
   },
+  preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
+  },
   assetsInclude: ['**/*.ktx2'],
   build: {
     outDir: 'dist',
     sourcemap: false,
-    target: 'es2020',
+    target: 'esnext',
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         manualChunks: {
-          // Core React
           'react-vendor': ['react', 'react-dom'],
-          // Three.js core
           'three-core': ['three'],
-          // React Three Fiber ecosystem
           'r3f-fiber': ['@react-three/fiber'],
           'r3f-drei': ['@react-three/drei'],
           'r3f-postprocessing': ['@react-three/postprocessing', 'postprocessing'],
-          // State management
           zustand: ['zustand'],
-          // Animation
           motion: ['motion'],
         },
       },

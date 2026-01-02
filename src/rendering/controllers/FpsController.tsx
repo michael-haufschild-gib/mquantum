@@ -84,11 +84,11 @@ export function FpsController(): null {
       const interval = 1000 / targetFps
       const elapsed = now - thenRef.current
 
-      // Use strict inequality to handle high-refresh rate displays correctly.
-      // e.g. 120Hz (8ms) vs 30fps (33ms target).
-      // If we use >= interval - 1, we might trigger at 32ms, then again at 40ms.
-      // Strict > ensures we only trigger when we've actually passed the target duration.
-      if (elapsed > interval) {
+      // Use 1ms tolerance to handle floating point precision issues.
+      // Without tolerance, elapsed=16.665ms vs interval=16.666ms fails the check,
+      // causing exactly 30 FPS (every other frame skipped).
+      // See: docs/bugfixing/log/fps-cap-30.md
+      if (elapsed >= interval - 1) {
         // Advance the frame - this triggers useFrame callbacks and renders
         // R3F's advance() expects timestamp in SECONDS, not milliseconds
         // RAF provides timestamp in ms, so convert: now / 1000
