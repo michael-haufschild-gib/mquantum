@@ -45,6 +45,7 @@ export class VideoRecorder {
   private compositionCtx: CanvasRenderingContext2D | null = null
   private options: VideoExportOptions
   private isRecording: boolean = false
+  private writableStream: FileSystemWritableFileStream | null = null
 
   constructor(canvas: HTMLCanvasElement, options: VideoExportOptions) {
     this.canvas = canvas
@@ -75,19 +76,23 @@ export class VideoRecorder {
       const isStreaming = !!this.options.streamHandle
 
       // Configure format with appropriate options for web playability
-      // MP4: fastStart moves moov atom for streaming; fragmented for disk streaming
-      // WebM: appendOnly avoids seeking in stream mode for efficient writes
+      // MP4: fastStart 'reserve' reserves space at file start for moov atom (good seeking)
+      //      fastStart 'in-memory' processes moov in memory (for BufferTarget)
+      // WebM: appendOnly for streaming avoids seeking during writes
       const format = this.options.format === 'webm'
         ? new WebMOutputFormat({
-            appendOnly: isStreaming // Enable append-only for streaming (no seeking)
+            appendOnly: isStreaming // Enable append-only for streaming (no seeking during write)
           })
         : new Mp4OutputFormat({
-            fastStart: isStreaming ? 'fragmented' : 'in-memory'
+            // 'reserve' works with FileSystemWritableFileStream (supports seek)
+            // and produces proper MP4 with moov at front for good seeking support
+            fastStart: isStreaming ? 'reserve' : 'in-memory'
           })
 
       if (this.options.streamHandle) {
           // Stream Mode - use chunked writes for batched disk I/O
           const writable = await this.options.streamHandle.createWritable()
+          this.writableStream = writable
           this.target = new StreamTarget(writable, {
             chunked: true,
             chunkSize: 16 * 1024 * 1024 // 16 MiB chunks
@@ -342,7 +347,14 @@ export class VideoRecorder {
           return new Blob([buffer], { type: mimeType })
       }
 
-      // For StreamTarget, data is already written to disk
+      // For StreamTarget: mediabunny should auto-close, but explicitly close to ensure file is committed
+      if (this.writableStream) {
+          try {
+              await this.writableStream.close()
+          } catch {
+              // Stream may already be closed by mediabunny - that's fine
+          }
+      }
       return null
     } catch (error) {
       throw new Error(

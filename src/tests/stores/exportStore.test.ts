@@ -468,9 +468,10 @@ describe('exportStore', () => {
         useExportStore.getState().applyPreset('instagram')
         expect(useExportStore.getState().settings.crop.enabled).toBe(true)
 
-        // Then disable it
+        // Then disable it (spread existing crop to satisfy TypeScript, updateSettings does deep merge)
+        const existingCrop = useExportStore.getState().settings.crop
         useExportStore.getState().updateSettings({
-          crop: { enabled: false },
+          crop: { ...existingCrop, enabled: false },
         })
         expect(useExportStore.getState().settings.crop.enabled).toBe(false)
       })

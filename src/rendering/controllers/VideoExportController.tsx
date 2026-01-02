@@ -112,17 +112,21 @@ export function VideoExportController() {
 
   const finishExport = useCallback(async () => {
     try {
-      const { exportMode, setCompletionDetails } = useExportStore.getState()
+      const { exportMode, setCompletionDetails, isExporting: stillExporting } = useExportStore.getState()
 
-      // If aborted, cancel properly instead of finalizing (avoids partial files)
+      // If aborted, clean up resources only - don't modify state
+      // State is already handled by the cancellation effect to avoid race conditions
       if (abortRef.current) {
-        if (recorderRef.current) {
-          await recorderRef.current.cancel()
-          recorderRef.current = null
-        }
-        setStatus('idle')
+        // Recorder cleanup is now handled in the cancellation effect
+        // Just restore renderer state and exit
         restoreState()
         exportStartedRef.current = false
+
+        // Only set status to idle if user hasn't already started a new export
+        // This prevents the race condition where finishExport overwrites 'rendering' status
+        if (!stillExporting) {
+          setStatus('idle')
+        }
         return
       }
 
@@ -469,6 +473,15 @@ export function VideoExportController() {
 
     exportStartedRef.current = true
 
+    // CRITICAL: Reset abort flag immediately to ensure clean start
+    // This must happen before any async operations to prevent race conditions
+    // with a previous export's finishExport still running
+    abortRef.current = false
+
+    // Reset progress and ETA for clean start
+    setProgress(0)
+    setEta(null)
+
     // For stream mode, show file picker FIRST before any state changes
     // This prevents race conditions and ensures user has confirmed file location
     let streamHandle: FileSystemFileHandle | undefined = undefined
@@ -539,7 +552,7 @@ export function VideoExportController() {
       if (exportMode !== 'stream') {
           setStatus('rendering')
       }
-      abortRef.current = false
+      // Note: abortRef.current is already set to false at the start of startExport()
 
       // Force High Quality - disable progressive refinement to prevent it from overriding
       perfStore.setProgressiveRefinementEnabled(false)
@@ -733,35 +746,69 @@ export function VideoExportController() {
       console.error('Export Start Error:', e)
       handleError(e)
     }
-  }, [gl, camera, settings, exportMode, restoreState, handleError, setStatus, setProgress, processBatch, setError])
+  }, [gl, camera, settings, exportMode, restoreState, handleError, setStatus, setProgress, setEta, processBatch, setError])
 
+  // Effect to trigger export start and handle user cancellation
   useEffect(() => {
     // Start export trigger
     if (isExporting && status === 'idle') {
       startExport()
     }
 
-    // Cleanup trigger - reset export state when export is cancelled
+    // Cleanup trigger - reset export state when export is cancelled by user
     if (!isExporting) {
       exportStartedRef.current = false
       if (recorderRef.current) {
         abortRef.current = true
+        // Cancel recorder immediately to prevent race conditions
+        // The finishExport will detect abortRef and just clean up resources
+        recorderRef.current.cancel().then(() => {
+          recorderRef.current?.dispose()
+          recorderRef.current = null
+        }).catch(() => {
+          // Ignore errors during cancel
+          recorderRef.current?.dispose()
+          recorderRef.current = null
+        })
+      }
+      // Reset progress and ETA immediately on cancel (don't wait for finishExport)
+      setProgress(0)
+      setEta(null)
+      // Reset loop state to prevent stale data on next export
+      loopStateRef.current = {
+        phase: 'warmup',
+        frameId: 0,
+        warmupFrame: 0,
+        startTime: 0,
+        totalFrames: 0,
+        frameDuration: 0,
+        exportStartTime: 0,
+        lastEtaUpdate: 0,
+        mainStreamHandle: undefined,
+        segmentDurationFrames: 0,
+        currentSegment: 0,
+        framesInCurrentSegment: 0,
+        segmentStartTimeVideo: 0
       }
     }
+    // NOTE: No cleanup function here! The cleanup was incorrectly aborting exports
+    // on every status change (e.g., 'rendering' → 'previewing' in stream mode).
+    // React runs cleanup before EVERY effect re-run, not just on unmount.
+    // Unmount cleanup is handled by a separate effect below.
+  }, [isExporting, status, startExport, setProgress, setEta])
 
+  // Separate effect for ACTUAL component unmount cleanup only
+  // This effect has an empty dependency array, so cleanup only runs on unmount
+  useEffect(() => {
     return () => {
-       // Component unmount cleanup
-       if (recorderRef.current) {
-         abortRef.current = true
-         restoreState()
-       }
-       // Do NOT reset exportStartedRef.current here.
-       // If the component re-renders (e.g. status change, store update), the effect cleans up.
-       // If we reset this flag, the effect body (startExport) will be allowed to run again immediately
-       // on the next render, potentially causing infinite loops if startExport is async/blocking (like file picker).
-       // The flag should only be reset when the export is truly finished or cancelled (via handlers above).
+      // Component unmount cleanup - abort any in-progress export
+      if (recorderRef.current) {
+        abortRef.current = true
+        restoreState()
+      }
     }
-  }, [isExporting, status, startExport, restoreState])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps = cleanup runs ONLY on unmount
 
   return null
 }

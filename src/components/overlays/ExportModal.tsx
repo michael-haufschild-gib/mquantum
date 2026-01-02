@@ -192,7 +192,7 @@ export const ExportModal = () => {
                                 />
                                 <circle
                                     cx="80" cy="80" r="70"
-                                    className="stroke-accent fill-none transition-all duration-300 ease-linear"
+                                    className="stroke-accent fill-none"
                                     strokeWidth="6"
                                     strokeDasharray={440}
                                     strokeDashoffset={440 * (1 - progress)}
