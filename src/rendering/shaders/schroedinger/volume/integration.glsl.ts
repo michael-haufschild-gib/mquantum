@@ -502,22 +502,21 @@ VolumeResult volumeRaymarchHQ(vec3 rayOrigin, vec3 rayDir, float tNear, float tF
         }
 #endif
 
-        // Alpha per channel (uniform since no dispersion)
-        vec3 alpha;
-        alpha.r = computeAlpha(rhoAlpha.r, stepLen, uDensityGain);
-        alpha.g = computeAlpha(rhoAlpha.g, stepLen, uDensityGain);
-        alpha.b = computeAlpha(rhoAlpha.b, stepLen, uDensityGain);
+        // OPTIMIZED: Single alpha computation - all channels identical without dispersion
+        // Saves 2 exp() calls per sample (was computing same value 3 times)
+        float alphaScalar = computeAlpha(rhoAlpha.r, stepLen, uDensityGain);
+        vec3 alpha = vec3(alphaScalar);
 
-        if (alpha.g > 0.001 || alpha.r > 0.001 || alpha.b > 0.001) {
-            // Track entry point (use Green/Center channel)
-            if (entryT < 0.0 && alpha.g > ENTRY_ALPHA_THRESHOLD) {
+        if (alphaScalar > 0.001) {
+            // Track entry point
+            if (entryT < 0.0 && alphaScalar > ENTRY_ALPHA_THRESHOLD) {
                 entryT = t;
             }
 
             // CENTROID ACCUMULATION
-            float avgAlpha = (alpha.r + alpha.g + alpha.b) / 3.0;
+            // OPTIMIZED: Use alphaScalar directly since all channels identical (no dispersion)
             float avgTrans = (transmittance.r + transmittance.g + transmittance.b) / 3.0;
-            float weight = avgAlpha * avgTrans;
+            float weight = alphaScalar * avgTrans;
             centroidSum += pos * weight;
             centroidWeight += weight;
 

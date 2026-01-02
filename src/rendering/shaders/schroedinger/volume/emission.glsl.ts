@@ -149,13 +149,13 @@ vec3 computeEmission(float rho, float phase, vec3 pos) {
 // Compute emission with full scene lighting (for HQ mode)
 // Same pattern as Mandelbulb main.glsl.ts lines 53-103
 vec3 computeEmissionLit(float rho, float phase, vec3 p, vec3 gradient, vec3 viewDir) {
-    vec3 surfaceColor = computeBaseColor(rho, phase, p);
-
-    // OPTIMIZATION: Early return if no lights (ambient-only mode)
-    // Skips expensive lighting loop when not needed (~30% faster for ambient-only scenes)
+    // OPTIMIZED: Check early return BEFORE computing surfaceColor
+    // Avoids redundant computeBaseColor when computeEmission will recompute it
     if (uNumLights == 0) {
-        return computeEmission(rho, phase, p); // Delegate to fast path which now handles nodes
+        return computeEmission(rho, phase, p);
     }
+
+    vec3 surfaceColor = computeBaseColor(rho, phase, p);
 
     // Start with ambient (energy-conserved: metals don't scatter diffuse light)
     // max() guards against uMetallic > 1.0 which would cause negative diffuse
@@ -324,10 +324,13 @@ vec3 computeEmissionLit(float rho, float phase, vec3 p, vec3 gradient, vec3 view
     }
 #endif
 
+    // OPTIMIZED: Cache sFromRho for reuse in HDR Emission and Nodal sections
+    // Saves 1 log() call when both features are active
+    float cachedS = sFromRho(rho);
+
     // HDR Emission Glow
     if (uEmissionIntensity > 0.0) {
-        float s = sFromRho(rho); 
-        float normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
+        float normalizedRho = clamp((cachedS + 8.0) / 8.0, 0.0, 1.0);
         
         if (normalizedRho > uEmissionThreshold) {
             float emissionFactor = (normalizedRho - uEmissionThreshold) / (1.0 - uEmissionThreshold);
@@ -360,9 +363,9 @@ vec3 computeEmissionLit(float rho, float phase, vec3 p, vec3 gradient, vec3 view
     
 #ifdef USE_NODAL
     if (uNodalEnabled) {
-        float s = sFromRho(rho);
-        if (s < -5.0 && s > -12.0) {
-             float intensity = 1.0 - smoothstep(-12.0, -5.0, s);
+        // OPTIMIZED: Reuse cachedS instead of recomputing sFromRho
+        if (cachedS < -5.0 && cachedS > -12.0) {
+             float intensity = 1.0 - smoothstep(-12.0, -5.0, cachedS);
              // Additive self-luminous glow for nodes (ignores shadows/lighting)
              col += uNodalColor * uNodalStrength * intensity * 2.0;
         }
