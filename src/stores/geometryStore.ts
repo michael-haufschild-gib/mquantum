@@ -20,7 +20,6 @@ import {
   DEFAULT_COLOR_ALGORITHM,
   isColorAlgorithmAvailable,
 } from '@/rendering/shaders/palette/types'
-import { flushSync } from 'react-dom'
 import { create } from 'zustand'
 import { useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
@@ -168,22 +167,20 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     // Invalidate temporal depth data - dimensions change depth completely
     invalidateAllTemporalDepth()
 
-    // Batch all store updates atomically to prevent intermediate renders
-    flushSync(() => {
-      // Trigger progressive refinement: start at low quality during dimension switch
-      usePerformanceStore.getState().setSceneTransitioning(true)
-      usePerformanceStore.getState().setCameraTeleported(true)
+    // All store updates execute synchronously and are batched by React 18's automatic batching
+    // Trigger progressive refinement: start at low quality during dimension switch
+    usePerformanceStore.getState().setSceneTransitioning(true)
+    usePerformanceStore.getState().setCameraTeleported(true)
 
-      // Update all dimension-dependent stores BEFORE setting geometry state
-      // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
-      useAnimationStore.getState().setDimension(clampedDimension)
-      useRotationStore.getState().setDimension(clampedDimension)
-      useTransformStore.getState().setDimension(clampedDimension)
+    // Update all dimension-dependent stores BEFORE setting geometry state
+    // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
+    useAnimationStore.getState().setDimension(clampedDimension)
+    useRotationStore.getState().setDimension(clampedDimension)
+    useTransformStore.getState().setDimension(clampedDimension)
 
-      set({
-        dimension: clampedDimension,
-        objectType: newType,
-      })
+    set({
+      dimension: clampedDimension,
+      objectType: newType,
     })
 
     // Signal transition complete after React settles - triggers progressive refinement
@@ -222,52 +219,49 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
         ? recommendedDimension
         : currentDimension
 
-    // Batch all store updates atomically to prevent intermediate renders
-    flushSync(() => {
-      // When switching object types, validate that the current color algorithm is still supported.
-      // If not, revert to the default (monochromatic) to avoid rendering artifacts or mismatch with UI.
-      // IMPORTANT: This must be inside flushSync to ensure atomic update with object type change.
-      const appearanceStore = useAppearanceStore.getState()
-      if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, type)) {
-        appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
+    // All store updates execute synchronously and are batched by React 18's automatic batching
+    // When switching object types, validate that the current color algorithm is still supported.
+    // If not, revert to the default (monochromatic) to avoid rendering artifacts or mismatch with UI.
+    const appearanceStore = useAppearanceStore.getState()
+    if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, type)) {
+      appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
+    }
+
+    // Raymarched fractals require facesVisible=true to render (determineRenderMode returns 'none' otherwise)
+    // Ensure it's set when switching to a raymarching type
+    if (isRaymarchingFractal(type, targetDimension)) {
+      if (!appearanceStore.facesVisible) {
+        appearanceStore.setFacesVisible(true)
       }
+    }
 
-      // Raymarched fractals require facesVisible=true to render (determineRenderMode returns 'none' otherwise)
-      // Ensure it's set when switching to a raymarching type
-      if (isRaymarchingFractal(type, targetDimension)) {
-        if (!appearanceStore.facesVisible) {
-          appearanceStore.setFacesVisible(true)
-        }
-      }
+    // Gravitational lensing is only available for black holes - auto-toggle based on object type
+    const ppStore = usePostProcessingStore.getState()
+    if (type === 'blackhole') {
+      ppStore.setGravityEnabled(true)
+    } else {
+      ppStore.setGravityEnabled(false)
+    }
 
-      // Gravitational lensing is only available for black holes - auto-toggle based on object type
-      const ppStore = usePostProcessingStore.getState()
-      if (type === 'blackhole') {
-        ppStore.setGravityEnabled(true)
-      } else {
-        ppStore.setGravityEnabled(false)
-      }
+    // Trigger progressive refinement: start at low quality during content type switch
+    usePerformanceStore.getState().setSceneTransitioning(true)
+    usePerformanceStore.getState().setCameraTeleported(true)
 
-      // Trigger progressive refinement: start at low quality during content type switch
-      usePerformanceStore.getState().setSceneTransitioning(true)
-      usePerformanceStore.getState().setCameraTeleported(true)
+    if (targetDimension !== currentDimension) {
+      // Update all dimension-dependent stores BEFORE setting geometry state
+      // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
+      useAnimationStore.getState().setDimension(targetDimension)
+      useRotationStore.getState().setDimension(targetDimension)
+      useTransformStore.getState().setDimension(targetDimension)
 
-      if (targetDimension !== currentDimension) {
-        // Update all dimension-dependent stores BEFORE setting geometry state
-        // This filters out invalid planes for the new dimension (e.g., "XV" doesn't exist in 4D)
-        useAnimationStore.getState().setDimension(targetDimension)
-        useRotationStore.getState().setDimension(targetDimension)
-        useTransformStore.getState().setDimension(targetDimension)
-
-        // Auto-switch to recommended dimension for optimal visualization
-        set({
-          objectType: type,
-          dimension: targetDimension,
-        })
-      } else {
-        set({ objectType: type })
-      }
-    })
+      // Auto-switch to recommended dimension for optimal visualization
+      set({
+        objectType: type,
+        dimension: targetDimension,
+      })
+    } else {
+      set({ objectType: type })
+    }
 
     // Signal transition complete after React settles - triggers progressive refinement
     scheduleTransitionComplete()
@@ -334,7 +328,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
       objectType: objectType,
     })
 
-    // Note: Caller (loadScene) handles flushSync and scheduleSceneLoadComplete
+    // Note: Caller (loadScene) handles scheduleSceneLoadComplete
   },
 
   reset: () => {

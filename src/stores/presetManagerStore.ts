@@ -1,5 +1,4 @@
 import { showConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
-import { flushSync } from 'react-dom'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useAnimationStore } from './animationStore'
@@ -364,100 +363,98 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         const scene = get().savedScenes.find((s) => s.id === id)
         if (!scene) return
 
-        // Batch all store updates atomically to prevent intermediate renders
-        flushSync(() => {
-          // Set both flags: isLoadingScene prevents hook-based rotation reset,
-          // sceneTransitioning enables progressive refinement for visual quality
-          usePerformanceStore.getState().setIsLoadingScene(true)
-          usePerformanceStore.getState().setSceneTransitioning(true)
+        // All store updates execute synchronously and are batched by React 18's automatic batching
+        // Set both flags: isLoadingScene prevents hook-based rotation reset,
+        // sceneTransitioning enables progressive refinement for visual quality
+        usePerformanceStore.getState().setIsLoadingScene(true)
+        usePerformanceStore.getState().setSceneTransitioning(true)
 
-          // Restore Style components with transient fields stripped
-          // This ensures legacy presets with version fields don't corrupt current counters
-          useAppearanceStore.setState(sanitizeLoadedState(scene.data.appearance))
-          useLightingStore.setState(sanitizeLoadedState(scene.data.lighting))
-          usePostProcessingStore.setState(sanitizeLoadedState(scene.data.postProcessing))
+        // Restore Style components with transient fields stripped
+        // This ensures legacy presets with version fields don't corrupt current counters
+        useAppearanceStore.setState(sanitizeLoadedState(scene.data.appearance))
+        useLightingStore.setState(sanitizeLoadedState(scene.data.lighting))
+        usePostProcessingStore.setState(sanitizeLoadedState(scene.data.postProcessing))
 
-          // Handle legacy environment data
-          const envData = sanitizeLoadedState({ ...scene.data.environment })
-          if (envData.skyboxEnabled === undefined) {
-            envData.skyboxEnabled = false
-          }
-          useEnvironmentStore.setState(envData)
+        // Handle legacy environment data
+        const envData = sanitizeLoadedState({ ...scene.data.environment })
+        if (envData.skyboxEnabled === undefined) {
+          envData.skyboxEnabled = false
+        }
+        useEnvironmentStore.setState(envData)
 
-          // Restore PBR settings (handle legacy presets without pbr)
-          if (scene.data.pbr) {
-            usePBRStore.setState(sanitizeLoadedState(scene.data.pbr))
-          }
+        // Restore PBR settings (handle legacy presets without pbr)
+        if (scene.data.pbr) {
+          usePBRStore.setState(sanitizeLoadedState(scene.data.pbr))
+        }
 
-          // Restore Geometry atomically using loadGeometry
-          // This sets both dimension and objectType without auto-adjustments
-          // (e.g., won't auto-switch to "recommended" dimension for fractals)
-          const geometryData = sanitizeLoadedState(scene.data.geometry) as {
-            dimension?: number
-            objectType?: string
-          }
-          if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
-            useGeometryStore.getState().loadGeometry(
-              geometryData.dimension,
-              geometryData.objectType as import('@/lib/geometry/types').ObjectType
-            )
-          } else if (geometryData.dimension !== undefined) {
-            useGeometryStore.getState().setDimension(geometryData.dimension)
-          } else if (geometryData.objectType !== undefined) {
-            useGeometryStore
-              .getState()
-              .setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
-          }
-
-          // Restore other scene components with transient fields stripped
-          // Merge with defaults to ensure new parameters added after scene was saved get default values
-          useExtendedObjectStore.setState(
-            mergeExtendedObjectState(sanitizeLoadedState(scene.data.extended))
+        // Restore Geometry atomically using loadGeometry
+        // This sets both dimension and objectType without auto-adjustments
+        // (e.g., won't auto-switch to "recommended" dimension for fractals)
+        const geometryData = sanitizeLoadedState(scene.data.geometry) as {
+          dimension?: number
+          objectType?: string
+        }
+        if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
+          useGeometryStore.getState().loadGeometry(
+            geometryData.dimension,
+            geometryData.objectType as import('@/lib/geometry/types').ObjectType
           )
-          useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
+        } else if (geometryData.dimension !== undefined) {
+          useGeometryStore.getState().setDimension(geometryData.dimension)
+        } else if (geometryData.objectType !== undefined) {
+          useGeometryStore
+            .getState()
+            .setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
+        }
 
-          // Sanitize UI data (already strips transient fields)
-          useUIStore.setState(sanitizeLoadedState(scene.data.ui))
+        // Restore other scene components with transient fields stripped
+        // Merge with defaults to ensure new parameters added after scene was saved get default values
+        useExtendedObjectStore.setState(
+          mergeExtendedObjectState(sanitizeLoadedState(scene.data.extended))
+        )
+        useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
 
-          // Special handling for Rotation (Object -> Map)
-          if (scene.data.rotation) {
-            const rotState = sanitizeLoadedState({ ...scene.data.rotation })
-            if (
-              rotState.rotations &&
-              typeof rotState.rotations === 'object' &&
-              !Array.isArray(rotState.rotations)
-            ) {
-              // Convert Object back to Map
-              rotState.rotations = new Map(
-                Object.entries(rotState.rotations as Record<string, number>)
-              )
-            }
-            useRotationStore.setState(rotState)
+        // Sanitize UI data (already strips transient fields)
+        useUIStore.setState(sanitizeLoadedState(scene.data.ui))
+
+        // Special handling for Rotation (Object -> Map)
+        if (scene.data.rotation) {
+          const rotState = sanitizeLoadedState({ ...scene.data.rotation })
+          if (
+            rotState.rotations &&
+            typeof rotState.rotations === 'object' &&
+            !Array.isArray(rotState.rotations)
+          ) {
+            // Convert Object back to Map
+            rotState.rotations = new Map(
+              Object.entries(rotState.rotations as Record<string, number>)
+            )
           }
+          useRotationStore.setState(rotState)
+        }
 
-          // Special handling for Animation (Array -> Set)
-          if (scene.data.animation) {
-            const animState = sanitizeLoadedState({ ...scene.data.animation })
-            if (Array.isArray(animState.animatingPlanes)) {
-              animState.animatingPlanes = new Set(animState.animatingPlanes)
-            }
-            useAnimationStore.setState(animState)
+        // Special handling for Animation (Array -> Set)
+        if (scene.data.animation) {
+          const animState = sanitizeLoadedState({ ...scene.data.animation })
+          if (Array.isArray(animState.animatingPlanes)) {
+            animState.animatingPlanes = new Set(animState.animatingPlanes)
           }
+          useAnimationStore.setState(animState)
+        }
 
-          // Special handling for Camera
-          if (scene.data.camera && Object.keys(scene.data.camera).length > 0) {
-            const cameraData = sanitizeLoadedState(scene.data.camera) as {
-              position?: [number, number, number]
-              target?: [number, number, number]
-            }
-            if (cameraData.position && cameraData.target) {
-              useCameraStore.getState().applyState({
-                position: cameraData.position,
-                target: cameraData.target,
-              })
-            }
+        // Special handling for Camera
+        if (scene.data.camera && Object.keys(scene.data.camera).length > 0) {
+          const cameraData = sanitizeLoadedState(scene.data.camera) as {
+            position?: [number, number, number]
+            target?: [number, number, number]
           }
-        })
+          if (cameraData.position && cameraData.target) {
+            useCameraStore.getState().applyState({
+              position: cameraData.position,
+              target: cameraData.target,
+            })
+          }
+        }
 
         // Bump version counters to trigger re-renders after direct setState calls
         // This is necessary because setState bypasses the wrapped setters that auto-increment versions

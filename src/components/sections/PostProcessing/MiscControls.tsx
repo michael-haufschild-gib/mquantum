@@ -95,7 +95,7 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({
           <Slider
             label="Blend Factor"
             min={0}
-            max={1}
+            max={0.95}
             step={0.05}
             value={frameBlendingFactor}
             onChange={setFrameBlendingFactor}

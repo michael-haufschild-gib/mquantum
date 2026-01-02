@@ -58,7 +58,7 @@ function loadPersistedResolutionScale(): number | null {
     const stored = localStorage.getItem(RESOLUTION_SCALE_KEY)
     if (stored !== null) {
       const value = parseFloat(stored)
-      if (!isNaN(value) && value >= 0.5 && value <= 1.0) {
+      if (!isNaN(value) && value >= 0.1 && value <= 1.0) {
         return value
       }
     }
@@ -427,7 +427,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => {
-    const clampedScale = Math.max(0.5, Math.min(1.0, scale))
+    const clampedScale = Math.max(0.1, Math.min(1.0, scale))
     set({ renderResolutionScale: clampedScale })
     persistResolutionScale(clampedScale)
   },

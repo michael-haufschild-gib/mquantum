@@ -184,17 +184,7 @@ Use Chrome DevTools MCP to navigate to the object you want to optimize.
 
 Wait for the scene to fully load and render.
 
-## Step 1.2: Capture Reference Screenshot
-
-**CRITICAL**: Before any optimization, capture a reference screenshot:
-
-```javascript
-// Take reference screenshot for visual comparison
-```
-
-Save this as the **ground truth**. All optimizations must produce **identical output**.
-
-## Step 1.3: Collect Baseline Performance Data
+## Step 1.2: Collect Baseline Performance Data
 
 Use Chrome DevTools MCP to execute in the browser console:
 
@@ -218,7 +208,7 @@ Also get the FPS baseline:
 window.__PROFILER__.getSummary()
 ```
 
-## Step 1.4: Identify the Bottleneck Pass
+## Step 1.3: Identify the Bottleneck Pass
 
 From the profiler output, identify:
 1. Which pass has the highest `gpu` time
@@ -245,11 +235,9 @@ This renders a **green→yellow→red gradient** based on raymarch iterations:
 - **Yellow**: Moderate iterations
 - **Red**: Many iterations (expensive pixels)
 
-## Step 2.2: Capture and Analyze the Heatmap
+## Step 2.2: Analyze the Heatmap via Console
 
-Take a screenshot of the heatmap visualization.
-
-Look for **optimization opportunities that don't affect quality**:
+Look for **optimization opportunities that don't affect quality** by examining the iteration distribution:
 
 | Pattern | Meaning | Quality-Safe Optimization |
 |---------|---------|--------------------------|
@@ -314,7 +302,91 @@ if (uSomeFeatureEnabled) { /* always true in this build */ }
 
 ---
 
-# Phase 4: Implement Optimizations
+# Phase 4: Optimization Plan Summary
+
+## MANDATORY: Present Optimization Plan Before Implementation
+
+**Before writing any code, you MUST output a detailed optimization plan summary for user review.**
+
+This summary allows the user to understand what changes will be made and approve the approach.
+
+### Required Summary Format
+
+```
+══════════════════════════════════════════════════════════════
+                   OPTIMIZATION PLAN SUMMARY
+══════════════════════════════════════════════════════════════
+
+BASELINE: [X] fps | GPU: [Y] ms/frame | Bottleneck: [pass name]
+
+──────────────────────────────────────────────────────────────
+1. [Optimization Name]
+   What: [One-line description of the change]
+   Where: [High-level location, e.g., "SDF inner loop", "shadow pass"]
+   Why safe: [Brief reason this won't affect visuals]
+
+   Impact estimate:
+   • FPS: +[X-Y] ([A-B]%)
+   • GPU: -[X-Y] ms
+   • CPU/Memory/Battery: [brief note if relevant, or "unchanged"]
+
+   Confidence: [High/Medium/Low]
+
+──────────────────────────────────────────────────────────────
+2. [Next optimization...]
+
+──────────────────────────────────────────────────────────────
+
+CUMULATIVE ESTIMATE
+| Metric  | Before | After | Change     |
+|---------|--------|-------|------------|
+| FPS     | [X]    | [Y]   | +[Z] ([%]) |
+| GPU     | [X] ms | [Y] ms| -[Z] ms    |
+
+RISK: [None/Low/Medium] - [one-line explanation]
+
+NOT RECOMMENDED: [List rejected optimizations with brief reasons]
+══════════════════════════════════════════════════════════════
+```
+
+### Estimation Guidelines
+
+When estimating performance impact:
+
+**FPS improvements** - Base on:
+- How often the optimized code runs per frame (every pixel? once per pass?)
+- Instruction cost reduction (ALU ops, texture fetches, branches removed)
+- Rule of thumb: Removing 1 sqrt/pow from inner SDF loop ≈ 2-5% improvement
+- Rule of thumb: Eliminating redundant texture fetch ≈ 0.5-2% per fetch
+
+**GPU time** - Calculate from:
+- Baseline pass time × expected percentage reduction
+- Be conservative - estimate low end of range
+
+**CPU time** - Consider:
+- Uniform calculations moved to/from CPU
+- Draw call overhead changes
+- Usually unchanged for shader-only optimizations
+
+**Memory** - Consider:
+- Texture format changes
+- Render target count/resolution changes
+- Uniform buffer size changes
+
+**Battery** - Qualitative assessment:
+- "Reduced draw" = less GPU work = less power
+- "No change" = similar GPU utilization
+- Usually correlates with GPU time reduction
+
+### Confidence Levels
+
+- **High**: Optimization pattern is well-understood, similar to proven optimizations
+- **Medium**: Theoretically sound but untested in this specific context
+- **Low**: Speculative, may or may not yield improvement
+
+---
+
+# Phase 5: Implement Optimizations
 
 ## Before Writing Any Code
 
@@ -326,9 +398,8 @@ Ask yourself:
 ## Implementation Guidelines
 
 1. Make **one optimization at a time**
-2. After each change, **verify visual output matches reference**
-3. If output differs by even one pixel, **revert immediately**
-4. Document each change with clear reasoning
+2. After each change, **reload the page and verify render completes without errors**
+3. Document each change with clear reasoning
 
 ## Safe Optimization Examples
 
@@ -367,20 +438,11 @@ if (distanceFromBounds > maxPossibleHit) return MISS;
 
 ---
 
-# Phase 5: Verification
+# Phase 6: Verification
 
-## Step 5.1: Visual Verification (MANDATORY)
+## Step 6.1: Performance Verification
 
-After each optimization:
-
-1. **Refresh the page** to ensure changes are applied
-2. **Take a new screenshot**
-3. **Compare with reference screenshot**
-4. **If ANY visual difference exists → REVERT THE CHANGE**
-
-Visual verification is not optional. Do not skip this step.
-
-## Step 5.2: Measure Performance Improvement
+After implementing optimizations:
 
 ```javascript
 window.__PROFILER__.enable()
@@ -394,15 +456,38 @@ JSON.stringify(window.__PROFILER__.getSlowestPasses(10), null, 2)
 window.__PROFILER__.getSummary()
 ```
 
-## Step 5.3: Validate Results
+## Step 6.2: Visual Verification
+
+```
+═══════════════════════════════════════════════════════════════
+                  IMPORTANT: VISUAL VERIFICATION
+═══════════════════════════════════════════════════════════════
+
+You CANNOT verify visual quality through screenshots.
+
+The user must manually verify that no visual regression occurred.
+
+After implementation, inform the user:
+
+"Optimizations have been implemented. Please verify visually:
+1. Check that the object renders correctly
+2. Verify no artifacts during animation
+3. Compare against your memory of the original appearance
+4. Confirm there is no flickering, banding, or quality loss
+
+If you notice ANY visual difference, let me know and I will
+revert the changes immediately."
+
+═══════════════════════════════════════════════════════════════
+```
+
+## Step 6.3: Validate Results
 
 **Required conditions for success:**
-1. Visual output is **identical** to reference
+1. User confirms visual output is acceptable
 2. FPS improved OR GPU time decreased
 3. No new visual artifacts during animation
 4. No flickering, popping, or temporal issues
-
-If condition #1 is not met, the optimization is **rejected** regardless of performance gain.
 
 ---
 
@@ -454,27 +539,44 @@ This is a valid outcome. Not every codebase has low-hanging optimization fruit.
 
 When you complete this optimization session, provide:
 
-1. **Baseline** (during animation)
-   - FPS:
-   - Total GPU time:
-   - Slowest pass:
+## Final Report
 
-2. **Changes Made**
-   - List each optimization with file path and line numbers
-   - Explain why each is quality-preserving
+```
+══════════════════════════════════════════════════════════════
+                  SHADER OPTIMIZATION REPORT
+══════════════════════════════════════════════════════════════
 
-3. **Results** (during animation)
-   - FPS:
-   - Total GPU time:
-   - Slowest pass:
+BEFORE: [X] fps | GPU: [Y] ms | Bottleneck: [pass]
+AFTER:  [X] fps | GPU: [Y] ms | Bottleneck: [pass]
 
-4. **Improvement**
-   - Percentage FPS improvement:
-   - Percentage GPU time reduction:
+──────────────────────────────────────────────────────────────
+CHANGES IMPLEMENTED
 
-5. **Visual Verification**
-   - Confirm: "Visual output verified identical to baseline"
-   - OR: "No optimizations implemented - all changes reverted due to visual differences"
+1. [Name]: [One-line description]
+   Estimated: +[X]% → Actual: +[Y]%
+
+2. [Name]: [One-line description]
+   Estimated: +[X]% → Actual: +[Y]%
+
+──────────────────────────────────────────────────────────────
+PERFORMANCE SUMMARY
+
+| Metric | Before | After  | Change     |
+|--------|--------|--------|------------|
+| FPS    | [X]    | [Y]    | +[Z] ([%]) |
+| GPU    | [X] ms | [Y] ms | -[Z] ms    |
+
+──────────────────────────────────────────────────────────────
+⚠️  USER VERIFICATION REQUIRED
+
+Please confirm:
+[ ] Object renders correctly
+[ ] No artifacts during animation
+[ ] No quality degradation visible
+
+If issues found, all changes can be reverted.
+══════════════════════════════════════════════════════════════
+```
 
 ---
 
@@ -485,7 +587,8 @@ When you complete this optimization session, provide:
 | Zero visual quality loss | **ABSOLUTE** - no exceptions |
 | No "fast mode" quality reduction | **ABSOLUTE** - animation is the use case |
 | No math approximations in SDF | **ABSOLUTE** - fractals amplify errors |
-| Visual verification after each change | **MANDATORY** |
-| Revert if any pixel differs | **MANDATORY** |
+| Output optimization plan before implementing | **MANDATORY** |
+| User verifies visual quality | **MANDATORY** - agent cannot verify via screenshots |
+| Revert if user reports any visual difference | **MANDATORY** |
 | WebGL2 / GLSL ES 3.00 compatibility | Required |
 | Test with animation running | Required |

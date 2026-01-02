@@ -139,7 +139,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(({
         <Slider
           label="Render Resolution"
           value={renderResolutionScale}
-          min={0.25}
+          min={0.1}
           max={1.0}
           step={0.05}
           onChange={setRenderResolutionScale}
