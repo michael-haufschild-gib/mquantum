@@ -144,6 +144,13 @@ const RESOURCES = {
 let lastSceneGpuUpdateTime = 0;
 const SCENE_GPU_UPDATE_INTERVAL = 500; // ms
 
+/**
+ * Throttle autofocus raycaster to reduce expensive scene graph traversals.
+ * Raycasting at 60 FPS is unnecessary since bokehSmoothTime already smooths
+ * focus transitions. 100ms (10 Hz) is sufficient for responsive auto-focus.
+ */
+const AUTOFOCUS_RAYCAST_INTERVAL = 100; // ms
+
 function throttledUpdateSceneGpu(stats: { calls: number; triangles: number; points: number; lines: number }) {
   // Only update when Stats tab is showing sceneGpu data
   const { showPerfMonitor, perfMonitorExpanded, perfMonitorTab } = useUIStore.getState();
@@ -366,6 +373,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
   const screenCenter = useMemo(() => new THREE.Vector2(0, 0), []);
   const autoFocusDistanceRef = useRef(ppState.bokehWorldFocusDistance);
   const currentFocusRef = useRef(ppState.bokehWorldFocusDistance);
+  const lastRaycastTimeRef = useRef(0); // Throttle autofocus raycaster
   const blackHoleWorldPosition = useMemo(() => new THREE.Vector3(0, 0, 0), []);
 
   // Buffer stats update interval (for performance monitor)
@@ -1586,10 +1594,16 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       let targetFocus = pp.bokehWorldFocusDistance;
 
       if (pp.bokehFocusMode === 'auto-center' || pp.bokehFocusMode === 'auto-mouse') {
-        autoFocusRaycaster.setFromCamera(screenCenter, camera);
-        const intersects = autoFocusRaycaster.intersectObjects(scene.children, true);
-        if (intersects.length > 0 && intersects[0]) {
-          autoFocusDistanceRef.current = intersects[0].distance;
+        // Throttle raycasting to reduce expensive scene graph traversals
+        // Focus smoothing (bokehSmoothTime) handles interpolation between updates
+        const now = performance.now();
+        if (now - lastRaycastTimeRef.current > AUTOFOCUS_RAYCAST_INTERVAL) {
+          lastRaycastTimeRef.current = now;
+          autoFocusRaycaster.setFromCamera(screenCenter, camera);
+          const intersects = autoFocusRaycaster.intersectObjects(scene.children, true);
+          if (intersects.length > 0 && intersects[0]) {
+            autoFocusDistanceRef.current = intersects[0].distance;
+          }
         }
         targetFocus = autoFocusDistanceRef.current;
       }

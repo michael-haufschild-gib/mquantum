@@ -8,6 +8,27 @@
  *
  * @module rendering/renderers/base/useFramePriority
  *
+ * ## Important: Callback Stability
+ *
+ * For best performance, callers should memoize their callbacks with useCallback:
+ *
+ * ```tsx
+ * // ✅ Good - stable callback, reads state inside
+ * const callback = useCallback((state, delta) => {
+ *   const { value } = useMyStore.getState()
+ *   // use value...
+ * }, []) // Empty deps - state read via getState()
+ *
+ * useFramePriority('ANIMATION', callback)
+ * ```
+ *
+ * ```tsx
+ * // ❌ Avoid - inline callbacks recreated every render
+ * useFramePriority('ANIMATION', (state, delta) => {
+ *   // ...
+ * })
+ * ```
+ *
  * @example
  * ```tsx
  * import { useFramePriority } from '@/rendering/renderers/base';
@@ -32,6 +53,7 @@
 
 import type { RootState } from '@react-three/fiber'
 import { useFrame } from '@react-three/fiber'
+import { useCallback } from 'react'
 
 import { FRAME_PRIORITY, type FramePriority } from '@/rendering/core/framePriorities'
 
@@ -118,12 +140,18 @@ export function useFramePriority(
   // Resolve the numeric priority from the key
   const priority: FramePriority = FRAME_PRIORITY[priorityKey]
 
+  // Memoize the wrapper callback to prevent unnecessary re-subscriptions.
+  // The wrapper only changes when callback or enabled changes.
+  const wrappedCallback = useCallback(
+    (state: RootState, delta: number) => {
+      if (!enabled) return
+      callback(state, delta)
+    },
+    [callback, enabled]
+  )
+
   // Use R3F's useFrame with the resolved priority
-  // The callback is wrapped to handle the enabled check
-  useFrame((state, delta) => {
-    if (!enabled) return
-    callback(state, delta)
-  }, priority)
+  useFrame(wrappedCallback, priority)
 }
 
 /**
@@ -151,10 +179,16 @@ export function useFramePriorityValue(
 ): void {
   const { enabled = true } = options
 
-  useFrame((state, delta) => {
-    if (!enabled) return
-    callback(state, delta)
-  }, priority)
+  // Memoize the wrapper callback to prevent unnecessary re-subscriptions.
+  const wrappedCallback = useCallback(
+    (state: RootState, delta: number) => {
+      if (!enabled) return
+      callback(state, delta)
+    },
+    [callback, enabled]
+  )
+
+  useFrame(wrappedCallback, priority)
 }
 
 /**

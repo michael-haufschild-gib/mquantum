@@ -1,101 +1,84 @@
 /**
  * Animation Loop Hook
- * Uses requestAnimationFrame to animate rotations
+ *
+ * Integrates rotation animation with R3F's frame system via useFrame.
+ * FpsController handles frame timing via advance(), this hook updates
+ * rotation state at the ANIMATION priority level.
+ *
+ * Performance: Uses a single RAF driver (FpsController) instead of separate
+ * RAF loops, eliminating duplicate timing logic and redundant wakeups.
  */
 
 import { getPlaneMultiplier } from '@/lib/animation/biasCalculation'
+import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
-import { useRotationStore } from '@/stores/rotationStore'
 import { useExportStore } from '@/stores/exportStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import { useRotationStore } from '@/stores/rotationStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useCallback, useEffect, useRef } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { useFrame } from '@react-three/fiber'
+import { useCallback, useRef } from 'react'
 
 /**
- * Hook that runs the animation loop when animation is playing
- * Updates rotation angles for all animating planes
- * Pauses during skybox loading or scene transitions to avoid visual artifacts
+ * Hook that runs animation updates within R3F's frame loop.
+ * Updates rotation angles for all animating planes at ANIMATION priority.
+ *
+ * All state is read via getState() inside the callback for fresh values.
+ * This ensures the callback is stable (empty deps) and conditions are
+ * always evaluated with current store state.
+ *
+ * Pauses during:
+ * - skybox loading
+ * - scene transitions
+ * - video export (export handles its own animation stepping)
  */
 export function useAnimationLoop(): void {
-  // Grouped animation store subscription
-  const { isPlaying, animatingPlanes, getRotationDelta } = useAnimationStore(
-    useShallow((state) => ({
-      isPlaying: state.isPlaying,
-      animatingPlanes: state.animatingPlanes,
-      getRotationDelta: state.getRotationDelta,
-    }))
-  )
-
-  // Environment and performance checks (grouped where possible)
-  const skyboxLoading = useEnvironmentStore((state) => state.skyboxLoading)
-  const sceneTransitioning = usePerformanceStore((state) => state.sceneTransitioning)
-  const isExporting = useExportStore((state) => state.isExporting)
-  const showMsgBox = useMsgBoxStore((state) => state.showMsgBox)
-
-  const updateRotations = useRotationStore((state) => state.updateRotations)
-  const getRotationRadians = useCallback((plane: string) => {
-    return useRotationStore.getState().rotations.get(plane) ?? 0
-  }, [])
-
-  const lastTimeRef = useRef<number | null>(null)
-  const frameRef = useRef<number | null>(null)
   // Reusable Map for rotation updates (avoids allocation every frame)
   const updatesRef = useRef(new Map<string, number>())
 
-  const animate = useCallback(
-    (currentTime: number) => {
+  // Stable callback - all state read via getState() inside
+  const animationCallback = useCallback(
+    (_state: unknown, delta: number) => {
       try {
-        if (lastTimeRef.current === null) {
-          lastTimeRef.current = currentTime
-        }
+        // Convert delta from seconds to milliseconds
+        const deltaTimeMs = delta * 1000
 
-        const deltaTime = currentTime - lastTimeRef.current
-
-        // Skip if delta is too large (e.g., tab was inactive)
-        if (deltaTime > 100) {
-          lastTimeRef.current = currentTime
-          frameRef.current = requestAnimationFrame(animate)
+        // Skip if delta is too large (e.g., tab was inactive or first frame)
+        if (deltaTimeMs > 100 || deltaTimeMs <= 0) {
           return
         }
 
-        // Batch all store reads at start of callback (avoids multiple getState() calls)
-        const { animationBias } = useUIStore.getState()
-        const { maxFps } = usePerformanceStore.getState()
+        // Batch all store reads at start of callback
         const animState = useAnimationStore.getState()
-        const { animatingPlanes: currentAnimatingPlanes, updateAccumulatedTime } = animState
+        const { isPlaying, animatingPlanes, getRotationDelta, updateAccumulatedTime } = animState
+        const { skyboxLoading } = useEnvironmentStore.getState()
+        const { sceneTransitioning } = usePerformanceStore.getState()
+        const { isExporting } = useExportStore.getState()
 
-        // Throttle based on maxFps setting
-        const frameInterval = 1000 / maxFps
-
-        // Use 1ms tolerance to handle floating point precision issues.
-        // Without tolerance, RAF timing (~16.665999ms) can be slightly less than
-        // frameInterval (16.666666ms), causing every other frame to be skipped.
-        // 1ms provides reliable tolerance across different systems while maintaining FPS accuracy.
-        if (deltaTime < frameInterval - 1) {
-          frameRef.current = requestAnimationFrame(animate)
+        // Check all pause conditions
+        if (!isPlaying || animatingPlanes.size === 0 || skyboxLoading || sceneTransitioning || isExporting) {
           return
         }
 
-        // Snap to frame boundary to prevent drift
-        lastTimeRef.current = currentTime - (deltaTime % frameInterval)
+        const { animationBias } = useUIStore.getState()
+        const rotationState = useRotationStore.getState()
 
         // Update global accumulated time (used by fractals and blackholes)
-        updateAccumulatedTime(deltaTime / 1000)
+        updateAccumulatedTime(delta)
 
-        const rotationDelta = getRotationDelta(deltaTime)
-        // Reuse Map instance to avoid allocation every frame (60 FPS = 60 allocations/sec)
+        const rotationDelta = getRotationDelta(deltaTimeMs)
+
+        // Reuse Map instance to avoid allocation every frame
         const updates = updatesRef.current
         updates.clear()
 
-        // OPT-ANIM-1: Update each animating plane with per-plane bias multiplier
-        // Using for...of instead of forEach to avoid closure allocation overhead
-        const totalPlanes = currentAnimatingPlanes.size
+        // Update each animating plane with per-plane bias multiplier
+        const totalPlanes = animatingPlanes.size
         let planeIndex = 0
-        for (const plane of currentAnimatingPlanes) {
-          const currentAngle = getRotationRadians(plane)
+        for (const plane of animatingPlanes) {
+          const currentAngle = rotationState.rotations.get(plane) ?? 0
           // Apply per-plane bias multiplier using golden ratio spread
           const multiplier = getPlaneMultiplier(planeIndex, totalPlanes, animationBias)
           const biasedDelta = rotationDelta * multiplier
@@ -113,23 +96,17 @@ export function useAnimationLoop(): void {
         }
 
         if (updates.size > 0) {
-          updateRotations(updates)
+          rotationState.updateRotations(updates)
         }
-
-        frameRef.current = requestAnimationFrame(animate)
       } catch (error) {
         console.error('Animation Loop Error:', error)
 
         // Stop animation
         useAnimationStore.getState().pause()
-        if (frameRef.current !== null) {
-          cancelAnimationFrame(frameRef.current)
-          frameRef.current = null
-        }
 
         // Show error message - wrap in try-catch to prevent double-error crashes
         try {
-          showMsgBox(
+          useMsgBoxStore.getState().showMsgBox(
             'Animation Error',
             `The animation loop encountered an error and has been stopped.\n\n${error instanceof Error ? error.message : 'Unknown error'}`,
             'error',
@@ -147,29 +124,13 @@ export function useAnimationLoop(): void {
             ]
           )
         } catch (msgBoxError) {
-          // If message box fails, log but don't crash
           console.error('Failed to show animation error dialog:', msgBoxError)
         }
       }
     },
-    [getRotationDelta, getRotationRadians, updateRotations, showMsgBox]
+    [] // Empty deps - all state read via getState()
   )
 
-  useEffect(() => {
-    // Don't animate while skybox is loading, scene is transitioning, or exporting
-    // (Export handles its own animation stepping)
-    const shouldAnimate =
-      isPlaying && animatingPlanes.size > 0 && !skyboxLoading && !sceneTransitioning && !isExporting
-    if (shouldAnimate) {
-      lastTimeRef.current = null
-      frameRef.current = requestAnimationFrame(animate)
-    }
-
-    return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current)
-        frameRef.current = null
-      }
-    }
-  }, [isPlaying, animatingPlanes, animate, skyboxLoading, sceneTransitioning, isExporting])
+  // Register with R3F's frame system at ANIMATION priority
+  useFrame(animationCallback, FRAME_PRIORITY.ANIMATION)
 }

@@ -90,8 +90,9 @@ export function FpsController(): null {
       // Strict > ensures we only trigger when we've actually passed the target duration.
       if (elapsed > interval) {
         // Advance the frame - this triggers useFrame callbacks and renders
-        // Pass timestamp for proper delta calculation in useFrame
-        advance(now)
+        // R3F's advance() expects timestamp in SECONDS, not milliseconds
+        // RAF provides timestamp in ms, so convert: now / 1000
+        advance(now / 1000)
 
         // Account for elapsed time to prevent drift, but don't set it to future
         // and ensure we don't 'lose' time if we skipped many frames.
