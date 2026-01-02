@@ -127,7 +127,11 @@ vec3 bendRay(vec3 rayDir, vec3 pos3d, float stepSize, float ndRadius) {
   // h² = |pos|^2 - (pos . rayDir)^2
   // Note: using 3D dot product here because ray is in 3D slice
   float p_dot_d = dot(pos3d, rayDir);
-  float pos3dLenSq = dot(pos3d, pos3d);
+  // PERF (OPT-BH-9): Derive pos3dLenSq from ndRadius instead of recomputing dot product.
+  // From ndDistance(): ndRadius = sqrt(pos3dLenSq + uOriginOffsetLengthSq)
+  // Therefore: pos3dLenSq = ndRadius² - uOriginOffsetLengthSq
+  // Saves 5 ALU ops (3 muls + 2 adds) per raymarch step (~200 steps/pixel).
+  float pos3dLenSq = max(1e-10, ndRadius * ndRadius - uOriginOffsetLengthSq);
   float h2 = pos3dLenSq - p_dot_d * p_dot_d;
 
   // If h² ≈ 0, ray is purely radial - no bending possible
@@ -205,7 +209,10 @@ vec3 bendRay(vec3 rayDir, vec3 pos3d, float stepSize, float ndRadius) {
   // Radial acceleration (toward origin)
   // vec3 radialDir = pos3d / r; (Using 3D pos for direction)
   // acceleration = -forceMagnitude * radialDir;
-  vec3 acceleration = -(forceMagnitude / sqrt(pos3dLenSq)) * pos3d;
+  // PERF (OPT-BH-10): Use inversesqrt instead of division by sqrt.
+  // Mathematically identical: 1/sqrt(x) ≡ inversesqrt(x)
+  // Division is ~4x slower than multiply on GPU.
+  vec3 acceleration = -(forceMagnitude * inversesqrt(pos3dLenSq)) * pos3d;
 
   // === Kerr frame dragging component ===
   // Frame dragging causes spacetime to rotate with the black hole.

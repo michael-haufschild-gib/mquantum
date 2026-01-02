@@ -501,7 +501,7 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
       1.0 - smoothstep(0.5, 1.0, t),     // G: stays high, drops in second half
       0.0                                 // B: always 0
     );
-    accum.color = vec4(heatmap, 1.0);
+    accum.color = heatmap;
     accum.transmittance = 0.0;  // Fully opaque
   }
 
