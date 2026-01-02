@@ -14,6 +14,11 @@ export const volumeIntegrationBlock = `
 // Volume Integration (Beer-Lambert Compositing)
 // ============================================
 
+// Global iteration counters for debug visualization
+// Set by volumeRaymarch/volumeRaymarchHQ, read by main shader for heatmap
+int g_volumeIterations = 0;
+int g_volumeMaxIterations = 0;
+
 // Maximum samples per ray
 #define MAX_VOLUME_SAMPLES 128
 
@@ -125,6 +130,10 @@ VolumeResult volumeRaymarch(vec3 rayOrigin, vec3 rayDir, float tNear, float tFar
     // Fixed sample count: 64 for HQ, 32 for fast mode
     int sampleCount = uFastMode ? 32 : 64;
 
+    // Set global max iterations for debug heatmap
+    g_volumeMaxIterations = sampleCount;
+    g_volumeIterations = 0;
+
     float stepLen = (tFar - tNear) / float(sampleCount);
     float t = tNear;
 
@@ -162,6 +171,9 @@ VolumeResult volumeRaymarch(vec3 rayOrigin, vec3 rayDir, float tNear, float tFar
 
     for (int i = 0; i < MAX_VOLUME_SAMPLES; i++) {
         if (i >= sampleCount) break;
+
+        // Track iterations for debug visualization
+        g_volumeIterations = i + 1;
 
 #ifdef USE_DISPERSION
         // Exit when all channels are blocked
@@ -345,6 +357,10 @@ VolumeResult volumeRaymarchHQ(vec3 rayOrigin, vec3 rayDir, float tNear, float tF
     // Fixed sample count: 64 for HQ, 32 for fast mode
     int sampleCount = uFastMode ? 32 : 64;
 
+    // Set global max iterations for debug heatmap
+    g_volumeMaxIterations = sampleCount;
+    g_volumeIterations = 0;
+
     float stepLen = (tFar - tNear) / float(sampleCount);
     float t = tNear;
 
@@ -373,6 +389,10 @@ VolumeResult volumeRaymarchHQ(vec3 rayOrigin, vec3 rayDir, float tNear, float tF
 
     for (int i = 0; i < MAX_VOLUME_SAMPLES; i++) {
         if (i >= sampleCount) break;
+
+        // Track iterations for debug visualization
+        g_volumeIterations = i + 1;
+
         // Exit if ALL channels are blocked
         if (transmittance.r < MIN_TRANSMITTANCE && transmittance.g < MIN_TRANSMITTANCE && transmittance.b < MIN_TRANSMITTANCE) break;
 

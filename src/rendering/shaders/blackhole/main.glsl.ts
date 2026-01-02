@@ -287,6 +287,7 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
 
   bool hitHorizon = false;
   int diskCrossings = 0;
+  int iterationsUsed = 0;  // Track iterations for debug visualization
 
   // PERF (OPT-BH-7): Pre-compute absorption factor before loop
   // This is constant for the entire ray, so compute once instead of per disk hit.
@@ -300,6 +301,8 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     if (i >= effectiveMaxSteps) break;
     if (totalDist > maxDist) break;
     if (accum.transmittance < uTransmittanceCutoff) break; // Early exit for opaque
+
+    iterationsUsed = i + 1;  // Track iterations for debug heatmap
 
     // ndRadius is already computed (from initial before loop OR from previous iteration's post-step)
 
@@ -487,6 +490,20 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
   }
 
   accum.color *= uBloomBoost;
+
+  // Debug mode: iteration heatmap visualization
+  // Green (few iterations) → Yellow → Red (many iterations)
+  if (uDebugMode == 1) {
+    float t = float(iterationsUsed) / float(effectiveMaxSteps);
+    // Green → Yellow → Red gradient
+    vec3 heatmap = vec3(
+      smoothstep(0.0, 0.5, t),           // R: ramps up in first half
+      1.0 - smoothstep(0.5, 1.0, t),     // G: stays high, drops in second half
+      0.0                                 // B: always 0
+    );
+    accum.color = vec4(heatmap, 1.0);
+    accum.transmittance = 0.0;  // Fully opaque
+  }
 
   return finalizeAccumulation(accum, pos, rayDir);
 }

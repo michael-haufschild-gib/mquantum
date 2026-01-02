@@ -19,6 +19,8 @@ export interface QualitySourceConfig {
   qualityMultiplier: number
   /** Whether fast mode is active (during animation playback) */
   fastMode: boolean
+  /** Debug visualization mode (0=off, 1=iterations, 2=depth, 3=normals) */
+  debugMode: number
 }
 
 /**
@@ -50,11 +52,13 @@ export class QualitySource extends BaseUniformSource {
   private qualityUniforms = {
     uQualityMultiplier: { value: 1.0 },
     uFastMode: { value: false },
+    uDebugMode: { value: 0 },
   }
 
   // Cached values for change detection
   private cachedQualityMultiplier = 1.0
   private cachedFastMode = false
+  private cachedDebugMode = 0
 
   /**
    * Update from store state.
@@ -73,6 +77,12 @@ export class QualitySource extends BaseUniformSource {
     if (this.cachedFastMode !== config.fastMode) {
       this.qualityUniforms.uFastMode.value = config.fastMode
       this.cachedFastMode = config.fastMode
+      changed = true
+    }
+
+    if (this.cachedDebugMode !== config.debugMode) {
+      this.qualityUniforms.uDebugMode.value = config.debugMode
+      this.cachedDebugMode = config.debugMode
       changed = true
     }
 
@@ -104,6 +114,7 @@ export class QualitySource extends BaseUniformSource {
     this.updateFromStore({
       qualityMultiplier: perfState.qualityMultiplier,
       fastMode: fastMode,
+      debugMode: perfState.debugMode,
     })
   }
 
@@ -129,8 +140,10 @@ export class QualitySource extends BaseUniformSource {
   reset(): void {
     this.qualityUniforms.uQualityMultiplier.value = 1.0
     this.qualityUniforms.uFastMode.value = false
+    this.qualityUniforms.uDebugMode.value = 0
     this.cachedQualityMultiplier = 1.0
     this.cachedFastMode = false
+    this.cachedDebugMode = 0
     this._version = 0
   }
 }

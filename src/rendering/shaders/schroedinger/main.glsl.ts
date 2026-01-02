@@ -118,7 +118,7 @@ void main() {
 
     // Volumetric raymarching
     VolumeResult volumeResult;
-    
+
     // Fast mode selection: uFastMode is always respected
     // Both paths now support dispersion:
     // - Fast path: gradient-based color modulation (lightweight approximation)
@@ -127,6 +127,28 @@ void main() {
         volumeResult = volumeRaymarch(ro, rd, tNear, tFar);
     } else {
         volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar);
+    }
+
+    // Debug Mode 1: Iteration Heatmap
+    // Shows green→yellow→red gradient based on iteration count
+    // Green = few iterations (efficient), Red = many iterations (expensive)
+    if (uDebugMode == 1) {
+        float iterT = float(g_volumeIterations) / float(max(g_volumeMaxIterations, 1));
+        // Heatmap: green (low) → yellow (mid) → red (high)
+        vec3 heatmap = vec3(
+            smoothstep(0.0, 0.5, iterT),           // R: ramps up in first half
+            1.0 - smoothstep(0.5, 1.0, iterT),     // G: stays high, drops in second half
+            0.0                                     // B: always 0
+        );
+        // For low alpha (nearly transparent), show slightly darker
+        if (volumeResult.alpha < 0.5) {
+            heatmap *= 0.5 + 0.5 * volumeResult.alpha;
+        }
+        gColor = vec4(heatmap, 1.0);
+        gNormal = vec4(0.5, 0.5, 1.0, 0.0);
+        gPosition = vec4(ro + rd * tNear, tNear);
+        gl_FragDepth = 0.5;
+        return;
     }
 
     // Discard fully transparent pixels
@@ -239,9 +261,16 @@ void main() {
     float t = tNear;
     float hitT = -1.0;
 
+    // Set global max iterations for debug heatmap
+    g_volumeMaxIterations = maxSteps;
+    g_volumeIterations = 0;
+
     for (int i = 0; i < 128; i++) {
         if (i >= maxSteps) break;
         if (t > tFar) break;
+
+        // Track iterations for debug visualization
+        g_volumeIterations = i + 1;
 
         vec3 pos = ro + rd * t;
         float rho = sampleDensity(pos, animTime);
@@ -266,6 +295,27 @@ void main() {
         }
 
         t += stepLen;
+    }
+
+    // Debug Mode 1: Iteration Heatmap (isosurface mode)
+    // Shows green→yellow→red gradient based on iteration count
+    if (uDebugMode == 1) {
+        float iterT = float(g_volumeIterations) / float(max(g_volumeMaxIterations, 1));
+        // Heatmap: green (low) → yellow (mid) → red (high)
+        vec3 heatmap = vec3(
+            smoothstep(0.0, 0.5, iterT),           // R: ramps up in first half
+            1.0 - smoothstep(0.5, 1.0, iterT),     // G: stays high, drops in second half
+            0.0                                     // B: always 0
+        );
+        // For misses, show slightly darker
+        if (hitT < 0.0) {
+            heatmap *= 0.7;
+        }
+        gColor = vec4(heatmap, 1.0);
+        gNormal = vec4(0.5, 0.5, 1.0, 0.0);
+        gPosition = vec4(ro + rd * (hitT > 0.0 ? hitT : tNear), hitT > 0.0 ? hitT : tNear);
+        gl_FragDepth = 0.5;
+        return;
     }
 
     if (hitT < 0.0) discard;

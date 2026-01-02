@@ -93,7 +93,7 @@ export function CameraController({
   enableDamping = true,
   dampingFactor = 0.05,
   minDistance = 2,
-  maxDistance = 20,
+  maxDistance = 10,
   autoRotate = false,
   autoRotateSpeed = 1.0,
   enablePan = true,

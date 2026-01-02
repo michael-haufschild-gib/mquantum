@@ -1370,9 +1370,26 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     setGraph(currentGraph);
     setTemporalDepthPass(passRefs.current.temporalDepthCapture ?? null);
 
+    // Initialize GPU profiler in dev mode
+    if (import.meta.env.DEV) {
+      import('@/dev-tools/profiler').then(({ initProfiler }) => {
+        const profiler = initProfiler(currentGraph);
+        // @ts-expect-error - Dev-only profiler access
+        window.__PROFILER__ = profiler;
+      });
+    }
+
     // Clear references on unmount or when graph changes
     return () => {
       clear();
+      // Dispose profiler in dev mode
+      if (import.meta.env.DEV) {
+        import('@/dev-tools/profiler').then(({ disposeProfiler }) => {
+          disposeProfiler();
+          // @ts-expect-error - Dev-only profiler access
+          window.__PROFILER__ = null;
+        });
+      }
     };
   }, [graph]);
 

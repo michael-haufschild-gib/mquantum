@@ -54,14 +54,14 @@ describe('QualitySource', () => {
 
   describe('updateFromStore', () => {
     it('should update quality multiplier', () => {
-      source.updateFromStore({ qualityMultiplier: 0.5, fastMode: false })
+      source.updateFromStore({ qualityMultiplier: 0.5, fastMode: false, debugMode: 0 })
 
       expect(source.getQualityMultiplier()).toBe(0.5)
       expect(source.getUniforms().uQualityMultiplier!.value).toBe(0.5)
     })
 
     it('should update fast mode', () => {
-      source.updateFromStore({ qualityMultiplier: 1.0, fastMode: true })
+      source.updateFromStore({ qualityMultiplier: 1.0, fastMode: true, debugMode: 0 })
 
       expect(source.isFastMode()).toBe(true)
       expect(source.getUniforms().uFastMode!.value).toBe(true)
@@ -70,16 +70,16 @@ describe('QualitySource', () => {
     it('should increment version on change', () => {
       const initialVersion = source.version
 
-      source.updateFromStore({ qualityMultiplier: 0.75, fastMode: false })
+      source.updateFromStore({ qualityMultiplier: 0.75, fastMode: false, debugMode: 0 })
 
       expect(source.version).toBe(initialVersion + 1)
     })
 
     it('should not increment version when values unchanged', () => {
-      source.updateFromStore({ qualityMultiplier: 0.5, fastMode: true })
+      source.updateFromStore({ qualityMultiplier: 0.5, fastMode: true, debugMode: 0 })
       const version = source.version
 
-      source.updateFromStore({ qualityMultiplier: 0.5, fastMode: true })
+      source.updateFromStore({ qualityMultiplier: 0.5, fastMode: true, debugMode: 0 })
 
       expect(source.version).toBe(version)
     })
@@ -87,7 +87,7 @@ describe('QualitySource', () => {
 
   describe('reset', () => {
     it('should reset to initial state', () => {
-      source.updateFromStore({ qualityMultiplier: 0.25, fastMode: true })
+      source.updateFromStore({ qualityMultiplier: 0.25, fastMode: true, debugMode: 1 })
       source.reset()
 
       expect(source.getQualityMultiplier()).toBe(1.0)
@@ -98,7 +98,7 @@ describe('QualitySource', () => {
 
   describe('applyToMaterial', () => {
     it('should apply uniforms to material', () => {
-      source.updateFromStore({ qualityMultiplier: 0.6, fastMode: true })
+      source.updateFromStore({ qualityMultiplier: 0.6, fastMode: true, debugMode: 0 })
 
       const material = new THREE.ShaderMaterial({
         uniforms: {

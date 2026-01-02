@@ -92,4 +92,8 @@ uniform bool uAoEnabled;
 
 // GPU Profiling mode (0=normal, 1=raymarch only, 2=raymarch+normal, 3=no shadows, 4=no lighting)
 uniform int uProfileMode;
+
+// Debug visualization mode (0=off, 1=iteration heatmap, 2=depth, 3=normals)
+// Used by Claude profiler for visual performance analysis
+uniform int uDebugMode;
 `

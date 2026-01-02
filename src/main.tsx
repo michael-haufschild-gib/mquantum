@@ -38,6 +38,10 @@ if (import.meta.env.DEV) {
   window.__POST_PROCESSING_STORE__ = usePostProcessingStore
   // @ts-expect-error - Dev-only debug store access
   window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
+
+  // GPU Profiler API - set when RenderGraph is initialized
+  // @ts-expect-error - Dev-only profiler access
+  window.__PROFILER__ = null
 }
 
 const rootElement = document.getElementById('root')

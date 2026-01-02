@@ -220,6 +220,13 @@ interface PerformanceState {
   shaderOverrides: string[]
 
   // -------------------------------------------------------------------------
+  // GPU Profiler Debug Mode
+  // -------------------------------------------------------------------------
+
+  /** Debug visualization mode for GPU profiler (0=off, 1=iteration heatmap, 2=depth, 3=normals) */
+  debugMode: number
+
+  // -------------------------------------------------------------------------
   // Shader Compilation State
   // -------------------------------------------------------------------------
 
@@ -268,6 +275,9 @@ interface PerformanceState {
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => void
   toggleShaderModule: (moduleName: string) => void
   resetShaderOverrides: () => void
+
+  // GPU Profiler Debug Mode
+  setDebugMode: (mode: number) => void
 
   // Shader Compilation
   setShaderCompiling: (shaderName: string, compiling: boolean) => void
@@ -325,6 +335,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Shader Debugging
   shaderDebugInfos: {},
   shaderOverrides: [],
+
+  // GPU Profiler Debug Mode (0=off, 1=iteration heatmap, 2=depth, 3=normals)
+  debugMode: 0,
 
   // Shader Compilation State
   compilingShaders: new Set<string>(),
@@ -455,6 +468,11 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ shaderOverrides: [] })
   },
 
+  // GPU Profiler Debug Mode
+  setDebugMode: (mode: number) => {
+    set({ debugMode: Math.max(0, Math.min(3, mode)) })
+  },
+
   // Shader Compilation
   setShaderCompiling: (shaderName: string, compiling: boolean) => {
     set((state) => {
@@ -500,6 +518,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       maxFps: DEFAULT_MAX_FPS,
       shaderDebugInfos: {},
       shaderOverrides: [],
+      debugMode: 0,
       compilingShaders: new Set<string>(),
       isShaderCompiling: false,
       shaderCompilationMessage: '',

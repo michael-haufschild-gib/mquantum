@@ -35,6 +35,29 @@ void main() {
     //     d = RayMarchNoTemporal(ro, rd, trap);
     // }
 
+    // Debug Mode 1: Iteration Heatmap
+    // Shows green→yellow→red gradient based on iteration count
+    // Green = few iterations (efficient), Red = many iterations (expensive)
+    // Works for both hits and misses to visualize full cost distribution
+    if (uDebugMode == 1) {
+        float t = float(g_raymarchIterations) / float(max(g_raymarchMaxIterations, 1));
+        // Heatmap: green (low) → yellow (mid) → red (high)
+        vec3 heatmap = vec3(
+            smoothstep(0.0, 0.5, t),           // R: ramps up in first half
+            1.0 - smoothstep(0.5, 1.0, t),     // G: stays high, drops in second half
+            0.0                                 // B: always 0
+        );
+        // For misses, show slightly darker to distinguish from hits
+        if (d > maxDist) {
+            heatmap *= 0.7;
+        }
+        gColor = vec4(heatmap, 1.0);
+        gNormal = vec4(0.5, 0.5, 1.0, 0.0);
+        gPosition = vec4(ro + rd * min(d, sphereEntry + 0.1), d);
+        gl_FragDepth = 0.5;
+        return;
+    }
+
     if (d > maxDist) discard;
 
     vec3 p = ro + rd * d;

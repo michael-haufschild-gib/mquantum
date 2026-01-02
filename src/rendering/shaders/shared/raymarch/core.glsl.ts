@@ -3,6 +3,11 @@ export const raymarchCoreBlock = `
 // Raymarching & Rendering
 // ============================================
 
+// Global iteration counter for debug visualization
+// Set by RayMarchCore, read by main shader for heatmap
+int g_raymarchIterations = 0;
+int g_raymarchMaxIterations = 0;
+
 /**
  * Core raymarching loop - shared by temporal and non-temporal variants.
  * Uses relaxed sphere tracing with overrelaxation for efficiency.
@@ -53,9 +58,16 @@ float RayMarchCore(vec3 ro, vec3 rd, float startDist, float maxT, float maxDist,
     // Safety: if we overstep, fall back to conservative stepping
     float prevDist = 1e10;
 
+    // Set global max iterations for debug heatmap
+    g_raymarchMaxIterations = maxSteps;
+    g_raymarchIterations = 0;
+
     // Loop uses max possible steps, early exit via maxSteps check
     for (int i = 0; i < MAX_MARCH_STEPS_HQ; i++) {
         if (i >= maxSteps) break;
+
+        // Track iterations for debug visualization
+        g_raymarchIterations = i + 1;
 
         vec3 p = ro + rd * dO;
         float currentTrap;
