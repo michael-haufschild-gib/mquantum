@@ -1,7 +1,7 @@
 # Rotation Animation Performance Analysis
 
-**Date:** 2 January 2026  
-**Author:** GitHub Copilot  
+**Date:** 2 January 2026
+**Author:** GitHub Copilot
 **Scope:** Math and matrix operations for N-dimensional rotation animations
 
 ---
@@ -193,10 +193,10 @@ The project uses a parabolic approximation for sin/cos:
 function fsin(x: number): number {
   // Normalize to [-π, π]
   x = ((x % TAU) + TAU + PI) % TAU - PI
-  
+
   // Parabolic approximation: sin(x) ≈ x(π - |x|) × 4/π²
   const y = x * (PI - Math.abs(x)) * (4 / (PI * PI))
-  
+
   return clamp(y, -1, 1)
 }
 ```
@@ -207,7 +207,7 @@ function fsin(x: number): number {
 - Exact at: 0, ±π/2, ±π
 - Continuous and smooth (no discontinuities)
 
-**Appropriate for:** Visual animations where smooth motion matters more than precision.  
+**Appropriate for:** Visual animations where smooth motion matters more than precision.
 **Not appropriate for:** Physics calculations, geometric construction, or arc drawing.
 
 ---
@@ -262,10 +262,10 @@ if (len === 16) {
 ```typescript
 // NDTransformSource.ts
 updateFromStore(config: NDTransformConfig): void {
-  const rotationChanged = 
-    dimension !== this.cachedDimension || 
+  const rotationChanged =
+    dimension !== this.cachedDimension ||
     rotationVersion !== this.cachedRotationVersion
-  
+
   if (!rotationChanged && !scaleChanged && !projectionChanged) {
     return  // Skip expensive recomputation
   }
@@ -304,7 +304,7 @@ export function matrixToFloat64(matrix: MatrixND): Float64Array {
 result.set(new Float32Array(wasmResult))  // Another allocation + copy
 ```
 
-**Impact:** 
+**Impact:**
 - 2 allocations per frame
 - 2 full matrix copies (n² elements each)
 - GC pressure from temporary arrays
@@ -409,8 +409,8 @@ export function matrixToFloat64(matrix: MatrixND): Float64Array {
 ```rust
 // New function signature
 pub fn compose_rotations_f32(
-  dimension: usize, 
-  plane_names: &[String], 
+  dimension: usize,
+  plane_names: &[String],
   angles: &[f32]
 ) -> Vec<f32>
 ```
@@ -524,7 +524,7 @@ Based on analysis, implement a dimension-based path selection:
 export function composeRotations(dimension: number, angles: Map<string, number>): MatrixND {
   // WASM only beneficial for higher dimensions (after optimization)
   const useWasm = dimension >= 7 && isAnimationWasmReady()
-  
+
   if (useWasm) {
     return composeRotationsWasm(...)
   }

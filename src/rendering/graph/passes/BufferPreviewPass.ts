@@ -137,10 +137,11 @@ const bufferPreviewShader = {
       }
 
       // Type 3: Temporal Depth
+      // gPosition buffer: xyz = model-space position, w = model-space ray distance
       if (uType == 3) {
-        float temporalDepth = texel.r;
+        float temporalDepth = texel.w;  // Use .w (ray distance), NOT .r (X position)!
 
-        // 0.0 indicates invalid/empty data
+        // 0.0 indicates invalid/empty data (no hit)
         if (temporalDepth < 0.0001) {
           fragColor = vec4(0.0, 0.0, 0.0, 1.0);
           return;

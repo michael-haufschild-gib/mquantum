@@ -17,6 +17,43 @@ export interface SceneExample {
 }
 
 /**
+ * Result of scene lookup indicating which source the scene was found in.
+ */
+export interface SceneLookupResult {
+  id: string
+  source: 'saved' | 'example'
+}
+
+/**
+ * Find a scene by name (case-insensitive) across both saved and example scenes.
+ * Saved scenes (user's custom scenes) take priority over example scenes.
+ *
+ * @param name - Scene name to search for (case-insensitive)
+ * @returns Scene lookup result if found, null otherwise
+ */
+export function findSceneByName(name: string): SceneLookupResult | null {
+  const lowerName = name.toLowerCase().trim()
+  if (!lowerName) {
+    return null
+  }
+
+  // Search saved scenes first (user's custom scenes take priority)
+  const savedScenes = usePresetManagerStore.getState().savedScenes
+  const savedMatch = savedScenes.find((s) => s.name.toLowerCase() === lowerName)
+  if (savedMatch) {
+    return { id: savedMatch.id, source: 'saved' }
+  }
+
+  // Search example scenes (bundled with the app)
+  const exampleMatch = scenesData.find((s) => s.name.toLowerCase() === lowerName)
+  if (exampleMatch) {
+    return { id: exampleMatch.id, source: 'example' }
+  }
+
+  return null
+}
+
+/**
  * Get all example scenes from the bundled JSON
  * @returns Array of scene examples with apply functions, sorted alphabetically by name
  */

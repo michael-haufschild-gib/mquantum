@@ -4,18 +4,141 @@ description: Deep shader performance optimization with GPU profiling
 
 # Mission
 
-You are performing **autonomous deep shader optimization** for a WebGL raymarching application. Your goal is to identify specific performance bottlenecks within shaders and implement concrete optimizations that measurably improve frame rate.
+You are performing **autonomous deep shader optimization** for a WebGL raymarching application that renders animated N-dimensional mathematical objects.
 
-**Success criteria**: Achieve measurable FPS improvement (document before/after metrics) while maintaining visual quality.
+---
 
-## Context: What This Application Renders
+## CRITICAL CONSTRAINT: ZERO VISUAL QUALITY LOSS
 
-This is a 3D visualization app rendering complex mathematical objects:
-- **Mandelbulb/Julia**: Fractal SDFs using iterative distance estimation (expensive: `pow()`, `atan()`, trigonometric functions in loops)
-- **Schrödinger**: Quantum wavefunction volumetric rendering (expensive: wavefunction sampling, Beer-Lambert integration)
-- **Black Hole**: Kerr metric raymarching with accretion disk (expensive: metric tensor computation, disk sampling, gravitational lensing)
+**This is absolute and non-negotiable.**
 
-All use **raymarching** - the main performance concern is iteration count and per-iteration cost.
+```
+==========================================================
+  VISUAL FIDELITY IS SACRED. DO NOT COMPROMISE IT. EVER.
+==========================================================
+```
+
+**Success criteria**: Achieve measurable FPS improvement during animation with **ZERO change to visual output**. The render must be **pixel-identical** before and after optimization.
+
+If you cannot find optimizations that preserve visual quality, **report that finding** rather than implementing quality-degrading changes.
+
+---
+
+## Application Context: Animated N-Dimensional Objects
+
+This application exists to **animate** complex mathematical objects:
+
+- Objects **continuously rotate** around one or more planes
+- Supported dimensions: **3D through 11D**
+- Users watch these objects animate - that's the core experience
+- **Animation performance IS the product**
+
+### Object Types
+
+| Type | Description | Expensive Operations |
+|------|-------------|---------------------|
+| **Mandelbulb/Julia** | Fractal SDFs via escape-time iteration | `pow()`, `atan()`, trig functions in loops |
+| **Schrödinger** | Quantum wavefunction volumetric rendering | Wavefunction sampling, Beer-Lambert integration |
+| **Black Hole** | Kerr metric raymarching with accretion disk | Metric tensor computation, gravitational lensing |
+
+All use **raymarching** with high iteration counts for visual fidelity.
+
+---
+
+# FORBIDDEN Optimizations
+
+**NEVER implement these. They degrade visual quality.**
+
+| Forbidden Technique | Why It's Forbidden |
+|--------------------|--------------------|
+| Fast math approximations (`acosApprox`, `atanApprox`, `fastSqrt`) | Accumulates error in iterative fractals, visibly distorts geometry |
+| Reducing `MAX_MARCH_STEPS` or `MAX_ITER` | Loses fine detail, misses thin features |
+| Increasing `SURF_DIST` / surface threshold | Makes surfaces rougher, loses sharp edges |
+| "Fast mode" / "Low quality during animation" | **Animation IS the use case** - this defeats the purpose |
+| Reducing shadow samples | Causes shadow banding and aliasing |
+| Skipping AO/SSS/effects during animation | Visible pop-in when animation stops |
+| Texture LOD biasing | Blurs details |
+| Temporal reprojection that causes ghosting | Visible artifacts during rotation |
+| Any approximation in the SDF inner loop | Fractals amplify errors exponentially |
+
+### Why "Lower Quality While Animating" Is Unacceptable
+
+The user asked explicitly:
+> "I never want to see something like 'lower quality while animating'"
+
+The entire purpose of this application is to watch animated objects. Degrading quality during animation means degrading quality 100% of the time the user cares about. **This is not a valid optimization strategy.**
+
+---
+
+# ALLOWED Optimizations
+
+**These preserve visual output while improving performance.**
+
+## Category 1: Eliminate Redundant Work
+
+```glsl
+// BEFORE: Same calculation done twice
+float r = sqrt(x*x + y*y + z*z);
+// ... 20 lines later ...
+float r2 = sqrt(x*x + y*y + z*z);  // REDUNDANT
+
+// AFTER: Cache and reuse
+float r = sqrt(x*x + y*y + z*z);
+// ... 20 lines later, use r ...
+```
+
+## Category 2: Defer Expensive Operations
+
+```glsl
+// BEFORE: sqrt inside loop when only comparing
+for (int i = 0; i < n; i++) {
+    if (sqrt(distSq) < threshold) break;
+}
+
+// AFTER: Compare squared values (mathematically identical)
+float thresholdSq = threshold * threshold;
+for (int i = 0; i < n; i++) {
+    if (distSq < thresholdSq) break;
+}
+```
+
+## Category 3: Better Early Exit (Same Visual Result)
+
+```glsl
+// Early exit when we KNOW the result won't change
+// Only valid if the exit condition guarantees identical output
+if (dO > maxT) break;  // Already past maximum distance - would miss anyway
+```
+
+## Category 4: Reduce Memory Bandwidth
+
+- Smaller uniform buffers
+- Better texture formats (same visual quality, less bandwidth)
+- Avoid redundant texture fetches of same coordinate
+
+## Category 5: GPU Occupancy Improvements
+
+- Reduce register pressure (same math, better packing)
+- Avoid thread divergence where possible
+- Better workgroup sizing
+
+## Category 6: Pass Optimization
+
+- Merge passes that read/write the same data
+- Eliminate passes that produce unused outputs
+- Reduce render target resolution ONLY if it doesn't affect final output (e.g., intermediate buffers that get upsampled correctly)
+
+## Category 7: Precision Selection (When Visually Identical)
+
+```glsl
+// ONLY for values that don't affect final color/position
+mediump float orbitTrap;  // Used for coloring variation, not geometry
+// NEVER reduce precision for:
+// - Position calculations
+// - Distance estimations
+// - Normal calculations
+// - Anything in the SDF loop
+```
 
 ---
 
@@ -27,7 +150,7 @@ This command requires the **Chrome DevTools MCP** to be running. Check if it's a
 
 **If Chrome DevTools MCP is NOT available:**
 ```
-⚠️ STOP - Chrome DevTools MCP is required but not connected.
+STOP - Chrome DevTools MCP is required but not connected.
 
 Ask the user:
 "The Chrome DevTools MCP is not available. Please:
@@ -55,24 +178,21 @@ The dev server runs at `http://localhost:3000`. Use these URLs to test specific 
 
 # Phase 1: Baseline Measurement
 
-## Step 1.1: Start the Dev Server
+## Step 1.1: Navigate to Target Object
 
-```bash
-npm run dev
-```
-
-Wait for compilation. The app runs at `http://localhost:3000`.
-
-## Step 1.2: Navigate to Target Object
-
-Use Chrome DevTools MCP to navigate to the object you want to optimize:
-
-```javascript
-// Example: Navigate to Mandelbulb
-// Use the appropriate URL from the table above
-```
+Use Chrome DevTools MCP to navigate to the object you want to optimize.
 
 Wait for the scene to fully load and render.
+
+## Step 1.2: Capture Reference Screenshot
+
+**CRITICAL**: Before any optimization, capture a reference screenshot:
+
+```javascript
+// Take reference screenshot for visual comparison
+```
+
+Save this as the **ground truth**. All optimizations must produce **identical output**.
 
 ## Step 1.3: Collect Baseline Performance Data
 
@@ -84,7 +204,7 @@ window.__PROFILER__.enable()
 window.__PROFILER__.startLogging(3000)
 ```
 
-**Wait 15-20 seconds** for data to accumulate, then execute:
+**Wait 15-20 seconds** for data to accumulate (object should be animating), then execute:
 
 ```javascript
 // Get the slowest passes
@@ -105,8 +225,8 @@ From the profiler output, identify:
 2. Whether it has `"warning": "high"` or `"warning": "exceeds budget"`
 
 **Decision tree**:
-- If `ScenePass` or object-specific pass (MandelbulbPass, BlackHolePass, etc.) is slowest → Proceed to Phase 2
-- If a post-processing pass (BloomPass, SSAOPass, etc.) is slowest → Read the pass implementation in `src/rendering/graph/passes/` and optimize there instead
+- If `ScenePass` or object-specific pass is slowest → Analyze the raymarching shader
+- If a post-processing pass is slowest → Read the pass implementation in `src/rendering/graph/passes/`
 
 ---
 
@@ -123,21 +243,21 @@ window.__PROFILER__.setDebugMode(1)
 This renders a **green→yellow→red gradient** based on raymarch iterations:
 - **Green**: Few iterations (fast pixels)
 - **Yellow**: Moderate iterations
-- **Red**: Many iterations (slow pixels - optimization targets)
+- **Red**: Many iterations (expensive pixels)
 
 ## Step 2.2: Capture and Analyze the Heatmap
 
-Use Chrome DevTools MCP to take a screenshot of the heatmap visualization.
+Take a screenshot of the heatmap visualization.
 
-Look for patterns:
-- **Red at object edges**: Normal - edges require more iterations to resolve
-- **Red in empty space**: BAD - wasted iterations on misses. Fix: improve bounding volume culling
-- **Uniform red across object**: BAD - too many iterations everywhere. Fix: reduce MAX_MARCH_STEPS or improve early termination
-- **Red at specific features**: The math for that feature is expensive. Fix: simplify that specific calculation
+Look for **optimization opportunities that don't affect quality**:
+
+| Pattern | Meaning | Quality-Safe Optimization |
+|---------|---------|--------------------------|
+| Red in empty space | Wasted iterations on guaranteed misses | Tighter bounding volume (same visual result) |
+| Uniform distribution | Well-optimized already | Look elsewhere |
+| Red at edges only | Normal behavior | No action needed |
 
 ## Step 2.3: Disable Heatmap When Done
-
-Use Chrome DevTools MCP to execute:
 
 ```javascript
 window.__PROFILER__.setDebugMode(0)
@@ -147,266 +267,225 @@ window.__PROFILER__.setDebugMode(0)
 
 # Phase 3: Shader Source Analysis
 
-Based on which pass is the bottleneck, read the relevant shader files:
+Based on which pass is the bottleneck, read the relevant shader files.
 
-## For Mandelbulb (fractal SDF):
-
-```
-src/rendering/shaders/mandelbulb/sdf/de.glsl.ts       # Distance estimator
-src/rendering/shaders/shared/raymarch/core.glsl.ts   # Raymarch loop
-src/rendering/shaders/shared/fractal/main.glsl.ts    # Main shader
-```
-
-**Key functions to analyze**:
-- `DE()` or `GetDist()` - the SDF distance function (called every iteration)
-- `RayMarchCore()` - the main loop
-- Look for: `pow()`, `sin()`, `cos()`, `atan()`, `sqrt()` - these are expensive
-
-## For Julia (quaternion fractal):
+## Key Shader Locations
 
 ```
-src/rendering/shaders/julia/sdf/                     # Julia-specific SDF
-src/rendering/shaders/shared/raymarch/core.glsl.ts   # Shared raymarch
+src/rendering/shaders/mandelbulb/sdf/     # Mandelbulb distance functions
+src/rendering/shaders/julia/sdf/          # Julia distance functions
+src/rendering/shaders/schroedinger/       # Schrödinger volume rendering
+src/rendering/shaders/blackhole/          # Black hole raymarching
+src/rendering/shaders/shared/raymarch/    # Shared raymarch core
+src/rendering/shaders/shared/features/    # Shadows, AO, etc.
+src/rendering/graph/passes/               # Render pass implementations
 ```
 
-## For Schrödinger (volumetric):
-
-```
-src/rendering/shaders/schroedinger/volume/integration.glsl.ts  # Volume integration
-src/rendering/shaders/schroedinger/volume/sampling.glsl.ts     # Density sampling
-src/rendering/shaders/schroedinger/main.glsl.ts                # Main shader
-```
-
-**Key functions to analyze**:
-- `volumeRaymarch()` / `volumeRaymarchHQ()` - the integration loop
-- `sampleDensity()` - wavefunction evaluation (called every sample)
-
-## For Black Hole:
-
-```
-src/rendering/shaders/blackhole/main.glsl.ts         # Main shader with all physics
-src/rendering/shaders/blackhole/disk.glsl.ts         # Accretion disk
-src/rendering/shaders/blackhole/metric.glsl.ts       # Kerr metric
-```
-
-**Key functions to analyze**:
-- `raymarchBlackHole()` - main integration loop
-- `kerrMetric()` or geodesic integration - expensive tensor math
-- `sampleDisk()` - disk color/emission calculation
-
-## Shader Code Red Flags
-
-When reading shader source, look for these performance anti-patterns:
-
-**In loops (very expensive - multiplied by iteration count):**
-```glsl
-// RED FLAG: Expensive functions inside loops
-for (int i = 0; i < MAX_STEPS; i++) {
-    float angle = atan(y, x);        // ~50 cycles each
-    float power = pow(r, n);         // ~30 cycles each
-    float sine = sin(theta);         // ~20 cycles each
-    vec4 tex = texture(sampler, uv); // ~100+ cycles (memory bound)
-}
-```
-
-**Unnecessary precision:**
-```glsl
-// RED FLAG: Using expensive functions when cheaper alternatives exist
-float dist = sqrt(x*x + y*y);  // Can often use distSquared and compare squared values
-float norm = normalize(v);      // Sometimes length isn't needed, just direction
-```
+## What to Look For (Quality-Preserving Only)
 
 **Redundant calculations:**
 ```glsl
-// RED FLAG: Same calculation done multiple times
-for (int i = 0; i < steps; i++) {
-    float r = length(p);        // Calculated here
-    float theta = acos(p.z/r);  // And r used here
-    // ... later in same iteration:
-    float r2 = length(p);       // REDUNDANT - r already computed above
-}
+// RED FLAG: Same value computed multiple times
+float r = sqrt(x*x + y*y + z*z);
+// ... code that doesn't modify x, y, z ...
+float r2 = sqrt(x*x + y*y + z*z);  // REDUNDANT - use r instead
 ```
 
-**Branch divergence:**
+**Deferred operations:**
 ```glsl
-// RED FLAG: Complex conditionals that cause thread divergence
-if (someCondition) {
-    // 50 lines of expensive code
-} else {
-    // 50 different lines of expensive code
-}
-// GPU threads in same warp must wait for each other
+// RED FLAG: sqrt() used only for comparison
+if (sqrt(distSq) < threshold) { ... }
+// OPTIMIZATION: Compare squared values (identical result)
+if (distSq < threshold * threshold) { ... }
+```
+
+**Dead code:**
+```glsl
+// RED FLAG: Code that never executes or results never used
+float unused = expensiveCalculation();  // Value never read
+```
+
+**Inefficient branching:**
+```glsl
+// RED FLAG: Uniform-based branch that could be compile-time
+if (uSomeFeatureEnabled) { /* always true in this build */ }
+// Could use #ifdef instead for zero runtime cost
 ```
 
 ---
 
 # Phase 4: Implement Optimizations
 
-Choose optimizations based on your analysis. Here are specific techniques:
+## Before Writing Any Code
 
-## 4.1: Reduce Iteration Count
+Ask yourself:
+1. **Will this change ANY pixel in the output?** If yes → STOP, do not implement
+2. **Is this mathematically equivalent?** If uncertain → STOP, verify first
+3. **Does this affect the SDF inner loop?** If yes → Be extremely careful
 
-**Where**: `src/rendering/shaders/shared/raymarch/core.glsl.ts`
+## Implementation Guidelines
+
+1. Make **one optimization at a time**
+2. After each change, **verify visual output matches reference**
+3. If output differs by even one pixel, **revert immediately**
+4. Document each change with clear reasoning
+
+## Safe Optimization Examples
+
+### Caching Repeated Calculations
 
 ```glsl
-// Find these constants and consider reducing them:
-#define MAX_MARCH_STEPS_HQ 256  // Try 192 or 128
-#define MAX_MARCH_STEPS_LQ 64   // Try 48 or 32
+// BEFORE
+float a = expensive(x);
+float b = expensive(x);  // Same input!
+
+// AFTER (mathematically identical)
+float cached = expensive(x);
+float a = cached;
+float b = cached;
 ```
 
-**Trade-off**: Lower values = faster but may miss thin features.
-
-## 4.2: Improve Early Termination
-
-Add early exit conditions in the raymarch loop:
+### Squared Distance Comparison
 
 ```glsl
-// Exit if we're clearly inside/outside the bounding volume
-if (dO > maxT * 1.5) break;  // We've gone too far
+// BEFORE
+if (length(v) < threshold) { ... }
 
-// Exit if step size is tiny (we're stuck)
-if (dS < surfDist * 0.01) break;
+// AFTER (mathematically identical)
+if (dot(v, v) < threshold * threshold) { ... }
 ```
 
-## 4.3: Optimize Expensive Math
-
-Replace expensive operations with approximations:
+### Early Exit on Guaranteed Miss
 
 ```glsl
-// Instead of:
-float angle = atan(y, x);
+// BEFORE
+// Always march full distance even when clearly outside bounds
 
-// Use (when full precision not needed):
-float angle = atan2Approx(y, x);  // Or precompute if possible
-
-// Instead of:
-float dist = sqrt(x*x + y*y + z*z);
-
-// Use (when comparing distances):
-float distSq = x*x + y*y + z*z;  // Compare squared distances
-```
-
-## 4.4: Reduce Texture Samples
-
-In volumetric shaders, texture samples are expensive:
-
-```glsl
-// Instead of sampling every iteration:
-for (int i = 0; i < steps; i++) {
-    vec4 sample = texture(uVolume, pos);  // EXPENSIVE
-    // ...
-}
-
-// Sample less frequently or use LOD:
-for (int i = 0; i < steps; i++) {
-    if (i % 2 == 0) {  // Sample every other step
-        cachedSample = textureLod(uVolume, pos, mipLevel);
-    }
-    // Use cachedSample...
-}
-```
-
-## 4.5: Improve Bounding Volume Culling
-
-If the heatmap shows red in empty space, improve the bounding sphere:
-
-```glsl
-// In intersectSphere() or similar:
-// Make BOUND_R tighter to the actual object
-#define BOUND_R 1.5  // Try smaller values like 1.3 or 1.2
-```
-
-## 4.6: Quality-Based Optimization
-
-Use the existing quality system to do less work at lower quality:
-
-```glsl
-if (uFastMode) {
-    // Use cheaper approximations during interaction
-    maxSteps = MAX_MARCH_STEPS_LQ;
-    // Skip expensive features like SSS, detailed shadows
-}
+// AFTER (same visual result - would have missed anyway)
+if (distanceFromBounds > maxPossibleHit) return MISS;
 ```
 
 ---
 
 # Phase 5: Verification
 
-## Step 5.1: Test the Changes
+## Step 5.1: Visual Verification (MANDATORY)
 
-After making edits, the dev server hot-reloads. Use Chrome DevTools MCP to:
+After each optimization:
 
-1. Refresh the page to ensure changes are applied
-2. Take a screenshot to verify visual quality
-3. Compare with original rendering - check for:
-   - Visual artifacts
-   - Edge quality degradation
-   - Flickering or missing geometry
+1. **Refresh the page** to ensure changes are applied
+2. **Take a new screenshot**
+3. **Compare with reference screenshot**
+4. **If ANY visual difference exists → REVERT THE CHANGE**
 
-## Step 5.2: Measure Improvement
+Visual verification is not optional. Do not skip this step.
 
-Use Chrome DevTools MCP to execute:
+## Step 5.2: Measure Performance Improvement
 
 ```javascript
-// Re-run profiling
 window.__PROFILER__.enable()
 window.__PROFILER__.startLogging(3000)
 ```
 
-Wait 15-20 seconds, then execute:
+Wait 15-20 seconds with animation running, then:
 
 ```javascript
 JSON.stringify(window.__PROFILER__.getSlowestPasses(10), null, 2)
-```
-
-And get updated FPS:
-```javascript
 window.__PROFILER__.getSummary()
 ```
 
-**Compare with baseline**:
-- Did the target pass GPU time decrease?
-- Did overall FPS improve?
-- What's the percentage improvement?
+## Step 5.3: Validate Results
 
-## Step 5.3: Document Results
+**Required conditions for success:**
+1. Visual output is **identical** to reference
+2. FPS improved OR GPU time decreased
+3. No new visual artifacts during animation
+4. No flickering, popping, or temporal issues
 
-Create or update a report with:
-- Before metrics (FPS, slowest pass time)
-- After metrics (FPS, slowest pass time)
-- What optimizations were applied
-- Any visual quality trade-offs
+If condition #1 is not met, the optimization is **rejected** regardless of performance gain.
 
 ---
 
-# Decision Matrix: What To Optimize
+# Decision Matrix
 
-| Symptom | Likely Cause | Optimization |
-|---------|--------------|--------------|
-| Uniform red heatmap | Too many iterations | Reduce MAX_MARCH_STEPS |
-| Red in empty space | Poor bounding volume | Tighten BOUND_R, add early exit |
-| Red at edges only | Normal behavior | Acceptable, or reduce surface threshold |
-| High GPU time, low iterations | Expensive per-iteration math | Optimize DE/SDF function |
-| Post-process pass is slowest | Not a shader issue | Check pass implementation |
+| Observation | Quality-Safe Action |
+|-------------|-------------------|
+| Redundant sqrt/length calls | Cache and reuse |
+| Same texture sampled multiple times at same UV | Cache the sample |
+| Uniform-based branches with constant values | Use preprocessor defines |
+| Calculations outside loop that could be inside | Move inside (if cheaper) OR vice versa |
+| Squared values compared via sqrt | Compare squared directly |
+| Dead code paths | Remove entirely |
+| Passes writing to unused buffers | Disable the pass |
 
 ---
 
-# Constraints
+# What To Do If No Safe Optimizations Exist
 
-- **DO NOT** break existing functionality
-- **DO NOT** change visual quality significantly without documenting the trade-off
-- **DO** maintain WebGL2 / GLSL ES 3.00 compatibility
-- **DO** test on at least one object type before declaring success
-- **DO** commit changes with clear description of optimization and measured improvement
+If after thorough analysis you find:
+- All redundant calculations are already eliminated
+- No dead code exists
+- Bounding volumes are already tight
+- No passes can be merged or eliminated
+
+Then **report this finding**:
+
+```
+Analysis complete. No quality-preserving optimizations identified.
+
+Current performance:
+- FPS: X
+- Slowest pass: Y (Z ms)
+
+The shader code is already well-optimized for quality-preserving performance.
+Further improvements would require quality trade-offs, which are not permitted.
+
+Potential areas for future investigation:
+- [List any architectural changes that might help]
+- [Hardware-specific optimizations]
+- [WebGPU migration possibilities]
+```
+
+This is a valid outcome. Not every codebase has low-hanging optimization fruit.
 
 ---
 
 # Output Format
 
-When you complete this optimization, provide:
+When you complete this optimization session, provide:
 
-1. **Baseline**: FPS and slowest pass time before optimization
-2. **Changes Made**: List of specific code changes with file paths
-3. **Results**: FPS and slowest pass time after optimization
-4. **Improvement**: Percentage improvement in target metric
-5. **Trade-offs**: Any visual quality changes (if any)
+1. **Baseline** (during animation)
+   - FPS:
+   - Total GPU time:
+   - Slowest pass:
+
+2. **Changes Made**
+   - List each optimization with file path and line numbers
+   - Explain why each is quality-preserving
+
+3. **Results** (during animation)
+   - FPS:
+   - Total GPU time:
+   - Slowest pass:
+
+4. **Improvement**
+   - Percentage FPS improvement:
+   - Percentage GPU time reduction:
+
+5. **Visual Verification**
+   - Confirm: "Visual output verified identical to baseline"
+   - OR: "No optimizations implemented - all changes reverted due to visual differences"
+
+---
+
+# Constraints Summary
+
+| Rule | Enforcement |
+|------|-------------|
+| Zero visual quality loss | **ABSOLUTE** - no exceptions |
+| No "fast mode" quality reduction | **ABSOLUTE** - animation is the use case |
+| No math approximations in SDF | **ABSOLUTE** - fractals amplify errors |
+| Visual verification after each change | **MANDATORY** |
+| Revert if any pixel differs | **MANDATORY** |
+| WebGL2 / GLSL ES 3.00 compatibility | Required |
+| Test with animation running | Required |

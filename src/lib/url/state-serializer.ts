@@ -44,6 +44,8 @@ export interface ShareableState {
   dimension: number
   objectType: ObjectType
   uniformScale?: number
+  // Scene preset name (case-insensitive lookup, mutually exclusive with other params)
+  scene?: string
   // Visual settings (PRD Story 1 AC6, Story 7 AC7)
   shaderType?: ShaderType
   shaderSettings?: AllShaderSettings
@@ -232,6 +234,17 @@ export function serializeState(state: ShareableState): string {
 export function deserializeState(searchParams: string): Partial<ShareableState> {
   const params = new URLSearchParams(searchParams)
   const state: Partial<ShareableState> = {}
+
+  // Scene parameter (mutually exclusive with other params - scene contains full state)
+  const sceneParam = params.get('scene')
+  if (sceneParam) {
+    const trimmed = sceneParam.trim()
+    if (trimmed) {
+      state.scene = trimmed
+      // Return early - scene overrides all other params
+      return state
+    }
+  }
 
   const dimension = params.get('d')
   if (dimension) {
