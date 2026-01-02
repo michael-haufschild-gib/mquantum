@@ -12,10 +12,34 @@ import {
   isAnimationWasmReady,
   multiplyMatrixVectorWasm,
   multiplyMatricesWasm,
-  matrixToFloat64,
-  vectorToFloat64,
   float64ToVector,
 } from '@/lib/wasm'
+
+// ============================================================================
+// Scratch Buffer Pools for WASM Operations
+// ============================================================================
+// These pools avoid per-call allocations when converting Float32 to Float64.
+// Dual pools (A/B) prevent data corruption when two same-sized buffers are
+// needed simultaneously (e.g., multiplyMatrices needs both a and b).
+
+const scratchMatrixA = new Map<number, Float64Array>()
+const scratchMatrixB = new Map<number, Float64Array>()
+const scratchVector = new Map<number, Float64Array>()
+
+/**
+ * Get or create a scratch buffer from the specified pool.
+ * @param pool - The pool to get from (A, B, or vector)
+ * @param size - Required buffer size
+ * @returns Float64Array of the requested size (may contain stale data)
+ */
+function getScratch(pool: Map<number, Float64Array>, size: number): Float64Array {
+  let buf = pool.get(size)
+  if (!buf) {
+    buf = new Float64Array(size)
+    pool.set(size, buf)
+  }
+  return buf
+}
 
 /**
  * Creates an n×n identity matrix
@@ -85,8 +109,10 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
 
   // Try WASM path if available
   if (isAnimationWasmReady()) {
-    const aF64 = matrixToFloat64(a)
-    const bF64 = matrixToFloat64(b)
+    const aF64 = getScratch(scratchMatrixA, len)
+    const bF64 = getScratch(scratchMatrixB, len)
+    aF64.set(a)
+    bF64.set(b)
     const wasmResult = multiplyMatricesWasm(aF64, bF64, dim)
     if (wasmResult) {
       result.set(new Float32Array(wasmResult))
@@ -791,8 +817,10 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
 
   // Try WASM path if available
   if (isAnimationWasmReady()) {
-    const matrixF64 = matrixToFloat64(m)
-    const vectorF64 = vectorToFloat64(v)
+    const matrixF64 = getScratch(scratchMatrixA, len)
+    const vectorF64 = getScratch(scratchVector, v.length)
+    matrixF64.set(m)
+    for (let i = 0; i < v.length; i++) vectorF64[i] = v[i]!
     const wasmResult = multiplyMatrixVectorWasm(matrixF64, vectorF64, dim)
     if (wasmResult) {
       const jsResult = float64ToVector(wasmResult)

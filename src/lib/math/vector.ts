@@ -13,9 +13,32 @@ import {
   magnitudeWasm,
   normalizeVectorWasm,
   subtractVectorsWasm,
-  vectorToFloat64,
   float64ToVector,
 } from '@/lib/wasm'
+
+// ============================================================================
+// Scratch Buffer Pools for WASM Operations
+// ============================================================================
+// Dual pools (A/B) prevent data corruption when two same-sized buffers are
+// needed simultaneously (e.g., dotProduct needs both a and b vectors).
+
+const scratchVectorA = new Map<number, Float64Array>()
+const scratchVectorB = new Map<number, Float64Array>()
+
+/**
+ * Get or create a scratch buffer from the specified pool.
+ * @param pool - The pool to get from (A or B)
+ * @param size - Required buffer size
+ * @returns Float64Array of the requested size (may contain stale data)
+ */
+function getScratch(pool: Map<number, Float64Array>, size: number): Float64Array {
+  let buf = pool.get(size)
+  if (!buf) {
+    buf = new Float64Array(size)
+    pool.set(size, buf)
+  }
+  return buf
+}
 
 /**
  * Creates an n-dimensional vector initialized with a fill value
@@ -73,8 +96,10 @@ export function subtractVectors(a: VectorND, b: VectorND, out?: VectorND): Vecto
 
   // Try WASM path if available (only when no out buffer, as WASM allocates)
   if (isAnimationWasmReady() && !out) {
-    const aF64 = vectorToFloat64(a)
-    const bF64 = vectorToFloat64(b)
+    const aF64 = getScratch(scratchVectorA, a.length)
+    const bF64 = getScratch(scratchVectorB, b.length)
+    for (let i = 0; i < a.length; i++) aF64[i] = a[i]!
+    for (let i = 0; i < b.length; i++) bF64[i] = b[i]!
     const wasmResult = subtractVectorsWasm(aF64, bF64)
     if (wasmResult) {
       return float64ToVector(wasmResult)
@@ -125,8 +150,10 @@ export function dotProduct(a: VectorND, b: VectorND): number {
 
   // Try WASM path if available
   if (isAnimationWasmReady()) {
-    const aF64 = vectorToFloat64(a)
-    const bF64 = vectorToFloat64(b)
+    const aF64 = getScratch(scratchVectorA, a.length)
+    const bF64 = getScratch(scratchVectorB, b.length)
+    for (let i = 0; i < a.length; i++) aF64[i] = a[i]!
+    for (let i = 0; i < b.length; i++) bF64[i] = b[i]!
     const wasmResult = dotProductWasm(aF64, bF64)
     if (wasmResult !== null) {
       return wasmResult
@@ -154,7 +181,8 @@ export function dotProduct(a: VectorND, b: VectorND): number {
 export function magnitude(v: VectorND): number {
   // Try WASM path if available
   if (isAnimationWasmReady()) {
-    const vF64 = vectorToFloat64(v)
+    const vF64 = getScratch(scratchVectorA, v.length)
+    for (let i = 0; i < v.length; i++) vF64[i] = v[i]!
     const wasmResult = magnitudeWasm(vF64)
     if (wasmResult !== null) {
       return wasmResult
@@ -184,7 +212,8 @@ export function magnitude(v: VectorND): number {
 export function normalize(v: VectorND, out?: VectorND): VectorND {
   // Try WASM path if available (only when no out buffer, as WASM allocates)
   if (isAnimationWasmReady() && !out) {
-    const vF64 = vectorToFloat64(v)
+    const vF64 = getScratch(scratchVectorA, v.length)
+    for (let i = 0; i < v.length; i++) vF64[i] = v[i]!
     const wasmResult = normalizeVectorWasm(vF64)
     if (wasmResult) {
       return float64ToVector(wasmResult)

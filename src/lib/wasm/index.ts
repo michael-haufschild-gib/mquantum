@@ -21,8 +21,6 @@ export {
   normalizeVectorWasm,
   subtractVectorsWasm,
   // Data conversion helpers
-  matrixToFloat64,
-  vectorToFloat64,
   float64ToVector,
   flattenVertices,
   flattenEdges,
