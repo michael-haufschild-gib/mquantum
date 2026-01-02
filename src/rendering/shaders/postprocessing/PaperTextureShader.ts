@@ -209,13 +209,14 @@ export const PaperTextureShader = {
       return total;
     }
 
+    // OPTIMIZATION: Forward difference (3 FBM calls) instead of central difference (4 FBM calls)
+    // Saves 25% FBM evaluations with visually identical results for soft procedural noise
     float fiberNoise(vec2 uv, vec2 seedOffset) {
       float epsilon = 0.001;
+      float n0 = fiberNoiseFbm(uv, seedOffset);
       float n1 = fiberNoiseFbm(uv + vec2(epsilon, 0.0), seedOffset);
-      float n2 = fiberNoiseFbm(uv - vec2(epsilon, 0.0), seedOffset);
-      float n3 = fiberNoiseFbm(uv + vec2(0.0, epsilon), seedOffset);
-      float n4 = fiberNoiseFbm(uv - vec2(0.0, epsilon), seedOffset);
-      return length(vec2(n1 - n2, n3 - n4)) / (2.0 * epsilon);
+      float n2 = fiberNoiseFbm(uv + vec2(0.0, epsilon), seedOffset);
+      return length(vec2(n1 - n0, n2 - n0)) / epsilon;
     }
 
     // ============================================================================

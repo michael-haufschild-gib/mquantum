@@ -53,7 +53,6 @@ import {
   BloomPass,
   BokehPass,
   BufferPreviewPass,
-  CinematicPass,
   CubemapCapturePass,
   DebugOverlayPass,
   DepthPass,
@@ -74,7 +73,7 @@ import {
   TemporalCloudPass,
   TemporalDepthCapturePass,
   ToScreenPass,
-  ToneMappingPass,
+  ToneMappingCinematicPass,
 } from '@/rendering/graph/passes';
 import { RenderGraph } from '@/rendering/graph/RenderGraph';
 import { cloudCompositeFragmentShader } from '@/rendering/shaders/postprocessing/cloudComposite.glsl';
@@ -125,7 +124,7 @@ const RESOURCES = {
   BOKEH_OUTPUT: 'bokehOutput',
   REFRACTION_OUTPUT: 'refractionOutput',
   LENSING_OUTPUT: 'lensingOutput',
-  CINEMATIC_OUTPUT: 'cinematicOutput',
+  // CINEMATIC_OUTPUT removed - merged with TONEMAPPED_OUTPUT
   TONEMAPPED_OUTPUT: 'tonemappedOutput',
   FRAME_BLENDING_OUTPUT: 'frameBlendingOutput',
   PAPER_OUTPUT: 'paperOutput',
@@ -411,8 +410,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     bokeh?: BokehPass;
     refraction?: RefractionPass;
     lensing?: ScreenSpaceLensingPass;
-    cinematic?: CinematicPass;
-    toneMapping?: ToneMappingPass;
+    toneMappingCinematic?: ToneMappingCinematicPass;
     frameBlending?: FrameBlendingPass;
     paper?: PaperTexturePass;
     fxaa?: FXAAPass;
@@ -724,13 +722,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       dataType: THREE.HalfFloatType,
     });
 
-    g.addResource({
-      id: RESOURCES.CINEMATIC_OUTPUT,
-      type: 'renderTarget',
-      size: { mode: 'screen' },
-      format: THREE.RGBAFormat,
-      dataType: THREE.HalfFloatType,
-    });
+    // CINEMATIC_OUTPUT removed - merged into TONEMAPPED_OUTPUT via ToneMappingCinematicPass
 
     g.addResource({
       id: RESOURCES.TONEMAPPED_OUTPUT,
@@ -1173,38 +1165,31 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.lensing = lensingPass;
     g.addPass(lensingPass);
 
-    // Cinematic pass (includes chromatic aberration, vignette, and film grain)
-    const cinematicPass = new CinematicPass({
-      id: 'cinematic',
+    // OPTIMIZATION: Combined ToneMapping + Cinematic pass
+    // Merges two passes into one, eliminating a render target switch and texture fetch.
+    // Operations: chromatic aberration → tone mapping → vignette → film grain
+    const toneMappingCinematicPass = new ToneMappingCinematicPass({
+      id: 'toneMappingCinematic',
       colorInput: RESOURCES.LENSING_OUTPUT,
-      outputResource: RESOURCES.CINEMATIC_OUTPUT,
+      outputResource: RESOURCES.TONEMAPPED_OUTPUT,
+      // Tone mapping settings
+      toneMapping: TONE_MAPPING_TO_THREE[lightingState.toneMappingAlgorithm],
+      exposure: lightingState.exposure,
+      // Cinematic settings
       aberration: ppStateRef.current.cinematicAberration,
       vignette: ppStateRef.current.cinematicVignette,
       grain: ppStateRef.current.cinematicGrain,
-      enabled: (frame) => frame?.stores.postProcessing.cinematicEnabled ?? false,
-      skipPassthrough: true,
-    });
-    passRefs.current.cinematic = cinematicPass;
-    g.addPass(cinematicPass);
-
-    // Tone mapping pass - converts HDR to LDR
-    // Position: After all HDR effects (cinematic), before AA
-    const toneMappingPass = new ToneMappingPass({
-      id: 'toneMapping',
-      colorInput: RESOURCES.CINEMATIC_OUTPUT,
-      outputResource: RESOURCES.TONEMAPPED_OUTPUT,
-      toneMapping: TONE_MAPPING_TO_THREE[lightingState.toneMappingAlgorithm],
-      exposure: lightingState.exposure,
+      // Enable if either tone mapping or cinematic is enabled
       enabled: (frame) => {
         if (!frame) return false;
-        // Access lighting state from frozen frame context
-        // Note: We need to add lighting to frozen context, for now use ref
-        return lightingState.toneMappingEnabled;
+        const cinematicEnabled = frame.stores.postProcessing.cinematicEnabled;
+        const toneMappingEnabled = lightingState.toneMappingEnabled;
+        return cinematicEnabled || toneMappingEnabled;
       },
       skipPassthrough: true,
     });
-    passRefs.current.toneMapping = toneMappingPass;
-    g.addPass(toneMappingPass);
+    passRefs.current.toneMappingCinematic = toneMappingCinematicPass;
+    g.addPass(toneMappingCinematicPass);
 
     // Frame blending pass - blends current frame with previous for smoother motion
     // Position: After tone mapping (LDR), before paper texture
@@ -1402,7 +1387,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
   // ==========================================================================
 
   useEffect(() => {
-    const { gtao, bloom, ssr, bokeh, refraction, lensing, cinematic, toneMapping } = passRefs.current;
+    const { gtao, bloom, ssr, bokeh, refraction, lensing, toneMappingCinematic } = passRefs.current;
 
     if (gtao) {
       gtao.setIntensity(ppState.ssaoIntensity);
@@ -1447,15 +1432,13 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       lensing.setHybridSkyEnabled(true);
     }
 
-    if (cinematic) {
-      cinematic.setAberration(ppState.cinematicAberration);
-      cinematic.setVignette(ppState.cinematicVignette);
-      cinematic.setGrain(ppState.cinematicGrain);
-    }
-
-    if (toneMapping) {
-      toneMapping.setToneMapping(TONE_MAPPING_TO_THREE[lightingState.toneMappingAlgorithm]);
-      toneMapping.setExposure(lightingState.exposure);
+    // Combined ToneMapping + Cinematic pass
+    if (toneMappingCinematic) {
+      toneMappingCinematic.setAberration(ppState.cinematicAberration);
+      toneMappingCinematic.setVignette(ppState.cinematicVignette);
+      toneMappingCinematic.setGrain(ppState.cinematicGrain);
+      toneMappingCinematic.setToneMapping(TONE_MAPPING_TO_THREE[lightingState.toneMappingAlgorithm]);
+      toneMappingCinematic.setExposure(lightingState.exposure);
     }
 
     const frameBlending = passRefs.current.frameBlending;

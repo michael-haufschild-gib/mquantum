@@ -51,6 +51,10 @@ export { GTAOPass, type GTAOPassConfig } from './GTAOPass'
 
 // Cinematic passes
 export { ToneMappingPass, type ToneMappingPassConfig } from './ToneMappingPass'
+export {
+  ToneMappingCinematicPass,
+  type ToneMappingCinematicPassConfig,
+} from './ToneMappingCinematicPass'
 
 // Debug passes
 export {
