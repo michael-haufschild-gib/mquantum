@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => ({
     topLevelAwait(),
     wasmPack('./src/wasm/mdimension_core'),
     viteStaticCopy({
-      targets: faviconFiles.map(file => ({
+      targets: faviconFiles.map((file) => ({
         src: `src/assets/logo/${file}`,
         dest: '', // Copy to dist root
       })),
@@ -67,7 +67,8 @@ export default defineConfig(({ mode }) => ({
   assetsInclude: ['**/*.ktx2'],
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    sourcemap: false,
+    target: 'es2020',
     rollupOptions: {
       output: {
         manualChunks: {

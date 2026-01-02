@@ -66,5 +66,13 @@
     "vite-plugin-wasm": "^3.5.0",
     "vite-plugin-wasm-pack": "^0.1.12",
     "vitest": "^4.0.15"
-  }
+  },
+  "browserslist": [
+    "last 2 versions",
+    "> 1%",
+    "not dead",
+    "not ie <= 11",
+    "not safari < 12",
+    "not android < 6"
+  ]
 }
