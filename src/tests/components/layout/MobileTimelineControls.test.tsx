@@ -27,6 +27,7 @@ const mockLayoutState = {
 let mockIsDesktop = false;
 
 // Cache for useShallow results to prevent infinite re-renders
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- Required for caching selector functions
 const layoutStateCache = new WeakMap<Function, unknown>();
 
 vi.mock('@/stores/layoutStore', () => ({

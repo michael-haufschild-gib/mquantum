@@ -5,37 +5,37 @@
  * Contains all menu item builders for File, View, Scenes, Styles, and Mobile menus.
  */
 
-import { soundManager } from '@/lib/audio/SoundManager';
-import { getModifierSymbols } from '@/lib/platform';
-import { PRESETS } from '@/lib/presets';
-import { THEME_PRESETS, type ThemeAccent, type ThemeMode } from '@/stores/themeStore';
-import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore';
-import type { ToastType } from '@/contexts/ToastContextInstance';
-import type { MenuItem, MenuContext } from './types';
+import type { ToastType } from '@/contexts/ToastContextInstance'
+import { soundManager } from '@/lib/audio/SoundManager'
+import { getModifierSymbols } from '@/lib/platform'
+import { applySceneExample, getSceneExamples } from '@/lib/sceneExamples'
+import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
+import { THEME_PRESETS, type ThemeAccent, type ThemeMode } from '@/stores/themeStore'
+import type { MenuContext, MenuItem } from './types'
 
 /**
  * Build accent color menu items
  */
-export function buildAccentItems(accent: ThemeAccent, setAccent: (accent: ThemeAccent) => void): MenuItem[] {
-  const accents: ThemeAccent[] = ['cyan', 'blue', 'green', 'magenta', 'orange', 'violet', 'red'];
-  return accents.map(a => ({
+export function buildAccentItems(
+  accent: ThemeAccent,
+  setAccent: (accent: ThemeAccent) => void
+): MenuItem[] {
+  const accents: ThemeAccent[] = ['cyan', 'blue', 'green', 'magenta', 'orange', 'violet', 'red']
+  return accents.map((a) => ({
     label: (accent === a ? '\u2713 ' : '  ') + a.charAt(0).toUpperCase() + a.slice(1),
     onClick: () => setAccent(a),
-  }));
+  }))
 }
 
 /**
  * Build theme mode menu items
  */
-export function buildModeItems(
-  mode: ThemeMode,
-  setMode: (mode: ThemeMode) => void
-): MenuItem[] {
-  const modes: ThemeMode[] = ['light', 'dark', 'system'];
-  return modes.map(m => ({
+export function buildModeItems(mode: ThemeMode, setMode: (mode: ThemeMode) => void): MenuItem[] {
+  const modes: ThemeMode[] = ['light', 'dark', 'system']
+  return modes.map((m) => ({
     label: (mode === m ? '\u2713 ' : '  ') + m.charAt(0).toUpperCase() + m.slice(1),
     onClick: () => setMode(m),
-  }));
+  }))
 }
 
 /**
@@ -47,11 +47,11 @@ export function buildPresetItems(
   accentItems: MenuItem[]
 ): MenuItem[] {
   return [
-    ...THEME_PRESETS.map(p => ({
+    ...THEME_PRESETS.map((p) => ({
       label: p.label,
       onClick: () => {
-        setPreset(p.id);
-        soundManager.playClick();
+        setPreset(p.id)
+        soundManager.playClick()
       },
     })),
     { label: '---' },
@@ -62,7 +62,7 @@ export function buildPresetItems(
         { label: 'Accent', items: accentItems },
       ],
     },
-  ];
+  ]
 }
 
 /**
@@ -76,23 +76,27 @@ export function buildSavedSceneItems(
   return savedScenes.map((s: SavedScene) => ({
     label: s.name,
     onClick: () => {
-      loadScene(s.id);
-      soundManager.playClick();
-      addToast(`Loaded scene: ${s.name}`, 'info');
+      loadScene(s.id)
+      soundManager.playClick()
+      addToast(`Loaded scene: ${s.name}`, 'info')
     },
-  }));
+  }))
 }
 
 /**
  * Build example scene menu items
  */
 export function buildExampleSceneItems(
-  handleApplyPreset: (preset: typeof PRESETS[0]) => void
+  addToast: (message: string, type?: ToastType) => void
 ): MenuItem[] {
-  return PRESETS.map(p => ({
-    label: p.label,
-    onClick: () => handleApplyPreset(p),
-  }));
+  const sceneExamples = getSceneExamples()
+  return sceneExamples.map((scene) => ({
+    label: scene.name,
+    onClick: () => {
+      applySceneExample(scene.id)
+      addToast(`Loaded example: ${scene.name}`, 'info')
+    },
+  }))
 }
 
 /**
@@ -111,19 +115,17 @@ export function buildSceneSubmenuItems(
     {
       label: 'Manage Scenes...',
       onClick: () => {
-        setIsSceneManagerOpen(true);
-        soundManager.playClick();
+        setIsSceneManagerOpen(true)
+        soundManager.playClick()
       },
     },
     { label: '---' },
     { label: 'Saved Scenes' },
-    ...(savedScenes.length === 0
-      ? [{ label: '(None)', disabled: true }]
-      : savedSceneItems),
+    ...(savedScenes.length === 0 ? [{ label: '(None)', disabled: true }] : savedSceneItems),
     { label: '---' },
     { label: 'Examples' },
     ...exampleSceneItems,
-  ];
+  ]
 }
 
 /**
@@ -137,11 +139,11 @@ export function buildSavedStyleItems(
   return savedStyles.map((s: SavedStyle) => ({
     label: s.name,
     onClick: () => {
-      loadStyle(s.id);
-      soundManager.playClick();
-      addToast(`Applied style: ${s.name}`, 'info');
+      loadStyle(s.id)
+      soundManager.playClick()
+      addToast(`Applied style: ${s.name}`, 'info')
     },
-  }));
+  }))
 }
 
 /**
@@ -159,16 +161,14 @@ export function buildStyleSubmenuItems(
     {
       label: 'Manage Styles...',
       onClick: () => {
-        setIsStyleManagerOpen(true);
-        soundManager.playClick();
+        setIsStyleManagerOpen(true)
+        soundManager.playClick()
       },
     },
     { label: '---' },
     { label: 'Saved Styles' },
-    ...(savedStyles.length === 0
-      ? [{ label: '(None)', disabled: true }]
-      : savedStyleItems),
-  ];
+    ...(savedStyles.length === 0 ? [{ label: '(None)', disabled: true }] : savedStyleItems),
+  ]
 }
 
 /**
@@ -176,10 +176,9 @@ export function buildStyleSubmenuItems(
  */
 export function buildFileItems(
   handleExport: () => void,
-  handleExportVideo: () => void,
-  handleShare: () => void
+  handleExportVideo: () => void
 ): MenuItem[] {
-  const m = getModifierSymbols();
+  const m = getModifierSymbols()
   return [
     {
       label: 'Export Image (PNG)',
@@ -193,12 +192,7 @@ export function buildFileItems(
       shortcut: `${m.ctrl}${m.shift}E`,
       'data-testid': 'menu-export-video',
     },
-    {
-      label: 'Copy Share Link',
-      onClick: handleShare,
-      'data-testid': 'menu-share',
-    },
-  ];
+  ]
 }
 
 /**
@@ -221,29 +215,29 @@ export function buildViewItems(
     {
       label: ctx.showLeftPanel ? 'Hide Explorer' : 'Show Explorer',
       onClick: () => {
-        ctx.toggleLeftPanel();
-        soundManager.playClick();
+        ctx.toggleLeftPanel()
+        soundManager.playClick()
       },
     },
     {
       label: ctx.showRightPanel ? 'Hide Inspector' : 'Show Inspector',
       onClick: () => {
-        ctx.toggleRightPanel();
-        soundManager.playClick();
+        ctx.toggleRightPanel()
+        soundManager.playClick()
       },
     },
     { label: 'Cinematic Mode', onClick: ctx.toggleCinematicMode, shortcut: 'C' },
-  ];
+  ]
 
   // Only show keyboard shortcuts option on desktop (not useful on mobile)
   if (!ctx.isMobile) {
-    items.push({ label: 'Keyboard Shortcuts', onClick: ctx.toggleShortcuts, shortcut: '?' });
+    items.push({ label: 'Keyboard Shortcuts', onClick: ctx.toggleShortcuts, shortcut: '?' })
   }
 
-  items.push({ label: '---' });
-  items.push({ label: 'Theme', items: presetItems });
+  items.push({ label: '---' })
+  items.push({ label: 'Theme', items: presetItems })
 
-  return items;
+  return items
 }
 
 /**
@@ -265,5 +259,5 @@ export function buildMobileMenuItems(
     { label: '---' },
     { label: 'TOOLS' },
     { label: isSoundEnabled ? 'Mute Sound' : 'Enable Sound', onClick: toggleSound },
-  ];
+  ]
 }

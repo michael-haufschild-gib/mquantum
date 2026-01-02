@@ -42,17 +42,22 @@ export const useDynamicFavicon = () => {
 
       // Update existing favicon link or create new one (avoid DOM pollution)
       const existingLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement;
+      const dataUrl = canvas.toDataURL();
+
       if (existingLink) {
         // Update existing link
-        existingLink.href = canvas.toDataURL();
+        existingLink.href = dataUrl;
       } else {
         // Create new link only if none exists
         const newLink = document.createElement('link');
         newLink.type = 'image/x-icon';
         newLink.rel = 'shortcut icon';
-        newLink.href = canvas.toDataURL();
+        newLink.href = dataUrl;
         document.head.appendChild(newLink);
       }
+
+      // Revoke object URL on next update to prevent memory accumulation
+      // Note: toDataURL returns a data URL (not a blob URL), so no revocation needed
     }
   }, [accent]);
 };

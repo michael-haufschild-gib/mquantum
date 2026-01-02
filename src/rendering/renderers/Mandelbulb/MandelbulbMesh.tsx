@@ -264,7 +264,9 @@ const MandelbulbMesh = () => {
         const material = meshRef.current.material as THREE.ShaderMaterial;
         if (material.uniforms?.uProfileMode) {
           material.uniforms.uProfileMode.value = mode;
-          console.log(`Profile mode set to ${mode}: ${['Normal', 'Raymarch only', 'Raymarch+Normal', 'Raymarch+Normal+AO'][mode] || 'Unknown'}`);
+          if (import.meta.env.DEV) {
+            console.log(`Profile mode set to ${mode}: ${['Normal', 'Raymarch only', 'Raymarch+Normal', 'Raymarch+Normal+AO'][mode] || 'Unknown'}`);
+          }
         }
       }
     };

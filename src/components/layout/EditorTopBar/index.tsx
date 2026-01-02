@@ -13,30 +13,26 @@ import { Button } from '@/components/ui/Button';
 import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import { InputModal } from '@/components/ui/InputModal';
 import { Modal } from '@/components/ui/Modal';
-import { BREAKPOINTS, useMediaQuery, useIsMobile } from '@/hooks/useMediaQuery';
+import { BREAKPOINTS, useIsMobile, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
 import { exportSceneToPNG, findThreeCanvas, generateTimestampFilename } from '@/lib/export';
 import { OBJECT_TYPE_REGISTRY } from '@/lib/geometry/registry/registry';
-import { generateShareUrl } from '@/lib/url';
-import { useAppearanceStore } from '@/stores/appearanceStore';
 import { useExportStore } from '@/stores/exportStore';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
 import { useGeometryStore } from '@/stores/geometryStore';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
-import { usePostProcessingStore } from '@/stores/postProcessingStore';
 import { usePresetManagerStore, type PresetManagerState } from '@/stores/presetManagerStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { useTransformStore } from '@/stores/transformStore';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
-  useThemeMenuItems,
-  useSceneMenuItems,
-  useStyleMenuItems,
-  useFileMenuItems,
-  useViewMenuItems,
-  useMobileMenuItems,
+    useFileMenuItems,
+    useMobileMenuItems,
+    useSceneMenuItems,
+    useStyleMenuItems,
+    useThemeMenuItems,
+    useViewMenuItems,
 } from './useMenuItems';
 
 /** Props for EditorTopBar component */
@@ -103,32 +99,12 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(({
   // Modal states for inputs
   const [saveStyleOpen, setSaveStyleOpen] = useState(false);
   const [saveSceneOpen, setSaveSceneOpen] = useState(false);
-  const [shareUrlOpen, setShareUrlOpen] = useState(false);
-  const [currentShareUrl, setCurrentShareUrl] = useState('');
 
-  // Store access for Share URL generation - consolidated subscriptions
+  // Store subscriptions needed for video export
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({
       dimension: state.dimension,
       objectType: state.objectType,
-    }))
-  );
-
-  const uniformScale = useTransformStore((state) => state.uniformScale);
-
-  const { shaderType, shaderSettings, edgeColor, backgroundColor } = useAppearanceStore(
-    useShallow((state) => ({
-      shaderType: state.shaderType,
-      shaderSettings: state.shaderSettings,
-      edgeColor: state.edgeColor,
-      backgroundColor: state.backgroundColor,
-    }))
-  );
-
-  const { bloomEnabled, bloomIntensity } = usePostProcessingStore(
-    useShallow((state) => ({
-      bloomEnabled: state.bloomEnabled,
-      bloomIntensity: state.bloomIntensity,
     }))
   );
 
@@ -179,41 +155,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(({
     const filename = generateTimestampFilename('ndimensional');
     exportSceneToPNG({ filename });
   }, []);
-
-  const handleShare = useCallback(async () => {
-    const url = generateShareUrl({
-      dimension,
-      objectType,
-      uniformScale,
-      shaderType,
-      shaderSettings,
-      edgeColor,
-      backgroundColor,
-      bloomEnabled,
-      bloomIntensity,
-    });
-
-    try {
-      await navigator.clipboard.writeText(url);
-      soundManager.playSuccess();
-      addToast('Share URL copied to clipboard!', 'success');
-    } catch (error) {
-      console.warn('Clipboard API failed:', error);
-      setCurrentShareUrl(url);
-      setShareUrlOpen(true);
-    }
-  }, [
-    dimension,
-    objectType,
-    uniformScale,
-    shaderType,
-    shaderSettings,
-    edgeColor,
-    backgroundColor,
-    bloomEnabled,
-    bloomIntensity,
-    addToast,
-  ]);
 
   const { setExportModalOpen, setPreviewImage, updateExportSettings } = useExportStore(
     useShallow((state) => ({
@@ -285,7 +226,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(({
     setIsStyleManagerOpen
   );
 
-  const fileItems = useFileMenuItems(handleExport, handleExportVideo, handleShare);
+  const fileItems = useFileMenuItems(handleExport, handleExportVideo);
 
   const viewItems = useViewMenuItems(
     showLeftPanel,
@@ -342,12 +283,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(({
   const handleCloseSaveScene = useCallback(() => {
     setSaveSceneOpen(false);
   }, []);
-
-  const handleCloseShareUrl = useCallback(() => {
-    setShareUrlOpen(false);
-  }, []);
-
-  const handleShareConfirm = useCallback(() => {}, []);
 
   return (
     <>
@@ -532,18 +467,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(({
         title="Save Scene"
         placeholder="Enter scene name..."
         confirmText="Save"
-      />
-
-      <InputModal
-        isOpen={shareUrlOpen}
-        onClose={handleCloseShareUrl}
-        onConfirm={handleShareConfirm}
-        title="Share Link"
-        message="Copy this URL to share your scene:"
-        initialValue={currentShareUrl}
-        readOnly
-        confirmText="Close"
-        cancelText="Close"
       />
     </>
   );

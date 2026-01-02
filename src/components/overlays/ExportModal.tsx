@@ -83,7 +83,7 @@ export const ExportModal = () => {
           label: 'Preview',
           content: (
             <div className="pt-4">
-              <div className="aspect-video rounded-lg overflow-hidden border border-border-default bg-[var(--bg-overlay)]">
+              <div className="aspect-video rounded-lg overflow-hidden border border-border-default">
                 <ExportPreview />
               </div>
             </div>
@@ -297,7 +297,7 @@ export const ExportModal = () => {
             <div className="flex flex-col lg:flex-row lg:h-[560px] lg:overflow-hidden">
                 {/* LEFT: Preview & Quick Stats */}
                 <div className="hidden lg:flex flex-col w-5/12 border-r border-border-subtle bg-[var(--bg-hover)] p-6 gap-6 relative">
-                    <div className="flex-1 min-h-0 relative rounded-xl overflow-hidden shadow-2xl border border-border-default bg-[var(--bg-overlay)]">
+                    <div className="flex-1 min-h-0 relative">
                          <ExportPreview />
                     </div>
                     

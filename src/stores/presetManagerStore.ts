@@ -471,10 +471,12 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
         // Increment preset load version to trigger material recreation in renderers
         // This ensures material properties (transparent, depthWrite) match loaded state
-        console.log(
-          '[loadScene] incrementPresetLoadVersion, faceOpacity:',
-          useAppearanceStore.getState().shaderSettings?.surface?.faceOpacity
-        )
+        if (import.meta.env.DEV) {
+          console.log(
+            '[loadScene] incrementPresetLoadVersion, faceOpacity:',
+            useAppearanceStore.getState().shaderSettings?.surface?.faceOpacity
+          )
+        }
         usePerformanceStore.getState().incrementPresetLoadVersion()
 
         // Signal load complete after React settles - uses helper to prevent race conditions

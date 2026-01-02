@@ -1,4 +1,5 @@
 import { m, useMotionValue } from 'motion/react';
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface CropValues {
@@ -10,7 +11,7 @@ export interface CropValues {
 
 interface CropBoxProps {
   /** Container ref for drag constraints */
-  containerRef: React.RefObject<HTMLElement | null>;
+  containerRef: RefObject<HTMLElement | null>;
   /** Current crop values (normalized 0-1) */
   crop: CropValues;
   /** Callback when crop changes */
@@ -76,7 +77,7 @@ export const CropBox = ({
 
   // Resize start
   const startResize = useCallback(
-    (e: React.PointerEvent, handle: string) => {
+    (e: ReactPointerEvent, handle: string) => {
       e.preventDefault();
       e.stopPropagation();
 

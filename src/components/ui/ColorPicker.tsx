@@ -61,7 +61,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
     setHistory(prev => {
       const filtered = prev.filter(c => c !== color);
       const newHistory = [color, ...filtered].slice(0, MAX_HISTORY);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+      } catch {
+        // localStorage quota exceeded or unavailable - silently ignore
+      }
       return newHistory;
     });
   };

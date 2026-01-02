@@ -581,28 +581,46 @@ export function VideoExportController() {
       exportWidth = Math.floor(exportWidth / 2) * 2
       exportHeight = Math.floor(exportHeight / 2) * 2
 
-      // Calculate Render Dimensions (Zoom to Fill Logic for Crop)
+      // Calculate Render Dimensions
+      // When crop is enabled, we need to render at the ORIGINAL canvas aspect ratio
+      // (matching what user sees in preview) so crop coordinates align correctly.
+      // Then video.ts will extract the crop region and scale to export dimensions.
       let renderWidth = exportWidth
       let renderHeight = exportHeight
 
       if (settings.crop.enabled && settings.crop.width > 0 && settings.crop.height > 0) {
-          // Calculate required resolution to maintain 1:1 pixel quality in crop
-          renderWidth = Math.round(exportWidth / settings.crop.width)
-          renderHeight = Math.round(exportHeight / settings.crop.height)
+          // Get the original canvas aspect ratio (what user sees in viewport/preview)
+          const originalAspect = originalCameraAspectRef.current
 
-          // Clamp to hardware limits (safe bet: 4096 or 8192)
-          // WebGL max texture size is often 16384, but renderbuffers can be smaller.
-          // Query the hardware limit to be safe.
+          // Calculate the scale needed so the crop region has at least export resolution
+          // We use the maximum scale factor to ensure quality in both dimensions
+          const scaleX = exportWidth / settings.crop.width
+          const scaleY = exportHeight / settings.crop.height
+          const scaleFactor = Math.max(scaleX, scaleY)
+
+          // Calculate render dimensions maintaining ORIGINAL aspect ratio
+          // This ensures the scene renders the same as preview
+          if (originalAspect >= 1) {
+              // Wider or square canvas - base on height
+              renderHeight = Math.round(scaleFactor)
+              renderWidth = Math.round(renderHeight * originalAspect)
+          } else {
+              // Taller canvas - base on width
+              renderWidth = Math.round(scaleFactor)
+              renderHeight = Math.round(renderWidth / originalAspect)
+          }
+
+          // Clamp to hardware limits
           const maxTextureSize = gl.capabilities.maxTextureSize || 4096
-          const safeLimit = Math.min(maxTextureSize, 8192) // Cap at 8K even if hardware supports more
-          
+          const safeLimit = Math.min(maxTextureSize, 8192)
+
           if (renderWidth > safeLimit || renderHeight > safeLimit) {
               const ratio = Math.min(safeLimit / renderWidth, safeLimit / renderHeight)
               renderWidth = Math.floor(renderWidth * ratio)
               renderHeight = Math.floor(renderHeight * ratio)
           }
       }
-      
+
       // Ensure even
       renderWidth = Math.floor(renderWidth / 2) * 2
       renderHeight = Math.floor(renderHeight / 2) * 2
@@ -617,10 +635,18 @@ export function VideoExportController() {
         throw new Error('Failed to resize renderer for export')
       }
 
-      // 3b. Update Camera Aspect Ratio to match new render dimensions
-      // This is critical to prevent scene distortion during export
+      // 3b. Update Camera Aspect Ratio
+      // CRITICAL: When crop is enabled, we MUST preserve the original camera aspect ratio
+      // so the scene renders identically to what the user sees in the preview.
+      // This ensures crop coordinates extract the correct visual region.
       if (camera instanceof THREE.PerspectiveCamera) {
-          camera.aspect = renderWidth / renderHeight
+          if (settings.crop.enabled) {
+              // Keep original aspect ratio to match preview
+              camera.aspect = originalCameraAspectRef.current
+          } else {
+              // No crop - match render dimensions
+              camera.aspect = renderWidth / renderHeight
+          }
           camera.updateProjectionMatrix()
       }
 
@@ -729,7 +755,7 @@ export function VideoExportController() {
          abortRef.current = true
          restoreState()
        }
-       // Do NOT reset exportStartedRef.current here. 
+       // Do NOT reset exportStartedRef.current here.
        // If the component re-renders (e.g. status change, store update), the effect cleans up.
        // If we reset this flag, the effect body (startExport) will be allowed to run again immediately
        // on the next render, potentially causing infinite loops if startExport is async/blocking (like file picker).

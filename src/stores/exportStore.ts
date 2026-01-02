@@ -59,7 +59,7 @@ export interface CompletionDetails {
   filename?: string
 }
 
-/** Configuration for export presets with optional crop ratio */
+/** Configuration for export presets with optional crop ratio for auto-centering */
 export type PresetConfig = Partial<ExportSettings> & { cropRatio?: number }
 
 interface ExportStore {
@@ -94,7 +94,9 @@ interface ExportStore {
   setPreviewImage: (url: string | null) => void
   setEta: (eta: string | null) => void
   setError: (error: string | null) => void
-  updateSettings: (settings: Partial<ExportSettings> | ((prev: ExportSettings) => Partial<ExportSettings>)) => void
+  updateSettings: (
+    settings: Partial<ExportSettings> | ((prev: ExportSettings) => Partial<ExportSettings>)
+  ) => void
   setExportModeOverride: (mode: ExportMode | null) => void
   setCompletionDetails: (details: CompletionDetails | null) => void
   reset: () => void
@@ -138,7 +140,7 @@ const DEFAULT_SETTINGS: ExportSettings = {
     y: 0,
     width: 1,
     height: 1,
-  }
+  },
 }
 
 const detectBrowser = (): BrowserType => {
@@ -193,18 +195,18 @@ export const getCompressionFactor = (
   // Base compression factors by codec (for CBR mode)
   // These represent typical output/theoretical ratios for animated 3D content
   const codecFactors: Record<VideoCodec, number> = {
-    'avc': 0.55,   // H.264 - oldest, least efficient
-    'hevc': 0.42,  // H.265 - ~25% better than AVC
-    'vp9': 0.42,   // Similar to HEVC
-    'av1': 0.32,   // ~25% better than HEVC, most efficient
+    avc: 0.55, // H.264 - oldest, least efficient
+    hevc: 0.42, // H.265 - ~25% better than AVC
+    vp9: 0.42, // Similar to HEVC
+    av1: 0.32, // ~25% better than HEVC, most efficient
   }
 
-  let factor = codecFactors[codec] ?? 0.50
+  let factor = codecFactors[codec] ?? 0.5
 
   // VBR mode is typically 15-25% more efficient for animated content
   // as it can allocate fewer bits to static/simple frames
   if (bitrateMode === 'variable') {
-    factor *= 0.80
+    factor *= 0.8
   }
 
   return factor
@@ -282,15 +284,19 @@ export const useExportStore = create<ExportStore>()(
       setError: (error) => set({ error }),
       updateSettings: (newSettingsOrFn) => {
         const currentSettings = get().settings
-        const newSettings = typeof newSettingsOrFn === 'function' 
-            ? newSettingsOrFn(currentSettings) 
-            : newSettingsOrFn
-            
+        const newSettings =
+          typeof newSettingsOrFn === 'function' ? newSettingsOrFn(currentSettings) : newSettingsOrFn
+
         const updatedSettings = { ...currentSettings, ...newSettings }
 
         // Deep merge for nested objects if they are partials
-        if (newSettings.textOverlay) updatedSettings.textOverlay = { ...currentSettings.textOverlay, ...newSettings.textOverlay }
-        if (newSettings.crop) updatedSettings.crop = { ...currentSettings.crop, ...newSettings.crop }
+        if (newSettings.textOverlay)
+          updatedSettings.textOverlay = {
+            ...currentSettings.textOverlay,
+            ...newSettings.textOverlay,
+          }
+        if (newSettings.crop)
+          updatedSettings.crop = { ...currentSettings.crop, ...newSettings.crop }
 
         // Auto-adjust bitrate when resolution, fps, or custom dimensions change
         // (but NOT when bitrate itself is being explicitly set)
@@ -319,100 +325,115 @@ export const useExportStore = create<ExportStore>()(
         set({ exportModeOverride: mode, exportMode: mode ?? 'in-memory' })
       },
       setCompletionDetails: (details) => set({ completionDetails: details }),
-      
+
       applyPreset: (presetName) => {
-          const defaults = DEFAULT_SETTINGS
-          const canvasRatio = get().canvasAspectRatio
+        const defaults = DEFAULT_SETTINGS
+        const canvasRatio = get().canvasAspectRatio
 
-          const calculateCropForRatio = (targetRatio: number) => {
-              if (canvasRatio > targetRatio) {
-                  const cropWidth = targetRatio / canvasRatio
-                  return { x: (1 - cropWidth) / 2, y: 0, width: cropWidth, height: 1 }
-              }
-              const cropHeight = canvasRatio / targetRatio
-              return { x: 0, y: (1 - cropHeight) / 2, width: 1, height: cropHeight }
+        /**
+         * Calculates a centered crop region for a target aspect ratio.
+         * The crop coordinates are relative to the current canvas (0-1 normalized).
+         *
+         * @param targetRatio - Desired output aspect ratio (width/height)
+         * @returns Crop settings that center-crop the canvas to achieve targetRatio
+         */
+        const calculateCropForRatio = (
+          targetRatio: number
+        ): { x: number; y: number; width: number; height: number } => {
+          if (canvasRatio > targetRatio) {
+            // Canvas is wider than target - crop horizontally (pillarbox in reverse)
+            const cropWidth = targetRatio / canvasRatio
+            return { x: (1 - cropWidth) / 2, y: 0, width: cropWidth, height: 1 }
           }
+          // Canvas is taller than target - crop vertically (letterbox in reverse)
+          const cropHeight = canvasRatio / targetRatio
+          return { x: 0, y: (1 - cropHeight) / 2, width: 1, height: cropHeight }
+        }
 
-          const presets: Record<string, PresetConfig> = {
-              'landscape-1080p': {
-                  resolution: '1080p',
-                  fps: 60,
-                  duration: 30,
-                  bitrate: 12,
-              },
-              'landscape-720p': {
-                  resolution: '720p',
-                  fps: 30,
-                  duration: 30,
-                  bitrate: 8,
-              },
-              'instagram': {
-                  resolution: 'custom',
-                  customWidth: 1080,
-                  customHeight: 1080,
-                  fps: 30,
-                  duration: 60,
-                  bitrate: 10,
-                  cropRatio: 1,
-              },
-              'tiktok': {
-                  resolution: 'custom',
-                  customWidth: 1080,
-                  customHeight: 1920,
-                  fps: 30,
-                  duration: 30,
-                  bitrate: 8,
-                  cropRatio: 9 / 16,
-              },
-              'youtube-shorts': {
-                  resolution: 'custom',
-                  customWidth: 1080,
-                  customHeight: 1920,
-                  fps: 60,
-                  duration: 30,
-                  bitrate: 15,
-                  cropRatio: 9 / 16,
-              },
-              'twitter-video': {
-                  resolution: '720p',
-                  fps: 30,
-                  duration: 30,
-                  bitrate: 8,
-              },
-              'cinematic': {
-                  resolution: '4k',
-                  fps: 24,
-                  bitrate: 40,
-                  cropRatio: 21 / 9,
-              },
-              'square-60fps': {
-                  resolution: 'custom',
-                  customWidth: 1080,
-                  customHeight: 1080,
-                  fps: 60,
-                  duration: 60,
-                  bitrate: 15,
-                  cropRatio: 1,
-              },
-              'high-q': {
-                  resolution: '4k',
-                  format: 'webm',
-                  codec: 'vp9',
-                  fps: 60,
-                  duration: 120,
-                  bitrate: 50,
-              },
-          }
+        const presets: Record<string, PresetConfig> = {
+          'landscape-1080p': {
+            resolution: '1080p',
+            fps: 60,
+            duration: 30,
+            bitrate: 12,
+          },
+          'landscape-720p': {
+            resolution: '720p',
+            fps: 30,
+            duration: 30,
+            bitrate: 8,
+          },
+          instagram: {
+            resolution: 'custom',
+            customWidth: 1080,
+            customHeight: 1080,
+            fps: 30,
+            duration: 60,
+            bitrate: 10,
+            cropRatio: 1, // 1:1 square
+          },
+          tiktok: {
+            resolution: 'custom',
+            customWidth: 1080,
+            customHeight: 1920,
+            fps: 30,
+            duration: 30,
+            bitrate: 8,
+            cropRatio: 9 / 16, // 9:16 portrait
+          },
+          'youtube-shorts': {
+            resolution: 'custom',
+            customWidth: 1080,
+            customHeight: 1920,
+            fps: 60,
+            duration: 30,
+            bitrate: 15,
+            cropRatio: 9 / 16, // 9:16 portrait
+          },
+          'twitter-video': {
+            resolution: '720p',
+            fps: 30,
+            duration: 30,
+            bitrate: 8,
+          },
+          cinematic: {
+            resolution: 'custom',
+            customWidth: 3840,
+            customHeight: 1634, // 21:9 aspect ratio
+            fps: 24,
+            bitrate: 40,
+            cropRatio: 21 / 9, // 21:9 ultrawide
+          },
+          'square-60fps': {
+            resolution: 'custom',
+            customWidth: 1080,
+            customHeight: 1080,
+            fps: 60,
+            duration: 60,
+            bitrate: 15,
+            cropRatio: 1, // 1:1 square
+          },
+          'high-q': {
+            resolution: '4k',
+            format: 'webm',
+            codec: 'vp9',
+            fps: 60,
+            duration: 120,
+            bitrate: 50,
+          },
+        }
 
-          const config = presets[presetName]
-          if (!config) return
+        const config = presets[presetName]
+        if (!config) return
 
-          const { cropRatio, ...settings } = config
-          const crop = cropRatio
-              ? { ...defaults.crop, enabled: true, ...calculateCropForRatio(cropRatio) }
-              : { ...defaults.crop, enabled: false }
+        const { cropRatio, ...settings } = config
 
-          get().updateSettings({ ...settings, crop })
+        // Calculate centered crop for presets with cropRatio
+        const crop = cropRatio
+          ? { ...defaults.crop, enabled: true, ...calculateCropForRatio(cropRatio) }
+          : { ...defaults.crop, enabled: false }
+
+        get().updateSettings({ ...settings, crop })
       },
 
       reset: () =>

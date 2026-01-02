@@ -1,31 +1,12 @@
-=== CRITICAL INSTRUCTION BLOCK (CIB-001)===
+=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-001)===
 
-## MANDATORY TOOLS
-
-### For Complex Tasks (research, analysis, debugging)
-```
-USE: mcp__mcp_docker__sequentialthinking
-WHEN: Multi-step problems, research, complex reasoning
-WHY: Prevents cognitive overload, ensures systematic approach
-```
-
-### For Task Management
-```
-USE: TodoWrite
-WHEN: Any task with 3+ steps
-WHY: Tracks progress, maintains focus
-```
-
-### For Research and Validation of Solutions
-```
-USE: WebSearch
-WHEN: Any non-trivial debugging, planning, solution design task
-WHY: Offers quick access to best practices and solutions
-```
-
-=== END CIB-001 ===
-
-=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-002)===
+## MANDATORY DOCUMENT READS
+Read at the start of a new session:
+- Project architecture and folder structure: `docs/architecture.md`
+- Development environment: `docs/testing.md`
+- Testing setup: `docs/testing.md`
+- Frontend setup: `docs/frontend.md`
+- Understanding math used for object creation, transformation and projection: `docs/research/nd-dimensional-react-threejs-guide.md`
 
 ## MANDATORY CODE STYLE AND ARCHITECTURE RULES
 Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
@@ -64,63 +45,14 @@ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 gl_Position = vec4(position.xy, 0.0, 1.0);
 ```
 
-
 **Use custom UI component library**: `src/components/ui`: Do not use default html controls. Use the custom components of this project.
 
 **Integrate UI components into theming solution**: Do not hardcode styles, always use the theme.
 
 **Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
 
-## MANDATORY TESTING RULES
-1. Write unit tests in the style of Roy Osherove's "Art of Unit Testing" principles.
-2. READABLE: Tests should be easy to understand at a glance
-3. MAINTAINABLE: Tests should be easy to change without breaking others
-4. TRUSTWORTHY - Tests should be reliable and deterministic
-5. MEANINGFUL - NEVER test for trivial things like default values
+=== END CIB-001 ===
 
-=== END CIB-002 ===
-
-## MANDATORY EXECUTION PROTOCOL
-1. Always complete all tasks fully. Do not simplify approaches, do not skip tasks.
-2. Always keep tests up to date and maintain 100% test coverage.
-3. Always test. 100% of tests must pass.
-4. Always fix bugs. Never changes tests only to make them pass if the cause is in the code it is testing.
-5. Never run Vitest in watch mode; automation must use `npm test`. Only set `ALLOW_VITEST_WATCH=1` when a human explicitly authorizes interactive debugging.
-6. **CRITICAL**: After implementing new functionality, ALWAYS create comprehensive tests:
-   - Unit tests for logic and components (Vitest)
-   - Integration tests for game flow
-   - Playwright tests for frontend functionality (must visually confirm UI works)
-   - All tests must be in `src/tests/` or `scripts/playwright/`
-   - Run ALL tests before considering task complete
-   - Maintain 100% test coverage - no exceptions
-
-## TEST MEMORY MANAGEMENT
-
-**CRITICAL**: The test suite previously caused memory exhaustion by spawning 13 workers consuming 9GB+ RAM. This has been fixed but requires vigilance.
-
-### Configuration Safeguards (DO NOT MODIFY without review)
-- `maxWorkers: 4` in `vitest.config.ts` - Prevents excessive process spawning
-- `pool: 'threads'` - Uses memory-efficient threading instead of forks
-- `environment: 'happy-dom'` - Fast DOM implementation for all tests
-
-### Before Changing Test Configuration
-1. **VERIFY**: Worker count stays ≤ 4, total memory < 2GB
-2. **DOCUMENT**: Update guide if making configuration changes
-
-### Writing Memory-Safe Tests
-- **DON'T**: Generate 1000+ data points in a single test without batching
-- **DO**: Process in batches of 100 and clear arrays between batches
-- **DON'T**: Rely on DOM for pure logic tests if not needed (keep them simple)
-- **DO**: Use component tests (`.test.tsx`) only for UI components
-- **DON'T**: Forget to cleanup timers/listeners in afterEach
-- **DO**: Call `cleanup()` from @testing-library/react in test teardown
-
-### Emergency Response
-If system becomes unresponsive during tests:
-```bash
-killall -9 node  # Force kill all Node processes
-node scripts/cleanup-vitest.mjs  # Clean up lingering workers
-```
 ## FOLDER USAGE RULES
 
 | Activity | Required Directory | Agent Enforcement |
@@ -170,9 +102,3 @@ node scripts/cleanup-vitest.mjs  # Clean up lingering workers
 - **Prettier** 3.4.1 - Code formatting
 - **@vitejs/plugin-react** 5.1.2 - Vite React plugin
 
-## MANDATORY DOCUMENT READS
-- Project architecture and folder structure: `docs/architecture.md`
-- Development environment: `docs/testing.md`
-- Testing setup: `docs/testing.md`
-- Frontend setup: `docs/frontend.md`
-- Understanding math used for object creation, transformation and projection: `docs/research/nd-dimensional-react-threejs-guide.md`

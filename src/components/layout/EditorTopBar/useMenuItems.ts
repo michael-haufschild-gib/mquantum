@@ -4,26 +4,24 @@
  * These hooks memoize menu item construction to prevent unnecessary re-renders.
  */
 
-import { useMemo } from 'react';
-import { PRESETS } from '@/lib/presets';
-import { soundManager } from '@/lib/audio/SoundManager';
-import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore';
-import type { ThemeAccent, ThemeMode } from '@/stores/themeStore';
-import type { ToastType } from '@/contexts/ToastContextInstance';
-import type { MenuItem } from './types';
+import type { ToastType } from '@/contexts/ToastContextInstance'
+import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
+import type { ThemeAccent, ThemeMode } from '@/stores/themeStore'
+import { useMemo } from 'react'
 import {
   buildAccentItems,
+  buildExampleSceneItems,
+  buildFileItems,
+  buildMobileMenuItems,
   buildModeItems,
   buildPresetItems,
   buildSavedSceneItems,
-  buildExampleSceneItems,
-  buildSceneSubmenuItems,
   buildSavedStyleItems,
+  buildSceneSubmenuItems,
   buildStyleSubmenuItems,
-  buildFileItems,
   buildViewItems,
-  buildMobileMenuItems,
-} from './menuItems';
+} from './menuItems'
+import type { MenuItem } from './types'
 
 /**
  * Hook for theme-related menu items (accent, mode, presets)
@@ -35,22 +33,16 @@ export function useThemeMenuItems(
   setMode: (mode: ThemeMode) => void,
   setPreset: (presetId: string) => void
 ) {
-  const accentItems = useMemo(
-    () => buildAccentItems(accent, setAccent),
-    [accent, setAccent]
-  );
+  const accentItems = useMemo(() => buildAccentItems(accent, setAccent), [accent, setAccent])
 
-  const modeItems = useMemo(
-    () => buildModeItems(mode, setMode),
-    [mode, setMode]
-  );
+  const modeItems = useMemo(() => buildModeItems(mode, setMode), [mode, setMode])
 
   const presetItems = useMemo(
     () => buildPresetItems(setPreset, modeItems, accentItems),
     [setPreset, modeItems, accentItems]
-  );
+  )
 
-  return { accentItems, modeItems, presetItems };
+  return { accentItems, modeItems, presetItems }
 }
 
 /**
@@ -63,24 +55,12 @@ export function useSceneMenuItems(
   setSaveSceneOpen: (open: boolean) => void,
   setIsSceneManagerOpen: (open: boolean) => void
 ) {
-  const handleApplyPreset = useMemo(
-    () => (preset: typeof PRESETS[0]) => {
-      preset.apply();
-      soundManager.playClick();
-      addToast(`Loaded example: ${preset.label}`, 'info');
-    },
-    [addToast]
-  );
-
   const savedSceneItems = useMemo(
     () => buildSavedSceneItems(savedScenes, loadScene, addToast),
     [savedScenes, loadScene, addToast]
-  );
+  )
 
-  const exampleSceneItems = useMemo(
-    () => buildExampleSceneItems(handleApplyPreset),
-    [handleApplyPreset]
-  );
+  const exampleSceneItems = useMemo(() => buildExampleSceneItems(addToast), [addToast])
 
   const sceneSubmenuItems = useMemo(
     () =>
@@ -92,9 +72,9 @@ export function useSceneMenuItems(
         setIsSceneManagerOpen
       ),
     [savedScenes, savedSceneItems, exampleSceneItems, setSaveSceneOpen, setIsSceneManagerOpen]
-  );
+  )
 
-  return { savedSceneItems, exampleSceneItems, sceneSubmenuItems, handleApplyPreset };
+  return { savedSceneItems, exampleSceneItems, sceneSubmenuItems }
 }
 
 /**
@@ -110,29 +90,25 @@ export function useStyleMenuItems(
   const savedStyleItems = useMemo(
     () => buildSavedStyleItems(savedStyles, loadStyle, addToast),
     [savedStyles, loadStyle, addToast]
-  );
+  )
 
   const styleSubmenuItems = useMemo(
     () =>
       buildStyleSubmenuItems(savedStyles, savedStyleItems, setSaveStyleOpen, setIsStyleManagerOpen),
     [savedStyles, savedStyleItems, setSaveStyleOpen, setIsStyleManagerOpen]
-  );
+  )
 
-  return { savedStyleItems, styleSubmenuItems };
+  return { savedStyleItems, styleSubmenuItems }
 }
 
 /**
  * Hook for file menu items
  */
-export function useFileMenuItems(
-  handleExport: () => void,
-  handleExportVideo: () => void,
-  handleShare: () => void
-) {
+export function useFileMenuItems(handleExport: () => void, handleExportVideo: () => void) {
   return useMemo(
-    () => buildFileItems(handleExport, handleExportVideo, handleShare),
-    [handleExport, handleExportVideo, handleShare]
-  );
+    () => buildFileItems(handleExport, handleExportVideo),
+    [handleExport, handleExportVideo]
+  )
 }
 
 /**
@@ -172,7 +148,7 @@ export function useViewMenuItems(
       isMobile,
       presetItems,
     ]
-  );
+  )
 }
 
 /**
@@ -197,5 +173,5 @@ export function useMobileMenuItems(
         toggleSound
       ),
     [fileItems, viewItems, sceneSubmenuItems, styleSubmenuItems, isSoundEnabled, toggleSound]
-  );
+  )
 }
