@@ -68,19 +68,17 @@ float getTemporalDepth(vec3 ro, vec3 rd, vec3 worldRayDir) {
         return -1.0;  // Previous hit not along current ray (camera rotated too much)
     }
 
-    // Disocclusion detection: check for depth discontinuities at current location
-    // Large differences with neighbors indicate unreliable temporal data
+    // PERF: Disocclusion detection using 2 diagonal samples instead of 4 orthogonal
+    // Diagonals still detect edges effectively while reducing texture reads by 40%
     vec2 texelSize = 1.0 / uDepthBufferResolution;
-    float distLeft = texture(uPrevPositionTexture, screenUV - vec2(texelSize.x, 0.0)).w;
-    float distRight = texture(uPrevPositionTexture, screenUV + vec2(texelSize.x, 0.0)).w;
-    float distUp = texture(uPrevPositionTexture, screenUV + vec2(0.0, texelSize.y)).w;
-    float distDown = texture(uPrevPositionTexture, screenUV - vec2(0.0, texelSize.y)).w;
+    float distTopLeft = texture(uPrevPositionTexture, screenUV + vec2(-texelSize.x, texelSize.y)).w;
+    float distBottomRight = texture(uPrevPositionTexture, screenUV + vec2(texelSize.x, -texelSize.y)).w;
 
     // Use relative threshold for discontinuity detection
-    float avgDist = (distLeft + distRight + distUp + distDown) * 0.25;
+    float avgDist = (distTopLeft + distBottomRight + storedDist) * 0.333;
     float maxNeighborDiff = max(
-        max(abs(storedDist - distLeft), abs(storedDist - distRight)),
-        max(abs(storedDist - distUp), abs(storedDist - distDown))
+        abs(storedDist - distTopLeft),
+        abs(storedDist - distBottomRight)
     );
 
     // Threshold: 20% relative difference indicates edge/discontinuity

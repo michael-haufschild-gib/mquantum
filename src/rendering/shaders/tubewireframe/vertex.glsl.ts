@@ -27,6 +27,7 @@ uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28]; // MAX_EXTRA_DIMS * 4
 uniform float uDepthRowSums[11];
+uniform float uDepthNormFactor;  // Precomputed: dimension > 4 ? sqrt(dimension - 3) : 1.0
 
 // Tube rendering uniform
 uniform float uRadius;
@@ -75,11 +76,9 @@ vec3 transformNDPoint(vec3 pos, vec4 extraA, vec4 extraB) {
       effectiveDepth += uDepthRowSums[j] * inputs[j];
     }
   }
-  // Normalize depth by sqrt(dimension - 3) for consistent visual scale across dimensions.
-  // Uses max(1.0, ...) to safely handle edge cases.
-  // See src/rendering/shaders/transforms/ndTransform.ts for mathematical justification.
-  float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - 3))) : 1.0;
-  effectiveDepth /= normFactor;
+  // Normalize depth for consistent visual scale across dimensions.
+  // uDepthNormFactor is precomputed on CPU: dimension > 4 ? sqrt(dimension - 3) : 1.0
+  effectiveDepth /= uDepthNormFactor;
 
   // Guard against division by zero
   float denominator = uProjectionDistance - effectiveDepth;

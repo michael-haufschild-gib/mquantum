@@ -162,32 +162,35 @@ export const iblBlock = `
 // ============================================
 
 // Fresnel-Schlick with roughness compensation for IBL
+// OPT-H5: pow(x,5) -> multiplication chain (3 muls vs transcendental)
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float x = clamp(1.0 - cosTheta, 0.0, 1.0);
+    float x2 = x * x;
+    float x5 = x2 * x2 * x;  // x^5 = x^2 * x^2 * x
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * x5;
 }
 
 // Compute IBL contribution using PMREM texture
 // Returns vec3 color to add to final output
 vec3 computeIBL(vec3 N, vec3 V, vec3 F0, float roughness, float metallic, vec3 albedo) {
     if (uIBLQuality == 0) return vec3(0.0);
-    
+
     vec3 R = reflect(-V, N);
     float NdotV = max(dot(N, V), 0.0);
-    
+
     // Fresnel with roughness compensation
     vec3 F = fresnelSchlickRoughness(NdotV, F0, roughness);
-    
-    // Specular IBL - sample PMREM at roughness level
-    vec3 specularIBL = textureCubeUV(uEnvMap, R, roughness).rgb;
-    
-    // For high quality, mix reflection with normal for rough surfaces
+
+    // PERF: For high quality + rough surfaces, blend direction BEFORE sampling (1 sample instead of 2)
     // This prevents rough objects from gathering light from behind their tangent plane
+    vec3 sampleDir = R;
     if (uIBLQuality == 2 && roughness > 0.3) {
-        vec3 blendedR = normalize(mix(R, N, roughness * roughness));
-        specularIBL = mix(specularIBL, textureCubeUV(uEnvMap, blendedR, roughness).rgb, 0.3);
+        // Blend reflection toward normal for rough surfaces (30% blend weight baked in)
+        sampleDir = normalize(mix(R, N, roughness * roughness * 0.3));
     }
-    
-    specularIBL *= F;
+
+    // Specular IBL - single PMREM sample at roughness level
+    vec3 specularIBL = textureCubeUV(uEnvMap, sampleDir, roughness).rgb * F;
     
     // Diffuse IBL - sample at max roughness (fully diffuse)
     // Energy conservation: diffuse is reduced by specular reflectance

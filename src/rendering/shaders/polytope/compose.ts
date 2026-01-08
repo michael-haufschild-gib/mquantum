@@ -241,12 +241,11 @@ export function composeFaceFragmentShader(config: PolytopeShaderConfig = {}): {
 const polytopeMainBlock = `
 void main() {
   // Use pre-computed face normal from vertex shader (flat interpolation = first vertex wins)
-  // This normal was computed after nD transformation, so it's geometrically correct
-  vec3 normal = normalize(vFaceNormal);
+  // This normal was computed after nD transformation and already normalized in vertex shader
+  vec3 normal = vFaceNormal;
 
-  // Guard against zero-length view direction
-  float vViewLen = length(vViewDir);
-  vec3 viewDir = vViewLen > 0.0001 ? vViewDir / vViewLen : vec3(0.0, 0.0, 1.0);
+  // vViewDir is already normalized in vertex shader (with zero-length guard)
+  vec3 viewDir = vViewDir;
 
   // Two-sided lighting: flip normal to face viewer for back faces
   // Use gl_FrontFacing for consistent orientation with face culling
@@ -499,9 +498,8 @@ void main() {
   // so cross product magnitude is naturally small (proportional to 1/pixels²)
   vec3 normal = normalLen > 1e-10 ? rawNormal / normalLen : vec3(0.0, 0.0, 1.0);
 
-  // Guard against zero-length view direction
-  float vViewLen = length(vViewDir);
-  vec3 viewDir = vViewLen > 0.0001 ? vViewDir / vViewLen : vec3(0.0, 0.0, 1.0);
+  // vViewDir is already normalized in vertex shader (with zero-length guard)
+  vec3 viewDir = vViewDir;
 
   // Two-sided lighting: flip normal to face viewer for back faces
   // Use gl_FrontFacing for consistent orientation with face culling

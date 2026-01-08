@@ -95,6 +95,7 @@ function createNDUniforms(): Record<string, { value: unknown }> {
     uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
     uDepthRowSums: { value: new Float32Array(11) },
+    uDepthNormFactor: { value: 1.0 },  // Precomputed: dimension > 4 ? sqrt(dimension - 3) : 1.0
     uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
   };
 }
@@ -142,6 +143,7 @@ function updateNDUniforms(
   if (u.uDepthRowSums) {
     (u.uDepthRowSums.value as Float32Array).set(gpuData.depthRowSums);
   }
+  if (u.uDepthNormFactor) u.uDepthNormFactor.value = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0;
   if (u.uProjectionDistance) u.uProjectionDistance.value = projectionDistance;
 }
 
@@ -184,6 +186,7 @@ uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28];
 uniform float uDepthRowSums[11];
+uniform float uDepthNormFactor;  // Precomputed: dimension > 4 ? sqrt(dimension - 3) : 1.0
 
 // Packed extra dimension inputs (WebGL2 GLSL ES 3.00)
 in vec4 aExtraDims0_3;
@@ -226,10 +229,9 @@ vec3 ndTransformVertex(vec3 pos) {
       effectiveDepth += uDepthRowSums[j] * inputs[j];
     }
   }
-  // Normalize depth by sqrt(dimension - 3) for consistent visual scale.
-  // See transforms/ndTransform.ts for mathematical justification.
-  float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - 3))) : 1.0;
-  effectiveDepth /= normFactor;
+  // Normalize depth for consistent visual scale across dimensions.
+  // uDepthNormFactor is precomputed on CPU: dimension > 4 ? sqrt(dimension - 3) : 1.0
+  effectiveDepth /= uDepthNormFactor;
 
   // Guard against division by zero
   float denom = uProjectionDistance - effectiveDepth;
@@ -986,6 +988,7 @@ export const PolytopeScene = React.memo(function PolytopeScene({
       u.uUniformScale!.value = visualScale;
       (u.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols);
       (u.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums);
+      u.uDepthNormFactor!.value = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0;
       u.uProjectionDistance!.value = projectionDistance;
     }
   }, FRAME_PRIORITY.RENDERER_UNIFORMS);

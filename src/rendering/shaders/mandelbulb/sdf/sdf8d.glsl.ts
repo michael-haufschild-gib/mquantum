@@ -26,9 +26,13 @@ float sdf8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
     for(int i=0;i<MAX_ITER_HQ;i++){
         if(i>=maxIt)break;
-        // OPT-M3: Cache z01_sq for both r and minASq calculations
-        float z01_sq = z[0]*z[0]+z[1]*z[1];
-        r=sqrt(z01_sq+z[2]*z[2]+z[3]*z[3]+z[4]*z[4]+z[5]*z[5]+z[6]*z[6]+z[7]*z[7]);
+        // PERF: Cache ALL squared values once for r, minASq, AND tail loop
+        float zSq[8];
+        zSq[0]=z[0]*z[0]; zSq[1]=z[1]*z[1];
+        float z01_sq = zSq[0]+zSq[1];
+        zSq[2]=z[2]*z[2]; zSq[3]=z[3]*z[3]; zSq[4]=z[4]*z[4];
+        zSq[5]=z[5]*z[5]; zSq[6]=z[6]*z[6]; zSq[7]=z[7]*z[7];
+        r=sqrt(z01_sq+zSq[2]+zSq[3]+zSq[4]+zSq[5]+zSq[6]+zSq[7]);
         if(r>bail){escIt=i;break;}
         minP=min(minP,abs(z[1]));
         minASq=min(minASq,z01_sq);  // OPT-C5: Track squared, defer sqrt
@@ -41,12 +45,13 @@ float sdf8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
         // 8D: 7 angles - compute tails and angles
         // OPT-C1: Use inversesqrt instead of sqrt+division
+        // PERF: Use cached zSq values to avoid recomputing z[k]*z[k]
         float t[7];
         float tailSq=r*r;  // Track squared value
         for(int k=0;k<6;k++){
             float invTail=inversesqrt(max(tailSq,EPS*EPS));
-            t[k]=acos(clamp(z[k]*invTail,-1.0,1.0));  // z[k]*inversesqrt = z[k]/sqrt
-            tailSq=max(tailSq-z[k]*z[k],0.0);
+            t[k]=acos(clamp(z[k]*invTail,-1.0,1.0));
+            tailSq=max(tailSq-zSq[k],0.0);  // PERF: Use cached squared value
         }
         t[6]=atan(z[7],z[6]);
 
@@ -91,7 +96,13 @@ float sdf8D_simple(vec3 pos, float pwr, float bail, int maxIt) {
     float dr=1.0,r=0.0;
     for(int i=0;i<MAX_ITER_HQ;i++){
         if(i>=maxIt)break;
-        r=sqrt(z[0]*z[0]+z[1]*z[1]+z[2]*z[2]+z[3]*z[3]+z[4]*z[4]+z[5]*z[5]+z[6]*z[6]+z[7]*z[7]);
+        // PERF: Cache ALL squared values once for r AND tail loop
+        float zSq[8];
+        zSq[0]=z[0]*z[0]; zSq[1]=z[1]*z[1];
+        float z01_sq = zSq[0]+zSq[1];
+        zSq[2]=z[2]*z[2]; zSq[3]=z[3]*z[3]; zSq[4]=z[4]*z[4];
+        zSq[5]=z[5]*z[5]; zSq[6]=z[6]*z[6]; zSq[7]=z[7]*z[7];
+        r=sqrt(z01_sq+zSq[2]+zSq[3]+zSq[4]+zSq[5]+zSq[6]+zSq[7]);
         if(r>bail)break;
 
         // OPT-C3: Use optimizedPow instead of two separate pow() calls
@@ -100,12 +111,13 @@ float sdf8D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         dr=rpMinus1*pwr*dr+1.0;
 
         // OPT-C1: Use inversesqrt instead of sqrt+division in tail loop
+        // PERF: Use cached zSq values to avoid recomputing z[k]*z[k]
         float t[7];
         float tailSq=r*r;
         for(int k=0;k<6;k++){
             float invTail=inversesqrt(max(tailSq,EPS*EPS));
             t[k]=acos(clamp(z[k]*invTail,-1.0,1.0));
-            tailSq=max(tailSq-z[k]*z[k],0.0);
+            tailSq=max(tailSq-zSq[k],0.0);  // PERF: Use cached squared value
         }
         t[6]=atan(z[7],z[6]);
 

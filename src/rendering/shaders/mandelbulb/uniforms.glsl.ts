@@ -32,4 +32,8 @@ uniform float uSssJitter;         // SSS jitter amount (0.0-1.0)
 // SDF Render Quality (user-configurable)
 uniform float uSdfMaxIterations;     // Max iterations for fractal calculation (10-200, default 30)
 uniform float uSdfSurfaceDistance;   // Surface hit threshold for raymarching (0.0005-0.01, default 0.002)
+
+// PERF: Pre-computed values (computed once per frame on CPU, not per SDF call)
+uniform float uEffectivePower;       // Pre-computed: considers animation + alternate power + min clamp
+uniform float uEffectiveBailout;     // Pre-computed: max(uEscapeRadius, 2.0)
 `;

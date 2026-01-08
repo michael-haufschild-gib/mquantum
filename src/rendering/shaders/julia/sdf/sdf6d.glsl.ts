@@ -1,30 +1,22 @@
 export const sdf6dBlock = `
 // ============================================
-// 6D Julia SDF - FULLY UNROLLED
-// z = z^n + c where c is fixed Julia constant
-// OPT-C3: Use optimizedPow for r^pwr and r^(pwr-1)
-// OPT-C5: Defer orbit trap sqrt (minASq)
-// OPT-M2: Cache squared values for reuse
-// OPT-PREC: mediump for orbit traps
+// 6D Julia SDF - Hyperspherical Power Map
+// z = z^n + c where z starts at sample point, c is Julia constant
+// Same power formula as Mandelbulb but with fixed c
 // ============================================
 
 float sdfJulia6D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
-    // Map 3D position to 6D via basis transformation
-    float px = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
-    float py = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
-    float pz = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
-    float p3 = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
-    float p4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
-    float p5 = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
+    // Map 3D position to 6D - z starts at sample point
+    float zx = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
+    float zy = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
+    float zz = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
+    float z3 = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
+    float z4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
+    float z5 = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
 
-    // z starts at sample position
-    float zx = px, zy = py, zz = pz, z3 = p3, z4 = p4, z5 = p5;
-
-    // c is fixed Julia constant (extended to 6D)
-    float cx = uJuliaConstant.x;
-    float cy = uJuliaConstant.y;
-    float cz = uJuliaConstant.z;
-    float c3 = uJuliaConstant.w;
+    // c is the fixed Julia constant
+    float cx = uJuliaConstant.x, cy = uJuliaConstant.y;
+    float cz = uJuliaConstant.z, c3 = uJuliaConstant.w;
     float c4 = 0.0, c5 = 0.0;
 
     float dr = 1.0, r = 0.0;
@@ -34,9 +26,11 @@ float sdfJulia6D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        // OPT-M2: Cache squared values
+        // Cache squared values
         float zxzy_sq = zx*zx + zy*zy;
-        r = sqrt(zxzy_sq + zz*zz + z3*z3 + z4*z4 + z5*z5);
+        float z45_sq = z4*z4 + z5*z5;
+        float z345_sq = z3*z3 + z45_sq;
+        r = sqrt(zxzy_sq + zz*zz + z345_sq);
         if (r > bail) { escIt = i; break; }
 
         minP = min(minP, abs(zy));
@@ -45,15 +39,15 @@ float sdfJulia6D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
         float rp, rpMinus1;
         optimizedPow(r, pwr, rp, rpMinus1);
-        dr = pwr * rpMinus1 * dr;
+        dr = pwr * rpMinus1 * dr;  // Julia: no +1.0 (c is constant)
 
-        // 6D hyperspherical: 5 angles
+        // 6D hyperspherical: 5 angles, z-axis primary
         float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float r1 = sqrt(zxzy_sq + z3*z3 + z4*z4 + z5*z5);
+        float r1 = sqrt(zxzy_sq + z345_sq);
         float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
-        float r2 = sqrt(zy*zy + z3*z3 + z4*z4 + z5*z5);
+        float r2 = sqrt(zy*zy + z345_sq);
         float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
-        float r3 = sqrt(z3*z3 + z4*z4 + z5*z5);
+        float r3 = sqrt(z345_sq);
         float t3 = r3 > EPS ? acos(clamp(z3 / max(r3, EPS), -1.0, 1.0)) : 0.0;
         float t4 = atan(z5, z4);
 
@@ -63,13 +57,14 @@ float sdfJulia6D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         float s3 = sin(t3 * pwr), c3_ = cos(t3 * pwr);
         float s4 = sin(t4 * pwr), c4_ = cos(t4 * pwr);
 
-        float sp = rp * s0 * s1 * s2 * s3;
-        zz = rp * c0 + cz;
-        zx = rp * s0 * c1 + cx;
-        zy = rp * s0 * s1 * c2 + cy;
-        z3 = rp * s0 * s1 * s2 * c3_ + c3;
-        z4 = sp * c4_ + c4;
-        z5 = sp * s4 + c5;
+        // Product chaining
+        float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2, p4 = p3*s3;
+        zz = p0*c0 + cz;
+        zx = p1*c1 + cx;
+        zy = p2*c2 + cy;
+        z3 = p3*c3_ + c3;
+        z4 = p4*c4_ + c4;
+        z5 = p4*s4 + c5;
 
         escIt = i;
     }
@@ -82,14 +77,13 @@ float sdfJulia6D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 }
 
 float sdfJulia6D_simple(vec3 pos, float pwr, float bail, int maxIt) {
-    float px = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
-    float py = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
-    float pz = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
-    float p3 = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
-    float p4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
-    float p5 = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
+    float zx = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
+    float zy = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
+    float zz = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
+    float z3 = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
+    float z4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
+    float z5 = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
 
-    float zx = px, zy = py, zz = pz, z3 = p3, z4 = p4, z5 = p5;
     float cx = uJuliaConstant.x, cy = uJuliaConstant.y;
     float cz = uJuliaConstant.z, c3 = uJuliaConstant.w;
     float c4 = 0.0, c5 = 0.0;
@@ -100,7 +94,9 @@ float sdfJulia6D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         if (i >= maxIt) break;
 
         float zxzy_sq = zx*zx + zy*zy;
-        r = sqrt(zxzy_sq + zz*zz + z3*z3 + z4*z4 + z5*z5);
+        float z45_sq = z4*z4 + z5*z5;
+        float z345_sq = z3*z3 + z45_sq;
+        r = sqrt(zxzy_sq + zz*zz + z345_sq);
         if (r > bail) break;
 
         float rp, rpMinus1;
@@ -108,11 +104,11 @@ float sdfJulia6D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         dr = pwr * rpMinus1 * dr;
 
         float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float r1 = sqrt(zxzy_sq + z3*z3 + z4*z4 + z5*z5);
+        float r1 = sqrt(zxzy_sq + z345_sq);
         float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
-        float r2 = sqrt(zy*zy + z3*z3 + z4*z4 + z5*z5);
+        float r2 = sqrt(zy*zy + z345_sq);
         float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
-        float r3 = sqrt(z3*z3 + z4*z4 + z5*z5);
+        float r3 = sqrt(z345_sq);
         float t3 = r3 > EPS ? acos(clamp(z3 / max(r3, EPS), -1.0, 1.0)) : 0.0;
         float t4 = atan(z5, z4);
 
@@ -122,13 +118,13 @@ float sdfJulia6D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         float s3 = sin(t3 * pwr), c3_ = cos(t3 * pwr);
         float s4 = sin(t4 * pwr), c4_ = cos(t4 * pwr);
 
-        float sp = rp * s0 * s1 * s2 * s3;
-        zz = rp * c0 + cz;
-        zx = rp * s0 * c1 + cx;
-        zy = rp * s0 * s1 * c2 + cy;
-        z3 = rp * s0 * s1 * s2 * c3_ + c3;
-        z4 = sp * c4_ + c4;
-        z5 = sp * s4 + c5;
+        float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2, p4 = p3*s3;
+        zz = p0*c0 + cz;
+        zx = p1*c1 + cx;
+        zy = p2*c2 + cy;
+        z3 = p3*c3_ + c3;
+        z4 = p4*c4_ + c4;
+        z5 = p4*s4 + c5;
     }
 
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);

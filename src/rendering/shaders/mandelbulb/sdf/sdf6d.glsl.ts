@@ -59,13 +59,14 @@ float sdf6D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         float s3 = sin(t3*pwr), c3_ = cos(t3*pwr);
         float s4 = sin(t4*pwr), c4_ = cos(t4*pwr);
 
-        float sp = rp * s0 * s1 * s2 * s3;
-        zz = rp * c0 + cz;
-        zx = rp * s0 * c1 + cx;
-        zy = rp * s0 * s1 * c2 + cy;
-        z3 = rp * s0 * s1 * s2 * c3_ + c3;
-        z4 = sp * c4_ + c4;
-        z5 = sp * s4 + c5;
+        // OPT-CHAIN: Product chaining - each product computed once and reused
+        float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2, p4 = p3*s3;
+        zz = p0*c0 + cz;
+        zx = p1*c1 + cx;
+        zy = p2*c2 + cy;
+        z3 = p3*c3_ + c3;
+        z4 = p4*c4_ + c4;
+        z5 = p4*s4 + c5;
         escIt = i;
     }
 
@@ -118,13 +119,14 @@ float sdf6D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         float s2 = sin(t2*pwr), c2 = cos(t2*pwr);
         float s3 = sin(t3*pwr), c3_ = cos(t3*pwr);
         float s4 = sin(t4*pwr), c4_ = cos(t4*pwr);
-        float sp = rp * s0 * s1 * s2 * s3;
-        zz = rp * c0 + cz;
-        zx = rp * s0 * c1 + cx;
-        zy = rp * s0 * s1 * c2 + cy;
-        z3 = rp * s0 * s1 * s2 * c3_ + c3;
-        z4 = sp * c4_ + c4;
-        z5 = sp * s4 + c5;
+        // OPT-CHAIN: Product chaining - each product computed once and reused
+        float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2, p4 = p3*s3;
+        zz = p0*c0 + cz;
+        zx = p1*c1 + cx;
+        zy = p2*c2 + cy;
+        z3 = p3*c3_ + c3;
+        z4 = p4*c4_ + c4;
+        z5 = p4*s4 + c5;
     }
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
 }

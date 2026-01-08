@@ -9,7 +9,9 @@ export const sdfHighDBlock = `
 float sdfHighD(vec3 pos, int D, float pwr, float bail, int maxIt, out float trap) {
     float c[11], z[11];
     // Mandelbulb mode: both z and c start at sample point
-    for (int j = 0; j < 11; j++) {
+    // PERF: Initialize all to 0 first, then only set used dimensions
+    for (int j = 0; j < 11; j++) { c[j] = 0.0; z[j] = 0.0; }
+    for (int j = 0; j < D; j++) {
         c[j] = uOrigin[j] + pos.x*uBasisX[j] + pos.y*uBasisY[j] + pos.z*uBasisZ[j];
         z[j] = c[j];
     }
@@ -26,13 +28,15 @@ float sdfHighD(vec3 pos, int D, float pwr, float bail, int maxIt, out float trap
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        // OPT: Cache all squared terms once for both r calculation and tail subtraction
+        // PERF: Only compute zSq for dimensions 0 to D-1 (unused dims are always 0)
         float zSq[11];
-        for (int k = 0; k < 11; k++) zSq[k] = z[k]*z[k];
+        float rSq = 0.0;
+        for (int k = 0; k < D; k++) {
+            zSq[k] = z[k]*z[k];
+            rSq += zSq[k];
+        }
         float z01_sq = zSq[0] + zSq[1];
-        r = z01_sq + zSq[2] + zSq[3] + zSq[4];
-        r += zSq[5] + zSq[6] + zSq[7] + zSq[8] + zSq[9] + zSq[10];
-        r = sqrt(r);
+        r = sqrt(rSq);
 
         if (r > bail) { escIt = i; break; }
         minP = min(minP, abs(z[1]));
@@ -75,8 +79,7 @@ float sdfHighD(vec3 pos, int D, float pwr, float bail, int maxIt, out float trap
         }
         z[D-2] = sp*cosT[D-2] + c[D-2];
         z[D-1] = sp*sinT[D-2] + c[D-1];
-        // Zero out unused dimensions
-        for (int k = D; k < 11; k++) z[k] = 0.0;
+        // PERF: Unused dimensions already zeroed before loop - no per-iteration zeroing needed
         escIt = i;
     }
     // OPT-C5: Single sqrt after loop
@@ -88,7 +91,9 @@ float sdfHighD(vec3 pos, int D, float pwr, float bail, int maxIt, out float trap
 float sdfHighD_simple(vec3 pos, int D, float pwr, float bail, int maxIt) {
     float c[11], z[11];
     // Mandelbulb mode: both z and c start at sample point
-    for (int j = 0; j < 11; j++) {
+    // PERF: Initialize all to 0 first, then only set used dimensions
+    for (int j = 0; j < 11; j++) { c[j] = 0.0; z[j] = 0.0; }
+    for (int j = 0; j < D; j++) {
         c[j] = uOrigin[j] + pos.x*uBasisX[j] + pos.y*uBasisY[j] + pos.z*uBasisZ[j];
         z[j] = c[j];
     }
@@ -100,12 +105,14 @@ float sdfHighD_simple(vec3 pos, int D, float pwr, float bail, int maxIt) {
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
-        // OPT: Cache all squared terms once for both r calculation and tail subtraction
+        // PERF: Only compute zSq for dimensions 0 to D-1 (unused dims are always 0)
         float zSq[11];
-        for (int k = 0; k < 11; k++) zSq[k] = z[k]*z[k];
-        r = zSq[0] + zSq[1] + zSq[2] + zSq[3] + zSq[4];
-        r += zSq[5] + zSq[6] + zSq[7] + zSq[8] + zSq[9] + zSq[10];
-        r = sqrt(r);
+        float rSq = 0.0;
+        for (int k = 0; k < D; k++) {
+            zSq[k] = z[k]*z[k];
+            rSq += zSq[k];
+        }
+        r = sqrt(rSq);
         if (r > bail) break;
 
         // OPT-C3: Use optimizedPow instead of two separate pow() calls
@@ -143,7 +150,7 @@ float sdfHighD_simple(vec3 pos, int D, float pwr, float bail, int maxIt) {
         }
         z[D-2] = sp*cosT[D-2] + c[D-2];
         z[D-1] = sp*sinT[D-2] + c[D-1];
-        for (int k = D; k < 11; k++) z[k] = 0.0;
+        // PERF: Unused dimensions already zeroed before loop - no per-iteration zeroing needed
     }
     return max(0.5*log(max(r,EPS))*r/max(dr,EPS),EPS);
 }

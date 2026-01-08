@@ -132,6 +132,10 @@ const MandelbulbMesh = () => {
       uSdfMaxIterations: { value: 30.0 },
       uSdfSurfaceDistance: { value: 0.002 },
 
+      // PERF: Pre-computed values (computed once per frame, not per SDF call)
+      uEffectivePower: { value: 8.0 },    // Pre-computed effective power
+      uEffectiveBailout: { value: 4.0 },  // Pre-computed max(escapeRadius, 2.0)
+
       // Power Animation uniforms (Technique B - power oscillation)
       uPowerAnimationEnabled: { value: false },
       uAnimatedPower: { value: 8.0 },  // Computed power = center + amplitude * sin(time * speed)
@@ -389,6 +393,27 @@ const MandelbulbMesh = () => {
         const normalized = (Math.sin(t) + 1) / 2; // Maps [-1, 1] to [0, 1]
         const targetPower = powerMin + normalized * (powerMax - powerMin);
         material.uniforms.uPower.value = targetPower;
+      }
+
+      // ============================================
+      // PERF: Pre-compute effective power and bailout (once per frame, not per SDF call)
+      // This replaces getEffectivePower() calls in GLSL which ran ~640x per pixel
+      // ============================================
+      if (material.uniforms.uEffectivePower) {
+        const mbConfig = extendedState.mandelbulb;
+        // Start with current power value (may be animated)
+        let effectivePower = material.uniforms.uPower?.value ?? mbConfig.mandelbulbPower;
+        // Apply alternate power blending if enabled
+        if (mbConfig.alternatePowerEnabled) {
+          effectivePower = effectivePower * (1 - mbConfig.alternatePowerBlend) +
+                           mbConfig.alternatePowerValue * mbConfig.alternatePowerBlend;
+        }
+        // Clamp to minimum safe value
+        material.uniforms.uEffectivePower.value = Math.max(effectivePower, 2.0);
+      }
+      if (material.uniforms.uEffectiveBailout) {
+        const escapeRadius = extendedState.mandelbulb.escapeRadius;
+        material.uniforms.uEffectiveBailout.value = Math.max(escapeRadius, 2.0);
       }
 
       // Update camera matrices

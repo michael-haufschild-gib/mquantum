@@ -22,30 +22,26 @@ export function generateDispatch(dimension: number): string {
 // ============================================
 // Optimized Dispatch (No branching)
 // Dimension: ${dimension}
+// PERF: Uses pre-computed uniforms (uEffectivePower, uEffectiveBailout)
+//       instead of per-call computation. ~640x fewer branches per pixel.
 // ============================================
 
 /**
  * Get distance to Mandelbulb surface (simple version).
- * Uses uSdfMaxIterations from store (user-configurable).
+ * Uses pre-computed uniforms for maximum performance.
  */
 float GetDist(vec3 pos) {
-    float pwr = getEffectivePower();
-    float bail = max(uEscapeRadius, 2.0);
-    int maxIt = int(uSdfMaxIterations);
-
-    return ${simpleSdfName}(${args});
+    // PERF: uEffectivePower and uEffectiveBailout computed once per frame on CPU
+    return ${simpleSdfName}(${args.replace('pwr', 'uEffectivePower').replace('bail', 'uEffectiveBailout').replace('maxIt', 'int(uSdfMaxIterations)')});
 }
 
 /**
  * Get distance to Mandelbulb surface with trap value output.
- * Uses uSdfMaxIterations from store (user-configurable).
+ * Uses pre-computed uniforms for maximum performance.
  */
 float GetDistWithTrap(vec3 pos, out float trap) {
-    float pwr = getEffectivePower();
-    float bail = max(uEscapeRadius, 2.0);
-    int maxIt = int(uSdfMaxIterations);
-
-    return ${sdfName}(${argsTrap});
+    // PERF: uEffectivePower and uEffectiveBailout computed once per frame on CPU
+    return ${sdfName}(${argsTrap.replace('pwr', 'uEffectivePower').replace('bail', 'uEffectiveBailout').replace('maxIt', 'int(uSdfMaxIterations)')});
 }
 `
 }

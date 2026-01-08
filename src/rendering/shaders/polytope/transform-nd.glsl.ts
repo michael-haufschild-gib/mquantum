@@ -1,5 +1,4 @@
 import { MAX_EXTRA_DIMS } from '../../renderers/Polytope/constants'
-import { DEPTH_NORMALIZATION_BASE_DIMENSION } from '../transforms/ndTransform'
 
 /**
  * N-D Transformation Block for Polytope Rendering
@@ -38,6 +37,7 @@ export const transformNDBlock = `
     uniform float uProjectionDistance;
     uniform float uExtraRotationCols[${MAX_EXTRA_DIMS * 4}];
     uniform float uDepthRowSums[11];
+    uniform float uDepthNormFactor;  // Precomputed: dimension > 4 ? sqrt(dimension - 3) : 1.0
 
     // Extra dimension attributes for THIS vertex (packed into vec4 + vec3)
     in vec4 aExtraDims0_3;  // dims 4-7 (w component of 4D + first 3 extra)
@@ -99,10 +99,9 @@ export const transformNDBlock = `
         if (j >= uDimension) break;  // Early exit when we've processed all dims
         effectiveDepth += uDepthRowSums[j] * inputs[j];
       }
-      // Normalize depth by sqrt(dimension - 3) for consistent visual scale across dimensions.
-      // See ndTransform.ts module documentation for mathematical justification.
-      float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - ${DEPTH_NORMALIZATION_BASE_DIMENSION}))) : 1.0;
-      effectiveDepth /= normFactor;
+      // Normalize depth for consistent visual scale across dimensions.
+      // uDepthNormFactor is precomputed on CPU: dimension > 4 ? sqrt(dimension - 3) : 1.0
+      effectiveDepth /= uDepthNormFactor;
 
       // Guard against division by zero when effectiveDepth approaches projectionDistance
       float denom = uProjectionDistance - effectiveDepth;

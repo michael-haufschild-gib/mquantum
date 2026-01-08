@@ -72,6 +72,7 @@ uniform float uUniformScale;  // Applied AFTER projection (like camera zoom)
 uniform float uProjectionDistance;
 uniform float uExtraRotationCols[28];
 uniform float uDepthRowSums[11];
+uniform float uDepthNormFactor;  // Precomputed: dimension > 4 ? sqrt(dimension - 3) : 1.0
 uniform float uRadius;
 
 // Instance inputs for tube start/end points (WebGL2 GLSL ES 3.00)
@@ -121,10 +122,9 @@ vec3 ndTransformPoint(vec3 pos, vec4 extraA, vec4 extraB) {
       effectiveDepth += uDepthRowSums[j] * inputs[j];
     }
   }
-  // Normalize depth by sqrt(dimension - 3) for consistent visual scale.
-  // See transforms/ndTransform.ts for mathematical justification.
-  float normFactor = uDimension > 4 ? sqrt(max(1.0, float(uDimension - 3))) : 1.0;
-  effectiveDepth /= normFactor;
+  // Normalize depth for consistent visual scale across dimensions.
+  // uDepthNormFactor is precomputed on CPU: dimension > 4 ? sqrt(dimension - 3) : 1.0
+  effectiveDepth /= uDepthNormFactor;
 
   // Guard against division by zero
   float denom = uProjectionDistance - effectiveDepth;
@@ -181,6 +181,7 @@ function createTubeShadowUniforms(dimension: number, radius: number): Record<str
     uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
     uDepthRowSums: { value: new Float32Array(11) },
+    uDepthNormFactor: { value: dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 },
     uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
     uRadius: { value: radius },
   };
@@ -331,6 +332,7 @@ export function TubeWireframe({
           uUniformScale: { value: 1.0 },  // Applied AFTER projection
           uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
           uDepthRowSums: { value: new Float32Array(11) },
+          uDepthNormFactor: { value: dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 },
           uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
 
           // Lighting and PBR uniforms (via UniformManager)
@@ -597,6 +599,7 @@ export function TubeWireframe({
     u.uUniformScale!.value = visualScale
     ;(u.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols)
     ;(u.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums)
+    u.uDepthNormFactor!.value = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0
     u.uProjectionDistance!.value = projectionDistance
 
     // Update material properties (cached linear conversion)
@@ -693,6 +696,7 @@ export function TubeWireframe({
       su.uUniformScale!.value = visualScale
       ;(su.uExtraRotationCols!.value as Float32Array).set(gpuData.extraRotationCols)
       ;(su.uDepthRowSums!.value as Float32Array).set(gpuData.depthRowSums)
+      su.uDepthNormFactor!.value = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0
       su.uProjectionDistance!.value = projectionDistance
       su.uRadius!.value = radius
     }

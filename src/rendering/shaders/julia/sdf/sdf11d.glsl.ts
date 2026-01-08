@@ -1,31 +1,29 @@
 export const sdf11dBlock = `
 // ============================================
-// 11D Julia SDF - Array-based with inversesqrt optimization
-// z = z^n + c where c is fixed Julia constant
-// OPT-C1: inversesqrt in tail loop
-// OPT-C3: Use optimizedPow for r^pwr and r^(pwr-1)
-// OPT-C5: Defer orbit trap sqrt (minASq)
-// OPT-PREC: mediump for orbit traps
+// 11D Julia SDF - Hyperspherical Power Map
+// z = z^n + c where z starts at sample point, c is Julia constant
+// Same power formula as Mandelbulb but with fixed c
 // ============================================
 
 float sdfJulia11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
-    float z[11];
-    z[0] = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
-    z[1] = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
-    z[2] = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
-    z[3] = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
-    z[4] = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
-    z[5] = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
-    z[6] = uOrigin[6] + pos.x*uBasisX[6] + pos.y*uBasisY[6] + pos.z*uBasisZ[6];
-    z[7] = uOrigin[7] + pos.x*uBasisX[7] + pos.y*uBasisY[7] + pos.z*uBasisZ[7];
-    z[8] = uOrigin[8] + pos.x*uBasisX[8] + pos.y*uBasisY[8] + pos.z*uBasisZ[8];
-    z[9] = uOrigin[9] + pos.x*uBasisX[9] + pos.y*uBasisY[9] + pos.z*uBasisZ[9];
-    z[10] = uOrigin[10] + pos.x*uBasisX[10] + pos.y*uBasisY[10] + pos.z*uBasisZ[10];
+    // 11D initialization - z starts at sample point
+    float z0 = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
+    float z1 = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
+    float z2 = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
+    float z3 = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
+    float z4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
+    float z5 = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
+    float z6 = uOrigin[6] + pos.x*uBasisX[6] + pos.y*uBasisY[6] + pos.z*uBasisZ[6];
+    float z7 = uOrigin[7] + pos.x*uBasisX[7] + pos.y*uBasisY[7] + pos.z*uBasisZ[7];
+    float z8 = uOrigin[8] + pos.x*uBasisX[8] + pos.y*uBasisY[8] + pos.z*uBasisZ[8];
+    float z9 = uOrigin[9] + pos.x*uBasisX[9] + pos.y*uBasisY[9] + pos.z*uBasisZ[9];
+    float z10 = uOrigin[10] + pos.x*uBasisX[10] + pos.y*uBasisY[10] + pos.z*uBasisZ[10];
 
-    float c[11];
-    c[0] = uJuliaConstant.x; c[1] = uJuliaConstant.y;
-    c[2] = uJuliaConstant.z; c[3] = uJuliaConstant.w;
-    c[4] = 0.0; c[5] = 0.0; c[6] = 0.0; c[7] = 0.0; c[8] = 0.0; c[9] = 0.0; c[10] = 0.0;
+    // c is the fixed Julia constant
+    float c0 = uJuliaConstant.x, c1 = uJuliaConstant.y;
+    float c2 = uJuliaConstant.z, c3 = uJuliaConstant.w;
+    float c4 = 0.0, c5 = 0.0, c6 = 0.0, c7 = 0.0;
+    float c8 = 0.0, c9 = 0.0, c10 = 0.0;
 
     float dr = 1.0, r = 0.0;
     mediump float minP = 1000.0, minASq = 1000000.0, minS = 1000.0;
@@ -34,40 +32,66 @@ float sdfJulia11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        float z01_sq = z[0]*z[0] + z[1]*z[1];
-        r = sqrt(z01_sq + z[2]*z[2] + z[3]*z[3] + z[4]*z[4] + z[5]*z[5] + z[6]*z[6] + z[7]*z[7] + z[8]*z[8] + z[9]*z[9] + z[10]*z[10]);
+        // Cache all squared terms
+        float z0_sq = z0*z0, z1_sq = z1*z1, z2_sq = z2*z2, z3_sq = z3*z3, z4_sq = z4*z4;
+        float z5_sq = z5*z5, z6_sq = z6*z6, z7_sq = z7*z7, z8_sq = z8*z8, z9_sq = z9*z9, z10_sq = z10*z10;
+        float z01_sq = z0_sq + z1_sq;
+        r = sqrt(z01_sq + z2_sq + z3_sq + z4_sq + z5_sq + z6_sq + z7_sq + z8_sq + z9_sq + z10_sq);
         if (r > bail) { escIt = i; break; }
 
-        minP = min(minP, abs(z[1]));
+        minP = min(minP, abs(z1));
         minASq = min(minASq, z01_sq);
         minS = min(minS, abs(r - 0.8));
 
         float rp, rpMinus1;
         optimizedPow(r, pwr, rp, rpMinus1);
-        dr = pwr * rpMinus1 * dr;
+        dr = pwr * rpMinus1 * dr;  // Julia: no +1.0 (c is constant)
 
-        // 11D: 10 angles
-        float t[10];
-        float tailSq = r * r;
-        for (int k = 0; k < 9; k++) {
-            float invTail = inversesqrt(max(tailSq, EPS*EPS));
-            t[k] = acos(clamp(z[k] * invTail, -1.0, 1.0));
-            tailSq = max(tailSq - z[k]*z[k], 0.0);
-        }
-        t[9] = atan(z[10], z[9]);
+        // 11D: 10 angles using inversesqrt and cached squared values
+        float tailSq = r*r;
+        float invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t1 = acos(clamp(z1 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z1_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t2 = acos(clamp(z2 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z2_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z4_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t5 = acos(clamp(z5 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z5_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t6 = acos(clamp(z6 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z6_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t7 = acos(clamp(z7 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z7_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t8 = acos(clamp(z8 * invTail, -1.0, 1.0));
+        float t9 = atan(z10, z9);
 
-        float s0 = sin(t[0] * pwr), c0 = cos(t[0] * pwr);
-        float s1 = sin(t[1] * pwr), c1 = cos(t[1] * pwr);
-        z[0] = rp * c0 + c[0];
+        float s0 = sin(t0 * pwr), c0_ = cos(t0 * pwr);
+        float s1 = sin(t1 * pwr), c1_ = cos(t1 * pwr);
+        float s2 = sin(t2 * pwr), c2_ = cos(t2 * pwr);
+        float s3 = sin(t3 * pwr), c3_ = cos(t3 * pwr);
+        float s4 = sin(t4 * pwr), c4_ = cos(t4 * pwr);
+        float s5 = sin(t5 * pwr), c5_ = cos(t5 * pwr);
+        float s6 = sin(t6 * pwr), c6_ = cos(t6 * pwr);
+        float s7 = sin(t7 * pwr), c7_ = cos(t7 * pwr);
+        float s8 = sin(t8 * pwr), c8_ = cos(t8 * pwr);
+        float s9 = sin(t9 * pwr), c9_ = cos(t9 * pwr);
+
+        z0 = rp * c0_ + c0;
         float sp = rp * s0;
-        z[1] = sp * c1 + c[1];
-        sp *= s1;
-        for (int k = 2; k < 9; k++) {
-            z[k] = sp * cos(t[k] * pwr) + c[k];
-            sp *= sin(t[k] * pwr);
-        }
-        z[9] = sp * cos(t[9] * pwr) + c[9];
-        z[10] = sp * sin(t[9] * pwr) + c[10];
+        z1 = sp * c1_ + c1; sp *= s1;
+        z2 = sp * c2_ + c2; sp *= s2;
+        z3 = sp * c3_ + c3; sp *= s3;
+        z4 = sp * c4_ + c4; sp *= s4;
+        z5 = sp * c5_ + c5; sp *= s5;
+        z6 = sp * c6_ + c6; sp *= s6;
+        z7 = sp * c7_ + c7; sp *= s7;
+        z8 = sp * c8_ + c8; sp *= s8;
+        z9 = sp * c9_ + c9;
+        z10 = sp * s9 + c10;
 
         escIt = i;
     }
@@ -80,57 +104,81 @@ float sdfJulia11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 }
 
 float sdfJulia11D_simple(vec3 pos, float pwr, float bail, int maxIt) {
-    float z[11];
-    z[0] = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
-    z[1] = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
-    z[2] = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
-    z[3] = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
-    z[4] = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
-    z[5] = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
-    z[6] = uOrigin[6] + pos.x*uBasisX[6] + pos.y*uBasisY[6] + pos.z*uBasisZ[6];
-    z[7] = uOrigin[7] + pos.x*uBasisX[7] + pos.y*uBasisY[7] + pos.z*uBasisZ[7];
-    z[8] = uOrigin[8] + pos.x*uBasisX[8] + pos.y*uBasisY[8] + pos.z*uBasisZ[8];
-    z[9] = uOrigin[9] + pos.x*uBasisX[9] + pos.y*uBasisY[9] + pos.z*uBasisZ[9];
-    z[10] = uOrigin[10] + pos.x*uBasisX[10] + pos.y*uBasisY[10] + pos.z*uBasisZ[10];
+    float z0 = uOrigin[0] + pos.x*uBasisX[0] + pos.y*uBasisY[0] + pos.z*uBasisZ[0];
+    float z1 = uOrigin[1] + pos.x*uBasisX[1] + pos.y*uBasisY[1] + pos.z*uBasisZ[1];
+    float z2 = uOrigin[2] + pos.x*uBasisX[2] + pos.y*uBasisY[2] + pos.z*uBasisZ[2];
+    float z3 = uOrigin[3] + pos.x*uBasisX[3] + pos.y*uBasisY[3] + pos.z*uBasisZ[3];
+    float z4 = uOrigin[4] + pos.x*uBasisX[4] + pos.y*uBasisY[4] + pos.z*uBasisZ[4];
+    float z5 = uOrigin[5] + pos.x*uBasisX[5] + pos.y*uBasisY[5] + pos.z*uBasisZ[5];
+    float z6 = uOrigin[6] + pos.x*uBasisX[6] + pos.y*uBasisY[6] + pos.z*uBasisZ[6];
+    float z7 = uOrigin[7] + pos.x*uBasisX[7] + pos.y*uBasisY[7] + pos.z*uBasisZ[7];
+    float z8 = uOrigin[8] + pos.x*uBasisX[8] + pos.y*uBasisY[8] + pos.z*uBasisZ[8];
+    float z9 = uOrigin[9] + pos.x*uBasisX[9] + pos.y*uBasisY[9] + pos.z*uBasisZ[9];
+    float z10 = uOrigin[10] + pos.x*uBasisX[10] + pos.y*uBasisY[10] + pos.z*uBasisZ[10];
 
-    float c[11];
-    c[0] = uJuliaConstant.x; c[1] = uJuliaConstant.y;
-    c[2] = uJuliaConstant.z; c[3] = uJuliaConstant.w;
-    c[4] = 0.0; c[5] = 0.0; c[6] = 0.0; c[7] = 0.0; c[8] = 0.0; c[9] = 0.0; c[10] = 0.0;
+    float c0 = uJuliaConstant.x, c1 = uJuliaConstant.y;
+    float c2 = uJuliaConstant.z, c3 = uJuliaConstant.w;
+    float c4 = 0.0, c5 = 0.0, c6 = 0.0, c7 = 0.0;
+    float c8 = 0.0, c9 = 0.0, c10 = 0.0;
 
     float dr = 1.0, r = 0.0;
 
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        r = sqrt(z[0]*z[0] + z[1]*z[1] + z[2]*z[2] + z[3]*z[3] + z[4]*z[4] + z[5]*z[5] + z[6]*z[6] + z[7]*z[7] + z[8]*z[8] + z[9]*z[9] + z[10]*z[10]);
+        float z0_sq = z0*z0, z1_sq = z1*z1, z2_sq = z2*z2, z3_sq = z3*z3, z4_sq = z4*z4;
+        float z5_sq = z5*z5, z6_sq = z6*z6, z7_sq = z7*z7, z8_sq = z8*z8, z9_sq = z9*z9, z10_sq = z10*z10;
+        r = sqrt(z0_sq + z1_sq + z2_sq + z3_sq + z4_sq + z5_sq + z6_sq + z7_sq + z8_sq + z9_sq + z10_sq);
         if (r > bail) break;
 
         float rp, rpMinus1;
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;
 
-        float t[10];
-        float tailSq = r * r;
-        for (int k = 0; k < 9; k++) {
-            float invTail = inversesqrt(max(tailSq, EPS*EPS));
-            t[k] = acos(clamp(z[k] * invTail, -1.0, 1.0));
-            tailSq = max(tailSq - z[k]*z[k], 0.0);
-        }
-        t[9] = atan(z[10], z[9]);
+        float tailSq = r*r;
+        float invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t1 = acos(clamp(z1 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z1_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t2 = acos(clamp(z2 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z2_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z4_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t5 = acos(clamp(z5 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z5_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t6 = acos(clamp(z6 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z6_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t7 = acos(clamp(z7 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z7_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t8 = acos(clamp(z8 * invTail, -1.0, 1.0));
+        float t9 = atan(z10, z9);
 
-        float s0 = sin(t[0] * pwr), c0 = cos(t[0] * pwr);
-        float s1 = sin(t[1] * pwr), c1 = cos(t[1] * pwr);
-        z[0] = rp * c0 + c[0];
+        float s0 = sin(t0 * pwr), c0_ = cos(t0 * pwr);
+        float s1 = sin(t1 * pwr), c1_ = cos(t1 * pwr);
+        float s2 = sin(t2 * pwr), c2_ = cos(t2 * pwr);
+        float s3 = sin(t3 * pwr), c3_ = cos(t3 * pwr);
+        float s4 = sin(t4 * pwr), c4_ = cos(t4 * pwr);
+        float s5 = sin(t5 * pwr), c5_ = cos(t5 * pwr);
+        float s6 = sin(t6 * pwr), c6_ = cos(t6 * pwr);
+        float s7 = sin(t7 * pwr), c7_ = cos(t7 * pwr);
+        float s8 = sin(t8 * pwr), c8_ = cos(t8 * pwr);
+        float s9 = sin(t9 * pwr), c9_ = cos(t9 * pwr);
+
+        z0 = rp * c0_ + c0;
         float sp = rp * s0;
-        z[1] = sp * c1 + c[1];
-        sp *= s1;
-        for (int k = 2; k < 9; k++) {
-            z[k] = sp * cos(t[k] * pwr) + c[k];
-            sp *= sin(t[k] * pwr);
-        }
-        z[9] = sp * cos(t[9] * pwr) + c[9];
-        z[10] = sp * sin(t[9] * pwr) + c[10];
+        z1 = sp * c1_ + c1; sp *= s1;
+        z2 = sp * c2_ + c2; sp *= s2;
+        z3 = sp * c3_ + c3; sp *= s3;
+        z4 = sp * c4_ + c4; sp *= s4;
+        z5 = sp * c5_ + c5; sp *= s5;
+        z6 = sp * c6_ + c6; sp *= s6;
+        z7 = sp * c7_ + c7; sp *= s7;
+        z8 = sp * c8_ + c8; sp *= s8;
+        z9 = sp * c9_ + c9;
+        z10 = sp * s9 + c10;
     }
 
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);

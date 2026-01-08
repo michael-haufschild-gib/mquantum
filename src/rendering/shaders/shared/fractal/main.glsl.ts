@@ -114,6 +114,11 @@ void main() {
     // Clamp roughness to prevent numerical issues (roughness=0 causes NDF=0)
     float roughness = max(uRoughness, 0.04);
 
+    // PERF: Shadow origin is constant for all lights - compute once before loop
+    #ifdef USE_SHADOWS
+    vec3 shadowOrigin = p + n * 0.02;
+    #endif
+
     for (int i = 0; i < MAX_LIGHTS; i++) {
         if (i >= uNumLights) break;
         if (!uLightsEnabled[i]) continue;
@@ -140,7 +145,7 @@ void main() {
         float shadow = 1.0;
         #ifdef USE_SHADOWS
         if (uShadowEnabled) {
-            vec3 shadowOrigin = p + n * 0.02;
+            // shadowOrigin computed before loop (PERF optimization)
             vec3 shadowDir = l;
             float shadowMaxDist = lightType == LIGHT_TYPE_DIRECTIONAL ? 10.0 : length(uLightPositions[i] - p);
             // When fastMode is active (during animation/interaction), use low quality shadows

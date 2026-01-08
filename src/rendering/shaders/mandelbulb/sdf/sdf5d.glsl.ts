@@ -55,12 +55,13 @@ float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         float s2 = sin(t2*pwr), c2 = cos(t2*pwr);
         float s3 = sin(t3*pwr), c3_ = cos(t3*pwr);
 
-        float sp = rp * s0 * s1 * s2;
-        zz = rp * c0 + cz;
-        zx = rp * s0 * c1 + cx;
-        zy = rp * s0 * s1 * c2 + cy;
-        z3 = sp * c3_ + c3;
-        z4 = sp * s3 + c4;
+        // OPT-CHAIN: Product chaining - each product computed once and reused
+        float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2;
+        zz = p0*c0 + cz;
+        zx = p1*c1 + cx;
+        zy = p2*c2 + cy;
+        z3 = p3*c3_ + c3;
+        z4 = p3*s3 + c4;
         escIt = i;
     }
 
@@ -108,9 +109,10 @@ float sdf5D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         float s1 = sin((t1+phaseP)*pwr), c1 = cos((t1+phaseP)*pwr);
         float s2 = sin(t2*pwr), c2 = cos(t2*pwr);
         float s3 = sin(t3*pwr), c3_ = cos(t3*pwr);
-        float sp = rp * s0 * s1 * s2;
-        zz = rp * c0 + cz; zx = rp * s0 * c1 + cx; zy = rp * s0 * s1 * c2 + cy;
-        z3 = sp * c3_ + c3; z4 = sp * s3 + c4;
+        // OPT-CHAIN: Product chaining - each product computed once and reused
+        float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2;
+        zz = p0*c0 + cz; zx = p1*c1 + cx; zy = p2*c2 + cy;
+        z3 = p3*c3_ + c3; z4 = p3*s3 + c4;
     }
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
 }
