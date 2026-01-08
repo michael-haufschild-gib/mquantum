@@ -66,21 +66,28 @@ float sdf10D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         float t8 = atan(z9, z8);
 
         // rp already computed by optimizedPow
+        // OPT-TRIG: Pre-compute all sin/cos pairs to avoid redundant trig calls
         float s0=sin((t0+phaseT)*pwr),c0=cos((t0+phaseT)*pwr);
         float s1=sin((t1+phaseP)*pwr),c1=cos((t1+phaseP)*pwr);
+        float s2=sin(t2*pwr),c2=cos(t2*pwr);
+        float s3=sin(t3*pwr),c3=cos(t3*pwr);
+        float s4=sin(t4*pwr),c4=cos(t4*pwr);
+        float s5=sin(t5*pwr),c5=cos(t5*pwr);
+        float s6=sin(t6*pwr),c6=cos(t6*pwr);
+        float s7=sin(t7*pwr),c7=cos(t7*pwr);
+        float s8=sin(t8*pwr),c8=cos(t8*pwr);
 
         z0 = rp * c0 + coord0;
         float sp = rp * s0;
-        z1 = sp * c1 + coord1;
-        sp *= s1;
-        z2 = sp * cos(t2*pwr) + coord2; sp *= sin(t2*pwr);
-        z3 = sp * cos(t3*pwr) + coord3; sp *= sin(t3*pwr);
-        z4 = sp * cos(t4*pwr) + coord4; sp *= sin(t4*pwr);
-        z5 = sp * cos(t5*pwr) + coord5; sp *= sin(t5*pwr);
-        z6 = sp * cos(t6*pwr) + coord6; sp *= sin(t6*pwr);
-        z7 = sp * cos(t7*pwr) + coord7; sp *= sin(t7*pwr);
-        z8 = sp * cos(t8*pwr) + coord8;
-        z9 = sp * sin(t8*pwr) + coord9;
+        z1 = sp * c1 + coord1; sp *= s1;
+        z2 = sp * c2 + coord2; sp *= s2;
+        z3 = sp * c3 + coord3; sp *= s3;
+        z4 = sp * c4 + coord4; sp *= s4;
+        z5 = sp * c5 + coord5; sp *= s5;
+        z6 = sp * c6 + coord6; sp *= s6;
+        z7 = sp * c7 + coord7; sp *= s7;
+        z8 = sp * c8 + coord8;
+        z9 = sp * s8 + coord9;
 
         escIt=i;
     }
@@ -141,21 +148,28 @@ float sdf10D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         float t8 = atan(z9, z8);
 
         // rp already computed by optimizedPow
+        // OPT-TRIG: Pre-compute all sin/cos pairs to avoid redundant trig calls
         float s0=sin((t0+phaseT)*pwr),c0=cos((t0+phaseT)*pwr);
         float s1=sin((t1+phaseP)*pwr),c1=cos((t1+phaseP)*pwr);
+        float s2=sin(t2*pwr),c2=cos(t2*pwr);
+        float s3=sin(t3*pwr),c3=cos(t3*pwr);
+        float s4=sin(t4*pwr),c4=cos(t4*pwr);
+        float s5=sin(t5*pwr),c5=cos(t5*pwr);
+        float s6=sin(t6*pwr),c6=cos(t6*pwr);
+        float s7=sin(t7*pwr),c7=cos(t7*pwr);
+        float s8=sin(t8*pwr),c8=cos(t8*pwr);
 
         z0 = rp * c0 + coord0;
         float sp = rp * s0;
-        z1 = sp * c1 + coord1;
-        sp *= s1;
-        z2 = sp * cos(t2*pwr) + coord2; sp *= sin(t2*pwr);
-        z3 = sp * cos(t3*pwr) + coord3; sp *= sin(t3*pwr);
-        z4 = sp * cos(t4*pwr) + coord4; sp *= sin(t4*pwr);
-        z5 = sp * cos(t5*pwr) + coord5; sp *= sin(t5*pwr);
-        z6 = sp * cos(t6*pwr) + coord6; sp *= sin(t6*pwr);
-        z7 = sp * cos(t7*pwr) + coord7; sp *= sin(t7*pwr);
-        z8 = sp * cos(t8*pwr) + coord8;
-        z9 = sp * sin(t8*pwr) + coord9;
+        z1 = sp * c1 + coord1; sp *= s1;
+        z2 = sp * c2 + coord2; sp *= s2;
+        z3 = sp * c3 + coord3; sp *= s3;
+        z4 = sp * c4 + coord4; sp *= s4;
+        z5 = sp * c5 + coord5; sp *= s5;
+        z6 = sp * c6 + coord6; sp *= s6;
+        z7 = sp * c7 + coord7; sp *= s7;
+        z8 = sp * c8 + coord8;
+        z9 = sp * s8 + coord9;
     }
     return max(0.5*log(max(r,EPS))*r/max(dr,EPS),EPS);
 }

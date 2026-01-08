@@ -56,19 +56,25 @@ float sdfHighD(vec3 pos, int D, float pwr, float bail, int maxIt, out float trap
 
         // Power map and reconstruct with phase shifts on first two angles
         // rp already computed by optimizedPow
-        float s0 = sin((t[0]+phaseT)*pwr), c0 = cos((t[0]+phaseT)*pwr);
-        float s1 = sin((t[1]+phaseP)*pwr), c1 = cos((t[1]+phaseP)*pwr);
-        z[0] = rp*c0 + c[0];
-        float sp = rp*s0;
-        z[1] = sp*c1 + c[1];
-        sp *= s1;
-        for (int k = 2; k < D-2; k++) {
-            sp *= sin(t[k-1]*pwr);
-            z[k] = sp*cos(t[k]*pwr) + c[k];
+        // OPT-TRIG: Pre-compute all sin/cos pairs to avoid redundant trig calls
+        float sinT[10], cosT[10];
+        sinT[0] = sin((t[0]+phaseT)*pwr); cosT[0] = cos((t[0]+phaseT)*pwr);
+        sinT[1] = sin((t[1]+phaseP)*pwr); cosT[1] = cos((t[1]+phaseP)*pwr);
+        for (int k = 2; k < D-1; k++) {
+            sinT[k] = sin(t[k]*pwr);
+            cosT[k] = cos(t[k]*pwr);
         }
-        sp *= sin(t[D-3]*pwr);
-        z[D-2] = sp*cos(t[D-2]*pwr) + c[D-2];
-        z[D-1] = sp*sin(t[D-2]*pwr) + c[D-1];
+
+        z[0] = rp*cosT[0] + c[0];
+        float sp = rp*sinT[0];
+        z[1] = sp*cosT[1] + c[1];
+        sp *= sinT[1];
+        for (int k = 2; k < D-2; k++) {
+            z[k] = sp*cosT[k] + c[k];
+            sp *= sinT[k];
+        }
+        z[D-2] = sp*cosT[D-2] + c[D-2];
+        z[D-1] = sp*sinT[D-2] + c[D-1];
         // Zero out unused dimensions
         for (int k = D; k < 11; k++) z[k] = 0.0;
         escIt = i;
@@ -118,20 +124,25 @@ float sdfHighD_simple(vec3 pos, int D, float pwr, float bail, int maxIt) {
         t[D-2] = atan(z[D-1], z[D-2]);
 
         // rp already computed by optimizedPow
-        // Apply phase shifts to first two angles (theta, phi)
-        float s0 = sin((t[0]+phaseT)*pwr), c0 = cos((t[0]+phaseT)*pwr);
-        float s1 = sin((t[1]+phaseP)*pwr), c1 = cos((t[1]+phaseP)*pwr);
-        z[0] = rp*c0 + c[0];
-        float sp = rp*s0;
-        z[1] = sp*c1 + c[1];
-        sp *= s1;
-        for (int k = 2; k < D-2; k++) {
-            sp *= sin(t[k-1]*pwr);
-            z[k] = sp*cos(t[k]*pwr) + c[k];
+        // OPT-TRIG: Pre-compute all sin/cos pairs to avoid redundant trig calls
+        float sinT[10], cosT[10];
+        sinT[0] = sin((t[0]+phaseT)*pwr); cosT[0] = cos((t[0]+phaseT)*pwr);
+        sinT[1] = sin((t[1]+phaseP)*pwr); cosT[1] = cos((t[1]+phaseP)*pwr);
+        for (int k = 2; k < D-1; k++) {
+            sinT[k] = sin(t[k]*pwr);
+            cosT[k] = cos(t[k]*pwr);
         }
-        sp *= sin(t[D-3]*pwr);
-        z[D-2] = sp*cos(t[D-2]*pwr) + c[D-2];
-        z[D-1] = sp*sin(t[D-2]*pwr) + c[D-1];
+
+        z[0] = rp*cosT[0] + c[0];
+        float sp = rp*sinT[0];
+        z[1] = sp*cosT[1] + c[1];
+        sp *= sinT[1];
+        for (int k = 2; k < D-2; k++) {
+            z[k] = sp*cosT[k] + c[k];
+            sp *= sinT[k];
+        }
+        z[D-2] = sp*cosT[D-2] + c[D-2];
+        z[D-1] = sp*sinT[D-2] + c[D-1];
         for (int k = D; k < 11; k++) z[k] = 0.0;
     }
     return max(0.5*log(max(r,EPS))*r/max(dr,EPS),EPS);

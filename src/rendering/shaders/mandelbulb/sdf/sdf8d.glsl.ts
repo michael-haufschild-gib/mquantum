@@ -51,19 +51,24 @@ float sdf8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         t[6]=atan(z[7],z[6]);
 
         // rp already computed by optimizedPow
-        // Apply phase shifts to first two angles (theta, phi)
+        // OPT-TRIG: Pre-compute all sin/cos pairs to avoid redundant trig calls
         float s0 = sin((t[0]+phaseT)*pwr), c0 = cos((t[0]+phaseT)*pwr);
         float s1 = sin((t[1]+phaseP)*pwr), c1 = cos((t[1]+phaseP)*pwr);
+        float s2 = sin(t[2]*pwr), c2 = cos(t[2]*pwr);
+        float s3 = sin(t[3]*pwr), c3 = cos(t[3]*pwr);
+        float s4 = sin(t[4]*pwr), c4 = cos(t[4]*pwr);
+        float s5 = sin(t[5]*pwr), c5 = cos(t[5]*pwr);
+        float s6 = sin(t[6]*pwr), c6 = cos(t[6]*pwr);
+
         z[0]=rp*c0+c[0];
         float sp=rp*s0;
-        z[1]=sp*c1+c[1];
-        sp*=s1;
-        for(int k=2;k<6;k++){
-            z[k]=sp*cos(t[k]*pwr)+c[k];
-            sp*=sin(t[k]*pwr);
-        }
-        z[6]=sp*cos(t[6]*pwr)+c[6];
-        z[7]=sp*sin(t[6]*pwr)+c[7];
+        z[1]=sp*c1+c[1]; sp*=s1;
+        z[2]=sp*c2+c[2]; sp*=s2;
+        z[3]=sp*c3+c[3]; sp*=s3;
+        z[4]=sp*c4+c[4]; sp*=s4;
+        z[5]=sp*c5+c[5]; sp*=s5;
+        z[6]=sp*c6+c[6];
+        z[7]=sp*s6+c[7];
         escIt=i;
     }
     // OPT-C5: Single sqrt after loop for final trap value
@@ -105,15 +110,24 @@ float sdf8D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         t[6]=atan(z[7],z[6]);
 
         // rp already computed by optimizedPow
-        // Apply phase shifts to first two angles (theta, phi)
+        // OPT-TRIG: Pre-compute all sin/cos pairs to avoid redundant trig calls
         float s0=sin((t[0]+phaseT)*pwr),c0=cos((t[0]+phaseT)*pwr);
         float s1=sin((t[1]+phaseP)*pwr),c1=cos((t[1]+phaseP)*pwr);
+        float s2=sin(t[2]*pwr),c2=cos(t[2]*pwr);
+        float s3=sin(t[3]*pwr),c3=cos(t[3]*pwr);
+        float s4=sin(t[4]*pwr),c4=cos(t[4]*pwr);
+        float s5=sin(t[5]*pwr),c5=cos(t[5]*pwr);
+        float s6=sin(t[6]*pwr),c6=cos(t[6]*pwr);
+
         z[0]=rp*c0+c[0];
         float sp=rp*s0;
-        z[1]=sp*c1+c[1];
-        sp*=s1;
-        for(int k=2;k<6;k++){z[k]=sp*cos(t[k]*pwr)+c[k];sp*=sin(t[k]*pwr);}
-        z[6]=sp*cos(t[6]*pwr)+c[6];z[7]=sp*sin(t[6]*pwr)+c[7];
+        z[1]=sp*c1+c[1]; sp*=s1;
+        z[2]=sp*c2+c[2]; sp*=s2;
+        z[3]=sp*c3+c[3]; sp*=s3;
+        z[4]=sp*c4+c[4]; sp*=s4;
+        z[5]=sp*c5+c[5]; sp*=s5;
+        z[6]=sp*c6+c[6];
+        z[7]=sp*s6+c[7];
     }
     return max(0.5*log(max(r,EPS))*r/max(dr,EPS),EPS);
 }
