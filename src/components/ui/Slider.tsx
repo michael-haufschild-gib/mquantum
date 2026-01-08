@@ -48,7 +48,7 @@ export const Slider: React.FC<SliderProps> = React.memo(({
   const decimals = step >= 1 ? 0 : Math.max(0, Math.ceil(-Math.log10(step)));
 
   const [inputValue, setInputValue] = useState(value.toString());
-  const [isHovered, setIsHovered] = useState(false);
+  // Removed isHovered state - use pure CSS group-hover instead (eliminates re-renders on hover)
   const [isDragging, setIsDragging] = useState(false);
   const [isLabelDragging, setIsLabelDragging] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -153,15 +153,6 @@ export const Slider: React.FC<SliderProps> = React.memo(({
     }
   }, [handleInputBlur]);
 
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-    soundManager.playHover();
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false);
-  }, []);
-
   const handleInputFocus = useCallback(() => {
     setIsInputFocused(true);
   }, []);
@@ -201,8 +192,6 @@ export const Slider: React.FC<SliderProps> = React.memo(({
   return (
     <div
       className={`group/slider relative select-none w-full ${className} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       data-testid={dataTestId}
     >
       {/* Header: Label and Value */}
@@ -262,7 +251,7 @@ export const Slider: React.FC<SliderProps> = React.memo(({
         <div className="absolute w-full h-[3px] bg-[var(--bg-hover)] rounded-full overflow-hidden transition-colors duration-300 group-hover/slider:bg-[var(--bg-active)] backdrop-blur-sm shadow-inner">
            {/* Active Fill Track - Gradient */}
            <div
-             className="h-full bg-gradient-to-r from-accent/50 to-accent shadow-[0_0_10px_var(--color-accent-glow)] opacity-80 group-hover/slider:opacity-100 transition-all duration-100 ease-out"
+             className="h-full bg-gradient-to-r from-accent/50 to-accent shadow-[0_0_10px_var(--color-accent-glow)] opacity-80 group-hover/slider:opacity-100 transition-opacity duration-100 ease-out"
              style={{ width: `${percentage}%` }}
            />
         </div>
@@ -299,7 +288,8 @@ export const Slider: React.FC<SliderProps> = React.memo(({
           `}
           style={{ left: `calc(${percentage}% - 7px)` }}
         >
-           <div className={`w-1 h-1 rounded-full bg-text-primary transition-opacity duration-200 ${isDragging || isHovered ? 'opacity-100' : 'opacity-50'}`} />
+           {/* Inner dot - use CSS group-hover instead of React state */}
+           <div className={`w-1 h-1 rounded-full bg-text-primary transition-opacity duration-200 ${isDragging ? 'opacity-100' : 'opacity-50 group-hover/slider:opacity-100'}`} />
         </div>
 
         {/* Tooltip while dragging */}

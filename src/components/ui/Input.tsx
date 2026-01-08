@@ -85,7 +85,7 @@ export const Input = ({
       )}
       
       <m.div 
-        className={`relative flex items-center group transition-all duration-200
+        className={`relative flex items-center group
           ${error ? 'animate-shake' : ''}
         `}
         animate={error ? { x: [-2, 2, -2, 2, 0] } : {}}
@@ -114,7 +114,7 @@ export const Input = ({
             props.onBlur?.(e);
           }}
           className={`
-            w-full bg-glass border rounded-lg px-3 py-2 text-sm transition-all duration-200
+            w-full bg-glass border rounded-lg px-3 py-2 text-sm transition-colors duration-200
             ${leftIcon ? 'ps-9' : ''}
             ${rightIcon || clearable || loading ? 'pe-9' : ''}
             ${error

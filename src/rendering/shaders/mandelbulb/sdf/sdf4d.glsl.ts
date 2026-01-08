@@ -112,9 +112,10 @@ float sdf4D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
         float thetaN = (theta + phaseT) * pwr;
         float phiN = (phi + phaseP) * pwr;
+        float psiN = psi * pwr;  // OPT: Cache angle multiplication
         float cTheta = cos(thetaN), sTheta = sin(thetaN);
         float cPhi = cos(phiN), sPhi = sin(phiN);
-        float cPsi = cos(psi * pwr), sPsi = sin(psi * pwr);
+        float cPsi = cos(psiN), sPsi = sin(psiN);
 
         float rSinThetaSinPhi = rp * sTheta * sPhi;
         zz = rp * cTheta + cz;

@@ -187,20 +187,49 @@ VolumeResult volumeRaymarch(vec3 rayOrigin, vec3 rayDir, float tNear, float tFar
         vec3 pos = rayOrigin + rayDir * t;
 
 #ifdef USE_DISPERSION
-        // DISPERSION PATH: Need gradient for R/B channel extrapolation before alpha check
-        // Combined density+gradient via tetrahedral sampling (4 samples total)
-        TetraSample tetra = sampleWithTetrahedralGradient(pos, animTime, 0.05);
-        float rho = tetra.rho;
-        float sCenter = tetra.s;
-        float phase = tetra.phase;
-        vec3 gradient = tetra.gradient;
+        // DISPERSION PATH: Need gradient for R/B channel extrapolation
+        // PERF: First do cheap center-only density check to skip expensive tetrahedral gradient
+        // when density is clearly negligible (log-density < -15 means rho < 3e-7)
+        vec3 quickCheck = sampleDensityWithPhase(pos, animTime);
+        float quickRho = quickCheck.x;
+        float quickS = quickCheck.y;
 
         // Early exit if density is consistently low (harmonic oscillator only)
-        if (allowEarlyExit && rho < MIN_DENSITY) {
+        if (allowEarlyExit && quickRho < MIN_DENSITY) {
             lowDensityCount++;
             if (lowDensityCount > 5) break;
+            t += stepLen;
+            continue;
         } else {
             lowDensityCount = 0;
+        }
+
+        // PERF: Skip expensive tetrahedral gradient when density is negligible
+        // and nodal surfaces won't boost it (log-density < -15 => rho < 3e-7)
+        bool skipGradient = (quickS < -15.0);
+#ifdef USE_NODAL
+        // Nodal can boost low-density samples, so don't skip if nodal might contribute
+        if (uNodalEnabled && quickS > -12.0 && quickS < -5.0) {
+            skipGradient = false;
+        }
+#endif
+
+        float rho, sCenter, phase;
+        vec3 gradient;
+
+        if (skipGradient) {
+            // Use quick sample, zero gradient (dispersion extrapolation will be identity)
+            rho = quickRho;
+            sCenter = quickS;
+            phase = quickCheck.z;
+            gradient = vec3(0.0);
+        } else {
+            // Combined density+gradient via tetrahedral sampling (4 samples total)
+            TetraSample tetra = sampleWithTetrahedralGradient(pos, animTime, 0.05);
+            rho = tetra.rho;
+            sCenter = tetra.s;
+            phase = tetra.phase;
+            gradient = tetra.gradient;
         }
 
         // Chromatic Dispersion: compute per-channel densities BEFORE alpha check
@@ -399,7 +428,7 @@ VolumeResult volumeRaymarchHQ(vec3 rayOrigin, vec3 rayDir, float tNear, float tF
         vec3 pos = rayOrigin + rayDir * t;
 
 #ifdef USE_DISPERSION
-        // DISPERSION PATH: Need gradient for R/B channel extrapolation before alpha check
+        // DISPERSION PATH: Need gradient for R/B channel extrapolation
         // Radial dispersion update per sample
         if (uDispersionEnabled && uDispersionDirection == 0) {
              vec3 normalProxy = normalize(pos); // From center
@@ -408,12 +437,39 @@ VolumeResult volumeRaymarchHQ(vec3 rayOrigin, vec3 rayDir, float tNear, float tF
              dispOffsetB = -normalProxy * dispAmount;
         }
 
-        // Combined density+gradient via tetrahedral sampling (4 samples total)
-        TetraSample tetra = sampleWithTetrahedralGradient(pos, animTime, 0.05);
-        float rho = tetra.rho;
-        float sCenter = tetra.s;
-        float phase = tetra.phase;
-        vec3 gradient = tetra.gradient;
+        // PERF: First do cheap center-only density check to skip expensive tetrahedral gradient
+        // when density is clearly negligible (log-density < -15 means rho < 3e-7)
+        vec3 quickCheck = sampleDensityWithPhase(pos, animTime);
+        float quickRho = quickCheck.x;
+        float quickS = quickCheck.y;
+
+        // PERF: Skip expensive tetrahedral gradient when density is negligible
+        // and nodal surfaces won't boost it (log-density < -15 => rho < 3e-7)
+        bool skipGradient = (quickS < -15.0);
+#ifdef USE_NODAL
+        // Nodal can boost low-density samples, so don't skip if nodal might contribute
+        if (uNodalEnabled && quickS > -12.0 && quickS < -5.0) {
+            skipGradient = false;
+        }
+#endif
+
+        float rho, sCenter, phase;
+        vec3 gradient;
+
+        if (skipGradient) {
+            // Use quick sample, zero gradient (dispersion extrapolation will be identity)
+            rho = quickRho;
+            sCenter = quickS;
+            phase = quickCheck.z;
+            gradient = vec3(0.0);
+        } else {
+            // Combined density+gradient via tetrahedral sampling (4 samples total)
+            TetraSample tetra = sampleWithTetrahedralGradient(pos, animTime, 0.05);
+            rho = tetra.rho;
+            sCenter = tetra.s;
+            phase = tetra.phase;
+            gradient = tetra.gradient;
+        }
 
         // Chromatic Dispersion Logic
         vec3 rhoRGB = vec3(rho); // Default: all channels same

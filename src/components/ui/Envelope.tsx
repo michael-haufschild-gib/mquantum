@@ -146,7 +146,7 @@ export const Envelope: React.FC<EnvelopeProps> = React.memo(({
         <path
           d={`${path} L ${xRelease},${yBottom} Z`}
           fill={`url(#fill-grad-${id})`}
-          className="transition-all duration-300 ease-out"
+          className="transition-[d] duration-300 ease-out"
         />
 
         {/* Stroke Line */}
@@ -158,12 +158,12 @@ export const Envelope: React.FC<EnvelopeProps> = React.memo(({
           strokeLinecap="round"
           strokeLinejoin="round"
           filter={`url(#glow-${id})`}
-          className="transition-all duration-300 ease-out"
+          className="transition-[d] duration-300 ease-out"
         />
 
         {/* Control Points */}
         {points.map((p, i) => !p.hidden && (
-          <g key={i} className="transition-all duration-300 ease-out" style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
+          <g key={i} className="transition-transform duration-300 ease-out" style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
             <circle
               r="4"
               fill="var(--color-background)"

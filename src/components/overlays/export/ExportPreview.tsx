@@ -61,7 +61,7 @@ export const ExportPreview = () => {
                         {/* Crop Box / Output Frame */}
                         <div
                             ref={cropBoxRef}
-                            className={`absolute border-2 transition-all duration-300 ${crop.enabled ? 'border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]' : 'border-transparent'}`}
+                            className={`absolute border-2 transition-[left,top,width,height,border-color,box-shadow] duration-300 ${crop.enabled ? 'border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]' : 'border-transparent'}`}
                             style={{
                                 left: crop.enabled ? `${crop.x * 100}%` : '0%',
                                 top: crop.enabled ? `${crop.y * 100}%` : '0%',

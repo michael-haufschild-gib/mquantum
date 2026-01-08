@@ -1,15 +1,8 @@
 export const quaternionBlock = `
 // ============================================
-// Power helper
-// ============================================
-
-float getEffectivePower() {
-    float basePower = uPowerAnimationEnabled ? uAnimatedPower : uPower;
-    return max(basePower, 2.0);
-}
-
-// ============================================
-// Quaternion Operations
+// Quaternion Operations for Julia Sets
+// OPT: Fast paths for powers 2-4 are inlined in SDF
+// This file handles powers 5+ and non-integer powers
 // ============================================
 
 // Quaternion multiplication: q1 * q2
@@ -22,7 +15,7 @@ vec4 quatMul(vec4 q1, vec4 q2) {
     );
 }
 
-// Quaternion squared: q * q
+// Quaternion squared: q * q (optimized, avoids full multiplication)
 vec4 quatSqr(vec4 q) {
     float xx = q.x * q.x;
     float yy = q.y * q.y;
@@ -38,59 +31,39 @@ vec4 quatSqr(vec4 q) {
 
 // Quaternion power using hyperspherical coordinates
 // For generalized power n (including non-integer)
-// OPTIMIZATION: Uses fast path for n=2 (the most common case) to avoid
-// expensive transcendental functions (acos, cos, sin, pow)
+// NOTE: Powers 2, 3, 4 are inlined in SDF for maximum performance
+// This function handles powers 5+ and non-integer powers
 vec4 quatPow(vec4 q, float n) {
-    // Fast path for n=2 (most common Julia set)
-    // Avoids: 1 acos, 2 cos/sin, 1 pow = saves ~20 ALU operations
-    if (abs(n - 2.0) < 0.01) {
-        return quatSqr(q);
-    }
-
-    // Fast path for n=3 (cubic Julia)
-    if (abs(n - 3.0) < 0.01) {
-        return quatMul(quatSqr(q), q);
-    }
-
-    // Fast path for n=4 (quartic Julia)
-    if (abs(n - 4.0) < 0.01) {
-        vec4 q2 = quatSqr(q);
-        return quatSqr(q2);
-    }
-
-    // PERF (OPT-FR-6): Fast path for n=5
-    // q^5 = q^4 * q = (q^2)^2 * q
-    if (abs(n - 5.0) < 0.01) {
+    // Fast path for power 5: q^5 = q^4 * q = (q^2)^2 * q
+    if (n == 5.0) {
         vec4 q2 = quatSqr(q);
         vec4 q4 = quatSqr(q2);
         return quatMul(q4, q);
     }
 
-    // PERF (OPT-FR-6): Fast path for n=6
-    // q^6 = q^4 * q^2 = (q^2)^2 * q^2
-    if (abs(n - 6.0) < 0.01) {
+    // Fast path for power 6: q^6 = (q^2)^3 = (q^2)^2 * q^2
+    if (n == 6.0) {
         vec4 q2 = quatSqr(q);
         vec4 q4 = quatSqr(q2);
         return quatMul(q4, q2);
     }
 
-    // PERF (OPT-FR-6): Fast path for n=7
-    // q^7 = q^6 * q = q^4 * q^2 * q
-    if (abs(n - 7.0) < 0.01) {
+    // Fast path for power 7: q^7 = q^6 * q
+    if (n == 7.0) {
         vec4 q2 = quatSqr(q);
         vec4 q4 = quatSqr(q2);
         vec4 q6 = quatMul(q4, q2);
         return quatMul(q6, q);
     }
 
-    // PERF (OPT-FR-6): Fast path for n=8 (classic Mandelbulb power)
-    // q^8 = ((q^2)^2)^2 - optimal: only 3 squarings
-    if (abs(n - 8.0) < 0.01) {
+    // Fast path for power 8: q^8 = ((q^2)^2)^2
+    if (n == 8.0) {
         vec4 q2 = quatSqr(q);
         vec4 q4 = quatSqr(q2);
         return quatSqr(q4);
     }
 
+    // General hyperspherical approach for other powers
     float r = length(q);
     if (r < EPS) return vec4(0.0);
 

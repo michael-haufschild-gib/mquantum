@@ -45,11 +45,12 @@ export const HydrogenOrbitalControls: React.FC<HydrogenOrbitalControlsProps> = R
 
   // Build preset options grouped by orbital type
   const presetOptions = useMemo(() => {
+    // Exclude 'custom' from all groups - it's added separately at the end
     const groups = {
       s: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 0 && p.name !== 'Custom'),
-      p: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 1),
-      d: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 2),
-      f: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 3),
+      p: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 1 && p.name !== 'Custom'),
+      d: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 2 && p.name !== 'Custom'),
+      f: Object.entries(HYDROGEN_ORBITAL_PRESETS).filter(([, p]) => p.l === 3 && p.name !== 'Custom'),
     };
 
     return [

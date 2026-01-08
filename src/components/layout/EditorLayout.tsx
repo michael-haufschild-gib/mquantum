@@ -9,7 +9,7 @@ import { soundManager } from '@/lib/audio/SoundManager';
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { AnimatePresence, m } from 'motion/react';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { EditorBottomPanel } from './EditorBottomPanel';
 import { EditorLeftPanel } from './EditorLeftPanel';
@@ -22,7 +22,6 @@ interface EditorLayoutProps {
 
 export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children }) => {
   const { accent, mode } = useThemeStore(useShallow((state) => ({ accent: state.accent, mode: state.mode })));
-  const spotlightRef = useRef<HTMLDivElement>(null);
 
   const {
     isCollapsed,
@@ -69,38 +68,6 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
     }
     return undefined;
   }, [accent, mode]);
-
-  // Spotlight Effect - optimized to avoid RAF cancel/reschedule thrashing
-  useEffect(() => {
-    let rafId: number | null = null;
-    let lastX = 0;
-    let lastY = 0;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      // Always capture latest position (cheap)
-      lastX = e.clientX;
-      lastY = e.clientY;
-
-      // Only queue RAF if not already pending
-      if (rafId !== null) return;
-
-      rafId = requestAnimationFrame(() => {
-        if (spotlightRef.current) {
-          spotlightRef.current.style.setProperty('--mouse-x', `${lastX}px`);
-          spotlightRef.current.style.setProperty('--mouse-y', `${lastY}px`);
-        }
-        rafId = null;
-      });
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, []);
 
   // Sync fullscreen state with cinematic mode
   useEffect(() => {
@@ -177,7 +144,6 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
 
   return (
     <div
-        ref={spotlightRef}
         className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-screen bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app"
     >
       {/* 1. Full-screen Canvas Layer (The Curtain) */}
@@ -217,7 +183,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                             toggleCinematicMode();
                             soundManager.playClick();
                         }}
-                        className="p-3 rounded-full glass-panel text-text-secondary hover:text-white hover:border-accent/50 transition-all group shadow-2xl shadow-accent/20"
+                        className="p-3 rounded-full glass-panel text-text-secondary hover:text-white hover:border-accent/50 transition-colors group shadow-2xl shadow-accent/20"
                         title="Exit Cinematic Mode (C)"
                         data-testid="exit-cinematic"
                         whileHover={{ scale: 1.1, rotate: 90 }}

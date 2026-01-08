@@ -81,7 +81,7 @@ export function PerformanceMonitor() {
               relative overflow-hidden rounded-full
               glass-panel hover:brightness-110 cursor-pointer
               shadow-[var(--shadow-hard)]
-              transition-all duration-300
+              transition-[filter] duration-300
             "
           >
             <CollapsedView />

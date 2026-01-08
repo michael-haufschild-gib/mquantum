@@ -18,16 +18,19 @@ vec2 evalHydrogenNDPsi10D(float xND[MAX_DIM], float t) {
         return vec2(0.0);
     }
 
+    // PERF: Compute sum of squares for 3D once, reuse for both r10D and r3D
+    float sum3D = x0*x0 + x1*x1 + x2*x2;
+
     // 10D radius
-    float r10D = sqrt(x0*x0 + x1*x1 + x2*x2 + x3*x3 + x4*x4 +
-                      x5*x5 + x6*x6 + x7*x7 + x8*x8 + x9*x9);
+    float r10D = sqrt(sum3D + x3*x3 + x4*x4 + x5*x5 + x6*x6 + x7*x7 + x8*x8 + x9*x9);
 
     // EARLY EXIT 2: Check hydrogen radial threshold
     if (hydrogenRadialEarlyExit(r10D, uPrincipalN, uBohrRadius, uAzimuthalL)) {
         return vec2(0.0);
     }
 
-    float r3D = radius3D(x0, x1, x2);
+    // PERF: Reuse sum3D for 3D radius computation
+    float r3D = sqrt(sum3D);
 
     vec2 angles = sphericalAngles3D(x0, x1, x2, r3D);
     float theta = angles.x, phi = angles.y;

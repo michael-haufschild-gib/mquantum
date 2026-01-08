@@ -80,7 +80,7 @@ export const InputModal: React.FC<InputModalProps> = React.memo(({
            <input
             ref={inputRef}
             type="text"
-            className={`w-full bg-[var(--bg-hover)] border border-panel-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all placeholder:text-text-muted ${readOnly ? 'cursor-text' : ''}`}
+            className={`w-full bg-[var(--bg-hover)] border border-panel-border rounded-md px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-colors placeholder:text-text-muted ${readOnly ? 'cursor-text' : ''}`}
             placeholder={placeholder}
             value={value}
             onChange={handleChange}

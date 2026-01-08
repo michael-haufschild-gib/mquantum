@@ -51,10 +51,37 @@ import { useLightingStore } from '@/stores/lightingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { RECOVERY_STATE_KEY, RECOVERY_STATE_MAX_AGE } from '@/stores/webglContextStore';
 import { Html } from '@react-three/drei';
-import { Canvas, type RootState } from '@react-three/fiber';
+import { Canvas, type RootState, events as createDomEvents } from '@react-three/fiber';
+import type { ComputeFunction } from '@react-three/fiber/dist/declarations/src/core/events';
 import { domMax, LazyMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
+
+/**
+ * Custom compute function that only sets up raycasting on click/pointer-down events.
+ * This dramatically reduces CPU usage by skipping raycasting on every mouse move.
+ *
+ * Default R3F behavior: Raycasts on EVERY pointermove to detect hover states.
+ * Our behavior: Only raycast when user actually clicks/presses.
+ *
+ * This is safe because our only interactive 3D element (LightGizmo) only needs
+ * click events, not hover states.
+ */
+const clickOnlyCompute: ComputeFunction = (event, state) => {
+  // Skip raycasting setup for move events - this is the key optimization
+  // By not updating pointer/raycaster, the expensive intersectObjects() call is avoided
+  if (event.type === 'pointermove' || event.type === 'mousemove') {
+    return;
+  }
+
+  // For click/pointerdown/pointerup events, compute normally
+  const { width, height, top, left } = state.size;
+  const x = event.clientX - left;
+  const y = event.clientY - top;
+
+  state.pointer.set((x / width) * 2 - 1, -(y / height) * 2 + 1);
+  state.raycaster.setFromCamera(state.pointer, state.camera);
+};
 
 /**
  * Extract 3D positions from N-D vertices for ground plane bounds calculation.
@@ -246,6 +273,9 @@ function AppContent() {
                 position: [0, 3.125, 7.5], // Closer angled view for prominent Interstellar look (25% further out)
                 fov: 60,
               }}
+              // Custom event system: Only raycast on click, not on mouse move.
+              // This eliminates expensive per-frame raycasting during mouse movement.
+              events={(store) => ({ ...createDomEvents(store), compute: clickOnlyCompute })}
               raycaster={{
                 // Enable DEBUG layer for raycasting so gizmos on layer 4 are interactive.
                 // The raycaster's layers determine which objects receive pointer events.

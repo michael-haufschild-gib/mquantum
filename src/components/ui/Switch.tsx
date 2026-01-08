@@ -60,7 +60,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(({
         {/* Track */}
         <div
           className={`
-            absolute inset-0 rounded-full border transition-all duration-300 ease-out
+            absolute inset-0 rounded-full border transition-colors duration-300 ease-out
             ${checked
               ? 'bg-accent/80 border-accent/50 shadow-[0_0_15px_var(--color-accent-glow)]'
               : 'glass-input border-border-default group-hover/switch:bg-[var(--bg-hover)]'

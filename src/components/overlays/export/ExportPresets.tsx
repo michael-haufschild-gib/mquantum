@@ -60,7 +60,7 @@ const PresetCard = ({ label, description, iconSrc, isActive, onClick }: PresetCa
         onClick={onClick}
         onMouseEnter={() => soundManager.playHover()}
         className={`
-            relative flex items-center gap-2 text-left p-2 sm:p-3 lg:p-4 rounded-lg lg:rounded-xl border transition-all duration-200 group
+            relative flex items-center gap-2 text-left p-2 sm:p-3 lg:p-4 rounded-lg lg:rounded-xl border transition-colors duration-200 group
             ${isActive
                 ? 'bg-accent/10 border-accent glow-accent-sm'
                 : 'bg-[var(--bg-hover)] border-border-subtle hover:border-border-default hover:bg-[var(--bg-active)]'

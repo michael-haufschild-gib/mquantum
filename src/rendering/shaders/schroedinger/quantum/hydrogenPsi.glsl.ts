@@ -25,6 +25,8 @@ export const hydrogenPsiBlock = `
 /**
  * Convert Cartesian coordinates to spherical coordinates
  *
+ * PERF: Computes x² and y² once, reuses for both r and rho_xy.
+ *
  * @param pos - Cartesian position (x, y, z)
  * @return vec3(r, theta, phi) where:
  *   r = radial distance from origin
@@ -32,7 +34,13 @@ export const hydrogenPsiBlock = `
  *   phi = azimuthal angle from +x axis [0, 2π]
  */
 vec3 cartesianToSpherical(vec3 pos) {
-    float r = length(pos);
+    // PERF: Compute squares once, reuse for both r and rho_xy
+    float x2 = pos.x * pos.x;
+    float y2 = pos.y * pos.y;
+    float z2 = pos.z * pos.z;
+
+    float rho_xy_sq = x2 + y2;
+    float r = sqrt(rho_xy_sq + z2);
 
     // Handle origin (avoid division by zero)
     if (r < 1e-10) {
@@ -43,7 +51,7 @@ vec3 cartesianToSpherical(vec3 pos) {
     // Using atan2(rho_xy, z) instead of acos(z/r) for numerical stability.
     // acos() loses precision when its argument approaches ±1 (near poles),
     // while atan() remains stable everywhere.
-    float rho_xy = sqrt(pos.x * pos.x + pos.y * pos.y);
+    float rho_xy = sqrt(rho_xy_sq);
     float theta = atan(rho_xy, pos.z);
 
     // φ = atan2(y, x), azimuthal angle from x-axis
@@ -80,19 +88,18 @@ vec3 cartesianToSpherical(vec3 pos) {
  * The formula includes a 25% safety margin above the mathematically
  * required minimum to guarantee zero fidelity loss.
  *
+ * PERF: Uses precomputed uHydrogenRadialThreshold uniform instead of
+ * computing threshold = 25 * n * a0 * (1 + 0.1*l) per sample.
+ *
  * @param r - Radial distance (3D or ND)
- * @param n - Principal quantum number (1-7)
- * @param a0 - Bohr radius scale (0.5-3.0)
- * @param l - Azimuthal quantum number (0 to n-1)
+ * @param n - Principal quantum number (1-7) - UNUSED, kept for API compatibility
+ * @param a0 - Bohr radius scale (0.5-3.0) - UNUSED, kept for API compatibility
+ * @param l - Azimuthal quantum number (0 to n-1) - UNUSED, kept for API compatibility
  * @return true if contribution is guaranteed negligible
  */
 bool hydrogenRadialEarlyExit(float r, int n, float a0, int l) {
-    float fn = float(n);
-    float fl = float(l);
-    // Conservative threshold: 25 * n * a0 * (1 + 0.1*l)
-    // At n=7, l=6, a0=3.0: threshold = 840
-    float threshold = 25.0 * fn * a0 * (1.0 + 0.1 * fl);
-    return r > threshold;
+    // PERF: Use precomputed threshold instead of computing per sample
+    return r > uHydrogenRadialThreshold;
 }
 
 /**
@@ -186,6 +193,9 @@ vec2 evalHydrogenPsiTime(vec3 pos, int n, int l, int m, float a0, bool useReal, 
  * Returns wavefunction value and phase information for
  * phase-based coloring schemes.
  *
+ * OPTIMIZED: Computes psi0 once and derives time-evolved psi from it,
+ * avoiding redundant hydrogenRadial() + sphericalHarmonic() calls.
+ *
  * @param pos - Cartesian position
  * @param n, l, m - Quantum numbers
  * @param a0 - Bohr radius
@@ -194,12 +204,21 @@ vec2 evalHydrogenPsiTime(vec3 pos, int n, int l, int m, float a0, bool useReal, 
  * @return vec4(psi.re, psi.im, spatialPhase, magnitude)
  */
 vec4 evalHydrogenPsiWithPhase(vec3 pos, int n, int l, int m, float a0, bool useReal, float t) {
-    // Time-evolved wavefunction
-    vec2 psi = evalHydrogenPsiTime(pos, n, l, m, a0, useReal, t);
+    // OPTIMIZED: Compute static wavefunction ONCE
+    vec2 psi0 = evalHydrogenPsi(pos, n, l, m, a0, useReal);
 
     // Spatial phase (at t=0) for stable coloring
-    vec2 psi0 = evalHydrogenPsi(pos, n, l, m, a0, useReal);
     float spatialPhase = atan(psi0.y, psi0.x);
+
+    // Apply time evolution: ψ(t) = ψ(0) · e^{-iEt}
+    // Energy eigenvalue: E_n = -1/(2n²) in atomic units
+    float fn = float(n);
+    float E = -0.5 / (fn * fn);
+    float phase = -E * t;
+    vec2 timeFactor = vec2(cos(phase), sin(phase));
+
+    // Complex multiplication: ψ(t) = ψ(0) · e^{-iEt}
+    vec2 psi = cmul(psi0, timeFactor);
 
     // Magnitude
     float mag = length(psi);

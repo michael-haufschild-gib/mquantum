@@ -390,37 +390,19 @@ float sampleDensity(vec3 pos, float t) {
     // Hydrogen wavefunctions have much smaller local density values than
     // harmonic oscillator superpositions due to different normalization.
     // Boost the density to make hydrogen orbitals visible with same gain settings.
+    // PERF: Uses precomputed uHydrogenBoost uniform instead of pow(3.0, fl) per sample
 #ifdef HYDROGEN_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
-        // Boost factor depends on orbital size and shape
-        // Higher n orbitals are more spread out (volume ~ n³)
-        // Higher l orbitals have more angular lobes, spreading density further
-        // The ρ^l factor in radial function also reduces density for high l
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        // Base boost scales with n², additional boost for l to compensate for angular spreading
-        // For l=0 (s): boost = 50 * n²
-        // For l=1 (p): boost = 50 * n² * 3
-        // For l=2 (d): boost = 50 * n² * 10
-        // For l=3 (f): boost = 50 * n² * 30
-        // For l=4 (g): boost = 50 * n² * 100
-        float lBoost = pow(3.0, fl); // Exponential boost for higher l
-        float hydrogenBoost = 50.0 * fn * fn * lBoost;
-        rho *= hydrogenBoost;
+        rho *= uHydrogenBoost;
     }
 #endif
 
     // Hydrogen ND density boost
     // ND hydrogen has additional decay from extra dimensions, requiring more aggressive boost
+    // PERF: Uses precomputed uHydrogenNDBoost uniform instead of pow(3.0, fl) per sample
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        // Base hydrogen boost + l boost + dimension factor to compensate for extra dim decay
-        float lBoost = pow(3.0, fl);
-        float dimFactor = 1.0 + float(uDimension - 3) * 0.3;
-        float hydrogenNDBoost = 50.0 * fn * fn * lBoost * dimFactor;
-        rho *= hydrogenNDBoost;
+        rho *= uHydrogenNDBoost;
     }
 #endif
 
@@ -450,26 +432,19 @@ vec3 sampleDensityWithPhase(vec3 pos, float t) {
 
     float rho = rhoFromPsi(psi);
 
-    // Hydrogen orbital density boost (same as sampleDensity above)
+    // Hydrogen orbital density boost
+    // PERF: Uses precomputed uHydrogenBoost uniform
 #ifdef HYDROGEN_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float hydrogenBoost = 50.0 * fn * fn * lBoost;
-        rho *= hydrogenBoost;
+        rho *= uHydrogenBoost;
     }
 #endif
 
-    // Hydrogen ND density boost (same as sampleDensity above)
+    // Hydrogen ND density boost
+    // PERF: Uses precomputed uHydrogenNDBoost uniform
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float dimFactor = 1.0 + float(uDimension - 3) * 0.3;
-        float hydrogenNDBoost = 50.0 * fn * fn * lBoost * dimFactor;
-        rho *= hydrogenNDBoost;
+        rho *= uHydrogenNDBoost;
     }
 #endif
 
@@ -523,25 +498,18 @@ vec3 sampleDensityWithPhaseAndFlow(vec3 pos, float t, out vec3 flowedPosOut) {
     float rho = rhoFromPsi(psi);
 
     // Hydrogen orbital density boost
+    // PERF: Uses precomputed uHydrogenBoost uniform
 #ifdef HYDROGEN_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float hydrogenBoost = 50.0 * fn * fn * lBoost;
-        rho *= hydrogenBoost;
+        rho *= uHydrogenBoost;
     }
 #endif
 
     // Hydrogen ND density boost
+    // PERF: Uses precomputed uHydrogenNDBoost uniform
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float dimFactor = 1.0 + float(uDimension - 3) * 0.3;
-        float hydrogenNDBoost = 50.0 * fn * fn * lBoost * dimFactor;
-        rho *= hydrogenNDBoost;
+        rho *= uHydrogenNDBoost;
     }
 #endif
 
@@ -580,25 +548,18 @@ float sampleDensityAtFlowedPos(vec3 flowedPos, float t) {
     float rho = rhoFromPsi(psi);
 
     // Hydrogen orbital density boost
+    // PERF: Uses precomputed uHydrogenBoost uniform
 #ifdef HYDROGEN_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float hydrogenBoost = 50.0 * fn * fn * lBoost;
-        rho *= hydrogenBoost;
+        rho *= uHydrogenBoost;
     }
 #endif
 
     // Hydrogen ND density boost
+    // PERF: Uses precomputed uHydrogenNDBoost uniform
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float dimFactor = 1.0 + float(uDimension - 3) * 0.3;
-        float hydrogenNDBoost = 50.0 * fn * fn * lBoost * dimFactor;
-        rho *= hydrogenNDBoost;
+        rho *= uHydrogenNDBoost;
     }
 #endif
 
@@ -622,24 +583,17 @@ float sampleDensityAtFlowedPosNoErosion(vec3 flowedPos, float t) {
     float rho = rhoFromPsi(psi);
 
     // Hydrogen orbital density boost (still needed for correct gradient magnitude)
+    // PERF: Uses precomputed uHydrogenBoost uniform
 #ifdef HYDROGEN_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float hydrogenBoost = 50.0 * fn * fn * lBoost;
-        rho *= hydrogenBoost;
+        rho *= uHydrogenBoost;
     }
 #endif
 
+    // PERF: Uses precomputed uHydrogenNDBoost uniform
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
-        float fn = float(uPrincipalN);
-        float fl = float(uAzimuthalL);
-        float lBoost = pow(3.0, fl);
-        float dimFactor = 1.0 + float(uDimension - 3) * 0.3;
-        float hydrogenNDBoost = 50.0 * fn * fn * lBoost * dimFactor;
-        rho *= hydrogenNDBoost;
+        rho *= uHydrogenNDBoost;
     }
 #endif
 

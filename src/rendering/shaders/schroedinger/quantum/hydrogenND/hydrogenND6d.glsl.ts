@@ -31,16 +31,19 @@ vec2 evalHydrogenNDPsi6D(float xND[MAX_DIM], float t) {
         return vec2(0.0);
     }
 
+    // PERF: Compute sum of squares for 3D once, reuse for both r6D and r3D
+    float sum3D = x0*x0 + x1*x1 + x2*x2;
+
     // Compute 6D radius for radial decay
-    float r6D = sqrt(x0*x0 + x1*x1 + x2*x2 + x3*x3 + x4*x4 + x5*x5);
+    float r6D = sqrt(sum3D + x3*x3 + x4*x4 + x5*x5);
 
     // EARLY EXIT 2: Check hydrogen radial threshold
     if (hydrogenRadialEarlyExit(r6D, uPrincipalN, uBohrRadius, uAzimuthalL)) {
         return vec2(0.0);
     }
 
-    // Compute 3D radius for spherical harmonics
-    float r3D = radius3D(x0, x1, x2);
+    // PERF: Reuse sum3D for 3D radius computation
+    float r3D = sqrt(sum3D);
 
     // Spherical angles from first 3 dims
     vec2 angles = sphericalAngles3D(x0, x1, x2, r3D);

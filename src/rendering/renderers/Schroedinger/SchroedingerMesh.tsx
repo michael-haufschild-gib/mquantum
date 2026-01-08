@@ -148,6 +148,11 @@ const SchroedingerMesh = () => {
       uBohrRadius: { value: 1.0 },
       uUseRealOrbitals: { value: true },
 
+      // PERF: Precomputed hydrogen density boost factors (avoid pow() per sample)
+      uHydrogenBoost: { value: 200.0 }, // 50 * n² * 3^l (default: n=2, l=1 -> 50*4*3=600)
+      uHydrogenNDBoost: { value: 200.0 }, // uHydrogenBoost * dimFactor
+      uHydrogenRadialThreshold: { value: 50.0 }, // 25 * n * a0 * (1 + 0.1*l)
+
       // Hydrogen ND configuration (extra dimensions 4-11)
       uExtraDimN: { value: new Int32Array(8) },
       uExtraDimOmega: { value: new Float32Array(8) },
@@ -167,7 +172,7 @@ const SchroedingerMesh = () => {
       uEmissionPulsing: { value: false },
       uRimExponent: { value: 3.0 },
       uScatteringAnisotropy: { value: 0.0 },
-      uRoughness: { value: 0.3 },
+      // uRoughness, uMetallic, etc. provided by 'pbr-face' via UniformManager.getCombinedUniforms below
       uSssEnabled: { value: false },
       uSssIntensity: { value: 1.0 },
       uSssColor: { value: new THREE.Color('#ff8844') },
@@ -457,6 +462,21 @@ const SchroedingerMesh = () => {
       if (material.uniforms.uMagneticM) material.uniforms.uMagneticM.value = validM;
       if (material.uniforms.uBohrRadius) material.uniforms.uBohrRadius.value = bohrRadiusScale;
       if (material.uniforms.uUseRealOrbitals) material.uniforms.uUseRealOrbitals.value = useRealOrbitals;
+
+      // PERF: Precompute hydrogen density boost factors (avoid pow() per sample)
+      // hydrogenBoost = 50 * n² * 3^l
+      const lBoost = Math.pow(3.0, validL);
+      const hydrogenBoost = 50.0 * validN * validN * lBoost;
+      if (material.uniforms.uHydrogenBoost) material.uniforms.uHydrogenBoost.value = hydrogenBoost;
+
+      // hydrogenNDBoost = hydrogenBoost * (1 + (dim - 3) * 0.3)
+      const dimFactor = 1.0 + (dimension - 3) * 0.3;
+      const hydrogenNDBoost = hydrogenBoost * dimFactor;
+      if (material.uniforms.uHydrogenNDBoost) material.uniforms.uHydrogenNDBoost.value = hydrogenNDBoost;
+
+      // PERF: Precompute early exit threshold = 25 * n * a0 * (1 + 0.1*l)
+      const hydrogenRadialThreshold = 25.0 * validN * bohrRadiusScale * (1.0 + 0.1 * validL);
+      if (material.uniforms.uHydrogenRadialThreshold) material.uniforms.uHydrogenRadialThreshold.value = hydrogenRadialThreshold;
 
       // Update Hydrogen ND uniforms (extra dimensions 4-11)
       const { extraDimQuantumNumbers, extraDimOmega, extraDimFrequencySpread } = schroedinger;

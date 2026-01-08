@@ -31,8 +31,11 @@ float sdf11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
     for(int i=0;i<MAX_ITER_HQ;i++){
         if(i>=maxIt)break;
-        float z01_sq = z0*z0+z1*z1;  // Cache for minASq
-        r=sqrt(z01_sq+z2*z2+z3*z3+z4*z4+z5*z5+z6*z6+z7*z7+z8*z8+z9*z9+z10*z10);
+        // OPT: Cache all squared terms once for both r calculation and tail subtraction
+        float z0_sq = z0*z0, z1_sq = z1*z1, z2_sq = z2*z2, z3_sq = z3*z3, z4_sq = z4*z4;
+        float z5_sq = z5*z5, z6_sq = z6*z6, z7_sq = z7*z7, z8_sq = z8*z8, z9_sq = z9*z9, z10_sq = z10*z10;
+        float z01_sq = z0_sq + z1_sq;
+        r=sqrt(z01_sq+z2_sq+z3_sq+z4_sq+z5_sq+z6_sq+z7_sq+z8_sq+z9_sq+z10_sq);
         if(r>bail){escIt=i;break;}
         minP=min(minP,abs(z1));
         minASq=min(minASq,z01_sq);  // OPT-C5: Track squared
@@ -43,24 +46,24 @@ float sdf11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         optimizedPow(r, pwr, rp, rpMinus1);
         dr=rpMinus1*pwr*dr+1.0;
 
-        // 11D: 10 angles - OPT-C1: Use inversesqrt instead of sqrt+division
+        // 11D: 10 angles - OPT-C1: Use inversesqrt and cached squared values
         float tailSq = r*r;
         float invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0*z0, 0.0);
+        float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t1 = acos(clamp(z1 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z1*z1, 0.0);
+        float t1 = acos(clamp(z1 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z1_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t2 = acos(clamp(z2 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z2*z2, 0.0);
+        float t2 = acos(clamp(z2 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z2_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3*z3, 0.0);
+        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z4*z4, 0.0);
+        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z4_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t5 = acos(clamp(z5 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z5*z5, 0.0);
+        float t5 = acos(clamp(z5 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z5_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t6 = acos(clamp(z6 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z6*z6, 0.0);
+        float t6 = acos(clamp(z6 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z6_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t7 = acos(clamp(z7 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z7*z7, 0.0);
+        float t7 = acos(clamp(z7 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z7_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
         float t8 = acos(clamp(z8 * invTail, -1.0, 1.0));
         float t9 = atan(z10, z9);
@@ -111,7 +114,10 @@ float sdf11D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
     for(int i=0;i<MAX_ITER_HQ;i++){
         if(i>=maxIt)break;
-        r=sqrt(z0*z0+z1*z1+z2*z2+z3*z3+z4*z4+z5*z5+z6*z6+z7*z7+z8*z8+z9*z9+z10*z10);
+        // OPT: Cache all squared terms once for both r calculation and tail subtraction
+        float z0_sq = z0*z0, z1_sq = z1*z1, z2_sq = z2*z2, z3_sq = z3*z3, z4_sq = z4*z4;
+        float z5_sq = z5*z5, z6_sq = z6*z6, z7_sq = z7*z7, z8_sq = z8*z8, z9_sq = z9*z9, z10_sq = z10*z10;
+        r=sqrt(z0_sq+z1_sq+z2_sq+z3_sq+z4_sq+z5_sq+z6_sq+z7_sq+z8_sq+z9_sq+z10_sq);
         if(r>bail)break;
 
         // OPT-C3: Use optimizedPow
@@ -119,24 +125,24 @@ float sdf11D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         optimizedPow(r, pwr, rp, rpMinus1);
         dr=rpMinus1*pwr*dr+1.0;
 
-        // OPT-C1: Use inversesqrt instead of sqrt+division
+        // OPT-C1: Use inversesqrt and cached squared values
         float tailSq = r*r;
         float invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0*z0, 0.0);
+        float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t1 = acos(clamp(z1 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z1*z1, 0.0);
+        float t1 = acos(clamp(z1 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z1_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t2 = acos(clamp(z2 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z2*z2, 0.0);
+        float t2 = acos(clamp(z2 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z2_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3*z3, 0.0);
+        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z4*z4, 0.0);
+        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z4_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t5 = acos(clamp(z5 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z5*z5, 0.0);
+        float t5 = acos(clamp(z5 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z5_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t6 = acos(clamp(z6 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z6*z6, 0.0);
+        float t6 = acos(clamp(z6 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z6_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t7 = acos(clamp(z7 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z7*z7, 0.0);
+        float t7 = acos(clamp(z7 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z7_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
         float t8 = acos(clamp(z8 * invTail, -1.0, 1.0));
         float t9 = atan(z10, z9);

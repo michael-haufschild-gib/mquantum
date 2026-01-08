@@ -32,6 +32,9 @@ export const hydrogenRadialBlock = `
  * For visualization, we use a simplified normalization that
  * maintains relative amplitudes but avoids numerical issues.
  *
+ * PERF: Uses FACTORIAL_LUT from sphericalHarmonics.glsl for O(1) lookup
+ * instead of O(n+l) loop computation. Falls back to loop for n > 7.
+ *
  * @param n - Principal quantum number (1-7)
  * @param l - Azimuthal quantum number (0 to n-1)
  * @param a0 - Bohr radius scale factor
@@ -44,20 +47,30 @@ float hydrogenRadialNorm(int n, int l, float a0) {
     float front = pow(2.0 / (fn * a0), 1.5);
 
     // sqrt((n-l-1)! / (2n·(n+l)!))
-    // Compute ratio of factorials carefully.
-    // IMPORTANT: Safe for n <= 7 (max factorial is 13! = 6227020800, within float32 range).
-    // For higher n values, consider log-space computation or precomputed lookup tables.
-    float factNum = 1.0;
-    for (int i = 1; i <= n - l - 1; i++) {
-        factNum *= float(i);
+    // PERF: Use FACTORIAL_LUT for O(1) lookup (n ≤ 7 means n+l ≤ 12)
+    int nMinusLMinus1 = n - l - 1;
+    int nPlusL = n + l;
+
+    float factRatio;
+    if (nPlusL <= 12 && nMinusLMinus1 >= 0) {
+        // PERF: Direct LUT lookup - O(1) instead of O(n+l) loop
+        float factNum = FACTORIAL_LUT[nMinusLMinus1];
+        float factDen = 2.0 * fn * FACTORIAL_LUT[nPlusL];
+        factRatio = factNum / factDen;
+    } else {
+        // Fallback for edge cases (rare: n ≤ 7 means nPlusL ≤ 12)
+        float factNum = 1.0;
+        for (int i = 1; i <= nMinusLMinus1; i++) {
+            factNum *= float(i);
+        }
+        float factDen = 2.0 * fn;
+        for (int i = 1; i <= nPlusL; i++) {
+            factDen *= float(i);
+        }
+        factRatio = factNum / factDen;
     }
 
-    float factDen = 2.0 * fn;
-    for (int i = 1; i <= n + l; i++) {
-        factDen *= float(i);
-    }
-
-    return front * sqrt(factNum / factDen);
+    return front * sqrt(factRatio);
 }
 
 /**

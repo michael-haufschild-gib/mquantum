@@ -41,10 +41,11 @@ float sdf5D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
         // 5D: 4 angles, z-axis primary (like Mandelbulb)
         float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        // OPT-M2: Reuse zxzy_sq in r1 calculation
-        float r1 = sqrt(zxzy_sq + z3*z3 + z4*z4);
+        // OPT-M2: Cache z34_sq to avoid redundant multiplications
+        float z34_sq = z3*z3 + z4*z4;
+        float r1 = sqrt(zxzy_sq + z34_sq);
         float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
-        float r2 = sqrt(zy*zy + z3*z3 + z4*z4);
+        float r2 = sqrt(zy*zy + z34_sq);
         float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
         float t3 = atan(z4, z3);
 
@@ -94,10 +95,11 @@ float sdf5D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         dr = rpMinus1 * pwr * dr + 1.0;
 
         float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        // OPT-M2: Reuse zxzy_sq in r1 calculation
-        float r1 = sqrt(zxzy_sq + z3*z3 + z4*z4);
+        // OPT-M2: Cache z34_sq to avoid redundant multiplications
+        float z34_sq = z3*z3 + z4*z4;
+        float r1 = sqrt(zxzy_sq + z34_sq);
         float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
-        float r2 = sqrt(zy*zy + z3*z3 + z4*z4);
+        float r2 = sqrt(zy*zy + z34_sq);
         float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
         float t3 = atan(z4, z3);
 

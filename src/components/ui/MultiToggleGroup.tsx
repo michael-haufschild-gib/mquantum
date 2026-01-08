@@ -50,7 +50,7 @@ const MultiToggleButton = React.memo(<T extends string>({
       onMouseEnter={handleMouseEnter}
       disabled={disabled}
       className={`
-        relative px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-300 border
+        relative px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-300 border
         disabled:opacity-50 disabled:cursor-not-allowed
         ${isSelected
           ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'

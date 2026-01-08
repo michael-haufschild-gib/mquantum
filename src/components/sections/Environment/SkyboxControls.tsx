@@ -109,7 +109,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
               data-testid={`skybox-option-${option.id}`}
               onClick={() => handleSkyboxSelect(option.id)}
               className={`
-                group relative aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 ease-out
+                group relative aspect-square rounded-xl overflow-hidden border-2 transition-[transform,border-color] duration-200 ease-out
                 hover:scale-105 hover:shadow-lg
                 ${
                   isSelected

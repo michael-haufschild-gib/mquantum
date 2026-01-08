@@ -177,7 +177,7 @@ export const Knob: React.FC<KnobProps> = React.memo(({
             strokeWidth="2"
             strokeLinecap="round"
             filter={`url(#glow-${id})`}
-            className="transition-all duration-75"
+            className="transition-[stroke-dasharray] duration-75"
           />
 
           {/* Dial Group */}

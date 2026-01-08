@@ -61,6 +61,9 @@ float factorial(int n) {
  *
  * This ensures ∫|Y_lm|² dΩ = 1
  *
+ * PERF: Uses FACTORIAL_LUT for direct lookup instead of loop computation.
+ * For l+|m| > 12, falls back to loop (rare for quantum viz where l ≤ 6).
+ *
  * @param l - Degree
  * @param m - Order
  * @return Normalization constant
@@ -72,12 +75,22 @@ float sphericalHarmonicNorm(int l, int m) {
     float front = float(2 * l + 1) / (4.0 * PI);
 
     // (l-|m|)! / (l+|m|)!
-    // Compute as product to avoid large factorial values
-    float factRatio = 1.0;
-    for (int i = l - absM + 1; i <= l + absM; i++) {
-        factRatio *= float(i);
+    // PERF: Use LUT for direct factorial lookup when possible
+    int lMinusM = l - absM;
+    int lPlusM = l + absM;
+
+    float factRatio;
+    if (lPlusM <= 12) {
+        // PERF: Direct LUT lookup - O(1) instead of O(2*|m|) loop
+        factRatio = FACTORIAL_LUT[lMinusM] / FACTORIAL_LUT[lPlusM];
+    } else {
+        // Fallback for large l+|m| (rare: l ≤ 6 means lPlusM ≤ 12)
+        factRatio = 1.0;
+        for (int i = lMinusM + 1; i <= lPlusM; i++) {
+            factRatio *= float(i);
+        }
+        factRatio = 1.0 / factRatio;
     }
-    factRatio = 1.0 / factRatio;
 
     return sqrt(front * factRatio);
 }

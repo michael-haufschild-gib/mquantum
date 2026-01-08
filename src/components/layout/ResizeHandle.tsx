@@ -126,12 +126,12 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
       {/* Visual handle line */}
       <div
         className={`
-          absolute left-1/2 top-4 bottom-4 w-0.5 -translate-x-1/2
-          rounded-full transition-all duration-150
+          absolute left-1/2 top-4 bottom-4 w-1 -translate-x-1/2
+          rounded-full transition-colors duration-150
           ${
             isDragging
-              ? 'bg-accent w-1 shadow-[0_0_8px_var(--color-accent)]'
-              : 'bg-border/30 group-hover:bg-accent/60 group-hover:w-1'
+              ? 'bg-accent shadow-[0_0_8px_var(--color-accent)]'
+              : 'bg-border/30 group-hover:bg-accent/60'
           }
         `}
       />

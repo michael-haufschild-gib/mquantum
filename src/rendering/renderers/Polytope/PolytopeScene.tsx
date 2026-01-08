@@ -453,10 +453,8 @@ export const PolytopeScene = React.memo(function PolytopeScene({
           // Color (converted to linear space for physically correct lighting)
           uColor: { value: new Color(faceColor).convertSRGBToLinear() },
           uOpacity: { value: surfaceSettings.faceOpacity },
-          // Material properties for G-buffer
-          uMetallic: { value: 0.0 },
-          // GGX PBR roughness
-          uRoughness: { value: 0.3 },
+          // PBR properties (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
+          // are provided by 'pbr-face' via UniformManager.getCombinedUniforms below
           // View matrix for normal transformation (updated every frame)
           uViewMatrix: { value: new Matrix4() },
           // Advanced Color System uniforms

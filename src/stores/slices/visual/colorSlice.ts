@@ -19,6 +19,50 @@ import {
 import type { StateCreator } from 'zustand'
 import type { AppearanceSlice, ColorSlice, ColorSliceState } from './types'
 
+// ============================================================================
+// Algorithm Parameter Groups
+// ============================================================================
+
+/**
+ * Define which parameter sets each color algorithm uses.
+ * Used to determine what to reset when switching algorithms.
+ */
+type AlgorithmParamSet = 'distribution' | 'cosine' | 'lch' | 'multiSource'
+
+const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
+  // HSL-based (only uses distribution for value mapping)
+  monochromatic: ['distribution'],
+  analogous: ['distribution'],
+  // Cosine palette-based
+  cosine: ['distribution', 'cosine'],
+  normal: ['distribution', 'cosine'],
+  distance: ['distribution', 'cosine'],
+  radial: ['distribution', 'cosine'],
+  phase: ['distribution', 'cosine'],
+  mixed: ['distribution', 'cosine'],
+  multiSource: ['distribution', 'cosine', 'multiSource'],
+  // LCH-based
+  lch: ['distribution', 'lch'],
+  // Simple gradient (blackbody uses distribution)
+  blackbody: ['distribution'],
+  // Black hole specific algorithms
+  accretionGradient: ['distribution'],
+  gravitationalRedshift: ['distribution'],
+}
+
+/**
+ * Check if two algorithms use the same parameter sets.
+ * Returns the parameters that are new in the target algorithm.
+ */
+function getNewParamsForAlgorithm(
+  prevAlgorithm: ColorAlgorithm,
+  newAlgorithm: ColorAlgorithm
+): AlgorithmParamSet[] {
+  const prevParams = ALGORITHM_PARAMS[prevAlgorithm] || ['distribution']
+  const newParams = ALGORITHM_PARAMS[newAlgorithm] || ['distribution']
+  return newParams.filter((p) => !prevParams.includes(p))
+}
+
 export const COLOR_INITIAL_STATE: ColorSliceState = {
   edgeColor: DEFAULT_EDGE_COLOR,
   faceColor: DEFAULT_FACE_COLOR,
@@ -43,7 +87,45 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
     setBackgroundColor: (color: string) => set({ backgroundColor: color }),
     setPerDimensionColorEnabled: (enabled: boolean) => set({ perDimensionColorEnabled: enabled }),
 
-    setColorAlgorithm: (algorithm: ColorAlgorithm) => set({ colorAlgorithm: algorithm }),
+    setColorAlgorithm: (algorithm: ColorAlgorithm) =>
+      set((state) => {
+        // Determine which parameters are new for this algorithm
+        const newParams = getNewParamsForAlgorithm(state.colorAlgorithm, algorithm)
+
+        // Build reset object for parameters that are new to this algorithm
+        // This ensures clean defaults when switching to algorithms with different parameter sets
+        const resets: Partial<ColorSliceState> = {}
+
+        if (newParams.includes('cosine')) {
+          // Switching to cosine-based algorithm - reset cosine coefficients
+          resets.cosineCoefficients = { ...DEFAULT_COSINE_COEFFICIENTS }
+        }
+
+        if (newParams.includes('lch')) {
+          // Switching to LCH algorithm - reset LCH parameters
+          resets.lchLightness = DEFAULT_LCH_LIGHTNESS
+          resets.lchChroma = DEFAULT_LCH_CHROMA
+        }
+
+        if (newParams.includes('multiSource')) {
+          // Switching to multiSource algorithm - reset blend weights
+          resets.multiSourceWeights = { ...DEFAULT_MULTI_SOURCE_WEIGHTS }
+        }
+
+        // Also reset distribution when switching FROM cosine/lch/multiSource TO simple HSL-based
+        // This prevents confusion when old distribution settings affect HSL algorithms
+        const prevParams = ALGORITHM_PARAMS[state.colorAlgorithm] || ['distribution']
+        const targetParams = ALGORITHM_PARAMS[algorithm] || ['distribution']
+        const wasComplex = prevParams.some((p) => p === 'cosine' || p === 'lch' || p === 'multiSource')
+        const isSimple = !targetParams.some((p) => p === 'cosine' || p === 'lch' || p === 'multiSource')
+
+        if (wasComplex && isSimple) {
+          // Switching from complex (cosine/lch/multiSource) to simple HSL-based - reset distribution
+          resets.distribution = { ...DEFAULT_DISTRIBUTION }
+        }
+
+        return { colorAlgorithm: algorithm, ...resets }
+      }),
 
     setCosineCoefficients: (coefficients: CosineCoefficients) =>
       set({ cosineCoefficients: { ...coefficients } }),

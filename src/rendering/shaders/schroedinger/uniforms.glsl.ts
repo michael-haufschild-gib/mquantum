@@ -38,6 +38,14 @@ uniform int uMagneticM;                      // Magnetic quantum number m (-l to
 uniform float uBohrRadius;                   // Bohr radius scale factor (0.5-3.0)
 uniform bool uUseRealOrbitals;               // Use real orbitals (px/py/pz) vs complex
 
+// PERF: Precomputed hydrogen density boost factors (avoid pow() per sample)
+// uHydrogenBoost = 50.0 * n * n * pow(3.0, l) for hydrogen 3D
+// uHydrogenNDBoost = uHydrogenBoost * (1.0 + (dim - 3) * 0.3) for hydrogen ND
+uniform float uHydrogenBoost;                // Precomputed: 50 * n² * 3^l
+uniform float uHydrogenNDBoost;              // Precomputed: uHydrogenBoost * dimFactor
+// PERF: Precomputed early exit threshold (avoid repeated computation)
+uniform float uHydrogenRadialThreshold;      // Precomputed: 25 * n * a0 * (1 + 0.1*l)
+
 // Hydrogen ND configuration (extra dimensions 4-11)
 #define MAX_EXTRA_DIM 8
 uniform int uExtraDimN[MAX_EXTRA_DIM];       // Quantum numbers for dims 4-11 (0-6 each)

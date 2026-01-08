@@ -221,7 +221,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
         trigger={
           <div className={`flex items-center gap-2 group p-1 rounded-md hover:bg-[var(--bg-hover)] transition-colors ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Trigger Swatch */}
-            <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-all">
+            <div className="relative w-8 h-5 rounded overflow-hidden shadow-sm ring-1 ring-border-default group-hover:ring-border-strong transition-[box-shadow]">
               <div className="absolute inset-0 z-0" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />
               <div className="absolute inset-0 z-10" style={{ backgroundColor: value }} />
             </div>
@@ -322,7 +322,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
                   {(['HEX', 'RGB'] as const).map(m => (
                     <button
                       key={m} onClick={() => setMode(m)}
-                      className={`px-2 py-0.5 text-[9px] font-bold rounded-sm transition-all ${mode === m ? 'bg-[var(--bg-active)] text-text-primary shadow-sm' : 'text-text-tertiary hover:text-text-secondary'}`}
+                      className={`px-2 py-0.5 text-[9px] font-bold rounded-sm transition-colors ${mode === m ? 'bg-[var(--bg-active)] text-text-primary shadow-sm' : 'text-text-tertiary hover:text-text-secondary'}`}
                     >
                       {m}
                     </button>
@@ -392,7 +392,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
                   <button
                     key={i}
                     onClick={() => handleHsvChange(parseColorToHsv(c))}
-                    className="w-6 h-6 rounded-md border border-border-subtle hover:scale-110 hover:border-border-strong transition-all shadow-sm"
+                    className="w-6 h-6 rounded-md border border-border-subtle hover:scale-110 hover:border-border-strong transition-transform shadow-sm"
                     style={{ backgroundColor: c }}
                     title={c}
                   />
@@ -406,7 +406,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
                     <button
                       key={i}
                       onClick={() => handleHsvChange(parseColorToHsv(c))}
-                      className="w-5 h-5 rounded-full border border-border-default hover:scale-110 hover:border-border-strong transition-all shadow-sm relative overflow-hidden"
+                      className="w-5 h-5 rounded-full border border-border-default hover:scale-110 hover:border-border-strong transition-transform shadow-sm relative overflow-hidden"
                       title="History"
                     >
                         <div className="absolute inset-0 -z-10" style={{ backgroundImage: `url(${checkerboard})`, opacity: 0.4 }} />

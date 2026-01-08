@@ -67,7 +67,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
                       onMouseEnter={() => !isDisabled && soundManager.playHover()}
                       disabled={isDisabled}
                       className={`
-                        relative group flex flex-col p-3 rounded-lg border text-left transition-all duration-200
+                        relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
                         ${isSelected
                           ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
                           : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'

@@ -86,19 +86,19 @@ export const DEFAULT_LIGHT_VALUES: Record<LightType, Partial<LightSource>> = {
     coneAngle: 30,
     penumbra: 0.5,
     range: 100,
-    decay: 0.9,
+    decay: 2.0, // Physically correct inverse-square falloff
   },
   directional: {
     coneAngle: 30,
     penumbra: 0.5,
     range: 100,
-    decay: 0.9,
+    decay: 2.0, // Physically correct (though directional lights don't attenuate by distance)
   },
   spot: {
     coneAngle: 30,
     penumbra: 0.2,
     range: 100,
-    decay: 0.9,
+    decay: 2.0, // Physically correct inverse-square falloff
   },
 } as const
 
@@ -137,7 +137,7 @@ export function createDefaultLight(): LightSource {
     coneAngle: 30,
     penumbra: 0.5,
     range: 100,
-    decay: 0.9,
+    decay: 2.0, // Physically correct inverse-square falloff
   }
 }
 
@@ -162,7 +162,7 @@ export function createDefaultSpotLight(): LightSource {
     coneAngle: 30,
     penumbra: 0.2,
     range: 100,
-    decay: 0.9,
+    decay: 2.0, // Physically correct inverse-square falloff
   }
 }
 

@@ -167,13 +167,10 @@ const MandelbulbMesh = () => {
       // - Temporal: Matrices, Enabled state (matrices updated via source)
       // - Quality: FastMode, QualityMultiplier
       // - Color: Algorithm, Cosine coeffs, Distribution, LCH
-      ...UniformManager.getCombinedUniforms(['lighting', 'temporal', 'quality', 'color']),
+      // - PBR: Roughness, Metallic, Specular (via 'pbr-face')
+      ...UniformManager.getCombinedUniforms(['lighting', 'temporal', 'quality', 'color', 'pbr-face']),
 
-      // Material property for G-buffer (reflectivity for SSR)
-      uMetallic: { value: 0.0 },
-
-      // Advanced Rendering
-      uRoughness: { value: 0.3 },
+      // Advanced Rendering (SSS - not part of PBR source)
       uSssEnabled: { value: false },
       uSssIntensity: { value: 1.0 },
       uSssColor: { value: new THREE.Color('#ff8844') },
@@ -273,6 +270,8 @@ const MandelbulbMesh = () => {
     return () => { delete win.setProfileMode; };
   }, []);
 
+  // Run at RENDERER_UNIFORMS priority (1) to ensure UniformManager.update() (0.5) runs first
+  // This fixes PBR and lighting uniforms being one frame behind
   useFrame((state) => {
     if (hasErroredRef.current) return;
 
