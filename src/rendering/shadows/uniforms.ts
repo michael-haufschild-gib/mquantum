@@ -429,21 +429,56 @@ export function blurToPCFSamples(blur: number): number {
 interface ShadowDataCache {
   /** Cached shadow data array */
   data: ShadowLightData[]
-  /** Hash of light configuration for invalidation */
-  lightsHash: string
+  /** Numeric hash of light configuration for invalidation */
+  lightsHash: number
 }
 
 /** Global shadow data cache */
 let shadowDataCache: ShadowDataCache | null = null
 
 /**
- * Generate a hash string from light configuration for cache invalidation.
- * Includes position, type, and enabled state.
- * @param lights
- * @returns Hash string uniquely identifying the light configuration
+ * Light type to numeric value for hashing.
+ * Must match LIGHT_TYPE_TO_INT but we duplicate here to avoid import dependency.
  */
-function computeLightsHash(lights: LightSource[]): string {
-  return lights.map((l) => `${l.id}:${l.type}:${l.enabled}:${l.position.join(',')}`).join('|')
+const LIGHT_TYPE_HASH: Record<string, number> = {
+  point: 0,
+  directional: 1,
+  spot: 2,
+}
+
+/**
+ * Compute a numeric hash from light configuration for cache invalidation.
+ * Uses a fast numeric hash instead of string concatenation to avoid
+ * per-frame allocations.
+ *
+ * OPT-HASH-1: Replaced string-based hash with numeric hash.
+ *
+ * @param lights - Array of light sources
+ * @returns Numeric hash uniquely identifying the light configuration
+ */
+function computeLightsHash(lights: LightSource[]): number {
+  // Use a simple polynomial hash
+  // FNV-1a inspired approach but simplified for performance
+  let hash = 2166136261 // FNV offset basis (32-bit)
+  const prime = 16777619 // FNV prime
+
+  for (let i = 0; i < lights.length; i++) {
+    const light = lights[i]!
+    // Hash light index
+    hash = (hash ^ i) * prime
+    // Hash type (0, 1, or 2)
+    hash = (hash ^ (LIGHT_TYPE_HASH[light.type] ?? 0)) * prime
+    // Hash enabled state
+    hash = (hash ^ (light.enabled ? 1 : 0)) * prime
+    // Hash position (quantized to 3 decimal places for stability)
+    const pos = light.position
+    hash = (hash ^ Math.round(pos[0] * 1000)) * prime
+    hash = (hash ^ Math.round(pos[1] * 1000)) * prime
+    hash = (hash ^ Math.round(pos[2] * 1000)) * prime
+  }
+
+  // Keep hash as 32-bit integer
+  return hash >>> 0
 }
 
 /**

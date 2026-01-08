@@ -173,7 +173,8 @@ export class SSRPass extends BasePass {
     uniforms.fadeEnd.value = config.fadeEnd ?? 0.8;
     uniforms.maxSteps.value = config.maxSteps ?? 64;
 
-    // Create fullscreen quad
+    // Create fullscreen quad - shared geometry for all meshes
+    // OPTIMIZATION: Share geometry instead of creating duplicates
     const geometry = new THREE.PlaneGeometry(2, 2);
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.frustumCulled = false;
@@ -206,7 +207,8 @@ export class SSRPass extends BasePass {
       depthTest: false,
       depthWrite: false,
     });
-    this.copyMesh = new THREE.Mesh(geometry.clone(), this.copyMaterial);
+    // OPTIMIZATION: Reuse same geometry instead of cloning
+    this.copyMesh = new THREE.Mesh(geometry, this.copyMaterial);
     this.copyMesh.frustumCulled = false;
     this.copyScene = new THREE.Scene();
     this.copyScene.add(this.copyMesh);
@@ -517,9 +519,9 @@ export class SSRPass extends BasePass {
 
   dispose(): void {
     this.material.dispose();
+    // Geometry is shared between mesh and copyMesh, dispose only once
     this.mesh.geometry.dispose();
     this.copyMaterial.dispose();
-    this.copyMesh.geometry.dispose();
     // Remove meshes from scenes to ensure proper cleanup
     this.scene.remove(this.mesh);
     this.copyScene.remove(this.copyMesh);

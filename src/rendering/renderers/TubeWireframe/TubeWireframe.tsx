@@ -590,7 +590,7 @@ export function TubeWireframe({
     const gpuData = ndTransform.source.getGPUData()
 
     // Get projection distance (no longer needs scale adjustment since scale is post-projection)
-    const projectionDistance = projDistCache.getProjectionDistance(vertices, dimension, [])
+    const projectionDistance = projDistCache.getProjectionDistance(vertices, dimension)
 
     // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
     const u = material.uniforms

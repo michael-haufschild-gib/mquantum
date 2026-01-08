@@ -154,6 +154,9 @@ export class GTAOPass extends BasePass {
   private lastHalfWidth = 0;
   private lastHalfHeight = 0;
 
+  // Cached WebGL2 context for hardware blit
+  private gl: WebGL2RenderingContext | null = null;
+
   constructor(config: GTAOPassConfig) {
     super({
       id: config.id,
@@ -417,6 +420,66 @@ export class GTAOPass extends BasePass {
     if (pdUniforms['tDepth']) pdUniforms['tDepth'].value = depthTex;
   }
 
+  /**
+   * Hardware-accelerated framebuffer copy using glBlitFramebuffer.
+   * Falls back to shader-based copy if blit fails.
+   *
+   * OPTIMIZATION: glBlitFramebuffer is faster than shader-based copy
+   * because it uses dedicated hardware paths and avoids shader overhead.
+   *
+   * @returns true if blit succeeded, false if fallback is needed
+   */
+  private blitFramebuffer(
+    renderer: THREE.WebGLRenderer,
+    source: THREE.WebGLRenderTarget,
+    dest: THREE.WebGLRenderTarget | null
+  ): boolean {
+    // Cache WebGL2 context on first use
+    if (!this.gl) {
+      this.gl = renderer.getContext() as WebGL2RenderingContext;
+    }
+    const gl = this.gl;
+
+    // Get framebuffer properties from Three.js
+    const props = renderer.properties;
+    const srcProps = props.get(source) as { __webglFramebuffer?: WebGLFramebuffer } | undefined;
+    const srcFbo = srcProps?.__webglFramebuffer;
+
+    if (!srcFbo) {
+      return false; // Source not initialized, fall back to shader copy
+    }
+
+    // Determine destination framebuffer (null = default/screen)
+    let dstFbo: WebGLFramebuffer | null = null;
+    let dstWidth = gl.drawingBufferWidth;
+    let dstHeight = gl.drawingBufferHeight;
+
+    if (dest) {
+      const dstProps = props.get(dest) as { __webglFramebuffer?: WebGLFramebuffer } | undefined;
+      dstFbo = dstProps?.__webglFramebuffer ?? null;
+      if (!dstFbo) {
+        return false; // Dest not initialized, fall back to shader copy
+      }
+      dstWidth = dest.width;
+      dstHeight = dest.height;
+    }
+
+    // Perform the blit
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, srcFbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, dstFbo);
+    gl.blitFramebuffer(
+      0, 0, source.width, source.height,
+      0, 0, dstWidth, dstHeight,
+      gl.COLOR_BUFFER_BIT,
+      gl.LINEAR
+    );
+
+    // Restore Three.js state
+    renderer.setRenderTarget(dest);
+
+    return true;
+  }
+
   execute(ctx: RenderContext): void {
     const { size } = ctx;
 
@@ -479,10 +542,14 @@ export class GTAOPass extends BasePass {
       false // maskActive
     );
 
-    // Copy result to output
-    this.copyMaterial.uniforms['tDiffuse']!.value = this.writeTarget.texture;
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.copyScene, this.copyCamera);
+    // Copy result to output using hardware blit when possible
+    // OPTIMIZATION: Use glBlitFramebuffer for hardware-accelerated copy
+    if (!outputTarget || !this.blitFramebuffer(renderer, this.writeTarget, outputTarget)) {
+      // Fallback to shader-based copy if blit fails
+      this.copyMaterial.uniforms['tDiffuse']!.value = this.writeTarget.texture;
+      renderer.setRenderTarget(outputTarget);
+      renderer.render(this.copyScene, this.copyCamera);
+    }
 
     renderer.setRenderTarget(null);
   }

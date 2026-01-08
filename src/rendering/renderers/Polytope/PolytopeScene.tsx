@@ -845,125 +845,130 @@ export const PolytopeScene = React.memo(function PolytopeScene({
     const gpuData = ndTransform.source.getGPUData();
 
     // Get projection distance (no longer needs scale adjustment since scale is post-projection)
-    const projectionDistance = projDistCache.getProjectionDistance(baseVertices, dimension, []);
+    const projectionDistance = projDistCache.getProjectionDistance(baseVertices, dimension);
 
 
 
     // Cached linear colors - avoid per-frame sRGB->linear conversion
     const cache = colorCacheRef.current;
 
-    // Update all materials through mesh refs
-    const meshUpdates = [
-      { ref: faceMeshRef, color: appearanceState.faceColor, cache: cache.faceColor },
-      { ref: edgeMeshRef, color: appearanceState.edgeColor, cache: cache.edgeColor },
-    ];
+    // Helper to update a single mesh material (avoids per-frame array allocation)
+    // OPT-MESH-1: Inline mesh updates instead of creating intermediate array
+    // Uses Object3D to support both Mesh (faces) and LineSegments (edges)
+    const updateMeshMaterial = (
+      meshRef: React.RefObject<THREE.Object3D | null>,
+      color: string,
+      colorCache: typeof cache.faceColor,
+      pbrSource: string
+    ): void => {
+      if (!meshRef.current) return;
+      const material = (meshRef.current as THREE.Mesh).material as ShaderMaterial;
 
-    for (const { ref, color, cache: colorCache } of meshUpdates) {
-      if (ref.current) {
-        const material = ref.current.material as ShaderMaterial;
+      // Skip if material is not ready (still compiling) or not a ShaderMaterial
+      if (!material || !('uniforms' in material)) return;
 
-        // Skip if material is not ready (still compiling) or not a ShaderMaterial
-        if (!material || !('uniforms' in material)) continue;
+      // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
+      updateNDUniforms(material, gpuData, dimension, visualScale, projectionDistance);
 
-        // Update N-D transformation uniforms (visualScale is applied AFTER projection like camera zoom)
-        updateNDUniforms(material, gpuData, dimension, visualScale, projectionDistance);
+      const u = material.uniforms;
 
-        const u = material.uniforms;
+      // Update view matrix for normal transformation (needed for SSR)
+      if (u.uViewMatrix) (u.uViewMatrix.value as Matrix4).copy(camera.matrixWorldInverse);
 
-        // Update view matrix for normal transformation (needed for SSR)
-        if (u.uViewMatrix) (u.uViewMatrix.value as Matrix4).copy(camera.matrixWorldInverse);
+      // ============================================
+      // DIRTY-FLAG: Only update appearance uniforms when settings change
+      // ============================================
+      if (appearanceChanged) {
+        // Update surface color
+        if (u.uColor) updateLinearColorUniform(colorCache, u.uColor.value as Color, color);
 
-        // ============================================
-        // DIRTY-FLAG: Only update appearance uniforms when settings change
-        // ============================================
-        if (appearanceChanged) {
-          // Update surface color
-          if (u.uColor) updateLinearColorUniform(colorCache, u.uColor.value as Color, color);
-
-          // Update opacity uniform (only for face material which has it)
-          // Also update material transparency state dynamically to avoid shader rebuild
-          if (u.uOpacity) {
-            u.uOpacity.value = faceOpacity;
-            // Update material transparency based on opacity (like Mandelbulb)
-            const isTransparent = faceOpacity < 1;
-            if (material.transparent !== isTransparent) {
-              material.transparent = isTransparent;
-              material.depthWrite = !isTransparent;
-              material.needsUpdate = true;
-            }
-          }
-
-          // Note: PBR material properties (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
-          // are applied via UniformManager using 'pbr-face' source
-          if (u.uFresnelEnabled) u.uFresnelEnabled.value = fresnelEnabled;
-          if (u.uFresnelIntensity) u.uFresnelIntensity.value = fresnelIntensity;
-          if (u.uRimColor) updateLinearColorUniform(cache.rimColor, u.uRimColor.value as Color, rimColor);
-
-          // Update rim SSS uniforms (shared with raymarched objects)
-          if (u.uSssEnabled) u.uSssEnabled.value = sssEnabled;
-          if (u.uSssIntensity) u.uSssIntensity.value = sssIntensity;
-          if (u.uSssColor) updateLinearColorUniform(cache.sssColor, u.uSssColor.value as Color, sssColor);
-          if (u.uSssThickness) u.uSssThickness.value = sssThickness;
-          if (u.uSssJitter) u.uSssJitter.value = sssJitter;
-
-          // Update advanced color system uniforms (only for face materials)
-          if (u.uColorAlgorithm) u.uColorAlgorithm.value = COLOR_ALGORITHM_TO_INT[colorAlgorithm];
-          if (u.uCosineA) (u.uCosineA.value as Vector3).set(cosineCoefficients.a[0], cosineCoefficients.a[1], cosineCoefficients.a[2]);
-          if (u.uCosineB) (u.uCosineB.value as Vector3).set(cosineCoefficients.b[0], cosineCoefficients.b[1], cosineCoefficients.b[2]);
-          if (u.uCosineC) (u.uCosineC.value as Vector3).set(cosineCoefficients.c[0], cosineCoefficients.c[1], cosineCoefficients.c[2]);
-          if (u.uCosineD) (u.uCosineD.value as Vector3).set(cosineCoefficients.d[0], cosineCoefficients.d[1], cosineCoefficients.d[2]);
-          if (u.uDistPower) u.uDistPower.value = distribution.power;
-          if (u.uDistCycles) u.uDistCycles.value = distribution.cycles;
-          if (u.uDistOffset) u.uDistOffset.value = distribution.offset;
-          if (u.uLchLightness) u.uLchLightness.value = lchLightness;
-          if (u.uLchChroma) u.uLchChroma.value = lchChroma;
-          if (u.uMultiSourceWeights) (u.uMultiSourceWeights.value as Vector3).set(multiSourceWeights.depth, multiSourceWeights.orbitTrap, multiSourceWeights.normal);
-        }
-
-        // ============================================
-        // DIRTY-FLAG: Only update IBL uniforms when settings change
-        // ============================================
-        if (iblChanged) {
-          // IBL (Image-Based Lighting) uniforms
-          // Compute isPMREM first to gate quality (prevents null texture sampling)
-          const env = scene.environment;
-          const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
-          const iblState = environmentStateRef.current;
-          if (u.uIBLQuality) {
-            const qualityMap = { off: 0, low: 1, high: 2 } as const;
-            // Force IBL off when no valid PMREM texture
-            u.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0;
-          }
-          if (u.uIBLIntensity) u.uIBLIntensity.value = iblState.iblIntensity;
-          if (u.uEnvMap) {
-            u.uEnvMap.value = isPMREM ? env : null;
+        // Update opacity uniform (only for face material which has it)
+        // Also update material transparency state dynamically to avoid shader rebuild
+        if (u.uOpacity) {
+          u.uOpacity.value = faceOpacity;
+          // Update material transparency based on opacity (like Mandelbulb)
+          const isTransparent = faceOpacity < 1;
+          if (material.transparent !== isTransparent) {
+            material.transparent = isTransparent;
+            material.depthWrite = !isTransparent;
+            material.needsUpdate = true;
           }
         }
 
-        // Lighting and PBR (via UniformManager) - uses internal version tracking
-        UniformManager.applyToMaterial(material, ['lighting', 'pbr-face']);
+        // Note: PBR material properties (uRoughness, uMetallic, uSpecularIntensity, uSpecularColor)
+        // are applied via UniformManager using the appropriate PBR source
+        if (u.uFresnelEnabled) u.uFresnelEnabled.value = fresnelEnabled;
+        if (u.uFresnelIntensity) u.uFresnelIntensity.value = fresnelIntensity;
+        if (u.uRimColor) updateLinearColorUniform(cache.rimColor, u.uRimColor.value as Color, rimColor);
 
-        // ============================================
-        // Shadow uniforms - matrices must update every frame, but use cached scene traversal
-        // Note: Shadow matrices are references to Three.js objects that update every frame,
-        // so we must call updateShadowMapUniforms to copy fresh matrix values to GPU uniforms.
-        // The expensive scene traversal is cached by collectShadowDataCached.
-        // ============================================
-        if (shadowEnabled) {
-          const shadowData = collectShadowDataCached(scene, lightingState.lights);
-          const shadowQuality = lightingState.shadowQuality;
-          const shadowMapSize = SHADOW_MAP_SIZES[shadowQuality];
-          const pcfSamples = blurToPCFSamples(lightingState.shadowMapBlur);
-          updateShadowMapUniforms(
-            u as Record<string, { value: unknown }>,
-            shadowData,
-            lightingState.shadowMapBias,
-            shadowMapSize,
-            pcfSamples
-          );
+        // Update rim SSS uniforms (shared with raymarched objects)
+        if (u.uSssEnabled) u.uSssEnabled.value = sssEnabled;
+        if (u.uSssIntensity) u.uSssIntensity.value = sssIntensity;
+        if (u.uSssColor) updateLinearColorUniform(cache.sssColor, u.uSssColor.value as Color, sssColor);
+        if (u.uSssThickness) u.uSssThickness.value = sssThickness;
+        if (u.uSssJitter) u.uSssJitter.value = sssJitter;
+
+        // Update advanced color system uniforms (only for face materials)
+        if (u.uColorAlgorithm) u.uColorAlgorithm.value = COLOR_ALGORITHM_TO_INT[colorAlgorithm];
+        if (u.uCosineA) (u.uCosineA.value as Vector3).set(cosineCoefficients.a[0], cosineCoefficients.a[1], cosineCoefficients.a[2]);
+        if (u.uCosineB) (u.uCosineB.value as Vector3).set(cosineCoefficients.b[0], cosineCoefficients.b[1], cosineCoefficients.b[2]);
+        if (u.uCosineC) (u.uCosineC.value as Vector3).set(cosineCoefficients.c[0], cosineCoefficients.c[1], cosineCoefficients.c[2]);
+        if (u.uCosineD) (u.uCosineD.value as Vector3).set(cosineCoefficients.d[0], cosineCoefficients.d[1], cosineCoefficients.d[2]);
+        if (u.uDistPower) u.uDistPower.value = distribution.power;
+        if (u.uDistCycles) u.uDistCycles.value = distribution.cycles;
+        if (u.uDistOffset) u.uDistOffset.value = distribution.offset;
+        if (u.uLchLightness) u.uLchLightness.value = lchLightness;
+        if (u.uLchChroma) u.uLchChroma.value = lchChroma;
+        if (u.uMultiSourceWeights) (u.uMultiSourceWeights.value as Vector3).set(multiSourceWeights.depth, multiSourceWeights.orbitTrap, multiSourceWeights.normal);
+      }
+
+      // ============================================
+      // DIRTY-FLAG: Only update IBL uniforms when settings change
+      // ============================================
+      if (iblChanged) {
+        // IBL (Image-Based Lighting) uniforms
+        // Compute isPMREM first to gate quality (prevents null texture sampling)
+        const env = scene.environment;
+        const isPMREM = env && env.mapping === THREE.CubeUVReflectionMapping;
+        const iblState = environmentStateRef.current;
+        if (u.uIBLQuality) {
+          const qualityMap = { off: 0, low: 1, high: 2 } as const;
+          // Force IBL off when no valid PMREM texture
+          u.uIBLQuality.value = isPMREM ? qualityMap[iblState.iblQuality] : 0;
+        }
+        if (u.uIBLIntensity) u.uIBLIntensity.value = iblState.iblIntensity;
+        if (u.uEnvMap) {
+          u.uEnvMap.value = isPMREM ? env : null;
         }
       }
-    }
+
+      // Lighting and PBR (via UniformManager) - uses internal version tracking
+      UniformManager.applyToMaterial(material, ['lighting', pbrSource]);
+
+      // ============================================
+      // Shadow uniforms - matrices must update every frame, but use cached scene traversal
+      // Note: Shadow matrices are references to Three.js objects that update every frame,
+      // so we must call updateShadowMapUniforms to copy fresh matrix values to GPU uniforms.
+      // The expensive scene traversal is cached by collectShadowDataCached.
+      // ============================================
+      if (shadowEnabled) {
+        const shadowData = collectShadowDataCached(scene, lightingState.lights);
+        const shadowQuality = lightingState.shadowQuality;
+        const shadowMapSize = SHADOW_MAP_SIZES[shadowQuality];
+        const pcfSamples = blurToPCFSamples(lightingState.shadowMapBlur);
+        updateShadowMapUniforms(
+          u as Record<string, { value: unknown }>,
+          shadowData,
+          lightingState.shadowMapBias,
+          shadowMapSize,
+          pcfSamples
+        );
+      }
+    };
+
+    // Update face and edge materials directly (no intermediate array allocation)
+    updateMeshMaterial(faceMeshRef, appearanceState.faceColor, cache.faceColor, 'pbr-face');
+    updateMeshMaterial(edgeMeshRef, appearanceState.edgeColor, cache.edgeColor, 'pbr-edge');
 
     // Update version refs at end of frame
     if (appearanceChanged) {

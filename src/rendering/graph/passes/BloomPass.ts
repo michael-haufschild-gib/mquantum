@@ -160,6 +160,13 @@ export class BloomPass extends BasePass {
   private copyScene: THREE.Scene;
   private copyCamera: THREE.OrthographicCamera;
 
+  // Cached bloom factors to avoid per-frame array allocation
+  private cachedBloomFactors: number[] = [1.0, 0.8, 0.6, 0.4, 0.2];
+  private cachedLevels = 5;
+
+  // Cached WebGL2 context for hardware blit
+  private gl: WebGL2RenderingContext | null = null;
+
   constructor(config: BloomPassConfig) {
     super({
       id: config.id,
@@ -275,6 +282,66 @@ export class BloomPass extends BasePass {
     }
   }
 
+  /**
+   * Hardware-accelerated framebuffer copy using glBlitFramebuffer.
+   * Falls back to shader-based copy if blit fails.
+   *
+   * OPTIMIZATION: glBlitFramebuffer is faster than shader-based copy
+   * because it uses dedicated hardware paths and avoids shader overhead.
+   *
+   * @returns true if blit succeeded, false if fallback is needed
+   */
+  private blitFramebuffer(
+    renderer: THREE.WebGLRenderer,
+    source: THREE.WebGLRenderTarget,
+    dest: THREE.WebGLRenderTarget | null
+  ): boolean {
+    // Cache WebGL2 context on first use
+    if (!this.gl) {
+      this.gl = renderer.getContext() as WebGL2RenderingContext;
+    }
+    const gl = this.gl;
+
+    // Get framebuffer properties from Three.js
+    const props = renderer.properties;
+    const srcProps = props.get(source) as { __webglFramebuffer?: WebGLFramebuffer } | undefined;
+    const srcFbo = srcProps?.__webglFramebuffer;
+
+    if (!srcFbo) {
+      return false; // Source not initialized, fall back to shader copy
+    }
+
+    // Determine destination framebuffer (null = default/screen)
+    let dstFbo: WebGLFramebuffer | null = null;
+    let dstWidth = gl.drawingBufferWidth;
+    let dstHeight = gl.drawingBufferHeight;
+
+    if (dest) {
+      const dstProps = props.get(dest) as { __webglFramebuffer?: WebGLFramebuffer } | undefined;
+      dstFbo = dstProps?.__webglFramebuffer ?? null;
+      if (!dstFbo) {
+        return false; // Dest not initialized, fall back to shader copy
+      }
+      dstWidth = dest.width;
+      dstHeight = dest.height;
+    }
+
+    // Perform the blit
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, srcFbo);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, dstFbo);
+    gl.blitFramebuffer(
+      0, 0, source.width, source.height,
+      0, 0, dstWidth, dstHeight,
+      gl.COLOR_BUFFER_BIT,
+      gl.LINEAR
+    );
+
+    // Restore Three.js state
+    renderer.setRenderTarget(dest);
+
+    return true;
+  }
+
   execute(ctx: RenderContext): void {
     const { renderer, size } = ctx;
 
@@ -316,18 +383,21 @@ export class BloomPass extends BasePass {
 
     // Adjust bloomFactors based on levels (1-5)
     // Lower levels = tighter bloom (reduce contribution of larger mips)
-    const levelScale = this.levels / 5; // 1.0 when levels=5, 0.2 when levels=1
-    const baseFactors = [1.0, 0.8, 0.6, 0.4, 0.2];
-    const adjustedFactors = baseFactors.map((f, i) => {
-      // Scale down higher mips when levels is low
-      const mipScale = i < this.levels ? 1.0 : 0.0;
-      return f * mipScale * (i === 0 ? 1.0 : levelScale);
-    });
+    // OPTIMIZATION: Only recompute when levels changes (avoids per-frame array allocation)
+    if (this.levels !== this.cachedLevels) {
+      const levelScale = this.levels / 5; // 1.0 when levels=5, 0.2 when levels=1
+      const baseFactors = [1.0, 0.8, 0.6, 0.4, 0.2];
+      for (let i = 0; i < 5; i++) {
+        const mipScale = i < this.levels ? 1.0 : 0.0;
+        this.cachedBloomFactors[i] = baseFactors[i]! * mipScale * (i === 0 ? 1.0 : levelScale);
+      }
+      this.cachedLevels = this.levels;
+    }
     // Cast to access internal uniforms
     const compositeUniforms = this.bloomPass.compositeMaterial.uniforms as {
       bloomFactors: { value: number[] };
     };
-    compositeUniforms.bloomFactors.value = adjustedFactors;
+    compositeUniforms.bloomFactors.value = this.cachedBloomFactors;
 
     // The UnrealBloomPass needs to work with its own read/write buffers
     // We need to:
@@ -356,12 +426,15 @@ export class BloomPass extends BasePass {
       false // maskActive
     );
 
-    // Copy bloom result to output
+    // Copy bloom result to output using hardware blit when possible
     // BUG FIX: UnrealBloomPass writes to readBuffer (not writeBuffer) due to needsSwap=false
-    // We should read from bloomReadTarget, not bloomWriteTarget
-    this.copyMaterial.uniforms['tDiffuse']!.value = this.bloomReadTarget.texture;
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.copyScene, this.copyCamera);
+    // OPTIMIZATION: Use glBlitFramebuffer for hardware-accelerated copy
+    if (!outputTarget || !this.blitFramebuffer(renderer, this.bloomReadTarget, outputTarget)) {
+      // Fallback to shader-based copy if blit fails
+      this.copyMaterial.uniforms['tDiffuse']!.value = this.bloomReadTarget.texture;
+      renderer.setRenderTarget(outputTarget);
+      renderer.render(this.copyScene, this.copyCamera);
+    }
 
     renderer.setRenderTarget(null);
   }

@@ -113,22 +113,25 @@ class RenderGraphContext implements RenderContext {
    * reading from C should actually read from A.
    *
    * This method follows the chain to find the final (non-aliased) resource.
-   * Includes cycle detection to prevent infinite loops.
+   * Uses depth counter for cycle detection (avoids Set allocation per call).
    *
    * @param resourceId - Resource ID to resolve
    * @returns Resolved resource ID (may be same as input if no alias)
    */
   private resolveAlias(resourceId: string): string {
     let current = resourceId
-    const visited = new Set<string>()
+    // OPTIMIZATION: Use depth counter instead of Set to avoid per-call allocation
+    // Alias chains are typically 1-2 hops; 16 is more than enough
+    let depth = 0
+    const maxDepth = 16
 
     while (this.resourceAliases.has(current)) {
-      if (visited.has(current)) {
-        // Cycle detected - break out and return current
-        console.warn(`RenderGraph: Alias cycle detected at '${current}'`)
+      if (depth >= maxDepth) {
+        // Cycle or excessively long chain detected
+        console.warn(`RenderGraph: Alias chain too long at '${current}' (possible cycle)`)
         return current
       }
-      visited.add(current)
+      depth++
       current = this.resourceAliases.get(current)!
     }
 

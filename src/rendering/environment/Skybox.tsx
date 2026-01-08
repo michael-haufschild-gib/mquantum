@@ -397,8 +397,9 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
             ? skyboxAnimationSpeed
             : 1.0;
 
-        const TIME_SCALE = 0.01;
-        timeRef.current += delta * speed * TIME_SCALE;
+        // NOTE: delta is in SECONDS (from R3F useFrame after FpsController fix).
+        // Previously TIME_SCALE=0.01 compensated for buggy ms delta; now removed.
+        timeRef.current += delta * speed;
     }
     const t = timeRef.current; // Use accumulated time
 

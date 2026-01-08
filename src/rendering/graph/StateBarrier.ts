@@ -72,7 +72,9 @@ export class StateBarrier {
   private cameraState: CameraState | null = null
 
   // Reusable objects to avoid per-frame allocation
+  // OPTIMIZATION: Reuse Color objects instead of cloning
   private tempColor = new THREE.Color()
+  private cachedClearColor = new THREE.Color()
 
   // ==========================================================================
   // Capture
@@ -91,9 +93,11 @@ export class StateBarrier {
     camera: THREE.Camera
   ): void {
     // Capture renderer state
+    // OPTIMIZATION: Copy to cached color instead of cloning
+    this.cachedClearColor.copy(renderer.getClearColor(this.tempColor))
     this.rendererState = {
       renderTarget: renderer.getRenderTarget(),
-      clearColor: renderer.getClearColor(this.tempColor).clone(),
+      clearColor: this.cachedClearColor,
       clearAlpha: renderer.getClearAlpha(),
       autoClear: renderer.autoClear,
       autoClearColor: renderer.autoClearColor,

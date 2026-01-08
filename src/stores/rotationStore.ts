@@ -103,6 +103,28 @@ export const useRotationStore = create<RotationState>((set) => ({
       // Filter updates to only include valid planes for current dimension
       // Use cached Set to avoid recreation on every call
       const validPlanes = getValidPlanesSet(state.dimension)
+
+      // OPT-MAP-1: First pass - check if any values actually changed
+      // Avoids creating a new Map when all updates are no-ops (same values)
+      let hasChanges = false
+      for (const [plane, angle] of updates.entries()) {
+        if (validPlanes.has(plane)) {
+          const normalizedAngle = normalizeAngle(angle)
+          const currentAngle = state.rotations.get(plane)
+          // Check if value is different (with tolerance for floating point)
+          if (currentAngle === undefined || Math.abs(currentAngle - normalizedAngle) > 1e-10) {
+            hasChanges = true
+            break
+          }
+        }
+      }
+
+      // Early exit if no actual changes - avoid Map allocation and version bump
+      if (!hasChanges) {
+        return state
+      }
+
+      // Second pass - create new Map only when we have actual changes
       const newRotations = new Map(state.rotations)
       for (const [plane, angle] of updates.entries()) {
         if (validPlanes.has(plane)) {

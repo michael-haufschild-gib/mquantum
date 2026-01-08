@@ -139,15 +139,18 @@ export function useNDTransformUpdates(
   // Track last update version for change detection
   const lastUpdateVersionRef = useRef(-1)
 
+  // OPT-SCALES-1: Pre-allocated scales array to avoid per-frame allocation
+  const scalesArrayRef = useRef<number[]>([])
+
   const update = (overrides?: { projectionDistance?: number; scales?: number[] }): boolean => {
     const rotState = rotationStateRef.current
     const geomState = geometryStateRef.current
     const transState = transformStateRef.current
 
-    // Build scales array from store
+    // Build scales array from store, reusing pre-allocated array
     const scales =
       overrides?.scales ??
-      buildScalesArray(geomState.dimension, transState.uniformScale, transState.perAxisScale)
+      buildScalesArrayInto(scalesArrayRef.current, geomState.dimension, transState.uniformScale, transState.perAxisScale)
 
     // Build config
     const config: NDTransformConfig = {
@@ -190,21 +193,26 @@ export function useNDTransformUpdates(
 }
 
 /**
- * Build scales array from store state.
+ * Build scales array from store state into a pre-allocated array.
  *
+ * OPT-SCALES-1: Reuses the provided array to avoid per-frame allocation.
+ *
+ * @param out - Output array to write into (will be resized if needed)
  * @param dimension - Current dimension
  * @param uniformScale - Uniform scale multiplier
  * @param perAxisScale - Per-axis scale array
- * @returns Combined scales array
+ * @returns The out array, resized and populated with scale values
  */
-function buildScalesArray(
+function buildScalesArrayInto(
+  out: number[],
   dimension: number,
   uniformScale: number,
   perAxisScale: number[]
 ): number[] {
-  const scales: number[] = []
+  // Resize array if needed (only allocates when dimension changes)
+  out.length = dimension
   for (let i = 0; i < dimension; i++) {
-    scales[i] = perAxisScale[i] ?? uniformScale
+    out[i] = perAxisScale[i] ?? uniformScale
   }
-  return scales
+  return out
 }
