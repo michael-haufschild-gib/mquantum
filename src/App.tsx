@@ -24,7 +24,9 @@ import { WebGL2UnsupportedOverlay } from '@/components/overlays/WebGL2Unsupporte
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { GeometryLoadingIndicator } from '@/components/ui/GeometryLoadingIndicator';
 import { ToastProvider } from '@/contexts/ToastContext';
+import { ProdDevDiagnostics } from '@/dev-tools/ProdDevDiagnostics';
 import { useAnimationLoop } from '@/hooks/useAnimationLoop';
+import { useCachePrewarming } from '@/hooks/useCachePrewarming';
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities';
 import { useDynamicFavicon } from '@/hooks/useDynamicFavicon';
 import { useFaceDepths } from '@/hooks/useFaceDepths';
@@ -34,9 +36,7 @@ import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useSyncedDimension } from '@/hooks/useSyncedDimension';
 import { useToast } from '@/hooks/useToast';
 import { useUrlState } from '@/hooks/useUrlState';
-import { useCachePrewarming } from '@/hooks/useCachePrewarming';
 import type { Vector3D, VectorND } from '@/lib/math/types';
-import { ProdDevDiagnostics } from '@/dev-tools/ProdDevDiagnostics';
 import { FpsController } from '@/rendering/controllers/FpsController';
 import { PerformanceStatsCollector } from '@/rendering/controllers/PerformanceStatsCollector';
 import { VideoExportController } from '@/rendering/controllers/VideoExportController';
@@ -51,7 +51,7 @@ import { useLightingStore } from '@/stores/lightingStore';
 import { useUIStore } from '@/stores/uiStore';
 import { RECOVERY_STATE_KEY, RECOVERY_STATE_MAX_AGE } from '@/stores/webglContextStore';
 import { Html } from '@react-three/drei';
-import { Canvas, type RootState, events as createDomEvents } from '@react-three/fiber';
+import { Canvas, events as createDomEvents, type RootState } from '@react-three/fiber';
 import type { ComputeFunction } from '@react-three/fiber/dist/declarations/src/core/events';
 import { domMax, LazyMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo } from 'react';
@@ -302,7 +302,7 @@ function AppContent() {
               <VideoExportController />
               <Visualizer />
               <PerformanceStatsCollector />
-              <ProdDevDiagnostics />
+              {import.meta.env.DEV && <ProdDevDiagnostics />}
             </Canvas>
           </ErrorBoundary>
         ) : (

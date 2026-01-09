@@ -355,16 +355,17 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     float diskR = length(pos.xz);
     float diskH = abs(pos.y);
 
-    // In volumetric mode, we might want smaller steps inside the disk
+    // In volumetric mode, we bias steps toward the disk plane (Importance Sampling)
     #ifdef USE_VOLUMETRIC_DISK
-    // Simple check if we are near the disk plane
-    // PERF (OPT-BH-6): Use pre-computed uDiskInnerR/uDiskOuterR
-    if (diskH < uManifoldThickness * uHorizonRadius * 2.0 &&
-        diskR > uDiskInnerR * 0.8 &&
-        diskR < uDiskOuterR * 1.2) {
-       // Relax step size in fast mode (0.1) vs high quality (0.05)
-       float diskStepLimit = uFastMode ? 0.1 : 0.05;
-       stepSize = min(stepSize, diskStepLimit * uHorizonRadius); // Force smaller steps in disk
+    // PERF (OPT-BH-28): Importance Sampling
+    // Instead of hard step limits, we smoothly decrease step size near the disk midplane.
+    // Only apply if radially within the potential disk region to save performance elsewhere.
+    if (diskR > uDiskInnerR * 0.5 && diskR < uDiskOuterR * 1.5) {
+        float diskThickness = uManifoldThickness * uHorizonRadius;
+        // Boost sampling density by up to 2.5x when inside the disk vertical bounds
+        // smoothstep(edge, center, value) returns 0 at edge, 1 at center
+        float importance = 1.0 + 1.5 * smoothstep(2.0, 0.0, diskH / max(diskThickness, 0.001));
+        stepSize /= importance;
     }
     #endif
 

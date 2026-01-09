@@ -1682,15 +1682,15 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
   // horizonRadius is the Schwarzschild radius rs = 2M (visual scale)
   horizonRadius: 0.5,
   spin: 0.3, // Low spin for ethereal dreamlike effect
-  diskTemperature: 6500, // ~Sun temperature for natural white disk color
+  diskTemperature: 19700, // Hot accretion disk
   gravityStrength: 0.8, // Ethereal: softer gravity
-  manifoldIntensity: 2.0, // Ethereal: moderate brightness
+  manifoldIntensity: 4.0, // Accretion disk intensity
   manifoldThickness: 0.8, // Ethereal: thick volumetric disk
-  photonShellWidth: 0.05,
+  photonShellWidth: 0.1,
   timeScale: 1.0,
   baseColor: '#fff5e6',
   paletteMode: 'diskGradient',
-  bloomBoost: 1.0,
+  bloomBoost: 0.8,
 
   // Lensing - Ethereal preset values
   dimensionEmphasis: 0.8,
@@ -1704,8 +1704,8 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
   // Photon shell
   photonShellRadiusMul: 1.3,
   photonShellRadiusDimBias: 0.05, // Reduced - dimension scaling is speculative
-  shellGlowStrength: 8.0, // Ethereal: strong glow
-  shellGlowColor: '#aaccff', // Ethereal: blue-white glow
+  shellGlowStrength: 4.0, // Photon shell glow strength
+  shellGlowColor: '#dec82b', // Golden photon shell color
   shellStepMul: 0.15, // Smaller steps near photon sphere for accurate orbits
   shellContrastBoost: 1.0,
 
@@ -1717,8 +1717,8 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
   thicknessPerDimMax: 4.0,
   highDimWScale: 2.0,
   swirlAmount: 1.2, // Ethereal: more swirl
-  noiseScale: 1.0,
-  noiseAmount: 0.6, // Ethereal: more noise
+  noiseScale: 0.2,
+  noiseAmount: 0.6, // Noise amount
   multiIntersectionGain: 1.0,
 
   // Quality
@@ -1729,7 +1729,7 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
   stepMax: 0.2,
   stepAdaptG: 1.0,
   stepAdaptR: 0.2,
-  enableAbsorption: true,
+  enableAbsorption: false, // Absorption off by default
   absorption: 0.3, // Low absorption = semi-transparent disk, rays continue for Einstein ring
   transmittanceCutoff: 0.005, // Lower cutoff = rays continue longer
   farRadius: 35.0, // Extended for rays that orbit multiple times
