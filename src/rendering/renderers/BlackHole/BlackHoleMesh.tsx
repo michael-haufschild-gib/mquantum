@@ -99,7 +99,9 @@ const BlackHoleMesh = () => {
   // v2: Added immediate horizon check after ray step to fix transparency bug
   // v3: Added OPT-BH-1/2/3/5 performance optimizations
   // v4: Added OPT-BH-15/16/17 major performance overhaul (2x FPS target)
-  const SHADER_VERSION = 4
+  // v5: OPT-BH-23/24/25/26/27 - Dead code removal, single noise sample,
+  //     unified snoise, pre-computed lensing constants, fast-mode crossing skip
+  const SHADER_VERSION = 5
 
   // Compile shader
   const { fragmentShader } = useMemo(() => {

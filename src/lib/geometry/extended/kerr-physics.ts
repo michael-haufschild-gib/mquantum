@@ -49,50 +49,41 @@ export interface KerrRadii {
  * @returns All computed radii in units of M
  */
 export function computeKerrRadii(mass: number, spin: number): KerrRadii {
-  // Clamp spin to physically valid range (0 to ~0.998)
-  // Extremal Kerr (chi = 1) is a mathematical limit, not physically achievable
   const chi = Math.max(0, Math.min(0.998, spin))
   const M = mass
 
-  // a = chi * M (spin parameter in geometric units)
-  const a = chi * M
-  const aSq = a * a
-  const MSq = M * M
+  const chiSq = chi * chi
 
-  // Event horizons: r± = M ± sqrt(M² - a²)
-  const sqrtTerm = Math.sqrt(Math.max(0, MSq - aSq))
-  const eventHorizon = M + sqrtTerm // r+
-  const cauchyHorizon = M - sqrtTerm // r-
+  // r± = M ± M*sqrt(1 - chi^2)
+  const sqrtTerm = M * Math.sqrt(Math.max(0, 1 - chiSq))
+  const eventHorizon = M + sqrtTerm
+  const cauchyHorizon = M - sqrtTerm
 
-  // Photon sphere radii (equatorial circular photon orbits)
-  // r_ph = 2M * (1 + cos((2/3) * arccos(∓a/M)))
-  // Prograde uses -a/M (smaller radius), retrograde uses +a/M (larger radius)
-  const progradeArg = Math.acos(-chi) // arccos(-a/M)
-  const retrogradeArg = Math.acos(chi) // arccos(+a/M)
+  // Photon sphere: use one acos
+  const theta = Math.acos(chi) // acos(+chi)
+  const thetaNeg = Math.PI - theta // acos(-chi)
+  const twoThirds = 2 / 3
 
-  const photonSpherePrograde = 2 * M * (1 + Math.cos((2 / 3) * progradeArg))
-  const photonSphereRetrograde = 2 * M * (1 + Math.cos((2 / 3) * retrogradeArg))
+  const photonSpherePrograde = 2 * M * (1 + Math.cos(twoThirds * thetaNeg))
+  const photonSphereRetrograde = 2 * M * (1 + Math.cos(twoThirds * theta))
 
-  // ISCO radii using the standard Kerr formula
-  // r_ISCO = M * (3 + Z2 ∓ sqrt((3 - Z1)(3 + Z1 + 2*Z2)))
-  // where the ∓ is - for prograde, + for retrograde
-  const Z1 = 1 + Math.cbrt(1 - chi * chi) * (Math.cbrt(1 + chi) + Math.cbrt(1 - chi))
-  const Z2 = Math.sqrt(3 * chi * chi + Z1 * Z1)
+  // ISCO: reuse cbrts, reuse chiSq
+  const oneMinusChiSq = Math.max(0, 1 - chiSq)
+  const c1 = Math.cbrt(oneMinusChiSq)
+  const cPlus = Math.cbrt(1 + chi)
+  const cMinus = Math.cbrt(1 - chi)
+
+  const Z1 = 1 + c1 * (cPlus + cMinus)
+  const Z2 = Math.sqrt(3 * chiSq + Z1 * Z1)
 
   const sqrtISCO = Math.sqrt(Math.max(0, (3 - Z1) * (3 + Z1 + 2 * Z2)))
-  const iscoPrograde = M * (3 + Z2 - sqrtISCO)
-  const iscoRetrograde = M * (3 + Z2 + sqrtISCO)
+  const base = M * (3 + Z2)
+  const iscoPrograde = base - M * sqrtISCO
+  const iscoRetrograde = base + M * sqrtISCO
 
-  // Shadow radius (critical impact parameter)
-  // For Schwarzschild (chi=0): b_crit = 3√3 * M ≈ 5.196 * M
-  // For Kerr: The shadow shrinks with spin. Using approximate formula based on
-  // the prograde photon sphere which dominates the shadow appearance.
-  // Shadow ≈ 3√3 * M * sqrt(1 - chi²/4) for moderate spins
-  // This is a simplification - actual Kerr shadow is asymmetric
-  const sqrt3 = Math.sqrt(3)
-  const schwarzschildShadow = 3 * sqrt3 * M // ≈ 5.196 * M
-  const spinCorrection = Math.sqrt(1 - (chi * chi) / 4) // Approximate shrinkage with spin
-  const shadowRadius = schwarzschildShadow * spinCorrection
+  // Shadow radius: reuse chiSq
+  const schwarzschildShadow = 3 * Math.sqrt(3) * M
+  const shadowRadius = schwarzschildShadow * Math.sqrt(1 - chiSq / 4)
 
   return {
     eventHorizon,
@@ -211,9 +202,10 @@ export function diskTemperatureToColor(temperature: number): string {
  * @returns Temperature at radius r (in Kelvin)
  */
 export function diskTemperatureProfile(r: number, rInner: number, tInner: number): number {
-  if (r <= rInner) return 0 // No emission at ISCO due to stress-free boundary
-  const basicFalloff = Math.pow(rInner / r, 0.75)
-  const iscoCorrection = Math.pow(Math.max(0, 1 - Math.sqrt(rInner / r)), 0.25)
+  if (r <= rInner) return 0
+  const x = rInner / r // reuse
+  const basicFalloff = Math.pow(x, 0.75)
+  const iscoCorrection = Math.pow(1 - Math.sqrt(x), 0.25)
   return tInner * basicFalloff * iscoCorrection
 }
 
@@ -229,10 +221,7 @@ export function diskTemperatureProfile(r: number, rInner: number, tInner: number
  * @returns Estimated inner disk temperature in Kelvin
  */
 export function estimateDiskTemperature(mass: number): number {
-  // Artistic mapping: larger mass = cooler disk
-  // This is inverted from physical reality but looks better visually
-  // (smaller holes are hotter but we want bigger holes to look more dramatic)
-  const baseTempK = 8000 // Base temperature for visualization (yellowish-white)
-  const scaleFactor = 1.0 / Math.pow(mass, 0.25)
+  const baseTempK = 8000
+  const scaleFactor = 1.0 / Math.sqrt(Math.sqrt(mass))
   return baseTempK * scaleFactor
 }

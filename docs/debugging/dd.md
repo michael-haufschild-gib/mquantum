@@ -136,3 +136,56 @@ Do a full in-depth code review of the new feature(s). Is the implementation 100%
   - Easy to add sharpness slider
 
   Want me to implement CAS in ToScreenPass with a sharpness control?
+
+
+ 1. Ray Bending Optimization (lensing.glsl.ts)
+  Impact: High (Runs every raymarch step)
+  Est. Improvement: ~15-20% reduced shader overhead
+
+   * Current Issue: The bendRay function contains expensive operations: a complex "proximity factor" calculation with multiple smoothstep/mix calls, unconditional pow for N-D scaling, and unconditional Kerr frame
+     dragging math (cross products).
+   * Suggestion:
+       * Simplify Proximity Logic: Collapse the multi-stage fade (mix + smoothstep + linear max) into a single smoothstep(far, near, r) interpolated by one mix.
+       * Special Case Falloff: Check if (abs(uDistanceFalloff - 2.0) < 0.01) to skip the expensive pow(r, 2.0 - beta) calculation for the standard Newtonian/Schwarzschild case.
+       * Optimize Frame Dragging: Wrap the entire Kerr effect block in if (abs(uSpin) > 0.001). Inside, replace normalize(cross(...)) with raw vector math + inversesqrt to save ALU cycles.
+
+  2. Volumetric Disk Optimization (disk-volumetric.glsl.ts)
+  Impact: High (Runs every step inside the disk)
+  Est. Improvement: ~25-30% faster disk rendering
+
+   * Current Issue:
+       * Uses pow(x, 2.5) for flare shape.
+       * Computes atan(z, x) unconditionally, which is expensive, even if noise/rotation features are effectively off.
+       * Samples noise for "dust lanes" even if uNoiseAmount is near zero.
+   * Suggestion:
+       * Fast Math: Replace pow(x, 2.5) with x * x * sqrt(x).
+       * Conditional Atan: Wrap the atan calculation. Only compute angle if uNoiseAmount > 0.01 (for texture) or uKeplerianDifferential > 0.001 (for rotation speed). If both are low, use angle = 0.0.
+       * Optimization: Pre-multiply h*h and thickness*thickness before the exp call for density.
+
+  3. Main Raymarch Loop (main.glsl.ts)
+  Impact: Medium (Cumulative step cost)
+  Est. Improvement: ~5-10%
+
+   * Current Issue: adaptiveStepSizeWithMask calculates a shellMask using smoothstep, but the comments confirm this mask is unused for emission (OPT-BH-23).
+   * Suggestion: Remove the out float outShellMask parameter and the internal smoothstep logic entirely. Only calculate the step modification.
+
+  4. Post-Processing Lensing (gravitationalLensing.glsl.ts)
+  Impact: Low (Screen-space pass)
+  Est. Improvement: < 1ms, but reduces fill rate pressure
+
+   * Current Issue: einsteinRingBoost uses exp() per pixel for a very subtle ring effect.
+   * Suggestion: Replace exp() with a simple linear falloff or 1.0 / (1.0 + x*x) approximation. Also, check if (uFalloff == 1.0) (3D case) to avoid pow() in the deflection formula.
+
+  Summary of Est. Performance Gains
+
+  ┌────────────────┬─────────────────────────┬─────────────┐
+  │ Optimization   │ Target                  │ Est. Gain   │
+  ├────────────────┼─────────────────────────┼─────────────┤
+  │ Ray Bending    │ lensing.glsl.ts         │ +15% FPS    │
+  │ Disk Density   │ disk-volumetric.glsl.ts │ +10% FPS    │
+  │ Step Logic     │ main.glsl.ts            │ +5% FPS     │
+  │ Total Combined │                         │ ~30-40% FPS │
+  └────────────────┴─────────────────────────┴─────────────┘
+
+
+  Note: "Double FPS" might require `uStepAdaptG` (gravity step adaptation) tuning alongside these code changes, as taking fewer steps is the only way to get massive gains beyond ALU optimization.
