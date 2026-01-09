@@ -21,7 +21,7 @@
 import { RENDER_LAYERS } from '@/rendering/core/layers'
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial'
 import { composeBlackHoleShader, generateBlackHoleVertexShader } from '@/rendering/shaders/blackhole/compose'
-import { generateRidgedNoiseTexture3D } from '@/rendering/utils/NoiseGenerator'
+import { generateBlackbodyLUT, generateRidgedNoiseTexture3D } from '@/rendering/utils/NoiseGenerator'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useEffect, useMemo, useRef } from 'react'
@@ -73,24 +73,33 @@ const BlackHoleMesh = () => {
   // This replaces expensive per-pixel noise computation with a single texture lookup
   const noiseTexture = useMemo(() => generateRidgedNoiseTexture3D(64), [])
 
-  // Dispose noise texture on unmount
+  // PERF (OPT-BH-17): Create pre-baked blackbody LUT for faster temperature coloring
+  // This replaces expensive pow()/log() operations with a single texture lookup
+  const blackbodyLUT = useMemo(() => generateBlackbodyLUT(256), [])
+
+  // Dispose textures on unmount
   useEffect(() => {
     return () => {
       noiseTexture.dispose()
+      blackbodyLUT.dispose()
     }
-  }, [noiseTexture])
+  }, [noiseTexture, blackbodyLUT])
 
-  // Pass noise texture to uniforms (static, only needs to be set once)
+  // Pass textures to uniforms (static, only needs to be set once)
   useEffect(() => {
     if (uniforms.tDiskNoise) {
       uniforms.tDiskNoise.value = noiseTexture
     }
-  }, [uniforms, noiseTexture])
+    if (uniforms.tBlackbodyLUT) {
+      uniforms.tBlackbodyLUT.value = blackbodyLUT
+    }
+  }, [uniforms, noiseTexture, blackbodyLUT])
 
   // Shader version - increment to force recompilation when GLSL source changes
   // v2: Added immediate horizon check after ray step to fix transparency bug
   // v3: Added OPT-BH-1/2/3/5 performance optimizations
-  const SHADER_VERSION = 3
+  // v4: Added OPT-BH-15/16/17 major performance overhaul (2x FPS target)
+  const SHADER_VERSION = 4
 
   // Compile shader
   const { fragmentShader } = useMemo(() => {
@@ -105,6 +114,7 @@ const BlackHoleMesh = () => {
       sliceAnimation: sliceAnimationEnabled,
       volumetricDisk: true,
       noiseTexture: true, // PERF (OPT-BH-1): Enable noise texture for faster rendering
+      blackbodyLUT: true, // PERF (OPT-BH-17): Enable blackbody LUT for faster temperature coloring
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, SHADER_VERSION])

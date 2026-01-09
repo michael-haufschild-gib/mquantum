@@ -42,6 +42,8 @@ export interface BlackHoleShaderConfig extends ShaderConfig {
   volumetricDisk?: boolean
   /** PERF (OPT-BH-1): Enable pre-baked noise texture for faster disk rendering */
   noiseTexture?: boolean
+  /** PERF (OPT-BH-17): Enable pre-baked blackbody LUT for faster temperature coloring */
+  blackbodyLUT?: boolean
 }
 
 /**
@@ -63,6 +65,7 @@ export function composeBlackHoleShader(config: BlackHoleShaderConfig) {
     sliceAnimation: enableSliceAnimation = false,
     volumetricDisk: enableVolumetricDisk = true, // Default to true for now
     noiseTexture: enableNoiseTexture = true, // PERF (OPT-BH-1): Enable by default for faster rendering
+    blackbodyLUT: enableBlackbodyLUT = true, // PERF (OPT-BH-17): Enable by default for faster rendering
   } = config
 
   const defines: string[] = []
@@ -117,6 +120,13 @@ export function composeBlackHoleShader(config: BlackHoleShaderConfig) {
     features.push('Noise Texture LUT')
   }
 
+  // PERF (OPT-BH-17): Blackbody LUT for faster temperature-based coloring
+  const useBlackbodyLUT = enableBlackbodyLUT && !overrides.includes('Blackbody LUT')
+  if (useBlackbodyLUT) {
+    defines.push('#define USE_BLACKBODY_LUT')
+    features.push('Blackbody LUT')
+  }
+
   // Slice animation (for higher dimensions)
   const useSliceAnimation =
     enableSliceAnimation && dimension > 3 && !overrides.includes('Slice Animation')
@@ -156,6 +166,8 @@ uniform float uSliceAmplitude;
     { name: 'Environment Map', content: 'uniform samplerCube envMap;', condition: enableEnvMap },
     // PERF (OPT-BH-1): Pre-baked 3D noise texture for volumetric disk
     { name: 'Disk Noise Texture', content: 'uniform sampler3D tDiskNoise;', condition: useNoiseTexture },
+    // PERF (OPT-BH-17): Pre-baked blackbody color LUT for temperature coloring
+    { name: 'Blackbody LUT', content: 'uniform sampler2D tBlackbodyLUT;', condition: useBlackbodyLUT },
     
     // Core Libraries
     { name: 'Palette Lib', content: GLSL_ALL_PALETTE_FUNCTIONS },

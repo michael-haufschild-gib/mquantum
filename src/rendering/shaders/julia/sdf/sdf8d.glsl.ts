@@ -3,6 +3,8 @@ export const sdf8dBlock = `
 // 8D Julia SDF - Full Octonion
 // Octonion power using hyperspherical representation
 // o^n = |o|^n * (cos(n*theta) + sin(n*theta) * v_hat)
+// OPT-LOOP: Hoist power check outside loop
+// OPT-PWR2: Angle-doubling for power=2 (eliminates transcendentals)
 // ============================================
 
 float sdfJulia8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -23,11 +25,17 @@ float sdfJulia8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     mediump float minP = 1000.0, minASq = 1000000.0, minS = 1000.0;
     int escIt = 0;
 
+    // OPT-LOOP: Hoist power check outside loop
+    bool usePower2 = (int(pwr) == 2);
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        float z01_sq = z0*z0 + z1*z1;
-        r = sqrt(z01_sq + z2*z2 + z3*z3 + z4*z4 + z5*z5 + z6*z6 + z7*z7);
+        float z0_sq = z0*z0;
+        float z01_sq = z0_sq + z1*z1;
+        float vSq = z1*z1 + z2*z2 + z3*z3 + z4*z4 + z5*z5 + z6*z6 + z7*z7;
+        float rSq = z0_sq + vSq;
+        r = sqrt(rSq);
         if (r > bail) { escIt = i; break; }
 
         minP = min(minP, abs(z1));
@@ -40,26 +48,42 @@ float sdfJulia8D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
 
         // Octonion power: o^n = |o|^n * (cos(n*theta) + sin(n*theta) * v_hat)
         // where v = (z1, z2, z3, z4, z5, z6, z7) is the imaginary part
-        float vSq = z1*z1 + z2*z2 + z3*z3 + z4*z4 + z5*z5 + z6*z6 + z7*z7;
         float vLen = sqrt(vSq);
 
         float new0, new1, new2, new3, new4, new5, new6, new7;
         if (vLen < EPS) {
             // Pure scalar octonion
-            float rn = pow(max(r, EPS), pwr);
-            new0 = rn * (z0 >= 0.0 ? 1.0 : -1.0) + c0;
+            new0 = rp * (z0 >= 0.0 ? 1.0 : -1.0) + c0;
             new1 = c1; new2 = c2; new3 = c3;
             new4 = c4; new5 = c5; new6 = c6; new7 = c7;
+        } else if (usePower2) {
+            // OPT-PWR2: Angle-doubling for power=2
+            // cos(2*theta) = 2*cos²(theta) - 1 where cos(theta) = z0/r
+            // sin(2*theta) = 2*sin(theta)*cos(theta) where sin(theta) = vLen/r
+            float invRSq = 1.0 / max(rSq, EPS*EPS);
+            float cosNT = (2.0*z0_sq - rSq) * invRSq;  // 2*cos²(theta) - 1
+            float sinNT = 2.0 * z0 * vLen * invRSq;    // 2*cos(theta)*sin(theta)
+            float rn = rSq;  // r^2
+            float scale = rn * sinNT / vLen;
+
+            new0 = rn * cosNT + c0;
+            new1 = scale * z1 + c1;
+            new2 = scale * z2 + c2;
+            new3 = scale * z3 + c3;
+            new4 = scale * z4 + c4;
+            new5 = scale * z5 + c5;
+            new6 = scale * z6 + c6;
+            new7 = scale * z7 + c7;
         } else {
+            // General power path
             float theta = acos(clamp(z0 / max(r, EPS), -1.0, 1.0));
             float invVLen = 1.0 / vLen;
             float nTheta = pwr * theta;
-            float rn = pow(max(r, EPS), pwr);
             float cosNT = cos(nTheta);
             float sinNT = sin(nTheta);
-            float scale = rn * sinNT * invVLen;
+            float scale = rp * sinNT * invVLen;
 
-            new0 = rn * cosNT + c0;
+            new0 = rp * cosNT + c0;
             new1 = scale * z1 + c1;
             new2 = scale * z2 + c2;
             new3 = scale * z3 + c3;
@@ -97,35 +121,55 @@ float sdfJulia8D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
     float dr = 1.0, r = 0.0;
 
+    // OPT-LOOP: Hoist power check outside loop
+    bool usePower2 = (int(pwr) == 2);
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        r = sqrt(z0*z0 + z1*z1 + z2*z2 + z3*z3 + z4*z4 + z5*z5 + z6*z6 + z7*z7);
+        float z0_sq = z0*z0;
+        float vSq = z1*z1 + z2*z2 + z3*z3 + z4*z4 + z5*z5 + z6*z6 + z7*z7;
+        float rSq = z0_sq + vSq;
+        r = sqrt(rSq);
         if (r > bail) break;
 
         float rp, rpMinus1;
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;
 
-        float vSq = z1*z1 + z2*z2 + z3*z3 + z4*z4 + z5*z5 + z6*z6 + z7*z7;
         float vLen = sqrt(vSq);
 
         float new0, new1, new2, new3, new4, new5, new6, new7;
         if (vLen < EPS) {
-            float rn = pow(max(r, EPS), pwr);
-            new0 = rn * (z0 >= 0.0 ? 1.0 : -1.0) + c0;
+            new0 = rp * (z0 >= 0.0 ? 1.0 : -1.0) + c0;
             new1 = c1; new2 = c2; new3 = c3;
             new4 = c4; new5 = c5; new6 = c6; new7 = c7;
+        } else if (usePower2) {
+            // OPT-PWR2: Angle-doubling for power=2
+            float invRSq = 1.0 / max(rSq, EPS*EPS);
+            float cosNT = (2.0*z0_sq - rSq) * invRSq;
+            float sinNT = 2.0 * z0 * vLen * invRSq;
+            float rn = rSq;
+            float scale = rn * sinNT / vLen;
+
+            new0 = rn * cosNT + c0;
+            new1 = scale * z1 + c1;
+            new2 = scale * z2 + c2;
+            new3 = scale * z3 + c3;
+            new4 = scale * z4 + c4;
+            new5 = scale * z5 + c5;
+            new6 = scale * z6 + c6;
+            new7 = scale * z7 + c7;
         } else {
+            // General power path
             float theta = acos(clamp(z0 / max(r, EPS), -1.0, 1.0));
             float invVLen = 1.0 / vLen;
             float nTheta = pwr * theta;
-            float rn = pow(max(r, EPS), pwr);
             float cosNT = cos(nTheta);
             float sinNT = sin(nTheta);
-            float scale = rn * sinNT * invVLen;
+            float scale = rp * sinNT * invVLen;
 
-            new0 = rn * cosNT + c0;
+            new0 = rp * cosNT + c0;
             new1 = scale * z1 + c1;
             new2 = scale * z2 + c2;
             new3 = scale * z3 + c3;

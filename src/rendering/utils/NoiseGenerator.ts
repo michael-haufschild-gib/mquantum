@@ -123,3 +123,72 @@ export function generateRidgedNoiseTexture3D(size: number = 64): THREE.Data3DTex
 
   return texture
 }
+
+/**
+ * PERF (OPT-BH-17): Generates a 1D texture containing pre-computed blackbody colors.
+ *
+ * This replaces the expensive blackbodyColor() function which uses pow() and log()
+ * operations (20+ cycles each) with a single texture lookup (~4 cycles).
+ *
+ * The texture maps normalized temperature [0, 1] to RGB color, where:
+ * - 0.0 = 1000K (deep red)
+ * - 1.0 = 40000K (blue-white)
+ *
+ * Uses the Tanner Helland algorithm for Planckian locus approximation.
+ *
+ * @param size Resolution of the 1D texture (default: 256, gives 768 bytes for RGB)
+ * @returns DataTexture with blackbody RGB values
+ */
+export function generateBlackbodyLUT(size: number = 256): THREE.DataTexture {
+  // Use RGBA format - RGB is deprecated in WebGL2 and causes GL_INVALID_ENUM
+  const data = new Uint8Array(size * 4) // RGBA format
+
+  for (let i = 0; i < size; i++) {
+    // Map [0, size-1] to temperature [1000K, 40000K]
+    const t = i / (size - 1)
+    const temperature = 1000 + t * 39000 // 1000K to 40000K
+
+    // Tanner Helland algorithm
+    const temp = temperature / 100.0
+
+    let r: number, g: number, b: number
+
+    // Red channel
+    if (temp <= 66) {
+      r = 1.0
+    } else {
+      r = 329.698727446 * Math.pow(temp - 60, -0.1332047592) / 255.0
+    }
+
+    // Green channel
+    if (temp <= 66) {
+      g = (99.4708025861 * Math.log(Math.max(temp, 1)) - 161.1195681661) / 255.0
+    } else {
+      g = 288.1221695283 * Math.pow(Math.max(temp - 60, 0.01), -0.0755148492) / 255.0
+    }
+
+    // Blue channel
+    if (temp >= 66) {
+      b = 1.0
+    } else if (temp <= 19) {
+      b = 0.0
+    } else {
+      b = (138.5177312231 * Math.log(Math.max(temp - 10, 0.01)) - 305.0447927307) / 255.0
+    }
+
+    // Clamp and store as bytes (RGBA)
+    const idx = i * 4
+    data[idx] = Math.floor(Math.max(0, Math.min(1, r)) * 255)
+    data[idx + 1] = Math.floor(Math.max(0, Math.min(1, g)) * 255)
+    data[idx + 2] = Math.floor(Math.max(0, Math.min(1, b)) * 255)
+    data[idx + 3] = 255 // Alpha = 1.0
+  }
+
+  const texture = new THREE.DataTexture(data, size, 1, THREE.RGBAFormat)
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.wrapS = THREE.ClampToEdgeWrapping
+  texture.needsUpdate = true
+
+  return texture
+}

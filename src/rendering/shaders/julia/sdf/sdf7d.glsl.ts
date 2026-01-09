@@ -3,6 +3,8 @@ export const sdf7dBlock = `
 // 7D Julia SDF - Hyperspherical Power Map
 // z = z^n + c where z starts at sample point, c is Julia constant
 // Same power formula as Mandelbulb but with fixed c
+// OPT-LOOP: Hoist power check outside loop
+// OPT-PWR2: Angle-doubling for power=2 (eliminates transcendentals)
 // ============================================
 
 float sdfJulia7D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
@@ -24,6 +26,9 @@ float sdfJulia7D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     mediump float minP = 1000.0, minASq = 1000000.0, minS = 1000.0;
     int escIt = 0;
 
+    // OPT-LOOP: Hoist power check outside loop
+    bool usePower2 = (int(pwr) == 2);
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
@@ -43,26 +48,67 @@ float sdfJulia7D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;  // Julia: no +1.0 (c is constant)
 
-        // 7D hyperspherical: 6 angles using inversesqrt (avoids extra sqrt calls)
-        float tailSq = rSq;
-        float invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t0 = acos(clamp(zz * invTail, -1.0, 1.0)); tailSq = max(tailSq - zz_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t1 = acos(clamp(zx * invTail, -1.0, 1.0)); tailSq = max(tailSq - zx_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t2 = acos(clamp(zy * invTail, -1.0, 1.0)); tailSq = max(tailSq - zy_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0));
-        float t5 = atan(z6, z5);
+        float s0, c0, s1, c1, s2, c2, s3, c3_, s4, c4_, s5, c5_;
 
-        float s0 = sin(t0 * pwr), c0 = cos(t0 * pwr);
-        float s1 = sin(t1 * pwr), c1 = cos(t1 * pwr);
-        float s2 = sin(t2 * pwr), c2 = cos(t2 * pwr);
-        float s3 = sin(t3 * pwr), c3_ = cos(t3 * pwr);
-        float s4 = sin(t4 * pwr), c4_ = cos(t4 * pwr);
-        float s5 = sin(t5 * pwr), c5_ = cos(t5 * pwr);
+        if (usePower2) {
+            // OPT-PWR2: Use angle-doubling identities to avoid transcendentals
+            float tailSq = rSq;
+            float invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg0 = clamp(zz * invTail, -1.0, 1.0);
+            c0 = 2.0*arg0*arg0 - 1.0;
+            s0 = 2.0*arg0*sqrt(max(1.0 - arg0*arg0, 0.0));
+            tailSq = max(tailSq - zz_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg1 = clamp(zx * invTail, -1.0, 1.0);
+            c1 = 2.0*arg1*arg1 - 1.0;
+            s1 = 2.0*arg1*sqrt(max(1.0 - arg1*arg1, 0.0));
+            tailSq = max(tailSq - zx_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg2 = clamp(zy * invTail, -1.0, 1.0);
+            c2 = 2.0*arg2*arg2 - 1.0;
+            s2 = 2.0*arg2*sqrt(max(1.0 - arg2*arg2, 0.0));
+            tailSq = max(tailSq - zy_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg3 = clamp(z3 * invTail, -1.0, 1.0);
+            c3_ = 2.0*arg3*arg3 - 1.0;
+            s3 = 2.0*arg3*sqrt(max(1.0 - arg3*arg3, 0.0));
+            tailSq = max(tailSq - z3_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg4 = clamp(z4 * invTail, -1.0, 1.0);
+            c4_ = 2.0*arg4*arg4 - 1.0;
+            s4 = 2.0*arg4*sqrt(max(1.0 - arg4*arg4, 0.0));
+
+            // For atan: cos(2*atan(y,x)) = (x²-y²)/(x²+y²), sin = 2xy/(x²+y²)
+            float den56 = max(z5_sq + z6_sq, EPS*EPS);
+            float invDen56 = 1.0 / den56;
+            c5_ = (z5_sq - z6_sq) * invDen56;
+            s5 = 2.0 * z5 * z6 * invDen56;
+        } else {
+            // General power path using full trigonometry
+            float tailSq = rSq;
+            float invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t0 = acos(clamp(zz * invTail, -1.0, 1.0)); tailSq = max(tailSq - zz_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t1 = acos(clamp(zx * invTail, -1.0, 1.0)); tailSq = max(tailSq - zx_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t2 = acos(clamp(zy * invTail, -1.0, 1.0)); tailSq = max(tailSq - zy_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t4 = acos(clamp(z4 * invTail, -1.0, 1.0));
+            float t5 = atan(z6, z5);
+
+            s0 = sin(t0 * pwr); c0 = cos(t0 * pwr);
+            s1 = sin(t1 * pwr); c1 = cos(t1 * pwr);
+            s2 = sin(t2 * pwr); c2 = cos(t2 * pwr);
+            s3 = sin(t3 * pwr); c3_ = cos(t3 * pwr);
+            s4 = sin(t4 * pwr); c4_ = cos(t4 * pwr);
+            s5 = sin(t5 * pwr); c5_ = cos(t5 * pwr);
+        }
 
         // Product chaining
         float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2, p4 = p3*s3, p5 = p4*s4;
@@ -99,6 +145,9 @@ float sdfJulia7D_simple(vec3 pos, float pwr, float bail, int maxIt) {
 
     float dr = 1.0, r = 0.0;
 
+    // OPT-LOOP: Hoist power check outside loop
+    bool usePower2 = (int(pwr) == 2);
+
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
@@ -113,26 +162,66 @@ float sdfJulia7D_simple(vec3 pos, float pwr, float bail, int maxIt) {
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;
 
-        // 7D hyperspherical using inversesqrt (avoids extra sqrt calls)
-        float tailSq = rSq;
-        float invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t0 = acos(clamp(zz * invTail, -1.0, 1.0)); tailSq = max(tailSq - zz_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t1 = acos(clamp(zx * invTail, -1.0, 1.0)); tailSq = max(tailSq - zx_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t2 = acos(clamp(zy * invTail, -1.0, 1.0)); tailSq = max(tailSq - zy_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
-        invTail = inversesqrt(max(tailSq, EPS*EPS));
-        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0));
-        float t5 = atan(z6, z5);
+        float s0, c0, s1, c1, s2, c2, s3, c3_, s4, c4_, s5, c5_;
 
-        float s0 = sin(t0 * pwr), c0 = cos(t0 * pwr);
-        float s1 = sin(t1 * pwr), c1 = cos(t1 * pwr);
-        float s2 = sin(t2 * pwr), c2 = cos(t2 * pwr);
-        float s3 = sin(t3 * pwr), c3_ = cos(t3 * pwr);
-        float s4 = sin(t4 * pwr), c4_ = cos(t4 * pwr);
-        float s5 = sin(t5 * pwr), c5_ = cos(t5 * pwr);
+        if (usePower2) {
+            // OPT-PWR2: Angle-doubling for power=2
+            float tailSq = rSq;
+            float invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg0 = clamp(zz * invTail, -1.0, 1.0);
+            c0 = 2.0*arg0*arg0 - 1.0;
+            s0 = 2.0*arg0*sqrt(max(1.0 - arg0*arg0, 0.0));
+            tailSq = max(tailSq - zz_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg1 = clamp(zx * invTail, -1.0, 1.0);
+            c1 = 2.0*arg1*arg1 - 1.0;
+            s1 = 2.0*arg1*sqrt(max(1.0 - arg1*arg1, 0.0));
+            tailSq = max(tailSq - zx_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg2 = clamp(zy * invTail, -1.0, 1.0);
+            c2 = 2.0*arg2*arg2 - 1.0;
+            s2 = 2.0*arg2*sqrt(max(1.0 - arg2*arg2, 0.0));
+            tailSq = max(tailSq - zy_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg3 = clamp(z3 * invTail, -1.0, 1.0);
+            c3_ = 2.0*arg3*arg3 - 1.0;
+            s3 = 2.0*arg3*sqrt(max(1.0 - arg3*arg3, 0.0));
+            tailSq = max(tailSq - z3_sq, 0.0);
+
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float arg4 = clamp(z4 * invTail, -1.0, 1.0);
+            c4_ = 2.0*arg4*arg4 - 1.0;
+            s4 = 2.0*arg4*sqrt(max(1.0 - arg4*arg4, 0.0));
+
+            float den56 = max(z5_sq + z6_sq, EPS*EPS);
+            float invDen56 = 1.0 / den56;
+            c5_ = (z5_sq - z6_sq) * invDen56;
+            s5 = 2.0 * z5 * z6 * invDen56;
+        } else {
+            // General power path
+            float tailSq = rSq;
+            float invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t0 = acos(clamp(zz * invTail, -1.0, 1.0)); tailSq = max(tailSq - zz_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t1 = acos(clamp(zx * invTail, -1.0, 1.0)); tailSq = max(tailSq - zx_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t2 = acos(clamp(zy * invTail, -1.0, 1.0)); tailSq = max(tailSq - zy_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
+            invTail = inversesqrt(max(tailSq, EPS*EPS));
+            float t4 = acos(clamp(z4 * invTail, -1.0, 1.0));
+            float t5 = atan(z6, z5);
+
+            s0 = sin(t0 * pwr); c0 = cos(t0 * pwr);
+            s1 = sin(t1 * pwr); c1 = cos(t1 * pwr);
+            s2 = sin(t2 * pwr); c2 = cos(t2 * pwr);
+            s3 = sin(t3 * pwr); c3_ = cos(t3 * pwr);
+            s4 = sin(t4 * pwr); c4_ = cos(t4 * pwr);
+            s5 = sin(t5 * pwr); c5_ = cos(t5 * pwr);
+        }
 
         float p0 = rp, p1 = p0*s0, p2 = p1*s1, p3 = p2*s2, p4 = p3*s3, p5 = p4*s4;
         zz = p0*c0 + cz;

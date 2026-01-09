@@ -91,20 +91,25 @@ float gravitationalRedshift(float r) {
 }
 
 /**
- * Compute blackbody color from temperature using Planckian locus approximation.
+ * Compute blackbody color from temperature.
  *
- * Based on the algorithm by Tanner Helland for temperatures 1000K - 40000K.
+ * PERF (OPT-BH-17): Uses pre-computed LUT texture when available.
+ * This replaces expensive pow()/log() operations (40+ cycles) with
+ * a single texture lookup (~4 cycles).
  *
- * Note: Branching version is FASTER than branchless here because:
- * - Temperature threshold (66.0) is uniform-coherent (all pixels same path)
- * - Branching avoids computing unused pow()/log() calls
- * - Called thousands of times per frame in raymarch loop
+ * When USE_BLACKBODY_LUT is defined, samples from tBlackbodyLUT.
+ * Otherwise falls back to analytical computation (Tanner Helland algorithm).
  *
- * @param temperature - Temperature in Kelvin
+ * @param temperature - Temperature in Kelvin (1000K - 40000K)
  * @returns RGB color (normalized to peak intensity)
  */
 vec3 blackbodyColor(float temperature) {
-  // Clamp to valid range and convert to hectoKelvin
+#ifdef USE_BLACKBODY_LUT
+  // PERF: LUT lookup - map temperature [1000, 40000] to UV [0, 1]
+  float t = clamp((temperature - 1000.0) / 39000.0, 0.0, 1.0);
+  return texture(tBlackbodyLUT, vec2(t, 0.5)).rgb;
+#else
+  // Fallback: analytical computation (Tanner Helland algorithm)
   float temp = clamp(temperature, 1000.0, 40000.0) / 100.0;
 
   vec3 rgb;
@@ -118,10 +123,8 @@ vec3 blackbodyColor(float temperature) {
 
   // Green channel
   if (temp <= 66.0) {
-    // Guard against log(0) - temp is already clamped above to minimum 10 (1000K/100)
     rgb.g = (99.4708025861 * log(max(temp, 1.0)) - 161.1195681661) / 255.0;
   } else {
-    // Guard against pow with zero or negative base
     rgb.g = 288.1221695283 * pow(max(temp - 60.0, 0.01), -0.0755148492) / 255.0;
   }
 
@@ -131,11 +134,11 @@ vec3 blackbodyColor(float temperature) {
   } else if (temp <= 19.0) {
     rgb.b = 0.0;
   } else {
-    // Guard against log(0) - ensure temp - 10.0 > 0
     rgb.b = (138.5177312231 * log(max(temp - 10.0, 0.01)) - 305.0447927307) / 255.0;
   }
 
   return clamp(rgb, 0.0, 1.0);
+#endif
 }
 
 /**

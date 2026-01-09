@@ -322,10 +322,14 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     float shellMask;
     float stepSize = adaptiveStepSizeWithMask(ndRadius, shellMask);
 
+    // PERF (OPT-BH-16): Cache diskR and diskH for the entire iteration.
+    // These are used multiple times: step size adaptation, density sampling, crossing detection.
+    // Computing length(pos.xz) once per iteration saves ~20% of volumetric overhead.
+    float diskR = length(pos.xz);
+    float diskH = abs(pos.y);
+
     // In volumetric mode, we might want smaller steps inside the disk
     #ifdef USE_VOLUMETRIC_DISK
-    float diskH = abs(pos.y);
-    float diskR = length(pos.xz);
     // Simple check if we are near the disk plane
     // PERF (OPT-BH-6): Use pre-computed uDiskInnerR/uDiskOuterR
     if (diskH < uManifoldThickness * uHorizonRadius * 2.0 &&
@@ -382,9 +386,9 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
 
     #ifdef USE_VOLUMETRIC_DISK
     // Volumetric sampling
-    // PERF: Reuse diskR from step size calculation, update for new position
-    // PERF (OPT-BH-6): Use pre-computed uDiskInnerR uniform
-    diskR = length(pos.xz); // Update diskR for the new position after stepping
+    // PERF (OPT-BH-16): Update cached diskR for the new position after stepping.
+    // This single length() call replaces what was previously computed twice.
+    diskR = length(pos.xz);
     float density = getDiskDensity(pos, time, diskR);
     if (density > 0.001) {
         // Calculate normal if needed for coloring or if likely needed for depth

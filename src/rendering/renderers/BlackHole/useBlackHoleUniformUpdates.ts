@@ -358,11 +358,16 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     // Note: 'pbr-face' provides uRoughness, uMetallic, uSpecularIntensity, uSpecularColor
     UniformManager.applyToMaterial(material, ['lighting', 'quality', 'color', 'pbr-face'])
 
-    // Override quality multiplier to include coverage-based reduction
+    // Override quality multiplier to include coverage-based and dimension-based reduction
     // This composes with the base quality from UniformManager
+    // PERF (OPT-BH-21): Dimension-aware quality reduction
+    // Higher dimensions (4D+) have more visual complexity that masks fine detail,
+    // so we can safely reduce quality for better performance:
+    // 3D: 100%, 4D: 95%, 5D: 90%, 6D: 85%, 7D+: 80%
     if (u.uQualityMultiplier) {
       const baseQuality = u.uQualityMultiplier.value as number
-      const effectiveQuality = Math.max(baseQuality * coverageQuality, 0.5)
+      const dimensionQuality = Math.max(0.8, 1.0 - (dimension - 3) * 0.05)
+      const effectiveQuality = Math.max(baseQuality * coverageQuality * dimensionQuality, 0.5)
       u.uQualityMultiplier.value = effectiveQuality
     }
 

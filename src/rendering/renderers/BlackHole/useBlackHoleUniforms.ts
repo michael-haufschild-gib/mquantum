@@ -131,6 +131,8 @@ export function useBlackHoleUniforms() {
       uUltraFastMode: { value: false },
       // PERF (OPT-BH-1): Pre-baked noise texture for volumetric disk
       tDiskNoise: { value: null as THREE.Data3DTexture | null },
+      // PERF (OPT-BH-17): Pre-baked blackbody color LUT
+      tBlackbodyLUT: { value: null as THREE.DataTexture | null },
 
       // Performance mode - enables lower quality during rotation/animation
       uFastMode: { value: false },

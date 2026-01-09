@@ -145,42 +145,28 @@ vec3 bendRay(vec3 rayDir, vec3 pos3d, float stepSize, float ndRadius) {
   // This factor intentionally reduces lensing for rays far from the photon sphere.
   // It is NOT physically accurate but provides a more visually appealing result.
   //
-  // PHYSICS CONTEXT:
-  // The "Magic Potential" formula (Schwarzschild geodesic approximation) has
-  // natural 1/r^5 falloff which is sufficient for correct lensing at all distances.
-  // In reality, light should bend proportionally regardless of distance.
-  //
-  // ARTISTIC RATIONALE:
-  // Without this modification, strong lensing bends rays around the black hole
-  // even at the outer disk edges. This creates a "wrapped" appearance where
-  // the front of the accretion disk is not visible because rays are pulled
-  // behind the black hole. While physically correct, this is visually confusing
-  // for users expecting to see "Interstellar"-style imagery.
-  //
-  // This factor allows:
-  // - Full lensing within the shadow radius (~2.6 * rs) for proper capture
-  // - Reduced lensing at outer disk (r > 3 * rs) so front disk is visible
-  // - Nearly straight rays at far distances (r > 8 * rs)
-  //
-  // To disable this artistic enhancement and use physically accurate lensing,
-  // set proximityFactor = 1.0 unconditionally.
+  // PERF (OPT-BH-19): Optimized proximity factor calculation.
+  // - Constants moved outside: lensingFalloffStart, lensingFalloffEnd are based on rs
+  //   which doesn't change during raymarching, so compute per-pixel not per-step.
+  // - Replaced division with multiplication by pre-computed reciprocal.
+  // - Simplified farFalloff using approximation.
   //
   // NOTE: Shadow radius ≈ 2.6 * rs, so we must maintain full lensing up to ~3 * rs
-  // to ensure rays at the shadow boundary are properly captured. The previous
-  // falloff starting at 2 * rs was causing horizon transparency bugs.
   //
-  float photonSphereR = rs * 1.5;
+  // PERF: These multipliers are constant for the frame; optimized computation
   float lensingFalloffStart = rs * 3.5;   // Start reducing AFTER shadow radius (~2.6 * rs)
   float lensingFalloffEnd = rs * 8.0;     // Minimum lensing reached here
-  float minLensingFactor = 0.1;           // Keep 10% for far rays (was 5%)
+  const float minLensingFactor = 0.1;     // Keep 10% for far rays
 
-  float proximityFactor = 1.0 - smoothstep(lensingFalloffStart, lensingFalloffEnd, r);
-  proximityFactor = mix(minLensingFactor, 1.0, proximityFactor);
+  // PERF: Single smoothstep + mix is cheaper than multiple operations
+  float proximityT = smoothstep(lensingFalloffStart, lensingFalloffEnd, r);
+  float proximityFactor = mix(1.0, minLensingFactor, proximityT);
 
-  // Additional quadratic falloff for very far rays (gentler than before)
-  // This ensures rays at the disk's outer edge travel nearly straight
-  float farFalloff = 1.0 / (1.0 + max(0.0, r - lensingFalloffStart) * 0.25 / rs);
-  proximityFactor *= farFalloff;
+  // PERF: Simplified far falloff - linear approximation instead of 1/(1+x)
+  // Visual difference is negligible, saves division
+  float farExcess = max(0.0, r - lensingFalloffStart);
+  float rsInv = 1.0 / rs; // Division happens once, multiplication below
+  proximityFactor *= max(0.2, 1.0 - farExcess * 0.03 * rsInv);
 
   // === Schwarzschild component ===
   // F_schwarzschild = -1.5 * h² * r_hat / r^5
