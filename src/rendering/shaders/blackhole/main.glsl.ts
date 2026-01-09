@@ -352,14 +352,8 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     dir = bendRay(dir, pos, stepSize, ndRadius);
     bentDirection = dir;
 
-    // PERF (OPT-BH-2): Use cached shell mask from adaptiveStepSizeWithMask
-    // The mask was already computed for step size adaptation, so reuse it here.
-    // shellMask > 0 only when within 2× shell thickness of photon sphere.
-    if (shellMask > 0.001) {
-      vec3 shellEmit = photonShellEmissionWithMask(shellMask, pos);
-      // Volumetric integration: accumulate emission weighted by transmittance
-      accum.color += shellEmit * stepSize * accum.transmittance;
-    }
+    // PERF (OPT-BH-23): Shell emission removed - photonShellEmissionWithMask returned vec3(0.0)
+    // The shell visual effect comes from adaptive step sizing capturing more detail near photon sphere
 
     prevPos = pos;
     pos += dir * stepSize;
@@ -445,7 +439,11 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     // Even in volumetric mode, we detect disk plane crossings to create
     // the Einstein ring effect. Rays bending around the black hole cross
     // the disk plane multiple times, and each crossing accumulates color.
-    if (diskCrossings < MAX_DISK_CROSSINGS) {
+    //
+    // PERF (OPT-BH-27): Skip crossing detection in fast/ultra-fast mode.
+    // The volumetric sampling captures the disk, crossings add subtle Einstein rings.
+    // This saves ~5-10% in fast mode when Einstein ring detail isn't needed.
+    if (!uFastMode && !uUltraFastMode && diskCrossings < MAX_DISK_CROSSINGS) {
       vec3 crossingPos;
       if (detectDiskCrossing(prevPos, pos, crossingPos)) {
         vec3 hitColor = shadeDiskHit(crossingPos, dir, diskCrossings, time);

@@ -15,43 +15,41 @@ export const manifoldBlock = /* glsl */ `
 //----------------------------------------------
 
 /**
- * Noise function for manifold turbulence.
+ * PERF (OPT-BH-25): Unified texture-based noise for all black hole modules.
  *
- * This is a local implementation using sin-based hashing for value noise.
- * Note: A similar implementation exists in skybox/utils/noise.glsl.ts
- * using a different hash function. Both are valid; this local version
- * is kept to avoid cross-module GLSL import complexity.
+ * This replaces the old noise3D() which used 8 sin() calls (~80 ALU ops).
+ * Single texture fetch is ~4 cycles vs ~80 cycles for procedural.
  *
- * @param p - 3D position to sample noise at
+ * Defined here in manifold.glsl.ts because it compiles before disk-volumetric
+ * and disk-sdf, making snoise() available to all modules.
+ *
+ * @param v - 3D position to sample noise at
+ * @returns Noise value in [-1, 1] range
+ */
+float snoise(vec3 v) {
+#ifdef USE_NOISE_TEXTURE
+    // Scale factor matches the frequency used in texture generation (freqMul = 4.0)
+    // We use fract() for seamless tiling
+    vec3 uv = fract(v * 0.25); // 1/4 = 0.25 to match the 4.0 frequency in generator
+    // Sample texture and remap from [0,1] to [-1,1]
+    return texture(tDiskNoise, uv).r * 2.0 - 1.0;
+#else
+    // PERF: Ultra-fast hash-based noise fallback when texture unavailable
+    // This is ~10x faster than procedural simplex but lower quality
+    vec3 p = fract(v * 0.1031);
+    p += dot(p, p.zyx + 31.32);
+    float n = fract((p.x + p.y) * p.z);
+    return n * 2.0 - 1.0;
+#endif
+}
+
+/**
+ * Convenience wrapper returning [0, 1] range for legacy compatibility.
+ * @param p - 3D position to sample
  * @returns Noise value in [0, 1] range
  */
-float noise3D(vec3 p) {
-  vec3 i = floor(p);
-  vec3 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f); // Smoothstep
-
-  float n = dot(i, vec3(1.0, 57.0, 113.0));
-  float a = fract(sin(n) * 43758.5453);
-  float b = fract(sin(n + 1.0) * 43758.5453);
-  float c = fract(sin(n + 57.0) * 43758.5453);
-  float d = fract(sin(n + 58.0) * 43758.5453);
-  float e = fract(sin(n + 113.0) * 43758.5453);
-  float ff = fract(sin(n + 114.0) * 43758.5453);
-  float g = fract(sin(n + 170.0) * 43758.5453);
-  float h = fract(sin(n + 171.0) * 43758.5453);
-
-  float k0 = a;
-  float k1 = b - a;
-  float k2 = c - a;
-  float k3 = e - a;
-  float k4 = a - b - c + d;
-  float k5 = a - c - e + g;
-  float k6 = a - b - e + ff;
-  float k7 = -a + b + c - d + e - ff - g + h;
-
-  return k0 + k1 * f.x + k2 * f.y + k3 * f.z
-       + k4 * f.x * f.y + k5 * f.y * f.z + k6 * f.z * f.x
-       + k7 * f.x * f.y * f.z;
+float noise01(vec3 p) {
+    return snoise(p) * 0.5 + 0.5;
 }
 
 /**
@@ -158,20 +156,22 @@ float manifoldDensity(vec3 pos3d, float ndRadius, float time) {
   // Combine factors
   float density = radialFactor * verticalFactor;
 
+  // PERF (OPT-BH-25): Use texture-based snoise instead of expensive noise3D
   // Add turbulence noise
   if (uNoiseAmount > 0.001) {
     // Swirl in XZ plane
     float angle = atan(pos3d.z, pos3d.x);
     float swirlOffset = uSwirlAmount * r * 0.5 * sin(time);
     vec3 noisePos = vec3(r * 0.3, angle * 2.0 + swirlOffset, h * 0.5) * uNoiseScale;
-    
-    float n = noise3D(noisePos + time * 0.1);
-    
+
+    // snoise returns [-1, 1], convert to [0, 1] for ridged calculation
+    float n = snoise(noisePos + time * 0.1) * 0.5 + 0.5;
+
     // Ridged multifractal noise (electric/filigree look)
     // Convert [0,1] to [-1,1], then take 1 - abs()
     float ridged = 1.0 - abs(2.0 * n - 1.0);
     ridged = ridged * ridged; // PERF: Sharpen ridges (x² instead of pow)
-    
+
     density *= mix(1.0, ridged, uNoiseAmount);
   }
 

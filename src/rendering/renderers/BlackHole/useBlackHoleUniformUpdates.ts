@@ -192,6 +192,11 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     setUniform(u, 'uDiskInnerR', bhState.horizonRadius * bhState.diskInnerRadiusMul)
     setUniform(u, 'uDiskOuterR', bhState.horizonRadius * bhState.diskOuterRadiusMul)
 
+    // CRITICAL: Sync pre-computed lensing falloff boundaries on mount
+    setUniform(u, 'uLensingFalloffStart', bhState.horizonRadius * 3.5)
+    setUniform(u, 'uLensingFalloffEnd', bhState.horizonRadius * 8.0)
+    setUniform(u, 'uHorizonRadiusInv', 1.0 / Math.max(bhState.horizonRadius, 0.001))
+
     // CRITICAL: Sync pre-computed effective thickness on mount
     // Default to dimension 3 (disk) for initial thickness scale
     const initDim = useGeometryStore.getState().dimension
@@ -519,6 +524,12 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       const diskOuterR = bhState.horizonRadius * bhState.diskOuterRadiusMul
       setUniform(u, 'uDiskInnerR', diskInnerR)
       setUniform(u, 'uDiskOuterR', diskOuterR)
+
+      // PERF OPTIMIZATION (OPT-BH-26): Pre-compute lensing falloff boundaries
+      // These only depend on horizonRadius and are computed per-ray-step otherwise
+      setUniform(u, 'uLensingFalloffStart', bhState.horizonRadius * 3.5)
+      setUniform(u, 'uLensingFalloffEnd', bhState.horizonRadius * 8.0)
+      setUniform(u, 'uHorizonRadiusInv', 1.0 / Math.max(bhState.horizonRadius, 0.001))
 
       // PERF OPTIMIZATION (OPT-BH-13): Pre-compute effective thickness on CPU
       // This avoids per-pixel getManifoldThicknessScale() runtime branches

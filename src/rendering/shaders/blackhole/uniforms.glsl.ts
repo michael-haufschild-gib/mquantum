@@ -40,6 +40,10 @@ uniform float uLensingClamp;        // Maximum lensing effect
 uniform int uRayBendingMode;        // 0=spiral, 1=orbital (Einstein-ring)
 uniform float uDimPower;            // Pre-calculated pow(DIMENSION, emphasis)
 uniform float uOriginOffsetLengthSq; // Pre-calculated lengthSq of extra-dim offset
+// PERF (OPT-BH-26): Pre-computed lensing falloff boundaries (depend only on horizonRadius)
+uniform float uLensingFalloffStart; // rs * 3.5 - where lensing starts to reduce
+uniform float uLensingFalloffEnd;   // rs * 8.0 - where lensing reaches minimum
+uniform float uHorizonRadiusInv;    // 1.0 / uHorizonRadius - avoid per-pixel division
 
 // Photon shell
 uniform float uPhotonShellRadiusMul;    // R_p multiplier (default 1.3)
@@ -98,8 +102,7 @@ uniform float uEnvMapReady;         // 1.0 when envMap is valid, 0.0 otherwise
 
 // Doppler effect
 uniform bool uDopplerEnabled;       // Enable Doppler shift
-uniform float uDopplerStrength;     // Doppler intensity
-uniform float uDopplerHueShift;     // Max hue shift
+uniform float uDopplerStrength;     // Doppler intensity (also controls hue shift magnitude)
 
 // Motion blur
 uniform bool uMotionBlurEnabled;    // Enable motion blur

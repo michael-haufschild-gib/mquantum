@@ -198,10 +198,12 @@ vec3 shadeDiskHit(vec3 hitPos, vec3 rayDir, int hitIndex, float time) {
     color *= mix(0.7, 1.3, swirlBright * uSwirlAmount);
   }
 
+  // PERF (OPT-BH-25): Use texture-based snoise instead of expensive noise3D
   // Add noise turbulence
   if (uNoiseAmount > 0.001) {
     vec3 noisePos = vec3(r * 0.3, angle * 2.0, 0.0) * uNoiseScale;
-    float n = noise3D(noisePos + time * 0.1);
+    // snoise returns [-1, 1], convert to [0, 1] for ridged calculation
+    float n = snoise(noisePos + time * 0.1) * 0.5 + 0.5;
     float ridged = 1.0 - abs(2.0 * n - 1.0);
     ridged = ridged * ridged; // PERF: x² instead of pow
     color *= mix(1.0, ridged, uNoiseAmount);

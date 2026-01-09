@@ -145,28 +145,20 @@ vec3 bendRay(vec3 rayDir, vec3 pos3d, float stepSize, float ndRadius) {
   // This factor intentionally reduces lensing for rays far from the photon sphere.
   // It is NOT physically accurate but provides a more visually appealing result.
   //
-  // PERF (OPT-BH-19): Optimized proximity factor calculation.
-  // - Constants moved outside: lensingFalloffStart, lensingFalloffEnd are based on rs
-  //   which doesn't change during raymarching, so compute per-pixel not per-step.
-  // - Replaced division with multiplication by pre-computed reciprocal.
-  // - Simplified farFalloff using approximation.
+  // PERF (OPT-BH-26): Use pre-computed uniforms instead of per-step computation.
+  // uLensingFalloffStart, uLensingFalloffEnd, and uHorizonRadiusInv are computed
+  // once per frame on CPU, eliminating ~10 ALU ops per ray step.
   //
   // NOTE: Shadow radius ≈ 2.6 * rs, so we must maintain full lensing up to ~3 * rs
-  //
-  // PERF: These multipliers are constant for the frame; optimized computation
-  float lensingFalloffStart = rs * 3.5;   // Start reducing AFTER shadow radius (~2.6 * rs)
-  float lensingFalloffEnd = rs * 8.0;     // Minimum lensing reached here
   const float minLensingFactor = 0.1;     // Keep 10% for far rays
 
-  // PERF: Single smoothstep + mix is cheaper than multiple operations
-  float proximityT = smoothstep(lensingFalloffStart, lensingFalloffEnd, r);
+  // PERF: Single smoothstep + mix using pre-computed boundaries
+  float proximityT = smoothstep(uLensingFalloffStart, uLensingFalloffEnd, r);
   float proximityFactor = mix(1.0, minLensingFactor, proximityT);
 
-  // PERF: Simplified far falloff - linear approximation instead of 1/(1+x)
-  // Visual difference is negligible, saves division
-  float farExcess = max(0.0, r - lensingFalloffStart);
-  float rsInv = 1.0 / rs; // Division happens once, multiplication below
-  proximityFactor *= max(0.2, 1.0 - farExcess * 0.03 * rsInv);
+  // PERF: Simplified far falloff using pre-computed rsInv
+  float farExcess = max(0.0, r - uLensingFalloffStart);
+  proximityFactor *= max(0.2, 1.0 - farExcess * 0.03 * uHorizonRadiusInv);
 
   // === Schwarzschild component ===
   // F_schwarzschild = -1.5 * h² * r_hat / r^5

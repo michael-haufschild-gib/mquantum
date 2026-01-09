@@ -87,6 +87,10 @@ export function useBlackHoleUniforms() {
       uRayBendingMode: { value: 0 },
       uDimPower: { value: 1.0 }, // Pre-calculated pow(DIMENSION, emphasis)
       uOriginOffsetLengthSq: { value: 0.0 }, // Pre-calculated lengthSq of extra-dim offset
+      // PERF (OPT-BH-26): Pre-computed lensing falloff boundaries
+      uLensingFalloffStart: { value: 1.75 }, // Default: 0.5 * 3.5
+      uLensingFalloffEnd: { value: 4.0 }, // Default: 0.5 * 8.0
+      uHorizonRadiusInv: { value: 2.0 }, // Default: 1.0 / 0.5
 
       // Photon shell
       uPhotonShellRadiusMul: { value: 1.3 },
@@ -151,7 +155,6 @@ export function useBlackHoleUniforms() {
       // Doppler
       uDopplerEnabled: { value: false },
       uDopplerStrength: { value: 0.6 },
-      uDopplerHueShift: { value: 0.1 },
 
       // Animation
       uPulseEnabled: { value: false },

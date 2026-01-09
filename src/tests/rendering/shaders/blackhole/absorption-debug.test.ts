@@ -2,8 +2,8 @@
  * Test to verify horizon detection code is present in compiled shader
  */
 
-import { describe, it, expect } from 'vitest'
 import { composeBlackHoleShader } from '@/rendering/shaders/blackhole/compose'
+import { describe, expect, it } from 'vitest'
 
 describe('Black Hole Horizon Detection', () => {
   it('should include immediate horizon check after ray step', () => {
@@ -12,7 +12,6 @@ describe('Black Hole Horizon Detection', () => {
       shadows: false,
       temporal: false,
       ambientOcclusion: false,
-      volumetricDisk: true,
     })
 
     // Check for the immediate horizon check comment
@@ -36,7 +35,6 @@ describe('Black Hole Horizon Detection', () => {
       shadows: false,
       temporal: false,
       ambientOcclusion: false,
-      volumetricDisk: true,
     })
 
     // The isInsideHorizon function should check against uVisualEventHorizon
@@ -50,7 +48,6 @@ describe('Black Hole Horizon Detection', () => {
       shadows: false,
       temporal: false,
       ambientOcclusion: false,
-      volumetricDisk: true,
     })
 
     // When horizon is crossed, these should be set:

@@ -55,29 +55,8 @@ float photonShellMask(float ndRadius) {
   return mask;
 }
 
-/**
- * Calculate photon shell emission.
- *
- * NOTE: Shell emission is now handled directly in main.glsl.ts using
- * lensing-aware closest approach tracking. This function is kept as a
- * stub for compatibility but returns vec3(0.0).
- *
- * The new implementation emits glow when a ray is at its closest approach
- * to the black hole, which naturally follows the lensing-deformed visual
- * shape instead of being a geometric sphere.
- */
-vec3 photonShellEmissionWithMask(float mask, vec3 pos) {
-  // Shell emission moved to main.glsl.ts for lensing-aware rendering
-  return vec3(0.0);
-}
-
-/**
- * Calculate photon shell emission (convenience wrapper).
- * NOTE: Shell emission is now handled in main.glsl.ts
- */
-vec3 photonShellEmission(float ndRadius, vec3 pos) {
-  return vec3(0.0);
-}
+// PERF (OPT-BH-23): Shell emission functions removed - they returned vec3(0.0)
+// Shell visual effect is handled by adaptive step sizing near photon sphere
 
 /**
  * Get adaptive step size modifier near shell, also outputs the computed mask.
