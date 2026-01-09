@@ -110,6 +110,13 @@ uniform float uMotionBlurStrength;  // Blur intensity
 uniform int uMotionBlurSamples;     // Blur sample count
 uniform float uMotionBlurRadialFalloff; // Radial falloff
 
+// SSS (Subsurface Scattering) - from appearanceStore
+uniform bool uSssEnabled;           // Enable subsurface scattering
+uniform float uSssIntensity;        // SSS intensity (0.0-2.0)
+uniform vec3 uSssColor;             // SSS tint color
+uniform float uSssThickness;        // SSS thickness factor (0.1-5.0)
+uniform float uSssJitter;           // SSS jitter amount (0.0-1.0)
+
 // Animation state
 uniform bool uPulseEnabled;          // Enable pulse animation
 uniform float uPulseSpeed;           // Pulse speed

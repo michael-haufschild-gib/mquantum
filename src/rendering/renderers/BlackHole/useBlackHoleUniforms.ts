@@ -171,6 +171,21 @@ export function useBlackHoleUniforms() {
       uMotionBlurSamples: { value: 4 },
       uMotionBlurRadialFalloff: { value: 1.0 },
 
+      // SSS (Subsurface Scattering - from appearanceStore)
+      uSssEnabled: { value: false },
+      uSssIntensity: { value: 1.0 },
+      uSssColor: { value: new THREE.Color('#ff8844').convertSRGBToLinear() },
+      uSssThickness: { value: 1.0 },
+      uSssJitter: { value: 0.2 },
+
+      // Fresnel Rim (from appearanceStore - shared uniforms)
+      uFresnelEnabled: { value: false },
+      uFresnelIntensity: { value: 0.5 },
+      uRimColor: { value: new THREE.Color('#ffffff').convertSRGBToLinear() },
+
+      // Ambient Occlusion (from appearanceStore - shared uniforms)
+      uAoEnabled: { value: false },
+
       // Slice animation (for trueND mode)
       uSliceSpeed: { value: 0.02 },
       uSliceAmplitude: { value: 0.3 },

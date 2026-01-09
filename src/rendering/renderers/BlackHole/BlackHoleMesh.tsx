@@ -22,6 +22,7 @@ import { RENDER_LAYERS } from '@/rendering/core/layers'
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial'
 import { composeBlackHoleShader, generateBlackHoleVertexShader } from '@/rendering/shaders/blackhole/compose'
 import { generateBlackbodyLUT, generateRidgedNoiseTexture3D } from '@/rendering/utils/NoiseGenerator'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useEffect, useMemo, useRef } from 'react'
@@ -66,6 +67,14 @@ const BlackHoleMesh = () => {
   const farRadius = useExtendedObjectStore((state) => state.blackhole.farRadius)
   const horizonRadius = useExtendedObjectStore((state) => state.blackhole.horizonRadius)
 
+  // Appearance settings that affect shader compilation (SSS/Fresnel)
+  // These are from the global SharedAdvancedControls UI
+  const sssEnabled = useAppearanceStore((state) => state.sssEnabled)
+  const fresnelEnabled = useAppearanceStore((state) => state.shaderSettings.surface.fresnelEnabled)
+  // Note: AO is per-object in other shaders (schroedingerSlice.aoEnabled)
+  // For black hole, we use a simple volumetric approximation when enabled
+  // TODO: Add aoEnabled to blackholeSlice if UI control is needed
+
   // Create uniforms using extracted hook
   const uniforms = useBlackHoleUniforms()
 
@@ -101,7 +110,8 @@ const BlackHoleMesh = () => {
   // v4: Added OPT-BH-15/16/17 major performance overhaul (2x FPS target)
   // v5: OPT-BH-23/24/25/26/27 - Dead code removal, single noise sample,
   //     unified snoise, pre-computed lensing constants, fast-mode crossing skip
-  const SHADER_VERSION = 5
+  // v6: Added Fresnel rim and SSS shader modules with proper intensity scaling
+  const SHADER_VERSION = 6
 
   // Compile shader
   const { fragmentShader } = useMemo(() => {
@@ -109,7 +119,9 @@ const BlackHoleMesh = () => {
       dimension,
       shadows: false,
       temporal: false,
-      ambientOcclusion: false,
+      ambientOcclusion: false, // AO disabled until added to blackholeSlice
+      sss: sssEnabled,
+      fresnel: fresnelEnabled,
       temporalAccumulation: temporalEnabled,
       doppler: dopplerEnabled,
       envMap: true,
@@ -118,15 +130,15 @@ const BlackHoleMesh = () => {
       blackbodyLUT: true, // PERF (OPT-BH-17): Enable blackbody LUT for faster temperature coloring
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, SHADER_VERSION])
+  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, fresnelEnabled, SHADER_VERSION])
 
   // Generate vertex shader
   const vertexShader = useMemo(() => generateBlackHoleVertexShader(), [])
 
   // Generate material key for caching
   const materialKey = useMemo(() => {
-    return `blackhole-${dimension}-${temporalEnabled}-${dopplerEnabled}-${sliceAnimationEnabled}-v${SHADER_VERSION}`
-  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, SHADER_VERSION])
+    return `blackhole-${dimension}-${temporalEnabled}-${dopplerEnabled}-${sliceAnimationEnabled}-${sssEnabled}-${fresnelEnabled}-v${SHADER_VERSION}`
+  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, fresnelEnabled, SHADER_VERSION])
 
   // Note: Material disposal is handled automatically by React Three Fiber
   // when TrackedShaderMaterial unmounts (materialKey change causes remount).

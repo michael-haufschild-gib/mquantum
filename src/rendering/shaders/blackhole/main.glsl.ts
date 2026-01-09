@@ -427,6 +427,59 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
         // PERF (OPT-BH-6): Pass pre-computed r and use uDiskInnerR uniform
         vec3 emission = getDiskEmission(pos, density, time, dir, stepNormal, diskR, uDiskInnerR);
 
+        // === FRESNEL RIM ENHANCEMENT ===
+        #ifdef USE_FRESNEL
+        if (uFresnelEnabled && uFresnelIntensity > 0.0 && !uFastMode) {
+            // Compute normal if not already done
+            if (!computedNormal) {
+                stepNormal = computeVolumetricDiskNormal(pos, dir);
+                computedNormal = true;
+            }
+            // Fresnel rim: enhance emission at grazing angles
+            // Use smoothstepped density (0-1 range) for modulation, not raw density
+            float NdotV = abs(dot(stepNormal, -dir));
+            float t = 1.0 - NdotV;
+            float rim = t * t * t * uFresnelIntensity * 5.0;
+            float densityMod = smoothstep(0.0, 0.2, density); // Normalize density to 0-1
+            emission += uRimColor * rim * densityMod * length(emission);
+        }
+        #endif
+
+        // === SUBSURFACE SCATTERING ===
+        #ifdef USE_SSS
+        if (uSssEnabled && uSssIntensity > 0.0 && !uFastMode) {
+            // Compute normal if not already done
+            if (!computedNormal) {
+                stepNormal = computeVolumetricDiskNormal(pos, dir);
+                computedNormal = true;
+            }
+            // Use radial direction as pseudo-light (light from center outward)
+            vec3 lightDir = normalize(vec3(pos.x, 0.0, pos.z));
+            vec3 sss = computeSSS(lightDir, -dir, stepNormal, 0.5, uSssThickness * 4.0, 0.0, uSssJitter, gl_FragCoord.xy);
+            // Scale SSS by emission brightness, not raw density
+            float emissionLum = dot(emission, vec3(0.2126, 0.7152, 0.0722));
+            emission += sss * uSssColor * uSssIntensity * 3.0 * max(emissionLum, 0.1);
+        }
+        #endif
+
+        // === AMBIENT OCCLUSION (volumetric approximation) ===
+        #ifdef USE_AO
+        if (uAoEnabled && !uFastMode) {
+            // Volumetric AO: sample density in nearby directions
+            // This is a simplified approximation since we don't have an SDF
+            float ao = 1.0;
+            float aoRadius = uHorizonRadius * 0.3;
+            // Sample 4 directions for performance
+            float d1 = getDiskDensity(pos + vec3(aoRadius, 0.0, 0.0), time, diskR + aoRadius);
+            float d2 = getDiskDensity(pos + vec3(-aoRadius, 0.0, 0.0), time, diskR);
+            float d3 = getDiskDensity(pos + vec3(0.0, 0.0, aoRadius), time, diskR);
+            float d4 = getDiskDensity(pos + vec3(0.0, 0.0, -aoRadius), time, diskR);
+            float nearbyDensity = (d1 + d2 + d3 + d4) * 0.25;
+            ao = 1.0 - clamp(nearbyDensity * 0.5, 0.0, 0.5);
+            emission *= ao;
+        }
+        #endif
+
         // Beer-Lambert law integration
         // transmittance *= exp(-density * stepSize * absorption_coeff)
         // For emission-absorption:

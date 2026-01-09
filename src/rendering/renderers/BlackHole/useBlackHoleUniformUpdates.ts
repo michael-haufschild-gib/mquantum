@@ -125,6 +125,7 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
   const lastRotationVersionRef = useRef(-1)
   const lastGravityVersionRef = useRef(-1)
   const lastDimensionRef = useRef(-1)
+  const lastAppearanceVersionRef = useRef(-1)
 
   // PERF (OPT-BH-3): Camera velocity tracking for ultra-fast mode
   // When camera moves quickly, enable ultra-fast mode to skip noise computation
@@ -320,6 +321,9 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     const gravityVersion = ppState.gravityVersion
     // Get rotation version for dirty tracking
     const rotationVersion = useRotationStore.getState().version
+    // Get appearance state for SSS/Fresnel/AO (from global appearance controls)
+    const appearanceState = useAppearanceStore.getState()
+    const appearanceVersion = appearanceState.appearanceVersion
 
     // ============================================
     // DIRTY-FLAG: Check which categories need updating
@@ -328,6 +332,7 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     const gravityChanged = gravityVersion !== lastGravityVersionRef.current
     const rotationChanged = rotationVersion !== lastRotationVersionRef.current
     const dimensionChanged = dimension !== lastDimensionRef.current
+    const appearanceChanged = appearanceVersion !== lastAppearanceVersionRef.current
 
     // Update matrices from mesh transform (handles position/rotation/scale)
     // Only call expensive updateMatrixWorld when mesh might have moved
@@ -604,6 +609,35 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
 
       // Update version ref
       lastGravityVersionRef.current = gravityVersion
+    }
+
+    // ============================================
+    // APPEARANCE UNIFORMS (SSS/Fresnel/AO from global controls)
+    // ============================================
+    if (appearanceChanged) {
+      // SSS (Subsurface Scattering)
+      setUniform(u, 'uSssEnabled', appearanceState.sssEnabled)
+      setUniform(u, 'uSssIntensity', appearanceState.sssIntensity)
+      setUniform(u, 'uSssThickness', appearanceState.sssThickness)
+      setUniform(u, 'uSssJitter', appearanceState.sssJitter)
+      if (u.uSssColor?.value) {
+        ;(u.uSssColor.value as THREE.Color).set(appearanceState.sssColor)
+      }
+
+      // Fresnel Rim (from shared surface settings)
+      setUniform(u, 'uFresnelEnabled', appearanceState.shaderSettings.surface.fresnelEnabled)
+      setUniform(u, 'uFresnelIntensity', appearanceState.fresnelIntensity)
+      if (u.uRimColor?.value) {
+        // Rim color uses edgeColor from appearance (same as other objects)
+        ;(u.uRimColor.value as THREE.Color).set(appearanceState.edgeColor)
+      }
+
+      // Note: AO is per-object (not in global appearanceStore)
+      // Black hole uses volumetric AO approximation controlled by aoEnabled in blackholeSlice
+      // For now, AO is controlled via shader compilation flag only
+
+      // Update version ref
+      lastAppearanceVersionRef.current = appearanceVersion
     }
 
     // ========================================================================

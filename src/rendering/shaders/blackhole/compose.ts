@@ -11,7 +11,9 @@
 import { constantsBlock } from '../shared/core/constants.glsl'
 import { precisionBlock } from '../shared/core/precision.glsl'
 import { uniformsBlock } from '../shared/core/uniforms.glsl'
+import { aoBlock } from '../shared/features/ao.glsl'
 import { temporalBlock } from '../shared/features/temporal.glsl'
+import { sssBlock } from '../shared/lighting/sss.glsl'
 import { ShaderConfig } from '../shared/types'
 import { GLSL_ALL_PALETTE_FUNCTIONS } from '../palette'
 
@@ -63,6 +65,10 @@ export function composeBlackHoleShader(config: BlackHoleShaderConfig) {
     sliceAnimation: enableSliceAnimation = false,
     noiseTexture: enableNoiseTexture = true, // PERF (OPT-BH-1): Enable by default for faster rendering
     blackbodyLUT: enableBlackbodyLUT = true, // PERF (OPT-BH-17): Enable by default for faster rendering
+    // Shared effects from appearanceStore
+    sss: enableSss = false,
+    fresnel: enableFresnel = false,
+    ambientOcclusion: enableAO = false,
   } = config
 
   const defines: string[] = []
@@ -125,6 +131,27 @@ export function composeBlackHoleShader(config: BlackHoleShaderConfig) {
     features.push('Slice Animation')
   }
 
+  // SSS (Subsurface Scattering)
+  const useSss = enableSss && !overrides.includes('SSS')
+  if (useSss) {
+    defines.push('#define USE_SSS')
+    features.push('Subsurface Scattering')
+  }
+
+  // Fresnel rim lighting
+  const useFresnel = enableFresnel && !overrides.includes('Fresnel')
+  if (useFresnel) {
+    defines.push('#define USE_FRESNEL')
+    features.push('Fresnel Rim')
+  }
+
+  // Ambient Occlusion (volumetric approximation for black hole)
+  const useAO = enableAO && !overrides.includes('Ambient Occlusion')
+  if (useAO) {
+    defines.push('#define USE_AO')
+    features.push('Ambient Occlusion')
+  }
+
   // Note: Shadows not implemented for black holes - shader code doesn't exist yet
   // Can be added later when proper volumetric shadow raymarching is implemented
 
@@ -178,6 +205,10 @@ uniform float uSliceAmplitude;
 
     // Effects
     { name: 'Motion Blur', content: motionBlurBlock, condition: enableMotionBlur },
+
+    // Shared lighting/feature modules
+    { name: 'SSS', content: sssBlock, condition: useSss },
+    { name: 'Ambient Occlusion', content: aoBlock, condition: useAO },
 
     // Temporal (if needed)
     {
