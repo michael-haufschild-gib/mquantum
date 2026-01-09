@@ -38,6 +38,19 @@ export const colorsBlock = /* glsl */ `
  * @param normal - Surface normal (for normal-based coloring)
  * @return RGB color
  */
+/**
+ * Get color from the selected algorithm.
+ *
+ * PERF (OPT-BH-20): Optimized color algorithms:
+ * - Removed rgb2hsl()/hsl2rgb() from MONOCHROMATIC/ANALOGOUS (~40 ALU ops saved)
+ * - Use direct RGB lightness variation instead
+ * - Simplified PHASE to reuse existing angle if available
+ *
+ * @param t - Input parameter [0, 1] (usually normalized radial distance)
+ * @param pos - 3D position (for normal/phase based algorithms)
+ * @param normal - Surface normal (for normal-based coloring)
+ * @return RGB color
+ */
 vec3 getAlgorithmColor(float t, vec3 pos, vec3 normal) {
   // PERF: Use else-if chain for proper mutual exclusion.
 

@@ -140,7 +140,8 @@ vec3 bendRay(vec3 rayDir, vec3 pos3d, float stepSize, float ndRadius) {
   // This replaces 2 smoothsteps, 1 mix, and 2 max calls with 1 smoothstep + 1 mix.
   // We want: 1.0 near horizon, decaying to 0.1 far away.
   // uLensingFalloffStart/End are pre-computed boundaries.
-  float proximityT = smoothstep(uLensingFalloffEnd, uLensingFalloffStart, r); // 1.0 near, 0.0 far
+  // Fix: standard smoothstep(min, max, x) logic to avoid driver issues with min > max
+  float proximityT = 1.0 - smoothstep(uLensingFalloffStart, uLensingFalloffEnd, r); // 1.0 near, 0.0 far
   
   // Mix between 0.1 (far) and 1.0 (near)
   float proximityFactor = mix(0.1, 1.0, proximityT);

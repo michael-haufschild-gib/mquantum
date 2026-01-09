@@ -75,7 +75,12 @@ export const gravitationalLensingFragmentShader = /* glsl */ `
     float ringWidth = ringRadius * 0.3;
     float diff = abs(r - ringRadius);
     float safeWidth = max(ringWidth, 0.001);
-    float falloff = exp(-diff * diff / (safeWidth * safeWidth * 2.0));
+    
+    // PERF: Lorentzian approximation 1/(1+x^2) instead of expensive exp()
+    // This provides a similar bell curve shape but is much faster
+    float x = diff / safeWidth;
+    float falloff = 1.0 / (1.0 + x * x);
+    
     return 1.0 + falloff * 0.3;
   }
 
@@ -97,7 +102,17 @@ export const gravitationalLensingFragmentShader = /* glsl */ `
     // Compute lensing magnitude (deflection) for early-exit check
     // Formula: deflection = (strength * distortionScale * ndScale * 0.02) / r^falloff
     // uNDScale compensates for faster falloff in higher dimensions (Tangherlini metric)
-    float deflection = (effectiveStrength * uNDScale * 0.02) / pow(safeR, uFalloff);
+    float deflection = (effectiveStrength * uNDScale * 0.02);
+    
+    // PERF: Avoid expensive pow() for common integer falloff values (1.0 and 2.0)
+    if (abs(uFalloff - 2.0) < 0.01) {
+      deflection /= (safeR * safeR);
+    } else if (abs(uFalloff - 1.0) < 0.01) {
+      deflection /= safeR;
+    } else {
+      deflection /= pow(safeR, uFalloff);
+    }
+    
     deflection = min(deflection, 0.5); // Clamp to prevent extreme distortion
 
     // Early exit 2: Deflection is sub-pixel, no visible effect

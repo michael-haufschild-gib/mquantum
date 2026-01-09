@@ -30,7 +30,7 @@ float snoise(vec3 v) {
 #ifdef USE_NOISE_TEXTURE
     // Scale factor matches the frequency used in texture generation (freqMul = 4.0)
     // We use fract() for seamless tiling
-    vec3 uv = fract(v * 0.25); // 1/4 = 0.25 to match the 4.0 frequency in generator
+    vec3 uv = fract(v * 0.25); 
     // Sample texture and remap from [0,1] to [-1,1]
     return texture(tDiskNoise, uv).r * 2.0 - 1.0;
 #else
