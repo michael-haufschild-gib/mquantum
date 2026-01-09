@@ -140,15 +140,17 @@ const BlackHoleMesh = () => {
     meshRef,
   })
 
-  // Calculate box size to ensure it covers the entire visual effect
-  // Shader uses farRadius * horizonRadius as the bounding sphere radius for raymarching.
-  // Use 2.2x radius (diameter + 10% padding) to prevent clipping.
+  // Calculate bounding volume
+  // Shader uses farRadius * horizonRadius as the clipping sphere radius.
+  // We use a SphereGeometry with slightly larger radius to ensure coverage.
+  // Previously used BoxGeometry (size ~2.2x), but SphereGeometry reduces
+  // fragment shader invocations on empty corners (Better Bounding Volume).
   const shaderRadius = farRadius * horizonRadius
-  const boxSize = shaderRadius * 2.2
-
+  
   return (
     <mesh ref={meshRef} layers={RENDER_LAYERS.MAIN_OBJECT} frustumCulled={true} scale={[1, 1, 1]}>
-      <boxGeometry args={[boxSize, boxSize, boxSize]} />
+      {/* Reduced segments from 64x64 to 32x16 to prevent Quad Overshading performance penalty */}
+      <sphereGeometry args={[shaderRadius * 1.05, 32, 16]} />
       <TrackedShaderMaterial
         shaderName="Black Hole N-Dimensional"
         materialKey={materialKey}

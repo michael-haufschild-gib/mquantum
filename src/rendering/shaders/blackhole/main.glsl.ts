@@ -20,16 +20,26 @@ export const mainBlock = /* glsl */ `
 // Note: Shader constants are defined locally where used (e.g., in shell.glsl.ts, deferred-lensing.glsl.ts)
 
 /**
- * Calculate intersection with a sphere.
+ * Calculate intersection with an axis-aligned spheroid (ellipsoid).
+ * The spheroid is defined by a radius and a flattening factor for the Y axis.
  * Returns vec2(near, far). If no intersection, returns vec2(-1.0).
  */
-vec2 intersectSphere(vec3 ro, vec3 rd, float rad) {
-    float b = dot(ro, rd);
-    float c = dot(ro, ro) - rad * rad;
-    float h = b * b - c;
+vec2 intersectSpheroid(vec3 ro, vec3 rd, float rad, float yFlatten) {
+    // Transform ray to unit sphere space (scale by 1/rad, and Y by 1/flatten)
+    vec3 s = vec3(1.0, 1.0/yFlatten, 1.0) / rad;
+    vec3 roS = ro * s;
+    vec3 rdS = rd * s;
+    
+    float a = dot(rdS, rdS);
+    float b = 2.0 * dot(roS, rdS);
+    float c = dot(roS, roS) - 1.0;
+    
+    float h = b*b - 4.0*a*c;
     if (h < 0.0) return vec2(-1.0);
+    
     float sqrtH = sqrt(h);
-    return vec2(-b - sqrtH, -b + sqrtH);
+    // Standard quadratic formula: (-b +/- sqrt(h)) / 2a
+    return vec2(-b - sqrtH, -b + sqrtH) / (2.0 * a);
 }
 
 /**
@@ -236,11 +246,15 @@ float interleavedGradientNoise(vec2 uv) {
 RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
   AccumulationState accum = initAccumulation();
 
-  // Bounding sphere skip
+  // Bounding volume skip
   // Scale is now handled by mesh transform, so rayOrigin/rayDir are already in local space
   // We remove the hardcoded 500.0 min radius to respect uFarRadius and match geometry
   float farRadius = uFarRadius * uHorizonRadius;
-  vec2 intersect = intersectSphere(rayOrigin, rayDir, farRadius);
+  
+  // Use Flattened Spheroid (Ellipsoid) intersection
+  // Flatten Y axis by 50% (0.5) to skip empty space above/below the disk
+  // This matches the visual "pancake" shape of the black hole system
+  vec2 intersect = intersectSpheroid(rayOrigin, rayDir, farRadius, 0.5);
 
   // Early exit if entire bounding sphere is behind the camera
   // intersect.y is the far intersection - if it's negative, the sphere is entirely behind us
