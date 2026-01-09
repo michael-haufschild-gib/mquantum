@@ -302,6 +302,19 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     if (totalDist > maxDist) break;
     if (accum.transmittance < uTransmittanceCutoff) break; // Early exit for opaque
 
+    // Improved Early Ray Termination
+    // 1. Exit if mostly opaque and near/inside photon sphere (behind horizon region)
+    // No more meaningful contribution possible
+    if (accum.transmittance < 0.1 && ndRadius < uVisualEventHorizon * 1.5) {
+        break;
+    }
+
+    // 2. Exit if ray has escaped the accretion disk without hitting anything significant
+    // Check if we are past the outer disk radius and haven't accumulated much density
+    if (ndRadius > uDiskOuterR * 1.5 && accum.totalDensity < 0.01 && !hitHorizon) {
+        break;
+    }
+
     iterationsUsed = i + 1;  // Track iterations for debug heatmap
 
     // ndRadius is already computed (from initial before loop OR from previous iteration's post-step)
