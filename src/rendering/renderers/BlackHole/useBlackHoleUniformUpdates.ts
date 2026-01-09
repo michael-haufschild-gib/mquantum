@@ -188,6 +188,26 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
     setUniform(u, 'uShellDeltaPrecomputed', initShellDelta)
     setUniform(u, 'uShellGlowStrength', bhState.shellGlowStrength)
 
+    // CRITICAL: Sync pre-computed disk radii on mount
+    setUniform(u, 'uDiskInnerR', bhState.horizonRadius * bhState.diskInnerRadiusMul)
+    setUniform(u, 'uDiskOuterR', bhState.horizonRadius * bhState.diskOuterRadiusMul)
+
+    // CRITICAL: Sync pre-computed effective thickness on mount
+    // Default to dimension 3 (disk) for initial thickness scale
+    const initDim = useGeometryStore.getState().dimension
+    const initManifoldType = MANIFOLD_TYPE_MAP[bhState.manifoldType] ?? 0
+    let initThicknessScale = 1.0
+    if (initManifoldType === 0) {
+      if (initDim <= 3) initThicknessScale = 1.0
+      else if (initDim === 4) initThicknessScale = 2.0
+      else if (initDim <= 6) initThicknessScale = Math.min(initDim - 2, bhState.thicknessPerDimMax)
+      else initThicknessScale = Math.min(initDim, bhState.thicknessPerDimMax)
+    } else if (initManifoldType === 1) initThicknessScale = 1.0
+    else if (initManifoldType === 2) initThicknessScale = 2.0
+    else if (initManifoldType === 3) initThicknessScale = Math.min(initDim - 2, bhState.thicknessPerDimMax)
+    else initThicknessScale = Math.min(initDim, bhState.thicknessPerDimMax)
+    setUniform(u, 'uEffectiveThickness', bhState.manifoldThickness * bhState.horizonRadius * initThicknessScale)
+
     // Sync camera uniforms
     if (u.uCameraPosition?.value) {
       ;(u.uCameraPosition.value as THREE.Vector3).copy(camera.position)
@@ -494,6 +514,23 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       const diskOuterR = bhState.horizonRadius * bhState.diskOuterRadiusMul
       setUniform(u, 'uDiskInnerR', diskInnerR)
       setUniform(u, 'uDiskOuterR', diskOuterR)
+
+      // PERF OPTIMIZATION (OPT-BH-13): Pre-compute effective thickness on CPU
+      // This avoids per-pixel getManifoldThicknessScale() runtime branches
+      const manifoldTypeInt = MANIFOLD_TYPE_MAP[bhState.manifoldType] ?? 0
+      let thicknessScale = 1.0
+      if (manifoldTypeInt === 0) {
+        // Auto mode: select based on dimension
+        if (dimension <= 3) thicknessScale = 1.0 // disk
+        else if (dimension === 4) thicknessScale = 2.0 // sheet
+        else if (dimension <= 6) thicknessScale = Math.min(dimension - 2, bhState.thicknessPerDimMax) // slab
+        else thicknessScale = Math.min(dimension, bhState.thicknessPerDimMax) // field
+      } else if (manifoldTypeInt === 1) thicknessScale = 1.0 // disk
+      else if (manifoldTypeInt === 2) thicknessScale = 2.0 // sheet
+      else if (manifoldTypeInt === 3) thicknessScale = Math.min(dimension - 2, bhState.thicknessPerDimMax) // slab
+      else thicknessScale = Math.min(dimension, bhState.thicknessPerDimMax) // field
+      const effectiveThickness = bhState.manifoldThickness * bhState.horizonRadius * thicknessScale
+      setUniform(u, 'uEffectiveThickness', effectiveThickness)
 
       // Manifold
       setUniform(u, 'uManifoldType', MANIFOLD_TYPE_MAP[bhState.manifoldType] ?? 0)

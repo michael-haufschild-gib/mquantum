@@ -59,6 +59,8 @@ uniform float uDiskOuterRadiusMul;  // Outer disk radius multiplier
 // PERF (OPT-BH-6): Pre-computed disk radii to avoid per-pixel multiplications
 uniform float uDiskInnerR;          // Pre-computed: uHorizonRadius * uDiskInnerRadiusMul
 uniform float uDiskOuterR;          // Pre-computed: uHorizonRadius * uDiskOuterRadiusMul
+// PERF (OPT-BH-13): Pre-computed effective thickness to avoid per-pixel getManifoldThicknessScale()
+uniform float uEffectiveThickness;  // Pre-computed: uManifoldThickness * uHorizonRadius * thicknessScale
 uniform float uRadialSoftnessMul;   // Radial edge softness
 uniform float uThicknessPerDimMax;  // Max thickness per extra dimension
 uniform float uHighDimWScale;       // W coordinate scaling for high-D

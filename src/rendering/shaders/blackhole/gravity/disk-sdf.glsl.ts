@@ -34,8 +34,8 @@ float sdfDisk(vec3 pos3d) {
   // PERF (OPT-BH-6): Use pre-computed disk radii uniforms
   float innerR = uDiskInnerR;
   float outerR = uDiskOuterR;
-  float thickness = uManifoldThickness * uHorizonRadius * getManifoldThicknessScale();
-  float halfThick = thickness * 0.5;
+  // PERF (OPT-BH-13): Use pre-computed effective thickness from CPU
+  float halfThick = uEffectiveThickness * 0.5;
 
   // Clamp r to annulus range
   float clampedR = clamp(r, innerR, outerR);
@@ -116,10 +116,9 @@ bool detectDiskCrossing(vec3 prevPos, vec3 currPos, out vec3 crossingPos) {
  * @returns Surface normal
  */
 vec3 computeDiskNormal(vec3 pos3d, vec3 approachDir) {
-  float thickness = uManifoldThickness * uHorizonRadius * getManifoldThicknessScale();
-
+  // PERF (OPT-BH-13): Use pre-computed effective thickness from CPU
   // For very thin disks, use flat normal
-  if (thickness < 0.05) {
+  if (uEffectiveThickness < 0.05) {
     // Normal points opposite to approach direction (toward viewer)
     return vec3(0.0, -sign(approachDir.y), 0.0);
   }
@@ -180,14 +179,20 @@ vec3 shadeDiskHit(vec3 hitPos, vec3 rayDir, int hitIndex, float time) {
   // Light from closer to the horizon is redshifted (dimmer and redder)
   float gRedshift = gravitationalRedshift(r);
   color *= gRedshift; // Intensity reduction
-  // Also shift hue slightly toward red for visual effect
-  vec3 hsl = rgb2hsl(color);
-  hsl.x = fract(hsl.x + (1.0 - gRedshift) * 0.05); // Slight red shift
-  color = hsl2rgb(hsl);
+  // PERF (OPT-BH-12): Use fast RGB red-tint instead of expensive HSL round-trip
+  // Simple red shift: mix toward a red-biased version of the color
+  // This avoids rgb2hsl + hsl2rgb (~20+ ALU ops) per disk crossing
+  float redShiftAmount = (1.0 - gRedshift) * 0.15; // Subtle effect
+  vec3 redTint = vec3(color.r * 1.2, color.g * 0.9, color.b * 0.85);
+  color = mix(color, redTint, redShiftAmount);
+
+  // PERF (OPT-BH-14): Calculate angle once for both swirl and noise
+  // atan() is ~8 cycles on GPU - avoid calling twice
+  bool needsAngle = uSwirlAmount > 0.001 || uNoiseAmount > 0.001;
+  float angle = needsAngle ? atan(hitPos.z, hitPos.x) : 0.0;
 
   // Add swirl pattern
   if (uSwirlAmount > 0.001) {
-    float angle = atan(hitPos.z, hitPos.x);
     float swirlPhase = angle * 3.0 + r * 0.5 - time * 0.5;
     float swirlBright = 0.5 + 0.5 * sin(swirlPhase);
     color *= mix(0.7, 1.3, swirlBright * uSwirlAmount);
@@ -195,7 +200,6 @@ vec3 shadeDiskHit(vec3 hitPos, vec3 rayDir, int hitIndex, float time) {
 
   // Add noise turbulence
   if (uNoiseAmount > 0.001) {
-    float angle = atan(hitPos.z, hitPos.x);
     vec3 noisePos = vec3(r * 0.3, angle * 2.0, 0.0) * uNoiseScale;
     float n = noise3D(noisePos + time * 0.1);
     float ridged = 1.0 - abs(2.0 * n - 1.0);

@@ -123,9 +123,9 @@ float manifoldDensity(vec3 pos3d, float ndRadius, float time) {
   float r = diskRadius(pos3d);
   float h = diskHeight(pos3d);
 
-  // Radial bounds
-  float innerR = uHorizonRadius * uDiskInnerRadiusMul;
-  float outerR = uHorizonRadius * uDiskOuterRadiusMul;
+  // PERF (OPT-BH-11): Use pre-computed disk radii uniforms
+  float innerR = uDiskInnerR;
+  float outerR = uDiskOuterR;
 
   // Radial falloff
   float radialFactor = 1.0;
@@ -135,9 +135,8 @@ float manifoldDensity(vec3 pos3d, float ndRadius, float time) {
     radialFactor = 1.0 - smoothstep(outerR, outerR * (1.0 + uRadialSoftnessMul), r);
   }
 
-  // Calculate thickness
-  float thicknessScale = getManifoldThicknessScale();
-  float thickness = uManifoldThickness * uHorizonRadius * thicknessScale;
+  // PERF (OPT-BH-13): Use pre-computed effective thickness from CPU
+  float thickness = uEffectiveThickness;
 
   // Add extra dimension contributions to height for higher D
   float effectiveH = h;
@@ -184,8 +183,9 @@ float manifoldDensity(vec3 pos3d, float ndRadius, float time) {
  */
 vec3 manifoldColor(vec3 pos3d, float ndRadius, float density, float time) {
   float r = diskRadius(pos3d);
-  float innerR = uHorizonRadius * uDiskInnerRadiusMul;
-  float outerR = uHorizonRadius * uDiskOuterRadiusMul;
+  // PERF (OPT-BH-11): Use pre-computed disk radii uniforms
+  float innerR = uDiskInnerR;
+  float outerR = uDiskOuterR;
 
   // Normalized radial position [0, 1]
   // Guard against division by zero when innerR >= outerR
