@@ -27,12 +27,12 @@ float sdfJulia7D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        // Cache squared values
-        float zxzy_sq = zx*zx + zy*zy;
-        float z56_sq = z5*z5 + z6*z6;
-        float z456_sq = z4*z4 + z56_sq;
-        float z3456_sq = z3*z3 + z456_sq;
-        r = sqrt(zxzy_sq + zz*zz + z3456_sq);
+        // OPT-M1: Cache all squared values individually
+        float zx_sq = zx*zx, zy_sq = zy*zy, zz_sq = zz*zz;
+        float z3_sq = z3*z3, z4_sq = z4*z4, z5_sq = z5*z5, z6_sq = z6*z6;
+        float zxzy_sq = zx_sq + zy_sq;
+        float rSq = zxzy_sq + zz_sq + z3_sq + z4_sq + z5_sq + z6_sq;
+        r = sqrt(rSq);
         if (r > bail) { escIt = i; break; }
 
         minP = min(minP, abs(zy));
@@ -43,16 +43,18 @@ float sdfJulia7D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;  // Julia: no +1.0 (c is constant)
 
-        // 7D hyperspherical: 6 angles, z-axis primary
-        float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float r1 = sqrt(zxzy_sq + z3456_sq);
-        float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
-        float r2 = sqrt(zy*zy + z3456_sq);
-        float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
-        float r3 = sqrt(z3456_sq);
-        float t3 = r3 > EPS ? acos(clamp(z3 / max(r3, EPS), -1.0, 1.0)) : 0.0;
-        float r4 = sqrt(z456_sq);
-        float t4 = r4 > EPS ? acos(clamp(z4 / max(r4, EPS), -1.0, 1.0)) : 0.0;
+        // 7D hyperspherical: 6 angles using inversesqrt (avoids extra sqrt calls)
+        float tailSq = rSq;
+        float invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t0 = acos(clamp(zz * invTail, -1.0, 1.0)); tailSq = max(tailSq - zz_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t1 = acos(clamp(zx * invTail, -1.0, 1.0)); tailSq = max(tailSq - zx_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t2 = acos(clamp(zy * invTail, -1.0, 1.0)); tailSq = max(tailSq - zy_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0));
         float t5 = atan(z6, z5);
 
         float s0 = sin(t0 * pwr), c0 = cos(t0 * pwr);
@@ -100,26 +102,29 @@ float sdfJulia7D_simple(vec3 pos, float pwr, float bail, int maxIt) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        float zxzy_sq = zx*zx + zy*zy;
-        float z56_sq = z5*z5 + z6*z6;
-        float z456_sq = z4*z4 + z56_sq;
-        float z3456_sq = z3*z3 + z456_sq;
-        r = sqrt(zxzy_sq + zz*zz + z3456_sq);
+        // OPT-M1: Cache all squared values individually
+        float zx_sq = zx*zx, zy_sq = zy*zy, zz_sq = zz*zz;
+        float z3_sq = z3*z3, z4_sq = z4*z4, z5_sq = z5*z5, z6_sq = z6*z6;
+        float rSq = zx_sq + zy_sq + zz_sq + z3_sq + z4_sq + z5_sq + z6_sq;
+        r = sqrt(rSq);
         if (r > bail) break;
 
         float rp, rpMinus1;
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;
 
-        float t0 = acos(clamp(zz / max(r, EPS), -1.0, 1.0));
-        float r1 = sqrt(zxzy_sq + z3456_sq);
-        float t1 = r1 > EPS ? acos(clamp(zx / max(r1, EPS), -1.0, 1.0)) : 0.0;
-        float r2 = sqrt(zy*zy + z3456_sq);
-        float t2 = r2 > EPS ? acos(clamp(zy / max(r2, EPS), -1.0, 1.0)) : 0.0;
-        float r3 = sqrt(z3456_sq);
-        float t3 = r3 > EPS ? acos(clamp(z3 / max(r3, EPS), -1.0, 1.0)) : 0.0;
-        float r4 = sqrt(z456_sq);
-        float t4 = r4 > EPS ? acos(clamp(z4 / max(r4, EPS), -1.0, 1.0)) : 0.0;
+        // 7D hyperspherical using inversesqrt (avoids extra sqrt calls)
+        float tailSq = rSq;
+        float invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t0 = acos(clamp(zz * invTail, -1.0, 1.0)); tailSq = max(tailSq - zz_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t1 = acos(clamp(zx * invTail, -1.0, 1.0)); tailSq = max(tailSq - zx_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t2 = acos(clamp(zy * invTail, -1.0, 1.0)); tailSq = max(tailSq - zy_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t3 = acos(clamp(z3 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z3_sq, 0.0);
+        invTail = inversesqrt(max(tailSq, EPS*EPS));
+        float t4 = acos(clamp(z4 * invTail, -1.0, 1.0));
         float t5 = atan(z6, z5);
 
         float s0 = sin(t0 * pwr), c0 = cos(t0 * pwr);

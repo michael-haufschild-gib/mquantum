@@ -32,11 +32,12 @@ float sdfJulia11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
-        // Cache all squared terms
+        // Cache all squared terms and save rSq to avoid recomputing r*r
         float z0_sq = z0*z0, z1_sq = z1*z1, z2_sq = z2*z2, z3_sq = z3*z3, z4_sq = z4*z4;
         float z5_sq = z5*z5, z6_sq = z6*z6, z7_sq = z7*z7, z8_sq = z8*z8, z9_sq = z9*z9, z10_sq = z10*z10;
         float z01_sq = z0_sq + z1_sq;
-        r = sqrt(z01_sq + z2_sq + z3_sq + z4_sq + z5_sq + z6_sq + z7_sq + z8_sq + z9_sq + z10_sq);
+        float rSq = z01_sq + z2_sq + z3_sq + z4_sq + z5_sq + z6_sq + z7_sq + z8_sq + z9_sq + z10_sq;
+        r = sqrt(rSq);
         if (r > bail) { escIt = i; break; }
 
         minP = min(minP, abs(z1));
@@ -48,7 +49,7 @@ float sdfJulia11D(vec3 pos, float pwr, float bail, int maxIt, out float trap) {
         dr = pwr * rpMinus1 * dr;  // Julia: no +1.0 (c is constant)
 
         // 11D: 10 angles using inversesqrt and cached squared values
-        float tailSq = r*r;
+        float tailSq = rSq;  // OPT: Reuse rSq instead of r*r
         float invTail = inversesqrt(max(tailSq, EPS*EPS));
         float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
@@ -126,16 +127,18 @@ float sdfJulia11D_simple(vec3 pos, float pwr, float bail, int maxIt) {
     for (int i = 0; i < MAX_ITER_HQ; i++) {
         if (i >= maxIt) break;
 
+        // Cache all squared terms and save rSq to avoid recomputing r*r
         float z0_sq = z0*z0, z1_sq = z1*z1, z2_sq = z2*z2, z3_sq = z3*z3, z4_sq = z4*z4;
         float z5_sq = z5*z5, z6_sq = z6*z6, z7_sq = z7*z7, z8_sq = z8*z8, z9_sq = z9*z9, z10_sq = z10*z10;
-        r = sqrt(z0_sq + z1_sq + z2_sq + z3_sq + z4_sq + z5_sq + z6_sq + z7_sq + z8_sq + z9_sq + z10_sq);
+        float rSq = z0_sq + z1_sq + z2_sq + z3_sq + z4_sq + z5_sq + z6_sq + z7_sq + z8_sq + z9_sq + z10_sq;
+        r = sqrt(rSq);
         if (r > bail) break;
 
         float rp, rpMinus1;
         optimizedPow(r, pwr, rp, rpMinus1);
         dr = pwr * rpMinus1 * dr;
 
-        float tailSq = r*r;
+        float tailSq = rSq;  // OPT: Reuse rSq instead of r*r
         float invTail = inversesqrt(max(tailSq, EPS*EPS));
         float t0 = acos(clamp(z0 * invTail, -1.0, 1.0)); tailSq = max(tailSq - z0_sq, 0.0);
         invTail = inversesqrt(max(tailSq, EPS*EPS));
