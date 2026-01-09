@@ -113,11 +113,19 @@ vec3 getAlgorithmColor(float t, vec3 pos, vec3 normal) {
       float temp = uDiskTemperature * inversesqrt(safeBase);
       return blackbodyColor(temp);
   }
-  // 8. Accretion Gradient
+  // 8. Accretion Gradient (Interstellar-style: white/yellow inner -> deep red outer)
   else if (uColorAlgorithm == ALGO_ACCRETION_GRADIENT) {
-      vec3 deepGold = vec3(1.0, 0.5, 0.1);
-      vec3 brightGold = vec3(1.0, 0.9, 0.7);
-      return mix(brightGold, deepGold, t);
+      // Three-color gradient for realistic accretion disk appearance
+      vec3 hotCore = vec3(1.0, 0.95, 0.8);    // White/pale yellow (hottest, inner)
+      vec3 midOrange = vec3(1.0, 0.6, 0.15);  // Bright orange (middle)
+      vec3 coolRed = vec3(0.7, 0.15, 0.05);   // Deep red (coolest, outer)
+
+      // Two-stage interpolation for smooth gradient
+      if (t < 0.5) {
+          return mix(hotCore, midOrange, t * 2.0);
+      } else {
+          return mix(midOrange, coolRed, (t - 0.5) * 2.0);
+      }
   }
   // 9. Gravitational Redshift
   else if (uColorAlgorithm == ALGO_GRAVITATIONAL_REDSHIFT) {

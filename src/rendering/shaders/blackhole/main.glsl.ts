@@ -457,20 +457,6 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
     }
     #endif
 
-    #ifdef USE_SDF_DISK
-    // Thin disk plane crossing (Einstein Ring) - Legacy SDF-only mode
-    if (diskCrossings < MAX_DISK_CROSSINGS) {
-      vec3 crossingPos;
-      if (detectDiskCrossing(prevPos, pos, crossingPos)) {
-        vec3 hitColor = shadeDiskHit(crossingPos, dir, diskCrossings, time);
-        vec3 diskNormal = computeDiskNormal(crossingPos, dir);
-        // PERF (OPT-BH-7): Pass pre-computed absorptionFactor
-        accumulateDiskHit(accum, hitColor, crossingPos, diskNormal, absorptionFactor);
-        diskCrossings++;
-      }
-    }
-    #endif
-
   }
 
   // Handle horizon or background

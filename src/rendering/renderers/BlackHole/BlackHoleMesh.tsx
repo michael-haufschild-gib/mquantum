@@ -112,7 +112,6 @@ const BlackHoleMesh = () => {
       doppler: dopplerEnabled,
       envMap: true,
       sliceAnimation: sliceAnimationEnabled,
-      volumetricDisk: true,
       noiseTexture: true, // PERF (OPT-BH-1): Enable noise texture for faster rendering
       blackbodyLUT: true, // PERF (OPT-BH-17): Enable blackbody LUT for faster temperature coloring
     })

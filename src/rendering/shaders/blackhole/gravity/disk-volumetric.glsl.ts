@@ -41,6 +41,12 @@ const float CORE_BRIGHTNESS = 3.0;           // Inner core glow multiplier
 const float DUST_LANE_FREQUENCY = 15.0;      // Radial dust lane period
 const float DUST_LANE_STRENGTH = 0.3;        // Dust lane modulation amount
 
+// Ring pattern parameters (for Interstellar-style concentric arcs)
+const float RING_RADIAL_FREQ = 6.0;          // High = many concentric rings
+const float RING_ANGULAR_FREQ = 0.5;         // Low = rings stay coherent as arcs
+const float RING_SHARPNESS = 2.5;            // Higher = thinner brighter lines
+// Note: PI is defined in shared/core/constants.glsl.ts
+
 // === Simplex Noise 3D ===
 // PERF (OPT-BH-1): Texture-based noise is now MANDATORY for performance.
 // The procedural fallback has been removed - it was 50x slower.
@@ -244,32 +250,47 @@ float getDiskDensity(vec3 pos, float time, float r) {
     float pixelHash = fract(sin(dot(pixelCoord + fract(time) * 100.0, vec2(12.9898, 78.233))) * 43758.5453);
     float noiseOffset = pixelHash * 0.1;
 
-    // Streak coordinates: High freq in R, Low freq in Angle
-    // Add per-pixel offset to r-component to break concentric ring patterns
-    vec3 noiseCoord = vec3(
-        r * 1.5 + noiseOffset,  // Ring frequency + per-pixel offset
-        phase * 2.0,            // Angular frequency (streaks)
-        h * 4.0                 // Vertical structure
+    // Ring-dominant noise for Interstellar-style concentric arc patterns.
+    // High radial frequency creates many rings, low angular frequency keeps them coherent.
+    // Seam blending hides the atan() discontinuity at angle = +/-PI (left side of disk).
+
+    // Primary noise coordinates (seam at angle = +/-PI)
+    vec3 coord1 = vec3(
+        r * RING_RADIAL_FREQ + noiseOffset,   // High radial freq = many concentric rings
+        phase * RING_ANGULAR_FREQ,             // Low angular freq = coherent arcs
+        h * 2.0                                // Vertical structure
     );
+
+    // Secondary coordinates offset by PI (seam at angle = 0, front of disk)
+    vec3 coord2 = vec3(
+        r * RING_RADIAL_FREQ + noiseOffset,
+        (phase + PI) * RING_ANGULAR_FREQ,
+        h * 2.0
+    );
+
+    // Blend factor: 0 near front (angle~0), increases toward back (angle~+/-PI)
+    // This hides the seam by cross-fading between two offset samples
+    float seamBlend = smoothstep(PI * 0.5, PI, abs(angle)) * 0.5;
 
     // Sample high quality noise
     float noiseVal = 0.0;
 
     if (uNoiseAmount > 0.01) {
-        // Use domain warping for fluid look
-        float warped = flowNoise(noiseCoord * uNoiseScale, time * 0.2);
+        // Sample both noise coordinates
+        float noise1 = flowNoise(coord1 * uNoiseScale, time * 0.2);
+        float noise2 = flowNoise(coord2 * uNoiseScale, time * 0.2);
 
-        // Mix base density with noise
-        // Ridged noise gives the "filigree" look
-        noiseVal = warped;
+        // Blend samples to hide seam (near seam: 50/50, away from seam: sample1 only)
+        float warped = mix(noise1, noise2, seamBlend);
 
-        // Erode more aggressively to avoid "solid cream" look
-        // Sharpen the strands by squaring the noise
-        noiseVal = smoothstep(0.1, 0.9, noiseVal);
-        noiseVal = noiseVal * noiseVal;
+        // Sharpen to create thin bright lines on dark background
+        // Higher exponent = thinner, brighter streaks (more like reference image)
+        noiseVal = smoothstep(0.15, 0.85, warped);
+        noiseVal = pow(noiseVal, RING_SHARPNESS);
 
-        // Apply noise amount with higher contrast boost
-        rDensity *= mix(1.0, noiseVal * 3.0, uNoiseAmount);
+        // Apply noise: bright lines (high noise) increase density, dark areas reduce it
+        // This creates the bright arc pattern on darker background
+        rDensity *= mix(0.3, 1.0, noiseVal) * mix(1.0, 2.0, uNoiseAmount);
     }
 
     // 5. Dust Lanes (dark rings) - RESTORED TO ORIGINAL LOCATION
@@ -332,6 +353,10 @@ vec3 getDiskEmission(vec3 pos, float density, float time, vec3 rayDir, vec3 norm
     // Get base color
     vec3 color;
 
+    // Normalized radial position: 0 at inner edge, 1 at outer edge
+    // This gives proper full-range gradient across the visible disk
+    float normalizedR = clamp((r - innerR) / (uDiskOuterR - innerR), 0.0, 1.0);
+
     if (uColorAlgorithm == ALGO_BLACKBODY) {
         // Map ratio to temperature
         // Inner edge = low (ISCO boundary), peak slightly outside, outer = cooler
@@ -341,23 +366,21 @@ vec3 getDiskEmission(vec3 pos, float density, float time, vec3 rayDir, vec3 norm
         // Boost intensity heavily for the "core" look
         color *= BLACKBODY_BOOST;
     } else {
-        // Use palette based on tempRatio (1.0 = hot/inner, 0.0 = cold/outer)
-        // Non-linear mapping to push "cold" colors to the outer edge
-        float t = pow(max(0.0, 1.0 - tempRatio), 0.8);
+        // Use normalized radius for color gradient (0 = inner/hot, 1 = outer/cool)
+        // This ensures full color range is used across the disk
+        float t = pow(normalizedR, 0.7);  // Slight non-linearity to push colors outward
         color = getAlgorithmColor(t, pos, normal);
 
-        // Boost contrast of palette colors to avoid pastel/cream look
-        // This makes darks darker and brights brighter
-        color = pow(color, vec3(1.5));
-
-        // Add "thermal core" - lighter/whiter at high temp regardless of palette
+        // Add "thermal core" - lighter/whiter at inner edge
         // This simulates incandescence at the inner edge
         vec3 coreColor = vec3(1.0, 0.98, 0.9);
-        float coreMix = smoothstep(0.7, 1.0, tempRatio);
-        color = mix(color, coreColor * CORE_BRIGHTNESS, coreMix * 0.6);
+        float coreMix = smoothstep(0.3, 0.0, normalizedR);  // Strongest at inner edge
+        color = mix(color, coreColor * CORE_BRIGHTNESS, coreMix * 0.5);
 
-        // Apply temperature-based brightness (inner regions brighter)
-        color *= PALETTE_BOOST * tempRatio;
+        // Brightness varies with radius but NOT as extreme as before
+        // Inner = bright, outer = slightly less bright (not dark)
+        float brightnessFactor = mix(1.5, 0.8, normalizedR);
+        color *= brightnessFactor;
     }
 
     // Gravitational Redshift

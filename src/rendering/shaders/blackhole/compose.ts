@@ -38,8 +38,6 @@ export interface BlackHoleShaderConfig extends ShaderConfig {
   motionBlur?: boolean
   /** Enable slice animation for higher dimensions */
   sliceAnimation?: boolean
-  /** Enable volumetric disk rendering */
-  volumetricDisk?: boolean
   /** PERF (OPT-BH-1): Enable pre-baked noise texture for faster disk rendering */
   noiseTexture?: boolean
   /** PERF (OPT-BH-17): Enable pre-baked blackbody LUT for faster temperature coloring */
@@ -63,7 +61,6 @@ export function composeBlackHoleShader(config: BlackHoleShaderConfig) {
     envMap: enableEnvMap = false,
     motionBlur: enableMotionBlur = false,
     sliceAnimation: enableSliceAnimation = false,
-    volumetricDisk: enableVolumetricDisk = true, // Default to true for now
     noiseTexture: enableNoiseTexture = true, // PERF (OPT-BH-1): Enable by default for faster rendering
     blackbodyLUT: enableBlackbodyLUT = true, // PERF (OPT-BH-17): Enable by default for faster rendering
   } = config
@@ -102,19 +99,12 @@ export function composeBlackHoleShader(config: BlackHoleShaderConfig) {
     features.push('Motion Blur')
   }
 
-  // Volumetric Disk vs SDF Disk
-  if (enableVolumetricDisk && !overrides.includes('Volumetric Disk')) {
-    defines.push('#define USE_VOLUMETRIC_DISK')
-    features.push('Volumetric Accretion Disk')
-  } else {
-    defines.push('#define USE_SDF_DISK')
-    features.push('SDF Disk Raymarching (Einstein Ring)')
-  }
+  // Volumetric Disk (always enabled)
+  defines.push('#define USE_VOLUMETRIC_DISK')
+  features.push('Volumetric Accretion Disk')
 
   // PERF (OPT-BH-1): Noise texture for faster volumetric disk rendering
-  // Only applies when volumetric disk is enabled
-  const useNoiseTexture =
-    enableNoiseTexture && enableVolumetricDisk && !overrides.includes('Noise Texture')
+  const useNoiseTexture = enableNoiseTexture && !overrides.includes('Noise Texture')
   if (useNoiseTexture) {
     defines.push('#define USE_NOISE_TEXTURE')
     features.push('Noise Texture LUT')
@@ -181,10 +171,9 @@ uniform float uSliceAmplitude;
     { name: 'Colors', content: colorsBlock },
     
     // Disk implementations
-    // Volumetric disk provides continuous density sampling
-    { name: 'Disk Volumetric', content: diskVolumetricBlock, condition: enableVolumetricDisk },
+    // Volumetric disk provides continuous density sampling (always enabled)
+    { name: 'Disk Volumetric', content: diskVolumetricBlock },
     // SDF disk provides plane crossing detection for Einstein rings
-    // Always included because volumetric mode now also uses crossing detection
     { name: 'Disk SDF', content: diskSdfBlock },
 
     // Effects
