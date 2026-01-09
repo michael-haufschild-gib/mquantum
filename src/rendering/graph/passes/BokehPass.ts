@@ -27,6 +27,10 @@ export interface BokehPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outp
   alternateDepthInput?: string;
   /** Alternate depth input attachment */
   alternateDepthInputAttachment?: number | 'depth';
+  /** Tertiary depth input resource (optional, for temporal cloud depth) */
+  tertiaryDepthInput?: string;
+  /** Tertiary depth input attachment */
+  tertiaryDepthInputAttachment?: number | 'depth';
   /** Optional selector for choosing depth input at runtime */
   depthInputSelector?: () => string;
   /** Output resource */
@@ -76,6 +80,8 @@ export class BokehPass extends BasePass {
   private depthInputAttachment?: number | 'depth';
   private alternateDepthInputId?: string;
   private alternateDepthInputAttachment?: number | 'depth';
+  private tertiaryDepthInputId?: string;
+  private tertiaryDepthInputAttachment?: number | 'depth';
   private depthInputSelector?: () => string;
   private outputId: string;
 
@@ -104,6 +110,15 @@ export class BokehPass extends BasePass {
       });
     }
 
+    if (config.tertiaryDepthInput && config.tertiaryDepthInput !== config.depthInput &&
+        config.tertiaryDepthInput !== config.alternateDepthInput) {
+      inputs.push({
+        resourceId: config.tertiaryDepthInput,
+        access: 'read' as const,
+        attachment: config.tertiaryDepthInputAttachment,
+      });
+    }
+
     super({
       id: config.id,
       name: config.name ?? 'Bokeh Pass',
@@ -119,6 +134,8 @@ export class BokehPass extends BasePass {
     this.depthInputAttachment = config.depthInputAttachment;
     this.alternateDepthInputId = config.alternateDepthInput;
     this.alternateDepthInputAttachment = config.alternateDepthInputAttachment;
+    this.tertiaryDepthInputId = config.tertiaryDepthInput;
+    this.tertiaryDepthInputAttachment = config.tertiaryDepthInputAttachment;
     this.depthInputSelector = config.depthInputSelector;
     this.outputId = config.outputResource;
 
@@ -196,7 +213,9 @@ export class BokehPass extends BasePass {
         ? this.depthInputAttachment
         : depthResourceId === this.alternateDepthInputId
           ? this.alternateDepthInputAttachment
-          : undefined;
+          : depthResourceId === this.tertiaryDepthInputId
+            ? this.tertiaryDepthInputAttachment
+            : undefined;
     const depthTex = ctx.getReadTexture(depthResourceId, depthAttachment);
 
     // Passthrough if required inputs missing

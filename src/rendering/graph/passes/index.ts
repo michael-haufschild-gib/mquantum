@@ -23,6 +23,10 @@ export {
   type TemporalDepthUniforms,
   invalidateAllTemporalDepth,
 } from './TemporalDepthCapturePass'
+export {
+  TemporalCloudDepthPass,
+  type TemporalCloudDepthPassConfig,
+} from './TemporalCloudDepthPass'
 
 // Effect passes
 export { BloomPass, type BloomPassConfig } from './BloomPass'

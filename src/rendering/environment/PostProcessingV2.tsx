@@ -71,6 +71,7 @@ import {
   ScenePass,
   ScreenSpaceLensingPass,
   TemporalCloudPass,
+  TemporalCloudDepthPass,
   TemporalDepthCapturePass,
   ToScreenPass,
   ToneMappingCinematicPass,
@@ -116,6 +117,7 @@ const RESOURCES = {
   TEMPORAL_ACCUMULATION: 'temporalAccumulation',
   TEMPORAL_REPROJECTION: 'temporalReprojection',
   TEMPORAL_DEPTH_OUTPUT: 'temporalDepthOutput',
+  TEMPORAL_CLOUD_DEPTH: 'temporalCloudDepth',
 
   // Effect chain resources
   GTAO_OUTPUT: 'gtaoOutput',
@@ -398,6 +400,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     objectDepth?: DepthPass;
     temporalDepthCapture?: TemporalDepthCapturePass;
     temporalCloud?: TemporalCloudPass;
+    temporalCloudDepth?: TemporalCloudDepthPass;
     normalPass?: NormalPass;
     mainObjectMrt?: MainObjectMRTPass;
     normalComposite?: FullscreenPass;
@@ -602,6 +605,17 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       size: { mode: 'screen' },
       format: THREE.RGBAFormat,
       dataType: THREE.FloatType,
+      depthBuffer: false,
+    });
+
+    // 5. Temporal cloud depth - extracted from temporal accumulation's world position
+    // Used by post-processing effects (SSR, Bokeh, Refraction) when Schroedinger is in temporal mode
+    g.addResource({
+      id: RESOURCES.TEMPORAL_CLOUD_DEPTH,
+      type: 'renderTarget',
+      size: { mode: 'screen' },
+      format: THREE.RGBAFormat,
+      dataType: THREE.HalfFloatType,
       depthBuffer: false,
     });
 
@@ -978,6 +992,29 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.temporalCloud = temporalCloudPass;
     g.addPass(temporalCloudPass);
 
+    // Temporal cloud depth extraction (converts world position to depth for post-processing)
+    // Enabled when Schroedinger uses temporal cloud and depth-based effects are active
+    const temporalCloudDepthPass = new TemporalCloudDepthPass({
+      id: 'temporalCloudDepth',
+      positionInput: RESOURCES.TEMPORAL_ACCUMULATION,
+      positionAttachment: 1, // World position is attachment 1
+      outputResource: RESOURCES.TEMPORAL_CLOUD_DEPTH,
+      enabled: (frame) => {
+        if (!frame) return false;
+        const pp = frame.stores.postProcessing;
+        const perf = frame.stores.performance;
+        const objectType = frame.stores.geometry?.objectType ?? '';
+        // Only enable when Schroedinger is using temporal cloud AND depth effects are active
+        const isTemporalCloud = usesTemporalCloud(objectType) &&
+          perf.temporalReprojectionEnabled &&
+          !blackHoleStateRef.current.schroedingerIsoEnabled;
+        const needsDepth = pp.ssrEnabled || pp.refractionEnabled || pp.bokehEnabled;
+        return isTemporalCloud && needsDepth;
+      },
+    });
+    passRefs.current.temporalCloudDepth = temporalCloudDepthPass;
+    g.addPass(temporalCloudDepthPass);
+
     // Environment normal pass
     const normalPass = new NormalPass({
       id: 'normalEnv',
@@ -1074,6 +1111,22 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.bloom = bloomPass;
     g.addPass(bloomPass);
 
+    // Helper to determine which depth buffer to use for post-processing effects
+    // Uses temporal cloud depth when Schroedinger is in temporal mode
+    const getDepthResourceForEffects = (): string => {
+      if (!ppStateRef.current.objectOnlyDepth) {
+        return RESOURCES.SCENE_COLOR;
+      }
+      // Check if Schroedinger is using temporal cloud accumulation
+      const isTemporalCloud = usesTemporalCloud(objectTypeRef.current) &&
+        perfStateRef.current.temporalReprojectionEnabled &&
+        !blackHoleStateRef.current.schroedingerIsoEnabled;
+      if (isTemporalCloud) {
+        return RESOURCES.TEMPORAL_CLOUD_DEPTH;
+      }
+      return RESOURCES.OBJECT_DEPTH;
+    };
+
     // SSR pass
     const ssrPass = new SSRPass({
       id: 'ssr',
@@ -1082,9 +1135,9 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       depthInput: RESOURCES.OBJECT_DEPTH,
       alternateDepthInput: RESOURCES.SCENE_COLOR,
       alternateDepthInputAttachment: 'depth',
+      tertiaryDepthInput: RESOURCES.TEMPORAL_CLOUD_DEPTH,
       // Note: depthInputSelector is not an enabled() callback, so it still uses refs
-      depthInputSelector: () =>
-        ppStateRef.current.objectOnlyDepth ? RESOURCES.OBJECT_DEPTH : RESOURCES.SCENE_COLOR,
+      depthInputSelector: getDepthResourceForEffects,
       outputResource: RESOURCES.SSR_OUTPUT,
       intensity: ppStateRef.current.ssrIntensity,
       maxDistance: ppStateRef.current.ssrMaxDistance,
@@ -1105,9 +1158,9 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       depthInput: RESOURCES.OBJECT_DEPTH,
       alternateDepthInput: RESOURCES.SCENE_COLOR,
       alternateDepthInputAttachment: 'depth',
+      tertiaryDepthInput: RESOURCES.TEMPORAL_CLOUD_DEPTH,
       // Note: depthInputSelector is not an enabled() callback, so it still uses refs
-      depthInputSelector: () =>
-        ppStateRef.current.objectOnlyDepth ? RESOURCES.OBJECT_DEPTH : RESOURCES.SCENE_COLOR,
+      depthInputSelector: getDepthResourceForEffects,
       outputResource: RESOURCES.REFRACTION_OUTPUT,
       ior: ppStateRef.current.refractionIOR,
       strength: ppStateRef.current.refractionStrength,
@@ -1125,9 +1178,9 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       depthInput: RESOURCES.OBJECT_DEPTH,
       alternateDepthInput: RESOURCES.SCENE_COLOR,
       alternateDepthInputAttachment: 'depth',
+      tertiaryDepthInput: RESOURCES.TEMPORAL_CLOUD_DEPTH,
       // Note: depthInputSelector is not an enabled() callback, so it still uses refs
-      depthInputSelector: () =>
-        ppStateRef.current.objectOnlyDepth ? RESOURCES.OBJECT_DEPTH : RESOURCES.SCENE_COLOR,
+      depthInputSelector: getDepthResourceForEffects,
       outputResource: RESOURCES.BOKEH_OUTPUT,
       focus: ppStateRef.current.bokehWorldFocusDistance,
       focusRange: ppStateRef.current.bokehWorldFocusRange,
@@ -1652,9 +1705,15 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       if (showDepthBuffer) {
         passRefs.current.bufferPreview.setBufferType('depth');
         passRefs.current.bufferPreview.setDepthMode('linear');
-        const depthTexture = pp.objectOnlyDepth
-          ? graphInstance.getTexture(RESOURCES.OBJECT_DEPTH)
-          : graphInstance.getTexture(RESOURCES.SCENE_COLOR, 'depth');
+        // Use temporal cloud depth when Schroedinger is in temporal mode
+        let depthTexture: THREE.Texture | null;
+        if (useTemporalCloud && pp.objectOnlyDepth) {
+          depthTexture = graphInstance.getTexture(RESOURCES.TEMPORAL_CLOUD_DEPTH);
+        } else if (pp.objectOnlyDepth) {
+          depthTexture = graphInstance.getTexture(RESOURCES.OBJECT_DEPTH);
+        } else {
+          depthTexture = graphInstance.getTexture(RESOURCES.SCENE_COLOR, 'depth');
+        }
         passRefs.current.bufferPreview.setExternalTexture(depthTexture);
       } else if (showNormalBuffer) {
         passRefs.current.bufferPreview.setBufferType('normal');
