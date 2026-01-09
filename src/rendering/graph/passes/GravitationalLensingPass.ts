@@ -94,6 +94,8 @@ export class GravitationalLensingPass extends BasePass {
         uDistortionScale: { value: 1.0 },
         uFalloff: { value: 1.5 },
         uChromaticAberration: { value: 0.0 },
+        // N-Dimensional physics: scale factor to compensate for faster falloff in higher dimensions
+        uNDScale: { value: 1.0 },
       },
       vertexShader: gravitationalLensingVertexShader,
       fragmentShader: gravitationalLensingFragmentShader,
@@ -128,10 +130,18 @@ export class GravitationalLensingPass extends BasePass {
     // Read gravity settings from frozen frame context
     const frame = ctx.frame as FrozenFrameContext | null
     const pp = frame?.stores.postProcessing
+    const geo = frame?.stores.geometry
     const strength = pp?.gravityStrength ?? 1.0
     const distortionScale = pp?.gravityDistortionScale ?? 1.0
-    const falloff = pp?.gravityFalloff ?? 1.5
     const chromaticAberration = pp?.gravityChromaticAberration ?? 0.0
+
+    // N-Dimensional physics: compute proper falloff and scale from dimension
+    // In N dimensions, gravity falls off as 1/r^(N-1) (Tangherlini metric)
+    const dimension = geo?.dimension ?? 3
+    const ndFalloff = dimension - 1 // N-D gravity falloff exponent
+    // Scale factor compensates for faster falloff in higher dimensions
+    // This ensures lensing remains visible as dimension increases
+    const ndScale = dimension > 3 ? Math.pow(3.0, dimension - 3) : 1.0
 
     // Project world origin to screen space for gravity center
     if (camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera) {
@@ -148,8 +158,10 @@ export class GravitationalLensingPass extends BasePass {
     this.material.uniforms['uGravityCenter']!.value = this.gravityCenter
     this.material.uniforms['uStrength']!.value = strength
     this.material.uniforms['uDistortionScale']!.value = distortionScale
-    this.material.uniforms['uFalloff']!.value = falloff
+    // Use N-D physics falloff instead of user-configured value for proper dimension-aware lensing
+    this.material.uniforms['uFalloff']!.value = ndFalloff
     this.material.uniforms['uChromaticAberration']!.value = chromaticAberration
+    this.material.uniforms['uNDScale']!.value = ndScale
 
     // Render
     renderer.setRenderTarget(outputTarget)

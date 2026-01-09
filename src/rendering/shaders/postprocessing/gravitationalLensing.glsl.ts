@@ -27,8 +27,9 @@ export const gravitationalLensingFragmentShader = /* glsl */ `
   uniform vec2 uGravityCenter;      // Gravity well center in UV space (projected from 0,0,0)
   uniform float uStrength;          // Gravity strength (0.1-10)
   uniform float uDistortionScale;   // Distortion scale (0.1-5)
-  uniform float uFalloff;           // Distance falloff exponent (0.5-4)
+  uniform float uFalloff;           // Distance falloff exponent (N-1 in N dimensions, Tangherlini metric)
   uniform float uChromaticAberration; // Chromatic aberration amount (0-1)
+  uniform float uNDScale;           // N-D scale factor to compensate for faster falloff in higher dimensions
 
   // Early-exit threshold: deflection below this value is sub-pixel and imperceptible
   const float DEFLECTION_THRESHOLD = 0.001;
@@ -94,8 +95,9 @@ export const gravitationalLensingFragmentShader = /* glsl */ `
     float safeR = max(r, 0.001);
 
     // Compute lensing magnitude (deflection) for early-exit check
-    // Formula: deflection = (strength * distortionScale * 0.02) / r^falloff
-    float deflection = (effectiveStrength * 0.02) / pow(safeR, uFalloff);
+    // Formula: deflection = (strength * distortionScale * ndScale * 0.02) / r^falloff
+    // uNDScale compensates for faster falloff in higher dimensions (Tangherlini metric)
+    float deflection = (effectiveStrength * uNDScale * 0.02) / pow(safeR, uFalloff);
     deflection = min(deflection, 0.5); // Clamp to prevent extreme distortion
 
     // Early exit 2: Deflection is sub-pixel, no visible effect

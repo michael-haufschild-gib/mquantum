@@ -21,37 +21,8 @@ The quality and completeness of the project in this folder when you return the p
 
 
 
-Compared current implementation against `docs/plans/refactor-rendering-architecture.md` across phases 0–6. check for:
-- bugs
-- unfinished implementations
-- code not in line with our tech stack and versions (React 19, WebGL2, Zustand 5, GSLS3)
-- dead code
-- ui components not "wired" to their actual parameters in the render graph
-- logic flaws
-- broken math
-- broken transformations, projections, rotation
-- disfunctional post processing effects
-- broken sdf raymarching, broken volume raymarching
-- broken temporal reprojection (both: temporal depth and temporal cloud)
-- broken normal/depth/temporal depth buffers
 
 
-Your task is to fix the temporal reprojection for the schroedinger object type.
-
-symptoms: looking at the temporal buffer texture image it does not show the object shape. on top of that, the scene itself shows a glitchy backgdrop to the object - showing that there is something applied that turns the backdrop black and glitchy.
-
-your task: fix this
-
-your workflow:
-1. add debug code for experiments and information gathering and output it to the browser console.
-2. use playwright or/and google chrome dev tools to open the dev server at port 3000, go to the page, and read the console (the website always loads schroedinger automatically)
-3. inspect the debug messages, formulate a hypothesis, write more debug code and repeat or start to fix
-
-success criteria:
-1. deactivate the object rendering for debugging. if you then take the color of the pixel in the center of the scene, it will not be black if everything is working.
-2. with the object rendering active, check the debug texture of the temporal debug buffer. check the color value of the pixel in the center and the value of the pixel in position 1,1. both pixels will have different colors if everything works.
-
-work autonomously. you have complete freedom. this project folder is backed up and only for you to find the solution to this severe problem nobody could fix so far. you can edit everything. you can add new files. do whatever it takes to fix this bug.
 
 BUT: simply deactivating temporal reprojection is not a solution. changing the fundamental approach of the feature is also not a solution.
 
