@@ -84,24 +84,23 @@ export class JetsRenderPass extends BasePass {
     this.outputResourceId = config.outputResource
     this.tempColor = new THREE.Color()
 
-    // Create jet material - PLASMA ENERGY BEAM
+    // Create jet material - SOFT BILLOWING PLASMA
     this.jetMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       uniforms: {
-        uJetColor: { value: new THREE.Color(0x4488ff) },  // Bright blue
-        uJetIntensity: { value: 5.0 },      // High intensity for glow
-        uJetHeight: { value: 25.0 },
-        uJetWidth: { value: 0.35 },         // Moderate width
-        uJetFalloff: { value: 1.2 },        // Gradual falloff
+        uJetColor: { value: new THREE.Color(0x3399ff) },  // Bright blue
+        uJetIntensity: { value: 4.0 },      // High intensity for glow
+        uJetHeight: { value: 30.0 },
+        uJetWidth: { value: 0.25 },         // Moderate width
+        uJetFalloff: { value: 1.8 },        // Gradual falloff
         uJetNoiseAmount: { value: 0.7 },    // Strong turbulence
-        uJetPulsation: { value: 0.6 },      // Visible pulsation
-        uJetSign: { value: 1.0 },
+        uJetPulsation: { value: 0.8 },      // Visible pulsation
         uTime: { value: 0 },
         tSceneDepth: { value: null },
         uResolution: { value: new THREE.Vector2(1, 1) },
         uNear: { value: 0.1 },
         uFar: { value: 1000 },
-        uSoftDepthRange: { value: 0.8 },    // Softer depth blending
+        uSoftDepthRange: { value: 1.0 },    // Soft depth blending
         uDepthAvailable: { value: 0.0 },
       },
       vertexShader: jetVolumetricVertexShader,
@@ -127,7 +126,6 @@ export class JetsRenderPass extends BasePass {
     this.topJetMesh = new THREE.Mesh(jetGeometry, this.jetMaterial.clone())
     this.topJetMesh.layers.set(RENDER_LAYERS.JETS)
     this.topJetMesh.frustumCulled = false
-    ;(this.topJetMesh.material as THREE.ShaderMaterial).uniforms['uJetSign']!.value = 1.0
 
     // BOTTOM JET: Points DOWN (y-) from origin
     // Rotate 180 deg around X to point down
@@ -135,7 +133,6 @@ export class JetsRenderPass extends BasePass {
     this.bottomJetMesh.rotation.x = Math.PI
     this.bottomJetMesh.layers.set(RENDER_LAYERS.JETS)
     this.bottomJetMesh.frustumCulled = false
-    ;(this.bottomJetMesh.material as THREE.ShaderMaterial).uniforms['uJetSign']!.value = -1.0
 
     // Create scene for jets only
     this.jetScene = new THREE.Scene()

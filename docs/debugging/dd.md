@@ -5,20 +5,19 @@ You cannot break anything. The project in this local folder is backed up and can
 Your task:
 The blackhole object type has a rudimentary implementation of polar jets which uses a cone geometry and simple god ray shader in a post processing pass to emulate actual hot plasma polar jets.
 
-The issue is that it looks awful, basically like solid cones, reversed party hats with a very pointy white root and sharp edges.
+The issue is that it looks awful, basically like solid cones with disco light and magic harry potter hat feel. This is not hot plasma ejected from a fucking black hole.
 
 Design and implement an improved version of the polar jets that are truly looking impressive and have a visual "wow" factor. Value visual "wow" factor over physical realism.
 
 Workflow:
 - Review current implementation of the polar jets.
-- Design an improved version that looks much more impressive.
+- Design an improved version that looks much more impressive and like hot plasma ejected from a black hole.
 - Find a good balance between performance and visual wow factor.
-- Add 5 details to make the visuals even more impressive.
+- Add 5 details to make the visuals even more impressive and more looking like hot plasma ejected from a black hole
 - Implement.
 
 Constraints:
 - You cannot change the underlying logic that this is a post processing pass.
-- Physical realism is not the goal - visual "wow" factor is the goal.
 - Keep FPS performance in mind and find a good balance.
 - Code must be using WebGL2, ThreeJS r182, GSLS3.
 - Do not reimplement already existing post-processing effects. For example: if Bloom is needed to make this work, we can just enable the existing Bloom pass instead of adding a 2nd bloom only for the polar jets.

@@ -1846,19 +1846,19 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
   // Keplerian Disk Rotation
   keplerianDifferential: 0.5, // Half Keplerian by default (moderate inner/outer speed difference)
 
-  // Polar Jets
+  // Polar Jets - Dramatic plasma beam defaults
   jetsEnabled: false,
-  jetsHeight: 25,
-  jetsWidth: 0.2,
-  jetsIntensity: 3.0,
-  jetsColor: '#4488ff',
-  jetsFalloff: 2.0,
-  jetsNoiseAmount: 0.3,
-  jetsPulsation: 0.5,
+  jetsHeight: 30, // Taller jets for more dramatic effect
+  jetsWidth: 0.25, // Slightly wider for more visible structure
+  jetsIntensity: 4.0, // Higher intensity for impressive glow
+  jetsColor: '#3399ff', // Bright blue plasma
+  jetsFalloff: 1.8, // Longer visible jets
+  jetsNoiseAmount: 0.7, // Strong turbulence for organic appearance
+  jetsPulsation: 0.8, // Visible pulsation and shock structures
   jetsGodRaysEnabled: true,
-  jetsGodRaysIntensity: 0.8,
-  jetsGodRaysSamples: 64,
-  jetsGodRaysDecay: 0.96,
+  jetsGodRaysIntensity: 1.0, // Strong god rays for dramatic effect
+  jetsGodRaysSamples: 80, // Higher quality for smoother rays
+  jetsGodRaysDecay: 0.965, // Slightly slower decay for longer rays
 }
 
 // ============================================================================

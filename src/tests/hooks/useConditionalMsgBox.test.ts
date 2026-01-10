@@ -10,7 +10,10 @@
  */
 
 import { showConditionalMsgBox, useConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
+import {
+  DismissedDialogsState,
+  useDismissedDialogsStore,
+} from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -242,10 +245,7 @@ describe('Hydration timing', () => {
 
   it('showConditionalMsgBox_beforeHydration_defersShowUntilHydrated', () => {
     // Simulate unhydrated state by mocking persist API
-    const originalHasHydrated = useDismissedDialogsStore.persist.hasHydrated
-    const originalOnFinishHydration = useDismissedDialogsStore.persist.onFinishHydration
-
-    let hydrationCallback: (() => void) | null = null
+    let hydrationCallback: ((state: DismissedDialogsState) => void) | null = null
 
     vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
     vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
@@ -266,7 +266,7 @@ describe('Hydration timing', () => {
 
     // Now trigger the hydration callback
     expect(hydrationCallback).not.toBeNull()
-    hydrationCallback!()
+    hydrationCallback!(useDismissedDialogsStore.getState())
 
     // Now dialog should be shown (since it wasn't dismissed)
     expect(useMsgBoxStore.getState().isOpen).toBe(true)
@@ -278,7 +278,7 @@ describe('Hydration timing', () => {
   })
 
   it('showConditionalMsgBox_beforeHydration_respectsDismissedStateAfterHydration', () => {
-    let hydrationCallback: (() => void) | null = null
+    let hydrationCallback: ((state: DismissedDialogsState) => void) | null = null
 
     vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
     vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
@@ -301,7 +301,7 @@ describe('Hydration timing', () => {
     vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
 
     // Trigger hydration callback
-    hydrationCallback!()
+    hydrationCallback!(useDismissedDialogsStore.getState())
 
     // Dialog should NOT be shown because it was dismissed in localStorage
     expect(useMsgBoxStore.getState().isOpen).toBe(false)
@@ -327,7 +327,7 @@ describe('Hydration timing', () => {
   })
 
   it('useConditionalMsgBox_showOnce_beforeHydration_defersShow', () => {
-    let hydrationCallback: (() => void) | null = null
+    let hydrationCallback: ((state: DismissedDialogsState) => void) | null = null
 
     vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
     vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
@@ -349,7 +349,7 @@ describe('Hydration timing', () => {
 
     // Simulate hydration complete
     vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
-    hydrationCallback!()
+    hydrationCallback!(useDismissedDialogsStore.getState())
 
     // Now shown
     expect(useMsgBoxStore.getState().isOpen).toBe(true)
