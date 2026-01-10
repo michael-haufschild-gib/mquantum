@@ -227,75 +227,61 @@ float getDiskDensity(vec3 pos, float time, float r) {
     rDensity *= 2.0 / (rOverInner * rOverInner + 0.1);
 
     // 4. Volumetric Detail (The "Interstellar" Look)
-    
-    // PERF (OPT-BH-32): Conditional atan() and noise setup
-    // Only calculate expensive angle and noise coords if needed
-    bool useNoise = uNoiseAmount > 0.01;
-    bool useKepler = uKeplerianDifferential > 0.001;
-    
-    // If we need angle for Keplerian rotation or Noise
-    if (useNoise || useKepler) {
-        // Coordinate mapping for "streak" texture
-        // Map (x,y,z) -> (radius, angle, height)
-        float angle = atan(pos.z, pos.x);
 
-        // Keplerian disk rotation from animation system
-        // uDiskRotationAngle comes from rotationStore (accumulated by animation loop)
-        // uKeplerianDifferential controls inner/outer speed ratio:
-        //   0 = uniform rotation (all radii same speed)
-        //   1 = full Keplerian (ω ∝ r^-1.5, inner ~3x faster than outer)
-        float phase = angle + uDiskRotationAngle;
-        if (useKepler) {
-          float safeR = max(r, max(safeInnerR * 0.1, 0.001));
-          float ratio = safeInnerR / safeR;
-          // PERF: x^1.5 = x * sqrt(x) is faster than pow(x, 1.5) on GPU
-          float keplerianFactor = ratio * sqrt(ratio);
-          float rotSpeed = mix(1.0, keplerianFactor, uKeplerianDifferential);
-          phase = angle + uDiskRotationAngle * rotSpeed;
+    // PERF (OPT-BH-32): Conditional noise setup - skip if not needed
+    if (uNoiseAmount > 0.01) {
+        // PERF: Compute sin/cos directly from position, avoiding expensive atan()
+        // cos(angle) = x/r, sin(angle) = z/r (unit circle definition)
+        float invR = 1.0 / max(r, 0.001);
+        float cosAngle = pos.x * invR;
+        float sinAngle = pos.z * invR;
+
+        // Apply disk rotation using angle addition formulas (avoids atan + sin/cos)
+        // cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
+        // sin(a+b) = sin(a)cos(b) + cos(a)sin(b)
+        float cosRot = cos(uDiskRotationAngle);
+        float sinRot = sin(uDiskRotationAngle);
+
+        // Keplerian differential rotation
+        if (uKeplerianDifferential > 0.001) {
+            float ratio = safeInnerR / max(r, safeInnerR * 0.1);
+            float keplerianFactor = ratio * sqrt(ratio);
+            float rotSpeed = mix(1.0, keplerianFactor, uKeplerianDifferential);
+            float adjustedRot = uDiskRotationAngle * rotSpeed;
+            cosRot = cos(adjustedRot);
+            sinRot = sin(adjustedRot);
         }
 
-        // Only calculate noise if amount > 0.01
-        if (useNoise) {
-            // Per-pixel noise offset to break coherent sampling (ring artifacts)
-            // Uses screen-space coordinates to ensure nearby pixels sample slightly different noise
-            // The offset is small (0.1) to maintain noise continuity while breaking aliasing
-            // Adding time creates temporal variation for smooth animation
-            vec2 pixelCoord = gl_FragCoord.xy;
-            float pixelHash = fract(sin(dot(pixelCoord + fract(time) * 100.0, vec2(12.9898, 78.233))) * 43758.5453);
-            float noiseOffset = pixelHash * 0.1;
+        // Rotated angular coordinates (seamless, no atan discontinuity)
+        float rotCos = cosAngle * cosRot - sinAngle * sinRot;
+        float rotSin = sinAngle * cosRot + cosAngle * sinRot;
 
-            // PERF (OPT-BH-24): Single noise sample for volumetric disk
-            // Previous implementation sampled noise TWICE for seam blending (2x flowNoise calls).
-            
-            // Ring-dominant noise for Interstellar-style concentric arc patterns.
-            // High radial frequency creates many rings, low angular frequency keeps them coherent.
-            vec3 noiseCoord = vec3(
-                r * RING_RADIAL_FREQ + noiseOffset,   // High radial freq = many concentric rings
-                phase * RING_ANGULAR_FREQ,             // Low angular freq = coherent arcs
-                h * 2.0                                // Vertical structure
-            );
+        // PERF: Simplified per-pixel dither using just fragment coords
+        float noiseOffset = fract(dot(gl_FragCoord.xy, vec2(0.0671056, 0.00583715))) * 0.1;
 
-            // Sample high quality noise - SINGLE SAMPLE instead of double
-            float warped = flowNoise(noiseCoord * uNoiseScale, time * 0.2);
+        // SEAM-FREE noise coordinates using rotated sin/cos
+        float radialCoord = r * RING_RADIAL_FREQ + noiseOffset;
+        vec3 noiseCoord = vec3(
+            radialCoord,
+            (rotCos + rotSin * 0.5) * RING_ANGULAR_FREQ,
+            h * 2.0 + rotSin * 0.3 * RING_ANGULAR_FREQ
+        );
 
-            // Sharpen to create thin bright lines on dark background
-            // Higher exponent = thinner, brighter streaks (more like reference image)
-            float noiseVal = smoothstep(0.15, 0.85, warped);
-            // PERF: x * x * sqrt(x) is faster than pow(x, 2.5) on GPU
-            noiseVal = noiseVal * noiseVal * sqrt(max(noiseVal, 0.001));
+        // PERF: Use ridgedMF directly instead of flowNoise to skip domain warp snoise
+        // Domain warping adds fluid look but costs +1 snoise call (~33% overhead)
+        float warped = ridgedMF(noiseCoord * uNoiseScale + vec3(time * 0.02, time * 0.01, 0.0));
 
-            // Apply noise: bright lines (high noise) increase density, dark areas reduce it
-            // This creates the bright arc pattern on darker background
-            rDensity *= mix(0.3, 1.0, noiseVal) * mix(1.0, 2.0, uNoiseAmount);
+        // Sharpen to create thin bright lines on dark background
+        float noiseVal = smoothstep(0.15, 0.85, warped);
+        noiseVal = noiseVal * noiseVal * sqrt(max(noiseVal, 0.001));
 
-            // 5. Dust Lanes (dark rings) - RESTORED TO ORIGINAL LOCATION
-            // Sine wave modulation on radius
-            // Apply per-pixel offset to break coherent ring patterns in dust lanes too
-            float dustLanes = 0.5 + 0.5 * sin((r + noiseOffset) * DUST_LANE_FREQUENCY / uHorizonRadius);
-            // PERF: Use sqrt() instead of pow(x, 0.5)
-            dustLanes = sqrt(dustLanes); // Sharpen
-            rDensity *= mix(1.0, dustLanes, DUST_LANE_STRENGTH * uNoiseAmount); // Subtle banding
-        }
+        // Apply noise modulation
+        rDensity *= mix(0.3, 1.0, noiseVal) * mix(1.0, 2.0, uNoiseAmount);
+
+        // Dust lanes (radial banding)
+        float dustLanes = 0.5 + 0.5 * sin((r + noiseOffset) * DUST_LANE_FREQUENCY / uHorizonRadius);
+        dustLanes = sqrt(dustLanes);
+        rDensity *= mix(1.0, dustLanes, DUST_LANE_STRENGTH * uNoiseAmount);
     }
 
     return hDensity * rDensity * uManifoldIntensity * DISK_BASE_INTENSITY;

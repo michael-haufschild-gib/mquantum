@@ -344,6 +344,20 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     // === Keplerian Disk Rotation ===
     setBlackHoleKeplerianDifferential: clampedSetter('keplerianDifferential', 0, 1),
 
+    // === Polar Jets ===
+    setBlackHoleJetsEnabled: valueSetter('jetsEnabled'),
+    setBlackHoleJetsHeight: clampedSetter('jetsHeight', 10, 50),
+    setBlackHoleJetsWidth: clampedSetter('jetsWidth', 0.1, 0.5),
+    setBlackHoleJetsIntensity: clampedSetter('jetsIntensity', 0, 10),
+    setBlackHoleJetsColor: valueSetter('jetsColor'),
+    setBlackHoleJetsFalloff: clampedSetter('jetsFalloff', 1, 5),
+    setBlackHoleJetsNoiseAmount: clampedSetter('jetsNoiseAmount', 0, 1),
+    setBlackHoleJetsPulsation: clampedSetter('jetsPulsation', 0, 2),
+    setBlackHoleJetsGodRaysEnabled: valueSetter('jetsGodRaysEnabled'),
+    setBlackHoleJetsGodRaysIntensity: clampedSetter('jetsGodRaysIntensity', 0, 2),
+    setBlackHoleJetsGodRaysSamples: clampedSetter('jetsGodRaysSamples', 16, 128, true),
+    setBlackHoleJetsGodRaysDecay: clampedSetter('jetsGodRaysDecay', 0.9, 1),
+
     // === Config Operations ===
     setBlackHoleConfig: (config) => {
       // Validate and clamp numeric fields to prevent invalid values
@@ -433,6 +447,40 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
         validated.temporalAccumulationEnabled = config.temporalAccumulationEnabled
       if (config.pulseEnabled !== undefined) validated.pulseEnabled = config.pulseEnabled
       if (config.parameterValues !== undefined) validated.parameterValues = config.parameterValues
+
+      // Polar Jets - numeric
+      if (config.jetsHeight !== undefined) {
+        validated.jetsHeight = Math.max(10, Math.min(50, config.jetsHeight))
+      }
+      if (config.jetsWidth !== undefined) {
+        validated.jetsWidth = Math.max(0.1, Math.min(0.5, config.jetsWidth))
+      }
+      if (config.jetsIntensity !== undefined) {
+        validated.jetsIntensity = Math.max(0, Math.min(10, config.jetsIntensity))
+      }
+      if (config.jetsFalloff !== undefined) {
+        validated.jetsFalloff = Math.max(1, Math.min(5, config.jetsFalloff))
+      }
+      if (config.jetsNoiseAmount !== undefined) {
+        validated.jetsNoiseAmount = Math.max(0, Math.min(1, config.jetsNoiseAmount))
+      }
+      if (config.jetsPulsation !== undefined) {
+        validated.jetsPulsation = Math.max(0, Math.min(2, config.jetsPulsation))
+      }
+      if (config.jetsGodRaysIntensity !== undefined) {
+        validated.jetsGodRaysIntensity = Math.max(0, Math.min(2, config.jetsGodRaysIntensity))
+      }
+      if (config.jetsGodRaysSamples !== undefined) {
+        validated.jetsGodRaysSamples = Math.floor(Math.max(16, Math.min(128, config.jetsGodRaysSamples)))
+      }
+      if (config.jetsGodRaysDecay !== undefined) {
+        validated.jetsGodRaysDecay = Math.max(0.9, Math.min(1, config.jetsGodRaysDecay))
+      }
+
+      // Polar Jets - booleans/strings
+      if (config.jetsEnabled !== undefined) validated.jetsEnabled = config.jetsEnabled
+      if (config.jetsColor !== undefined) validated.jetsColor = config.jetsColor
+      if (config.jetsGodRaysEnabled !== undefined) validated.jetsGodRaysEnabled = config.jetsGodRaysEnabled
 
       setWithVersion((state) => ({
         blackhole: { ...state.blackhole, ...validated },

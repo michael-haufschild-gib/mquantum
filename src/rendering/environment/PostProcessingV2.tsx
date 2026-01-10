@@ -60,8 +60,11 @@ import {
   FXAAPass,
   FrameBlendingPass,
   FullscreenPass,
+  GodRaysPass,
   GTAOPass,
   GravitationalLensingPass,
+  JetsCompositePass,
+  JetsRenderPass,
   MainObjectMRTPass,
   NormalPass,
   PaperTexturePass,
@@ -111,6 +114,11 @@ const RESOURCES = {
   ENVIRONMENT_COLOR: 'environmentColor',
   MAIN_OBJECT_COLOR: 'mainObjectColor',
   LENSED_ENVIRONMENT: 'lensedEnvironment',
+
+  // Polar Jets resources
+  JETS_COLOR: 'jetsColor',
+  JETS_COMPOSITE: 'jetsComposite',  // Jets composited over scene (before god rays)
+  GOD_RAYS_OUTPUT: 'godRaysOutput', // Final jets output (after god rays if enabled)
 
   // Temporal Cloud resources
   TEMPORAL_CLOUD_BUFFER: 'temporalCloudBuffer',
@@ -673,6 +681,33 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       dataType: THREE.HalfFloatType,
     });
 
+    // Polar jets color buffer (rendered separately for additive composite)
+    g.addResource({
+      id: RESOURCES.JETS_COLOR,
+      type: 'renderTarget',
+      size: { mode: 'screen' },
+      format: THREE.RGBAFormat,
+      dataType: THREE.HalfFloatType,
+    });
+
+    // Jets composite buffer (scene + jets, before god rays)
+    g.addResource({
+      id: RESOURCES.JETS_COMPOSITE,
+      type: 'renderTarget',
+      size: { mode: 'screen' },
+      format: THREE.RGBAFormat,
+      dataType: THREE.HalfFloatType,
+    });
+
+    // God rays output buffer (radial blur from jets)
+    g.addResource({
+      id: RESOURCES.GOD_RAYS_OUTPUT,
+      type: 'renderTarget',
+      size: { mode: 'screen' },
+      format: THREE.RGBAFormat,
+      dataType: THREE.HalfFloatType,
+    });
+
     // Buffer preview output
     g.addResource({
       id: RESOURCES.PREVIEW_OUTPUT,
@@ -791,13 +826,17 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
       if (!frame) return false;
       const pp = frame.stores.postProcessing;
       const ui = frame.stores.ui;
+      const blackhole = frame.stores.blackHole;
+      const objectType = frame.stores.geometry?.objectType;
       const depthForEffects =
         pp.objectOnlyDepth && (pp.ssrEnabled || pp.refractionEnabled || pp.bokehEnabled);
       // NOTE: temporalDepthNeeded was removed from here because TemporalDepthCapturePass
       // now reads from MAIN_OBJECT_MRT's depth texture instead of OBJECT_DEPTH.
       // This eliminates the double-render issue for Mandelbulb/Julia temporal reprojection.
       const depthPreview = ui.showDepthBuffer && pp.objectOnlyDepth;
-      return depthForEffects || depthPreview;
+      // Jets need depth for soft intersections at the accretion disk
+      const jetsNeedDepth = objectType === 'blackhole' && (blackhole?.jetsEnabled ?? false);
+      return depthForEffects || depthPreview || jetsNeedDepth;
     };
 
     const shouldRenderTemporalCloud = (frame: import('@/rendering/graph/FrameContext').FrozenFrameContext | null) => {
@@ -946,6 +985,71 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
     passRefs.current.objectDepth = objectDepthPass;
     g.addPass(objectDepthPass);
 
+    // =========================================================================
+    // POLAR JETS (Black Hole)
+    // =========================================================================
+    // Jets are rendered after main object so we have depth for soft intersections.
+    // They composite additively over the scene.
+
+    /**
+     * Check if jets should be rendered.
+     * Jets are only rendered when:
+     * 1. Object type is blackhole
+     * 2. Jets are enabled in blackhole config
+     */
+    const shouldRenderJets = (frame: import('@/rendering/graph/FrameContext').FrozenFrameContext | null): boolean => {
+      if (!frame) return false;
+      const objectType = frame.stores.geometry?.objectType;
+      const jetsEnabled = frame.stores.blackHole?.jetsEnabled ?? false;
+      return objectType === 'blackhole' && jetsEnabled;
+    };
+
+    // Jets render pass - renders jet cones to separate buffer
+    const jetsRenderPass = new JetsRenderPass({
+      id: 'jetsRender',
+      sceneDepthInput: RESOURCES.OBJECT_DEPTH,
+      outputResource: RESOURCES.JETS_COLOR,
+      enabled: shouldRenderJets,
+    });
+    g.addPass(jetsRenderPass);
+
+    // Jets composite pass - composites jets over scene with additive blending
+    // When jets enabled: composites scene + jets → JETS_COMPOSITE
+    // When jets disabled: passthrough SCENE_COLOR → JETS_COMPOSITE
+    const jetsCompositePass = new JetsCompositePass({
+      id: 'jetsComposite',
+      sceneInput: RESOURCES.SCENE_COLOR,
+      jetsInput: RESOURCES.JETS_COLOR,
+      outputResource: RESOURCES.JETS_COMPOSITE,
+      enabled: shouldRenderJets,
+      // skipPassthrough: false (default) - copies SCENE_COLOR → JETS_COMPOSITE when disabled
+    });
+    g.addPass(jetsCompositePass);
+
+    /**
+     * Check if god rays should be rendered.
+     * God rays are enabled when jets are enabled AND jetsGodRaysEnabled is true.
+     */
+    const shouldRenderGodRays = (frame: import('@/rendering/graph/FrameContext').FrozenFrameContext | null): boolean => {
+      if (!frame) return false;
+      const blackhole = frame.stores.blackHole;
+      const objectType = frame.stores.geometry?.objectType;
+      return objectType === 'blackhole' && blackhole?.jetsEnabled && blackhole?.jetsGodRaysEnabled;
+    };
+
+    // God rays pass - radial blur from jets for light scattering effect
+    // Reads from JETS_COMPOSITE, outputs to GOD_RAYS_OUTPUT
+    // When disabled: passthrough JETS_COMPOSITE → GOD_RAYS_OUTPUT (jets without god rays)
+    const godRaysPass = new GodRaysPass({
+      id: 'godRays',
+      jetsInput: RESOURCES.JETS_COLOR,
+      sceneInput: RESOURCES.JETS_COMPOSITE, // Chain from jets composite
+      outputResource: RESOURCES.GOD_RAYS_OUTPUT, // Final jets output
+      enabled: shouldRenderGodRays,
+      // skipPassthrough: false (default) - copies JETS_COMPOSITE → GOD_RAYS_OUTPUT when disabled
+    });
+    g.addPass(godRaysPass);
+
     // Temporal position capture pass
     // Captures gPosition buffer (xyz=world pos, w=model-space ray distance) for
     // position-based temporal reprojection. This correctly handles camera rotation
@@ -1061,10 +1165,11 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
 
     // Composite temporal clouds over the scene color
     // This pass is only needed when temporal clouds are active.
-    // When disabled, passthrough correctly copies SCENE_COLOR → SCENE_COMPOSITE.
+    // Reads from GOD_RAYS_OUTPUT (which contains scene color, optionally with jets/god rays)
+    // When disabled, passthrough correctly copies GOD_RAYS_OUTPUT → SCENE_COMPOSITE.
     const cloudComposite = new FullscreenPass({
       id: 'cloudComposite',
-      inputs: [{ resourceId: RESOURCES.SCENE_COLOR, access: 'read', binding: 'uSceneColor' }],
+      inputs: [{ resourceId: RESOURCES.GOD_RAYS_OUTPUT, access: 'read', binding: 'uSceneColor' }],
       outputs: [{ resourceId: RESOURCES.SCENE_COMPOSITE, access: 'write' }],
       fragmentShader: cloudCompositeFragmentShader,
       uniforms: {
@@ -1072,7 +1177,7 @@ export const PostProcessingV2 = memo(function PostProcessingV2() {
         uCloudAvailable: { value: 0 },
       },
       enabled: shouldRenderTemporalCloud,
-      skipPassthrough: true,
+      // skipPassthrough: false - copies GOD_RAYS_OUTPUT → SCENE_COMPOSITE when disabled
     });
     passRefs.current.cloudComposite = cloudComposite;
     g.addPass(cloudComposite);

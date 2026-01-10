@@ -52,14 +52,17 @@ export function useSyncedDimension() {
     setTransformDimension(dimension);
     setAnimationDimension(dimension);
 
-    // Object-specific re-initialization
+    // Object-specific re-initialization for dimension changes
+    // Note: Color algorithm is NOT set here - only when transitioning TO blackhole
+    // (see second useLayoutEffect). This preserves the user's color algorithm choice
+    // when changing dimensions on an existing black hole.
     if (objectType === 'blackhole') {
       initializeBlackHoleForDimension(dimension);
-      useAppearanceStore.getState().setColorAlgorithm('blackbody');
     }
   }, [dimension, objectType, setRotationDimension, setTransformDimension, setAnimationDimension, initializeBlackHoleForDimension]);
 
   // Reset rotations when object type changes (but not during scene loading)
+  // Also set default color algorithm when transitioning TO blackhole
   useLayoutEffect(() => {
     // Check if a scene is being loaded - skip rotation reset during scene load
     // because the scene loader will restore rotations from saved state
@@ -70,6 +73,14 @@ export function useSyncedDimension() {
 
     if (prevObjectTypeRef.current !== objectType) {
       resetAllRotations();
+      
+      // When transitioning TO blackhole, set default color algorithm to blackbody.
+      // This only runs on object type CHANGE, not on dimension changes,
+      // so loaded scenes preserve their color algorithm setting.
+      if (objectType === 'blackhole') {
+        useAppearanceStore.getState().setColorAlgorithm('blackbody');
+      }
+      
       prevObjectTypeRef.current = objectType;
     }
   }, [objectType, resetAllRotations]);

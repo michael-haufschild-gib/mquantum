@@ -632,13 +632,15 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
         ;(u.uRimColor.value as THREE.Color).set(appearanceState.edgeColor)
       }
 
-      // Note: AO is per-object (not in global appearanceStore)
-      // Black hole uses volumetric AO approximation controlled by aoEnabled in blackholeSlice
-      // For now, AO is controlled via shader compilation flag only
-
       // Update version ref
       lastAppearanceVersionRef.current = appearanceVersion
     }
+
+    // ============================================
+    // AO UNIFORM (from postProcessingStore - global toggle)
+    // ============================================
+    // Black hole uses volumetric AO (density-based), controlled by global ssaoEnabled toggle
+    setUniform(u, 'uAoEnabled', usePostProcessingStore.getState().ssaoEnabled)
 
     // ========================================================================
     // Environment Map Update (Frame-Consistent via ExternalBridge)

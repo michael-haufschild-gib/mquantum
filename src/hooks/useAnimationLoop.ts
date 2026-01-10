@@ -84,11 +84,11 @@ export function useAnimationLoop(): void {
           const biasedDelta = rotationDelta * multiplier
           let newAngle = currentAngle + biasedDelta
 
-          // Normalize to [0, 2π) - using modulo for safety against NaN/Infinity
+          // Only guard against NaN/Infinity - do NOT normalize here.
+          // Normalization happens lazily in rotationStore to avoid double-modulo
+          // precision loss that causes visible jump-cuts in animated textures.
           if (!isFinite(newAngle)) {
-            newAngle = 0
-          } else {
-            newAngle = ((newAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+            newAngle = currentAngle // Keep previous valid angle
           }
 
           updates.set(plane, newAngle)

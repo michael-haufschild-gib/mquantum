@@ -1,4 +1,26 @@
+import type { ObjectType } from '@/lib/geometry/types'
 import type { SavedScene, SavedStyle } from '../presetManagerStore'
+
+/**
+ * Mapping from ObjectType to the config key in the extended object store.
+ * Used to serialize only the relevant config when saving a scene,
+ * and to apply only the relevant config when loading a scene.
+ */
+export const OBJECT_TYPE_TO_CONFIG_KEY: Record<ObjectType, string> = {
+  // Polytopes
+  'hypercube': 'polytope',
+  'simplex': 'polytope',
+  'cross-polytope': 'polytope',
+  'wythoff-polytope': 'wythoffPolytope',
+  // Extended objects
+  'root-system': 'rootSystem',
+  'clifford-torus': 'cliffordTorus',
+  'nested-torus': 'nestedTorus',
+  'mandelbulb': 'mandelbulb',
+  'quaternion-julia': 'quaternionJulia',
+  'schroedinger': 'schroedinger',
+  'blackhole': 'blackhole',
+}
 
 /**
  * Fields that should never be serialized to presets.
@@ -92,6 +114,39 @@ export const serializeRotationState = <T extends object>(state: T): Record<strin
     clean.rotations = Object.fromEntries(state.rotations as Map<string, unknown>)
   }
   return clean
+}
+
+/**
+ * Serializes only the relevant extended object config for the given object type.
+ * This prevents saving irrelevant configs (e.g., blackhole config when saving a hypercube).
+ * 
+ * @param state - The full extended object store state
+ * @param objectType - The current object type being saved
+ * @returns A serialized state containing only the relevant config
+ */
+export const serializeExtendedState = <T extends object>(
+  state: T,
+  objectType: ObjectType
+): Record<string, unknown> => {
+  const configKey = OBJECT_TYPE_TO_CONFIG_KEY[objectType]
+  if (!configKey) {
+    // Unknown object type - return empty (shouldn't happen)
+    console.warn(`Unknown object type for extended config: ${objectType}`)
+    return {}
+  }
+
+  const stateRecord = state as Record<string, unknown>
+  const config = stateRecord[configKey]
+  
+  if (!config || typeof config !== 'object') {
+    return {}
+  }
+
+  // Return only the relevant config, keyed by its config key
+  // This allows mergeExtendedObjectState to properly merge on load
+  return {
+    [configKey]: JSON.parse(JSON.stringify(config))
+  }
 }
 
 /**

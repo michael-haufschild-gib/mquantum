@@ -134,13 +134,20 @@ describe('useAnimationLoop', () => {
       expect(useRotationStore.getState().rotations.get('XZ')).toBeCloseTo(Math.PI / 2)
     })
 
-    it('should normalize angles to [0, 2π)', () => {
-      // Set angle greater than 2π
+    it('should use lazy normalization (only when angle exceeds threshold)', () => {
+      // Small angles (below 10000 rad threshold) are NOT normalized
+      // This prevents floating-point precision loss that causes visible jump-cuts
       useRotationStore.getState().setRotation('XY', 3 * Math.PI)
 
       const angle = useRotationStore.getState().rotations.get('XY') ?? 0
-      expect(angle).toBeGreaterThanOrEqual(0)
-      expect(angle).toBeLessThan(2 * Math.PI)
+      // 3π is below the 10000 rad threshold, so it should NOT be normalized
+      expect(angle).toBeCloseTo(3 * Math.PI)
+
+      // Large angles (above threshold) ARE normalized
+      useRotationStore.getState().setRotation('XZ', 10001)
+      const largeAngle = useRotationStore.getState().rotations.get('XZ') ?? 0
+      expect(largeAngle).toBeGreaterThanOrEqual(0)
+      expect(largeAngle).toBeLessThan(2 * Math.PI)
     })
   })
 

@@ -191,6 +191,7 @@ export interface FrozenPerformanceState {
  */
 export interface FrozenBlackHoleState {
   readonly horizonRadius: number
+  readonly diskInnerRadiusMul: number
   readonly spin: number
   readonly gravityStrength: number
   readonly manifoldIntensity: number
@@ -207,6 +208,19 @@ export interface FrozenBlackHoleState {
   // NOTE: screenSpaceLensingEnabled removed - gravity lensing is now controlled globally
   readonly skyCubemapResolution: BlackHoleConfig['skyCubemapResolution']
   readonly temporalAccumulationEnabled: boolean
+  // Polar Jets
+  readonly jetsEnabled: boolean
+  readonly jetsHeight: number
+  readonly jetsWidth: number
+  readonly jetsIntensity: number
+  readonly jetsColor: string
+  readonly jetsFalloff: number
+  readonly jetsNoiseAmount: number
+  readonly jetsPulsation: number
+  readonly jetsGodRaysEnabled: boolean
+  readonly jetsGodRaysIntensity: number
+  readonly jetsGodRaysSamples: number
+  readonly jetsGodRaysDecay: number
 }
 
 /**
@@ -521,6 +535,7 @@ function captureBlackHoleState(getter: StoreGetters['getBlackHoleState']): Froze
   const state = getter()
   return {
     horizonRadius: state.horizonRadius,
+    diskInnerRadiusMul: state.diskInnerRadiusMul,
     spin: state.spin,
     gravityStrength: state.gravityStrength,
     manifoldIntensity: state.manifoldIntensity,
@@ -536,6 +551,19 @@ function captureBlackHoleState(getter: StoreGetters['getBlackHoleState']): Froze
     deferredLensingStrength: state.deferredLensingStrength,
     skyCubemapResolution: state.skyCubemapResolution,
     temporalAccumulationEnabled: state.temporalAccumulationEnabled,
+    // Polar Jets
+    jetsEnabled: state.jetsEnabled,
+    jetsHeight: state.jetsHeight,
+    jetsWidth: state.jetsWidth,
+    jetsIntensity: state.jetsIntensity,
+    jetsColor: state.jetsColor,
+    jetsFalloff: state.jetsFalloff,
+    jetsNoiseAmount: state.jetsNoiseAmount,
+    jetsPulsation: state.jetsPulsation,
+    jetsGodRaysEnabled: state.jetsGodRaysEnabled,
+    jetsGodRaysIntensity: state.jetsGodRaysIntensity,
+    jetsGodRaysSamples: state.jetsGodRaysSamples,
+    jetsGodRaysDecay: state.jetsGodRaysDecay,
   }
 }
 
@@ -732,6 +760,7 @@ export function createEmptyFrameContext(): FrozenFrameContext {
       },
       blackHole: {
         horizonRadius: 1,
+        diskInnerRadiusMul: 4.23,
         spin: 0,
         gravityStrength: 1,
         manifoldIntensity: 1,
@@ -747,6 +776,19 @@ export function createEmptyFrameContext(): FrozenFrameContext {
         deferredLensingStrength: 1,
         skyCubemapResolution: 512,
         temporalAccumulationEnabled: false,
+        // Polar Jets
+        jetsEnabled: false,
+        jetsHeight: 25,
+        jetsWidth: 0.2,
+        jetsIntensity: 3.0,
+        jetsColor: '#4488ff',
+        jetsFalloff: 2.0,
+        jetsNoiseAmount: 0.3,
+        jetsPulsation: 0.5,
+        jetsGodRaysEnabled: true,
+        jetsGodRaysIntensity: 0.8,
+        jetsGodRaysSamples: 64,
+        jetsGodRaysDecay: 0.96,
       },
       ui: {
         showDepthBuffer: false,

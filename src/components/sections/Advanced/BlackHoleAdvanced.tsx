@@ -38,6 +38,19 @@ export const BlackHoleAdvanced: React.FC = React.memo(() => {
     // Motion blur
     setMotionBlurEnabled: state.setBlackHoleMotionBlurEnabled,
     setMotionBlurStrength: state.setBlackHoleMotionBlurStrength,
+    // Polar Jets
+    setJetsEnabled: state.setBlackHoleJetsEnabled,
+    setJetsHeight: state.setBlackHoleJetsHeight,
+    setJetsWidth: state.setBlackHoleJetsWidth,
+    setJetsIntensity: state.setBlackHoleJetsIntensity,
+    setJetsColor: state.setBlackHoleJetsColor,
+    setJetsFalloff: state.setBlackHoleJetsFalloff,
+    setJetsNoiseAmount: state.setBlackHoleJetsNoiseAmount,
+    setJetsPulsation: state.setBlackHoleJetsPulsation,
+    setJetsGodRaysEnabled: state.setBlackHoleJetsGodRaysEnabled,
+    setJetsGodRaysIntensity: state.setBlackHoleJetsGodRaysIntensity,
+    setJetsGodRaysSamples: state.setBlackHoleJetsGodRaysSamples,
+    setJetsGodRaysDecay: state.setBlackHoleJetsGodRaysDecay,
   }));
   const {
     config,
@@ -60,6 +73,19 @@ export const BlackHoleAdvanced: React.FC = React.memo(() => {
     setAbsorption,
     setMotionBlurEnabled,
     setMotionBlurStrength,
+    // Polar Jets
+    setJetsEnabled,
+    setJetsHeight,
+    setJetsWidth,
+    setJetsIntensity,
+    setJetsColor,
+    setJetsFalloff,
+    setJetsNoiseAmount,
+    setJetsPulsation,
+    setJetsGodRaysEnabled,
+    setJetsGodRaysIntensity,
+    setJetsGodRaysSamples,
+    setJetsGodRaysDecay,
   } = useExtendedObjectStore(extendedObjectSelector);
 
   return (
@@ -225,6 +251,151 @@ export const BlackHoleAdvanced: React.FC = React.memo(() => {
             onChange={setDopplerStrength}
             showValue
           />
+        )}
+      </ControlGroup>
+
+      {/* Polar Jets */}
+      <ControlGroup title="Polar Jets" collapsible defaultOpen>
+        <div className="flex items-center justify-between">
+          <label className="text-xs text-text-secondary">Enable Jets</label>
+          <ToggleButton
+            pressed={config.jetsEnabled}
+            onToggle={() => setJetsEnabled(!config.jetsEnabled)}
+            className="text-xs px-2 py-1 h-auto"
+            ariaLabel="Toggle polar jets"
+            data-testid="blackhole-jets-toggle"
+          >
+            {config.jetsEnabled ? 'ON' : 'OFF'}
+          </ToggleButton>
+        </div>
+        {config.jetsEnabled && (
+          <>
+            <Slider
+              label="Height"
+              min={10}
+              max={50}
+              step={1}
+              value={config.jetsHeight}
+              onChange={setJetsHeight}
+              showValue
+              data-testid="blackhole-jets-height"
+            />
+            <Slider
+              label="Width"
+              min={0.1}
+              max={0.5}
+              step={0.01}
+              value={config.jetsWidth}
+              onChange={setJetsWidth}
+              showValue
+              data-testid="blackhole-jets-width"
+            />
+            <Slider
+              label="Intensity"
+              min={0}
+              max={10}
+              step={0.1}
+              value={config.jetsIntensity}
+              onChange={setJetsIntensity}
+              showValue
+              data-testid="blackhole-jets-intensity"
+            />
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-text-secondary">Color</label>
+              <ColorPicker
+                value={config.jetsColor}
+                onChange={setJetsColor}
+                disableAlpha={true}
+                className="w-24"
+                data-testid="blackhole-jets-color"
+              />
+            </div>
+            <Slider
+              label="Falloff"
+              min={1}
+              max={5}
+              step={0.1}
+              value={config.jetsFalloff}
+              onChange={setJetsFalloff}
+              showValue
+              data-testid="blackhole-jets-falloff"
+            />
+
+            {/* Turbulence */}
+            <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">
+              <label className="text-xs text-text-secondary font-medium">Turbulence</label>
+              <Slider
+                label="Noise Amount"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.jetsNoiseAmount}
+                onChange={setJetsNoiseAmount}
+                showValue
+                data-testid="blackhole-jets-noise"
+              />
+              <Slider
+                label="Pulsation"
+                min={0}
+                max={2}
+                step={0.1}
+                value={config.jetsPulsation}
+                onChange={setJetsPulsation}
+                showValue
+                data-testid="blackhole-jets-pulsation"
+              />
+            </div>
+
+            {/* God Rays */}
+            <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-text-secondary font-medium">God Rays</label>
+                <ToggleButton
+                  pressed={config.jetsGodRaysEnabled}
+                  onToggle={() => setJetsGodRaysEnabled(!config.jetsGodRaysEnabled)}
+                  className="text-xs px-2 py-1 h-auto"
+                  ariaLabel="Toggle god rays"
+                  data-testid="blackhole-jets-godrays-toggle"
+                >
+                  {config.jetsGodRaysEnabled ? 'ON' : 'OFF'}
+                </ToggleButton>
+              </div>
+              {config.jetsGodRaysEnabled && (
+                <>
+                  <Slider
+                    label="Intensity"
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    value={config.jetsGodRaysIntensity}
+                    onChange={setJetsGodRaysIntensity}
+                    showValue
+                    data-testid="blackhole-jets-godrays-intensity"
+                  />
+                  <Slider
+                    label="Samples"
+                    min={16}
+                    max={128}
+                    step={8}
+                    value={config.jetsGodRaysSamples}
+                    onChange={setJetsGodRaysSamples}
+                    showValue
+                    data-testid="blackhole-jets-godrays-samples"
+                  />
+                  <Slider
+                    label="Decay"
+                    min={0.9}
+                    max={1.0}
+                    step={0.01}
+                    value={config.jetsGodRaysDecay}
+                    onChange={setJetsGodRaysDecay}
+                    showValue
+                    data-testid="blackhole-jets-godrays-decay"
+                  />
+                </>
+              )}
+            </div>
+          </>
         )}
       </ControlGroup>
 

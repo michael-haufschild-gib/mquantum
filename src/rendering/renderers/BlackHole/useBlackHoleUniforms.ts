@@ -183,7 +183,8 @@ export function useBlackHoleUniforms() {
       uFresnelIntensity: { value: 0.5 },
       uRimColor: { value: new THREE.Color('#ffffff').convertSRGBToLinear() },
 
-      // Ambient Occlusion (from appearanceStore - shared uniforms)
+      // Ambient Occlusion - controlled by global ssaoEnabled toggle in postProcessingStore
+      // Uses volumetric density sampling (not SDF-based calcAO)
       uAoEnabled: { value: false },
 
       // Slice animation (for trueND mode)

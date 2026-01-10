@@ -10,6 +10,7 @@
  * for the missing parameters.
  */
 
+import type { ObjectType } from '@/lib/geometry/types'
 import {
   DEFAULT_BLACK_HOLE_CONFIG,
   DEFAULT_CLIFFORD_TORUS_CONFIG,
@@ -21,6 +22,22 @@ import {
   DEFAULT_SCHROEDINGER_CONFIG,
   DEFAULT_WYTHOFF_POLYTOPE_CONFIG,
 } from '@/lib/geometry/extended/types'
+import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
+
+/**
+ * Mapping from config key to its default config.
+ */
+const CONFIG_KEY_TO_DEFAULT: Record<string, object> = {
+  polytope: DEFAULT_POLYTOPE_CONFIG,
+  wythoffPolytope: DEFAULT_WYTHOFF_POLYTOPE_CONFIG,
+  rootSystem: DEFAULT_ROOT_SYSTEM_CONFIG,
+  cliffordTorus: DEFAULT_CLIFFORD_TORUS_CONFIG,
+  nestedTorus: DEFAULT_NESTED_TORUS_CONFIG,
+  mandelbulb: DEFAULT_MANDELBROT_CONFIG,
+  quaternionJulia: DEFAULT_QUATERNION_JULIA_CONFIG,
+  schroedinger: DEFAULT_SCHROEDINGER_CONFIG,
+  blackhole: DEFAULT_BLACK_HOLE_CONFIG,
+}
 
 /**
  * Deep merges loaded state with defaults.
@@ -81,8 +98,8 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
 /**
  * Merges loaded extended object state with all config defaults.
  *
- * This ensures that old saved scenes automatically get default values
- * for any new parameters that were added after the scene was saved.
+ * @deprecated Use mergeExtendedObjectStateForType instead to only merge the relevant config.
+ * This function merges ALL configs which can overwrite unrelated object type settings.
  *
  * @param loaded - The loaded extended object state from a saved scene
  * @returns Merged state with all defaults filled in
@@ -102,5 +119,46 @@ export function mergeExtendedObjectState(
     quaternionJulia: deepMerge(DEFAULT_QUATERNION_JULIA_CONFIG, loaded.quaternionJulia),
     schroedinger: deepMerge(DEFAULT_SCHROEDINGER_CONFIG, loaded.schroedinger),
     blackhole: deepMerge(DEFAULT_BLACK_HOLE_CONFIG, loaded.blackhole),
+  }
+}
+
+/**
+ * Merges loaded extended object state for a specific object type only.
+ *
+ * This is the preferred function for scene loading. It:
+ * 1. Only updates the config for the loaded object type
+ * 2. Merges with defaults to handle newly added parameters
+ * 3. Does NOT touch configs for other object types
+ *
+ * This prevents issues like:
+ * - Loading a hypercube scene overwriting blackhole settings
+ * - Loading a blackhole scene overwriting schroedinger settings
+ *
+ * @param loaded - The loaded extended object state from a saved scene (typically only contains one config)
+ * @param objectType - The object type being loaded
+ * @returns Partial state update containing only the relevant config
+ */
+export function mergeExtendedObjectStateForType(
+  loaded: Record<string, unknown>,
+  objectType: ObjectType
+): Record<string, unknown> {
+  const configKey = OBJECT_TYPE_TO_CONFIG_KEY[objectType]
+  if (!configKey) {
+    console.warn(`Unknown object type for extended config merge: ${objectType}`)
+    return {}
+  }
+
+  const defaultConfig = CONFIG_KEY_TO_DEFAULT[configKey]
+  if (!defaultConfig) {
+    console.warn(`No default config found for key: ${configKey}`)
+    return {}
+  }
+
+  const loadedConfig = loaded[configKey]
+
+  // Return only the merged config for this object type
+  // This ensures we don't overwrite other object type configs
+  return {
+    [configKey]: deepMerge(defaultConfig, loadedConfig),
   }
 }

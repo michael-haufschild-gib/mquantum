@@ -6,6 +6,7 @@ import { useRotationStore } from '@/stores/rotationStore'
 import { useTransformStore } from '@/stores/transformStore'
 import { useAnimationStore } from '@/stores/animationStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
+import { useAppearanceStore } from '@/stores/appearanceStore'
 
 describe('useSyncedDimension', () => {
   beforeEach(() => {
@@ -210,6 +211,87 @@ describe('useSyncedDimension', () => {
       for (const [, angle] of useRotationStore.getState().rotations) {
         expect(angle).toBe(0)
       }
+    })
+  })
+
+  describe('blackhole color algorithm behavior', () => {
+    it('sets blackbody color algorithm when transitioning TO blackhole', () => {
+      // Start with hypercube
+      act(() => {
+        useGeometryStore.getState().setDimension(4)
+        useGeometryStore.getState().setObjectType('hypercube')
+      })
+
+      const { rerender } = renderHook(() => useSyncedDimension())
+
+      // Set a non-blackbody color algorithm
+      useAppearanceStore.getState().setColorAlgorithm('cosine')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('cosine')
+
+      // Switch to blackhole - should set blackbody
+      act(() => {
+        useGeometryStore.getState().setObjectType('blackhole')
+      })
+      rerender()
+
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
+    })
+
+    it('preserves color algorithm when changing dimension on existing blackhole', () => {
+      // Start with blackhole
+      act(() => {
+        useGeometryStore.getState().setDimension(4)
+        useGeometryStore.getState().setObjectType('blackhole')
+      })
+
+      const { rerender } = renderHook(() => useSyncedDimension())
+
+      // Set a different valid color algorithm for blackhole
+      useAppearanceStore.getState().setColorAlgorithm('accretionGradient')
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
+
+      // Change dimension - should NOT reset to blackbody
+      act(() => {
+        useGeometryStore.getState().setDimension(5)
+      })
+      rerender()
+
+      // Color algorithm should be preserved
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
+    })
+
+    it('preserves color algorithm when loading blackhole scene', () => {
+      // Start with hypercube
+      act(() => {
+        useGeometryStore.getState().setDimension(4)
+        useGeometryStore.getState().setObjectType('hypercube')
+      })
+
+      const { rerender } = renderHook(() => useSyncedDimension())
+
+      // Simulate scene loading - set the color algorithm BEFORE changing object type
+      usePerformanceStore.getState().setIsLoadingScene(true)
+      useAppearanceStore.getState().setColorAlgorithm('accretionGradient')
+
+      // Change to blackhole during scene loading
+      act(() => {
+        useGeometryStore.getState().setObjectType('blackhole')
+      })
+      rerender()
+
+      // Color algorithm should be preserved (not reset to blackbody)
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
+
+      // End scene loading
+      usePerformanceStore.getState().setIsLoadingScene(false)
+
+      // Change dimension - should still preserve color algorithm
+      act(() => {
+        useGeometryStore.getState().setDimension(5)
+      })
+      rerender()
+
+      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
     })
   })
 })

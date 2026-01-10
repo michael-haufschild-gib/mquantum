@@ -37,6 +37,17 @@ export const RENDER_LAYERS = {
    * - Any debug visualization that shouldn't affect post-processing
    */
   DEBUG: 4,
+  /**
+   * Polar jets layer for black hole visualization.
+   *
+   * Rendered as a separate pass with additive blending over the scene.
+   * Uses volumetric cone geometry with John Chapman's "Good Enough Volumetrics"
+   * technique: distance attenuation, edge softness via normal·view dot product,
+   * and soft depth intersections at the accretion disk.
+   *
+   * Optionally followed by GPU Gems 3 god rays (radial blur) for light scattering.
+   */
+  JETS: 5,
 } as const
 
 export type RenderLayer = (typeof RENDER_LAYERS)[keyof typeof RENDER_LAYERS]

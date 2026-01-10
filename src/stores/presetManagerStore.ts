@@ -16,11 +16,12 @@ import { usePostProcessingStore } from './postProcessingStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
 import { useUIStore } from './uiStore'
-import { mergeExtendedObjectState } from './utils/mergeWithDefaults'
+import { mergeExtendedObjectStateForType } from './utils/mergeWithDefaults'
 import {
   serializeState,
   serializeAnimationState,
   serializeRotationState,
+  serializeExtendedState,
   sanitizeLoadedState,
   sanitizeStyleData,
   sanitizeSceneData,
@@ -310,7 +311,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
 
         // Scene components
         const geometry = serializeState(useGeometryStore.getState())
-        const extended = serializeState(useExtendedObjectStore.getState())
+        // Only serialize the extended config for the current object type
+        // This prevents irrelevant configs from being saved/overwritten
+        const currentObjectType = useGeometryStore.getState().objectType
+        const extended = serializeExtendedState(useExtendedObjectStore.getState(), currentObjectType)
         const transform = serializeState(useTransformStore.getState())
         const ui = serializeState(useUIStore.getState())
 
@@ -394,6 +398,9 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           dimension?: number
           objectType?: string
         }
+        // Determine the object type for loading (either from saved data or keep current)
+        const loadedObjectType = (geometryData.objectType ?? useGeometryStore.getState().objectType) as import('@/lib/geometry/types').ObjectType
+        
         if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
           useGeometryStore.getState().loadGeometry(
             geometryData.dimension,
@@ -407,10 +414,11 @@ export const usePresetManagerStore = create<PresetManagerState>()(
             .setObjectType(geometryData.objectType as import('@/lib/geometry/types').ObjectType)
         }
 
-        // Restore other scene components with transient fields stripped
-        // Merge with defaults to ensure new parameters added after scene was saved get default values
+        // Restore only the extended config for the loaded object type
+        // This prevents overwriting configs for other object types
+        // mergeExtendedObjectStateForType merges with defaults and only touches the relevant config
         useExtendedObjectStore.setState(
-          mergeExtendedObjectState(sanitizeLoadedState(scene.data.extended))
+          mergeExtendedObjectStateForType(sanitizeLoadedState(scene.data.extended), loadedObjectType)
         )
         useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
 

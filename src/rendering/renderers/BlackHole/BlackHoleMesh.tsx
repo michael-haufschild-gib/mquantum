@@ -111,7 +111,9 @@ const BlackHoleMesh = () => {
   // v5: OPT-BH-23/24/25/26/27 - Dead code removal, single noise sample,
   //     unified snoise, pre-computed lensing constants, fast-mode crossing skip
   // v6: Added Fresnel rim and SSS shader modules with proper intensity scaling
-  const SHADER_VERSION = 6
+  // v7: Fixed Fresnel/SSS/AO for volumetric context - removed emission scaling,
+  //     enabled AO by default, fixed AO diskR bug
+  const SHADER_VERSION = 7
 
   // Compile shader
   const { fragmentShader } = useMemo(() => {
@@ -119,7 +121,7 @@ const BlackHoleMesh = () => {
       dimension,
       shadows: false,
       temporal: false,
-      ambientOcclusion: false, // AO disabled until added to blackholeSlice
+      ambientOcclusion: true, // Volumetric AO approximation for disk self-shadowing
       sss: sssEnabled,
       fresnel: fresnelEnabled,
       temporalAccumulation: temporalEnabled,
@@ -158,7 +160,7 @@ const BlackHoleMesh = () => {
   // Previously used BoxGeometry (size ~2.2x), but SphereGeometry reduces
   // fragment shader invocations on empty corners (Better Bounding Volume).
   const shaderRadius = farRadius * horizonRadius
-  
+
   return (
     <mesh ref={meshRef} layers={RENDER_LAYERS.MAIN_OBJECT} frustumCulled={true} scale={[1, 1, 1]}>
       {/* Reduced segments from 64x64 to 32x16 to prevent Quad Overshading performance penalty */}
@@ -170,7 +172,7 @@ const BlackHoleMesh = () => {
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}
         uniforms={uniforms}
-        side={THREE.BackSide}
+        side={THREE.DoubleSide}
         /* transparent and depthWrite are set dynamically in useBlackHoleUniformUpdates
          * based on opacity mode (solid = depthWrite:true, others = depthWrite:false) */
       />

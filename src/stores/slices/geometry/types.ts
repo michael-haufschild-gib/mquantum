@@ -528,6 +528,20 @@ export interface BlackHoleSliceActions {
   // Keplerian Disk Rotation
   setBlackHoleKeplerianDifferential: (differential: number) => void
 
+  // Polar Jets
+  setBlackHoleJetsEnabled: (enabled: boolean) => void
+  setBlackHoleJetsHeight: (height: number) => void
+  setBlackHoleJetsWidth: (width: number) => void
+  setBlackHoleJetsIntensity: (intensity: number) => void
+  setBlackHoleJetsColor: (color: string) => void
+  setBlackHoleJetsFalloff: (falloff: number) => void
+  setBlackHoleJetsNoiseAmount: (amount: number) => void
+  setBlackHoleJetsPulsation: (pulsation: number) => void
+  setBlackHoleJetsGodRaysEnabled: (enabled: boolean) => void
+  setBlackHoleJetsGodRaysIntensity: (intensity: number) => void
+  setBlackHoleJetsGodRaysSamples: (samples: number) => void
+  setBlackHoleJetsGodRaysDecay: (decay: number) => void
+
   // Config Operations
   setBlackHoleConfig: (config: Partial<BlackHoleConfig>) => void
   initializeBlackHoleForDimension: (dimension: number) => void

@@ -40,6 +40,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
   // Get current object type for AO type switching
   const objectType = useGeometryStore((state) => state.objectType);
   const isSchroedinger = objectType === 'schroedinger';
+  const isBlackHole = objectType === 'blackhole';
 
   const {
     selectedLightId,
@@ -118,10 +119,12 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
     setSchroedingerAoQuality(parseInt(val, 10));
   }, [setSchroedingerAoQuality]);
 
-  // Get AO type label
+  // Get AO type label based on object type
   const aoTypeLabel = isSchroedinger
     ? 'Volumetric (Schrödinger)'
-    : 'Screen-Space (SSAO)';
+    : isBlackHole
+      ? 'Volumetric (Black Hole)'
+      : 'Screen-Space (SSAO)';
 
 
   const hasSelectedLight = selectedLightId !== null;
@@ -170,20 +173,28 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
           className={`space-y-3 ${!effectiveAoEnabled ? 'opacity-50 pointer-events-none' : ''}`}
           aria-disabled={!effectiveAoEnabled}
         >
-          {/* Shared Intensity/Strength slider */}
-          <Slider
-            label="Intensity"
-            value={effectiveAoIntensity ?? 1.0}
-            min={0}
-            max={2}
-            step={0.1}
-            onChange={handleAoIntensityChange}
-            showValue
-            tooltip="Higher values create darker crevice shadows."
-            data-testid="ao-intensity-slider"
-          />
+          {/* Intensity slider - not available for black hole (fixed volumetric approximation) */}
+          {!isBlackHole && (
+            <Slider
+              label="Intensity"
+              value={effectiveAoIntensity ?? 1.0}
+              min={0}
+              max={2}
+              step={0.1}
+              onChange={handleAoIntensityChange}
+              showValue
+              tooltip="Higher values create darker crevice shadows."
+              data-testid="ao-intensity-slider"
+            />
+          )}
+          {isBlackHole && (
+            <p className="text-[10px] text-text-tertiary italic">
+              Fixed volumetric approximation (no adjustable parameters)
+            </p>
+          )}
 
-          {/* Schrödinger-specific controls - shown but disabled when not Schrödinger */}
+          {/* Schrödinger-specific controls - hidden for black hole, shown but disabled for others */}
+          {!isBlackHole && (
           <div
             className={`space-y-3 ${!isSchroedinger ? 'opacity-50 pointer-events-none' : ''}`}
             aria-disabled={!isSchroedinger}
@@ -220,6 +231,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(({
               />
             </div>
           </div>
+          )}
         </div>
       </ControlGroup>
     </div>

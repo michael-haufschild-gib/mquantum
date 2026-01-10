@@ -76,3 +76,8 @@ export {
   type EnvironmentCompositePassConfig,
   type ShellGlowConfig,
 } from './EnvironmentCompositePass'
+
+// Jet passes (Black Hole polar jets)
+export { JetsRenderPass, type JetsRenderPassConfig } from './JetsRenderPass'
+export { JetsCompositePass, type JetsCompositePassConfig } from './JetsCompositePass'
+export { GodRaysPass, type GodRaysPassConfig } from './GodRaysPass'

@@ -11,9 +11,9 @@
 import { constantsBlock } from '../shared/core/constants.glsl'
 import { precisionBlock } from '../shared/core/precision.glsl'
 import { uniformsBlock } from '../shared/core/uniforms.glsl'
-import { aoBlock } from '../shared/features/ao.glsl'
 import { temporalBlock } from '../shared/features/temporal.glsl'
 import { sssBlock } from '../shared/lighting/sss.glsl'
+// Note: aoBlock not imported - black hole uses inline volumetric AO (getDiskDensity-based)
 import { ShaderConfig } from '../shared/types'
 import { GLSL_ALL_PALETTE_FUNCTIONS } from '../palette'
 
@@ -208,7 +208,8 @@ uniform float uSliceAmplitude;
 
     // Shared lighting/feature modules
     { name: 'SSS', content: sssBlock, condition: useSss },
-    { name: 'Ambient Occlusion', content: aoBlock, condition: useAO },
+    // Note: AO for black hole uses inline volumetric implementation in main.glsl.ts
+    // (getDiskDensity-based), NOT the shared aoBlock (which uses SDF GetDist)
 
     // Temporal (if needed)
     {

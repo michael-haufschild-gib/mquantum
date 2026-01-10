@@ -25,18 +25,25 @@ describe('rotationStore', () => {
       expect(rotations.get('XY')).toBeCloseTo(Math.PI / 4);
     });
 
-    it('should normalize angles to [0, 2π)', () => {
+    it('should use lazy normalization (only when angle exceeds threshold)', () => {
       const { setRotation } = useRotationStore.getState();
 
-      // Test negative angle
+      // Small angles (below 10000 rad threshold) are NOT normalized
+      // This prevents floating-point precision loss from frequent modulo operations
       setRotation('XY', -Math.PI / 4);
       let rotations = useRotationStore.getState().rotations;
-      expect(rotations.get('XY')).toBeCloseTo(2 * Math.PI - Math.PI / 4);
+      expect(rotations.get('XY')).toBeCloseTo(-Math.PI / 4); // NOT normalized
 
-      // Test angle > 2π
+      // Angles slightly above 2π are also NOT normalized (still below threshold)
       setRotation('XZ', 3 * Math.PI);
       rotations = useRotationStore.getState().rotations;
-      expect(rotations.get('XZ')).toBeCloseTo(Math.PI);
+      expect(rotations.get('XZ')).toBeCloseTo(3 * Math.PI); // NOT normalized
+
+      // Only angles exceeding threshold (10000 rad) are normalized
+      setRotation('YZ', 10001);
+      rotations = useRotationStore.getState().rotations;
+      const normalizedAngle = ((10001 % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      expect(rotations.get('YZ')).toBeCloseTo(normalizedAngle); // NORMALIZED
     });
 
     it('should ignore invalid planes for current dimension', () => {

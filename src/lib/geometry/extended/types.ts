@@ -1626,6 +1626,68 @@ export interface BlackHoleConfig {
    * 1 = full Keplerian (ω ∝ r^-1.5, inner ~3x faster than outer)
    */
   keplerianDifferential: number
+
+  // === POLAR JETS ===
+  /**
+   * Enable polar jets emanating from black hole poles (default false).
+   * Rendered as volumetric cones with soft edges and depth intersections.
+   */
+  jetsEnabled: boolean
+  /**
+   * Jet cone height in horizon radius units (10-50, default 25).
+   * Height of each jet cone from the black hole center.
+   */
+  jetsHeight: number
+  /**
+   * Jet cone base width as fraction of height (0.1-0.5, default 0.2).
+   * Lower values = narrow, focused jets. Higher values = wide, diffuse jets.
+   */
+  jetsWidth: number
+  /**
+   * Jet emission intensity (0-10, default 3.0).
+   * Controls brightness/emissive strength of the jet material.
+   */
+  jetsIntensity: number
+  /**
+   * Jet base color (hex string, default '#4488ff').
+   * Blue-white is typical for relativistic jets; can also use warm colors.
+   */
+  jetsColor: string
+  /**
+   * Jet intensity falloff exponent (1-5, default 2.0).
+   * Controls how quickly jet brightness decreases with distance from axis.
+   */
+  jetsFalloff: number
+  /**
+   * Jet turbulence noise amount (0-1, default 0.3).
+   * Adds animated turbulence to break up uniform appearance.
+   */
+  jetsNoiseAmount: number
+  /**
+   * Jet pulsation speed (0-2, default 0.5).
+   * Controls animation speed of brightness pulsation along jet length.
+   */
+  jetsPulsation: number
+  /**
+   * Enable god rays effect for jets (default true).
+   * Adds radial blur light scattering effect (GPU Gems 3 technique).
+   */
+  jetsGodRaysEnabled: boolean
+  /**
+   * God rays intensity multiplier (0-2, default 0.8).
+   * Controls strength of the radial blur light scattering.
+   */
+  jetsGodRaysIntensity: number
+  /**
+   * God rays sample count (16-128, default 64).
+   * Higher = better quality but more expensive. 64 is a good balance.
+   */
+  jetsGodRaysSamples: number
+  /**
+   * God rays decay factor (0.9-1.0, default 0.96).
+   * How quickly light intensity decreases along ray march.
+   */
+  jetsGodRaysDecay: number
 }
 
 /**
@@ -1783,6 +1845,20 @@ export const DEFAULT_BLACK_HOLE_CONFIG: BlackHoleConfig = {
 
   // Keplerian Disk Rotation
   keplerianDifferential: 0.5, // Half Keplerian by default (moderate inner/outer speed difference)
+
+  // Polar Jets
+  jetsEnabled: false,
+  jetsHeight: 25,
+  jetsWidth: 0.2,
+  jetsIntensity: 3.0,
+  jetsColor: '#4488ff',
+  jetsFalloff: 2.0,
+  jetsNoiseAmount: 0.3,
+  jetsPulsation: 0.5,
+  jetsGodRaysEnabled: true,
+  jetsGodRaysIntensity: 0.8,
+  jetsGodRaysSamples: 64,
+  jetsGodRaysDecay: 0.96,
 }
 
 // ============================================================================

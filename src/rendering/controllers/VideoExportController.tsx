@@ -199,8 +199,12 @@ export function VideoExportController() {
               const biasedDelta = rotationDelta * multiplier
               let newAngle = currentAngle + biasedDelta
 
-              if (!isFinite(newAngle)) newAngle = 0
-              newAngle = ((newAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+              // Only guard against NaN/Infinity - do NOT normalize here.
+              // Normalization happens lazily in rotationStore to avoid double-modulo
+              // precision loss that causes visible jump-cuts in animated textures.
+              if (!isFinite(newAngle)) {
+                  newAngle = currentAngle // Keep previous valid angle
+              }
 
               updates.set(plane, newAngle)
               planeIndex++

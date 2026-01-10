@@ -34,6 +34,14 @@ export const MIN_ROTATION = 0
 /** Maximum rotation angle in radians (360 degrees) */
 export const MAX_ROTATION = 2 * Math.PI
 
+/**
+ * Threshold for lazy angle normalization (radians).
+ * Angles are only normalized when they exceed this value to prevent
+ * floating-point precision loss from frequent modulo operations.
+ * 10000 radians ≈ 1592 full rotations ≈ 11 hours at default speed.
+ */
+const LAZY_NORMALIZE_THRESHOLD = 10000
+
 export interface RotationState {
   /** Map of plane name (e.g. "XY") to rotation angle in radians */
   rotations: Map<string, number>
@@ -64,16 +72,26 @@ export interface RotationState {
 }
 
 /**
- * Normalizes an angle to [0, 2π)
+ * Lazily normalizes an angle - only when it exceeds the threshold.
+ * This prevents floating-point precision loss from frequent modulo operations
+ * that cause visible "jump cuts" in animated textures (e.g., black hole disk).
+ *
+ * The angle is allowed to accumulate continuously (0 → 2π → 4π → ...)
+ * and only normalized when it gets very large (|angle| > 10000 radians).
+ *
  * @param angle - Angle in radians
- * @returns Normalized angle in [0, 2π)
+ * @returns Angle (possibly normalized if threshold exceeded)
  */
 function normalizeAngle(angle: number): number {
-  let normalized = angle % (2 * Math.PI)
-  if (normalized < 0) {
-    normalized += 2 * Math.PI
+  // Only normalize when angle exceeds threshold to prevent precision loss
+  if (Math.abs(angle) > LAZY_NORMALIZE_THRESHOLD) {
+    let normalized = angle % (2 * Math.PI)
+    if (normalized < 0) {
+      normalized += 2 * Math.PI
+    }
+    return normalized
   }
-  return normalized
+  return angle
 }
 
 export const useRotationStore = create<RotationState>((set) => ({

@@ -21,9 +21,10 @@ const float DOPPLER_MIN_RADIUS = 0.001;   // Minimum radius for calculations
  */
 vec3 orbitalVelocity(vec3 pos3d, float r) {
   // Tangent to circle in XZ plane (counter-clockwise when viewed from +Y)
+  // For counter-clockwise rotation, left side approaches camera at +Z
   // Add epsilon to prevent NaN when pos3d.xz is zero
   float safeLen = max(length(pos3d.xz), DOPPLER_EPSILON);
-  vec3 tangent = vec3(-pos3d.z, 0.0, pos3d.x) / safeLen;
+  vec3 tangent = vec3(pos3d.z, 0.0, -pos3d.x) / safeLen;
   return tangent;
 }
 
@@ -55,7 +56,9 @@ float dopplerFactor(vec3 pos3d, vec3 viewDir) {
   vec3 velocity = orbitalVelocity(pos3d, r);
 
   // Dot product with view direction
-  // Negative because viewDir points toward camera
+  // viewDir points INTO the scene (from camera toward geometry)
+  // Positive dot = velocity aligns with viewDir = moving away = receding
+  // We want approaching (velocity toward camera), so negate
   float approaching = -dot(velocity, viewDir);
 
   // Keplerian orbital speed: v ∝ 1/√r
@@ -189,21 +192,30 @@ vec3 applyDopplerShift(vec3 color, float dopplerFac) {
   vec3 luminance = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
 
   if (shiftAmount > 0.0) {
-    // Blue shift: boost blue, reduce red
+    // Blue shift (approaching): shift spectrum toward shorter wavelengths
+    // For warm colors, this should produce a bluish-white appearance
+    // More aggressive shift: reduce red significantly, add blue
+    float t = min(shiftAmount, 1.0);
+    vec3 blueTarget = vec3(0.6, 0.8, 1.0); // Blue-white target for strong shift
     vec3 blueShifted = vec3(
-      color.r * 0.7,
-      color.g * 0.9,
-      min(color.b * 1.3 + 0.1, 2.0)
+      color.r * (1.0 - t * 0.5),           // Reduce red more aggressively
+      color.g * (1.0 - t * 0.2),           // Slightly reduce green
+      max(color.b, 0.3) + t * 0.4          // Boost blue significantly
     );
-    color = mix(color, blueShifted, min(shiftAmount, 1.0));
+    // Blend toward blue-white for strong shifts
+    color = mix(color, blueShifted, t);
+    color = mix(color, blueTarget * dot(color, vec3(0.299, 0.587, 0.114)) * 2.0, t * 0.3);
   } else {
-    // Red shift: boost red, reduce blue
+    // Red shift (receding): shift spectrum toward longer wavelengths
+    float t = min(-shiftAmount, 1.0);
+    vec3 redTarget = vec3(1.0, 0.4, 0.1); // Deep red-orange target
     vec3 redShifted = vec3(
-      min(color.r * 1.3 + 0.1, 2.0),
-      color.g * 0.9,
-      color.b * 0.7
+      max(color.r, 0.3) + t * 0.4,         // Boost red significantly
+      color.g * (1.0 - t * 0.3),           // Reduce green
+      color.b * (1.0 - t * 0.5)            // Reduce blue more aggressively
     );
-    color = mix(color, redShifted, min(-shiftAmount, 1.0));
+    color = mix(color, redShifted, t);
+    color = mix(color, redTarget * dot(color, vec3(0.299, 0.587, 0.114)) * 2.0, t * 0.3);
   }
 
   // Boost saturation slightly for stronger effect (similar to HSL version)
