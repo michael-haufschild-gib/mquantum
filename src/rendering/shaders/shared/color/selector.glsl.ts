@@ -79,6 +79,39 @@ vec3 getColorByAlgorithm(float t, vec3 normal, vec3 baseHSL, vec3 position) {
     col.g = smoothstep(0.33, 0.66, distT);
     col.b = smoothstep(0.66, 1.0, distT);
     return col;
+  } else if (uColorAlgorithm == 13) {
+    // Algorithm 13: Dimension-based coloring (Polytopes)
+    // Colors each face/edge based on which N-dimensional axis it primarily extends along.
+    // Uses cosine palette for colors - fully configurable via the palette controls.
+    //
+    // Maps primary axis from normal direction to a t value, then uses cosine palette.
+    // X-axis → t=0.0, Y-axis → t=0.33, Z-axis → t=0.67
+    // Higher dimensions blend based on extra dimension depth.
+
+    // Determine primary 3D axis from normal direction
+    vec3 absNormal = abs(normal);
+    float maxComp = max(max(absNormal.x, absNormal.y), absNormal.z);
+
+    // Map primary axis to t value (evenly spaced on color wheel)
+    // X=0.0, Y=0.33, Z=0.67, with higher dims continuing the sequence
+    float dimT = 0.0;
+    if (absNormal.y >= maxComp - 0.001) dimT = 0.333;
+    else if (absNormal.z >= maxComp - 0.001) dimT = 0.667;
+
+    // For higher dimensions (4D+), shift the t value based on extra dimension depth
+    // t parameter represents contribution from dimensions 4-10
+    // This creates distinct colors for W, V, U, T, S dimensions
+    float extraDimInfluence = smoothstep(0.2, 0.8, t);
+
+    // Offset dimT by extra dimension contribution (wraps around color wheel)
+    // Each higher dimension gets 0.125 offset (8 distinct dimension slots)
+    float highDimOffset = t * 0.5; // Maps t∈[0,1] to offset∈[0,0.5]
+    dimT = fract(dimT + highDimOffset * extraDimInfluence);
+
+    // Use cosine palette with the dimension-derived t value
+    // This respects user's palette configuration (uCosineA/B/C/D)
+    return getCosinePaletteColor(dimT, uCosineA, uCosineB, uCosineC, uCosineD,
+                                  uDistPower, uDistCycles, uDistOffset);
   } else {
     // Fallback: cosine palette
     return getCosinePaletteColor(t, uCosineA, uCosineB, uCosineC, uCosineD,

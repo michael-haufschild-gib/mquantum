@@ -8,7 +8,8 @@
  * - Volume rendering parameters
  */
 
-// Constants for array sizes (must match TypeScript constants)
+// CANONICAL CONSTANTS: These define array sizes for all quantum modules.
+// The GLSL #defines below must match these TypeScript values.
 export const MAX_DIM = 11;
 export const MAX_TERMS = 8;
 
@@ -17,7 +18,9 @@ export const schroedingerUniformsBlock = `
 // Schrödinger Quantum Configuration Uniforms
 // ============================================
 
-// Array size constants
+// CANONICAL DEFINITIONS: MAX_DIM and MAX_TERMS are defined here and used by all
+// quantum modules (psi.glsl, hoNDVariants.glsl, hoSuperpositionVariants.glsl,
+// hydrogenNDVariants.glsl, density.glsl). Do not redefine in other modules.
 #define MAX_DIM 11
 #define MAX_TERMS 8
 

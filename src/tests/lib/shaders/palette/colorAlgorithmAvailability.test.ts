@@ -14,9 +14,11 @@ import {
   isQuantumOnlyAlgorithm,
   isBlackHoleOnlyAlgorithm,
   isGeometricPhaseAlgorithm,
+  isPolytopeOnlyAlgorithm,
   QUANTUM_ONLY_ALGORITHMS,
   BLACKHOLE_ONLY_ALGORITHMS,
   GEOMETRIC_PHASE_ALGORITHMS,
+  POLYTOPE_ONLY_ALGORITHMS,
   type ColorAlgorithm,
 } from '@/rendering/shaders/palette/types'
 import type { ObjectType } from '@/lib/geometry/types'
@@ -41,6 +43,11 @@ describe('Color Algorithm Availability', () => {
       expect(BLACKHOLE_ONLY_ALGORITHMS).toContain('gravitationalRedshift')
       expect(isBlackHoleOnlyAlgorithm('accretionGradient')).toBe(true)
       expect(isBlackHoleOnlyAlgorithm('gravitationalRedshift')).toBe(true)
+    })
+
+    it('should classify dimension as polytope-only', () => {
+      expect(POLYTOPE_ONLY_ALGORITHMS).toContain('dimension')
+      expect(isPolytopeOnlyAlgorithm('dimension')).toBe(true)
     })
   })
 
@@ -119,6 +126,40 @@ describe('Color Algorithm Availability', () => {
             isColorAlgorithmAvailable('blackbody', objectType),
             `blackbody should NOT be available for ${objectType}`
           ).toBe(false)
+        }
+      })
+    })
+
+    describe('polytope-only algorithms', () => {
+      const polytopeAlgorithms: ColorAlgorithm[] = ['dimension']
+      const polytopeTypes: ObjectType[] = ['hypercube', 'simplex', 'cross-polytope', 'wythoff-polytope']
+
+      it('should be available for polytope types', () => {
+        for (const algo of polytopeAlgorithms) {
+          for (const objectType of polytopeTypes) {
+            expect(
+              isColorAlgorithmAvailable(algo, objectType),
+              `${algo} should be available for ${objectType}`
+            ).toBe(true)
+          }
+        }
+      })
+
+      it('should NOT be available for non-polytope types', () => {
+        const nonPolytopeTypes: ObjectType[] = [
+          'mandelbulb',
+          'schroedinger',
+          'blackhole',
+          'clifford-torus',
+        ]
+
+        for (const algo of polytopeAlgorithms) {
+          for (const objectType of nonPolytopeTypes) {
+            expect(
+              isColorAlgorithmAvailable(algo, objectType),
+              `${algo} should NOT be available for ${objectType}`
+            ).toBe(false)
+          }
         }
       })
     })

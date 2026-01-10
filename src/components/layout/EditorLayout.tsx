@@ -49,7 +49,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
   useEffect(() => {
     const applyTheme = () => {
       document.documentElement.setAttribute('data-accent', accent);
-      
+
       let resolvedMode = mode;
       if (mode === 'system') {
         const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -144,7 +144,7 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
 
   return (
     <div
-        className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-screen bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app"
+        className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-full bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app"
     >
       {/* 1. Full-screen Canvas Layer (The Curtain) */}
       <div className="absolute inset-0 z-0">

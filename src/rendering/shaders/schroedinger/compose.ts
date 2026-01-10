@@ -13,6 +13,10 @@ import { cosinePaletteBlock } from '../shared/color/cosine-palette.glsl'
 import { hslBlock } from '../shared/color/hsl.glsl'
 import { oklabBlock } from '../shared/color/oklab.glsl'
 import { selectorBlock } from '../shared/color/selector.glsl'
+import {
+  generateColorSelectorBlock,
+  getColorModuleDependencies,
+} from '../shared/color/selectorVariants.glsl'
 import { constantsBlock } from '../shared/core/constants.glsl'
 import { precisionBlock } from '../shared/core/precision.glsl'
 import { uniformsBlock } from '../shared/core/uniforms.glsl'
@@ -22,7 +26,7 @@ import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighti
 import { multiLightBlock } from '../shared/lighting/multi-light.glsl'
 import { sphereIntersectBlock } from '../shared/raymarch/sphere-intersect.glsl'
 
-import { ShaderConfig } from '../shared/types'
+import type { ShaderConfig } from '../shared/types'
 import { mainBlock, mainBlockIsosurface } from './main.glsl'
 import { complexMathBlock } from './quantum/complex.glsl'
 import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from './quantum/density.glsl'
@@ -40,23 +44,28 @@ import {
   hoND11dBlock,
   generateHoNDDispatchBlock,
 } from './quantum/hoNDVariants.glsl'
+import { hydrogenNDCommonBlock } from './quantum/hydrogenND'
 import {
-  hydrogenND10dBlock,
-  hydrogenND11dBlock,
-  hydrogenND3dBlock,
-  hydrogenND4dBlock,
-  hydrogenND5dBlock,
-  hydrogenND6dBlock,
-  hydrogenND7dBlock,
-  hydrogenND8dBlock,
-  hydrogenND9dBlock,
-  hydrogenNDCommonBlock,
-} from './quantum/hydrogenND'
+  hydrogenNDGen3dBlock,
+  hydrogenNDGen4dBlock,
+  hydrogenNDGen5dBlock,
+  hydrogenNDGen6dBlock,
+  hydrogenNDGen7dBlock,
+  hydrogenNDGen8dBlock,
+  hydrogenNDGen9dBlock,
+  hydrogenNDGen10dBlock,
+  hydrogenNDGen11dBlock,
+  generateHydrogenNDDispatchBlock,
+} from './quantum/hydrogenNDVariants.glsl'
+import {
+  getHOUnrolledBlocks,
+  generateHODispatchBlock,
+} from './quantum/hoSuperpositionVariants.glsl'
 import { hydrogenPsiBlock } from './quantum/hydrogenPsi.glsl'
 import { hydrogenRadialBlock } from './quantum/hydrogenRadial.glsl'
 import { laguerreBlock } from './quantum/laguerre.glsl'
 import { legendreBlock } from './quantum/legendre.glsl'
-import { psiBlock } from './quantum/psi.glsl'
+import { psiBlock, psiBlockDynamic } from './quantum/psi.glsl'
 import { sphericalHarmonicsBlock } from './quantum/sphericalHarmonics.glsl'
 import { schroedingerUniformsBlock } from './uniforms.glsl'
 import { absorptionBlock } from './volume/absorption.glsl'
@@ -79,6 +88,13 @@ export interface SchroedingerShaderConfig extends ShaderConfig {
    * If undefined, all modules are included for runtime switching.
    */
   quantumMode?: QuantumModeForShader
+  /**
+   * Number of HO superposition terms for compile-time unrolling (1-8).
+   * When specified, generates unrolled evaluation code eliminating runtime loops.
+   * Most effective for termCount=1 (single eigenstate visualization).
+   * If undefined, uses dynamic loop with runtime termCount uniform.
+   */
+  termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 }
 
 /**
@@ -96,6 +112,7 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     isosurface = false,
     temporalAccumulation = false,
     quantumMode,
+    termCount,
     sss: enableSss,
     fresnel: enableFresnel,
     curl: enableCurl,
@@ -106,6 +123,8 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     erosion: enableErosion,
     erosionNoiseType,
     erosionHQ,
+    colorAlgorithm,
+    lightingMode = 'full',
   } = config
 
   // Determine which quantum modules to include
@@ -118,6 +137,22 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
   // This dramatically reduces shader size and compilation time
   const hydrogenNDDimension = includeHydrogenND ? Math.min(Math.max(dimension, 3), 11) : 0
 
+  // Determine which color modules to include based on colorAlgorithm
+  // If colorAlgorithm is specified, only include required dependencies
+  const colorDeps = colorAlgorithm !== undefined
+    ? getColorModuleDependencies(colorAlgorithm)
+    : { hsl: true, cosine: true, oklab: true } // Include all for runtime switching
+
+  // Determine which lighting modules to include based on lightingMode
+  const includeLightingGGX = lightingMode === 'pbr' || lightingMode === 'full'
+  const includeLightingMulti = lightingMode === 'pbr' || lightingMode === 'full'
+  const includeLightingIBL = lightingMode === 'full'
+
+  // Determine if we should use unrolled HO superposition
+  const useUnrolledHO = termCount !== undefined && (
+    quantumMode === 'harmonicOscillator' || quantumMode === undefined
+  )
+
   const defines: string[] = []
   const features: string[] = []
 
@@ -129,6 +164,12 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     defines.push('#define HYDROGEN_ND_MODE_ENABLED')
     // Add dimension-specific define to eliminate runtime dispatch
     defines.push(`#define HYDROGEN_ND_DIMENSION ${hydrogenNDDimension}`)
+  }
+
+  // Add HO unrolled define when using compile-time term count
+  if (useUnrolledHO) {
+    defines.push('#define HO_UNROLLED')
+    defines.push(`#define HO_TERM_COUNT ${termCount}`)
   }
 
   // Add compile-time dimension define for loop unrolling in hoND and density mapping
@@ -287,71 +328,109 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     { name: 'Hydrogen ND Common', content: hydrogenNDCommonBlock, condition: includeHydrogenND },
     {
       name: 'Hydrogen ND 3D',
-      content: hydrogenND3dBlock,
+      content: hydrogenNDGen3dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 3,
     },
     {
       name: 'Hydrogen ND 4D',
-      content: hydrogenND4dBlock,
+      content: hydrogenNDGen4dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 4,
     },
     {
       name: 'Hydrogen ND 5D',
-      content: hydrogenND5dBlock,
+      content: hydrogenNDGen5dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 5,
     },
     {
       name: 'Hydrogen ND 6D',
-      content: hydrogenND6dBlock,
+      content: hydrogenNDGen6dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 6,
     },
     {
       name: 'Hydrogen ND 7D',
-      content: hydrogenND7dBlock,
+      content: hydrogenNDGen7dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 7,
     },
     {
       name: 'Hydrogen ND 8D',
-      content: hydrogenND8dBlock,
+      content: hydrogenNDGen8dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 8,
     },
     {
       name: 'Hydrogen ND 9D',
-      content: hydrogenND9dBlock,
+      content: hydrogenNDGen9dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 9,
     },
     {
       name: 'Hydrogen ND 10D',
-      content: hydrogenND10dBlock,
+      content: hydrogenNDGen10dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 10,
     },
     {
       name: 'Hydrogen ND 11D',
-      content: hydrogenND11dBlock,
+      content: hydrogenNDGen11dBlock,
       condition: includeHydrogenND && hydrogenNDDimension === 11,
     },
+    // Generated dispatch: directly calls evalHydrogenNDPsi${dim}D without preprocessor conditionals
+    {
+      name: 'Hydrogen ND Dispatch',
+      content: generateHydrogenNDDispatchBlock(hydrogenNDDimension),
+      condition: includeHydrogenND,
+    },
+
+    // HO Superposition - unrolled variants when termCount is known at compile time
+    // This eliminates runtime loop with dynamic break condition
+    ...(useUnrolledHO && termCount ? [
+      {
+        name: `HO Superposition (${termCount} term${termCount > 1 ? 's' : ''})`,
+        content: getHOUnrolledBlocks(termCount).superposition,
+      },
+      {
+        name: `HO Spatial (${termCount} term${termCount > 1 ? 's' : ''})`,
+        content: getHOUnrolledBlocks(termCount).spatial,
+      },
+      {
+        name: `HO Combined (${termCount} term${termCount > 1 ? 's' : ''})`,
+        content: getHOUnrolledBlocks(termCount).combined,
+      },
+      {
+        name: 'HO Dispatch (Unrolled)',
+        content: generateHODispatchBlock(termCount),
+      },
+    ] : []),
 
     // Unified wavefunction evaluation (mode-switching)
-    { name: 'Wavefunction (Psi)', content: psiBlock },
-    
+    // Use dynamic version when HO is unrolled (evalHarmonicOscillatorPsi is provided by dispatch)
+    { name: 'Wavefunction (Psi)', content: useUnrolledHO ? psiBlockDynamic : psiBlock },
+
     // Density field blocks - split for dimension-specific mapPosToND generation
     // Following mandelbulb pattern: generate exact code at JS level, no preprocessor conditionals
     { name: 'Density Pre-Map', content: densityPreMapBlock },
     { name: `Density mapPosToND (${actualDim}D)`, content: generateMapPosToND(actualDim) },
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
-    // Color system
-    { name: 'Color (HSL)', content: hslBlock },
-    { name: 'Color (Cosine)', content: cosinePaletteBlock },
-    { name: 'Color (Oklab)', content: oklabBlock },
-    { name: 'Color Selector', content: selectorBlock },
+    // Color system - conditionally include based on colorAlgorithm
+    // When colorAlgorithm is specified, only include required modules
+    { name: 'Color (HSL)', content: hslBlock, condition: colorDeps.hsl },
+    { name: 'Color (Cosine)', content: cosinePaletteBlock, condition: colorDeps.cosine },
+    { name: 'Color (Oklab)', content: oklabBlock, condition: colorDeps.oklab },
+    // Use compile-time optimized selector when colorAlgorithm is known
+    {
+      name: 'Color Selector',
+      content: colorAlgorithm !== undefined
+        ? generateColorSelectorBlock(colorAlgorithm)
+        : selectorBlock,
+    },
 
-    // Lighting (must come before emission which uses light functions)
-    { name: 'GGX PBR', content: ggxBlock },
-    { name: 'Multi-Light System', content: multiLightBlock },
-    { name: 'IBL Uniforms', content: iblUniformsBlock },
-    { name: 'PMREM Sampling', content: pmremSamplingBlock },
-    { name: 'IBL Functions', content: iblBlock },
+    // Lighting - conditionally include based on lightingMode
+    // 'none'/'simple': No lighting modules
+    // 'pbr': GGX + Multi-Light (no IBL)
+    // 'full': All lighting including IBL
+    { name: 'GGX PBR', content: ggxBlock, condition: includeLightingGGX },
+    { name: 'Multi-Light System', content: multiLightBlock, condition: includeLightingMulti },
+    { name: 'IBL Uniforms', content: iblUniformsBlock, condition: includeLightingIBL },
+    { name: 'PMREM Sampling', content: pmremSamplingBlock, condition: includeLightingIBL },
+    { name: 'IBL Functions', content: iblBlock, condition: includeLightingIBL },
 
     // Volumetric rendering
     { name: 'Beer-Lambert Absorption', content: absorptionBlock },

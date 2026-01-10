@@ -28,8 +28,7 @@ export * from './palette'
 // N-D transformation utilities
 export * from './transforms'
 
-// Post-processing shaders (Bokeh, Depth, SSR, Refraction)
+// Post-processing shaders (Bokeh, SSR, Refraction)
 export * from './postprocessing/BokehShader'
-export * from './postprocessing/DepthCaptureShader'
 export * from './postprocessing/SSRShader'
 export * from './postprocessing/RefractionShader'

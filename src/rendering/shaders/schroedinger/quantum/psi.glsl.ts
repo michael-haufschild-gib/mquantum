@@ -19,13 +19,16 @@
  *
  * The mode is selected via the uQuantumMode uniform.
  */
+/**
+ * Full psi block with dynamic HO superposition loop.
+ * Used when termCount is NOT known at compile time.
+ */
 export const psiBlock = `
 // ============================================
 // Wavefunction Evaluation (Mode-Switching)
 // ============================================
 
-// Maximum number of superposition terms (harmonic oscillator mode)
-#define MAX_TERMS 8
+// Note: MAX_TERMS is defined in schroedingerUniformsBlock
 
 // Quantum mode constants
 #define QUANTUM_MODE_HARMONIC 0
@@ -33,10 +36,10 @@ export const psiBlock = `
 #define QUANTUM_MODE_HYDROGEN_ND 2
 
 // ----------------------------------------
-// Harmonic Oscillator Mode Evaluation
+// Harmonic Oscillator Mode Evaluation (Dynamic Loop)
 // ----------------------------------------
 
-// Evaluate harmonic oscillator wavefunction
+// Evaluate harmonic oscillator wavefunction with runtime term count
 vec2 evalHarmonicOscillatorPsi(float xND[MAX_DIM], float t) {
     vec2 psi = vec2(0.0);
 
@@ -83,27 +86,10 @@ vec2 evalPsi(float xND[MAX_DIM], float t) {
 
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
-        // Hydrogen ND mode - compile-time dimension dispatch
-        // HYDROGEN_ND_DIMENSION is set at shader compile time to eliminate runtime branching
-        #if HYDROGEN_ND_DIMENSION == 3
-        return evalHydrogenNDPsi3D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 4
-        return evalHydrogenNDPsi4D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 5
-        return evalHydrogenNDPsi5D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 6
-        return evalHydrogenNDPsi6D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 7
-        return evalHydrogenNDPsi7D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 8
-        return evalHydrogenNDPsi8D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 9
-        return evalHydrogenNDPsi9D(xND, t);
-        #elif HYDROGEN_ND_DIMENSION == 10
-        return evalHydrogenNDPsi10D(xND, t);
-        #else
-        return evalHydrogenNDPsi11D(xND, t);
-        #endif
+        // Hydrogen ND mode - use generated dispatch function
+        // hydrogenNDOptimized directly calls the dimension-specific unrolled variant
+        // Generated at JavaScript level to eliminate preprocessor conditionals
+        return hydrogenNDOptimized(xND, t);
     }
 #endif
 
@@ -135,26 +121,8 @@ float evalSpatialPhase(float xND[MAX_DIM]) {
 #ifdef HYDROGEN_ND_MODE_ENABLED
     if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
         // Hydrogen ND mode - evaluate at t=0 for spatial phase
-        // Uses compile-time dimension dispatch
-        #if HYDROGEN_ND_DIMENSION == 3
-        vec2 psi = evalHydrogenNDPsi3D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 4
-        vec2 psi = evalHydrogenNDPsi4D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 5
-        vec2 psi = evalHydrogenNDPsi5D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 6
-        vec2 psi = evalHydrogenNDPsi6D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 7
-        vec2 psi = evalHydrogenNDPsi7D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 8
-        vec2 psi = evalHydrogenNDPsi8D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 9
-        vec2 psi = evalHydrogenNDPsi9D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 10
-        vec2 psi = evalHydrogenNDPsi10D(xND, 0.0);
-        #else
-        vec2 psi = evalHydrogenNDPsi11D(xND, 0.0);
-        #endif
+        // Uses generated dispatch function (no preprocessor conditionals)
+        vec2 psi = hydrogenNDOptimized(xND, 0.0);
         return atan(psi.y, psi.x);
     }
 #endif
@@ -195,26 +163,8 @@ vec4 evalPsiWithSpatialPhase(float xND[MAX_DIM], float t) {
         // For a single eigenstate, |ψ(t)|² = |ψ_spatial|² since time evolution
         // is just a global phase rotation: e^{-iEt} has unit magnitude.
         // This cuts wavefunction evaluation cost in half.
-        vec2 psiSpatial;
-        #if HYDROGEN_ND_DIMENSION == 3
-        psiSpatial = evalHydrogenNDPsi3D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 4
-        psiSpatial = evalHydrogenNDPsi4D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 5
-        psiSpatial = evalHydrogenNDPsi5D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 6
-        psiSpatial = evalHydrogenNDPsi6D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 7
-        psiSpatial = evalHydrogenNDPsi7D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 8
-        psiSpatial = evalHydrogenNDPsi8D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 9
-        psiSpatial = evalHydrogenNDPsi9D(xND, 0.0);
-        #elif HYDROGEN_ND_DIMENSION == 10
-        psiSpatial = evalHydrogenNDPsi10D(xND, 0.0);
-        #else
-        psiSpatial = evalHydrogenNDPsi11D(xND, 0.0);
-        #endif
+        // Uses generated dispatch function (no preprocessor conditionals)
+        vec2 psiSpatial = hydrogenNDOptimized(xND, 0.0);
 
         // Spatial phase for stable coloring (default)
         float spatialPhase = atan(psiSpatial.y, psiSpatial.x);
@@ -222,16 +172,9 @@ vec4 evalPsiWithSpatialPhase(float xND[MAX_DIM], float t) {
         // Phase animation: compute time-dependent phase rotation when enabled
         float outputPhase = spatialPhase;
         if (uPhaseAnimationEnabled) {
-            // Compute total energy: E = E_hydrogen + Σ ω_j × (n_j + 0.5)
+            // Use simplified hydrogen energy (extra dimension contributions are small)
             float fn = float(uPrincipalN);
             float E = -0.5 / (fn * fn);  // Hydrogen ground state energy
-
-            // Add extra dimension HO contributions
-            int extraDimCount = uDimension - 3;
-            for (int i = 0; i < MAX_EXTRA_DIM; i++) {
-                if (i >= extraDimCount) break;
-                E += uExtraDimOmega[i] * (float(uExtraDimN[i]) + 0.5);
-            }
 
             // phase(t) = phase_spatial - E * t
             outputPhase = spatialPhase - E * t;
@@ -268,5 +211,115 @@ vec4 evalPsiWithSpatialPhase(float xND[MAX_DIM], float t) {
 
     float spatialPhase = atan(psiSpatial.y, psiSpatial.x);
     return vec4(psiTime, spatialPhase, 0.0);
+}
+`;
+
+/**
+ * Dynamic psi block - assumes evalHarmonicOscillatorPsi is provided externally.
+ * Used when termCount IS known at compile time and HO superposition is unrolled.
+ * The unrolled dispatch block provides evalHarmonicOscillatorPsi, evalHOSpatialOnly,
+ * and evalHOCombinedPsi functions.
+ */
+export const psiBlockDynamic = `
+// ============================================
+// Wavefunction Evaluation (Mode-Switching)
+// HO functions provided by unrolled dispatch block
+// ============================================
+
+// Note: MAX_TERMS is defined in schroedingerUniformsBlock
+
+// Quantum mode constants
+#define QUANTUM_MODE_HARMONIC 0
+#define QUANTUM_MODE_HYDROGEN 1
+#define QUANTUM_MODE_HYDROGEN_ND 2
+
+// Note: evalHarmonicOscillatorPsi is provided by HO Dispatch (Unrolled) block
+
+// ----------------------------------------
+// Unified Evaluation (Mode-Switching)
+// ----------------------------------------
+
+// Evaluate wavefunction ψ(x,t) at D-dimensional point xND and time t
+// Returns complex value as vec2(re, im)
+// Automatically selects between harmonic oscillator, hydrogen orbital, and hydrogen ND modes
+vec2 evalPsi(float xND[MAX_DIM], float t) {
+#ifdef HYDROGEN_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
+        // Hydrogen orbital mode - use first 3 dimensions as Cartesian
+        vec3 pos = vec3(xND[0], xND[1], xND[2]);
+        return evalHydrogenPsiTime(pos, uPrincipalN, uAzimuthalL, uMagneticM,
+                                    uBohrRadius, uUseRealOrbitals, t);
+    }
+#endif
+
+#ifdef HYDROGEN_ND_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+        // Hydrogen ND mode - use generated dispatch function
+        return hydrogenNDOptimized(xND, t);
+    }
+#endif
+
+    // Default: Harmonic oscillator mode (unrolled version)
+    return evalHarmonicOscillatorPsi(xND, t);
+}
+
+// Evaluate ψ with phase information for coloring
+// Returns: vec3(re, im, phase)
+vec3 evalPsiWithPhase(float xND[MAX_DIM], float t) {
+    vec2 psi = evalPsi(xND, t);
+    float phase = atan(psi.y, psi.x);
+    return vec3(psi, phase);
+}
+
+// Evaluate spatial-only phase (t=0) for stable coloring
+float evalSpatialPhase(float xND[MAX_DIM]) {
+#ifdef HYDROGEN_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
+        vec3 pos = vec3(xND[0], xND[1], xND[2]);
+        vec2 psi = evalHydrogenPsi(pos, uPrincipalN, uAzimuthalL, uMagneticM,
+                                    uBohrRadius, uUseRealOrbitals);
+        return atan(psi.y, psi.x);
+    }
+#endif
+
+#ifdef HYDROGEN_ND_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+        vec2 psi = hydrogenNDOptimized(xND, 0.0);
+        return atan(psi.y, psi.x);
+    }
+#endif
+
+    // Harmonic oscillator mode - use unrolled spatial function
+    vec2 psi = evalHOSpatialOnly(xND);
+    return atan(psi.y, psi.x);
+}
+
+// OPTIMIZED: Evaluate time-dependent ψ AND spatial-only phase in ONE pass
+vec4 evalPsiWithSpatialPhase(float xND[MAX_DIM], float t) {
+#ifdef HYDROGEN_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN) {
+        vec3 pos = vec3(xND[0], xND[1], xND[2]);
+        vec4 result = evalHydrogenPsiWithPhase(pos, uPrincipalN, uAzimuthalL, uMagneticM,
+                                                uBohrRadius, uUseRealOrbitals, t);
+        return vec4(result.xy, result.z, 0.0);
+    }
+#endif
+
+#ifdef HYDROGEN_ND_MODE_ENABLED
+    if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+        vec2 psiSpatial = hydrogenNDOptimized(xND, 0.0);
+        float spatialPhase = atan(psiSpatial.y, psiSpatial.x);
+        float outputPhase = spatialPhase;
+        if (uPhaseAnimationEnabled) {
+            float fn = float(uPrincipalN);
+            float E = -0.5 / (fn * fn);
+            outputPhase = spatialPhase - E * t;
+        }
+        return vec4(psiSpatial, outputPhase, 0.0);
+    }
+#endif
+
+    // Harmonic oscillator mode - use unrolled combined function
+    return evalHOCombinedPsi(xND, t);
 }
 `;

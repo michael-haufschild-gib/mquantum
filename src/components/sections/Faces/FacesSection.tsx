@@ -43,6 +43,7 @@ const COSINE_GRADIENT_ALGORITHMS = new Set([
   'phase',
   'mixed',
   'blackbody',
+  'dimension',
 ]);
 
 export interface FacesSectionProps {
