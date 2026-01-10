@@ -1,20 +1,29 @@
-Important: This is a test of your autonomous capabilities and your UI/UX design and frontend coding abilities.
+Important: This is a test of your autonomous capabilities and abilities to write modern WebGL2 shaders.
 
 You cannot break anything. The project in this local folder is backed up and can be restored. You can create, modify, and delete files as necessary to complete the tasks assigned to you. You have full autonomy to make decisions and take actions to achieve the desired outcomes.
 
 Your task:
-This project has a very rudimentary theming system for its UI. All it does is change some text colors, while all backgrounds are fixed to be a dark mode in the same colors.
+The blackhole object type has a rudimentary implementation of polar jets which uses a cone geometry and simple god ray shader in a post processing pass to emulate actual hot plasma polar jets.
 
-Design and implement a truly advanced best-of-class theming system that caters to all type of user, user abilities and user taste.
+The issue is that it looks awful, basically like solid cones, reversed party hats with a very pointy white root and sharp edges.
+
+Design and implement an improved version of the polar jets that are truly looking impressive and have a visual "wow" factor. Value visual "wow" factor over physical realism.
 
 Workflow:
-- Review the UI and components and theming solution in detail.
-- Review what industry leaders in web and app design are considering best practices for a best-of-class theming solution.
-- Design such a best-of-class theming solution for this app.
-- Implement and integrate.
-- Test and fix until no more bugs, race conditions, side effects can be found.
+- Review current implementation of the polar jets.
+- Design an improved version that looks much more impressive.
+- Find a good balance between performance and visual wow factor.
+- Add 5 details to make the visuals even more impressive.
+- Implement.
 
-Important Reminder: This is a test of your autonomous capabilities and your ability to design and implemented exceptional modern web and mobile UI. You are expected to take initiative and make decisions independently. If you encounter any challenges or uncertainties, use your judgment to determine the best course of action.
+Constraints:
+- You cannot change the underlying logic that this is a post processing pass.
+- Physical realism is not the goal - visual "wow" factor is the goal.
+- Keep FPS performance in mind and find a good balance.
+- Code must be using WebGL2, ThreeJS r182, GSLS3.
+- Do not reimplement already existing post-processing effects. For example: if Bloom is needed to make this work, we can just enable the existing Bloom pass instead of adding a 2nd bloom only for the polar jets.
+
+Important Reminder: This is a test of your autonomous capabilities and your ability to design modern WebGL2 shaders. You are expected to take initiative and make decisions independently. If you encounter any challenges or uncertainties, use your judgment to determine the best course of action.
 
 The quality and completeness of the project in this folder when you return the prompt to the user will be the only criteria for success. If you deliver unfinished or less than exceptional looking work, this test and you are a failure. Be exceptional. Do not just complete the task. Ace it. There is no time or token limit. Do it right instead of fast. Be exceptional.
 

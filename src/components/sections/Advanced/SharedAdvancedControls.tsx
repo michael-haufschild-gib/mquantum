@@ -16,9 +16,6 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
     sssColor: state.sssColor, setSssColor: state.setSssColor,
     sssThickness: state.sssThickness, setSssThickness: state.setSssThickness,
     sssJitter: state.sssJitter, setSssJitter: state.setSssJitter,
-    fresnelEnabled: state.shaderSettings.surface.fresnelEnabled,
-    setSurfaceSettings: state.setSurfaceSettings,
-    fresnelIntensity: state.fresnelIntensity, setFresnelIntensity: state.setFresnelIntensity,
   }));
   const {
     sssEnabled, setSssEnabled,
@@ -26,17 +23,11 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
     sssColor, setSssColor,
     sssThickness, setSssThickness,
     sssJitter, setSssJitter,
-    fresnelEnabled, setSurfaceSettings,
-    fresnelIntensity, setFresnelIntensity,
   } = useAppearanceStore(appearanceSelector);
 
   const handleSssColorChange = useCallback((c: string) => {
     setSssColor(c);
   }, [setSssColor]);
-
-  const handleFresnelToggle = useCallback((checked: boolean) => {
-    setSurfaceSettings({ fresnelEnabled: checked });
-  }, [setSurfaceSettings]);
 
   return (
     <div className="space-y-4 mb-4 pb-4">
@@ -91,31 +82,6 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
           onChange={setSssJitter}
           showValue
           data-testid="global-sss-jitter"
-        />
-      </ControlGroup>
-
-      {/* Fresnel Rim */}
-      <ControlGroup
-        title="Fresnel Rim"
-        collapsible
-        defaultOpen={false}
-        rightElement={
-          <Switch
-            checked={fresnelEnabled}
-            onCheckedChange={handleFresnelToggle}
-            data-testid="global-fresnel-toggle"
-          />
-        }
-      >
-        <Slider
-          label="Intensity"
-          min={0.0}
-          max={1.0}
-          step={0.1}
-          value={fresnelIntensity}
-          onChange={setFresnelIntensity}
-          showValue
-          data-testid="global-fresnel-intensity"
         />
       </ControlGroup>
 

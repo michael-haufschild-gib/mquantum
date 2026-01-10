@@ -57,7 +57,7 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
     if (!showMaterialControls) return null
 
     return (
-      <ControlGroup title="Material" className={className} defaultOpen>
+      <ControlGroup title="Material" className={className} collapsible defaultOpen={false}>
         {/* Metallic */}
         <Slider
           label="Metallic"

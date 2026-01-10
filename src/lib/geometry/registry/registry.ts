@@ -649,12 +649,12 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
 
       rendering: {
         supportsFaces: true,
-        supportsEdges: false,
+        supportsEdges: true,
         supportsPoints: false,
         renderMethod: 'raymarch',
         faceDetection: 'none',
         requiresRaymarching: true,
-        edgesAreFresnelRim: false,
+        edgesAreFresnelRim: true,
         supportsEmission: false,
       },
 

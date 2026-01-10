@@ -109,8 +109,9 @@ export const screenSpaceLensingFragmentShader = /* glsl */ `
 
   /**
    * Sample sky cubemap with chromatic aberration.
+   * Uses mip bias for far-field samples to reduce bandwidth.
    */
-  vec3 sampleSkyChromatic(vec3 bentDir, vec3 baseDir) {
+  vec3 sampleSkyChromatic(vec3 bentDir, vec3 baseDir, float mipBias) {
     float rScale = 1.0 - uChromaticAberration * 0.1;
     float gScale = 1.0;
     float bScale = 1.0 + uChromaticAberration * 0.1;
@@ -119,9 +120,9 @@ export const screenSpaceLensingFragmentShader = /* glsl */ `
     vec3 gDir = normalize(mix(baseDir, bentDir, gScale));
     vec3 bDir = normalize(mix(baseDir, bentDir, bScale));
 
-    float r = texture(tSkyCubemap, rDir).r;
-    float g = texture(tSkyCubemap, gDir).g;
-    float b = texture(tSkyCubemap, bDir).b;
+    float r = textureLod(tSkyCubemap, rDir, mipBias).r;
+    float g = textureLod(tSkyCubemap, gDir, mipBias).g;
+    float b = textureLod(tSkyCubemap, bDir, mipBias).b;
 
     return vec3(r, g, b);
   }
@@ -164,6 +165,12 @@ export const screenSpaceLensingFragmentShader = /* glsl */ `
   }
 
   void main() {
+    // Early exit if effect is disabled
+    if (uIntensity < 0.001) {
+      fragColor = texture(tColor, vUv);
+      return;
+    }
+
     vec2 displacement = computeLensingDisplacement(vUv, uBlackHoleCenter);
 
     float r = length(vUv - uBlackHoleCenter);
@@ -199,10 +206,15 @@ export const screenSpaceLensingFragmentShader = /* glsl */ `
       vec3 baseDir = getWorldRayDirection(vUv);
       vec3 bentDir = bendRay3D(baseDir, uBlackHoleCenter);
 
+      // Compute mip bias: higher LOD for far-field samples (less distortion = less detail needed)
+      // Near black hole (r < 0.1): mip 0 (full detail for strong lensing)
+      // Far from center (r > 0.5): mip 2 (reduced detail, saves bandwidth)
+      float mipBias = smoothstep(0.1, 0.5, r) * 2.0;
+
       if (uChromaticAberration > 0.01) {
-        color = sampleSkyChromatic(bentDir, baseDir);
+        color = sampleSkyChromatic(bentDir, baseDir, mipBias);
       } else {
-        color = texture(tSkyCubemap, bentDir).rgb;
+        color = textureLod(tSkyCubemap, bentDir, mipBias).rgb;
       }
     } else {
       // =======================================================================

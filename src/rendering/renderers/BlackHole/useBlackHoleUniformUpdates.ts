@@ -624,8 +624,8 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
         ;(u.uSssColor.value as THREE.Color).set(appearanceState.sssColor)
       }
 
-      // Fresnel Rim (from shared surface settings)
-      setUniform(u, 'uFresnelEnabled', appearanceState.shaderSettings.surface.fresnelEnabled)
+      // Fresnel Rim (controlled by Edges toggle, same as Mandelbulb)
+      setUniform(u, 'uFresnelEnabled', appearanceState.edgesVisible)
       setUniform(u, 'uFresnelIntensity', appearanceState.fresnelIntensity)
       if (u.uRimColor?.value) {
         // Rim color uses edgeColor from appearance (same as other objects)

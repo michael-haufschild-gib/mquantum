@@ -70,7 +70,8 @@ const BlackHoleMesh = () => {
   // Appearance settings that affect shader compilation (SSS/Fresnel)
   // These are from the global SharedAdvancedControls UI
   const sssEnabled = useAppearanceStore((state) => state.sssEnabled)
-  const fresnelEnabled = useAppearanceStore((state) => state.shaderSettings.surface.fresnelEnabled)
+  // Edges toggle controls fresnel rim lighting (same as Mandelbulb)
+  const edgesVisible = useAppearanceStore((state) => state.edgesVisible)
   // Note: AO is per-object in other shaders (schroedingerSlice.aoEnabled)
   // For black hole, we use a simple volumetric approximation when enabled
   // TODO: Add aoEnabled to blackholeSlice if UI control is needed
@@ -123,7 +124,7 @@ const BlackHoleMesh = () => {
       temporal: false,
       ambientOcclusion: true, // Volumetric AO approximation for disk self-shadowing
       sss: sssEnabled,
-      fresnel: fresnelEnabled,
+      fresnel: edgesVisible,
       temporalAccumulation: temporalEnabled,
       doppler: dopplerEnabled,
       envMap: true,
@@ -132,15 +133,15 @@ const BlackHoleMesh = () => {
       blackbodyLUT: true, // PERF (OPT-BH-17): Enable blackbody LUT for faster temperature coloring
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, fresnelEnabled, SHADER_VERSION])
+  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, edgesVisible, SHADER_VERSION])
 
   // Generate vertex shader
   const vertexShader = useMemo(() => generateBlackHoleVertexShader(), [])
 
   // Generate material key for caching
   const materialKey = useMemo(() => {
-    return `blackhole-${dimension}-${temporalEnabled}-${dopplerEnabled}-${sliceAnimationEnabled}-${sssEnabled}-${fresnelEnabled}-v${SHADER_VERSION}`
-  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, fresnelEnabled, SHADER_VERSION])
+    return `blackhole-${dimension}-${temporalEnabled}-${dopplerEnabled}-${sliceAnimationEnabled}-${sssEnabled}-${edgesVisible}-v${SHADER_VERSION}`
+  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, edgesVisible, SHADER_VERSION])
 
   // Note: Material disposal is handled automatically by React Three Fiber
   // when TrackedShaderMaterial unmounts (materialKey change causes remount).
