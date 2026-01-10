@@ -113,33 +113,26 @@ export class JetsRenderPass extends BasePass {
       side: THREE.DoubleSide,
     })
 
-    // High-detail cone geometry for smooth plasma gradients
-    // ConeGeometry creates: tip at y=+0.5, base at y=-0.5 (centered at origin)
-    // We want: NARROW end (tip) at black hole, WIDE end (base) extending away
-    //
-    // For TOP JET: tip near BH (small y), base far (large y)
-    //   - Flip cone 180° so base is at top
-    //   - Translate so tip is at origin
-    //
-    // For BOTTOM JET: tip near BH (small negative y), base far (large negative y)
-    //   - Keep cone orientation (tip at top = near BH after positioning)
-    //   - Translate so tip is at origin
+    // High-detail Cylinder geometry for beam shape (narrow start, wide end)
+    // CylinderGeometry(radiusTop, radiusBottom, height, radialSegments, heightSegments, openEnded)
+    // We want the jet to start narrow (near BH) and widen out.
+    // By default Cylinder is centered at (0,0,0) with height 1 (-0.5 to 0.5).
+    // We want radiusBottom=0.05 (narrow) and radiusTop=1.0 (wide).
+    // Then translate up by 0.5 so it goes from 0.0 to 1.0.
+    const jetGeometry = new THREE.CylinderGeometry(1.0, 0.05, 1.0, 64, 256, true)
+    jetGeometry.translate(0, 0.5, 0) // Base (narrow) at y=0, Tip (wide) at y=1
 
-    // TOP JET geometry: flip and position tip at origin
-    const topConeGeometry = new THREE.ConeGeometry(1, 1, 64, 128, true)
-    topConeGeometry.rotateX(Math.PI) // Flip: tip now at y=-0.5, base at y=+0.5
-    topConeGeometry.translate(0, 0.5, 0) // Move tip to origin, base at y=+1
-
-    this.topJetMesh = new THREE.Mesh(topConeGeometry, this.jetMaterial.clone())
+    // TOP JET: Points UP (y+) from origin
+    // Geometry is already 0..1 in Y.
+    this.topJetMesh = new THREE.Mesh(jetGeometry, this.jetMaterial.clone())
     this.topJetMesh.layers.set(RENDER_LAYERS.JETS)
     this.topJetMesh.frustumCulled = false
     ;(this.topJetMesh.material as THREE.ShaderMaterial).uniforms['uJetSign']!.value = 1.0
 
-    // BOTTOM JET geometry: keep orientation, position tip at origin
-    const bottomConeGeometry = new THREE.ConeGeometry(1, 1, 64, 128, true)
-    bottomConeGeometry.translate(0, -0.5, 0) // Move tip to origin, base at y=-1
-
-    this.bottomJetMesh = new THREE.Mesh(bottomConeGeometry, this.jetMaterial.clone())
+    // BOTTOM JET: Points DOWN (y-) from origin
+    // Rotate 180 deg around X to point down
+    this.bottomJetMesh = new THREE.Mesh(jetGeometry, this.jetMaterial.clone())
+    this.bottomJetMesh.rotation.x = Math.PI
     this.bottomJetMesh.layers.set(RENDER_LAYERS.JETS)
     this.bottomJetMesh.frustumCulled = false
     ;(this.bottomJetMesh.material as THREE.ShaderMaterial).uniforms['uJetSign']!.value = -1.0
