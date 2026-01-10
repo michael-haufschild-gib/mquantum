@@ -304,7 +304,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(({
           {/* Tab List */}
           <div
             ref={scrollContainerRef}
-            className={`overflow-x-auto scrollbar-none ${fullWidth ? 'w-full' : ''}`}
+            className={`overflow-x-auto overflow-y-hidden scrollbar-none ${fullWidth ? 'w-full' : ''}`}
           >
             <div
               className={`flex items-center ${listContainerStyles} ${widthStyles}`}

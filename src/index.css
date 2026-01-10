@@ -151,7 +151,7 @@
 /* Hide scrollbar utility */
 @utility scrollbar-none {
   -ms-overflow-style: none;
-  scrollbar-width: none;
+  scrollbar-width: none !important;
   &::-webkit-scrollbar {
     display: none;
   }
