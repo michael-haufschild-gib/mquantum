@@ -28,6 +28,7 @@ export const jetVolumetricVertexShader = /* glsl */ `
   uniform float uJetSign;
   uniform float uTime;
   uniform float uJetWidth;
+  uniform float uJetNoiseAmount; // Controls snaking intensity
 
   // 3D Simplex Noise for vertex displacement
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -89,18 +90,23 @@ export const jetVolumetricVertexShader = /* glsl */ `
     vec3 pos = position;
     
     // Normalized height: position.y goes from 0.0 (base) to 1.0 (tip)
-    // because we translated the geometry in the RenderPass.
     float h = pos.y; 
     
     // === SNAKING MOTION ===
-    // Low frequency large displacement
     // "Snaking" increases with height (whip effect)
-    float whip = pow(h, 1.2) * 0.3; // Significant displacement at tip
-    float t = uTime * 2.0;
+    // Modulate amplitude by uJetNoiseAmount
+    float noiseAmp = max(0.0, uJetNoiseAmount);
     
-    // Snake along Y axis
-    float snakeX = snoise(vec3(h * 2.0, t * 0.5, 0.0)) * whip;
-    float snakeZ = snoise(vec3(h * 2.0, t * 0.5, 100.0)) * whip;
+    // REDUCED AMPLITUDE, HIGHER FREQUENCY
+    // Was: pow(h, 1.2) * 0.3
+    // Now: Smaller amplitude to avoid "party hat" wobbling off-axis too much
+    float whip = pow(h, 1.5) * 0.15 * noiseAmp; 
+    float t = uTime * 1.5; // Slightly slower main wave
+    
+    // Snake along Y axis - HIGHER FREQUENCY
+    // Was: h * 2.0 (1 wave). Now: h * 8.0 (4 waves)
+    float snakeX = snoise(vec3(h * 8.0, t * 0.5, 0.0)) * whip;
+    float snakeZ = snoise(vec3(h * 8.0, t * 0.5, 100.0)) * whip;
     
     // Apply snake
     pos.x += snakeX;
@@ -109,7 +115,8 @@ export const jetVolumetricVertexShader = /* glsl */ `
     // === PULSING THICKNESS ===
     // Modulate width to make it look like blobs/packets of energy
     // High frequency noise
-    float pulse = 1.0 + snoise(vec3(h * 6.0, t * 3.0, 200.0)) * 0.3 * sqrt(h);
+    // Was: h * 6.0. Now: h * 15.0 for smaller packets
+    float pulse = 1.0 + snoise(vec3(h * 15.0, t * 2.0, 200.0)) * 0.2 * sqrt(h) * (0.5 + 0.5 * noiseAmp);
     
     // Only affect X/Z (thickness)
     pos.x *= pulse;
@@ -124,10 +131,7 @@ export const jetVolumetricVertexShader = /* glsl */ `
 
     vViewDir = normalize(cameraPosition - vWorldPos);
     
-    // Approximate normal based on displacement? 
-    // For volumetric clouds, standard normals are often misleading.
-    // We'll use the original normal but let's perturb it slightly for the Fresnel calculation later.
-    // Actually, simple normal is fine, we do heavy lifting in frag.
+    // Simple normal
     vNormal = normalize(normalMatrix * normal);
 
     vViewDotNormal = abs(dot(vViewDir, vNormal));
@@ -153,8 +157,8 @@ export const jetVolumetricFragmentShader = /* glsl */ `
   uniform float uJetIntensity;
   uniform float uJetHeight;
   uniform float uJetWidth;
-  uniform float uJetFalloff;
-  uniform float uJetNoiseAmount;
+  uniform float uJetFalloff; // Controls axial fade length
+  uniform float uJetNoiseAmount; // Controls erosion and turbulence
   uniform float uJetPulsation;
   uniform float uTime;
 
@@ -225,7 +229,7 @@ export const jetVolumetricFragmentShader = /* glsl */ `
     float f = 0.0;
     float w = 0.5;
     float freq = 1.0;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) { // Increased octaves for detail
       f += w * snoise(p * freq);
       p += vec3(12.3);
       freq *= 2.0;
@@ -260,129 +264,115 @@ export const jetVolumetricFragmentShader = /* glsl */ `
   // ============================================================
 
   void main() {
-    // Height factor (0 at base/origin, 1 at tip)
-    // Cylinder translated to [0,1] range in Y
     float h = vLocalPos.y; 
     
-    // Effective radius at this height (linear interpolation from 0.05 to 1.0)
-    // Note: This matches the vertex shader geometry construction
-    // We use this to normalize radial distance for consistent density
+    // Effective radius matching vertex shader
     float currentRadius = mix(0.05, 1.0, h);
     
     // Radial distance from axis
     float r = length(vLocalPos.xz);
-    
-    // Normalized radial coord (0 at center, 1 at mesh edge)
-    // We add a safety margin because vertex displacement might push vertices out
     float rNorm = r / max(currentRadius, 0.001);
     
     // === COORDINATE SETUP ===
-    // Use scale-independent noise coordinates
-    vec3 p = vLocalPos * vec3(uJetHeight, 1.0, uJetHeight); // Scale XZ to match world scale approx
+    // FIX: Scale noise coordinates by WORLD DIMENSIONS to avoid stretching
+    // Scale XZ by width, Y by height
+    // We multiply by a frequency factor (e.g. 2.0) to get base density
+    vec3 worldScale = vec3(uJetHeight * uJetWidth, uJetHeight, uJetHeight * uJetWidth);
+    vec3 p = vLocalPos * worldScale * 0.5; 
     
     // Parallax Offset - look deep into the plasma
-    vec3 viewOffset = vViewDir * 0.4;
+    vec3 viewOffset = vViewDir * 0.5;
     p += viewOffset;
 
-    // === FLOW ANIMATION ===
-    // High speed "Fire Hose" effect
-    // Noise flows UP (along Y) fast
-    float flowSpeed = 6.0 + h * 4.0; // Faster at tip
+    // Flow speed - High speed "Fire Hose" effect
+    float flowSpeed = 4.0 + h * 6.0;
     float flowTime = uTime * flowSpeed;
     
     // === NOISE GENERATION ===
     
-    // 1. Core Structure (Low freq, fast)
-    vec3 coreP = p * 1.5;
+    // 1. Core Structure (Medium freq)
+    // Scale up for detail
+    vec3 coreP = p * 2.0; 
     coreP.y -= flowTime;
     float coreNoise = fbm(coreP); // -1 to 1
     
-    // 2. Fine Detail / Sparkles (High freq, very fast)
-    vec3 fineP = p * 5.0;
+    // 2. Fine Detail / Sparkles (Very High freq)
+    vec3 fineP = p * 8.0;
     fineP.y -= flowTime * 1.5;
     float fineNoise = snoise(fineP);
     
-    // 3. Erosion Noise (Static-ish texture for edges)
-    // Moves slower to give "structure" to the beam
-    vec3 erodeP = p * 2.0;
-    erodeP.y -= uTime * 2.0;
+    // 3. Erosion Noise (Structural)
+    vec3 erodeP = p * 3.0;
+    erodeP.y -= uTime * 3.0;
     float erosion = snoise(erodeP);
     
     // === DENSITY CALCULATION ===
     
-    // Base radial falloff (Soft cylinder)
-    // Make it hollow-ish? No, plasma beams are usually dense cores.
-    float density = 1.0 - smoothstep(0.0, 1.0, rNorm);
-    density = pow(density, 0.5); // Push density out a bit
+    // Base radial falloff - Softer core
+    float density = 1.0 - smoothstep(0.0, 1.2, rNorm); // 1.2 extends slightly past geo
+    density = pow(density, 0.8); // Less aggressive falloff than 0.5
     
-    // Edge Erosion:
-    // If we are near the edge (rNorm > 0.5), subtract noise
-    // This breaks the straight line silhouette
-    float edgeMask = smoothstep(0.4, 1.0, rNorm);
-    density -= edgeMask * (erosion * 0.5 + 0.5) * 1.5;
+    // Edge Erosion
+    float noiseAmp = clamp(uJetNoiseAmount, 0.0, 1.0);
+    // Erode mainly the outer shell
+    float edgeMask = smoothstep(0.3, 1.0, rNorm);
     
-    // Discard if fully eroded
+    // Erosion intensity
+    density -= edgeMask * (erosion * 0.5 + 0.5) * 1.8 * noiseAmp;
+    
     if (density < 0.0) discard;
     
-    // Modulate density with core noise (internal turbulence)
-    density *= (coreNoise * 0.5 + 0.5) + 0.5;
+    // Internal turbulence
+    float coreInfluence = (coreNoise * 0.5 + 0.5);
+    // Mix solid density with turbulent density based on noise amp
+    density *= mix(1.0, coreInfluence, noiseAmp * 0.8);
     
-    // Add "Hotspots" - bright knots
-    float knots = smoothstep(0.6, 1.0, coreNoise);
-    density += knots * 2.0 * uJetPulsation;
+    // Hotspots/Knots - Smaller and more frequent
+    float knots = smoothstep(0.7, 1.0, coreNoise);
+    density += knots * 1.5 * uJetPulsation;
     
-    // Add sparkles
-    float sparkleVal = smoothstep(0.7, 1.0, fineNoise);
-    density += sparkleVal * 1.0;
+    // Sparkles
+    float sparkleVal = smoothstep(0.6, 1.0, fineNoise);
+    density += sparkleVal * 0.8;
     
     // Axial Fade
-    // Fade in at base (avoid hard clip with horizon)
-    // Fade out at tip (dissipate)
-    float fade = smoothstep(0.0, 0.1, h) * smoothstep(1.0, 0.8, h);
-    density *= fade;
+    float baseFade = smoothstep(0.0, 0.05, h);
+    float fadePoint = 1.0 / max(uJetFalloff * 0.5, 0.1); 
+    float tipFade = smoothstep(fadePoint, fadePoint * 0.7, h); // Smoother fade
     
-    // Overall Intensity
+    density *= baseFade * tipFade;
+    
+    // Intensity
     float intensity = density * uJetIntensity * 3.0;
     
     // === COLOR GRADING ===
     
-    // Heat map:
-    // Low intensity: Dark/Transparent
-    // Mid intensity: User Color
-    // High intensity: Cyan/White (Energy)
-    
     vec3 userColor = uJetColor;
-    vec3 hotColor = vec3(0.5, 0.9, 1.0); // Electric Blue/Cyan
-    vec3 coreColor = vec3(1.0, 1.0, 1.0); // White
+    // Cooler/Hotter colors
+    vec3 energyColor = vec3(0.4, 0.8, 1.0); // Cyan/Electric
+    vec3 coreColor = vec3(1.0, 1.0, 1.0);
     
     vec3 finalColor = userColor;
     
-    // Mix to hot color based on intensity
-    float heat = smoothstep(0.5, 2.0, intensity);
-    finalColor = mix(finalColor, hotColor, heat);
+    // Smooth transition to energy color
+    float energyMix = smoothstep(0.8, 3.0, intensity);
+    finalColor = mix(finalColor, energyColor, energyMix);
     
-    // Mix to white core
-    float whiteHeat = smoothstep(3.0, 6.0, intensity);
-    finalColor = mix(finalColor, coreColor, whiteHeat);
+    // Core white hot
+    float coreMix = smoothstep(4.0, 8.0, intensity);
+    finalColor = mix(finalColor, coreColor, coreMix);
     
     // === ALPHA & BLENDING ===
     
     float depthSoft = softDepthIntersection(vWorldPos);
     
-    // View alpha - more opaque in center/thick parts
-    // But for volume, edge falloff (Fresnel) is handled by density erosion mostly
-    float alpha = clamp(intensity, 0.0, 1.0);
-    
+    // Reduce opacity for wispy look
+    float alpha = clamp(intensity * 0.8, 0.0, 1.0);
     alpha *= depthSoft;
     
-    // Final premultiplied alpha
     fragColor = vec4(finalColor * intensity, alpha);
   }
-`
 
-/**
- * Simple vertex shader for fullscreen jet composite quad.
- */
 export const jetCompositeVertexShader = /* glsl */ `
   out vec2 vUv;
 
@@ -392,9 +382,6 @@ export const jetCompositeVertexShader = /* glsl */ `
   }
 `
 
-/**
- * Fragment shader that composites jet buffer over scene with additive blending.
- */
 export const jetCompositeFragmentShader = /* glsl */ `
   precision highp float;
 
@@ -409,10 +396,7 @@ export const jetCompositeFragmentShader = /* glsl */ `
     vec4 sceneColor = texture(tScene, vUv);
     vec4 jetColor = texture(tJets, vUv);
 
-    // Additive blending for emissive jets
     vec3 combined = sceneColor.rgb + jetColor.rgb * uJetOpacity;
-
-    // Preserve scene alpha
     fragColor = vec4(combined, sceneColor.a);
   }
 `

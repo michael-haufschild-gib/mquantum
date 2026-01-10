@@ -38,6 +38,11 @@ export const godRaysFragmentShader = /* glsl */ `
 
   const int MAX_SAMPLES = 128;
 
+  // Simple pseudo-random number generator
+  float random(vec2 co) {
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+  }
+
   void main() {
     // Calculate ray direction: from current pixel TOWARD light source
     vec2 deltaTexCoord = (vUv - uLightPosition);
@@ -48,6 +53,11 @@ export const godRaysFragmentShader = /* glsl */ `
 
     // Start at current pixel
     vec2 texCoord = vUv;
+
+    // Apply dithering to start position to reduce banding
+    // Offset along the ray direction by a random fraction of a step
+    float jitter = random(gl_FragCoord.xy);
+    texCoord -= deltaTexCoord * jitter;
 
     // Accumulate samples with proper normalization
     vec3 color = vec3(0.0);
@@ -103,8 +113,8 @@ export const godRaysFragmentShader = /* glsl */ `
 `
 
 /**
- * God rays composite shader - combines god rays with scene.
- * Uses soft additive blending with tone mapping.
+ * God Rays Composite Shader
+ * Combine with scene
  */
 export const godRaysCompositeVertexShader = /* glsl */ `
   out vec2 vUv;
@@ -133,10 +143,8 @@ export const godRaysCompositeFragmentShader = /* glsl */ `
     vec3 godRays = godRaysColor.rgb * uIntensity;
 
     // Soft compress only the god rays contribution to prevent blowout
-    // IMPORTANT: Do NOT compress the scene color - it contains HDR values
-    // that bloom needs to extract bright areas. Compressing the entire
-    // combined result was causing bloom to appear weaker.
-    vec3 godRaysCompressed = godRays / (1.0 + godRays * 0.1);
+    // Relaxed compression for more impact (0.05 factor instead of 0.1)
+    vec3 godRaysCompressed = godRays / (1.0 + godRays * 0.05);
 
     // Additive blend: preserve scene HDR, add compressed god rays
     vec3 combined = sceneColor.rgb + godRaysCompressed;
