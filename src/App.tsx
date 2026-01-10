@@ -39,6 +39,7 @@ import { useUrlState } from '@/hooks/useUrlState';
 import type { Vector3D, VectorND } from '@/lib/math/types';
 import { FpsController } from '@/rendering/controllers/FpsController';
 import { PerformanceStatsCollector } from '@/rendering/controllers/PerformanceStatsCollector';
+import { ScreenshotCaptureController } from '@/rendering/controllers/ScreenshotCaptureController';
 import { VideoExportController } from '@/rendering/controllers/VideoExportController';
 import { ContextEventHandler } from '@/rendering/core/ContextEventHandler';
 import { UniformLifecycleController } from '@/rendering/core/UniformLifecycleController';
@@ -288,7 +289,7 @@ function AppContent() {
               }}
               shadows="soft"
               flat
-              gl={{ alpha: false, antialias: false, preserveDrawingBuffer: true }}
+              gl={{ alpha: false, antialias: false, preserveDrawingBuffer: false }}
               style={{ background: backgroundColor }}
               onPointerMissed={handlePointerMissed}
               onCreated={handleCanvasCreated}
@@ -299,6 +300,7 @@ function AppContent() {
               <UniformLifecycleController />
 
               <FpsController />
+              <ScreenshotCaptureController />
               <VideoExportController />
               <Visualizer />
               <PerformanceStatsCollector />

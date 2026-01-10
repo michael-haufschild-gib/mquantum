@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useScreenshotCaptureStore } from './screenshotCaptureStore';
 
 interface ScreenshotStore {
   isOpen: boolean;
@@ -16,5 +17,9 @@ export const useScreenshotStore = create<ScreenshotStore>((set) => ({
 
   openModal: (imageSrc) => set({ isOpen: true, imageSrc }),
   closeModal: () => set({ isOpen: false }),
-  reset: () => set({ isOpen: false, imageSrc: null }),
+  reset: () => {
+    set({ isOpen: false, imageSrc: null });
+    // Clean up the screenshot capture store to free memory from data URL
+    useScreenshotCaptureStore.getState().reset();
+  },
 }));

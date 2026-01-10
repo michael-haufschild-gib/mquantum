@@ -166,10 +166,6 @@ export const Tabs: React.FC<TabsProps> = React.memo(({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    let stableCheckCount = 0;
-    let lastScrollWidth = 0;
-    let lastClientWidth = 0;
-
     const checkScroll = () => {
       if (!container) return;
       const { scrollLeft, scrollWidth, clientWidth } = container;
@@ -184,37 +180,14 @@ export const Tabs: React.FC<TabsProps> = React.memo(({
       setCanScrollRight(hasRightOverflow);
     };
 
-    // Stability check: wait for dimensions to stabilize before initial check
-    // This handles the Section open animation timing issue
-    const waitForStableLayout = () => {
-      const { scrollWidth, clientWidth } = container;
-
-      if (scrollWidth === lastScrollWidth && clientWidth === lastClientWidth) {
-        stableCheckCount++;
-        if (stableCheckCount >= 2) {
-          // Layout is stable, do the real check
-          checkScroll();
-          return;
-        }
-      } else {
-        stableCheckCount = 0;
-      }
-
-      lastScrollWidth = scrollWidth;
-      lastClientWidth = clientWidth;
-
-      // Check again in next frame
-      requestAnimationFrame(waitForStableLayout);
-    };
-
     // Use ResizeObserver for size changes after initial mount
     const resizeObserver = new ResizeObserver(() => {
       requestAnimationFrame(checkScroll);
     });
     resizeObserver.observe(container);
 
-    // Wait for stable layout before initial check
-    requestAnimationFrame(waitForStableLayout);
+    // Initial check
+    checkScroll();
 
     // Check on scroll (throttled via RAF naturally)
     const handleScroll = () => requestAnimationFrame(checkScroll);

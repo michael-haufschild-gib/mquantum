@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useScreenshotCaptureStore } from './screenshotCaptureStore'
 
 export type ExportFormat = 'mp4' | 'webm'
 export type ExportResolution = '720p' | '1080p' | '4k' | 'custom'
@@ -266,7 +267,14 @@ export const useExportStore = create<ExportStore>()(
       completionDetails: null,
       canvasAspectRatio: 16 / 9, // Default assumption
 
-      setModalOpen: (isOpen) => set({ isModalOpen: isOpen }),
+      setModalOpen: (isOpen) => {
+        set({ isModalOpen: isOpen })
+        // Clean up screenshot capture store and preview image when modal closes
+        if (!isOpen) {
+          set({ previewImage: null })
+          useScreenshotCaptureStore.getState().reset()
+        }
+      },
       setCropEditorOpen: (isOpen) => set({ isCropEditorOpen: isOpen }),
       setCanvasAspectRatio: (ratio) => set({ canvasAspectRatio: ratio }),
       setIsExporting: (isExporting) => set({ isExporting }),

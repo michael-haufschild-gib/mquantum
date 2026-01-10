@@ -104,14 +104,19 @@ export class CubemapCapturePass extends BasePass {
 
   /**
    * Initialize the cube camera and render target for background capture.
+   * Note: The cubeRenderTarget here is a placeholder - actual rendering uses
+   * the temporal history targets. Settings must match to avoid WebGL state conflicts.
    */
   private ensureCubeCamera(): void {
     if (this.cubeRenderTarget && this.cubeCamera) return
 
+    // CRITICAL: generateMipmaps must be FALSE to match temporal history targets.
+    // Mismatch between this placeholder and the actual render targets causes
+    // "bindTexture: textures can not be used with multiple targets" warnings.
     this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(this.backgroundResolution, {
       format: THREE.RGBAFormat,
-      generateMipmaps: true,
-      minFilter: THREE.LinearMipmapLinearFilter,
+      generateMipmaps: false,
+      minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
     })
 
@@ -133,7 +138,11 @@ export class CubemapCapturePass extends BasePass {
     if (this.pmremGenerator) return
 
     this.pmremGenerator = new THREE.PMREMGenerator(renderer)
-    this.pmremGenerator.compileEquirectangularShader()
+    // CRITICAL: Pre-compile the CUBEMAP shader, not equirectangular.
+    // Using compileEquirectangularShader() with fromCubemap() causes
+    // "bindTexture: Texture previously bound to TEXTURE_CUBE_MAP cannot
+    // be bound now to TEXTURE_2D" warnings due to shader type mismatch.
+    this.pmremGenerator.compileCubemapShader()
   }
 
   /**

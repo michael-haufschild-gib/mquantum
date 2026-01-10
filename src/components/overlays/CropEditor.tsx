@@ -1,6 +1,6 @@
 import { useExportStore } from '@/stores/exportStore';
 import { useLayoutStore } from '@/stores/layoutStore';
-import { findThreeCanvas } from '@/lib/export';
+import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { useEffect, useRef, useState } from 'react';
@@ -42,21 +42,18 @@ export const CropEditor = () => {
 
   // Recapture screenshot before reopening modal
   // (The modal's reset() clears previewImage when it closes for crop editor)
-  const recapturePreview = () => {
-    const canvas = findThreeCanvas();
-    if (canvas) {
-      try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setPreviewImage(dataUrl);
-      } catch (e) {
-        console.error('Failed to recapture preview:', e);
-      }
+  const recapturePreview = async () => {
+    try {
+      const dataUrl = await captureScreenshotAsync();
+      setPreviewImage(dataUrl);
+    } catch (e) {
+      console.error('Failed to recapture preview:', e);
     }
   };
 
   if (!isCropEditorOpen) return null;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     updateSettings({
       crop: {
         enabled: true,
@@ -67,16 +64,18 @@ export const CropEditor = () => {
       },
     });
     setCropEditorOpen(false);
-    recapturePreview();
-    setModalOpen(true);
     setCinematicMode(false);
+    // Capture preview before opening modal
+    await recapturePreview();
+    setModalOpen(true);
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     setCropEditorOpen(false);
-    recapturePreview();
-    setModalOpen(true);
     setCinematicMode(false);
+    // Capture preview before opening modal
+    await recapturePreview();
+    setModalOpen(true);
   };
 
   // Aspect Ratio Helper

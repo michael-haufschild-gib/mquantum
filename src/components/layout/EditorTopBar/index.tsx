@@ -16,7 +16,8 @@ import { Modal } from '@/components/ui/Modal';
 import { BREAKPOINTS, useIsMobile, useMediaQuery } from '@/hooks/useMediaQuery';
 import { useToast } from '@/hooks/useToast';
 import { soundManager } from '@/lib/audio/SoundManager';
-import { exportSceneToPNG, findThreeCanvas, generateTimestampFilename } from '@/lib/export';
+import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export';
+import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture';
 import { OBJECT_TYPE_REGISTRY } from '@/lib/geometry/registry/registry';
 import { useExportStore } from '@/stores/exportStore';
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore';
@@ -164,15 +165,13 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(({
     }))
   );
 
-  const handleExportVideo = useCallback(() => {
-    const canvas = findThreeCanvas();
-    if (canvas) {
-      try {
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setPreviewImage(dataUrl);
-      } catch (e) {
-        console.error('Failed to capture preview for video export:', e);
-      }
+  const handleExportVideo = useCallback(async () => {
+    // Capture preview using on-demand screenshot system
+    try {
+      const dataUrl = await captureScreenshotAsync();
+      setPreviewImage(dataUrl);
+    } catch (e) {
+      console.error('Failed to capture preview for video export:', e);
     }
 
     let defaultText = '';

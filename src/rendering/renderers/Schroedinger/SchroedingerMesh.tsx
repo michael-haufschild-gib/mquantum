@@ -15,7 +15,10 @@ import {
     useQualityTracking,
     useRotationUpdates,
 } from '@/rendering/renderers/base';
-import { composeSchroedingerShader } from '@/rendering/shaders/schroedinger/compose';
+import {
+    composeSchroedingerShader,
+    generateSchroedingerVertexShader,
+} from '@/rendering/shaders/schroedinger/compose';
 import { MAX_DIM, MAX_TERMS } from '@/rendering/shaders/schroedinger/uniforms.glsl';
 import { UniformManager } from '@/rendering/uniforms/UniformManager';
 // Sample count is fixed in shader: 64 (HQ) or 32 (fast mode)
@@ -29,7 +32,6 @@ import { useWebGLContextStore } from '@/stores/webglContextStore';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import vertexShader from './schroedinger.vert?raw';
 
 /**
  * Pre-allocated quantum uniform arrays
@@ -297,6 +299,12 @@ const SchroedingerMesh = () => {
   // For isosurface mode with temporal enabled, use temporal REPROJECTION (depth-skip)
   const useTemporalAccumulation = temporalEnabled && !isoEnabled;
 
+  // Generate vertex shader dynamically based on temporal accumulation mode
+  // When temporal accumulation is enabled, vPosition is not needed (ray computed from screen coords)
+  const vertexShader = useMemo(() => {
+    return generateSchroedingerVertexShader(useTemporalAccumulation);
+  }, [useTemporalAccumulation]);
+
   const { glsl: shaderString, modules, features } = useMemo(() => {
     const result = composeSchroedingerShader({
       dimension,
@@ -335,7 +343,7 @@ const SchroedingerMesh = () => {
       const { setShaderDebugInfo: clearDebugInfo } = usePerformanceStore.getState();
       clearDebugInfo('object', null);
     };
-  }, [shaderString, modules, features]);
+  }, [vertexShader, shaderString, modules, features]);
 
   // Assign layer based on temporal accumulation mode
   // When temporal cloud accumulation is active, use VOLUMETRIC layer for separate rendering
@@ -795,7 +803,7 @@ const SchroedingerMesh = () => {
   }, FRAME_PRIORITY.RENDERER_UNIFORMS);
 
   // Generate unique key to force material recreation when shader changes or context is restored
-  const materialKey = `schroedinger-material-${shaderString.length}-${features.join(',')}-${restoreCount}`
+  const materialKey = `schroedinger-material-${vertexShader.length}-${shaderString.length}-${features.join(',')}-${restoreCount}`
 
   return (
     <mesh ref={meshRef} frustumCulled={true}>

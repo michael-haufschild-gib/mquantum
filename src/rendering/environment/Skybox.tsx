@@ -315,7 +315,7 @@ export const SkyboxMesh: React.FC<SkyboxMeshProps> = ({ texture }) => {
       const { glsl } = composeSkyboxFragmentShader(config);
       const mat = new THREE.ShaderMaterial({
           glslVersion: THREE.GLSL3,
-          vertexShader: composeSkyboxVertexShader(),
+          vertexShader: composeSkyboxVertexShader(config.effects),
           fragmentShader: glsl,
           uniforms: createSkyboxShaderDefaults(),
           side: THREE.BackSide,

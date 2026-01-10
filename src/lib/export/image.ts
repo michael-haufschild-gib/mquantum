@@ -1,9 +1,11 @@
 /**
  * Image Export Utilities
- * Exports Three.js canvas to PNG images
+ * Exports Three.js canvas to PNG images using on-demand screenshot capture
  */
 
 import { useMsgBoxStore } from '@/stores/msgBoxStore';
+import { useScreenshotStore } from '@/stores/screenshotStore';
+import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture';
 
 export interface ExportOptions {
   /** Filename without extension */
@@ -56,9 +58,6 @@ export function exportCanvasToPNG(
   document.body.removeChild(link);
 }
 
-// Import the store (circular dependency avoided by using useScreenshotStore.getState())
-import { useScreenshotStore } from '@/stores/screenshotStore';
-
 /**
  * Finds the Three.js canvas in the document
  *
@@ -77,44 +76,37 @@ export function findThreeCanvas(): HTMLCanvasElement | null {
 }
 
 /**
- * Captures the current Three.js scene and opens the preview modal
+ * Captures the current Three.js scene and opens the preview modal.
+ * Uses the on-demand screenshot capture system which works without
+ * preserveDrawingBuffer being enabled.
  *
- * @param options - Export options (filename ignored in favor of modal flow)
- * @param _options
- * @returns True if capture was successful
+ * @param _options - Export options (filename ignored in favor of modal flow)
+ * @returns True if capture was initiated (async operation)
  */
 export function exportSceneToPNG(_options: ExportOptions = {}): boolean {
-  const canvas = findThreeCanvas();
+  // Trigger async capture
+  captureScreenshotAsync()
+    .then((dataUrl) => {
+      // Open the modal with the captured image
+      useScreenshotStore.getState().openModal(dataUrl);
+    })
+    .catch((error) => {
+      // Handle specific error cases with helpful messages
+      let errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
-  if (!canvas) {
-    console.error('No canvas found for export');
-    useMsgBoxStore.getState().showMsgBox('Export Error', 'Could not find the rendering canvas. Please ensure the scene is visible.', 'error');
-    return false;
-  }
+      if (error instanceof DOMException && error.name === 'SecurityError') {
+        errorMsg = 'Canvas is tainted by cross-origin content (CORS). External textures or images were used without proper permissions.';
+        console.error('Export failed: ' + errorMsg);
+      } else {
+        console.error('Export failed:', error);
+      }
 
-  try {
-    // We strictly need to preserveDrawingBuffer: true or capture synchronously after render
-    // `toDataURL` is synchronous and blocks the main thread, which is fine for a screenshot
-    const dataUrl = canvas.toDataURL('image/png');
+      useMsgBoxStore.getState().showMsgBox('Export Failed', errorMsg, 'error');
+    });
 
-    // Open the modal with the captured image
-    useScreenshotStore.getState().openModal(dataUrl);
-
-    return true;
-  } catch (error) {
-    // Handle specific error cases with helpful messages
-    let errorMsg = error instanceof Error ? error.message : 'Unknown error';
-
-    if (error instanceof DOMException && error.name === 'SecurityError') {
-      errorMsg = 'Canvas is tainted by cross-origin content (CORS). External textures or images were used without proper permissions.';
-      console.error('Export failed: ' + errorMsg);
-    } else {
-      console.error('Export failed:', error);
-    }
-
-    useMsgBoxStore.getState().showMsgBox('Export Failed', errorMsg, 'error');
-    return false;
-  }
+  // Return true to indicate capture was initiated
+  // The actual result is handled asynchronously
+  return true;
 }
 
 

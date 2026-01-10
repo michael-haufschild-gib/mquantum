@@ -126,6 +126,12 @@ export class MRTStateManager {
     this.renderer = renderer
     this.gl = renderer.getContext() as WebGL2RenderingContext
 
+    // Explicitly enable EXT_float_blend for blending on float/half-float render targets.
+    // Without this, WebGL throws a warning when blending is used with HalfFloatType targets
+    // (e.g., Schrödinger temporal accumulation): "Using format enabled by implicitly enabled
+    // extension: EXT_float_blend. For maximal portability enable it explicitly."
+    this.gl.getExtension('EXT_float_blend')
+
     this.initializeDrawBufferArrays()
     this.patchRenderer()
 

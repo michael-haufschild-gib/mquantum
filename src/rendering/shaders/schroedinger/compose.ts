@@ -239,9 +239,15 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     // when precision block conditionally declares MRT outputs
     { name: 'Defines', content: defines.join('\n') },
     { name: 'Precision', content: precisionBlock },
+    // Vertex Inputs: Only declare vPosition when NOT using temporal accumulation.
+    // When temporal accumulation is enabled, the fragment shader computes ray direction
+    // from screen coordinates (uInverseViewProjectionMatrix) instead of using vPosition.
+    // Declaring unused vertex outputs causes Firefox warning:
+    // "Output of vertex shader not read by fragment shader"
     {
       name: 'Vertex Inputs',
       content: `\n// Inputs from vertex shader\nin vec3 vPosition;\n`,
+      condition: !useTemporalAccumulation,
     },
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },
@@ -378,4 +384,38 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
   })
 
   return { glsl: glslParts.join('\n'), modules, features }
+}
+
+/**
+ * Generate vertex shader for Schrödinger raymarching.
+ *
+ * When temporal accumulation is enabled, the fragment shader computes ray direction
+ * from screen coordinates using uInverseViewProjectionMatrix, so vPosition is not needed.
+ * When temporal accumulation is disabled, vPosition is used for ray direction calculation.
+ *
+ * @param temporalAccumulation - Whether temporal accumulation is enabled
+ * @returns Vertex shader GLSL source
+ */
+export function generateSchroedingerVertexShader(temporalAccumulation: boolean): string {
+  if (temporalAccumulation) {
+    // Temporal accumulation mode: no vertex outputs needed
+    // Fragment shader computes ray direction from screen coordinates
+    return /* glsl */ `
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `
+  } else {
+    // Standard mode: output vPosition for fragment shader ray calculation
+    return /* glsl */ `
+      out vec3 vPosition;
+
+      void main() {
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `
+  }
 }

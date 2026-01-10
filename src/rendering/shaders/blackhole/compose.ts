@@ -244,10 +244,8 @@ export function generateBlackHoleVertexShader(): string {
     precision highp float;
 
     out vec3 vPosition;
-    out vec2 vUv;
 
     void main() {
-      vUv = uv;
       // Transform to world space - required for raymarching
       vec4 worldPosition = modelMatrix * vec4(position, 1.0);
       vPosition = worldPosition.xyz;

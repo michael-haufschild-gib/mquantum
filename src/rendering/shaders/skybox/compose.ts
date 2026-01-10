@@ -3,7 +3,7 @@ import { cosinePaletteBlock } from '../shared/color/cosine-palette.glsl'
 import { constantsBlock } from './core/constants.glsl'
 import { skyboxPrecisionBlock } from './core/precision.glsl'
 import { uniformsBlock } from './core/uniforms.glsl'
-import { varyingsBlock } from './core/varyings.glsl'
+import { generateVaryingsBlock } from './core/varyings.glsl'
 
 import { colorBlock } from './utils/color.glsl'
 import { noiseBlock } from './utils/noise.glsl'
@@ -72,6 +72,10 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
   // So noiseBlock can be conditional.
   const needsNoise = mode !== 'classic'
 
+  // Generate varyings dynamically based on which effects are enabled
+  // This avoids Firefox warning "Output of vertex shader not read by fragment shader"
+  const varyingsBlock = generateVaryingsBlock({ sun: useSun, vignette: useVignette })
+
   const blocks = [
     { name: 'Precision', content: skyboxPrecisionBlock },
     { name: 'Varyings', content: varyingsBlock },
@@ -113,9 +117,43 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
 
 /**
  * Compose skybox vertex shader with rotation support.
+ *
+ * Only outputs varyings that are actually used by the fragment shader to avoid
+ * Firefox warning: "Output of vertex shader not read by fragment shader"
+ *
+ * @param effects - Which effects are enabled (determines which varyings are needed)
  * @returns GLSL vertex shader code string for skybox rendering
  */
-export function composeSkyboxVertexShader() {
+export function composeSkyboxVertexShader(effects: { vignette: boolean }) {
+  // Build varyings list based on enabled effects
+  const varyings = ['out vec3 vWorldDirection;'] // Always needed
+  if (effects.vignette) {
+    varyings.push('out vec2 vScreenUV;')
+  }
+  // Note: vWorldPosition removed - was never used in fragment shader
+
+  // Build main body
+  const mainBody = [
+    '// Standard Skybox Rotation',
+    'vec4 worldPos4 = modelMatrix * vec4(position, 1.0);',
+    'vec3 worldPos = worldPos4.xyz;',
+    '',
+    'vWorldDirection = uRotation * normalize(worldPos);',
+    '',
+    'vec4 clipPos = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+    'gl_Position = clipPos;',
+    '',
+    '// Force to background (z = w)',
+    'gl_Position.z = gl_Position.w;',
+  ]
+
+  // Only compute vScreenUV if vignette is enabled
+  if (effects.vignette) {
+    mainBody.push('')
+    mainBody.push('// Screen UV for post effects')
+    mainBody.push('vScreenUV = clipPos.xy / clipPos.w * 0.5 + 0.5;')
+  }
+
   return `
 /**
  * Skybox Vertex Shader
@@ -128,27 +166,10 @@ precision highp float;
 
 uniform mat3 uRotation;
 
-out vec3 vWorldDirection;
-out vec2 vScreenUV;
-out vec3 vWorldPosition;
+${varyings.join('\n')}
 
 void main() {
-  // Standard Skybox Rotation
-  vec4 worldPos4 = modelMatrix * vec4(position, 1.0);
-  vec3 worldPos = worldPos4.xyz;
-  vWorldPosition = worldPos;
-
-  vWorldDirection = uRotation * normalize(worldPos);
-
-  vec4 clipPos = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_Position = clipPos;
-
-  // Force to background (z = w)
-  gl_Position.z = gl_Position.w;
-
-  // Screen UV for post effects
-  vScreenUV = clipPos.xy / clipPos.w * 0.5 + 0.5;
+  ${mainBody.join('\n  ')}
 }
-
 `
 }

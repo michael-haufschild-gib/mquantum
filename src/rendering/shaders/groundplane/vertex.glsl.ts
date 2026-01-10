@@ -18,7 +18,7 @@ out vec3 vWorldPosition;
 out vec3 vLocalPosition;  // Local position before transformation (for grid)
 out vec3 vNormal;
 out vec3 vViewDirection;
-out vec2 vUv;
+// Note: vUv removed - was never used in fragment shader
 
 void main() {
   // Store local position before transformation (for grid calculation)
@@ -34,9 +34,6 @@ void main() {
 
   // View direction (from fragment to camera)
   vViewDirection = normalize(cameraPosition - worldPos.xyz);
-
-  // Pass through UVs for potential texture mapping
-  vUv = uv;
 
   // Final clip space position
   gl_Position = projectionMatrix * viewMatrix * worldPos;

@@ -61,7 +61,7 @@ in vec3 vWorldPosition;
 in vec3 vLocalPosition;  // Local position before transformation (for grid)
 in vec3 vNormal;
 in vec3 vViewDirection;
-in vec2 vUv;
+// Note: vUv removed - was never used in fragment shader
 
 // Ground plane specific uniforms (others come from shared uniformsBlock)
 // Note: uColor, uMetallic, uSpecularIntensity, uSpecularColor are in uniformsBlock
