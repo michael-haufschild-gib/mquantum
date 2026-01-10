@@ -6,9 +6,9 @@
  * automatic checking of the dismissed dialogs store.
  */
 
-import { useCallback } from 'react'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore, type MsgBoxAction, type MsgBoxType } from '@/stores/msgBoxStore'
+import { useCallback } from 'react'
 
 export interface UseConditionalMsgBoxResult {
   /**
@@ -38,6 +38,7 @@ export interface UseConditionalMsgBoxResult {
 
 /**
  * Hook for showing dismissible message boxes.
+ * Handles hydration timing to prevent race conditions with localStorage persistence.
  *
  * @example
  * ```tsx
@@ -55,7 +56,6 @@ export interface UseConditionalMsgBoxResult {
  * ```
  */
 export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
-  const isDismissedFn = useDismissedDialogsStore((state) => state.isDismissed)
   const showMsgBox = useMsgBoxStore((state) => state.showMsgBox)
 
   const showOnce = useCallback(
@@ -66,46 +66,57 @@ export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
       type: MsgBoxType = 'info',
       actions?: MsgBoxAction[]
     ): boolean => {
-      // Check if already dismissed
-      if (isDismissedFn(dialogId)) {
-        return false
+      // Helper to perform the actual show logic
+      const doShow = (): boolean => {
+        const { isDismissed } = useDismissedDialogsStore.getState()
+        if (isDismissed(dialogId)) {
+          return false
+        }
+        showMsgBox(title, message, type, actions, {
+          dismissible: true,
+          dismissId: dialogId,
+        })
+        return true
       }
 
-      // Show the dialog with dismissible option
-      showMsgBox(title, message, type, actions, {
-        dismissible: true,
-        dismissId: dialogId,
-      })
+      // Check if store has hydrated from localStorage
+      // If not hydrated, dismissed state may not be loaded yet
+      if (!useDismissedDialogsStore.persist.hasHydrated()) {
+        // Wait for hydration, then check and show if needed
+        useDismissedDialogsStore.persist.onFinishHydration(() => {
+          doShow()
+        })
+        return true // Optimistic return
+      }
 
-      return true
+      return doShow()
     },
-    [isDismissedFn, showMsgBox]
+    [showMsgBox]
   )
 
-  const isDismissed = useCallback(
-    (dialogId: string): boolean => isDismissedFn(dialogId),
-    [isDismissedFn]
-  )
+  const isDismissed = useCallback((dialogId: string): boolean => {
+    // For immediate checks, always get fresh state and respect hydration
+    if (!useDismissedDialogsStore.persist.hasHydrated()) {
+      // Not hydrated - can't reliably know if dismissed
+      // Return false (not dismissed) to be safe, but this is a race condition
+      // Callers should prefer showOnce which handles this properly
+      return false
+    }
+    return useDismissedDialogsStore.getState().isDismissed(dialogId)
+  }, [])
 
   return { showOnce, isDismissed }
 }
 
 /**
- * Utility function for showing a conditional message box from outside React components.
- * Useful for store actions and other non-component code.
- *
- * @param dialogId - Unique identifier for this dialog type
- * @param title - Dialog title
- * @param message - Dialog message content
- * @param type - Message type (info, success, warning, error)
- * @param actions - Custom action buttons (defaults to "OK" if not provided)
- * @returns true if the dialog was shown, false if it was previously dismissed
+ * Internal helper to perform the actual conditional message box show.
+ * Assumes hydration has already been verified.
  */
-export function showConditionalMsgBox(
+function doShowConditionalMsgBox(
   dialogId: string,
   title: string,
   message: string,
-  type: MsgBoxType = 'info',
+  type: MsgBoxType,
   actions?: MsgBoxAction[]
 ): boolean {
   const { isDismissed } = useDismissedDialogsStore.getState()
@@ -120,4 +131,43 @@ export function showConditionalMsgBox(
   })
 
   return true
+}
+
+/**
+ * Utility function for showing a conditional message box from outside React components.
+ * Useful for store actions and other non-component code.
+ *
+ * Handles hydration timing: if the dismissedDialogsStore hasn't hydrated from
+ * localStorage yet, waits for hydration before checking dismissed state.
+ * This prevents the popup from incorrectly showing when user had previously
+ * checked "Don't show again".
+ *
+ * @param dialogId - Unique identifier for this dialog type
+ * @param title - Dialog title
+ * @param message - Dialog message content
+ * @param type - Message type (info, success, warning, error)
+ * @param actions - Custom action buttons (defaults to "OK" if not provided)
+ * @returns true if the dialog was shown (or will be shown after hydration),
+ *          false if it was previously dismissed (only reliable after hydration)
+ */
+export function showConditionalMsgBox(
+  dialogId: string,
+  title: string,
+  message: string,
+  type: MsgBoxType = 'info',
+  actions?: MsgBoxAction[]
+): boolean {
+  // Check if store has hydrated from localStorage
+  // If not hydrated, dismissed state may not be loaded yet, leading to
+  // incorrect "not dismissed" checks (race condition)
+  if (!useDismissedDialogsStore.persist.hasHydrated()) {
+    // Wait for hydration to complete, then check and show if needed
+    useDismissedDialogsStore.persist.onFinishHydration(() => {
+      doShowConditionalMsgBox(dialogId, title, message, type, actions)
+    })
+    // Return true optimistically - actual show depends on hydrated state
+    return true
+  }
+
+  return doShowConditionalMsgBox(dialogId, title, message, type, actions)
 }

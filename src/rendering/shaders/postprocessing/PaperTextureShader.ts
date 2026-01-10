@@ -136,10 +136,11 @@ export const PaperTextureShader = {
       return mix(x1, x2, u.y);
     }
 
-    float fbm(vec2 n) {
+    float fbm(vec2 n, int octaves) {
       float total = 0.0;
       float amplitude = 0.4;
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 4; i++) {
+        if (i >= octaves) break;
         total += valueNoise(n) * amplitude;
         n *= 1.99;
         amplitude *= 0.65;
@@ -156,10 +157,11 @@ export const PaperTextureShader = {
       return texture(tNoiseTexture, fract(uv)).g;
     }
 
-    float roughnessNoise(vec2 p) {
+    float roughnessNoise(vec2 p, int octaves) {
       p *= 0.1;
       float o = 0.0;
-      for (float i = 0.0; i < 4.0; i += 1.0) {
+      for (int i = 0; i < 4; i++) {
+        if (i >= octaves) break;
         vec4 w = vec4(floor(p), ceil(p));
         vec2 f = fract(p);
         o += mix(
@@ -197,10 +199,11 @@ export const PaperTextureShader = {
       return mix(x1, x2, u.y);
     }
 
-    float fiberNoiseFbm(vec2 n, vec2 seedOffset) {
+    float fiberNoiseFbm(vec2 n, vec2 seedOffset, int octaves) {
       float total = 0.0;
       float amplitude = 1.0;
       for (int i = 0; i < 4; i++) {
+        if (i >= octaves) break;
         n = rotate(n, 0.7);
         total += fiberValueNoise(n + seedOffset) * amplitude;
         n *= 2.0;
@@ -211,11 +214,11 @@ export const PaperTextureShader = {
 
     // OPTIMIZATION: Forward difference (3 FBM calls) instead of central difference (4 FBM calls)
     // Saves 25% FBM evaluations with visually identical results for soft procedural noise
-    float fiberNoise(vec2 uv, vec2 seedOffset) {
+    float fiberNoise(vec2 uv, vec2 seedOffset, int octaves) {
       float epsilon = 0.001;
-      float n0 = fiberNoiseFbm(uv, seedOffset);
-      float n1 = fiberNoiseFbm(uv + vec2(epsilon, 0.0), seedOffset);
-      float n2 = fiberNoiseFbm(uv + vec2(0.0, epsilon), seedOffset);
+      float n0 = fiberNoiseFbm(uv, seedOffset, octaves);
+      float n1 = fiberNoiseFbm(uv + vec2(epsilon, 0.0), seedOffset, octaves);
+      float n2 = fiberNoiseFbm(uv + vec2(0.0, epsilon), seedOffset, octaves);
       return length(vec2(n1 - n0, n2 - n0)) / epsilon;
     }
 
@@ -320,18 +323,24 @@ export const PaperTextureShader = {
       vec2 normal = vec2(0.0);
       vec2 normalImage = vec2(0.0);
 
+      // ========== Quality-based octave counts ==========
+      // Low (0): 2 octaves, Medium (1): 3 octaves, High (2): 4 octaves
+      int roughnessOctaves = uQuality < 0.5 ? 2 : (uQuality < 1.5 ? 3 : 4);
+      int fiberOctaves = uQuality < 0.5 ? 2 : (uQuality < 1.5 ? 3 : 4);
+      int fbmOctaves = uQuality < 0.5 ? 2 : 3;
+
       // ========== Roughness (skip if disabled) ==========
       float roughness = 0.0;
       if (uRoughness > 0.001) {
-        roughness = roughnessNoise(roughnessUv + vec2(1.0, 0.0)) -
-                    roughnessNoise(roughnessUv - vec2(1.0, 0.0));
+        roughness = roughnessNoise(roughnessUv + vec2(1.0, 0.0), roughnessOctaves) -
+                    roughnessNoise(roughnessUv - vec2(1.0, 0.0), roughnessOctaves);
       }
 
       // ========== Fiber (skip if disabled) ==========
       float fiber = 0.0;
       if (uFiber > 0.001) {
         vec2 fiberUV = 2.0 / max(0.1, uFiberSize) * patternUV;
-        fiber = fiberNoise(fiberUV, vec2(0.0));
+        fiber = fiberNoise(fiberUV, vec2(0.0), fiberOctaves);
         fiber = 0.5 * uFiber * (fiber - 1.0);
       }
 
@@ -363,7 +372,7 @@ export const PaperTextureShader = {
       // ========== Fade mask ==========
       float fade = 0.0;
       if (uFade > 0.001) {
-        fade = uFade * fbm(0.17 * patternUV + 10.0 * uSeed);
+        fade = uFade * fbm(0.17 * patternUV + 10.0 * uSeed, fbmOctaves);
         fade = clamp(8.0 * fade * fade * fade, 0.0, 1.0);
 
         // Apply fade to all effects

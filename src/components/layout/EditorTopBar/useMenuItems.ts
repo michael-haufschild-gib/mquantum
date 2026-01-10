@@ -11,6 +11,7 @@ import { useMemo } from 'react'
 import {
   buildAccentItems,
   buildExampleSceneItems,
+  buildExampleStyleItems,
   buildFileItems,
   buildMobileMenuItems,
   buildModeItems,
@@ -92,13 +93,21 @@ export function useStyleMenuItems(
     [savedStyles, loadStyle, addToast]
   )
 
+  const exampleStyleItems = useMemo(() => buildExampleStyleItems(addToast), [addToast])
+
   const styleSubmenuItems = useMemo(
     () =>
-      buildStyleSubmenuItems(savedStyles, savedStyleItems, setSaveStyleOpen, setIsStyleManagerOpen),
-    [savedStyles, savedStyleItems, setSaveStyleOpen, setIsStyleManagerOpen]
+      buildStyleSubmenuItems(
+        savedStyles,
+        savedStyleItems,
+        exampleStyleItems,
+        setSaveStyleOpen,
+        setIsStyleManagerOpen
+      ),
+    [savedStyles, savedStyleItems, exampleStyleItems, setSaveStyleOpen, setIsStyleManagerOpen]
   )
 
-  return { savedStyleItems, styleSubmenuItems }
+  return { savedStyleItems, exampleStyleItems, styleSubmenuItems }
 }
 
 /**

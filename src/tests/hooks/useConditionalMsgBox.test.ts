@@ -9,14 +9,11 @@
  * - Trustworthy: Deterministic results
  */
 
-import { renderHook, act } from '@testing-library/react'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import {
-  useConditionalMsgBox,
-  showConditionalMsgBox,
-} from '@/hooks/useConditionalMsgBox'
+import { showConditionalMsgBox, useConditionalMsgBox } from '@/hooks/useConditionalMsgBox'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { act, renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -66,12 +63,7 @@ describe('useConditionalMsgBox', () => {
 
       let shown: boolean = false
       act(() => {
-        shown = result.current.showOnce(
-          'test-dialog',
-          'Test Title',
-          'Test Message',
-          'info'
-        )
+        shown = result.current.showOnce('test-dialog', 'Test Title', 'Test Message', 'info')
       })
 
       expect(shown).toBe(true)
@@ -109,13 +101,7 @@ describe('useConditionalMsgBox', () => {
       const customAction = { label: 'Custom', onClick: vi.fn(), variant: 'primary' as const }
 
       act(() => {
-        result.current.showOnce(
-          'with-actions',
-          'Title',
-          'Message',
-          'warning',
-          [customAction]
-        )
+        result.current.showOnce('with-actions', 'Title', 'Message', 'warning', [customAction])
       })
 
       const msgBoxState = useMsgBoxStore.getState()
@@ -204,11 +190,7 @@ describe('showConditionalMsgBox (utility function)', () => {
   it('showConditionalMsgBox_alreadyDismissed_returnsFalse', () => {
     useDismissedDialogsStore.getState().dismiss('utility-dismissed')
 
-    const shown = showConditionalMsgBox(
-      'utility-dismissed',
-      'Should Not Show',
-      'Message'
-    )
+    const shown = showConditionalMsgBox('utility-dismissed', 'Should Not Show', 'Message')
 
     expect(shown).toBe(false)
     expect(useMsgBoxStore.getState().isOpen).toBe(false)
@@ -238,5 +220,141 @@ describe('showConditionalMsgBox (utility function)', () => {
     expect(msgBoxState.actions).toHaveLength(1)
     expect(msgBoxState.actions[0]?.label).toBe('Retry')
     expect(msgBoxState.actions[0]?.variant).toBe('danger')
+  })
+})
+
+describe('Hydration timing', () => {
+  beforeEach(() => {
+    useDismissedDialogsStore.setState({
+      dismissedIds: new Set<string>(),
+    })
+    useMsgBoxStore.setState({
+      isOpen: false,
+      title: '',
+      message: '',
+      type: 'info',
+      actions: [],
+      dismissible: false,
+      dismissId: null,
+    })
+    localStorageMock.clear()
+  })
+
+  it('showConditionalMsgBox_beforeHydration_defersShowUntilHydrated', () => {
+    // Simulate unhydrated state by mocking persist API
+    const originalHasHydrated = useDismissedDialogsStore.persist.hasHydrated
+    const originalOnFinishHydration = useDismissedDialogsStore.persist.onFinishHydration
+
+    let hydrationCallback: (() => void) | null = null
+
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
+    vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
+      hydrationCallback = cb
+      return () => {}
+    })
+
+    // Call showConditionalMsgBox while "not hydrated"
+    const result = showConditionalMsgBox('deferred-dialog', 'Title', 'Message')
+
+    // Should return true optimistically
+    expect(result).toBe(true)
+    // Dialog should NOT be shown yet
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+
+    // Restore hasHydrated to return true (simulating hydration completion)
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
+
+    // Now trigger the hydration callback
+    expect(hydrationCallback).not.toBeNull()
+    hydrationCallback!()
+
+    // Now dialog should be shown (since it wasn't dismissed)
+    expect(useMsgBoxStore.getState().isOpen).toBe(true)
+    expect(useMsgBoxStore.getState().title).toBe('Title')
+
+    // Cleanup mocks
+    vi.mocked(useDismissedDialogsStore.persist.hasHydrated).mockRestore()
+    vi.mocked(useDismissedDialogsStore.persist.onFinishHydration).mockRestore()
+  })
+
+  it('showConditionalMsgBox_beforeHydration_respectsDismissedStateAfterHydration', () => {
+    let hydrationCallback: (() => void) | null = null
+
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
+    vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
+      hydrationCallback = cb
+      return () => {}
+    })
+
+    // Call showConditionalMsgBox while "not hydrated"
+    showConditionalMsgBox('dismissed-before-hydration', 'Title', 'Message')
+
+    // Dialog not shown yet
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+
+    // Simulate that hydration loads dismissed state
+    useDismissedDialogsStore.setState({
+      dismissedIds: new Set(['dismissed-before-hydration']),
+    })
+
+    // Restore hasHydrated
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
+
+    // Trigger hydration callback
+    hydrationCallback!()
+
+    // Dialog should NOT be shown because it was dismissed in localStorage
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+
+    // Cleanup
+    vi.mocked(useDismissedDialogsStore.persist.hasHydrated).mockRestore()
+    vi.mocked(useDismissedDialogsStore.persist.onFinishHydration).mockRestore()
+  })
+
+  it('showConditionalMsgBox_afterHydration_checksImmediately', () => {
+    // Store is hydrated by default in tests, just verify immediate behavior
+    const persistSpy = vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated')
+    persistSpy.mockReturnValue(true)
+
+    useDismissedDialogsStore.getState().dismiss('already-dismissed')
+
+    const shown = showConditionalMsgBox('already-dismissed', 'Title', 'Message')
+
+    expect(shown).toBe(false)
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+
+    persistSpy.mockRestore()
+  })
+
+  it('useConditionalMsgBox_showOnce_beforeHydration_defersShow', () => {
+    let hydrationCallback: (() => void) | null = null
+
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(false)
+    vi.spyOn(useDismissedDialogsStore.persist, 'onFinishHydration').mockImplementation((cb) => {
+      hydrationCallback = cb
+      return () => {}
+    })
+
+    const { result } = renderHook(() => useConditionalMsgBox())
+
+    let shown: boolean = false
+    act(() => {
+      shown = result.current.showOnce('hook-deferred', 'Title', 'Message')
+    })
+
+    // Optimistic return
+    expect(shown).toBe(true)
+    // Not shown yet
+    expect(useMsgBoxStore.getState().isOpen).toBe(false)
+
+    // Simulate hydration complete
+    vi.spyOn(useDismissedDialogsStore.persist, 'hasHydrated').mockReturnValue(true)
+    hydrationCallback!()
+
+    // Now shown
+    expect(useMsgBoxStore.getState().isOpen).toBe(true)
+
+    vi.mocked(useDismissedDialogsStore.persist.hasHydrated).mockRestore()
+    vi.mocked(useDismissedDialogsStore.persist.onFinishHydration).mockRestore()
   })
 })

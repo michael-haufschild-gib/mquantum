@@ -9,6 +9,7 @@ import type { ToastType } from '@/contexts/ToastContextInstance'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { getModifierSymbols } from '@/lib/platform'
 import { applySceneExample, getSceneExamples } from '@/lib/sceneExamples'
+import { applyStyleExample, getStyleExamples } from '@/lib/styleExamples'
 import type { SavedScene, SavedStyle } from '@/stores/presetManagerStore'
 import { THEME_PRESETS, type ThemeAccent, type ThemeMode } from '@/stores/themeStore'
 import type { MenuContext, MenuItem } from './types'
@@ -147,11 +148,28 @@ export function buildSavedStyleItems(
 }
 
 /**
+ * Build example style menu items
+ */
+export function buildExampleStyleItems(
+  addToast: (message: string, type?: ToastType) => void
+): MenuItem[] {
+  const styleExamples = getStyleExamples()
+  return styleExamples.map((style) => ({
+    label: style.name,
+    onClick: () => {
+      applyStyleExample(style.id)
+      addToast(`Applied preset: ${style.name}`, 'info')
+    },
+  }))
+}
+
+/**
  * Build styles submenu items
  */
 export function buildStyleSubmenuItems(
   savedStyles: SavedStyle[],
   savedStyleItems: MenuItem[],
+  exampleStyleItems: MenuItem[],
   setSaveStyleOpen: (open: boolean) => void,
   setIsStyleManagerOpen: (open: boolean) => void
 ): MenuItem[] {
@@ -168,6 +186,9 @@ export function buildStyleSubmenuItems(
     { label: '---' },
     { label: 'Saved Styles' },
     ...(savedStyles.length === 0 ? [{ label: '(None)', disabled: true }] : savedStyleItems),
+    { label: '---' },
+    { label: 'Presets' },
+    ...exampleStyleItems,
   ]
 }
 
