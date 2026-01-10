@@ -96,6 +96,12 @@ export class GravitationalLensingPass extends BasePass {
         uChromaticAberration: { value: 0.0 },
         // N-Dimensional physics: scale factor to compensate for faster falloff in higher dimensions
         uNDScale: { value: 1.0 },
+        // Apparent horizon radius in UV space (scales with camera zoom)
+        uApparentHorizonRadius: { value: 0.1 },
+        // Black hole gravity multiplier (from blackHole.gravityStrength * blackHole.bendScale)
+        uBlackHoleGravity: { value: 1.0 },
+        // Aspect ratio (width / height) for circular lensing correction
+        uAspectRatio: { value: 1.0 },
       },
       vertexShader: gravitationalLensingVertexShader,
       fragmentShader: gravitationalLensingFragmentShader,
@@ -131,9 +137,19 @@ export class GravitationalLensingPass extends BasePass {
     const frame = ctx.frame as FrozenFrameContext | null
     const pp = frame?.stores.postProcessing
     const geo = frame?.stores.geometry
+    const bh = frame?.stores.blackHole
+
+    // Post-processing gravity settings (user-controllable global effect)
     const strength = pp?.gravityStrength ?? 1.0
     const distortionScale = pp?.gravityDistortionScale ?? 1.0
     const chromaticAberration = pp?.gravityChromaticAberration ?? 0.0
+
+    // Black hole gravity settings
+    const horizonRadius = bh?.horizonRadius ?? 1.0
+    const bhGravityStrength = bh?.gravityStrength ?? 1.0
+    const bhBendScale = bh?.bendScale ?? 1.0
+    // Combined black hole gravity multiplier
+    const blackHoleGravity = bhGravityStrength * bhBendScale
 
     // N-Dimensional physics: compute proper falloff and scale from dimension
     // In N dimensions, gravity falls off as 1/r^(N-1) (Tangherlini metric)
@@ -143,14 +159,48 @@ export class GravitationalLensingPass extends BasePass {
     // This ensures lensing remains visible as dimension increases
     const ndScale = dimension > 3 ? Math.pow(3.0, dimension - 3) : 1.0
 
+    // Compute apparent horizon radius in UV space based on camera zoom
+    let apparentHorizonRadiusUV = 0.1 // default fallback
+
     // Project world origin to screen space for gravity center
-    if (camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera) {
+    if (camera instanceof THREE.PerspectiveCamera) {
       const projected = this.worldOrigin.clone().project(camera)
       // Convert from NDC (-1 to 1) to UV (0 to 1)
       this.gravityCenter.set(
         (projected.x + 1) * 0.5,
         (projected.y + 1) * 0.5
       )
+
+      // Calculate apparent horizon radius for zoom scaling
+      // For perspective camera: apparent size = actual size / distance * projection factor
+      const cameraDistance = camera.position.length()
+      if (cameraDistance > 0.001) {
+        const vFov = camera.fov * (Math.PI / 180)
+        // Apparent radius as fraction of screen height
+        // Factor of 2 because NDC goes from -1 to 1 (height = 2)
+        apparentHorizonRadiusUV = horizonRadius / (cameraDistance * Math.tan(vFov / 2))
+      }
+    } else if (camera instanceof THREE.OrthographicCamera) {
+      const projected = this.worldOrigin.clone().project(camera)
+      this.gravityCenter.set(
+        (projected.x + 1) * 0.5,
+        (projected.y + 1) * 0.5
+      )
+
+      // For ortho camera: apparent size = actual size / view height
+      const viewHeight = camera.top - camera.bottom
+      if (viewHeight > 0.001) {
+        apparentHorizonRadiusUV = horizonRadius / viewHeight
+      }
+    }
+
+    // Clamp apparent radius to reasonable range (prevent extreme values)
+    apparentHorizonRadiusUV = Math.max(0.005, Math.min(0.8, apparentHorizonRadiusUV))
+
+    // Compute aspect ratio for circular lensing (prevents elliptical distortion)
+    let aspectRatio = 1.0
+    if (outputTarget) {
+      aspectRatio = outputTarget.width / outputTarget.height
     }
 
     // Update uniforms
@@ -162,6 +212,10 @@ export class GravitationalLensingPass extends BasePass {
     this.material.uniforms['uFalloff']!.value = ndFalloff
     this.material.uniforms['uChromaticAberration']!.value = chromaticAberration
     this.material.uniforms['uNDScale']!.value = ndScale
+    // New uniforms for black hole integration and zoom scaling
+    this.material.uniforms['uApparentHorizonRadius']!.value = apparentHorizonRadiusUV
+    this.material.uniforms['uBlackHoleGravity']!.value = blackHoleGravity
+    this.material.uniforms['uAspectRatio']!.value = aspectRatio
 
     // Render
     renderer.setRenderTarget(outputTarget)

@@ -47,6 +47,74 @@ const float RING_ANGULAR_FREQ = 0.5;         // Low = rings stay coherent as arc
 const float RING_SHARPNESS = 2.5;            // Higher = thinner brighter lines
 // Note: PI is defined in shared/core/constants.glsl.ts
 
+// Disk warp parameters (Bardeen-Petterson effect for Kerr black holes)
+const float WARP_TRANSITION_START = 1.5;     // Warp starts at 1.5x inner radius
+const float WARP_TRANSITION_END = 4.0;       // Warp fully decayed by 4x inner radius
+const float WARP_MAX_AMPLITUDE = 0.4;        // Maximum warp height (fraction of thickness)
+
+/**
+ * Calculate warped disk midplane height for Kerr black holes.
+ *
+ * Implements the Bardeen-Petterson effect: frame dragging causes the inner disk
+ * to align with the black hole's equatorial plane, while the outer disk maintains
+ * its original orientation. This creates a smooth warp transition zone.
+ *
+ * Additional effects:
+ * - Frame-drag induced vertical oscillation (disk "wobbles" due to dragging)
+ * - Precession-based azimuthal variation (different heights at different angles)
+ *
+ * @param pos - Position in disk space
+ * @param r - Radial distance in XZ plane
+ * @param innerR - Inner disk radius (ISCO)
+ * @param thickness - Local disk thickness
+ * @return Vertical offset of the warped midplane from y=0
+ */
+float getDiskWarp(vec3 pos, float r, float innerR, float thickness) {
+    // No warp without spin
+    if (abs(uSpin) < 0.01) return 0.0;
+
+    // Compute azimuthal angle using atan2 equivalent
+    float angle = atan(pos.z, pos.x);
+
+    // Warp strength profile: strongest near inner edge, decays outward
+    // Based on Bardeen-Petterson radius ~ r_BP ∝ (α * H/R)^(2/3) * r_g
+    // Simplified: warp decays as 1/r² from inner edge
+    float rRatio = r / max(innerR, 0.001);
+    float warpDecay = 1.0 / (1.0 + (rRatio - 1.0) * (rRatio - 1.0));
+
+    // Smooth transition: no warp very close to ISCO, peaks slightly outside, then decays
+    float transitionIn = smoothstep(1.0, WARP_TRANSITION_START, rRatio);
+    float transitionOut = 1.0 - smoothstep(WARP_TRANSITION_START, WARP_TRANSITION_END, rRatio);
+    float warpStrength = transitionIn * transitionOut * warpDecay;
+
+    // === Primary warp: Bardeen-Petterson tilt ===
+    // The disk tilts like a warped vinyl record
+    // Tilt axis is perpendicular to spin axis (Y), so warp varies with angle
+    // Maximum displacement when looking along X axis (angle = 0 or PI)
+    float tiltWarp = cos(angle) * warpStrength;
+
+    // === Secondary warp: Frame-drag induced twist ===
+    // Frame dragging adds a twist component that varies as sin(2*angle)
+    // This creates a saddle-like deformation
+    float twistWarp = sin(2.0 * angle) * warpStrength * 0.3;
+
+    // === Tertiary: Precession ripple ===
+    // Lense-Thirring precession causes the warp to have higher-frequency ripples
+    // This adds visual complexity and realism
+    float precessionPhase = angle + uDiskRotationAngle * 0.5; // Slow precession
+    float precessionRipple = sin(3.0 * precessionPhase) * warpStrength * 0.15;
+
+    // Combine all warp components
+    float totalWarp = tiltWarp + twistWarp + precessionRipple;
+
+    // Scale by spin magnitude and disk thickness
+    // Higher spin = more pronounced warp
+    // Warp amplitude scales with local thickness for visual consistency
+    float warpAmplitude = abs(uSpin) * thickness * WARP_MAX_AMPLITUDE;
+
+    return totalWarp * warpAmplitude;
+}
+
 // PERF (OPT-BH-25): snoise() is now defined in manifold.glsl.ts (compiled earlier)
 // This avoids duplicate definitions and ensures all modules use the same fast texture-based noise
 
@@ -163,8 +231,6 @@ float flowNoise(vec3 p, float time) {
  * @returns Density value (0.0 to ~1.0+)
  */
 float getDiskDensity(vec3 pos, float time, float r) {
-    float h = abs(pos.y);
-
     // PERF (OPT-BH-6): Use pre-computed disk radii uniforms
     float innerR = uDiskInnerR;
     float outerR = uDiskOuterR;
@@ -178,6 +244,13 @@ float getDiskDensity(vec3 pos, float time, float r) {
     float rNorm = r / outerR;
     float flare = 1.0 + (rNorm * rNorm * sqrt(rNorm)) * DISK_FLARE_SCALE;
     float thickness = uManifoldThickness * uHorizonRadius * 0.5 * flare;
+
+    // === Kerr disk warp (Bardeen-Petterson effect) ===
+    // Calculate warped midplane offset based on spin
+    float warpOffset = getDiskWarp(pos, r, innerR, thickness);
+
+    // Height relative to warped midplane (not flat y=0 plane)
+    float h = abs(pos.y - warpOffset);
 
     // Very sharp vertical falloff for "thin disk" look at center
     // PERF: Pre-multiply h*h and thick*thick
@@ -409,6 +482,7 @@ vec3 getDiskEmission(vec3 pos, float density, float time, vec3 rayDir, vec3 norm
  * For a thin accretion disk in the XZ plane:
  * - The Y (vertical) gradient dominates and is predictable (Gaussian falloff)
  * - The radial gradient follows the density profile with disk flare
+ * - For spinning black holes, the warp gradient tilts the normal
  *
  * Visual difference between analytical and numerical normals is negligible
  * at 60fps, but analytical is ~10x faster.
@@ -419,13 +493,39 @@ vec3 computeVolumetricDiskNormal(vec3 pos, vec3 rayDir) {
     // - Radial component: slight outward tilt at edges (disk flare)
     float r = length(pos.xz);
     // PERF (OPT-BH-6): Use pre-computed uDiskOuterR uniform
+    float innerR = uDiskInnerR;
     float outerR = uDiskOuterR;
 
     // Radial direction in XZ plane (outward from center)
     vec3 radialDir = r > 0.001 ? vec3(pos.x / r, 0.0, pos.z / r) : vec3(1.0, 0.0, 0.0);
 
-    // Vertical component: dominant, points away from disk plane
-    float ySign = pos.y > 0.0 ? 1.0 : -1.0;
+    // Calculate thickness for warp computation
+    float rNorm = r / outerR;
+    float flare = 1.0 + (rNorm * rNorm * sqrt(max(rNorm, 0.0))) * DISK_FLARE_SCALE;
+    float thickness = uManifoldThickness * uHorizonRadius * 0.5 * flare;
+
+    // === Warp gradient for Kerr black holes ===
+    // Compute numerical gradient of warp to tilt the normal
+    vec3 warpGradient = vec3(0.0);
+    if (abs(uSpin) > 0.01) {
+        float eps = 0.05 * uHorizonRadius;
+        vec3 px = pos + vec3(eps, 0.0, 0.0);
+        vec3 pz = pos + vec3(0.0, 0.0, eps);
+        float rx = length(px.xz);
+        float rz = length(pz.xz);
+
+        float warpCenter = getDiskWarp(pos, r, innerR, thickness);
+        float warpX = getDiskWarp(px, rx, innerR, thickness);
+        float warpZ = getDiskWarp(pz, rz, innerR, thickness);
+
+        // Gradient: how much warp changes in X and Z directions
+        warpGradient.x = (warpX - warpCenter) / eps;
+        warpGradient.z = (warpZ - warpCenter) / eps;
+    }
+
+    // Vertical component: dominant, points away from warped disk plane
+    float warpOffset = getDiskWarp(pos, r, innerR, thickness);
+    float ySign = (pos.y - warpOffset) > 0.0 ? 1.0 : -1.0;
 
     // Slight radial tilt at outer edge (disk flare)
     // Enhanced tilt for better visual depth cues
@@ -433,13 +533,15 @@ vec3 computeVolumetricDiskNormal(vec3 pos, vec3 rayDir) {
 
     // Density-based tilt: tilts more in low-density regions for visual interest
     // This approximates what numerical gradient would compute
-    float verticalPos = abs(pos.y) / (uManifoldThickness * uHorizonRadius * 0.5 + 0.001);
+    float verticalPos = abs(pos.y - warpOffset) / (thickness + 0.001);
     float edgeTilt = smoothstep(0.5, 1.5, verticalPos) * 0.2;
 
+    // Combine flare tilt, edge tilt, and warp gradient
+    // For surface y = warpOffset(x,z), normal is (-dw/dx, 1, -dw/dz) normalized
     vec3 normal = normalize(vec3(
-        radialDir.x * (flareTilt + edgeTilt),
+        radialDir.x * (flareTilt + edgeTilt) - warpGradient.x,
         ySign * (1.0 - edgeTilt * 0.5),
-        radialDir.z * (flareTilt + edgeTilt)
+        radialDir.z * (flareTilt + edgeTilt) - warpGradient.z
     ));
 
     // Ensure normal faces the viewer
