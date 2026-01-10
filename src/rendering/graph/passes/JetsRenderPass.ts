@@ -126,7 +126,7 @@ export class JetsRenderPass extends BasePass {
     //   - Translate so tip is at origin
 
     // TOP JET geometry: flip and position tip at origin
-    const topConeGeometry = new THREE.ConeGeometry(1, 1, 64, 8, true)
+    const topConeGeometry = new THREE.ConeGeometry(1, 1, 64, 128, true)
     topConeGeometry.rotateX(Math.PI) // Flip: tip now at y=-0.5, base at y=+0.5
     topConeGeometry.translate(0, 0.5, 0) // Move tip to origin, base at y=+1
 
@@ -136,7 +136,7 @@ export class JetsRenderPass extends BasePass {
     ;(this.topJetMesh.material as THREE.ShaderMaterial).uniforms['uJetSign']!.value = 1.0
 
     // BOTTOM JET geometry: keep orientation, position tip at origin
-    const bottomConeGeometry = new THREE.ConeGeometry(1, 1, 64, 8, true)
+    const bottomConeGeometry = new THREE.ConeGeometry(1, 1, 64, 128, true)
     bottomConeGeometry.translate(0, -0.5, 0) // Move tip to origin, base at y=-1
 
     this.bottomJetMesh = new THREE.Mesh(bottomConeGeometry, this.jetMaterial.clone())
