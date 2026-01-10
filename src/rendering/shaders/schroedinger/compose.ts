@@ -241,7 +241,7 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     { name: 'Precision', content: precisionBlock },
     {
       name: 'Vertex Inputs',
-      content: `\n// Inputs from vertex shader\nin vec3 vPosition;\nin vec2 vUv;\n`,
+      content: `\n// Inputs from vertex shader\nin vec3 vPosition;\n`,
     },
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },

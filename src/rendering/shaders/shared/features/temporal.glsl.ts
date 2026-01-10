@@ -24,9 +24,8 @@ float getTemporalDepth(vec3 ro, vec3 rd, vec3 worldRayDir) {
     }
 
     // CRITICAL: Use screen coordinates for sampling the previous frame's MRT
-    // vUv is the mesh texture coordinate (per-face UV on the box geometry)
-    // but uPrevPositionTexture is a screen-space render target
-    // Must use gl_FragCoord to get actual screen position
+    // uPrevPositionTexture is a screen-space render target, so we must use
+    // gl_FragCoord to get actual screen position (not mesh texture coordinates)
     // Use uDepthBufferResolution (temporal buffer size) not uResolution (may differ)
     vec2 screenUV = gl_FragCoord.xy / uDepthBufferResolution;
 

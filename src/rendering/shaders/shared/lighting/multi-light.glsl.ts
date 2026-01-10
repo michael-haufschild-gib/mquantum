@@ -4,6 +4,9 @@ export const multiLightBlock = `
 // OPT-LIGHT-2: Use inversesqrt for combined length/normalize
 // ============================================
 
+// Length squared threshold: EPS_POSITION^2 for consistency
+const float LEN_SQ_THRESHOLD = EPS_POSITION * EPS_POSITION;
+
 /**
  * OPT-LIGHT-2: Fast normalize using inversesqrt
  * Avoids separate length() and divide operations.
@@ -11,8 +14,8 @@ export const multiLightBlock = `
  */
 vec3 fastNormalize(vec3 v) {
     float lenSq = dot(v, v);
-    // Guard against zero-length vector
-    if (lenSq < 0.00000001) return vec3(0.0, 1.0, 0.0);
+    // Guard against zero-length vector using standardized threshold
+    if (lenSq < LEN_SQ_THRESHOLD) return vec3(0.0, 1.0, 0.0);
     return v * inversesqrt(lenSq);
 }
 
@@ -23,8 +26,8 @@ vec3 fastNormalize(vec3 v) {
  */
 vec3 fastNormalizeWithLength(vec3 v, out float len) {
     float lenSq = dot(v, v);
-    // Guard against zero-length vector
-    if (lenSq < 0.00000001) {
+    // Guard against zero-length vector using standardized threshold
+    if (lenSq < LEN_SQ_THRESHOLD) {
         len = 0.0;
         return vec3(0.0, 1.0, 0.0);
     }
@@ -36,23 +39,26 @@ vec3 fastNormalizeWithLength(vec3 v, out float len) {
 /**
  * Calculate light direction for a given light index.
  * Returns normalized direction FROM fragment TO light source.
+ * Note: Uses single-return pattern to avoid HLSL compiler warnings
+ * about potentially uninitialized return values (X4000).
  */
 vec3 getLightDirection(int lightIndex, vec3 fragPos) {
+    // Initialize result with default value to satisfy HLSL static analysis
+    vec3 result = vec3(0.0, 1.0, 0.0);
     int lightType = uLightTypes[lightIndex];
 
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
-        vec3 diff = uLightPositions[lightIndex] - fragPos;
         // OPT-LIGHT-2: Use fast normalize
-        return fastNormalize(diff);
+        result = fastNormalize(uLightPositions[lightIndex] - fragPos);
     }
     else if (lightType == LIGHT_TYPE_DIRECTIONAL) {
         // Directional lights: stored direction points Light -> Surface
         // We need L vector: Surface -> Light, so we negate it
         // OPT-LIGHT-2: Use fast normalize
-        return fastNormalize(-uLightDirections[lightIndex]);
+        result = fastNormalize(-uLightDirections[lightIndex]);
     }
 
-    return vec3(0.0, 1.0, 0.0);
+    return result;
 }
 
 /**
@@ -81,8 +87,8 @@ float getDistanceAttenuation(int lightIndex, float distance) {
         return 1.0;
     }
 
-    // Clamp distance to prevent division by zero
-    float d = max(distance, 0.0001);
+    // Clamp distance to prevent division by zero (standardized epsilon)
+    float d = max(distance, EPS_DIVISION);
 
     // Three.js attenuation formula
     float rangeAttenuation = clamp(1.0 - d / range, 0.0, 1.0);

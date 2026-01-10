@@ -11,7 +11,14 @@ export const constantsBlock = `
 #define SURF_DIST_LQ 0.002
 
 #define BOUND_R 2.0
-#define EPS 1e-6
+
+// Standardized epsilon values for numerical stability
+// Use the appropriate epsilon for each context:
+#define EPS 1e-6                    // General floating point comparison
+#define EPS_POSITION 1e-6           // Position/direction normalization guards
+#define EPS_DIVISION 0.0001         // Division-by-zero guards
+#define EPS_UV 0.001                // UV coordinate/radius guards
+#define EPS_WEIGHT 0.001            // Blend weight/density guards
 
 #define PI 3.14159265359
 #define HALF_PI 1.57079632679

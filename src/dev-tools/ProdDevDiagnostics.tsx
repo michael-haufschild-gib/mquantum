@@ -110,7 +110,6 @@ export function ProdDevDiagnostics() {
   useEffect(() => {
     const logDiagnostics = () => {
       const context = gl.getContext() as WebGL2RenderingContext;
-      const debugInfo = context.getExtension('WEBGL_debug_renderer_info');
 
       const canvas = gl.domElement;
       const dpr = viewport.dpr;
@@ -146,17 +145,17 @@ export function ProdDevDiagnostics() {
       const extensions = context.getSupportedExtensions();
       const extensionCount = extensions?.length ?? 0;
 
+      // Use standard WebGL2 RENDERER/VENDOR parameters (Firefox deprecated WEBGL_debug_renderer_info)
+      const renderer = context.getParameter(context.RENDERER) || 'unknown';
+      const vendor = context.getParameter(context.VENDOR) || 'unknown';
+
       const data: DiagnosticData = {
         mode: import.meta.env.MODE,
         userAgent: navigator.userAgent.slice(0, 100),
 
         contextAttributes: context.getContextAttributes(),
-        renderer: debugInfo
-          ? context.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
-          : 'unknown',
-        vendor: debugInfo
-          ? context.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
-          : 'unknown',
+        renderer,
+        vendor,
         maxTextureSize: context.getParameter(context.MAX_TEXTURE_SIZE),
         maxViewportDims: context.getParameter(context.MAX_VIEWPORT_DIMS),
 

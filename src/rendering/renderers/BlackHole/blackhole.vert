@@ -6,11 +6,8 @@
  */
 
 out vec3 vPosition;
-out vec2 vUv;
 
 void main() {
-  vUv = uv;
-
   // Transform to world space for ray direction calculation
   vec4 worldPosition = modelMatrix * vec4(position, 1.0);
   vPosition = worldPosition.xyz;

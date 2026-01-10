@@ -38,6 +38,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
   const [isOpen, setIsOpen] = useState(false);
   const [initialColor, setInitialColor] = useState(value); // For comparison
 
+  // Track last emitted value to prevent destructive round-trip updates
+  // When we emit a color via onChange, the parent may echo it back as a prop change.
+  // Without this ref, the useEffect would re-parse the hex and lose hue information
+  // for achromatic colors (where saturation=0 or value=0).
+  const lastEmittedRef = useRef<string>('');
+
   // Local inputs
   const [hexInput, setHexInput] = useState(value);
   const [rgbInput, setRgbInput] = useState({ r: 0, g: 0, b: 0, a: 1 });
@@ -72,8 +78,20 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
 
   // Sync Prop -> State
   useEffect(() => {
+    // Skip if this value is just an echo of what we emitted.
+    // This prevents destructive round-trip: when we emit a color via onChange,
+    // the parent echoes it back as a prop change. Re-parsing would lose hue
+    // for achromatic colors (saturation=0 or value=0).
+    if (value === lastEmittedRef.current) {
+      // Still need to handle alpha prop changes even on echoed values
+      if (alpha !== undefined && alpha !== hsv.a) {
+        setHsv(prev => ({ ...prev, a: disableAlpha ? 1 : alpha }));
+      }
+      return;
+    }
+
     const newHsv = parseColorToHsv(value);
-    
+
     // Override alpha if prop provided or disabled
     if (disableAlpha) {
       newHsv.a = 1;
@@ -81,15 +99,11 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
       newHsv.a = alpha;
     }
 
-    // Update if color changed OR alpha prop changed substantially
-    // Note: Comparing `value` prop to current state is tricky with alpha separation.
-    // We trust the props.
-    
     setHsv(newHsv);
-    setHexInput(newHsv.a === 1 ? hsvToHex(newHsv.h, newHsv.s, newHsv.v) : hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a)); 
+    setHexInput(newHsv.a === 1 ? hsvToHex(newHsv.h, newHsv.s, newHsv.v) : hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a));
     setRgbInput(hsvToRgb(newHsv.h, newHsv.s, newHsv.v, newHsv.a));
-    
-  }, [value, alpha, disableAlpha]);
+
+  }, [value, alpha, disableAlpha, hsv.a]);
 
   // On Open -> Capture Initial
   const handleOpenChange = (open: boolean) => {
@@ -104,16 +118,14 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
   // --- Internal Updates ---
   const updateExternal = useCallback((newHsv: HSVA) => {
     let output: string;
-    
+
     // Enforce disableAlpha
     if (disableAlpha) newHsv.a = 1;
 
     // Handle Alpha Output
     if (onChangeAlpha) {
       onChangeAlpha(newHsv.a);
-      // If we handle alpha separately, the main `onChange` usually expects purely the color part?
-      // Or should it receive Hex8 if alpha < 1?
-      // Convention: if onChangeAlpha is present, assume parent handles them separately (like FacesSection)
+      // Convention: if onChangeAlpha is present, assume parent handles them separately
       // So we output Hex6 to onChange to keep Three.js happy.
       output = hsvToHex(newHsv.h, newHsv.s, newHsv.v);
     } else {
@@ -124,7 +136,9 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(({
         output = hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a);
       }
     }
-    
+
+    // Track what we emit so the sync useEffect can skip echoed values
+    lastEmittedRef.current = output;
     onChange(output);
     return output;
   }, [onChange, onChangeAlpha, disableAlpha]);

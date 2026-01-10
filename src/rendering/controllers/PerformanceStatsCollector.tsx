@@ -68,10 +68,11 @@ export function PerformanceStatsCollector() {
 
   // Initialization: Hardware Detection (always runs once)
   useEffect(() => {
-    // Attempt to get GPU renderer name
-    const debugInfo = gl.getContext().getExtension('WEBGL_debug_renderer_info');
-    if (debugInfo) {
-      const renderer = gl.getContext().getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+    // Get GPU renderer name using standard WebGL2 RENDERER parameter
+    // (WEBGL_debug_renderer_info is deprecated in Firefox)
+    const context = gl.getContext();
+    const renderer = context.getParameter(context.RENDERER) as string;
+    if (renderer) {
       // Clean up strings like "ANGLE (Apple, Apple M1 Pro, OpenGL 4.1)"
       const cleanName = renderer.replace(/angle\s*\((.+)\)/i, '$1').split(',')[1]?.trim() || renderer;
       setGpuName(cleanName);

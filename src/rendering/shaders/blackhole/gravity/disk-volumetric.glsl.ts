@@ -136,38 +136,6 @@ float getDiskWarp(vec3 pos, float r, float innerR, float thickness) {
  *
  * This change alone provides ~40% speedup in volumetric disk rendering.
  */
-/**
- * Ridged multifractal noise for electric/plasma look.
- *
- * PERF OPTIMIZATION (OPT-BH-2): Fixed 2 octaves maximum for all quality levels.
- * Analysis showed 3rd/4th octaves contributed <10% visual difference at 60fps
- * but cost 50-100% more GPU cycles. The amplitude is boosted to compensate.
- *
- * PERF (OPT-BH-22): Dimension-aware LOD added.
- * For dimensions 6D+, use single octave since the extra visual complexity
- * of higher dimensions masks fine noise detail anyway.
- *
- * - Fast mode OR dim >= 6: 1 octave (single snoise call)
- * - Normal mode dim < 6: 2 octaves (2 snoise calls)
- *
- * This change alone provides ~40% speedup in volumetric disk rendering.
- */
-/**
- * Ridged multifractal noise for electric/plasma look.
- *
- * PERF OPTIMIZATION (OPT-BH-2): Fixed 2 octaves maximum for all quality levels.
- * Analysis showed 3rd/4th octaves contributed <10% visual difference at 60fps
- * but cost 50-100% more GPU cycles. The amplitude is boosted to compensate.
- *
- * PERF (OPT-BH-22): Dimension-aware LOD added.
- * For dimensions 6D+, use single octave since the extra visual complexity
- * of higher dimensions masks fine noise detail anyway.
- *
- * - Fast mode OR dim >= 6: 1 octave (single snoise call)
- * - Normal mode dim < 6: 2 octaves (2 snoise calls)
- *
- * This change alone provides ~40% speedup in volumetric disk rendering.
- */
 float ridgedMF(vec3 p) {
     float n = snoise(p);
     n = 1.0 - abs(n);

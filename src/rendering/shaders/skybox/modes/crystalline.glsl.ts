@@ -1,6 +1,5 @@
 export const crystallineBlock = `
-// Voronoi distance function for Crystalline mode
-// Uses 3D input for seamless spherical mapping (no seams)
+// Standard 3D Voronoi with 3x3x3 neighborhood for seamless cell boundaries
 vec2 voronoi(vec3 x) {
     vec3 p = floor(x);
     vec3 f = fract(x);
@@ -8,6 +7,7 @@ vec2 voronoi(vec3 x) {
     float minDist = 1.0;
     float secondDist = 1.0;
 
+    // Full 3x3x3 neighborhood required for seamless cell boundaries
     for (int k = -1; k <= 1; k++) {
         for (int j = -1; j <= 1; j++) {
             for (int i = -1; i <= 1; i++) {

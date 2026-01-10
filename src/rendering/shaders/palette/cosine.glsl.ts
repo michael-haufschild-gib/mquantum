@@ -48,11 +48,31 @@ float applyDistribution(float t, float power, float cycles, float offset) {
   // Clamp t to valid range first
   float clamped = clamp(t, 0.0, 1.0);
 
-  // Apply power curve for contrast control
-  // Guard pow() - ensure base > 0 when power could be negative
-  float safePower = max(power, 0.001);
-  float safeBase = max(clamped, 0.0001);
-  float curved = pow(safeBase, safePower);
+  // PERF: Fast paths for common power values
+  // pow() is expensive (~40 cycles), but sqrt/multiplication are cheap (~4 cycles)
+  float curved;
+  if (abs(power - 1.0) < 0.01) {
+    // Power ~= 1.0: identity
+    curved = clamped;
+  } else if (abs(power - 0.5) < 0.01) {
+    // Power ~= 0.5: square root
+    curved = sqrt(max(clamped, 0.0));
+  } else if (abs(power - 2.0) < 0.01) {
+    // Power ~= 2.0: square
+    curved = clamped * clamped;
+  } else if (abs(power - 0.75) < 0.01) {
+    // Power ~= 0.75: x^(3/4) = sqrt(x * sqrt(x))
+    float sqrtX = sqrt(max(clamped, 0.0));
+    curved = sqrt(clamped * sqrtX);
+  } else if (abs(power - 1.5) < 0.01) {
+    // Power ~= 1.5: x * sqrt(x)
+    curved = clamped * sqrt(max(clamped, 0.0));
+  } else {
+    // General case: use pow()
+    float safePower = max(power, 0.001);
+    float safeBase = max(clamped, 0.0001);
+    curved = pow(safeBase, safePower);
+  }
 
   // Apply cycles and offset, wrap to [0, 1]
   float cycled = fract(curved * cycles + offset);

@@ -15,6 +15,12 @@ export const dopplerBlock = /* glsl */ `
 const float DOPPLER_EPSILON = 0.0001;     // Prevents division by zero
 const float DOPPLER_MIN_RADIUS = 0.001;   // Minimum radius for calculations
 
+// Doppler color shift constants
+const vec3 BLUE_SHIFT_TARGET = vec3(0.6, 0.8, 1.0);   // Blue-white for approaching
+const vec3 RED_SHIFT_TARGET = vec3(1.0, 0.4, 0.1);    // Deep red-orange for receding
+const float DOPPLER_SHIFT_THRESHOLD = 0.01;            // Skip negligible shifts
+const float DOPPLER_SAT_BOOST_MAX = 1.5;               // Maximum saturation boost
+
 /**
  * Calculate orbital velocity direction at a position in the disk.
  * Assumes Keplerian rotation in the XZ plane (horizontal disk like Saturn's rings).
@@ -185,7 +191,7 @@ vec3 applyDopplerShift(vec3 color, float dopplerFac) {
   float shiftAmount = (dopplerFac - 1.0) * uDopplerStrength;
 
   // Skip negligible shifts
-  if (abs(shiftAmount) < 0.01) return color;
+  if (abs(shiftAmount) < DOPPLER_SHIFT_THRESHOLD) return color;
 
   // For blue shift (approaching): mix toward blue-weighted color
   // For red shift (receding): mix toward red-weighted color
@@ -196,7 +202,6 @@ vec3 applyDopplerShift(vec3 color, float dopplerFac) {
     // For warm colors, this should produce a bluish-white appearance
     // More aggressive shift: reduce red significantly, add blue
     float t = min(shiftAmount, 1.0);
-    vec3 blueTarget = vec3(0.6, 0.8, 1.0); // Blue-white target for strong shift
     vec3 blueShifted = vec3(
       color.r * (1.0 - t * 0.5),           // Reduce red more aggressively
       color.g * (1.0 - t * 0.2),           // Slightly reduce green
@@ -204,23 +209,22 @@ vec3 applyDopplerShift(vec3 color, float dopplerFac) {
     );
     // Blend toward blue-white for strong shifts
     color = mix(color, blueShifted, t);
-    color = mix(color, blueTarget * dot(color, vec3(0.299, 0.587, 0.114)) * 2.0, t * 0.3);
+    color = mix(color, BLUE_SHIFT_TARGET * dot(color, vec3(0.299, 0.587, 0.114)) * 2.0, t * 0.3);
   } else {
     // Red shift (receding): shift spectrum toward longer wavelengths
     float t = min(-shiftAmount, 1.0);
-    vec3 redTarget = vec3(1.0, 0.4, 0.1); // Deep red-orange target
     vec3 redShifted = vec3(
       max(color.r, 0.3) + t * 0.4,         // Boost red significantly
       color.g * (1.0 - t * 0.3),           // Reduce green
       color.b * (1.0 - t * 0.5)            // Reduce blue more aggressively
     );
     color = mix(color, redShifted, t);
-    color = mix(color, redTarget * dot(color, vec3(0.299, 0.587, 0.114)) * 2.0, t * 0.3);
+    color = mix(color, RED_SHIFT_TARGET * dot(color, vec3(0.299, 0.587, 0.114)) * 2.0, t * 0.3);
   }
 
   // Boost saturation slightly for stronger effect (similar to HSL version)
   float satBoost = 1.0 + abs(shiftAmount) * 0.3;
-  color = mix(luminance, color, min(satBoost, 1.5));
+  color = mix(luminance, color, min(satBoost, DOPPLER_SAT_BOOST_MAX));
 
   return max(color, vec3(0.0));
 }

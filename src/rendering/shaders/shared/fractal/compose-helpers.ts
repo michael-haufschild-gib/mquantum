@@ -146,7 +146,6 @@ export function assembleShaderBlocks(
 export const fractalVertexInputsBlock = `
 // Inputs from vertex shader
 in vec3 vPosition;
-in vec2 vUv;
 `;
 
 // ============================================

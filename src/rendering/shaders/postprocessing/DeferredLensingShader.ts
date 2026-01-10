@@ -72,16 +72,21 @@ vec2 computeDisplacement(vec2 uv, vec2 center, float strength, float falloff) {
 }
 
 /**
- * Sample with chromatic aberration
+ * Sample with chromatic aberration.
+ * PERF: Pre-computes UV offsets to avoid redundant multiplications.
  */
 vec3 sampleChromatic(vec2 uv, vec2 displacement, float chromatic) {
-  float rScale = 1.0 - chromatic * 0.015;
-  float gScale = 1.0;
-  float bScale = 1.0 + chromatic * 0.015;
+  // Chromatic separation constant
+  const float CHROMATIC_SCALE = 0.015;
 
-  float r = texture(uSceneTexture, uv + displacement * rScale).r;
-  float g = texture(uSceneTexture, uv + displacement * gScale).g;
-  float b = texture(uSceneTexture, uv + displacement * bScale).b;
+  // Pre-compute UV coordinates
+  vec2 baseUV = uv + displacement;
+  vec2 chromaticOffset = displacement * chromatic * CHROMATIC_SCALE;
+
+  // Sample with offset for each channel (R bends less, B bends more)
+  float r = texture(uSceneTexture, baseUV - chromaticOffset).r;
+  float g = texture(uSceneTexture, baseUV).g;
+  float b = texture(uSceneTexture, baseUV + chromaticOffset).b;
 
   return vec3(r, g, b);
 }

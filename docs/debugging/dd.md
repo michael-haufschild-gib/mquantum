@@ -189,3 +189,23 @@ Do a full in-depth code review of the new feature(s). Is the implementation 100%
 
 
   Note: "Double FPS" might require `uStepAdaptG` (gravity step adaptation) tuning alongside these code changes, as taking fewer steps is the only way to get massive gains beyond ALU optimization.
+
+
+https://mdimension.vercel.app/
+three-core-DO01uutK.js:1 THREE.WebGLProgram: Program Info Log: C:\fakepath(370,1): warning X4000: use of potentially uninitialized variable (f_getLightDirection_int)
+
+[GroupMarkerNotSet(crbug.com/242999)!:A8802F00F4510000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.Understand this warning
+(index):1 [GroupMarkerNotSet(crbug.com/242999)!:A8B02F00F4510000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.Understand this warning
+(index):1 [GroupMarkerNotSet(crbug.com/242999)!:A8103000F4510000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.Understand this warning
+index-CIm-FbnP.js:6137 GPUTimer: EXT_disjoint_timer_query_webgl2 not available
+(index):1 [.WebGL-0x555c02ceff00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixelsUnderstand this warning
+(index):1 [.WebGL-0x555c02ceff00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixelsUnderstand this warning
+2mdimension_core-DMVvC5hj.js:2 WASM Module Initialized (with panic hook)
+2geometry.worker-D4TyRIe2.js:2 WASM Module Initialized (with panic hook)
+(index):1 [.WebGL-0x555c02ceff00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixelsUnderstand this warning
+(index):1 [.WebGL-0x555c02ceff00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)
+
+
+GroupMarkerNotSet(crbug.com/242999)!:A8402003FC310000]Automatic fallback to software WebGL has been deprecated. Please use the --enable-unsafe-swiftshader (about:flags#enable-unsafe-swiftshader) flag to opt in to lower security guarantees for trusted content.Understand this warning
+71WebGL: INVALID_OPERATION: delete: object does not belong to this contextUnderstand this warning
+8WebGL: INVALID_OPERAT

@@ -38,9 +38,25 @@ float lensingMagnitude(float r, float strength, float falloff) {
   // Prevent division by zero at center
   float safeR = max(r, 0.001);
 
+  // PERF: Fast paths for common falloff exponents
+  // pow() is expensive (~40 cycles), use algebraic equivalents when possible
+  float rPowFalloff;
+  if (abs(falloff - 1.0) < 0.01) {
+    // falloff ~= 1.0: linear
+    rPowFalloff = safeR;
+  } else if (abs(falloff - 1.5) < 0.01) {
+    // falloff ~= 1.5: r * sqrt(r) - default lensing
+    rPowFalloff = safeR * sqrt(safeR);
+  } else if (abs(falloff - 2.0) < 0.01) {
+    // falloff ~= 2.0: r^2 (inverse square law)
+    rPowFalloff = safeR * safeR;
+  } else {
+    // General case
+    rPowFalloff = pow(safeR, falloff);
+  }
+
   // Gravitational lensing: deflection = strength / r^falloff
-  // Higher falloff = steeper curve (concentrated), lower = flatter (extended)
-  float deflection = strength / pow(safeR, falloff);
+  float deflection = strength / rPowFalloff;
 
   // Clamp to prevent extreme distortion
   return min(deflection, 0.5);
@@ -81,21 +97,32 @@ vec2 computeLensingDisplacement(vec2 uv, vec2 center, float strength, float fall
  * Apply chromatic aberration to lensing.
  * Simulates wavelength-dependent light bending.
  *
+ * PERF: For small chromatic amounts (<0.5), uses single sample.
+ * For larger amounts, samples R and B with offset from center G.
+ *
  * @param uv - Current UV coordinate
  * @param displacement - Base displacement vector
  * @param chromaticAmount - Strength of chromatic separation
  * @returns RGB color with chromatic separation
  */
 vec3 applyLensingChromatic(sampler2D sceneTexture, vec2 uv, vec2 displacement, float chromaticAmount) {
-  // Each color channel bends slightly differently
-  float rScale = 1.0 - chromaticAmount * 0.02;
-  float gScale = 1.0;
-  float bScale = 1.0 + chromaticAmount * 0.02;
+  // PERF: Early exit for negligible chromatic aberration (single sample)
+  if (chromaticAmount < 0.5) {
+    return texture(sceneTexture, uv + displacement).rgb;
+  }
+
+  // Chromatic separation constants
+  const float CHROMATIC_SCALE = 0.02;
+
+  // Pre-compute UV coordinates (avoid redundant multiplications)
+  vec2 baseUV = uv + displacement;
+  vec2 chromaticOffset = displacement * chromaticAmount * CHROMATIC_SCALE;
 
   // Sample with offset for each channel
-  float r = texture(sceneTexture, uv + displacement * rScale).r;
-  float g = texture(sceneTexture, uv + displacement * gScale).g;
-  float b = texture(sceneTexture, uv + displacement * bScale).b;
+  // R bends less, B bends more, G is the reference
+  float r = texture(sceneTexture, baseUV - chromaticOffset).r;
+  float g = texture(sceneTexture, baseUV).g;
+  float b = texture(sceneTexture, baseUV + chromaticOffset).b;
 
   return vec3(r, g, b);
 }
