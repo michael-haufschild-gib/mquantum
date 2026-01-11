@@ -41,10 +41,11 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
   esbuild: {
-    // Keep function/class names in both dev and prod
-    // This prevents potential V8 deoptimization from name mangling
-    // and ensures Three.js/R3F internal checks work correctly
-    keepNames: true,
+    // REMOVED: keepNames: true
+    // This was breaking Three.js KTX2Loader - esbuild's keepNames helper function `c()`
+    // is defined at module scope, but KTX2Loader extracts worker code via substring,
+    // missing the helper and causing "c is not defined" in production.
+    // See: docs/bugfixing/log/blobktx2.md
   },
   resolve: {
     alias: {
