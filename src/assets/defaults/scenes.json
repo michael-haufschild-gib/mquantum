@@ -7132,5 +7132,344 @@
         "target": [0, 0, 0]
       }
     }
+  },
+  {
+    "id": "91081403-5831-452a-9023-ef9f01d5e80b",
+    "name": "Mandelblob (High load)",
+    "timestamp": 1768133545673,
+    "data": {
+      "appearance": {
+        "edgeColor": "#1c020f",
+        "faceColor": "#33cc9e",
+        "backgroundColor": "#232323",
+        "perDimensionColorEnabled": false,
+        "colorAlgorithm": "radial",
+        "cosineCoefficients": {
+          "a": [1.04, 0.08, 0.23],
+          "b": [0.5, 0.08, 0],
+          "c": [0.93, 0.88, 1.76],
+          "d": [2, 0, 0]
+        },
+        "distribution": {
+          "power": 2.7,
+          "cycles": 5,
+          "offset": 0
+        },
+        "multiSourceWeights": {
+          "depth": 0.5,
+          "orbitTrap": 0.2,
+          "normal": 0
+        },
+        "lchLightness": 0.7,
+        "lchChroma": 0.15,
+        "edgeThickness": 1,
+        "faceOpacity": 1,
+        "tubeCaps": false,
+        "faceEmission": 0,
+        "faceEmissionThreshold": 0,
+        "faceEmissionColorShift": 0,
+        "faceEmissionPulsing": false,
+        "faceRimFalloff": 0,
+        "edgesVisible": true,
+        "facesVisible": true,
+        "shaderType": "surface",
+        "shaderSettings": {
+          "wireframe": {
+            "lineThickness": 1
+          },
+          "surface": {
+            "faceOpacity": 1,
+            "specularIntensity": 0.8,
+            "fresnelEnabled": true
+          }
+        },
+        "fresnelEnabled": false,
+        "fresnelIntensity": 1,
+        "sssEnabled": true,
+        "sssIntensity": 0.9,
+        "sssColor": "#35272a",
+        "sssThickness": 1.6,
+        "sssJitter": 0.45
+      },
+      "lighting": {
+        "lightEnabled": true,
+        "lightColor": "#FFFFFF",
+        "lightHorizontalAngle": 145,
+        "lightVerticalAngle": 30,
+        "ambientEnabled": true,
+        "ambientIntensity": 0.35,
+        "ambientColor": "#ffaff1",
+        "showLightIndicator": false,
+        "lightStrength": 1,
+        "toneMappingEnabled": true,
+        "toneMappingAlgorithm": "aces",
+        "exposure": 1.7,
+        "lights": [
+          {
+            "id": "light-default",
+            "name": "Main Light",
+            "type": "point",
+            "enabled": true,
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
+            "color": "#770e5c",
+            "intensity": 2.2,
+            "coneAngle": 30,
+            "penumbra": 0.5,
+            "range": 100,
+            "decay": 2
+          },
+          {
+            "id": "light-default-spot",
+            "name": "Spot Light",
+            "type": "spot",
+            "enabled": true,
+            "position": [-5, 5, 5],
+            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
+            "color": "#ed26ef",
+            "intensity": 1,
+            "coneAngle": 30,
+            "penumbra": 0.2,
+            "range": 100,
+            "decay": 2
+          }
+        ],
+        "selectedLightId": "__ambient__",
+        "transformMode": "translate",
+        "shadowEnabled": true,
+        "shadowQuality": "high",
+        "shadowSoftness": 0.6,
+        "shadowAnimationMode": "low",
+        "shadowMapBias": 0.001,
+        "shadowMapBlur": 2
+      },
+      "postProcessing": {
+        "bloomEnabled": true,
+        "bloomIntensity": 0.4,
+        "bloomThreshold": 0.1,
+        "bloomRadius": 0.15,
+        "bloomSmoothing": 0.16,
+        "bloomLevels": 5,
+        "bokehEnabled": false,
+        "bokehFocusMode": "auto-center",
+        "bokehBlurMethod": "hexagonal",
+        "bokehWorldFocusDistance": 15,
+        "bokehWorldFocusRange": 10,
+        "bokehScale": 0,
+        "bokehFocalLength": 0.1,
+        "bokehSmoothTime": 0.25,
+        "bokehShowDebug": false,
+        "ssrEnabled": false,
+        "ssrIntensity": 1,
+        "ssrMaxDistance": 30,
+        "ssrThickness": 0.5,
+        "ssrFadeStart": 0.7,
+        "ssrFadeEnd": 1,
+        "ssrQuality": "high",
+        "refractionEnabled": false,
+        "refractionIOR": 1.5,
+        "refractionStrength": 0,
+        "refractionChromaticAberration": 0,
+        "antiAliasingMethod": "none",
+        "cinematicEnabled": true,
+        "cinematicAberration": 0,
+        "cinematicVignette": 1.2,
+        "cinematicGrain": 0.041,
+        "objectOnlyDepth": true,
+        "ssaoEnabled": false,
+        "ssaoIntensity": 1.7,
+        "gravityEnabled": false,
+        "gravityStrength": 1,
+        "gravityDistortionScale": 1,
+        "gravityFalloff": 1.5,
+        "gravityChromaticAberration": 0,
+        "paperEnabled": false,
+        "paperContrast": 0.5,
+        "paperRoughness": 0.3,
+        "paperFiber": 0.4,
+        "paperFiberSize": 0.5,
+        "paperCrumples": 0.2,
+        "paperCrumpleSize": 0.5,
+        "paperFolds": 0.1,
+        "paperFoldCount": 5,
+        "paperDrops": 0,
+        "paperFade": 0,
+        "paperSeed": 42,
+        "paperColorFront": "#f5f5dc",
+        "paperColorBack": "#ffffff",
+        "paperQuality": "medium",
+        "paperIntensity": 1,
+        "frameBlendingEnabled": false,
+        "frameBlendingFactor": 0.3
+      },
+      "environment": {
+        "activeWalls": [],
+        "groundPlaneOffset": 10,
+        "groundPlaneColor": "#ead6e8",
+        "groundPlaneType": "plane",
+        "groundPlaneSizeScale": 10,
+        "showGroundGrid": true,
+        "groundGridColor": "#dbdcdb",
+        "groundGridSpacing": 5,
+        "iblQuality": "off",
+        "iblIntensity": 0.5,
+        "skyboxSelection": "none",
+        "skyboxEnabled": false,
+        "skyboxMode": "procedural_aurora",
+        "skyboxTexture": "space_blue",
+        "skyboxIntensity": 1,
+        "skyboxRotation": 0,
+        "skyboxAnimationMode": "heatwave",
+        "skyboxAnimationSpeed": 0.01,
+        "skyboxHighQuality": false,
+        "proceduralSettings": {
+          "scale": 1,
+          "complexity": 0.5,
+          "timeScale": 0.2,
+          "syncWithObject": true,
+          "cosineCoefficients": {
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
+          },
+          "distribution": {
+            "power": 1,
+            "cycles": 1,
+            "offset": 0
+          },
+          "hue": 0,
+          "saturation": 1,
+          "turbulence": 0.3,
+          "dualToneContrast": 0.5,
+          "sunIntensity": 0,
+          "sunPosition": [10, 10, 10],
+          "evolution": 0,
+          "aurora": {
+            "curtainHeight": 0.5,
+            "waveFrequency": 1
+          },
+          "horizonGradient": {
+            "gradientContrast": 0.5,
+            "spotlightFocus": 0.5
+          },
+          "ocean": {
+            "causticIntensity": 0.5,
+            "depthGradient": 0.5,
+            "bubbleDensity": 0.3,
+            "surfaceShimmer": 0.4
+          }
+        },
+        "backgroundColor": "#44152d",
+        "backgroundBlendMode": "normal"
+      },
+      "pbr": {
+        "face": {
+          "roughness": 0.2,
+          "metallic": 0.2,
+          "specularIntensity": 0.8,
+          "specularColor": "#ec21c5"
+        },
+        "edge": {
+          "roughness": 0.3,
+          "metallic": 0,
+          "specularIntensity": 0.5,
+          "specularColor": "#ffffff"
+        },
+        "ground": {
+          "roughness": 0.2,
+          "metallic": 0.6,
+          "specularIntensity": 0.8,
+          "specularColor": "#ffffff"
+        }
+      },
+      "geometry": {
+        "dimension": 5,
+        "objectType": "mandelbulb"
+      },
+      "extended": {
+        "mandelbulb": {
+          "scale": 1,
+          "maxIterations": 50,
+          "escapeRadius": 8,
+          "qualityPreset": "standard",
+          "resolution": 32,
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0, 0],
+          "center": [0, 0, 0, 0, 0],
+          "extent": 2,
+          "colorMode": "boundaryOnly",
+          "palette": "complement",
+          "customPalette": {
+            "start": "#0000ff",
+            "mid": "#ffffff",
+            "end": "#ff8000"
+          },
+          "invertColors": false,
+          "interiorColor": "#000000",
+          "paletteCycles": 1,
+          "renderStyle": "rayMarching",
+          "pointSize": 3,
+          "boundaryThreshold": [0.1, 0.9],
+          "mandelbulbPower": 8,
+          "epsilon": 1e-12,
+          "powerAnimationEnabled": false,
+          "powerMin": 5,
+          "powerMax": 12,
+          "powerSpeed": 0.02,
+          "alternatePowerEnabled": true,
+          "alternatePowerValue": 4,
+          "alternatePowerBlend": 0.5,
+          "sliceAnimationEnabled": false,
+          "sliceSpeed": 0.02,
+          "sliceAmplitude": 0.3,
+          "phaseShiftEnabled": false,
+          "phaseSpeed": 0.02,
+          "phaseAmplitude": 0.67,
+          "sdfMaxIterations": 31,
+          "sdfSurfaceDistance": 0.01,
+          "roughness": 0.3,
+          "sssEnabled": false,
+          "sssIntensity": 1,
+          "sssColor": "#ff8844",
+          "sssThickness": 1
+        }
+      },
+      "transform": {
+        "uniformScale": 1,
+        "perAxisScale": [1, 1, 1, 1, 1],
+        "scaleLocked": true,
+        "dimension": 5
+      },
+      "ui": {
+        "animationBias": 0.05
+      },
+      "rotation": {
+        "rotations": {
+          "XY": 51.85083464379176,
+          "XZ": 48.3285549009094,
+          "XW": 51.95679654630762,
+          "XV": 50.018040286720606,
+          "YZ": 49.079842797310114,
+          "YW": 52.31515609910291,
+          "YV": 48.550033284732834,
+          "ZW": 51.0495183233563,
+          "ZV": 51.301915973635175,
+          "WV": 48.45362596100573
+        },
+        "dimension": 5
+      },
+      "animation": {
+        "isPlaying": true,
+        "speed": 0.2,
+        "direction": 1,
+        "animatingPlanes": ["XY", "XZ", "XW", "XV", "YZ", "YW", "YV", "ZW", "ZV", "WV"],
+        "accumulatedTime": 378.3215004999728
+      },
+      "camera": {
+        "position": [1.7313933819434637, -0.09282997382238872, 1.916869800842743],
+        "target": [0, 0, 0]
+      }
+    }
   }
 ]
