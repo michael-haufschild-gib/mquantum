@@ -274,7 +274,7 @@ export function VideoExportController() {
 
               updateSceneState(state.frameDuration)
               const warmupTime = state.startTime + (state.warmupFrame * (state.frameDuration * 1000))
-              advance(warmupTime)
+              advance(warmupTime / 1000)
               state.warmupFrame++
 
               if (performance.now() - batchStartTime > MAX_BLOCKING_TIME) {
@@ -342,7 +342,7 @@ export function VideoExportController() {
 
               updateSceneState(state.frameDuration)
               const timestamp = state.startTime + (state.frameId * state.frameDuration * 1000)
-              advance(timestamp)
+              advance(timestamp / 1000)
 
               if (recorderRef.current) {
                   await recorderRef.current.captureFrame(state.frameId * state.frameDuration, state.frameDuration)
@@ -408,8 +408,9 @@ export function VideoExportController() {
               updateSceneState(state.frameDuration)
 
               // 2. Render
+              // R3F's advance() expects timestamp in SECONDS, not milliseconds
               const timestamp = state.startTime + (state.frameId * state.frameDuration * 1000)
-              advance(timestamp)
+              advance(timestamp / 1000)
 
               // 3. Capture
               // Video time relative to CURRENT SEGMENT for encoding
