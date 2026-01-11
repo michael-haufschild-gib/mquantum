@@ -86,7 +86,6 @@ export const TimelineControls: FC = () => {
       case 'mandelbulb':
         return [
           mandelbulbConfig.powerAnimationEnabled,
-          mandelbulbConfig.alternatePowerEnabled,
           mandelbulbConfig.sliceAnimationEnabled,
           mandelbulbConfig.phaseShiftEnabled,
         ].filter(Boolean).length;
@@ -112,7 +111,6 @@ export const TimelineControls: FC = () => {
   }, [
     objectType,
     mandelbulbConfig.powerAnimationEnabled,
-    mandelbulbConfig.alternatePowerEnabled,
     mandelbulbConfig.sliceAnimationEnabled,
     mandelbulbConfig.phaseShiftEnabled,
     schroedingerConfig.curlEnabled,

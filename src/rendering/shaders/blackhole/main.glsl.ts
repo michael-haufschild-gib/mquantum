@@ -474,6 +474,10 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
         #endif
 
         // === SUBSURFACE SCATTERING ===
+        // For volumetric rendering, use rim-based SSS formula instead of computeSSS.
+        // The standard computeSSS formula requires different lightDir and viewDir vectors,
+        // but for backlit volumetric disk, both would be -dir (same vector), making SSS always zero.
+        // Rim-based SSS creates visible edge glow from any viewing angle.
         #ifdef USE_SSS
         if (uSssEnabled && uSssIntensity > 0.0) {
             // Compute normal if not already done
@@ -481,12 +485,16 @@ RaymarchResult raymarchBlackHole(vec3 rayOrigin, vec3 rayDir, float time) {
                 stepNormal = computeVolumetricDiskNormal(pos, dir);
                 computedNormal = true;
             }
-            // For volumetric disk, use backlight direction (opposite to view)
-            // This creates the classic SSS "glow through" effect at disk edges
-            vec3 lightDir = -dir;
-            vec3 sss = computeSSS(lightDir, -dir, stepNormal, 0.5, uSssThickness * 4.0, 0.0, uSssJitter, gl_FragCoord.xy);
-            // For volumetric rendering, use flat contribution (not scaled by emission)
-            // since per-sample emission is already tiny from density scaling
+            // Rim-based SSS: glow at grazing angles where light "wraps around"
+            float NdotV = abs(dot(stepNormal, -dir));
+            float rimT = 1.0 - NdotV;
+            // Use thickness to control SSS spread (higher = tighter edge glow)
+            float sssPower = max(uSssThickness * 2.0 + 1.0, 1.0);
+            float sss = pow(rimT, sssPower);
+            // Apply jitter for softer, more natural look
+            float sssNoise = sssHash(gl_FragCoord.xy * 0.1) * 2.0 - 1.0;
+            sss *= 1.0 + sssNoise * uSssJitter * 0.5;
+            // Modulate by density for volumetric consistency
             float densityMod = smoothstep(0.0, 0.2, density);
             emission += sss * uSssColor * uSssIntensity * densityMod;
         }

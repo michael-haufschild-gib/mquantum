@@ -29,43 +29,76 @@ uniform int uIBLQuality; // 0 = off, 1 = low, 2 = high
  * PMREM CubeUV Sampling Functions
  * Adapted from Three.js cube_uv_reflection_fragment.glsl.js
  * These functions allow sampling a 2D PMREM texture as if it were a cubemap.
+ *
+ * SEAM FIX (2025-01): Updated to use dynamic texel calculations based on
+ * uEnvMapSize uniform instead of hardcoded 256. Added epsilon to face selection
+ * for edge case handling. Increased UV margin for better seamless sampling.
  */
 export const pmremSamplingBlock = `
 // ============================================
 // PMREM CubeUV Sampling (from Three.js)
+// Seamless edge handling version
 // ============================================
 
 #define cubeUV_minMipLevel 4.0
 #define cubeUV_minTileSize 16.0
 
-// CUBEUV_MAX_MIP and texel sizes are set based on PMREMGenerator output
-// Default PMREMGenerator creates 256x256 per face with 8 mip levels
-#define CUBEUV_MAX_MIP 8.0
-#define CUBEUV_TEXEL_WIDTH (1.0 / (3.0 * 256.0))
-#define CUBEUV_TEXEL_HEIGHT (1.0 / (4.0 * 256.0))
+// Small epsilon for face selection edge cases
+// Prevents discontinuities at exact cube edge boundaries
+#define FACE_SELECTION_EPSILON 1e-4
 
+// Compute max mip level from face size: log2(faceSize)
+// For 256: log2(256) = 8.0
+float getCubeUVMaxMip() {
+    return log2(uEnvMapSize);
+}
+
+// Compute texel dimensions dynamically from uEnvMapSize
+// PMREM layout: 3 faces wide, 4 face heights tall (includes mip chain)
+vec2 getCubeUVTexelSize() {
+    return vec2(
+        1.0 / (3.0 * uEnvMapSize),
+        1.0 / (4.0 * uEnvMapSize)
+    );
+}
+
+// Face selection with epsilon for edge case handling
+// Prevents seams at exact cube boundaries where floating-point precision
+// could cause adjacent pixels to select different faces
 float getFace(vec3 direction) {
     vec3 absDirection = abs(direction);
     float face = -1.0;
-    
-    if (absDirection.x > absDirection.z) {
-        if (absDirection.x > absDirection.y)
+
+    // Add small epsilon to prefer consistent face selection at edges
+    // This biases toward X > Z > Y ordering when values are nearly equal
+    float ax = absDirection.x;
+    float ay = absDirection.y;
+    float az = absDirection.z;
+
+    if (ax > az + FACE_SELECTION_EPSILON) {
+        if (ax > ay + FACE_SELECTION_EPSILON)
             face = direction.x > 0.0 ? 0.0 : 3.0;
         else
             face = direction.y > 0.0 ? 1.0 : 4.0;
-    } else {
-        if (absDirection.z > absDirection.y)
+    } else if (az > ax - FACE_SELECTION_EPSILON) {
+        if (az > ay + FACE_SELECTION_EPSILON)
             face = direction.z > 0.0 ? 2.0 : 5.0;
         else
             face = direction.y > 0.0 ? 1.0 : 4.0;
+    } else {
+        // Fallback for truly equal cases - prefer X axis
+        if (ax >= ay)
+            face = direction.x > 0.0 ? 0.0 : 3.0;
+        else
+            face = direction.y > 0.0 ? 1.0 : 4.0;
     }
-    
+
     return face;
 }
 
 vec2 getUV(vec3 direction, float face) {
     vec2 uv;
-    
+
     if (face == 0.0) {
         uv = vec2(direction.z, direction.y) / abs(direction.x);
     } else if (face == 1.0) {
@@ -79,30 +112,42 @@ vec2 getUV(vec3 direction, float face) {
     } else {
         uv = vec2(direction.x, direction.y) / abs(direction.z);
     }
-    
+
     return 0.5 * (uv + 1.0);
 }
 
 vec3 bilinearCubeUV(sampler2D envMap, vec3 direction, float mipInt) {
+    float cubeUV_maxMip = getCubeUVMaxMip();
+    vec2 texelSize = getCubeUVTexelSize();
+
     float face = getFace(direction);
     float filterInt = max(cubeUV_minMipLevel - mipInt, 0.0);
     mipInt = max(mipInt, cubeUV_minMipLevel);
-    
+
     float faceSize = exp2(mipInt);
-    vec2 uv = getUV(direction, face) * (faceSize - 2.0) + 1.0;
-    
+
+    // SEAM FIX: Increased UV margin from 1.0 to 1.5 pixels
+    // This prevents sampling across face boundaries when texture filtering
+    // is applied (especially with anisotropic filtering on Nvidia GPUs)
+    // The 0.5 extra margin accounts for bilinear/trilinear filter kernel size
+    float uvMargin = 1.5;
+    vec2 uv = getUV(direction, face) * (faceSize - 2.0 * uvMargin) + uvMargin;
+
     if (face > 2.0) {
         uv.y += faceSize;
         face -= 3.0;
     }
-    
+
     uv.x += face * faceSize;
     uv.x += filterInt * 3.0 * cubeUV_minTileSize;
-    uv.y += 4.0 * (exp2(CUBEUV_MAX_MIP) - faceSize);
-    
-    uv.x *= CUBEUV_TEXEL_WIDTH;
-    uv.y *= CUBEUV_TEXEL_HEIGHT;
-    
+    uv.y += 4.0 * (exp2(cubeUV_maxMip) - faceSize);
+
+    uv.x *= texelSize.x;
+    uv.y *= texelSize.y;
+
+    // Clamp UV to valid range to prevent any edge bleeding
+    uv = clamp(uv, vec2(0.001), vec2(0.999));
+
     return texture(envMap, uv).rgb;
 }
 
@@ -120,7 +165,7 @@ vec3 bilinearCubeUV(sampler2D envMap, vec3 direction, float mipInt) {
 
 float roughnessToMip(float roughness) {
     float mip = 0.0;
-    
+
     if (roughness >= cubeUV_r1) {
         mip = (cubeUV_r0 - roughness) * (cubeUV_m1 - cubeUV_m0) / (cubeUV_r0 - cubeUV_r1) + cubeUV_m0;
     } else if (roughness >= cubeUV_r4) {
@@ -132,17 +177,18 @@ float roughnessToMip(float roughness) {
     } else {
         mip = -2.0 * log2(1.16 * roughness);
     }
-    
+
     return mip;
 }
 
 vec4 textureCubeUV(sampler2D envMap, vec3 sampleDir, float roughness) {
-    float mip = clamp(roughnessToMip(roughness), cubeUV_m0, CUBEUV_MAX_MIP);
+    float cubeUV_maxMip = getCubeUVMaxMip();
+    float mip = clamp(roughnessToMip(roughness), cubeUV_m0, cubeUV_maxMip);
     float mipF = fract(mip);
     float mipInt = floor(mip);
-    
+
     vec3 color0 = bilinearCubeUV(envMap, sampleDir, mipInt);
-    
+
     if (mipF == 0.0) {
         return vec4(color0, 1.0);
     } else {

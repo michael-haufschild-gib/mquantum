@@ -369,6 +369,14 @@ export class CubemapCapturePass extends BasePass {
           // actually, let's use the same logic as before: create from the just-rendered cubemap.
           this.pmremRenderTarget = this.pmremGenerator.fromCubemap(writeTarget.texture)
 
+          // SEAM FIX: Disable anisotropic filtering on PMREM texture
+          // Per Three.js issue #17855, Nvidia GPUs with anisotropic filtering enabled
+          // in the driver control panel can cause seams at cubemap face boundaries.
+          // Explicitly setting anisotropy to 1 disables this filtering.
+          if (this.pmremRenderTarget.texture) {
+            this.pmremRenderTarget.texture.anisotropy = 1
+          }
+
           // Force sync after PMREM generation
           getGlobalMRTManager().forceSync()
         }

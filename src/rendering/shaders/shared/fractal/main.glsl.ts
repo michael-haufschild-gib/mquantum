@@ -87,7 +87,7 @@ void main() {
     float ao = 1.0;
     #ifdef USE_AO
     if (uAoEnabled) {
-        ao = uFastMode ? 1.0 : calcAO(p, n);
+        ao = uFastMode ? calcAOFast(p, n) : calcAO(p, n);
     }
     #endif
 
