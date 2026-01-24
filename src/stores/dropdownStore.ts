@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from 'zustand'
 
 // ============================================================================
 // Types
@@ -6,21 +6,21 @@ import { create } from 'zustand';
 
 interface DropdownState {
   /** ID of the currently open dropdown, or null if none open */
-  openDropdownId: string | null;
+  openDropdownId: string | null
 }
 
 interface DropdownActions {
   /** Open a dropdown by ID (closes any other open dropdown) */
-  openDropdown: (id: string) => void;
+  openDropdown: (id: string) => void
   /** Close a specific dropdown by ID */
-  closeDropdown: (id: string) => void;
+  closeDropdown: (id: string) => void
   /** Close all dropdowns */
-  closeAllDropdowns: () => void;
+  closeAllDropdowns: () => void
   /** Toggle a dropdown - opens if closed, closes if open */
-  toggleDropdown: (id: string) => void;
+  toggleDropdown: (id: string) => void
 }
 
-export type DropdownStore = DropdownState & DropdownActions;
+export type DropdownStore = DropdownState & DropdownActions
 
 // ============================================================================
 // Store
@@ -46,26 +46,26 @@ export const useDropdownStore = create<DropdownStore>((set, get) => ({
   openDropdownId: null,
 
   openDropdown: (id: string) => {
-    set({ openDropdownId: id });
+    set({ openDropdownId: id })
   },
 
   closeDropdown: (id: string) => {
-    const { openDropdownId } = get();
+    const { openDropdownId } = get()
     if (openDropdownId === id) {
-      set({ openDropdownId: null });
+      set({ openDropdownId: null })
     }
   },
 
   closeAllDropdowns: () => {
-    set({ openDropdownId: null });
+    set({ openDropdownId: null })
   },
 
   toggleDropdown: (id: string) => {
-    const { openDropdownId } = get();
+    const { openDropdownId } = get()
     if (openDropdownId === id) {
-      set({ openDropdownId: null });
+      set({ openDropdownId: null })
     } else {
-      set({ openDropdownId: id });
+      set({ openDropdownId: id })
     }
   },
-}));
+}))

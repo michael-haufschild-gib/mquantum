@@ -5,10 +5,7 @@
  * and TubeWireframe for N-D vertex transformation in shadow maps.
  */
 
-import {
-  useShadowPatching,
-  type UseShadowPatchingOptions,
-} from '@/rendering/renderers/base'
+import { useShadowPatching, type UseShadowPatchingOptions } from '@/rendering/renderers/base'
 import { describe, expect, it } from 'vitest'
 
 describe('useShadowPatching', () => {
@@ -79,18 +76,3 @@ describe('useShadowPatching', () => {
     })
   })
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

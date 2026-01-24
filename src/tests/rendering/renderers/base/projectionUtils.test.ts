@@ -47,9 +47,7 @@ describe('projectionUtils', () => {
       })
 
       it('should return DEFAULT_PROJECTION_DISTANCE when dimension <= 3', () => {
-        const vertices: VectorND[] = [
-          [1, 1, 1, 0.5],
-        ]
+        const vertices: VectorND[] = [[1, 1, 1, 0.5]]
         const result = calculateSafeProjectionDistance(vertices, 3)
         expect(result).toBe(DEFAULT_PROJECTION_DISTANCE)
       })
@@ -91,9 +89,7 @@ describe('projectionUtils', () => {
       })
 
       it('should handle 11D vertices (maximum supported)', () => {
-        const vertices: VectorND[] = [
-          [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ]
+        const vertices: VectorND[] = [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
         const result = calculateSafeProjectionDistance(vertices, 11)
         expect(result).toBeGreaterThanOrEqual(DEFAULT_PROJECTION_DISTANCE)
       })
@@ -167,18 +163,3 @@ describe('projectionUtils', () => {
     })
   })
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

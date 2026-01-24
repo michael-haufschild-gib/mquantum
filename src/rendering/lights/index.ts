@@ -14,7 +14,7 @@
  */
 
 // Type definitions
-export type { LightSource, LightType, TransformMode } from './types';
+export type { LightSource, LightType, TransformMode } from './types'
 
 // Constants
 export {
@@ -23,28 +23,19 @@ export {
   LIGHT_TYPE_TO_INT,
   DEFAULT_LIGHT_VALUES,
   DEFAULT_NEW_LIGHT_POSITIONS,
-} from './types';
+} from './types'
 
 // Factory functions
-export {
-  createDefaultLight,
-  createNewLight,
-  cloneLight,
-} from './types';
+export { createDefaultLight, createNewLight, cloneLight } from './types'
 
 // Utility functions
-export {
-  rotationToDirection,
-  clampIntensity,
-  clampConeAngle,
-  clampPenumbra,
-} from './types';
+export { rotationToDirection, clampIntensity, clampConeAngle, clampPenumbra } from './types'
 
 // Uniform types and helpers
-export type { LightUniforms } from './uniforms';
+export type { LightUniforms } from './uniforms'
 export {
   createLightUniforms,
   updateLightUniforms,
   mergeLightUniforms,
   getLightUniformDeclarations,
-} from './uniforms';
+} from './uniforms'

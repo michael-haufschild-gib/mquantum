@@ -49,12 +49,10 @@ export const WebGL2UnsupportedOverlay: React.FC = () => {
         </div>
 
         <div>
-          <h2 className="text-xl font-semibold text-text-primary mb-2">
-            WebGL2 Required
-          </h2>
+          <h2 className="text-xl font-semibold text-text-primary mb-2">WebGL2 Required</h2>
           <p className="text-sm text-text-secondary leading-relaxed">
-            This application requires WebGL2 for advanced 3D rendering, which is
-            not supported by your browser or has been disabled.
+            This application requires WebGL2 for advanced 3D rendering, which is not supported by
+            your browser or has been disabled.
           </p>
         </div>
 

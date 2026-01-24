@@ -49,13 +49,13 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     const position: [number, number, number] = [
       controls.object.position.x,
       controls.object.position.y,
-      controls.object.position.z
+      controls.object.position.z,
     ]
 
     const target: [number, number, number] = [
       controls.target.x,
       controls.target.y,
-      controls.target.z
+      controls.target.z,
     ]
 
     return { position, target }
@@ -85,5 +85,5 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     if (controls) {
       controls.reset()
     }
-  }
+  },
 }))

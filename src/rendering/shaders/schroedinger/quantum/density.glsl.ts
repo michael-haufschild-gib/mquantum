@@ -316,18 +316,18 @@ vec3 applyFlow(vec3 pos, float t) { return pos; }
  */
 export function generateMapPosToND(dimension: number): string {
   const dim = Math.min(Math.max(dimension, 3), 11)
-  
+
   // Generate unrolled coordinate assignments
   const assignments = []
   for (let j = 0; j < dim; j++) {
-    assignments.push(`    xND[${j}] = (uOrigin[${j}] + pos.x*uBasisX[${j}] + pos.y*uBasisY[${j}] + pos.z*uBasisZ[${j}]) * uFieldScale;`)
+    assignments.push(
+      `    xND[${j}] = (uOrigin[${j}] + pos.x*uBasisX[${j}] + pos.y*uBasisY[${j}] + pos.z*uBasisZ[${j}]) * uFieldScale;`
+    )
   }
-  
+
   // Zero out remaining dimensions if not at MAX_DIM
-  const zeroLoop = dim < 11 
-    ? `\n    for (int j = ${dim}; j < MAX_DIM; j++) xND[j] = 0.0;`
-    : ''
-  
+  const zeroLoop = dim < 11 ? `\n    for (int j = ${dim}; j < MAX_DIM; j++) xND[j] = 0.0;` : ''
+
   return `
 // ============================================
 // Dimension-Specific Coordinate Mapping (Unrolled)
@@ -606,7 +606,9 @@ float sampleDensityAtFlowedPosNoErosion(vec3 flowedPos, float t) {
  * Legacy combined block - kept for backwards compatibility
  * @deprecated Use densityPreMapBlock + generateMapPosToND(dim) + densityPostMapBlock instead
  */
-export const densityBlock = densityPreMapBlock + `
+export const densityBlock =
+  densityPreMapBlock +
+  `
 // Fallback: generic loop-based mapping
 void mapPosToND(vec3 pos, out float xND[MAX_DIM]) {
     for (int j = 0; j < MAX_DIM; j++) {
@@ -620,4 +622,5 @@ void mapPosToND(vec3 pos, out float xND[MAX_DIM]) {
         }
     }
 }
-` + densityPostMapBlock
+` +
+  densityPostMapBlock

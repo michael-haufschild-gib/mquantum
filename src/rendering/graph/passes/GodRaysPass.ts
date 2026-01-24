@@ -90,7 +90,7 @@ export class GodRaysPass extends BasePass {
       id: config.id,
       name: config.name ?? 'God Rays',
       inputs: [
-        { resourceId: config.sceneInput, access: 'read' },   // First for passthrough
+        { resourceId: config.sceneInput, access: 'read' }, // First for passthrough
         { resourceId: config.jetsInput, access: 'read' },
       ],
       outputs: [{ resourceId: config.outputResource, access: 'write' }],
@@ -111,11 +111,11 @@ export class GodRaysPass extends BasePass {
       uniforms: {
         tInput: { value: null },
         uLightPosition: { value: this.lightPosition },
-        uDensity: { value: 1.0 },      // Ray length (1.0 = sample to light source)
-        uWeight: { value: 1.0 },       // Initial sample weight
-        uDecay: { value: 0.96 },       // Exponential decay per sample
-        uExposure: { value: 0.3 },     // Low exposure to prevent blowout
-        uSamples: { value: 64 },       // Samples along ray
+        uDensity: { value: 1.0 }, // Ray length (1.0 = sample to light source)
+        uWeight: { value: 1.0 }, // Initial sample weight
+        uDecay: { value: 0.96 }, // Exponential decay per sample
+        uExposure: { value: 0.3 }, // Low exposure to prevent blowout
+        uSamples: { value: 64 }, // Samples along ray
       },
       vertexShader: godRaysVertexShader,
       fragmentShader: godRaysFragmentShader,
@@ -129,7 +129,7 @@ export class GodRaysPass extends BasePass {
       uniforms: {
         tScene: { value: null },
         tGodRays: { value: null },
-        uIntensity: { value: 1.0 },   // Moderate blend
+        uIntensity: { value: 1.0 }, // Moderate blend
       },
       vertexShader: godRaysCompositeVertexShader,
       fragmentShader: godRaysCompositeFragmentShader,
@@ -213,10 +213,7 @@ export class GodRaysPass extends BasePass {
       origin.project(camera)
 
       // Convert from NDC (-1 to 1) to UV (0 to 1)
-      this.lightPosition.set(
-        (origin.x + 1) * 0.5,
-        (origin.y + 1) * 0.5
-      )
+      this.lightPosition.set((origin.x + 1) * 0.5, (origin.y + 1) * 0.5)
     }
 
     // === Pass 1: Render god rays to intermediate target ===

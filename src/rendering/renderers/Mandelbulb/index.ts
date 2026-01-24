@@ -1,1 +1,1 @@
-export { default as MandelbulbMesh } from './MandelbulbMesh';
+export { default as MandelbulbMesh } from './MandelbulbMesh'

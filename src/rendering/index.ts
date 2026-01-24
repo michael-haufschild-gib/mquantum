@@ -61,22 +61,3 @@ export * from './materials'
 
 // Re-export shader utilities
 export * from './shaders'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

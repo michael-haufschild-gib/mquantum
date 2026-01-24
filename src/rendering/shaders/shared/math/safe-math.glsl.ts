@@ -295,19 +295,3 @@ float safeReciprocal(float x) {
   return 1.0 / (abs(x) < SAFE_EPSILON ? signX * SAFE_EPSILON : x);
 }
 `
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

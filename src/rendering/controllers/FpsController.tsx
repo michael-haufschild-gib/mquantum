@@ -80,7 +80,7 @@ export function FpsController(): null {
 
       // If idle (not playing and not interacting), cap at 10 FPS to save power
       // while still allowing UI updates to reflect reasonably fast.
-      const targetFps = (isPlaying || isInteracting) ? maxFps : 10
+      const targetFps = isPlaying || isInteracting ? maxFps : 10
       const interval = 1000 / targetFps
       const elapsed = now - thenRef.current
 

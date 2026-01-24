@@ -28,7 +28,7 @@ export function getScreenCoverage(camera: THREE.PerspectiveCamera, objectRadius?
   const cameraDistance = camera.position.length()
   if (cameraDistance < 0.01) return 1.0
 
-  const fovRad = camera.fov * Math.PI / 180
+  const fovRad = (camera.fov * Math.PI) / 180
   const halfFovTan = Math.tan(fovRad / 2)
   const radius = objectRadius ?? BOUND_R
   const projectedSize = radius / cameraDistance
@@ -49,7 +49,8 @@ export function applyScreenCoverageReduction(baseValue: number, screenCoverage: 
     return baseValue
   }
 
-  const coverageReduction = 1.0 - Math.min((screenCoverage - COVERAGE_THRESHOLD) * 0.8, MAX_REDUCTION)
+  const coverageReduction =
+    1.0 - Math.min((screenCoverage - COVERAGE_THRESHOLD) * 0.8, MAX_REDUCTION)
   return baseValue * coverageReduction
 }
 

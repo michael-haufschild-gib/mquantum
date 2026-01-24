@@ -36,4 +36,4 @@ float calcSoftShadowQuality(vec3 ro, vec3 rd, float mint, float maxt, float soft
     }
     return clamp(res, 0.0, 1.0);
 }
-`;
+`

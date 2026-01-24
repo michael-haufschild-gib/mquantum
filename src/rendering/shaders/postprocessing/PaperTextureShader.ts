@@ -9,7 +9,7 @@
  * @module rendering/shaders/postprocessing/PaperTextureShader
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 export const PaperTextureShader = {
   uniforms: {
@@ -438,27 +438,27 @@ export const PaperTextureShader = {
       fragColor = vec4(finalColor, inputColor.a);
     }
   `,
-};
+}
 
 export type PaperTextureUniforms = {
-  tDiffuse: THREE.Uniform<THREE.Texture | null>;
-  tNoiseTexture: THREE.Uniform<THREE.Texture | null>;
-  uTime: THREE.Uniform<number>;
-  uResolution: THREE.Uniform<THREE.Vector2>;
-  uPixelRatio: THREE.Uniform<number>;
-  uColorFront: THREE.Uniform<THREE.Vector4>;
-  uColorBack: THREE.Uniform<THREE.Vector4>;
-  uContrast: THREE.Uniform<number>;
-  uRoughness: THREE.Uniform<number>;
-  uFiber: THREE.Uniform<number>;
-  uFiberSize: THREE.Uniform<number>;
-  uCrumples: THREE.Uniform<number>;
-  uCrumpleSize: THREE.Uniform<number>;
-  uFolds: THREE.Uniform<number>;
-  uFoldCount: THREE.Uniform<number>;
-  uDrops: THREE.Uniform<number>;
-  uFade: THREE.Uniform<number>;
-  uSeed: THREE.Uniform<number>;
-  uQuality: THREE.Uniform<number>;
-  uIntensity: THREE.Uniform<number>;
-};
+  tDiffuse: THREE.Uniform<THREE.Texture | null>
+  tNoiseTexture: THREE.Uniform<THREE.Texture | null>
+  uTime: THREE.Uniform<number>
+  uResolution: THREE.Uniform<THREE.Vector2>
+  uPixelRatio: THREE.Uniform<number>
+  uColorFront: THREE.Uniform<THREE.Vector4>
+  uColorBack: THREE.Uniform<THREE.Vector4>
+  uContrast: THREE.Uniform<number>
+  uRoughness: THREE.Uniform<number>
+  uFiber: THREE.Uniform<number>
+  uFiberSize: THREE.Uniform<number>
+  uCrumples: THREE.Uniform<number>
+  uCrumpleSize: THREE.Uniform<number>
+  uFolds: THREE.Uniform<number>
+  uFoldCount: THREE.Uniform<number>
+  uDrops: THREE.Uniform<number>
+  uFade: THREE.Uniform<number>
+  uSeed: THREE.Uniform<number>
+  uQuality: THREE.Uniform<number>
+  uIntensity: THREE.Uniform<number>
+}

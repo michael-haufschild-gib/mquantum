@@ -464,14 +464,14 @@ function projectVertices4D(
     const x = v[0]!
     const y = v[1]!
     const z = v[2]!
-    const w = v[3]!  // Direct access, no loop
-    
+    const w = v[3]! // Direct access, no loop
+
     let denom = projectionDistance - w
     if (Math.abs(denom) < MIN_SAFE_DISTANCE) {
       denom = denom >= 0 ? MIN_SAFE_DISTANCE : -MIN_SAFE_DISTANCE
     }
     const scale = 1 / denom
-    
+
     const idx = offset + i * 3
     positions[idx] = x * scale
     positions[idx + 1] = y * scale
@@ -494,7 +494,7 @@ function projectVertices5D(
   offset: number,
   len: number
 ): void {
-  const SQRT2_INV = 0.7071067811865475  // 1 / sqrt(2)
+  const SQRT2_INV = 0.7071067811865475 // 1 / sqrt(2)
   for (let i = 0; i < len; i++) {
     const v = vertices[i]!
     const x = v[0]!
@@ -502,13 +502,13 @@ function projectVertices5D(
     const z = v[2]!
     // Direct access to both higher dims, no loop
     const effectiveDepth = (v[3]! + v[4]!) * SQRT2_INV
-    
+
     let denom = projectionDistance - effectiveDepth
     if (Math.abs(denom) < MIN_SAFE_DISTANCE) {
       denom = denom >= 0 ? MIN_SAFE_DISTANCE : -MIN_SAFE_DISTANCE
     }
     const scale = 1 / denom
-    
+
     const idx = offset + i * 3
     positions[idx] = x * scale
     positions[idx + 1] = y * scale
@@ -535,7 +535,7 @@ function projectVerticesND(
 ): void {
   const numHigherDims = dimension - 3
   const normalizationFactor = Math.sqrt(numHigherDims)
-  
+
   for (let i = 0; i < len; i++) {
     const vertex = vertices[i]!
     const x = vertex[0]!

@@ -38,4 +38,4 @@ void main() {
   // Final clip space position
   gl_Position = projectionMatrix * viewMatrix * worldPos;
 }
-`;
+`

@@ -314,7 +314,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // Only serialize the extended config for the current object type
         // This prevents irrelevant configs from being saved/overwritten
         const currentObjectType = useGeometryStore.getState().objectType
-        const extended = serializeExtendedState(useExtendedObjectStore.getState(), currentObjectType)
+        const extended = serializeExtendedState(
+          useExtendedObjectStore.getState(),
+          currentObjectType
+        )
         const transform = serializeState(useTransformStore.getState())
         const ui = serializeState(useUIStore.getState())
 
@@ -399,13 +402,16 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           objectType?: string
         }
         // Determine the object type for loading (either from saved data or keep current)
-        const loadedObjectType = (geometryData.objectType ?? useGeometryStore.getState().objectType) as import('@/lib/geometry/types').ObjectType
-        
+        const loadedObjectType = (geometryData.objectType ??
+          useGeometryStore.getState().objectType) as import('@/lib/geometry/types').ObjectType
+
         if (geometryData.dimension !== undefined && geometryData.objectType !== undefined) {
-          useGeometryStore.getState().loadGeometry(
-            geometryData.dimension,
-            geometryData.objectType as import('@/lib/geometry/types').ObjectType
-          )
+          useGeometryStore
+            .getState()
+            .loadGeometry(
+              geometryData.dimension,
+              geometryData.objectType as import('@/lib/geometry/types').ObjectType
+            )
         } else if (geometryData.dimension !== undefined) {
           useGeometryStore.getState().setDimension(geometryData.dimension)
         } else if (geometryData.objectType !== undefined) {
@@ -418,7 +424,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // This prevents overwriting configs for other object types
         // mergeExtendedObjectStateForType merges with defaults and only touches the relevant config
         useExtendedObjectStore.setState(
-          mergeExtendedObjectStateForType(sanitizeLoadedState(scene.data.extended), loadedObjectType)
+          mergeExtendedObjectStateForType(
+            sanitizeLoadedState(scene.data.extended),
+            loadedObjectType
+          )
         )
         useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
 

@@ -28,7 +28,10 @@ export interface ShellGlowConfig {
 /**
  * Configuration for EnvironmentCompositePass.
  */
-export interface EnvironmentCompositePassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
+export interface EnvironmentCompositePassConfig extends Omit<
+  RenderPassConfig,
+  'inputs' | 'outputs'
+> {
   /** Lensed environment color texture resource ID */
   lensedEnvironmentInput: string
 
@@ -88,7 +91,11 @@ export class EnvironmentCompositePass extends BasePass {
       inputs: [
         { resourceId: config.lensedEnvironmentInput, access: 'read' },
         { resourceId: config.mainObjectInput, access: 'read' },
-        { resourceId: config.mainObjectDepthInput, access: 'read', attachment: config.mainObjectDepthInputAttachment },
+        {
+          resourceId: config.mainObjectDepthInput,
+          access: 'read',
+          attachment: config.mainObjectDepthInputAttachment,
+        },
       ],
       outputs: [{ resourceId: config.outputResource, access: 'write' }],
       enabled: config.enabled,

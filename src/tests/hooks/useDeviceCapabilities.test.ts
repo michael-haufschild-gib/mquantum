@@ -8,10 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import {
-  MOBILE_DEFAULT_MAX_FPS,
-  MOBILE_DEFAULT_RESOLUTION_SCALE,
-} from '@/lib/deviceCapabilities'
+import { MOBILE_DEFAULT_MAX_FPS, MOBILE_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
 
 // Mock the deviceCapabilities module
 vi.mock('@/lib/deviceCapabilities', async () => {

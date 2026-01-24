@@ -7,4 +7,4 @@ vec2 intersectSphere(vec3 ro, vec3 rd, float radius) {
     h = sqrt(h);
     return vec2(-b - h, -b + h);
 }
-`;
+`

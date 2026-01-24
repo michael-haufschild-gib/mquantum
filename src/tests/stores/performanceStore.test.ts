@@ -3,7 +3,7 @@
  * Verifies performance optimization state management
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   usePerformanceStore,
   REFINEMENT_STAGE_QUALITY,
@@ -12,185 +12,180 @@ import {
   getEffectiveSampleQuality,
   hasPersistedResolutionScale,
   hasPersistedMaxFps,
-} from '@/stores/performanceStore';
-import {
-  DEFAULT_MAX_FPS,
-  MAX_MAX_FPS,
-  MIN_MAX_FPS,
-} from '@/stores/defaults/visualDefaults';
+} from '@/stores/performanceStore'
+import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from '@/stores/defaults/visualDefaults'
 
 describe('performanceStore', () => {
   beforeEach(() => {
     // Reset store state before each test
-    usePerformanceStore.getState().reset();
-  });
+    usePerformanceStore.getState().reset()
+  })
 
   describe('interaction state', () => {
     it('should set isInteracting', () => {
-      const { setIsInteracting } = usePerformanceStore.getState();
+      const { setIsInteracting } = usePerformanceStore.getState()
 
-      setIsInteracting(true);
-      expect(usePerformanceStore.getState().isInteracting).toBe(true);
+      setIsInteracting(true)
+      expect(usePerformanceStore.getState().isInteracting).toBe(true)
 
-      setIsInteracting(false);
-      expect(usePerformanceStore.getState().isInteracting).toBe(false);
-    });
+      setIsInteracting(false)
+      expect(usePerformanceStore.getState().isInteracting).toBe(false)
+    })
 
     it('should set sceneTransitioning', () => {
-      const { setSceneTransitioning } = usePerformanceStore.getState();
+      const { setSceneTransitioning } = usePerformanceStore.getState()
 
-      setSceneTransitioning(true);
-      expect(usePerformanceStore.getState().sceneTransitioning).toBe(true);
+      setSceneTransitioning(true)
+      expect(usePerformanceStore.getState().sceneTransitioning).toBe(true)
 
-      setSceneTransitioning(false);
-      expect(usePerformanceStore.getState().sceneTransitioning).toBe(false);
-    });
+      setSceneTransitioning(false)
+      expect(usePerformanceStore.getState().sceneTransitioning).toBe(false)
+    })
 
     it('should set isLoadingScene', () => {
-      const { setIsLoadingScene } = usePerformanceStore.getState();
+      const { setIsLoadingScene } = usePerformanceStore.getState()
 
-      setIsLoadingScene(true);
-      expect(usePerformanceStore.getState().isLoadingScene).toBe(true);
+      setIsLoadingScene(true)
+      expect(usePerformanceStore.getState().isLoadingScene).toBe(true)
 
-      setIsLoadingScene(false);
-      expect(usePerformanceStore.getState().isLoadingScene).toBe(false);
-    });
-  });
+      setIsLoadingScene(false)
+      expect(usePerformanceStore.getState().isLoadingScene).toBe(false)
+    })
+  })
 
   describe('progressive refinement', () => {
     it('should set progressiveRefinementEnabled', () => {
-      const { setProgressiveRefinementEnabled } = usePerformanceStore.getState();
+      const { setProgressiveRefinementEnabled } = usePerformanceStore.getState()
 
-      setProgressiveRefinementEnabled(false);
-      expect(usePerformanceStore.getState().progressiveRefinementEnabled).toBe(false);
+      setProgressiveRefinementEnabled(false)
+      expect(usePerformanceStore.getState().progressiveRefinementEnabled).toBe(false)
       // When disabled, should reset to final quality
-      expect(usePerformanceStore.getState().refinementStage).toBe('final');
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(1.0);
-    });
+      expect(usePerformanceStore.getState().refinementStage).toBe('final')
+      expect(usePerformanceStore.getState().qualityMultiplier).toBe(1.0)
+    })
 
     it('should set refinement stage with correct quality multiplier', () => {
-      const { setRefinementStage } = usePerformanceStore.getState();
+      const { setRefinementStage } = usePerformanceStore.getState()
 
-      setRefinementStage('low');
-      expect(usePerformanceStore.getState().refinementStage).toBe('low');
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.low);
+      setRefinementStage('low')
+      expect(usePerformanceStore.getState().refinementStage).toBe('low')
+      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.low)
 
-      setRefinementStage('medium');
-      expect(usePerformanceStore.getState().refinementStage).toBe('medium');
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.medium);
+      setRefinementStage('medium')
+      expect(usePerformanceStore.getState().refinementStage).toBe('medium')
+      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.medium)
 
-      setRefinementStage('high');
-      expect(usePerformanceStore.getState().refinementStage).toBe('high');
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.high);
+      setRefinementStage('high')
+      expect(usePerformanceStore.getState().refinementStage).toBe('high')
+      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.high)
 
-      setRefinementStage('final');
-      expect(usePerformanceStore.getState().refinementStage).toBe('final');
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.final);
-    });
+      setRefinementStage('final')
+      expect(usePerformanceStore.getState().refinementStage).toBe('final')
+      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.final)
+    })
 
     it('should clamp refinement progress to 0-100', () => {
-      const { setRefinementProgress } = usePerformanceStore.getState();
+      const { setRefinementProgress } = usePerformanceStore.getState()
 
-      setRefinementProgress(-10);
-      expect(usePerformanceStore.getState().refinementProgress).toBe(0);
+      setRefinementProgress(-10)
+      expect(usePerformanceStore.getState().refinementProgress).toBe(0)
 
-      setRefinementProgress(150);
-      expect(usePerformanceStore.getState().refinementProgress).toBe(100);
+      setRefinementProgress(150)
+      expect(usePerformanceStore.getState().refinementProgress).toBe(100)
 
-      setRefinementProgress(50);
-      expect(usePerformanceStore.getState().refinementProgress).toBe(50);
-    });
+      setRefinementProgress(50)
+      expect(usePerformanceStore.getState().refinementProgress).toBe(50)
+    })
 
     it('should reset refinement when enabled', () => {
-      const { setRefinementStage, resetRefinement } = usePerformanceStore.getState();
+      const { setRefinementStage, resetRefinement } = usePerformanceStore.getState()
 
-      setRefinementStage('final');
-      resetRefinement();
+      setRefinementStage('final')
+      resetRefinement()
 
-      expect(usePerformanceStore.getState().refinementStage).toBe('low');
-      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.low);
-    });
+      expect(usePerformanceStore.getState().refinementStage).toBe('low')
+      expect(usePerformanceStore.getState().qualityMultiplier).toBe(REFINEMENT_STAGE_QUALITY.low)
+    })
 
     it('should not reset refinement when disabled', () => {
-      const { setProgressiveRefinementEnabled, resetRefinement } =
-        usePerformanceStore.getState();
+      const { setProgressiveRefinementEnabled, resetRefinement } = usePerformanceStore.getState()
 
-      setProgressiveRefinementEnabled(false);
+      setProgressiveRefinementEnabled(false)
       // Since disabled sets to final, the stage is already final
-      resetRefinement();
+      resetRefinement()
 
       // Should stay at final when disabled
-      expect(usePerformanceStore.getState().refinementStage).toBe('final');
-    });
-  });
+      expect(usePerformanceStore.getState().refinementStage).toBe('final')
+    })
+  })
 
   describe('temporal reprojection', () => {
     it('should set temporalReprojectionEnabled', () => {
-      const { setTemporalReprojectionEnabled } = usePerformanceStore.getState();
+      const { setTemporalReprojectionEnabled } = usePerformanceStore.getState()
 
-      setTemporalReprojectionEnabled(false);
-      expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(false);
+      setTemporalReprojectionEnabled(false)
+      expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(false)
 
-      setTemporalReprojectionEnabled(true);
-      expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(true);
-    });
+      setTemporalReprojectionEnabled(true)
+      expect(usePerformanceStore.getState().temporalReprojectionEnabled).toBe(true)
+    })
 
     it('should set cameraTeleported', () => {
-      const { setCameraTeleported } = usePerformanceStore.getState();
+      const { setCameraTeleported } = usePerformanceStore.getState()
 
-      setCameraTeleported(true);
-      expect(usePerformanceStore.getState().cameraTeleported).toBe(true);
+      setCameraTeleported(true)
+      expect(usePerformanceStore.getState().cameraTeleported).toBe(true)
 
-      setCameraTeleported(false);
-      expect(usePerformanceStore.getState().cameraTeleported).toBe(false);
-    });
-  });
+      setCameraTeleported(false)
+      expect(usePerformanceStore.getState().cameraTeleported).toBe(false)
+    })
+  })
 
   describe('fractal animation quality', () => {
     it('should set fractalAnimationLowQuality', () => {
-      const { setFractalAnimationLowQuality } = usePerformanceStore.getState();
+      const { setFractalAnimationLowQuality } = usePerformanceStore.getState()
 
-      setFractalAnimationLowQuality(false);
-      expect(usePerformanceStore.getState().fractalAnimationLowQuality).toBe(false);
+      setFractalAnimationLowQuality(false)
+      expect(usePerformanceStore.getState().fractalAnimationLowQuality).toBe(false)
 
-      setFractalAnimationLowQuality(true);
-      expect(usePerformanceStore.getState().fractalAnimationLowQuality).toBe(true);
-    });
-  });
+      setFractalAnimationLowQuality(true)
+      expect(usePerformanceStore.getState().fractalAnimationLowQuality).toBe(true)
+    })
+  })
 
   describe('shader compilation', () => {
     it('should track shader compilation state', () => {
-      const { setShaderCompiling } = usePerformanceStore.getState();
+      const { setShaderCompiling } = usePerformanceStore.getState()
 
-      setShaderCompiling('floor', true);
-      expect(usePerformanceStore.getState().isShaderCompiling).toBe(true);
-      expect(usePerformanceStore.getState().shaderCompilationMessage).toContain('floor');
+      setShaderCompiling('floor', true)
+      expect(usePerformanceStore.getState().isShaderCompiling).toBe(true)
+      expect(usePerformanceStore.getState().shaderCompilationMessage).toContain('floor')
 
-      setShaderCompiling('floor', false);
-      expect(usePerformanceStore.getState().isShaderCompiling).toBe(false);
-    });
+      setShaderCompiling('floor', false)
+      expect(usePerformanceStore.getState().isShaderCompiling).toBe(false)
+    })
 
     it('should handle multiple simultaneous compilations', () => {
-      const { setShaderCompiling } = usePerformanceStore.getState();
+      const { setShaderCompiling } = usePerformanceStore.getState()
 
-      setShaderCompiling('floor', true);
-      setShaderCompiling('skybox', true);
+      setShaderCompiling('floor', true)
+      setShaderCompiling('skybox', true)
 
-      const state = usePerformanceStore.getState();
-      expect(state.isShaderCompiling).toBe(true);
-      expect(state.shaderCompilationMessage).toContain('2 shaders');
+      const state = usePerformanceStore.getState()
+      expect(state.isShaderCompiling).toBe(true)
+      expect(state.shaderCompilationMessage).toContain('2 shaders')
 
-      setShaderCompiling('floor', false);
-      expect(usePerformanceStore.getState().isShaderCompiling).toBe(true);
+      setShaderCompiling('floor', false)
+      expect(usePerformanceStore.getState().isShaderCompiling).toBe(true)
 
-      setShaderCompiling('skybox', false);
-      expect(usePerformanceStore.getState().isShaderCompiling).toBe(false);
-    });
-  });
+      setShaderCompiling('skybox', false)
+      expect(usePerformanceStore.getState().isShaderCompiling).toBe(false)
+    })
+  })
 
   describe('shader debugging', () => {
     it('should set shader debug info', () => {
-      const { setShaderDebugInfo } = usePerformanceStore.getState();
+      const { setShaderDebugInfo } = usePerformanceStore.getState()
 
       const debugInfo = {
         name: 'test',
@@ -198,14 +193,14 @@ describe('performanceStore', () => {
         fragmentShaderLength: 200,
         activeModules: ['lighting'],
         features: ['shadows'],
-      };
-      setShaderDebugInfo('testKey', debugInfo);
+      }
+      setShaderDebugInfo('testKey', debugInfo)
 
-      expect(usePerformanceStore.getState().shaderDebugInfos['testKey']).toEqual(debugInfo);
-    });
+      expect(usePerformanceStore.getState().shaderDebugInfos['testKey']).toEqual(debugInfo)
+    })
 
     it('should remove shader debug info when set to null', () => {
-      const { setShaderDebugInfo } = usePerformanceStore.getState();
+      const { setShaderDebugInfo } = usePerformanceStore.getState()
 
       setShaderDebugInfo('testKey', {
         name: 'test',
@@ -213,217 +208,218 @@ describe('performanceStore', () => {
         fragmentShaderLength: 200,
         activeModules: [],
         features: [],
-      });
-      setShaderDebugInfo('testKey', null);
+      })
+      setShaderDebugInfo('testKey', null)
 
-      expect(usePerformanceStore.getState().shaderDebugInfos['testKey']).toBeUndefined();
-    });
+      expect(usePerformanceStore.getState().shaderDebugInfos['testKey']).toBeUndefined()
+    })
 
     it('should toggle shader module overrides', () => {
-      const { toggleShaderModule } = usePerformanceStore.getState();
+      const { toggleShaderModule } = usePerformanceStore.getState()
 
-      toggleShaderModule('lighting');
-      expect(usePerformanceStore.getState().shaderOverrides).toContain('lighting');
+      toggleShaderModule('lighting')
+      expect(usePerformanceStore.getState().shaderOverrides).toContain('lighting')
 
-      toggleShaderModule('lighting');
-      expect(usePerformanceStore.getState().shaderOverrides).not.toContain('lighting');
-    });
+      toggleShaderModule('lighting')
+      expect(usePerformanceStore.getState().shaderOverrides).not.toContain('lighting')
+    })
 
     it('should reset shader overrides', () => {
-      const { toggleShaderModule, resetShaderOverrides } = usePerformanceStore.getState();
+      const { toggleShaderModule, resetShaderOverrides } = usePerformanceStore.getState()
 
-      toggleShaderModule('lighting');
-      toggleShaderModule('shadows');
-      resetShaderOverrides();
+      toggleShaderModule('lighting')
+      toggleShaderModule('shadows')
+      resetShaderOverrides()
 
-      expect(usePerformanceStore.getState().shaderOverrides).toHaveLength(0);
-    });
-  });
+      expect(usePerformanceStore.getState().shaderOverrides).toHaveLength(0)
+    })
+  })
 
   describe('reset', () => {
     it('should reset all state to defaults', () => {
-      const store = usePerformanceStore.getState();
+      const store = usePerformanceStore.getState()
 
       // Modify various state
-      store.setIsInteracting(true);
-      store.setSceneTransitioning(true);
-      store.setRefinementStage('low');
-      store.setShaderCompiling('test', true);
+      store.setIsInteracting(true)
+      store.setSceneTransitioning(true)
+      store.setRefinementStage('low')
+      store.setShaderCompiling('test', true)
 
       // Reset
-      store.reset();
+      store.reset()
 
       // Verify all back to defaults
-      const state = usePerformanceStore.getState();
-      expect(state.isInteracting).toBe(false);
-      expect(state.sceneTransitioning).toBe(false);
-      expect(state.refinementStage).toBe('final');
-      expect(state.isShaderCompiling).toBe(false);
-    });
-  });
-});
+      const state = usePerformanceStore.getState()
+      expect(state.isInteracting).toBe(false)
+      expect(state.sceneTransitioning).toBe(false)
+      expect(state.refinementStage).toBe('final')
+      expect(state.isShaderCompiling).toBe(false)
+    })
+  })
+})
 
 describe('quality interpolation utilities', () => {
   describe('getEffectiveSSRQuality', () => {
     it('should return low at minimum multiplier', () => {
-      expect(getEffectiveSSRQuality('high', 0.25)).toBe('low');
-    });
+      expect(getEffectiveSSRQuality('high', 0.25)).toBe('low')
+    })
 
     it('should return target at maximum multiplier', () => {
-      expect(getEffectiveSSRQuality('high', 1.0)).toBe('high');
-      expect(getEffectiveSSRQuality('medium', 1.0)).toBe('medium');
-    });
+      expect(getEffectiveSSRQuality('high', 1.0)).toBe('high')
+      expect(getEffectiveSSRQuality('medium', 1.0)).toBe('medium')
+    })
 
     it('should interpolate between low and target', () => {
       // At 0.5 multiplier with high target, should be around medium
-      const result = getEffectiveSSRQuality('high', 0.5);
-      expect(['low', 'medium']).toContain(result);
-    });
-  });
+      const result = getEffectiveSSRQuality('high', 0.5)
+      expect(['low', 'medium']).toContain(result)
+    })
+  })
 
   describe('getEffectiveShadowQuality', () => {
     it('should return target at maximum multiplier', () => {
-      expect(getEffectiveShadowQuality('ultra', 1.0)).toBe('ultra');
-    });
+      expect(getEffectiveShadowQuality('ultra', 1.0)).toBe('ultra')
+    })
 
     it('should return low at minimum multiplier', () => {
-      expect(getEffectiveShadowQuality('ultra', 0.25)).toBe('low');
-    });
-  });
+      expect(getEffectiveShadowQuality('ultra', 0.25)).toBe('low')
+    })
+  })
 
   describe('getEffectiveSampleQuality', () => {
     it('should return target at maximum multiplier', () => {
-      expect(getEffectiveSampleQuality('high', 1.0)).toBe('high');
-    });
+      expect(getEffectiveSampleQuality('high', 1.0)).toBe('high')
+    })
 
     it('should return low at minimum multiplier', () => {
-      expect(getEffectiveSampleQuality('high', 0.25)).toBe('low');
-    });
-  });
-});
+      expect(getEffectiveSampleQuality('high', 0.25)).toBe('low')
+    })
+  })
+})
 
 describe('render resolution scale persistence', () => {
-  const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale';
+  const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
 
   beforeEach(() => {
     // Clear localStorage before each test
-    localStorage.removeItem(RESOLUTION_SCALE_KEY);
+    localStorage.removeItem(RESOLUTION_SCALE_KEY)
     // Reset store state
-    usePerformanceStore.getState().reset();
-  });
+    usePerformanceStore.getState().reset()
+  })
 
   afterEach(() => {
     // Clean up localStorage after each test
-    localStorage.removeItem(RESOLUTION_SCALE_KEY);
-  });
+    localStorage.removeItem(RESOLUTION_SCALE_KEY)
+  })
 
   describe('setRenderResolutionScale', () => {
     it('should persist resolution scale to localStorage', () => {
-      const { setRenderResolutionScale } = usePerformanceStore.getState();
+      const { setRenderResolutionScale } = usePerformanceStore.getState()
 
-      setRenderResolutionScale(0.75);
+      setRenderResolutionScale(0.75)
 
-      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.75');
-    });
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.75')
+    })
 
     it('should clamp and persist values at boundaries', () => {
-      const { setRenderResolutionScale } = usePerformanceStore.getState();
+      const { setRenderResolutionScale } = usePerformanceStore.getState()
 
-      // Below minimum
-      setRenderResolutionScale(0.3);
-      expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.5);
-      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.5');
+      // Below minimum (0.1)
+      setRenderResolutionScale(0.05)
+      expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.1)
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.1')
 
       // Above maximum
-      setRenderResolutionScale(1.5);
-      expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0);
-      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('1');
-    });
-  });
+      setRenderResolutionScale(1.5)
+      expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0)
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('1')
+    })
+  })
 
   describe('hasPersistedResolutionScale', () => {
     it('should return false when no value is persisted', () => {
-      expect(hasPersistedResolutionScale()).toBe(false);
-    });
+      expect(hasPersistedResolutionScale()).toBe(false)
+    })
 
     it('should return true after setting resolution scale', () => {
-      const { setRenderResolutionScale } = usePerformanceStore.getState();
+      const { setRenderResolutionScale } = usePerformanceStore.getState()
 
-      setRenderResolutionScale(0.75);
+      setRenderResolutionScale(0.75)
 
-      expect(hasPersistedResolutionScale()).toBe(true);
-    });
+      expect(hasPersistedResolutionScale()).toBe(true)
+    })
 
     it('should return false for invalid persisted values', () => {
       // Set an invalid value directly
-      localStorage.setItem(RESOLUTION_SCALE_KEY, 'invalid');
-      expect(hasPersistedResolutionScale()).toBe(false);
+      localStorage.setItem(RESOLUTION_SCALE_KEY, 'invalid')
+      expect(hasPersistedResolutionScale()).toBe(false)
 
-      // Set a value out of range
-      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.3');
-      expect(hasPersistedResolutionScale()).toBe(false);
+      // Set a value out of range (below 0.1)
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.05')
+      expect(hasPersistedResolutionScale()).toBe(false)
 
-      localStorage.setItem(RESOLUTION_SCALE_KEY, '1.5');
-      expect(hasPersistedResolutionScale()).toBe(false);
-    });
-  });
+      // Set a value out of range (above 1.0)
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '1.5')
+      expect(hasPersistedResolutionScale()).toBe(false)
+    })
+  })
 
   describe('initial state loading', () => {
     it('should load persisted resolution scale on store creation', () => {
       // Pre-populate localStorage
-      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.75');
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.75')
 
       // Force store to reload by getting fresh state
       // Note: In actual usage, this happens on module load
       // For testing, we verify the loadPersistedResolutionScale function works correctly
       // by checking hasPersistedResolutionScale returns true
-      expect(hasPersistedResolutionScale()).toBe(true);
-    });
-  });
-});
+      expect(hasPersistedResolutionScale()).toBe(true)
+    })
+  })
+})
 
 describe('max FPS persistence', () => {
-  const MAX_FPS_KEY = 'mdim_max_fps';
+  const MAX_FPS_KEY = 'mdim_max_fps'
 
   beforeEach(() => {
     // Clear localStorage before each test
-    localStorage.removeItem(MAX_FPS_KEY);
+    localStorage.removeItem(MAX_FPS_KEY)
     // Reset store state
-    usePerformanceStore.getState().reset();
-  });
+    usePerformanceStore.getState().reset()
+  })
 
   afterEach(() => {
     // Clean up localStorage after each test
-    localStorage.removeItem(MAX_FPS_KEY);
-  });
+    localStorage.removeItem(MAX_FPS_KEY)
+  })
 
   describe('setMaxFps', () => {
     it('should set maxFps to a valid value', () => {
-      usePerformanceStore.getState().setMaxFps(30);
-      expect(usePerformanceStore.getState().maxFps).toBe(30);
-    });
+      usePerformanceStore.getState().setMaxFps(30)
+      expect(usePerformanceStore.getState().maxFps).toBe(30)
+    })
 
     it('should persist maxFps to localStorage', () => {
-      const { setMaxFps } = usePerformanceStore.getState();
+      const { setMaxFps } = usePerformanceStore.getState()
 
-      setMaxFps(60);
+      setMaxFps(60)
 
-      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60');
-    });
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60')
+    })
 
     it('should clamp and persist values at boundaries', () => {
-      const { setMaxFps } = usePerformanceStore.getState();
+      const { setMaxFps } = usePerformanceStore.getState()
 
       // Below minimum
-      setMaxFps(5);
-      expect(usePerformanceStore.getState().maxFps).toBe(MIN_MAX_FPS);
-      expect(localStorage.getItem(MAX_FPS_KEY)).toBe(String(MIN_MAX_FPS));
+      setMaxFps(5)
+      expect(usePerformanceStore.getState().maxFps).toBe(MIN_MAX_FPS)
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe(String(MIN_MAX_FPS))
 
       // Above maximum
-      setMaxFps(999);
-      expect(usePerformanceStore.getState().maxFps).toBe(MAX_MAX_FPS);
-      expect(localStorage.getItem(MAX_FPS_KEY)).toBe(String(MAX_MAX_FPS));
-    });
+      setMaxFps(999)
+      expect(usePerformanceStore.getState().maxFps).toBe(MAX_MAX_FPS)
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe(String(MAX_MAX_FPS))
+    })
 
     it('clamps to the allowed range', () => {
       const cases: Array<{ input: number; expected: number }> = [
@@ -435,53 +431,53 @@ describe('max FPS persistence', () => {
         { input: MAX_MAX_FPS + 1, expected: MAX_MAX_FPS },
         { input: -30, expected: MIN_MAX_FPS },
         { input: 999, expected: MAX_MAX_FPS },
-      ];
+      ]
 
       for (const { input, expected } of cases) {
-        usePerformanceStore.getState().reset();
-        usePerformanceStore.getState().setMaxFps(input);
-        expect(usePerformanceStore.getState().maxFps).toBe(expected);
+        usePerformanceStore.getState().reset()
+        usePerformanceStore.getState().setMaxFps(input)
+        expect(usePerformanceStore.getState().maxFps).toBe(expected)
       }
-    });
-  });
+    })
+  })
 
   describe('hasPersistedMaxFps', () => {
     it('should return false when no value is persisted', () => {
-      expect(hasPersistedMaxFps()).toBe(false);
-    });
+      expect(hasPersistedMaxFps()).toBe(false)
+    })
 
     it('should return true after setting maxFps', () => {
-      const { setMaxFps } = usePerformanceStore.getState();
+      const { setMaxFps } = usePerformanceStore.getState()
 
-      setMaxFps(60);
+      setMaxFps(60)
 
-      expect(hasPersistedMaxFps()).toBe(true);
-    });
+      expect(hasPersistedMaxFps()).toBe(true)
+    })
 
     it('should return false for invalid persisted values', () => {
       // Set an invalid value directly
-      localStorage.setItem(MAX_FPS_KEY, 'invalid');
-      expect(hasPersistedMaxFps()).toBe(false);
+      localStorage.setItem(MAX_FPS_KEY, 'invalid')
+      expect(hasPersistedMaxFps()).toBe(false)
 
       // Set a value out of range (below MIN)
-      localStorage.setItem(MAX_FPS_KEY, '5');
-      expect(hasPersistedMaxFps()).toBe(false);
+      localStorage.setItem(MAX_FPS_KEY, '5')
+      expect(hasPersistedMaxFps()).toBe(false)
 
       // Set a value out of range (above MAX)
-      localStorage.setItem(MAX_FPS_KEY, '999');
-      expect(hasPersistedMaxFps()).toBe(false);
-    });
-  });
+      localStorage.setItem(MAX_FPS_KEY, '999')
+      expect(hasPersistedMaxFps()).toBe(false)
+    })
+  })
 
   describe('reset', () => {
     it('should reset maxFps to default value', () => {
       // Change from default
-      usePerformanceStore.getState().setMaxFps(90);
-      expect(usePerformanceStore.getState().maxFps).toBe(90);
+      usePerformanceStore.getState().setMaxFps(90)
+      expect(usePerformanceStore.getState().maxFps).toBe(90)
 
       // Reset
-      usePerformanceStore.getState().reset();
-      expect(usePerformanceStore.getState().maxFps).toBe(DEFAULT_MAX_FPS);
-    });
-  });
-});
+      usePerformanceStore.getState().reset()
+      expect(usePerformanceStore.getState().maxFps).toBe(DEFAULT_MAX_FPS)
+    })
+  })
+})

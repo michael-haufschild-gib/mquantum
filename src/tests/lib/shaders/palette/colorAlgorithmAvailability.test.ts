@@ -85,10 +85,7 @@ describe('Color Algorithm Availability', () => {
     })
 
     describe('blackhole-only algorithms', () => {
-      const blackholeAlgorithms: ColorAlgorithm[] = [
-        'accretionGradient',
-        'gravitationalRedshift',
-      ]
+      const blackholeAlgorithms: ColorAlgorithm[] = ['accretionGradient', 'gravitationalRedshift']
 
       it('should only be available for blackhole', () => {
         for (const algo of blackholeAlgorithms) {
@@ -117,9 +114,7 @@ describe('Color Algorithm Availability', () => {
       })
 
       it('should NOT be available for other object types', () => {
-        const otherTypes = objectTypes.filter(
-          (t) => t !== 'schroedinger' && t !== 'blackhole'
-        )
+        const otherTypes = objectTypes.filter((t) => t !== 'schroedinger' && t !== 'blackhole')
 
         for (const objectType of otherTypes) {
           expect(
@@ -132,7 +127,12 @@ describe('Color Algorithm Availability', () => {
 
     describe('polytope-only algorithms', () => {
       const polytopeAlgorithms: ColorAlgorithm[] = ['dimension']
-      const polytopeTypes: ObjectType[] = ['hypercube', 'simplex', 'cross-polytope', 'wythoff-polytope']
+      const polytopeTypes: ObjectType[] = [
+        'hypercube',
+        'simplex',
+        'cross-polytope',
+        'wythoff-polytope',
+      ]
 
       it('should be available for polytope types', () => {
         for (const algo of polytopeAlgorithms) {

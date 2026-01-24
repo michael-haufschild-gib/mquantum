@@ -17,10 +17,10 @@
  * ```
  */
 
-import type { AnimationSystemDef } from '@/lib/geometry/registry';
-import { ToggleButton } from '@/components/ui/ToggleButton';
-import { Slider } from '@/components/ui/Slider';
-import React from 'react';
+import type { AnimationSystemDef } from '@/lib/geometry/registry'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import { Slider } from '@/components/ui/Slider'
+import React from 'react'
 
 /**
  * Formats a camelCase parameter key to a human-readable label
@@ -35,33 +35,33 @@ function formatParamLabel(paramKey: string): string {
     .replace(/^slice/, '')
     .replace(/^phase/, '')
     .replace(/^origin/, '')
-    .replace(/^dimension/, '');
+    .replace(/^dimension/, '')
 
   // Handle empty result (e.g., 'power' alone)
   if (cleanKey === '') {
-    return 'Value';
+    return 'Value'
   }
 
   // Split camelCase and capitalize
   return cleanKey
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (str) => str.toUpperCase())
-    .trim();
+    .trim()
 }
 
 export interface AnimationSystemPanelProps {
   /** Key identifying this animation system */
-  systemKey: string;
+  systemKey: string
   /** Animation system definition from registry */
-  system: AnimationSystemDef;
+  system: AnimationSystemDef
   /** Whether this animation system is enabled */
-  enabled: boolean;
+  enabled: boolean
   /** Current values for each parameter */
-  values: Record<string, number>;
+  values: Record<string, number>
   /** Called when the system is toggled on/off */
-  onToggle: (enabled: boolean) => void;
+  onToggle: (enabled: boolean) => void
   /** Called when a parameter value changes */
-  onParamChange: (paramKey: string, value: number) => void;
+  onParamChange: (paramKey: string, value: number) => void
 }
 
 /**
@@ -72,55 +72,50 @@ export interface AnimationSystemPanelProps {
  * - Sliders for each parameter with min/max/step from the registry
  * - Parameters are disabled (dimmed) when the system is off
  */
-export const AnimationSystemPanel: React.FC<AnimationSystemPanelProps> = React.memo(({
-  systemKey,
-  system,
-  enabled,
-  values,
-  onToggle,
-  onParamChange,
-}) => {
-  return (
-    <div className="space-y-4" data-testid={`animation-panel-${systemKey}`}>
-      {/* Header with toggle */}
-      <div className="flex items-center justify-between">
-        <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-          {system.name}
-        </label>
-        <ToggleButton
-          pressed={enabled}
-          onToggle={() => onToggle(!enabled)}
-          className="text-xs px-2 py-1 h-auto"
-          ariaLabel={`Toggle ${system.name}`}
-        >
-          {enabled ? 'ON' : 'OFF'}
-        </ToggleButton>
+export const AnimationSystemPanel: React.FC<AnimationSystemPanelProps> = React.memo(
+  ({ systemKey, system, enabled, values, onToggle, onParamChange }) => {
+    return (
+      <div className="space-y-4" data-testid={`animation-panel-${systemKey}`}>
+        {/* Header with toggle */}
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+            {system.name}
+          </label>
+          <ToggleButton
+            pressed={enabled}
+            onToggle={() => onToggle(!enabled)}
+            className="text-xs px-2 py-1 h-auto"
+            ariaLabel={`Toggle ${system.name}`}
+          >
+            {enabled ? 'ON' : 'OFF'}
+          </ToggleButton>
+        </div>
+
+        {/* Parameter sliders */}
+        <div className={`space-y-3 ${!enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+          {Object.entries(system.params).map(([paramKey, range]) => {
+            const currentValue = values[paramKey] ?? range.default
+            const step = range.step ?? 0.01
+
+            return (
+              <Slider
+                key={paramKey}
+                label={formatParamLabel(paramKey)}
+                min={range.min}
+                max={range.max}
+                step={step}
+                value={currentValue}
+                onChange={(value) => onParamChange(paramKey, value)}
+                showValue
+              />
+            )
+          })}
+        </div>
       </div>
+    )
+  }
+)
 
-      {/* Parameter sliders */}
-      <div className={`space-y-3 ${!enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-        {Object.entries(system.params).map(([paramKey, range]) => {
-          const currentValue = values[paramKey] ?? range.default;
-          const step = range.step ?? 0.01;
+AnimationSystemPanel.displayName = 'AnimationSystemPanel'
 
-          return (
-            <Slider
-              key={paramKey}
-              label={formatParamLabel(paramKey)}
-              min={range.min}
-              max={range.max}
-              step={step}
-              value={currentValue}
-              onChange={(value) => onParamChange(paramKey, value)}
-              showValue
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
-});
-
-AnimationSystemPanel.displayName = 'AnimationSystemPanel';
-
-export default AnimationSystemPanel;
+export default AnimationSystemPanel

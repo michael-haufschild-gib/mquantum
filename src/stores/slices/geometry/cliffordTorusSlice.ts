@@ -2,7 +2,12 @@ import { DEFAULT_CLIFFORD_TORUS_CONFIG } from '@/lib/geometry/extended/types'
 import { StateCreator } from 'zustand'
 import { CliffordTorusSlice, ExtendedObjectSlice } from './types'
 
-export const createCliffordTorusSlice: StateCreator<ExtendedObjectSlice, [], [], CliffordTorusSlice> = (set, get) => ({
+export const createCliffordTorusSlice: StateCreator<
+  ExtendedObjectSlice,
+  [],
+  [],
+  CliffordTorusSlice
+> = (set, get) => ({
   cliffordTorus: { ...DEFAULT_CLIFFORD_TORUS_CONFIG },
 
   setCliffordTorusMode: (mode) => {

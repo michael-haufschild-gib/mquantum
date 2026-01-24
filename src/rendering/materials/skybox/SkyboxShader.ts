@@ -84,22 +84,3 @@ export function createSkyboxShaderDefaults(): Record<string, { value: any }> {
  * GLSL version for WebGL2 - Three.js will handle the #version directive
  */
 export const skyboxGlslVersion = THREE.GLSL3
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

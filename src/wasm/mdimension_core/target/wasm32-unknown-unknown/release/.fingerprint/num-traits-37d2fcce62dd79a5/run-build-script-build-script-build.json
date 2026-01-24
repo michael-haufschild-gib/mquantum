@@ -1,1 +1,20 @@
-{"rustc":18415816196306954164,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[5157631553186200874,"build_script_build",false,17016713464097850512]],"local":[{"RerunIfChanged":{"output":"wasm32-unknown-unknown/release/build/num-traits-37d2fcce62dd79a5/output","paths":["build.rs"]}}],"rustflags":[],"config":0,"compile_kind":0}
+{
+  "rustc": 18415816196306954164,
+  "features": "",
+  "declared_features": "",
+  "target": 0,
+  "profile": 0,
+  "path": 0,
+  "deps": [[5157631553186200874, "build_script_build", false, 17016713464097850512]],
+  "local": [
+    {
+      "RerunIfChanged": {
+        "output": "wasm32-unknown-unknown/release/build/num-traits-37d2fcce62dd79a5/output",
+        "paths": ["build.rs"]
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 0,
+  "compile_kind": 0
+}

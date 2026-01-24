@@ -199,11 +199,9 @@ export function useInteractionState(options: UseInteractionStateOptions = {}): I
     const prevRot = prevRotationRef.current
 
     // Use squared distances to avoid sqrt (cheaper comparison)
-    const posDistSq =
-      (pos.x - prevPos.x) ** 2 + (pos.y - prevPos.y) ** 2 + (pos.z - prevPos.z) ** 2
+    const posDistSq = (pos.x - prevPos.x) ** 2 + (pos.y - prevPos.y) ** 2 + (pos.z - prevPos.z) ** 2
 
-    const rotDistSq =
-      (rot.x - prevRot.x) ** 2 + (rot.y - prevRot.y) ** 2 + (rot.z - prevRot.z) ** 2
+    const rotDistSq = (rot.x - prevRot.x) ** 2 + (rot.y - prevRot.y) ** 2 + (rot.z - prevRot.z) ** 2
 
     // Check for teleport (large sudden movement) using squared thresholds
     const isTeleport =

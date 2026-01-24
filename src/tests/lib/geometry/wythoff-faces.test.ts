@@ -17,7 +17,7 @@ describe('Wythoff polytope face detection', () => {
         customSymbol: [],
         scale: 1.0,
         snub: false,
-      }
+      },
     })
 
     console.log('=== 4D Wythoff Regular (Tesseract) ===')
@@ -44,13 +44,16 @@ describe('Wythoff polytope face detection', () => {
         customSymbol: [],
         scale: 1.0,
         snub: false,
-      }
+      },
     })
 
     console.log('=== 6D Wythoff Regular ===')
     console.log('Vertices:', geo.vertices.length)
     console.log('Edges:', geo.edges.length)
-    console.log('analyticalFaces in metadata:', (geo.metadata?.properties?.analyticalFaces as number[][] | undefined)?.length ?? 'MISSING')
+    console.log(
+      'analyticalFaces in metadata:',
+      (geo.metadata?.properties?.analyticalFaces as number[][] | undefined)?.length ?? 'MISSING'
+    )
 
     const faceMethod = getFaceDetectionMethod('wythoff-polytope')
     console.log('Face detection method:', faceMethod)
@@ -70,13 +73,16 @@ describe('Wythoff polytope face detection', () => {
         customSymbol: [],
         scale: 1.0,
         snub: false,
-      }
+      },
     })
 
     console.log('=== 4D Wythoff Rectified ===')
     console.log('Vertices:', geo.vertices.length)
     console.log('Edges:', geo.edges.length)
-    console.log('analyticalFaces in metadata:', (geo.metadata?.properties?.analyticalFaces as number[][] | undefined)?.length ?? 'MISSING')
+    console.log(
+      'analyticalFaces in metadata:',
+      (geo.metadata?.properties?.analyticalFaces as number[][] | undefined)?.length ?? 'MISSING'
+    )
 
     const faceMethod = getFaceDetectionMethod('wythoff-polytope')
     console.log('Face detection method:', faceMethod)
@@ -94,7 +100,7 @@ describe('Wythoff polytope face detection', () => {
       rootSystem: {
         rootType: 'D',
         scale: 1.0,
-      }
+      },
     })
 
     console.log('=== 6D Root System D_6 ===')
@@ -118,7 +124,7 @@ describe('Wythoff polytope face detection', () => {
       rootSystem: {
         rootType: 'A',
         scale: 1.0,
-      }
+      },
     })
 
     console.log('=== 8D Root System A_7 ===')
@@ -137,8 +143,8 @@ describe('Wythoff polytope face detection', () => {
 
     // Collect all vertices covered by faces
     const coveredVertices = new Set<number>()
-    faces.forEach(face => {
-      face.vertices.forEach(idx => coveredVertices.add(idx))
+    faces.forEach((face) => {
+      face.vertices.forEach((idx) => coveredVertices.add(idx))
     })
 
     console.log('Vertices covered by faces:', coveredVertices.size, 'of', geo.vertices.length)

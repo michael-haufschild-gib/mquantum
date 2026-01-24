@@ -102,9 +102,21 @@ describe('GTAOPass', () => {
     // Use full-res path for easier inspection.
     pass.setHalfResolution(false)
 
+    const mockGl = {
+      blitFramebuffer: vi.fn(),
+      bindFramebuffer: vi.fn(),
+      READ_FRAMEBUFFER: 0x8ca8,
+      DRAW_FRAMEBUFFER: 0x8ca9,
+      FRAMEBUFFER: 0x8d40,
+      COLOR_BUFFER_BIT: 0x4000,
+      NEAREST: 0x2600,
+    }
+    const mockProperties = new Map()
     const renderer = {
       setRenderTarget: vi.fn(),
       render: vi.fn(),
+      getContext: vi.fn(() => mockGl),
+      properties: { get: vi.fn((target: unknown) => mockProperties.get(target) ?? {}) },
     } as unknown as THREE.WebGLRenderer
 
     const colorTex = new THREE.Texture()
@@ -130,7 +142,11 @@ describe('GTAOPass', () => {
 
     pass.execute(ctx)
 
-    const internal = (pass as unknown as { gtaoPass: import('three/examples/jsm/postprocessing/GTAOPass.js').GTAOPass }).gtaoPass
+    const internal = (
+      pass as unknown as {
+        gtaoPass: import('three/examples/jsm/postprocessing/GTAOPass.js').GTAOPass
+      }
+    ).gtaoPass
     expect(internal).toBeTruthy()
     expect(internal._renderGBuffer).toBe(false)
     expect(internal.normalTexture).toBe(normalTex)

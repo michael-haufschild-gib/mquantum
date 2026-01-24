@@ -10,16 +10,16 @@
  * @module rendering/graph/passes/FXAAPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /** Typed uniforms interface for FXAA shader material */
 interface FXAAUniforms {
-  [uniform: string]: THREE.IUniform<unknown>;
-  tDiffuse: THREE.IUniform<THREE.Texture | null>;
-  resolution: THREE.IUniform<THREE.Vector2>;
+  [uniform: string]: THREE.IUniform<unknown>
+  tDiffuse: THREE.IUniform<THREE.Texture | null>
+  resolution: THREE.IUniform<THREE.Vector2>
 }
 
 // =============================================================================
@@ -40,7 +40,7 @@ const FXAA_QUALITY = {
   ITERATIONS: 12,
   /** Subpixel anti-aliasing quality (0 = off, 1 = max) */
   SUBPIXEL_QUALITY: 0.75,
-};
+}
 
 /**
  * FXAA Vertex Shader (GLSL ES 3.00)
@@ -54,7 +54,7 @@ const fxaaVertexShader = /* glsl */ `
     vUv = uv;
     gl_Position = vec4(position.xy, 0.0, 1.0);
   }
-`;
+`
 
 /**
  * FXAA 3.11 Fragment Shader (GLSL ES 3.00)
@@ -245,16 +245,16 @@ const fxaaFragmentShader = /* glsl */ `
 
     fragColor = vec4(texture(tDiffuse, finalUv).rgb, 1.0);
   }
-`;
+`
 
 /**
  * Configuration for FXAAPass.
  */
 export interface FXAAPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Input color resource */
-  colorInput: string;
+  colorInput: string
   /** Output resource */
-  outputResource: string;
+  outputResource: string
 }
 
 /**
@@ -270,15 +270,15 @@ export interface FXAAPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outpu
  * ```
  */
 export class FXAAPass extends BasePass {
-  private material: THREE.ShaderMaterial;
-  private uniforms: FXAAUniforms;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private uniforms: FXAAUniforms
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
-  private colorInputId: string;
-  private outputId: string;
-  private disposed = false;
+  private colorInputId: string
+  private outputId: string
+  private disposed = false
 
   constructor(config: FXAAPassConfig) {
     super({
@@ -289,16 +289,16 @@ export class FXAAPass extends BasePass {
       enabled: config.enabled,
       priority: config.priority,
       skipPassthrough: config.skipPassthrough,
-    });
+    })
 
-    this.colorInputId = config.colorInput;
-    this.outputId = config.outputResource;
+    this.colorInputId = config.colorInput
+    this.outputId = config.outputResource
 
     // Create typed uniforms for type-safe access
     this.uniforms = {
       tDiffuse: { value: null },
       resolution: { value: new THREE.Vector2() },
-    };
+    }
 
     // Create FXAA material with GLSL ES 3.00 (WebGL2 compliant)
     this.material = new THREE.ShaderMaterial({
@@ -308,56 +308,56 @@ export class FXAAPass extends BasePass {
       uniforms: this.uniforms,
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
     // Create fullscreen quad
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, size } = ctx;
+    const { renderer, size } = ctx
 
     // Skip if invalid size (prevents division by zero)
     if (size.width <= 0 || size.height <= 0) {
-      return;
+      return
     }
 
     // Get textures
-    const colorTex = ctx.getReadTexture(this.colorInputId);
-    const outputTarget = ctx.getWriteTarget(this.outputId);
+    const colorTex = ctx.getReadTexture(this.colorInputId)
+    const outputTarget = ctx.getWriteTarget(this.outputId)
 
     // Skip if no color input (output target can be null for screen render)
     if (!colorTex) {
-      return;
+      return
     }
 
     // Update uniforms (type-safe access via stored reference)
-    this.uniforms.tDiffuse.value = colorTex;
-    this.uniforms.resolution.value.set(1 / size.width, 1 / size.height);
+    this.uniforms.tDiffuse.value = colorTex
+    this.uniforms.resolution.value.set(1 / size.width, 1 / size.height)
 
     // Render (outputTarget null = render to screen)
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.scene, this.camera);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(outputTarget)
+    renderer.render(this.scene, this.camera)
+    renderer.setRenderTarget(null)
   }
 
   dispose(): void {
     // Idempotent disposal
     if (this.disposed) {
-      return;
+      return
     }
-    this.disposed = true;
+    this.disposed = true
 
-    this.material.dispose();
-    this.mesh.geometry.dispose();
+    this.material.dispose()
+    this.mesh.geometry.dispose()
     // Remove mesh from scene to ensure proper cleanup
-    this.scene.remove(this.mesh);
+    this.scene.remove(this.mesh)
   }
 }

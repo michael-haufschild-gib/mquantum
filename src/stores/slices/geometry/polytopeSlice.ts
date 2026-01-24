@@ -1,7 +1,4 @@
-import {
-  DEFAULT_POLYTOPE_CONFIG,
-  DEFAULT_POLYTOPE_SCALES,
-} from '@/lib/geometry/extended/types'
+import { DEFAULT_POLYTOPE_CONFIG, DEFAULT_POLYTOPE_SCALES } from '@/lib/geometry/extended/types'
 import { StateCreator } from 'zustand'
 import { ExtendedObjectSlice, PolytopeSlice } from './types'
 

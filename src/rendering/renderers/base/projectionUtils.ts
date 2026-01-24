@@ -181,10 +181,3 @@ export function useProjectionDistanceCache(): UseProjectionDistanceCacheResult {
     invalidate,
   }
 }
-
-
-
-
-
-
-

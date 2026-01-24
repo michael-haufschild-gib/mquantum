@@ -9,11 +9,7 @@
 
 import type { DeviceCapabilities, GPUTier } from '@/lib/deviceCapabilities'
 import { DEFAULT_CAPABILITIES, DESKTOP_DEFAULT_RESOLUTION_SCALE } from '@/lib/deviceCapabilities'
-import {
-  DEFAULT_MAX_FPS,
-  MAX_MAX_FPS,
-  MIN_MAX_FPS,
-} from './defaults/visualDefaults'
+import { DEFAULT_MAX_FPS, MAX_MAX_FPS, MIN_MAX_FPS } from './defaults/visualDefaults'
 import type { ShaderDebugInfo } from '@/types/shaderDebug'
 import { create } from 'zustand'
 

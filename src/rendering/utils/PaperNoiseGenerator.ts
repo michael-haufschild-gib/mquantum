@@ -13,31 +13,31 @@
  * @module rendering/utils/PaperNoiseGenerator
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 /**
  * Self-contained noise implementation for paper texture generation.
  * Based on standard Perlin noise with LCG-based random number generation.
  */
 class PaperNoise {
-  private perm: Uint8Array;
+  private perm: Uint8Array
 
   constructor(seed: number = 42) {
-    this.perm = new Uint8Array(512);
-    const p = new Uint8Array(256);
-    for (let i = 0; i < 256; i++) p[i] = i;
+    this.perm = new Uint8Array(512)
+    const p = new Uint8Array(256)
+    for (let i = 0; i < 256; i++) p[i] = i
 
     // Shuffle using LCG
-    let s = seed;
+    let s = seed
     for (let i = 255; i > 0; i--) {
-      s = (s * 16807) % 2147483647;
-      const j = s % (i + 1);
-      const temp = p[i]!;
-      p[i] = p[j]!;
-      p[j] = temp;
+      s = (s * 16807) % 2147483647
+      const j = s % (i + 1)
+      const temp = p[i]!
+      p[i] = p[j]!
+      p[j] = temp
     }
 
-    for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255]!;
+    for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255]!
   }
 
   /**
@@ -48,9 +48,9 @@ class PaperNoise {
    * @returns Hash value in range [0, 1]
    */
   hash(x: number, y: number): number {
-    const ix = Math.floor(x) & 255;
-    const iy = Math.floor(y) & 255;
-    return this.perm[(this.perm[ix]! + iy) & 511]! / 255;
+    const ix = Math.floor(x) & 255
+    const iy = Math.floor(y) & 255
+    return this.perm[(this.perm[ix]! + iy) & 511]! / 255
   }
 
   /**
@@ -61,21 +61,21 @@ class PaperNoise {
    * @returns Noise value in range [0, 1]
    */
   noise2D(x: number, y: number): number {
-    const ix = Math.floor(x);
-    const iy = Math.floor(y);
-    const fx = x - ix;
-    const fy = y - iy;
+    const ix = Math.floor(x)
+    const iy = Math.floor(y)
+    const fx = x - ix
+    const fy = y - iy
 
     // Smooth interpolation
-    const u = fx * fx * (3 - 2 * fx);
-    const v = fy * fy * (3 - 2 * fy);
+    const u = fx * fx * (3 - 2 * fx)
+    const v = fy * fy * (3 - 2 * fy)
 
-    const a = this.hash(ix, iy);
-    const b = this.hash(ix + 1, iy);
-    const c = this.hash(ix, iy + 1);
-    const d = this.hash(ix + 1, iy + 1);
+    const a = this.hash(ix, iy)
+    const b = this.hash(ix + 1, iy)
+    const c = this.hash(ix, iy + 1)
+    const d = this.hash(ix + 1, iy + 1)
 
-    return a + u * (b - a) + v * (c - a) + u * v * (a - b - c + d);
+    return a + u * (b - a) + v * (c - a) + u * v * (a - b - c + d)
   }
 
   /**
@@ -87,26 +87,26 @@ class PaperNoise {
    * @returns FBM noise value in range [0, 1]
    */
   fbm(x: number, y: number, octaves: number = 4): number {
-    let total = 0;
-    let amplitude = 1;
-    let frequency = 1;
-    let maxValue = 0;
+    let total = 0
+    let amplitude = 1
+    let frequency = 1
+    let maxValue = 0
 
     for (let i = 0; i < octaves; i++) {
-      total += this.noise2D(x * frequency, y * frequency) * amplitude;
-      maxValue += amplitude;
-      amplitude *= 0.5;
-      frequency *= 2;
+      total += this.noise2D(x * frequency, y * frequency) * amplitude
+      maxValue += amplitude
+      amplitude *= 0.5
+      frequency *= 2
     }
 
-    return total / maxValue;
+    return total / maxValue
   }
 }
 
 /** Cached paper noise texture singleton */
-let cachedTexture: THREE.DataTexture | null = null;
+let cachedTexture: THREE.DataTexture | null = null
 /** Reference count for shared texture disposal */
-let textureRefCount = 0;
+let textureRefCount = 0
 
 /**
  * Generates a 2D paper noise texture.
@@ -121,49 +121,49 @@ let textureRefCount = 0;
  * @returns DataTexture with paper noise values
  */
 export function generatePaperNoiseTexture(size: number = 64): THREE.DataTexture {
-  const totalSize = size * size;
-  const data = new Uint8Array(totalSize * 4); // RGBA
+  const totalSize = size * size
+  const data = new Uint8Array(totalSize * 4) // RGBA
 
   // Create noise generators with different seeds
-  const noise1 = new PaperNoise(42);
-  const noise2 = new PaperNoise(123);
-  const noise3 = new PaperNoise(7919); // Prime for fiber
+  const noise1 = new PaperNoise(42)
+  const noise2 = new PaperNoise(123)
+  const noise3 = new PaperNoise(7919) // Prime for fiber
 
-  let idx = 0;
-  const scale = 1.0 / size;
+  let idx = 0
+  const scale = 1.0 / size
 
   for (let y = 0; y < size; y++) {
-    const ny = y * scale;
+    const ny = y * scale
     for (let x = 0; x < size; x++) {
-      const nx = x * scale;
+      const nx = x * scale
 
       // R: Random noise (scaled for crumple/roughness patterns)
-      const r = noise1.noise2D(nx * 8, ny * 8);
+      const r = noise1.noise2D(nx * 8, ny * 8)
 
       // G: Random noise 2 (offset, for drops/folds)
-      const g = noise2.noise2D(nx * 8 + 100, ny * 8 + 100);
+      const g = noise2.noise2D(nx * 8 + 100, ny * 8 + 100)
 
       // B: Fiber noise (FBM for curly fiber patterns)
-      const b = noise3.fbm(nx * 4, ny * 4, 4);
+      const b = noise3.fbm(nx * 4, ny * 4, 4)
 
       // Store as bytes [0-255]
-      data[idx++] = Math.floor(r * 255);
-      data[idx++] = Math.floor(g * 255);
-      data[idx++] = Math.floor(b * 255);
-      data[idx++] = 255; // Alpha = 1.0
+      data[idx++] = Math.floor(r * 255)
+      data[idx++] = Math.floor(g * 255)
+      data[idx++] = Math.floor(b * 255)
+      data[idx++] = 255 // Alpha = 1.0
     }
   }
 
-  const texture = new THREE.DataTexture(data, size, size);
-  texture.format = THREE.RGBAFormat;
-  texture.type = THREE.UnsignedByteType;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  texture.needsUpdate = true;
+  const texture = new THREE.DataTexture(data, size, size)
+  texture.format = THREE.RGBAFormat
+  texture.type = THREE.UnsignedByteType
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.needsUpdate = true
 
-  return texture;
+  return texture
 }
 
 /**
@@ -176,10 +176,10 @@ export function generatePaperNoiseTexture(size: number = 64): THREE.DataTexture 
  */
 export function getPaperNoiseTexture(): THREE.DataTexture {
   if (!cachedTexture) {
-    cachedTexture = generatePaperNoiseTexture(64);
+    cachedTexture = generatePaperNoiseTexture(64)
   }
-  textureRefCount++;
-  return cachedTexture;
+  textureRefCount++
+  return cachedTexture
 }
 
 /**
@@ -187,10 +187,10 @@ export function getPaperNoiseTexture(): THREE.DataTexture {
  * when no more references exist. Safe to call multiple times.
  */
 export function disposePaperNoiseTexture(): void {
-  textureRefCount = Math.max(0, textureRefCount - 1);
+  textureRefCount = Math.max(0, textureRefCount - 1)
   if (textureRefCount === 0 && cachedTexture) {
-    cachedTexture.dispose();
-    cachedTexture = null;
+    cachedTexture.dispose()
+    cachedTexture = null
   }
 }
 
@@ -200,5 +200,5 @@ export function disposePaperNoiseTexture(): void {
  * @returns True if texture exists, false otherwise
  */
 export function isPaperNoiseTextureAllocated(): boolean {
-  return cachedTexture !== null;
+  return cachedTexture !== null
 }

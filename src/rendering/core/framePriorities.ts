@@ -90,9 +90,9 @@ export const FRAME_PRIORITY = {
    * Always runs last to capture accurate frame timing.
    */
   STATS: 20,
-} as const;
+} as const
 
 /**
  * Type for frame priority values.
  */
-export type FramePriority = (typeof FRAME_PRIORITY)[keyof typeof FRAME_PRIORITY];
+export type FramePriority = (typeof FRAME_PRIORITY)[keyof typeof FRAME_PRIORITY]

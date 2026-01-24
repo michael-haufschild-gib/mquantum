@@ -8,7 +8,7 @@
  * - Render mode toggles (edges/faces visible)
  * - Depth effects (attenuation, fresnel)
  * - Visual presets
- * 
+ *
  * Re-exports decomposed slices.
  */
 
@@ -17,7 +17,10 @@ import { AppearanceSlice as AppearanceSliceType } from './visual/types'
 import { createColorSlice, COLOR_INITIAL_STATE } from './visual/colorSlice'
 import { createMaterialSlice, MATERIAL_INITIAL_STATE } from './visual/materialSlice'
 import { createRenderSlice, RENDER_INITIAL_STATE } from './visual/renderSlice'
-import { createAdvancedRenderingSlice, ADVANCED_RENDERING_INITIAL_STATE } from './visual/advancedRenderingSlice'
+import {
+  createAdvancedRenderingSlice,
+  ADVANCED_RENDERING_INITIAL_STATE,
+} from './visual/advancedRenderingSlice'
 
 export type AppearanceSlice = AppearanceSliceType
 export * from './visual/types'

@@ -99,4 +99,4 @@ float hermite(int n, float u) {
 
     return result;
 }
-`;
+`

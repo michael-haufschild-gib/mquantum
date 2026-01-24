@@ -8,11 +8,7 @@
 import * as THREE from 'three'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import {
-  getAttachmentCount,
-  isMRTTarget,
-  MRTStateManager,
-} from '@/rendering/graph/MRTStateManager'
+import { getAttachmentCount, isMRTTarget, MRTStateManager } from '@/rendering/graph/MRTStateManager'
 
 describe('MRTStateManager', () => {
   let mockGlContext: WebGL2RenderingContext
@@ -27,6 +23,7 @@ describe('MRTStateManager', () => {
       COLOR_ATTACHMENT2: 0x8ce2,
       COLOR_ATTACHMENT3: 0x8ce3,
       drawBuffers: vi.fn(),
+      getExtension: vi.fn(() => null),
     } as unknown as WebGL2RenderingContext
 
     originalSetRenderTarget = vi.fn()
@@ -91,9 +88,7 @@ describe('MRTStateManager', () => {
 
       expect(originalSetRenderTarget).toHaveBeenCalledWith(null, undefined, undefined)
       // Default framebuffer (screen) uses gl.BACK, not COLOR_ATTACHMENT0
-      expect(mockGlContext.drawBuffers).toHaveBeenCalledWith([
-        mockGlContext.BACK,
-      ])
+      expect(mockGlContext.drawBuffers).toHaveBeenCalledWith([mockGlContext.BACK])
     })
 
     it('should configure single attachment for simple target', () => {
@@ -103,9 +98,7 @@ describe('MRTStateManager', () => {
 
       mockRenderer.setRenderTarget(target)
 
-      expect(mockGlContext.drawBuffers).toHaveBeenCalledWith([
-        mockGlContext.COLOR_ATTACHMENT0,
-      ])
+      expect(mockGlContext.drawBuffers).toHaveBeenCalledWith([mockGlContext.COLOR_ATTACHMENT0])
     })
 
     it('should configure 2 attachments for 2-MRT target', () => {
@@ -126,11 +119,7 @@ describe('MRTStateManager', () => {
       const manager = new MRTStateManager()
       manager.initialize(mockRenderer)
       const target = new THREE.WebGLRenderTarget(100, 100, { count: 3 })
-      target.textures = [
-        new THREE.Texture(),
-        new THREE.Texture(),
-        new THREE.Texture(),
-      ]
+      target.textures = [new THREE.Texture(), new THREE.Texture(), new THREE.Texture()]
 
       mockRenderer.setRenderTarget(target)
 
@@ -160,11 +149,7 @@ describe('MRTStateManager', () => {
 
       const target1 = new THREE.WebGLRenderTarget(100, 100)
       const target3 = new THREE.WebGLRenderTarget(100, 100, { count: 3 })
-      target3.textures = [
-        new THREE.Texture(),
-        new THREE.Texture(),
-        new THREE.Texture(),
-      ]
+      target3.textures = [new THREE.Texture(), new THREE.Texture(), new THREE.Texture()]
 
       mockRenderer.setRenderTarget(target1)
       mockRenderer.setRenderTarget(target3)
@@ -196,6 +181,7 @@ describe('MRTStateManager', () => {
         COLOR_ATTACHMENT0: 0x8ce0,
         COLOR_ATTACHMENT1: 0x8ce1,
         drawBuffers: vi.fn(),
+        getExtension: vi.fn(() => null),
       } as unknown as WebGL2RenderingContext
 
       const newMockRenderer = {
@@ -223,6 +209,7 @@ describe('MRTStateManager', () => {
         COLOR_ATTACHMENT0: 0x8ce0,
         COLOR_ATTACHMENT1: 0x8ce1,
         drawBuffers: vi.fn(),
+        getExtension: vi.fn(() => null),
       } as unknown as WebGL2RenderingContext
 
       const newMockRenderer = {
@@ -266,11 +253,7 @@ describe('isMRTTarget', () => {
 
   it('should return true for MRT target with 2+ textures', () => {
     const target = new THREE.WebGLRenderTarget(100, 100, { count: 3 })
-    target.textures = [
-      new THREE.Texture(),
-      new THREE.Texture(),
-      new THREE.Texture(),
-    ]
+    target.textures = [new THREE.Texture(), new THREE.Texture(), new THREE.Texture()]
     expect(isMRTTarget(target)).toBe(true)
   })
 
@@ -297,11 +280,7 @@ describe('getAttachmentCount', () => {
     expect(getAttachmentCount(target2)).toBe(2)
 
     const target3 = new THREE.WebGLRenderTarget(100, 100, { count: 3 })
-    target3.textures = [
-      new THREE.Texture(),
-      new THREE.Texture(),
-      new THREE.Texture(),
-    ]
+    target3.textures = [new THREE.Texture(), new THREE.Texture(), new THREE.Texture()]
     expect(getAttachmentCount(target3)).toBe(3)
   })
 })

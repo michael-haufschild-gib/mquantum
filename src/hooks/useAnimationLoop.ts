@@ -58,7 +58,13 @@ export function useAnimationLoop(): void {
         const { isExporting } = useExportStore.getState()
 
         // Check all pause conditions
-        if (!isPlaying || animatingPlanes.size === 0 || skyboxLoading || sceneTransitioning || isExporting) {
+        if (
+          !isPlaying ||
+          animatingPlanes.size === 0 ||
+          skyboxLoading ||
+          sceneTransitioning ||
+          isExporting
+        ) {
           return
         }
 
@@ -106,23 +112,25 @@ export function useAnimationLoop(): void {
 
         // Show error message - wrap in try-catch to prevent double-error crashes
         try {
-          useMsgBoxStore.getState().showMsgBox(
-            'Animation Error',
-            `The animation loop encountered an error and has been stopped.\n\n${error instanceof Error ? error.message : 'Unknown error'}`,
-            'error',
-            [
-              {
-                label: 'Reload Page',
-                onClick: () => window.location.reload(),
-                variant: 'danger'
-              },
-              {
-                label: 'Close',
-                onClick: () => useMsgBoxStore.getState().closeMsgBox(),
-                variant: 'secondary'
-              }
-            ]
-          )
+          useMsgBoxStore
+            .getState()
+            .showMsgBox(
+              'Animation Error',
+              `The animation loop encountered an error and has been stopped.\n\n${error instanceof Error ? error.message : 'Unknown error'}`,
+              'error',
+              [
+                {
+                  label: 'Reload Page',
+                  onClick: () => window.location.reload(),
+                  variant: 'danger',
+                },
+                {
+                  label: 'Close',
+                  onClick: () => useMsgBoxStore.getState().closeMsgBox(),
+                  variant: 'secondary',
+                },
+              ]
+            )
         } catch (msgBoxError) {
           console.error('Failed to show animation error dialog:', msgBoxError)
         }

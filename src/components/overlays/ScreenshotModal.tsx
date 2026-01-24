@@ -1,115 +1,115 @@
-import { Button } from '@/components/ui/Button';
-import { Icon } from '@/components/ui/Icon';
-import { Modal } from '@/components/ui/Modal';
-import { useToast } from '@/hooks/useToast';
-import { soundManager } from '@/lib/audio/SoundManager';
-import { useScreenshotStore } from '@/stores/screenshotStore';
-import { useEffect, useRef, useState } from 'react';
-import { CropBox, CropValues } from './CropBox';
+import { Button } from '@/components/ui/Button'
+import { Icon } from '@/components/ui/Icon'
+import { Modal } from '@/components/ui/Modal'
+import { useToast } from '@/hooks/useToast'
+import { soundManager } from '@/lib/audio/SoundManager'
+import { useScreenshotStore } from '@/stores/screenshotStore'
+import { useEffect, useRef, useState } from 'react'
+import { CropBox, CropValues } from './CropBox'
 
 export const ScreenshotModal = () => {
-  const { isOpen, imageSrc, closeModal, reset } = useScreenshotStore();
-  const { addToast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
+  const { isOpen, imageSrc, closeModal, reset } = useScreenshotStore()
+  const { addToast } = useToast()
+  const [isSaving, setIsSaving] = useState(false)
 
-  const [crop, setCrop] = useState<CropValues>({ x: 0, y: 0, width: 1, height: 1 });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [crop, setCrop] = useState<CropValues>({ x: 0, y: 0, width: 1, height: 1 })
+  const containerRef = useRef<HTMLDivElement>(null)
+  const imgRef = useRef<HTMLImageElement>(null)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   // Reset crop when modal opens with new image
   useEffect(() => {
     if (isOpen && imageSrc) {
-      setCrop({ x: 0, y: 0, width: 1, height: 1 });
-      setImageLoaded(false);
+      setCrop({ x: 0, y: 0, width: 1, height: 1 })
+      setImageLoaded(false)
     }
-  }, [isOpen, imageSrc]);
+  }, [isOpen, imageSrc])
 
-  if (!isOpen || !imageSrc) return null;
+  if (!isOpen || !imageSrc) return null
 
   const generateOutput = async (): Promise<Blob | null> => {
     return new Promise((resolve) => {
-      const img = new Image();
+      const img = new Image()
 
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
         if (!ctx) {
-          resolve(null);
-          return;
+          resolve(null)
+          return
         }
 
-        const pixelX = Math.round(crop.x * img.naturalWidth);
-        const pixelY = Math.round(crop.y * img.naturalHeight);
-        const pixelWidth = Math.round(crop.width * img.naturalWidth);
-        const pixelHeight = Math.round(crop.height * img.naturalHeight);
+        const pixelX = Math.round(crop.x * img.naturalWidth)
+        const pixelY = Math.round(crop.y * img.naturalHeight)
+        const pixelWidth = Math.round(crop.width * img.naturalWidth)
+        const pixelHeight = Math.round(crop.height * img.naturalHeight)
 
-        canvas.width = pixelWidth;
-        canvas.height = pixelHeight;
-        ctx.drawImage(img, pixelX, pixelY, pixelWidth, pixelHeight, 0, 0, pixelWidth, pixelHeight);
+        canvas.width = pixelWidth
+        canvas.height = pixelHeight
+        ctx.drawImage(img, pixelX, pixelY, pixelWidth, pixelHeight, 0, 0, pixelWidth, pixelHeight)
 
-        canvas.toBlob((blob) => resolve(blob), 'image/png');
-      };
+        canvas.toBlob((blob) => resolve(blob), 'image/png')
+      }
 
-      img.onerror = () => resolve(null);
-      img.src = imageSrc;
-    });
-  };
+      img.onerror = () => resolve(null)
+      img.src = imageSrc
+    })
+  }
 
   const handleCopy = async () => {
     try {
-      const blob = await generateOutput();
-      if (!blob) throw new Error('Failed to process image');
+      const blob = await generateOutput()
+      if (!blob) throw new Error('Failed to process image')
 
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      addToast('Copied screenshot to clipboard!', 'success');
-      soundManager.playSuccess();
-      closeModal();
-      setTimeout(reset, 300);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      addToast('Copied screenshot to clipboard!', 'success')
+      soundManager.playSuccess()
+      closeModal()
+      setTimeout(reset, 300)
     } catch (err) {
-      console.error(err);
-      addToast('Failed to copy. ' + (err instanceof Error ? err.message : ''), 'error');
+      console.error(err)
+      addToast('Failed to copy. ' + (err instanceof Error ? err.message : ''), 'error')
     }
-  };
+  }
 
   const handleDownload = async () => {
-    setIsSaving(true);
+    setIsSaving(true)
     try {
-      const blob = await generateOutput();
-      if (!blob) throw new Error('Failed to process image');
+      const blob = await generateOutput()
+      if (!blob) throw new Error('Failed to process image')
 
-      const filename = `mdimension-${Date.now()}.png`;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
+      const filename = `mdimension-${Date.now()}.png`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.style.display = 'none'
+      document.body.appendChild(a)
+      a.click()
 
       setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 100);
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }, 100)
 
-      addToast('Screenshot downloaded!', 'success');
-      soundManager.playSuccess();
-      closeModal();
-      setTimeout(reset, 300);
+      addToast('Screenshot downloaded!', 'success')
+      soundManager.playSuccess()
+      closeModal()
+      setTimeout(reset, 300)
     } catch (err) {
-      console.error(err);
-      addToast('Failed to save image.', 'error');
+      console.error(err)
+      addToast('Failed to save image.', 'error')
     } finally {
-      setIsSaving(false);
+      setIsSaving(false)
     }
-  };
+  }
 
   const getCropDimensions = () => {
-    if (!imgRef.current || !imageLoaded) return null;
-    const w = Math.round(crop.width * imgRef.current.naturalWidth);
-    const h = Math.round(crop.height * imgRef.current.naturalHeight);
-    return `${w} × ${h}`;
-  };
+    if (!imgRef.current || !imageLoaded) return null
+    const w = Math.round(crop.width * imgRef.current.naturalWidth)
+    const h = Math.round(crop.height * imgRef.current.naturalHeight)
+    return `${w} × ${h}`
+  }
 
   return (
     <Modal
@@ -148,9 +148,14 @@ export const ScreenshotModal = () => {
 
         {/* Footer Controls */}
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-xs text-text-tertiary text-center sm:text-left" data-testid="crop-dimensions">
+          <div
+            className="text-xs text-text-tertiary text-center sm:text-left"
+            data-testid="crop-dimensions"
+          >
             <span className="hidden sm:inline">Drag corners to crop • </span>
-            {imageLoaded && <span className="font-mono text-text-secondary">{getCropDimensions()} px</span>}
+            {imageLoaded && (
+              <span className="font-mono text-text-secondary">{getCropDimensions()} px</span>
+            )}
           </div>
 
           <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
@@ -180,5 +185,5 @@ export const ScreenshotModal = () => {
         </div>
       </div>
     </Modal>
-  );
-};
+  )
+}

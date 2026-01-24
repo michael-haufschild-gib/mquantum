@@ -10,7 +10,14 @@ describe('ToggleGroup', () => {
   ]
 
   it('exposes a radiogroup with the selected option checked', () => {
-    render(<ToggleGroup options={options} value="perspective" onChange={() => {}} ariaLabel="Projection" />)
+    render(
+      <ToggleGroup
+        options={options}
+        value="perspective"
+        onChange={() => {}}
+        ariaLabel="Projection"
+      />
+    )
 
     expect(screen.getByRole('radiogroup')).toHaveAttribute('aria-label', 'Projection')
     expect(screen.getByRole('radio', { name: /perspective/i })).toBeChecked()
@@ -21,7 +28,9 @@ describe('ToggleGroup', () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
 
-    const { rerender } = render(<ToggleGroup options={options} value="perspective" onChange={onChange} />)
+    const { rerender } = render(
+      <ToggleGroup options={options} value="perspective" onChange={onChange} />
+    )
     await user.click(screen.getByRole('radio', { name: /orthographic/i }))
     expect(onChange).toHaveBeenCalledWith('orthographic')
 

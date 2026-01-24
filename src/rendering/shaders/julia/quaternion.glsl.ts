@@ -89,4 +89,4 @@ vec4 quatPow(vec4 q, float n) {
 
     return vec4(rn * cosNT, rn * sinNT * vHat);
 }
-`;
+`

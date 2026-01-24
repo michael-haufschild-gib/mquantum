@@ -12,11 +12,11 @@
  * @module rendering/graph/passes/FrameBlendingPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
-import { frameBlendingFragmentShader } from '@/rendering/shaders/postprocessing/frameBlending.glsl';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
+import { frameBlendingFragmentShader } from '@/rendering/shaders/postprocessing/frameBlending.glsl'
 
 /**
  * Default vertex shader for fullscreen quad.
@@ -29,18 +29,18 @@ void main() {
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
-`;
+`
 
 /**
  * Configuration for FrameBlendingPass.
  */
 export interface FrameBlendingPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Input color resource (current frame) */
-  colorInput: string;
+  colorInput: string
   /** Output resource (blended frame) */
-  outputResource: string;
+  outputResource: string
   /** Blend factor (0 = current only, 1 = previous only) */
-  blendFactor?: number;
+  blendFactor?: number
 }
 
 /**
@@ -60,20 +60,20 @@ export interface FrameBlendingPassConfig extends Omit<RenderPassConfig, 'inputs'
  * ```
  */
 export class FrameBlendingPass extends BasePass {
-  private material: THREE.ShaderMaterial;
-  private copyMaterial: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private copyMaterial: THREE.ShaderMaterial
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
-  private colorInputId: string;
-  private outputId: string;
+  private colorInputId: string
+  private outputId: string
 
   // Internal history buffer (ping-pong)
-  private historyBuffer: THREE.WebGLRenderTarget | null = null;
-  private historyInitialized = false;
-  private lastWidth = 0;
-  private lastHeight = 0;
+  private historyBuffer: THREE.WebGLRenderTarget | null = null
+  private historyInitialized = false
+  private lastWidth = 0
+  private lastHeight = 0
 
   constructor(config: FrameBlendingPassConfig) {
     super({
@@ -84,10 +84,10 @@ export class FrameBlendingPass extends BasePass {
       enabled: config.enabled,
       priority: config.priority,
       skipPassthrough: config.skipPassthrough,
-    });
+    })
 
-    this.colorInputId = config.colorInput;
-    this.outputId = config.outputResource;
+    this.colorInputId = config.colorInput
+    this.outputId = config.outputResource
 
     // Create blend material
     this.material = new THREE.ShaderMaterial({
@@ -101,7 +101,7 @@ export class FrameBlendingPass extends BasePass {
       },
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
     // Create simple copy material for history update
     this.copyMaterial = new THREE.ShaderMaterial({
@@ -121,17 +121,17 @@ export class FrameBlendingPass extends BasePass {
       },
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
     // Create fullscreen quad
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   /**
@@ -139,12 +139,12 @@ export class FrameBlendingPass extends BasePass {
    */
   private ensureHistoryBuffer(width: number, height: number): void {
     if (this.historyBuffer && this.lastWidth === width && this.lastHeight === height) {
-      return;
+      return
     }
 
     // Dispose old buffer
     if (this.historyBuffer) {
-      this.historyBuffer.dispose();
+      this.historyBuffer.dispose()
     }
 
     // Create new buffer matching output size
@@ -155,11 +155,11 @@ export class FrameBlendingPass extends BasePass {
       magFilter: THREE.LinearFilter,
       generateMipmaps: false,
       depthBuffer: false,
-    });
+    })
 
-    this.lastWidth = width;
-    this.lastHeight = height;
-    this.historyInitialized = false;
+    this.lastWidth = width
+    this.lastHeight = height
+    this.historyInitialized = false
   }
 
   /**
@@ -176,92 +176,98 @@ export class FrameBlendingPass extends BasePass {
     source: THREE.WebGLRenderTarget,
     destination: THREE.WebGLRenderTarget
   ): void {
-    const gl = renderer.getContext() as WebGL2RenderingContext;
-    const properties = renderer.properties;
+    const gl = renderer.getContext() as WebGL2RenderingContext
+    const properties = renderer.properties
 
     // Get internal WebGL framebuffer handles from Three.js
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sourceProps = properties.get(source) as any;
+    const sourceProps = properties.get(source) as any
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const destProps = properties.get(destination) as any;
+    const destProps = properties.get(destination) as any
 
-    const sourceFBO = sourceProps?.__webglFramebuffer;
-    const destFBO = destProps?.__webglFramebuffer;
+    const sourceFBO = sourceProps?.__webglFramebuffer
+    const destFBO = destProps?.__webglFramebuffer
 
     if (!sourceFBO || !destFBO) {
       // Fallback to shader-based copy if framebuffers not available
       // This can happen on first frame before targets are initialized
-      this.copyMaterial.uniforms['uSource']!.value = source.texture;
-      this.mesh.material = this.copyMaterial;
-      renderer.setRenderTarget(destination);
-      renderer.render(this.scene, this.camera);
-      this.mesh.material = this.material;
-      return;
+      this.copyMaterial.uniforms['uSource']!.value = source.texture
+      this.mesh.material = this.copyMaterial
+      renderer.setRenderTarget(destination)
+      renderer.render(this.scene, this.camera)
+      this.mesh.material = this.material
+      return
     }
 
     // Bind source as READ_FRAMEBUFFER and destination as DRAW_FRAMEBUFFER
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, sourceFBO);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, destFBO);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, sourceFBO)
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, destFBO)
 
     // Perform the blit (hardware-accelerated copy)
     gl.blitFramebuffer(
-      0, 0, source.width, source.height, // Source rect
-      0, 0, destination.width, destination.height, // Dest rect
+      0,
+      0,
+      source.width,
+      source.height, // Source rect
+      0,
+      0,
+      destination.width,
+      destination.height, // Dest rect
       gl.COLOR_BUFFER_BIT, // Copy color only
       gl.NEAREST // No filtering needed for same-size copy
-    );
+    )
 
     // Restore Three.js framebuffer state
     // Setting render target to null ensures Three.js state is consistent
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(null)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, size } = ctx;
+    const { renderer, size } = ctx
 
     // Get current frame texture
-    const currentTex = ctx.getReadTexture(this.colorInputId);
-    const outputTarget = ctx.getWriteTarget(this.outputId);
+    const currentTex = ctx.getReadTexture(this.colorInputId)
+    const outputTarget = ctx.getWriteTarget(this.outputId)
 
     if (!currentTex || !outputTarget) {
-      return;
+      return
     }
 
     // Ensure history buffer exists at correct size
-    this.ensureHistoryBuffer(size.width, size.height);
+    this.ensureHistoryBuffer(size.width, size.height)
 
     if (!this.historyBuffer) {
-      return;
+      return
     }
 
     // If first frame, just copy current to output and initialize history
     if (!this.historyInitialized) {
       // Copy current frame to output using shader (needed because source is a texture, not RT)
-      this.copyMaterial.uniforms['uSource']!.value = currentTex;
-      this.mesh.material = this.copyMaterial;
-      renderer.setRenderTarget(outputTarget);
-      renderer.render(this.scene, this.camera);
+      this.copyMaterial.uniforms['uSource']!.value = currentTex
+      this.mesh.material = this.copyMaterial
+      renderer.setRenderTarget(outputTarget)
+      renderer.render(this.scene, this.camera)
 
       // Copy output to history for next frame using hardware blit
-      this.blitFramebuffer(renderer, outputTarget, this.historyBuffer);
+      this.blitFramebuffer(renderer, outputTarget, this.historyBuffer)
 
-      this.mesh.material = this.material;
-      this.historyInitialized = true;
-      return;
+      this.mesh.material = this.material
+      this.historyInitialized = true
+      return
     }
 
     // Blend current with previous
-    this.material.uniforms['uCurrentFrame']!.value = currentTex;
-    this.material.uniforms['uPreviousFrame']!.value = this.historyBuffer.texture;
-    this.mesh.material = this.material;
+    this.material.uniforms['uCurrentFrame']!.value = currentTex
+    this.material.uniforms['uPreviousFrame']!.value = this.historyBuffer.texture
+    this.mesh.material = this.material
 
     // Render blended result to output
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.scene, this.camera);
+    renderer.setRenderTarget(outputTarget)
+    renderer.render(this.scene, this.camera)
 
     // Copy blended result to history for next frame using hardware blit
     // This is faster than shader-based copy (~0.5-1ms savings per frame)
-    this.blitFramebuffer(renderer, outputTarget, this.historyBuffer);
+    this.blitFramebuffer(renderer, outputTarget, this.historyBuffer)
   }
 
   /**
@@ -269,14 +275,14 @@ export class FrameBlendingPass extends BasePass {
    * @param value Blend factor (0 = current only, 1 = previous only)
    */
   setBlendFactor(value: number): void {
-    this.material.uniforms['uBlendFactor']!.value = value;
+    this.material.uniforms['uBlendFactor']!.value = value
   }
 
   /**
    * Reset history buffer (e.g., on camera teleport or scene change).
    */
   resetHistory(): void {
-    this.historyInitialized = false;
+    this.historyInitialized = false
   }
 
   /**
@@ -285,17 +291,17 @@ export class FrameBlendingPass extends BasePass {
    */
   onEnabled(): void {
     // Reset history when pass is re-enabled to avoid stale frame blending
-    this.historyInitialized = false;
+    this.historyInitialized = false
   }
 
   dispose(): void {
-    this.material.dispose();
-    this.copyMaterial.dispose();
-    this.mesh.geometry.dispose();
+    this.material.dispose()
+    this.copyMaterial.dispose()
+    this.mesh.geometry.dispose()
     if (this.historyBuffer) {
-      this.historyBuffer.dispose();
-      this.historyBuffer = null;
+      this.historyBuffer.dispose()
+      this.historyBuffer = null
     }
-    this.scene.remove(this.mesh);
+    this.scene.remove(this.mesh)
   }
 }

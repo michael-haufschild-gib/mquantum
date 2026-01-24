@@ -201,11 +201,7 @@ function correctTriangleWinding(
   const p2 = vertices[v2]!
 
   // Get first 3 coordinates for cross product (project to 3D)
-  const get3D = (v: number[]): [number, number, number] => [
-    v[0] ?? 0,
-    v[1] ?? 0,
-    v[2] ?? 0,
-  ]
+  const get3D = (v: number[]): [number, number, number] => [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0]
 
   const a = get3D(p0)
   const b = get3D(p1)

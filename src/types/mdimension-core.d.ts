@@ -3,18 +3,18 @@ declare module 'mdimension-core' {
    * Initialize the WASM module
    * @returns Promise that resolves when WASM is initialized
    */
-  export default function init(): Promise<void>;
+  export default function init(): Promise<void>
 
   /**
    * Initialize panic hook for better error logging
    */
-  export function start(): void;
+  export function start(): void
 
   /**
    * Log a greeting to the console
    * @param name
    */
-  export function greet(name: string): void;
+  export function greet(name: string): void
 
   /**
    * Add two numbers (sanity check)
@@ -22,7 +22,7 @@ declare module 'mdimension-core' {
    * @param b - Second number
    * @returns Sum of a and b
    */
-  export function add_wasm(a: number, b: number): number;
+  export function add_wasm(a: number, b: number): number
 
   /**
    * Compute convex hull of N-dimensional points.
@@ -31,17 +31,20 @@ declare module 'mdimension-core' {
    * @param dimension Dimension of points
    * @returns Flat array of triangle vertex indices
    */
-  export function compute_convex_hull_wasm(flat_vertices: Float64Array, dimension: number): Uint32Array;
+  export function compute_convex_hull_wasm(
+    flat_vertices: Float64Array,
+    dimension: number
+  ): Uint32Array
 
   /**
    * Wythoff configuration object
    */
   export interface WythoffConfigWasm {
-    symmetry_group: string;
-    preset: string;
-    dimension: number;
-    scale: number;
-    custom_symbol?: boolean[];
+    symmetry_group: string
+    preset: string
+    dimension: number
+    scale: number
+    custom_symbol?: boolean[]
   }
 
   /**
@@ -51,15 +54,15 @@ declare module 'mdimension-core' {
    */
   export interface PolytopeResultWasm {
     /** Flat array of vertex coordinates (plain JS array from serde) */
-    vertices: number[];
+    vertices: number[]
     /** Flat array of edge indices [v0, v1, v0, v1, ...] (plain JS array from serde) */
-    edges: number[];
+    edges: number[]
     /** Flat array of face indices (triangulated) [v0, v1, v2, ...] (plain JS array from serde) */
-    faces: number[];
+    faces: number[]
     /** Dimension of the polytope */
-    dimension: number;
+    dimension: number
     /** Warning messages from generation */
-    warnings: string[];
+    warnings: string[]
   }
 
   /**
@@ -67,15 +70,15 @@ declare module 'mdimension-core' {
    */
   export interface RootSystemResultWasm {
     /** Flat array of vertex coordinates */
-    vertices: number[];
+    vertices: number[]
     /** Flat array of edge indices [v0, v1, v0, v1, ...] */
-    edges: number[];
+    edges: number[]
     /** Dimension of the root system */
-    dimension: number;
+    dimension: number
     /** Number of vertices generated */
-    vertex_count: number;
+    vertex_count: number
     /** Number of edges generated */
-    edge_count: number;
+    edge_count: number
   }
 
   /**
@@ -83,7 +86,7 @@ declare module 'mdimension-core' {
    * @param config - Wythoff configuration
    * @returns Generated polytope result
    */
-  export function generate_wythoff_wasm(config: WythoffConfigWasm): PolytopeResultWasm;
+  export function generate_wythoff_wasm(config: WythoffConfigWasm): PolytopeResultWasm
 
   /**
    * Detect faces of a polytope in WASM.
@@ -98,7 +101,7 @@ declare module 'mdimension-core' {
     flat_edges: Uint32Array,
     dimension: number,
     method: string
-  ): Uint32Array;
+  ): Uint32Array
 
   /**
    * Build KNN edges connecting each point to its k nearest neighbors.
@@ -111,7 +114,7 @@ declare module 'mdimension-core' {
     flat_points: Float64Array,
     dimension: number,
     k: number
-  ): Uint32Array;
+  ): Uint32Array
 
   /**
    * Build edges connecting vertices at minimum nonzero distance.
@@ -125,7 +128,7 @@ declare module 'mdimension-core' {
     flat_vertices: Float64Array,
     dimension: number,
     epsilon_factor: number
-  ): Uint32Array;
+  ): Uint32Array
 
   /**
    * Generate a complete root system with vertices and edges.
@@ -138,7 +141,7 @@ declare module 'mdimension-core' {
     root_type: string,
     dimension: number,
     scale: number
-  ): RootSystemResultWasm;
+  ): RootSystemResultWasm
 
   // ============================================================================
   // Animation Operations (Hot Path - 60 FPS)
@@ -156,7 +159,7 @@ declare module 'mdimension-core' {
     dimension: number,
     plane_names: string[],
     angles: Float64Array | number[]
-  ): Float64Array;
+  ): Float64Array
 
   /**
    * Projects n-dimensional vertices to 3D positions using perspective projection.
@@ -170,7 +173,7 @@ declare module 'mdimension-core' {
     flat_vertices: Float64Array,
     dimension: number,
     projection_distance: number
-  ): Float32Array;
+  ): Float32Array
 
   /**
    * Projects edge pairs to 3D positions for LineSegments2 geometry.
@@ -186,7 +189,7 @@ declare module 'mdimension-core' {
     dimension: number,
     flat_edges: Uint32Array,
     projection_distance: number
-  ): Float32Array;
+  ): Float32Array
 
   /**
    * Multiplies a matrix by a vector.
@@ -199,7 +202,7 @@ declare module 'mdimension-core' {
     matrix: Float64Array,
     vector: Float64Array,
     dimension: number
-  ): Float64Array;
+  ): Float64Array
 
   // ============================================================================
   // Phase 2: Matrix and Vector Operations
@@ -216,7 +219,7 @@ declare module 'mdimension-core' {
     a: Float64Array,
     b: Float64Array,
     dimension: number
-  ): Float64Array;
+  ): Float64Array
 
   /**
    * Computes the dot product of two vectors: a · b = Σ(a[i] * b[i])
@@ -224,21 +227,21 @@ declare module 'mdimension-core' {
    * @param b Second vector
    * @returns The scalar dot product
    */
-  export function dot_product_wasm(a: Float64Array, b: Float64Array): number;
+  export function dot_product_wasm(a: Float64Array, b: Float64Array): number
 
   /**
    * Computes the magnitude (length) of a vector: ||v|| = √(Σ(v[i]²))
    * @param v Input vector
    * @returns The magnitude of the vector
    */
-  export function magnitude_wasm(v: Float64Array): number;
+  export function magnitude_wasm(v: Float64Array): number
 
   /**
    * Normalizes a vector to unit length: v̂ = v / ||v||
    * @param v Input vector
    * @returns Unit vector in the same direction
    */
-  export function normalize_vector_wasm(v: Float64Array): Float64Array;
+  export function normalize_vector_wasm(v: Float64Array): Float64Array
 
   /**
    * Subtracts two vectors element-wise: c = a - b
@@ -246,5 +249,5 @@ declare module 'mdimension-core' {
    * @param b Second vector
    * @returns The difference vector
    */
-  export function subtract_vectors_wasm(a: Float64Array, b: Float64Array): Float64Array;
+  export function subtract_vectors_wasm(a: Float64Array, b: Float64Array): Float64Array
 }

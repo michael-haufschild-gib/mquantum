@@ -1,10 +1,10 @@
-import { ControlGroup } from '@/components/ui/ControlGroup';
-import { Slider } from '@/components/ui/Slider';
-import { ToggleButton } from '@/components/ui/ToggleButton';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
-import React, { useEffect } from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Slider } from '@/components/ui/Slider'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
+import React, { useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Black Hole Gravity Controls
@@ -25,8 +25,8 @@ export const GravityAdvanced: React.FC = React.memo(() => {
     setGravityFalloff: state.setGravityFalloff,
     gravityChromaticAberration: state.gravityChromaticAberration,
     setGravityChromaticAberration: state.setGravityChromaticAberration,
-  }));
-  const ppState = usePostProcessingStore(ppSelector);
+  }))
+  const ppState = usePostProcessingStore(ppSelector)
 
   // Black hole state for syncing
   const bhSelector = useShallow((state: ExtendedObjectState) => ({
@@ -34,23 +34,23 @@ export const GravityAdvanced: React.FC = React.memo(() => {
     bendScale: state.blackhole.bendScale,
     lensingFalloff: state.blackhole.lensingFalloff,
     chromaticAberration: state.blackhole.deferredLensingChromaticAberration,
-  }));
-  const bhState = useExtendedObjectStore(bhSelector);
+  }))
+  const bhState = useExtendedObjectStore(bhSelector)
 
   // Sync global gravity settings from black hole on mount
   useEffect(() => {
     // Force gravity enabled
     if (!ppState.gravityEnabled) {
-      ppState.setGravityEnabled(true);
+      ppState.setGravityEnabled(true)
     }
     // Sync from black hole to global
-    ppState.setGravityStrength(bhState.gravityStrength);
-    ppState.setGravityDistortionScale(bhState.bendScale);
-    ppState.setGravityFalloff(bhState.lensingFalloff);
-    ppState.setGravityChromaticAberration(bhState.chromaticAberration);
+    ppState.setGravityStrength(bhState.gravityStrength)
+    ppState.setGravityDistortionScale(bhState.bendScale)
+    ppState.setGravityFalloff(bhState.lensingFalloff)
+    ppState.setGravityChromaticAberration(bhState.chromaticAberration)
     // Only run on mount (component only renders for blackhole)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   return (
     <ControlGroup title="Gravitational Lensing" collapsible defaultOpen>
@@ -113,7 +113,7 @@ export const GravityAdvanced: React.FC = React.memo(() => {
         data-testid="gravity-chromatic-aberration"
       />
     </ControlGroup>
-  );
-});
+  )
+})
 
-GravityAdvanced.displayName = 'GravityAdvanced';
+GravityAdvanced.displayName = 'GravityAdvanced'

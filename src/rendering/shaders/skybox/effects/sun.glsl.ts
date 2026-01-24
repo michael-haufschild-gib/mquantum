@@ -15,4 +15,4 @@ vec3 applySun(vec3 col, vec3 dir) {
     }
     return col;
 }
-`;
+`

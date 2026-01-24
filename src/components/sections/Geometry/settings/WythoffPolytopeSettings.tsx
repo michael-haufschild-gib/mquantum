@@ -14,10 +14,7 @@ import { Section } from '@/components/sections/Section'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import {
-  WythoffPreset,
-  WythoffSymmetryGroup,
-} from '@/lib/geometry/extended/types'
+import { WythoffPreset, WythoffSymmetryGroup } from '@/lib/geometry/extended/types'
 import { getWythoffPresetName } from '@/lib/geometry/wythoff'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -72,7 +69,7 @@ export const WythoffPolytopeSettings: React.FC = React.memo(() => {
     if (dimension >= 4) {
       options.push(
         { value: 'cantellated', label: 'Cantellated (1st & 3rd nodes)' },
-        { value: 'runcinated', label: 'Runcinated (1st & last nodes)' },
+        { value: 'runcinated', label: 'Runcinated (1st & last nodes)' }
       )
     }
 
@@ -103,81 +100,78 @@ export const WythoffPolytopeSettings: React.FC = React.memo(() => {
     <div data-testid="wythoff-polytope-settings">
       <Section title="Construction" defaultOpen={true}>
         {/* Current polytope name */}
-        <div className="text-sm font-medium text-text-primary mb-2">
-            {polytopeName}
-        </div>
+        <div className="text-sm font-medium text-text-primary mb-2">{polytopeName}</div>
 
         {/* Symmetry group selection */}
         <Select<WythoffSymmetryGroup>
-            label="Symmetry Group"
-            options={symmetryGroupOptions}
-            value={config.symmetryGroup}
-            onChange={handleSymmetryGroupChange}
-            data-testid="wythoff-symmetry-group"
+          label="Symmetry Group"
+          options={symmetryGroupOptions}
+          value={config.symmetryGroup}
+          onChange={handleSymmetryGroupChange}
+          data-testid="wythoff-symmetry-group"
         />
         <p className="text-xs text-text-secondary -mt-2">
-            {config.symmetryGroup === 'A' && 'Simplex-based forms with n! symmetry operations'}
-            {config.symmetryGroup === 'B' && 'Hypercube/cross-polytope forms with 2ⁿ·n! operations'}
-            {config.symmetryGroup === 'D' && 'Half-hypercube forms with 2ⁿ⁻¹·n! operations'}
+          {config.symmetryGroup === 'A' && 'Simplex-based forms with n! symmetry operations'}
+          {config.symmetryGroup === 'B' && 'Hypercube/cross-polytope forms with 2ⁿ·n! operations'}
+          {config.symmetryGroup === 'D' && 'Half-hypercube forms with 2ⁿ⁻¹·n! operations'}
         </p>
 
         {/* Preset selection */}
         <Select<WythoffPreset>
-            label="Wythoff Preset"
-            options={presetOptions}
-            value={config.preset}
-            onChange={setPreset}
-            data-testid="wythoff-preset"
+          label="Wythoff Preset"
+          options={presetOptions}
+          value={config.preset}
+          onChange={setPreset}
+          data-testid="wythoff-preset"
         />
         <p className="text-xs text-text-secondary -mt-2">
-            Determines which nodes are "ringed" in the Coxeter-Dynkin diagram
+          Determines which nodes are "ringed" in the Coxeter-Dynkin diagram
         </p>
       </Section>
 
       <Section title="Properties" defaultOpen={true}>
         {/* Scale slider */}
         <Slider
-            label="Scale"
-            min={0.5}
-            max={5.0}
-            step={0.1}
-            value={config.scale}
-            onChange={setScale}
-            showValue
-            data-testid="wythoff-scale"
+          label="Scale"
+          min={0.5}
+          max={5.0}
+          step={0.1}
+          value={config.scale}
+          onChange={setScale}
+          showValue
+          data-testid="wythoff-scale"
         />
 
         {/* Snub variant toggle */}
         <div className="flex items-center gap-2">
-            <Switch
+          <Switch
             label="Snub Variant"
             checked={config.snub}
             onCheckedChange={setSnub}
             data-testid="wythoff-snub"
-            />
+          />
         </div>
         <p className="text-xs text-text-secondary -mt-2">
-            Alternated vertices, creates chiral forms
+          Alternated vertices, creates chiral forms
         </p>
       </Section>
 
       <Section title="Math Details" defaultOpen={false}>
         {/* Information about vertex/edge counts */}
         <div className="p-2 bg-[var(--bg-hover)] rounded text-xs text-text-secondary border border-border-subtle">
-            <p>
-            <strong>Wythoff Construction:</strong> Creates uniform polytopes by
-            reflecting a seed point through {dimension} mirrors arranged according
-            to a Coxeter-Dynkin diagram.
-            </p>
-            <p className="mt-1">
+          <p>
+            <strong>Wythoff Construction:</strong> Creates uniform polytopes by reflecting a seed
+            point through {dimension} mirrors arranged according to a Coxeter-Dynkin diagram.
+          </p>
+          <p className="mt-1">
             The {config.symmetryGroup} symmetry group in {dimension}D has{' '}
             {config.symmetryGroup === 'A'
-                ? `${factorial(dimension + 1)} symmetry operations`
-                : config.symmetryGroup === 'B'
+              ? `${factorial(dimension + 1)} symmetry operations`
+              : config.symmetryGroup === 'B'
                 ? `${Math.pow(2, dimension) * factorial(dimension)} symmetry operations`
-                : `${Math.pow(2, dimension - 1) * factorial(dimension)} symmetry operations`
-            }.
-            </p>
+                : `${Math.pow(2, dimension - 1) * factorial(dimension)} symmetry operations`}
+            .
+          </p>
         </div>
       </Section>
     </div>
@@ -192,4 +186,3 @@ function factorial(n: number): number {
   for (let i = 2; i <= n; i++) result *= i
   return result
 }
-

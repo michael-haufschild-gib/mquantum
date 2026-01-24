@@ -1,6 +1,6 @@
 /**
  * SoundManager - Premium Audio Feedback System
- * 
+ *
  * Uses Web Audio API to generate synthesized UI sounds (no external assets needed).
  * Features:
  * - Spatial clicks
@@ -10,211 +10,213 @@
  */
 
 class SoundManager {
-    private ctx: AudioContext | null = null;
-    private enabled: boolean = true;
-    private masterGain: GainNode | null = null;
-    private initialized: boolean = false;
+  private ctx: AudioContext | null = null
+  private enabled: boolean = true
+  private masterGain: GainNode | null = null
+  private initialized: boolean = false
 
-    constructor() {
-      // Lazy init on first interaction
-      if (typeof window !== 'undefined') {
-        window.addEventListener('click', this.init, { once: true });
-        window.addEventListener('keydown', this.init, { once: true });
-      }
+  constructor() {
+    // Lazy init on first interaction
+    if (typeof window !== 'undefined') {
+      window.addEventListener('click', this.init, { once: true })
+      window.addEventListener('keydown', this.init, { once: true })
+    }
+  }
+
+  private init = () => {
+    if (this.initialized) return
+    this.initialized = true
+
+    // Remove the other listener since we only need to init once
+    window.removeEventListener('click', this.init)
+    window.removeEventListener('keydown', this.init)
+
+    const AudioContext =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext
+    this.ctx = new AudioContext()
+    this.masterGain = this.ctx.createGain()
+    this.masterGain.gain.value = 0.15 // Low volume by default
+    this.masterGain.connect(this.ctx.destination)
+  }
+
+  public playClick() {
+    if (!this.ctx || !this.enabled) return
+
+    const now = this.ctx.currentTime
+    const duration = 0.02
+    const sampleRate = this.ctx.sampleRate
+    const bufferSize = Math.floor(sampleRate * duration)
+
+    // Create short noise burst
+    const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
+    const data = buffer.getChannelData(0)
+
+    // Sharp attack, fast decay - like a soft tap
+    for (let i = 0; i < bufferSize; i++) {
+      const t = i / bufferSize
+      const envelope = Math.pow(1 - t, 3)
+      data[i] = (Math.random() * 2 - 1) * envelope
     }
 
-    private init = () => {
-      if (this.initialized) return;
-      this.initialized = true;
+    const source = this.ctx.createBufferSource()
+    source.buffer = buffer
 
-      // Remove the other listener since we only need to init once
-      window.removeEventListener('click', this.init);
-      window.removeEventListener('keydown', this.init);
+    // Bandpass to give it body without being harsh
+    const filter = this.ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 1000
+    filter.Q.value = 0.5
 
-      const AudioContext = window.AudioContext || (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext;
-      this.ctx = new AudioContext();
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.15; // Low volume by default
-      this.masterGain.connect(this.ctx.destination);
-    };
-  
-    public playClick() {
-      if (!this.ctx || !this.enabled) return;
+    const gain = this.ctx.createGain()
+    gain.gain.value = 0.15
 
-      const now = this.ctx.currentTime;
-      const duration = 0.02;
-      const sampleRate = this.ctx.sampleRate;
-      const bufferSize = Math.floor(sampleRate * duration);
+    source.connect(filter)
+    filter.connect(gain)
+    gain.connect(this.masterGain!)
 
-      // Create short noise burst
-      const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
-      const data = buffer.getChannelData(0);
+    source.start(now)
+    source.stop(now + duration)
+  }
 
-      // Sharp attack, fast decay - like a soft tap
-      for (let i = 0; i < bufferSize; i++) {
-        const t = i / bufferSize;
-        const envelope = Math.pow(1 - t, 3);
-        data[i] = (Math.random() * 2 - 1) * envelope;
-      }
+  public playHover() {
+    if (!this.ctx || !this.enabled) return
 
-      const source = this.ctx.createBufferSource();
-      source.buffer = buffer;
+    const osc = this.ctx.createOscillator()
+    const gain = this.ctx.createGain()
 
-      // Bandpass to give it body without being harsh
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.value = 1000;
-      filter.Q.value = 0.5;
+    osc.type = 'triangle'
+    osc.frequency.setValueAtTime(200, this.ctx.currentTime)
 
-      const gain = this.ctx.createGain();
-      gain.gain.value = 0.15;
+    gain.gain.setValueAtTime(0, this.ctx.currentTime)
+    gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.01)
+    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.05)
 
-      source.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain!);
+    const filter = this.ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 400
 
-      source.start(now);
-      source.stop(now + duration);
-    }
-  
-    public playHover() {
-      if (!this.ctx || !this.enabled) return;
-  
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(200, this.ctx.currentTime);
-      
-      gain.gain.setValueAtTime(0, this.ctx.currentTime);
-      gain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 0.01);
-      gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.05);
-      
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 400;
-  
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.masterGain!);
-      
-      osc.start();
-      osc.stop(this.ctx.currentTime + 0.05);
+    osc.connect(filter)
+    filter.connect(gain)
+    gain.connect(this.masterGain!)
+
+    osc.start()
+    osc.stop(this.ctx.currentTime + 0.05)
+  }
+
+  public playSnap() {
+    if (!this.ctx || !this.enabled) return
+
+    const now = this.ctx.currentTime
+    const duration = 0.025
+    const sampleRate = this.ctx.sampleRate
+    const bufferSize = Math.floor(sampleRate * duration)
+
+    // Short low-frequency thud
+    const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
+    const data = buffer.getChannelData(0)
+
+    for (let i = 0; i < bufferSize; i++) {
+      const t = i / bufferSize
+      const envelope = Math.pow(1 - t, 4)
+      data[i] = (Math.random() * 2 - 1) * envelope
     }
 
-    public playSnap() {
-        if (!this.ctx || !this.enabled) return;
+    const source = this.ctx.createBufferSource()
+    source.buffer = buffer
 
-        const now = this.ctx.currentTime;
-        const duration = 0.025;
-        const sampleRate = this.ctx.sampleRate;
-        const bufferSize = Math.floor(sampleRate * duration);
+    // Low bandpass for soft thud
+    const filter = this.ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 400
 
-        // Short low-frequency thud
-        const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
-        const data = buffer.getChannelData(0);
+    const gain = this.ctx.createGain()
+    gain.gain.value = 0.1
 
-        for (let i = 0; i < bufferSize; i++) {
-          const t = i / bufferSize;
-          const envelope = Math.pow(1 - t, 4);
-          data[i] = (Math.random() * 2 - 1) * envelope;
-        }
+    source.connect(filter)
+    filter.connect(gain)
+    gain.connect(this.masterGain!)
 
-        const source = this.ctx.createBufferSource();
-        source.buffer = buffer;
+    source.start(now)
+    source.stop(now + duration)
+  }
 
-        // Low bandpass for soft thud
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.value = 400;
+  public playSuccess() {
+    if (!this.ctx || !this.enabled) return
 
-        const gain = this.ctx.createGain();
-        gain.gain.value = 0.1;
+    const now = this.ctx.currentTime
 
-        source.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain!);
+    // Arpeggio
+    ;[440, 554, 659].forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator()
+      const gain = this.ctx!.createGain()
 
-        source.start(now);
-        source.stop(now + duration);
-    }
-    
-    public playSuccess() {
-        if (!this.ctx || !this.enabled) return;
+      osc.type = 'sine'
+      osc.frequency.value = freq
 
-        const now = this.ctx.currentTime;
+      gain.gain.setValueAtTime(0, now + i * 0.05)
+      gain.gain.linearRampToValueAtTime(0.1, now + i * 0.05 + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4)
 
-        // Arpeggio
-        [440, 554, 659].forEach((freq, i) => {
-            const osc = this.ctx!.createOscillator();
-            const gain = this.ctx!.createGain();
+      osc.connect(gain)
+      gain.connect(this.masterGain!)
 
-            osc.type = 'sine';
-            osc.frequency.value = freq;
+      osc.start(now + i * 0.05)
+      osc.stop(now + i * 0.05 + 0.4)
+    })
+  }
 
-            gain.gain.setValueAtTime(0, now + i * 0.05);
-            gain.gain.linearRampToValueAtTime(0.1, now + i * 0.05 + 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4);
+  /**
+   * Plays a soft "reverse hihat/cymbal tail" sound for opening UI elements.
+   * Very subtle - like a whisper of air.
+   */
+  public playSwish() {
+    if (!this.ctx || !this.enabled) return
 
-            osc.connect(gain);
-            gain.connect(this.masterGain!);
+    const now = this.ctx.currentTime
+    const duration = 0.08
+    const sampleRate = this.ctx.sampleRate
+    const bufferSize = Math.floor(sampleRate * duration)
 
-            osc.start(now + i * 0.05);
-            osc.stop(now + i * 0.05 + 0.4);
-        });
-    }
+    // Create noise buffer
+    const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
+    const data = buffer.getChannelData(0)
 
-    /**
-     * Plays a soft "reverse hihat/cymbal tail" sound for opening UI elements.
-     * Very subtle - like a whisper of air.
-     */
-    public playSwish() {
-        if (!this.ctx || !this.enabled) return;
-
-        const now = this.ctx.currentTime;
-        const duration = 0.08;
-        const sampleRate = this.ctx.sampleRate;
-        const bufferSize = Math.floor(sampleRate * duration);
-
-        // Create noise buffer
-        const buffer = this.ctx.createBuffer(1, bufferSize, sampleRate);
-        const data = buffer.getChannelData(0);
-
-        // Very gentle rise and fall
-        for (let i = 0; i < bufferSize; i++) {
-            const t = i / bufferSize;
-            // Sine-shaped envelope for smoothness
-            const envelope = Math.sin(t * Math.PI) * 0.5;
-            data[i] = (Math.random() * 2 - 1) * envelope;
-        }
-
-        const source = this.ctx.createBufferSource();
-        source.buffer = buffer;
-
-        // Soft bandpass - lower frequency, wider Q
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = 1500;
-        filter.Q.value = 0.3;
-
-        const gain = this.ctx.createGain();
-        gain.gain.value = 0.06;
-
-        source.connect(filter);
-        filter.connect(gain);
-        gain.connect(this.masterGain!);
-
-        source.start(now);
-        source.stop(now + duration);
+    // Very gentle rise and fall
+    for (let i = 0; i < bufferSize; i++) {
+      const t = i / bufferSize
+      // Sine-shaped envelope for smoothness
+      const envelope = Math.sin(t * Math.PI) * 0.5
+      data[i] = (Math.random() * 2 - 1) * envelope
     }
 
-    public toggle(enabled: boolean) {
-        this.enabled = enabled;
-    }
+    const source = this.ctx.createBufferSource()
+    source.buffer = buffer
 
-    public get isEnabled() {
-        return this.enabled;
-    }
+    // Soft bandpass - lower frequency, wider Q
+    const filter = this.ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 1500
+    filter.Q.value = 0.3
+
+    const gain = this.ctx.createGain()
+    gain.gain.value = 0.06
+
+    source.connect(filter)
+    filter.connect(gain)
+    gain.connect(this.masterGain!)
+
+    source.start(now)
+    source.stop(now + duration)
+  }
+
+  public toggle(enabled: boolean) {
+    this.enabled = enabled
+  }
+
+  public get isEnabled() {
+    return this.enabled
+  }
 }
-  
-export const soundManager = new SoundManager();
+
+export const soundManager = new SoundManager()

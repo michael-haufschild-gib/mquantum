@@ -101,8 +101,16 @@ export interface TransitionValidation {
  */
 const VALID_TRANSITIONS: Record<ResourceState, ResourceState[]> = {
   [ResourceState.Created]: [ResourceState.WriteTarget, ResourceState.Disposed],
-  [ResourceState.WriteTarget]: [ResourceState.ShaderRead, ResourceState.WriteTarget, ResourceState.Disposed],
-  [ResourceState.ShaderRead]: [ResourceState.WriteTarget, ResourceState.ShaderRead, ResourceState.Disposed],
+  [ResourceState.WriteTarget]: [
+    ResourceState.ShaderRead,
+    ResourceState.WriteTarget,
+    ResourceState.Disposed,
+  ],
+  [ResourceState.ShaderRead]: [
+    ResourceState.WriteTarget,
+    ResourceState.ShaderRead,
+    ResourceState.Disposed,
+  ],
   [ResourceState.Disposed]: [], // No valid transitions from disposed
 }
 

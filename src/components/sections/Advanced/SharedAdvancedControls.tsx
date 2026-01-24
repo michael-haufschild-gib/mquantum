@@ -1,33 +1,46 @@
-import { ColorPicker } from '@/components/ui/ColorPicker';
-import { ControlGroup } from '@/components/ui/ControlGroup';
-import { Slider } from '@/components/ui/Slider';
-import { Switch } from '@/components/ui/Switch';
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import React, { useCallback } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { GravityAdvanced } from './GravityAdvanced';
+import { ColorPicker } from '@/components/ui/ColorPicker'
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
+import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import React, { useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { GravityAdvanced } from './GravityAdvanced'
 
 export const SharedAdvancedControls: React.FC = React.memo(() => {
-  const objectType = useGeometryStore(state => state.objectType);
+  const objectType = useGeometryStore((state) => state.objectType)
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
-    sssEnabled: state.sssEnabled, setSssEnabled: state.setSssEnabled,
-    sssIntensity: state.sssIntensity, setSssIntensity: state.setSssIntensity,
-    sssColor: state.sssColor, setSssColor: state.setSssColor,
-    sssThickness: state.sssThickness, setSssThickness: state.setSssThickness,
-    sssJitter: state.sssJitter, setSssJitter: state.setSssJitter,
-  }));
+    sssEnabled: state.sssEnabled,
+    setSssEnabled: state.setSssEnabled,
+    sssIntensity: state.sssIntensity,
+    setSssIntensity: state.setSssIntensity,
+    sssColor: state.sssColor,
+    setSssColor: state.setSssColor,
+    sssThickness: state.sssThickness,
+    setSssThickness: state.setSssThickness,
+    sssJitter: state.sssJitter,
+    setSssJitter: state.setSssJitter,
+  }))
   const {
-    sssEnabled, setSssEnabled,
-    sssIntensity, setSssIntensity,
-    sssColor, setSssColor,
-    sssThickness, setSssThickness,
-    sssJitter, setSssJitter,
-  } = useAppearanceStore(appearanceSelector);
+    sssEnabled,
+    setSssEnabled,
+    sssIntensity,
+    setSssIntensity,
+    sssColor,
+    setSssColor,
+    sssThickness,
+    setSssThickness,
+    sssJitter,
+    setSssJitter,
+  } = useAppearanceStore(appearanceSelector)
 
-  const handleSssColorChange = useCallback((c: string) => {
-    setSssColor(c);
-  }, [setSssColor]);
+  const handleSssColorChange = useCallback(
+    (c: string) => {
+      setSssColor(c)
+    },
+    [setSssColor]
+  )
 
   return (
     <div className="space-y-4 mb-4 pb-4">
@@ -88,7 +101,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
       {/* Gravitational Lensing - only available for black hole */}
       {objectType === 'blackhole' && <GravityAdvanced />}
     </div>
-  );
-});
+  )
+})
 
-SharedAdvancedControls.displayName = 'SharedAdvancedControls';
+SharedAdvancedControls.displayName = 'SharedAdvancedControls'

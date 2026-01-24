@@ -11,25 +11,25 @@
  * Only visible when facesVisible is true.
  */
 
-import { Section } from '@/components/sections/Section';
-import { Button } from '@/components/ui/Button';
-import { ColorPicker } from '@/components/ui/ColorPicker';
-import { Slider } from '@/components/ui/Slider';
-import { Tabs } from '@/components/ui/Tabs';
-import { isRaymarchingFractal } from '@/lib/geometry/registry';
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
-import { usePBRStore, type PBRSlice } from '@/stores/pbrStore';
-import React, { useCallback, useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { ColorAlgorithmSelector } from './ColorAlgorithmSelector';
-import { ColorPreview } from './ColorPreview';
-import { CosineGradientEditor } from './CosineGradientEditor';
-import { DistributionControls } from './DistributionControls';
-import { LchPresetSelector } from './LchPresetSelector';
-import { PresetSelector } from './PresetSelector';
+import { Section } from '@/components/sections/Section'
+import { Button } from '@/components/ui/Button'
+import { ColorPicker } from '@/components/ui/ColorPicker'
+import { Slider } from '@/components/ui/Slider'
+import { Tabs } from '@/components/ui/Tabs'
+import { isRaymarchingFractal } from '@/lib/geometry/registry'
+import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
+import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
+import { usePBRStore, type PBRSlice } from '@/stores/pbrStore'
+import React, { useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { ColorAlgorithmSelector } from './ColorAlgorithmSelector'
+import { ColorPreview } from './ColorPreview'
+import { CosineGradientEditor } from './CosineGradientEditor'
+import { DistributionControls } from './DistributionControls'
+import { LchPresetSelector } from './LchPresetSelector'
+import { PresetSelector } from './PresetSelector'
 
 /**
  * Color algorithms that share the same cosine gradient controls:
@@ -44,18 +44,16 @@ const COSINE_GRADIENT_ALGORITHMS = new Set([
   'mixed',
   'blackbody',
   'dimension',
-]);
+])
 
 export interface FacesSectionProps {
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
-type FacesTabId = 'colors' | 'material';
+type FacesTabId = 'colors' | 'material'
 
-export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
-  defaultOpen = false,
-}) => {
-  const [activeTab, setActiveTab] = React.useState<FacesTabId>('colors');
+export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOpen = false }) => {
+  const [activeTab, setActiveTab] = React.useState<FacesTabId>('colors')
 
   // Get object type and dimension to check rendering mode
   const { objectType, dimension } = useGeometryStore(
@@ -63,10 +61,10 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
       objectType: state.objectType,
       dimension: state.dimension,
     }))
-  );
+  )
 
   // Raymarching fractals (mandelbulb, julia, schroedinger, blackhole) are always fully opaque
-  const isRaymarchingFractalType = isRaymarchingFractal(objectType, dimension);
+  const isRaymarchingFractalType = isRaymarchingFractal(objectType, dimension)
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -81,7 +79,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
     lchChroma: state.lchChroma,
     setLchChroma: state.setLchChroma,
     shaderType: state.shaderType,
-  }));
+  }))
   const {
     facesVisible,
     colorAlgorithm,
@@ -94,13 +92,13 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
     lchChroma,
     setLchChroma,
     shaderType,
-  } = useAppearanceStore(appearanceSelector);
+  } = useAppearanceStore(appearanceSelector)
 
   // Lighting settings
   const lightingSelector = useShallow((state: LightingSlice) => ({
     lightEnabled: state.lightEnabled,
-  }));
-  const { lightEnabled } = useLightingStore(lightingSelector);
+  }))
+  const { lightEnabled } = useLightingStore(lightingSelector)
 
   // PBR settings for faces (from dedicated PBR store)
   const pbrSelector = useShallow((state: PBRSlice) => ({
@@ -112,7 +110,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
     setMetallic: state.setFaceMetallic,
     setSpecularIntensity: state.setFaceSpecularIntensity,
     setSpecularColor: state.setFaceSpecularColor,
-  }));
+  }))
   const {
     roughness,
     metallic,
@@ -122,69 +120,91 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
     setMetallic,
     setSpecularIntensity,
     setSpecularColor,
-  } = usePBRStore(pbrSelector);
+  } = usePBRStore(pbrSelector)
 
-  const surfaceSettings = shaderSettings.surface;
+  const surfaceSettings = shaderSettings.surface
 
   // Check if lighting controls should be shown
-  const showLightingControls = shaderType === 'surface' && lightEnabled;
+  const showLightingControls = shaderType === 'surface' && lightEnabled
 
   const handleTabChange = useCallback((id: string) => {
-    setActiveTab(id as FacesTabId);
-  }, []);
+    setActiveTab(id as FacesTabId)
+  }, [])
 
-  const handleFaceOpacityChange = useCallback((value: number) => {
-    setSurfaceSettings({ faceOpacity: value });
-  }, [setSurfaceSettings]);
+  const handleFaceOpacityChange = useCallback(
+    (value: number) => {
+      setSurfaceSettings({ faceOpacity: value })
+    },
+    [setSurfaceSettings]
+  )
 
-  const tabs = useMemo(() => [
-    {
-      id: 'colors' as const,
-      label: 'Colors',
-      content: (
-        <ColorsTabContent
-          colorAlgorithm={colorAlgorithm}
-          faceColor={faceColor}
-          setFaceColor={setFaceColor}
-          lchLightness={lchLightness}
-          setLchLightness={setLchLightness}
-          lchChroma={lchChroma}
-          setLchChroma={setLchChroma}
-        />
-      ),
-    },
-    {
-      id: 'material' as const,
-      label: 'Material',
-      content: (
-        <MaterialTabContent
-          faceOpacity={surfaceSettings.faceOpacity}
-          setFaceOpacity={handleFaceOpacityChange}
-          showLightingControls={showLightingControls}
-          specularColor={specularColor}
-          setSpecularColor={setSpecularColor}
-          specularIntensity={specularIntensity}
-          setSpecularIntensity={setSpecularIntensity}
-          roughness={roughness}
-          setRoughness={setRoughness}
-          metallic={metallic}
-          setMetallic={setMetallic}
-          // Hide opacity for raymarching fractals (always fully opaque)
-          hideOpacity={isRaymarchingFractalType}
-        />
-      ),
-    },
-  ], [
-    colorAlgorithm, faceColor, setFaceColor, lchLightness, setLchLightness,
-    lchChroma, setLchChroma, surfaceSettings.faceOpacity, handleFaceOpacityChange,
-    showLightingControls, specularColor, setSpecularColor, specularIntensity,
-    setSpecularIntensity, roughness, setRoughness, metallic, setMetallic,
-    isRaymarchingFractalType
-  ]);
+  const tabs = useMemo(
+    () => [
+      {
+        id: 'colors' as const,
+        label: 'Colors',
+        content: (
+          <ColorsTabContent
+            colorAlgorithm={colorAlgorithm}
+            faceColor={faceColor}
+            setFaceColor={setFaceColor}
+            lchLightness={lchLightness}
+            setLchLightness={setLchLightness}
+            lchChroma={lchChroma}
+            setLchChroma={setLchChroma}
+          />
+        ),
+      },
+      {
+        id: 'material' as const,
+        label: 'Material',
+        content: (
+          <MaterialTabContent
+            faceOpacity={surfaceSettings.faceOpacity}
+            setFaceOpacity={handleFaceOpacityChange}
+            showLightingControls={showLightingControls}
+            specularColor={specularColor}
+            setSpecularColor={setSpecularColor}
+            specularIntensity={specularIntensity}
+            setSpecularIntensity={setSpecularIntensity}
+            roughness={roughness}
+            setRoughness={setRoughness}
+            metallic={metallic}
+            setMetallic={setMetallic}
+            // Hide opacity for raymarching fractals (always fully opaque)
+            hideOpacity={isRaymarchingFractalType}
+          />
+        ),
+      },
+    ],
+    [
+      colorAlgorithm,
+      faceColor,
+      setFaceColor,
+      lchLightness,
+      setLchLightness,
+      lchChroma,
+      setLchChroma,
+      surfaceSettings.faceOpacity,
+      handleFaceOpacityChange,
+      showLightingControls,
+      specularColor,
+      setSpecularColor,
+      specularIntensity,
+      setSpecularIntensity,
+      roughness,
+      setRoughness,
+      metallic,
+      setMetallic,
+      isRaymarchingFractalType,
+    ]
+  )
 
   return (
     <Section title="Faces" defaultOpen={defaultOpen} data-testid="section-faces">
-      <div className={`transition-opacity duration-300 ${!facesVisible ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
+      <div
+        className={`transition-opacity duration-300 ${!facesVisible ? 'opacity-40 pointer-events-none grayscale' : ''}`}
+      >
         <Tabs
           tabs={tabs}
           value={activeTab}
@@ -193,53 +213,53 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({
           data-testid="faces-tabs"
         />
         {!facesVisible && (
-            <div className="text-center p-4 mt-2 border border-dashed border-border-default rounded-lg bg-[var(--bg-hover)]">
-                <p className="text-xs text-text-secondary">Enable Faces to edit settings</p>
-            </div>
+          <div className="text-center p-4 mt-2 border border-dashed border-border-default rounded-lg bg-[var(--bg-hover)]">
+            <p className="text-xs text-text-secondary">Enable Faces to edit settings</p>
+          </div>
         )}
       </div>
     </Section>
-  );
-});
+  )
+})
 
-FacesSection.displayName = 'FacesSection';
+FacesSection.displayName = 'FacesSection'
 
 // =============================================================================
 // Colors Tab Content
 // =============================================================================
 
 interface ColorsTabContentProps {
-  colorAlgorithm: string;
-  faceColor: string;
-  setFaceColor: (color: string) => void;
-  lchLightness: number;
-  setLchLightness: (value: number) => void;
-  lchChroma: number;
-  setLchChroma: (value: number) => void;
+  colorAlgorithm: string
+  faceColor: string
+  setFaceColor: (color: string) => void
+  lchLightness: number
+  setLchLightness: (value: number) => void
+  lchChroma: number
+  setLchChroma: (value: number) => void
 }
 
-const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(({
-  colorAlgorithm,
-  faceColor,
-  setFaceColor,
-  lchLightness,
-  setLchLightness,
-  lchChroma,
-  setLchChroma,
-}) => {
-  return (
-    <div className="space-y-4">
-      {/* Color Algorithm Selection */}
+const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
+  ({
+    colorAlgorithm,
+    faceColor,
+    setFaceColor,
+    lchLightness,
+    setLchLightness,
+    lchChroma,
+    setLchChroma,
+  }) => {
+    return (
+      <div className="space-y-4">
+        {/* Color Algorithm Selection */}
         <ColorAlgorithmSelector />
 
-      {/* Live Preview */}
+        {/* Live Preview */}
         <ColorPreview />
 
-      {/* Algorithm-Specific Controls */}
+        {/* Algorithm-Specific Controls */}
 
         {/* Monochromatic and Analogous use base color */}
-        {(colorAlgorithm === 'monochromatic' ||
-          colorAlgorithm === 'analogous') && (
+        {(colorAlgorithm === 'monochromatic' || colorAlgorithm === 'analogous') && (
           <ColorPicker
             label="Base Color"
             value={faceColor}
@@ -291,56 +311,56 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(({
             <MultiSourceWeightsEditor />
           </div>
         )}
+      </div>
+    )
+  }
+)
 
-    </div>
-  );
-});
-
-ColorsTabContent.displayName = 'ColorsTabContent';
+ColorsTabContent.displayName = 'ColorsTabContent'
 
 // =============================================================================
 // Material Tab Content
 // =============================================================================
 
 interface MaterialTabContentProps {
-  faceOpacity: number;
-  setFaceOpacity: (value: number) => void;
-  showLightingControls: boolean;
-  specularColor: string;
-  setSpecularColor: (color: string) => void;
-  specularIntensity: number;
-  setSpecularIntensity: (value: number) => void;
-  roughness: number;
-  setRoughness: (value: number) => void;
-  metallic: number;
-  setMetallic: (value: number) => void;
+  faceOpacity: number
+  setFaceOpacity: (value: number) => void
+  showLightingControls: boolean
+  specularColor: string
+  setSpecularColor: (color: string) => void
+  specularIntensity: number
+  setSpecularIntensity: (value: number) => void
+  roughness: number
+  setRoughness: (value: number) => void
+  metallic: number
+  setMetallic: (value: number) => void
   // Hide opacity controls for raymarching fractals (always fully opaque)
-  hideOpacity?: boolean;
+  hideOpacity?: boolean
 }
 
-const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(({
-  faceOpacity,
-  setFaceOpacity,
-  showLightingControls,
-  specularColor,
-  setSpecularColor,
-  specularIntensity,
-  setSpecularIntensity,
-  roughness,
-  setRoughness,
-  metallic,
-  setMetallic,
-  hideOpacity = false,
-}) => {
-  const handleResetSpecularColor = useCallback(() => {
-    setSpecularColor(DEFAULT_FACE_PBR.specularColor);
-  }, [setSpecularColor]);
+const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
+  ({
+    faceOpacity,
+    setFaceOpacity,
+    showLightingControls,
+    specularColor,
+    setSpecularColor,
+    specularIntensity,
+    setSpecularIntensity,
+    roughness,
+    setRoughness,
+    metallic,
+    setMetallic,
+    hideOpacity = false,
+  }) => {
+    const handleResetSpecularColor = useCallback(() => {
+      setSpecularColor(DEFAULT_FACE_PBR.specularColor)
+    }, [setSpecularColor])
 
-  return (
-    <div className="space-y-4">
-      {/* Face Opacity - Hidden for raymarching fractals (always fully opaque) */}
-      {!hideOpacity && (
-
+    return (
+      <div className="space-y-4">
+        {/* Face Opacity - Hidden for raymarching fractals (always fully opaque) */}
+        {!hideOpacity && (
           <Slider
             label="Opacity"
             min={0}
@@ -351,55 +371,53 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(({
             showValue
             data-testid="slider-face-opacity"
           />
+        )}
 
-      )}
+        {/* PBR Material - Only when lighting is enabled */}
+        {showLightingControls && (
+          <div>
+            {/* Metallic */}
+            <Slider
+              label="Metallic"
+              min={0}
+              max={1}
+              step={0.05}
+              value={metallic}
+              onChange={setMetallic}
+              showValue
+              tooltip="0 = dielectric (plastic, wood), 1 = metal (gold, chrome)"
+              data-testid="slider-metallic"
+            />
 
-      {/* PBR Material - Only when lighting is enabled */}
-      {showLightingControls && (
-        <div>
+            {/* Roughness (GGX PBR) */}
+            <Slider
+              label="Roughness"
+              min={0}
+              max={1}
+              step={0.05}
+              value={roughness}
+              onChange={setRoughness}
+              showValue
+              tooltip="Surface roughness (0 = mirror, 1 = matte)"
+              data-testid="slider-roughness"
+            />
 
-          {/* Metallic */}
-          <Slider
-            label="Metallic"
-            min={0}
-            max={1}
-            step={0.05}
-            value={metallic}
-            onChange={setMetallic}
-            showValue
-            tooltip="0 = dielectric (plastic, wood), 1 = metal (gold, chrome)"
-            data-testid="slider-metallic"
-          />
+            <div className="h-px bg-[var(--bg-hover)] my-2" />
 
-          {/* Roughness (GGX PBR) */}
-          <Slider
-            label="Roughness"
-            min={0}
-            max={1}
-            step={0.05}
-            value={roughness}
-            onChange={setRoughness}
-            showValue
-            tooltip="Surface roughness (0 = mirror, 1 = matte)"
-            data-testid="slider-roughness"
-          />
+            {/* Specular Intensity */}
+            <Slider
+              label="Specular Intensity"
+              min={0}
+              max={2}
+              step={0.1}
+              value={specularIntensity}
+              onChange={setSpecularIntensity}
+              showValue
+              tooltip="Artistic multiplier for specular highlights"
+            />
 
-          <div className="h-px bg-[var(--bg-hover)] my-2" />
-
-          {/* Specular Intensity */}
-          <Slider
-            label="Specular Intensity"
-            min={0}
-            max={2}
-            step={0.1}
-            value={specularIntensity}
-            onChange={setSpecularIntensity}
-            showValue
-            tooltip="Artistic multiplier for specular highlights"
-          />
-
-          {/* Specular Color */}
-          <div className="flex items-center justify-between">
+            {/* Specular Color */}
+            <div className="flex items-center justify-between">
               <ColorPicker
                 label="Specular Color"
                 value={specularColor}
@@ -416,22 +434,23 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(({
                   Reset
                 </Button>
               )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {!showLightingControls && (
-        <div className="p-4 rounded-lg bg-[var(--bg-hover)] border border-border-subtle border-dashed text-center">
+        {!showLightingControls && (
+          <div className="p-4 rounded-lg bg-[var(--bg-hover)] border border-border-subtle border-dashed text-center">
             <p className="text-xs text-text-secondary italic">
-            Enable lighting in the Visual section to access PBR material settings.
+              Enable lighting in the Visual section to access PBR material settings.
             </p>
-        </div>
-      )}
-    </div>
-  );
-});
+          </div>
+        )}
+      </div>
+    )
+  }
+)
 
-MaterialTabContent.displayName = 'MaterialTabContent';
+MaterialTabContent.displayName = 'MaterialTabContent'
 
 // =============================================================================
 // Multi-Source Weights Editor
@@ -447,25 +466,32 @@ const MultiSourceWeightsEditor: React.FC = React.memo(() => {
       multiSourceWeights: state.multiSourceWeights,
       setMultiSourceWeights: state.setMultiSourceWeights,
     }))
-  );
+  )
 
-  const handleDepthChange = useCallback((value: number) => {
-    setMultiSourceWeights({ depth: value });
-  }, [setMultiSourceWeights]);
+  const handleDepthChange = useCallback(
+    (value: number) => {
+      setMultiSourceWeights({ depth: value })
+    },
+    [setMultiSourceWeights]
+  )
 
-  const handleOrbitTrapChange = useCallback((value: number) => {
-    setMultiSourceWeights({ orbitTrap: value });
-  }, [setMultiSourceWeights]);
+  const handleOrbitTrapChange = useCallback(
+    (value: number) => {
+      setMultiSourceWeights({ orbitTrap: value })
+    },
+    [setMultiSourceWeights]
+  )
 
-  const handleNormalChange = useCallback((value: number) => {
-    setMultiSourceWeights({ normal: value });
-  }, [setMultiSourceWeights]);
+  const handleNormalChange = useCallback(
+    (value: number) => {
+      setMultiSourceWeights({ normal: value })
+    },
+    [setMultiSourceWeights]
+  )
 
   return (
     <div className="space-y-4">
-      <div className="text-sm font-medium text-text-secondary">
-        Source Weights
-      </div>
+      <div className="text-sm font-medium text-text-secondary">Source Weights</div>
 
       <Slider
         label="Depth"
@@ -500,7 +526,7 @@ const MultiSourceWeightsEditor: React.FC = React.memo(() => {
         tooltip="Weight for normal direction-based coloring"
       />
     </div>
-  );
-});
+  )
+})
 
-MultiSourceWeightsEditor.displayName = 'MultiSourceWeightsEditor';
+MultiSourceWeightsEditor.displayName = 'MultiSourceWeightsEditor'

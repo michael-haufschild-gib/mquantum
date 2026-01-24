@@ -11,4 +11,4 @@ export const constantsBlock = `
 #define MODE_OCEAN 6.0
 #define MODE_TWILIGHT 7.0
 #define MODE_STARFIELD 8.0
-`;
+`

@@ -9,7 +9,7 @@
  * @module rendering/shaders/postprocessing/BilateralUpsampleShader
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 export const BilateralUpsampleShader = {
   uniforms: {
@@ -118,15 +118,14 @@ export const BilateralUpsampleShader = {
       }
     }
   `,
-};
+}
 
 export type BilateralUpsampleUniforms = {
-  tInput: THREE.Uniform<THREE.Texture | null>;
-  tColor: THREE.Uniform<THREE.Texture | null>;
-  tDepth: THREE.Uniform<THREE.Texture | null>;
-  uResolution: THREE.Uniform<THREE.Vector2>;
-  uDepthThreshold: THREE.Uniform<number>;
-  uNearClip: THREE.Uniform<number>;
-  uFarClip: THREE.Uniform<number>;
-};
-
+  tInput: THREE.Uniform<THREE.Texture | null>
+  tColor: THREE.Uniform<THREE.Texture | null>
+  tDepth: THREE.Uniform<THREE.Texture | null>
+  uResolution: THREE.Uniform<THREE.Vector2>
+  uDepthThreshold: THREE.Uniform<number>
+  uNearClip: THREE.Uniform<number>
+  uFarClip: THREE.Uniform<number>
+}

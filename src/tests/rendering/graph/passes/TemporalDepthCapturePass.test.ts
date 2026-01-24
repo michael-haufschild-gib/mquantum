@@ -52,8 +52,17 @@ describe('TemporalDepthCapturePass', () => {
   })
 
   it('should have valid history after successful execution', () => {
-    const positionTexture = new THREE.DataTexture(new Float32Array(4 * 4 * 4), 4, 4, THREE.RGBAFormat, THREE.FloatType)
-    ;(positionTexture as unknown as { image: { width: number; height: number } }).image = { width: 4, height: 4 }
+    const positionTexture = new THREE.DataTexture(
+      new Float32Array(4 * 4 * 4),
+      4,
+      4,
+      THREE.RGBAFormat,
+      THREE.FloatType
+    )
+    ;(positionTexture as unknown as { image: { width: number; height: number } }).image = {
+      width: 4,
+      height: 4,
+    }
 
     const writeTarget = new THREE.WebGLRenderTarget(4, 4)
 
@@ -104,8 +113,17 @@ describe('TemporalDepthCapturePass', () => {
   })
 
   it('should invalidate history when invalidate() is called', () => {
-    const positionTexture = new THREE.DataTexture(new Float32Array(4 * 4 * 4), 4, 4, THREE.RGBAFormat, THREE.FloatType)
-    ;(positionTexture as unknown as { image: { width: number; height: number } }).image = { width: 4, height: 4 }
+    const positionTexture = new THREE.DataTexture(
+      new Float32Array(4 * 4 * 4),
+      4,
+      4,
+      THREE.RGBAFormat,
+      THREE.FloatType
+    )
+    ;(positionTexture as unknown as { image: { width: number; height: number } }).image = {
+      width: 4,
+      height: 4,
+    }
 
     const writeTarget = new THREE.WebGLRenderTarget(4, 4)
 
@@ -138,8 +156,17 @@ describe('TemporalDepthCapturePass', () => {
   })
 
   it('should track camera matrices across frames', () => {
-    const positionTexture = new THREE.DataTexture(new Float32Array(4 * 4 * 4), 4, 4, THREE.RGBAFormat, THREE.FloatType)
-    ;(positionTexture as unknown as { image: { width: number; height: number } }).image = { width: 4, height: 4 }
+    const positionTexture = new THREE.DataTexture(
+      new Float32Array(4 * 4 * 4),
+      4,
+      4,
+      THREE.RGBAFormat,
+      THREE.FloatType
+    )
+    ;(positionTexture as unknown as { image: { width: number; height: number } }).image = {
+      width: 4,
+      height: 4,
+    }
 
     const writeTarget = new THREE.WebGLRenderTarget(4, 4)
     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 100)

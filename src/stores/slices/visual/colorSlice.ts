@@ -118,8 +118,12 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
         // This prevents confusion when old distribution settings affect HSL algorithms
         const prevParams = ALGORITHM_PARAMS[state.colorAlgorithm] || ['distribution']
         const targetParams = ALGORITHM_PARAMS[algorithm] || ['distribution']
-        const wasComplex = prevParams.some((p) => p === 'cosine' || p === 'lch' || p === 'multiSource')
-        const isSimple = !targetParams.some((p) => p === 'cosine' || p === 'lch' || p === 'multiSource')
+        const wasComplex = prevParams.some(
+          (p) => p === 'cosine' || p === 'lch' || p === 'multiSource'
+        )
+        const isSimple = !targetParams.some(
+          (p) => p === 'cosine' || p === 'lch' || p === 'multiSource'
+        )
 
         if (wasComplex && isSimple) {
           // Switching from complex (cosine/lch/multiSource) to simple HSL-based - reset distribution

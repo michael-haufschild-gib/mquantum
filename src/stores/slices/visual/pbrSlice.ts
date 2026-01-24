@@ -236,8 +236,7 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
     })),
 
   // --- Version Bump ---
-  bumpVersion: () =>
-    set((state) => ({ pbrVersion: state.pbrVersion + 1 })),
+  bumpVersion: () => set((state) => ({ pbrVersion: state.pbrVersion + 1 })),
 
   // --- Reset ---
   resetPBR: () =>

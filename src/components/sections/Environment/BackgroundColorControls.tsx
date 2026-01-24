@@ -54,9 +54,7 @@ export const BackgroundColorControls: React.FC = React.memo(() => {
       )}
 
       {!skyboxEnabled && (
-        <p className="text-xs text-text-tertiary">
-          Enable a skybox to use blend modes.
-        </p>
+        <p className="text-xs text-text-tertiary">Enable a skybox to use blend modes.</p>
       )}
     </div>
   )

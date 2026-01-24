@@ -71,8 +71,7 @@ describe('dismissedDialogsStore', () => {
     })
 
     it('dismiss_multipleDialogs_allAreDismissed', () => {
-      const { dismiss, isDismissed, getDismissedCount } =
-        useDismissedDialogsStore.getState()
+      const { dismiss, isDismissed, getDismissedCount } = useDismissedDialogsStore.getState()
 
       dismiss('dialog-1')
       dismiss('dialog-2')
@@ -145,8 +144,7 @@ describe('dismissedDialogsStore', () => {
     })
 
     it('restore_nonExistentDialog_noEffect', () => {
-      const { dismiss, restore, getDismissedCount } =
-        useDismissedDialogsStore.getState()
+      const { dismiss, restore, getDismissedCount } = useDismissedDialogsStore.getState()
 
       dismiss('existing-dialog')
       restore('non-existent-dialog')
@@ -173,8 +171,7 @@ describe('dismissedDialogsStore', () => {
 
   describe('resetAll', () => {
     it('resetAll_withMultipleDismissed_clearsAll', () => {
-      const { dismiss, resetAll, getDismissedCount } =
-        useDismissedDialogsStore.getState()
+      const { dismiss, resetAll, getDismissedCount } = useDismissedDialogsStore.getState()
 
       dismiss('dialog-1')
       dismiss('dialog-2')

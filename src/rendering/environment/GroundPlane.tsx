@@ -25,41 +25,41 @@
  * ```
  */
 
-import type { Vector3D } from '@/lib/math/types';
-import { RENDER_LAYERS } from '@/rendering/core/layers';
-import type { GroundPlaneType, WallPosition } from '@/stores/defaults/visualDefaults';
-import { useCallback, useMemo } from 'react';
-import { Color, DoubleSide, FrontSide, Object3D } from 'three';
-import { GroundPlaneMaterial } from './GroundPlaneMaterial';
+import type { Vector3D } from '@/lib/math/types'
+import { RENDER_LAYERS } from '@/rendering/core/layers'
+import type { GroundPlaneType, WallPosition } from '@/stores/defaults/visualDefaults'
+import { useCallback, useMemo } from 'react'
+import { Color, DoubleSide, FrontSide, Object3D } from 'three'
+import { GroundPlaneMaterial } from './GroundPlaneMaterial'
 
 /**
  * Props for the GroundPlane component
  */
 export interface GroundPlaneProps {
   /** 3D projected vertices to calculate bounds from */
-  vertices?: Vector3D[];
+  vertices?: Vector3D[]
   /** Additional offset below the lowest point (default: 0.5) */
-  offset?: number;
+  offset?: number
   /** Which walls are currently active/visible */
-  activeWalls?: WallPosition[];
+  activeWalls?: WallPosition[]
   /**
    * Minimum bounding radius to consider for positioning.
    * Used when external objects (like raymarched Mandelbulb) need to be
    * accounted for even if they don't contribute to vertices array.
    */
-  minBoundingRadius?: number;
+  minBoundingRadius?: number
   /** Surface color (default: '#101010') */
-  color?: string;
+  color?: string
   /** Surface type: 'two-sided' (visible from both sides) or 'plane' (single-sided) */
-  surfaceType?: GroundPlaneType;
+  surfaceType?: GroundPlaneType
   /** Whether to show the grid overlay (default: true) */
-  showGrid?: boolean;
+  showGrid?: boolean
   /** Grid line color (default: '#3a3a3a') */
-  gridColor?: string;
+  gridColor?: string
   /** Grid cell spacing (default: 1) */
-  gridSpacing?: number;
+  gridSpacing?: number
   /** Size scale multiplier (1-5, 1 = auto-calculated minimum) */
-  sizeScale?: number;
+  sizeScale?: number
   // Note: PBR properties (metallic, roughness, specularIntensity, specularColor)
   // are managed via UniformManager using 'pbr-ground' source
 }
@@ -81,12 +81,12 @@ function calculateWallDistance(
 ): number {
   // Calculate bounding sphere radius from vertices (max distance from origin)
   // This gives a stable position that doesn't change during rotation
-  let maxRadius = 0;
+  let maxRadius = 0
   if (vertices && vertices.length > 0) {
     for (const v of vertices) {
-      const dist = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+      const dist = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
       if (dist > maxRadius) {
-        maxRadius = dist;
+        maxRadius = dist
       }
     }
   }
@@ -94,19 +94,19 @@ function calculateWallDistance(
   // Use the larger of calculated radius and minimum bounding radius
   // This ensures walls account for external objects (e.g., raymarched Mandelbulb)
   if (minBoundingRadius !== undefined && minBoundingRadius > maxRadius) {
-    maxRadius = minBoundingRadius;
+    maxRadius = minBoundingRadius
   }
 
   // Default distance when no vertices and no minBoundingRadius
   if (maxRadius === 0) {
-    return 2;
+    return 2
   }
 
   // Round to nearest 0.25 to prevent jitter from small position changes
-  const roundedRadius = Math.ceil(maxRadius * 4) / 4;
+  const roundedRadius = Math.ceil(maxRadius * 4) / 4
 
   // Return distance from origin
-  return roundedRadius + offset;
+  return roundedRadius + offset
 }
 
 /**
@@ -117,27 +117,29 @@ function calculateWallDistance(
  */
 function calculatePlaneSize(vertices: Vector3D[] | undefined): number {
   if (!vertices || vertices.length === 0) {
-    return 20;
+    return 20
   }
 
   // Find bounding box in X and Z
-  let minX = Infinity, maxX = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
+  let minX = Infinity,
+    maxX = -Infinity
+  let minZ = Infinity,
+    maxZ = -Infinity
 
   for (const v of vertices) {
-    if (v[0] < minX) minX = v[0];
-    if (v[0] > maxX) maxX = v[0];
-    if (v[2] < minZ) minZ = v[2];
-    if (v[2] > maxZ) maxZ = v[2];
+    if (v[0] < minX) minX = v[0]
+    if (v[0] > maxX) maxX = v[0]
+    if (v[2] < minZ) minZ = v[2]
+    if (v[2] > maxZ) maxZ = v[2]
   }
 
   // Calculate max extent and add padding
-  const extentX = maxX - minX;
-  const extentZ = maxZ - minZ;
-  const maxExtent = Math.max(extentX, extentZ, 4);
+  const extentX = maxX - minX
+  const extentZ = maxZ - minZ
+  const maxExtent = Math.max(extentX, extentZ, 4)
 
   // Return size with generous padding for visual appeal
-  return Math.max(maxExtent * 3, 10);
+  return Math.max(maxExtent * 3, 10)
 }
 
 /**
@@ -148,27 +150,27 @@ function calculatePlaneSize(vertices: Vector3D[] | undefined): number {
  * @returns Lightened hex color
  */
 function lightenColor(hex: string, percent: number): string {
-  const color = new Color(hex);
-  const hsl = { h: 0, s: 0, l: 0 };
-  color.getHSL(hsl);
-  hsl.l = Math.min(1, hsl.l + percent / 100);
-  color.setHSL(hsl.h, hsl.s, hsl.l);
-  return '#' + color.getHexString();
+  const color = new Color(hex)
+  const hsl = { h: 0, s: 0, l: 0 }
+  color.getHSL(hsl)
+  hsl.l = Math.min(1, hsl.l + percent / 100)
+  color.setHSL(hsl.h, hsl.s, hsl.l)
+  return '#' + color.getHexString()
 }
 
 /** Configuration for a single wall */
 interface WallConfig {
-  position: [number, number, number];
-  surfaceRotation: [number, number, number];
-  gridRotation: [number, number, number];
+  position: [number, number, number]
+  surfaceRotation: [number, number, number]
+  gridRotation: [number, number, number]
   /** Offset for grid to prevent z-fighting (in direction of wall normal) */
-  gridOffset: [number, number, number];
+  gridOffset: [number, number, number]
 }
 
 /**
  * Offset to prevent z-fighting between grid and surface.
  */
-const Z_OFFSET = 0.05;
+const Z_OFFSET = 0.05
 
 /**
  * Get wall configuration for a given wall position and distance.
@@ -192,7 +194,7 @@ function getWallConfig(wall: WallPosition, distance: number): WallConfig {
         surfaceRotation: [-Math.PI / 2, 0, 0],
         gridRotation: [Math.PI, 0, 0],
         gridOffset: [0, Z_OFFSET, 0],
-      };
+      }
     case 'top':
       // Ceiling at y=+distance, horizontal, facing down
       // Surface: rotate +90° around X (XY -> XZ, normal +Z -> -Y)
@@ -203,7 +205,7 @@ function getWallConfig(wall: WallPosition, distance: number): WallConfig {
         surfaceRotation: [Math.PI / 2, 0, 0],
         gridRotation: [0, 0, 0],
         gridOffset: [0, -Z_OFFSET, 0],
-      };
+      }
     case 'back':
       // Back wall at z=-distance, vertical (XY plane), facing +Z
       // Surface: no rotation needed (already XY, normal +Z)
@@ -214,7 +216,7 @@ function getWallConfig(wall: WallPosition, distance: number): WallConfig {
         surfaceRotation: [0, 0, 0],
         gridRotation: [-Math.PI / 2, 0, 0],
         gridOffset: [0, 0, Z_OFFSET],
-      };
+      }
     case 'left':
       // Left wall at x=-distance, vertical (YZ plane), facing +X
       // Surface: rotate +90° around Y (XY -> YZ, normal +Z -> +X)
@@ -225,7 +227,7 @@ function getWallConfig(wall: WallPosition, distance: number): WallConfig {
         surfaceRotation: [0, Math.PI / 2, 0],
         gridRotation: [0, 0, Math.PI / 2],
         gridOffset: [Z_OFFSET, 0, 0],
-      };
+      }
     case 'right':
       // Right wall at x=+distance, vertical (YZ plane), facing -X
       // Surface: rotate -90° around Y (XY -> YZ, normal +Z -> -X)
@@ -236,14 +238,14 @@ function getWallConfig(wall: WallPosition, distance: number): WallConfig {
         surfaceRotation: [0, -Math.PI / 2, 0],
         gridRotation: [0, 0, -Math.PI / 2],
         gridOffset: [-Z_OFFSET, 0, 0],
-      };
+      }
     default:
       return {
         position: [0, -distance, 0],
         surfaceRotation: [-Math.PI / 2, 0, 0],
         gridRotation: [Math.PI, 0, 0],
         gridOffset: [0, Z_OFFSET, 0],
-      };
+      }
   }
 }
 
@@ -281,31 +283,28 @@ export function GroundPlane({
   sizeScale = 1,
 }: GroundPlaneProps) {
   // Calculate position and size based on vertex count (not positions)
-  const vertexCount = vertices?.length ?? 0;
+  const vertexCount = vertices?.length ?? 0
 
   const wallDistance = useMemo(
     () => calculateWallDistance(vertices, offset, minBoundingRadius),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vertexCount, offset, minBoundingRadius]
-  );
+  )
 
   const basePlaneSize = useMemo(
     () => calculatePlaneSize(vertices),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [vertexCount]
-  );
+  )
 
   // Apply size scale to the base plane size
-  const planeSize = basePlaneSize * sizeScale;
+  const planeSize = basePlaneSize * sizeScale
 
   // Calculate grid section color
-  const sectionColor = useMemo(
-    () => lightenColor(gridColor, 15),
-    [gridColor]
-  );
+  const sectionColor = useMemo(() => lightenColor(gridColor, 15), [gridColor])
 
   // Determine material side
-  const side = surfaceType === 'two-sided' ? DoubleSide : FrontSide;
+  const side = surfaceType === 'two-sided' ? DoubleSide : FrontSide
 
   // Callback ref to set layer on wall meshes
   // IMPORTANT: Must be called before any early returns to maintain hook order
@@ -321,14 +320,13 @@ export function GroundPlane({
   // - NormalPass: [ENVIRONMENT] - includes floor for SSAO/edge detection
   const setWallLayer = useCallback((obj: Object3D | null) => {
     if (obj) {
-      obj.layers.set(RENDER_LAYERS.ENVIRONMENT);
-
+      obj.layers.set(RENDER_LAYERS.ENVIRONMENT)
     }
-  }, []);
+  }, [])
 
   // Don't render if no walls are active
   if (!activeWalls || activeWalls.length === 0) {
-    return null;
+    return null
   }
 
   return (
@@ -339,7 +337,7 @@ export function GroundPlane({
         Grid is rendered directly in the shader for MRT compatibility.
       */}
       {activeWalls.map((wall) => {
-        const config = getWallConfig(wall, wallDistance);
+        const config = getWallConfig(wall, wallDistance)
         return (
           <mesh
             key={wall}
@@ -362,8 +360,8 @@ export function GroundPlane({
               gridFadeStrength={2}
             />
           </mesh>
-        );
+        )
       })}
     </>
-  );
+  )
 }

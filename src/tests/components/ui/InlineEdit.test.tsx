@@ -279,13 +279,7 @@ describe('InlineEdit', () => {
 
   describe('aria labels', () => {
     it('should use custom edit button aria label', () => {
-      render(
-        <InlineEdit
-          value="Test"
-          onSave={vi.fn()}
-          editButtonAriaLabel="Rename this item"
-        />
-      )
+      render(<InlineEdit value="Test" onSave={vi.fn()} editButtonAriaLabel="Rename this item" />)
 
       expect(screen.getByRole('button', { name: 'Rename this item' })).toBeInTheDocument()
     })

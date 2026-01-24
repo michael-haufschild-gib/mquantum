@@ -1,1 +1,23 @@
-{"rustc":18415816196306954164,"features":"[\"default\", \"proc-macro\"]","declared_features":"[\"default\", \"nightly\", \"proc-macro\", \"span-locations\"]","target":369203346396300798,"profile":9719146384424564959,"path":13864907050147870592,"deps":[[1548027836057496652,"unicode_ident",false,17268687429230734929],[14285738760999836560,"build_script_build",false,1089267875963621405]],"local":[{"CheckDepInfo":{"dep_info":"release/.fingerprint/proc-macro2-3b91e0ad6053e374/dep-lib-proc_macro2","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":0}
+{
+  "rustc": 18415816196306954164,
+  "features": "[\"default\", \"proc-macro\"]",
+  "declared_features": "[\"default\", \"nightly\", \"proc-macro\", \"span-locations\"]",
+  "target": 369203346396300798,
+  "profile": 9719146384424564959,
+  "path": 13864907050147870592,
+  "deps": [
+    [1548027836057496652, "unicode_ident", false, 17268687429230734929],
+    [14285738760999836560, "build_script_build", false, 1089267875963621405]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "release/.fingerprint/proc-macro2-3b91e0ad6053e374/dep-lib-proc_macro2",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

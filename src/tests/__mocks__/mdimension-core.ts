@@ -84,7 +84,6 @@ export function multiply_matrix_vector_wasm(
   return new Float64Array(0)
 }
 
-
 // Phase 2: Matrix and vector functions
 /**
  * Multiply matrices mock
@@ -139,7 +138,6 @@ export function subtract_vectors_wasm(_a: Float64Array, _b: Float64Array): Float
   return new Float64Array(0)
 }
 
-
 // Geometry worker functions (matching lib.rs exports)
 
 /**
@@ -147,9 +145,13 @@ export function subtract_vectors_wasm(_a: Float64Array, _b: Float64Array): Float
  * @param _config - Configuration object
  * @returns Mock polytope result
  */
-export function generate_wythoff_wasm(
-  _config: Record<string, unknown>
-): { vertices: number[]; edges: number[]; faces: number[]; dimension: number; warnings: string[] } {
+export function generate_wythoff_wasm(_config: Record<string, unknown>): {
+  vertices: number[]
+  edges: number[]
+  faces: number[]
+  dimension: number
+  warnings: string[]
+} {
   return { vertices: [], edges: [], faces: [], dimension: 0, warnings: [] }
 }
 
@@ -164,7 +166,13 @@ export function generate_root_system_wasm(
   _root_type: string,
   _dimension: number,
   _scale: number
-): { vertices: number[]; edges: number[]; dimension: number; vertex_count: number; edge_count: number } {
+): {
+  vertices: number[]
+  edges: number[]
+  dimension: number
+  vertex_count: number
+  edge_count: number
+} {
   return { vertices: [], edges: [], dimension: 0, vertex_count: 0, edge_count: 0 }
 }
 

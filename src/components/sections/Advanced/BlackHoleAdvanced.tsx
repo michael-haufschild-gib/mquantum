@@ -1,13 +1,13 @@
-import { ColorPicker } from '@/components/ui/ColorPicker';
-import { ControlGroup } from '@/components/ui/ControlGroup';
-import { NumberInput } from '@/components/ui/NumberInput';
-import { Select } from '@/components/ui/Select';
-import { Slider } from '@/components/ui/Slider';
-import { ToggleButton } from '@/components/ui/ToggleButton';
-import type { BlackHoleRayBendingMode } from '@/lib/geometry/extended/types';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { ColorPicker } from '@/components/ui/ColorPicker'
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { NumberInput } from '@/components/ui/NumberInput'
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import type { BlackHoleRayBendingMode } from '@/lib/geometry/extended/types'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 export const BlackHoleAdvanced: React.FC = React.memo(() => {
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
@@ -51,7 +51,7 @@ export const BlackHoleAdvanced: React.FC = React.memo(() => {
     setJetsGodRaysIntensity: state.setBlackHoleJetsGodRaysIntensity,
     setJetsGodRaysSamples: state.setBlackHoleJetsGodRaysSamples,
     setJetsGodRaysDecay: state.setBlackHoleJetsGodRaysDecay,
-  }));
+  }))
   const {
     config,
     setBloomBoost,
@@ -86,7 +86,7 @@ export const BlackHoleAdvanced: React.FC = React.memo(() => {
     setJetsGodRaysIntensity,
     setJetsGodRaysSamples,
     setJetsGodRaysDecay,
-  } = useExtendedObjectStore(extendedObjectSelector);
+  } = useExtendedObjectStore(extendedObjectSelector)
 
   return (
     <div className="space-y-4">
@@ -466,7 +466,7 @@ export const BlackHoleAdvanced: React.FC = React.memo(() => {
 
       {/* NOTE: Deferred Lensing / Gravity controls moved to global GravityAdvanced section */}
     </div>
-  );
-});
+  )
+})
 
-BlackHoleAdvanced.displayName = 'BlackHoleAdvanced';
+BlackHoleAdvanced.displayName = 'BlackHoleAdvanced'

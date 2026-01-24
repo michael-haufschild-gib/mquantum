@@ -8,16 +8,16 @@
  * context is lost or a shader compilation fails.
  */
 
-import { useMsgBoxStore } from '@/stores/msgBoxStore';
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface CanvasErrorBoundaryProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 interface CanvasErrorBoundaryState {
-  hasError: boolean;
-  error: Error | null;
+  hasError: boolean
+  error: Error | null
 }
 
 /**
@@ -30,40 +30,42 @@ export class CanvasErrorBoundary extends Component<
   CanvasErrorBoundaryState
 > {
   constructor(props: CanvasErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
+    super(props)
+    this.state = { hasError: false, error: null }
   }
 
   static getDerivedStateFromError(error: Error): CanvasErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log error for debugging
-    console.error('Canvas rendering error:', error);
-    console.error('Component stack:', errorInfo.componentStack);
+    console.error('Canvas rendering error:', error)
+    console.error('Component stack:', errorInfo.componentStack)
 
     // Show error dialog using the message box store
-    useMsgBoxStore.getState().showMsgBox(
-      'Rendering Error',
-      `A rendering error occurred: ${error.message}\n\nThis may be caused by WebGL context loss or shader compilation failure.`,
-      'error',
-      [
-        {
-          label: 'Reload Page',
-          onClick: () => window.location.reload(),
-          variant: 'danger',
-        },
-        {
-          label: 'Try Again',
-          onClick: () => {
-            this.setState({ hasError: false, error: null });
-            useMsgBoxStore.getState().closeMsgBox();
+    useMsgBoxStore
+      .getState()
+      .showMsgBox(
+        'Rendering Error',
+        `A rendering error occurred: ${error.message}\n\nThis may be caused by WebGL context loss or shader compilation failure.`,
+        'error',
+        [
+          {
+            label: 'Reload Page',
+            onClick: () => window.location.reload(),
+            variant: 'danger',
           },
-          variant: 'secondary',
-        },
-      ]
-    );
+          {
+            label: 'Try Again',
+            onClick: () => {
+              this.setState({ hasError: false, error: null })
+              useMsgBoxStore.getState().closeMsgBox()
+            },
+            variant: 'secondary',
+          },
+        ]
+      )
   }
 
   render(): ReactNode {
@@ -87,18 +89,16 @@ export class CanvasErrorBoundary extends Component<
                 />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-text-primary mb-2">
-              Rendering Error
-            </h2>
+            <h2 className="text-xl font-semibold text-text-primary mb-2">Rendering Error</h2>
             <p className="text-text-secondary text-sm max-w-md">
-              The 3D canvas encountered an error. This may be due to WebGL
-              context loss or a shader compilation failure.
+              The 3D canvas encountered an error. This may be due to WebGL context loss or a shader
+              compilation failure.
             </p>
           </div>
         </div>
-      );
+      )
     }
 
-    return this.props.children;
+    return this.props.children
   }
 }

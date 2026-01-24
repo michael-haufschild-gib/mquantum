@@ -15,10 +15,7 @@ vi.mock('mediabunny', () => {
 
   // Accept chunked options for StreamTarget
   class MockStreamTarget {
-    constructor(
-      _writable: unknown,
-      _options?: { chunked?: boolean; chunkSize?: number }
-    ) {}
+    constructor(_writable: unknown, _options?: { chunked?: boolean; chunkSize?: number }) {}
   }
 
   // Accept fastStart option for Mp4OutputFormat

@@ -14,4 +14,4 @@ vec3 getClassic(vec3 dir, float time) {
     }
     return color;
 }
-`;
+`

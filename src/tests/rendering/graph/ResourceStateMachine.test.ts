@@ -92,9 +92,9 @@ describe('ResourceStateMachine', () => {
     })
 
     it('should throw for invalid transition Created to ShaderRead', () => {
-      expect(() => stateMachine.transition('colorBuffer', ResourceState.ShaderRead, 'scenePass')).toThrow(
-        'Invalid transition'
-      )
+      expect(() =>
+        stateMachine.transition('colorBuffer', ResourceState.ShaderRead, 'scenePass')
+      ).toThrow('Invalid transition')
     })
 
     it('should transition to Disposed from any state', () => {

@@ -192,8 +192,8 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   updateAccumulatedTime: (delta: number) => {
     const { isPlaying, speed, direction } = get()
     if (isPlaying) {
-      set((state) => ({ 
-        accumulatedTime: state.accumulatedTime + delta * speed * direction 
+      set((state) => ({
+        accumulatedTime: state.accumulatedTime + delta * speed * direction,
       }))
     }
   },

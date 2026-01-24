@@ -11,7 +11,7 @@
  * @returns Maximum k such that 2k ≤ n
  */
 export function getMaxTorusDimension(n: number): number {
-  return Math.floor(n / 2);
+  return Math.floor(n / 2)
 }
 
 /**
@@ -22,5 +22,5 @@ export function getMaxTorusDimension(n: number): number {
  * @returns Total number of points (stepsPerCircle^k)
  */
 export function getGeneralizedCliffordTorusPointCount(k: number, stepsPerCircle: number): number {
-  return Math.pow(stepsPerCircle, k);
+  return Math.pow(stepsPerCircle, k)
 }

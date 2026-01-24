@@ -3,10 +3,10 @@
  * Controls for reusing previous frame depth data (fractals only)
  */
 
-import { Switch } from '@/components/ui/Switch';
-import { usePerformanceStore } from '@/stores/performanceStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Switch } from '@/components/ui/Switch'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Temporal reprojection controls for the Performance section.
@@ -19,7 +19,7 @@ export const TemporalReprojectionControls: React.FC = () => {
       enabled: s.temporalReprojectionEnabled,
       setEnabled: s.setTemporalReprojectionEnabled,
     }))
-  );
+  )
 
   return (
     <div className="space-y-2">
@@ -29,9 +29,7 @@ export const TemporalReprojectionControls: React.FC = () => {
         label="Temporal Reprojection"
         data-testid="temporal-reprojection-toggle"
       />
-      <p className="text-xs text-text-tertiary ml-4">
-        Fractals only. 30-50% faster during motion.
-      </p>
+      <p className="text-xs text-text-tertiary ml-4">Fractals only. 30-50% faster during motion.</p>
     </div>
-  );
-};
+  )
+}

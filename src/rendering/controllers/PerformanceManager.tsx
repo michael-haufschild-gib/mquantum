@@ -8,9 +8,9 @@
  * This component should be placed inside the Canvas to access Three.js context.
  */
 
-import { useInteractionState } from '@/hooks/useInteractionState';
-import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement';
-import React from 'react';
+import { useInteractionState } from '@/hooks/useInteractionState'
+import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement'
+import React from 'react'
 
 /**
  * Performance manager that activates all performance optimization hooks.
@@ -19,11 +19,11 @@ import React from 'react';
  */
 export const PerformanceManager: React.FC = () => {
   // Interaction state detection (updates store)
-  useInteractionState();
+  useInteractionState()
 
   // Progressive refinement (manages quality stages)
-  useProgressiveRefinement();
+  useProgressiveRefinement()
 
   // This component doesn't render anything
-  return null;
-};
+  return null
+}

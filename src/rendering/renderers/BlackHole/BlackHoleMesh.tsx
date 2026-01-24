@@ -20,8 +20,14 @@
 
 import { RENDER_LAYERS } from '@/rendering/core/layers'
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial'
-import { composeBlackHoleShader, generateBlackHoleVertexShader } from '@/rendering/shaders/blackhole/compose'
-import { generateBlackbodyLUT, generateRidgedNoiseTexture3D } from '@/rendering/utils/NoiseGenerator'
+import {
+  composeBlackHoleShader,
+  generateBlackHoleVertexShader,
+} from '@/rendering/shaders/blackhole/compose'
+import {
+  generateBlackbodyLUT,
+  generateRidgedNoiseTexture3D,
+} from '@/rendering/utils/NoiseGenerator'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -133,7 +139,15 @@ const BlackHoleMesh = () => {
       blackbodyLUT: true, // PERF (OPT-BH-17): Enable blackbody LUT for faster temperature coloring
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, edgesVisible, SHADER_VERSION])
+  }, [
+    dimension,
+    temporalEnabled,
+    dopplerEnabled,
+    sliceAnimationEnabled,
+    sssEnabled,
+    edgesVisible,
+    SHADER_VERSION,
+  ])
 
   // Generate vertex shader
   const vertexShader = useMemo(() => generateBlackHoleVertexShader(), [])
@@ -141,7 +155,15 @@ const BlackHoleMesh = () => {
   // Generate material key for caching
   const materialKey = useMemo(() => {
     return `blackhole-${dimension}-${temporalEnabled}-${dopplerEnabled}-${sliceAnimationEnabled}-${sssEnabled}-${edgesVisible}-v${SHADER_VERSION}`
-  }, [dimension, temporalEnabled, dopplerEnabled, sliceAnimationEnabled, sssEnabled, edgesVisible, SHADER_VERSION])
+  }, [
+    dimension,
+    temporalEnabled,
+    dopplerEnabled,
+    sliceAnimationEnabled,
+    sssEnabled,
+    edgesVisible,
+    SHADER_VERSION,
+  ])
 
   // Note: Material disposal is handled automatically by React Three Fiber
   // when TrackedShaderMaterial unmounts (materialKey change causes remount).

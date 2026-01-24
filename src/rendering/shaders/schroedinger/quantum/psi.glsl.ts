@@ -212,7 +212,7 @@ vec4 evalPsiWithSpatialPhase(float xND[MAX_DIM], float t) {
     float spatialPhase = atan(psiSpatial.y, psiSpatial.x);
     return vec4(psiTime, spatialPhase, 0.0);
 }
-`;
+`
 
 /**
  * Dynamic psi block - assumes evalHarmonicOscillatorPsi is provided externally.
@@ -322,4 +322,4 @@ vec4 evalPsiWithSpatialPhase(float xND[MAX_DIM], float t) {
     // Harmonic oscillator mode - use unrolled combined function
     return evalHOCombinedPsi(xND, t);
 }
-`;
+`

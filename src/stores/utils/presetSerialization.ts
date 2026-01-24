@@ -8,18 +8,18 @@ import type { SavedScene, SavedStyle } from '../presetManagerStore'
  */
 export const OBJECT_TYPE_TO_CONFIG_KEY: Record<ObjectType, string> = {
   // Polytopes
-  'hypercube': 'polytope',
-  'simplex': 'polytope',
+  hypercube: 'polytope',
+  simplex: 'polytope',
   'cross-polytope': 'polytope',
   'wythoff-polytope': 'wythoffPolytope',
   // Extended objects
   'root-system': 'rootSystem',
   'clifford-torus': 'cliffordTorus',
   'nested-torus': 'nestedTorus',
-  'mandelbulb': 'mandelbulb',
+  mandelbulb: 'mandelbulb',
   'quaternion-julia': 'quaternionJulia',
-  'schroedinger': 'schroedinger',
-  'blackhole': 'blackhole',
+  schroedinger: 'schroedinger',
+  blackhole: 'blackhole',
 }
 
 /**
@@ -119,7 +119,7 @@ export const serializeRotationState = <T extends object>(state: T): Record<strin
 /**
  * Serializes only the relevant extended object config for the given object type.
  * This prevents saving irrelevant configs (e.g., blackhole config when saving a hypercube).
- * 
+ *
  * @param state - The full extended object store state
  * @param objectType - The current object type being saved
  * @returns A serialized state containing only the relevant config
@@ -137,7 +137,7 @@ export const serializeExtendedState = <T extends object>(
 
   const stateRecord = state as Record<string, unknown>
   const config = stateRecord[configKey]
-  
+
   if (!config || typeof config !== 'object') {
     return {}
   }
@@ -145,7 +145,7 @@ export const serializeExtendedState = <T extends object>(
   // Return only the relevant config, keyed by its config key
   // This allows mergeExtendedObjectState to properly merge on load
   return {
-    [configKey]: JSON.parse(JSON.stringify(config))
+    [configKey]: JSON.parse(JSON.stringify(config)),
   }
 }
 

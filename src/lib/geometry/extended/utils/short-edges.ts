@@ -7,7 +7,7 @@
  * @see docs/research/nd-extended-objects-guide.md Section 2.6
  */
 
-import type { VectorND } from '@/lib/math/types';
+import type { VectorND } from '@/lib/math/types'
 
 /**
  * Computes squared Euclidean distance between two n-dimensional points
@@ -17,13 +17,13 @@ import type { VectorND } from '@/lib/math/types';
  * @returns Squared distance
  */
 function distanceSquared(a: VectorND, b: VectorND): number {
-  let sum = 0;
-  const len = Math.min(a.length, b.length);
+  let sum = 0
+  const len = Math.min(a.length, b.length)
   for (let i = 0; i < len; i++) {
-    const d = a[i]! - b[i]!;
-    sum += d * d;
+    const d = a[i]! - b[i]!
+    sum += d * d
   }
-  return sum;
+  return sum
 }
 
 /**
@@ -51,43 +51,43 @@ export function buildShortEdges(
   vertices: VectorND[],
   epsilonFactor: number = 0.01
 ): [number, number][] {
-  const n = vertices.length;
+  const n = vertices.length
   if (n < 2) {
-    return [];
+    return []
   }
 
   // First pass: find minimum nonzero distance
-  let minDistSq = Infinity;
-  const EPSILON_SQ = 1e-9;
+  let minDistSq = Infinity
+  const EPSILON_SQ = 1e-9
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const d2 = distanceSquared(vertices[i]!, vertices[j]!);
+      const d2 = distanceSquared(vertices[i]!, vertices[j]!)
       if (d2 > EPSILON_SQ && d2 < minDistSq) {
-        minDistSq = d2;
+        minDistSq = d2
       }
     }
   }
 
   if (minDistSq === Infinity) {
-    return [];
+    return []
   }
 
   // Threshold with tolerance
-  const threshold = Math.sqrt(minDistSq) * (1 + epsilonFactor);
-  const thresholdSq = threshold * threshold;
+  const threshold = Math.sqrt(minDistSq) * (1 + epsilonFactor)
+  const thresholdSq = threshold * threshold
 
   // Second pass: add edges under threshold
-  const edges: [number, number][] = [];
+  const edges: [number, number][] = []
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
-      const d2 = distanceSquared(vertices[i]!, vertices[j]!);
+      const d2 = distanceSquared(vertices[i]!, vertices[j]!)
       if (d2 <= thresholdSq) {
-        edges.push([i, j]);
+        edges.push([i, j])
       }
     }
   }
 
-  return edges;
+  return edges
 }

@@ -41,7 +41,9 @@ describe('hashVertex', () => {
   })
 
   it('should handle high-dimensional vertices', () => {
-    const vertex: VectorND = Array(11).fill(0).map((_, i) => i)
+    const vertex: VectorND = Array(11)
+      .fill(0)
+      .map((_, i) => i)
     const hash = hashVertex(vertex)
     expect(typeof hash).toBe('number')
     expect(hash).toBeGreaterThanOrEqual(0)

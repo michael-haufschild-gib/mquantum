@@ -20,4 +20,4 @@ layout(location = 1) out vec4 gNormal;
 // during temporal toggle. Unused outputs are safely ignored by WebGL.
 // See: docs/bugfixing/log/2025-12-21-schroedinger-temporal-gl-invalid-operation.md
 layout(location = 2) out vec4 gPosition;
-`;
+`

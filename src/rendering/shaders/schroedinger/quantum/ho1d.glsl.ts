@@ -88,4 +88,4 @@ float hoND(float xND[MAX_DIM], int dim, int termIdx) {
 
     return product;
 }
-`;
+`

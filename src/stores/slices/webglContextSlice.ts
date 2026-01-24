@@ -182,12 +182,10 @@ function saveStateForRecovery(): void {
 // Slice Creator
 // ============================================================================
 
-export const createWebGLContextSlice: StateCreator<
-  WebGLContextSlice,
-  [],
-  [],
-  WebGLContextSlice
-> = (set, get) => ({
+export const createWebGLContextSlice: StateCreator<WebGLContextSlice, [], [], WebGLContextSlice> = (
+  set,
+  get
+) => ({
   ...WEBGL_CONTEXT_INITIAL_STATE,
 
   onContextLost: () => {
@@ -257,8 +255,7 @@ export const createWebGLContextSlice: StateCreator<
 
     // Calculate timeout with exponential backoff
     const timeout = Math.min(
-      recoveryConfig.initialTimeout *
-        Math.pow(recoveryConfig.backoffMultiplier, recoveryAttempts),
+      recoveryConfig.initialTimeout * Math.pow(recoveryConfig.backoffMultiplier, recoveryAttempts),
       recoveryConfig.maxTimeout
     )
 

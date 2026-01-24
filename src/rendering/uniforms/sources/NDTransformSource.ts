@@ -63,7 +63,7 @@ interface NDTransformUniforms {
   uExtraRotationCols: IUniform<Float32Array>
   uDepthRowSums: IUniform<Float32Array>
   uDimension: IUniform<number>
-  uUniformScale: IUniform<number>  // Applied AFTER projection (like camera zoom)
+  uUniformScale: IUniform<number> // Applied AFTER projection (like camera zoom)
   uProjectionDistance: IUniform<number>
 }
 
@@ -133,7 +133,7 @@ export class NDTransformSource extends BaseUniformSource {
       uExtraRotationCols: { value: new Float32Array(EXTRA_DIMS_SIZE * 4) },
       uDepthRowSums: { value: new Float32Array(MAX_GPU_DIMENSION) },
       uDimension: { value: 4 },
-      uUniformScale: { value: 1.0 },  // Applied AFTER projection
+      uUniformScale: { value: 1.0 }, // Applied AFTER projection
       uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
     }
   }

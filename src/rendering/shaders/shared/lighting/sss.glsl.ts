@@ -31,4 +31,4 @@ vec3 computeSSS(vec3 lightDir, vec3 viewDir, vec3 normal, float distortion, floa
     // Attenuate by thickness (simulated by density or depth)
     return vec3(trans) * exp(-thickness);
 }
-`;
+`

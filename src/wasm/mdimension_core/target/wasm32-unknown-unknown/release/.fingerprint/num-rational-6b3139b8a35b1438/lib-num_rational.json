@@ -1,1 +1,23 @@
-{"rustc":18415816196306954164,"features":"[]","declared_features":"[\"default\", \"num-bigint\", \"num-bigint-std\", \"serde\", \"std\"]","target":10895754937005166100,"profile":1207370057436191037,"path":5678642110080894258,"deps":[[5157631553186200874,"num_traits",false,4700768055843057315],[16795989132585092538,"num_integer",false,13382473023731898234]],"local":[{"CheckDepInfo":{"dep_info":"wasm32-unknown-unknown/release/.fingerprint/num-rational-6b3139b8a35b1438/dep-lib-num_rational","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":14682669768258224367}
+{
+  "rustc": 18415816196306954164,
+  "features": "[]",
+  "declared_features": "[\"default\", \"num-bigint\", \"num-bigint-std\", \"serde\", \"std\"]",
+  "target": 10895754937005166100,
+  "profile": 1207370057436191037,
+  "path": 5678642110080894258,
+  "deps": [
+    [5157631553186200874, "num_traits", false, 4700768055843057315],
+    [16795989132585092538, "num_integer", false, 13382473023731898234]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "wasm32-unknown-unknown/release/.fingerprint/num-rational-6b3139b8a35b1438/dep-lib-num_rational",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 14682669768258224367
+}

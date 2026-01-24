@@ -288,7 +288,6 @@ function to3D(v: number[]): VectorND {
   return [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0]
 }
 
-
 /**
  * Detects 2D faces (polygons) from an edge list of a polytope
  *

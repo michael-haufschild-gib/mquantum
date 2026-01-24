@@ -166,7 +166,6 @@ export function CameraController({
     if (controls && (controls.enableDamping || controls.autoRotate)) {
       controls.update()
     }
-
   }, FRAME_PRIORITY.CAMERA)
 
   // Reset camera when onReset callback is provided and changes

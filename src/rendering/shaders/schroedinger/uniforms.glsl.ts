@@ -10,8 +10,8 @@
 
 // CANONICAL CONSTANTS: These define array sizes for all quantum modules.
 // The GLSL #defines below must match these TypeScript values.
-export const MAX_DIM = 11;
-export const MAX_TERMS = 8;
+export const MAX_DIM = 11
+export const MAX_TERMS = 8
 
 export const schroedingerUniformsBlock = `
 // ============================================
@@ -111,4 +111,4 @@ uniform float uIsoThreshold;   // Log-density threshold for isosurface
 
 // Sample count for loop control (LOD)
 uniform int uSampleCount;
-`;
+`

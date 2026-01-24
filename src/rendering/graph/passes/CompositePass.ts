@@ -7,26 +7,26 @@
  * @module rendering/graph/passes/CompositePass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Blend modes for compositing.
  */
-export type BlendMode = 'add' | 'multiply' | 'screen' | 'alpha' | 'overlay';
+export type BlendMode = 'add' | 'multiply' | 'screen' | 'alpha' | 'overlay'
 
 /**
  * Input configuration for compositing.
  */
 export interface CompositeInput {
   /** Resource ID for the input texture */
-  resourceId: string;
+  resourceId: string
   /** Blend mode for this input */
-  blendMode: BlendMode;
+  blendMode: BlendMode
   /** Blend weight (0-1) */
-  weight?: number;
+  weight?: number
 }
 
 /**
@@ -34,11 +34,11 @@ export interface CompositeInput {
  */
 export interface CompositePassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Input textures to composite */
-  compositeInputs: CompositeInput[];
+  compositeInputs: CompositeInput[]
   /** Output resource ID */
-  outputResource: string;
+  outputResource: string
   /** Background color for the output (default: transparent black) */
-  backgroundColor?: THREE.ColorRepresentation;
+  backgroundColor?: THREE.ColorRepresentation
 }
 
 /**
@@ -66,22 +66,22 @@ export interface CompositePassConfig extends Omit<RenderPassConfig, 'inputs' | '
  * ```
  */
 export class CompositePass extends BasePass {
-  private compositeInputs: CompositeInput[];
-  private outputResourceId: string;
-  private backgroundColor: THREE.Color;
+  private compositeInputs: CompositeInput[]
+  private outputResourceId: string
+  private backgroundColor: THREE.Color
 
   // Rendering resources
-  private material: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
   constructor(config: CompositePassConfig) {
     // Build inputs list from compositeInputs
     const inputs = config.compositeInputs.map((input) => ({
       resourceId: input.resourceId,
       access: 'read' as const,
-    }));
+    }))
 
     super({
       id: config.id,
@@ -90,11 +90,11 @@ export class CompositePass extends BasePass {
       outputs: [{ resourceId: config.outputResource, access: 'write' }],
       enabled: config.enabled,
       priority: config.priority,
-    });
+    })
 
-    this.compositeInputs = config.compositeInputs;
-    this.outputResourceId = config.outputResource;
-    this.backgroundColor = new THREE.Color(config.backgroundColor ?? 0x000000);
+    this.compositeInputs = config.compositeInputs
+    this.outputResourceId = config.outputResource
+    this.backgroundColor = new THREE.Color(config.backgroundColor ?? 0x000000)
 
     // Create composite material
     // Supports up to 4 input textures for simplicity
@@ -241,62 +241,62 @@ export class CompositePass extends BasePass {
       `,
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
     // Create fullscreen quad
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer } = ctx;
+    const { renderer } = ctx
 
     // Get output target
-    const outputTarget = ctx.getWriteTarget(this.outputResourceId);
+    const outputTarget = ctx.getWriteTarget(this.outputResourceId)
 
     // Set up textures and blend parameters
     // Reuse existing uniform Vector4 values to avoid per-frame allocations
-    const weights = this.material.uniforms['uWeights']!.value as THREE.Vector4;
-    const blendModes = this.material.uniforms['uBlendModes']!.value as THREE.Vector4;
+    const weights = this.material.uniforms['uWeights']!.value as THREE.Vector4
+    const blendModes = this.material.uniforms['uBlendModes']!.value as THREE.Vector4
 
     // Reset to defaults before populating
-    weights.set(1, 1, 1, 1);
-    blendModes.set(0, 0, 0, 0);
+    weights.set(1, 1, 1, 1)
+    blendModes.set(0, 0, 0, 0)
 
-    const textureUniforms = ['tInput0', 'tInput1', 'tInput2', 'tInput3'];
-    const inputCount = Math.min(this.compositeInputs.length, 4);
+    const textureUniforms = ['tInput0', 'tInput1', 'tInput2', 'tInput3']
+    const inputCount = Math.min(this.compositeInputs.length, 4)
 
     for (let i = 0; i < inputCount; i++) {
-      const input = this.compositeInputs[i]!;
-      const texture = ctx.getReadTexture(input.resourceId);
-      this.material.uniforms[textureUniforms[i]!]!.value = texture;
+      const input = this.compositeInputs[i]!
+      const texture = ctx.getReadTexture(input.resourceId)
+      this.material.uniforms[textureUniforms[i]!]!.value = texture
 
       // Set weight
-      const weight = input.weight ?? 1.0;
-      if (i === 0) weights.x = weight;
-      else if (i === 1) weights.y = weight;
-      else if (i === 2) weights.z = weight;
-      else weights.w = weight;
+      const weight = input.weight ?? 1.0
+      if (i === 0) weights.x = weight
+      else if (i === 1) weights.y = weight
+      else if (i === 2) weights.z = weight
+      else weights.w = weight
 
       // Set blend mode
-      const blendMode = this.blendModeToInt(input.blendMode);
-      if (i === 0) blendModes.x = blendMode;
-      else if (i === 1) blendModes.y = blendMode;
-      else if (i === 2) blendModes.z = blendMode;
-      else blendModes.w = blendMode;
+      const blendMode = this.blendModeToInt(input.blendMode)
+      if (i === 0) blendModes.x = blendMode
+      else if (i === 1) blendModes.y = blendMode
+      else if (i === 2) blendModes.z = blendMode
+      else blendModes.w = blendMode
     }
-    this.material.uniforms['uInputCount']!.value = inputCount;
+    this.material.uniforms['uInputCount']!.value = inputCount
 
     // Render composite
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.scene, this.camera);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(outputTarget)
+    renderer.render(this.scene, this.camera)
+    renderer.setRenderTarget(null)
   }
 
   /**
@@ -311,8 +311,8 @@ export class CompositePass extends BasePass {
       screen: 2,
       alpha: 3,
       overlay: 4,
-    };
-    return modeMap[mode];
+    }
+    return modeMap[mode]
   }
 
   /**
@@ -321,9 +321,9 @@ export class CompositePass extends BasePass {
    * @param weight
    */
   setInputWeight(index: number, weight: number): void {
-    const input = this.compositeInputs[index];
+    const input = this.compositeInputs[index]
     if (input) {
-      input.weight = weight;
+      input.weight = weight
     }
   }
 
@@ -333,16 +333,16 @@ export class CompositePass extends BasePass {
    * @param mode
    */
   setInputBlendMode(index: number, mode: BlendMode): void {
-    const input = this.compositeInputs[index];
+    const input = this.compositeInputs[index]
     if (input) {
-      input.blendMode = mode;
+      input.blendMode = mode
     }
   }
 
   dispose(): void {
-    this.material.dispose();
-    this.mesh.geometry.dispose();
+    this.material.dispose()
+    this.mesh.geometry.dispose()
     // Remove mesh from scene to ensure proper cleanup
-    this.scene.remove(this.mesh);
+    this.scene.remove(this.mesh)
   }
 }

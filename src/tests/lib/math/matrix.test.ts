@@ -20,24 +20,24 @@ import { MatrixND } from '@/lib/math/types'
 
 // Helper to create MatrixND from array of arrays
 function mat(rows: number[][]): MatrixND {
-  const flat = new Float32Array(rows.length * rows.length);
-  for(let i=0; i<rows.length; i++) {
-    for(let j=0; j<rows.length; j++) {
-      flat[i*rows.length + j] = rows[i]![j]!;
+  const flat = new Float32Array(rows.length * rows.length)
+  for (let i = 0; i < rows.length; i++) {
+    for (let j = 0; j < rows.length; j++) {
+      flat[i * rows.length + j] = rows[i]![j]!
     }
   }
-  return flat;
+  return flat
 }
 
 // Helper to verify matrix against 2D array
 function expectMatrix(m: MatrixND, expected: number[][]) {
-    const dim = Math.sqrt(m.length);
-    expect(dim).toBe(expected.length);
-    for(let i=0; i<dim; i++) {
-        for(let j=0; j<dim; j++) {
-            expect(m[i*dim + j]!).toBeCloseTo(expected[i]![j]!);
-        }
+  const dim = Math.sqrt(m.length)
+  expect(dim).toBe(expected.length)
+  for (let i = 0; i < dim; i++) {
+    for (let j = 0; j < dim; j++) {
+      expect(m[i * dim + j]!).toBeCloseTo(expected[i]![j]!)
     }
+  }
 }
 
 describe('Matrix Operations', () => {
@@ -114,9 +114,9 @@ describe('Matrix Operations', () => {
 
     it('throws error for non-square matrices (unsupported in optimized version)', () => {
       // 2x3 matrices would flatten to length 6, which sqrt is 2.44 (not integer)
-       const flat = new Float32Array(6);
-       const flat2 = new Float32Array(6);
-       expect(() => multiplyMatrices(flat, flat2)).toThrow()
+      const flat = new Float32Array(6)
+      const flat2 = new Float32Array(6)
+      expect(() => multiplyMatrices(flat, flat2)).toThrow()
     })
   })
 
@@ -265,7 +265,11 @@ describe('Matrix Operations', () => {
     })
 
     it('throws error for incompatible dimensions', () => {
-      const M = mat([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) // 3x3
+      const M = mat([
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9],
+      ]) // 3x3
       const v = [1, 2] // 2
       expect(() => multiplyMatrixVector(M, v)).toThrow()
     })
@@ -367,8 +371,14 @@ describe('Matrix Operations', () => {
     })
 
     it('handles floating point comparison with epsilon', () => {
-      const A = mat([[1.0, 2.0], [0, 1]])
-      const B = mat([[1.0 + EPSILON / 2, 2.0], [0, 1]])
+      const A = mat([
+        [1.0, 2.0],
+        [0, 1],
+      ])
+      const B = mat([
+        [1.0 + EPSILON / 2, 2.0],
+        [0, 1],
+      ])
       expect(matricesEqual(A, B)).toBe(true)
     })
   })

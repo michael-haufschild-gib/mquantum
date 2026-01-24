@@ -7,11 +7,7 @@
  * @module rendering/graph/BasePass
  */
 
-import type {
-  RenderContext,
-  RenderPass,
-  RenderPassConfig,
-} from './types';
+import type { RenderContext, RenderPass, RenderPassConfig } from './types'
 
 /**
  * Abstract base class for render passes.
@@ -42,14 +38,14 @@ import type {
  * ```
  */
 export abstract class BasePass implements RenderPass {
-  readonly config: RenderPassConfig;
+  readonly config: RenderPassConfig
 
   constructor(config: RenderPassConfig) {
-    this.config = config;
+    this.config = config
   }
 
   get id(): string {
-    return this.config.id;
+    return this.config.id
   }
 
   /**
@@ -59,7 +55,7 @@ export abstract class BasePass implements RenderPass {
    *
    * @param ctx - Render context with access to resources and renderer
    */
-  abstract execute(ctx: RenderContext): void;
+  abstract execute(ctx: RenderContext): void
 
   /**
    * Optional cleanup when pass is removed.

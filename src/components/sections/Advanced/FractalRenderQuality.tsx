@@ -1,9 +1,9 @@
-import { ControlGroup } from '@/components/ui/ControlGroup';
-import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Slider } from '@/components/ui/Slider'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Fractal Render Quality Controls
@@ -11,7 +11,7 @@ import { useShallow } from 'zustand/react/shallow';
  * These parameters directly control raymarching quality vs performance.
  */
 export const FractalRenderQuality: React.FC = React.memo(() => {
-  const objectType = useGeometryStore(state => state.objectType);
+  const objectType = useGeometryStore((state) => state.objectType)
 
   // Mandelbulb selectors
   const mandelbulbSelector = useShallow((state: ExtendedObjectState) => ({
@@ -19,7 +19,7 @@ export const FractalRenderQuality: React.FC = React.memo(() => {
     sdfSurfaceDistance: state.mandelbulb.sdfSurfaceDistance,
     setSdfMaxIterations: state.setMandelbulbSdfMaxIterations,
     setSdfSurfaceDistance: state.setMandelbulbSdfSurfaceDistance,
-  }));
+  }))
 
   // Quaternion Julia selectors
   const juliaSelector = useShallow((state: ExtendedObjectState) => ({
@@ -27,14 +27,14 @@ export const FractalRenderQuality: React.FC = React.memo(() => {
     sdfSurfaceDistance: state.quaternionJulia.sdfSurfaceDistance,
     setSdfMaxIterations: state.setQuaternionJuliaSdfMaxIterations,
     setSdfSurfaceDistance: state.setQuaternionJuliaSdfSurfaceDistance,
-  }));
+  }))
 
-  const mandelbulbState = useExtendedObjectStore(mandelbulbSelector);
-  const juliaState = useExtendedObjectStore(juliaSelector);
+  const mandelbulbState = useExtendedObjectStore(mandelbulbSelector)
+  const juliaState = useExtendedObjectStore(juliaSelector)
 
   // Select appropriate state based on object type
-  const state = objectType === 'mandelbulb' ? mandelbulbState : juliaState;
-  const testIdPrefix = objectType === 'mandelbulb' ? 'mandelbulb' : 'julia';
+  const state = objectType === 'mandelbulb' ? mandelbulbState : juliaState
+  const testIdPrefix = objectType === 'mandelbulb' ? 'mandelbulb' : 'julia'
 
   return (
     <ControlGroup title="Render Quality" collapsible defaultOpen>
@@ -62,7 +62,7 @@ export const FractalRenderQuality: React.FC = React.memo(() => {
         Higher iterations and lower surface distance = better quality but slower
       </p>
     </ControlGroup>
-  );
-});
+  )
+})
 
-FractalRenderQuality.displayName = 'FractalRenderQuality';
+FractalRenderQuality.displayName = 'FractalRenderQuality'

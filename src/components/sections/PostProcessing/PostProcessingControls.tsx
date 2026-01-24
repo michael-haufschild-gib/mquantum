@@ -1,18 +1,18 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { BloomControls } from './BloomControls';
-import { BokehControls } from './BokehControls';
-import { CinematicControls } from './CinematicControls';
-import { PaperControls } from './PaperControls';
+import React, { useState, useCallback, useMemo } from 'react'
+import { BloomControls } from './BloomControls'
+import { BokehControls } from './BokehControls'
+import { CinematicControls } from './CinematicControls'
+import { PaperControls } from './PaperControls'
 // NOTE: GravityControls moved to Advanced Rendering section (AdvancedObjectControls)
-import { Switch } from '@/components/ui/Switch';
-import { Tabs } from '@/components/ui/Tabs';
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
-import { useShallow } from 'zustand/react/shallow';
-import { MiscControls } from './MiscControls';
-import { RefractionControls } from './RefractionControls';
+import { Switch } from '@/components/ui/Switch'
+import { Tabs } from '@/components/ui/Tabs'
+import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
+import { useShallow } from 'zustand/react/shallow'
+import { MiscControls } from './MiscControls'
+import { RefractionControls } from './RefractionControls'
 
 export const PostProcessingControls: React.FC = React.memo(() => {
-  const [activeTab, setActiveTab] = useState('bloom');
+  const [activeTab, setActiveTab] = useState('bloom')
 
   const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
     bloomEnabled: state.bloomEnabled,
@@ -25,115 +25,126 @@ export const PostProcessingControls: React.FC = React.memo(() => {
     setRefractionEnabled: state.setRefractionEnabled,
     paperEnabled: state.paperEnabled,
     setPaperEnabled: state.setPaperEnabled,
-  }));
+  }))
   const {
-    bloomEnabled, setBloomEnabled,
-    cinematicEnabled, setCinematicEnabled,
-    bokehEnabled, setBokehEnabled,
-    refractionEnabled, setRefractionEnabled,
-    paperEnabled, setPaperEnabled,
-  } = usePostProcessingStore(postProcessingSelector);
+    bloomEnabled,
+    setBloomEnabled,
+    cinematicEnabled,
+    setCinematicEnabled,
+    bokehEnabled,
+    setBokehEnabled,
+    refractionEnabled,
+    setRefractionEnabled,
+    paperEnabled,
+    setPaperEnabled,
+  } = usePostProcessingStore(postProcessingSelector)
 
   const handleTabChange = useCallback((id: string) => {
-    setActiveTab(id);
-  }, []);
+    setActiveTab(id)
+  }, [])
 
-  const tabs = useMemo(() => [
-    {
-      id: 'bloom',
-      label: 'Bloom',
-      content: (
-        <div className="space-y-4">
-          <Switch
-            checked={bloomEnabled}
-            onCheckedChange={setBloomEnabled}
-            label="Enable Bloom"
-          />
-          <div className={!bloomEnabled ? 'opacity-50 pointer-events-none' : ''}>
-            <BloomControls />
+  const tabs = useMemo(
+    () => [
+      {
+        id: 'bloom',
+        label: 'Bloom',
+        content: (
+          <div className="space-y-4">
+            <Switch checked={bloomEnabled} onCheckedChange={setBloomEnabled} label="Enable Bloom" />
+            <div className={!bloomEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <BloomControls />
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      id: 'cinematic',
-      label: 'Cinematic',
-      content: (
-        <div className="space-y-4">
-          <Switch
-            checked={cinematicEnabled}
-            onCheckedChange={setCinematicEnabled}
-            label="Enable Cinematic"
-          />
-          <div className={!cinematicEnabled ? 'opacity-50 pointer-events-none' : ''}>
-            <CinematicControls />
+        ),
+      },
+      {
+        id: 'cinematic',
+        label: 'Cinematic',
+        content: (
+          <div className="space-y-4">
+            <Switch
+              checked={cinematicEnabled}
+              onCheckedChange={setCinematicEnabled}
+              label="Enable Cinematic"
+            />
+            <div className={!cinematicEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <CinematicControls />
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      id: 'dof',
-      label: 'DoF',
-      content: (
-        <div className="space-y-4">
-          <Switch
-            checked={bokehEnabled}
-            onCheckedChange={setBokehEnabled}
-            label="Enable Depth of Field"
-          />
-          <div className={!bokehEnabled ? 'opacity-50 pointer-events-none' : ''}>
-            <BokehControls />
+        ),
+      },
+      {
+        id: 'dof',
+        label: 'DoF',
+        content: (
+          <div className="space-y-4">
+            <Switch
+              checked={bokehEnabled}
+              onCheckedChange={setBokehEnabled}
+              label="Enable Depth of Field"
+            />
+            <div className={!bokehEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <BokehControls />
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      id: 'refraction',
-      label: 'Refraction',
-      content: (
-        <div className="space-y-4">
-          <Switch
-            checked={refractionEnabled}
-            onCheckedChange={setRefractionEnabled}
-            label="Enable Refraction"
-          />
-          <div className={!refractionEnabled ? 'opacity-50 pointer-events-none' : ''}>
-            <RefractionControls />
+        ),
+      },
+      {
+        id: 'refraction',
+        label: 'Refraction',
+        content: (
+          <div className="space-y-4">
+            <Switch
+              checked={refractionEnabled}
+              onCheckedChange={setRefractionEnabled}
+              label="Enable Refraction"
+            />
+            <div className={!refractionEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <RefractionControls />
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      id: 'paper',
-      label: 'Paper',
-      content: (
-        <div className="space-y-4">
-          <Switch
-            checked={paperEnabled}
-            onCheckedChange={setPaperEnabled}
-            label="Enable Paper Texture"
-          />
-          <div className={!paperEnabled ? 'opacity-50 pointer-events-none' : ''}>
-            <PaperControls />
+        ),
+      },
+      {
+        id: 'paper',
+        label: 'Paper',
+        content: (
+          <div className="space-y-4">
+            <Switch
+              checked={paperEnabled}
+              onCheckedChange={setPaperEnabled}
+              label="Enable Paper Texture"
+            />
+            <div className={!paperEnabled ? 'opacity-50 pointer-events-none' : ''}>
+              <PaperControls />
+            </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      id: 'fx',
-      label: 'FX',
-      content: (
-        <div className="space-y-4">
-          <MiscControls />
-        </div>
-      ),
-    },
-    // NOTE: Gravity tab removed - controls moved to Advanced Rendering section
-  ], [
-    bloomEnabled, setBloomEnabled, cinematicEnabled, setCinematicEnabled,
-    bokehEnabled, setBokehEnabled, refractionEnabled, setRefractionEnabled,
-    paperEnabled, setPaperEnabled
-  ]);
+        ),
+      },
+      {
+        id: 'fx',
+        label: 'FX',
+        content: (
+          <div className="space-y-4">
+            <MiscControls />
+          </div>
+        ),
+      },
+      // NOTE: Gravity tab removed - controls moved to Advanced Rendering section
+    ],
+    [
+      bloomEnabled,
+      setBloomEnabled,
+      cinematicEnabled,
+      setCinematicEnabled,
+      bokehEnabled,
+      setBokehEnabled,
+      refractionEnabled,
+      setRefractionEnabled,
+      paperEnabled,
+      setPaperEnabled,
+    ]
+  )
 
   return (
     <Tabs
@@ -143,7 +154,7 @@ export const PostProcessingControls: React.FC = React.memo(() => {
       variant="default"
       tabListClassName="mb-4"
     />
-  );
-});
+  )
+})
 
-PostProcessingControls.displayName = 'PostProcessingControls';
+PostProcessingControls.displayName = 'PostProcessingControls'

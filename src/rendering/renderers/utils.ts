@@ -1,10 +1,16 @@
-import type { NdGeometry, ObjectType } from '@/lib/geometry/types';
-import { determineRenderMode as determineRenderModeFromRegistry } from '@/lib/geometry/registry';
+import type { NdGeometry, ObjectType } from '@/lib/geometry/types'
+import { determineRenderMode as determineRenderModeFromRegistry } from '@/lib/geometry/registry'
 
 /**
  * Render mode types
  */
-export type RenderMode = 'polytope' | 'raymarch-mandelbulb' | 'raymarch-quaternion-julia' | 'raymarch-schroedinger' | 'raymarch-blackhole' | 'none';
+export type RenderMode =
+  | 'polytope'
+  | 'raymarch-mandelbulb'
+  | 'raymarch-quaternion-julia'
+  | 'raymarch-schroedinger'
+  | 'raymarch-blackhole'
+  | 'none'
 
 /**
  * Determines the appropriate render mode based on object type and settings
@@ -24,12 +30,12 @@ export function determineRenderMode(
   facesVisible: boolean
 ): RenderMode {
   // Use registry-based determination
-  const mode = determineRenderModeFromRegistry(objectType, dimension, facesVisible);
+  const mode = determineRenderModeFromRegistry(objectType, dimension, facesVisible)
 
   // If registry returns 'polytope', verify we have vertices
   if (mode === 'polytope' && geometry.vertices.length === 0) {
-    return 'none';
+    return 'none'
   }
 
-  return mode;
+  return mode
 }

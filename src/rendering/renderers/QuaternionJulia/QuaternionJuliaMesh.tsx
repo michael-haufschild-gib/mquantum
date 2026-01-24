@@ -7,23 +7,18 @@
  * @see docs/prd/quaternion-julia-fractal.md
  */
 
-import {
-    createColorCache,
-    updateLinearColorUniform,
-} from '@/rendering/colors/linearCache'
+import { createColorCache, updateLinearColorUniform } from '@/rendering/colors/linearCache'
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
 import { useTemporalDepthUniforms } from '@/rendering/core/useTemporalDepthUniforms'
 import { TrackedShaderMaterial } from '@/rendering/materials/TrackedShaderMaterial'
 import {
-    MAX_DIMENSION,
-    useLayerAssignment,
-    useQualityTracking,
-    useRotationUpdates,
+  MAX_DIMENSION,
+  useLayerAssignment,
+  useQualityTracking,
+  useRotationUpdates,
 } from '@/rendering/renderers/base'
 import { composeJuliaShader } from '@/rendering/shaders/julia/compose'
-import {
-    SHADOW_QUALITY_TO_INT,
-} from '@/rendering/shadows/types'
+import { SHADOW_QUALITY_TO_INT } from '@/rendering/shadows/types'
 import { UniformManager } from '@/rendering/uniforms/UniformManager'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useAppearanceStore } from '@/stores/appearanceStore'
@@ -31,10 +26,7 @@ import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLightingStore } from '@/stores/lightingStore'
-import {
-    getEffectiveShadowQuality,
-    usePerformanceStore,
-} from '@/stores/performanceStore'
+import { getEffectiveShadowQuality, usePerformanceStore } from '@/stores/performanceStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useWebGLContextStore } from '@/stores/webglContextStore'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -91,9 +83,7 @@ const QuaternionJuliaMesh = () => {
   const restoreCount = useWebGLContextStore((state) => state.restoreCount)
 
   // Get parameterValues for useEffect dependency (triggers basis vector recomputation)
-  const parameterValues = useExtendedObjectStore(
-    (state) => state.quaternionJulia.parameterValues
-  )
+  const parameterValues = useExtendedObjectStore((state) => state.quaternionJulia.parameterValues)
 
   // Use shared rotation hook for basis vector computation with caching
   const rotationUpdates = useRotationUpdates({ dimension, parameterValues })
@@ -114,7 +104,11 @@ const QuaternionJuliaMesh = () => {
     resetShaderOverrides()
   }, [dimension, shadowEnabled, temporalEnabled, sssEnabled, edgesVisible, resetShaderOverrides])
 
-  const { glsl: shaderString, modules, features } = useMemo(() => {
+  const {
+    glsl: shaderString,
+    modules,
+    features,
+  } = useMemo(() => {
     return composeJuliaShader({
       dimension,
       shadows: shadowEnabled,
@@ -180,7 +174,13 @@ const QuaternionJuliaMesh = () => {
       // - Quality: FastMode, QualityMultiplier
       // - Color: Algorithm, Cosine coeffs, Distribution, LCH
       // - PBR: Roughness, Metallic, Specular (via 'pbr-face')
-      ...UniformManager.getCombinedUniforms(['lighting', 'temporal', 'quality', 'color', 'pbr-face']),
+      ...UniformManager.getCombinedUniforms([
+        'lighting',
+        'temporal',
+        'quality',
+        'color',
+        'pbr-face',
+      ]),
 
       // Advanced Rendering (SSS - not part of PBR source)
       uSssEnabled: { value: false },
@@ -203,8 +203,8 @@ const QuaternionJuliaMesh = () => {
       uAoEnabled: { value: true },
 
       // Temporal Reprojection - Textures must be manually handled as they come from context
-      uPrevDepthTexture: { value: null },      // Legacy: kept for compatibility
-      uPrevPositionTexture: { value: null },   // Position buffer: xyz=world pos, w=model-space ray distance
+      uPrevDepthTexture: { value: null }, // Legacy: kept for compatibility
+      uPrevPositionTexture: { value: null }, // Position buffer: xyz=world pos, w=model-space ray distance
 
       // IBL (Image-Based Lighting) uniforms - PMREM texture (sampler2D)
       uEnvMap: { value: null },
@@ -227,8 +227,8 @@ const QuaternionJuliaMesh = () => {
     // A full type definition would be very large and duplicate the useMemo structure
     // We suppress the lint error as this is a deliberate trade-off for performance/complexity
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const u = material.uniforms as any;
-    if (!u) return;
+    const u = material.uniforms as any
+    if (!u) return
 
     // ============================================
     // DIRTY-FLAG: Detect material change and reset version refs
@@ -300,7 +300,12 @@ const QuaternionJuliaMesh = () => {
     // D-dimensional Rotation & Basis Vectors (via shared hook)
     // Only recomputes when rotations, dimension, or params change
     // ============================================
-    const { basisX, basisY, basisZ, changed: basisChanged } = rotationUpdates.getBasisVectors(rotationsChanged)
+    const {
+      basisX,
+      basisY,
+      basisZ,
+      changed: basisChanged,
+    } = rotationUpdates.getBasisVectors(rotationsChanged)
 
     if (basisChanged) {
       // Copy basis vectors to uniforms
@@ -357,10 +362,7 @@ const QuaternionJuliaMesh = () => {
     // gl_FragCoord.xy / uResolution.xy calculation must match.
     if (u.uResolution) {
       const dpr = viewport.dpr
-      u.uResolution.value.set(
-        Math.floor(size.width * dpr),
-        Math.floor(size.height * dpr)
-      )
+      u.uResolution.value.set(Math.floor(size.width * dpr), Math.floor(size.height * dpr))
     }
 
     // Update temporal reprojection uniforms from TemporalDepthCapturePass
@@ -384,7 +386,9 @@ const QuaternionJuliaMesh = () => {
         u.uPrevViewProjectionMatrix.value.copy(temporalUniforms.uPrevViewProjectionMatrix)
       }
       if (u.uPrevInverseViewProjectionMatrix) {
-        u.uPrevInverseViewProjectionMatrix.value.copy(temporalUniforms.uPrevInverseViewProjectionMatrix)
+        u.uPrevInverseViewProjectionMatrix.value.copy(
+          temporalUniforms.uPrevInverseViewProjectionMatrix
+        )
       }
       if (u.uDepthBufferResolution) {
         u.uDepthBufferResolution.value.copy(temporalUniforms.uDepthBufferResolution)
@@ -401,7 +405,11 @@ const QuaternionJuliaMesh = () => {
       if (u.uSssEnabled) u.uSssEnabled.value = appStore.sssEnabled
       if (u.uSssIntensity) u.uSssIntensity.value = appStore.sssIntensity
       if (u.uSssColor) {
-        updateLinearColorUniform(colorCacheRef.current.faceColor /* reuse helper */, u.uSssColor.value as THREE.Color, appStore.sssColor || '#ff8844')
+        updateLinearColorUniform(
+          colorCacheRef.current.faceColor /* reuse helper */,
+          u.uSssColor.value as THREE.Color,
+          appStore.sssColor || '#ff8844'
+        )
       }
       if (u.uSssThickness) u.uSssThickness.value = appStore.sssThickness
       if (u.uSssJitter) u.uSssJitter.value = appStore.sssJitter

@@ -107,7 +107,10 @@ export class SectionProfiler {
       'g'
     )
 
-    return shader.replace(pattern, `// === ${sectionName} === (DISABLED)\n// === End ${sectionName} ===`)
+    return shader.replace(
+      pattern,
+      `// === ${sectionName} === (DISABLED)\n// === End ${sectionName} ===`
+    )
   }
 
   /**

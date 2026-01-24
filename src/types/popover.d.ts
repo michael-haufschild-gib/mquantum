@@ -12,9 +12,9 @@
  */
 interface ToggleEvent extends Event {
   /** The new state of the popover after the toggle */
-  readonly newState: 'open' | 'closed';
+  readonly newState: 'open' | 'closed'
   /** The previous state of the popover before the toggle */
-  readonly oldState: 'open' | 'closed';
+  readonly oldState: 'open' | 'closed'
 }
 
 declare global {
@@ -24,13 +24,13 @@ declare global {
      * For `popover="auto"`, this also closes any other auto popovers.
      * @throws {DOMException} If the element is not a valid popover or is already showing.
      */
-    showPopover(): void;
+    showPopover(): void
 
     /**
      * Hides the popover element by removing it from the top layer.
      * @throws {DOMException} If the element is not a valid popover.
      */
-    hidePopover(): void;
+    hidePopover(): void
 
     /**
      * Toggles the popover between showing and hidden states.
@@ -38,11 +38,11 @@ declare global {
      * @returns The new visibility state: true if now showing, false if now hidden.
      * @throws {DOMException} If the element is not a valid popover.
      */
-    togglePopover(force?: boolean): boolean;
+    togglePopover(force?: boolean): boolean
   }
 
   interface GlobalEventHandlersEventMap {
-    toggle: ToggleEvent;
+    toggle: ToggleEvent
   }
 }
 
@@ -53,13 +53,13 @@ declare module 'react' {
      * - `auto`: Light-dismiss (click outside, Escape key), only one visible at a time.
      * - `manual`: No auto-dismiss, must explicitly show/hide, multiple can be visible.
      */
-    popover?: 'auto' | 'manual';
+    popover?: 'auto' | 'manual'
 
     /**
      * Specifies the ID of the popover element this button/input controls.
      * The target element must have the `popover` attribute.
      */
-    popovertarget?: string;
+    popovertarget?: string
 
     /**
      * Specifies the action to perform on the target popover.
@@ -67,8 +67,8 @@ declare module 'react' {
      * - `show`: Shows the popover
      * - `hide`: Hides the popover
      */
-    popovertargetaction?: 'toggle' | 'show' | 'hide';
+    popovertargetaction?: 'toggle' | 'show' | 'hide'
   }
 }
 
-export {};
+export {}

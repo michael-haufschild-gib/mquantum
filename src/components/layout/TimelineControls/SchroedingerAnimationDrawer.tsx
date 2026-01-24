@@ -17,17 +17,17 @@
  * @see docs/prd/ndimensional-visualizer.md
  */
 
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { ToggleButton } from '@/components/ui/ToggleButton';
-import { Slider } from '@/components/ui/Slider';
-import { AnimationDrawerContainer } from './AnimationDrawerContainer';
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import { Slider } from '@/components/ui/Slider'
+import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 
 export interface SchroedingerAnimationDrawerProps {
   /** Callback to close the drawer */
-  onClose?: () => void;
+  onClose?: () => void
 }
 
 /**
@@ -39,64 +39,65 @@ export interface SchroedingerAnimationDrawerProps {
  *
  * @returns React component
  */
-export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerProps> = React.memo(({ onClose }) => {
-  const dimension = useGeometryStore((state) => state.dimension);
+export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerProps> = React.memo(
+  ({ onClose }) => {
+    const dimension = useGeometryStore((state) => state.dimension)
 
-  // Get config and setters from store
-  const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
-    config: state.schroedinger,
-    // Time Evolution
-    setTimeScale: state.setSchroedingerTimeScale,
-    // Animated Flow
-    setCurlEnabled: state.setSchroedingerCurlEnabled,
-    setCurlStrength: state.setSchroedingerCurlStrength,
-    setCurlScale: state.setSchroedingerCurlScale,
-    setCurlSpeed: state.setSchroedingerCurlSpeed,
-    // Spread Animation
-    setSpreadAnimationEnabled: state.setSchroedingerSpreadAnimationEnabled,
-    setSpreadAnimationSpeed: state.setSchroedingerSpreadAnimationSpeed,
-    // Slice Animation
-    setSliceAnimationEnabled: state.setSchroedingerSliceAnimationEnabled,
-    setSliceSpeed: state.setSchroedingerSliceSpeed,
-    setSliceAmplitude: state.setSchroedingerSliceAmplitude,
-    // Phase Animation (Hydrogen ND only)
-    setPhaseAnimationEnabled: state.setSchroedingerPhaseAnimationEnabled,
-  }));
+    // Get config and setters from store
+    const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
+      config: state.schroedinger,
+      // Time Evolution
+      setTimeScale: state.setSchroedingerTimeScale,
+      // Animated Flow
+      setCurlEnabled: state.setSchroedingerCurlEnabled,
+      setCurlStrength: state.setSchroedingerCurlStrength,
+      setCurlScale: state.setSchroedingerCurlScale,
+      setCurlSpeed: state.setSchroedingerCurlSpeed,
+      // Spread Animation
+      setSpreadAnimationEnabled: state.setSchroedingerSpreadAnimationEnabled,
+      setSpreadAnimationSpeed: state.setSchroedingerSpreadAnimationSpeed,
+      // Slice Animation
+      setSliceAnimationEnabled: state.setSchroedingerSliceAnimationEnabled,
+      setSliceSpeed: state.setSchroedingerSliceSpeed,
+      setSliceAmplitude: state.setSchroedingerSliceAmplitude,
+      // Phase Animation (Hydrogen ND only)
+      setPhaseAnimationEnabled: state.setSchroedingerPhaseAnimationEnabled,
+    }))
 
-  const {
-    config,
-    // Time Evolution
-    setTimeScale,
-    // Animated Flow (Curl)
-    setCurlEnabled,
-    setCurlStrength,
-    setCurlScale,
-    setCurlSpeed,
-    // Spread Animation (Dispersion) - HO mode only
-    setSpreadAnimationEnabled,
-    setSpreadAnimationSpeed,
-    // Slice Animation - HO mode only, 4D+
-    setSliceAnimationEnabled,
-    setSliceSpeed,
-    setSliceAmplitude,
-    // Phase Animation - Hydrogen ND only
-    setPhaseAnimationEnabled,
-  } = useExtendedObjectStore(extendedObjectSelector);
+    const {
+      config,
+      // Time Evolution
+      setTimeScale,
+      // Animated Flow (Curl)
+      setCurlEnabled,
+      setCurlStrength,
+      setCurlScale,
+      setCurlSpeed,
+      // Spread Animation (Dispersion) - HO mode only
+      setSpreadAnimationEnabled,
+      setSpreadAnimationSpeed,
+      // Slice Animation - HO mode only, 4D+
+      setSliceAnimationEnabled,
+      setSliceSpeed,
+      setSliceAmplitude,
+      // Phase Animation - Hydrogen ND only
+      setPhaseAnimationEnabled,
+    } = useExtendedObjectStore(extendedObjectSelector)
 
-  // Check quantum mode for UI visibility
-  const isHydrogenMode = config.quantumMode === 'hydrogenOrbital';
-  const isHydrogenNDMode = config.quantumMode === 'hydrogenND';
+    // Check quantum mode for UI visibility
+    const isHydrogenMode = config.quantumMode === 'hydrogenOrbital'
+    const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
 
-  return (
-    <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
-      {/* Time Evolution (Always Active) */}
-      <div className="space-y-4" data-testid="animation-panel-timeEvolution">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-            Time Evolution
-          </label>
-        </div>
-        <div className="space-y-3">
+    return (
+      <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
+        {/* Time Evolution (Always Active) */}
+        <div className="space-y-4" data-testid="animation-panel-timeEvolution">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+              Time Evolution
+            </label>
+          </div>
+          <div className="space-y-3">
             <Slider
               label="Time Scale"
               min={0.1}
@@ -106,103 +107,109 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               onChange={setTimeScale}
               showValue
             />
+          </div>
         </div>
-      </div>
 
-      {/* Wavepacket Dispersion (Spread Animation) - HO mode only */}
-      {!isHydrogenMode && (
-        <div className="space-y-4" data-testid="animation-panel-dispersion">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Wavepacket Dispersion
-            </label>
-            <ToggleButton
-              pressed={config.spreadAnimationEnabled}
-              onToggle={() => setSpreadAnimationEnabled(!config.spreadAnimationEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle spread animation"
+        {/* Wavepacket Dispersion (Spread Animation) - HO mode only */}
+        {!isHydrogenMode && (
+          <div className="space-y-4" data-testid="animation-panel-dispersion">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Wavepacket Dispersion
+              </label>
+              <ToggleButton
+                pressed={config.spreadAnimationEnabled}
+                onToggle={() => setSpreadAnimationEnabled(!config.spreadAnimationEnabled)}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle spread animation"
+              >
+                {config.spreadAnimationEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+            <div
+              className={`space-y-3 ${!config.spreadAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}
             >
-              {config.spreadAnimationEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <div className={`space-y-3 ${!config.spreadAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-               <Slider
-                  label="Breathing Speed"
-                  min={0.1}
-                  max={2.0}
-                  step={0.1}
-                  value={config.spreadAnimationSpeed ?? 0.5}
-                  onChange={setSpreadAnimationSpeed}
-                  showValue
-               />
-          </div>
-        </div>
-      )}
-
-      {/* Animated Flow (Curl Noise) */}
-      <div className="space-y-4" data-testid="animation-panel-flow">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-            Animated Flow
-          </label>
-          <ToggleButton
-            pressed={config.curlEnabled}
-            onToggle={() => setCurlEnabled(!config.curlEnabled)}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle flow animation"
-          >
-            {config.curlEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
-        </div>
-        <div className={`space-y-3 ${!config.curlEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-             <Slider
-                label="Strength"
-                min={0.0}
-                max={1.0}
-                step={0.05}
-                value={config.curlStrength}
-                onChange={setCurlStrength}
-                showValue
-             />
-             <Slider
-                label="Scale"
-                min={0.25}
-                max={4.0}
-                step={0.25}
-                value={config.curlScale}
-                onChange={setCurlScale}
-                showValue
-             />
-             <Slider
-                label="Speed"
+              <Slider
+                label="Breathing Speed"
                 min={0.1}
-                max={5.0}
+                max={2.0}
                 step={0.1}
-                value={config.curlSpeed}
-                onChange={setCurlSpeed}
+                value={config.spreadAnimationSpeed ?? 0.5}
+                onChange={setSpreadAnimationSpeed}
                 showValue
-             />
-        </div>
-      </div>
+              />
+            </div>
+          </div>
+        )}
 
-      {/* Slice Animation - 4D+ and HO mode only */}
-      {!isHydrogenMode && dimension >= 4 && (
-        <div className="space-y-4" data-testid="animation-panel-sliceAnimation">
+        {/* Animated Flow (Curl Noise) */}
+        <div className="space-y-4" data-testid="animation-panel-flow">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Dimensional Sweeps
+              Animated Flow
             </label>
             <ToggleButton
-              pressed={config.sliceAnimationEnabled}
-              onToggle={() => setSliceAnimationEnabled(!config.sliceAnimationEnabled)}
+              pressed={config.curlEnabled}
+              onToggle={() => setCurlEnabled(!config.curlEnabled)}
               className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle slice animation"
+              ariaLabel="Toggle flow animation"
             >
-              {config.sliceAnimationEnabled ? 'ON' : 'OFF'}
+              {config.curlEnabled ? 'ON' : 'OFF'}
             </ToggleButton>
           </div>
+          <div
+            className={`space-y-3 ${!config.curlEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <Slider
+              label="Strength"
+              min={0.0}
+              max={1.0}
+              step={0.05}
+              value={config.curlStrength}
+              onChange={setCurlStrength}
+              showValue
+            />
+            <Slider
+              label="Scale"
+              min={0.25}
+              max={4.0}
+              step={0.25}
+              value={config.curlScale}
+              onChange={setCurlScale}
+              showValue
+            />
+            <Slider
+              label="Speed"
+              min={0.1}
+              max={5.0}
+              step={0.1}
+              value={config.curlSpeed}
+              onChange={setCurlSpeed}
+              showValue
+            />
+          </div>
+        </div>
 
-          <div className={`space-y-3 ${!config.sliceAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+        {/* Slice Animation - 4D+ and HO mode only */}
+        {!isHydrogenMode && dimension >= 4 && (
+          <div className="space-y-4" data-testid="animation-panel-sliceAnimation">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Dimensional Sweeps
+              </label>
+              <ToggleButton
+                pressed={config.sliceAnimationEnabled}
+                onToggle={() => setSliceAnimationEnabled(!config.sliceAnimationEnabled)}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle slice animation"
+              >
+                {config.sliceAnimationEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+
+            <div
+              className={`space-y-3 ${!config.sliceAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+            >
               <Slider
                 label="Amplitude"
                 min={0.1}
@@ -221,45 +228,47 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
                 onChange={setSliceSpeed}
                 showValue
               />
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Quantum Phase Evolution - Hydrogen ND mode only */}
-      {isHydrogenNDMode && (
-        <div className="space-y-4" data-testid="animation-panel-phaseEvolution">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Quantum Phase Evolution
-            </label>
-            <ToggleButton
-              pressed={config.phaseAnimationEnabled}
-              onToggle={() => setPhaseAnimationEnabled(!config.phaseAnimationEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle phase animation"
-            >
-              {config.phaseAnimationEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
+        {/* Quantum Phase Evolution - Hydrogen ND mode only */}
+        {isHydrogenNDMode && (
+          <div className="space-y-4" data-testid="animation-panel-phaseEvolution">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Quantum Phase Evolution
+              </label>
+              <ToggleButton
+                pressed={config.phaseAnimationEnabled}
+                onToggle={() => setPhaseAnimationEnabled(!config.phaseAnimationEnabled)}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle phase animation"
+              >
+                {config.phaseAnimationEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+            <p className="text-xs text-text-tertiary">
+              Animates phase coloring based on quantum energy eigenvalue. Speed controlled by Time
+              Scale.
+            </p>
           </div>
-          <p className="text-xs text-text-tertiary">
-            Animates phase coloring based on quantum energy eigenvalue. Speed controlled by Time Scale.
-          </p>
-        </div>
-      )}
+        )}
 
-      {/* Mode info for hydrogen 3D orbitals */}
-      {isHydrogenMode && !isHydrogenNDMode && (
-        <div className="space-y-2 px-1">
-          <p className="text-xs text-text-tertiary italic">
-            Hydrogen 3D orbitals have static phase. Switch to Hydrogen ND mode for phase animation.
-          </p>
-        </div>
-      )}
+        {/* Mode info for hydrogen 3D orbitals */}
+        {isHydrogenMode && !isHydrogenNDMode && (
+          <div className="space-y-2 px-1">
+            <p className="text-xs text-text-tertiary italic">
+              Hydrogen 3D orbitals have static phase. Switch to Hydrogen ND mode for phase
+              animation.
+            </p>
+          </div>
+        )}
+      </AnimationDrawerContainer>
+    )
+  }
+)
 
-    </AnimationDrawerContainer>
-  );
-});
+SchroedingerAnimationDrawer.displayName = 'SchroedingerAnimationDrawer'
 
-SchroedingerAnimationDrawer.displayName = 'SchroedingerAnimationDrawer';
-
-export default SchroedingerAnimationDrawer;
+export default SchroedingerAnimationDrawer

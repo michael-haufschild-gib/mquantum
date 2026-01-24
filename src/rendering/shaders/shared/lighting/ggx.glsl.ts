@@ -64,4 +64,4 @@ vec3 computePBRSpecular(vec3 N, vec3 V, vec3 L, float roughness, vec3 F0) {
     
     return specular;
 }
-`;
+`

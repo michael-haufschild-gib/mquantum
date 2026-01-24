@@ -15,31 +15,27 @@
  * @see {@link usePostProcessingStore} for state management
  */
 
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { Slider } from '@/components/ui/Slider';
-import { Select } from '@/components/ui/Select';
-import {
-  type SSRQuality,
-} from '@/stores/defaults/visualDefaults';
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { Slider } from '@/components/ui/Slider'
+import { Select } from '@/components/ui/Select'
+import { type SSRQuality } from '@/stores/defaults/visualDefaults'
+import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 
 export interface SSRControlsProps {
-  className?: string;
+  className?: string
 }
 
 const SSR_QUALITY_OPTIONS: { value: SSRQuality; label: string }[] = [
   { value: 'low', label: 'Low (16 steps)' },
   { value: 'medium', label: 'Medium (32 steps)' },
   { value: 'high', label: 'High (64 steps)' },
-];
+]
 
 /**
  * SSRControls component that provides UI for adjusting screen-space reflection settings.
  */
-export const SSRControls: React.FC<SSRControlsProps> = React.memo(({
-  className = '',
-}) => {
+export const SSRControls: React.FC<SSRControlsProps> = React.memo(({ className = '' }) => {
   const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
     // State
     ssrIntensity: state.ssrIntensity,
@@ -55,7 +51,7 @@ export const SSRControls: React.FC<SSRControlsProps> = React.memo(({
     setSSRFadeStart: state.setSSRFadeStart,
     setSSRFadeEnd: state.setSSRFadeEnd,
     setSSRQuality: state.setSSRQuality,
-  }));
+  }))
   const {
     ssrIntensity,
     ssrMaxDistance,
@@ -69,73 +65,73 @@ export const SSRControls: React.FC<SSRControlsProps> = React.memo(({
     setSSRFadeStart,
     setSSRFadeEnd,
     setSSRQuality,
-  } = usePostProcessingStore(postProcessingSelector);
+  } = usePostProcessingStore(postProcessingSelector)
 
   return (
     <div className={`space-y-4 ${className}`}>
-          {/* Quality */}
-          <Select
-            label="Quality"
-            options={SSR_QUALITY_OPTIONS}
-            value={ssrQuality}
-            onChange={setSSRQuality}
-            data-testid="ssr-quality-select"
-          />
+      {/* Quality */}
+      <Select
+        label="Quality"
+        options={SSR_QUALITY_OPTIONS}
+        value={ssrQuality}
+        onChange={setSSRQuality}
+        data-testid="ssr-quality-select"
+      />
 
-          {/* Intensity */}
-          <Slider
-            label="Intensity"
-            min={0}
-            max={1}
-            step={0.05}
-            value={ssrIntensity}
-            onChange={setSSRIntensity}
-            showValue
-          />
+      {/* Intensity */}
+      <Slider
+        label="Intensity"
+        min={0}
+        max={1}
+        step={0.05}
+        value={ssrIntensity}
+        onChange={setSSRIntensity}
+        showValue
+      />
 
-          {/* Max Distance */}
-          <Slider
-            label="Max Distance"
-            min={1}
-            max={50}
-            step={1}
-            value={ssrMaxDistance}
-            onChange={setSSRMaxDistance}
-            showValue
-          />
+      {/* Max Distance */}
+      <Slider
+        label="Max Distance"
+        min={1}
+        max={50}
+        step={1}
+        value={ssrMaxDistance}
+        onChange={setSSRMaxDistance}
+        showValue
+      />
 
-          {/* Thickness */}
-          <Slider
-            label="Thickness"
-            min={0.01}
-            max={2}
-            step={0.05}
-            value={ssrThickness}
-            onChange={setSSRThickness}
-            showValue
-          />
+      {/* Thickness */}
+      <Slider
+        label="Thickness"
+        min={0.01}
+        max={2}
+        step={0.05}
+        value={ssrThickness}
+        onChange={setSSRThickness}
+        showValue
+      />
 
-          {/* Fade Start */}
-          <Slider
-            label="Fade Start"
-            min={0}
-            max={1}
-            step={0.05}
-            value={ssrFadeStart}
-            onChange={setSSRFadeStart}
-            showValue
-          />
+      {/* Fade Start */}
+      <Slider
+        label="Fade Start"
+        min={0}
+        max={1}
+        step={0.05}
+        value={ssrFadeStart}
+        onChange={setSSRFadeStart}
+        showValue
+      />
 
-          {/* Fade End */}
-          <Slider
-            label="Fade End"
-            min={0}
-            max={1}
-            step={0.05}
-            value={ssrFadeEnd}
-            onChange={setSSRFadeEnd}
-            showValue
-          />
+      {/* Fade End */}
+      <Slider
+        label="Fade End"
+        min={0}
+        max={1}
+        step={0.05}
+        value={ssrFadeEnd}
+        onChange={setSSRFadeEnd}
+        showValue
+      />
     </div>
-  );
-});
+  )
+})

@@ -7,13 +7,13 @@
  * @module rendering/renderers/base/types
  */
 
-import type { MatrixND } from '@/lib/math/types';
+import type { MatrixND } from '@/lib/math/types'
 
 /** Maximum supported dimension for N-dimensional objects */
-export const MAX_DIMENSION = 11;
+export const MAX_DIMENSION = 11
 
 /** Debounce time in ms before restoring high quality after rotation stops */
-export const QUALITY_RESTORE_DELAY_MS = 150;
+export const QUALITY_RESTORE_DELAY_MS = 150
 
 /**
  * Pre-allocated working arrays to avoid per-frame allocations.
@@ -21,21 +21,21 @@ export const QUALITY_RESTORE_DELAY_MS = 150;
  */
 export interface WorkingArrays {
   /** Unit vector along X axis (input) */
-  unitX: number[];
+  unitX: number[]
   /** Unit vector along Y axis (input) */
-  unitY: number[];
+  unitY: number[]
   /** Unit vector along Z axis (input) */
-  unitZ: number[];
+  unitZ: number[]
   /** Origin point in N-dimensional space (input) */
-  origin: number[];
+  origin: number[]
   /** Rotated X basis vector (output) */
-  rotatedX: Float32Array;
+  rotatedX: Float32Array
   /** Rotated Y basis vector (output) */
-  rotatedY: Float32Array;
+  rotatedY: Float32Array
   /** Rotated Z basis vector (output) */
-  rotatedZ: Float32Array;
+  rotatedZ: Float32Array
   /** Rotated origin (output) */
-  rotatedOrigin: Float32Array;
+  rotatedOrigin: Float32Array
 }
 
 /**
@@ -53,7 +53,7 @@ export function createWorkingArrays(): WorkingArrays {
     rotatedY: new Float32Array(MAX_DIMENSION),
     rotatedZ: new Float32Array(MAX_DIMENSION),
     rotatedOrigin: new Float32Array(MAX_DIMENSION),
-  };
+  }
 }
 
 /**
@@ -72,15 +72,15 @@ export function applyRotationInPlace(
   dimension: number
 ): void {
   // Clear output first (only needed if we assume clean buffer beyond D)
-  out.fill(0);
+  out.fill(0)
 
   for (let i = 0; i < dimension; i++) {
-    let sum = 0;
-    const rowOffset = i * dimension;
+    let sum = 0
+    const rowOffset = i * dimension
     for (let j = 0; j < dimension; j++) {
-      sum += (matrix[rowOffset + j] ?? 0) * (vec[j] ?? 0);
+      sum += (matrix[rowOffset + j] ?? 0) * (vec[j] ?? 0)
     }
-    out[i] = sum;
+    out[i] = sum
   }
 }
 
@@ -90,15 +90,15 @@ export function applyRotationInPlace(
  */
 export interface RotationState {
   /** Version number of the rotation store (for change detection) */
-  prevVersion: number;
+  prevVersion: number
   /** Cached rotation matrix (recomputed when rotations change) */
-  cachedMatrix: MatrixND | null;
+  cachedMatrix: MatrixND | null
   /** Previous dimension (for detecting dimension changes) */
-  prevDimension: number | null;
+  prevDimension: number | null
   /** Previous parameter values (for detecting parameter changes) */
-  prevParamValues: number[] | null;
+  prevParamValues: number[] | null
   /** Flag indicating basis vectors need recomputation */
-  basisVectorsDirty: boolean;
+  basisVectorsDirty: boolean
 }
 
 /**
@@ -107,9 +107,9 @@ export interface RotationState {
  */
 export interface QualityState {
   /** Whether fast mode is currently active */
-  fastMode: boolean;
+  fastMode: boolean
   /** Timeout handle for restoring quality after interaction stops */
-  restoreTimeout: ReturnType<typeof setTimeout> | null;
+  restoreTimeout: ReturnType<typeof setTimeout> | null
   /** Previous rotation version for change detection */
-  prevVersion: number;
+  prevVersion: number
 }

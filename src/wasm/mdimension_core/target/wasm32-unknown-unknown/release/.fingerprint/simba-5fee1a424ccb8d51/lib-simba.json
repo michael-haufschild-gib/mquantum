@@ -1,1 +1,26 @@
-{"rustc":18415816196306954164,"features":"[\"std\", \"wide\"]","declared_features":"[\"cordic\", \"cuda\", \"cuda_std\", \"cust_core\", \"decimal\", \"default\", \"fixed\", \"libm\", \"libm_force\", \"packed_simd\", \"partial_fixed_point_support\", \"rand\", \"rkyv\", \"rkyv-serialize\", \"serde\", \"serde_serialize\", \"std\", \"wide\"]","target":18314989904106682660,"profile":1207370057436191037,"path":14469153030516559577,"deps":[[5157631553186200874,"num_traits",false,4700768055843057315],[11243818633362483251,"wide",false,1124148854668206821],[12319020793864570031,"num_complex",false,3737142325958030166],[15677050387741058262,"approx",false,5133926198609619142],[17605717126308396068,"paste",false,12559901471691018779]],"local":[{"CheckDepInfo":{"dep_info":"wasm32-unknown-unknown/release/.fingerprint/simba-5fee1a424ccb8d51/dep-lib-simba","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":14682669768258224367}
+{
+  "rustc": 18415816196306954164,
+  "features": "[\"std\", \"wide\"]",
+  "declared_features": "[\"cordic\", \"cuda\", \"cuda_std\", \"cust_core\", \"decimal\", \"default\", \"fixed\", \"libm\", \"libm_force\", \"packed_simd\", \"partial_fixed_point_support\", \"rand\", \"rkyv\", \"rkyv-serialize\", \"serde\", \"serde_serialize\", \"std\", \"wide\"]",
+  "target": 18314989904106682660,
+  "profile": 1207370057436191037,
+  "path": 14469153030516559577,
+  "deps": [
+    [5157631553186200874, "num_traits", false, 4700768055843057315],
+    [11243818633362483251, "wide", false, 1124148854668206821],
+    [12319020793864570031, "num_complex", false, 3737142325958030166],
+    [15677050387741058262, "approx", false, 5133926198609619142],
+    [17605717126308396068, "paste", false, 12559901471691018779]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "wasm32-unknown-unknown/release/.fingerprint/simba-5fee1a424ccb8d51/dep-lib-simba",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 14682669768258224367
+}

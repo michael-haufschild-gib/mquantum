@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 /**
  * Cinematic Shader (GLSL ES 3.00)
@@ -84,14 +84,14 @@ export const CinematicShader = {
       fragColor = vec4(color, 1.0);
     }
   `,
-};
+}
 
 export type CinematicUniforms = {
-  tDiffuse: THREE.Uniform<THREE.Texture | null>;
-  uTime: THREE.Uniform<number>;
-  uResolution: THREE.Uniform<THREE.Vector2>;
-  uDistortion: THREE.Uniform<number>;
-  uVignetteDarkness: THREE.Uniform<number>;
-  uVignetteOffset: THREE.Uniform<number>;
-  uNoiseIntensity: THREE.Uniform<number>;
-};
+  tDiffuse: THREE.Uniform<THREE.Texture | null>
+  uTime: THREE.Uniform<number>
+  uResolution: THREE.Uniform<THREE.Vector2>
+  uDistortion: THREE.Uniform<number>
+  uVignetteDarkness: THREE.Uniform<number>
+  uVignetteOffset: THREE.Uniform<number>
+  uNoiseIntensity: THREE.Uniform<number>
+}

@@ -4,7 +4,7 @@
  * Checks if points lie on the expected spheres and circles.
  */
 
-import type { VectorND } from '@/lib/math/types';
+import type { VectorND } from '@/lib/math/types'
 
 /**
  * Verifies that classic Clifford torus points lie on S³
@@ -19,38 +19,40 @@ export function verifyCliffordTorusOnSphere(
   expectedRadius: number,
   tolerance: number = 1e-6
 ): { valid: boolean; maxDeviation: number; issues: string[] } {
-  const issues: string[] = [];
-  let maxDeviation = 0;
-  const expectedRadiusSq = expectedRadius * expectedRadius;
+  const issues: string[] = []
+  let maxDeviation = 0
+  const expectedRadiusSq = expectedRadius * expectedRadius
 
   for (let i = 0; i < points.length; i++) {
-    const p = points[i]!;
+    const p = points[i]!
     if (p.length < 4) {
-      issues.push(`Point ${i} has insufficient dimensions`);
-      continue;
+      issues.push(`Point ${i} has insufficient dimensions`)
+      continue
     }
 
     // Sum of squares of first 4 coordinates should equal R²
-    const radiusSq = p[0]! * p[0]! + p[1]! * p[1]! + p[2]! * p[2]! + p[3]! * p[3]!;
-    const deviation = Math.abs(radiusSq - expectedRadiusSq);
-    maxDeviation = Math.max(maxDeviation, deviation);
+    const radiusSq = p[0]! * p[0]! + p[1]! * p[1]! + p[2]! * p[2]! + p[3]! * p[3]!
+    const deviation = Math.abs(radiusSq - expectedRadiusSq)
+    maxDeviation = Math.max(maxDeviation, deviation)
 
     if (deviation > tolerance) {
       if (issues.length < 5) {
-        issues.push(`Point ${i} deviates from S³: ||x||² = ${radiusSq}, expected ${expectedRadiusSq}`);
+        issues.push(
+          `Point ${i} deviates from S³: ||x||² = ${radiusSq}, expected ${expectedRadiusSq}`
+        )
       }
     }
   }
 
   if (issues.length >= 5) {
-    issues.push('(and more...)');
+    issues.push('(and more...)')
   }
 
   return {
     valid: issues.length === 0,
     maxDeviation,
     issues,
-  };
+  }
 }
 
 /**
@@ -68,45 +70,45 @@ export function verifyGeneralizedCliffordTorusOnSphere(
   expectedRadius: number,
   tolerance: number = 1e-6
 ): { valid: boolean; maxDeviation: number; issues: string[] } {
-  const issues: string[] = [];
-  let maxDeviation = 0;
-  const expectedRadiusSq = expectedRadius * expectedRadius;
-  const requiredDim = 2 * k;
+  const issues: string[] = []
+  let maxDeviation = 0
+  const expectedRadiusSq = expectedRadius * expectedRadius
+  const requiredDim = 2 * k
 
   for (let i = 0; i < points.length; i++) {
-    const p = points[i]!;
+    const p = points[i]!
     if (p.length < requiredDim) {
-      issues.push(`Point ${i} has insufficient dimensions (${p.length} < ${requiredDim})`);
-      continue;
+      issues.push(`Point ${i} has insufficient dimensions (${p.length} < ${requiredDim})`)
+      continue
     }
 
     // Sum of squares of first 2k coordinates should equal R²
-    let radiusSq = 0;
+    let radiusSq = 0
     for (let j = 0; j < requiredDim; j++) {
-      radiusSq += p[j]! * p[j]!;
+      radiusSq += p[j]! * p[j]!
     }
 
-    const deviation = Math.abs(radiusSq - expectedRadiusSq);
-    maxDeviation = Math.max(maxDeviation, deviation);
+    const deviation = Math.abs(radiusSq - expectedRadiusSq)
+    maxDeviation = Math.max(maxDeviation, deviation)
 
     if (deviation > tolerance) {
       if (issues.length < 5) {
         issues.push(
           `Point ${i} deviates from S^${2 * k - 1}: ||x||² = ${radiusSq.toFixed(6)}, expected ${expectedRadiusSq.toFixed(6)}`
-        );
+        )
       }
     }
   }
 
   if (issues.length >= 5) {
-    issues.push('(and more...)');
+    issues.push('(and more...)')
   }
 
   return {
     valid: issues.length === 0,
     maxDeviation,
     issues,
-  };
+  }
 }
 
 /**
@@ -126,42 +128,42 @@ export function verifyGeneralizedCliffordTorusCircleRadii(
   expectedRadius: number,
   tolerance: number = 1e-6
 ): { valid: boolean; maxDeviation: number; issues: string[] } {
-  const issues: string[] = [];
-  let maxDeviation = 0;
-  const expectedCircleRadiusSq = (expectedRadius / Math.sqrt(k)) ** 2;
+  const issues: string[] = []
+  let maxDeviation = 0
+  const expectedCircleRadiusSq = (expectedRadius / Math.sqrt(k)) ** 2
 
   for (let i = 0; i < points.length; i++) {
-    const p = points[i]!;
+    const p = points[i]!
     if (p.length < 2 * k) {
-      issues.push(`Point ${i} has insufficient dimensions`);
-      continue;
+      issues.push(`Point ${i} has insufficient dimensions`)
+      continue
     }
 
     // Check each circle's radius
     for (let m = 0; m < k; m++) {
-      const x = p[2 * m]!;
-      const y = p[2 * m + 1]!;
-      const circleRadiusSq = x * x + y * y;
-      const deviation = Math.abs(circleRadiusSq - expectedCircleRadiusSq);
-      maxDeviation = Math.max(maxDeviation, deviation);
+      const x = p[2 * m]!
+      const y = p[2 * m + 1]!
+      const circleRadiusSq = x * x + y * y
+      const deviation = Math.abs(circleRadiusSq - expectedCircleRadiusSq)
+      maxDeviation = Math.max(maxDeviation, deviation)
 
       if (deviation > tolerance) {
         if (issues.length < 5) {
           issues.push(
             `Point ${i}, circle ${m + 1}: |z|² = ${circleRadiusSq.toFixed(6)}, expected ${expectedCircleRadiusSq.toFixed(6)}`
-          );
+          )
         }
       }
     }
   }
 
   if (issues.length >= 5) {
-    issues.push('(and more...)');
+    issues.push('(and more...)')
   }
 
   return {
     valid: issues.length === 0,
     maxDeviation,
     issues,
-  };
+  }
 }

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import type { Face } from '@/lib/geometry';
+import { useMemo } from 'react'
+import type { Face } from '@/lib/geometry'
 
 /**
  * Hook to calculate per-face depth values for palette color variation.
@@ -22,76 +22,76 @@ export function useFaceDepths(
 ): number[] {
   return useMemo(() => {
     if (faces.length === 0 || originalVertices.length === 0) {
-      return [];
+      return []
     }
 
     // Calculate raw depth for each face while tracking min/max in single pass
     // (avoids separate Math.min/max spread operations which are O(n) each)
-    let minDepth = Infinity;
-    let maxDepth = -Infinity;
+    let minDepth = Infinity
+    let maxDepth = -Infinity
 
     const rawDepths = faces.map((face) => {
-      const vertexIndices = face.vertices;
+      const vertexIndices = face.vertices
 
       if (vertexIndices.length === 0) {
-        return 0;
+        return 0
       }
 
-      let depth: number;
+      let depth: number
 
       if (dimension > 3) {
         // For 4D+: Average the W+ coordinates (indices 3 and beyond)
-        let sum = 0;
-        let count = 0;
+        let sum = 0
+        let count = 0
 
         for (const vIdx of vertexIndices) {
-          const vertex = originalVertices[vIdx];
-          if (!vertex) continue;
+          const vertex = originalVertices[vIdx]
+          if (!vertex) continue
 
           // Sum all coordinates from index 3 onwards
           for (let d = 3; d < dimension; d++) {
-            sum += vertex[d] ?? 0;
-            count++;
+            sum += vertex[d] ?? 0
+            count++
           }
         }
 
-        depth = count > 0 ? sum / count : 0;
+        depth = count > 0 ? sum / count : 0
       } else {
         // For 3D: Use Y-coordinate of face centroid
-        let sumY = 0;
-        let validCount = 0;
+        let sumY = 0
+        let validCount = 0
 
         for (const vIdx of vertexIndices) {
-          const vertex = originalVertices[vIdx];
+          const vertex = originalVertices[vIdx]
           if (vertex && vertex.length > 1 && vertex[1] !== undefined) {
-            sumY += vertex[1]; // Y coordinate
-            validCount++;
+            sumY += vertex[1] // Y coordinate
+            validCount++
           }
         }
 
-        depth = validCount > 0 ? sumY / validCount : 0;
+        depth = validCount > 0 ? sumY / validCount : 0
       }
 
       // Track min/max during iteration (single pass)
-      if (depth < minDepth) minDepth = depth;
-      if (depth > maxDepth) maxDepth = depth;
+      if (depth < minDepth) minDepth = depth
+      if (depth > maxDepth) maxDepth = depth
 
-      return depth;
-    });
+      return depth
+    })
 
     // Normalize to [0, 1] range
     if (rawDepths.length === 0) {
-      return [];
+      return []
     }
 
-    const range = maxDepth - minDepth;
+    const range = maxDepth - minDepth
 
     // Avoid division by zero if all depths are the same
     if (range < 1e-10) {
       // All faces have same depth; use 0.5 for all
-      return rawDepths.map(() => 0.5);
+      return rawDepths.map(() => 0.5)
     }
 
-    return rawDepths.map((depth) => (depth - minDepth) / range);
-  }, [originalVertices, faces, dimension]);
+    return rawDepths.map((depth) => (depth - minDepth) / range)
+  }, [originalVertices, faces, dimension])
 }

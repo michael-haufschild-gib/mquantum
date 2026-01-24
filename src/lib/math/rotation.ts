@@ -299,23 +299,17 @@ export function composeRotations(
   for (const [planeName, angle] of angles.entries()) {
     // OPT-ROT-1: O(1) lookup instead of O(n) find()
     const indices = planeIndices.get(planeName)
-    
+
     // Validate plane name (DEV only)
     if (import.meta.env.DEV && !indices) {
       throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
     }
-    
+
     // Skip invalid planes in production (shouldn't happen with valid input)
     if (!indices) continue
 
     // Create rotation matrix directly into scratch buffer
-    createRotationMatrixInto(
-      scratch.rotation,
-      dimension,
-      indices[0],
-      indices[1],
-      angle
-    )
+    createRotationMatrixInto(scratch.rotation, dimension, indices[0], indices[1], angle)
 
     // Multiply: next = current * rotation (no intermediate allocation)
     multiplyMatricesInto(next, current, scratch.rotation)

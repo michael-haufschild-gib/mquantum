@@ -7,24 +7,24 @@
  * - Block assembly
  */
 
-import { ShaderConfig } from '../types';
+import { ShaderConfig } from '../types'
 
 /** Shader block with optional condition */
 export interface ShaderBlock {
-  name: string;
-  content: string;
-  condition?: boolean;
+  name: string
+  content: string
+  condition?: boolean
 }
 
 /** Result of feature flag processing */
 export interface FeatureFlags {
-  defines: string[];
-  features: string[];
-  useShadows: boolean;
-  useTemporal: boolean;
-  useAO: boolean;
-  useSss: boolean;
-  useFresnel: boolean;
+  defines: string[]
+  features: string[]
+  useShadows: boolean
+  useTemporal: boolean
+  useAO: boolean
+  useSss: boolean
+  useFresnel: boolean
 }
 
 /**
@@ -57,38 +57,38 @@ export function processFeatureFlags(config: ShaderConfig): FeatureFlags {
     overrides = [],
     sss: enableSss,
     fresnel: enableFresnel,
-  } = config;
+  } = config
 
-  const defines: string[] = [];
-  const features: string[] = [];
+  const defines: string[] = []
+  const features: string[] = []
 
-  features.push('Multi-Light');
+  features.push('Multi-Light')
 
-  const useShadows = enableShadows && !overrides.includes('Shadows');
-  const useTemporal = enableTemporal && !overrides.includes('Temporal Reprojection');
-  const useAO = enableAO && !overrides.includes('Ambient Occlusion');
-  const useSss = !!enableSss && !overrides.includes('SSS');
-  const useFresnel = !!enableFresnel && !overrides.includes('Fresnel');
+  const useShadows = enableShadows && !overrides.includes('Shadows')
+  const useTemporal = enableTemporal && !overrides.includes('Temporal Reprojection')
+  const useAO = enableAO && !overrides.includes('Ambient Occlusion')
+  const useSss = !!enableSss && !overrides.includes('SSS')
+  const useFresnel = !!enableFresnel && !overrides.includes('Fresnel')
 
   if (useShadows) {
-    defines.push('#define USE_SHADOWS');
-    features.push('Shadows');
+    defines.push('#define USE_SHADOWS')
+    features.push('Shadows')
   }
   if (useTemporal) {
-    defines.push('#define USE_TEMPORAL');
-    features.push('Temporal Reprojection');
+    defines.push('#define USE_TEMPORAL')
+    features.push('Temporal Reprojection')
   }
   if (useAO) {
-    defines.push('#define USE_AO');
-    features.push('Ambient Occlusion');
+    defines.push('#define USE_AO')
+    features.push('Ambient Occlusion')
   }
   if (useSss) {
-    defines.push('#define USE_SSS');
-    features.push('SSS');
+    defines.push('#define USE_SSS')
+    features.push('SSS')
   }
   if (useFresnel) {
-    defines.push('#define USE_FRESNEL');
-    features.push('Fresnel');
+    defines.push('#define USE_FRESNEL')
+    features.push('Fresnel')
   }
 
   return {
@@ -99,7 +99,7 @@ export function processFeatureFlags(config: ShaderConfig): FeatureFlags {
     useAO,
     useSss,
     useFresnel,
-  };
+  }
 }
 
 /**
@@ -124,29 +124,29 @@ export function assembleShaderBlocks(
   blocks: ShaderBlock[],
   overrides: string[]
 ): { glsl: string; modules: string[] } {
-  const modules: string[] = [];
-  const glslParts: string[] = [];
+  const modules: string[] = []
+  const glslParts: string[] = []
 
-  blocks.forEach(b => {
-    if (b.condition === false) return; // Disabled in config
+  blocks.forEach((b) => {
+    if (b.condition === false) return // Disabled in config
 
-    modules.push(b.name);
+    modules.push(b.name)
 
     if (overrides.includes(b.name)) {
       // Overridden: Don't add content
     } else {
-      glslParts.push(b.content);
+      glslParts.push(b.content)
     }
-  });
+  })
 
-  return { glsl: glslParts.join('\n'), modules };
+  return { glsl: glslParts.join('\n'), modules }
 }
 
 /** Standard vertex inputs block for fractal shaders */
 export const fractalVertexInputsBlock = `
 // Inputs from vertex shader
 in vec3 vPosition;
-`;
+`
 
 // ============================================
 // Mesh Shader Helpers (Polytope, TubeWireframe)
@@ -154,19 +154,19 @@ in vec3 vPosition;
 
 /** Configuration for mesh-based shaders (Polytope, TubeWireframe) */
 export interface MeshShaderConfig {
-  shadows?: boolean;
-  sss?: boolean;
-  fresnel?: boolean;
-  overrides?: string[];
+  shadows?: boolean
+  sss?: boolean
+  fresnel?: boolean
+  overrides?: string[]
 }
 
 /** Result of mesh feature flag processing */
 export interface MeshFeatureFlags {
-  defines: string[];
-  features: string[];
-  useShadows: boolean;
-  useSss: boolean;
-  useFresnel: boolean;
+  defines: string[]
+  features: string[]
+  useShadows: boolean
+  useSss: boolean
+  useFresnel: boolean
 }
 
 /**
@@ -191,27 +191,27 @@ export function processMeshFeatureFlags(config: MeshShaderConfig): MeshFeatureFl
     sss: enableSss = true,
     fresnel: enableFresnel = true,
     overrides = [],
-  } = config;
+  } = config
 
-  const defines: string[] = [];
-  const features: string[] = ['Multi-Light'];
+  const defines: string[] = []
+  const features: string[] = ['Multi-Light']
 
-  const useShadows = enableShadows && !overrides.includes('Shadow Maps');
-  const useSss = enableSss && !overrides.includes('SSS');
-  const useFresnel = enableFresnel && !overrides.includes('Fresnel');
+  const useShadows = enableShadows && !overrides.includes('Shadow Maps')
+  const useSss = enableSss && !overrides.includes('SSS')
+  const useFresnel = enableFresnel && !overrides.includes('Fresnel')
 
   if (useShadows) {
-    defines.push('#define USE_SHADOWS');
-    features.push('Shadow Maps');
+    defines.push('#define USE_SHADOWS')
+    features.push('Shadow Maps')
   }
   if (useSss) {
-    defines.push('#define USE_SSS');
-    features.push('SSS');
+    defines.push('#define USE_SSS')
+    features.push('SSS')
   }
   if (useFresnel) {
-    defines.push('#define USE_FRESNEL');
-    features.push('Fresnel');
+    defines.push('#define USE_FRESNEL')
+    features.push('Fresnel')
   }
 
-  return { defines, features, useShadows, useSss, useFresnel };
+  return { defines, features, useShadows, useSss, useFresnel }
 }

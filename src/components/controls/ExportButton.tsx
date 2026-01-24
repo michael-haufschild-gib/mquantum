@@ -3,55 +3,53 @@
  * Button for exporting the visualization as PNG
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/Button';
-import { useToast } from '@/hooks/useToast';
-import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export';
+import React, { useState, useEffect, useRef } from 'react'
+import { Button } from '@/components/ui/Button'
+import { useToast } from '@/hooks/useToast'
+import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
 
 export interface ExportButtonProps {
-  className?: string;
+  className?: string
 }
 
-export const ExportButton: React.FC<ExportButtonProps> = ({
-  className = '',
-}) => {
-  const [isExporting, setIsExporting] = useState(false);
-  const [lastExport, setLastExport] = useState<string | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { addToast } = useToast();
+export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) => {
+  const [isExporting, setIsExporting] = useState(false)
+  const [lastExport, setLastExport] = useState<string | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { addToast } = useToast()
 
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+        clearTimeout(timeoutRef.current)
       }
-    };
-  }, []);
+    }
+  }, [])
 
   const handleExport = async () => {
-    setIsExporting(true);
+    setIsExporting(true)
 
     // Small delay to ensure UI updates
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
-    const filename = generateTimestampFilename('ndimensional');
-    const success = exportSceneToPNG({ filename });
+    const filename = generateTimestampFilename('ndimensional')
+    const success = exportSceneToPNG({ filename })
 
     if (success) {
-      setLastExport(filename);
-      addToast(`Exported ${filename}.png`, 'success');
+      setLastExport(filename)
+      addToast(`Exported ${filename}.png`, 'success')
       // Clear the success message after 3 seconds
       if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+        clearTimeout(timeoutRef.current)
       }
-      timeoutRef.current = setTimeout(() => setLastExport(null), 3000);
+      timeoutRef.current = setTimeout(() => setLastExport(null), 3000)
     } else {
-      addToast('Export failed. Please try again.', 'error');
+      addToast('Export failed. Please try again.', 'error')
     }
 
-    setIsExporting(false);
-  };
+    setIsExporting(false)
+  }
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -65,11 +63,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
         {isExporting ? 'Exporting...' : 'Export PNG'}
       </Button>
 
-      {lastExport && (
-        <p className="text-xs text-accent">
-          Saved: {lastExport}.png
-        </p>
-      )}
+      {lastExport && <p className="text-xs text-accent">Saved: {lastExport}.png</p>}
     </div>
-  );
-};
+  )
+}

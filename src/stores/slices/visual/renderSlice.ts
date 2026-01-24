@@ -21,55 +21,63 @@ export const RENDER_INITIAL_STATE: RenderSliceState = {
 export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlice> = (set) => ({
   ...RENDER_INITIAL_STATE,
 
-  setEdgesVisible: (visible) => set((state) => {
-    let newThickness = state.edgeThickness
-    if (visible) {
-      if (state.edgeThickness < 1) newThickness = 1
-    } else {
-      newThickness = 0
-    }
-    return { 
-      edgesVisible: visible,
-      edgeThickness: newThickness
-    }
-  }),
+  setEdgesVisible: (visible) =>
+    set((state) => {
+      let newThickness = state.edgeThickness
+      if (visible) {
+        if (state.edgeThickness < 1) newThickness = 1
+      } else {
+        newThickness = 0
+      }
+      return {
+        edgesVisible: visible,
+        edgeThickness: newThickness,
+      }
+    }),
 
-  setFacesVisible: (visible) => set({
-    facesVisible: visible,
-    shaderType: visible ? 'surface' : 'wireframe',
-  }),
+  setFacesVisible: (visible) =>
+    set({
+      facesVisible: visible,
+      shaderType: visible ? 'surface' : 'wireframe',
+    }),
 
   setShaderType: (shaderType) => set({ shaderType }),
 
-  setWireframeSettings: (settings) => set((state) => ({
-    shaderSettings: {
-      ...state.shaderSettings,
-      wireframe: {
-        ...state.shaderSettings.wireframe,
-        ...settings,
-        lineThickness: settings.lineThickness !== undefined
-          ? Math.max(1, Math.min(5, settings.lineThickness))
-          : state.shaderSettings.wireframe.lineThickness,
+  setWireframeSettings: (settings) =>
+    set((state) => ({
+      shaderSettings: {
+        ...state.shaderSettings,
+        wireframe: {
+          ...state.shaderSettings.wireframe,
+          ...settings,
+          lineThickness:
+            settings.lineThickness !== undefined
+              ? Math.max(1, Math.min(5, settings.lineThickness))
+              : state.shaderSettings.wireframe.lineThickness,
+        },
       },
-    },
-  })),
+    })),
 
-  setSurfaceSettings: (settings) => set((state) => ({
-    shaderSettings: {
-      ...state.shaderSettings,
-      surface: {
-        ...state.shaderSettings.surface,
-        ...settings,
-        faceOpacity: settings.faceOpacity !== undefined
-          ? Math.max(0, Math.min(1, settings.faceOpacity))
-          : state.shaderSettings.surface.faceOpacity,
-        specularIntensity: settings.specularIntensity !== undefined
-          ? Math.max(0, Math.min(2, settings.specularIntensity))
-          : state.shaderSettings.surface.specularIntensity,
+  setSurfaceSettings: (settings) =>
+    set((state) => ({
+      shaderSettings: {
+        ...state.shaderSettings,
+        surface: {
+          ...state.shaderSettings.surface,
+          ...settings,
+          faceOpacity:
+            settings.faceOpacity !== undefined
+              ? Math.max(0, Math.min(1, settings.faceOpacity))
+              : state.shaderSettings.surface.faceOpacity,
+          specularIntensity:
+            settings.specularIntensity !== undefined
+              ? Math.max(0, Math.min(2, settings.specularIntensity))
+              : state.shaderSettings.surface.specularIntensity,
+        },
       },
-    },
-  })),
+    })),
 
   setFresnelEnabled: (enabled) => set({ fresnelEnabled: enabled }),
-  setFresnelIntensity: (intensity) => set({ fresnelIntensity: Math.max(0, Math.min(1, intensity)) }),
+  setFresnelIntensity: (intensity) =>
+    set({ fresnelIntensity: Math.max(0, Math.min(1, intensity)) }),
 })

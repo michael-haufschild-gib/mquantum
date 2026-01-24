@@ -36,7 +36,10 @@ const LostState: React.FC = () => {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       {/* Warning icon (decorative) */}
-      <div className="w-16 h-16 rounded-full bg-warning-bg flex items-center justify-center" aria-hidden="true">
+      <div
+        className="w-16 h-16 rounded-full bg-warning-bg flex items-center justify-center"
+        aria-hidden="true"
+      >
         <svg
           className="w-8 h-8 text-warning"
           fill="none"
@@ -81,7 +84,10 @@ const RestoringState: React.FC = React.memo(() => {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       {/* Sync icon (decorative) */}
-      <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center" aria-hidden="true">
+      <div
+        className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center"
+        aria-hidden="true"
+      >
         <svg
           className="w-8 h-8 text-accent animate-spin"
           fill="none"
@@ -142,7 +148,10 @@ const FailedState: React.FC = React.memo(() => {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       {/* Error icon (decorative) */}
-      <div className="w-16 h-16 rounded-full bg-danger-bg flex items-center justify-center" aria-hidden="true">
+      <div
+        className="w-16 h-16 rounded-full bg-danger-bg flex items-center justify-center"
+        aria-hidden="true"
+      >
         <svg
           className="w-8 h-8 text-danger"
           fill="none"
@@ -150,11 +159,7 @@ const FailedState: React.FC = React.memo(() => {
           stroke="currentColor"
           strokeWidth={2}
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M6 18L18 6M6 6l12 12"
-          />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </div>
 
@@ -163,21 +168,13 @@ const FailedState: React.FC = React.memo(() => {
           Unable to Recover
         </h2>
         <p id="context-lost-description" className="text-sm text-text-secondary max-w-xs mb-2">
-          The GPU connection could not be restored. Your settings have been saved
-          and will be restored after reloading.
+          The GPU connection could not be restored. Your settings have been saved and will be
+          restored after reloading.
         </p>
-        {lastError && (
-          <p className="text-xs text-text-secondary/60 font-mono">
-            {lastError}
-          </p>
-        )}
+        {lastError && <p className="text-xs text-text-secondary/60 font-mono">{lastError}</p>}
       </div>
 
-      <Button
-        variant="primary"
-        onClick={handleReload}
-        className="min-w-[140px]"
-      >
+      <Button variant="primary" onClick={handleReload} className="min-w-[140px]">
         Reload Page
       </Button>
     </div>
@@ -213,7 +210,10 @@ const EscalatedState: React.FC = React.memo(() => {
   return (
     <div className="flex flex-col items-center gap-6 text-center">
       {/* Warning icon (decorative) */}
-      <div className="w-16 h-16 rounded-full bg-warning-bg flex items-center justify-center" aria-hidden="true">
+      <div
+        className="w-16 h-16 rounded-full bg-warning-bg flex items-center justify-center"
+        aria-hidden="true"
+      >
         <svg
           className="w-8 h-8 text-warning"
           fill="none"
@@ -240,25 +240,18 @@ const EscalatedState: React.FC = React.memo(() => {
 
       {/* Action buttons */}
       <div className="flex flex-col sm:flex-row gap-3 w-full">
-        <Button
-          variant="primary"
-          onClick={handleReduceQuality}
-          className="flex-1 min-w-[140px]"
-        >
+        <Button variant="primary" onClick={handleReduceQuality} className="flex-1 min-w-[140px]">
           Reduce Quality & Retry
         </Button>
-        <Button
-          variant="secondary"
-          onClick={handleManualRetry}
-          className="flex-1 min-w-[140px]"
-        >
+        <Button variant="secondary" onClick={handleManualRetry} className="flex-1 min-w-[140px]">
           Try Again
         </Button>
       </div>
 
       {/* Help text */}
       <p className="text-xs text-text-secondary/60 max-w-xs">
-        &ldquo;Reduce Quality&rdquo; lowers resolution to 50% and disables bloom, ambient occlusion, reflections, and shadows.
+        &ldquo;Reduce Quality&rdquo; lowers resolution to 50% and disables bloom, ambient occlusion,
+        reflections, and shadows.
       </p>
     </div>
   )
@@ -294,7 +287,10 @@ export const ContextLostOverlay: React.FC = React.memo(() => {
         transition={{ duration: OVERLAY_ANIMATION_DURATION }}
       >
         {/* Backdrop */}
-        <div className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm" aria-hidden="true" />
+        <div
+          className="absolute inset-0 bg-[var(--bg-overlay)] backdrop-blur-sm"
+          aria-hidden="true"
+        />
 
         {/* Content card */}
         <m.div

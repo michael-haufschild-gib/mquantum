@@ -88,19 +88,19 @@ export class JetsRenderPass extends BasePass {
     this.jetMaterial = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
       uniforms: {
-        uJetColor: { value: new THREE.Color(0x3399ff) },  // Bright blue
-        uJetIntensity: { value: 4.0 },      // High intensity for glow
+        uJetColor: { value: new THREE.Color(0x3399ff) }, // Bright blue
+        uJetIntensity: { value: 4.0 }, // High intensity for glow
         uJetHeight: { value: 30.0 },
-        uJetWidth: { value: 0.25 },         // Moderate width
-        uJetFalloff: { value: 1.8 },        // Gradual falloff
-        uJetNoiseAmount: { value: 0.7 },    // Strong turbulence
-        uJetPulsation: { value: 0.8 },      // Visible pulsation
+        uJetWidth: { value: 0.25 }, // Moderate width
+        uJetFalloff: { value: 1.8 }, // Gradual falloff
+        uJetNoiseAmount: { value: 0.7 }, // Strong turbulence
+        uJetPulsation: { value: 0.8 }, // Visible pulsation
         uTime: { value: 0 },
         tSceneDepth: { value: null },
         uResolution: { value: new THREE.Vector2(1, 1) },
         uNear: { value: 0.1 },
         uFar: { value: 1000 },
-        uSoftDepthRange: { value: 1.0 },    // Soft depth blending
+        uSoftDepthRange: { value: 1.0 }, // Soft depth blending
         uDepthAvailable: { value: 0.0 },
       },
       vertexShader: jetVolumetricVertexShader,

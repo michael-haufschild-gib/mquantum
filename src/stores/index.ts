@@ -73,3 +73,18 @@ export { useScreenshotCaptureStore, type CaptureStatus } from './screenshotCaptu
 export { useThemeStore, type ThemeAccent, type ThemeMode } from './themeStore'
 export { useWebGLContextStore } from './webglContextStore'
 export { useDropdownStore, type DropdownStore } from './dropdownStore'
+export {
+  useRendererStore,
+  selectRendererMode,
+  selectWebGPUAvailable,
+  selectDetectionComplete,
+  selectShowFallbackNotification,
+  selectWebGPUCapabilities,
+} from './rendererStore'
+export type {
+  RendererMode,
+  WebGPUSupportStatus,
+  WebGPUUnavailableReason,
+  WebGPUCapabilityInfo,
+  RendererState,
+} from './rendererStore'

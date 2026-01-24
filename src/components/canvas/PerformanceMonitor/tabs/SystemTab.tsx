@@ -1,9 +1,9 @@
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { Icons } from '../icons';
-import { InfoCard, ProgressBar, SectionHeader } from '../subcomponents';
-import { formatBytes } from '../utils';
+import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { Icons } from '../icons'
+import { InfoCard, ProgressBar, SectionHeader } from '../subcomponents'
+import { formatBytes } from '../utils'
 
 // ============================================================================
 // SYSTEM TAB - Isolated subscription for system info
@@ -15,7 +15,7 @@ export const SystemTabContent = React.memo(function SystemTabContent() {
       viewport: s.viewport,
       vram: s.vram,
     }))
-  );
+  )
 
   return (
     <div className="space-y-5 p-5">
@@ -37,14 +37,26 @@ export const SystemTabContent = React.memo(function SystemTabContent() {
         <div className="bg-[var(--bg-hover)] rounded-lg p-3 space-y-3 border border-border-subtle">
           <div className="flex justify-between items-baseline">
             <span className="text-[10px] text-text-tertiary uppercase tracking-wider">Total</span>
-            <span className="text-sm font-bold font-mono text-text-primary">{formatBytes(vram.total)}</span>
+            <span className="text-sm font-bold font-mono text-text-primary">
+              {formatBytes(vram.total)}
+            </span>
           </div>
           <div className="space-y-2">
-            <ProgressBar label="Geometry" value={vram.geometries} total={vram.total} color="bg-indigo-500" />
-            <ProgressBar label="Textures" value={vram.textures} total={vram.total} color="bg-pink-500" />
+            <ProgressBar
+              label="Geometry"
+              value={vram.geometries}
+              total={vram.total}
+              color="bg-indigo-500"
+            />
+            <ProgressBar
+              label="Textures"
+              value={vram.textures}
+              total={vram.total}
+              color="bg-pink-500"
+            />
           </div>
         </div>
       </div>
     </div>
-  );
-});
+  )
+})

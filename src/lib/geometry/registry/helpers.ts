@@ -223,7 +223,13 @@ export function determineRenderMode(
   type: ObjectType,
   dimension: number,
   facesVisible: boolean
-): 'polytope' | 'raymarch-mandelbulb' | 'raymarch-quaternion-julia' | 'raymarch-schroedinger' | 'raymarch-blackhole' | 'none' {
+):
+  | 'polytope'
+  | 'raymarch-mandelbulb'
+  | 'raymarch-quaternion-julia'
+  | 'raymarch-schroedinger'
+  | 'raymarch-blackhole'
+  | 'none' {
   const entry = getObjectTypeEntry(type)
   if (!entry) return 'none'
 

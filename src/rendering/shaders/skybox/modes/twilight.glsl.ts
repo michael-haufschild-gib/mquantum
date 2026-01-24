@@ -74,4 +74,4 @@ vec3 getTwilight(vec3 dir, float time) {
 
     return col;
 }
-`;
+`

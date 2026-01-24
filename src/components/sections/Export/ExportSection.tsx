@@ -3,18 +3,16 @@
  * Section wrapper for export and share controls
  */
 
-import { Section } from '@/components/sections/Section';
-import React from 'react';
-import { ExportButton } from '@/components/controls/ExportButton';
-import { ShareButton } from '@/components/controls/ShareButton';
+import { Section } from '@/components/sections/Section'
+import React from 'react'
+import { ExportButton } from '@/components/controls/ExportButton'
+import { ShareButton } from '@/components/controls/ShareButton'
 
 export interface ExportSectionProps {
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
-export const ExportSection: React.FC<ExportSectionProps> = ({
-  defaultOpen = true,
-}) => {
+export const ExportSection: React.FC<ExportSectionProps> = ({ defaultOpen = true }) => {
   return (
     <Section title="Export & Share" defaultOpen={defaultOpen}>
       <div className="space-y-3">
@@ -22,5 +20,5 @@ export const ExportSection: React.FC<ExportSectionProps> = ({
         <ShareButton />
       </div>
     </Section>
-  );
-};
+  )
+}

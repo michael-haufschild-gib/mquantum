@@ -3,12 +3,12 @@
  * Section wrapper for educational content
  */
 
-import { Section } from '@/components/sections/Section';
-import React from 'react';
-import { EducationPanel } from './EducationPanel';
+import { Section } from '@/components/sections/Section'
+import React from 'react'
+import { EducationPanel } from './EducationPanel'
 
 export interface DocumentationSectionProps {
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
 export const DocumentationSection: React.FC<DocumentationSectionProps> = ({
@@ -18,5 +18,5 @@ export const DocumentationSection: React.FC<DocumentationSectionProps> = ({
     <Section title="Documentation" defaultOpen={defaultOpen}>
       <EducationPanel />
     </Section>
-  );
-};
+  )
+}

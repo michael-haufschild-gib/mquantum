@@ -1,12 +1,12 @@
-import { Tabs } from '@/components/ui/Tabs';
-import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore';
-import { useUIStore } from '@/stores/uiStore';
-import React, { useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { Icons } from './icons';
-import { Sparkline } from './subcomponents';
-import { BuffersTabContent, ShaderTabContent, StatsTabContent, SystemTabContent } from './tabs';
-import { getHealthColor } from './utils';
+import { Tabs } from '@/components/ui/Tabs'
+import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { useUIStore } from '@/stores/uiStore'
+import React, { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { Icons } from './icons'
+import { Sparkline } from './subcomponents'
+import { BuffersTabContent, ShaderTabContent, StatsTabContent, SystemTabContent } from './tabs'
+import { getHealthColor } from './utils'
 
 // ============================================================================
 // FPS HEADER - Isolated subscription for FPS graph area
@@ -21,9 +21,9 @@ const FPSHeader = React.memo(function FPSHeader() {
       maxFps: s.maxFps,
       fpsHistory: s.history.fps,
     }))
-  );
+  )
 
-  const fpsColor = getHealthColor(fps, 55, 30);
+  const fpsColor = getHealthColor(fps, 55, 30)
 
   return (
     <div className="px-5 py-5 space-y-4 bg-gradient-to-b from-[var(--bg-hover)] to-transparent">
@@ -31,15 +31,22 @@ const FPSHeader = React.memo(function FPSHeader() {
         <div>
           <div className={`text-4xl font-bold font-mono tracking-tighter ${fpsColor.text}`}>
             {fps}
-            <span className="text-sm text-text-tertiary ml-2 font-sans tracking-normal font-medium">FPS</span>
+            <span className="text-sm text-text-tertiary ml-2 font-sans tracking-normal font-medium">
+              FPS
+            </span>
           </div>
           <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
             Min {minFps} • Max {maxFps}
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-mono text-text-secondary">{frameTime.toFixed(1)}<span className="text-xs text-text-tertiary ml-1">ms</span></div>
-          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">Frame Time</div>
+          <div className="text-lg font-mono text-text-secondary">
+            {frameTime.toFixed(1)}
+            <span className="text-xs text-text-tertiary ml-1">ms</span>
+          </div>
+          <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
+            Frame Time
+          </div>
         </div>
       </div>
 
@@ -59,40 +66,50 @@ const FPSHeader = React.memo(function FPSHeader() {
         </div>
       </div>
     </div>
-  );
-});
+  )
+})
 
 // ============================================================================
 // EXPANDED CONTENT - Minimal subscriptions, delegates to tab components
 // ============================================================================
 interface ExpandedContentProps {
-  onCollapse: () => void;
-  didDrag: boolean;
+  onCollapse: () => void
+  didDrag: boolean
 }
 
-export const ExpandedContent = React.memo(function ExpandedContent({ onCollapse, didDrag }: ExpandedContentProps) {
+export const ExpandedContent = React.memo(function ExpandedContent({
+  onCollapse,
+  didDrag,
+}: ExpandedContentProps) {
   // Only subscribe to tab state - not metrics
-  const perfMonitorTab = useUIStore((s) => s.perfMonitorTab);
-  const setPerfMonitorTab = useUIStore((s) => s.setPerfMonitorTab);
+  const perfMonitorTab = useUIStore((s) => s.perfMonitorTab)
+  const setPerfMonitorTab = useUIStore((s) => s.setPerfMonitorTab)
 
   // Memoize tab definitions to prevent recreation
-  const tabs = useMemo(() => [
-    { id: 'perf', label: 'Stats', content: <StatsTabContent /> },
-    { id: 'sys', label: 'System', content: <SystemTabContent /> },
-    { id: 'shader', label: 'Shader', content: <ShaderTabContent /> },
-    { id: 'buffers', label: 'Buffers', content: <BuffersTabContent /> }
-  ], []);
+  const tabs = useMemo(
+    () => [
+      { id: 'perf', label: 'Stats', content: <StatsTabContent /> },
+      { id: 'sys', label: 'System', content: <SystemTabContent /> },
+      { id: 'shader', label: 'Shader', content: <ShaderTabContent /> },
+      { id: 'buffers', label: 'Buffers', content: <BuffersTabContent /> },
+    ],
+    []
+  )
 
   return (
     <>
       {/* Header */}
       <div
-        onClick={() => { if (!didDrag) onCollapse(); }}
+        onClick={() => {
+          if (!didDrag) onCollapse()
+        }}
         className="flex items-center justify-between px-5 py-4 border-b border-border-subtle bg-[var(--bg-hover)] cursor-pointer hover:bg-[var(--bg-active)] transition-colors"
       >
         <div className="flex items-center gap-3">
           <Icons.Activity className="w-4 h-4 text-text-tertiary" />
-          <span className="text-xs font-bold uppercase tracking-widest text-text-secondary">System Monitor</span>
+          <span className="text-xs font-bold uppercase tracking-widest text-text-secondary">
+            System Monitor
+          </span>
         </div>
         <div className="p-1.5 -mr-1.5 rounded-full text-text-tertiary">
           <Icons.Minimize className="w-4 h-4" />
@@ -115,5 +132,5 @@ export const ExpandedContent = React.memo(function ExpandedContent({ onCollapse,
         />
       </div>
     </>
-  );
-});
+  )
+})

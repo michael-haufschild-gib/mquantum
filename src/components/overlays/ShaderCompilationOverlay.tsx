@@ -14,33 +14,33 @@
  * @module components/overlays/ShaderCompilationOverlay
  */
 
-import { Z_INDEX } from '@/constants/zIndex';
-import { usePerformanceStore } from '@/stores/performanceStore';
-import { AnimatePresence, m } from 'motion/react';
-import React, { useEffect, useRef, useState } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { Z_INDEX } from '@/constants/zIndex'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import { AnimatePresence, m } from 'motion/react'
+import React, { useEffect, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { LoadingSpinner } from '../ui/LoadingSpinner'
 
 /** Animation duration for overlay fade in (seconds) */
-const OVERLAY_FADE_IN_DURATION = 0.15;
+const OVERLAY_FADE_IN_DURATION = 0.15
 
 /** Animation duration for overlay fade out (seconds) - slower for smooth exit */
-const OVERLAY_FADE_OUT_DURATION = 0.4;
+const OVERLAY_FADE_OUT_DURATION = 0.4
 
 /** Animation duration for card entrance (seconds) */
-const CARD_ENTER_DURATION = 0.2;
+const CARD_ENTER_DURATION = 0.2
 
 /** Animation duration for card exit (seconds) - slower for smooth exit */
-const CARD_EXIT_DURATION = 0.35;
+const CARD_EXIT_DURATION = 0.35
 
 /** Minimum time the overlay stays visible (ms) - prevents jarring flashes */
-const MIN_DISPLAY_TIME_MS = 600;
+const MIN_DISPLAY_TIME_MS = 600
 
 /** Custom ease curve for snappy card entrance */
-const CARD_ENTER_EASE = [0.16, 1, 0.3, 1] as const;
+const CARD_ENTER_EASE = [0.16, 1, 0.3, 1] as const
 
 /** Custom ease curve for smooth card exit */
-const CARD_EXIT_EASE = [0.4, 0, 0.2, 1] as const;
+const CARD_EXIT_EASE = [0.4, 0, 0.2, 1] as const
 
 /**
  * Shader compilation overlay component.
@@ -56,44 +56,44 @@ export const ShaderCompilationOverlay: React.FC = () => {
       isCompiling: s.isShaderCompiling,
       message: s.shaderCompilationMessage,
     }))
-  );
+  )
 
   // Track when overlay started showing for minimum display time
-  const showStartTimeRef = useRef<number>(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const [displayMessage, setDisplayMessage] = useState('');
+  const showStartTimeRef = useRef<number>(0)
+  const [isVisible, setIsVisible] = useState(false)
+  const [displayMessage, setDisplayMessage] = useState('')
 
   // Handle visibility with minimum display time
   useEffect(() => {
     if (isCompiling) {
       // Show immediately when compilation starts
-      showStartTimeRef.current = Date.now();
-      setIsVisible(true);
-      setDisplayMessage(message);
-      return;
+      showStartTimeRef.current = Date.now()
+      setIsVisible(true)
+      setDisplayMessage(message)
+      return
     }
 
     if (isVisible) {
       // When compilation ends, ensure minimum display time
-      const elapsed = Date.now() - showStartTimeRef.current;
-      const remaining = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed);
+      const elapsed = Date.now() - showStartTimeRef.current
+      const remaining = Math.max(0, MIN_DISPLAY_TIME_MS - elapsed)
 
       const timer = setTimeout(() => {
-        setIsVisible(false);
-      }, remaining);
+        setIsVisible(false)
+      }, remaining)
 
-      return () => clearTimeout(timer);
+      return () => clearTimeout(timer)
     }
 
-    return;
-  }, [isCompiling, isVisible, message]);
+    return
+  }, [isCompiling, isVisible, message])
 
   // Update message while visible (in case shader name changes)
   useEffect(() => {
     if (isCompiling && message) {
-      setDisplayMessage(message);
+      setDisplayMessage(message)
     }
-  }, [isCompiling, message]);
+  }, [isCompiling, message])
 
   return (
     <AnimatePresence>
@@ -136,7 +136,10 @@ export const ShaderCompilationOverlay: React.FC = () => {
             }}
           >
             {/* GPU/Shader icon (decorative) */}
-            <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+            <div
+              className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0"
+              aria-hidden="true"
+            >
               <svg
                 className="w-5 h-5 text-accent"
                 fill="none"
@@ -158,9 +161,7 @@ export const ShaderCompilationOverlay: React.FC = () => {
               <span className="text-sm font-medium text-text-primary">
                 {displayMessage || 'Compiling shader...'}
               </span>
-              <span className="text-xs text-text-secondary">
-                This may take a moment
-              </span>
+              <span className="text-xs text-text-secondary">This may take a moment</span>
             </div>
 
             {/* Spinner */}
@@ -169,5 +170,5 @@ export const ShaderCompilationOverlay: React.FC = () => {
         </m.div>
       )}
     </AnimatePresence>
-  );
-};
+  )
+}

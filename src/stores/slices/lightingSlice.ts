@@ -255,7 +255,11 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
       return null
     }
     const newLight = createNewLight(type, state.lights.length)
-    set({ lights: [...state.lights, newLight], selectedLightId: newLight.id, version: state.version + 1 })
+    set({
+      lights: [...state.lights, newLight],
+      selectedLightId: newLight.id,
+      version: state.version + 1,
+    })
     return newLight.id
   },
 
@@ -302,7 +306,11 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
       return null
     }
     const newLight = cloneLight(sourceLight)
-    set({ lights: [...state.lights, newLight], selectedLightId: newLight.id, version: state.version + 1 })
+    set({
+      lights: [...state.lights, newLight],
+      selectedLightId: newLight.id,
+      version: state.version + 1,
+    })
     return newLight.id
   },
 

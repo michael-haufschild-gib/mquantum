@@ -17,11 +17,12 @@
 // =============================================================================
 // Debug Logging
 // =============================================================================
-const DEBUG_RENDER_GRAPH = () => (window as unknown as { _debugRenderGraph?: boolean })._debugRenderGraph ?? false;
+const DEBUG_RENDER_GRAPH = () =>
+  (window as unknown as { _debugRenderGraph?: boolean })._debugRenderGraph ?? false
 
 function debugLog(category: string, ...args: unknown[]): void {
   if (DEBUG_RENDER_GRAPH()) {
-    console.log(`[RenderGraph:${category}]`, ...args);
+    console.log(`[RenderGraph:${category}]`, ...args)
   }
 }
 
@@ -880,9 +881,9 @@ export class RenderGraph {
     // Track resources written by enabled passes to prevent passthrough overwriting them
     const writtenByEnabledPass = new Set<string>()
 
-    debugLog('execute', '=== Frame', this.frameNumber, 'Start ===');
-    debugLog('execute', 'Compiled passes:', this.compiled.passes.map(p => p.id).join(', '));
-    debugLog('execute', 'PingPong resources:', [...this.compiled.pingPongResources].join(', '));
+    debugLog('execute', '=== Frame', this.frameNumber, 'Start ===')
+    debugLog('execute', 'Compiled passes:', this.compiled.passes.map((p) => p.id).join(', '))
+    debugLog('execute', 'PingPong resources:', [...this.compiled.pingPongResources].join(', '))
 
     for (const pass of this.compiled.passes) {
       // Check if pass is enabled (also check debug disable flag)
@@ -891,11 +892,17 @@ export class RenderGraph {
         (pass as unknown as { _debugDisabled?: boolean })._debugDisabled ?? false
       const enabled = !debugDisabled && (pass.config.enabled?.(frozenFrameContext) ?? true)
 
-      debugLog('pass', `--- ${pass.id} ---`);
-      debugLog('pass', `  enabled: ${enabled}, debugDisabled: ${debugDisabled}`);
-      debugLog('pass', `  inputs: ${(pass.config.inputs ?? []).map(i => `${i.resourceId}[${i.attachment ?? 'default'}]`).join(', ')}`);
-      debugLog('pass', `  outputs: ${(pass.config.outputs ?? []).map(o => `${o.resourceId}`).join(', ')}`);
-      debugLog('pass', `  skipPassthrough: ${pass.config.skipPassthrough ?? false}`);
+      debugLog('pass', `--- ${pass.id} ---`)
+      debugLog('pass', `  enabled: ${enabled}, debugDisabled: ${debugDisabled}`)
+      debugLog(
+        'pass',
+        `  inputs: ${(pass.config.inputs ?? []).map((i) => `${i.resourceId}[${i.attachment ?? 'default'}]`).join(', ')}`
+      )
+      debugLog(
+        'pass',
+        `  outputs: ${(pass.config.outputs ?? []).map((o) => `${o.resourceId}`).join(', ')}`
+      )
+      debugLog('pass', `  skipPassthrough: ${pass.config.skipPassthrough ?? false}`)
 
       // ========================================================================
       // Lazy Resource Deallocation: Track disabled frames and manage grace period
@@ -956,15 +963,18 @@ export class RenderGraph {
             // Register alias: output → input
             // Downstream passes reading 'outputId' will resolve to 'inputId'
             this.resourceAliases.set(outputId, inputId)
-            debugLog('alias', `  Aliasing ${outputId} → ${inputId}`);
+            debugLog('alias', `  Aliasing ${outputId} → ${inputId}`)
           } else {
             // Legacy behavior: copy input texture to output target
             const inputTexture = context.getReadTexture(inputId)
             const outputTarget = context.getWriteTarget(outputId)
 
-            debugLog('passthrough', `  Passthrough ${inputId} → ${outputId}`);
-            debugLog('passthrough', `    inputTexture: ${inputTexture ? 'exists' : 'NULL'}`);
-            debugLog('passthrough', `    outputTarget: ${outputTarget ? `${outputTarget.width}x${outputTarget.height}, textures: ${outputTarget.textures?.length ?? 1}` : 'NULL'}`);
+            debugLog('passthrough', `  Passthrough ${inputId} → ${outputId}`)
+            debugLog('passthrough', `    inputTexture: ${inputTexture ? 'exists' : 'NULL'}`)
+            debugLog(
+              'passthrough',
+              `    outputTarget: ${outputTarget ? `${outputTarget.width}x${outputTarget.height}, textures: ${outputTarget.textures?.length ?? 1}` : 'NULL'}`
+            )
 
             if (inputTexture && outputTarget) {
               this.executePassthrough(renderer, inputTexture, outputTarget)
@@ -991,21 +1001,33 @@ export class RenderGraph {
       // Debug: Log resource state for this pass
       if (DEBUG_RENDER_GRAPH()) {
         for (const input of pass.config.inputs ?? []) {
-          const texture = context.getReadTexture(input.resourceId, input.attachment);
-          const target = context.getReadTarget(input.resourceId);
-          debugLog('resource', `  INPUT ${input.resourceId}[${input.attachment ?? 'default'}]:`);
-          debugLog('resource', `    texture: ${texture ? 'exists' : 'NULL'}`);
-          debugLog('resource', `    target: ${target ? `${target.width}x${target.height}, textures: ${target.textures?.length ?? 1}` : 'NULL'}`);
+          const texture = context.getReadTexture(input.resourceId, input.attachment)
+          const target = context.getReadTarget(input.resourceId)
+          debugLog('resource', `  INPUT ${input.resourceId}[${input.attachment ?? 'default'}]:`)
+          debugLog('resource', `    texture: ${texture ? 'exists' : 'NULL'}`)
+          debugLog(
+            'resource',
+            `    target: ${target ? `${target.width}x${target.height}, textures: ${target.textures?.length ?? 1}` : 'NULL'}`
+          )
           if (target?.textures && target.textures.length > 1) {
-            debugLog('resource', `    MRT textures: ${target.textures.map((t, i) => `[${i}]:${t ? 'exists' : 'NULL'}`).join(', ')}`);
+            debugLog(
+              'resource',
+              `    MRT textures: ${target.textures.map((t, i) => `[${i}]:${t ? 'exists' : 'NULL'}`).join(', ')}`
+            )
           }
         }
         for (const output of pass.config.outputs ?? []) {
-          const target = context.getWriteTarget(output.resourceId);
-          debugLog('resource', `  OUTPUT ${output.resourceId}:`);
-          debugLog('resource', `    target: ${target ? `${target.width}x${target.height}, textures: ${target.textures?.length ?? 1}` : 'NULL'}`);
+          const target = context.getWriteTarget(output.resourceId)
+          debugLog('resource', `  OUTPUT ${output.resourceId}:`)
+          debugLog(
+            'resource',
+            `    target: ${target ? `${target.width}x${target.height}, textures: ${target.textures?.length ?? 1}` : 'NULL'}`
+          )
           if (target?.textures && target.textures.length > 1) {
-            debugLog('resource', `    MRT textures: ${target.textures.map((t, i) => `[${i}]:${t ? 'exists' : 'NULL'}`).join(', ')}`);
+            debugLog(
+              'resource',
+              `    MRT textures: ${target.textures.map((t, i) => `[${i}]:${t ? 'exists' : 'NULL'}`).join(', ')}`
+            )
           }
         }
       }

@@ -7,6 +7,6 @@
  * 3. integration - volume raymarch loop (depends on both)
  */
 
-export { absorptionBlock } from './absorption.glsl';
-export { emissionBlock } from './emission.glsl';
-export { volumeIntegrationBlock } from './integration.glsl';
+export { absorptionBlock } from './absorption.glsl'
+export { emissionBlock } from './emission.glsl'
+export { volumeIntegrationBlock } from './integration.glsl'

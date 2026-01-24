@@ -16,11 +16,12 @@
 // =============================================================================
 // Debug Logging
 // =============================================================================
-const DEBUG_RESOURCE_POOL = () => (window as unknown as { _debugResourcePool?: boolean })._debugResourcePool ?? false;
+const DEBUG_RESOURCE_POOL = () =>
+  (window as unknown as { _debugResourcePool?: boolean })._debugResourcePool ?? false
 
 function debugLog(category: string, ...args: unknown[]): void {
   if (DEBUG_RESOURCE_POOL()) {
-    console.log(`[ResourcePool:${category}]`, ...args);
+    console.log(`[ResourcePool:${category}]`, ...args)
   }
 }
 
@@ -441,7 +442,10 @@ export class ResourcePool {
 
     // Handle MRT
     if (config.type === 'mrt' && config.attachmentCount && config.attachmentCount > 1) {
-      debugLog('createMRT', `Creating MRT '${config.id}' with ${config.attachmentCount} attachments, ${width}x${height}`);
+      debugLog(
+        'createMRT',
+        `Creating MRT '${config.id}' with ${config.attachmentCount} attachments, ${width}x${height}`
+      )
 
       const target = new THREE.WebGLRenderTarget(width, height, {
         ...options,
@@ -451,12 +455,12 @@ export class ResourcePool {
       const count = config.attachmentCount
       const textures = target.textures ?? []
 
-      debugLog('createMRT', `  Initial textures array length: ${textures.length}`);
+      debugLog('createMRT', `  Initial textures array length: ${textures.length}`)
 
       // Ensure textures array has the correct length
       if (textures.length < count) {
         target.textures = new Array(count).fill(null).map(() => new THREE.Texture())
-        debugLog('createMRT', `  Created new textures array with ${count} textures`);
+        debugLog('createMRT', `  Created new textures array with ${count} textures`)
       }
 
       for (let i = 0; i < count; i++) {
@@ -471,7 +475,10 @@ export class ResourcePool {
           texture.internalFormat = internalFormat
         }
         target.textures[i] = texture
-        debugLog('createMRT', `  Texture[${i}]: format=${texture.format}, type=${texture.type}, uuid=${texture.uuid.substring(0, 8)}`);
+        debugLog(
+          'createMRT',
+          `  Texture[${i}]: format=${texture.format}, type=${texture.type}, uuid=${texture.uuid.substring(0, 8)}`
+        )
       }
 
       // Ensure target.texture points to attachment 0
@@ -488,7 +495,10 @@ export class ResourcePool {
         target.depthTexture = this.createDepthTexture(config, width, height)
       }
 
-      debugLog('createMRT', `  Final textures array: ${target.textures.map((t, i) => `[${i}]:${t ? t.uuid.substring(0, 8) : 'NULL'}`).join(', ')}`);
+      debugLog(
+        'createMRT',
+        `  Final textures array: ${target.textures.map((t, i) => `[${i}]:${t ? t.uuid.substring(0, 8) : 'NULL'}`).join(', ')}`
+      )
 
       return target
     }
@@ -565,11 +575,11 @@ export class ResourcePool {
 
   // Pre-allocated arrays for invalidateFramebuffer to avoid per-frame allocation
   // WebGL constants: COLOR_ATTACHMENT0 = 0x8CE0, DEPTH_ATTACHMENT = 0x8D00
-  private static readonly INVALIDATE_COLOR_1 = [0x8CE0]
-  private static readonly INVALIDATE_COLOR_2 = [0x8CE0, 0x8CE1]
-  private static readonly INVALIDATE_COLOR_3 = [0x8CE0, 0x8CE1, 0x8CE2]
-  private static readonly INVALIDATE_COLOR_4 = [0x8CE0, 0x8CE1, 0x8CE2, 0x8CE3]
-  private static readonly INVALIDATE_DEPTH = [0x8D00]
+  private static readonly INVALIDATE_COLOR_1 = [0x8ce0]
+  private static readonly INVALIDATE_COLOR_2 = [0x8ce0, 0x8ce1]
+  private static readonly INVALIDATE_COLOR_3 = [0x8ce0, 0x8ce1, 0x8ce2]
+  private static readonly INVALIDATE_COLOR_4 = [0x8ce0, 0x8ce1, 0x8ce2, 0x8ce3]
+  private static readonly INVALIDATE_DEPTH = [0x8d00]
 
   /**
    * Invalidate non-persistent framebuffers for TBDR GPU optimization.
@@ -581,10 +591,7 @@ export class ResourcePool {
    * @param renderer - The Three.js WebGL renderer
    * @param pingPongResources - Set of resource IDs that need ping-pong (skip these)
    */
-  invalidateFramebuffers(
-    renderer: THREE.WebGLRenderer,
-    pingPongResources: Set<string>
-  ): void {
+  invalidateFramebuffers(renderer: THREE.WebGLRenderer, pingPongResources: Set<string>): void {
     const gl = renderer.getContext() as WebGL2RenderingContext
 
     // Check WebGL2 availability - invalidateFramebuffer is WebGL2 only
@@ -614,10 +621,13 @@ export class ResourcePool {
       // Invalidate all color attachments (MRT targets may have 2-4)
       const attachmentCount = entry.config.attachmentCount ?? 1
       const colorAttachments =
-        attachmentCount === 1 ? ResourcePool.INVALIDATE_COLOR_1 :
-        attachmentCount === 2 ? ResourcePool.INVALIDATE_COLOR_2 :
-        attachmentCount === 3 ? ResourcePool.INVALIDATE_COLOR_3 :
-        ResourcePool.INVALIDATE_COLOR_4
+        attachmentCount === 1
+          ? ResourcePool.INVALIDATE_COLOR_1
+          : attachmentCount === 2
+            ? ResourcePool.INVALIDATE_COLOR_2
+            : attachmentCount === 3
+              ? ResourcePool.INVALIDATE_COLOR_3
+              : ResourcePool.INVALIDATE_COLOR_4
       gl.invalidateFramebuffer(gl.FRAMEBUFFER, colorAttachments)
 
       // Also invalidate depth if present

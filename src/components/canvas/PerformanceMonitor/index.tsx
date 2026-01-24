@@ -1,9 +1,9 @@
-import { usePanelCollision } from '@/hooks/usePanelCollision';
-import { useUIStore } from '@/stores/uiStore';
-import { AnimatePresence, LazyMotion, domMax, m, useMotionValue } from 'motion/react';
-import { useEffect, useRef, useState } from 'react';
-import { CollapsedView } from './CollapsedView';
-import { ExpandedContent } from './ExpandedContent';
+import { usePanelCollision } from '@/hooks/usePanelCollision'
+import { useUIStore } from '@/stores/uiStore'
+import { AnimatePresence, LazyMotion, domMax, m, useMotionValue } from 'motion/react'
+import { useEffect, useRef, useState } from 'react'
+import { CollapsedView } from './CollapsedView'
+import { ExpandedContent } from './ExpandedContent'
 
 // ============================================================================
 // MAIN COMPONENT - NO store subscriptions, minimal re-renders
@@ -22,43 +22,43 @@ import { ExpandedContent } from './ExpandedContent';
 export function PerformanceMonitor() {
   // -- State --
   // Use store for expanded state so PerformanceStatsCollector can read it
-  const expanded = useUIStore((s) => s.perfMonitorExpanded);
-  const setExpanded = useUIStore((s) => s.setPerfMonitorExpanded);
-  const [isDragging, setIsDragging] = useState(false);
-  const [didDrag, setDidDrag] = useState(false);
+  const expanded = useUIStore((s) => s.perfMonitorExpanded)
+  const setExpanded = useUIStore((s) => s.setPerfMonitorExpanded)
+  const [isDragging, setIsDragging] = useState(false)
+  const [didDrag, setDidDrag] = useState(false)
 
   // -- Dimensions & Positioning --
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(180);
-  const [height, setHeight] = useState(48);
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(180)
+  const [height, setHeight] = useState(48)
 
   // Motion values for drag
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
 
   // Resize Observer - only when expanded
   useEffect(() => {
     if (!expanded) {
-      setWidth(180);
-      setHeight(48);
-      return;
+      setWidth(180)
+      setHeight(48)
+      return
     }
 
-    const container = containerRef.current;
-    if (!container) return;
+    const container = containerRef.current
+    if (!container) return
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setWidth(entry.contentRect.width);
-        setHeight(entry.contentRect.height);
+        setWidth(entry.contentRect.width)
+        setHeight(entry.contentRect.height)
       }
-    });
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, [expanded]);
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [expanded])
 
   // Panel collision - keeps monitor from being covered by sidebars/toolbars
-  usePanelCollision(x, y, width, height, isDragging);
+  usePanelCollision(x, y, width, height, isDragging)
 
   return (
     <LazyMotion features={domMax}>
@@ -67,10 +67,18 @@ export function PerformanceMonitor() {
         drag
         dragMomentum={false}
         style={{ x, y }}
-        onDragStart={() => { setIsDragging(true); setDidDrag(true); }}
-        onDragEnd={() => setTimeout(() => { setIsDragging(false); setDidDrag(false); }, 100)}
+        onDragStart={() => {
+          setIsDragging(true)
+          setDidDrag(true)
+        }}
+        onDragEnd={() =>
+          setTimeout(() => {
+            setIsDragging(false)
+            setDidDrag(false)
+          }, 100)
+        }
         onTap={() => {
-          if (!expanded && !didDrag) setExpanded(true);
+          if (!expanded && !didDrag) setExpanded(true)
         }}
         className="absolute top-20 left-4 z-[50] pointer-events-auto select-none"
       >
@@ -96,7 +104,7 @@ export function PerformanceMonitor() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
               className="
                 flex flex-col w-[360px]
                 relative overflow-hidden rounded-2xl
@@ -110,5 +118,5 @@ export function PerformanceMonitor() {
         </AnimatePresence>
       </m.div>
     </LazyMotion>
-  );
+  )
 }

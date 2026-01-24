@@ -51,8 +51,8 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
     const showMaterialControls = edgeThickness > 1 && lightEnabled
 
     const handleResetSpecularColor = useCallback(() => {
-      setSpecularColor(DEFAULT_EDGE_PBR.specularColor);
-    }, [setSpecularColor]);
+      setSpecularColor(DEFAULT_EDGE_PBR.specularColor)
+    }, [setSpecularColor])
 
     if (!showMaterialControls) return null
 
@@ -80,7 +80,7 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
           showValue
         />
 
-         {/* Specular Intensity */}
+        {/* Specular Intensity */}
         <Slider
           label="Specular Intensity"
           min={0}
@@ -110,11 +110,9 @@ export const EdgeMaterialControls: React.FC<EdgeMaterialControlsProps> = React.m
             </Button>
           )}
         </div>
-
-
       </ControlGroup>
     )
   }
-);
+)
 
-EdgeMaterialControls.displayName = 'EdgeMaterialControls';
+EdgeMaterialControls.displayName = 'EdgeMaterialControls'

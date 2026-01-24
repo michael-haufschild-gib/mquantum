@@ -32,7 +32,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
       setCinematicAberration: state.setCinematicAberration,
       setCinematicVignette: state.setCinematicVignette,
       setCinematicGrain: state.setCinematicGrain,
-    }));
+    }))
     const {
       cinematicAberration,
       cinematicVignette,
@@ -40,7 +40,7 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
       setCinematicAberration,
       setCinematicVignette,
       setCinematicGrain,
-    } = usePostProcessingStore(postProcessingSelector);
+    } = usePostProcessingStore(postProcessingSelector)
 
     // Tone Mapping State
     const lightingSelector = useShallow((state: LightingSlice) => ({
@@ -48,21 +48,17 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
       exposure: state.exposure,
       setToneMappingAlgorithm: state.setToneMappingAlgorithm,
       setExposure: state.setExposure,
-    }));
-    const {
-      toneMappingAlgorithm,
-      exposure,
-      setToneMappingAlgorithm,
-      setExposure,
-    } = useLightingStore(lightingSelector);
+    }))
+    const { toneMappingAlgorithm, exposure, setToneMappingAlgorithm, setExposure } =
+      useLightingStore(lightingSelector)
 
     // Filter out 'none' option for tone mapping selector
-    const toneMappingOptions = TONE_MAPPING_OPTIONS
-      .filter((opt) => opt.value !== 'none')
-      .map((opt) => ({
+    const toneMappingOptions = TONE_MAPPING_OPTIONS.filter((opt) => opt.value !== 'none').map(
+      (opt) => ({
         value: opt.value,
         label: opt.label,
-      }));
+      })
+    )
 
     return (
       <div className={`space-y-3 ${className}`}>
@@ -71,57 +67,57 @@ export const CinematicControls: React.FC<CinematicControlsProps> = React.memo(
           <SectionHeader title="Cinematic" />
         </div>
 
-          <Slider
-            label="Aberration"
-            min={0}
-            max={0.1}
-            step={0.001}
-            value={cinematicAberration}
-            onChange={setCinematicAberration}
-            showValue
-          />
+        <Slider
+          label="Aberration"
+          min={0}
+          max={0.1}
+          step={0.001}
+          value={cinematicAberration}
+          onChange={setCinematicAberration}
+          showValue
+        />
 
-          <Slider
-            label="Vignette"
-            min={0}
-            max={3.0}
-            step={0.1}
-            value={cinematicVignette}
-            onChange={setCinematicVignette}
-            showValue
-          />
+        <Slider
+          label="Vignette"
+          min={0}
+          max={3.0}
+          step={0.1}
+          value={cinematicVignette}
+          onChange={setCinematicVignette}
+          showValue
+        />
 
-          <Slider
-            label="Grain"
-            min={0}
-            max={0.2}
-            step={0.001}
-            value={cinematicGrain}
-            onChange={setCinematicGrain}
-            showValue
-          />
+        <Slider
+          label="Grain"
+          min={0}
+          max={0.2}
+          step={0.001}
+          value={cinematicGrain}
+          onChange={setCinematicGrain}
+          showValue
+        />
 
         {/* --- Tone Mapping Section --- */}
         <div className="flex items-center justify-between pt-2">
           <SectionHeader title="Tone Mapping" />
         </div>
 
-          <Select
-            label="Algorithm"
-            value={toneMappingAlgorithm}
-            options={toneMappingOptions}
-            onChange={(value) => setToneMappingAlgorithm(value as ToneMappingAlgorithm)}
-          />
+        <Select
+          label="Algorithm"
+          value={toneMappingAlgorithm}
+          options={toneMappingOptions}
+          onChange={(value) => setToneMappingAlgorithm(value as ToneMappingAlgorithm)}
+        />
 
-          <Slider
-            label="Exposure"
-            min={0.1}
-            max={3}
-            step={0.1}
-            value={exposure}
-            onChange={setExposure}
-            showValue
-          />
+        <Slider
+          label="Exposure"
+          min={0.1}
+          max={3}
+          step={0.1}
+          value={exposure}
+          onChange={setExposure}
+          showValue
+        />
       </div>
     )
   }

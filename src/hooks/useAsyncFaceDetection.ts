@@ -72,10 +72,7 @@ function getWorkerMethod(faceMethod: FaceDetectionMethod): WorkerFaceMethod | un
  * @param vertexCount - Number of vertices in the geometry
  * @returns True if all indices are valid
  */
-function validateFaceIndices(
-  faces: [number, number, number][],
-  vertexCount: number
-): boolean {
+function validateFaceIndices(faces: [number, number, number][], vertexCount: number): boolean {
   for (const [v0, v1, v2] of faces) {
     if (v0 >= vertexCount || v1 >= vertexCount || v2 >= vertexCount) {
       return false
@@ -192,7 +189,12 @@ export function useAsyncFaceDetection(
     if (!geometry || geometry.vertices.length === 0) return 'empty'
     const firstVertex = geometry.vertices[0]
     // Include a hash of more vertex data for better uniqueness
-    const vertexHash = firstVertex ? firstVertex.slice(0, 3).map(v => v.toFixed(6)).join(',') : ''
+    const vertexHash = firstVertex
+      ? firstVertex
+          .slice(0, 3)
+          .map((v) => v.toFixed(6))
+          .join(',')
+      : ''
     return `${geometry.vertices.length}-${geometry.dimension}-${vertexHash}`
   }, [geometry])
 
@@ -286,7 +288,9 @@ export function useAsyncFaceDetection(
           // Triangle detection needs edges - validate we have some
           if (geo.edges.length === 0) {
             if (import.meta.env.DEV) {
-              console.warn('[useAsyncFaceDetection] No edges for triangle detection, returning empty')
+              console.warn(
+                '[useAsyncFaceDetection] No edges for triangle detection, returning empty'
+              )
             }
             setFaces([])
             setIsLoading(false)
@@ -378,8 +382,7 @@ export function useAsyncFaceDetection(
 
           // Fallback to sync detection if worker is unavailable or timed out
           const shouldFallback =
-            errorMessage.includes('Worker not available') ||
-            errorMessage.includes('timed out')
+            errorMessage.includes('Worker not available') || errorMessage.includes('timed out')
 
           if (shouldFallback) {
             if (import.meta.env.DEV) {

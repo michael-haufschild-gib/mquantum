@@ -374,4 +374,4 @@ vec3 computeEmissionLit(float rho, float phase, vec3 p, vec3 gradient, vec3 view
 
     return col;
 }
-`;
+`

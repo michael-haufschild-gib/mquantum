@@ -55,4 +55,4 @@ vec3 getPaletteColor(vec3 hsl, float t, int mode) {
     }
     return hsl2rgb(vec3(h, hsl.y, newL));
 }
-`;
+`

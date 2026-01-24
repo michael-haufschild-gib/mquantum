@@ -2,7 +2,9 @@ import { DEFAULT_NESTED_TORUS_CONFIG } from '@/lib/geometry/extended/types'
 import { StateCreator } from 'zustand'
 import { ExtendedObjectSlice, NestedTorusSlice } from './types'
 
-export const createNestedTorusSlice: StateCreator<ExtendedObjectSlice, [], [], NestedTorusSlice> = (set) => ({
+export const createNestedTorusSlice: StateCreator<ExtendedObjectSlice, [], [], NestedTorusSlice> = (
+  set
+) => ({
   nestedTorus: { ...DEFAULT_NESTED_TORUS_CONFIG },
 
   setNestedTorusRadius: (radius) => {

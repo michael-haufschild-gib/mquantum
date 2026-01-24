@@ -198,12 +198,14 @@ class ResourceRecoveryCoordinator {
           const error = e instanceof Error ? e : new Error(String(e))
           this.emit({ type: 'error', manager: manager.name, error })
           console.error(`[ResourceRecovery] Failed to reinitialize "${manager.name}":`, e)
-          
-          useMsgBoxStore.getState().showMsgBox(
-            'Recovery Error',
-            `Failed to restore GPU resources for: ${manager.name}. The application may be unstable.\n\nDetails: ${error.message}`,
-            'warning'
-          );
+
+          useMsgBoxStore
+            .getState()
+            .showMsgBox(
+              'Recovery Error',
+              `Failed to restore GPU resources for: ${manager.name}. The application may be unstable.\n\nDetails: ${error.message}`,
+              'warning'
+            )
           // Continue with other managers - partial recovery is better than none
         }
 

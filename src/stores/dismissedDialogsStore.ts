@@ -61,9 +61,7 @@ export const useDismissedDialogsStore = create<DismissedDialogsState>()(
       merge: (persisted, current) => ({
         ...current,
         // Convert Array back to Set on hydration
-        dismissedIds: new Set(
-          (persisted as { dismissedIds?: string[] })?.dismissedIds ?? []
-        ),
+        dismissedIds: new Set((persisted as { dismissedIds?: string[] })?.dismissedIds ?? []),
       }),
     }
   )

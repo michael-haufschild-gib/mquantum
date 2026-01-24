@@ -213,10 +213,7 @@ export function updateDeferredLensingUniforms(
   const projected = blackHolePosition.clone().project(camera)
 
   // Convert to UV coordinates (0-1)
-  const centerUV = new THREE.Vector2(
-    (projected.x + 1) * 0.5,
-    (projected.y + 1) * 0.5
-  )
+  const centerUV = new THREE.Vector2((projected.x + 1) * 0.5, (projected.y + 1) * 0.5)
 
   blackHoleCenter.value = centerUV
 

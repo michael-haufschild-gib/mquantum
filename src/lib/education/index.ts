@@ -13,5 +13,5 @@ export {
   getHypercubeVertexCount,
   getSimplexVertexCount,
   getCrossPolytopeVertexCount,
-} from './content';
-export type { EducationTopic, DimensionInfo } from './content';
+} from './content'
+export type { EducationTopic, DimensionInfo } from './content'

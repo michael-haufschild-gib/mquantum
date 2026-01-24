@@ -18,11 +18,7 @@ import { inflateGeometry } from '@/lib/geometry/transfer'
 import type { GenerationStage } from '@/workers/types'
 import type { WythoffPolytopeConfig } from '@/lib/geometry/wythoff/types'
 import type { RootSystemConfig } from '@/lib/geometry/extended/types'
-import {
-  getCachedPolytope,
-  cachePolytope,
-  getCacheKey,
-} from '@/lib/geometry/wythoff/cache'
+import { getCachedPolytope, cachePolytope, getCacheKey } from '@/lib/geometry/wythoff/cache'
 import type { PolytopeGeometry } from '@/lib/geometry/types'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -314,12 +310,18 @@ export function useGeometryGenerator(): GeometryGeneratorResult {
       const errorMessage = err instanceof Error ? err.message : String(err)
 
       // Fallback to sync generation if worker is unavailable or not initialized
-      if (errorMessage.includes('Worker not available') || errorMessage.includes('Worker not initialized')) {
+      if (
+        errorMessage.includes('Worker not available') ||
+        errorMessage.includes('Worker not initialized')
+      ) {
         if (import.meta.env.DEV) {
           console.warn('[useGeometryGenerator] Worker unavailable, using sync fallback')
         }
         try {
-          const result = generateWythoffPolytopeWithWarnings(dimension, config as WythoffPolytopeConfig)
+          const result = generateWythoffPolytopeWithWarnings(
+            dimension,
+            config as WythoffPolytopeConfig
+          )
           const scale = (config as WythoffPolytopeConfig).scale ?? 1
 
           // Check generation again after sync operation
@@ -442,7 +444,10 @@ export function useGeometryGenerator(): GeometryGeneratorResult {
       const errorMessage = err instanceof Error ? err.message : String(err)
 
       // Fallback to sync generation if worker is unavailable or not initialized
-      if (errorMessage.includes('Worker not available') || errorMessage.includes('Worker not initialized')) {
+      if (
+        errorMessage.includes('Worker not available') ||
+        errorMessage.includes('Worker not initialized')
+      ) {
         if (import.meta.env.DEV) {
           console.warn('[useGeometryGenerator] Worker unavailable, using sync fallback')
         }
@@ -509,7 +514,14 @@ export function useGeometryGenerator(): GeometryGeneratorResult {
         currentRequestId.current = null
       }
     }
-  }, [objectType, dimension, configJson, generateWythoffAsync, generateRootSystemAsync, cancelRequest])
+  }, [
+    objectType,
+    dimension,
+    configJson,
+    generateWythoffAsync,
+    generateRootSystemAsync,
+    cancelRequest,
+  ])
 
   // Show warnings via toast (only new warnings, not duplicates)
   useEffect(() => {

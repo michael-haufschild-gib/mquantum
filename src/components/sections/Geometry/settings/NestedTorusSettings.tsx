@@ -1,8 +1,8 @@
-import { Select } from '@/components/ui/Select';
-import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { useShallow } from 'zustand/react/shallow';
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Nested Torus settings component.
@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
  * @returns Nested torus settings controls
  */
 export function NestedTorusSettings() {
-  const dimension = useGeometryStore((state) => state.dimension);
+  const dimension = useGeometryStore((state) => state.dimension)
 
   // Consolidate extended object store selectors with useShallow
   const {
@@ -31,15 +31,15 @@ export function NestedTorusSettings() {
       setShowNestedTori: state.setNestedTorusShowNestedTori,
       setNumberOfTori: state.setNestedTorusNumberOfTori,
     }))
-  );
+  )
 
   // Calculate point count
   const getPointCount = () => {
-    const base = config.resolutionXi1 * config.resolutionXi2;
-    return config.showNestedTori && dimension === 4 ? base * config.numberOfTori : base;
-  };
+    const base = config.resolutionXi1 * config.resolutionXi2
+    return config.showNestedTori && dimension === 4 ? base * config.numberOfTori : base
+  }
 
-  const pointCount = getPointCount();
+  const pointCount = getPointCount()
 
   // Number of tori options for nested mode
   const numberOfToriOptions = [
@@ -47,27 +47,37 @@ export function NestedTorusSettings() {
     { value: '3', label: '3 tori' },
     { value: '4', label: '4 tori' },
     { value: '5', label: '5 tori' },
-  ];
+  ]
 
   // Get dimension-specific description
   const getDescription = () => {
     switch (dimension) {
-      case 4: return 'Hopf fibration: linked circles on S³';
-      case 5: return 'Twisted 2-torus: T² + helix';
-      case 6: return '3-torus (T³): three coupled circles';
-      case 7: return 'Twisted 3-torus: T³ + helix';
-      case 8: return 'Quaternionic Hopf: S³ fibers over S⁴';
-      case 9: return 'Twisted 4-torus: T⁴ + helix';
-      case 10: return '5-torus (T⁵): five coupled circles';
-      case 11: return 'Twisted 5-torus: T⁵ + helix';
-      default: return 'Nested torus structure';
+      case 4:
+        return 'Hopf fibration: linked circles on S³'
+      case 5:
+        return 'Twisted 2-torus: T² + helix'
+      case 6:
+        return '3-torus (T³): three coupled circles'
+      case 7:
+        return 'Twisted 3-torus: T³ + helix'
+      case 8:
+        return 'Quaternionic Hopf: S³ fibers over S⁴'
+      case 9:
+        return 'Twisted 4-torus: T⁴ + helix'
+      case 10:
+        return '5-torus (T⁵): five coupled circles'
+      case 11:
+        return 'Twisted 5-torus: T⁵ + helix'
+      default:
+        return 'Nested torus structure'
     }
-  };
+  }
 
   // Get appropriate label for eta slider based on dimension
-  const etaLabel = dimension === 4 || dimension === 8
-    ? `Torus Position (η = ${(config.eta / Math.PI).toFixed(2)}π)`
-    : `Circle Balance (η = ${(config.eta / Math.PI).toFixed(2)}π)`;
+  const etaLabel =
+    dimension === 4 || dimension === 8
+      ? `Torus Position (η = ${(config.eta / Math.PI).toFixed(2)}π)`
+      : `Circle Balance (η = ${(config.eta / Math.PI).toFixed(2)}π)`
 
   return (
     <div className="space-y-4" data-testid="nested-torus-settings">
@@ -121,7 +131,9 @@ export function NestedTorusSettings() {
       {dimension === 4 && (
         <>
           <div className="flex items-center justify-between">
-            <label htmlFor="show-nested-tori" className="text-sm">Show Nested Tori</label>
+            <label htmlFor="show-nested-tori" className="text-sm">
+              Show Nested Tori
+            </label>
             <input
               id="show-nested-tori"
               type="checkbox"
@@ -149,10 +161,8 @@ export function NestedTorusSettings() {
         <span> · {(config.resolutionXi1 * config.resolutionXi2 * 2).toLocaleString()} edges</span>
       </p>
       {pointCount > 10000 && (
-        <p className="text-xs text-warning">
-          High point count may affect performance
-        </p>
+        <p className="text-xs text-warning">High point count may affect performance</p>
       )}
     </div>
-  );
+  )
 }

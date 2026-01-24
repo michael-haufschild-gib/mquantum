@@ -28,4 +28,4 @@ void main() {
   vec3 combined = cloudColor.rgb + sceneColor.rgb * (1.0 - cloudColor.a);
   fragColor = vec4(combined, sceneColor.a);
 }
-`;
+`

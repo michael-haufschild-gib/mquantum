@@ -47,4 +47,4 @@ float computeAlphaBoost(float rho, float stepLen, float sigma, float boost) {
     float boostedRho = rho * (1.0 + boost * exp(-rho * 10.0));
     return computeAlpha(boostedRho, stepLen, sigma);
 }
-`;
+`

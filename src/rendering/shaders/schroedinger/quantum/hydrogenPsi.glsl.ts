@@ -239,4 +239,4 @@ float hydrogenProbabilityDensity(vec3 pos, int n, int l, int m, float a0, bool u
     vec2 psi = evalHydrogenPsi(pos, n, l, m, a0, useReal);
     return dot(psi, psi); // |ψ|² = re² + im²
 }
-`;
+`

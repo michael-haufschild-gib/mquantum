@@ -50,4 +50,4 @@ uniform float uHistoryWeight;
 
 // Disocclusion threshold for depth-based rejection
 uniform float uDisocclusionThreshold;
-`;
+`

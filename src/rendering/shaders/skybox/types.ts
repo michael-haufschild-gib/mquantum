@@ -5,15 +5,15 @@ export type SkyboxMode =
   | 'crystalline'
   | 'horizon'
   | 'ocean'
-  | 'twilight';
+  | 'twilight'
 
 export interface SkyboxEffects {
-  sun: boolean;
-  vignette: boolean;
+  sun: boolean
+  vignette: boolean
 }
 
 export interface SkyboxShaderConfig {
-  mode: SkyboxMode;
-  effects: SkyboxEffects;
-  overrides?: string[];
+  mode: SkyboxMode
+  effects: SkyboxEffects
+  overrides?: string[]
 }

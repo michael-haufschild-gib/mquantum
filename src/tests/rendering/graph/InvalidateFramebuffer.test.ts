@@ -31,9 +31,9 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     const mockGl = {
       invalidateFramebuffer,
       bindFramebuffer,
-      FRAMEBUFFER: 0x8D40,
-      COLOR_ATTACHMENT0: 0x8CE0,
-      DEPTH_ATTACHMENT: 0x8D00,
+      FRAMEBUFFER: 0x8d40,
+      COLOR_ATTACHMENT0: 0x8ce0,
+      DEPTH_ATTACHMENT: 0x8d00,
     }
 
     // Mock renderer with properties WeakMap
@@ -49,7 +49,9 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     expect(bindFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, mockFramebuffer)
-    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [mockGl.COLOR_ATTACHMENT0])
+    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [
+      mockGl.COLOR_ATTACHMENT0,
+    ])
   })
 
   it('should skip ping-pong resources', () => {
@@ -64,8 +66,8 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     const mockGl = {
       invalidateFramebuffer,
       bindFramebuffer: vi.fn(),
-      FRAMEBUFFER: 0x8D40,
-      COLOR_ATTACHMENT0: 0x8CE0,
+      FRAMEBUFFER: 0x8d40,
+      COLOR_ATTACHMENT0: 0x8ce0,
     }
 
     const mockRenderer = {
@@ -92,8 +94,8 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     const mockGl = {
       invalidateFramebuffer,
       bindFramebuffer: vi.fn(),
-      FRAMEBUFFER: 0x8D40,
-      COLOR_ATTACHMENT0: 0x8CE0,
+      FRAMEBUFFER: 0x8d40,
+      COLOR_ATTACHMENT0: 0x8ce0,
     }
 
     const mockRenderer = {
@@ -119,9 +121,9 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     const mockGl = {
       invalidateFramebuffer,
       bindFramebuffer: vi.fn(),
-      FRAMEBUFFER: 0x8D40,
-      COLOR_ATTACHMENT0: 0x8CE0,
-      DEPTH_ATTACHMENT: 0x8D00,
+      FRAMEBUFFER: 0x8d40,
+      COLOR_ATTACHMENT0: 0x8ce0,
+      DEPTH_ATTACHMENT: 0x8d00,
     }
 
     const mockRenderer = {
@@ -133,8 +135,12 @@ describe('ResourcePool.invalidateFramebuffers', () => {
 
     // Should have called invalidateFramebuffer twice: color + depth
     expect(invalidateFramebuffer).toHaveBeenCalledTimes(2)
-    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [mockGl.COLOR_ATTACHMENT0])
-    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [mockGl.DEPTH_ATTACHMENT])
+    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [
+      mockGl.COLOR_ATTACHMENT0,
+    ])
+    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [
+      mockGl.DEPTH_ATTACHMENT,
+    ])
   })
 
   it('should invalidate all MRT color attachments', () => {
@@ -147,11 +153,11 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     pool.get('mrt3')
 
     const invalidateFramebuffer = vi.fn()
-    const COLOR_ATTACHMENT0 = 0x8CE0
+    const COLOR_ATTACHMENT0 = 0x8ce0
     const mockGl = {
       invalidateFramebuffer,
       bindFramebuffer: vi.fn(),
-      FRAMEBUFFER: 0x8D40,
+      FRAMEBUFFER: 0x8d40,
       COLOR_ATTACHMENT0,
     }
 
@@ -163,10 +169,11 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     pool.invalidateFramebuffers(mockRenderer as unknown as WebGLRenderer, new Set())
 
     // Should invalidate all 3 color attachments
-    expect(invalidateFramebuffer).toHaveBeenCalledWith(
-      mockGl.FRAMEBUFFER,
-      [COLOR_ATTACHMENT0, COLOR_ATTACHMENT0 + 1, COLOR_ATTACHMENT0 + 2]
-    )
+    expect(invalidateFramebuffer).toHaveBeenCalledWith(mockGl.FRAMEBUFFER, [
+      COLOR_ATTACHMENT0,
+      COLOR_ATTACHMENT0 + 1,
+      COLOR_ATTACHMENT0 + 2,
+    ])
   })
 
   it('should handle WebGL1 gracefully (no invalidateFramebuffer)', () => {
@@ -206,8 +213,8 @@ describe('ResourcePool.invalidateFramebuffers', () => {
     const mockGl = {
       invalidateFramebuffer: vi.fn(),
       bindFramebuffer,
-      FRAMEBUFFER: 0x8D40,
-      COLOR_ATTACHMENT0: 0x8CE0,
+      FRAMEBUFFER: 0x8d40,
+      COLOR_ATTACHMENT0: 0x8ce0,
     }
 
     const mockRenderer = {

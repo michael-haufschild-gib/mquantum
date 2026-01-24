@@ -153,7 +153,9 @@ export function isBinaryFormat(data: unknown): data is BinaryPolytopeData {
 
   // Validate version
   if (obj.version !== BINARY_FORMAT_VERSION) {
-    console.warn(`[BinarySerialization] Unknown version: ${obj.version}, expected ${BINARY_FORMAT_VERSION}`)
+    console.warn(
+      `[BinarySerialization] Unknown version: ${obj.version}, expected ${BINARY_FORMAT_VERSION}`
+    )
     return false
   }
 
@@ -170,11 +172,15 @@ export function isBinaryFormat(data: unknown): data is BinaryPolytopeData {
   const expectedEdgeBytes = obj.edgeCount * 2 * 4 // Uint32 = 4 bytes
 
   if (obj.vertices.byteLength !== expectedVertexBytes) {
-    console.warn(`[BinarySerialization] Vertex buffer size mismatch: ${obj.vertices.byteLength} vs expected ${expectedVertexBytes}`)
+    console.warn(
+      `[BinarySerialization] Vertex buffer size mismatch: ${obj.vertices.byteLength} vs expected ${expectedVertexBytes}`
+    )
     return false
   }
   if (obj.edges.byteLength !== expectedEdgeBytes) {
-    console.warn(`[BinarySerialization] Edge buffer size mismatch: ${obj.edges.byteLength} vs expected ${expectedEdgeBytes}`)
+    console.warn(
+      `[BinarySerialization] Edge buffer size mismatch: ${obj.edges.byteLength} vs expected ${expectedEdgeBytes}`
+    )
     return false
   }
 

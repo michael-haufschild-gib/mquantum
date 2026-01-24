@@ -5,10 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  isWebGL2Supported,
-  detectDeviceCapabilities,
-} from '@/lib/deviceCapabilities'
+import { isWebGL2Supported, detectDeviceCapabilities } from '@/lib/deviceCapabilities'
 
 // Mock detect-gpu module
 vi.mock('detect-gpu', () => ({
@@ -170,5 +167,4 @@ describe('deviceCapabilities', () => {
       expect(result.gpuName).toBe('unknown')
     })
   })
-
 })

@@ -8,8 +8,8 @@
  * @module rendering/uniforms/UniformManager
  */
 
-import type * as THREE from 'three';
-import type { UniformSource, UniformUpdateState } from './UniformSource';
+import type * as THREE from 'three'
+import type { UniformSource, UniformUpdateState } from './UniformSource'
 
 /**
  * Singleton manager for uniform sources.
@@ -31,8 +31,8 @@ import type { UniformSource, UniformUpdateState } from './UniformSource';
  * ```
  */
 class UniformManagerClass {
-  private sources = new Map<string, UniformSource>();
-  private materialVersionCache = new WeakMap<THREE.ShaderMaterial, Map<string, number>>();
+  private sources = new Map<string, UniformSource>()
+  private materialVersionCache = new WeakMap<THREE.ShaderMaterial, Map<string, number>>()
 
   /**
    * Register a uniform source.
@@ -42,9 +42,9 @@ class UniformManagerClass {
    */
   register(source: UniformSource): void {
     if (this.sources.has(source.id)) {
-      console.warn(`UniformManager: Replacing existing source '${source.id}'`);
+      console.warn(`UniformManager: Replacing existing source '${source.id}'`)
     }
-    this.sources.set(source.id, source);
+    this.sources.set(source.id, source)
   }
 
   /**
@@ -54,7 +54,7 @@ class UniformManagerClass {
    * @returns true if the source was found and removed
    */
   unregister(sourceId: string): boolean {
-    return this.sources.delete(sourceId);
+    return this.sources.delete(sourceId)
   }
 
   /**
@@ -64,7 +64,7 @@ class UniformManagerClass {
    * @returns The uniform source, or undefined if not found
    */
   getSource(sourceId: string): UniformSource | undefined {
-    return this.sources.get(sourceId);
+    return this.sources.get(sourceId)
   }
 
   /**
@@ -74,7 +74,7 @@ class UniformManagerClass {
    * @returns true if the source is registered
    */
   hasSource(sourceId: string): boolean {
-    return this.sources.has(sourceId);
+    return this.sources.has(sourceId)
   }
 
   /**
@@ -86,7 +86,7 @@ class UniformManagerClass {
    */
   update(state: UniformUpdateState): void {
     for (const source of this.sources.values()) {
-      source.update(state);
+      source.update(state)
     }
   }
 
@@ -98,9 +98,9 @@ class UniformManagerClass {
    */
   updateSources(sourceIds: string[], state: UniformUpdateState): void {
     for (const id of sourceIds) {
-      const source = this.sources.get(id);
+      const source = this.sources.get(id)
       if (source) {
-        source.update(state);
+        source.update(state)
       }
     }
   }
@@ -113,22 +113,22 @@ class UniformManagerClass {
    * @returns true if any source has changed
    */
   hasChanges(material: THREE.ShaderMaterial, sourceIds: string[]): boolean {
-    const cache = this.materialVersionCache.get(material);
+    const cache = this.materialVersionCache.get(material)
     if (!cache) {
-      return true; // Never applied, so definitely has changes
+      return true // Never applied, so definitely has changes
     }
 
     for (const id of sourceIds) {
-      const source = this.sources.get(id);
-      if (!source) continue;
+      const source = this.sources.get(id)
+      if (!source) continue
 
-      const cachedVersion = cache.get(id);
+      const cachedVersion = cache.get(id)
       if (cachedVersion === undefined || cachedVersion !== source.version) {
-        return true;
+        return true
       }
     }
 
-    return false;
+    return false
   }
 
   /**
@@ -141,35 +141,31 @@ class UniformManagerClass {
    * @param sourceIds - IDs of sources to apply
    * @param force - If true, apply all uniforms regardless of version
    */
-  applyToMaterial(
-    material: THREE.ShaderMaterial,
-    sourceIds: string[],
-    force = false
-  ): void {
+  applyToMaterial(material: THREE.ShaderMaterial, sourceIds: string[], force = false): void {
     // Get or create version cache for this material
-    let cache = this.materialVersionCache.get(material);
+    let cache = this.materialVersionCache.get(material)
     if (!cache) {
-      cache = new Map();
-      this.materialVersionCache.set(material, cache);
+      cache = new Map()
+      this.materialVersionCache.set(material, cache)
     }
 
     for (const id of sourceIds) {
-      const source = this.sources.get(id);
+      const source = this.sources.get(id)
       if (!source) {
-        console.warn(`UniformManager: Source '${id}' not found`);
-        continue;
+        console.warn(`UniformManager: Source '${id}' not found`)
+        continue
       }
 
-      const cachedVersion = cache.get(id);
+      const cachedVersion = cache.get(id)
       if (!force && cachedVersion === source.version) {
-        continue; // Skip - no changes
+        continue // Skip - no changes
       }
 
       // Apply uniforms
-      source.applyToMaterial(material);
+      source.applyToMaterial(material)
 
       // Update cache
-      cache.set(id, source.version);
+      cache.set(id, source.version)
     }
   }
 
@@ -182,16 +178,16 @@ class UniformManagerClass {
    * @returns Combined uniform record
    */
   getCombinedUniforms(sourceIds: string[]): Record<string, { value: unknown }> {
-    const result: Record<string, { value: unknown }> = {};
+    const result: Record<string, { value: unknown }> = {}
 
     for (const id of sourceIds) {
-      const source = this.sources.get(id);
+      const source = this.sources.get(id)
       if (source) {
-        Object.assign(result, source.getUniforms());
+        Object.assign(result, source.getUniforms())
       }
     }
 
-    return result;
+    return result
   }
 
   /**
@@ -203,7 +199,7 @@ class UniformManagerClass {
    * @param material - The material to clear cache for
    */
   clearMaterialCache(material: THREE.ShaderMaterial): void {
-    this.materialVersionCache.delete(material);
+    this.materialVersionCache.delete(material)
   }
 
   /**
@@ -214,7 +210,7 @@ class UniformManagerClass {
   clearAllCaches(): void {
     // WeakMap entries are automatically cleared when materials are GC'd
     // Just create a new WeakMap to clear everything
-    this.materialVersionCache = new WeakMap();
+    this.materialVersionCache = new WeakMap()
   }
 
   /**
@@ -223,7 +219,7 @@ class UniformManagerClass {
    * @returns Array of registered source IDs
    */
   getRegisteredSources(): string[] {
-    return Array.from(this.sources.keys());
+    return Array.from(this.sources.keys())
   }
 
   /**
@@ -233,12 +229,12 @@ class UniformManagerClass {
    * Primarily used for testing.
    */
   reset(): void {
-    this.sources.clear();
-    this.materialVersionCache = new WeakMap();
+    this.sources.clear()
+    this.materialVersionCache = new WeakMap()
   }
 }
 
 /**
  * Singleton instance of the UniformManager.
  */
-export const UniformManager = new UniformManagerClass();
+export const UniformManager = new UniformManagerClass()

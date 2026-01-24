@@ -53,4 +53,4 @@ vec3 GetNormalFast(vec3 p) {
     float lenSq = dot(n, n);
     return lenSq > 1e-8 ? n * inversesqrt(lenSq) : vec3(0.0, 1.0, 0.0);
 }
-`;
+`

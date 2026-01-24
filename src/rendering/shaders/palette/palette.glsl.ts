@@ -209,4 +209,4 @@ vec3 getPaletteColor(vec3 baseHSL, float t, int mode) {
     // Fallback: monochromatic
     return hsl2rgb(vec3(h, baseHSL.y, mix(minL, maxL, t)));
 }
-`;
+`

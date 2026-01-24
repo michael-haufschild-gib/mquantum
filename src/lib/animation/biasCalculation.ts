@@ -50,11 +50,7 @@ const PHASE_OFFSET = Math.PI / 4
  * @param bias - Bias value from 0 (uniform) to 1 (maximum variation)
  * @returns Rotation speed multiplier in range [MIN_MULTIPLIER, MAX_MULTIPLIER]
  */
-export function getPlaneMultiplier(
-  planeIndex: number,
-  _totalPlanes: number,
-  bias: number
-): number {
+export function getPlaneMultiplier(planeIndex: number, _totalPlanes: number, bias: number): number {
   // Fast path: no bias means uniform speed
   if (bias === 0) return 1.0
 

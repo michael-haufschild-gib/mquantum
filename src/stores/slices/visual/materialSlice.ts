@@ -39,14 +39,16 @@ export const createMaterialSlice: StateCreator<AppearanceSlice, [], [], Material
     const clamped = Math.max(0, Math.min(5, thickness))
     set({
       edgeThickness: clamped,
-      edgesVisible: clamped > 0
+      edgesVisible: clamped > 0,
     })
   },
   setFaceOpacity: (opacity) => set({ faceOpacity: Math.max(0, Math.min(1, opacity)) }),
   setTubeCaps: (caps) => set({ tubeCaps: caps }),
   setFaceEmission: (emission) => set({ faceEmission: Math.max(0, Math.min(5, emission)) }),
-  setFaceEmissionThreshold: (threshold) => set({ faceEmissionThreshold: Math.max(0, Math.min(1, threshold)) }),
-  setFaceEmissionColorShift: (shift) => set({ faceEmissionColorShift: Math.max(-1, Math.min(1, shift)) }),
+  setFaceEmissionThreshold: (threshold) =>
+    set({ faceEmissionThreshold: Math.max(0, Math.min(1, threshold)) }),
+  setFaceEmissionColorShift: (shift) =>
+    set({ faceEmissionColorShift: Math.max(-1, Math.min(1, shift)) }),
   setFaceEmissionPulsing: (pulsing) => set({ faceEmissionPulsing: pulsing }),
   setFaceRimFalloff: (falloff) => set({ faceRimFalloff: Math.max(0, Math.min(10, falloff)) }),
 })

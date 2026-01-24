@@ -517,4 +517,4 @@ vec3 computeVolumetricDiskNormal(vec3 pos, vec3 rayDir) {
 
     return normal;
 }
-`;
+`

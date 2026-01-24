@@ -25,14 +25,14 @@ const suppressedErrorPatterns = [
 ]
 
 console.warn = (...args) => {
-  if (typeof args[0] === 'string' && suppressedWarnPatterns.some(p => args[0].includes(p))) {
+  if (typeof args[0] === 'string' && suppressedWarnPatterns.some((p) => args[0].includes(p))) {
     return
   }
   originalWarn.apply(console, args)
 }
 
 console.error = (...args) => {
-  if (typeof args[0] === 'string' && suppressedErrorPatterns.some(p => args[0].includes(p))) {
+  if (typeof args[0] === 'string' && suppressedErrorPatterns.some((p) => args[0].includes(p))) {
     return
   }
   originalError.apply(console, args)
@@ -44,7 +44,8 @@ class MockResizeObserver {
   unobserve = vi.fn()
   disconnect = vi.fn()
 }
-;(globalThis as unknown as { ResizeObserver: typeof MockResizeObserver }).ResizeObserver = MockResizeObserver
+;(globalThis as unknown as { ResizeObserver: typeof MockResizeObserver }).ResizeObserver =
+  MockResizeObserver
 
 // Mock window.matchMedia for media query hooks (not provided by happy-dom)
 Object.defineProperty(window, 'matchMedia', {
@@ -478,6 +479,340 @@ HTMLCanvasElement.prototype.getContext = vi.fn((contextType: string) => {
   return webglContextMock
 }) as unknown as typeof HTMLCanvasElement.prototype.getContext
 
+// =============================================================================
+// WebGPU Mock for WebGPU renderer tests
+// =============================================================================
+
+/**
+ * Creates a comprehensive WebGPU mock for testing WebGPU renderer components.
+ * Mirrors the structure of real WebGPU API for type-safe testing.
+ */
+const createWebGPUMock = () => {
+  // Track created resources for cleanup verification
+  const createdResources = {
+    buffers: new Set<object>(),
+    textures: new Set<object>(),
+    samplers: new Set<object>(),
+    shaderModules: new Set<object>(),
+    bindGroups: new Set<object>(),
+    bindGroupLayouts: new Set<object>(),
+    pipelineLayouts: new Set<object>(),
+    renderPipelines: new Set<object>(),
+    computePipelines: new Set<object>(),
+    commandEncoders: new Set<object>(),
+    querysets: new Set<object>(),
+  }
+
+  // Mock GPUBuffer
+  const createMockBuffer = (): GPUBuffer => {
+    const buffer = {
+      size: 0,
+      usage: 0,
+      mapState: 'unmapped' as GPUBufferMapState,
+      label: '',
+      getMappedRange: vi.fn(() => new ArrayBuffer(0)),
+      unmap: vi.fn(),
+      destroy: vi.fn(),
+      mapAsync: vi.fn().mockResolvedValue(undefined),
+    }
+    createdResources.buffers.add(buffer)
+    return buffer as unknown as GPUBuffer
+  }
+
+  // Mock GPUTexture
+  const createMockTexture = (): GPUTexture => {
+    const texture = {
+      width: 1,
+      height: 1,
+      depthOrArrayLayers: 1,
+      mipLevelCount: 1,
+      sampleCount: 1,
+      dimension: '2d' as GPUTextureDimension,
+      format: 'rgba8unorm' as GPUTextureFormat,
+      usage: 0,
+      label: '',
+      createView: vi.fn(() => ({
+        label: '',
+      })),
+      destroy: vi.fn(),
+    }
+    createdResources.textures.add(texture)
+    return texture as unknown as GPUTexture
+  }
+
+  // Mock GPUSampler
+  const createMockSampler = (): GPUSampler => {
+    const sampler = {
+      label: '',
+    }
+    createdResources.samplers.add(sampler)
+    return sampler as unknown as GPUSampler
+  }
+
+  // Mock GPUShaderModule
+  const createMockShaderModule = (): GPUShaderModule => {
+    const module = {
+      label: '',
+      getCompilationInfo: vi.fn().mockResolvedValue({
+        messages: [],
+      }),
+    }
+    createdResources.shaderModules.add(module)
+    return module as unknown as GPUShaderModule
+  }
+
+  // Mock GPUBindGroupLayout
+  const createMockBindGroupLayout = (): GPUBindGroupLayout => {
+    const layout = {
+      label: '',
+    }
+    createdResources.bindGroupLayouts.add(layout)
+    return layout as unknown as GPUBindGroupLayout
+  }
+
+  // Mock GPUBindGroup
+  const createMockBindGroup = (): GPUBindGroup => {
+    const group = {
+      label: '',
+    }
+    createdResources.bindGroups.add(group)
+    return group as unknown as GPUBindGroup
+  }
+
+  // Mock GPUPipelineLayout
+  const createMockPipelineLayout = (): GPUPipelineLayout => {
+    const layout = {
+      label: '',
+    }
+    createdResources.pipelineLayouts.add(layout)
+    return layout as unknown as GPUPipelineLayout
+  }
+
+  // Mock GPURenderPipeline
+  const createMockRenderPipeline = (): GPURenderPipeline => {
+    const pipeline = {
+      label: '',
+      getBindGroupLayout: vi.fn(() => createMockBindGroupLayout()),
+    }
+    createdResources.renderPipelines.add(pipeline)
+    return pipeline as unknown as GPURenderPipeline
+  }
+
+  // Mock GPUComputePipeline
+  const createMockComputePipeline = (): GPUComputePipeline => {
+    const pipeline = {
+      label: '',
+      getBindGroupLayout: vi.fn(() => createMockBindGroupLayout()),
+    }
+    createdResources.computePipelines.add(pipeline)
+    return pipeline as unknown as GPUComputePipeline
+  }
+
+  // Mock GPURenderPassEncoder
+  const createMockRenderPassEncoder = (): GPURenderPassEncoder => ({
+    label: '',
+    setPipeline: vi.fn(),
+    setBindGroup: vi.fn(),
+    setVertexBuffer: vi.fn(),
+    setIndexBuffer: vi.fn(),
+    draw: vi.fn(),
+    drawIndexed: vi.fn(),
+    drawIndirect: vi.fn(),
+    drawIndexedIndirect: vi.fn(),
+    setViewport: vi.fn(),
+    setScissorRect: vi.fn(),
+    setBlendConstant: vi.fn(),
+    setStencilReference: vi.fn(),
+    beginOcclusionQuery: vi.fn(),
+    endOcclusionQuery: vi.fn(),
+    executeBundles: vi.fn(),
+    end: vi.fn(),
+    pushDebugGroup: vi.fn(),
+    popDebugGroup: vi.fn(),
+    insertDebugMarker: vi.fn(),
+  }) as unknown as GPURenderPassEncoder
+
+  // Mock GPUComputePassEncoder
+  const createMockComputePassEncoder = (): GPUComputePassEncoder => ({
+    label: '',
+    setPipeline: vi.fn(),
+    setBindGroup: vi.fn(),
+    dispatchWorkgroups: vi.fn(),
+    dispatchWorkgroupsIndirect: vi.fn(),
+    end: vi.fn(),
+    pushDebugGroup: vi.fn(),
+    popDebugGroup: vi.fn(),
+    insertDebugMarker: vi.fn(),
+  }) as unknown as GPUComputePassEncoder
+
+  // Mock GPUCommandEncoder
+  const createMockCommandEncoder = (): GPUCommandEncoder => {
+    const encoder = {
+      label: '',
+      beginRenderPass: vi.fn(() => createMockRenderPassEncoder()),
+      beginComputePass: vi.fn(() => createMockComputePassEncoder()),
+      copyBufferToBuffer: vi.fn(),
+      copyBufferToTexture: vi.fn(),
+      copyTextureToBuffer: vi.fn(),
+      copyTextureToTexture: vi.fn(),
+      clearBuffer: vi.fn(),
+      resolveQuerySet: vi.fn(),
+      finish: vi.fn(() => ({
+        label: '',
+      })),
+      pushDebugGroup: vi.fn(),
+      popDebugGroup: vi.fn(),
+      insertDebugMarker: vi.fn(),
+    }
+    createdResources.commandEncoders.add(encoder)
+    return encoder as unknown as GPUCommandEncoder
+  }
+
+  // Mock GPUQuerySet
+  const createMockQuerySet = (): GPUQuerySet => {
+    const querySet = {
+      label: '',
+      type: 'occlusion' as GPUQueryType,
+      count: 0,
+      destroy: vi.fn(),
+    }
+    createdResources.querysets.add(querySet)
+    return querySet as unknown as GPUQuerySet
+  }
+
+  // Mock GPUQueue
+  const mockQueue: GPUQueue = {
+    label: '',
+    submit: vi.fn(),
+    onSubmittedWorkDone: vi.fn().mockResolvedValue(undefined),
+    writeBuffer: vi.fn(),
+    writeTexture: vi.fn(),
+    copyExternalImageToTexture: vi.fn(),
+  } as unknown as GPUQueue
+
+  // Mock GPUDevice
+  const mockDevice: GPUDevice = {
+    label: '',
+    features: new Set() as GPUSupportedFeatures,
+    limits: {
+      maxTextureDimension1D: 8192,
+      maxTextureDimension2D: 8192,
+      maxTextureDimension3D: 2048,
+      maxTextureArrayLayers: 256,
+      maxBindGroups: 4,
+      maxBindGroupsPlusVertexBuffers: 24,
+      maxBindingsPerBindGroup: 1000,
+      maxDynamicUniformBuffersPerPipelineLayout: 8,
+      maxDynamicStorageBuffersPerPipelineLayout: 4,
+      maxSampledTexturesPerShaderStage: 16,
+      maxSamplersPerShaderStage: 16,
+      maxStorageBuffersPerShaderStage: 8,
+      maxStorageTexturesPerShaderStage: 4,
+      maxUniformBuffersPerShaderStage: 12,
+      maxUniformBufferBindingSize: 65536,
+      maxStorageBufferBindingSize: 134217728,
+      minUniformBufferOffsetAlignment: 256,
+      minStorageBufferOffsetAlignment: 256,
+      maxVertexBuffers: 8,
+      maxBufferSize: 268435456,
+      maxVertexAttributes: 16,
+      maxVertexBufferArrayStride: 2048,
+      maxInterStageShaderComponents: 60,
+      maxInterStageShaderVariables: 16,
+      maxColorAttachments: 8,
+      maxColorAttachmentBytesPerSample: 32,
+      maxComputeWorkgroupStorageSize: 16384,
+      maxComputeInvocationsPerWorkgroup: 256,
+      maxComputeWorkgroupSizeX: 256,
+      maxComputeWorkgroupSizeY: 256,
+      maxComputeWorkgroupSizeZ: 64,
+      maxComputeWorkgroupsPerDimension: 65535,
+    } as unknown as GPUSupportedLimits,
+    queue: mockQueue,
+    lost: new Promise(() => {}), // Never resolves in tests
+    createBuffer: vi.fn((descriptor) => {
+      const buffer = createMockBuffer()
+      Object.assign(buffer, { size: descriptor.size, usage: descriptor.usage })
+      return buffer
+    }),
+    createTexture: vi.fn((descriptor) => {
+      const texture = createMockTexture()
+      Object.assign(texture, {
+        width: descriptor.size.width ?? descriptor.size,
+        height: descriptor.size.height ?? 1,
+        format: descriptor.format,
+        usage: descriptor.usage,
+      })
+      return texture
+    }),
+    createSampler: vi.fn(() => createMockSampler()),
+    createShaderModule: vi.fn(() => createMockShaderModule()),
+    createBindGroupLayout: vi.fn(() => createMockBindGroupLayout()),
+    createBindGroup: vi.fn(() => createMockBindGroup()),
+    createPipelineLayout: vi.fn(() => createMockPipelineLayout()),
+    createRenderPipeline: vi.fn(() => createMockRenderPipeline()),
+    createComputePipeline: vi.fn(() => createMockComputePipeline()),
+    createRenderPipelineAsync: vi.fn().mockResolvedValue(createMockRenderPipeline()),
+    createComputePipelineAsync: vi.fn().mockResolvedValue(createMockComputePipeline()),
+    createCommandEncoder: vi.fn(() => createMockCommandEncoder()),
+    createRenderBundleEncoder: vi.fn(),
+    createQuerySet: vi.fn(() => createMockQuerySet()),
+    pushErrorScope: vi.fn(),
+    popErrorScope: vi.fn().mockResolvedValue(null),
+    onuncapturederror: null,
+    destroy: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(() => true),
+  } as unknown as GPUDevice
+
+  // Mock GPUAdapterInfo
+  const mockAdapterInfo: GPUAdapterInfo = {
+    vendor: 'Mock Vendor',
+    architecture: 'Mock Architecture',
+    device: 'Mock Device',
+    description: 'Mock WebGPU Adapter',
+  } as GPUAdapterInfo
+
+  // Mock GPUAdapter
+  const mockAdapter: GPUAdapter = {
+    features: new Set() as GPUSupportedFeatures,
+    limits: mockDevice.limits,
+    info: mockAdapterInfo,
+    isFallbackAdapter: false,
+    requestDevice: vi.fn().mockResolvedValue(mockDevice),
+    requestAdapterInfo: vi.fn().mockResolvedValue(mockAdapterInfo),
+  } as unknown as GPUAdapter
+
+  // Mock GPU (navigator.gpu)
+  const mockGPU: GPU = {
+    requestAdapter: vi.fn().mockResolvedValue(mockAdapter),
+    getPreferredCanvasFormat: vi.fn(() => 'bgra8unorm' as GPUTextureFormat),
+    wgslLanguageFeatures: new Set() as WGSLLanguageFeatures,
+  } as unknown as GPU
+
+  return {
+    gpu: mockGPU,
+    adapter: mockAdapter,
+    device: mockDevice,
+    queue: mockQueue,
+    createdResources,
+  }
+}
+
+// Create the WebGPU mock instance
+const webgpuMock = createWebGPUMock()
+
+// Install WebGPU mock on navigator
+Object.defineProperty(navigator, 'gpu', {
+  writable: true,
+  configurable: true,
+  value: webgpuMock.gpu,
+})
+
+// Export for tests that need direct access to mock internals
+export const mockWebGPU = webgpuMock
+
 // Mock AudioContext with full SoundManager support
 const mockAudioParam = {
   value: 0,
@@ -494,7 +829,7 @@ class MockAudioContext {
 
   createGain = vi.fn().mockReturnValue({
     gain: { ...mockAudioParam, value: 1 },
-    connect: vi.fn()
+    connect: vi.fn(),
   })
 
   createOscillator = vi.fn().mockReturnValue({
@@ -506,12 +841,14 @@ class MockAudioContext {
   })
 
   // Buffer-based sound support (for noise-based sounds)
-  createBuffer = vi.fn().mockImplementation((channels: number, length: number, sampleRate: number) => ({
-    numberOfChannels: channels,
-    length,
-    sampleRate,
-    getChannelData: vi.fn().mockReturnValue(new Float32Array(length)),
-  }))
+  createBuffer = vi
+    .fn()
+    .mockImplementation((channels: number, length: number, sampleRate: number) => ({
+      numberOfChannels: channels,
+      length,
+      sampleRate,
+      getChannelData: vi.fn().mockReturnValue(new Float32Array(length)),
+    }))
 
   createBufferSource = vi.fn().mockReturnValue({
     buffer: null,
@@ -539,127 +876,127 @@ globalThis.AudioContext = MockAudioContext as any
 
 // Mock Popover API (not fully supported in happy-dom)
 // Track popover open state for each element
-const popoverOpenState = new WeakMap<HTMLElement, boolean>();
-const popoverEscapeListeners = new WeakMap<HTMLElement, (e: KeyboardEvent) => void>();
-const popoverClickListeners = new WeakMap<HTMLElement, (e: MouseEvent) => void>();
+const popoverOpenState = new WeakMap<HTMLElement, boolean>()
+const popoverEscapeListeners = new WeakMap<HTMLElement, (e: KeyboardEvent) => void>()
+const popoverClickListeners = new WeakMap<HTMLElement, (e: MouseEvent) => void>()
 
 HTMLElement.prototype.showPopover = vi.fn(function (this: HTMLElement) {
   if (!this.hasAttribute('popover')) {
-    throw new DOMException('Element is not a popover', 'InvalidStateError');
+    throw new DOMException('Element is not a popover', 'InvalidStateError')
   }
-  const wasOpen = popoverOpenState.get(this) ?? false;
+  const wasOpen = popoverOpenState.get(this) ?? false
   if (!wasOpen) {
-    popoverOpenState.set(this, true);
-    this.setAttribute('data-popover-open', '');
+    popoverOpenState.set(this, true)
+    this.setAttribute('data-popover-open', '')
 
     // Simulate native light-dismiss behavior for popover="auto"
     if (this.getAttribute('popover') === 'auto') {
       // Escape key handling
       const escapeHandler = (e: KeyboardEvent) => {
         if (e.key === 'Escape' && popoverOpenState.get(this)) {
-          this.hidePopover();
+          this.hidePopover()
         }
-      };
-      popoverEscapeListeners.set(this, escapeHandler);
-      document.addEventListener('keydown', escapeHandler);
+      }
+      popoverEscapeListeners.set(this, escapeHandler)
+      document.addEventListener('keydown', escapeHandler)
 
       // Click outside handling for light-dismiss
       const clickHandler = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
+        const target = e.target as HTMLElement
         // Don't close if clicking inside the popover
-        if (this.contains(target)) return;
+        if (this.contains(target)) return
         // Don't close if clicking on a trigger that controls this popover
-        if (target.closest(`[popovertarget="${this.id}"]`)) return;
-        if (target.closest(`[data-dropdown-trigger="${this.id}"]`)) return;
+        if (target.closest(`[popovertarget="${this.id}"]`)) return
+        if (target.closest(`[data-dropdown-trigger="${this.id}"]`)) return
         // Don't close if clicking on another dropdown content (submenu)
-        if (target.closest('[data-dropdown-content]')) return;
+        if (target.closest('[data-dropdown-content]')) return
         // Close the popover
         if (popoverOpenState.get(this)) {
-          this.hidePopover();
+          this.hidePopover()
         }
-      };
-      popoverClickListeners.set(this, clickHandler);
-      document.addEventListener('mousedown', clickHandler);
+      }
+      popoverClickListeners.set(this, clickHandler)
+      document.addEventListener('mousedown', clickHandler)
     }
 
-    const event = new Event('toggle') as Event & { newState: string; oldState: string };
-    Object.defineProperty(event, 'newState', { value: 'open', writable: false });
-    Object.defineProperty(event, 'oldState', { value: 'closed', writable: false });
-    this.dispatchEvent(event);
+    const event = new Event('toggle') as Event & { newState: string; oldState: string }
+    Object.defineProperty(event, 'newState', { value: 'open', writable: false })
+    Object.defineProperty(event, 'oldState', { value: 'closed', writable: false })
+    this.dispatchEvent(event)
   }
-});
+})
 
 HTMLElement.prototype.hidePopover = vi.fn(function (this: HTMLElement) {
   if (!this.hasAttribute('popover')) {
-    throw new DOMException('Element is not a popover', 'InvalidStateError');
+    throw new DOMException('Element is not a popover', 'InvalidStateError')
   }
-  const wasOpen = popoverOpenState.get(this) ?? false;
+  const wasOpen = popoverOpenState.get(this) ?? false
   if (wasOpen) {
-    popoverOpenState.set(this, false);
-    this.removeAttribute('data-popover-open');
+    popoverOpenState.set(this, false)
+    this.removeAttribute('data-popover-open')
 
     // Clean up Escape key listener
-    const escapeHandler = popoverEscapeListeners.get(this);
+    const escapeHandler = popoverEscapeListeners.get(this)
     if (escapeHandler) {
-      document.removeEventListener('keydown', escapeHandler);
-      popoverEscapeListeners.delete(this);
+      document.removeEventListener('keydown', escapeHandler)
+      popoverEscapeListeners.delete(this)
     }
 
     // Clean up click listener
-    const clickHandler = popoverClickListeners.get(this);
+    const clickHandler = popoverClickListeners.get(this)
     if (clickHandler) {
-      document.removeEventListener('mousedown', clickHandler);
-      popoverClickListeners.delete(this);
+      document.removeEventListener('mousedown', clickHandler)
+      popoverClickListeners.delete(this)
     }
 
-    const event = new Event('toggle') as Event & { newState: string; oldState: string };
-    Object.defineProperty(event, 'newState', { value: 'closed', writable: false });
-    Object.defineProperty(event, 'oldState', { value: 'open', writable: false });
-    this.dispatchEvent(event);
+    const event = new Event('toggle') as Event & { newState: string; oldState: string }
+    Object.defineProperty(event, 'newState', { value: 'closed', writable: false })
+    Object.defineProperty(event, 'oldState', { value: 'open', writable: false })
+    this.dispatchEvent(event)
   }
-});
+})
 
 HTMLElement.prototype.togglePopover = vi.fn(function (this: HTMLElement, force?: boolean): boolean {
   if (!this.hasAttribute('popover')) {
-    throw new DOMException('Element is not a popover', 'InvalidStateError');
+    throw new DOMException('Element is not a popover', 'InvalidStateError')
   }
-  const isOpen = popoverOpenState.get(this) ?? false;
-  const shouldOpen = force !== undefined ? force : !isOpen;
+  const isOpen = popoverOpenState.get(this) ?? false
+  const shouldOpen = force !== undefined ? force : !isOpen
 
   if (shouldOpen && !isOpen) {
-    this.showPopover();
-    return true;
+    this.showPopover()
+    return true
   } else if (!shouldOpen && isOpen) {
-    this.hidePopover();
-    return false;
+    this.hidePopover()
+    return false
   }
-  return isOpen;
-});
+  return isOpen
+})
 
 // Override matches to support :popover-open pseudo-selector
-const originalMatches = HTMLElement.prototype.matches;
+const originalMatches = HTMLElement.prototype.matches
 HTMLElement.prototype.matches = function (this: HTMLElement, selector: string): boolean {
   if (selector === ':popover-open') {
-    return popoverOpenState.get(this) ?? false;
+    return popoverOpenState.get(this) ?? false
   }
-  return originalMatches.call(this, selector);
-};
+  return originalMatches.call(this, selector)
+}
 
 // Mock HTMLDialogElement methods (for Modal refactoring)
 HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
-  this.setAttribute('open', '');
-  const event = new Event('open');
-  this.dispatchEvent(event);
-});
+  this.setAttribute('open', '')
+  const event = new Event('open')
+  this.dispatchEvent(event)
+})
 
 HTMLDialogElement.prototype.close = vi.fn(function (this: HTMLDialogElement, returnValue?: string) {
-  this.removeAttribute('open');
+  this.removeAttribute('open')
   if (returnValue !== undefined) {
-    this.returnValue = returnValue;
+    this.returnValue = returnValue
   }
-  const event = new Event('close');
-  this.dispatchEvent(event);
-});
+  const event = new Event('close')
+  this.dispatchEvent(event)
+})
 
 // Cleanup after each test case
 afterEach(() => {

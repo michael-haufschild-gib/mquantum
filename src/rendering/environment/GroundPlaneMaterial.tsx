@@ -207,7 +207,11 @@ export function GroundPlaneMaterial({
     if (groundChanged) {
       u.uShowGrid!.value = showGrid
       updateLinearColorUniform(cache.gridColor, u.uGridColor!.value as THREE.Color, gridColor)
-      updateLinearColorUniform(cache.sectionColor, u.uSectionColor!.value as THREE.Color, sectionColor)
+      updateLinearColorUniform(
+        cache.sectionColor,
+        u.uSectionColor!.value as THREE.Color,
+        sectionColor
+      )
       u.uGridSpacing!.value = gridSpacing
       u.uSectionSpacing!.value = gridSpacing * 5
       u.uGridThickness!.value = gridThickness

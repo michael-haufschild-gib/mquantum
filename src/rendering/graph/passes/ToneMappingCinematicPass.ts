@@ -15,33 +15,36 @@
  * @module rendering/graph/passes/ToneMappingCinematicPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Configuration for ToneMappingCinematicPass.
  */
-export interface ToneMappingCinematicPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
+export interface ToneMappingCinematicPassConfig extends Omit<
+  RenderPassConfig,
+  'inputs' | 'outputs'
+> {
   /** Input HDR color resource */
-  colorInput: string;
+  colorInput: string
   /** Output LDR color resource */
-  outputResource: string;
+  outputResource: string
 
   // Tone mapping settings
   /** Initial tone mapping mode (Three.js constant) */
-  toneMapping?: number;
+  toneMapping?: number
   /** Initial exposure value */
-  exposure?: number;
+  exposure?: number
 
   // Cinematic settings
   /** Chromatic aberration distortion amount */
-  aberration?: number;
+  aberration?: number
   /** Vignette darkness (0 = none, 2 = strong) */
-  vignette?: number;
+  vignette?: number
   /** Film grain intensity */
-  grain?: number;
+  grain?: number
 }
 
 /**
@@ -187,7 +190,7 @@ vec3 applyToneMapping(vec3 color, int mode, float exposure) {
   if (mode == 7) return NeutralToneMapping(color, exposure);
   return color;
 }
-`;
+`
 
 const FRAGMENT_SHADER = /* glsl */ `
 precision highp float;
@@ -253,7 +256,7 @@ void main() {
 
   fragColor = vec4(color, 1.0);
 }
-`;
+`
 
 const VERTEX_SHADER = /* glsl */ `
 out vec2 vUv;
@@ -262,7 +265,7 @@ void main() {
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
-`;
+`
 
 /**
  * Combined tone mapping and cinematic effects pass.
@@ -285,13 +288,13 @@ void main() {
  * ```
  */
 export class ToneMappingCinematicPass extends BasePass {
-  private inputResourceId: string;
-  private outputResourceId: string;
+  private inputResourceId: string
+  private outputResourceId: string
 
-  private material: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
   constructor(config: ToneMappingCinematicPassConfig) {
     super({
@@ -302,10 +305,10 @@ export class ToneMappingCinematicPass extends BasePass {
       enabled: config.enabled,
       priority: config.priority,
       skipPassthrough: config.skipPassthrough,
-    });
+    })
 
-    this.inputResourceId = config.colorInput;
-    this.outputResourceId = config.outputResource;
+    this.inputResourceId = config.colorInput
+    this.outputResourceId = config.outputResource
 
     this.material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -326,71 +329,71 @@ export class ToneMappingCinematicPass extends BasePass {
       },
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, time, size } = ctx;
+    const { renderer, time, size } = ctx
 
-    const inputTexture = ctx.getReadTexture(this.inputResourceId);
+    const inputTexture = ctx.getReadTexture(this.inputResourceId)
     if (!inputTexture) {
-      console.warn(`ToneMappingCinematicPass: Input '${this.inputResourceId}' not found`);
-      return;
+      console.warn(`ToneMappingCinematicPass: Input '${this.inputResourceId}' not found`)
+      return
     }
 
-    const outputTarget = ctx.getWriteTarget(this.outputResourceId);
+    const outputTarget = ctx.getWriteTarget(this.outputResourceId)
 
-    this.material.uniforms['uInput']!.value = inputTexture;
-    this.material.uniforms['uTime']!.value = time;
-    this.material.uniforms['uResolution']!.value.set(size.width, size.height);
+    this.material.uniforms['uInput']!.value = inputTexture
+    this.material.uniforms['uTime']!.value = time
+    this.material.uniforms['uResolution']!.value.set(size.width, size.height)
 
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.scene, this.camera);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(outputTarget)
+    renderer.render(this.scene, this.camera)
+    renderer.setRenderTarget(null)
   }
 
   /**
    * Set tone mapping algorithm (Three.js constant).
    */
   setToneMapping(mode: number): void {
-    this.material.uniforms['uToneMapping']!.value = mode;
+    this.material.uniforms['uToneMapping']!.value = mode
   }
 
   /**
    * Set exposure value.
    */
   setExposure(exposure: number): void {
-    this.material.uniforms['uExposure']!.value = exposure;
+    this.material.uniforms['uExposure']!.value = exposure
   }
 
   /**
    * Set chromatic aberration intensity.
    */
   setAberration(value: number): void {
-    this.material.uniforms['uDistortion']!.value = value;
+    this.material.uniforms['uDistortion']!.value = value
   }
 
   /**
    * Set vignette darkness.
    */
   setVignette(value: number): void {
-    this.material.uniforms['uVignetteDarkness']!.value = value;
+    this.material.uniforms['uVignetteDarkness']!.value = value
   }
 
   /**
    * Set film grain intensity.
    */
   setGrain(value: number): void {
-    this.material.uniforms['uNoiseIntensity']!.value = value;
+    this.material.uniforms['uNoiseIntensity']!.value = value
   }
 
   /**
@@ -400,12 +403,12 @@ export class ToneMappingCinematicPass extends BasePass {
     return {
       toneMapping: this.material.uniforms['uToneMapping']!.value as number,
       exposure: this.material.uniforms['uExposure']!.value as number,
-    };
+    }
   }
 
   dispose(): void {
-    this.material.dispose();
-    this.mesh.geometry.dispose();
-    this.scene.remove(this.mesh);
+    this.material.dispose()
+    this.mesh.geometry.dispose()
+    this.scene.remove(this.mesh)
   }
 }

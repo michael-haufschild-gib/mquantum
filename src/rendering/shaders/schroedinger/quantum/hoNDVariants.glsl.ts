@@ -55,13 +55,15 @@ function generateHoNDBlock(dimension: number): string {
   const threshold = computeEarlyExitThreshold(dimension).toFixed(1)
 
   // Generate alpha declarations
-  const alphaDecls = Array.from({ length: dimension }, (_, i) =>
-    `    float alpha${i} = sqrt(max(uOmega[${i}], 0.01));`
+  const alphaDecls = Array.from(
+    { length: dimension },
+    (_, i) => `    float alpha${i} = sqrt(max(uOmega[${i}], 0.01));`
   ).join('\n')
 
   // Generate u calculations
-  const uCalcs = Array.from({ length: dimension }, (_, i) =>
-    `    float u${i} = alpha${i} * xND[${i}];`
+  const uCalcs = Array.from(
+    { length: dimension },
+    (_, i) => `    float u${i} = alpha${i} * xND[${i}];`
   ).join('\n')
 
   // Generate distSq sum
@@ -137,4 +139,3 @@ float hoNDOptimized(float xND[MAX_DIM], int termIdx) {
 }
 `
 }
-

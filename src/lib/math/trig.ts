@@ -38,7 +38,7 @@ const PI_SQ_INV_4 = 4 / (PI * PI)
  */
 export function fsin(x: number): number {
   // Normalize to [-PI, PI]
-  x = ((x % TAU) + TAU + PI) % TAU - PI
+  x = (((x % TAU) + TAU + PI) % TAU) - PI
 
   // Parabolic approximation: y = x * (PI - |x|) * 4/PI²
   const y = x * (PI - Math.abs(x)) * PI_SQ_INV_4
@@ -106,6 +106,5 @@ export function fcosUnchecked(x: number): number {
  * @returns Normalized angle in [-PI, PI]
  */
 export function normalizeAngle(x: number): number {
-  return ((x % TAU) + TAU + PI) % TAU - PI
+  return (((x % TAU) + TAU + PI) % TAU) - PI
 }
-

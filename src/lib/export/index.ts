@@ -7,5 +7,5 @@ export {
   exportSceneToPNG,
   findThreeCanvas,
   generateTimestampFilename,
-} from './image';
-export type { ExportOptions } from './image';
+} from './image'
+export type { ExportOptions } from './image'

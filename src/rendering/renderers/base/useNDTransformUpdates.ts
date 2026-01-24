@@ -150,7 +150,12 @@ export function useNDTransformUpdates(
     // Build scales array from store, reusing pre-allocated array
     const scales =
       overrides?.scales ??
-      buildScalesArrayInto(scalesArrayRef.current, geomState.dimension, transState.uniformScale, transState.perAxisScale)
+      buildScalesArrayInto(
+        scalesArrayRef.current,
+        geomState.dimension,
+        transState.uniformScale,
+        transState.perAxisScale
+      )
 
     // Build config
     const config: NDTransformConfig = {

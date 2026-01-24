@@ -1,9 +1,9 @@
-import { Select } from '@/components/ui/Select';
-import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Root System settings controls
@@ -13,7 +13,7 @@ import { useShallow } from 'zustand/react/shallow';
  * @returns The root system settings UI component
  */
 export const RootSystemSettings: React.FC = React.memo(() => {
-  const dimension = useGeometryStore((state) => state.dimension);
+  const dimension = useGeometryStore((state) => state.dimension)
 
   const { config, setRootType, setScale } = useExtendedObjectStore(
     useShallow((state: ExtendedObjectState) => ({
@@ -21,29 +21,29 @@ export const RootSystemSettings: React.FC = React.memo(() => {
       setRootType: state.setRootSystemType,
       setScale: state.setRootSystemScale,
     }))
-  );
+  )
 
   // Build available root types based on dimension
   const rootTypeOptions = React.useMemo(() => {
     const options: { value: 'A' | 'D' | 'E8'; label: string }[] = [
       { value: 'A', label: `A${dimension - 1} (${dimension * (dimension - 1)} roots)` },
-    ];
+    ]
 
     // D_n requires n >= 4
     if (dimension >= 4) {
       options.push({
         value: 'D',
         label: `D${dimension} (${2 * dimension * (dimension - 1)} roots)`,
-      });
+      })
     }
 
     // E8 requires exactly 8 dimensions
     if (dimension === 8) {
-      options.push({ value: 'E8', label: 'E8 (240 roots)' });
+      options.push({ value: 'E8', label: 'E8 (240 roots)' })
     }
 
-    return options;
-  }, [dimension]);
+    return options
+  }, [dimension])
 
   return (
     <div className="space-y-4" data-testid="root-system-settings">
@@ -68,7 +68,7 @@ export const RootSystemSettings: React.FC = React.memo(() => {
         data-testid="root-system-scale"
       />
     </div>
-  );
-});
+  )
+})
 
-RootSystemSettings.displayName = 'RootSystemSettings';
+RootSystemSettings.displayName = 'RootSystemSettings'

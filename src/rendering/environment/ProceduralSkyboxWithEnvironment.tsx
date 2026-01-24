@@ -9,8 +9,8 @@
  * has been moved to src/rendering/graph/passes/CubemapCapturePass.ts
  */
 
-import React from 'react';
-import { SkyboxMesh } from './Skybox';
+import React from 'react'
+import { SkyboxMesh } from './Skybox'
 
 /**
  * Procedural skybox component that renders the visual skybox mesh.
@@ -25,5 +25,5 @@ export const ProceduralSkyboxWithEnvironment: React.FC = () => {
   // CubemapCapturePass in PostProcessingV2 handles:
   // - scene.background (raw CubeTexture for black hole samplerCube)
   // - scene.environment (PMREM for wall PBR reflections)
-  return <SkyboxMesh texture={null} />;
-};
+  return <SkyboxMesh texture={null} />
+}

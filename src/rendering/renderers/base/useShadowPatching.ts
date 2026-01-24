@@ -170,9 +170,7 @@ function createPatchedShadowMaterials(
  * }
  * ```
  */
-export function useShadowPatching(
-  options: UseShadowPatchingOptions
-): UseShadowPatchingResult {
+export function useShadowPatching(options: UseShadowPatchingOptions): UseShadowPatchingResult {
   const { transformGLSL, transformFunctionCall, uniforms, shadowEnabled } = options
 
   // Track mesh ref for runtime shadow toggle
@@ -239,18 +237,3 @@ export function useShadowPatching(
     uniforms,
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

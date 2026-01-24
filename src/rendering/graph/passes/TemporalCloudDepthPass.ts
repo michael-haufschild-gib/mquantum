@@ -12,19 +12,19 @@
  * @module rendering/graph/passes/TemporalCloudDepthPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Uniforms interface for TemporalCloudDepthPass shader.
  */
 interface TemporalCloudDepthUniforms {
-  uWorldPosition: THREE.IUniform<THREE.Texture | null>;
-  uViewProjectionMatrix: THREE.IUniform<THREE.Matrix4>;
-  uNear: THREE.IUniform<number>;
-  uFar: THREE.IUniform<number>;
+  uWorldPosition: THREE.IUniform<THREE.Texture | null>
+  uViewProjectionMatrix: THREE.IUniform<THREE.Matrix4>
+  uNear: THREE.IUniform<number>
+  uFar: THREE.IUniform<number>
 }
 
 /**
@@ -32,11 +32,11 @@ interface TemporalCloudDepthUniforms {
  */
 export interface TemporalCloudDepthPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** World position input resource (temporal accumulation buffer) */
-  positionInput: string;
+  positionInput: string
   /** Attachment index for world position (default: 1) */
-  positionAttachment?: number;
+  positionAttachment?: number
   /** Output depth resource */
-  outputResource: string;
+  outputResource: string
 }
 
 /**
@@ -50,7 +50,7 @@ void main() {
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
-`;
+`
 
 /**
  * Fragment shader that converts world position to NDC depth.
@@ -98,7 +98,7 @@ void main() {
   // Also store in all channels for flexibility
   fragColor = vec4(ndcDepth, ndcDepth, ndcDepth, 1.0);
 }
-`;
+`
 
 /**
  * Extracts depth from temporal cloud accumulation's world position buffer.
@@ -120,20 +120,20 @@ void main() {
  * ```
  */
 export class TemporalCloudDepthPass extends BasePass {
-  private material: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
-  private positionInputId: string;
-  private positionAttachment: number;
-  private outputId: string;
+  private positionInputId: string
+  private positionAttachment: number
+  private outputId: string
 
   // Reusable matrix to avoid per-frame allocation
-  private viewProjectionMatrix = new THREE.Matrix4();
+  private viewProjectionMatrix = new THREE.Matrix4()
 
   constructor(config: TemporalCloudDepthPassConfig) {
-    const positionAttachment = config.positionAttachment ?? 1;
+    const positionAttachment = config.positionAttachment ?? 1
 
     super({
       ...config,
@@ -145,11 +145,11 @@ export class TemporalCloudDepthPass extends BasePass {
         },
       ],
       outputs: [{ resourceId: config.outputResource, access: 'write' }],
-    });
+    })
 
-    this.positionInputId = config.positionInput;
-    this.positionAttachment = positionAttachment;
-    this.outputId = config.outputResource;
+    this.positionInputId = config.positionInput
+    this.positionAttachment = positionAttachment
+    this.outputId = config.outputResource
 
     // Create shader material
     this.material = new THREE.ShaderMaterial({
@@ -165,63 +165,60 @@ export class TemporalCloudDepthPass extends BasePass {
       depthTest: false,
       depthWrite: false,
       blending: THREE.NoBlending,
-    });
+    })
 
     // Create fullscreen quad
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
     // Create dedicated scene and camera
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, camera } = ctx;
+    const { renderer, camera } = ctx
 
     // Get input texture (world position from temporal accumulation)
-    const positionTexture = ctx.getReadTexture(this.positionInputId, this.positionAttachment);
+    const positionTexture = ctx.getReadTexture(this.positionInputId, this.positionAttachment)
     if (!positionTexture) {
-      return;
+      return
     }
 
     // Get output target
-    const outputTarget = ctx.getWriteTarget(this.outputId);
+    const outputTarget = ctx.getWriteTarget(this.outputId)
     if (!outputTarget) {
-      return;
+      return
     }
 
     // Update uniforms
-    const uniforms = this.material.uniforms as unknown as TemporalCloudDepthUniforms;
-    uniforms.uWorldPosition.value = positionTexture;
+    const uniforms = this.material.uniforms as unknown as TemporalCloudDepthUniforms
+    uniforms.uWorldPosition.value = positionTexture
 
     // Compute view-projection matrix
-    this.viewProjectionMatrix.multiplyMatrices(
-      camera.projectionMatrix,
-      camera.matrixWorldInverse
-    );
-    uniforms.uViewProjectionMatrix.value.copy(this.viewProjectionMatrix);
+    this.viewProjectionMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    uniforms.uViewProjectionMatrix.value.copy(this.viewProjectionMatrix)
 
     // Get near/far from camera if it's a perspective camera
     if ((camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
-      const perspCam = camera as THREE.PerspectiveCamera;
-      uniforms.uNear.value = perspCam.near;
-      uniforms.uFar.value = perspCam.far;
+      const perspCam = camera as THREE.PerspectiveCamera
+      uniforms.uNear.value = perspCam.near
+      uniforms.uFar.value = perspCam.far
     }
 
     // Render
-    renderer.setRenderTarget(outputTarget);
-    renderer.setClearColor(0xffffff, 1); // Clear to far depth (white)
-    renderer.clear(true, false, false);
-    renderer.render(this.scene, this.camera);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(outputTarget)
+    renderer.setClearColor(0xffffff, 1) // Clear to far depth (white)
+    renderer.clear(true, false, false)
+    renderer.render(this.scene, this.camera)
+    renderer.setRenderTarget(null)
   }
 
   dispose(): void {
-    this.material.dispose();
-    this.mesh.geometry.dispose();
-    this.scene.remove(this.mesh);
+    this.material.dispose()
+    this.mesh.geometry.dispose()
+    this.scene.remove(this.mesh)
   }
 }

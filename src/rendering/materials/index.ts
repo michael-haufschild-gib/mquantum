@@ -18,12 +18,12 @@ export {
   trackShaderCompilation,
   deferredExecute,
   waitForGPUCompile,
-} from './shaderCompilationTracking';
+} from './shaderCompilationTracking'
 
-export { useTrackedShaderMaterial } from './useTrackedShaderMaterial';
-export type { TrackedShaderMaterialResult } from './useTrackedShaderMaterial';
+export { useTrackedShaderMaterial } from './useTrackedShaderMaterial'
+export type { TrackedShaderMaterialResult } from './useTrackedShaderMaterial'
 
-export { TrackedShaderMaterial } from './TrackedShaderMaterial';
+export { TrackedShaderMaterial } from './TrackedShaderMaterial'
 
 // ============================================================================
 // Skybox Shader Material
@@ -40,26 +40,3 @@ export {
   createSkyboxShaderDefaults,
   skyboxGlslVersion,
 } from './skybox/SkyboxShader'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

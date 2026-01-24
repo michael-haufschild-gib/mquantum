@@ -17,7 +17,7 @@
  * @module rendering/shaders/postprocessing/GTAOBilateralUpsampleShader
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 export const GTAOBilateralUpsampleShader = {
   uniforms: {
@@ -149,19 +149,18 @@ export const GTAOBilateralUpsampleShader = {
       fragColor = vec4(sceneColor.rgb * aoFactor, sceneColor.a);
     }
   `,
-};
+}
 
 /**
  * Type definition for GTAOBilateralUpsampleShader uniforms.
  */
 export type GTAOBilateralUpsampleUniforms = {
-  tAO: THREE.Uniform<THREE.Texture | null>;
-  tColor: THREE.Uniform<THREE.Texture | null>;
-  tDepth: THREE.Uniform<THREE.Texture | null>;
-  uResolution: THREE.Uniform<THREE.Vector2>;
-  uDepthThreshold: THREE.Uniform<number>;
-  uNearClip: THREE.Uniform<number>;
-  uFarClip: THREE.Uniform<number>;
-  uAOIntensity: THREE.Uniform<number>;
-};
-
+  tAO: THREE.Uniform<THREE.Texture | null>
+  tColor: THREE.Uniform<THREE.Texture | null>
+  tDepth: THREE.Uniform<THREE.Texture | null>
+  uResolution: THREE.Uniform<THREE.Vector2>
+  uDepthThreshold: THREE.Uniform<number>
+  uNearClip: THREE.Uniform<number>
+  uFarClip: THREE.Uniform<number>
+  uAOIntensity: THREE.Uniform<number>
+}

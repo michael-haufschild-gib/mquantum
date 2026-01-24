@@ -1,13 +1,13 @@
-import { ColorPicker } from '@/components/ui/ColorPicker';
-import { ControlGroup } from '@/components/ui/ControlGroup';
-import { Select } from '@/components/ui/Select';
-import { Slider } from '@/components/ui/Slider';
-import { Switch } from '@/components/ui/Switch';
-import { ToggleButton } from '@/components/ui/ToggleButton';
-import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { ColorPicker } from '@/components/ui/ColorPicker'
+import { ControlGroup } from '@/components/ui/ControlGroup'
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
+import { ToggleButton } from '@/components/ui/ToggleButton'
+import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
@@ -39,7 +39,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setErosionTurbulence: state.setSchroedingerErosionTurbulence,
     setErosionNoiseType: state.setSchroedingerErosionNoiseType,
     setErosionHQ: state.setSchroedingerErosionHQ,
-  }));
+  }))
   const {
     config,
     setDensityGain,
@@ -66,7 +66,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setErosionTurbulence,
     setErosionNoiseType,
     setErosionHQ,
-  } = useExtendedObjectStore(extendedObjectSelector);
+  } = useExtendedObjectStore(extendedObjectSelector)
 
   // Emission settings from appearance store
   const emissionSelector = useShallow((state: AppearanceSlice) => ({
@@ -80,7 +80,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setFaceEmissionColorShift: state.setFaceEmissionColorShift,
     setFaceEmissionPulsing: state.setFaceEmissionPulsing,
     setFaceRimFalloff: state.setFaceRimFalloff,
-  }));
+  }))
   const {
     faceEmission,
     faceEmissionThreshold,
@@ -92,7 +92,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setFaceEmissionColorShift,
     setFaceEmissionPulsing,
     setFaceRimFalloff,
-  } = useAppearanceStore(emissionSelector);
+  } = useAppearanceStore(emissionSelector)
 
   return (
     <div className="space-y-4">
@@ -257,8 +257,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
         <p className="text-xs text-text-tertiary">
           {config.isoEnabled
             ? 'Sharp surface at constant probability density'
-            : 'Volumetric cloud visualization'
-          }
+            : 'Volumetric cloud visualization'}
         </p>
       </ControlGroup>
 
@@ -467,7 +466,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
         </div>
       </ControlGroup>
     </div>
-  );
-});
+  )
+})
 
-SchroedingerAdvanced.displayName = 'SchroedingerAdvanced';
+SchroedingerAdvanced.displayName = 'SchroedingerAdvanced'

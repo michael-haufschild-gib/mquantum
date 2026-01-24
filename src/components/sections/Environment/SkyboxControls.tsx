@@ -33,19 +33,90 @@ interface SkyboxOption {
 
 const ALL_SKYBOX_OPTIONS: SkyboxOption[] = [
   // No skybox
-  { id: 'none', name: 'None', thumbnail: null, gradientClass: 'bg-black', description: 'No skybox', type: 'none' },
+  {
+    id: 'none',
+    name: 'None',
+    thumbnail: null,
+    gradientClass: 'bg-black',
+    description: 'No skybox',
+    type: 'none',
+  },
   // Classic textures
-  { id: 'space_blue', name: 'Deep Space', thumbnail: spaceBlueThumb, gradientClass: null, description: 'Cold, deep space environment', type: 'classic' },
-  { id: 'space_lightblue', name: 'Nebula', thumbnail: spaceLightBlueThumb, gradientClass: null, description: 'Bright nebula with stars', type: 'classic' },
-  { id: 'space_red', name: 'Red Giant', thumbnail: spaceRedThumb, gradientClass: null, description: 'Warm, intense red space', type: 'classic' },
+  {
+    id: 'space_blue',
+    name: 'Deep Space',
+    thumbnail: spaceBlueThumb,
+    gradientClass: null,
+    description: 'Cold, deep space environment',
+    type: 'classic',
+  },
+  {
+    id: 'space_lightblue',
+    name: 'Nebula',
+    thumbnail: spaceLightBlueThumb,
+    gradientClass: null,
+    description: 'Bright nebula with stars',
+    type: 'classic',
+  },
+  {
+    id: 'space_red',
+    name: 'Red Giant',
+    thumbnail: spaceRedThumb,
+    gradientClass: null,
+    description: 'Warm, intense red space',
+    type: 'classic',
+  },
   // Original procedural
-  { id: 'procedural_aurora', name: 'Aurora', thumbnail: null, gradientClass: 'bg-gradient-to-b from-cyan-400 via-emerald-600 to-slate-900', description: 'Northern lights effect', type: 'procedural' },
-  { id: 'procedural_nebula', name: 'Cosmic Nebula', thumbnail: null, gradientClass: 'bg-gradient-to-br from-purple-500 via-fuchsia-600 to-slate-900', description: 'Volumetric clouds', type: 'procedural' },
+  {
+    id: 'procedural_aurora',
+    name: 'Aurora',
+    thumbnail: null,
+    gradientClass: 'bg-gradient-to-b from-cyan-400 via-emerald-600 to-slate-900',
+    description: 'Northern lights effect',
+    type: 'procedural',
+  },
+  {
+    id: 'procedural_nebula',
+    name: 'Cosmic Nebula',
+    thumbnail: null,
+    gradientClass: 'bg-gradient-to-br from-purple-500 via-fuchsia-600 to-slate-900',
+    description: 'Volumetric clouds',
+    type: 'procedural',
+  },
   // Premium procedural skyboxes
-  { id: 'procedural_crystalline', name: 'Crystalline', thumbnail: null, gradientClass: 'bg-[conic-gradient(from_45deg,_#0ea5e9_0%,_#8b5cf6_25%,_#ec4899_50%,_#0ea5e9_75%,_#8b5cf6_100%)]', description: 'Geometric Voronoi patterns with iridescence', type: 'procedural' },
-  { id: 'procedural_horizon', name: 'Horizon', thumbnail: null, gradientClass: 'bg-gradient-to-b from-slate-900 via-slate-700 to-slate-400', description: 'Cinematic studio gradient', type: 'procedural' },
-  { id: 'procedural_ocean', name: 'Deep Ocean', thumbnail: null, gradientClass: 'bg-gradient-to-b from-cyan-300 via-blue-600 to-slate-900', description: 'Underwater atmosphere with caustics', type: 'procedural' },
-  { id: 'procedural_twilight', name: 'Twilight', thumbnail: null, gradientClass: 'bg-gradient-to-b from-amber-400 via-rose-500 to-indigo-900', description: 'Sunset gradient with atmosphere', type: 'procedural' },
+  {
+    id: 'procedural_crystalline',
+    name: 'Crystalline',
+    thumbnail: null,
+    gradientClass:
+      'bg-[conic-gradient(from_45deg,_#0ea5e9_0%,_#8b5cf6_25%,_#ec4899_50%,_#0ea5e9_75%,_#8b5cf6_100%)]',
+    description: 'Geometric Voronoi patterns with iridescence',
+    type: 'procedural',
+  },
+  {
+    id: 'procedural_horizon',
+    name: 'Horizon',
+    thumbnail: null,
+    gradientClass: 'bg-gradient-to-b from-slate-900 via-slate-700 to-slate-400',
+    description: 'Cinematic studio gradient',
+    type: 'procedural',
+  },
+  {
+    id: 'procedural_ocean',
+    name: 'Deep Ocean',
+    thumbnail: null,
+    gradientClass: 'bg-gradient-to-b from-cyan-300 via-blue-600 to-slate-900',
+    description: 'Underwater atmosphere with caustics',
+    type: 'procedural',
+  },
+  {
+    id: 'procedural_twilight',
+    name: 'Twilight',
+    thumbnail: null,
+    gradientClass: 'bg-gradient-to-b from-amber-400 via-rose-500 to-indigo-900',
+    description: 'Sunset gradient with atmosphere',
+    type: 'procedural',
+  },
 ]
 
 export const SkyboxControls: React.FC = React.memo(() => {
@@ -62,7 +133,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
     setSkyboxAnimationSpeed: state.setSkyboxAnimationSpeed,
     setSkyboxHighQuality: state.setSkyboxHighQuality,
     setProceduralSettings: state.setProceduralSettings,
-  }));
+  }))
   const {
     skyboxSelection,
     skyboxIntensity,
@@ -76,12 +147,12 @@ export const SkyboxControls: React.FC = React.memo(() => {
     setSkyboxAnimationSpeed,
     setSkyboxHighQuality,
     setProceduralSettings,
-  } = useEnvironmentStore(environmentSelector);
+  } = useEnvironmentStore(environmentSelector)
 
   const selectedOption = useMemo(
     () => ALL_SKYBOX_OPTIONS.find((opt) => opt.id === skyboxSelection),
     [skyboxSelection]
-  );
+  )
   const isClassicMode = selectedOption?.type === 'classic'
   const isProceduralMode = selectedOption?.type === 'procedural'
   const isAuroraMode = skyboxSelection === 'procedural_aurora'
@@ -93,9 +164,12 @@ export const SkyboxControls: React.FC = React.memo(() => {
   // Aurora, crystalline, and twilight don't use complexity
   const hideComplexity = isAuroraMode || isCrystallineMode || isTwilightMode
 
-  const handleSkyboxSelect = useCallback((id: SkyboxSelection) => {
-    setSkyboxSelection(id);
-  }, [setSkyboxSelection]);
+  const handleSkyboxSelect = useCallback(
+    (id: SkyboxSelection) => {
+      setSkyboxSelection(id)
+    },
+    [setSkyboxSelection]
+  )
 
   return (
     <div className="space-y-6">
@@ -198,6 +272,6 @@ export const SkyboxControls: React.FC = React.memo(() => {
       )}
     </div>
   )
-});
+})
 
-SkyboxControls.displayName = 'SkyboxControls';
+SkyboxControls.displayName = 'SkyboxControls'

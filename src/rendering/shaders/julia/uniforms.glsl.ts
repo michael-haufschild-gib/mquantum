@@ -29,4 +29,4 @@ uniform float uLodDetail;         // Detail multiplier (epsilon scalar)
 // SDF Render Quality (user-configurable)
 uniform float uSdfMaxIterations;     // Max iterations for fractal calculation (10-200, default 30)
 uniform float uSdfSurfaceDistance;   // Surface hit threshold for raymarching (0.0005-0.01, default 0.002)
-`;
+`

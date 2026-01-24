@@ -1,16 +1,16 @@
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
-import { createAppearanceSlice, AppearanceSlice } from './slices/appearanceSlice';
+import { create } from 'zustand'
+import { subscribeWithSelector } from 'zustand/middleware'
+import { createAppearanceSlice, AppearanceSlice } from './slices/appearanceSlice'
 
 // Extended type with version tracking for dirty-flag optimization
 export interface AppearanceStoreState extends AppearanceSlice {
   /** Version counter for dirty-flag tracking (incremented on any appearance change) */
-  appearanceVersion: number;
+  appearanceVersion: number
   /** Manually bump version counter (used after direct setState calls) */
-  bumpVersion: () => void;
+  bumpVersion: () => void
 }
 
-export type { AppearanceSlice };
+export type { AppearanceSlice }
 
 /**
  * Appearance store with automatic version tracking.
@@ -26,21 +26,21 @@ export const useAppearanceStore = create<AppearanceStoreState>()(
      */
     const wrappedSet: typeof set = (updater) => {
       set((state) => {
-        const update = typeof updater === 'function' ? updater(state) : updater;
+        const update = typeof updater === 'function' ? updater(state) : updater
         // Always bump version on any update (appearance changes are user-initiated)
-        return { ...update, appearanceVersion: state.appearanceVersion + 1 };
-      });
-    };
+        return { ...update, appearanceVersion: state.appearanceVersion + 1 }
+      })
+    }
 
     // Re-create the slice with the wrapped setter
-    const wrappedSlice = createAppearanceSlice(wrappedSet, get, api);
+    const wrappedSlice = createAppearanceSlice(wrappedSet, get, api)
 
     return {
       ...wrappedSlice,
       appearanceVersion: 0,
       bumpVersion: () => {
-        set((state) => ({ appearanceVersion: state.appearanceVersion + 1 }));
+        set((state) => ({ appearanceVersion: state.appearanceVersion + 1 }))
       },
-    };
+    }
   })
-);
+)

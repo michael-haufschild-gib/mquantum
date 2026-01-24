@@ -32,13 +32,13 @@
  * @module components/canvas/DebugLayerGroup
  */
 
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
-import * as THREE from 'three';
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
+import * as THREE from 'three'
 
-import { RENDER_LAYERS } from '@/rendering/core/layers';
+import { RENDER_LAYERS } from '@/rendering/core/layers'
 
 interface DebugLayerGroupProps {
-  children: ReactNode;
+  children: ReactNode
 }
 
 /**
@@ -54,19 +54,19 @@ interface DebugLayerGroupProps {
  * @returns React element wrapping children in a debug layer group
  */
 export function DebugLayerGroup({ children }: DebugLayerGroupProps) {
-  const groupRef = useRef<THREE.Group>(null);
+  const groupRef = useRef<THREE.Group>(null)
 
   // Use useLayoutEffect to set layer BEFORE first paint
   // No dependency array = runs every render to catch dynamic children
   useLayoutEffect(() => {
     if (groupRef.current) {
       groupRef.current.traverse((obj) => {
-        obj.layers.set(RENDER_LAYERS.DEBUG);
-      });
+        obj.layers.set(RENDER_LAYERS.DEBUG)
+      })
     }
-  });
+  })
 
-  return <group ref={groupRef}>{children}</group>;
+  return <group ref={groupRef}>{children}</group>
 }
 
-export default DebugLayerGroup;
+export default DebugLayerGroup

@@ -48,4 +48,4 @@ vec3 lchColor(float t, float lightness, float chroma) {
   vec3 rgb = oklabToLinearSrgb(oklab);
   return clamp(rgb, 0.0, 1.0);
 }
-`;
+`

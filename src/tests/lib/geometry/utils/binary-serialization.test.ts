@@ -22,7 +22,9 @@ function createTestGeometry(
 ): PolytopeGeometry {
   const vertices: number[][] = []
   for (let i = 0; i < vertexCount; i++) {
-    const vertex = Array(dimension).fill(0).map((_, d) => i + d * 0.1)
+    const vertex = Array(dimension)
+      .fill(0)
+      .map((_, d) => i + d * 0.1)
     vertices.push(vertex)
   }
 
@@ -61,7 +63,10 @@ describe('serializeToBinary', () => {
     const geometry: PolytopeGeometry = {
       type: 'wythoff-polytope',
       dimension: 3,
-      vertices: [[1.5, 2.5, 3.5], [4.5, 5.5, 6.5]],
+      vertices: [
+        [1.5, 2.5, 3.5],
+        [4.5, 5.5, 6.5],
+      ],
       edges: [[0, 1]],
     }
 
@@ -82,8 +87,16 @@ describe('serializeToBinary', () => {
     const geometry: PolytopeGeometry = {
       type: 'wythoff-polytope',
       dimension: 3,
-      vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
-      edges: [[0, 1], [1, 2], [2, 0]],
+      vertices: [
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+      ],
+      edges: [
+        [0, 1],
+        [1, 2],
+        [2, 0],
+      ],
     }
 
     const binary = serializeToBinary(geometry)
@@ -152,8 +165,15 @@ describe('deserializeFromBinary', () => {
     const original: PolytopeGeometry = {
       type: 'wythoff-polytope',
       dimension: 3,
-      vertices: [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
-      edges: [[0, 1], [1, 2]],
+      vertices: [
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9],
+      ],
+      edges: [
+        [0, 1],
+        [1, 2],
+      ],
       metadata: { name: 'Test', properties: { foo: 'bar' } },
     }
 
@@ -162,8 +182,15 @@ describe('deserializeFromBinary', () => {
 
     expect(restored.type).toBe('wythoff-polytope')
     expect(restored.dimension).toBe(3)
-    expect(restored.vertices).toEqual([[1, 2, 3], [4, 5, 6], [7, 8, 9]])
-    expect(restored.edges).toEqual([[0, 1], [1, 2]])
+    expect(restored.vertices).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
+      [7, 8, 9],
+    ])
+    expect(restored.edges).toEqual([
+      [0, 1],
+      [1, 2],
+    ])
     expect(restored.metadata?.name).toBe('Test')
     expect(restored.metadata?.properties?.foo).toBe('bar')
   })
@@ -246,105 +273,123 @@ describe('isBinaryFormat', () => {
   it('should return false for missing fields', () => {
     expect(isBinaryFormat({})).toBe(false)
     expect(isBinaryFormat({ version: 1 })).toBe(false)
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 3,
-      // missing other fields
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 3,
+        // missing other fields
+      })
+    ).toBe(false)
   })
 
   it('should return false for wrong types', () => {
-    expect(isBinaryFormat({
-      version: '1',
-      dimension: 3,
-      vertexCount: 0,
-      edgeCount: 0,
-      vertices: new ArrayBuffer(0),
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: '1',
+        dimension: 3,
+        vertexCount: 0,
+        edgeCount: 0,
+        vertices: new ArrayBuffer(0),
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
 
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 3,
-      vertexCount: 0,
-      edgeCount: 0,
-      vertices: [], // Wrong type
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 3,
+        vertexCount: 0,
+        edgeCount: 0,
+        vertices: [], // Wrong type
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
   })
 
   it('should return false for unsupported version', () => {
-    expect(isBinaryFormat({
-      version: 2, // Unsupported
-      dimension: 3,
-      vertexCount: 0,
-      edgeCount: 0,
-      vertices: new ArrayBuffer(0),
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 2, // Unsupported
+        dimension: 3,
+        vertexCount: 0,
+        edgeCount: 0,
+        vertices: new ArrayBuffer(0),
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
   })
 
   it('should return false for invalid dimension range', () => {
     // Dimension < 3
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 2,
-      vertexCount: 0,
-      edgeCount: 0,
-      vertices: new ArrayBuffer(0),
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 2,
+        vertexCount: 0,
+        edgeCount: 0,
+        vertices: new ArrayBuffer(0),
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
 
     // Dimension > 11
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 12,
-      vertexCount: 0,
-      edgeCount: 0,
-      vertices: new ArrayBuffer(0),
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 12,
+        vertexCount: 0,
+        edgeCount: 0,
+        vertices: new ArrayBuffer(0),
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
   })
 
   it('should return false for negative counts', () => {
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 3,
-      vertexCount: -1,
-      edgeCount: 0,
-      vertices: new ArrayBuffer(0),
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 3,
+        vertexCount: -1,
+        edgeCount: 0,
+        vertices: new ArrayBuffer(0),
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
   })
 
   it('should return false for buffer size mismatch', () => {
     // Wrong vertex buffer size
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 3,
-      vertexCount: 10,
-      edgeCount: 0,
-      vertices: new ArrayBuffer(100), // Should be 10 * 3 * 8 = 240
-      edges: new ArrayBuffer(0),
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 3,
+        vertexCount: 10,
+        edgeCount: 0,
+        vertices: new ArrayBuffer(100), // Should be 10 * 3 * 8 = 240
+        edges: new ArrayBuffer(0),
+        metadata: '{}',
+      })
+    ).toBe(false)
 
     // Wrong edge buffer size
-    expect(isBinaryFormat({
-      version: 1,
-      dimension: 3,
-      vertexCount: 0,
-      edgeCount: 5,
-      vertices: new ArrayBuffer(0),
-      edges: new ArrayBuffer(20), // Should be 5 * 2 * 4 = 40
-      metadata: '{}',
-    })).toBe(false)
+    expect(
+      isBinaryFormat({
+        version: 1,
+        dimension: 3,
+        vertexCount: 0,
+        edgeCount: 5,
+        vertices: new ArrayBuffer(0),
+        edges: new ArrayBuffer(20), // Should be 5 * 2 * 4 = 40
+        metadata: '{}',
+      })
+    ).toBe(false)
   })
 })
 

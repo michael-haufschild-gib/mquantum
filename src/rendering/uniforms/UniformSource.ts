@@ -8,13 +8,13 @@
  * @module rendering/uniforms/UniformSource
  */
 
-import type * as THREE from 'three';
+import type * as THREE from 'three'
 
 /**
  * A single uniform value with type information.
  */
 export interface IUniform<T = unknown> {
-  value: T;
+  value: T
 }
 
 /**
@@ -22,17 +22,17 @@ export interface IUniform<T = unknown> {
  */
 export interface UniformUpdateState {
   /** Current frame time in seconds */
-  time: number;
+  time: number
   /** Delta time since last frame */
-  delta: number;
+  delta: number
   /** Current camera */
-  camera: THREE.Camera;
+  camera: THREE.Camera
   /** Current scene */
-  scene: THREE.Scene;
+  scene: THREE.Scene
   /** WebGL renderer */
-  gl: THREE.WebGLRenderer;
+  gl: THREE.WebGLRenderer
   /** Viewport size */
-  size: { width: number; height: number };
+  size: { width: number; height: number }
 }
 
 /**
@@ -71,13 +71,13 @@ export interface UniformSource {
    * Unique identifier for this source.
    * Used to register and reference the source in the manager.
    */
-  readonly id: string;
+  readonly id: string
 
   /**
    * Version number that increments whenever uniforms change.
    * Consumers can compare versions to skip redundant updates.
    */
-  readonly version: number;
+  readonly version: number
 
   /**
    * Get the current uniform values.
@@ -85,7 +85,7 @@ export interface UniformSource {
    *
    * @returns Record of uniform names to uniform objects
    */
-  getUniforms(): Record<string, IUniform>;
+  getUniforms(): Record<string, IUniform>
 
   /**
    * Update internal state based on the current frame state.
@@ -93,7 +93,7 @@ export interface UniformSource {
    *
    * @param state - Current frame state
    */
-  update(state: UniformUpdateState): void;
+  update(state: UniformUpdateState): void
 
   /**
    * Apply uniforms to a material.
@@ -101,7 +101,7 @@ export interface UniformSource {
    *
    * @param material - The shader material to update
    */
-  applyToMaterial(material: THREE.ShaderMaterial): void;
+  applyToMaterial(material: THREE.ShaderMaterial): void
 }
 
 /**
@@ -111,12 +111,12 @@ export interface UniformSource {
  * Subclasses should implement getUniforms() and update().
  */
 export abstract class BaseUniformSource implements UniformSource {
-  abstract readonly id: string;
+  abstract readonly id: string
 
-  protected _version = 0;
+  protected _version = 0
 
   get version(): number {
-    return this._version;
+    return this._version
   }
 
   /**
@@ -124,12 +124,12 @@ export abstract class BaseUniformSource implements UniformSource {
    * Call this when any uniform value changes.
    */
   protected incrementVersion(): void {
-    this._version++;
+    this._version++
   }
 
-  abstract getUniforms(): Record<string, IUniform>;
+  abstract getUniforms(): Record<string, IUniform>
 
-  abstract update(state: UniformUpdateState): void;
+  abstract update(state: UniformUpdateState): void
 
   /**
    * Apply uniforms to a material.
@@ -137,24 +137,24 @@ export abstract class BaseUniformSource implements UniformSource {
    * @param material
    */
   applyToMaterial(material: THREE.ShaderMaterial): void {
-    const uniforms = this.getUniforms();
-    const materialUniforms = material.uniforms;
+    const uniforms = this.getUniforms()
+    const materialUniforms = material.uniforms
 
     for (const [name, uniform] of Object.entries(uniforms)) {
       if (materialUniforms[name]) {
         // Handle different value types appropriately
-        const targetValue = materialUniforms[name].value;
-        const sourceValue = uniform.value;
+        const targetValue = materialUniforms[name].value
+        const sourceValue = uniform.value
 
         if (targetValue && typeof targetValue === 'object' && 'copy' in targetValue) {
           // Value has a copy method (Vector3, Matrix4, Color, etc.)
-          (targetValue as { copy: (v: unknown) => void }).copy(sourceValue);
+          ;(targetValue as { copy: (v: unknown) => void }).copy(sourceValue)
         } else if (targetValue instanceof Float32Array && sourceValue instanceof Float32Array) {
           // Float32Array - use set method
-          targetValue.set(sourceValue);
+          targetValue.set(sourceValue)
         } else {
           // Primitive or other value - direct assignment
-          materialUniforms[name].value = sourceValue;
+          materialUniforms[name].value = sourceValue
         }
       }
     }

@@ -33,4 +33,4 @@ float fbm(vec3 x, int octaves) {
     }
     return v;
 }
-`;
+`

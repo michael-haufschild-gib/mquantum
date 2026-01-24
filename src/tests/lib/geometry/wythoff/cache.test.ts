@@ -25,7 +25,7 @@ function createTestGeometry(dimension: number = 4): PolytopeGeometry {
   for (let i = 0; i < 8; i++) {
     const vertex = Array(dimension)
       .fill(0)
-      .map((_, d) => (i >> d) & 1 ? 1 : -1)
+      .map((_, d) => ((i >> d) & 1 ? 1 : -1))
     vertices.push(vertex)
   }
 

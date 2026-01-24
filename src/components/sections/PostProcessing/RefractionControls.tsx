@@ -13,76 +13,75 @@
  * @see {@link usePostProcessingStore} for state management
  */
 
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { Slider } from '@/components/ui/Slider';
-import {
-} from '@/stores/defaults/visualDefaults';
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { Slider } from '@/components/ui/Slider'
+import {} from '@/stores/defaults/visualDefaults'
+import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 
 export interface RefractionControlsProps {
-  className?: string;
+  className?: string
 }
 
 /**
  * RefractionControls component that provides UI for adjusting screen-space refraction settings.
  */
-export const RefractionControls: React.FC<RefractionControlsProps> = React.memo(({
-  className = '',
-}) => {
-  const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
-    // State
-    refractionIOR: state.refractionIOR,
-    refractionStrength: state.refractionStrength,
-    refractionChromaticAberration: state.refractionChromaticAberration,
-    // Actions
-    setRefractionIOR: state.setRefractionIOR,
-    setRefractionStrength: state.setRefractionStrength,
-    setRefractionChromaticAberration: state.setRefractionChromaticAberration,
-  }));
-  const {
-    refractionIOR,
-    refractionStrength,
-    refractionChromaticAberration,
-    setRefractionIOR,
-    setRefractionStrength,
-    setRefractionChromaticAberration,
-  } = usePostProcessingStore(postProcessingSelector);
+export const RefractionControls: React.FC<RefractionControlsProps> = React.memo(
+  ({ className = '' }) => {
+    const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
+      // State
+      refractionIOR: state.refractionIOR,
+      refractionStrength: state.refractionStrength,
+      refractionChromaticAberration: state.refractionChromaticAberration,
+      // Actions
+      setRefractionIOR: state.setRefractionIOR,
+      setRefractionStrength: state.setRefractionStrength,
+      setRefractionChromaticAberration: state.setRefractionChromaticAberration,
+    }))
+    const {
+      refractionIOR,
+      refractionStrength,
+      refractionChromaticAberration,
+      setRefractionIOR,
+      setRefractionStrength,
+      setRefractionChromaticAberration,
+    } = usePostProcessingStore(postProcessingSelector)
 
-  return (
-    <div className={`space-y-4 ${className}`}>
-          {/* Index of Refraction */}
-          <Slider
-            label="IOR (Index of Refraction)"
-            min={1.0}
-            max={2.5}
-            step={0.05}
-            value={refractionIOR}
-            onChange={setRefractionIOR}
-            showValue
-          />
+    return (
+      <div className={`space-y-4 ${className}`}>
+        {/* Index of Refraction */}
+        <Slider
+          label="IOR (Index of Refraction)"
+          min={1.0}
+          max={2.5}
+          step={0.05}
+          value={refractionIOR}
+          onChange={setRefractionIOR}
+          showValue
+        />
 
-          {/* Strength */}
-          <Slider
-            label="Strength"
-            min={0}
-            max={1}
-            step={0.05}
-            value={refractionStrength}
-            onChange={setRefractionStrength}
-            showValue
-          />
+        {/* Strength */}
+        <Slider
+          label="Strength"
+          min={0}
+          max={1}
+          step={0.05}
+          value={refractionStrength}
+          onChange={setRefractionStrength}
+          showValue
+        />
 
-          {/* Chromatic Aberration */}
-          <Slider
-            label="Chromatic Aberration"
-            min={0}
-            max={1}
-            step={0.01}
-            value={refractionChromaticAberration}
-            onChange={setRefractionChromaticAberration}
-            showValue
-          />
-    </div>
-  );
-});
+        {/* Chromatic Aberration */}
+        <Slider
+          label="Chromatic Aberration"
+          min={0}
+          max={1}
+          step={0.01}
+          value={refractionChromaticAberration}
+          onChange={setRefractionChromaticAberration}
+          showValue
+        />
+      </div>
+    )
+  }
+)

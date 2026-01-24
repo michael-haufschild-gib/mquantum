@@ -168,16 +168,34 @@ export function getHOUnrolledBlocks(termCount: number): {
 } {
   const tc = Math.min(Math.max(termCount, 1), 8)
   const superpositionBlocks: string[] = [
-    hoSuperposition1Block, hoSuperposition2Block, hoSuperposition3Block, hoSuperposition4Block,
-    hoSuperposition5Block, hoSuperposition6Block, hoSuperposition7Block, hoSuperposition8Block,
+    hoSuperposition1Block,
+    hoSuperposition2Block,
+    hoSuperposition3Block,
+    hoSuperposition4Block,
+    hoSuperposition5Block,
+    hoSuperposition6Block,
+    hoSuperposition7Block,
+    hoSuperposition8Block,
   ]
   const spatialBlocks: string[] = [
-    hoSpatial1Block, hoSpatial2Block, hoSpatial3Block, hoSpatial4Block,
-    hoSpatial5Block, hoSpatial6Block, hoSpatial7Block, hoSpatial8Block,
+    hoSpatial1Block,
+    hoSpatial2Block,
+    hoSpatial3Block,
+    hoSpatial4Block,
+    hoSpatial5Block,
+    hoSpatial6Block,
+    hoSpatial7Block,
+    hoSpatial8Block,
   ]
   const combinedBlocks: string[] = [
-    hoCombined1Block, hoCombined2Block, hoCombined3Block, hoCombined4Block,
-    hoCombined5Block, hoCombined6Block, hoCombined7Block, hoCombined8Block,
+    hoCombined1Block,
+    hoCombined2Block,
+    hoCombined3Block,
+    hoCombined4Block,
+    hoCombined5Block,
+    hoCombined6Block,
+    hoCombined7Block,
+    hoCombined8Block,
   ]
   // tc is guaranteed to be 1-8, so index tc-1 is always valid (0-7)
   return {

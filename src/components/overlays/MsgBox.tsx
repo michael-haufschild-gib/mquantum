@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useMsgBoxStore } from '@/stores/msgBoxStore';
-import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore';
-import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-import { Icon, type IconName } from '@/components/ui/Icon';
+import React, { useState, useEffect } from 'react'
+import { useMsgBoxStore } from '@/stores/msgBoxStore'
+import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
+import { Icon, type IconName } from '@/components/ui/Icon'
 
 export const MsgBox: React.FC = () => {
   const { isOpen, title, message, type, actions, dismissible, dismissId, closeMsgBox } =
-    useMsgBoxStore();
-  const dismiss = useDismissedDialogsStore((state) => state.dismiss);
+    useMsgBoxStore()
+  const dismiss = useDismissedDialogsStore((state) => state.dismiss)
 
   // Local state for the "don't show again" checkbox
-  const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false)
 
   // Reset checkbox state when dialog opens/closes
   useEffect(() => {
     if (!isOpen) {
-      setDontShowAgain(false);
+      setDontShowAgain(false)
     }
-  }, [isOpen]);
+  }, [isOpen])
 
   /**
    * Handles action button click.
@@ -26,45 +26,55 @@ export const MsgBox: React.FC = () => {
    */
   const handleAction = (action: { onClick: () => void }) => {
     if (dontShowAgain && dismissId) {
-      dismiss(dismissId);
+      dismiss(dismissId)
     }
-    action.onClick();
-  };
+    action.onClick()
+  }
 
   const getIcon = (): IconName => {
     switch (type) {
-      case 'error': return 'warning'; // We use 'warning' icon for error as it's the triangle exclamation
-      case 'warning': return 'warning';
-      case 'success': return 'check';
-      case 'info': default: return 'info';
+      case 'error':
+        return 'warning' // We use 'warning' icon for error as it's the triangle exclamation
+      case 'warning':
+        return 'warning'
+      case 'success':
+        return 'check'
+      case 'info':
+      default:
+        return 'info'
     }
-  };
+  }
 
   const getColorClass = () => {
     switch (type) {
-      case 'error': return 'text-danger';
-      case 'warning': return 'text-warning';
-      case 'success': return 'text-success';
-      case 'info': default: return 'text-accent';
+      case 'error':
+        return 'text-danger'
+      case 'warning':
+        return 'text-warning'
+      case 'success':
+        return 'text-success'
+      case 'info':
+      default:
+        return 'text-accent'
     }
-  };
+  }
 
   const getBgClass = () => {
     switch (type) {
-      case 'error': return 'bg-danger-bg border-danger-border';
-      case 'warning': return 'bg-warning-bg border-warning-border';
-      case 'success': return 'bg-success-bg border-success-border';
-      case 'info': default: return 'bg-accent-subtle border-accent-muted';
+      case 'error':
+        return 'bg-danger-bg border-danger-border'
+      case 'warning':
+        return 'bg-warning-bg border-warning-border'
+      case 'success':
+        return 'bg-success-bg border-success-border'
+      case 'info':
+      default:
+        return 'bg-accent-subtle border-accent-muted'
     }
-  };
+  }
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={closeMsgBox}
-      title={title}
-      width="max-w-md"
-    >
+    <Modal isOpen={isOpen} onClose={closeMsgBox} title={title} width="max-w-md">
       <div className="space-y-6">
         <div className={`flex items-start gap-4 p-4 rounded-xl border ${getBgClass()}`}>
           <div className={`shrink-0 p-2 rounded-full bg-[var(--bg-hover)] ${getColorClass()}`}>
@@ -115,5 +125,5 @@ export const MsgBox: React.FC = () => {
         </div>
       </div>
     </Modal>
-  );
-};
+  )
+}

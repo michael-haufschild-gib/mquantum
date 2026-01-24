@@ -82,10 +82,7 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
       !Array.isArray(defaultVal)
     ) {
       // Recursively merge nested objects (e.g., cosineParams, customPalette)
-      ;(result as Record<string, unknown>)[key] = deepMerge(
-        defaultVal as object,
-        loadedVal
-      )
+      ;(result as Record<string, unknown>)[key] = deepMerge(defaultVal as object, loadedVal)
     } else {
       // Primitives: loaded value overrides default
       ;(result as Record<string, unknown>)[key] = loadedVal
@@ -104,9 +101,7 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
  * @param loaded - The loaded extended object state from a saved scene
  * @returns Merged state with all defaults filled in
  */
-export function mergeExtendedObjectState(
-  loaded: Record<string, unknown>
-): Record<string, unknown> {
+export function mergeExtendedObjectState(loaded: Record<string, unknown>): Record<string, unknown> {
   return {
     ...loaded,
     // Merge each config object with its defaults

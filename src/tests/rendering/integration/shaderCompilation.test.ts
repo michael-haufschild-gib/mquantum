@@ -36,8 +36,12 @@ function verifyGlsl3(fragmentShader: string): void {
 
   // Must not contain legacy WebGL1 keywords (check actual declarations, not comments)
   expect(fragmentShader).not.toContain('gl_FragColor')
-  expect(fragmentShader).not.toMatch(/\bvarying\s+(highp\s+|mediump\s+|lowp\s+)?(vec|mat|float|int)/)
-  expect(fragmentShader).not.toMatch(/\battribute\s+(highp\s+|mediump\s+|lowp\s+)?(vec|mat|float|int)/)
+  expect(fragmentShader).not.toMatch(
+    /\bvarying\s+(highp\s+|mediump\s+|lowp\s+)?(vec|mat|float|int)/
+  )
+  expect(fragmentShader).not.toMatch(
+    /\battribute\s+(highp\s+|mediump\s+|lowp\s+)?(vec|mat|float|int)/
+  )
 
   // texture2D is forbidden in GLSL3
   expect(fragmentShader).not.toMatch(/\btexture2D\s*\(/)

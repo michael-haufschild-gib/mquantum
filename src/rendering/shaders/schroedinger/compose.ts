@@ -139,9 +139,10 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
 
   // Determine which color modules to include based on colorAlgorithm
   // If colorAlgorithm is specified, only include required dependencies
-  const colorDeps = colorAlgorithm !== undefined
-    ? getColorModuleDependencies(colorAlgorithm)
-    : { hsl: true, cosine: true, oklab: true } // Include all for runtime switching
+  const colorDeps =
+    colorAlgorithm !== undefined
+      ? getColorModuleDependencies(colorAlgorithm)
+      : { hsl: true, cosine: true, oklab: true } // Include all for runtime switching
 
   // Determine which lighting modules to include based on lightingMode
   const includeLightingGGX = lightingMode === 'pbr' || lightingMode === 'full'
@@ -149,9 +150,8 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
   const includeLightingIBL = lightingMode === 'full'
 
   // Determine if we should use unrolled HO superposition
-  const useUnrolledHO = termCount !== undefined && (
-    quantumMode === 'harmonicOscillator' || quantumMode === undefined
-  )
+  const useUnrolledHO =
+    termCount !== undefined && (quantumMode === 'harmonicOscillator' || quantumMode === undefined)
 
   const defines: string[] = []
   const features: string[] = []
@@ -380,24 +380,26 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
 
     // HO Superposition - unrolled variants when termCount is known at compile time
     // This eliminates runtime loop with dynamic break condition
-    ...(useUnrolledHO && termCount ? [
-      {
-        name: `HO Superposition (${termCount} term${termCount > 1 ? 's' : ''})`,
-        content: getHOUnrolledBlocks(termCount).superposition,
-      },
-      {
-        name: `HO Spatial (${termCount} term${termCount > 1 ? 's' : ''})`,
-        content: getHOUnrolledBlocks(termCount).spatial,
-      },
-      {
-        name: `HO Combined (${termCount} term${termCount > 1 ? 's' : ''})`,
-        content: getHOUnrolledBlocks(termCount).combined,
-      },
-      {
-        name: 'HO Dispatch (Unrolled)',
-        content: generateHODispatchBlock(termCount),
-      },
-    ] : []),
+    ...(useUnrolledHO && termCount
+      ? [
+          {
+            name: `HO Superposition (${termCount} term${termCount > 1 ? 's' : ''})`,
+            content: getHOUnrolledBlocks(termCount).superposition,
+          },
+          {
+            name: `HO Spatial (${termCount} term${termCount > 1 ? 's' : ''})`,
+            content: getHOUnrolledBlocks(termCount).spatial,
+          },
+          {
+            name: `HO Combined (${termCount} term${termCount > 1 ? 's' : ''})`,
+            content: getHOUnrolledBlocks(termCount).combined,
+          },
+          {
+            name: 'HO Dispatch (Unrolled)',
+            content: generateHODispatchBlock(termCount),
+          },
+        ]
+      : []),
 
     // Unified wavefunction evaluation (mode-switching)
     // Use dynamic version when HO is unrolled (evalHarmonicOscillatorPsi is provided by dispatch)
@@ -417,9 +419,8 @@ export function composeSchroedingerShader(config: SchroedingerShaderConfig) {
     // Use compile-time optimized selector when colorAlgorithm is known
     {
       name: 'Color Selector',
-      content: colorAlgorithm !== undefined
-        ? generateColorSelectorBlock(colorAlgorithm)
-        : selectorBlock,
+      content:
+        colorAlgorithm !== undefined ? generateColorSelectorBlock(colorAlgorithm) : selectorBlock,
     },
 
     // Lighting - conditionally include based on lightingMode

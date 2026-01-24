@@ -108,4 +108,4 @@ mat3 getBasisRotation() {
     // This transforms from world space to object space
     return mat3(bx, by, bz);
 }
-`;
+`

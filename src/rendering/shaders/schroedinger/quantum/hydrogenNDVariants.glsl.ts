@@ -31,10 +31,9 @@ const EXTRA_DIM_THRESHOLD = 18.0
  * Generate coordinate extraction for a given dimension.
  */
 function generateCoordExtraction(dimension: number): string {
-  const coords = Array.from(
-    { length: dimension },
-    (_, i) => `    float x${i} = xND[${i}];`
-  ).join('\n')
+  const coords = Array.from({ length: dimension }, (_, i) => `    float x${i} = xND[${i}];`).join(
+    '\n'
+  )
   return coords
 }
 
@@ -60,10 +59,9 @@ function generateExtraDimEarlyExit(dimension: number): string {
   ).join('\n')
 
   // Generate distSq sum for extra dimensions
-  const distSqTerms = Array.from(
-    { length: extraDimCount },
-    (_, i) => `u_ed${i}*u_ed${i}`
-  ).join(' + ')
+  const distSqTerms = Array.from({ length: extraDimCount }, (_, i) => `u_ed${i}*u_ed${i}`).join(
+    ' + '
+  )
 
   return `
     // EARLY EXIT 1: Check extra dimensions (unrolled, no loops)
@@ -92,10 +90,9 @@ function generateRadiusCalculation(dimension: number): string {
   }
 
   // For dimensions > 3, compute sum of extra dimension squares
-  const extraSqTerms = Array.from(
-    { length: dimension - 3 },
-    (_, i) => `x${i + 3}*x${i + 3}`
-  ).join(' + ')
+  const extraSqTerms = Array.from({ length: dimension - 3 }, (_, i) => `x${i + 3}*x${i + 3}`).join(
+    ' + '
+  )
 
   return `
     // PERF: Compute sum3D once, reuse for both rND and r3D
@@ -141,10 +138,7 @@ function generateExtraDimProduct(dimension: number): string {
   }).join('\n')
 
   // Generate product calculation
-  const productTerms = Array.from(
-    { length: extraDimCount },
-    (_, i) => `ef${i}`
-  ).join(' * ')
+  const productTerms = Array.from({ length: extraDimCount }, (_, i) => `ef${i}`).join(' * ')
 
   return `
     // Extra dimension factors (unrolled, inlined ho1D calls)
@@ -245,15 +239,25 @@ export const hydrogenNDGen11dBlock = generateHydrogenNDBlock(11)
 export function getHydrogenNDBlockForDimension(dimension: number): string {
   const dim = Math.min(Math.max(dimension, 3), 11)
   switch (dim) {
-    case 3: return hydrogenNDGen3dBlock
-    case 4: return hydrogenNDGen4dBlock
-    case 5: return hydrogenNDGen5dBlock
-    case 6: return hydrogenNDGen6dBlock
-    case 7: return hydrogenNDGen7dBlock
-    case 8: return hydrogenNDGen8dBlock
-    case 9: return hydrogenNDGen9dBlock
-    case 10: return hydrogenNDGen10dBlock
-    case 11: return hydrogenNDGen11dBlock
-    default: return hydrogenNDGen11dBlock
+    case 3:
+      return hydrogenNDGen3dBlock
+    case 4:
+      return hydrogenNDGen4dBlock
+    case 5:
+      return hydrogenNDGen5dBlock
+    case 6:
+      return hydrogenNDGen6dBlock
+    case 7:
+      return hydrogenNDGen7dBlock
+    case 8:
+      return hydrogenNDGen8dBlock
+    case 9:
+      return hydrogenNDGen9dBlock
+    case 10:
+      return hydrogenNDGen10dBlock
+    case 11:
+      return hydrogenNDGen11dBlock
+    default:
+      return hydrogenNDGen11dBlock
   }
 }

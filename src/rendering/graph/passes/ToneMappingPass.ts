@@ -19,23 +19,23 @@
  * @module rendering/graph/passes/ToneMappingPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Configuration for ToneMappingPass.
  */
 export interface ToneMappingPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Input HDR color resource */
-  colorInput: string;
+  colorInput: string
   /** Output LDR color resource */
-  outputResource: string;
+  outputResource: string
   /** Initial tone mapping mode (Three.js constant) */
-  toneMapping?: number;
+  toneMapping?: number
   /** Initial exposure value */
-  exposure?: number;
+  exposure?: number
 }
 
 /**
@@ -188,7 +188,7 @@ vec3 applyToneMapping(vec3 color, int mode, float exposure) {
   if (mode == 7) return NeutralToneMapping(color, exposure);
   return color;
 }
-`;
+`
 
 const FRAGMENT_SHADER = /* glsl */ `
 precision highp float;
@@ -208,7 +208,7 @@ void main() {
   color.rgb = applyToneMapping(color.rgb, uToneMapping, uExposure);
   fragColor = color;
 }
-`;
+`
 
 const VERTEX_SHADER = /* glsl */ `
 out vec2 vUv;
@@ -217,7 +217,7 @@ void main() {
   vUv = uv;
   gl_Position = vec4(position.xy, 0.0, 1.0);
 }
-`;
+`
 
 /**
  * Applies tone mapping to convert HDR to LDR.
@@ -237,13 +237,13 @@ void main() {
  * ```
  */
 export class ToneMappingPass extends BasePass {
-  private inputResourceId: string;
-  private outputResourceId: string;
+  private inputResourceId: string
+  private outputResourceId: string
 
-  private material: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
   constructor(config: ToneMappingPassConfig) {
     super({
@@ -253,10 +253,10 @@ export class ToneMappingPass extends BasePass {
       outputs: [{ resourceId: config.outputResource, access: 'write' }],
       enabled: config.enabled,
       priority: config.priority,
-    });
+    })
 
-    this.inputResourceId = config.colorInput;
-    this.outputResourceId = config.outputResource;
+    this.inputResourceId = config.colorInput
+    this.outputResourceId = config.outputResource
 
     this.material = new THREE.ShaderMaterial({
       glslVersion: THREE.GLSL3,
@@ -269,34 +269,34 @@ export class ToneMappingPass extends BasePass {
       },
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer } = ctx;
+    const { renderer } = ctx
 
-    const inputTexture = ctx.getReadTexture(this.inputResourceId);
+    const inputTexture = ctx.getReadTexture(this.inputResourceId)
     if (!inputTexture) {
-      console.warn(`ToneMappingPass: Input '${this.inputResourceId}' not found`);
-      return;
+      console.warn(`ToneMappingPass: Input '${this.inputResourceId}' not found`)
+      return
     }
 
-    const outputTarget = ctx.getWriteTarget(this.outputResourceId);
+    const outputTarget = ctx.getWriteTarget(this.outputResourceId)
 
-    this.material.uniforms['uInput']!.value = inputTexture;
+    this.material.uniforms['uInput']!.value = inputTexture
 
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.scene, this.camera);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(outputTarget)
+    renderer.render(this.scene, this.camera)
+    renderer.setRenderTarget(null)
   }
 
   /**
@@ -304,7 +304,7 @@ export class ToneMappingPass extends BasePass {
    * @param mode
    */
   setToneMapping(mode: number): void {
-    this.material.uniforms['uToneMapping']!.value = mode;
+    this.material.uniforms['uToneMapping']!.value = mode
   }
 
   /**
@@ -312,7 +312,7 @@ export class ToneMappingPass extends BasePass {
    * @param exposure
    */
   setExposure(exposure: number): void {
-    this.material.uniforms['uExposure']!.value = exposure;
+    this.material.uniforms['uExposure']!.value = exposure
   }
 
   /**
@@ -323,13 +323,13 @@ export class ToneMappingPass extends BasePass {
     return {
       toneMapping: this.material.uniforms['uToneMapping']!.value as number,
       exposure: this.material.uniforms['uExposure']!.value as number,
-    };
+    }
   }
 
   dispose(): void {
-    this.material.dispose();
-    this.mesh.geometry.dispose();
+    this.material.dispose()
+    this.mesh.geometry.dispose()
     // Remove mesh from scene to ensure proper cleanup
-    this.scene.remove(this.mesh);
+    this.scene.remove(this.mesh)
   }
 }

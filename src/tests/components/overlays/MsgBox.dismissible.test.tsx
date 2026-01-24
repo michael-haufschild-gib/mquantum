@@ -276,9 +276,7 @@ describe('MsgBox dismissible functionality', () => {
       await user.click(cancelButton)
 
       expect(onCancel).toHaveBeenCalledTimes(1)
-      expect(useDismissedDialogsStore.getState().isDismissed('multi-action-dialog')).toBe(
-        true
-      )
+      expect(useDismissedDialogsStore.getState().isDismissed('multi-action-dialog')).toBe(true)
     })
   })
 

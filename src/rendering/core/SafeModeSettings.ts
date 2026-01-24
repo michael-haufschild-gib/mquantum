@@ -122,8 +122,12 @@ export function restoreSettings(snapshot: SafeModeSnapshot): void {
   usePostProcessingStore.getState().setSSREnabled(snapshot.ssrEnabled)
   usePostProcessingStore.getState().setBokehEnabled(snapshot.bokehEnabled)
   useLightingStore.getState().setShadowEnabled(snapshot.shadowEnabled)
-  usePerformanceStore.getState().setTemporalReprojectionEnabled(snapshot.temporalReprojectionEnabled)
-  usePerformanceStore.getState().setProgressiveRefinementEnabled(snapshot.progressiveRefinementEnabled)
+  usePerformanceStore
+    .getState()
+    .setTemporalReprojectionEnabled(snapshot.temporalReprojectionEnabled)
+  usePerformanceStore
+    .getState()
+    .setProgressiveRefinementEnabled(snapshot.progressiveRefinementEnabled)
 
   clearSafeMode()
 }

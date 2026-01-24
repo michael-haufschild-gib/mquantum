@@ -3,10 +3,10 @@
  * Controls for progressive quality improvement after interaction stops
  */
 
-import { Switch } from '@/components/ui/Switch';
-import { usePerformanceStore } from '@/stores/performanceStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Switch } from '@/components/ui/Switch'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Get stage label for display.
@@ -16,15 +16,15 @@ import { useShallow } from 'zustand/react/shallow';
 function getStageLabel(stage: string): string {
   switch (stage) {
     case 'low':
-      return '25';
+      return '25'
     case 'medium':
-      return '50';
+      return '50'
     case 'high':
-      return '75';
+      return '75'
     case 'final':
-      return '100';
+      return '100'
     default:
-      return stage;
+      return stage
   }
 }
 
@@ -41,7 +41,7 @@ export const ProgressiveRefinementControls: React.FC = () => {
       stage: s.refinementStage,
       progress: s.refinementProgress,
     }))
-  );
+  )
 
   return (
     <div className="space-y-3">
@@ -64,20 +64,16 @@ export const ProgressiveRefinementControls: React.FC = () => {
 
           {/* Stage indicator */}
           <div className="flex justify-between items-center mt-2">
-            <span className="text-xs text-text-tertiary">
-              Quality: {getStageLabel(stage)}
-            </span>
+            <span className="text-xs text-text-tertiary">Quality: {getStageLabel(stage)}</span>
             <span className="text-xs text-text-tertiary">{Math.round(progress)}%</span>
           </div>
 
           {/* Stage dots */}
           <div className="flex justify-between mt-2">
             {['low', 'medium', 'high', 'final'].map((s, i) => {
-              const stageIndex = ['low', 'medium', 'high', 'final'].indexOf(
-                stage
-              );
-              const isActive = i <= stageIndex;
-              const isCurrent = s === stage;
+              const stageIndex = ['low', 'medium', 'high', 'final'].indexOf(stage)
+              const isActive = i <= stageIndex
+              const isCurrent = s === stage
 
               return (
                 <div
@@ -87,15 +83,13 @@ export const ProgressiveRefinementControls: React.FC = () => {
                   <div
                     className={`w-2 h-2 rounded-full ${isCurrent ? 'bg-accent shadow-[0_0_6px_var(--color-accent)]' : isActive ? 'bg-text-secondary' : 'bg-panel-bg'}`}
                   />
-                  <span className="text-[10px] mt-1">
-                    {getStageLabel(s)}
-                  </span>
+                  <span className="text-[10px] mt-1">{getStageLabel(s)}</span>
                 </div>
-              );
+              )
             })}
           </div>
         </div>
       )}
     </div>
-  );
-};
+  )
+}

@@ -26,7 +26,10 @@ import type { RenderContext, RenderPassConfig } from '../types'
 /**
  * Configuration for GravitationalLensingPass.
  */
-export interface GravitationalLensingPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
+export interface GravitationalLensingPassConfig extends Omit<
+  RenderPassConfig,
+  'inputs' | 'outputs'
+> {
   /** Input environment color texture resource ID */
   environmentInput: string
 
@@ -126,7 +129,9 @@ export class GravitationalLensingPass extends BasePass {
     // Get input texture
     const environmentTexture = ctx.getReadTexture(this.inputResourceId)
     if (!environmentTexture) {
-      console.warn(`GravitationalLensingPass: Environment texture '${this.inputResourceId}' not found`)
+      console.warn(
+        `GravitationalLensingPass: Environment texture '${this.inputResourceId}' not found`
+      )
       return
     }
 
@@ -166,10 +171,7 @@ export class GravitationalLensingPass extends BasePass {
     if (camera instanceof THREE.PerspectiveCamera) {
       const projected = this.worldOrigin.clone().project(camera)
       // Convert from NDC (-1 to 1) to UV (0 to 1)
-      this.gravityCenter.set(
-        (projected.x + 1) * 0.5,
-        (projected.y + 1) * 0.5
-      )
+      this.gravityCenter.set((projected.x + 1) * 0.5, (projected.y + 1) * 0.5)
 
       // Calculate apparent horizon radius for zoom scaling
       // For perspective camera: apparent size = actual size / distance * projection factor
@@ -182,10 +184,7 @@ export class GravitationalLensingPass extends BasePass {
       }
     } else if (camera instanceof THREE.OrthographicCamera) {
       const projected = this.worldOrigin.clone().project(camera)
-      this.gravityCenter.set(
-        (projected.x + 1) * 0.5,
-        (projected.y + 1) * 0.5
-      )
+      this.gravityCenter.set((projected.x + 1) * 0.5, (projected.y + 1) * 0.5)
 
       // For ortho camera: apparent size = actual size / view height
       const viewHeight = camera.top - camera.bottom

@@ -55,9 +55,7 @@ function createTestGeometry(
 describe('useAsyncFaceDetection', () => {
   describe('empty/null geometry', () => {
     it('should return empty faces for null geometry', () => {
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(null, 'hypercube')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(null, 'hypercube'))
 
       expect(result.current.faces).toEqual([])
       expect(result.current.isLoading).toBe(false)
@@ -67,9 +65,7 @@ describe('useAsyncFaceDetection', () => {
     it('should return empty faces for geometry with no vertices', () => {
       const emptyGeometry = createTestGeometry([], 3, 'hypercube', [])
 
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(emptyGeometry, 'hypercube')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(emptyGeometry, 'hypercube'))
 
       expect(result.current.faces).toEqual([])
       expect(result.current.isLoading).toBe(false)
@@ -81,9 +77,7 @@ describe('useAsyncFaceDetection', () => {
       // Use actual simplex geometry
       const simplex = generateGeometry('simplex', 3, DEFAULT_EXTENDED_OBJECT_PARAMS)
 
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(simplex, 'simplex')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(simplex, 'simplex'))
 
       // Wait for sync detection to complete
       await waitFor(() => {
@@ -106,9 +100,7 @@ describe('useAsyncFaceDetection', () => {
         },
       })
 
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(rootGeometry, 'root-system')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(rootGeometry, 'root-system'))
 
       // Wait for face detection to complete
       await waitFor(() => {
@@ -135,9 +127,7 @@ describe('useAsyncFaceDetection', () => {
         },
       })
 
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(rootGeometry, 'root-system')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(rootGeometry, 'root-system'))
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)
@@ -158,9 +148,7 @@ describe('useAsyncFaceDetection', () => {
         },
       })
 
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(rootGeometry, 'root-system')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(rootGeometry, 'root-system'))
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)
@@ -240,12 +228,18 @@ describe('useAsyncFaceDetection', () => {
 
       // Pre-computed triangular faces for a cube (6 quads = 12 triangles)
       const analyticalFaces = [
-        [0, 1, 3], [0, 3, 2], // bottom
-        [4, 6, 7], [4, 7, 5], // top
-        [0, 4, 5], [0, 5, 1], // front
-        [2, 3, 7], [2, 7, 6], // back
-        [0, 2, 6], [0, 6, 4], // left
-        [1, 5, 7], [1, 7, 3], // right
+        [0, 1, 3],
+        [0, 3, 2], // bottom
+        [4, 6, 7],
+        [4, 7, 5], // top
+        [0, 4, 5],
+        [0, 5, 1], // front
+        [2, 3, 7],
+        [2, 7, 6], // back
+        [0, 2, 6],
+        [0, 6, 4], // left
+        [1, 5, 7],
+        [1, 7, 3], // right
       ]
 
       const wythoffGeometry = {
@@ -287,9 +281,7 @@ describe('useAsyncFaceDetection', () => {
         'root-system'
       )
 
-      const { result } = renderHook(() =>
-        useAsyncFaceDetection(tooFewPoints, 'root-system')
-      )
+      const { result } = renderHook(() => useAsyncFaceDetection(tooFewPoints, 'root-system'))
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)

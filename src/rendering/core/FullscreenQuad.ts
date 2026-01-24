@@ -8,13 +8,13 @@
  * @module rendering/core/FullscreenQuad
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 /** Singleton fullscreen quad geometry (2x2 plane centered at origin) */
-let sharedGeometry: THREE.PlaneGeometry | null = null;
+let sharedGeometry: THREE.PlaneGeometry | null = null
 
 /** Reference count for proper disposal */
-let referenceCount = 0;
+let referenceCount = 0
 
 /**
  * Gets the shared fullscreen quad geometry.
@@ -32,19 +32,16 @@ let referenceCount = 0;
  */
 export function getFullscreenQuadGeometry(): THREE.PlaneGeometry {
   if (!sharedGeometry) {
-    sharedGeometry = new THREE.PlaneGeometry(2, 2);
+    sharedGeometry = new THREE.PlaneGeometry(2, 2)
     // Disable auto-update bounds since this never changes
     sharedGeometry.boundingBox = new THREE.Box3(
       new THREE.Vector3(-1, -1, 0),
       new THREE.Vector3(1, 1, 0)
-    );
-    sharedGeometry.boundingSphere = new THREE.Sphere(
-      new THREE.Vector3(0, 0, 0),
-      Math.SQRT2
-    );
+    )
+    sharedGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, 0), Math.SQRT2)
   }
-  referenceCount++;
-  return sharedGeometry;
+  referenceCount++
+  return sharedGeometry
 }
 
 /**
@@ -52,10 +49,10 @@ export function getFullscreenQuadGeometry(): THREE.PlaneGeometry {
  * When all references are released, the geometry is disposed.
  */
 export function releaseFullscreenQuadGeometry(): void {
-  referenceCount = Math.max(0, referenceCount - 1);
+  referenceCount = Math.max(0, referenceCount - 1)
   if (referenceCount === 0 && sharedGeometry) {
-    sharedGeometry.dispose();
-    sharedGeometry = null;
+    sharedGeometry.dispose()
+    sharedGeometry = null
   }
 }
 
@@ -64,15 +61,15 @@ export function releaseFullscreenQuadGeometry(): void {
  * @returns The current reference count
  */
 export function getFullscreenQuadRefCount(): number {
-  return referenceCount;
+  return referenceCount
 }
 
 /**
  * Shared orthographic camera for fullscreen rendering.
  * Uses NDC coordinates (-1 to 1 range).
  */
-let sharedCamera: THREE.OrthographicCamera | null = null;
-let cameraRefCount = 0;
+let sharedCamera: THREE.OrthographicCamera | null = null
+let cameraRefCount = 0
 
 /**
  * Gets the shared orthographic camera for fullscreen passes.
@@ -82,20 +79,19 @@ let cameraRefCount = 0;
  */
 export function getFullscreenCamera(): THREE.OrthographicCamera {
   if (!sharedCamera) {
-    sharedCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    sharedCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
-  cameraRefCount++;
-  return sharedCamera;
+  cameraRefCount++
+  return sharedCamera
 }
 
 /**
  * Releases a reference to the shared fullscreen camera.
  */
 export function releaseFullscreenCamera(): void {
-  cameraRefCount = Math.max(0, cameraRefCount - 1);
+  cameraRefCount = Math.max(0, cameraRefCount - 1)
   // Cameras don't need disposal, but we can null it to free memory
   if (cameraRefCount === 0 && sharedCamera) {
-    sharedCamera = null;
+    sharedCamera = null
   }
 }
-

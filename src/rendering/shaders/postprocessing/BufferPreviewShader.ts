@@ -1,11 +1,11 @@
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 /**
  * Buffer Preview Shader
- * 
+ *
  * specialized shader for debugging and visualizing various G-buffers
  * (Depth, Normal, Temporal Depth, etc.)
- * 
+ *
  * This isolates debug logic from production shaders like BokehShader.
  */
 
@@ -143,4 +143,4 @@ export const BufferPreviewShader = {
       fragColor = texel;
     }
   `,
-};
+}

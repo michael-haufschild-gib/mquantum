@@ -77,4 +77,4 @@ float laguerreDamped(int k, float alpha, float x) {
     float damp = 1.0 / (1.0 + 0.05 * float(k * k));
     return damp * L;
 }
-`;
+`

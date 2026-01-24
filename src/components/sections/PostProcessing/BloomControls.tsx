@@ -32,15 +32,14 @@
  * @see {@link usePostProcessingStore} for state management
  */
 
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { Slider } from '@/components/ui/Slider';
-import {
-} from '@/stores/defaults/visualDefaults';
-import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore';
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { Slider } from '@/components/ui/Slider'
+import {} from '@/stores/defaults/visualDefaults'
+import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 
 export interface BloomControlsProps {
-  className?: string;
+  className?: string
 }
 
 /**
@@ -48,9 +47,7 @@ export interface BloomControlsProps {
  * @param root0
  * @param root0.className
  */
-export const BloomControls: React.FC<BloomControlsProps> = React.memo(({
-  className = '',
-}) => {
+export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ className = '' }) => {
   // Consolidate all visual store subscriptions with useShallow to reduce re-renders
   const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
     // State
@@ -65,7 +62,7 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({
     setBloomRadius: state.setBloomRadius,
     setBloomSmoothing: state.setBloomSmoothing,
     setBloomLevels: state.setBloomLevels,
-  }));
+  }))
   const {
     bloomIntensity,
     bloomThreshold,
@@ -77,66 +74,66 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({
     setBloomRadius,
     setBloomSmoothing,
     setBloomLevels,
-  } = usePostProcessingStore(postProcessingSelector);
+  } = usePostProcessingStore(postProcessingSelector)
 
   return (
     <div className={`space-y-4 ${className}`}>
-          {/* Intensity */}
-          <Slider
-            label="Intensity"
-            min={0}
-            max={2}
-            step={0.05}
-            value={bloomIntensity}
-            onChange={setBloomIntensity}
-            showValue
-          />
+      {/* Intensity */}
+      <Slider
+        label="Intensity"
+        min={0}
+        max={2}
+        step={0.05}
+        value={bloomIntensity}
+        onChange={setBloomIntensity}
+        showValue
+      />
 
-          {/* Threshold */}
-          <Slider
-            label="Threshold"
-            min={0}
-            max={1}
-            step={0.05}
-            value={bloomThreshold}
-            onChange={setBloomThreshold}
-            showValue
-          />
+      {/* Threshold */}
+      <Slider
+        label="Threshold"
+        min={0}
+        max={1}
+        step={0.05}
+        value={bloomThreshold}
+        onChange={setBloomThreshold}
+        showValue
+      />
 
-          {/* Smoothing - new parameter for soft threshold transition */}
-          <Slider
-            label="Smoothing"
-            min={0}
-            max={1}
-            step={0.01}
-            value={bloomSmoothing}
-            onChange={setBloomSmoothing}
-            showValue
-          />
+      {/* Smoothing - new parameter for soft threshold transition */}
+      <Slider
+        label="Smoothing"
+        min={0}
+        max={1}
+        step={0.01}
+        value={bloomSmoothing}
+        onChange={setBloomSmoothing}
+        showValue
+      />
 
-          {/* Radius */}
-          <Slider
-            label="Radius"
-            min={0}
-            max={1}
-            step={0.05}
-            value={bloomRadius}
-            onChange={setBloomRadius}
-            showValue
-          />
+      {/* Radius */}
+      <Slider
+        label="Radius"
+        min={0}
+        max={1}
+        step={0.05}
+        value={bloomRadius}
+        onChange={setBloomRadius}
+        showValue
+      />
 
-          {/* Levels - number of blur levels (1-5) */}
-          <Slider
-            label="Levels"
-            min={1}
-            max={5}
-            step={1}
-            value={bloomLevels}
-            onChange={setBloomLevels}
-            showValue
-          />
+      {/* Levels - number of blur levels (1-5) */}
+      <Slider
+        label="Levels"
+        min={1}
+        max={5}
+        step={1}
+        value={bloomLevels}
+        onChange={setBloomLevels}
+        showValue
+      />
     </div>
-  );
-});
+  )
+})
 
-BloomControls.displayName = 'BloomControls';
+BloomControls.displayName = 'BloomControls'

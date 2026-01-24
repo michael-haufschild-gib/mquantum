@@ -23,7 +23,7 @@ uniform sampler2D uEnvMap;
 uniform float uEnvMapSize;
 uniform float uIBLIntensity;
 uniform int uIBLQuality; // 0 = off, 1 = low, 2 = high
-`;
+`
 
 /**
  * PMREM CubeUV Sampling Functions
@@ -196,7 +196,7 @@ vec4 textureCubeUV(sampler2D envMap, vec3 sampleDir, float roughness) {
         return vec4(mix(color0, color1, mipF), 1.0);
     }
 }
-`;
+`
 
 /**
  * IBL Computation Block
@@ -246,4 +246,4 @@ vec3 computeIBL(vec3 N, vec3 V, vec3 F0, float roughness, float metallic, vec3 a
     
     return (specularIBL + diffuseIBL) * uIBLIntensity;
 }
-`;
+`

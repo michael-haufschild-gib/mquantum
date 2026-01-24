@@ -125,4 +125,4 @@ void main() {
   // See: docs/bugfixing/log/2025-12-21-schroedinger-temporal-gl-invalid-operation.md
   gPosition = vec4(vWorldPosition, 1.0);
 }
-`;
+`

@@ -45,4 +45,4 @@ uniform float uOceanCausticIntensity;
 uniform float uOceanDepthGradient;
 uniform float uOceanBubbleDensity;
 uniform float uOceanSurfaceShimmer;
-`;
+`

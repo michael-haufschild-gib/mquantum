@@ -27,4 +27,4 @@ vec3 getCosinePaletteColor(
   float distributedT = applyDistribution(t, power, cycles, offset);
   return cosinePalette(distributedT, a, b, c, d);
 }
-`;
+`

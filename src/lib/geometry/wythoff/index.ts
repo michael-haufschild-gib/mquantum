@@ -60,12 +60,7 @@ import {
 
 import { generateEdgesByMinDistance } from './edges'
 
-import {
-  cachePolytope,
-  getCacheKey,
-  getCachedPolytope,
-  getFromMemoryCache,
-} from './cache'
+import { cachePolytope, getCacheKey, getCachedPolytope, getFromMemoryCache } from './cache'
 
 /**
  * Calculate maximum vertices based on dimension and preset.

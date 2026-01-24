@@ -156,4 +156,4 @@ float hydrogenRadialMaxRadius(int n, int l, float a0) {
         return fn * a0 * (1.0 + sqrt(max(0.0, 1.0 - ratio * ratio)));
     }
 }
-`;
+`

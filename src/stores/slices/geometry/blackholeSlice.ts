@@ -77,7 +77,8 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
   // Reduce boilerplate for common setter patterns
 
   /** Factory for simple value setters (no validation) */
-  const valueSetter = <K extends keyof BlackHoleConfig>(key: K) =>
+  const valueSetter =
+    <K extends keyof BlackHoleConfig>(key: K) =>
     (value: BlackHoleConfig[K]) => {
       setWithVersion((state) => ({
         blackhole: { ...state.blackhole, [key]: value },
@@ -85,18 +86,15 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     }
 
   /** Factory for clamped numeric setters */
-  const clampedSetter = <K extends keyof BlackHoleConfig>(
-    key: K,
-    min: number,
-    max: number,
-    floor = false
-  ) => (value: number) => {
-    let clamped = Math.max(min, Math.min(max, value))
-    if (floor) clamped = Math.floor(clamped)
-    setWithVersion((state) => ({
-      blackhole: { ...state.blackhole, [key]: clamped },
-    }))
-  }
+  const clampedSetter =
+    <K extends keyof BlackHoleConfig>(key: K, min: number, max: number, floor = false) =>
+    (value: number) => {
+      let clamped = Math.max(min, Math.min(max, value))
+      if (floor) clamped = Math.floor(clamped)
+      setWithVersion((state) => ({
+        blackhole: { ...state.blackhole, [key]: clamped },
+      }))
+    }
 
   return {
     blackhole: { ...DEFAULT_BLACK_HOLE_CONFIG },
@@ -317,7 +315,11 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
     setBlackHoleDeferredLensingEnabled: valueSetter('deferredLensingEnabled'),
     setBlackHoleDeferredLensingStrength: clampedSetter('deferredLensingStrength', 0, 2),
     setBlackHoleDeferredLensingRadius: clampedSetter('deferredLensingRadius', 0, 10),
-    setBlackHoleDeferredLensingChromaticAberration: clampedSetter('deferredLensingChromaticAberration', 0, 1),
+    setBlackHoleDeferredLensingChromaticAberration: clampedSetter(
+      'deferredLensingChromaticAberration',
+      0,
+      1
+    ),
 
     setBlackHoleSkyCubemapResolution: (resolution) => {
       const snapped = snapToValidResolution(resolution)
@@ -471,7 +473,9 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
         validated.jetsGodRaysIntensity = Math.max(0, Math.min(2, config.jetsGodRaysIntensity))
       }
       if (config.jetsGodRaysSamples !== undefined) {
-        validated.jetsGodRaysSamples = Math.floor(Math.max(16, Math.min(128, config.jetsGodRaysSamples)))
+        validated.jetsGodRaysSamples = Math.floor(
+          Math.max(16, Math.min(128, config.jetsGodRaysSamples))
+        )
       }
       if (config.jetsGodRaysDecay !== undefined) {
         validated.jetsGodRaysDecay = Math.max(0.9, Math.min(1, config.jetsGodRaysDecay))
@@ -480,7 +484,8 @@ export const createBlackHoleSlice: StateCreator<ExtendedObjectSlice, [], [], Bla
       // Polar Jets - booleans/strings
       if (config.jetsEnabled !== undefined) validated.jetsEnabled = config.jetsEnabled
       if (config.jetsColor !== undefined) validated.jetsColor = config.jetsColor
-      if (config.jetsGodRaysEnabled !== undefined) validated.jetsGodRaysEnabled = config.jetsGodRaysEnabled
+      if (config.jetsGodRaysEnabled !== undefined)
+        validated.jetsGodRaysEnabled = config.jetsGodRaysEnabled
 
       setWithVersion((state) => ({
         blackhole: { ...state.blackhole, ...validated },

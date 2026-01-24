@@ -67,9 +67,9 @@
        These are combined to form the dynamic accent color.
        Default values are for cyan - overridden by [data-accent] selectors.
        ═══════════════════════════════════════════════════════════════════ */
-    --token-accent-h: 200;    /* Hue (0-360) */
-    --token-accent-c: 0.14;   /* Chroma (saturation) */
-    --token-accent-l: 70%;    /* Lightness */
+    --token-accent-h: 200; /* Hue (0-360) */
+    --token-accent-c: 0.14; /* Chroma (saturation) */
+    --token-accent-l: 70%; /* Lightness */
   }
 
   /* ═══════════════════════════════════════════════════════════════════
@@ -115,7 +115,7 @@
 
   [data-accent='red'] {
     --token-accent-h: 25;
-    --token-accent-c: 0.20;
+    --token-accent-c: 0.2;
     --token-accent-l: 65%;
   }
 

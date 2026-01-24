@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { Section } from '@/components/sections/Section';
-import { Knob } from '@/components/ui/Knob';
-import { Envelope } from '@/components/ui/Envelope';
+import React, { useState } from 'react'
+import { Section } from '@/components/sections/Section'
+import { Knob } from '@/components/ui/Knob'
+import { Envelope } from '@/components/ui/Envelope'
 
 export interface TestSectionProps {
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
 export const TestSection: React.FC<TestSectionProps> = ({ defaultOpen = false }) => {
-  const [attack, setAttack] = useState(0.5);
-  const [decay, setDecay] = useState(0.5);
+  const [attack, setAttack] = useState(0.5)
+  const [decay, setDecay] = useState(0.5)
 
   return (
     <Section title="Test" defaultOpen={defaultOpen}>
@@ -49,5 +49,5 @@ export const TestSection: React.FC<TestSectionProps> = ({ defaultOpen = false })
         </div>
       </div>
     </Section>
-  );
-};
+  )
+}

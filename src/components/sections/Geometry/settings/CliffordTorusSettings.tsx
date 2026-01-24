@@ -1,8 +1,8 @@
-import { Slider } from '@/components/ui/Slider';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Slider } from '@/components/ui/Slider'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Clifford Torus settings controls
@@ -12,47 +12,41 @@ import { useShallow } from 'zustand/react/shallow';
  * @returns Clifford torus settings controls
  */
 export function CliffordTorusSettings() {
-  const dimension = useGeometryStore((state) => state.dimension);
+  const dimension = useGeometryStore((state) => state.dimension)
 
   // Consolidate extended object store selectors with useShallow
-  const {
-    config,
-    setRadius,
-    setMode,
-    setResolutionU,
-    setResolutionV,
-    setStepsPerCircle,
-  } = useExtendedObjectStore(
-    useShallow((state: ExtendedObjectState) => ({
-      config: state.cliffordTorus,
-      setRadius: state.setCliffordTorusRadius,
-      setMode: state.setCliffordTorusMode,
-      setResolutionU: state.setCliffordTorusResolutionU,
-      setResolutionV: state.setCliffordTorusResolutionV,
-      setStepsPerCircle: state.setCliffordTorusStepsPerCircle,
-    }))
-  );
+  const { config, setRadius, setMode, setResolutionU, setResolutionV, setStepsPerCircle } =
+    useExtendedObjectStore(
+      useShallow((state: ExtendedObjectState) => ({
+        config: state.cliffordTorus,
+        setRadius: state.setCliffordTorusRadius,
+        setMode: state.setCliffordTorusMode,
+        setResolutionU: state.setCliffordTorusResolutionU,
+        setResolutionV: state.setCliffordTorusResolutionV,
+        setStepsPerCircle: state.setCliffordTorusStepsPerCircle,
+      }))
+    )
 
   // Calculate max k for flat/generalized mode
-  const maxK = Math.floor(dimension / 2);
+  const maxK = Math.floor(dimension / 2)
 
   // Update flat mode internal setting based on dimension
   React.useEffect(() => {
-    const effectiveMode = dimension === 4 ? 'classic' : 'generalized';
+    const effectiveMode = dimension === 4 ? 'classic' : 'generalized'
     if (config.mode !== effectiveMode) {
-      setMode(effectiveMode);
+      setMode(effectiveMode)
     }
-  }, [dimension, config.mode, setMode]);
+  }, [dimension, config.mode, setMode])
 
   // Calculate point count
   const getPointCount = () => {
     if (dimension === 4) {
-      return config.resolutionU * config.resolutionV;
+      return config.resolutionU * config.resolutionV
     }
-    return Math.pow(config.stepsPerCircle, Math.min(config.k, maxK));
-  };
+    return Math.pow(config.stepsPerCircle, Math.min(config.k, maxK))
+  }
 
-  const pointCount = getPointCount();
+  const pointCount = getPointCount()
 
   return (
     <div className="space-y-4" data-testid="clifford-torus-settings">
@@ -113,14 +107,10 @@ export function CliffordTorusSettings() {
       )}
 
       {/* Point count and warnings */}
-      <p className="text-xs text-text-secondary">
-        {pointCount.toLocaleString()} points
-      </p>
+      <p className="text-xs text-text-secondary">{pointCount.toLocaleString()} points</p>
       {pointCount > 10000 && (
-        <p className="text-xs text-warning">
-          High point count may affect performance
-        </p>
+        <p className="text-xs text-warning">High point count may affect performance</p>
       )}
     </div>
-  );
+  )
 }

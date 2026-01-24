@@ -32,11 +32,7 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react'
-import type {
-  WorkerRequest,
-  WorkerResponse,
-  GenerationStage,
-} from '@/workers/types'
+import type { WorkerRequest, WorkerResponse, GenerationStage } from '@/workers/types'
 
 // ============================================================================
 // Worker Singleton Management
@@ -175,10 +171,9 @@ function getWorker(): Worker | null {
 
   if (!workerInstance) {
     // Create new worker using Vite's worker syntax
-    workerInstance = new Worker(
-      new URL('../workers/geometry.worker.ts', import.meta.url),
-      { type: 'module' }
-    )
+    workerInstance = new Worker(new URL('../workers/geometry.worker.ts', import.meta.url), {
+      type: 'module',
+    })
 
     // Attach global handlers
     workerInstance.addEventListener('message', handleWorkerMessage)
@@ -279,9 +274,7 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
   // Initialize worker SYNCHRONOUSLY to avoid race conditions where
   // sendRequest is called before the useEffect runs.
   // This ensures the worker is available on the very first render.
-  const workerRef = useRef<Worker | null>(
-    workerAvailable.current ? getWorker() : null
-  )
+  const workerRef = useRef<Worker | null>(workerAvailable.current ? getWorker() : null)
 
   // Cleanup on unmount
   useEffect(() => {

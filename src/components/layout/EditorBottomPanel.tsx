@@ -1,12 +1,12 @@
-import React from 'react';
-import { TimelineControls } from './TimelineControls';
+import React from 'react'
+import { TimelineControls } from './TimelineControls'
 
 export const EditorBottomPanel: React.FC = React.memo(() => {
-    return (
-        <div data-testid="editor-bottom-panel">
-            <TimelineControls />
-        </div>
-    );
-});
+  return (
+    <div data-testid="editor-bottom-panel">
+      <TimelineControls />
+    </div>
+  )
+})
 
-EditorBottomPanel.displayName = 'EditorBottomPanel';
+EditorBottomPanel.displayName = 'EditorBottomPanel'

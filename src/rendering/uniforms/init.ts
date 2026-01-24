@@ -7,7 +7,7 @@
  * @module rendering/uniforms/init
  */
 
-import { UniformManager } from './UniformManager';
+import { UniformManager } from './UniformManager'
 import {
   ColorSource,
   createEdgePBRSource,
@@ -16,9 +16,9 @@ import {
   LightingSource,
   QualitySource,
   TemporalSource,
-} from './sources';
+} from './sources'
 
-let initialized = false;
+let initialized = false
 
 /**
  * Initialize and register all uniform sources.
@@ -36,21 +36,21 @@ let initialized = false;
  */
 export function initUniformSources(): void {
   if (initialized) {
-    return;
+    return
   }
 
   // Register all uniform sources
-  UniformManager.register(new LightingSource());
-  UniformManager.register(new QualitySource());
-  UniformManager.register(new TemporalSource());
-  UniformManager.register(new ColorSource());
+  UniformManager.register(new LightingSource())
+  UniformManager.register(new QualitySource())
+  UniformManager.register(new TemporalSource())
+  UniformManager.register(new ColorSource())
 
   // Register PBR sources for each object type
-  UniformManager.register(createFacePBRSource());
-  UniformManager.register(createEdgePBRSource());
-  UniformManager.register(createGroundPBRSource());
+  UniformManager.register(createFacePBRSource())
+  UniformManager.register(createEdgePBRSource())
+  UniformManager.register(createGroundPBRSource())
 
-  initialized = true;
+  initialized = true
 }
 
 /**
@@ -58,13 +58,13 @@ export function initUniformSources(): void {
  * @returns True if initialized
  */
 export function isUniformSourcesInitialized(): boolean {
-  return initialized;
+  return initialized
 }
 
 /**
  * Reset initialization state (for testing).
  */
 export function resetUniformSourcesForTesting(): void {
-  initialized = false;
-  UniformManager.reset();
+  initialized = false
+  UniformManager.reset()
 }

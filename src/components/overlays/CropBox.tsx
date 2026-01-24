@@ -1,88 +1,83 @@
-import { m, useMotionValue } from 'motion/react';
-import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { m, useMotionValue } from 'motion/react'
+import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface CropValues {
-  x: number;      // 0-1
-  y: number;      // 0-1
-  width: number;  // 0-1
-  height: number; // 0-1
+  x: number // 0-1
+  y: number // 0-1
+  width: number // 0-1
+  height: number // 0-1
 }
 
 interface CropBoxProps {
   /** Container ref for drag constraints */
-  containerRef: RefObject<HTMLElement | null>;
+  containerRef: RefObject<HTMLElement | null>
   /** Current crop values (normalized 0-1) */
-  crop: CropValues;
+  crop: CropValues
   /** Callback when crop changes */
-  onCropChange: (crop: CropValues) => void;
+  onCropChange: (crop: CropValues) => void
   /** Minimum crop size (0-1), default 0.05 */
-  minSize?: number;
+  minSize?: number
 }
 
 /**
  * Reusable crop box component with drag handles.
  * Used by both ScreenshotModal (inline) and CropEditor (full-screen).
  */
-export const CropBox = ({
-  containerRef,
-  crop,
-  onCropChange,
-  minSize = 0.05,
-}: CropBoxProps) => {
-  const [bounds, setBounds] = useState({ width: 0, height: 0 });
-  const [isResizing, setIsResizing] = useState(false);
+export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: CropBoxProps) => {
+  const [bounds, setBounds] = useState({ width: 0, height: 0 })
+  const [isResizing, setIsResizing] = useState(false)
 
-  const dragX = useMotionValue(0);
-  const dragY = useMotionValue(0);
+  const dragX = useMotionValue(0)
+  const dragY = useMotionValue(0)
 
-  const activeHandle = useRef<string | null>(null);
-  const startPos = useRef({ x: 0, y: 0, cropX: 0, cropY: 0, cropW: 0, cropH: 0 });
+  const activeHandle = useRef<string | null>(null)
+  const startPos = useRef({ x: 0, y: 0, cropX: 0, cropY: 0, cropW: 0, cropH: 0 })
 
   // Update bounds on container resize
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) return
     const updateBounds = () => {
       if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        setBounds({ width: rect.width, height: rect.height });
+        const rect = containerRef.current.getBoundingClientRect()
+        setBounds({ width: rect.width, height: rect.height })
       }
-    };
+    }
 
-    updateBounds();
-    const ro = new ResizeObserver(updateBounds);
-    ro.observe(containerRef.current);
+    updateBounds()
+    const ro = new ResizeObserver(updateBounds)
+    ro.observe(containerRef.current)
 
-    return () => ro.disconnect();
-  }, [containerRef]);
+    return () => ro.disconnect()
+  }, [containerRef])
 
   // Drag handler
   const onDragEnd = useCallback(() => {
-    if (isResizing || bounds.width === 0) return;
+    if (isResizing || bounds.width === 0) return
 
-    const dxPx = dragX.get();
-    const dyPx = dragY.get();
+    const dxPx = dragX.get()
+    const dyPx = dragY.get()
 
-    const dx = dxPx / bounds.width;
-    const dy = dyPx / bounds.height;
+    const dx = dxPx / bounds.width
+    const dy = dyPx / bounds.height
 
-    const nx = Math.max(0, Math.min(1 - crop.width, crop.x + dx));
-    const ny = Math.max(0, Math.min(1 - crop.height, crop.y + dy));
+    const nx = Math.max(0, Math.min(1 - crop.width, crop.x + dx))
+    const ny = Math.max(0, Math.min(1 - crop.height, crop.y + dy))
 
-    onCropChange({ ...crop, x: nx, y: ny });
+    onCropChange({ ...crop, x: nx, y: ny })
 
-    dragX.set(0);
-    dragY.set(0);
-  }, [bounds.width, bounds.height, isResizing, dragX, dragY, crop, onCropChange]);
+    dragX.set(0)
+    dragY.set(0)
+  }, [bounds.width, bounds.height, isResizing, dragX, dragY, crop, onCropChange])
 
   // Resize start
   const startResize = useCallback(
     (e: ReactPointerEvent, handle: string) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault()
+      e.stopPropagation()
 
-      setIsResizing(true);
-      activeHandle.current = handle;
+      setIsResizing(true)
+      activeHandle.current = handle
 
       startPos.current = {
         x: e.clientX,
@@ -91,77 +86,97 @@ export const CropBox = ({
         cropY: crop.y,
         cropW: crop.width,
         cropH: crop.height,
-      };
+      }
     },
     [crop]
-  );
+  )
 
   // Handle resize move
   useEffect(() => {
-    if (!isResizing) return;
+    if (!isResizing) return
 
     const onResizeMove = (e: PointerEvent) => {
-      if (!activeHandle.current || bounds.width === 0) return;
+      if (!activeHandle.current || bounds.width === 0) return
 
-      const dxPx = e.clientX - startPos.current.x;
-      const dyPx = e.clientY - startPos.current.y;
+      const dxPx = e.clientX - startPos.current.x
+      const dyPx = e.clientY - startPos.current.y
 
-      const dx = dxPx / bounds.width;
-      const dy = dyPx / bounds.height;
+      const dx = dxPx / bounds.width
+      const dy = dyPx / bounds.height
 
-      const s = startPos.current;
-      let { cropX: px, cropY: py, cropW: pw, cropH: ph } = s;
+      const s = startPos.current
+      let { cropX: px, cropY: py, cropW: pw, cropH: ph } = s
 
       if (activeHandle.current.includes('w')) {
-        const maxDx = pw - minSize;
-        const validDx = Math.min(dx, maxDx);
-        const finalDx = Math.max(-px, validDx);
-        px += finalDx;
-        pw -= finalDx;
+        const maxDx = pw - minSize
+        const validDx = Math.min(dx, maxDx)
+        const finalDx = Math.max(-px, validDx)
+        px += finalDx
+        pw -= finalDx
       }
 
       if (activeHandle.current.includes('e')) {
-        const maxW = 1 - px;
-        pw = Math.max(minSize, Math.min(maxW, pw + dx));
+        const maxW = 1 - px
+        pw = Math.max(minSize, Math.min(maxW, pw + dx))
       }
 
       if (activeHandle.current.includes('n')) {
-        const maxDy = ph - minSize;
-        const validDy = Math.min(dy, maxDy);
-        const finalDy = Math.max(-py, validDy);
-        py += finalDy;
-        ph -= finalDy;
+        const maxDy = ph - minSize
+        const validDy = Math.min(dy, maxDy)
+        const finalDy = Math.max(-py, validDy)
+        py += finalDy
+        ph -= finalDy
       }
 
       if (activeHandle.current.includes('s')) {
-        const maxH = 1 - py;
-        ph = Math.max(minSize, Math.min(maxH, ph + dy));
+        const maxH = 1 - py
+        ph = Math.max(minSize, Math.min(maxH, ph + dy))
       }
 
-      onCropChange({ x: px, y: py, width: pw, height: ph });
-    };
+      onCropChange({ x: px, y: py, width: pw, height: ph })
+    }
 
     const onResizeEnd = () => {
-      setIsResizing(false);
-      activeHandle.current = null;
-    };
+      setIsResizing(false)
+      activeHandle.current = null
+    }
 
-    window.addEventListener('pointermove', onResizeMove);
-    window.addEventListener('pointerup', onResizeEnd);
+    window.addEventListener('pointermove', onResizeMove)
+    window.addEventListener('pointerup', onResizeEnd)
 
     return () => {
-      window.removeEventListener('pointermove', onResizeMove);
-      window.removeEventListener('pointerup', onResizeEnd);
-    };
-  }, [isResizing, bounds.width, bounds.height, minSize, onCropChange]);
+      window.removeEventListener('pointermove', onResizeMove)
+      window.removeEventListener('pointerup', onResizeEnd)
+    }
+  }, [isResizing, bounds.width, bounds.height, minSize, onCropChange])
 
   // Corner bracket handles (video editor style)
   const handles = [
-    { id: 'nw', cursor: 'nw-resize', pos: '-top-1 -left-1', bracket: 'top-0 left-0 border-t-4 border-l-4 rounded-tl-sm' },
-    { id: 'ne', cursor: 'ne-resize', pos: '-top-1 -right-1', bracket: 'top-0 right-0 border-t-4 border-r-4 rounded-tr-sm' },
-    { id: 'sw', cursor: 'sw-resize', pos: '-bottom-1 -left-1', bracket: 'bottom-0 left-0 border-b-4 border-l-4 rounded-bl-sm' },
-    { id: 'se', cursor: 'se-resize', pos: '-bottom-1 -right-1', bracket: 'bottom-0 right-0 border-b-4 border-r-4 rounded-br-sm' },
-  ];
+    {
+      id: 'nw',
+      cursor: 'nw-resize',
+      pos: '-top-1 -left-1',
+      bracket: 'top-0 left-0 border-t-4 border-l-4 rounded-tl-sm',
+    },
+    {
+      id: 'ne',
+      cursor: 'ne-resize',
+      pos: '-top-1 -right-1',
+      bracket: 'top-0 right-0 border-t-4 border-r-4 rounded-tr-sm',
+    },
+    {
+      id: 'sw',
+      cursor: 'sw-resize',
+      pos: '-bottom-1 -left-1',
+      bracket: 'bottom-0 left-0 border-b-4 border-l-4 rounded-bl-sm',
+    },
+    {
+      id: 'se',
+      cursor: 'se-resize',
+      pos: '-bottom-1 -right-1',
+      bracket: 'bottom-0 right-0 border-b-4 border-r-4 rounded-br-sm',
+    },
+  ]
 
   return (
     <m.div
@@ -211,9 +226,11 @@ export const CropBox = ({
           onPointerDown={(e) => startResize(e, h.id)}
           data-testid={`crop-handle-${h.id}`}
         >
-          <div className={`absolute w-5 h-5 sm:w-4 sm:h-4 border-accent transition-transform group-hover:scale-110 group-active:scale-95 ${h.bracket}`} />
+          <div
+            className={`absolute w-5 h-5 sm:w-4 sm:h-4 border-accent transition-transform group-hover:scale-110 group-active:scale-95 ${h.bracket}`}
+          />
         </div>
       ))}
     </m.div>
-  );
-};
+  )
+}

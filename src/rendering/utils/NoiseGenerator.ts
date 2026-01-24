@@ -1,64 +1,89 @@
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 /**
  * Self-contained 3D Noise implementation since we can't add dependencies.
  * Based on standard Perlin noise.
  */
 class FastNoise {
-    private perm: Uint8Array;
+  private perm: Uint8Array
 
-    constructor(seed: number = 123) {
-        this.perm = new Uint8Array(512);
-        const p = new Uint8Array(256);
-        for (let i = 0; i < 256; i++) p[i] = i;
-        
-        // Shuffle
-        let s = seed;
-        for (let i = 255; i > 0; i--) {
-            s = (s * 16807) % 2147483647;
-            const j = s % (i + 1);
-            const temp = p[i]!;
-            p[i] = p[j]!;
-            p[j] = temp;
-        }
-        
-        for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255]!;
+  constructor(seed: number = 123) {
+    this.perm = new Uint8Array(512)
+    const p = new Uint8Array(256)
+    for (let i = 0; i < 256; i++) p[i] = i
+
+    // Shuffle
+    let s = seed
+    for (let i = 255; i > 0; i--) {
+      s = (s * 16807) % 2147483647
+      const j = s % (i + 1)
+      const temp = p[i]!
+      p[i] = p[j]!
+      p[j] = temp
     }
 
-    private fade(t: number): number { return t * t * t * (t * (t * 6 - 15) + 10); }
-    private lerp(t: number, a: number, b: number): number { return a + t * (b - a); }
-    private grad(hash: number, x: number, y: number, z: number): number {
-        const h = hash & 15;
-        const u = h < 8 ? x : y;
-        const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
-        return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
-    }
+    for (let i = 0; i < 512; i++) this.perm[i] = p[i & 255]!
+  }
 
-    public noise(x: number, y: number, z: number): number {
-        const X = Math.floor(x) & 255;
-        const Y = Math.floor(y) & 255;
-        const Z = Math.floor(z) & 255;
+  private fade(t: number): number {
+    return t * t * t * (t * (t * 6 - 15) + 10)
+  }
+  private lerp(t: number, a: number, b: number): number {
+    return a + t * (b - a)
+  }
+  private grad(hash: number, x: number, y: number, z: number): number {
+    const h = hash & 15
+    const u = h < 8 ? x : y
+    const v = h < 4 ? y : h === 12 || h === 14 ? x : z
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v)
+  }
 
-        x -= Math.floor(x);
-        y -= Math.floor(y);
-        z -= Math.floor(z);
+  public noise(x: number, y: number, z: number): number {
+    const X = Math.floor(x) & 255
+    const Y = Math.floor(y) & 255
+    const Z = Math.floor(z) & 255
 
-        const u = this.fade(x);
-        const v = this.fade(y);
-        const w = this.fade(z);
+    x -= Math.floor(x)
+    y -= Math.floor(y)
+    z -= Math.floor(z)
 
-        const A = this.perm[X]! + Y, AA = this.perm[A]! + Z, AB = this.perm[A + 1]! + Z;
-        const B = this.perm[X + 1]! + Y, BA = this.perm[B]! + Z, BB = this.perm[B + 1]! + Z;
+    const u = this.fade(x)
+    const v = this.fade(y)
+    const w = this.fade(z)
 
-        return this.lerp(w, this.lerp(v, this.lerp(u, this.grad(this.perm[AA]!, x, y, z),
-            this.grad(this.perm[BA]!, x - 1, y, z)),
-            this.lerp(u, this.grad(this.perm[AB]!, x, y - 1, z),
-                this.grad(this.perm[BB]!, x - 1, y - 1, z))),
-            this.lerp(v, this.lerp(u, this.grad(this.perm[AA + 1]!, x, y, z - 1),
-                this.grad(this.perm[BA + 1]!, x - 1, y, z - 1)),
-                this.lerp(u, this.grad(this.perm[AB + 1]!, x, y - 1, z - 1),
-                    this.grad(this.perm[BB + 1]!, x - 1, y - 1, z - 1))));
-    }
+    const A = this.perm[X]! + Y,
+      AA = this.perm[A]! + Z,
+      AB = this.perm[A + 1]! + Z
+    const B = this.perm[X + 1]! + Y,
+      BA = this.perm[B]! + Z,
+      BB = this.perm[B + 1]! + Z
+
+    return this.lerp(
+      w,
+      this.lerp(
+        v,
+        this.lerp(u, this.grad(this.perm[AA]!, x, y, z), this.grad(this.perm[BA]!, x - 1, y, z)),
+        this.lerp(
+          u,
+          this.grad(this.perm[AB]!, x, y - 1, z),
+          this.grad(this.perm[BB]!, x - 1, y - 1, z)
+        )
+      ),
+      this.lerp(
+        v,
+        this.lerp(
+          u,
+          this.grad(this.perm[AA + 1]!, x, y, z - 1),
+          this.grad(this.perm[BA + 1]!, x - 1, y, z - 1)
+        ),
+        this.lerp(
+          u,
+          this.grad(this.perm[AB + 1]!, x, y - 1, z - 1),
+          this.grad(this.perm[BB + 1]!, x - 1, y - 1, z - 1)
+        )
+      )
+    )
+  }
 }
 
 /**
@@ -157,14 +182,14 @@ export function generateBlackbodyLUT(size: number = 256): THREE.DataTexture {
     if (temp <= 66) {
       r = 1.0
     } else {
-      r = 329.698727446 * Math.pow(temp - 60, -0.1332047592) / 255.0
+      r = (329.698727446 * Math.pow(temp - 60, -0.1332047592)) / 255.0
     }
 
     // Green channel
     if (temp <= 66) {
       g = (99.4708025861 * Math.log(Math.max(temp, 1)) - 161.1195681661) / 255.0
     } else {
-      g = 288.1221695283 * Math.pow(Math.max(temp - 60, 0.01), -0.0755148492) / 255.0
+      g = (288.1221695283 * Math.pow(Math.max(temp - 60, 0.01), -0.0755148492)) / 255.0
     }
 
     // Blue channel

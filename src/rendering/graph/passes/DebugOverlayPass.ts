@@ -21,11 +21,11 @@
  * @module rendering/graph/passes/DebugOverlayPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { RENDER_LAYERS } from '@/rendering/core/layers';
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { RENDER_LAYERS } from '@/rendering/core/layers'
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Configuration for DebugOverlayPass.
@@ -50,7 +50,7 @@ export type DebugOverlayPassConfig = Omit<RenderPassConfig, 'inputs' | 'outputs'
  * ```
  */
 export class DebugOverlayPass extends BasePass {
-  private savedCameraLayers = new THREE.Layers();
+  private savedCameraLayers = new THREE.Layers()
 
   constructor(config: DebugOverlayPassConfig) {
     super({
@@ -62,43 +62,42 @@ export class DebugOverlayPass extends BasePass {
       // Without this, DebugOverlayPass (with 0 dependencies) would run at the START
       // of the graph, before any scene is rendered to screen.
       priority: 10000,
-    });
+    })
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, scene, camera } = ctx;
+    const { renderer, scene, camera } = ctx
 
     // Save camera layers
-    this.savedCameraLayers.mask = camera.layers.mask;
+    this.savedCameraLayers.mask = camera.layers.mask
 
     // IMPORTANT: Clear scene.background to prevent WebGLBackground from rendering.
     // When scene.background is a WebGLCubeRenderTarget.texture, THREE.js's WebGLBackground
     // attempts to render it, which can cause WebGL state issues. Since we only render
     // the DEBUG layer here (gizmos, helpers), we don't need the background.
-    const savedBackground = scene.background;
-    scene.background = null;
+    const savedBackground = scene.background
+    scene.background = null
 
     try {
       // Configure camera to ONLY render DEBUG layer
-      camera.layers.disableAll();
-      camera.layers.enable(RENDER_LAYERS.DEBUG);
+      camera.layers.disableAll()
+      camera.layers.enable(RENDER_LAYERS.DEBUG)
 
       // Render directly to screen (null = default framebuffer)
       // MRTStateManager automatically configures drawBuffers via patched setRenderTarget
-      renderer.setRenderTarget(null);
+      renderer.setRenderTarget(null)
 
       // Don't clear - overlay on top of existing render
-      renderer.autoClear = false;
+      renderer.autoClear = false
 
       // Render debug elements
-      renderer.render(scene, camera);
-
+      renderer.render(scene, camera)
     } finally {
       // Restore camera layers
-      camera.layers.mask = this.savedCameraLayers.mask;
-      renderer.autoClear = true;
+      camera.layers.mask = this.savedCameraLayers.mask
+      renderer.autoClear = true
       // Restore scene.background
-      scene.background = savedBackground;
+      scene.background = savedBackground
     }
   }
 }

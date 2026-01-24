@@ -17,7 +17,12 @@ describe('useSyncedDimension', () => {
     // Reset all stores to their defaults
     useGeometryStore.getState().reset() // Sets dimension to 3 (default)
     useRotationStore.setState({ dimension: 3, rotations: new Map(), version: 0 })
-    useTransformStore.setState({ dimension: 3, uniformScale: 1, perAxisScale: [1, 1, 1], scaleLocked: true })
+    useTransformStore.setState({
+      dimension: 3,
+      uniformScale: 1,
+      perAxisScale: [1, 1, 1],
+      scaleLocked: true,
+    })
     useAnimationStore.getState().reset()
   })
 

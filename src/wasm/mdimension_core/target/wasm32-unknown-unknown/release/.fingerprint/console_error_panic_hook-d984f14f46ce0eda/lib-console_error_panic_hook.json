@@ -1,1 +1,23 @@
-{"rustc":18415816196306954164,"features":"[]","declared_features":"[]","target":9676079782213560798,"profile":1207370057436191037,"path":5360024637082681000,"deps":[[5100922937202109703,"wasm_bindgen",false,638461256896859160],[7667230146095136825,"cfg_if",false,2599941329101270931]],"local":[{"CheckDepInfo":{"dep_info":"wasm32-unknown-unknown/release/.fingerprint/console_error_panic_hook-d984f14f46ce0eda/dep-lib-console_error_panic_hook","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":14682669768258224367}
+{
+  "rustc": 18415816196306954164,
+  "features": "[]",
+  "declared_features": "[]",
+  "target": 9676079782213560798,
+  "profile": 1207370057436191037,
+  "path": 5360024637082681000,
+  "deps": [
+    [5100922937202109703, "wasm_bindgen", false, 638461256896859160],
+    [7667230146095136825, "cfg_if", false, 2599941329101270931]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "wasm32-unknown-unknown/release/.fingerprint/console_error_panic_hook-d984f14f46ce0eda/dep-lib-console_error_panic_hook",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 14682669768258224367
+}

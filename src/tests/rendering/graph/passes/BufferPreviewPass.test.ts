@@ -4,12 +4,12 @@
  * Tests debug visualization pass for G-buffer contents.
  */
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach } from 'vitest'
 
-import { BufferPreviewPass } from '@/rendering/graph/passes/BufferPreviewPass';
+import { BufferPreviewPass } from '@/rendering/graph/passes/BufferPreviewPass'
 
 describe('BufferPreviewPass', () => {
-  let pass: BufferPreviewPass;
+  let pass: BufferPreviewPass
 
   beforeEach(() => {
     pass = new BufferPreviewPass({
@@ -18,24 +18,24 @@ describe('BufferPreviewPass', () => {
       outputResource: 'previewOutput',
       bufferType: 'depth',
       depthMode: 'linear',
-    });
-  });
+    })
+  })
 
   describe('initialization', () => {
     it('should create pass with correct ID', () => {
-      expect(pass.id).toBe('bufferPreview');
-    });
+      expect(pass.id).toBe('bufferPreview')
+    })
 
     it('should configure buffer input', () => {
-      expect(pass.config.inputs).toHaveLength(1);
-      expect(pass.config.inputs[0]!.resourceId).toBe('sceneDepth');
-    });
+      expect(pass.config.inputs).toHaveLength(1)
+      expect(pass.config.inputs[0]!.resourceId).toBe('sceneDepth')
+    })
 
     it('should configure correct output', () => {
-      expect(pass.config.outputs).toHaveLength(1);
-      expect(pass.config.outputs[0]!.resourceId).toBe('previewOutput');
-    });
-  });
+      expect(pass.config.outputs).toHaveLength(1)
+      expect(pass.config.outputs[0]!.resourceId).toBe('previewOutput')
+    })
+  })
 
   describe('buffer type configurations', () => {
     it('should create copy buffer preview', () => {
@@ -44,9 +44,9 @@ describe('BufferPreviewPass', () => {
         bufferInput: 'sceneColor',
         outputResource: 'copyOutput',
         bufferType: 'copy',
-      });
-      expect(copyPass.id).toBe('copy');
-    });
+      })
+      expect(copyPass.id).toBe('copy')
+    })
 
     it('should create depth buffer preview', () => {
       const depthPass = new BufferPreviewPass({
@@ -54,9 +54,9 @@ describe('BufferPreviewPass', () => {
         bufferInput: 'sceneDepth',
         outputResource: 'depthOutput',
         bufferType: 'depth',
-      });
-      expect(depthPass.id).toBe('depth');
-    });
+      })
+      expect(depthPass.id).toBe('depth')
+    })
 
     it('should create normal buffer preview', () => {
       const normalPass = new BufferPreviewPass({
@@ -64,9 +64,9 @@ describe('BufferPreviewPass', () => {
         bufferInput: 'normalBuffer',
         outputResource: 'normalOutput',
         bufferType: 'normal',
-      });
-      expect(normalPass.id).toBe('normal');
-    });
+      })
+      expect(normalPass.id).toBe('normal')
+    })
 
     it('should create temporal depth buffer preview', () => {
       const temporalPass = new BufferPreviewPass({
@@ -74,10 +74,10 @@ describe('BufferPreviewPass', () => {
         bufferInput: 'temporalDepth',
         outputResource: 'temporalOutput',
         bufferType: 'temporalDepth',
-      });
-      expect(temporalPass.id).toBe('temporal');
-    });
-  });
+      })
+      expect(temporalPass.id).toBe('temporal')
+    })
+  })
 
   describe('depth visualization modes', () => {
     it('should create raw depth visualization', () => {
@@ -87,9 +87,9 @@ describe('BufferPreviewPass', () => {
         outputResource: 'rawOutput',
         bufferType: 'depth',
         depthMode: 'raw',
-      });
-      expect(rawPass.id).toBe('raw');
-    });
+      })
+      expect(rawPass.id).toBe('raw')
+    })
 
     it('should create linear depth visualization', () => {
       const linearPass = new BufferPreviewPass({
@@ -98,9 +98,9 @@ describe('BufferPreviewPass', () => {
         outputResource: 'linearOutput',
         bufferType: 'depth',
         depthMode: 'linear',
-      });
-      expect(linearPass.id).toBe('linear');
-    });
+      })
+      expect(linearPass.id).toBe('linear')
+    })
 
     it('should create focus zones visualization', () => {
       const focusPass = new BufferPreviewPass({
@@ -111,10 +111,10 @@ describe('BufferPreviewPass', () => {
         depthMode: 'focusZones',
         focus: 10.0,
         focusRange: 5.0,
-      });
-      expect(focusPass.id).toBe('focus');
-    });
-  });
+      })
+      expect(focusPass.id).toBe('focus')
+    })
+  })
 
   describe('camera clip planes configuration', () => {
     it('should accept custom near/far clip planes', () => {
@@ -126,38 +126,38 @@ describe('BufferPreviewPass', () => {
         depthMode: 'linear',
         nearClip: 0.01,
         farClip: 500.0,
-      });
-      expect(customPass.id).toBe('custom');
-    });
-  });
+      })
+      expect(customPass.id).toBe('custom')
+    })
+  })
 
   describe('parameter setters', () => {
     it('should set buffer type', () => {
-      expect(() => pass.setBufferType('copy')).not.toThrow();
-      expect(() => pass.setBufferType('depth')).not.toThrow();
-      expect(() => pass.setBufferType('normal')).not.toThrow();
-      expect(() => pass.setBufferType('temporalDepth')).not.toThrow();
-    });
+      expect(() => pass.setBufferType('copy')).not.toThrow()
+      expect(() => pass.setBufferType('depth')).not.toThrow()
+      expect(() => pass.setBufferType('normal')).not.toThrow()
+      expect(() => pass.setBufferType('temporalDepth')).not.toThrow()
+    })
 
     it('should set depth mode', () => {
-      expect(() => pass.setDepthMode('raw')).not.toThrow();
-      expect(() => pass.setDepthMode('linear')).not.toThrow();
-      expect(() => pass.setDepthMode('focusZones')).not.toThrow();
-    });
+      expect(() => pass.setDepthMode('raw')).not.toThrow()
+      expect(() => pass.setDepthMode('linear')).not.toThrow()
+      expect(() => pass.setDepthMode('focusZones')).not.toThrow()
+    })
 
     it('should set focus parameters', () => {
-      expect(() => pass.setFocusParams(15.0, 3.0)).not.toThrow();
-    });
-  });
+      expect(() => pass.setFocusParams(15.0, 3.0)).not.toThrow()
+    })
+  })
 
   describe('disposal', () => {
     it('should dispose without error', () => {
-      expect(() => pass.dispose()).not.toThrow();
-    });
+      expect(() => pass.dispose()).not.toThrow()
+    })
 
     it('should be safe to call dispose multiple times', () => {
-      pass.dispose();
-      expect(() => pass.dispose()).not.toThrow();
-    });
-  });
-});
+      pass.dispose()
+      expect(() => pass.dispose()).not.toThrow()
+    })
+  })
+})

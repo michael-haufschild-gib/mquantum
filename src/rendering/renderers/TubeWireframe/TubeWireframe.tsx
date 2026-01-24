@@ -12,34 +12,37 @@ import { createColorCache, updateLinearColorUniform } from '@/rendering/colors/l
 import { FRAME_PRIORITY } from '@/rendering/core/framePriorities'
 import { useTrackedShaderMaterial } from '@/rendering/materials/useTrackedShaderMaterial'
 import {
-    useNDTransformUpdates,
-    useProjectionDistanceCache,
-    useShadowPatching,
+  useNDTransformUpdates,
+  useProjectionDistanceCache,
+  useShadowPatching,
 } from '@/rendering/renderers/base'
 import { UniformManager } from '@/rendering/uniforms/UniformManager'
 import { useFrame } from '@react-three/fiber'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import {
-    Color,
-    CylinderGeometry,
-    DoubleSide,
-    GLSL3,
-    InstancedBufferAttribute,
-    InstancedMesh,
-    Matrix4,
-    ShaderMaterial,
+  Color,
+  CylinderGeometry,
+  DoubleSide,
+  GLSL3,
+  InstancedBufferAttribute,
+  InstancedMesh,
+  Matrix4,
+  ShaderMaterial,
 } from 'three'
 
 import { DEFAULT_PROJECTION_DISTANCE } from '@/lib/math/projection'
 import type { VectorND } from '@/lib/math/types'
-import { composeTubeWireframeFragmentShader, composeTubeWireframeVertexShader } from '@/rendering/shaders/tubewireframe/compose'
 import {
-    blurToPCFSamples,
-    collectShadowDataCached,
-    createShadowMapUniforms,
-    SHADOW_MAP_SIZES,
-    updateShadowMapUniforms,
+  composeTubeWireframeFragmentShader,
+  composeTubeWireframeVertexShader,
+} from '@/rendering/shaders/tubewireframe/compose'
+import {
+  blurToPCFSamples,
+  collectShadowDataCached,
+  createShadowMapUniforms,
+  SHADOW_MAP_SIZES,
+  updateShadowMapUniforms,
 } from '@/rendering/shadows'
 import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
@@ -162,7 +165,7 @@ vec3 tubeTransformVertex(vec3 localPos) {
 
   return start3D + radial + axial;
 }
-`;
+`
 
 /**
  * Create shared uniforms for tube shadow materials.
@@ -174,17 +177,20 @@ vec3 tubeTransformVertex(vec3 localPos) {
  * @param radius - Tube radius
  * @returns Record of tube shadow uniforms
  */
-function createTubeShadowUniforms(dimension: number, radius: number): Record<string, { value: unknown }> {
+function createTubeShadowUniforms(
+  dimension: number,
+  radius: number
+): Record<string, { value: unknown }> {
   return {
     uRotationMatrix4D: { value: new Matrix4() },
     uDimension: { value: dimension },
-    uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
+    uUniformScale: { value: 1.0 }, // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
     uDepthRowSums: { value: new Float32Array(11) },
     uDepthNormFactor: { value: dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 },
     uProjectionDistance: { value: DEFAULT_PROJECTION_DISTANCE },
     uRadius: { value: radius },
-  };
+  }
 }
 
 export interface TubeWireframeProps {
@@ -247,13 +253,13 @@ export function TubeWireframe({
   // P4 Optimization: Pre-allocated instance attribute arrays to avoid per-change allocations
   // These are resized only when edge count increases, otherwise reused
   const instanceArraysRef = useRef<{
-    capacity: number;
-    start: Float32Array;
-    end: Float32Array;
-    startExtraA: Float32Array;
-    startExtraB: Float32Array;
-    endExtraA: Float32Array;
-    endExtraB: Float32Array;
+    capacity: number
+    start: Float32Array
+    end: Float32Array
+    startExtraA: Float32Array
+    startExtraB: Float32Array
+    endExtraA: Float32Array
+    endExtraB: Float32Array
   } | null>(null)
 
   // Performance optimization: Cache store state in refs to avoid getState() calls every frame
@@ -272,11 +278,21 @@ export function TubeWireframe({
 
   // Subscribe to store changes to update refs
   useEffect(() => {
-    const unsubTrans = useTransformStore.subscribe((s) => { transformStateRef.current = s })
-    const unsubApp = useAppearanceStore.subscribe((s) => { appearanceStateRef.current = s })
-    const unsubLight = useLightingStore.subscribe((s) => { lightingStateRef.current = s })
-    const unsubEnv = useEnvironmentStore.subscribe((s) => { environmentStateRef.current = s })
-    const unsubExt = useExtendedObjectStore.subscribe((s) => { extendedObjectStateRef.current = s })
+    const unsubTrans = useTransformStore.subscribe((s) => {
+      transformStateRef.current = s
+    })
+    const unsubApp = useAppearanceStore.subscribe((s) => {
+      appearanceStateRef.current = s
+    })
+    const unsubLight = useLightingStore.subscribe((s) => {
+      lightingStateRef.current = s
+    })
+    const unsubEnv = useEnvironmentStore.subscribe((s) => {
+      environmentStateRef.current = s
+    })
+    const unsubExt = useExtendedObjectStore.subscribe((s) => {
+      extendedObjectStateRef.current = s
+    })
     return () => {
       unsubTrans()
       unsubApp()
@@ -299,7 +315,11 @@ export function TubeWireframe({
   const fresnelEnabled = useAppearanceStore((state) => state.shaderSettings.surface.fresnelEnabled)
 
   // Compute shader configuration for tracking (used outside the hook)
-  const { glsl: fragmentShaderString, modules: shaderModules, features: shaderFeatures } = useMemo(() => {
+  const {
+    glsl: fragmentShaderString,
+    modules: shaderModules,
+    features: shaderFeatures,
+  } = useMemo(() => {
     return composeTubeWireframeFragmentShader({
       sss: sssEnabled,
       fresnel: fresnelEnabled,
@@ -329,7 +349,7 @@ export function TubeWireframe({
           // N-D transformation (scale is applied AFTER projection, like camera zoom)
           uRotationMatrix4D: { value: new Matrix4() },
           uDimension: { value: dimension },
-          uUniformScale: { value: 1.0 },  // Applied AFTER projection
+          uUniformScale: { value: 1.0 }, // Applied AFTER projection
           uExtraRotationCols: { value: new Float32Array(MAX_EXTRA_DIMS * 4) },
           uDepthRowSums: { value: new Float32Array(11) },
           uDepthNormFactor: { value: dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 },
@@ -375,7 +395,10 @@ export function TubeWireframe({
 
   // Create shared uniforms for shadow materials (patched MeshDepthMaterial and MeshDistanceMaterial)
   // These uniforms are shared and updated per-frame
-  const shadowUniforms = useMemo(() => createTubeShadowUniforms(dimension, radius), [dimension, radius])
+  const shadowUniforms = useMemo(
+    () => createTubeShadowUniforms(dimension, radius),
+    [dimension, radius]
+  )
 
   // Use shared shadow patching hook for tube N-D transformation in shadow materials.
   // This handles creation, lifecycle, and runtime toggling of patched materials.
@@ -387,11 +410,14 @@ export function TubeWireframe({
   })
 
   // Combined callback ref for mesh: assigns layer and shadow materials
-  const setMeshRef = useCallback((mesh: InstancedMesh | null) => {
-    meshRef.current = mesh
-    // Delegate layer and shadow material assignment to the hook
-    assignShadowToMesh(mesh)
-  }, [assignShadowToMesh])
+  const setMeshRef = useCallback(
+    (mesh: InstancedMesh | null) => {
+      meshRef.current = mesh
+      // Delegate layer and shadow material assignment to the hook
+      assignShadowToMesh(mesh)
+    },
+    [assignShadowToMesh]
+  )
 
   // Dispatch shader debug info (only when material is ready)
   useEffect(() => {
@@ -454,7 +480,14 @@ export function TubeWireframe({
     }
 
     // Use the pre-allocated arrays
-    const { start: instanceStart, end: instanceEnd, startExtraA: instanceStartExtraA, startExtraB: instanceStartExtraB, endExtraA: instanceEndExtraA, endExtraB: instanceEndExtraB } = arrays
+    const {
+      start: instanceStart,
+      end: instanceEnd,
+      startExtraA: instanceStartExtraA,
+      startExtraB: instanceStartExtraB,
+      endExtraA: instanceEndExtraA,
+      endExtraB: instanceEndExtraB,
+    } = arrays
 
     // Fill instance arrays
     for (let i = 0; i < edges.length; i++) {
@@ -512,29 +545,59 @@ export function TubeWireframe({
 
     // P4 Optimization: Check if attributes already exist and can be updated in-place
     // This avoids creating new InstancedBufferAttribute objects every time
-    const existingStart = geometry.getAttribute('instanceStart') as InstancedBufferAttribute | undefined
+    const existingStart = geometry.getAttribute('instanceStart') as
+      | InstancedBufferAttribute
+      | undefined
     if (existingStart && existingStart.array.length >= instanceCount * 3) {
       // Reuse existing attribute - just update the data
       existingStart.array.set(instanceStart.subarray(0, instanceCount * 3))
       existingStart.needsUpdate = true
-      ;(geometry.getAttribute('instanceEnd') as InstancedBufferAttribute).array.set(instanceEnd.subarray(0, instanceCount * 3))
+      ;(geometry.getAttribute('instanceEnd') as InstancedBufferAttribute).array.set(
+        instanceEnd.subarray(0, instanceCount * 3)
+      )
       ;(geometry.getAttribute('instanceEnd') as InstancedBufferAttribute).needsUpdate = true
-      ;(geometry.getAttribute('instanceStartExtraA') as InstancedBufferAttribute).array.set(instanceStartExtraA.subarray(0, instanceCount * 4))
+      ;(geometry.getAttribute('instanceStartExtraA') as InstancedBufferAttribute).array.set(
+        instanceStartExtraA.subarray(0, instanceCount * 4)
+      )
       ;(geometry.getAttribute('instanceStartExtraA') as InstancedBufferAttribute).needsUpdate = true
-      ;(geometry.getAttribute('instanceStartExtraB') as InstancedBufferAttribute).array.set(instanceStartExtraB.subarray(0, instanceCount * 4))
+      ;(geometry.getAttribute('instanceStartExtraB') as InstancedBufferAttribute).array.set(
+        instanceStartExtraB.subarray(0, instanceCount * 4)
+      )
       ;(geometry.getAttribute('instanceStartExtraB') as InstancedBufferAttribute).needsUpdate = true
-      ;(geometry.getAttribute('instanceEndExtraA') as InstancedBufferAttribute).array.set(instanceEndExtraA.subarray(0, instanceCount * 4))
+      ;(geometry.getAttribute('instanceEndExtraA') as InstancedBufferAttribute).array.set(
+        instanceEndExtraA.subarray(0, instanceCount * 4)
+      )
       ;(geometry.getAttribute('instanceEndExtraA') as InstancedBufferAttribute).needsUpdate = true
-      ;(geometry.getAttribute('instanceEndExtraB') as InstancedBufferAttribute).array.set(instanceEndExtraB.subarray(0, instanceCount * 4))
+      ;(geometry.getAttribute('instanceEndExtraB') as InstancedBufferAttribute).array.set(
+        instanceEndExtraB.subarray(0, instanceCount * 4)
+      )
       ;(geometry.getAttribute('instanceEndExtraB') as InstancedBufferAttribute).needsUpdate = true
     } else {
       // Create new attributes (first time or capacity increased)
-      geometry.setAttribute('instanceStart', new InstancedBufferAttribute(instanceStart.subarray(0, instanceCount * 3), 3))
-      geometry.setAttribute('instanceEnd', new InstancedBufferAttribute(instanceEnd.subarray(0, instanceCount * 3), 3))
-      geometry.setAttribute('instanceStartExtraA', new InstancedBufferAttribute(instanceStartExtraA.subarray(0, instanceCount * 4), 4))
-      geometry.setAttribute('instanceStartExtraB', new InstancedBufferAttribute(instanceStartExtraB.subarray(0, instanceCount * 4), 4))
-      geometry.setAttribute('instanceEndExtraA', new InstancedBufferAttribute(instanceEndExtraA.subarray(0, instanceCount * 4), 4))
-      geometry.setAttribute('instanceEndExtraB', new InstancedBufferAttribute(instanceEndExtraB.subarray(0, instanceCount * 4), 4))
+      geometry.setAttribute(
+        'instanceStart',
+        new InstancedBufferAttribute(instanceStart.subarray(0, instanceCount * 3), 3)
+      )
+      geometry.setAttribute(
+        'instanceEnd',
+        new InstancedBufferAttribute(instanceEnd.subarray(0, instanceCount * 3), 3)
+      )
+      geometry.setAttribute(
+        'instanceStartExtraA',
+        new InstancedBufferAttribute(instanceStartExtraA.subarray(0, instanceCount * 4), 4)
+      )
+      geometry.setAttribute(
+        'instanceStartExtraB',
+        new InstancedBufferAttribute(instanceStartExtraB.subarray(0, instanceCount * 4), 4)
+      )
+      geometry.setAttribute(
+        'instanceEndExtraA',
+        new InstancedBufferAttribute(instanceEndExtraA.subarray(0, instanceCount * 4), 4)
+      )
+      geometry.setAttribute(
+        'instanceEndExtraB',
+        new InstancedBufferAttribute(instanceEndExtraB.subarray(0, instanceCount * 4), 4)
+      )
     }
 
     // Update instance count
@@ -629,12 +692,20 @@ export function TubeWireframe({
       // Fresnel (cached linear conversion)
       u.uFresnelEnabled!.value = appearanceState.shaderSettings.surface.fresnelEnabled
       u.uFresnelIntensity!.value = appearanceState.fresnelIntensity
-      updateLinearColorUniform(cache.rimColor, u.uRimColor!.value as Color, appearanceState.edgeColor)
+      updateLinearColorUniform(
+        cache.rimColor,
+        u.uRimColor!.value as Color,
+        appearanceState.edgeColor
+      )
 
       // Rim SSS (shared with raymarched objects)
       u.uSssEnabled!.value = appearanceState.sssEnabled
       u.uSssIntensity!.value = appearanceState.sssIntensity
-      updateLinearColorUniform(cache.sssColor, u.uSssColor!.value as Color, appearanceState.sssColor)
+      updateLinearColorUniform(
+        cache.sssColor,
+        u.uSssColor!.value as Color,
+        appearanceState.sssColor
+      )
       u.uSssThickness!.value = appearanceState.sssThickness
       if (u.uSssJitter) u.uSssJitter.value = appearanceState.sssJitter
 

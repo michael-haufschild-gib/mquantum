@@ -230,7 +230,7 @@ void main() {
     gPosition = vec4(0.0);
     #endif
 }
-`;
+`
 
 /**
  * Alternative main block for isosurface mode (optional)
@@ -447,4 +447,4 @@ void main() {
     // Dummy output for isosurface mode (always required for MRT compatibility)
     gPosition = vec4(worldHitPos.xyz, alpha);
 }
-`;
+`

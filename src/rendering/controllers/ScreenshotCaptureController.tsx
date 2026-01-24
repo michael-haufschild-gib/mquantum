@@ -33,7 +33,7 @@ export function ScreenshotCaptureController() {
     captureCanvasRef.current = document.createElement('canvas')
     captureCtxRef.current = captureCanvasRef.current.getContext('2d', {
       willReadFrequently: false,
-      alpha: false
+      alpha: false,
     })
 
     return () => {

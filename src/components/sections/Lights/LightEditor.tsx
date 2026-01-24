@@ -14,20 +14,20 @@
  * - Range/Decay sliders (point/spot only)
  */
 
-import { Button } from '@/components/ui/Button';
-import { ColorPicker } from '@/components/ui/ColorPicker';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
-import { Slider } from '@/components/ui/Slider';
-import type { LightSource, LightType } from '@/rendering/lights/types';
-import { useLightingStore, type LightingSlice } from '@/stores/lightingStore';
-import React, { memo, useCallback } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { AMBIENT_LIGHT_ID } from './LightListItem';
-import { Vector3Input } from './Vector3Input';
+import { Button } from '@/components/ui/Button'
+import { ColorPicker } from '@/components/ui/ColorPicker'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { Slider } from '@/components/ui/Slider'
+import type { LightSource, LightType } from '@/rendering/lights/types'
+import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
+import React, { memo, useCallback } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { AMBIENT_LIGHT_ID } from './LightListItem'
+import { Vector3Input } from './Vector3Input'
 
 export interface LightEditorProps {
-  className?: string;
+  className?: string
 }
 
 /** Light type options for selector */
@@ -35,10 +35,10 @@ const LIGHT_TYPE_OPTIONS: { value: LightType; label: string }[] = [
   { value: 'point', label: 'Point' },
   { value: 'directional', label: 'Directional' },
   { value: 'spot', label: 'Spot' },
-];
+]
 
 /** Radians to degrees conversion */
-const RAD_TO_DEG = 180 / Math.PI;
+const RAD_TO_DEG = 180 / Math.PI
 
 export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor({
   className = '',
@@ -54,7 +54,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     ambientColor: state.ambientColor,
     setAmbientIntensity: state.setAmbientIntensity,
     setAmbientColor: state.setAmbientColor,
-  }));
+  }))
   const {
     lights,
     selectedLightId,
@@ -65,119 +65,120 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
     ambientColor,
     setAmbientIntensity,
     setAmbientColor,
-  } = useLightingStore(lightingSelector);
+  } = useLightingStore(lightingSelector)
 
   // Check if ambient light is selected
-  const isAmbientLightSelected = selectedLightId === AMBIENT_LIGHT_ID;
+  const isAmbientLightSelected = selectedLightId === AMBIENT_LIGHT_ID
 
   // Find selected light (only for non-ambient)
   const selectedLight = isAmbientLightSelected
     ? null
-    : lights.find((l: LightSource) => l.id === selectedLightId);
+    : lights.find((l: LightSource) => l.id === selectedLightId)
 
   // Update handlers
   const handleNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { name: e.target.value });
+        updateLight(selectedLightId, { name: e.target.value })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleTypeChange = useCallback(
     (type: LightType) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { type });
+        updateLight(selectedLightId, { type })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleIntensityChange = useCallback(
     (intensity: number) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { intensity });
+        updateLight(selectedLightId, { intensity })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handlePositionChange = useCallback(
     (position: [number, number, number]) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { position });
+        updateLight(selectedLightId, { position })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleRotationChange = useCallback(
     (rotation: [number, number, number]) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { rotation });
+        updateLight(selectedLightId, { rotation })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleConeAngleChange = useCallback(
     (coneAngle: number) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { coneAngle });
+        updateLight(selectedLightId, { coneAngle })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handlePenumbraChange = useCallback(
     (penumbra: number) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { penumbra });
+        updateLight(selectedLightId, { penumbra })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleRangeChange = useCallback(
     (range: number) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { range });
+        updateLight(selectedLightId, { range })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleDecayChange = useCallback(
     (decay: number) => {
       if (selectedLightId) {
-        updateLight(selectedLightId, { decay });
+        updateLight(selectedLightId, { decay })
       }
     },
     [selectedLightId, updateLight]
-  );
+  )
 
   const handleDuplicate = useCallback(() => {
     if (selectedLightId) {
-      const newId = duplicateLight(selectedLightId);
+      const newId = duplicateLight(selectedLightId)
       if (newId) {
-        selectLight(newId);
+        selectLight(newId)
       }
     }
-  }, [selectedLightId, duplicateLight, selectLight]);
+  }, [selectedLightId, duplicateLight, selectLight])
 
-  const handleColorChange = useCallback((val: string) => {
-    if (selectedLightId) {
-      updateLight(selectedLightId, { color: val });
-    }
-  }, [selectedLightId, updateLight]);
+  const handleColorChange = useCallback(
+    (val: string) => {
+      if (selectedLightId) {
+        updateLight(selectedLightId, { color: val })
+      }
+    },
+    [selectedLightId, updateLight]
+  )
 
   // Show ambient light editor if ambient is selected
   if (isAmbientLightSelected) {
     return (
       <div className={`space-y-4 ${className}`}>
-
-
         {/* Color picker */}
         <div className="flex items-center justify-between">
           <ColorPicker
@@ -186,7 +187,6 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
             onChange={setAmbientColor}
             disableAlpha={true}
           />
-
         </div>
 
         {/* Intensity slider */}
@@ -203,10 +203,9 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
               tooltip="Global ambient lighting level"
             />
           </div>
-
         </div>
       </div>
-    );
+    )
   }
 
   // Show placeholder if no light selected
@@ -215,11 +214,11 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
       <div className={`text-center text-sm text-text-tertiary py-4 ${className}`}>
         Select a light to edit
       </div>
-    );
+    )
   }
 
-  const showRotation = selectedLight.type === 'directional' || selectedLight.type === 'spot';
-  const showSpotSettings = selectedLight.type === 'spot';
+  const showRotation = selectedLight.type === 'directional' || selectedLight.type === 'spot'
+  const showSpotSettings = selectedLight.type === 'spot'
 
   return (
     <div className={`space-y-4 ${className}`}>
@@ -231,13 +230,14 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
           aria-label="Light name"
           containerClassName="flex-1"
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleDuplicate}
-          ariaLabel="Duplicate light"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <Button variant="ghost" size="icon" onClick={handleDuplicate} ariaLabel="Duplicate light">
+          <svg
+            className="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
             <rect x="9" y="9" width="13" height="13" rx="2" />
             <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
           </svg>
@@ -254,7 +254,6 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
             onChange={handleTypeChange}
           />
         </div>
-
       </div>
 
       {/* Color picker */}
@@ -264,7 +263,6 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         onChange={handleColorChange}
         disableAlpha={true}
       />
-
 
       {/* Intensity slider */}
       <Slider
@@ -347,7 +345,6 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
           />
         </>
       )}
-
     </div>
-  );
-});
+  )
+})

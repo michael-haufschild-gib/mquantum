@@ -46,9 +46,9 @@ export function ContextEventHandler(): null {
    */
   const getExtension = useCallback((): WEBGL_lose_context | null => {
     if (!loseContextExtRef.current) {
-      loseContextExtRef.current = gl.getContext().getExtension(
-        'WEBGL_lose_context'
-      ) as WEBGL_lose_context | null
+      loseContextExtRef.current = gl
+        .getContext()
+        .getExtension('WEBGL_lose_context') as WEBGL_lose_context | null
     }
     return loseContextExtRef.current
   }, [gl])

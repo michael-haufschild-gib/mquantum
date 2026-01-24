@@ -4,4 +4,4 @@
  * @module lib/cache
  */
 
-export { IndexedDBCache, type IndexedDBCacheStore } from './IndexedDBCache';
+export { IndexedDBCache, type IndexedDBCacheStore } from './IndexedDBCache'

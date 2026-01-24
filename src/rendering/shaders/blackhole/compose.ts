@@ -178,14 +178,26 @@ uniform float uSliceAmplitude;
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },
     { name: 'Param Values', content: paramValuesStr },
-    { name: 'Slice Animation Uniforms', content: sliceAnimationUniforms, condition: useSliceAnimation },
+    {
+      name: 'Slice Animation Uniforms',
+      content: sliceAnimationUniforms,
+      condition: useSliceAnimation,
+    },
     { name: 'Black Hole Uniforms', content: blackHoleUniformsBlock },
     { name: 'Environment Map', content: 'uniform samplerCube envMap;', condition: enableEnvMap },
     // PERF (OPT-BH-1): Pre-baked 3D noise texture for volumetric disk
-    { name: 'Disk Noise Texture', content: 'uniform sampler3D tDiskNoise;', condition: useNoiseTexture },
+    {
+      name: 'Disk Noise Texture',
+      content: 'uniform sampler3D tDiskNoise;',
+      condition: useNoiseTexture,
+    },
     // PERF (OPT-BH-17): Pre-baked blackbody color LUT for temperature coloring
-    { name: 'Blackbody LUT', content: 'uniform sampler2D tBlackbodyLUT;', condition: useBlackbodyLUT },
-    
+    {
+      name: 'Blackbody LUT',
+      content: 'uniform sampler2D tBlackbodyLUT;',
+      condition: useBlackbodyLUT,
+    },
+
     // Core Libraries
     { name: 'Palette Lib', content: GLSL_ALL_PALETTE_FUNCTIONS },
 
@@ -196,7 +208,7 @@ uniform float uSliceAmplitude;
     { name: 'Manifold', content: manifoldBlock },
     { name: 'Doppler', content: dopplerBlock },
     { name: 'Colors', content: colorsBlock },
-    
+
     // Disk implementations
     // Volumetric disk provides continuous density sampling (always enabled)
     { name: 'Disk Volumetric', content: diskVolumetricBlock },

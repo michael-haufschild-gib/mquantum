@@ -184,4 +184,3 @@ describe('Gravitational Lensing Shader Early-Exit', () => {
     })
   })
 })
-

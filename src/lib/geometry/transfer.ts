@@ -1,6 +1,6 @@
 /**
  * Types and utilities for efficient geometry transfer between workers and main thread.
- * 
+ *
  * Uses TypedArrays and Transferable objects to minimize serialization overhead.
  */
 
@@ -99,8 +99,14 @@ export function flattenGeometry(geometry: PolytopeGeometry | NdGeometry): {
  * @throws Error if data is corrupted or indices are out of bounds
  */
 export function inflateGeometry(transferable: TransferablePolytopeGeometry): NdGeometry {
-  const { vertices: flatVertices, edges: flatEdges, faces: flatFaces, dimension, type, metadata } =
-    transferable
+  const {
+    vertices: flatVertices,
+    edges: flatEdges,
+    faces: flatFaces,
+    dimension,
+    type,
+    metadata,
+  } = transferable
 
   // Validate input
   if (dimension < 1) {
@@ -114,9 +120,7 @@ export function inflateGeometry(transferable: TransferablePolytopeGeometry): NdG
   }
 
   if (flatEdges.length % 2 !== 0) {
-    throw new Error(
-      `Edge data corruption: buffer length ${flatEdges.length} is not divisible by 2`
-    )
+    throw new Error(`Edge data corruption: buffer length ${flatEdges.length} is not divisible by 2`)
   }
 
   // Reconstruct vertices with bounds checking
@@ -266,9 +270,7 @@ export function flattenFaces(faces: [number, number, number][]): {
  */
 export function inflateFaces(flatFaces: Uint32Array): [number, number, number][] {
   if (flatFaces.length % 3 !== 0) {
-    throw new Error(
-      `Face data corruption: buffer length ${flatFaces.length} is not divisible by 3`
-    )
+    throw new Error(`Face data corruption: buffer length ${flatFaces.length} is not divisible by 3`)
   }
 
   const numFaces = flatFaces.length / 3
@@ -360,9 +362,7 @@ export function inflateVerticesOnly(flatVertices: Float64Array, dimension: numbe
  */
 export function inflateEdges(flatEdges: Uint32Array): [number, number][] {
   if (flatEdges.length % 2 !== 0) {
-    throw new Error(
-      `Edge data corruption: buffer length ${flatEdges.length} is not divisible by 2`
-    )
+    throw new Error(`Edge data corruption: buffer length ${flatEdges.length} is not divisible by 2`)
   }
 
   const numEdges = flatEdges.length / 2

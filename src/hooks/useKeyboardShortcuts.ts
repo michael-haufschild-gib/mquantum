@@ -96,15 +96,16 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
   const resetCamera = useCameraStore((state) => state.reset)
 
   // Grouped lighting store subscription
-  const { selectedLightId, setTransformMode, selectLight, removeLight, duplicateLight } = useLightingStore(
-    useShallow((state) => ({
-      selectedLightId: state.selectedLightId,
-      setTransformMode: state.setTransformMode,
-      selectLight: state.selectLight,
-      removeLight: state.removeLight,
-      duplicateLight: state.duplicateLight,
-    }))
-  )
+  const { selectedLightId, setTransformMode, selectLight, removeLight, duplicateLight } =
+    useLightingStore(
+      useShallow((state) => ({
+        selectedLightId: state.selectedLightId,
+        setTransformMode: state.setTransformMode,
+        selectLight: state.selectLight,
+        removeLight: state.removeLight,
+        duplicateLight: state.duplicateLight,
+      }))
+    )
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -162,9 +163,9 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       }
 
       if (isCtrlOrMeta && shiftKey && lowerKey === 'e') {
-          event.preventDefault()
-          useExportStore.getState().setModalOpen(true)
-          return
+        event.preventDefault()
+        useExportStore.getState().setModalOpen(true)
+        return
       }
 
       if (!isCtrlOrMeta && !shiftKey && lowerKey === 'c') {

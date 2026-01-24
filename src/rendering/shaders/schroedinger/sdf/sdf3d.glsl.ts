@@ -90,4 +90,4 @@ float sdf3D_simple(vec3 pos, float pwr, float bail, int maxIt) {
     }
     return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
 }
-`;
+`

@@ -95,4 +95,4 @@ void main() {
   // CRITICAL: Always write to gPosition to prevent GL_INVALID_OPERATION
   gPosition = vec4(vWorldPosition, 1.0);
 }
-`;
+`

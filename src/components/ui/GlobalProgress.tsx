@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { m, AnimatePresence } from 'motion/react';
-import { usePerformanceStore } from '@/stores/performanceStore';
-import { useEnvironmentStore } from '@/stores/environmentStore';
-import { useShallow } from 'zustand/react/shallow';
+import React, { useEffect, useMemo, useState } from 'react'
+import { m, AnimatePresence } from 'motion/react'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import { useEnvironmentStore } from '@/stores/environmentStore'
+import { useShallow } from 'zustand/react/shallow'
 
 export const GlobalProgress: React.FC = React.memo(() => {
   const { sceneTransitioning, refinementProgress } = usePerformanceStore(
@@ -10,28 +10,31 @@ export const GlobalProgress: React.FC = React.memo(() => {
       sceneTransitioning: s.sceneTransitioning,
       refinementProgress: s.refinementProgress,
     }))
-  );
-  const skyboxLoading = useEnvironmentStore((s) => s.skyboxLoading);
+  )
+  const skyboxLoading = useEnvironmentStore((s) => s.skyboxLoading)
 
   // We show the bar if:
   // 1. Scene is transitioning (indeterminate or just started)
   // 2. Skybox is loading (indeterminate)
   // 3. Refinement is in progress (determinate < 100)
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout>
     if (sceneTransitioning || skyboxLoading || refinementProgress < 100) {
-        setIsVisible(true);
+      setIsVisible(true)
     } else {
-        // Small delay before hiding to prevent flickering
-        timer = setTimeout(() => setIsVisible(false), 500);
+      // Small delay before hiding to prevent flickering
+      timer = setTimeout(() => setIsVisible(false), 500)
     }
-    return () => clearTimeout(timer);
-  }, [sceneTransitioning, skyboxLoading, refinementProgress]);
+    return () => clearTimeout(timer)
+  }, [sceneTransitioning, skyboxLoading, refinementProgress])
 
   // If indeterminate - memoize to prevent recalculation
-  const isIndeterminate = useMemo(() => sceneTransitioning || skyboxLoading, [sceneTransitioning, skyboxLoading]);
+  const isIndeterminate = useMemo(
+    () => sceneTransitioning || skyboxLoading,
+    [sceneTransitioning, skyboxLoading]
+  )
 
   return (
     <AnimatePresence>
@@ -47,19 +50,19 @@ export const GlobalProgress: React.FC = React.memo(() => {
 
           {/* Progress Bar */}
           {isIndeterminate ? (
-             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent to-transparent w-[50%] animate-[shimmer_1.5s_infinite] translate-x-[-100%]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-accent to-transparent w-[50%] animate-[shimmer_1.5s_infinite] translate-x-[-100%]" />
           ) : (
-             <m.div 
-               className="absolute inset-y-0 left-0 bg-accent shadow-[0_0_10px_var(--color-accent)]"
-               initial={{ width: 0 }}
-               animate={{ width: `${refinementProgress}%` }}
-               transition={{ type: "spring", stiffness: 100, damping: 20 }}
-             />
+            <m.div
+              className="absolute inset-y-0 left-0 bg-accent shadow-[0_0_10px_var(--color-accent)]"
+              initial={{ width: 0 }}
+              animate={{ width: `${refinementProgress}%` }}
+              transition={{ type: 'spring', stiffness: 100, damping: 20 }}
+            />
           )}
         </m.div>
       )}
     </AnimatePresence>
-  );
-});
+  )
+})
 
-GlobalProgress.displayName = 'GlobalProgress';
+GlobalProgress.displayName = 'GlobalProgress'

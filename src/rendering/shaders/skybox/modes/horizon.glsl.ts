@@ -96,4 +96,4 @@ vec3 getHorizonGradient(vec3 dir, float time) {
 
     return col;
 }
-`;
+`

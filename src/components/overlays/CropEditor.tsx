@@ -1,19 +1,26 @@
-import { useExportStore } from '@/stores/exportStore';
-import { useLayoutStore } from '@/stores/layoutStore';
-import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture';
-import { Button } from '../ui/Button';
-import { Icon } from '../ui/Icon';
-import { useEffect, useRef, useState } from 'react';
-import { m } from 'motion/react';
-import { useShallow } from 'zustand/react/shallow';
-import { CropBox, CropValues } from './CropBox';
+import { useExportStore } from '@/stores/exportStore'
+import { useLayoutStore } from '@/stores/layoutStore'
+import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
+import { Button } from '../ui/Button'
+import { Icon } from '../ui/Icon'
+import { useEffect, useRef, useState } from 'react'
+import { m } from 'motion/react'
+import { useShallow } from 'zustand/react/shallow'
+import { CropBox, CropValues } from './CropBox'
 
 /**
  * Full-screen crop editor for video export.
  * Uses shared CropBox component for the crop UI.
  */
 export const CropEditor = () => {
-  const { isCropEditorOpen, setCropEditorOpen, settings, updateSettings, setModalOpen, setPreviewImage } = useExportStore(
+  const {
+    isCropEditorOpen,
+    setCropEditorOpen,
+    settings,
+    updateSettings,
+    setModalOpen,
+    setPreviewImage,
+  } = useExportStore(
     useShallow((state) => ({
       isCropEditorOpen: state.isCropEditorOpen,
       setCropEditorOpen: state.setCropEditorOpen,
@@ -22,36 +29,36 @@ export const CropEditor = () => {
       setModalOpen: state.setModalOpen,
       setPreviewImage: state.setPreviewImage,
     }))
-  );
-  const setCinematicMode = useLayoutStore((state) => state.setCinematicMode);
+  )
+  const setCinematicMode = useLayoutStore((state) => state.setCinematicMode)
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [crop, setCrop] = useState<CropValues>({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 });
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [crop, setCrop] = useState<CropValues>({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 })
 
   // Initialize from store on open
   useEffect(() => {
     if (isCropEditorOpen) {
-      const { x, y, width, height, enabled } = settings.crop;
+      const { x, y, width, height, enabled } = settings.crop
       if (enabled && width > 0) {
-        setCrop({ x, y, width, height });
+        setCrop({ x, y, width, height })
       } else {
-        setCrop({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 });
+        setCrop({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 })
       }
     }
-  }, [isCropEditorOpen, settings.crop]);
+  }, [isCropEditorOpen, settings.crop])
 
   // Recapture screenshot before reopening modal
   // (The modal's reset() clears previewImage when it closes for crop editor)
   const recapturePreview = async () => {
     try {
-      const dataUrl = await captureScreenshotAsync();
-      setPreviewImage(dataUrl);
+      const dataUrl = await captureScreenshotAsync()
+      setPreviewImage(dataUrl)
     } catch (e) {
-      console.error('Failed to recapture preview:', e);
+      console.error('Failed to recapture preview:', e)
     }
-  };
+  }
 
-  if (!isCropEditorOpen) return null;
+  if (!isCropEditorOpen) return null
 
   const handleConfirm = async () => {
     updateSettings({
@@ -62,34 +69,34 @@ export const CropEditor = () => {
         width: crop.width,
         height: crop.height,
       },
-    });
-    setCropEditorOpen(false);
-    setCinematicMode(false);
+    })
+    setCropEditorOpen(false)
+    setCinematicMode(false)
     // Capture preview before opening modal
-    await recapturePreview();
-    setModalOpen(true);
-  };
+    await recapturePreview()
+    setModalOpen(true)
+  }
 
   const handleCancel = async () => {
-    setCropEditorOpen(false);
-    setCinematicMode(false);
+    setCropEditorOpen(false)
+    setCinematicMode(false)
     // Capture preview before opening modal
-    await recapturePreview();
-    setModalOpen(true);
-  };
+    await recapturePreview()
+    setModalOpen(true)
+  }
 
   // Aspect Ratio Helper
   const setRatio = (ratio: number) => {
-    let w = crop.width;
-    let h = w / ratio;
+    let w = crop.width
+    let h = w / ratio
     if (h > 1) {
-      h = 1;
-      w = h * ratio;
+      h = 1
+      w = h * ratio
     }
-    const x = (1 - w) / 2;
-    const y = (1 - h) / 2;
-    setCrop({ x, y, width: w, height: h });
-  };
+    const x = (1 - w) / 2
+    const y = (1 - h) / 2
+    setCrop({ x, y, width: w, height: h })
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col pointer-events-auto overflow-hidden">
@@ -106,18 +113,30 @@ export const CropEditor = () => {
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-text-primary text-sm">Crop Selection</span>
-              <span className="text-[10px] text-text-tertiary uppercase tracking-widest">Cinematic Mode</span>
+              <span className="text-[10px] text-text-tertiary uppercase tracking-widest">
+                Cinematic Mode
+              </span>
             </div>
           </div>
 
           <div className="h-8 w-px bg-[var(--bg-active)]" />
 
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setRatio(16 / 9)}>16:9</Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(9 / 16)}>9:16</Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(1)}>1:1</Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(4 / 5)}>4:5</Button>
-            <Button size="sm" variant="secondary" onClick={() => setRatio(2.35)}>2.35:1</Button>
+            <Button size="sm" variant="secondary" onClick={() => setRatio(16 / 9)}>
+              16:9
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setRatio(9 / 16)}>
+              9:16
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setRatio(1)}>
+              1:1
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setRatio(4 / 5)}>
+              4:5
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setRatio(2.35)}>
+              2.35:1
+            </Button>
           </div>
         </div>
 
@@ -136,14 +155,19 @@ export const CropEditor = () => {
       </m.div>
 
       {/* Editor Area */}
-      <div ref={containerRef} className="flex-1 relative cursor-crosshair overflow-hidden select-none">
+      <div
+        ref={containerRef}
+        className="flex-1 relative cursor-crosshair overflow-hidden select-none"
+      >
         <CropBox containerRef={containerRef} crop={crop} onCropChange={setCrop} minSize={0.1} />
       </div>
 
       {/* Dimensions Label */}
       <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-[var(--bg-overlay)] backdrop-blur-md text-text-primary text-[10px] px-3 py-1.5 rounded-full font-mono pointer-events-none whitespace-nowrap border border-border-default flex items-center gap-2 z-10">
         <Icon name="image" className="w-3 h-3 text-accent" />
-        <span>{Math.round(crop.width * 100)}% × {Math.round(crop.height * 100)}%</span>
+        <span>
+          {Math.round(crop.width * 100)}% × {Math.round(crop.height * 100)}%
+        </span>
       </div>
 
       {/* Bottom Tip */}
@@ -157,5 +181,5 @@ export const CropEditor = () => {
         </div>
       </m.div>
     </div>
-  );
-};
+  )
+}

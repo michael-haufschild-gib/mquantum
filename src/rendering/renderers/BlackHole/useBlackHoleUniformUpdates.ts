@@ -210,9 +210,14 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       else initThicknessScale = Math.min(initDim, bhState.thicknessPerDimMax)
     } else if (initManifoldType === 1) initThicknessScale = 1.0
     else if (initManifoldType === 2) initThicknessScale = 2.0
-    else if (initManifoldType === 3) initThicknessScale = Math.min(initDim - 2, bhState.thicknessPerDimMax)
+    else if (initManifoldType === 3)
+      initThicknessScale = Math.min(initDim - 2, bhState.thicknessPerDimMax)
     else initThicknessScale = Math.min(initDim, bhState.thicknessPerDimMax)
-    setUniform(u, 'uEffectiveThickness', bhState.manifoldThickness * bhState.horizonRadius * initThicknessScale)
+    setUniform(
+      u,
+      'uEffectiveThickness',
+      bhState.manifoldThickness * bhState.horizonRadius * initThicknessScale
+    )
 
     // Sync camera uniforms
     if (u.uCameraPosition?.value) {
@@ -542,13 +547,19 @@ export function useBlackHoleUniformUpdates({ meshRef }: UseBlackHoleUniformUpdat
       let thicknessScale = 1.0
       if (manifoldTypeInt === 0) {
         // Auto mode: select based on dimension
-        if (dimension <= 3) thicknessScale = 1.0 // disk
-        else if (dimension === 4) thicknessScale = 2.0 // sheet
-        else if (dimension <= 6) thicknessScale = Math.min(dimension - 2, bhState.thicknessPerDimMax) // slab
+        if (dimension <= 3)
+          thicknessScale = 1.0 // disk
+        else if (dimension === 4)
+          thicknessScale = 2.0 // sheet
+        else if (dimension <= 6)
+          thicknessScale = Math.min(dimension - 2, bhState.thicknessPerDimMax) // slab
         else thicknessScale = Math.min(dimension, bhState.thicknessPerDimMax) // field
-      } else if (manifoldTypeInt === 1) thicknessScale = 1.0 // disk
-      else if (manifoldTypeInt === 2) thicknessScale = 2.0 // sheet
-      else if (manifoldTypeInt === 3) thicknessScale = Math.min(dimension - 2, bhState.thicknessPerDimMax) // slab
+      } else if (manifoldTypeInt === 1)
+        thicknessScale = 1.0 // disk
+      else if (manifoldTypeInt === 2)
+        thicknessScale = 2.0 // sheet
+      else if (manifoldTypeInt === 3)
+        thicknessScale = Math.min(dimension - 2, bhState.thicknessPerDimMax) // slab
       else thicknessScale = Math.min(dimension, bhState.thicknessPerDimMax) // field
       const effectiveThickness = bhState.manifoldThickness * bhState.horizonRadius * thicknessScale
       setUniform(u, 'uEffectiveThickness', effectiveThickness)

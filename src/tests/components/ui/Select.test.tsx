@@ -14,7 +14,9 @@ describe('Select', () => {
     const handleChange = vi.fn()
     const user = userEvent.setup()
 
-    render(<Select options={mockOptions} value="option1" onChange={handleChange} label="Choose option" />)
+    render(
+      <Select options={mockOptions} value="option1" onChange={handleChange} label="Choose option" />
+    )
 
     const select = screen.getByRole('combobox') as HTMLSelectElement
     expect(select.value).toBe('option1')

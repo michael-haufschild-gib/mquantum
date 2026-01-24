@@ -1,18 +1,18 @@
-import { create } from 'zustand';
-import { subscribeWithSelector } from 'zustand/middleware';
-import { createGroundSlice, GroundSlice } from './slices/groundSlice';
-import { createSkyboxSlice, SkyboxSlice } from './slices/skyboxSlice';
+import { create } from 'zustand'
+import { subscribeWithSelector } from 'zustand/middleware'
+import { createGroundSlice, GroundSlice } from './slices/groundSlice'
+import { createSkyboxSlice, SkyboxSlice } from './slices/skyboxSlice'
 
 // Extended type with version tracking for dirty-flag optimization
 export interface EnvironmentStore extends GroundSlice, SkyboxSlice {
   /** Version counter for IBL setting changes (iblQuality, iblIntensity) */
-  iblVersion: number;
+  iblVersion: number
   /** Version counter for ground plane setting changes */
-  groundVersion: number;
+  groundVersion: number
   /** Version counter for skybox/procedural setting changes */
-  skyboxVersion: number;
+  skyboxVersion: number
   /** Manually bump all version counters (used after direct setState calls) */
-  bumpAllVersions: () => void;
+  bumpAllVersions: () => void
 }
 
 /**
@@ -28,31 +28,31 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
      */
     const wrappedSet: typeof set = (updater) => {
       set((state) => {
-        const update = typeof updater === 'function' ? updater(state) : updater;
+        const update = typeof updater === 'function' ? updater(state) : updater
 
         // Check which categories are being updated and bump appropriate versions
-        let iblBump = 0;
-        let groundBump = 0;
-        let skyboxBump = 0;
+        let iblBump = 0
+        let groundBump = 0
+        let skyboxBump = 0
 
-        const keys = Object.keys(update);
+        const keys = Object.keys(update)
         for (const key of keys) {
           if (key === 'iblQuality' || key === 'iblIntensity') {
-            iblBump = 1;
+            iblBump = 1
           } else if (
             key.startsWith('groundPlane') ||
             key.startsWith('groundGrid') ||
             key === 'activeWalls' ||
             key === 'showGroundGrid'
           ) {
-            groundBump = 1;
+            groundBump = 1
           } else if (
             key.startsWith('skybox') ||
             key === 'proceduralSettings' ||
             key === 'backgroundColor' ||
             key === 'backgroundBlendMode'
           ) {
-            skyboxBump = 1;
+            skyboxBump = 1
           }
         }
 
@@ -61,13 +61,13 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
           iblVersion: state.iblVersion + iblBump,
           groundVersion: state.groundVersion + groundBump,
           skyboxVersion: state.skyboxVersion + skyboxBump,
-        };
-      });
-    };
+        }
+      })
+    }
 
     // Create slices with the wrapped setter
-    const groundSlice = createGroundSlice(wrappedSet, get, api);
-    const skyboxSlice = createSkyboxSlice(wrappedSet, get, api);
+    const groundSlice = createGroundSlice(wrappedSet, get, api)
+    const skyboxSlice = createSkyboxSlice(wrappedSet, get, api)
 
     return {
       ...groundSlice,
@@ -80,8 +80,8 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
           iblVersion: state.iblVersion + 1,
           groundVersion: state.groundVersion + 1,
           skyboxVersion: state.skyboxVersion + 1,
-        }));
+        }))
       },
-    };
+    }
   })
-);
+)

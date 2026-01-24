@@ -3,16 +3,16 @@
  * Displays progressive refinement progress
  */
 
-import { usePerformanceStore } from '@/stores/performanceStore';
-import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { useShallow } from 'zustand/react/shallow';
+import { usePerformanceStore } from '@/stores/performanceStore'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useShallow } from 'zustand/react/shallow'
 
 export interface RefinementIndicatorProps {
   /** Position in the viewport */
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
   /** Auto-hide delay after reaching 100% (ms) */
-  autoHideDelay?: number;
+  autoHideDelay?: number
 }
 
 /**
@@ -34,49 +34,49 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
       progress: s.refinementProgress,
       isInteracting: s.isInteracting,
     }))
-  );
+  )
 
-  const [isVisible, setIsVisible] = useState(false);
-  const [fadeOut, setFadeOut] = useState(false);
+  const [isVisible, setIsVisible] = useState(false)
+  const [fadeOut, setFadeOut] = useState(false)
 
   // Show/hide logic
   useEffect(() => {
     if (!enabled) {
-      setIsVisible(false);
-      setFadeOut(false);
-      return undefined;
+      setIsVisible(false)
+      setFadeOut(false)
+      return undefined
     }
 
     if (isInteracting) {
       // During interaction - hide immediately
-      setIsVisible(false);
-      setFadeOut(false);
-      return undefined;
+      setIsVisible(false)
+      setFadeOut(false)
+      return undefined
     }
 
     if (progress < 100) {
       // During refinement - show
-      setIsVisible(true);
-      setFadeOut(false);
-      return undefined;
+      setIsVisible(true)
+      setFadeOut(false)
+      return undefined
     }
 
     if (progress >= 100 && stage === 'final') {
       // Complete - start fade out
-      setFadeOut(true);
+      setFadeOut(true)
       const timer = setTimeout(() => {
-        setIsVisible(false);
-        setFadeOut(false);
-      }, autoHideDelay);
-      return () => clearTimeout(timer);
+        setIsVisible(false)
+        setFadeOut(false)
+      }, autoHideDelay)
+      return () => clearTimeout(timer)
     }
 
-    return undefined;
-  }, [enabled, isInteracting, progress, stage, autoHideDelay]);
+    return undefined
+  }, [enabled, isInteracting, progress, stage, autoHideDelay])
 
   // Don't render if not visible
   if (!isVisible && !fadeOut) {
-    return null;
+    return null
   }
 
   // Position classes
@@ -85,7 +85,7 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
     'top-right': 'top-4 right-4',
     'bottom-left': 'bottom-20 left-4',
     'bottom-right': 'bottom-20 right-4',
-  };
+  }
 
   return createPortal(
     <div
@@ -113,5 +113,5 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
       </div>
     </div>,
     document.body
-  );
-};
+  )
+}

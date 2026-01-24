@@ -8,4 +8,4 @@ vec3 applyVignette(vec3 col, vec2 uv) {
     }
     return col;
 }
-`;
+`

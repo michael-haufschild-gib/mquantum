@@ -87,9 +87,7 @@ export const GeometryLoadingIndicator: React.FC<GeometryLoadingIndicatorProps> =
           {/* Header with spinner and stage label */}
           <div className="flex items-center gap-2 mb-2">
             <LoadingSpinner size={14} className="text-accent" />
-            <span className="text-xs text-muted font-medium">
-              {stageLabel}
-            </span>
+            <span className="text-xs text-muted font-medium">{stageLabel}</span>
           </div>
 
           {/* Progress bar track */}
@@ -109,9 +107,7 @@ export const GeometryLoadingIndicator: React.FC<GeometryLoadingIndicatorProps> =
 
           {/* Progress percentage */}
           <div className="mt-1 text-right">
-            <span className="text-[10px] text-muted/70 font-mono">
-              {Math.round(progress)}%
-            </span>
+            <span className="text-[10px] text-muted/70 font-mono">{Math.round(progress)}%</span>
           </div>
         </m.div>
       )}

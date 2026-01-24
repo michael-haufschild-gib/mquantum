@@ -3,10 +3,10 @@
  * Controls for reducing quality during fractal animation for smoother interaction
  */
 
-import { Switch } from '@/components/ui/Switch';
-import { usePerformanceStore } from '@/stores/performanceStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Switch } from '@/components/ui/Switch'
+import { usePerformanceStore } from '@/stores/performanceStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Fractal animation quality controls for the Performance section.
@@ -20,7 +20,7 @@ export const FractalAnimationQualityControls: React.FC = React.memo(() => {
       enabled: s.fractalAnimationLowQuality,
       setEnabled: s.setFractalAnimationLowQuality,
     }))
-  );
+  )
 
   return (
     <div className="space-y-2">
@@ -34,7 +34,7 @@ export const FractalAnimationQualityControls: React.FC = React.memo(() => {
         Fractals only. Smoother rotation at lower quality.
       </p>
     </div>
-  );
-});
+  )
+})
 
-FractalAnimationQualityControls.displayName = 'FractalAnimationQualityControls';
+FractalAnimationQualityControls.displayName = 'FractalAnimationQualityControls'

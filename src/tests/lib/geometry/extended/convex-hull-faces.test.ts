@@ -2,28 +2,46 @@
  * Tests for convex hull face extraction
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect } from 'vitest'
 import {
   computeConvexHullFaces,
   hasValidConvexHull,
   getConvexHullStats,
-} from '@/lib/geometry/extended/utils/convex-hull-faces';
-import { generateARoots, generateDRoots } from '@/lib/geometry/extended/root-system';
-import { generateE8Roots } from '@/lib/geometry/extended/e8-roots';
+} from '@/lib/geometry/extended/utils/convex-hull-faces'
+import { generateARoots, generateDRoots } from '@/lib/geometry/extended/root-system'
+import { generateE8Roots } from '@/lib/geometry/extended/e8-roots'
 
 describe('computeConvexHullFaces', () => {
   describe('basic validation', () => {
     it('should return empty array for less than 4 points', () => {
-      expect(computeConvexHullFaces([])).toEqual([]);
-      expect(computeConvexHullFaces([[0, 0, 0]])).toEqual([]);
-      expect(computeConvexHullFaces([[0, 0, 0], [1, 0, 0]])).toEqual([]);
-      expect(computeConvexHullFaces([[0, 0, 0], [1, 0, 0], [0, 1, 0]])).toEqual([]);
-    });
+      expect(computeConvexHullFaces([])).toEqual([])
+      expect(computeConvexHullFaces([[0, 0, 0]])).toEqual([])
+      expect(
+        computeConvexHullFaces([
+          [0, 0, 0],
+          [1, 0, 0],
+        ])
+      ).toEqual([])
+      expect(
+        computeConvexHullFaces([
+          [0, 0, 0],
+          [1, 0, 0],
+          [0, 1, 0],
+        ])
+      ).toEqual([])
+    })
 
     it('should return empty array for less than 3 dimensions', () => {
-      expect(computeConvexHullFaces([[0, 0], [1, 0], [0, 1], [1, 1]])).toEqual([]);
-    });
-  });
+      expect(
+        computeConvexHullFaces([
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [1, 1],
+        ])
+      ).toEqual([])
+    })
+  })
 
   describe('3D tetrahedron', () => {
     it('should compute 4 triangular faces for a tetrahedron', () => {
@@ -33,27 +51,27 @@ describe('computeConvexHullFaces', () => {
         [1, -1, -1],
         [-1, 1, -1],
         [-1, -1, 1],
-      ];
+      ]
 
-      const faces = computeConvexHullFaces(tetrahedron);
+      const faces = computeConvexHullFaces(tetrahedron)
 
       // Tetrahedron has 4 triangular faces
-      expect(faces).toHaveLength(4);
+      expect(faces).toHaveLength(4)
 
       // Each face should have exactly 3 vertices
       faces.forEach((face) => {
-        expect(face).toHaveLength(3);
-      });
+        expect(face).toHaveLength(3)
+      })
 
       // All face indices should be valid (0-3)
       faces.forEach((face) => {
         face.forEach((idx) => {
-          expect(idx).toBeGreaterThanOrEqual(0);
-          expect(idx).toBeLessThan(4);
-        });
-      });
-    });
-  });
+          expect(idx).toBeGreaterThanOrEqual(0)
+          expect(idx).toBeLessThan(4)
+        })
+      })
+    })
+  })
 
   describe('3D cube', () => {
     it('should compute 12 triangular faces for a cube', () => {
@@ -67,105 +85,112 @@ describe('computeConvexHullFaces', () => {
         [1, 0, 1],
         [0, 1, 1],
         [1, 1, 1],
-      ];
+      ]
 
-      const faces = computeConvexHullFaces(cube);
+      const faces = computeConvexHullFaces(cube)
 
       // Cube has 6 square faces, each triangulated into 2 triangles = 12 triangles
-      expect(faces).toHaveLength(12);
-    });
-  });
+      expect(faces).toHaveLength(12)
+    })
+  })
 
   describe('A_n root system faces', () => {
     it('should compute faces for A_3 (4D, 12 roots)', () => {
-      const vertices = generateARoots(4, 1.0);
-      expect(vertices).toHaveLength(12);
+      const vertices = generateARoots(4, 1.0)
+      expect(vertices).toHaveLength(12)
 
-      const faces = computeConvexHullFaces(vertices);
+      const faces = computeConvexHullFaces(vertices)
 
       // A_3 root polytope (cuboctahedron in projected 3D) has many faces
-      expect(faces.length).toBeGreaterThan(0);
+      expect(faces.length).toBeGreaterThan(0)
 
       // All faces should be triangles
       faces.forEach((face) => {
-        expect(face).toHaveLength(3);
-      });
+        expect(face).toHaveLength(3)
+      })
 
       // All indices should be valid
       faces.forEach((face) => {
         face.forEach((idx) => {
-          expect(idx).toBeGreaterThanOrEqual(0);
-          expect(idx).toBeLessThan(vertices.length);
-        });
-      });
-    });
+          expect(idx).toBeGreaterThanOrEqual(0)
+          expect(idx).toBeLessThan(vertices.length)
+        })
+      })
+    })
 
     it('should compute faces for A_4 (5D, 20 roots)', () => {
-      const vertices = generateARoots(5, 1.0);
-      expect(vertices).toHaveLength(20);
+      const vertices = generateARoots(5, 1.0)
+      expect(vertices).toHaveLength(20)
 
-      const faces = computeConvexHullFaces(vertices);
-      expect(faces.length).toBeGreaterThan(0);
-    });
-  });
+      const faces = computeConvexHullFaces(vertices)
+      expect(faces.length).toBeGreaterThan(0)
+    })
+  })
 
   describe('D_n root system faces', () => {
     it('should compute faces for D_4 (4D, 24 roots / 24-cell)', () => {
-      const vertices = generateDRoots(4, 1.0);
-      expect(vertices).toHaveLength(24);
+      const vertices = generateDRoots(4, 1.0)
+      expect(vertices).toHaveLength(24)
 
-      const faces = computeConvexHullFaces(vertices);
+      const faces = computeConvexHullFaces(vertices)
 
       // D_4 / 24-cell has 96 triangular faces
-      expect(faces.length).toBeGreaterThan(0);
+      expect(faces.length).toBeGreaterThan(0)
 
       // All faces should be triangles
       faces.forEach((face) => {
-        expect(face).toHaveLength(3);
-      });
-    });
+        expect(face).toHaveLength(3)
+      })
+    })
 
     it('should compute faces for D_5 (5D, 40 roots)', () => {
-      const vertices = generateDRoots(5, 1.0);
-      expect(vertices).toHaveLength(40);
+      const vertices = generateDRoots(5, 1.0)
+      expect(vertices).toHaveLength(40)
 
-      const faces = computeConvexHullFaces(vertices);
-      expect(faces.length).toBeGreaterThan(0);
-    });
-  });
+      const faces = computeConvexHullFaces(vertices)
+      expect(faces.length).toBeGreaterThan(0)
+    })
+  })
 
   describe('E_8 root system faces', () => {
     it('should compute faces for E_8 (8D, 240 roots)', () => {
-      const vertices = generateE8Roots(1.0);
-      expect(vertices).toHaveLength(240);
+      const vertices = generateE8Roots(1.0)
+      expect(vertices).toHaveLength(240)
 
-      const faces = computeConvexHullFaces(vertices);
+      const faces = computeConvexHullFaces(vertices)
 
       // E_8 polytope has many triangular faces
-      expect(faces.length).toBeGreaterThan(0);
+      expect(faces.length).toBeGreaterThan(0)
 
       // All faces should be triangles
       faces.forEach((face) => {
-        expect(face).toHaveLength(3);
-      });
+        expect(face).toHaveLength(3)
+      })
 
       // All indices should be valid
       faces.forEach((face) => {
         face.forEach((idx) => {
-          expect(idx).toBeGreaterThanOrEqual(0);
-          expect(idx).toBeLessThan(240);
-        });
-      });
-    });
-  });
-});
+          expect(idx).toBeGreaterThanOrEqual(0)
+          expect(idx).toBeLessThan(240)
+        })
+      })
+    })
+  })
+})
 
 describe('hasValidConvexHull', () => {
   it('should return false for degenerate cases', () => {
-    expect(hasValidConvexHull([])).toBe(false);
-    expect(hasValidConvexHull([[0, 0, 0]])).toBe(false);
-    expect(hasValidConvexHull([[0, 0], [1, 0], [0, 1], [1, 1]])).toBe(false);
-  });
+    expect(hasValidConvexHull([])).toBe(false)
+    expect(hasValidConvexHull([[0, 0, 0]])).toBe(false)
+    expect(
+      hasValidConvexHull([
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+      ])
+    ).toBe(false)
+  })
 
   it('should return true for valid polytopes', () => {
     const tetrahedron = [
@@ -173,21 +198,21 @@ describe('hasValidConvexHull', () => {
       [1, -1, -1],
       [-1, 1, -1],
       [-1, -1, 1],
-    ];
-    expect(hasValidConvexHull(tetrahedron)).toBe(true);
-  });
+    ]
+    expect(hasValidConvexHull(tetrahedron)).toBe(true)
+  })
 
   it('should return true for root systems', () => {
-    const aRoots = generateARoots(4, 1.0);
-    expect(hasValidConvexHull(aRoots)).toBe(true);
+    const aRoots = generateARoots(4, 1.0)
+    expect(hasValidConvexHull(aRoots)).toBe(true)
 
-    const dRoots = generateDRoots(4, 1.0);
-    expect(hasValidConvexHull(dRoots)).toBe(true);
+    const dRoots = generateDRoots(4, 1.0)
+    expect(hasValidConvexHull(dRoots)).toBe(true)
 
-    const e8Roots = generateE8Roots(1.0);
-    expect(hasValidConvexHull(e8Roots)).toBe(true);
-  });
-});
+    const e8Roots = generateE8Roots(1.0)
+    expect(hasValidConvexHull(e8Roots)).toBe(true)
+  })
+})
 
 describe('ridge-based face extraction', () => {
   /**
@@ -232,12 +257,7 @@ describe('ridge-based face extraction', () => {
   function generate4DHypercube(): number[][] {
     const vertices: number[][] = []
     for (let i = 0; i < 16; i++) {
-      vertices.push([
-        (i & 1) ? 1 : -1,
-        (i & 2) ? 1 : -1,
-        (i & 4) ? 1 : -1,
-        (i & 8) ? 1 : -1,
-      ])
+      vertices.push([i & 1 ? 1 : -1, i & 2 ? 1 : -1, i & 4 ? 1 : -1, i & 8 ? 1 : -1])
     }
     return vertices
   }
@@ -278,9 +298,7 @@ describe('ridge-based face extraction', () => {
     const faces = computeConvexHullFaces(vertices)
 
     // Count unique triangles
-    const uniqueKeys = new Set(
-      faces.map((f) => [...f].sort((a, b) => a - b).join(','))
-    )
+    const uniqueKeys = new Set(faces.map((f) => [...f].sort((a, b) => a - b).join(',')))
 
     // All faces should be unique (no interior duplicates)
     expect(uniqueKeys.size).toBe(faces.length)
@@ -353,9 +371,9 @@ describe('ridge-based face extraction', () => {
 
 describe('getConvexHullStats', () => {
   it('should return null for degenerate cases', () => {
-    expect(getConvexHullStats([])).toBeNull();
-    expect(getConvexHullStats([[0, 0, 0]])).toBeNull();
-  });
+    expect(getConvexHullStats([])).toBeNull()
+    expect(getConvexHullStats([[0, 0, 0]])).toBeNull()
+  })
 
   it('should return stats for valid polytopes', () => {
     const tetrahedron = [
@@ -363,36 +381,36 @@ describe('getConvexHullStats', () => {
       [1, -1, -1],
       [-1, 1, -1],
       [-1, -1, 1],
-    ];
+    ]
 
-    const stats = getConvexHullStats(tetrahedron);
-    expect(stats).not.toBeNull();
-    expect(stats!.dimension).toBe(3);
-    expect(stats!.actualDimension).toBe(3);
-    expect(stats!.vertexCount).toBe(4);
-    expect(stats!.facetCount).toBe(4);
-    expect(stats!.triangleCount).toBe(4);
-  });
+    const stats = getConvexHullStats(tetrahedron)
+    expect(stats).not.toBeNull()
+    expect(stats!.dimension).toBe(3)
+    expect(stats!.actualDimension).toBe(3)
+    expect(stats!.vertexCount).toBe(4)
+    expect(stats!.facetCount).toBe(4)
+    expect(stats!.triangleCount).toBe(4)
+  })
 
   it('should return stats for D_4 root system', () => {
-    const vertices = generateDRoots(4, 1.0);
-    const stats = getConvexHullStats(vertices);
+    const vertices = generateDRoots(4, 1.0)
+    const stats = getConvexHullStats(vertices)
 
-    expect(stats).not.toBeNull();
-    expect(stats!.dimension).toBe(4);
-    expect(stats!.actualDimension).toBe(4); // D_4 roots are full 4D
-    expect(stats!.vertexCount).toBe(24);
-    expect(stats!.facetCount).toBeGreaterThan(0);
-    expect(stats!.triangleCount).toBeGreaterThan(0);
-  });
+    expect(stats).not.toBeNull()
+    expect(stats!.dimension).toBe(4)
+    expect(stats!.actualDimension).toBe(4) // D_4 roots are full 4D
+    expect(stats!.vertexCount).toBe(24)
+    expect(stats!.facetCount).toBeGreaterThan(0)
+    expect(stats!.triangleCount).toBeGreaterThan(0)
+  })
 
   it('should detect reduced dimension for A_n root system', () => {
-    const vertices = generateARoots(4, 1.0);
-    const stats = getConvexHullStats(vertices);
+    const vertices = generateARoots(4, 1.0)
+    const stats = getConvexHullStats(vertices)
 
-    expect(stats).not.toBeNull();
-    expect(stats!.dimension).toBe(4);
-    expect(stats!.actualDimension).toBe(3); // A_3 roots lie in 3D hyperplane
-    expect(stats!.triangleCount).toBeGreaterThan(0);
-  });
-});
+    expect(stats).not.toBeNull()
+    expect(stats!.dimension).toBe(4)
+    expect(stats!.actualDimension).toBe(3) // A_3 roots lie in 3D hyperplane
+    expect(stats!.triangleCount).toBeGreaterThan(0)
+  })
+})

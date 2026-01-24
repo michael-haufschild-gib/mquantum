@@ -385,7 +385,7 @@ export function createNDTransformUniforms(dimension: number): Record<string, { v
   return {
     rotationMatrix4D: { value: new Matrix4() },
     uDimension: { value: dimension },
-    uUniformScale: { value: 1.0 },  // Applied AFTER projection (like camera zoom)
+    uUniformScale: { value: 1.0 }, // Applied AFTER projection (like camera zoom)
     uExtraRotationCols: { value: new Float32Array(extraDims * 4).fill(0) },
     uDepthRowSums: { value: new Float32Array(MAX_GPU_DIMENSION).fill(0) },
     uProjectionDistance: { value: 5.0 },

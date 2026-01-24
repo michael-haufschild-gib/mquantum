@@ -218,6 +218,6 @@
   }
 
   [data-accent='red'] {
-    --theme-accent-glow: oklch(65% 0.20 25);
+    --theme-accent-glow: oklch(65% 0.2 25);
   }
 }

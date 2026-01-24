@@ -7,20 +7,20 @@
  * @module rendering/graph/passes/SMAAPass
  */
 
-import * as THREE from 'three';
-import { SMAAPass as ThreeSMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
+import * as THREE from 'three'
+import { SMAAPass as ThreeSMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Configuration for SMAAPass.
  */
 export interface SMAAPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Input color resource */
-  colorInput: string;
+  colorInput: string
   /** Output resource */
-  outputResource: string;
+  outputResource: string
 }
 
 /**
@@ -38,20 +38,20 @@ export interface SMAAPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outpu
  * ```
  */
 export class SMAAPass extends BasePass {
-  private smaaPass: ThreeSMAAPass | null = null;
-  private copyMaterial: THREE.ShaderMaterial;
-  private copyMesh: THREE.Mesh;
-  private copyScene: THREE.Scene;
-  private copyCamera: THREE.OrthographicCamera;
+  private smaaPass: ThreeSMAAPass | null = null
+  private copyMaterial: THREE.ShaderMaterial
+  private copyMesh: THREE.Mesh
+  private copyScene: THREE.Scene
+  private copyCamera: THREE.OrthographicCamera
 
-  private colorInputId: string;
-  private outputId: string;
+  private colorInputId: string
+  private outputId: string
 
-  private lastWidth = 0;
-  private lastHeight = 0;
+  private lastWidth = 0
+  private lastHeight = 0
 
   // Only need readTarget - we render SMAA directly to outputTarget to avoid redundant copy
-  private readTarget: THREE.WebGLRenderTarget | null = null;
+  private readTarget: THREE.WebGLRenderTarget | null = null
 
   constructor(config: SMAAPassConfig) {
     super({
@@ -62,10 +62,10 @@ export class SMAAPass extends BasePass {
       enabled: config.enabled,
       priority: config.priority,
       skipPassthrough: config.skipPassthrough,
-    });
+    })
 
-    this.colorInputId = config.colorInput;
-    this.outputId = config.outputResource;
+    this.colorInputId = config.colorInput
+    this.outputId = config.outputResource
 
     // Create copy material for texture transfer
     this.copyMaterial = new THREE.ShaderMaterial({
@@ -89,25 +89,25 @@ export class SMAAPass extends BasePass {
       `,
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.copyMesh = new THREE.Mesh(geometry, this.copyMaterial);
-    this.copyMesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.copyMesh = new THREE.Mesh(geometry, this.copyMaterial)
+    this.copyMesh.frustumCulled = false
 
-    this.copyScene = new THREE.Scene();
-    this.copyScene.add(this.copyMesh);
+    this.copyScene = new THREE.Scene()
+    this.copyScene.add(this.copyMesh)
 
-    this.copyCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.copyCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   private ensureInitialized(width: number, height: number): void {
     if (!this.smaaPass || width !== this.lastWidth || height !== this.lastHeight) {
-      this.smaaPass?.dispose?.();
-      this.readTarget?.dispose();
+      this.smaaPass?.dispose?.()
+      this.readTarget?.dispose()
 
       // Create SMAA pass (r181+ takes no constructor args)
-      this.smaaPass = new ThreeSMAAPass();
+      this.smaaPass = new ThreeSMAAPass()
 
       // Create read target for SMAA input
       // Note: We render SMAA output directly to the graph's outputTarget to avoid
@@ -115,44 +115,44 @@ export class SMAAPass extends BasePass {
       this.readTarget = new THREE.WebGLRenderTarget(width, height, {
         format: THREE.RGBAFormat,
         type: THREE.UnsignedByteType,
-      });
+      })
 
-      this.lastWidth = width;
-      this.lastHeight = height;
+      this.lastWidth = width
+      this.lastHeight = height
     }
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, size } = ctx;
+    const { renderer, size } = ctx
 
     if (size.width < 1 || size.height < 1) {
-      return;
+      return
     }
 
-    this.ensureInitialized(size.width, size.height);
+    this.ensureInitialized(size.width, size.height)
 
     if (!this.smaaPass || !this.readTarget) {
-      return;
+      return
     }
 
     // Get textures
-    const colorTex = ctx.getReadTexture(this.colorInputId);
-    const outputTarget = ctx.getWriteTarget(this.outputId);
+    const colorTex = ctx.getReadTexture(this.colorInputId)
+    const outputTarget = ctx.getWriteTarget(this.outputId)
 
     if (!colorTex || !outputTarget) {
-      return;
+      return
     }
 
     // Copy input to read target (required because SMAA needs a render target as input)
-    this.copyMaterial.uniforms['tDiffuse']!.value = colorTex;
-    renderer.setRenderTarget(this.readTarget);
-    renderer.render(this.copyScene, this.copyCamera);
+    this.copyMaterial.uniforms['tDiffuse']!.value = colorTex
+    renderer.setRenderTarget(this.readTarget)
+    renderer.render(this.copyScene, this.copyCamera)
 
     // Run SMAA directly to outputTarget (eliminates redundant copy)
     // Both targets use identical formats (RGBA, UnsignedByteType), so this is safe.
-    this.smaaPass.render(renderer, outputTarget, this.readTarget, 0, false);
+    this.smaaPass.render(renderer, outputTarget, this.readTarget, 0, false)
 
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(null)
   }
 
   /**
@@ -164,29 +164,29 @@ export class SMAAPass extends BasePass {
    */
   releaseInternalResources(): void {
     // Dispose SMAAPass (has internal textures for edge/blend)
-    this.smaaPass?.dispose?.();
-    this.smaaPass = null;
+    this.smaaPass?.dispose?.()
+    this.smaaPass = null
 
     // Dispose our read target
-    this.readTarget?.dispose();
-    this.readTarget = null;
+    this.readTarget?.dispose()
+    this.readTarget = null
 
     // Reset size tracking to trigger reallocation on next execute()
-    this.lastWidth = 0;
-    this.lastHeight = 0;
+    this.lastWidth = 0
+    this.lastHeight = 0
 
     // Keep copyMaterial, copyMesh, copyScene, copyCamera - they're cheap
     // and keeping them avoids shader recompilation on re-enable
   }
 
   dispose(): void {
-    this.smaaPass?.dispose?.();
-    this.smaaPass = null;
-    this.readTarget?.dispose();
-    this.readTarget = null;
-    this.copyMaterial.dispose();
-    this.copyMesh.geometry.dispose();
+    this.smaaPass?.dispose?.()
+    this.smaaPass = null
+    this.readTarget?.dispose()
+    this.readTarget = null
+    this.copyMaterial.dispose()
+    this.copyMesh.geometry.dispose()
     // Remove mesh from scene to ensure proper cleanup
-    this.copyScene.remove(this.copyMesh);
+    this.copyScene.remove(this.copyMesh)
   }
 }

@@ -1,1 +1,20 @@
-{"rustc":18415816196306954164,"features":"[\"default\"]","declared_features":"[\"allocator-api2\", \"allocator_api\", \"bench_allocator_api\", \"boxed\", \"collections\", \"default\", \"serde\", \"std\"]","target":10625613344215589528,"profile":9719146384424564959,"path":12210427695529488010,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"release/.fingerprint/bumpalo-76266e0caec6542b/dep-lib-bumpalo","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":0}
+{
+  "rustc": 18415816196306954164,
+  "features": "[\"default\"]",
+  "declared_features": "[\"allocator-api2\", \"allocator_api\", \"bench_allocator_api\", \"boxed\", \"collections\", \"default\", \"serde\", \"std\"]",
+  "target": 10625613344215589528,
+  "profile": 9719146384424564959,
+  "path": 12210427695529488010,
+  "deps": [],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "release/.fingerprint/bumpalo-76266e0caec6542b/dep-lib-bumpalo",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 0
+}

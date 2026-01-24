@@ -9,8 +9,8 @@
  * 5. density - density field (depends on psi)
  */
 
-export { complexMathBlock } from './complex.glsl';
-export { hermiteBlock } from './hermite.glsl';
-export { ho1dBlock } from './ho1d.glsl';
-export { psiBlock } from './psi.glsl';
-export { densityBlock } from './density.glsl';
+export { complexMathBlock } from './complex.glsl'
+export { hermiteBlock } from './hermite.glsl'
+export { ho1dBlock } from './ho1d.glsl'
+export { psiBlock } from './psi.glsl'
+export { densityBlock } from './density.glsl'

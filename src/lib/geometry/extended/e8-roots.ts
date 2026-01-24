@@ -10,7 +10,7 @@
  * @see docs/research/nd-extended-objects-guide.md Section 2.5
  */
 
-import type { VectorND } from '@/lib/math/types';
+import type { VectorND } from '@/lib/math/types'
 
 /**
  * Counts the number of set bits (1s) in a number
@@ -19,12 +19,12 @@ import type { VectorND } from '@/lib/math/types';
  * @returns Number of 1 bits
  */
 function popcount(n: number): number {
-  let count = 0;
+  let count = 0
   while (n > 0) {
-    count += n & 1;
-    n >>>= 1;
+    count += n & 1
+    n >>>= 1
   }
-  return count;
+  return count
 }
 
 /**
@@ -51,13 +51,13 @@ function popcount(n: number): number {
  * ```
  */
 export function generateE8Roots(scale: number = 1.0): VectorND[] {
-  const roots: VectorND[] = [];
-  const dim = 8;
+  const roots: VectorND[] = []
+  const dim = 8
 
   // Normalization: D8 roots have length sqrt(2), half-integer roots have length sqrt(2)
   // We normalize to unit length then scale
-  const d8Normalizer = Math.sqrt(2);
-  const halfIntNormalizer = Math.sqrt(2); // sqrt(8 * 0.25) = sqrt(2)
+  const d8Normalizer = Math.sqrt(2)
+  const halfIntNormalizer = Math.sqrt(2) // sqrt(8 * 0.25) = sqrt(2)
 
   // Part 1: D8-style roots (112 vectors)
   // ±e_i ± e_j for i < j
@@ -66,15 +66,15 @@ export function generateE8Roots(scale: number = 1.0): VectorND[] {
     [1, -1],
     [-1, 1],
     [-1, -1],
-  ];
+  ]
 
   for (let i = 0; i < dim; i++) {
     for (let j = i + 1; j < dim; j++) {
       for (const [si, sj] of signPairs) {
-        const v: VectorND = new Array(dim).fill(0);
-        v[i] = (si / d8Normalizer) * scale;
-        v[j] = (sj / d8Normalizer) * scale;
-        roots.push(v);
+        const v: VectorND = new Array(dim).fill(0)
+        v[i] = (si / d8Normalizer) * scale
+        v[j] = (sj / d8Normalizer) * scale
+        roots.push(v)
       }
     }
   }
@@ -85,16 +85,16 @@ export function generateE8Roots(scale: number = 1.0): VectorND[] {
     // mask determines which coordinates are negative
     // Even popcount = even number of minus signs
     if (popcount(mask) % 2 === 0) {
-      const v: VectorND = new Array(dim);
+      const v: VectorND = new Array(dim)
       for (let i = 0; i < dim; i++) {
-        const sign = (mask & (1 << i)) ? -1 : 1;
-        v[i] = (sign * 0.5 / halfIntNormalizer) * scale;
+        const sign = mask & (1 << i) ? -1 : 1
+        v[i] = ((sign * 0.5) / halfIntNormalizer) * scale
       }
-      roots.push(v);
+      roots.push(v)
     }
   }
 
-  return roots;
+  return roots
 }
 
 /**
@@ -104,31 +104,29 @@ export function generateE8Roots(scale: number = 1.0): VectorND[] {
  * @returns Object with verification results
  */
 export function verifyE8Roots(roots: VectorND[]): {
-  valid: boolean;
-  rootCount: number;
-  allLength2: boolean;
-  issues: string[];
+  valid: boolean
+  rootCount: number
+  allLength2: boolean
+  issues: string[]
 } {
-  const issues: string[] = [];
+  const issues: string[] = []
 
   // Check count
   if (roots.length !== 240) {
-    issues.push(`Expected 240 roots, got ${roots.length}`);
+    issues.push(`Expected 240 roots, got ${roots.length}`)
   }
 
   // Check that all roots have approximately the same length (sqrt(2) when not normalized)
   // Since we normalize to unit length, they should all have length = scale
-  let allSameLength = true;
-  const expectedLengthSq = roots.length > 0
-    ? roots[0]!.reduce((sum, x) => sum + x * x, 0)
-    : 0;
+  let allSameLength = true
+  const expectedLengthSq = roots.length > 0 ? roots[0]!.reduce((sum, x) => sum + x * x, 0) : 0
 
   for (const root of roots) {
-    const lengthSq = root.reduce((sum, x) => sum + x * x, 0);
+    const lengthSq = root.reduce((sum, x) => sum + x * x, 0)
     if (Math.abs(lengthSq - expectedLengthSq) > 1e-6) {
-      allSameLength = false;
-      issues.push(`Root has inconsistent length: ${Math.sqrt(lengthSq)}`);
-      break;
+      allSameLength = false
+      issues.push(`Root has inconsistent length: ${Math.sqrt(lengthSq)}`)
+      break
     }
   }
 
@@ -137,5 +135,5 @@ export function verifyE8Roots(roots: VectorND[]): {
     rootCount: roots.length,
     allLength2: allSameLength,
     issues,
-  };
+  }
 }

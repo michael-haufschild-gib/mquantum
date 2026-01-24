@@ -102,10 +102,7 @@ export const QUANTUM_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
  * These work for all object types EXCEPT blackhole (which has its own specialized algorithms).
  * Uses azimuth angle in XZ plane for coloring.
  */
-export const GEOMETRIC_PHASE_ALGORITHMS: readonly ColorAlgorithm[] = [
-  'phase',
-  'mixed',
-] as const
+export const GEOMETRIC_PHASE_ALGORITHMS: readonly ColorAlgorithm[] = ['phase', 'mixed'] as const
 
 /**
  * Check if a color algorithm is quantum-specific (Schroedinger only).
@@ -149,9 +146,7 @@ export function isBlackHoleOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
  * These use N-dimensional geometry data specific to polytopes.
  * For non-polytope objects, these should be hidden from the UI.
  */
-export const POLYTOPE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [
-  'dimension',
-] as const
+export const POLYTOPE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = ['dimension'] as const
 
 /**
  * Check if a color algorithm is polytope-specific.
@@ -170,7 +165,10 @@ export function isPolytopeOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
  * @param objectType - The object type to check availability for
  * @returns True if the algorithm can be used with the object type
  */
-export function isColorAlgorithmAvailable(algorithm: ColorAlgorithm, objectType: ObjectType): boolean {
+export function isColorAlgorithmAvailable(
+  algorithm: ColorAlgorithm,
+  objectType: ObjectType
+): boolean {
   // Special case: Blackbody is shared by Schroedinger and Black Hole
   if (algorithm === 'blackbody') {
     return objectType === 'schroedinger' || objectType === 'blackhole'

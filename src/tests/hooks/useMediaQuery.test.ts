@@ -28,9 +28,7 @@ const mockMatchMedia = (matches: boolean) => {
     dispatchEvent: () => true,
     // Helper to trigger change
     trigger: (newMatches: boolean) => {
-      listeners.forEach((listener) =>
-        listener({ matches: newMatches } as MediaQueryListEvent)
-      )
+      listeners.forEach((listener) => listener({ matches: newMatches } as MediaQueryListEvent))
     },
   }
 
@@ -78,9 +76,9 @@ describe('useMediaQuery', () => {
 
 describe('useBreakpoint', () => {
   beforeEach(() => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) =>
-      mockMatchMedia(query === BREAKPOINTS.md)
-    )
+    window.matchMedia = vi
+      .fn()
+      .mockImplementation((query: string) => mockMatchMedia(query === BREAKPOINTS.md))
   })
 
   afterEach(() => {
@@ -88,9 +86,9 @@ describe('useBreakpoint', () => {
   })
 
   it('should check if screen is at md breakpoint', () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) =>
-      mockMatchMedia(query === BREAKPOINTS.md)
-    )
+    window.matchMedia = vi
+      .fn()
+      .mockImplementation((query: string) => mockMatchMedia(query === BREAKPOINTS.md))
 
     const { result } = renderHook(() => useBreakpoint('md'))
     expect(result.current).toBe(true)
@@ -136,9 +134,9 @@ describe('useIsDesktop', () => {
   })
 
   it('should return true for desktop screens', () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) =>
-      mockMatchMedia(query === BREAKPOINTS.lg)
-    )
+    window.matchMedia = vi
+      .fn()
+      .mockImplementation((query: string) => mockMatchMedia(query === BREAKPOINTS.lg))
 
     const { result } = renderHook(() => useIsDesktop())
     expect(result.current).toBe(true)

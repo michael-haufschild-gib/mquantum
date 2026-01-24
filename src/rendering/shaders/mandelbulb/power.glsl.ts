@@ -41,4 +41,4 @@ void optimizedPow(float r, float pwr, out float rPow, out float rPowMinus1) {
         rPowMinus1 = pow(max(r, EPS), pwr - 1.0);
     }
 }
-`;
+`

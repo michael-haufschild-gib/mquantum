@@ -118,4 +118,4 @@ vec3 getColorByAlgorithm(float t, vec3 normal, vec3 baseHSL, vec3 position) {
                                   uDistPower, uDistCycles, uDistOffset);
   }
 }
-`;
+`

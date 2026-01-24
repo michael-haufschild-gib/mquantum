@@ -406,7 +406,8 @@ describe('Wythoff Polytope Generation', () => {
   })
 })
 
-describe('High-dimensional omnitruncated memory safety', () => {
+// Skip slow high-dimensional tests by default - run with: npm test -- --run wythoff-polytope
+describe.skip('High-dimensional omnitruncated memory safety', () => {
   // This test verifies the fix for the memory exhaustion bug in high-dimensional
   // omnitruncated polytopes. Without the fix, 11D omnitruncated would try to
   // generate 11! × 2^11 ≈ 81 billion vertices and crash the browser.

@@ -216,7 +216,10 @@ export class ExternalBridge {
         }
       } catch (error) {
         if (import.meta.env.DEV) {
-          console.warn(`[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] Failed to capture import '${id}':`, error)
+          console.warn(
+            `[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] Failed to capture import '${id}':`,
+            error
+          )
         }
       }
     }
@@ -233,7 +236,9 @@ export class ExternalBridge {
   getImported<T>(id: ExternalResourceId): T | null {
     if (!this.importsCaptured) {
       if (import.meta.env.DEV) {
-        console.warn(`[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] getImported called before captureImports for '${id}'`)
+        console.warn(
+          `[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] getImported called before captureImports for '${id}'`
+        )
       }
     }
 
@@ -260,7 +265,9 @@ export class ExternalBridge {
    *
    * @param config - Export configuration
    */
-  registerExport<TInternal, TExternal = TInternal>(config: ExportConfig<TInternal, TExternal>): void {
+  registerExport<TInternal, TExternal = TInternal>(
+    config: ExportConfig<TInternal, TExternal>
+  ): void {
     this.exports.set(config.id, {
       config: config as ExportConfig<unknown, unknown>,
       value: null,
@@ -299,7 +306,9 @@ export class ExternalBridge {
       if (!registered) {
         // Direct export without registration
         if (import.meta.env.DEV) {
-          console.warn(`[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] Export '${id}' queued but not registered`)
+          console.warn(
+            `[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] Export '${id}' queued but not registered`
+          )
         }
         continue
       }
@@ -314,7 +323,10 @@ export class ExternalBridge {
         registered.config.setter(value)
       } catch (error) {
         if (import.meta.env.DEV) {
-          console.error(`[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] Failed to execute export '${id}':`, error)
+          console.error(
+            `[ExternalBridge${this.debugName ? `:${this.debugName}` : ''}] Failed to execute export '${id}':`,
+            error
+          )
         }
       }
     }
@@ -424,7 +436,9 @@ export class ExternalBridge {
  * @param scene - The THREE.Scene to capture from
  * @returns Import configuration
  */
-export function createSceneBackgroundImport(scene: THREE.Scene): ImportConfig<THREE.Color | THREE.Texture | null> {
+export function createSceneBackgroundImport(
+  scene: THREE.Scene
+): ImportConfig<THREE.Color | THREE.Texture | null> {
   return {
     id: 'scene.background',
     getter: () => scene.background,
@@ -437,7 +451,9 @@ export function createSceneBackgroundImport(scene: THREE.Scene): ImportConfig<TH
  * @param scene - The THREE.Scene to capture from
  * @returns Import configuration
  */
-export function createSceneEnvironmentImport(scene: THREE.Scene): ImportConfig<THREE.Texture | null> {
+export function createSceneEnvironmentImport(
+  scene: THREE.Scene
+): ImportConfig<THREE.Texture | null> {
   return {
     id: 'scene.environment',
     getter: () => scene.environment,
@@ -468,7 +484,9 @@ export function createSceneBackgroundExport(
  * @param scene - The THREE.Scene to export to
  * @returns Export configuration
  */
-export function createSceneEnvironmentExport(scene: THREE.Scene): ExportConfig<THREE.Texture | null> {
+export function createSceneEnvironmentExport(
+  scene: THREE.Scene
+): ExportConfig<THREE.Texture | null> {
   return {
     id: 'scene.environment',
     resourceId: '', // Not backed by a pool resource

@@ -164,7 +164,12 @@ describe('ScenePass', () => {
     })
 
     it('should accept onRenderStats with full config', () => {
-      let capturedStats: { calls: number; triangles: number; points: number; lines: number } | null = null
+      let capturedStats: {
+        calls: number
+        triangles: number
+        points: number
+        lines: number
+      } | null = null
       const statsPass = new ScenePass({
         id: 'stats-full',
         outputs: [{ resourceId: 'color', access: 'write' }],

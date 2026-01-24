@@ -100,4 +100,4 @@ vec2 hydrogenNDTimeEvolution(float psiReal, int n, float t) {
     vec2 timeFactor = vec2(cos(phase), sin(phase));
     return vec2(psiReal * timeFactor.x, psiReal * timeFactor.y);
 }
-`;
+`

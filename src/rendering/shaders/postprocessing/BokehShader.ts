@@ -13,23 +13,23 @@
  * - Temporal depth buffer visualization support
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
 /**
  * Type for bokeh shader uniforms
  */
 export interface BokehUniforms {
-  tDiffuse: { value: THREE.Texture | null };
-  tDepth: { value: THREE.DepthTexture | null };
-  focus: { value: number };
-  focusRange: { value: number };
-  aperture: { value: number };
-  maxblur: { value: number };
-  nearClip: { value: number };
-  farClip: { value: number };
-  aspect: { value: number };
-  blurMethod: { value: number };
-  time: { value: number };
+  tDiffuse: { value: THREE.Texture | null }
+  tDepth: { value: THREE.DepthTexture | null }
+  focus: { value: number }
+  focusRange: { value: number }
+  aperture: { value: number }
+  maxblur: { value: number }
+  nearClip: { value: number }
+  farClip: { value: number }
+  aspect: { value: number }
+  blurMethod: { value: number }
+  time: { value: number }
 }
 
 /**
@@ -258,4 +258,4 @@ export const BokehShader = {
       fragColor.a = 1.0;
     }
   `,
-};
+}

@@ -10,43 +10,43 @@
  * @module rendering/graph/passes/BufferPreviewPass
  */
 
-import * as THREE from 'three';
+import * as THREE from 'three'
 
-import { BasePass } from '../BasePass';
-import type { RenderContext, RenderPassConfig } from '../types';
+import { BasePass } from '../BasePass'
+import type { RenderContext, RenderPassConfig } from '../types'
 
 /**
  * Buffer types that can be previewed.
  */
-export type BufferType = 'copy' | 'depth' | 'normal' | 'temporalDepth';
+export type BufferType = 'copy' | 'depth' | 'normal' | 'temporalDepth'
 
 /**
  * Depth visualization modes.
  */
-export type DepthMode = 'raw' | 'linear' | 'focusZones';
+export type DepthMode = 'raw' | 'linear' | 'focusZones'
 
 /**
  * Configuration for BufferPreviewPass.
  */
 export interface BufferPreviewPassConfig extends Omit<RenderPassConfig, 'inputs' | 'outputs'> {
   /** Input resource to preview */
-  bufferInput: string;
+  bufferInput: string
   /** Additional input resources (for dynamic switching without recompiling) */
-  additionalInputs?: string[];
+  additionalInputs?: string[]
   /** Output resource */
-  outputResource: string;
+  outputResource: string
   /** Type of buffer being previewed */
-  bufferType?: BufferType;
+  bufferType?: BufferType
   /** Depth visualization mode (for depth buffers) */
-  depthMode?: DepthMode;
+  depthMode?: DepthMode
   /** Camera near plane (for depth linearization) */
-  nearClip?: number;
+  nearClip?: number
   /** Camera far plane (for depth linearization) */
-  farClip?: number;
+  farClip?: number
   /** Focus distance (for focus zones visualization) */
-  focus?: number;
+  focus?: number
   /** Focus range (for focus zones visualization) */
-  focusRange?: number;
+  focusRange?: number
 }
 
 /**
@@ -159,7 +159,7 @@ const bufferPreviewShader = {
       fragColor = texel;
     }
   `,
-};
+}
 
 /**
  * Buffer preview pass for render graph.
@@ -181,18 +181,18 @@ const bufferPreviewShader = {
  * ```
  */
 export class BufferPreviewPass extends BasePass {
-  private material: THREE.ShaderMaterial;
-  private mesh: THREE.Mesh;
-  private scene: THREE.Scene;
-  private camera: THREE.OrthographicCamera;
+  private material: THREE.ShaderMaterial
+  private mesh: THREE.Mesh
+  private scene: THREE.Scene
+  private camera: THREE.OrthographicCamera
 
-  private bufferInputId: string;
-  private outputId: string;
-  private externalTexture: THREE.Texture | null = null;
+  private bufferInputId: string
+  private outputId: string
+  private externalTexture: THREE.Texture | null = null
 
   constructor(config: BufferPreviewPassConfig) {
-    const inputIds = [config.bufferInput, ...(config.additionalInputs ?? [])];
-    const uniqueInputs = Array.from(new Set(inputIds));
+    const inputIds = [config.bufferInput, ...(config.additionalInputs ?? [])]
+    const uniqueInputs = Array.from(new Set(inputIds))
 
     super({
       id: config.id,
@@ -202,10 +202,10 @@ export class BufferPreviewPass extends BasePass {
       enabled: config.enabled,
       priority: config.priority,
       skipPassthrough: config.skipPassthrough,
-    });
+    })
 
-    this.bufferInputId = config.bufferInput;
-    this.outputId = config.outputResource;
+    this.bufferInputId = config.bufferInput
+    this.outputId = config.outputResource
 
     // Map buffer type to int
     const typeMap: Record<BufferType, number> = {
@@ -213,14 +213,14 @@ export class BufferPreviewPass extends BasePass {
       depth: 1,
       normal: 2,
       temporalDepth: 3,
-    };
+    }
 
     // Map depth mode to int
     const depthModeMap: Record<DepthMode, number> = {
       raw: 0,
       linear: 1,
       focusZones: 2,
-    };
+    }
 
     // Create material
     this.material = new THREE.ShaderMaterial({
@@ -238,44 +238,44 @@ export class BufferPreviewPass extends BasePass {
       fragmentShader: bufferPreviewShader.fragmentShader,
       depthTest: false,
       depthWrite: false,
-    });
+    })
 
     // Create fullscreen quad
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    const geometry = new THREE.PlaneGeometry(2, 2)
+    this.mesh = new THREE.Mesh(geometry, this.material)
+    this.mesh.frustumCulled = false
 
-    this.scene = new THREE.Scene();
-    this.scene.add(this.mesh);
+    this.scene = new THREE.Scene()
+    this.scene.add(this.mesh)
 
-    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
   }
 
   execute(ctx: RenderContext): void {
-    const { renderer, camera } = ctx;
+    const { renderer, camera } = ctx
 
     // Get textures
-    const inputTex = this.externalTexture ?? ctx.getReadTexture(this.bufferInputId);
-    const outputTarget = ctx.getWriteTarget(this.outputId);
+    const inputTex = this.externalTexture ?? ctx.getReadTexture(this.bufferInputId)
+    const outputTarget = ctx.getWriteTarget(this.outputId)
 
     if (!inputTex) {
-      return;
+      return
     }
 
     // Update camera clip planes if using depth visualization
-    const perspCam = camera as THREE.PerspectiveCamera;
+    const perspCam = camera as THREE.PerspectiveCamera
     if (perspCam.near !== undefined) {
-      this.material.uniforms['uNearClip']!.value = perspCam.near;
-      this.material.uniforms['uFarClip']!.value = perspCam.far;
+      this.material.uniforms['uNearClip']!.value = perspCam.near
+      this.material.uniforms['uFarClip']!.value = perspCam.far
     }
 
     // Update uniforms
-    this.material.uniforms['tInput']!.value = inputTex;
+    this.material.uniforms['tInput']!.value = inputTex
 
     // Render
-    renderer.setRenderTarget(outputTarget);
-    renderer.render(this.scene, this.camera);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(outputTarget)
+    renderer.render(this.scene, this.camera)
+    renderer.setRenderTarget(null)
   }
 
   /**
@@ -288,8 +288,8 @@ export class BufferPreviewPass extends BasePass {
       depth: 1,
       normal: 2,
       temporalDepth: 3,
-    };
-    this.material.uniforms['uType']!.value = typeMap[type];
+    }
+    this.material.uniforms['uType']!.value = typeMap[type]
   }
 
   /**
@@ -297,7 +297,7 @@ export class BufferPreviewPass extends BasePass {
    * @param resourceId
    */
   setBufferInput(resourceId: string): void {
-    this.bufferInputId = resourceId;
+    this.bufferInputId = resourceId
   }
 
   /**
@@ -305,7 +305,7 @@ export class BufferPreviewPass extends BasePass {
    * @param texture
    */
   setExternalTexture(texture: THREE.Texture | null): void {
-    this.externalTexture = texture;
+    this.externalTexture = texture
   }
 
   /**
@@ -317,8 +317,8 @@ export class BufferPreviewPass extends BasePass {
       raw: 0,
       linear: 1,
       focusZones: 2,
-    };
-    this.material.uniforms['uDepthMode']!.value = modeMap[mode];
+    }
+    this.material.uniforms['uDepthMode']!.value = modeMap[mode]
   }
 
   /**
@@ -327,14 +327,14 @@ export class BufferPreviewPass extends BasePass {
    * @param focusRange
    */
   setFocusParams(focus: number, focusRange: number): void {
-    this.material.uniforms['uFocus']!.value = focus;
-    this.material.uniforms['uFocusRange']!.value = focusRange;
+    this.material.uniforms['uFocus']!.value = focus
+    this.material.uniforms['uFocusRange']!.value = focusRange
   }
 
   dispose(): void {
-    this.material.dispose();
-    this.mesh.geometry.dispose();
+    this.material.dispose()
+    this.mesh.geometry.dispose()
     // Remove mesh from scene to ensure proper cleanup
-    this.scene.remove(this.mesh);
+    this.scene.remove(this.mesh)
   }
 }

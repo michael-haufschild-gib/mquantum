@@ -209,9 +209,7 @@ describe('TubeWireframe', () => {
   })
 
   it('should handle empty inputs gracefully', () => {
-    const { container } = render(
-      <TubeWireframe vertices={[]} edges={[]} color="#0000ff" />
-    )
+    const { container } = render(<TubeWireframe vertices={[]} edges={[]} color="#0000ff" />)
     // Should return null for empty inputs
     expect(container.firstChild).toBeNull()
   })
@@ -241,15 +239,11 @@ describe('TubeWireframe', () => {
 
   it('should accept caps prop for tube end caps', () => {
     // Default: caps=false (hollow tubes for performance)
-    render(
-      <TubeWireframe vertices={mockVertices} edges={mockEdges} color="#ff0000" caps={false} />
-    )
+    render(<TubeWireframe vertices={mockVertices} edges={mockEdges} color="#ff0000" caps={false} />)
   })
 
   it('should accept caps=true for capped tube ends', () => {
-    render(
-      <TubeWireframe vertices={mockVertices} edges={mockEdges} color="#ff0000" caps={true} />
-    )
+    render(<TubeWireframe vertices={mockVertices} edges={mockEdges} color="#ff0000" caps={true} />)
   })
 
   // Note: metallic and roughness tests removed - these properties are now managed

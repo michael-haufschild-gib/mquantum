@@ -1,10 +1,10 @@
-import { Section } from '@/components/sections/Section';
-import { Slider } from '@/components/ui/Slider';
-import { getConfigStoreKey, getTypeName } from '@/lib/geometry/registry';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import React from 'react';
-import { useShallow } from 'zustand/react/shallow';
+import { Section } from '@/components/sections/Section'
+import { Slider } from '@/components/ui/Slider'
+import { getConfigStoreKey, getTypeName } from '@/lib/geometry/registry'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import React from 'react'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Polytope settings controls.
@@ -15,23 +15,24 @@ import { useShallow } from 'zustand/react/shallow';
  * @returns The polytope settings UI component
  */
 export const PolytopeSettings: React.FC = React.memo(() => {
-  const objectType = useGeometryStore((state) => state.objectType);
+  const objectType = useGeometryStore((state) => state.objectType)
 
   const { config, setScale } = useExtendedObjectStore(
     useShallow((state: ExtendedObjectState) => ({
       config: state.polytope,
       setScale: state.setPolytopeScale,
     }))
-  );
+  )
 
   // Get display name from registry (data-driven)
-  const typeName = getTypeName(objectType);
+  const typeName = getTypeName(objectType)
 
   // Get type-specific default scale
 
   // Simplex needs a larger range due to its default of 4.0
   // This is a specific UI constraint, not a category-level property
-  const maxScale = getConfigStoreKey(objectType) === 'polytope' && objectType === 'simplex' ? 8.0 : 5.0;
+  const maxScale =
+    getConfigStoreKey(objectType) === 'polytope' && objectType === 'simplex' ? 8.0 : 5.0
 
   return (
     <div data-testid="polytope-settings">
@@ -47,12 +48,10 @@ export const PolytopeSettings: React.FC = React.memo(() => {
           showValue
           data-testid="polytope-scale"
         />
-        <p className="text-xs text-text-secondary">
-          Vertices in [-scale, scale] per axis.
-        </p>
+        <p className="text-xs text-text-secondary">Vertices in [-scale, scale] per axis.</p>
       </Section>
     </div>
-  );
-});
+  )
+})
 
-PolytopeSettings.displayName = 'PolytopeSettings';
+PolytopeSettings.displayName = 'PolytopeSettings'

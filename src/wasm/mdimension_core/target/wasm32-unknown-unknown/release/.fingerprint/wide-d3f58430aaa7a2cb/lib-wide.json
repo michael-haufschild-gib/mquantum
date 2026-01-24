@@ -1,1 +1,23 @@
-{"rustc":18415816196306954164,"features":"[\"std\"]","declared_features":"[\"default\", \"serde\", \"std\"]","target":10838888221915111951,"profile":1207370057436191037,"path":9677472632512557612,"deps":[[6942256293210557013,"safe_arch",false,16175922325975676607],[14567563978122280782,"bytemuck",false,8425593779746287189]],"local":[{"CheckDepInfo":{"dep_info":"wasm32-unknown-unknown/release/.fingerprint/wide-d3f58430aaa7a2cb/dep-lib-wide","checksum":false}}],"rustflags":[],"config":2069994364910194474,"compile_kind":14682669768258224367}
+{
+  "rustc": 18415816196306954164,
+  "features": "[\"std\"]",
+  "declared_features": "[\"default\", \"serde\", \"std\"]",
+  "target": 10838888221915111951,
+  "profile": 1207370057436191037,
+  "path": 9677472632512557612,
+  "deps": [
+    [6942256293210557013, "safe_arch", false, 16175922325975676607],
+    [14567563978122280782, "bytemuck", false, 8425593779746287189]
+  ],
+  "local": [
+    {
+      "CheckDepInfo": {
+        "dep_info": "wasm32-unknown-unknown/release/.fingerprint/wide-d3f58430aaa7a2cb/dep-lib-wide",
+        "checksum": false
+      }
+    }
+  ],
+  "rustflags": [],
+  "config": 2069994364910194474,
+  "compile_kind": 14682669768258224367
+}

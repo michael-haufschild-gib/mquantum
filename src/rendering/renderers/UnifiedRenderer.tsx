@@ -12,34 +12,34 @@
  * to bypass React's render cycle completely during animation.
  */
 
-import type { Face } from '@/lib/geometry/faces';
-import type { NdGeometry, ObjectType } from '@/lib/geometry/types';
-import { useAppearanceStore } from '@/stores/appearanceStore';
-import React, { useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { BlackHoleMesh } from './BlackHole';
-import MandelbulbMesh from './Mandelbulb/MandelbulbMesh';
-import { PolytopeScene } from './Polytope';
-import QuaternionJuliaMesh from './QuaternionJulia/QuaternionJuliaMesh';
-import SchroedingerMesh from './Schroedinger/SchroedingerMesh';
-import { determineRenderMode } from './utils';
+import type { Face } from '@/lib/geometry/faces'
+import type { NdGeometry, ObjectType } from '@/lib/geometry/types'
+import { useAppearanceStore } from '@/stores/appearanceStore'
+import React, { useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { BlackHoleMesh } from './BlackHole'
+import MandelbulbMesh from './Mandelbulb/MandelbulbMesh'
+import { PolytopeScene } from './Polytope'
+import QuaternionJuliaMesh from './QuaternionJulia/QuaternionJuliaMesh'
+import SchroedingerMesh from './Schroedinger/SchroedingerMesh'
+import { determineRenderMode } from './utils'
 
 /**
  * Props for UnifiedRenderer
  */
 export interface UnifiedRendererProps {
   /** Generated geometry containing vertices, edges, and metadata */
-  geometry: NdGeometry;
+  geometry: NdGeometry
   /** Current dimension of the object */
-  dimension: number;
+  dimension: number
   /** Type of object being rendered */
-  objectType: ObjectType;
+  objectType: ObjectType
   /** Detected faces for surface rendering (polytopes only) */
-  faces?: Face[];
+  faces?: Face[]
   /** Per-face depth values for palette coloring (polytopes only) */
-  faceDepths?: number[];
+  faceDepths?: number[]
   /** Overall opacity (default: 1.0) */
-  opacity?: number;
+  opacity?: number
 }
 
 /**
@@ -60,18 +60,16 @@ export const UnifiedRenderer = React.memo(function UnifiedRenderer({
   opacity = 1.0,
 }: UnifiedRendererProps) {
   // Get facesVisible from store to determine raymarch mode
-  const facesVisible = useAppearanceStore(
-    useShallow((state) => state.facesVisible)
-  );
+  const facesVisible = useAppearanceStore(useShallow((state) => state.facesVisible))
 
   // Determine render mode
   const renderMode = useMemo(
     () => determineRenderMode(geometry, objectType, dimension, facesVisible),
     [geometry, objectType, dimension, facesVisible]
-  );
+  )
 
   // Type assertion for edges (no computation needed, just cast)
-  const edges = geometry.edges as [number, number][];
+  const edges = geometry.edges as [number, number][]
 
   return (
     <>
@@ -99,5 +97,5 @@ export const UnifiedRenderer = React.memo(function UnifiedRenderer({
       {/* Raymarched 3D-11D Black Hole */}
       {renderMode === 'raymarch-blackhole' && <BlackHoleMesh />}
     </>
-  );
-});
+  )
+})

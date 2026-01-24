@@ -40,7 +40,9 @@ describe('geometryStore (invariants)', () => {
   it('rejects invalid object types and ignores types unavailable for the current dimension', () => {
     // Invalid type throws
     // @ts-expect-error intentional invalid input
-    expect(() => useGeometryStore.getState().setObjectType('not-a-real-type')).toThrow(/Invalid object type/i)
+    expect(() => useGeometryStore.getState().setObjectType('not-a-real-type')).toThrow(
+      /Invalid object type/i
+    )
 
     // Unavailable type is ignored (warns)
     useGeometryStore.getState().setDimension(3)
@@ -70,5 +72,3 @@ describe('geometryStore (invariants)', () => {
     expect(useAppearanceStore.getState().facesVisible).toBe(true)
   })
 })
-
-

@@ -3,9 +3,9 @@
  * Generalization of a tetrahedron to n dimensions
  */
 
-import type { VectorND } from '@/lib/math';
-import { addVectors, createVector, scaleVector, subtractVectors } from '@/lib/math';
-import type { PolytopeGeometry } from './types';
+import type { VectorND } from '@/lib/math'
+import { addVectors, createVector, scaleVector, subtractVectors } from '@/lib/math'
+import type { PolytopeGeometry } from './types'
 
 /**
  * Generates a regular simplex in n-dimensional space
@@ -31,60 +31,60 @@ import type { PolytopeGeometry } from './types';
  * @throws {Error} If dimension is less than 2
  */
 export function generateSimplex(dimension: number, _scale = 1.0): PolytopeGeometry {
-  void _scale; // Scale is now applied post-projection via shader uniform
+  void _scale // Scale is now applied post-projection via shader uniform
 
   if (dimension < 2) {
-    throw new Error('Simplex dimension must be at least 2');
+    throw new Error('Simplex dimension must be at least 2')
   }
 
-  const vertexCount = dimension + 1;
-  const vertices: VectorND[] = [];
+  const vertexCount = dimension + 1
+  const vertices: VectorND[] = []
 
   // Generate standard simplex vertices
   // First vertex at origin
-  vertices.push(createVector(dimension, 0));
+  vertices.push(createVector(dimension, 0))
 
   // Remaining vertices along each axis
   for (let i = 0; i < dimension; i++) {
-    const vertex = createVector(dimension, 0);
-    vertex[i] = 1;
-    vertices.push(vertex);
+    const vertex = createVector(dimension, 0)
+    vertex[i] = 1
+    vertices.push(vertex)
   }
 
   // Calculate centroid using library functions
-  let centroid = createVector(dimension, 0);
+  let centroid = createVector(dimension, 0)
   for (const vertex of vertices) {
-    centroid = addVectors(centroid, vertex);
+    centroid = addVectors(centroid, vertex)
   }
-  centroid = scaleVector(centroid, 1 / vertexCount);
+  centroid = scaleVector(centroid, 1 / vertexCount)
 
   // Center vertices at origin using library functions
   for (let i = 0; i < vertices.length; i++) {
-    vertices[i] = subtractVectors(vertices[i]!, centroid);
+    vertices[i] = subtractVectors(vertices[i]!, centroid)
   }
 
   // Find max coordinate value for normalization
-  let maxCoord = 0;
+  let maxCoord = 0
   for (const vertex of vertices) {
     for (const coord of vertex) {
-      maxCoord = Math.max(maxCoord, Math.abs(coord));
+      maxCoord = Math.max(maxCoord, Math.abs(coord))
     }
   }
 
   // Normalize to fit in [-1, 1] (UNIT SCALE)
   // Visual scale is applied post-projection via uUniformScale uniform
   if (maxCoord > 0) {
-    const normFactor = 1.0 / maxCoord;
+    const normFactor = 1.0 / maxCoord
     for (let i = 0; i < vertices.length; i++) {
-      vertices[i] = scaleVector(vertices[i]!, normFactor);
+      vertices[i] = scaleVector(vertices[i]!, normFactor)
     }
   }
 
   // Generate edges: connect all pairs (complete graph)
-  const edges: [number, number][] = [];
+  const edges: [number, number][] = []
   for (let i = 0; i < vertexCount; i++) {
     for (let j = i + 1; j < vertexCount; j++) {
-      edges.push([i, j]);
+      edges.push([i, j])
     }
   }
 
@@ -93,5 +93,5 @@ export function generateSimplex(dimension: number, _scale = 1.0): PolytopeGeomet
     edges,
     dimension,
     type: 'simplex',
-  };
+  }
 }

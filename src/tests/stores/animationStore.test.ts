@@ -163,7 +163,7 @@ describe('animationStore', () => {
       useAnimationStore.getState().randomizePlanes(3)
       const selected3D = Array.from(useAnimationStore.getState().animatingPlanes)
       const valid3D = ['XY', 'YZ', 'XZ']
-      selected3D.forEach(plane => {
+      selected3D.forEach((plane) => {
         expect(valid3D).toContain(plane)
       })
 
@@ -171,7 +171,7 @@ describe('animationStore', () => {
       useAnimationStore.getState().randomizePlanes(4)
       const selected4D = Array.from(useAnimationStore.getState().animatingPlanes)
       const valid4D = ['XY', 'YZ', 'XZ', 'XW', 'YW', 'ZW']
-      selected4D.forEach(plane => {
+      selected4D.forEach((plane) => {
         expect(valid4D).toContain(plane)
       })
     })

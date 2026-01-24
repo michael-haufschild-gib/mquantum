@@ -52,9 +52,7 @@ describe('ExternalResourceRegistry', () => {
 
       registry.captureAll()
       expect(registry.get('test.resource')).toBe('second')
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('already registered')
-      )
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('already registered'))
 
       warnSpy.mockRestore()
     })

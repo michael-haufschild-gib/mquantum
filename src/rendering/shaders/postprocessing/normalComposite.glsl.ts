@@ -48,4 +48,4 @@ void main() {
 
   fragColor = outNormal;
 }
-`;
+`

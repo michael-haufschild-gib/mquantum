@@ -213,13 +213,19 @@ export function serializeState(state: ShareableState): string {
   if (state.gravityStrength !== undefined && state.gravityStrength !== DEFAULT_GRAVITY_STRENGTH) {
     params.set('gs', state.gravityStrength.toFixed(2))
   }
-  if (state.gravityDistortionScale !== undefined && state.gravityDistortionScale !== DEFAULT_GRAVITY_DISTORTION_SCALE) {
+  if (
+    state.gravityDistortionScale !== undefined &&
+    state.gravityDistortionScale !== DEFAULT_GRAVITY_DISTORTION_SCALE
+  ) {
     params.set('gds', state.gravityDistortionScale.toFixed(2))
   }
   if (state.gravityFalloff !== undefined && state.gravityFalloff !== DEFAULT_GRAVITY_FALLOFF) {
     params.set('gf', state.gravityFalloff.toFixed(1))
   }
-  if (state.gravityChromaticAberration !== undefined && state.gravityChromaticAberration !== DEFAULT_GRAVITY_CHROMATIC_ABERRATION) {
+  if (
+    state.gravityChromaticAberration !== undefined &&
+    state.gravityChromaticAberration !== DEFAULT_GRAVITY_CHROMATIC_ABERRATION
+  ) {
     params.set('gca', state.gravityChromaticAberration.toFixed(2))
   }
 

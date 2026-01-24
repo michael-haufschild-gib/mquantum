@@ -87,11 +87,7 @@ export class StateBarrier {
    * @param scene - Current scene
    * @param camera - Current camera
    */
-  capture(
-    renderer: THREE.WebGLRenderer,
-    scene: THREE.Scene,
-    camera: THREE.Camera
-  ): void {
+  capture(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
     // Capture renderer state
     // OPTIMIZATION: Copy to cached color instead of cloning
     this.cachedClearColor.copy(renderer.getClearColor(this.tempColor))
@@ -125,11 +121,7 @@ export class StateBarrier {
    * @param scene - Current scene
    * @param camera - Current camera
    */
-  restore(
-    renderer: THREE.WebGLRenderer,
-    scene: THREE.Scene,
-    camera: THREE.Camera
-  ): void {
+  restore(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera): void {
     // Restore renderer state
     if (this.rendererState) {
       renderer.setRenderTarget(this.rendererState.renderTarget)

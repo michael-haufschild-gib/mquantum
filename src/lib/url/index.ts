@@ -7,5 +7,5 @@ export {
   deserializeState,
   generateShareUrl,
   parseCurrentUrl,
-} from './state-serializer';
-export type { ShareableState } from './state-serializer';
+} from './state-serializer'
+export type { ShareableState } from './state-serializer'

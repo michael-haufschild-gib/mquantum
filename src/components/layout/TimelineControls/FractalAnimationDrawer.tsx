@@ -16,17 +16,14 @@
  * ```
  */
 
-import type { AnimationSystemDef } from '@/lib/geometry/registry';
-import {
-    getAvailableAnimationSystems,
-    getConfigStoreKey,
-} from '@/lib/geometry/registry';
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore';
-import { useGeometryStore } from '@/stores/geometryStore';
-import { m } from 'motion/react';
-import React, { useCallback, useMemo } from 'react';
-import { useShallow } from 'zustand/react/shallow';
-import { AnimationSystemPanel } from './AnimationSystemPanel';
+import type { AnimationSystemDef } from '@/lib/geometry/registry'
+import { getAvailableAnimationSystems, getConfigStoreKey } from '@/lib/geometry/registry'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { m } from 'motion/react'
+import React, { useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import { AnimationSystemPanel } from './AnimationSystemPanel'
 
 /**
  * Gets a value from a nested path in an object
@@ -36,17 +33,17 @@ import { AnimationSystemPanel } from './AnimationSystemPanel';
  * @returns The value at the path or undefined if not found
  */
 function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split('.');
-  let current: unknown = obj;
+  const parts = path.split('.')
+  let current: unknown = obj
 
   for (const part of parts) {
     if (current === null || current === undefined || typeof current !== 'object') {
-      return undefined;
+      return undefined
     }
-    current = (current as Record<string, unknown>)[part];
+    current = (current as Record<string, unknown>)[part]
   }
 
-  return current;
+  return current
 }
 
 /**
@@ -65,17 +62,17 @@ function extractParamValues(
   config: Record<string, unknown>,
   system: AnimationSystemDef
 ): Record<string, number> {
-  const values: Record<string, number> = {};
+  const values: Record<string, number> = {}
 
   for (const paramKey of Object.keys(system.params)) {
     // Try nested path first (e.g., 'powerAnimation.minPower')
-    const value = getNestedValue(config, paramKey);
+    const value = getNestedValue(config, paramKey)
     if (typeof value === 'number') {
-      values[paramKey] = value;
+      values[paramKey] = value
     }
   }
 
-  return values;
+  return values
 }
 
 /**
@@ -86,13 +83,10 @@ function extractParamValues(
  * @param system - Animation system definition
  * @returns True if the system is enabled
  */
-function getSystemEnabled(
-  config: Record<string, unknown>,
-  system: AnimationSystemDef
-): boolean {
-  const enabledKey = system.enabledKey;
-  const value = getNestedValue(config, enabledKey);
-  return typeof value === 'boolean' ? value : system.enabledByDefault;
+function getSystemEnabled(config: Record<string, unknown>, system: AnimationSystemDef): boolean {
+  const enabledKey = system.enabledKey
+  const value = getNestedValue(config, enabledKey)
+  return typeof value === 'boolean' ? value : system.enabledByDefault
 }
 
 /**
@@ -108,63 +102,63 @@ export const FractalAnimationDrawer: React.FC = React.memo(() => {
       objectType: state.objectType,
       dimension: state.dimension,
     }))
-  );
+  )
 
   // Get the config store key from registry
-  const configKey = useMemo(() => getConfigStoreKey(objectType), [objectType]);
+  const configKey = useMemo(() => getConfigStoreKey(objectType), [objectType])
 
   // Get available animation systems from registry
   const systems = useMemo(
     () => getAvailableAnimationSystems(objectType, dimension),
     [objectType, dimension]
-  );
+  )
 
   // Get config from store based on object type
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => {
     if (configKey && configKey in state) {
-      const value = state[configKey as keyof typeof state];
+      const value = state[configKey as keyof typeof state]
       // Only return config objects, not functions (store actions)
       if (typeof value === 'object' && value !== null) {
-        return value as unknown as Record<string, unknown>;
+        return value as unknown as Record<string, unknown>
       }
     }
-    return {};
-  });
-  const config = useExtendedObjectStore(extendedObjectSelector);
+    return {}
+  })
+  const config = useExtendedObjectStore(extendedObjectSelector)
 
   // Handler to update config in store
   const updateConfig = useCallback(
     (updates: Record<string, unknown>) => {
-      const state = useExtendedObjectStore.getState();
+      const state = useExtendedObjectStore.getState()
 
       for (const [key, value] of Object.entries(updates)) {
         // Determine setter name based on configKey from registry
-        let setterName: string;
-        const currentConfigKey = configKey;
+        let setterName: string
+        const currentConfigKey = configKey
 
         if (currentConfigKey === 'mandelbulb') {
           // Mandelbulb uses flat keys: 'powerMin' → 'setMandelbulbPowerMin'
-          setterName = `setMandelbulb${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+          setterName = `setMandelbulb${key.charAt(0).toUpperCase()}${key.slice(1)}`
         } else if (currentConfigKey === 'schroedinger') {
           // Schroedinger uses flat keys like mandelbulb
-          setterName = `setSchroedinger${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+          setterName = `setSchroedinger${key.charAt(0).toUpperCase()}${key.slice(1)}`
         } else {
           // Default fallback (shouldn't happen for fractals)
-          continue;
+          continue
         }
 
-        const setter = state[setterName as keyof typeof state];
+        const setter = state[setterName as keyof typeof state]
         if (typeof setter === 'function') {
-          (setter as (v: unknown) => void)(value);
+          ;(setter as (v: unknown) => void)(value)
         }
       }
     },
     [configKey]
-  );
+  )
 
   // If no animation systems available, don't render anything
   if (Object.keys(systems).length === 0) {
-    return null;
+    return null
   }
 
   return (
@@ -190,9 +184,9 @@ export const FractalAnimationDrawer: React.FC = React.memo(() => {
         ))}
       </div>
     </m.div>
-  );
-});
+  )
+})
 
-FractalAnimationDrawer.displayName = 'FractalAnimationDrawer';
+FractalAnimationDrawer.displayName = 'FractalAnimationDrawer'
 
-export default FractalAnimationDrawer;
+export default FractalAnimationDrawer

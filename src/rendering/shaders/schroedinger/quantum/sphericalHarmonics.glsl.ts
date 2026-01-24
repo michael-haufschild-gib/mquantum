@@ -236,4 +236,4 @@ float fastRealSphericalHarmonic(int l, int m, float theta, float phi) {
     // Fall back to general computation for l > 2
     return realSphericalHarmonic(l, m, theta, phi, true);
 }
-`;
+`

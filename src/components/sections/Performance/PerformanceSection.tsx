@@ -3,14 +3,14 @@
  * Top-level sidebar section for performance optimization controls
  */
 
-import { Section } from '@/components/sections/Section';
-import React from 'react';
-import { FractalAnimationQualityControls } from './FractalAnimationQualityControls';
-import { ProgressiveRefinementControls } from './ProgressiveRefinementControls';
-import { TemporalReprojectionControls } from './TemporalReprojectionControls';
+import { Section } from '@/components/sections/Section'
+import React from 'react'
+import { FractalAnimationQualityControls } from './FractalAnimationQualityControls'
+import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'
+import { TemporalReprojectionControls } from './TemporalReprojectionControls'
 
 export interface PerformanceSectionProps {
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
 /**
@@ -22,25 +22,25 @@ export interface PerformanceSectionProps {
  * @param props.defaultOpen - Whether the section is initially expanded
  * @returns Performance section with all optimization controls
  */
-export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(({
-  defaultOpen = false,
-}) => {
-  return (
-    <Section title="Performance" defaultOpen={defaultOpen}>
-      {/* Progressive Refinement - All objects */}
-      <div className="pb-3 mb-3 border-b border-panel-border">
-        <ProgressiveRefinementControls />
-      </div>
+export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(
+  ({ defaultOpen = false }) => {
+    return (
+      <Section title="Performance" defaultOpen={defaultOpen}>
+        {/* Progressive Refinement - All objects */}
+        <div className="pb-3 mb-3 border-b border-panel-border">
+          <ProgressiveRefinementControls />
+        </div>
 
-      {/* Fractal Animation Quality - Fractals only */}
-      <div className="pb-3 mb-3 border-b border-panel-border">
-        <FractalAnimationQualityControls />
-      </div>
+        {/* Fractal Animation Quality - Fractals only */}
+        <div className="pb-3 mb-3 border-b border-panel-border">
+          <FractalAnimationQualityControls />
+        </div>
 
-      {/* Temporal Reprojection - Fractals only */}
-      <TemporalReprojectionControls />
-    </Section>
-  );
-});
+        {/* Temporal Reprojection - Fractals only */}
+        <TemporalReprojectionControls />
+      </Section>
+    )
+  }
+)
 
-PerformanceSection.displayName = 'PerformanceSection';
+PerformanceSection.displayName = 'PerformanceSection'

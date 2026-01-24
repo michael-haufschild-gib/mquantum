@@ -7,10 +7,10 @@
  * @module rendering/renderers/base/useLayerAssignment
  */
 
-import { RENDER_LAYERS } from '@/rendering/core/layers';
-import type { RefObject } from 'react';
-import { useEffect } from 'react';
-import type * as THREE from 'three';
+import { RENDER_LAYERS } from '@/rendering/core/layers'
+import type { RefObject } from 'react'
+import { useEffect } from 'react'
+import type * as THREE from 'three'
 
 /**
  * Options for the useLayerAssignment hook.
@@ -20,14 +20,14 @@ export interface UseLayerAssignmentOptions {
    * The render layer to assign to the mesh.
    * @default RENDER_LAYERS.MAIN_OBJECT
    */
-  layer?: number;
+  layer?: number
 
   /**
    * Whether layer assignment is enabled.
    * When false, the mesh keeps its default layer.
    * @default true
    */
-  enabled?: boolean;
+  enabled?: boolean
 }
 
 /**
@@ -59,25 +59,25 @@ export function useLayerAssignment(
   meshRef: RefObject<THREE.Mesh | null>,
   options: UseLayerAssignmentOptions = {}
 ): void {
-  const { layer = RENDER_LAYERS.MAIN_OBJECT, enabled = true } = options;
+  const { layer = RENDER_LAYERS.MAIN_OBJECT, enabled = true } = options
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return
 
-    const mesh = meshRef.current;
+    const mesh = meshRef.current
     if (mesh?.layers) {
-      mesh.layers.set(layer);
+      mesh.layers.set(layer)
     }
 
     // Reset to default layer on unmount to prevent stale layer assignments
     // when component remounts or mesh is reused
     return () => {
       if (mesh?.layers) {
-        mesh.layers.set(0); // Reset to default layer
+        mesh.layers.set(0) // Reset to default layer
       }
-    };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meshRef is a stable ref object
-  }, [layer, enabled]);
+  }, [layer, enabled])
 }
 
 /**
@@ -102,21 +102,21 @@ export function useVolumetricLayerAssignment(
   needsSeparation: boolean
 ): void {
   useEffect(() => {
-    const mesh = meshRef.current;
+    const mesh = meshRef.current
     if (mesh?.layers) {
       if (needsSeparation) {
-        mesh.layers.set(RENDER_LAYERS.VOLUMETRIC);
+        mesh.layers.set(RENDER_LAYERS.VOLUMETRIC)
       } else {
-        mesh.layers.set(RENDER_LAYERS.MAIN_OBJECT);
+        mesh.layers.set(RENDER_LAYERS.MAIN_OBJECT)
       }
     }
 
     // Reset to default layer on unmount
     return () => {
       if (mesh?.layers) {
-        mesh.layers.set(0); // Reset to default layer
+        mesh.layers.set(0) // Reset to default layer
       }
-    };
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- meshRef is a stable ref object
-  }, [needsSeparation]);
+  }, [needsSeparation])
 }

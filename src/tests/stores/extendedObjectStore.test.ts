@@ -60,9 +60,9 @@ describe('extendedObjectStore (invariants)', () => {
 
     useExtendedObjectStore.getState().reset()
     expect(useExtendedObjectStore.getState().polytope).toEqual({ ...DEFAULT_POLYTOPE_CONFIG })
-    expect(useExtendedObjectStore.getState().wythoffPolytope).toEqual({ ...DEFAULT_WYTHOFF_POLYTOPE_CONFIG })
+    expect(useExtendedObjectStore.getState().wythoffPolytope).toEqual({
+      ...DEFAULT_WYTHOFF_POLYTOPE_CONFIG,
+    })
     expect(useExtendedObjectStore.getState().mandelbulb).toEqual({ ...DEFAULT_MANDELBROT_CONFIG })
   })
 })
-
-

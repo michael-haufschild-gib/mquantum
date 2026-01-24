@@ -157,10 +157,7 @@ export class ExternalResourceRegistry {
       entry.valid = true
       entry.capturedFrame = this.currentFrame
     } catch (error) {
-      console.error(
-        `ExternalResourceRegistry: Failed to capture '${entry.config.id}':`,
-        error
-      )
+      console.error(`ExternalResourceRegistry: Failed to capture '${entry.config.id}':`, error)
       entry.capturedValue = null
       entry.valid = false
       entry.capturedFrame = this.currentFrame
@@ -257,7 +254,8 @@ export class ExternalResourceRegistry {
 
     for (const [id, entry] of this.resources) {
       const status = entry.valid ? 'valid' : 'invalid'
-      const frame = entry.capturedFrame === this.currentFrame ? 'current' : `frame ${entry.capturedFrame}`
+      const frame =
+        entry.capturedFrame === this.currentFrame ? 'current' : `frame ${entry.capturedFrame}`
       const desc = entry.config.description ?? 'no description'
       lines.push(`  ${id}: ${status} (${frame}) - ${desc}`)
     }

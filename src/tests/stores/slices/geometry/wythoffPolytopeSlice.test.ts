@@ -4,7 +4,10 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { DEFAULT_WYTHOFF_POLYTOPE_CONFIG, DEFAULT_WYTHOFF_SCALES } from '@/lib/geometry/extended/types'
+import {
+  DEFAULT_WYTHOFF_POLYTOPE_CONFIG,
+  DEFAULT_WYTHOFF_SCALES,
+} from '@/lib/geometry/extended/types'
 
 describe('Wythoff Polytope Store Slice', () => {
   beforeEach(() => {
@@ -169,30 +172,3 @@ describe('Wythoff Polytope Store Slice', () => {
     })
   })
 })
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

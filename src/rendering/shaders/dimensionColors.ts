@@ -27,9 +27,9 @@
  * ```
  */
 export function getDimensionColor(dimIndex: number, totalDims: number): string {
-  if (totalDims <= 0) return 'hsl(0, 80%, 60%)';
-  const hue = (dimIndex / totalDims) * 360;
-  return `hsl(${hue}, 80%, 60%)`;
+  if (totalDims <= 0) return 'hsl(0, 80%, 60%)'
+  const hue = (dimIndex / totalDims) * 360
+  return `hsl(${hue}, 80%, 60%)`
 }
 
 /**
@@ -46,9 +46,9 @@ export function getDimensionColor(dimIndex: number, totalDims: number): string {
  * ```
  */
 export function getDimensionColorHex(dimIndex: number, totalDims: number): string {
-  if (totalDims <= 0) return '#ff3333';
-  const hue = (dimIndex / totalDims) * 360;
-  return hslToHex(hue, 80, 60);
+  if (totalDims <= 0) return '#ff3333'
+  const hue = (dimIndex / totalDims) * 360
+  return hslToHex(hue, 80, 60)
 }
 
 /**
@@ -75,17 +75,17 @@ export function getDimensionColorHex(dimIndex: number, totalDims: number): strin
  * ```
  */
 export function getEdgeDimensions(v1: number[], v2: number[]): number[] {
-  const dimensions: number[] = [];
-  const minLength = Math.min(v1.length, v2.length);
+  const dimensions: number[] = []
+  const minLength = Math.min(v1.length, v2.length)
 
   for (let i = 0; i < minLength; i++) {
     // Use a small epsilon for floating point comparison
     if (Math.abs((v1[i] ?? 0) - (v2[i] ?? 0)) > 1e-10) {
-      dimensions.push(i);
+      dimensions.push(i)
     }
   }
 
-  return dimensions;
+  return dimensions
 }
 
 /**
@@ -99,8 +99,8 @@ export function getEdgeDimensions(v1: number[], v2: number[]): number[] {
  * @returns Primary dimension index
  */
 export function getEdgePrimaryDimension(v1: number[], v2: number[]): number {
-  const dims = getEdgeDimensions(v1, v2);
-  return dims[0] ?? 0;
+  const dims = getEdgeDimensions(v1, v2)
+  return dims[0] ?? 0
 }
 
 /**
@@ -115,18 +115,18 @@ export function getEdgePrimaryDimension(v1: number[], v2: number[]): number {
  * @returns Hex color string
  */
 export function getEdgeColor(v1: number[], v2: number[], totalDims: number): string {
-  const dims = getEdgeDimensions(v1, v2);
+  const dims = getEdgeDimensions(v1, v2)
 
   if (dims.length === 0) {
-    return getDimensionColorHex(0, totalDims);
+    return getDimensionColorHex(0, totalDims)
   }
 
   if (dims.length === 1) {
-    return getDimensionColorHex(dims[0]!, totalDims);
+    return getDimensionColorHex(dims[0]!, totalDims)
   }
 
   // For multi-dimension edges, use the primary (first) dimension
-  return getDimensionColorHex(dims[0]!, totalDims);
+  return getDimensionColorHex(dims[0]!, totalDims)
 }
 
 /**
@@ -148,7 +148,7 @@ export const DIMENSION_COLORS: Record<number, string> = {
   5: '#44FFFF', // U - Cyan
   6: '#FF8844', // T - Orange
   7: '#8844FF', // S - Purple
-};
+}
 
 /**
  * Get a predefined dimension color.
@@ -162,9 +162,9 @@ export const DIMENSION_COLORS: Record<number, string> = {
  */
 export function getPredefinedDimensionColor(dimIndex: number, totalDims: number): string {
   if (dimIndex < 8 && DIMENSION_COLORS[dimIndex]) {
-    return DIMENSION_COLORS[dimIndex]!;
+    return DIMENSION_COLORS[dimIndex]!
   }
-  return getDimensionColorHex(dimIndex, totalDims);
+  return getDimensionColorHex(dimIndex, totalDims)
 }
 
 // ============================================================================
@@ -180,33 +180,47 @@ export function getPredefinedDimensionColor(dimIndex: number, totalDims: number)
  * @returns Hex color string
  */
 function hslToHex(h: number, s: number, l: number): string {
-  const sNorm = s / 100;
-  const lNorm = l / 100;
+  const sNorm = s / 100
+  const lNorm = l / 100
 
-  const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  const m = lNorm - c / 2;
+  const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = lNorm - c / 2
 
-  let r = 0, g = 0, b = 0;
+  let r = 0,
+    g = 0,
+    b = 0
 
   if (0 <= h && h < 60) {
-    r = c; g = x; b = 0;
+    r = c
+    g = x
+    b = 0
   } else if (60 <= h && h < 120) {
-    r = x; g = c; b = 0;
+    r = x
+    g = c
+    b = 0
   } else if (120 <= h && h < 180) {
-    r = 0; g = c; b = x;
+    r = 0
+    g = c
+    b = x
   } else if (180 <= h && h < 240) {
-    r = 0; g = x; b = c;
+    r = 0
+    g = x
+    b = c
   } else if (240 <= h && h < 300) {
-    r = x; g = 0; b = c;
+    r = x
+    g = 0
+    b = c
   } else if (300 <= h && h < 360) {
-    r = c; g = 0; b = x;
+    r = c
+    g = 0
+    b = x
   }
 
   const toHex = (n: number) => {
-    const hex = Math.round((n + m) * 255).toString(16);
-    return hex.length === 1 ? '0' + hex : hex;
-  };
+    const hex = Math.round((n + m) * 255).toString(16)
+    return hex.length === 1 ? '0' + hex : hex
+  }
 
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }

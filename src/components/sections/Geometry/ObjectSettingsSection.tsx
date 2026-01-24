@@ -19,17 +19,17 @@
  * - Quaternion Julia: constant, power, iterations, etc.
  */
 
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import {
-    getControlsComponent,
-    getControlsComponentKey,
-    hasControlsComponent,
-} from '@/lib/geometry/registry';
-import { useGeometryStore } from '@/stores/geometryStore';
-import React, { Suspense, useMemo } from 'react';
+  getControlsComponent,
+  getControlsComponentKey,
+  hasControlsComponent,
+} from '@/lib/geometry/registry'
+import { useGeometryStore } from '@/stores/geometryStore'
+import React, { Suspense, useMemo } from 'react'
 
 export interface ObjectSettingsSectionProps {
-  className?: string;
+  className?: string
 }
 
 /**
@@ -42,7 +42,7 @@ const ControlsSkeleton: React.FC = () => (
     <div className="h-8 bg-panel-border/30 rounded" />
     <div className="h-8 bg-panel-border/30 rounded" />
   </div>
-);
+)
 
 /**
  * Error fallback for failed component loads
@@ -56,7 +56,7 @@ const ControlsError: React.FC = () => (
     <p className="font-medium">Failed to load controls</p>
     <p className="text-xs text-danger mt-1">Please refresh the page</p>
   </div>
-);
+)
 
 /**
  * Main ObjectSettingsSection component
@@ -69,36 +69,33 @@ const ControlsError: React.FC = () => (
  * @param root0.className - Optional CSS class name
  * @returns React element displaying object-specific settings controls
  */
-export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = React.memo(({
-  className = '',
-}) => {
-  const objectType = useGeometryStore((state) => state.objectType);
+export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = React.memo(
+  ({ className = '' }) => {
+    const objectType = useGeometryStore((state) => state.objectType)
 
-  // Get the controls component key from registry
-  const componentKey = useMemo(
-    () => getControlsComponentKey(objectType),
-    [objectType]
-  );
+    // Get the controls component key from registry
+    const componentKey = useMemo(() => getControlsComponentKey(objectType), [objectType])
 
-  // Get the lazy-loaded component from registry
-  const ControlsComponent = useMemo(() => {
-    if (!componentKey || !hasControlsComponent(componentKey)) {
-      return null;
-    }
-    return getControlsComponent(componentKey);
-  }, [componentKey]);
+    // Get the lazy-loaded component from registry
+    const ControlsComponent = useMemo(() => {
+      if (!componentKey || !hasControlsComponent(componentKey)) {
+        return null
+      }
+      return getControlsComponent(componentKey)
+    }, [componentKey])
 
-  return (
-    <div className={className} data-testid="object-settings-section">
-      {ControlsComponent && (
-        <ErrorBoundary fallback={<ControlsError />}>
-          <Suspense fallback={<ControlsSkeleton />}>
-            <ControlsComponent />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-    </div>
-  );
-});
+    return (
+      <div className={className} data-testid="object-settings-section">
+        {ControlsComponent && (
+          <ErrorBoundary fallback={<ControlsError />}>
+            <Suspense fallback={<ControlsSkeleton />}>
+              <ControlsComponent />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+      </div>
+    )
+  }
+)
 
-ObjectSettingsSection.displayName = 'ObjectSettingsSection';
+ObjectSettingsSection.displayName = 'ObjectSettingsSection'

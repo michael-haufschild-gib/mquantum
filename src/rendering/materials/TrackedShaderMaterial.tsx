@@ -28,10 +28,10 @@
  * @module rendering/materials/TrackedShaderMaterial
  */
 
-import { usePerformanceStore } from '@/stores/performanceStore';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { Side } from 'three';
-import * as THREE from 'three';
+import { usePerformanceStore } from '@/stores/performanceStore'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type { Side } from 'three'
+import * as THREE from 'three'
 
 /**
  * Props for TrackedShaderMaterial component.
@@ -39,25 +39,25 @@ import * as THREE from 'three';
  */
 interface TrackedShaderMaterialProps {
   /** Display name shown in compilation overlay (e.g., "Schrödinger Quantum Volume") */
-  shaderName: string;
+  shaderName: string
   /** Fragment shader GLSL source (required) */
-  fragmentShader: string;
+  fragmentShader: string
   /** Vertex shader GLSL source (required) */
-  vertexShader: string;
+  vertexShader: string
   /** Material key for React reconciliation (forces remount when changed) */
-  materialKey?: string;
+  materialKey?: string
   /** Shader uniforms (required for functional shaders) */
-  uniforms: Record<string, THREE.IUniform>;
+  uniforms: Record<string, THREE.IUniform>
   /** GLSL version (WebGL2/GLSL ES 3.00 required) */
-  glslVersion?: typeof THREE.GLSL3;
+  glslVersion?: typeof THREE.GLSL3
   /** Which side of faces to render */
-  side?: Side;
+  side?: Side
   /** Whether material is transparent */
-  transparent?: boolean;
+  transparent?: boolean
   /** Whether to write to depth buffer */
-  depthWrite?: boolean;
+  depthWrite?: boolean
   /** Blending mode */
-  blending?: THREE.Blending;
+  blending?: THREE.Blending
 }
 
 /**
@@ -90,47 +90,54 @@ export function TrackedShaderMaterial({
   ...props
 }: TrackedShaderMaterialProps) {
   // Input validation - provide fallback for empty shaderName
-  const validShaderName = shaderName?.trim() || 'Unknown Shader';
-  const hasValidShaders = Boolean(fragmentShader && vertexShader);
+  const validShaderName = shaderName?.trim() || 'Unknown Shader'
+  const hasValidShaders = Boolean(fragmentShader && vertexShader)
 
   // Track which shader version we've rendered to detect changes
-  const renderedShaderRef = useRef<{ fragment: string; vertex: string } | null>(null);
+  const renderedShaderRef = useRef<{ fragment: string; vertex: string } | null>(null)
 
   // State to control deferred rendering
   // When shaders change, we set this to false, show overlay, then set to true next frame
-  const [readyToRender, setReadyToRender] = useState(false);
+  const [readyToRender, setReadyToRender] = useState(false)
 
   // Detect if shaders have changed since last render
   const shadersChanged =
     !renderedShaderRef.current ||
     renderedShaderRef.current.fragment !== fragmentShader ||
-    renderedShaderRef.current.vertex !== vertexShader;
+    renderedShaderRef.current.vertex !== vertexShader
 
   // When shaders change, reset ready state and show overlay
   useLayoutEffect(() => {
     if (!hasValidShaders) {
-      return;
+      return
     }
 
     if (shadersChanged) {
       // Reset ready state - this will cause us to return null this render
-      setReadyToRender(false);
+      setReadyToRender(false)
 
       // Show the compilation overlay immediately
-      usePerformanceStore.getState().setShaderCompiling(validShaderName, true);
+      usePerformanceStore.getState().setShaderCompiling(validShaderName, true)
     } else if (!readyToRender) {
       // FIX: If shaders reverted to previous state while hidden (e.g. A->B->A),
       // we are stuck in hidden state because the RAF effect won't fire (shadersChanged is false).
       // Since we match the renderedShaderRef, we can show immediately.
-      setReadyToRender(true);
-      usePerformanceStore.getState().setShaderCompiling(validShaderName, false);
+      setReadyToRender(true)
+      usePerformanceStore.getState().setShaderCompiling(validShaderName, false)
     }
-  }, [fragmentShader, vertexShader, validShaderName, hasValidShaders, shadersChanged, readyToRender]);
+  }, [
+    fragmentShader,
+    vertexShader,
+    validShaderName,
+    hasValidShaders,
+    shadersChanged,
+    readyToRender,
+  ])
 
   // After overlay has painted, allow shader to render
   useEffect(() => {
     if (!hasValidShaders) {
-      return;
+      return
     }
 
     if (!readyToRender && shadersChanged) {
@@ -139,71 +146,71 @@ export function TrackedShaderMaterial({
       // block before the overlay is visible. Double RAF ensures:
       // 1st RAF: overlay render is queued for paint
       // 2nd RAF: browser has painted the overlay, safe to block for compilation
-      let cancelled = false;
+      let cancelled = false
       const frameId = requestAnimationFrame(() => {
-        if (cancelled) return;
+        if (cancelled) return
         requestAnimationFrame(() => {
-          if (cancelled) return;
-          setReadyToRender(true);
+          if (cancelled) return
+          setReadyToRender(true)
           // Update the ref to track what we're about to render
-          renderedShaderRef.current = { fragment: fragmentShader, vertex: vertexShader };
-        });
-      });
+          renderedShaderRef.current = { fragment: fragmentShader, vertex: vertexShader }
+        })
+      })
 
       return () => {
-        cancelled = true;
-        cancelAnimationFrame(frameId);
-      };
+        cancelled = true
+        cancelAnimationFrame(frameId)
+      }
     }
 
-    return;
-  }, [fragmentShader, vertexShader, hasValidShaders, readyToRender, shadersChanged]);
+    return
+  }, [fragmentShader, vertexShader, hasValidShaders, readyToRender, shadersChanged])
 
   // Hide overlay after shader has compiled (render completes)
   useEffect(() => {
     if (!hasValidShaders || !readyToRender) {
-      return;
+      return
     }
 
     // Shader is rendering this frame, hide overlay after GPU compile finishes
-    let cancelled = false;
-    let innerFrameId: number | null = null;
+    let cancelled = false
+    let innerFrameId: number | null = null
 
     // Double RAF ensures we're past the blocking GPU compilation
     const outerFrameId = requestAnimationFrame(() => {
-      if (cancelled) return;
+      if (cancelled) return
       innerFrameId = requestAnimationFrame(() => {
-        if (cancelled) return;
-        usePerformanceStore.getState().setShaderCompiling(validShaderName, false);
-      });
-    });
+        if (cancelled) return
+        usePerformanceStore.getState().setShaderCompiling(validShaderName, false)
+      })
+    })
 
     return () => {
-      cancelled = true;
-      cancelAnimationFrame(outerFrameId);
+      cancelled = true
+      cancelAnimationFrame(outerFrameId)
       if (innerFrameId !== null) {
-        cancelAnimationFrame(innerFrameId);
+        cancelAnimationFrame(innerFrameId)
       }
-    };
-  }, [readyToRender, validShaderName, hasValidShaders]);
+    }
+  }, [readyToRender, validShaderName, hasValidShaders])
 
   // Cleanup on unmount - prevent stuck overlay
   useEffect(() => {
     return () => {
-      usePerformanceStore.getState().setShaderCompiling(validShaderName, false);
-    };
-  }, [validShaderName]);
+      usePerformanceStore.getState().setShaderCompiling(validShaderName, false)
+    }
+  }, [validShaderName])
 
   // Warn about missing shader sources in development
   if (!hasValidShaders) {
     if (import.meta.env.DEV) {
       console.error(
         `TrackedShaderMaterial [${validShaderName}]: Missing shader source. ` +
-        `fragmentShader: ${fragmentShader ? 'provided' : 'MISSING'}, ` +
-        `vertexShader: ${vertexShader ? 'provided' : 'MISSING'}`
-      );
+          `fragmentShader: ${fragmentShader ? 'provided' : 'MISSING'}, ` +
+          `vertexShader: ${vertexShader ? 'provided' : 'MISSING'}`
+      )
     }
-    return null;
+    return null
   }
 
   // While shader is compiling, render an invisible placeholder material
@@ -241,7 +248,7 @@ export function TrackedShaderMaterial({
         `}
         {...props}
       />
-    );
+    )
   }
 
   return (
@@ -252,5 +259,5 @@ export function TrackedShaderMaterial({
       glslVersion={glslVersion}
       {...props}
     />
-  );
+  )
 }

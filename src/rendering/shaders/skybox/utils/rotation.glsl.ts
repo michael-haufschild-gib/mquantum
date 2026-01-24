@@ -9,4 +9,4 @@ mat3 rotateY(float theta) {
         vec3(-s, 0, c)
     );
 }
-`;
+`

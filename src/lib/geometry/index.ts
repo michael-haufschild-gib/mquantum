@@ -105,11 +105,7 @@ export {
 export { generateCrossPolytope } from './cross-polytope'
 export { generateHypercube } from './hypercube'
 export { generateSimplex } from './simplex'
-export {
-  generateWythoffPolytope,
-  getWythoffPolytopeInfo,
-  getWythoffPresetName,
-} from './wythoff'
+export { generateWythoffPolytope, getWythoffPolytopeInfo, getWythoffPresetName } from './wythoff'
 export type { WythoffSymbol } from './wythoff'
 
 // Extended object generator exports

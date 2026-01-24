@@ -3,22 +3,20 @@
  * Section wrapper for lighting controls
  */
 
-import { Section } from '@/components/sections/Section';
-import React from 'react';
-import { LightingControls } from './LightingControls';
+import { Section } from '@/components/sections/Section'
+import React from 'react'
+import { LightingControls } from './LightingControls'
 
 export interface LightsSectionProps {
-  defaultOpen?: boolean;
+  defaultOpen?: boolean
 }
 
-export const LightsSection: React.FC<LightsSectionProps> = React.memo(({
-  defaultOpen = false,
-}) => {
+export const LightsSection: React.FC<LightsSectionProps> = React.memo(({ defaultOpen = false }) => {
   return (
     <Section title="Lights" defaultOpen={defaultOpen}>
       <LightingControls />
     </Section>
-  );
-});
+  )
+})
 
-LightsSection.displayName = 'LightsSection';
+LightsSection.displayName = 'LightsSection'

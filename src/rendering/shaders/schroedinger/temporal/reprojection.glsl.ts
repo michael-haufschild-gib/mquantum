@@ -13,7 +13,7 @@ void main() {
     // Direct NDC output for fullscreen quad
     gl_Position = vec4(position.xy, 0.0, 1.0);
 }
-`;
+`
 
 export const reprojectionFragmentShader = `
 precision highp float;
@@ -167,4 +167,4 @@ void main() {
     fragColor = prevColor;
     fragValidity = vec4(validity, 0.0, 0.0, 1.0);
 }
-`;
+`

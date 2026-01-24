@@ -36,4 +36,4 @@ uniform float uSdfSurfaceDistance;   // Surface hit threshold for raymarching (0
 // PERF: Pre-computed values (computed once per frame on CPU, not per SDF call)
 uniform float uEffectivePower;       // Pre-computed: considers animation + alternate power + min clamp
 uniform float uEffectiveBailout;     // Pre-computed: max(uEscapeRadius, 2.0)
-`;
+`

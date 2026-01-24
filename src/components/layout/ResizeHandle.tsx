@@ -10,10 +10,7 @@
  * - Subtle visual feedback during active drag
  */
 
-import {
-  clampSidebarWidth,
-  useLayoutStore,
-} from '@/stores/layoutStore'
+import { clampSidebarWidth, useLayoutStore } from '@/stores/layoutStore'
 import React, { useCallback, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -140,6 +137,6 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = React.memo(({ className
       <div className="absolute inset-0 -left-1 -right-1" />
     </div>
   )
-});
+})
 
-ResizeHandle.displayName = 'ResizeHandle';
+ResizeHandle.displayName = 'ResizeHandle'
