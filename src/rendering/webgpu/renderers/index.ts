@@ -23,3 +23,9 @@ export type { PolytopeRendererConfig } from './WebGPUPolytopeRenderer'
 
 export { WebGPUTubeWireframeRenderer } from './WebGPUTubeWireframeRenderer'
 export type { TubeWireframeRendererConfig } from './WebGPUTubeWireframeRenderer'
+
+export { WebGPUGroundPlaneRenderer } from './WebGPUGroundPlaneRenderer'
+export type { GroundPlaneRendererConfig } from './WebGPUGroundPlaneRenderer'
+
+export { WebGPUSkyboxRenderer } from './WebGPUSkyboxRenderer'
+export type { SkyboxRendererConfig } from './WebGPUSkyboxRenderer'

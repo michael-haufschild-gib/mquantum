@@ -38,7 +38,7 @@ function generateHoNDBlock(dimension: number): string {
   // Generate alpha declarations
   const alphaDecls = Array.from(
     { length: dimension },
-    (_, i) => `  let alpha${i} = sqrt(max(uniforms.omega[${i}], 0.01));`
+    (_, i) => `  let alpha${i} = sqrt(max(getOmega(uniforms, ${i}), 0.01));`
   ).join('\n')
 
   // Generate u calculations
@@ -53,15 +53,15 @@ function generateHoNDBlock(dimension: number): string {
   // Generate ho1D product chain
   const ho1DChain = Array.from({ length: dimension }, (_, i) => {
     if (i === 0) {
-      return `  var p = ho1D(uniforms.quantum[base + 0], xND[0], uniforms.omega[0]);
+      return `  var p = ho1D(getQuantum(uniforms, base + 0), xND[0], getOmega(uniforms, 0));
   if (abs(p) < 1e-10) { return 0.0; }`
     } else if (i === dimension - 1) {
       return `
-  p *= ho1D(uniforms.quantum[base + ${i}], xND[${i}], uniforms.omega[${i}]);
+  p *= ho1D(getQuantum(uniforms, base + ${i}), xND[${i}], getOmega(uniforms, ${i}));
   return p;`
     } else {
       return `
-  p *= ho1D(uniforms.quantum[base + ${i}], xND[${i}], uniforms.omega[${i}]);
+  p *= ho1D(getQuantum(uniforms, base + ${i}), xND[${i}], getOmega(uniforms, ${i}));
   if (abs(p) < 1e-10) { return 0.0; }`
     }
   }).join('')

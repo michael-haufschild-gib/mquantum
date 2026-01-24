@@ -35,6 +35,21 @@ struct SSRUniforms {
 @group(0) @binding(3) var tDepth: texture_depth_2d;
 @group(0) @binding(4) var linearSampler: sampler;
 
+// Helper to load depth using textureLoad (required for unfilterable-float depth textures)
+fn loadDepth(uv: vec2f) -> f32 {
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+  return textureLoad(tDepth, depthCoord, 0);
+}
+
+// Helper to load depth at a specific pixel offset from a base UV
+fn loadDepthOffset(uv: vec2f, offsetPixels: vec2i) -> f32 {
+  let depthDims = textureDimensions(tDepth);
+  let baseCoord = vec2i(uv * vec2f(depthDims));
+  let offsetCoord = clamp(baseCoord + offsetPixels, vec2i(0), vec2i(depthDims) - vec2i(1));
+  return textureLoad(tDepth, offsetCoord, 0);
+}
+
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
@@ -67,7 +82,7 @@ fn perspectiveDepthToViewZ(depth: f32, near: f32, far: f32) -> f32 {
 
 // Get linear depth from depth buffer
 fn getLinearDepth(coord: vec2f) -> f32 {
-  let depth = textureSample(tDepth, linearSampler, coord);
+  let depth = loadDepth(coord);
   return perspectiveDepthToViewZ(depth, uniforms.nearClip, uniforms.farClip);
 }
 
@@ -83,11 +98,12 @@ fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
 fn reconstructNormal(coord: vec2f) -> vec3f {
   let texel = 1.0 / uniforms.resolution;
 
-  let depthC = textureSample(tDepth, linearSampler, coord);
-  let depthL = textureSample(tDepth, linearSampler, coord - vec2f(texel.x, 0.0));
-  let depthR = textureSample(tDepth, linearSampler, coord + vec2f(texel.x, 0.0));
-  let depthB = textureSample(tDepth, linearSampler, coord - vec2f(0.0, texel.y));
-  let depthT = textureSample(tDepth, linearSampler, coord + vec2f(0.0, texel.y));
+  // Use textureLoad with integer pixel offsets for depth sampling
+  let depthC = loadDepth(coord);
+  let depthL = loadDepthOffset(coord, vec2i(-1, 0));
+  let depthR = loadDepthOffset(coord, vec2i(1, 0));
+  let depthB = loadDepthOffset(coord, vec2i(0, -1));
+  let depthT = loadDepthOffset(coord, vec2i(0, 1));
 
   let posC = getViewPosition(coord, depthC);
   let posL = getViewPosition(coord - vec2f(texel.x, 0.0), depthL);
@@ -148,7 +164,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     return noReflectionOutput;
   }
 
-  let depth = textureSample(tDepth, linearSampler, input.uv);
+  let depth = loadDepth(input.uv);
 
   if (depth >= 0.9999) {
     return noReflectionOutput;
@@ -189,7 +205,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       continue;
     }
 
-    let sampleDepth = textureSample(tDepth, linearSampler, sampleUV);
+    let sampleDepth = loadDepth(sampleUV);
     let sampleViewPos = getViewPosition(sampleUV, sampleDepth);
 
     let depthDiff = rayPos.z - sampleViewPos.z;

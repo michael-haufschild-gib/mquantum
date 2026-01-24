@@ -19,6 +19,10 @@ export enum TonemapMode {
 }
 
 export interface TonemappingPassOptions {
+  /** HDR input resource name (default: 'hdr-color') */
+  inputResource?: string
+  /** LDR output resource name (default: 'ldr-color') */
+  outputResource?: string
   exposure?: number
   gamma?: number
   mode?: TonemapMode
@@ -36,13 +40,22 @@ export class TonemappingPass extends WebGPUBasePass {
   private gamma = 2.2
   private mode = TonemapMode.ACES
 
+  private readonly inputResource: string
+  private readonly outputResource: string
+
   constructor(options?: TonemappingPassOptions) {
+    const inputResource = options?.inputResource ?? 'hdr-color'
+    const outputResource = options?.outputResource ?? 'ldr-color'
+
     super({
       id: 'tonemap',
       priority: 900, // Late in pipeline
-      inputs: [{ resourceId: 'hdr-color', access: 'read' }],
-      outputs: [{ resourceId: 'ldr-color', access: 'write' }],
+      inputs: [{ resourceId: inputResource, access: 'read', binding: 0 }],
+      outputs: [{ resourceId: outputResource, access: 'write', binding: 0 }],
     })
+
+    this.inputResource = inputResource
+    this.outputResource = outputResource
 
     if (options?.exposure !== undefined) this.exposure = options.exposure
     if (options?.gamma !== undefined) this.gamma = options.gamma
@@ -83,7 +96,7 @@ export class TonemappingPass extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create shader module
     const shaderModule = this.createShaderModule(device, tonemappingShader, 'tonemap-shader')
@@ -120,12 +133,12 @@ export class TonemappingPass extends WebGPUBasePass {
       minFilter: 'linear',
     })
 
-    // Create pipeline
+    // Create pipeline - use rgba8unorm for LDR output buffer
     this.pipeline = this.createFullscreenPipeline(
       device,
       shaderModule,
       [this.bindGroupLayout],
-      format,
+      'rgba8unorm',
       { label: 'tonemap' }
     )
   }
@@ -153,9 +166,9 @@ export class TonemappingPass extends WebGPUBasePass {
     ])
     this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
 
-    // Get textures
-    const inputView = ctx.getTextureView('hdr-color')
-    const outputView = ctx.getWriteTarget('ldr-color') ?? ctx.getCanvasTextureView()
+    // Get textures (using configurable resource names)
+    const inputView = ctx.getTextureView(this.inputResource)
+    const outputView = ctx.getWriteTarget(this.outputResource) ?? ctx.getCanvasTextureView()
 
     if (!inputView) return
 

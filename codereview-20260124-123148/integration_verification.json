@@ -1,0 +1,776 @@
+{
+  "integrated": [
+    {
+      "export": "WebGPUCanvas",
+      "file": "src/rendering/webgpu/WebGPUCanvas.tsx",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/WebGPUCanvas.tsx (definition)",
+        "src/rendering/webgpu/index.ts (RE_EXPORT)",
+        "src/App.tsx (CALL: <WebGPUCanvas>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUScene",
+      "file": "src/rendering/webgpu/WebGPUScene.tsx",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/WebGPUScene.tsx (definition)",
+        "src/rendering/webgpu/index.ts (RE_EXPORT)",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPURenderGraph",
+      "file": "src/rendering/webgpu/graph/WebGPURenderGraph.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/graph/WebGPURenderGraph.ts (definition)",
+        "src/rendering/webgpu/WebGPUCanvas.tsx (CALL: new WebGPURenderGraph())",
+        "src/App.tsx (CALL: <WebGPUCanvas>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUDevice",
+      "file": "src/rendering/webgpu/core/WebGPUDevice.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/core/WebGPUDevice.ts (definition)",
+        "src/rendering/webgpu/WebGPUCanvas.tsx (CALL: WebGPUDevice.initialize())",
+        "src/App.tsx (CALL: <WebGPUCanvas>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUResourcePool",
+      "file": "src/rendering/webgpu/core/WebGPUResourcePool.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/core/WebGPUResourcePool.ts (definition)",
+        "src/rendering/webgpu/graph/WebGPURenderGraph.ts (CALL: new WebGPUResourcePool())",
+        "src/rendering/webgpu/WebGPUCanvas.tsx (uses WebGPURenderGraph)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUMandelbulbRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUMandelbulbRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUMandelbulbRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUMandelbulbRenderer())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUQuaternionJuliaRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUQuaternionJuliaRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUQuaternionJuliaRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUQuaternionJuliaRenderer())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUSchrodingerRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUSchrodingerRenderer())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUBlackHoleRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUBlackHoleRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUBlackHoleRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUBlackHoleRenderer())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUPolytopeRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUPolytopeRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUPolytopeRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUPolytopeRenderer())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUTubeWireframeRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUTubeWireframeRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUTubeWireframeRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUTubeWireframeRenderer())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "ScenePass",
+      "file": "src/rendering/webgpu/passes/ScenePass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/ScenePass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new ScenePass())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "BloomPass",
+      "file": "src/rendering/webgpu/passes/BloomPass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/BloomPass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new BloomPass())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "TonemappingPass",
+      "file": "src/rendering/webgpu/passes/TonemappingPass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/TonemappingPass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new TonemappingPass())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "FXAAPass",
+      "file": "src/rendering/webgpu/passes/FXAAPass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/FXAAPass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new FXAAPass())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "ToScreenPass",
+      "file": "src/rendering/webgpu/passes/ToScreenPass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/ToScreenPass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new ToScreenPass())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "EnvironmentCompositePass",
+      "file": "src/rendering/webgpu/passes/EnvironmentCompositePass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/EnvironmentCompositePass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new EnvironmentCompositePass())",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "GTAOPass",
+      "file": "src/rendering/webgpu/passes/GTAOPass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/GTAOPass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new GTAOPass() when ssaoEnabled)",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "SSRPass",
+      "file": "src/rendering/webgpu/passes/SSRPass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/SSRPass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new SSRPass() when ssrEnabled)",
+        "src/App.tsx (CALL: <WebGPUScene>)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "composeMandelbulbShader",
+      "file": "src/rendering/webgpu/shaders/mandelbulb/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/mandelbulb/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUMandelbulbRenderer.ts (CALL)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "composeJuliaShader",
+      "file": "src/rendering/webgpu/shaders/julia/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/julia/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUQuaternionJuliaRenderer.ts (CALL)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "composeSchroedingerShader",
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (CALL)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "composeBlackHoleShader",
+      "file": "src/rendering/webgpu/shaders/blackhole/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/blackhole/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUBlackHoleRenderer.ts (CALL)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "composeFaceVertexShader",
+      "file": "src/rendering/webgpu/shaders/polytope/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/polytope/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUPolytopeRenderer.ts (CALL)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "composeTubeWireframeVertexShader",
+      "file": "src/rendering/webgpu/shaders/tubewireframe/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/tubewireframe/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUTubeWireframeRenderer.ts (CALL)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    },
+    {
+      "export": "WebGPUBasePass",
+      "file": "src/rendering/webgpu/core/WebGPUBasePass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/core/WebGPUBasePass.ts (definition)",
+        "All passes/renderers (extends WebGPUBasePass)",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses passes)",
+        "src/App.tsx IS entry point"
+      ],
+      "entry_point": "src/App.tsx"
+    }
+  ],
+  "orphaned": [
+    {
+      "export": "SMAAPass",
+      "file": "src/rendering/webgpu/passes/SMAAPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported or instantiated in WebGPUScene.tsx or elsewhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/SMAAPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add SMAA as antiAliasingMethod option in WebGPUScene.tsx setupRenderPasses()"
+    },
+    {
+      "export": "RefractionPass",
+      "file": "src/rendering/webgpu/passes/RefractionPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/RefractionPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add refraction support to render pipeline or remove if not needed"
+    },
+    {
+      "export": "BokehPass",
+      "file": "src/rendering/webgpu/passes/BokehPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/BokehPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add depth-of-field support to render pipeline or remove if not needed"
+    },
+    {
+      "export": "CinematicPass",
+      "file": "src/rendering/webgpu/passes/CinematicPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/CinematicPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Wire up cinematic effects or remove if not needed"
+    },
+    {
+      "export": "CopyPass",
+      "file": "src/rendering/webgpu/passes/CopyPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/CopyPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Utility pass - may be needed for future pipeline stages"
+    },
+    {
+      "export": "GodRaysPass",
+      "file": "src/rendering/webgpu/passes/GodRaysPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/GodRaysPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add god rays post-processing support or remove if not needed"
+    },
+    {
+      "export": "FrameBlendingPass",
+      "file": "src/rendering/webgpu/passes/FrameBlendingPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/FrameBlendingPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add motion blur/frame blending support or remove if not needed"
+    },
+    {
+      "export": "GravitationalLensingPass",
+      "file": "src/rendering/webgpu/passes/GravitationalLensingPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/GravitationalLensingPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Should be used with BlackHole renderer for deferred lensing effect"
+    },
+    {
+      "export": "PaperTexturePass",
+      "file": "src/rendering/webgpu/passes/PaperTexturePass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/PaperTexturePass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add paper texture overlay support or remove if not needed"
+    },
+    {
+      "export": "JetsRenderPass",
+      "file": "src/rendering/webgpu/passes/JetsRenderPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/JetsRenderPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Should be used with BlackHole renderer for relativistic jets"
+    },
+    {
+      "export": "JetsCompositePass",
+      "file": "src/rendering/webgpu/passes/JetsCompositePass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/JetsCompositePass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Should be used with JetsRenderPass for jet compositing"
+    },
+    {
+      "export": "ScreenSpaceLensingPass",
+      "file": "src/rendering/webgpu/passes/ScreenSpaceLensingPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/ScreenSpaceLensingPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Add screen-space lensing effect or remove if not needed"
+    },
+    {
+      "export": "BufferPreviewPass",
+      "file": "src/rendering/webgpu/passes/BufferPreviewPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/BufferPreviewPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Debug pass - could be used for development/debugging"
+    },
+    {
+      "export": "ToneMappingCinematicPass",
+      "file": "src/rendering/webgpu/passes/ToneMappingCinematicPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere (TonemappingPass is used instead)",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/ToneMappingCinematicPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "May be duplicate of TonemappingPass - consolidate or differentiate"
+    },
+    {
+      "export": "DebugOverlayPass",
+      "file": "src/rendering/webgpu/passes/DebugOverlayPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/DebugOverlayPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Debug pass - could be used for development/debugging"
+    },
+    {
+      "export": "CubemapCapturePass",
+      "file": "src/rendering/webgpu/passes/CubemapCapturePass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/CubemapCapturePass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Could be used for IBL probe capture"
+    },
+    {
+      "export": "TemporalCloudDepthPass",
+      "file": "src/rendering/webgpu/passes/TemporalCloudDepthPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/TemporalCloudDepthPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Should be used with Schroedinger renderer for temporal cloud effects"
+    },
+    {
+      "export": "FullscreenPass",
+      "file": "src/rendering/webgpu/passes/FullscreenPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/FullscreenPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Generic fullscreen shader pass - may be needed for custom effects"
+    },
+    {
+      "export": "TemporalDepthCapturePass",
+      "file": "src/rendering/webgpu/passes/TemporalDepthCapturePass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/TemporalDepthCapturePass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Should be used for temporal reprojection effects"
+    },
+    {
+      "export": "TemporalCloudPass",
+      "file": "src/rendering/webgpu/passes/TemporalCloudPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/TemporalCloudPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Should be used with Schroedinger renderer for temporal cloud effects"
+    },
+    {
+      "export": "MainObjectMRTPass",
+      "file": "src/rendering/webgpu/passes/MainObjectMRTPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/MainObjectMRTPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "MRT pass for multi-output rendering - may be superseded by renderers"
+    },
+    {
+      "export": "NormalPass",
+      "file": "src/rendering/webgpu/passes/NormalPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/NormalPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Normal buffer generation - may be handled by renderers instead"
+    },
+    {
+      "export": "DepthPass",
+      "file": "src/rendering/webgpu/passes/DepthPass.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from passes/index.ts but never imported anywhere",
+      "dead_end_at": "src/rendering/webgpu/passes/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/passes/DepthPass.ts (definition)",
+        "src/rendering/webgpu/passes/index.ts (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Depth buffer generation - may be handled by renderers instead"
+    },
+    {
+      "export": "CompositePass",
+      "file": "src/rendering/webgpu/passes/CompositePass.ts",
+      "status": "ORPHANED",
+      "evidence": "Imported in WebGPUScene.tsx but NEVER INSTANTIATED - only in import statement, not in setupRenderPasses()",
+      "dead_end_at": "src/rendering/webgpu/WebGPUScene.tsx",
+      "call_chain": [
+        "src/rendering/webgpu/passes/CompositePass.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx (IMPORT_ONLY, commented out in usage)",
+        "NO CALL FOUND - see TODO comment in code"
+      ],
+      "suggested_fix": "The CompositePass is imported but usage is commented out due to hardcoded TonemappingPass input. Refactor TonemappingPass to accept configurable input."
+    },
+    {
+      "export": "composeSkyboxFragmentShader",
+      "file": "src/rendering/webgpu/shaders/skybox/compose.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported but only used in tests (wgslCompilation.test.ts) and WebGL Skybox.tsx (not WebGPU)",
+      "dead_end_at": "src/rendering/webgpu/shaders/skybox/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/skybox/compose.ts (definition)",
+        "src/rendering/webgpu/shaders/skybox/index.ts (RE_EXPORT)",
+        "src/tests/rendering/webgpu/wgslCompilation.test.ts (TEST_ONLY)",
+        "NO RUNTIME USAGE IN WEBGPU PIPELINE"
+      ],
+      "suggested_fix": "Create a WebGPU SkyboxRenderer that uses these compose functions"
+    },
+    {
+      "export": "composeSkyboxVertexShader",
+      "file": "src/rendering/webgpu/shaders/skybox/vertex.wgsl.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported but only used in tests (wgslCompilation.test.ts) and WebGL Skybox.tsx",
+      "dead_end_at": "src/rendering/webgpu/shaders/skybox/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/skybox/vertex.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/skybox/index.ts (RE_EXPORT)",
+        "src/tests/rendering/webgpu/wgslCompilation.test.ts (TEST_ONLY)",
+        "NO RUNTIME USAGE IN WEBGPU PIPELINE"
+      ],
+      "suggested_fix": "Create a WebGPU SkyboxRenderer that uses these compose functions"
+    },
+    {
+      "export": "composeGroundPlaneFragmentShader",
+      "file": "src/rendering/webgpu/shaders/groundplane/compose.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported but only used in tests (wgslCompilation.test.ts) and WebGL GroundPlaneMaterial.tsx",
+      "dead_end_at": "src/rendering/webgpu/shaders/groundplane/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/groundplane/compose.ts (definition)",
+        "src/rendering/webgpu/shaders/groundplane/index.ts (RE_EXPORT)",
+        "src/tests/rendering/webgpu/wgslCompilation.test.ts (TEST_ONLY)",
+        "NO RUNTIME USAGE IN WEBGPU PIPELINE"
+      ],
+      "suggested_fix": "Create a WebGPU GroundPlaneRenderer that uses these compose functions"
+    },
+    {
+      "export": "composeGroundPlaneVertexShader",
+      "file": "src/rendering/webgpu/shaders/groundplane/compose.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported but only used in tests (wgslCompilation.test.ts) and WebGL GroundPlaneMaterial.tsx",
+      "dead_end_at": "src/rendering/webgpu/shaders/groundplane/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/groundplane/compose.ts (definition)",
+        "src/rendering/webgpu/shaders/groundplane/index.ts (RE_EXPORT)",
+        "src/tests/rendering/webgpu/wgslCompilation.test.ts (TEST_ONLY)",
+        "NO RUNTIME USAGE IN WEBGPU PIPELINE"
+      ],
+      "suggested_fix": "Create a WebGPU GroundPlaneRenderer that uses these compose functions"
+    }
+  ],
+  "integration_gaps": [
+    {
+      "component": "Environment Rendering",
+      "issue": "Skybox and GroundPlane have WGSL shaders but no WebGPU renderers. The WebGL version uses Skybox.tsx and GroundPlaneMaterial.tsx which import from WebGPU shaders but use them for GLSL generation. WebGPU needs dedicated SkyboxRenderer and GroundPlaneRenderer classes."
+    },
+    {
+      "component": "CompositePass",
+      "issue": "CompositePass is imported but never instantiated in WebGPUScene.tsx. There is a TODO comment: 'Refactor TonemappingPass to accept configurable input resource'. The pipeline currently bypasses composition step."
+    },
+    {
+      "component": "BlackHole Advanced Features",
+      "issue": "JetsRenderPass, JetsCompositePass, and GravitationalLensingPass are implemented but not wired into WebGPUScene.tsx. The WebGL version uses these for relativistic jets and deferred lensing."
+    },
+    {
+      "component": "Temporal Accumulation",
+      "issue": "TemporalCloudPass, TemporalCloudDepthPass, and TemporalDepthCapturePass are implemented but not used. The Schroedinger renderer likely needs these for smooth cloud rendering."
+    },
+    {
+      "component": "SMAA Anti-aliasing",
+      "issue": "SMAAPass is implemented but only FXAA is wired up in WebGPUScene.tsx. SMAA option should be added alongside FXAA."
+    },
+    {
+      "component": "Depth of Field",
+      "issue": "BokehPass is implemented but not wired into the post-processing pipeline."
+    },
+    {
+      "component": "Debug Utilities",
+      "issue": "DebugOverlayPass and BufferPreviewPass are implemented but never used. Should add debug mode toggle."
+    }
+  ],
+  "summary": {
+    "total_exports": 52,
+    "integrated": 26,
+    "orphaned": 26,
+    "passes_integrated": 9,
+    "passes_orphaned": 23,
+    "renderers_integrated": 6,
+    "renderers_orphaned": 0,
+    "shaders_integrated": 6,
+    "shaders_orphaned": 4
+  },
+  "critical_findings": [
+    {
+      "severity": "HIGH",
+      "finding": "23 out of 32 render passes are exported but never used",
+      "impact": "Many post-processing features are unavailable in WebGPU mode",
+      "files_affected": [
+        "src/rendering/webgpu/passes/SMAAPass.ts",
+        "src/rendering/webgpu/passes/RefractionPass.ts",
+        "src/rendering/webgpu/passes/BokehPass.ts",
+        "src/rendering/webgpu/passes/CinematicPass.ts",
+        "src/rendering/webgpu/passes/CopyPass.ts",
+        "src/rendering/webgpu/passes/GodRaysPass.ts",
+        "src/rendering/webgpu/passes/FrameBlendingPass.ts",
+        "src/rendering/webgpu/passes/GravitationalLensingPass.ts",
+        "src/rendering/webgpu/passes/PaperTexturePass.ts",
+        "src/rendering/webgpu/passes/JetsRenderPass.ts",
+        "src/rendering/webgpu/passes/JetsCompositePass.ts",
+        "src/rendering/webgpu/passes/ScreenSpaceLensingPass.ts",
+        "src/rendering/webgpu/passes/BufferPreviewPass.ts",
+        "src/rendering/webgpu/passes/ToneMappingCinematicPass.ts",
+        "src/rendering/webgpu/passes/DebugOverlayPass.ts",
+        "src/rendering/webgpu/passes/CubemapCapturePass.ts",
+        "src/rendering/webgpu/passes/TemporalCloudDepthPass.ts",
+        "src/rendering/webgpu/passes/FullscreenPass.ts",
+        "src/rendering/webgpu/passes/TemporalDepthCapturePass.ts",
+        "src/rendering/webgpu/passes/TemporalCloudPass.ts",
+        "src/rendering/webgpu/passes/MainObjectMRTPass.ts",
+        "src/rendering/webgpu/passes/NormalPass.ts",
+        "src/rendering/webgpu/passes/DepthPass.ts"
+      ]
+    },
+    {
+      "severity": "HIGH",
+      "finding": "Skybox and GroundPlane have no WebGPU runtime implementation",
+      "impact": "Environment rendering (sky, ground) will not work in WebGPU mode",
+      "files_affected": [
+        "src/rendering/webgpu/shaders/skybox/",
+        "src/rendering/webgpu/shaders/groundplane/"
+      ]
+    },
+    {
+      "severity": "MEDIUM",
+      "finding": "CompositePass imported but not instantiated - pipeline incomplete",
+      "impact": "Final composition step is skipped, bloom may not blend correctly",
+      "files_affected": [
+        "src/rendering/webgpu/WebGPUScene.tsx"
+      ]
+    }
+  ]
+}

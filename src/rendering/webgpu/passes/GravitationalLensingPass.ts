@@ -222,7 +222,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -249,12 +249,12 @@ export class GravitationalLensingPass extends WebGPUBasePass {
       'gravitational-lensing-fragment'
     )
 
-    // Create pipeline
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'gravitational-lensing' }
     )
 

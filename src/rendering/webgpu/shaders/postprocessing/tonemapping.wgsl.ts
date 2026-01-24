@@ -92,7 +92,7 @@ fn gammaCorrect(color: vec3f, gamma: f32) -> vec3f {
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn main(input: VertexOutput) -> @location(0) vec4f {
   var color = textureSample(tInput, linearSampler, input.uv).rgb;
 
   // Apply exposure

@@ -4,6 +4,9 @@
  * Port of GLSL schroedinger/uniforms.glsl to WGSL.
  * Defines uniform structures for quantum wavefunction visualization.
  *
+ * NOTE: All arrays use vec4f/vec4i packing for WebGPU 16-byte alignment requirement.
+ * Use helper functions (getOmega, getQuantum, getCoeff, getEnergy, etc.) to access values.
+ *
  * @module rendering/webgpu/shaders/schroedinger/uniforms.wgsl
  */
 
@@ -22,22 +25,36 @@ const MAX_DIM: i32 = 11;
 const MAX_TERMS: i32 = 8;
 const MAX_EXTRA_DIM: i32 = 8;
 
+// WebGPU uniform buffers require 16-byte alignment for array elements.
+// All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
   // Quantum mode selection
   quantumMode: i32,              // 0 = harmonic oscillator, 1 = hydrogen orbital
 
   // Harmonic oscillator state configuration
   termCount: i32,                // Number of superposition terms (1-8)
-  omega: array<f32, 11>,         // Per-dimension frequencies (MAX_DIM)
-  quantum: array<i32, 88>,       // Quantum numbers n[k][j] (MAX_TERMS * MAX_DIM = 88)
-  coeff: array<vec2f, 8>,        // Complex coefficients c_k = (re, im) (MAX_TERMS)
-  energy: array<f32, 8>,         // Precomputed energies E_k (MAX_TERMS)
+  _padScalar0: i32,              // Padding for alignment
+  _padScalar1: i32,              // Padding for alignment
 
-  // Hydrogen orbital configuration
+  // Packed arrays (16-byte aligned)
+  // omega: 11 f32 values packed into 3 vec4f (12 slots, use 11)
+  omega: array<vec4f, 3>,
+
+  // quantum: 88 i32 values (MAX_TERMS * MAX_DIM = 8 * 11) packed into 22 vec4i
+  quantum: array<vec4<i32>, 22>,
+
+  // coeff: 8 complex values (vec2f each) packed into 8 vec4f (xy = value, zw = unused)
+  coeff: array<vec4f, 8>,
+
+  // energy: 8 f32 values packed into 2 vec4f
+  energy: array<vec4f, 2>,
+
+  // Hydrogen orbital configuration (scalar block)
   principalN: i32,               // Principal quantum number n (1-7)
   azimuthalL: i32,               // Azimuthal quantum number l (0 to n-1)
   magneticM: i32,                // Magnetic quantum number m (-l to +l)
   bohrRadius: f32,               // Bohr radius scale factor (0.5-3.0)
+
   useRealOrbitals: u32,          // Use real orbitals (px/py/pz) vs complex
 
   // PERF: Precomputed hydrogen density boost factors
@@ -46,8 +63,11 @@ struct SchroedingerUniforms {
   hydrogenRadialThreshold: f32,  // Precomputed: 25 * n * a0 * (1 + 0.1*l)
 
   // Hydrogen ND configuration (extra dimensions 4-11)
-  extraDimN: array<i32, 8>,      // Quantum numbers for dims 4-11 (MAX_EXTRA_DIM)
-  extraDimOmega: array<f32, 8>,  // Frequencies for dims 4-11 (MAX_EXTRA_DIM)
+  // extraDimN: 8 i32 values packed into 2 vec4i
+  extraDimN: array<vec4<i32>, 2>,
+
+  // extraDimOmega: 8 f32 values packed into 2 vec4f
+  extraDimOmega: array<vec4f, 2>,
 
   // Phase animation
   phaseAnimationEnabled: u32,    // Enable time-dependent phase rotation
@@ -56,10 +76,12 @@ struct SchroedingerUniforms {
   timeScale: f32,                // Time evolution speed (0.1-2.0)
   fieldScale: f32,               // Coordinate scale into HO basis (0.5-2.0)
   densityGain: f32,              // Absorption coefficient (0.1-5.0)
+
   powderScale: f32,              // Multiple scattering effect (0.0-2.0)
   emissionIntensity: f32,        // HDR emission intensity (0.0-5.0)
   emissionThreshold: f32,        // Density threshold for emission (0.0-1.0)
   emissionColorShift: f32,       // Emission color temperature shift (-1.0 to 1.0)
+
   emissionPulsing: u32,          // Enable phase-based emission pulsing
   rimExponent: f32,              // Fresnel rim falloff (1.0-10.0)
   scatteringAnisotropy: f32,     // Henyey-Greenstein phase function g factor
@@ -92,6 +114,7 @@ struct SchroedingerUniforms {
   dispersionEnabled: u32,        // Enable chromatic dispersion
   dispersionStrength: f32,       // Dispersion strength (0.0-1.0)
   dispersionDirection: i32,      // 0=Radial, 1=View
+
   dispersionQuality: i32,        // 0=Fast, 1=High
 
   // Shadows
@@ -133,6 +156,76 @@ struct SchroedingerUniforms {
   phaseTheta: f32,               // Phase offset for theta angle
   phasePhi: f32,                 // Phase offset for phi angle
   _pad3: f32,                    // Alignment padding
+}
+
+// ============================================
+// Packed Array Access Helpers
+// ============================================
+
+// Get omega[i] from packed array<vec4f, 3>
+fn getOmega(uniforms: SchroedingerUniforms, i: i32) -> f32 {
+  let vecIdx = i / 4;
+  let compIdx = i % 4;
+  let v = uniforms.omega[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
+}
+
+// Get quantum[k * MAX_DIM + j] from packed array<vec4i, 22>
+// quantum numbers are stored as n[k][j] where k is term index, j is dimension
+fn getQuantum(uniforms: SchroedingerUniforms, idx: i32) -> i32 {
+  let vecIdx = idx / 4;
+  let compIdx = idx % 4;
+  let v = uniforms.quantum[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
+}
+
+// Get quantum number n[k][j] for term k, dimension j
+fn getQuantumNumber(uniforms: SchroedingerUniforms, termIdx: i32, dimIdx: i32) -> i32 {
+  return getQuantum(uniforms, termIdx * MAX_DIM + dimIdx);
+}
+
+// Get coeff[k] as vec2f (real, imag) from packed array<vec4f, 8>
+fn getCoeff(uniforms: SchroedingerUniforms, k: i32) -> vec2f {
+  return uniforms.coeff[k].xy;
+}
+
+// Get energy[k] from packed array<vec4f, 2>
+fn getEnergy(uniforms: SchroedingerUniforms, k: i32) -> f32 {
+  let vecIdx = k / 4;
+  let compIdx = k % 4;
+  let v = uniforms.energy[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
+}
+
+// Get extraDimN[i] from packed array<vec4i, 2>
+fn getExtraDimN(uniforms: SchroedingerUniforms, i: i32) -> i32 {
+  let vecIdx = i / 4;
+  let compIdx = i % 4;
+  let v = uniforms.extraDimN[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
+}
+
+// Get extraDimOmega[i] from packed array<vec4f, 2>
+fn getExtraDimOmega(uniforms: SchroedingerUniforms, i: i32) -> f32 {
+  let vecIdx = i / 4;
+  let compIdx = i % 4;
+  let v = uniforms.extraDimOmega[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
 }
 
 // ============================================

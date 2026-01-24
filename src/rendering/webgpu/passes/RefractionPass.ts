@@ -77,13 +77,15 @@ fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
 fn reconstructNormal(coord: vec2f) -> vec3f {
   let texel = 1.0 / uniforms.resolution;
 
-  // Sample depth at center and neighboring pixels
+  // Sample depth at center and neighboring pixels using textureLoad (unfilterable-float)
   // In WebGPU: V=0 is bottom, V=1 is top
-  let depthC = textureSample(tDepth, texSampler, coord).x;
-  let depthL = textureSample(tDepth, texSampler, coord - vec2f(texel.x, 0.0)).x;
-  let depthR = textureSample(tDepth, texSampler, coord + vec2f(texel.x, 0.0)).x;
-  let depthB = textureSample(tDepth, texSampler, coord - vec2f(0.0, texel.y)).x;
-  let depthT = textureSample(tDepth, texSampler, coord + vec2f(0.0, texel.y)).x;
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(coord * vec2f(depthDims));
+  let depthC = textureLoad(tDepth, depthCoord, 0).x;
+  let depthL = textureLoad(tDepth, depthCoord + vec2i(-1, 0), 0).x;
+  let depthR = textureLoad(tDepth, depthCoord + vec2i(1, 0), 0).x;
+  let depthB = textureLoad(tDepth, depthCoord + vec2i(0, -1), 0).x;
+  let depthT = textureLoad(tDepth, depthCoord + vec2i(0, 1), 0).x;
 
   // Reconstruct view-space positions
   let posC = getViewPosition(coord, depthC);
@@ -125,7 +127,9 @@ fn getNormal(coord: vec2f) -> vec3f {
 
 // Check if this pixel has valid G-buffer data (not background)
 fn hasGBufferData(coord: vec2f) -> bool {
-  let depth = textureSample(tDepth, texSampler, coord).x;
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(coord * vec2f(depthDims));
+  let depth = textureLoad(tDepth, depthCoord, 0).x;
   return depth < 0.9999;
 }
 
@@ -244,7 +248,7 @@ export class RefractionPass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -277,12 +281,12 @@ export class RefractionPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, REFRACTION_SHADER, 'refraction-fragment')
 
-    // Create pipeline
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'refraction' }
     )
 

@@ -52,6 +52,6 @@ struct JuliaUniforms {
  */
 export function generateJuliaBindGroupEntry(bindingIndex: number): string {
   return /* wgsl */ `
-@group(4) @binding(${bindingIndex}) var<uniform> julia: JuliaUniforms;
+@group(3) @binding(${bindingIndex}) var<uniform> julia: JuliaUniforms;
 `
 }

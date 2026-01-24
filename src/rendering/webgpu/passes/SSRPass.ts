@@ -76,6 +76,13 @@ fn projectToScreen(viewPos: vec3f) -> vec3f {
   return vec3f(clipPos.xy * 0.5 + 0.5, clipPos.z * 0.5 + 0.5);
 }
 
+// Load depth using integer coordinates (for unfilterable-float texture)
+fn loadDepth(uv: vec2f) -> f32 {
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+  return textureLoad(tDepth, depthCoord, 0).r;
+}
+
 // Ray march in screen space
 fn rayMarch(origin: vec3f, direction: vec3f) -> vec4f {
   var rayPos = origin;
@@ -94,8 +101,8 @@ fn rayMarch(origin: vec3f, direction: vec3f) -> vec4f {
       break;
     }
 
-    // Sample depth at this screen position
-    let sampleDepth = textureSample(tDepth, texSampler, screenPos.xy).r;
+    // Sample depth at this screen position (using textureLoad for unfilterable-float)
+    let sampleDepth = loadDepth(screenPos.xy);
     let sampleViewPos = getViewPosition(screenPos.xy, sampleDepth);
 
     // Check if ray is behind surface
@@ -125,8 +132,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Sample original color
   let originalColor = textureSample(tColor, texSampler, uv);
 
-  // Sample depth
-  let depth = textureSample(tDepth, texSampler, uv).r;
+  // Sample depth (using textureLoad for unfilterable-float)
+  let depth = loadDepth(uv);
 
   // Skip far plane (sky)
   if (depth >= 0.9999) {
@@ -210,7 +217,7 @@ export class SSRPass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -243,12 +250,12 @@ export class SSRPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, SSR_SHADER, 'ssr-fragment')
 
-    // Create pipeline
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'ssr' }
     )
 

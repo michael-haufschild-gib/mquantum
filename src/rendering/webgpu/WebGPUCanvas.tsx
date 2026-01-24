@@ -119,7 +119,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         }
 
         // Create render graph
-        const graph = new WebGPURenderGraph(deviceManager)
+        const graph = new WebGPURenderGraph()
 
         // Set initial size
         const container = containerRef.current

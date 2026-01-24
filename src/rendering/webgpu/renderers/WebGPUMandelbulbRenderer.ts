@@ -47,7 +47,7 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
   private objectBindGroup: GPUBindGroup | null = null
 
   // Configuration
-  private config: MandelbulbRendererConfig
+  private rendererConfig: MandelbulbRendererConfig
   private shaderConfig: WGSLShaderConfig
 
   // Geometry
@@ -59,9 +59,9 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
       priority: 100,
       inputs: [],
       outputs: [
-        { resourceId: 'hdr-color', access: 'write' },
-        { resourceId: 'normal-buffer', access: 'write' },
-        { resourceId: 'depth-buffer', access: 'write' },
+        { resourceId: 'hdr-color', access: 'write', binding: 0 },
+        { resourceId: 'normal-buffer', access: 'write', binding: 1 },
+        { resourceId: 'depth-buffer', access: 'write', binding: 2 },
       ],
     })
 
@@ -76,18 +76,18 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     }
 
     this.shaderConfig = {
-      dimension: this.config.dimension!,
-      shadows: this.config.shadows,
-      ambientOcclusion: this.config.ambientOcclusion,
-      sss: this.config.sss,
-      ibl: this.config.ibl,
-      temporal: this.config.temporal,
+      dimension: this.rendererConfig.dimension!,
+      shadows: this.rendererConfig.shadows,
+      ambientOcclusion: this.rendererConfig.ambientOcclusion,
+      sss: this.rendererConfig.sss,
+      ibl: this.rendererConfig.ibl,
+      temporal: this.rendererConfig.temporal,
     }
   }
 
   setDimension(dimension: number): void {
-    if (this.config.dimension === dimension) return
-    this.config.dimension = dimension
+    if (this.rendererConfig.dimension === dimension) return
+    this.rendererConfig.dimension = dimension
     this.shaderConfig.dimension = dimension
     // Note: Would need to recreate pipeline for dimension change
   }
@@ -549,7 +549,7 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const data = new Float32Array(32) // 128 bytes / 4
 
     // Core parameters (matching MandelbulbUniforms struct)
-    data[0] = this.config.dimension ?? 3 // dimension: i32 (stored as f32 for alignment)
+    data[0] = this.rendererConfig.dimension ?? 3 // dimension: i32 (stored as f32 for alignment)
     data[1] = mb.mandelbulbPower ?? 8.0 // power
     data[2] = mb.maxIterations ?? 48 // iterations
     data[3] = mb.escapeRadius ?? 4.0 // escapeRadius
@@ -592,7 +592,7 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const extended = ctx.frame?.stores?.['extended'] as any
     if (!rotation) return
 
-    const dimension = this.config.dimension ?? 3
+    const dimension = this.rendererConfig.dimension ?? 3
     const rotations = rotation.rotations as Map<string, number> | undefined
 
     // Import composeRotations dynamically would be complex, so we'll use a simplified

@@ -109,7 +109,7 @@ export class JetsCompositePass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -141,12 +141,12 @@ export class JetsCompositePass extends WebGPUBasePass {
       'jets-composite-fragment'
     )
 
-    // Create pipeline using fullscreen helper
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'jets-composite' }
     )
 

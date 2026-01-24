@@ -35,6 +35,9 @@ export interface EnvironmentCompositePassConfig {
 
 /**
  * WGSL Environment Composite Fragment Shader
+ *
+ * Uses textureLoad instead of textureSample for horizon detection to avoid
+ * non-uniform control flow issues in WGSL.
  */
 const ENVIRONMENT_COMPOSITE_SHADER = /* wgsl */ `
 struct Uniforms {
@@ -64,37 +67,44 @@ fn isAtFarPlane(depth: f32) -> bool {
   return depth >= 0.9999;
 }
 
-// Check if a pixel is part of the event horizon
-fn isHorizonPixel(uv: vec2f) -> bool {
-  let color = textureSample(tMainObject, texSampler, uv);
-  let depth = textureSample(tMainObjectDepth, texSampler, uv).r;
-  return depth >= 0.999 && color.a > 0.9;
-}
-
-// Detect the visual boundary of the event horizon
+// Detect the visual boundary of the event horizon using textureLoad (uniform control flow safe)
 fn detectHorizonEdge(uv: vec2f) -> f32 {
-  let texelSize = 1.0 / uniforms.resolution;
+  let texDims = textureDimensions(tMainObject);
+  let texCoord = vec2i(uv * vec2f(texDims));
 
-  // Check if current pixel is horizon
-  let centerIsHorizon = isHorizonPixel(uv);
+  // Check if current pixel is horizon using textureLoad
+  let centerColor = textureLoad(tMainObject, texCoord, 0);
+  let centerDepth = textureLoad(tMainObjectDepth, texCoord, 0).r;
+  let centerIsHorizon = centerDepth >= 0.999 && centerColor.a > 0.9;
 
   // Only glow OUTSIDE the horizon
   if (centerIsHorizon) {
     return 0.0;
   }
 
-  // Check neighbors for horizon pixels
-  var horizonCount: f32 = 0.0;
+  // Check neighbors for horizon pixels using textureLoad with unrolled offsets
+  var horizonCount = 0.0;
 
-  // Sample in a small radius for smooth glow
-  for (var x: f32 = -2.0; x <= 2.0; x += 1.0) {
-    for (var y: f32 = -2.0; y <= 2.0; y += 1.0) {
-      if (x == 0.0 && y == 0.0) { continue; }
-      let sampleUv = uv + vec2f(x, y) * texelSize;
-      if (isHorizonPixel(sampleUv)) {
-        let dist = length(vec2f(x, y));
-        horizonCount += 1.0 / (dist + 0.5);
-      }
+  // 5x5 grid offsets (excluding center)
+  let offsets = array<vec2i, 24>(
+    vec2i(-2, -2), vec2i(-1, -2), vec2i(0, -2), vec2i(1, -2), vec2i(2, -2),
+    vec2i(-2, -1), vec2i(-1, -1), vec2i(0, -1), vec2i(1, -1), vec2i(2, -1),
+    vec2i(-2,  0), vec2i(-1,  0),               vec2i(1,  0), vec2i(2,  0),
+    vec2i(-2,  1), vec2i(-1,  1), vec2i(0,  1), vec2i(1,  1), vec2i(2,  1),
+    vec2i(-2,  2), vec2i(-1,  2), vec2i(0,  2), vec2i(1,  2), vec2i(2,  2)
+  );
+
+  for (var i = 0; i < 24; i++) {
+    let sampleCoord = texCoord + offsets[i];
+    // Clamp to texture bounds
+    let clampedCoord = clamp(sampleCoord, vec2i(0), vec2i(texDims) - vec2i(1));
+
+    let sampleColor = textureLoad(tMainObject, clampedCoord, 0);
+    let sampleDepth = textureLoad(tMainObjectDepth, clampedCoord, 0).r;
+
+    if (sampleDepth >= 0.999 && sampleColor.a > 0.9) {
+      let dist = length(vec2f(offsets[i]));
+      horizonCount += 1.0 / (dist + 0.5);
     }
   }
 
@@ -105,10 +115,14 @@ fn detectHorizonEdge(uv: vec2f) -> f32 {
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Sample both layers
+  // Sample color textures with filtering sampler
   let envColor = textureSample(tLensedEnvironment, texSampler, uv);
   let objColor = textureSample(tMainObject, texSampler, uv);
-  let objDepth = textureSample(tMainObjectDepth, texSampler, uv).r;
+
+  // Use textureLoad for depth (unfilterable-float texture can't use textureSample)
+  let texDims = textureDimensions(tMainObjectDepth);
+  let depthCoord = vec2i(uv * vec2f(texDims));
+  let objDepth = textureLoad(tMainObjectDepth, depthCoord, 0).r;
 
   var finalColor: vec3f;
   var finalAlpha: f32;
@@ -180,7 +194,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -217,12 +231,12 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
       'environment-composite-fragment'
     )
 
-    // Create pipeline using fullscreen helper
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'environment-composite' }
     )
 

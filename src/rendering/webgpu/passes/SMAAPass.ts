@@ -65,8 +65,8 @@ export class SMAAPass extends WebGPUBasePass {
     super({
       id: 'smaa',
       priority: 950, // After tonemapping, same priority as FXAA
-      inputs: [{ resourceId: 'ldr-color', access: 'read' }],
-      outputs: [{ resourceId: 'final-color', access: 'write' }],
+      inputs: [{ resourceId: 'ldr-color', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'final-color', access: 'write', binding: 0 }],
     })
 
     if (options?.threshold !== undefined) this.threshold = options.threshold
@@ -100,7 +100,7 @@ export class SMAAPass extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create shader modules
     const edgeShaderModule = this.createShaderModule(
@@ -243,11 +243,12 @@ export class SMAAPass extends WebGPUBasePass {
       'smaa-neighborhood-uniforms'
     )
 
+    // Use rgba8unorm for LDR final-color output buffer
     this.neighborhoodBlendPipeline = this.createFullscreenPipeline(
       device,
       neighborhoodShaderModule,
       [this.neighborhoodBlendBindGroupLayout],
-      format, // Final output format
+      'rgba8unorm',
       { label: 'smaa-neighborhood-blend' }
     )
   }

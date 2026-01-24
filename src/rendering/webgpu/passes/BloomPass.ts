@@ -54,8 +54,8 @@ export class BloomPass extends WebGPUBasePass {
     super({
       id: 'bloom',
       priority: 800,
-      inputs: [{ resourceId: 'hdr-color', access: 'read' }],
-      outputs: [{ resourceId: 'bloom-output', access: 'write' }],
+      inputs: [{ resourceId: 'hdr-color', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'bloom-output', access: 'write', binding: 0 }],
     })
 
     if (options?.threshold !== undefined) this.threshold = options.threshold
@@ -314,7 +314,7 @@ export class BloomPass extends WebGPUBasePass {
       blurPass.end()
 
       // Swap textures
-      const temp = readTexture
+      const _temp = readTexture
       readTexture = writeTexture
       writeTexture = i % 2 === 0 ? this.blurTextureB : this.blurTextureA
     }

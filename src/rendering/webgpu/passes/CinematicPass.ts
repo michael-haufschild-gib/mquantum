@@ -138,7 +138,7 @@ export class CinematicPass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -161,12 +161,12 @@ export class CinematicPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, CINEMATIC_SHADER, 'cinematic-fragment')
 
-    // Create pipeline
+    // Create pipeline - use rgba8unorm for LDR output buffer
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba8unorm',
       { label: 'cinematic' }
     )
 

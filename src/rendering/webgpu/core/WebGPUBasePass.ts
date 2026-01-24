@@ -134,7 +134,7 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
   protected writeUniformBuffer(
     device: GPUDevice,
     buffer: GPUBuffer,
-    data: ArrayBuffer | ArrayBufferView,
+    data: Float32Array | Uint32Array | Int32Array | Uint8Array,
     offset = 0
   ): void {
     device.queue.writeBuffer(buffer, offset, data)

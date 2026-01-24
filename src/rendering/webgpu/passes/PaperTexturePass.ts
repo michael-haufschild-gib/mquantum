@@ -672,7 +672,7 @@ export class PaperTexturePass extends WebGPUBasePass {
    * @param ctx - WebGPU setup context
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -704,12 +704,12 @@ export class PaperTexturePass extends WebGPUBasePass {
       'paper-texture-fragment'
     )
 
-    // Create pipeline
+    // Create pipeline - use rgba8unorm for LDR output buffer
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba8unorm',
       { label: 'paper-texture' }
     )
 
@@ -749,7 +749,7 @@ export class PaperTexturePass extends WebGPUBasePass {
     // Write data to texture
     device.queue.writeTexture(
       { texture: this.noiseTexture },
-      data,
+      data.buffer,
       { bytesPerRow: size * 4 },
       { width: size, height: size }
     )

@@ -103,7 +103,9 @@ fn sampleBokeh(uv: vec2f, cocRadius: f32) -> vec4f {
 
       // Sample color and depth at this point
       let sampleColor = textureSample(tColor, texSampler, sampleUV);
-      let sampleDepth = textureSample(tDepth, texSampler, sampleUV).r;
+      let depthDims = textureDimensions(tDepth);
+      let depthCoord = vec2i(sampleUV * vec2f(depthDims));
+      let sampleDepth = textureLoad(tDepth, depthCoord, 0).r;
       let sampleCoC = calculateCoC(sampleDepth);
 
       // Weight by sample's CoC (foreground should bleed, background should not)
@@ -126,8 +128,10 @@ fn sampleBokeh(uv: vec2f, cocRadius: f32) -> vec4f {
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Sample depth
-  let depth = textureSample(tDepth, texSampler, uv).r;
+  // Sample depth using textureLoad (depth texture is unfilterable-float)
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+  let depth = textureLoad(tDepth, depthCoord, 0).r;
 
   // Calculate circle of confusion
   let coc = calculateCoC(depth);
@@ -185,7 +189,7 @@ export class BokehPass extends WebGPUBasePass {
    * Create the rendering pipeline.
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -213,12 +217,12 @@ export class BokehPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, BOKEH_SHADER, 'bokeh-fragment')
 
-    // Create pipeline
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'bokeh' }
     )
 

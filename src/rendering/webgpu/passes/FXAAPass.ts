@@ -32,8 +32,8 @@ export class FXAAPass extends WebGPUBasePass {
     super({
       id: 'fxaa',
       priority: 950, // After tonemapping
-      inputs: [{ resourceId: 'ldr-color', access: 'read' }],
-      outputs: [{ resourceId: 'final-color', access: 'write' }],
+      inputs: [{ resourceId: 'ldr-color', access: 'read', binding: 0 }],
+      outputs: [{ resourceId: 'final-color', access: 'write', binding: 0 }],
     })
 
     if (options?.subpixelQuality !== undefined) this.subpixelQuality = options.subpixelQuality
@@ -50,7 +50,7 @@ export class FXAAPass extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     const shaderModule = this.createShaderModule(device, fxaaShader, 'fxaa-shader')
 
@@ -74,12 +74,12 @@ export class FXAAPass extends WebGPUBasePass {
       minFilter: 'linear',
     })
 
-    // Create pipeline
+    // Create pipeline - use rgba8unorm for LDR output buffer
     this.pipeline = this.createFullscreenPipeline(
       device,
       shaderModule,
       [this.bindGroupLayout],
-      format,
+      'rgba8unorm',
       { label: 'fxaa' }
     )
   }

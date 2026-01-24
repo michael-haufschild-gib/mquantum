@@ -52,7 +52,6 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   // Uniform buffers
   private cameraUniformBuffer: GPUBuffer | null = null
   private polytopeUniformBuffer: GPUBuffer | null = null
-  private basisUniformBuffer: GPUBuffer | null = null
 
   // Geometry buffers (provided externally or created from polytope data)
   private faceVertexBuffer: GPUBuffer | null = null
@@ -65,10 +64,12 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   constructor(config?: PolytopeRendererConfig) {
     super({
       id: 'polytope',
-      priority: 100,
-      inputs: [],
+      priority: 5, // Execute AFTER ScenePass (priority 0) clears, but before other passes
+      inputs: [
+        { resourceId: 'scene-render', access: 'read' as const, binding: 0 }, // Depend on ScenePass
+      ],
       outputs: [
-        { resourceId: 'hdr-color', access: 'write' as const, binding: 0 },
+        { resourceId: 'scene-render', access: 'write' as const, binding: 0 },
         { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
       ],
     })
@@ -106,6 +107,7 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       ],
     })
 
+    // Polytope uniforms only (no more basis vectors - N-D transform is in main uniforms)
     const polytopeBindGroupLayout = device.createBindGroupLayout({
       label: 'polytope-object-bgl',
       entries: [
@@ -113,24 +115,19 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
           binding: 0,
           visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
           buffer: { type: 'uniform' as const },
-        }, // Polytope uniforms
-        {
-          binding: 1,
-          visibility: GPUShaderStage.VERTEX,
-          buffer: { type: 'uniform' as const },
-        }, // Basis vectors
+        },
       ],
     })
 
     // Create pipeline layout for faces (camera + polytope bind groups)
+    // WebGPU has a maximum of 4 bind group layouts (groups 0-3)
     const facePipelineLayout = device.createPipelineLayout({
       label: 'polytope-face-pipeline-layout',
       bindGroupLayouts: [
-        cameraBindGroupLayout,
-        cameraBindGroupLayout, // placeholder for lighting (group 1)
-        cameraBindGroupLayout, // placeholder for material (group 2)
-        cameraBindGroupLayout, // placeholder for quality (group 3)
-        polytopeBindGroupLayout, // polytope object (group 4)
+        cameraBindGroupLayout,     // group 0: camera
+        cameraBindGroupLayout,     // group 1: placeholder for lighting
+        cameraBindGroupLayout,     // group 2: placeholder for material
+        polytopeBindGroupLayout,   // group 3: polytope uniforms (includes N-D transform)
       ],
     })
 
@@ -138,11 +135,10 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     const edgePipelineLayout = device.createPipelineLayout({
       label: 'polytope-edge-pipeline-layout',
       bindGroupLayouts: [
-        cameraBindGroupLayout,
-        cameraBindGroupLayout,
-        cameraBindGroupLayout,
-        cameraBindGroupLayout,
-        polytopeBindGroupLayout,
+        cameraBindGroupLayout,     // group 0: camera
+        cameraBindGroupLayout,     // group 1: placeholder for lighting
+        cameraBindGroupLayout,     // group 2: placeholder for material
+        polytopeBindGroupLayout,   // group 3: polytope uniforms (includes N-D transform)
       ],
     })
 
@@ -170,13 +166,13 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
           entryPoint: 'main',
           buffers: [
             {
-              // Face vertex buffer: position (3) + normal (3) + extraDims0_3 (4) + extraDims4_7 (4)
-              arrayStride: 56, // 14 floats * 4 bytes
+              // Face vertex buffer: position (3) + extraDims0_3 (4) + extraDims4_6 (3) = 10 floats
+              // Matches WebGL screen-space normals layout (normals computed in fragment shader)
+              arrayStride: 40, // 10 floats * 4 bytes
               attributes: [
                 { shaderLocation: 0, offset: 0, format: 'float32x3' as const }, // position
-                { shaderLocation: 1, offset: 12, format: 'float32x3' as const }, // normal
-                { shaderLocation: 2, offset: 24, format: 'float32x4' as const }, // extraDims0_3
-                { shaderLocation: 3, offset: 40, format: 'float32x4' as const }, // extraDims4_7
+                { shaderLocation: 1, offset: 12, format: 'float32x4' as const }, // extraDims0_3
+                { shaderLocation: 2, offset: 28, format: 'float32x3' as const }, // extraDims4_6
               ],
             },
           ],
@@ -184,14 +180,14 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
         fragment: {
           module: faceFragmentModule,
           entryPoint: 'fragmentMain',
-          targets: [{ format }],
+          targets: [{ format: 'rgba16float' as GPUTextureFormat }],
         },
         primitive: {
           topology: 'triangle-list' as const,
           cullMode: 'back' as const,
         },
         depthStencil: {
-          format: 'depth32float',
+          format: 'depth24plus',
           depthWriteEnabled: true,
           depthCompare: 'less',
         },
@@ -222,12 +218,13 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
           entryPoint: 'main',
           buffers: [
             {
-              // Edge vertex buffer: position (3) + extraDims0_3 (4) + extraDims4_7 (4)
-              arrayStride: 44, // 11 floats * 4 bytes
+              // Edge vertex buffer: position (3) + extraDims0_3 (4) + extraDims4_6 (3) = 10 floats
+              // Matches WebGL buildNDGeometry layout
+              arrayStride: 40, // 10 floats * 4 bytes
               attributes: [
                 { shaderLocation: 0, offset: 0, format: 'float32x3' as const }, // position
                 { shaderLocation: 1, offset: 12, format: 'float32x4' as const }, // extraDims0_3
-                { shaderLocation: 2, offset: 28, format: 'float32x4' as const }, // extraDims4_7
+                { shaderLocation: 2, offset: 28, format: 'float32x3' as const }, // extraDims4_6
               ],
             },
           ],
@@ -235,14 +232,14 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
         fragment: {
           module: edgeFragmentModule,
           entryPoint: 'fragmentMain',
-          targets: [{ format }],
+          targets: [{ format: 'rgba16float' as GPUTextureFormat }],
         },
         primitive: {
           topology: 'line-list' as const,
           cullMode: 'none' as const,
         },
         depthStencil: {
-          format: 'depth32float',
+          format: 'depth24plus',
           depthWriteEnabled: true,
           depthCompare: 'less',
         },
@@ -250,9 +247,10 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     }
 
     // Create uniform buffers
+    // Camera: 256 bytes (matches CameraUniforms struct)
+    // Polytope: 320 bytes (288 bytes for PolytopeUniforms + padding for alignment)
     this.cameraUniformBuffer = this.createUniformBuffer(device, 256, 'polytope-camera')
-    this.polytopeUniformBuffer = this.createUniformBuffer(device, 128, 'polytope-uniforms')
-    this.basisUniformBuffer = this.createUniformBuffer(device, 256, 'polytope-basis')
+    this.polytopeUniformBuffer = this.createUniformBuffer(device, 320, 'polytope-uniforms')
 
     // Create bind groups
     this.cameraBindGroup = device.createBindGroup({
@@ -266,7 +264,6 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       layout: polytopeBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.polytopeUniformBuffer } },
-        { binding: 1, resource: { buffer: this.basisUniformBuffer } },
       ],
     })
   }
@@ -435,6 +432,13 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
    */
   updatePolytopeUniforms(
     uniforms: {
+      // N-D Transform
+      rotationMatrix4D?: number[]
+      extraRotationCols?: number[]
+      depthRowSums?: number[]
+      uniformScale?: number
+      projectionDistance?: number
+      // Material
       baseColor?: [number, number, number]
       opacity?: number
       edgeColor?: [number, number, number]
@@ -448,40 +452,75 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     if (!this.device || !this.polytopeUniformBuffer) return
 
     // Polytope uniform layout (matches PolytopeUniforms struct):
-    // dimension: i32, _pad1-3: f32 (16 bytes)
-    // baseColor: vec3f, opacity: f32 (16 bytes)
-    // edgeColor: vec3f, edgeWidth: f32 (16 bytes)
-    // roughness, metalness, ambientIntensity, emissiveIntensity: f32 (16 bytes)
-    // Total: 64 bytes
+    // rotationMatrix4D: mat4x4f (64 bytes, indices 0-15)
+    // dimension: i32, uniformScale: f32, projectionDistance: f32, depthNormFactor: f32 (16 bytes, indices 16-19)
+    // baseColor: vec3f, opacity: f32 (16 bytes, indices 20-23)
+    // edgeColor: vec3f, edgeWidth: f32 (16 bytes, indices 24-27)
+    // roughness, metalness, ambientIntensity, emissiveIntensity: f32 (16 bytes, indices 28-31)
+    // extraRotCol0-6: 7 * vec4f (112 bytes, indices 32-59)
+    // depthRowSums0_3: vec4f, depthRowSums4_7: vec4f (32 bytes, indices 60-67)
+    // depthRowSums8_10: vec3f, _padDepth: f32 (16 bytes, indices 68-71)
+    // Total: 288 bytes = 72 floats
 
-    const data = new Float32Array(16)
+    const data = new Float32Array(72)
 
-    // dimension + padding (use default of 4 if not set)
+    // rotationMatrix4D (16 floats, offset 0)
+    if (uniforms.rotationMatrix4D) {
+      for (let i = 0; i < 16 && i < uniforms.rotationMatrix4D.length; i++) {
+        const value = uniforms.rotationMatrix4D[i]
+        if (value !== undefined) data[i] = value
+      }
+    } else {
+      // Identity matrix
+      data[0] = 1
+      data[5] = 1
+      data[10] = 1
+      data[15] = 1
+    }
+
+    // dimension, uniformScale, projectionDistance, depthNormFactor (offset 16)
     const dimension = this.rendererConfig.dimension ?? 4
-    data[0] = dimension
-    data[1] = 0
-    data[2] = 0
-    data[3] = 0
+    data[16] = dimension
+    data[17] = uniforms.uniformScale ?? 1.0
+    data[18] = uniforms.projectionDistance ?? 5.0
+    data[19] = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 // depthNormFactor
 
-    // baseColor + opacity
+    // baseColor + opacity (offset 20)
     const baseColor = uniforms.baseColor ?? [0.7, 0.7, 0.9]
-    data[4] = baseColor[0]
-    data[5] = baseColor[1]
-    data[6] = baseColor[2]
-    data[7] = uniforms.opacity ?? 1.0
+    data[20] = baseColor[0]
+    data[21] = baseColor[1]
+    data[22] = baseColor[2]
+    data[23] = uniforms.opacity ?? 1.0
 
-    // edgeColor + edgeWidth
+    // edgeColor + edgeWidth (offset 24)
     const edgeColor = uniforms.edgeColor ?? [1.0, 1.0, 1.0]
-    data[8] = edgeColor[0]
-    data[9] = edgeColor[1]
-    data[10] = edgeColor[2]
-    data[11] = uniforms.edgeWidth ?? 1.0
+    data[24] = edgeColor[0]
+    data[25] = edgeColor[1]
+    data[26] = edgeColor[2]
+    data[27] = uniforms.edgeWidth ?? 1.0
 
-    // Material properties
-    data[12] = uniforms.roughness ?? 0.5
-    data[13] = uniforms.metalness ?? 0.0
-    data[14] = uniforms.ambientIntensity ?? 0.3
-    data[15] = uniforms.emissiveIntensity ?? 0.0
+    // Material properties (offset 28)
+    data[28] = uniforms.roughness ?? 0.5
+    data[29] = uniforms.metalness ?? 0.0
+    data[30] = uniforms.ambientIntensity ?? 0.3
+    data[31] = uniforms.emissiveIntensity ?? 0.0
+
+    // extraRotCols (7 * 4 = 28 floats, offset 32)
+    if (uniforms.extraRotationCols) {
+      for (let i = 0; i < 28 && i < uniforms.extraRotationCols.length; i++) {
+        const value = uniforms.extraRotationCols[i]
+        if (value !== undefined) data[32 + i] = value
+      }
+    }
+
+    // depthRowSums (12 floats for alignment, offset 60)
+    if (uniforms.depthRowSums) {
+      for (let i = 0; i < 11 && i < uniforms.depthRowSums.length; i++) {
+        const value = uniforms.depthRowSums[i]
+        if (value !== undefined) data[60 + i] = value
+      }
+    }
+    // _padDepth at index 71 remains 0
 
     this.writeUniformBuffer(this.device, this.polytopeUniformBuffer, data)
   }
@@ -493,7 +532,13 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     const extended = ctx.frame?.stores?.['extended'] as any
     const pbr = ctx.frame?.stores?.['pbr'] as any
     const appearance = ctx.frame?.stores?.['appearance'] as any
-    const transform = ctx.frame?.stores?.['transform'] as any
+    // N-D transform data including dynamically computed projectionDistance
+    const ndTransform = ctx.frame?.stores?.['ndTransform'] as {
+      rotationMatrix4D?: number[]
+      extraRotationCols?: number[]
+      depthRowSums?: number[]
+      projectionDistance?: number
+    }
 
     const polytope = extended?.polytope
 
@@ -502,6 +547,18 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     const edgeColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
 
     this.updatePolytopeUniforms({
+      // N-D Transform data from stores
+      rotationMatrix4D: ndTransform?.rotationMatrix4D,
+      extraRotationCols: ndTransform?.extraRotationCols,
+      depthRowSums: ndTransform?.depthRowSums,
+      // FIX: uniformScale from polytope.scale (not transform.uniformScale)
+      // WebGL uses extendedObjectStore.polytope.scale (line 841 of PolytopeScene.tsx)
+      // Defaults: hypercube=1.8, simplex=4.0, cross-polytope=1.8, wythoff=2.0
+      uniformScale: polytope?.scale ?? 1.8,
+      // FIX: projectionDistance from ndTransform (computed dynamically)
+      // WebGL uses projDistCache.getProjectionDistance() (line 872 of PolytopeScene.tsx)
+      projectionDistance: ndTransform?.projectionDistance ?? 5.0,
+      // Material
       baseColor: [faceColor[0], faceColor[1], faceColor[2]],
       opacity: polytope?.opacity ?? 1.0,
       edgeColor: [edgeColor[0], edgeColor[1], edgeColor[2]],
@@ -511,26 +568,6 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       ambientIntensity: 0.3,
       emissiveIntensity: 0.0,
     })
-  }
-
-  /**
-   * Update basis vectors from rotation and transform stores.
-   */
-  updateBasisUniforms(ctx: WebGPURenderContext): void {
-    if (!this.device || !this.basisUniformBuffer) return
-
-    const transform = ctx.frame?.stores?.['transform'] as any
-    const dimension = this.rendererConfig.dimension ?? 4
-
-    const data = new Float32Array(48)
-
-    // Default identity basis with scale applied
-    const scale = transform?.uniformScale ?? 1.0
-    data[0] = scale // basisX[0]
-    data[12] = scale // basisY[1]
-    data[24] = scale // basisZ[2]
-
-    this.writeUniformBuffer(this.device, this.basisUniformBuffer, data)
   }
 
   private parseColor(hex: string): [number, number, number] {
@@ -545,44 +582,6 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   }
 
   /**
-   * Update basis vectors for N-D projection.
-   */
-  updateBasisVectors(basisX: number[], basisY: number[], basisZ: number[], origin: number[]): void {
-    if (!this.device || !this.basisUniformBuffer) return
-
-    // Basis vectors layout (matches BasisVectors struct):
-    // basisX: array<f32, 11> (44 bytes, aligned to 48)
-    // basisY: array<f32, 11> (44 bytes, aligned to 48)
-    // basisZ: array<f32, 11> (44 bytes, aligned to 48)
-    // origin: array<f32, 11> (44 bytes, aligned to 48)
-    // Total: 192 bytes (with alignment)
-
-    // For simplicity, we'll use a padded layout
-    const data = new Float32Array(64) // 256 bytes total
-
-    // Copy basis vectors with padding
-    const maxDims = 11
-    for (let i = 0; i < maxDims && i < basisX.length; i++) {
-      const value = basisX[i]
-      if (value !== undefined) data[i] = value
-    }
-    for (let i = 0; i < maxDims && i < basisY.length; i++) {
-      const value = basisY[i]
-      if (value !== undefined) data[16 + i] = value
-    }
-    for (let i = 0; i < maxDims && i < basisZ.length; i++) {
-      const value = basisZ[i]
-      if (value !== undefined) data[32 + i] = value
-    }
-    for (let i = 0; i < maxDims && i < origin.length; i++) {
-      const value = origin[i]
-      if (value !== undefined) data[48 + i] = value
-    }
-
-    this.writeUniformBuffer(this.device, this.basisUniformBuffer, data)
-  }
-
-  /**
    * Execute the render pass.
    */
   execute(ctx: WebGPURenderContext): void {
@@ -593,10 +592,9 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     // Update all uniforms from stores
     this.updateCameraUniforms(ctx)
     this.updatePolytopeFromStores(ctx)
-    this.updateBasisUniforms(ctx)
 
-    // Get render targets
-    const colorView = ctx.getWriteTarget('hdr-color')
+    // Get render targets (write to scene-render, same as WebGL ScenePass)
+    const colorView = ctx.getWriteTarget('scene-render')
     const depthView = ctx.getWriteTarget('depth-buffer')
 
     if (!colorView || !depthView) return
@@ -614,16 +612,14 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
         colorAttachments: [
           {
             view: colorView,
-            loadOp: 'clear' as const,
+            loadOp: 'load' as const, // Preserve ScenePass clear
             storeOp: 'store' as const,
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
           },
         ],
         depthStencilAttachment: {
           view: depthView,
-          depthLoadOp: 'clear' as const,
+          depthLoadOp: 'load' as const, // Preserve ScenePass clear
           depthStoreOp: 'store' as const,
-          depthClearValue: 1.0,
         },
       })
 
@@ -631,8 +627,7 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       facePassEncoder.setBindGroup(0, this.cameraBindGroup)
       facePassEncoder.setBindGroup(1, this.cameraBindGroup) // placeholder
       facePassEncoder.setBindGroup(2, this.cameraBindGroup) // placeholder
-      facePassEncoder.setBindGroup(3, this.cameraBindGroup) // placeholder
-      facePassEncoder.setBindGroup(4, this.polytopeBindGroup)
+      facePassEncoder.setBindGroup(3, this.polytopeBindGroup) // Fixed: use polytope bind group
 
       facePassEncoder.setVertexBuffer(0, this.faceVertexBuffer)
       facePassEncoder.setIndexBuffer(this.faceIndexBuffer, 'uint16' as const)
@@ -669,8 +664,7 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       edgePassEncoder.setBindGroup(0, this.cameraBindGroup)
       edgePassEncoder.setBindGroup(1, this.cameraBindGroup) // placeholder
       edgePassEncoder.setBindGroup(2, this.cameraBindGroup) // placeholder
-      edgePassEncoder.setBindGroup(3, this.cameraBindGroup) // placeholder
-      edgePassEncoder.setBindGroup(4, this.polytopeBindGroup)
+      edgePassEncoder.setBindGroup(3, this.polytopeBindGroup) // Fixed: use polytope bind group
 
       edgePassEncoder.setVertexBuffer(0, this.edgeVertexBuffer)
       edgePassEncoder.setIndexBuffer(this.edgeIndexBuffer, 'uint16' as const)
@@ -692,7 +686,6 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
 
     this.cameraUniformBuffer?.destroy()
     this.polytopeUniformBuffer?.destroy()
-    this.basisUniformBuffer?.destroy()
 
     this.faceVertexBuffer?.destroy()
     this.faceIndexBuffer?.destroy()
@@ -701,7 +694,6 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
 
     this.cameraUniformBuffer = null
     this.polytopeUniformBuffer = null
-    this.basisUniformBuffer = null
     this.faceVertexBuffer = null
     this.faceIndexBuffer = null
     this.edgeVertexBuffer = null

@@ -60,6 +60,13 @@ struct VertexOutput {
 const PI: f32 = 3.14159265359;
 const TWO_PI: f32 = 6.28318530718;
 
+// Load depth using integer coordinates (for unfilterable-float textures)
+fn loadDepth(uv: vec2f) -> f32 {
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+  return textureLoad(tDepth, depthCoord, 0).r;
+}
+
 // Reconstruct view-space position from depth
 fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
   // NDC position
@@ -93,7 +100,7 @@ fn sampleDirection(viewPos: vec3f, normal: vec3f, direction: vec2f, uv: vec2f) -
   let stepSize = uniforms.radius / uniforms.stepCount;
 
   for (var i: f32 = 1.0; i <= uniforms.stepCount; i += 1.0) {
-    let sampleOffset = direction * i * stepSize / linearizeDepth(textureSample(tDepth, texSampler, uv).r);
+    let sampleOffset = direction * i * stepSize / linearizeDepth(loadDepth(uv));
     let sampleUV = uv + sampleOffset;
 
     // Skip if outside screen
@@ -101,7 +108,7 @@ fn sampleDirection(viewPos: vec3f, normal: vec3f, direction: vec2f, uv: vec2f) -
       continue;
     }
 
-    let sampleDepth = textureSample(tDepth, texSampler, sampleUV).r;
+    let sampleDepth = loadDepth(sampleUV);
     let samplePos = getViewPosition(sampleUV, sampleDepth);
 
     // Vector from current position to sample
@@ -130,8 +137,8 @@ fn sampleDirection(viewPos: vec3f, normal: vec3f, direction: vec2f, uv: vec2f) -
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Sample depth and normal
-  let depth = textureSample(tDepth, texSampler, uv).r;
+  // Load depth using textureLoad (required for unfilterable-float textures)
+  let depth = loadDepth(uv);
 
   // Skip far plane (sky)
   if (depth >= 0.9999) {

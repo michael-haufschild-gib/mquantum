@@ -58,39 +58,55 @@ fn isAtFarPlane(depth: f32) -> bool {
   return depth >= 0.9999;
 }
 
-// Check if a pixel is part of the event horizon
-fn isHorizonPixel(uv: vec2f) -> bool {
-  let color = textureSample(tMainObject, linearSampler, uv);
-  let depth = textureSample(tMainObjectDepth, linearSampler, uv);
+// Check if a pixel is part of the event horizon using textureLoad (uniform control flow safe)
+fn isHorizonPixelLoad(texCoord: vec2i) -> bool {
+  let color = textureLoad(tMainObject, texCoord, 0);
+  let depth = textureLoad(tMainObjectDepth, texCoord, 0);
 
   // Horizon = far plane + high alpha
   return depth >= 0.999 && color.a > 0.9;
 }
 
 // Detect the visual boundary of the event horizon
+// Uses textureLoad to avoid non-uniform control flow issues
 fn detectHorizonEdge(uv: vec2f) -> f32 {
-  let texelSize = 1.0 / uniforms.resolution;
+  let texDims = textureDimensions(tMainObject);
+  let texCoord = vec2i(uv * vec2f(texDims));
 
   // Check if current pixel is horizon
-  let centerIsHorizon = isHorizonPixel(uv);
+  let centerColor = textureLoad(tMainObject, texCoord, 0);
+  let centerDepth = textureLoad(tMainObjectDepth, texCoord, 0);
+  let centerIsHorizon = centerDepth >= 0.999 && centerColor.a > 0.9;
 
   // Only glow OUTSIDE the horizon
   if (centerIsHorizon) {
     return 0.0;
   }
 
-  // Check neighbors for horizon pixels
+  // Check neighbors for horizon pixels using textureLoad
   var horizonCount = 0.0;
 
-  // Sample in a small radius
-  for (var x = -2.0; x <= 2.0; x += 1.0) {
-    for (var y = -2.0; y <= 2.0; y += 1.0) {
-      if (x == 0.0 && y == 0.0) { continue; }
-      let sampleUv = uv + vec2f(x, y) * texelSize;
-      if (isHorizonPixel(sampleUv)) {
-        let dist = length(vec2f(x, y));
-        horizonCount += 1.0 / (dist + 0.5);
-      }
+  // Unrolled loop to avoid non-uniform control flow with textureSample
+  // Check 5x5 grid around center (excluding center)
+  let offsets = array<vec2i, 24>(
+    vec2i(-2, -2), vec2i(-1, -2), vec2i(0, -2), vec2i(1, -2), vec2i(2, -2),
+    vec2i(-2, -1), vec2i(-1, -1), vec2i(0, -1), vec2i(1, -1), vec2i(2, -1),
+    vec2i(-2,  0), vec2i(-1,  0),               vec2i(1,  0), vec2i(2,  0),
+    vec2i(-2,  1), vec2i(-1,  1), vec2i(0,  1), vec2i(1,  1), vec2i(2,  1),
+    vec2i(-2,  2), vec2i(-1,  2), vec2i(0,  2), vec2i(1,  2), vec2i(2,  2)
+  );
+
+  for (var i = 0; i < 24; i++) {
+    let sampleCoord = texCoord + offsets[i];
+    // Clamp to texture bounds
+    let clampedCoord = clamp(sampleCoord, vec2i(0), vec2i(texDims) - vec2i(1));
+
+    let sampleColor = textureLoad(tMainObject, clampedCoord, 0);
+    let sampleDepth = textureLoad(tMainObjectDepth, clampedCoord, 0);
+
+    if (sampleDepth >= 0.999 && sampleColor.a > 0.9) {
+      let dist = length(vec2f(offsets[i]));
+      horizonCount += 1.0 / (dist + 0.5);
     }
   }
 
@@ -102,7 +118,11 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Sample both layers
   let envColor = textureSample(tLensedEnvironment, linearSampler, input.uv);
   let objColor = textureSample(tMainObject, linearSampler, input.uv);
-  let objDepth = textureSample(tMainObjectDepth, linearSampler, input.uv);
+
+  // Use textureLoad for depth texture (unfilterable-float compatibility)
+  let depthDims = textureDimensions(tMainObjectDepth);
+  let depthCoord = vec2i(input.uv * vec2f(depthDims));
+  let objDepth = textureLoad(tMainObjectDepth, depthCoord, 0);
 
   var finalColor: vec3f;
   var finalAlpha: f32;

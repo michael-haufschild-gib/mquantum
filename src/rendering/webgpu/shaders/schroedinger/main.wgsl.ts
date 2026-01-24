@@ -40,11 +40,11 @@ fn computeDensity(pos: vec3f) -> f32 {
   let scaledPos = pos * schroedinger.fieldScale;
 
   // For now, use a single 3D HO state
-  let omega = vec3f(schroedinger.omega[0], schroedinger.omega[1], schroedinger.omega[2]);
+  let omega = vec3f(getOmega(schroedinger, 0), getOmega(schroedinger, 1), getOmega(schroedinger, 2));
   let n = vec3<i32>(
-    schroedinger.quantum[0],
-    schroedinger.quantum[1],
-    schroedinger.quantum[2]
+    getQuantum(schroedinger, 0),
+    getQuantum(schroedinger, 1),
+    getQuantum(schroedinger, 2)
   );
 
   let psi = harmonicOscillator3D(scaledPos, n, omega, schroedinger.time);

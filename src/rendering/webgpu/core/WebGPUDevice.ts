@@ -37,7 +37,7 @@ export function isWebGPUSupported(): boolean {
 export class WebGPUDevice {
   private static instance: WebGPUDevice | null = null
 
-  private adapter: GPUAdapter | null = null
+  private _adapter: GPUAdapter | null = null
   private device: GPUDevice | null = null
   private context: GPUCanvasContext | null = null
   private format: GPUTextureFormat = 'bgra8unorm'
@@ -163,7 +163,7 @@ export class WebGPUDevice {
     }
 
     // Store references
-    this.adapter = adapter
+    this._adapter = adapter
     this.device = device
     this.context = context
     this.format = format
@@ -269,7 +269,7 @@ export class WebGPUDevice {
     this.context?.unconfigure()
     this.device?.destroy()
 
-    this.adapter = null
+    this._adapter = null
     this.device = null
     this.context = null
     this.canvas = null

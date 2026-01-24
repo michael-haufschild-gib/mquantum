@@ -46,14 +46,16 @@ export interface PolytopeWGSLShaderConfig extends WGSLShaderConfig {
 export const polytopeUniformsBlock = /* wgsl */ `
 // ============================================
 // Polytope Uniforms
+// Matches WebGL ND_TRANSFORM_GLSL uniforms
 // ============================================
 
 struct PolytopeUniforms {
-  // Dimension
+  // N-D Transformation (matches TubeWireframe layout)
+  rotationMatrix4D: mat4x4f,
   dimension: i32,
-  _pad1: f32,
-  _pad2: f32,
-  _pad3: f32,
+  uniformScale: f32,
+  projectionDistance: f32,
+  depthNormFactor: f32,
 
   // Material
   baseColor: vec3f,
@@ -67,6 +69,22 @@ struct PolytopeUniforms {
   metalness: f32,
   ambientIntensity: f32,
   emissiveIntensity: f32,
+
+  // Extra rotation columns (7 * 4 = 28 floats for 5D-11D)
+  // Stored as 7 vec4s for alignment
+  extraRotCol0: vec4f,
+  extraRotCol1: vec4f,
+  extraRotCol2: vec4f,
+  extraRotCol3: vec4f,
+  extraRotCol4: vec4f,
+  extraRotCol5: vec4f,
+  extraRotCol6: vec4f,
+
+  // Depth row sums (11 floats for projection)
+  depthRowSums0_3: vec4f,
+  depthRowSums4_7: vec4f,
+  depthRowSums8_10: vec3f,
+  _padDepth: f32,
 }
 `
 
@@ -76,6 +94,7 @@ struct PolytopeUniforms {
 export function composeFaceVertexShader(_config: PolytopeWGSLShaderConfig): string {
   return /* wgsl */ `
 // Polytope Face Vertex Shader
+// Port of WebGL ND_TRANSFORM_GLSL
 
 struct CameraUniforms {
   viewMatrix: mat4x4f,
@@ -96,29 +115,19 @@ struct CameraUniforms {
 
 ${polytopeUniformsBlock}
 
-struct BasisVectors {
-  basisX: array<f32, 11>,
-  basisY: array<f32, 11>,
-  basisZ: array<f32, 11>,
-  origin: array<f32, 11>,
-}
-
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(4) @binding(0) var<uniform> polytope: PolytopeUniforms;
-@group(4) @binding(1) var<uniform> basis: BasisVectors;
+@group(3) @binding(0) var<uniform> polytope: PolytopeUniforms;
 
 struct VertexInput {
   @location(0) position: vec3f,
-  @location(1) normal: vec3f,
-  @location(2) extraDims0_3: vec4f,  // Extra dimensions 0-3
-  @location(3) extraDims4_7: vec4f,  // Extra dimensions 4-7
+  @location(1) extraDims0_3: vec4f,  // Extra dimensions 4-7 (dim indices 3-6)
+  @location(2) extraDims4_6: vec3f,  // Extra dimensions 8-10 (dim indices 7-9)
 }
 
 struct VertexOutput {
   @builtin(position) clipPosition: vec4f,
   @location(0) worldPosition: vec3f,
-  @location(1) normal: vec3f,
-  @location(2) viewDir: vec3f,
+  @location(1) viewDir: vec3f,
 }
 
 ${transformNDBlock}
@@ -127,26 +136,42 @@ ${transformNDBlock}
 fn main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
 
-  // Pack extra dims into array
-  var extraDims: array<f32, 8>;
-  extraDims[0] = input.extraDims0_3.x;
-  extraDims[1] = input.extraDims0_3.y;
-  extraDims[2] = input.extraDims0_3.z;
-  extraDims[3] = input.extraDims0_3.w;
-  extraDims[4] = input.extraDims4_7.x;
-  extraDims[5] = input.extraDims4_7.y;
-  extraDims[6] = input.extraDims4_7.z;
-  extraDims[7] = input.extraDims4_7.w;
+  // Build extra rotation columns array from uniforms
+  var extraRotCols: array<vec4f, 7>;
+  extraRotCols[0] = polytope.extraRotCol0;
+  extraRotCols[1] = polytope.extraRotCol1;
+  extraRotCols[2] = polytope.extraRotCol2;
+  extraRotCols[3] = polytope.extraRotCol3;
+  extraRotCols[4] = polytope.extraRotCol4;
+  extraRotCols[5] = polytope.extraRotCol5;
+  extraRotCols[6] = polytope.extraRotCol6;
 
-  // Transform from N-D to 3D
+  // Build depth row sums array from uniforms
+  var depthRowSums: array<f32, 11>;
+  depthRowSums[0] = polytope.depthRowSums0_3.x;
+  depthRowSums[1] = polytope.depthRowSums0_3.y;
+  depthRowSums[2] = polytope.depthRowSums0_3.z;
+  depthRowSums[3] = polytope.depthRowSums0_3.w;
+  depthRowSums[4] = polytope.depthRowSums4_7.x;
+  depthRowSums[5] = polytope.depthRowSums4_7.y;
+  depthRowSums[6] = polytope.depthRowSums4_7.z;
+  depthRowSums[7] = polytope.depthRowSums4_7.w;
+  depthRowSums[8] = polytope.depthRowSums8_10.x;
+  depthRowSums[9] = polytope.depthRowSums8_10.y;
+  depthRowSums[10] = polytope.depthRowSums8_10.z;
+
+  // Transform from N-D to 3D using rotation + perspective projection
   let pos3d = transformND(
     input.position,
-    extraDims,
-    basis.basisX,
-    basis.basisY,
-    basis.basisZ,
-    basis.origin,
-    polytope.dimension
+    input.extraDims0_3,
+    input.extraDims4_6,
+    polytope.rotationMatrix4D,
+    polytope.dimension,
+    polytope.uniformScale,
+    polytope.projectionDistance,
+    polytope.depthNormFactor,
+    extraRotCols,
+    depthRowSums
   );
 
   // World position
@@ -155,10 +180,7 @@ fn main(input: VertexInput) -> VertexOutput {
   // Clip position
   output.clipPosition = camera.viewProjectionMatrix * vec4f(pos3d, 1.0);
 
-  // Normal (simplified - in full implementation would transform normal too)
-  output.normal = normalize(input.normal);
-
-  // View direction
+  // View direction (normals computed in fragment shader using screen-space derivatives)
   output.viewDir = normalize(camera.cameraPosition - pos3d);
 
   return output;
@@ -191,9 +213,7 @@ export function composeFaceFragmentShader(config: PolytopeWGSLShaderConfig): {
       content:
         polytopeUniformsBlock +
         '\n' +
-        generateObjectBindGroup(4, 'PolytopeUniforms', 'polytope') +
-        '\n' +
-        generateObjectBindGroup(4, 'BasisVectors', 'basis'),
+        generateObjectBindGroup(3, 'PolytopeUniforms', 'polytope'),
     },
     { name: 'Color (HSL)', content: hslBlock },
     { name: 'Color (Cosine)', content: cosinePaletteBlock },
@@ -205,8 +225,7 @@ export function composeFaceFragmentShader(config: PolytopeWGSLShaderConfig): {
       content: /* wgsl */ `
 struct FragmentInput {
   @location(0) worldPosition: vec3f,
-  @location(1) normal: vec3f,
-  @location(2) viewDir: vec3f,
+  @location(1) viewDir: vec3f,
 }
 `,
     },
@@ -215,7 +234,11 @@ struct FragmentInput {
       content: /* wgsl */ `
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
-  let N = normalize(input.normal);
+  // Compute screen-space normal using derivatives (matches WebGL dFdx/dFdy approach)
+  let dPdx = dpdx(input.worldPosition);
+  let dPdy = dpdy(input.worldPosition);
+  let N = normalize(cross(dPdx, dPdy));
+
   let V = normalize(input.viewDir);
 
   // Simple lighting
@@ -255,6 +278,7 @@ fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
 export function composeEdgeVertexShader(_config: PolytopeWGSLShaderConfig): string {
   return /* wgsl */ `
 // Polytope Edge Vertex Shader
+// Port of WebGL ND_TRANSFORM_GLSL
 
 struct CameraUniforms {
   viewMatrix: mat4x4f,
@@ -275,21 +299,13 @@ struct CameraUniforms {
 
 ${polytopeUniformsBlock}
 
-struct BasisVectors {
-  basisX: array<f32, 11>,
-  basisY: array<f32, 11>,
-  basisZ: array<f32, 11>,
-  origin: array<f32, 11>,
-}
-
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(4) @binding(0) var<uniform> polytope: PolytopeUniforms;
-@group(4) @binding(1) var<uniform> basis: BasisVectors;
+@group(3) @binding(0) var<uniform> polytope: PolytopeUniforms;
 
 struct VertexInput {
   @location(0) position: vec3f,
   @location(1) extraDims0_3: vec4f,
-  @location(2) extraDims4_7: vec4f,
+  @location(2) extraDims4_6: vec3f,
 }
 
 struct VertexOutput {
@@ -303,24 +319,42 @@ ${transformNDBlock}
 fn main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
 
-  var extraDims: array<f32, 8>;
-  extraDims[0] = input.extraDims0_3.x;
-  extraDims[1] = input.extraDims0_3.y;
-  extraDims[2] = input.extraDims0_3.z;
-  extraDims[3] = input.extraDims0_3.w;
-  extraDims[4] = input.extraDims4_7.x;
-  extraDims[5] = input.extraDims4_7.y;
-  extraDims[6] = input.extraDims4_7.z;
-  extraDims[7] = input.extraDims4_7.w;
+  // Build extra rotation columns array from uniforms
+  var extraRotCols: array<vec4f, 7>;
+  extraRotCols[0] = polytope.extraRotCol0;
+  extraRotCols[1] = polytope.extraRotCol1;
+  extraRotCols[2] = polytope.extraRotCol2;
+  extraRotCols[3] = polytope.extraRotCol3;
+  extraRotCols[4] = polytope.extraRotCol4;
+  extraRotCols[5] = polytope.extraRotCol5;
+  extraRotCols[6] = polytope.extraRotCol6;
 
+  // Build depth row sums array from uniforms
+  var depthRowSums: array<f32, 11>;
+  depthRowSums[0] = polytope.depthRowSums0_3.x;
+  depthRowSums[1] = polytope.depthRowSums0_3.y;
+  depthRowSums[2] = polytope.depthRowSums0_3.z;
+  depthRowSums[3] = polytope.depthRowSums0_3.w;
+  depthRowSums[4] = polytope.depthRowSums4_7.x;
+  depthRowSums[5] = polytope.depthRowSums4_7.y;
+  depthRowSums[6] = polytope.depthRowSums4_7.z;
+  depthRowSums[7] = polytope.depthRowSums4_7.w;
+  depthRowSums[8] = polytope.depthRowSums8_10.x;
+  depthRowSums[9] = polytope.depthRowSums8_10.y;
+  depthRowSums[10] = polytope.depthRowSums8_10.z;
+
+  // Transform from N-D to 3D using rotation + perspective projection
   let pos3d = transformND(
     input.position,
-    extraDims,
-    basis.basisX,
-    basis.basisY,
-    basis.basisZ,
-    basis.origin,
-    polytope.dimension
+    input.extraDims0_3,
+    input.extraDims4_6,
+    polytope.rotationMatrix4D,
+    polytope.dimension,
+    polytope.uniformScale,
+    polytope.projectionDistance,
+    polytope.depthNormFactor,
+    extraRotCols,
+    depthRowSums
   );
 
   output.worldPosition = pos3d;
@@ -342,22 +376,9 @@ export function composeEdgeFragmentShader(_config: PolytopeWGSLShaderConfig): {
   const wgsl = /* wgsl */ `
 // Polytope Edge Fragment Shader
 
-struct PolytopeUniforms {
-  dimension: i32,
-  _pad1: f32,
-  _pad2: f32,
-  _pad3: f32,
-  baseColor: vec3f,
-  opacity: f32,
-  edgeColor: vec3f,
-  edgeWidth: f32,
-  roughness: f32,
-  metalness: f32,
-  ambientIntensity: f32,
-  emissiveIntensity: f32,
-}
+${polytopeUniformsBlock}
 
-@group(4) @binding(0) var<uniform> polytope: PolytopeUniforms;
+@group(3) @binding(0) var<uniform> polytope: PolytopeUniforms;
 
 struct FragmentInput {
   @location(0) worldPosition: vec3f,

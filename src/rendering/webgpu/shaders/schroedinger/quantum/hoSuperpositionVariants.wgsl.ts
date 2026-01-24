@@ -23,17 +23,17 @@ function generateHOSuperpositionBlock(termCount: number): string {
       return `
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let phase${k} = -uniforms.energy[${k}] * t;
+  let phase${k} = -getEnergy(uniforms, ${k}) * t;
   let timeFactor${k} = cexp_i(phase${k});
-  let term${k} = cmul(uniforms.coeff[${k}], timeFactor${k});
+  let term${k} = cmul(getCoeff(uniforms, ${k}), timeFactor${k});
   var psi = cscale(spatial${k}, term${k});`
     } else {
       return `
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let phase${k} = -uniforms.energy[${k}] * t;
+  let phase${k} = -getEnergy(uniforms, ${k}) * t;
   let timeFactor${k} = cexp_i(phase${k});
-  let term${k} = cmul(uniforms.coeff[${k}], timeFactor${k});
+  let term${k} = cmul(getCoeff(uniforms, ${k}), timeFactor${k});
   psi += cscale(spatial${k}, term${k});`
     }
   }).join('\n')
@@ -61,11 +61,11 @@ function generateHOSpatialBlock(termCount: number): string {
     if (k === 0) {
       return `
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  var psi = cscale(spatial${k}, uniforms.coeff[${k}]);`
+  var psi = cscale(spatial${k}, getCoeff(uniforms, ${k}));`
     } else {
       return `
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  psi += cscale(spatial${k}, uniforms.coeff[${k}]);`
+  psi += cscale(spatial${k}, getCoeff(uniforms, ${k}));`
     }
   }).join('\n')
 
@@ -90,13 +90,13 @@ function generateHOCombinedBlock(termCount: number): string {
       return `
   // Term ${k}: compute spatial ONCE, use for both
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = uniforms.coeff[${k}];
+  let coeff${k} = getCoeff(uniforms, ${k});
 
   // Spatial-only accumulation
   var psiSpatial = cscale(spatial${k}, coeff${k});
 
   // Time-dependent accumulation
-  let phase${k} = -uniforms.energy[${k}] * t;
+  let phase${k} = -getEnergy(uniforms, ${k}) * t;
   let timeFactor${k} = cexp_i(phase${k});
   let term${k} = cmul(coeff${k}, timeFactor${k});
   var psiTime = cscale(spatial${k}, term${k});`
@@ -104,9 +104,9 @@ function generateHOCombinedBlock(termCount: number): string {
       return `
   // Term ${k}
   let spatial${k} = hoNDOptimized(xND, ${k}, uniforms);
-  let coeff${k} = uniforms.coeff[${k}];
+  let coeff${k} = getCoeff(uniforms, ${k});
   psiSpatial += cscale(spatial${k}, coeff${k});
-  let phase${k} = -uniforms.energy[${k}] * t;
+  let phase${k} = -getEnergy(uniforms, ${k}) * t;
   let timeFactor${k} = cexp_i(phase${k});
   let term${k} = cmul(coeff${k}, timeFactor${k});
   psiTime += cscale(spatial${k}, term${k});`

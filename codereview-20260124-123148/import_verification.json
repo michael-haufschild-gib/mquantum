@@ -1,0 +1,348 @@
+{
+  "verified": [
+    {
+      "import": "WebGPUBasePass",
+      "from": "../core/WebGPUBasePass",
+      "files": [
+        "src/rendering/webgpu/passes/BloomPass.ts",
+        "src/rendering/webgpu/passes/TonemappingPass.ts",
+        "src/rendering/webgpu/passes/FXAAPass.ts",
+        "src/rendering/webgpu/passes/SSRPass.ts",
+        "src/rendering/webgpu/passes/GTAOPass.ts",
+        "src/rendering/webgpu/passes/DepthPass.ts",
+        "src/rendering/webgpu/passes/BokehPass.ts",
+        "src/rendering/webgpu/passes/NormalPass.ts",
+        "src/rendering/webgpu/passes/RefractionPass.ts",
+        "src/rendering/webgpu/passes/SMAAPass.ts",
+        "src/rendering/webgpu/passes/FrameBlendingPass.ts",
+        "src/rendering/webgpu/passes/ScenePass.ts",
+        "src/rendering/webgpu/passes/FullscreenPass.ts",
+        "src/rendering/webgpu/passes/GravitationalLensingPass.ts",
+        "src/rendering/webgpu/passes/MainObjectMRTPass.ts",
+        "src/rendering/webgpu/passes/TemporalCloudPass.ts",
+        "src/rendering/webgpu/passes/DebugOverlayPass.ts",
+        "src/rendering/webgpu/passes/CopyPass.ts",
+        "src/rendering/webgpu/passes/BufferPreviewPass.ts",
+        "src/rendering/webgpu/passes/TemporalCloudDepthPass.ts",
+        "src/rendering/webgpu/passes/CinematicPass.ts",
+        "src/rendering/webgpu/passes/CompositePass.ts",
+        "src/rendering/webgpu/passes/EnvironmentCompositePass.ts",
+        "src/rendering/webgpu/passes/ToScreenPass.ts",
+        "src/rendering/webgpu/passes/JetsCompositePass.ts",
+        "src/rendering/webgpu/passes/GodRaysPass.ts",
+        "src/rendering/webgpu/passes/ScreenSpaceLensingPass.ts",
+        "src/rendering/webgpu/passes/CubemapCapturePass.ts",
+        "src/rendering/webgpu/passes/ToneMappingCinematicPass.ts",
+        "src/rendering/webgpu/passes/JetsRenderPass.ts",
+        "src/rendering/webgpu/passes/PaperTexturePass.ts",
+        "src/rendering/webgpu/passes/TemporalDepthCapturePass.ts",
+        "src/rendering/webgpu/renderers/WebGPUMandelbulbRenderer.ts",
+        "src/rendering/webgpu/renderers/WebGPUQuaternionJuliaRenderer.ts",
+        "src/rendering/webgpu/renderers/WebGPUBlackHoleRenderer.ts",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+        "src/rendering/webgpu/renderers/WebGPUPolytopeRenderer.ts",
+        "src/rendering/webgpu/renderers/WebGPUTubeWireframeRenderer.ts"
+      ],
+      "status": "VERIFIED",
+      "evidence": "Found: export abstract class WebGPUBasePass at src/rendering/webgpu/core/WebGPUBasePass.ts:30"
+    },
+    {
+      "import": "WebGPURenderContext, WebGPUSetupContext",
+      "from": "../core/types",
+      "files": ["All passes and renderers"],
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WebGPURenderContext at src/rendering/webgpu/core/types.ts:248, export interface WebGPUSetupContext at src/rendering/webgpu/core/types.ts:233"
+    },
+    {
+      "import": "WebGPUResourceAccess",
+      "from": "../core/types",
+      "files": [
+        "src/rendering/webgpu/passes/FullscreenPass.ts",
+        "src/rendering/webgpu/passes/MainObjectMRTPass.ts"
+      ],
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WebGPUResourceAccess at src/rendering/webgpu/core/types.ts:150"
+    },
+    {
+      "import": "bloomThresholdShader, bloomBlurShader, bloomCompositeShader",
+      "from": "../shaders/postprocessing/bloom.wgsl",
+      "file": "src/rendering/webgpu/passes/BloomPass.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found: export const bloomThresholdShader at src/rendering/webgpu/shaders/postprocessing/bloom.wgsl.ts:10, bloomBlurShader at :76, bloomCompositeShader at :136"
+    },
+    {
+      "import": "tonemappingShader",
+      "from": "../shaders/postprocessing/tonemapping.wgsl",
+      "file": "src/rendering/webgpu/passes/TonemappingPass.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found: export const tonemappingShader at src/rendering/webgpu/shaders/postprocessing/tonemapping.wgsl.ts"
+    },
+    {
+      "import": "fxaaShader",
+      "from": "../shaders/postprocessing/fxaa.wgsl",
+      "file": "src/rendering/webgpu/passes/FXAAPass.ts",
+      "line": 11,
+      "status": "VERIFIED",
+      "evidence": "Found: export const fxaaShader at src/rendering/webgpu/shaders/postprocessing/fxaa.wgsl.ts"
+    },
+    {
+      "import": "smaaEdgeDetectionShader, smaaBlendingWeightShader, smaaNeighborhoodBlendingShader",
+      "from": "../shaders/postprocessing/smaa.wgsl",
+      "file": "src/rendering/webgpu/passes/SMAAPass.ts",
+      "line": 14,
+      "status": "VERIFIED",
+      "evidence": "Found: export const smaaEdgeDetectionShader at :13, smaaBlendingWeightShader at :131, smaaNeighborhoodBlendingShader at :325"
+    },
+    {
+      "import": "WebGPUDevice",
+      "from": "../core/WebGPUDevice",
+      "file": "src/rendering/webgpu/graph/WebGPURenderGraph.ts",
+      "line": 24,
+      "status": "VERIFIED",
+      "evidence": "Found: export class WebGPUDevice at src/rendering/webgpu/core/WebGPUDevice.ts"
+    },
+    {
+      "import": "WebGPUResourcePool",
+      "from": "../core/WebGPUResourcePool",
+      "file": "src/rendering/webgpu/graph/WebGPURenderGraph.ts",
+      "line": 25,
+      "status": "VERIFIED",
+      "evidence": "Found: export class WebGPUResourcePool at src/rendering/webgpu/core/WebGPUResourcePool.ts"
+    },
+    {
+      "import": "composeBlackHoleShader, composeBlackHoleVertexShader, BlackHoleWGSLShaderConfig",
+      "from": "../shaders/blackhole/compose",
+      "file": "src/rendering/webgpu/renderers/WebGPUBlackHoleRenderer.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeBlackHoleShader at :47, export function composeBlackHoleVertexShader at :149, export interface BlackHoleWGSLShaderConfig at :35"
+    },
+    {
+      "import": "MAX_DIMENSION, PALETTE_MODE_MAP, RAY_BENDING_MODE_MAP, MANIFOLD_TYPE_MAP, LIGHTING_MODE_MAP",
+      "from": "../../renderers/BlackHole/types",
+      "file": "src/rendering/webgpu/renderers/WebGPUBlackHoleRenderer.ts",
+      "line": 17,
+      "status": "VERIFIED",
+      "evidence": "Found: export const MAX_DIMENSION at :10, PALETTE_MODE_MAP at :70, RAY_BENDING_MODE_MAP at :78, MANIFOLD_TYPE_MAP at :84, LIGHTING_MODE_MAP at :93"
+    },
+    {
+      "import": "composeSchroedingerShader, composeSchroedingerVertexShader, SchroedingerWGSLShaderConfig, QuantumModeForShader",
+      "from": "../shaders/schroedinger/compose",
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeSchroedingerShader at :64, export function composeSchroedingerVertexShader at :194, export interface SchroedingerWGSLShaderConfig at :50, export type QuantumModeForShader at :45"
+    },
+    {
+      "import": "MAX_DIM, MAX_TERMS, MAX_EXTRA_DIM",
+      "from": "../shaders/schroedinger/uniforms.wgsl",
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 18,
+      "status": "VERIFIED",
+      "evidence": "Found: export const MAX_DIM at :11, MAX_TERMS at :12, MAX_EXTRA_DIM at :13"
+    },
+    {
+      "import": "composeMandelbulbShader, composeMandelbulbVertexShader",
+      "from": "../shaders/mandelbulb/compose",
+      "file": "src/rendering/webgpu/renderers/WebGPUMandelbulbRenderer.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeMandelbulbShader at :151, export function composeMandelbulbVertexShader at :254"
+    },
+    {
+      "import": "WGSLShaderConfig",
+      "from": "../shaders/shared/compose-helpers",
+      "files": [
+        "src/rendering/webgpu/renderers/WebGPUMandelbulbRenderer.ts",
+        "src/rendering/webgpu/renderers/WebGPUQuaternionJuliaRenderer.ts"
+      ],
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WGSLShaderConfig at src/rendering/webgpu/shaders/shared/compose-helpers.ts:25"
+    },
+    {
+      "import": "composeJuliaShader, composeJuliaVertexShader",
+      "from": "../shaders/julia/compose",
+      "file": "src/rendering/webgpu/renderers/WebGPUQuaternionJuliaRenderer.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeJuliaShader at :134, export function composeJuliaVertexShader at :241"
+    },
+    {
+      "import": "composeFaceVertexShader, composeFaceFragmentShader, composeEdgeVertexShader, composeEdgeFragmentShader, PolytopeWGSLShaderConfig",
+      "from": "../shaders/polytope",
+      "file": "src/rendering/webgpu/renderers/WebGPUPolytopeRenderer.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found in src/rendering/webgpu/shaders/polytope/index.ts: exports match imports"
+    },
+    {
+      "import": "composeTubeWireframeVertexShader, composeTubeWireframeFragmentShader, TubeWireframeWGSLShaderConfig",
+      "from": "../shaders/tubewireframe",
+      "file": "src/rendering/webgpu/renderers/WebGPUTubeWireframeRenderer.ts",
+      "line": 12,
+      "status": "VERIFIED",
+      "evidence": "Found in src/rendering/webgpu/shaders/tubewireframe/index.ts: exports match imports"
+    },
+    {
+      "import": "assembleShaderBlocks, generateStandardBindGroups, generateObjectBindGroup",
+      "from": "../shared/compose-helpers",
+      "file": "src/rendering/webgpu/shaders/polytope/compose.ts",
+      "status": "VERIFIED",
+      "evidence": "Found: export function assembleShaderBlocks at :101, generateStandardBindGroups at :204, generateObjectBindGroup at :223"
+    },
+    {
+      "import": "constantsBlock",
+      "from": "../shared/core/constants.wgsl",
+      "files": [
+        "src/rendering/webgpu/shaders/polytope/compose.ts",
+        "src/rendering/webgpu/shaders/mandelbulb/compose.ts",
+        "src/rendering/webgpu/shaders/julia/compose.ts",
+        "src/rendering/webgpu/shaders/blackhole/compose.ts",
+        "src/rendering/webgpu/shaders/tubewireframe/compose.ts",
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+        "src/rendering/webgpu/shaders/groundplane/compose.ts"
+      ],
+      "status": "VERIFIED",
+      "evidence": "Found: export const constantsBlock at src/rendering/webgpu/shaders/shared/core/constants.wgsl.ts:10"
+    },
+    {
+      "import": "uniformsBlock",
+      "from": "../shared/core/uniforms.wgsl",
+      "files": [
+        "src/rendering/webgpu/shaders/polytope/compose.ts",
+        "src/rendering/webgpu/shaders/mandelbulb/compose.ts",
+        "src/rendering/webgpu/shaders/julia/compose.ts",
+        "src/rendering/webgpu/shaders/blackhole/compose.ts",
+        "src/rendering/webgpu/shaders/tubewireframe/compose.ts",
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+        "src/rendering/webgpu/shaders/groundplane/compose.ts"
+      ],
+      "status": "VERIFIED",
+      "evidence": "Found: export const uniformsBlock at src/rendering/webgpu/shaders/shared/core/uniforms.wgsl.ts:10"
+    },
+    {
+      "import": "cosinePaletteBlock, hslBlock, selectorBlock",
+      "from": "../shared/color/*.wgsl",
+      "files": ["Various compose.ts files"],
+      "status": "VERIFIED",
+      "evidence": "All color blocks exported from src/rendering/webgpu/shaders/shared/color/*.wgsl.ts files"
+    },
+    {
+      "import": "ggxBlock, multiLightBlock, sssBlock, iblBlock",
+      "from": "../shared/lighting/*.wgsl",
+      "files": ["Various compose.ts files"],
+      "status": "VERIFIED",
+      "evidence": "All lighting blocks exported from src/rendering/webgpu/shaders/shared/lighting/*.wgsl.ts files"
+    },
+    {
+      "import": "raymarchCoreBlock, normalBlock",
+      "from": "../shared/raymarch/*.wgsl",
+      "files": ["mandelbulb/compose.ts", "julia/compose.ts"],
+      "status": "VERIFIED",
+      "evidence": "Found in src/rendering/webgpu/shaders/shared/raymarch/ directory"
+    },
+    {
+      "import": "aoBlock, shadowsBlock, temporalBlock",
+      "from": "../shared/features/*.wgsl",
+      "files": ["mandelbulb/compose.ts", "julia/compose.ts"],
+      "status": "VERIFIED",
+      "evidence": "Found in src/rendering/webgpu/shaders/shared/features/ directory"
+    },
+    {
+      "import": "shadowMapsFunctionsBlock, shadowMapsUniformsBlock",
+      "from": "../shared/features/shadowMaps.wgsl",
+      "file": "src/rendering/webgpu/shaders/groundplane/compose.ts",
+      "status": "VERIFIED",
+      "evidence": "Found in src/rendering/webgpu/shaders/shared/features/shadowMaps.wgsl.ts"
+    },
+    {
+      "import": "ColorAlgorithm",
+      "from": "../../types",
+      "file": "src/rendering/webgpu/shaders/shared/color/selectorVariants.wgsl.ts",
+      "status": "VERIFIED",
+      "evidence": "Found: export type ColorAlgorithm at src/rendering/webgpu/shaders/types.ts:13"
+    },
+    {
+      "import": "usePerformanceStore",
+      "from": "@/stores/performanceStore",
+      "file": "src/rendering/webgpu/passes/TemporalDepthCapturePass.ts",
+      "line": 15,
+      "status": "VERIFIED",
+      "evidence": "File exists at src/stores/performanceStore.ts with Zustand store"
+    },
+    {
+      "import": "PaperQuality",
+      "from": "@/stores/defaults/visualDefaults",
+      "file": "src/rendering/webgpu/passes/PaperTexturePass.ts",
+      "line": 19,
+      "status": "VERIFIED",
+      "evidence": "Found: export type PaperQuality at src/stores/defaults/visualDefaults.ts:160"
+    }
+  ],
+  "hallucinated": [],
+  "unresolved_modules": [],
+  "npm_packages_verified": [
+    {
+      "package": "zustand",
+      "status": "VERIFIED",
+      "evidence": "Found in package.json dependencies",
+      "used_by": ["src/stores/performanceStore.ts"]
+    }
+  ],
+  "summary": {
+    "total_imports_checked": 89,
+    "verified": 89,
+    "hallucinated": 0,
+    "module_not_found": 0,
+    "notes": [
+      "All imports in the WebGPU port resolve to real exports",
+      "Local imports (../ and ./) all resolve to actual files",
+      "Shader module imports (.wgsl.ts pattern) all exist and export expected symbols",
+      "Path alias imports (@/) resolve correctly through TypeScript config",
+      "No npm package imports in core WebGPU code - only local modules",
+      "Shared shader blocks are properly exported from index.ts files",
+      "All renderer imports from shader compose modules verified",
+      "Cross-module type imports (WGSLShaderConfig, etc.) verified"
+    ]
+  },
+  "verification_details": {
+    "core_module_files_verified": [
+      "src/rendering/webgpu/core/types.ts",
+      "src/rendering/webgpu/core/WebGPUBasePass.ts",
+      "src/rendering/webgpu/core/WebGPUDevice.ts",
+      "src/rendering/webgpu/core/WebGPUResourcePool.ts",
+      "src/rendering/webgpu/core/WebGPUUniformBuffer.ts",
+      "src/rendering/webgpu/core/index.ts"
+    ],
+    "shader_compose_files_verified": [
+      "src/rendering/webgpu/shaders/shared/compose-helpers.ts",
+      "src/rendering/webgpu/shaders/shared/core/constants.wgsl.ts",
+      "src/rendering/webgpu/shaders/shared/core/uniforms.wgsl.ts",
+      "src/rendering/webgpu/shaders/polytope/compose.ts",
+      "src/rendering/webgpu/shaders/mandelbulb/compose.ts",
+      "src/rendering/webgpu/shaders/julia/compose.ts",
+      "src/rendering/webgpu/shaders/blackhole/compose.ts",
+      "src/rendering/webgpu/shaders/tubewireframe/compose.ts",
+      "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "src/rendering/webgpu/shaders/groundplane/compose.ts",
+      "src/rendering/webgpu/shaders/skybox/compose.ts"
+    ],
+    "postprocessing_shaders_verified": [
+      "src/rendering/webgpu/shaders/postprocessing/bloom.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/fxaa.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/smaa.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/tonemapping.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/ssr.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/screen-space-lensing.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/frame-blending.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/environment-composite.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/jet-volumetric.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/normal-composite.wgsl.ts",
+      "src/rendering/webgpu/shaders/postprocessing/cloud-composite.wgsl.ts"
+    ],
+    "passes_verified": 33,
+    "renderers_verified": 6
+  }
+}

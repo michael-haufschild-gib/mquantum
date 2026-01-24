@@ -52,7 +52,7 @@ struct CameraUniforms {
 ${tubeWireframeUniformsBlock}
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(4) @binding(0) var<uniform> tube: TubeWireframeUniforms;
+@group(3) @binding(0) var<uniform> tube: TubeWireframeUniforms;
 
 // Cylinder geometry input (instanced)
 struct VertexInput {
@@ -183,7 +183,7 @@ ${tubeMainBlock}
 // Bind group declarations
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var<uniform> lighting: LightingUniforms;
-@group(4) @binding(0) var<uniform> tube: TubeWireframeUniforms;
+@group(3) @binding(0) var<uniform> tube: TubeWireframeUniforms;
 
 struct FragmentInput {
   @location(0) worldPosition: vec3f,

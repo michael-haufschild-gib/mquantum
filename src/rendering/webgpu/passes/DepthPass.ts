@@ -54,8 +54,15 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var texSampler: sampler;
+@group(0) @binding(1) var texSampler: sampler;  // Kept for potential future use
 @group(0) @binding(2) var tDepth: texture_2d<f32>;
+
+// Helper to load depth using integer coordinates (required for unfilterable-float textures)
+fn loadDepth(uv: vec2f) -> f32 {
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+  return textureLoad(tDepth, depthCoord, 0).r;
+}
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -96,7 +103,7 @@ fn packDepthToRGBA(depth: f32) -> vec4f {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
-  let depth = textureSample(tDepth, texSampler, uv).r;
+  let depth = loadDepth(uv);
 
   // Format 0: Raw depth
   if (uniforms.format == 0) {
@@ -204,7 +211,7 @@ export class DepthPass extends WebGPUBasePass {
         {
           binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
+          sampler: { type: 'non-filtering' as const },
         },
         {
           binding: 2,

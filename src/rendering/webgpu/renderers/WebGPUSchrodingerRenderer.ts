@@ -341,58 +341,181 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const extended = ctx.frame?.stores?.['extended'] as any
     const schroedinger = extended?.schroedinger
 
-    // Pack Schroedinger uniforms
-    const data = new Float32Array(256) // 1024 bytes / 4
-    let offset = 0
+    // Allocate buffer for the entire SchroedingerUniforms struct
+    // See uniforms.wgsl.ts for the exact layout with packed arrays
+    const buffer = new ArrayBuffer(1024)
+    const floatView = new Float32Array(buffer)
+    const intView = new Int32Array(buffer)
 
-    // Quantum mode
-    data[offset++] = schroedinger?.quantumMode ?? 0 // quantumMode
+    // Byte offsets based on the WGSL struct layout:
+    // struct SchroedingerUniforms {
+    //   quantumMode: i32,              // offset 0
+    //   termCount: i32,                // offset 4
+    //   _padScalar0: i32,              // offset 8
+    //   _padScalar1: i32,              // offset 12
+    //   omega: array<vec4f, 3>,        // offset 16 (48 bytes, holds 11 values)
+    //   quantum: array<vec4<i32>, 22>, // offset 64 (352 bytes, holds 88 values)
+    //   coeff: array<vec4f, 8>,        // offset 416 (128 bytes, xy = complex value)
+    //   energy: array<vec4f, 2>,       // offset 544 (32 bytes, holds 8 values)
+    //   principalN: i32,               // offset 576
+    //   azimuthalL: i32,               // offset 580
+    //   magneticM: i32,                // offset 584
+    //   bohrRadius: f32,               // offset 588
+    //   useRealOrbitals: u32,          // offset 592
+    //   hydrogenBoost: f32,            // offset 596
+    //   hydrogenNDBoost: f32,          // offset 600
+    //   hydrogenRadialThreshold: f32,  // offset 604
+    //   extraDimN: array<vec4<i32>, 2>, // offset 608 (32 bytes)
+    //   extraDimOmega: array<vec4f, 2>, // offset 640 (32 bytes)
+    //   phaseAnimationEnabled: u32,    // offset 672
+    //   timeScale: f32,                // offset 676
+    //   ... (more scalar fields follow)
+    // }
 
-    // Harmonic oscillator configuration
-    data[offset++] = schroedinger?.termCount ?? 1 // termCount
+    // --- Scalars (offset 0-15) ---
+    intView[0] = schroedinger?.quantumMode ?? 0 // quantumMode
+    intView[1] = schroedinger?.termCount ?? 1 // termCount
+    intView[2] = 0 // _padScalar0
+    intView[3] = 0 // _padScalar1
 
-    // Padding to align omega array
-    offset += 2
-
-    // omega array (11 floats)
+    // --- omega array (offset 16, 3 vec4f = 12 floats, use 11) ---
+    const omegaOffset = 16 / 4 // offset in float32 units
     for (let i = 0; i < MAX_DIM; i++) {
-      data[offset++] = schroedinger?.omega?.[i] ?? 1.0
+      floatView[omegaOffset + i] = schroedinger?.omega?.[i] ?? 1.0
     }
+    floatView[omegaOffset + 11] = 0.0 // padding slot
 
-    // Padding
-    offset += 1
-
-    // quantum array (88 ints stored as floats for simplicity)
+    // --- quantum array (offset 64, 22 vec4i = 88 ints) ---
+    const quantumOffset = 64 / 4 // offset in int32 units
     for (let i = 0; i < MAX_TERMS * MAX_DIM; i++) {
-      data[offset++] = schroedinger?.quantum?.[i] ?? 0
+      intView[quantumOffset + i] = schroedinger?.quantum?.[i] ?? 0
     }
 
-    // coeff array (8 vec2f = 16 floats)
+    // --- coeff array (offset 416, 8 vec4f, xy = complex value, zw = padding) ---
+    const coeffOffset = 416 / 4
     for (let i = 0; i < MAX_TERMS; i++) {
-      data[offset++] = schroedinger?.coeff?.[i]?.[0] ?? (i === 0 ? 1.0 : 0.0)
-      data[offset++] = schroedinger?.coeff?.[i]?.[1] ?? 0.0
+      const baseIdx = coeffOffset + i * 4
+      floatView[baseIdx] = schroedinger?.coeff?.[i]?.[0] ?? (i === 0 ? 1.0 : 0.0) // real
+      floatView[baseIdx + 1] = schroedinger?.coeff?.[i]?.[1] ?? 0.0 // imag
+      floatView[baseIdx + 2] = 0.0 // padding
+      floatView[baseIdx + 3] = 0.0 // padding
     }
 
-    // energy array (8 floats)
+    // --- energy array (offset 544, 2 vec4f = 8 floats) ---
+    const energyOffset = 544 / 4
     for (let i = 0; i < MAX_TERMS; i++) {
-      data[offset++] = schroedinger?.energy?.[i] ?? 0.5
+      floatView[energyOffset + i] = schroedinger?.energy?.[i] ?? 0.5
     }
 
-    // Volume rendering parameters
-    data[offset++] = schroedinger?.timeScale ?? 1.0
-    data[offset++] = schroedinger?.fieldScale ?? 1.0
-    data[offset++] = schroedinger?.densityGain ?? 1.0
-    data[offset++] = schroedinger?.powderScale ?? 0.5
-    data[offset++] = schroedinger?.emissionIntensity ?? 1.0
-    data[offset++] = schroedinger?.emissionThreshold ?? 0.01
+    // --- Hydrogen scalar fields (offset 576-607) ---
+    intView[576 / 4] = schroedinger?.principalN ?? 1
+    intView[580 / 4] = schroedinger?.azimuthalL ?? 0
+    intView[584 / 4] = schroedinger?.magneticM ?? 0
+    floatView[588 / 4] = schroedinger?.bohrRadius ?? 1.0
+    intView[592 / 4] = schroedinger?.useRealOrbitals ? 1 : 0
+    floatView[596 / 4] = schroedinger?.hydrogenBoost ?? 50.0
+    floatView[600 / 4] = schroedinger?.hydrogenNDBoost ?? 50.0
+    floatView[604 / 4] = schroedinger?.hydrogenRadialThreshold ?? 25.0
 
-    // Time
-    data[offset++] = ctx.frame?.time ?? 0
+    // --- extraDimN array (offset 608, 2 vec4i = 8 ints) ---
+    const extraDimNOffset = 608 / 4
+    for (let i = 0; i < MAX_EXTRA_DIM; i++) {
+      intView[extraDimNOffset + i] = schroedinger?.extraDimN?.[i] ?? 0
+    }
 
-    // Sample count
-    data[offset++] = schroedinger?.sampleCount ?? 64
+    // --- extraDimOmega array (offset 640, 2 vec4f = 8 floats) ---
+    const extraDimOmegaOffset = 640 / 4
+    for (let i = 0; i < MAX_EXTRA_DIM; i++) {
+      floatView[extraDimOmegaOffset + i] = schroedinger?.extraDimOmega?.[i] ?? 1.0
+    }
 
-    this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, data)
+    // --- More scalar fields (offset 672+) ---
+    intView[672 / 4] = schroedinger?.phaseAnimationEnabled ? 1 : 0
+    floatView[676 / 4] = schroedinger?.timeScale ?? 1.0
+    floatView[680 / 4] = schroedinger?.fieldScale ?? 1.0
+    floatView[684 / 4] = schroedinger?.densityGain ?? 1.0
+    floatView[688 / 4] = schroedinger?.powderScale ?? 0.5
+    floatView[692 / 4] = schroedinger?.emissionIntensity ?? 1.0
+    floatView[696 / 4] = schroedinger?.emissionThreshold ?? 0.01
+    floatView[700 / 4] = schroedinger?.emissionColorShift ?? 0.0
+    intView[704 / 4] = schroedinger?.emissionPulsing ? 1 : 0
+    floatView[708 / 4] = schroedinger?.rimExponent ?? 3.0
+    floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
+    floatView[716 / 4] = schroedinger?.roughness ?? 0.5
+
+    // SSS fields
+    intView[720 / 4] = schroedinger?.sssEnabled ? 1 : 0
+    floatView[724 / 4] = schroedinger?.sssIntensity ?? 0.0
+
+    // sssColor (vec3f needs 16-byte alignment, so it's at 736 after implicit padding)
+    floatView[736 / 4] = schroedinger?.sssColor?.[0] ?? 1.0
+    floatView[740 / 4] = schroedinger?.sssColor?.[1] ?? 0.8
+    floatView[744 / 4] = schroedinger?.sssColor?.[2] ?? 0.6
+    floatView[748 / 4] = 0.0 // _pad1
+
+    floatView[752 / 4] = schroedinger?.sssThickness ?? 1.0
+    floatView[756 / 4] = schroedinger?.sssJitter ?? 0.0
+
+    // Erosion fields
+    floatView[760 / 4] = schroedinger?.erosionStrength ?? 0.0
+    floatView[764 / 4] = schroedinger?.erosionScale ?? 1.0
+    floatView[768 / 4] = schroedinger?.erosionTurbulence ?? 0.0
+    intView[772 / 4] = schroedinger?.erosionNoiseType ?? 0
+
+    // Curl fields
+    intView[776 / 4] = schroedinger?.curlEnabled ? 1 : 0
+    floatView[780 / 4] = schroedinger?.curlStrength ?? 0.0
+    floatView[784 / 4] = schroedinger?.curlScale ?? 1.0
+    floatView[788 / 4] = schroedinger?.curlSpeed ?? 1.0
+    intView[792 / 4] = schroedinger?.curlBias ?? 0
+
+    // Dispersion fields
+    intView[796 / 4] = schroedinger?.dispersionEnabled ? 1 : 0
+    floatView[800 / 4] = schroedinger?.dispersionStrength ?? 0.0
+    intView[804 / 4] = schroedinger?.dispersionDirection ?? 0
+    intView[808 / 4] = schroedinger?.dispersionQuality ?? 0
+
+    // Shadow fields
+    intView[812 / 4] = schroedinger?.shadowsEnabled ? 1 : 0
+    floatView[816 / 4] = schroedinger?.shadowStrength ?? 0.5
+    intView[820 / 4] = schroedinger?.shadowSteps ?? 4
+
+    // AO fields
+    floatView[824 / 4] = schroedinger?.aoStrength ?? 0.5
+    intView[828 / 4] = schroedinger?.aoSteps ?? 4
+    floatView[832 / 4] = schroedinger?.aoRadius ?? 0.5
+
+    // aoColor (vec3f needs 16-byte alignment at offset 848 after padding)
+    floatView[848 / 4] = schroedinger?.aoColor?.[0] ?? 0.0
+    floatView[852 / 4] = schroedinger?.aoColor?.[1] ?? 0.0
+    floatView[856 / 4] = schroedinger?.aoColor?.[2] ?? 0.0
+    floatView[860 / 4] = 0.0 // _pad2
+
+    // Nodal fields
+    intView[864 / 4] = schroedinger?.nodalEnabled ? 1 : 0
+
+    // nodalColor (vec3f at offset 880 after padding)
+    floatView[880 / 4] = schroedinger?.nodalColor?.[0] ?? 1.0
+    floatView[884 / 4] = schroedinger?.nodalColor?.[1] ?? 1.0
+    floatView[888 / 4] = schroedinger?.nodalColor?.[2] ?? 1.0
+    floatView[892 / 4] = schroedinger?.nodalStrength ?? 0.5
+
+    // More fields
+    intView[896 / 4] = schroedinger?.energyColorEnabled ? 1 : 0
+    intView[900 / 4] = schroedinger?.shimmerEnabled ? 1 : 0
+    floatView[904 / 4] = schroedinger?.shimmerStrength ?? 0.1
+    floatView[908 / 4] = ctx.frame?.time ?? 0 // time
+    intView[912 / 4] = schroedinger?.isoEnabled ? 1 : 0
+    floatView[916 / 4] = schroedinger?.isoThreshold ?? -2.0
+    intView[920 / 4] = schroedinger?.sampleCount ?? 64
+
+    // Phase shift fields
+    intView[924 / 4] = schroedinger?.phaseEnabled ? 1 : 0
+    floatView[928 / 4] = schroedinger?.phaseTheta ?? 0.0
+    floatView[932 / 4] = schroedinger?.phasePhi ?? 0.0
+    floatView[936 / 4] = 0.0 // _pad3
+
+    this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
 
   updateBasisVectors(ctx: WebGPURenderContext): void {
@@ -401,12 +524,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const extended = ctx.frame?.stores?.['extended'] as any
     const schroedinger = extended?.schroedinger
 
+    // BasisVectors struct uses array<vec4f, 3> for each member (48 floats total)
+    // Stride is 12 (not 11) because array<vec4f, 3> = 3 * 4 = 12 floats
+    const STRIDE = 12
     const basisData = new Float32Array(48)
 
     // Default basis vectors
     basisData[0] = 1.0 // X basis: [1, 0, 0, ...]
-    basisData[MAX_DIM + 1] = 1.0 // Y basis: [0, 1, 0, ...]
-    basisData[MAX_DIM * 2 + 2] = 1.0 // Z basis: [0, 0, 1, ...]
+    basisData[STRIDE + 1] = 1.0 // Y basis: [0, 1, 0, ...]
+    basisData[STRIDE * 2 + 2] = 1.0 // Z basis: [0, 0, 1, ...]
 
     // Override with stored basis if available
     const basisX = schroedinger?.basisX as Float32Array | undefined
@@ -421,17 +547,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
     if (basisY) {
       for (let i = 0; i < Math.min(basisY.length, MAX_DIM); i++) {
-        basisData[MAX_DIM + i] = basisY[i] ?? 0
+        basisData[STRIDE + i] = basisY[i] ?? 0
       }
     }
     if (basisZ) {
       for (let i = 0; i < Math.min(basisZ.length, MAX_DIM); i++) {
-        basisData[MAX_DIM * 2 + i] = basisZ[i] ?? 0
+        basisData[STRIDE * 2 + i] = basisZ[i] ?? 0
       }
     }
     if (origin) {
       for (let i = 0; i < Math.min(origin.length, MAX_DIM); i++) {
-        basisData[MAX_DIM * 3 + i] = origin[i] ?? 0
+        basisData[STRIDE * 3 + i] = origin[i] ?? 0
       }
     }
 

@@ -40,7 +40,7 @@ function generateExtraDimEarlyExit(dimension: number): string {
   // Generate alpha and u calculations for extra dimensions only
   const alphaDecls = Array.from(
     { length: extraDimCount },
-    (_, i) => `  let alpha_ed${i} = sqrt(max(uniforms.extraDimOmega[${i}], 0.01));`
+    (_, i) => `  let alpha_ed${i} = sqrt(max(getExtraDimOmega(uniforms, ${i}), 0.01));`
   ).join('\n')
 
   const uCalcs = Array.from(
@@ -116,13 +116,13 @@ function generateExtraDimProduct(dimension: number): string {
     const efVar = `ef${i}`
     const coordVar = `x${i + 3}`
     if (i === 0) {
-      return `  let ${efVar} = ho1D(uniforms.extraDimN[${i}], ${coordVar}, uniforms.extraDimOmega[${i}]);
+      return `  let ${efVar} = ho1D(getExtraDimN(uniforms, ${i}), ${coordVar}, getExtraDimOmega(uniforms, ${i}));
   if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
     } else if (i === extraDimCount - 1) {
       // Last one - no early exit check needed
-      return `  let ${efVar} = ho1D(uniforms.extraDimN[${i}], ${coordVar}, uniforms.extraDimOmega[${i}]);`
+      return `  let ${efVar} = ho1D(getExtraDimN(uniforms, ${i}), ${coordVar}, getExtraDimOmega(uniforms, ${i}));`
     } else {
-      return `  let ${efVar} = ho1D(uniforms.extraDimN[${i}], ${coordVar}, uniforms.extraDimOmega[${i}]);
+      return `  let ${efVar} = ho1D(getExtraDimN(uniforms, ${i}), ${coordVar}, getExtraDimOmega(uniforms, ${i}));
   if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
     }
   }).join('\n')

@@ -70,19 +70,24 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
   let texelSize = 1.0 / uniforms.resolution;
 
-  // Sample depth at current pixel and neighbors
-  let depth = textureSample(tDepth, texSampler, uv).r;
+  // Get depth texture dimensions and compute integer coordinates
+  // Use textureLoad for unfilterable-float depth texture
+  let depthDims = textureDimensions(tDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+
+  // Load depth at current pixel and neighbors using integer coordinates
+  let depth = textureLoad(tDepth, depthCoord, 0).r;
 
   // Skip far plane (sky) - output neutral normal pointing toward camera
   if (depth >= 0.9999) {
     return vec4f(0.5, 0.5, 1.0, 0.0);
   }
 
-  // Sample neighboring depths for derivative calculation
-  let depthRight = textureSample(tDepth, texSampler, uv + vec2f(texelSize.x, 0.0)).r;
-  let depthLeft = textureSample(tDepth, texSampler, uv - vec2f(texelSize.x, 0.0)).r;
-  let depthUp = textureSample(tDepth, texSampler, uv + vec2f(0.0, texelSize.y)).r;
-  let depthDown = textureSample(tDepth, texSampler, uv - vec2f(0.0, texelSize.y)).r;
+  // Load neighboring depths for derivative calculation
+  let depthRight = textureLoad(tDepth, depthCoord + vec2i(1, 0), 0).r;
+  let depthLeft = textureLoad(tDepth, depthCoord + vec2i(-1, 0), 0).r;
+  let depthUp = textureLoad(tDepth, depthCoord + vec2i(0, 1), 0).r;
+  let depthDown = textureLoad(tDepth, depthCoord + vec2i(0, -1), 0).r;
 
   // Reconstruct view-space positions
   let posCenter = getViewPosition(uv, depth);
@@ -175,7 +180,7 @@ export class NormalPass extends WebGPUBasePass {
         {
           binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
+          sampler: { type: 'non-filtering' as const },
         },
         {
           binding: 2,

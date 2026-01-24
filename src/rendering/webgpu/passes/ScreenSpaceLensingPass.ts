@@ -207,12 +207,16 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let r = length(uv - uniforms.blackHoleCenter);
 
   // Sample depth for depth-aware distortion
+  // NOTE: Depth texture is bound as unfilterable-float, so we must use textureLoad
+  // with integer coordinates instead of textureSample.
   var depth: f32 = 1.0;
   var linearDepth: f32 = uniforms.far;
   var isSky: bool = true;
 
   if (uniforms.depthAvailable > 0.5) {
-    depth = textureSample(tDepth, texSampler, uv).r;
+    let depthDims = textureDimensions(tDepth);
+    let depthCoord = vec2i(uv * vec2f(depthDims));
+    depth = textureLoad(tDepth, depthCoord, 0).r;
     linearDepth = linearizeDepth(depth, uniforms.near, uniforms.far);
     isSky = depth > 0.99;
   }
@@ -345,7 +349,7 @@ export class ScreenSpaceLensingPass extends WebGPUBasePass {
    * @param ctx - WebGPU setup context
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -377,19 +381,19 @@ export class ScreenSpaceLensingPass extends WebGPUBasePass {
       'screen-space-lensing-fragment'
     )
 
-    // Create pipeline
+    // Create pipeline - use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'screen-space-lensing' }
     )
 
     // Create uniform buffer
     // Uniforms struct size: 32 (scalars) + 64 (mat4x4f) + 16 (cameraPosition + pad) = 112 bytes
     // Aligned to 16 bytes = 112 bytes
-    this.uniformBuffer = this.createUniformBuffer(device, 128, 'screen-space-lensing-uniforms')
+    this.uniformBuffer = this.createUniformBuffer(device, 160, 'screen-space-lensing-uniforms')
 
     // Create sampler
     this.sampler = device.createSampler({

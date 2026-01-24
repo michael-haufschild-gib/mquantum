@@ -264,7 +264,10 @@ fn softDepthIntersection(worldPos: vec3f, fragCoord: vec2f) -> f32 {
   if (jet.depthAvailable < 0.5) { return 1.0; }
 
   let screenUV = fragCoord / jet.resolution;
-  let sceneDepth = textureSample(sceneDepthTexture, sceneDepthSampler, screenUV).r;
+  // Use textureLoad for unfilterable-float depth textures
+  let depthDims = textureDimensions(sceneDepthTexture);
+  let depthCoord = vec2i(screenUV * vec2f(depthDims));
+  let sceneDepth = textureLoad(sceneDepthTexture, depthCoord, 0).r;
 
   if (sceneDepth < 0.001 || sceneDepth > 0.999) { return 1.0; }
 

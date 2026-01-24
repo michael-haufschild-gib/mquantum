@@ -11,6 +11,8 @@
  */
 
 import type {
+  ResourceSize,
+  WebGPUCapabilities,
   WebGPUFrameContext,
   WebGPUFrameStats,
   WebGPURenderContext,
@@ -96,12 +98,12 @@ class RenderContextImpl implements WebGPURenderContext {
 class SetupContextImpl implements WebGPUSetupContext {
   device: GPUDevice
   format: GPUTextureFormat
-  capabilities: WebGPURenderContext['frame'] extends null ? never : WebGPURenderContext['frame']
+  capabilities: WebGPUCapabilities
 
   private bindGroupLayouts = new Map<string, GPUBindGroupLayout>()
   private samplers = new Map<string, GPUSampler>()
 
-  constructor(device: GPUDevice, format: GPUTextureFormat, capabilities: any) {
+  constructor(device: GPUDevice, format: GPUTextureFormat, capabilities: WebGPUCapabilities) {
     this.device = device
     this.format = format
     this.capabilities = capabilities
@@ -187,7 +189,10 @@ export class WebGPURenderGraph {
     this.pool.initialize(device)
 
     // Create setup context
-    this.setupContext = new SetupContextImpl(device, format, capabilities as any)
+    if (!capabilities) {
+      throw new Error('WebGPURenderGraph: Capabilities not available')
+    }
+    this.setupContext = new SetupContextImpl(device, format, capabilities)
 
     // Enable GPU timing if supported
     if (capabilities?.timestampQuery) {
@@ -234,9 +239,17 @@ export class WebGPURenderGraph {
   /**
    * Add a resource configuration.
    */
-  addResource(config: WebGPURenderResourceConfig): void {
-    this.resources.set(config.id, config)
-    this.pool.addResource(config)
+  addResource(
+    id: string,
+    config: Omit<WebGPURenderResourceConfig, 'id' | 'size'> & { size?: ResourceSize }
+  ): void {
+    const fullConfig: WebGPURenderResourceConfig = {
+      ...config,
+      id,
+      size: config.size ?? { mode: 'screen' },
+    }
+    this.resources.set(id, fullConfig)
+    this.pool.addResource(fullConfig)
     this.compiled = false
   }
 

@@ -502,10 +502,10 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
 
     const extended = ctx.frame?.stores?.['extended'] as any
     const blackhole = extended?.blackhole
-    const dimension = blackhole?.dimension ?? this.rendererConfig.dimension ?? 4
 
-    // Pack basis vectors: basisX, basisY, basisZ, origin (each MAX_DIMENSION floats)
-    // With padding to 192 bytes = 48 floats
+    // BasisVectors struct uses array<vec4f, 3> for each member (48 floats total)
+    // Stride is 12 (not MAX_DIMENSION=11) because array<vec4f, 3> = 3 * 4 = 12 floats
+    const STRIDE = 12
     const basisData = new Float32Array(48)
 
     // Default basis vectors for 3D slice of N-D space
@@ -513,11 +513,10 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     basisData[0] = 1.0
 
     // Y basis: [0, 1, 0, 0, ...]
-    basisData[MAX_DIMENSION] = 0.0
-    basisData[MAX_DIMENSION + 1] = 1.0
+    basisData[STRIDE + 1] = 1.0
 
     // Z basis: [0, 0, 1, 0, ...]
-    basisData[MAX_DIMENSION * 2 + 2] = 1.0
+    basisData[STRIDE * 2 + 2] = 1.0
 
     // Origin: [0, 0, 0, ...]
     // Already zero-initialized
@@ -535,17 +534,17 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     }
     if (basisY) {
       for (let i = 0; i < Math.min(basisY.length, MAX_DIMENSION); i++) {
-        basisData[MAX_DIMENSION + i] = basisY[i] ?? 0
+        basisData[STRIDE + i] = basisY[i] ?? 0
       }
     }
     if (basisZ) {
       for (let i = 0; i < Math.min(basisZ.length, MAX_DIMENSION); i++) {
-        basisData[MAX_DIMENSION * 2 + i] = basisZ[i] ?? 0
+        basisData[STRIDE * 2 + i] = basisZ[i] ?? 0
       }
     }
     if (origin) {
       for (let i = 0; i < Math.min(origin.length, MAX_DIMENSION); i++) {
-        basisData[MAX_DIMENSION * 3 + i] = origin[i] ?? 0
+        basisData[STRIDE * 3 + i] = origin[i] ?? 0
       }
     }
 

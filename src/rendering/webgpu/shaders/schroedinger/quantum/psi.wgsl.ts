@@ -47,11 +47,11 @@ fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: Schroedinger
     if (k >= uniforms.termCount) { break; }
 
     // Time phase factor: e^{-iE_k t}
-    let phase = -uniforms.energy[k] * t;
+    let phase = -getEnergy(uniforms, k) * t;
     let timeFactor = cexp_i(phase);
 
     // Complex coefficient c_k
-    let coeff = uniforms.coeff[k];
+    let coeff = getCoeff(uniforms, k);
 
     // Combined: c_k · e^{-iE_k t}
     let term = cmul(coeff, timeFactor);
@@ -123,7 +123,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
     if (k >= uniforms.termCount) { break; }
 
     // No time factor - just spatial part
-    let coeff = uniforms.coeff[k];
+    let coeff = getCoeff(uniforms, k);
     let spatial = hoNDOptimized(xND, k, uniforms);
     psi += cscale(spatial, coeff);
   }
@@ -176,13 +176,13 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     let spatial = hoNDOptimized(xND, k, uniforms);
 
     // Complex coefficient c_k
-    let coeff = uniforms.coeff[k];
+    let coeff = getCoeff(uniforms, k);
 
     // Spatial-only accumulation (no time factor)
     psiSpatial += cscale(spatial, coeff);
 
     // Time-dependent accumulation
-    let phase = -uniforms.energy[k] * t;
+    let phase = -getEnergy(uniforms, k) * t;
     let timeFactor = cexp_i(phase);
     let term = cmul(coeff, timeFactor);
     psiTime += cscale(spatial, term);

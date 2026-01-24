@@ -154,7 +154,10 @@ fn getSceneDepth(uv: vec2f) -> f32 {
   if (uniforms.depthAvailable < 0.5) {
     return 10000.0; // Very far if no depth
   }
-  let depth = textureSample(tSceneDepth, texSampler, uv).r;
+  // Use textureLoad for unfilterable-float textures (cannot use textureSample)
+  let depthDims = textureDimensions(tSceneDepth);
+  let depthCoord = vec2i(uv * vec2f(depthDims));
+  let depth = textureLoad(tSceneDepth, depthCoord, 0).r;
   if (depth < 0.001 || depth > 0.999) {
     return 10000.0;
   }
@@ -461,7 +464,7 @@ export class JetsRenderPass extends WebGPUBasePass {
    * @param ctx - WebGPU setup context
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -485,11 +488,12 @@ export class JetsRenderPass extends WebGPUBasePass {
     const fragmentModule = this.createShaderModule(device, JETS_SHADER, 'jets-render-fragment')
 
     // Create pipeline with additive blending for proper jet accumulation
+    // Use rgba16float for HDR intermediate output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba16float',
       {
         label: 'jets-render',
         blendState: {

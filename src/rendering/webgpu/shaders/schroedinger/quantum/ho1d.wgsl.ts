@@ -65,7 +65,7 @@ fn hoND(
   var distSq = 0.0;
   for (var j = 0; j < 11; j++) {
     if (j >= dim) { break; }
-    let alpha = sqrt(max(uniforms.omega[j], 0.01));
+    let alpha = sqrt(max(getOmega(uniforms, j), 0.01));
     let u = alpha * xND[j];
     distSq += u * u;
   }
@@ -77,8 +77,8 @@ fn hoND(
   for (var j = 0; j < 11; j++) {
     if (j >= dim) { break; }
 
-    let n = uniforms.quantum[termIdx * 11 + j];
-    let omega = uniforms.omega[j];
+    let n = getQuantum(uniforms, termIdx * 11 + j);
+    let omega = getOmega(uniforms, j);
 
     product *= ho1D(n, xND[j], omega);
 
