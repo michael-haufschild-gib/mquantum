@@ -284,15 +284,11 @@ export class GTAOPass extends WebGPUBasePass {
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
-      aoRadius?: number
-      aoIntensity?: number
+      ssaoIntensity?: number
     }
 
-    if (postProcessing?.aoRadius !== undefined) {
-      this.radius = postProcessing.aoRadius
-    }
-    if (postProcessing?.aoIntensity !== undefined) {
-      this.intensity = postProcessing.aoIntensity
+    if (postProcessing?.ssaoIntensity !== undefined) {
+      this.intensity = postProcessing.ssaoIntensity
     }
   }
 

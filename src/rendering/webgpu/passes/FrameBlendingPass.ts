@@ -272,11 +272,11 @@ export class FrameBlendingPass extends WebGPUBasePass {
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
-      frameBlendFactor?: number
+      frameBlendingFactor?: number
     }
 
-    if (postProcessing?.frameBlendFactor !== undefined) {
-      this.blendFactor = postProcessing.frameBlendFactor
+    if (postProcessing?.frameBlendingFactor !== undefined) {
+      this.blendFactor = postProcessing.frameBlendingFactor
     }
   }
 

@@ -75,14 +75,14 @@ const environmentSelector = (state: ReturnType<typeof useEnvironmentStore.getSta
 
 const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getState>) => ({
   renderResolutionScale: state.renderResolutionScale,
-  antialiasing: state.antialiasing,
 })
 
 const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.getState>) => ({
   bloomEnabled: state.bloomEnabled,
   bloomIntensity: state.bloomIntensity,
-  aoEnabled: state.aoEnabled,
+  ssaoEnabled: state.ssaoEnabled,
   ssrEnabled: state.ssrEnabled,
+  antiAliasingMethod: state.antiAliasingMethod,
 })
 
 // ============================================================================
@@ -133,9 +133,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
       objectType,
       dimension,
       bloomEnabled: postProcessing.bloomEnabled,
-      aoEnabled: postProcessing.aoEnabled,
+      ssaoEnabled: postProcessing.ssaoEnabled,
       ssrEnabled: postProcessing.ssrEnabled,
-      antialiasing: performance_.antialiasing,
+      antiAliasingMethod: postProcessing.antiAliasingMethod,
     })
 
     // Compile the graph
@@ -145,7 +145,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
       // Cleanup passes
       passesInitializedRef.current = false
     }
-  }, [graph, objectType, dimension, postProcessing.bloomEnabled, postProcessing.aoEnabled, postProcessing.ssrEnabled, performance_.antialiasing])
+  }, [graph, objectType, dimension, postProcessing.bloomEnabled, postProcessing.ssaoEnabled, postProcessing.ssrEnabled, postProcessing.antiAliasingMethod])
 
   // Set up store getters for uniform updates
   useEffect(() => {
@@ -205,9 +205,9 @@ interface PassConfig {
   objectType: ObjectType
   dimension: number
   bloomEnabled: boolean
-  aoEnabled: boolean
+  ssaoEnabled: boolean
   ssrEnabled: boolean
-  antialiasing: 'none' | 'fxaa' | 'smaa'
+  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
 }
 
 /**
@@ -275,7 +275,7 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
   )
 
   // 3. GTAO (optional)
-  if (config.aoEnabled) {
+  if (config.ssaoEnabled) {
     graph.addResource('aoBuffer', {
       type: 'texture',
       format: 'r8unorm',
@@ -315,7 +315,7 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
       inputs: [
         'hdr-color',
         'normal-buffer',
-        ...(config.aoEnabled ? ['aoBuffer'] : []),
+        ...(config.ssaoEnabled ? ['aoBuffer'] : []),
         ...(config.ssrEnabled ? ['ssrBuffer'] : []),
       ],
       outputs: ['compositeBuffer'],
@@ -361,7 +361,7 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
   )
 
   // 9. Anti-aliasing (optional)
-  if (config.antialiasing === 'fxaa') {
+  if (config.antiAliasingMethod === 'fxaa') {
     graph.addPass(
       new FXAAPass({
         id: 'fxaa',

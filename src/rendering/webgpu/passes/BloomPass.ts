@@ -80,7 +80,7 @@ export class BloomPass extends WebGPUBasePass {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
       bloomIntensity?: number
       bloomThreshold?: number
-      bloomKnee?: number
+      bloomSmoothing?: number
     }
 
     if (postProcessing?.bloomIntensity !== undefined) {
@@ -89,8 +89,8 @@ export class BloomPass extends WebGPUBasePass {
     if (postProcessing?.bloomThreshold !== undefined) {
       this.threshold = postProcessing.bloomThreshold
     }
-    if (postProcessing?.bloomKnee !== undefined) {
-      this.knee = postProcessing.bloomKnee
+    if (postProcessing?.bloomSmoothing !== undefined) {
+      this.knee = postProcessing.bloomSmoothing
     }
   }
 

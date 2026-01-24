@@ -92,19 +92,11 @@ export class SMAAPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * Note: SMAA threshold and maxSearchSteps are not in any store.
+   * Using constructor defaults or values set via setThreshold/setMaxSearchSteps.
    */
-  private updateFromStores(ctx: WebGPURenderContext): void {
-    const performance = ctx.frame?.stores?.['performance'] as {
-      smaaThreshold?: number
-      smaaMaxSearchSteps?: number
-    }
-
-    if (performance?.smaaThreshold !== undefined) {
-      this.threshold = Math.max(0.05, Math.min(0.5, performance.smaaThreshold))
-    }
-    if (performance?.smaaMaxSearchSteps !== undefined) {
-      this.maxSearchSteps = Math.max(4, Math.min(32, performance.smaaMaxSearchSteps))
-    }
+  private updateFromStores(_ctx: WebGPURenderContext): void {
+    // No store properties for SMAA - using constructor defaults
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {

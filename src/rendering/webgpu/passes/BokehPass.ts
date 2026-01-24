@@ -255,24 +255,17 @@ export class BokehPass extends WebGPUBasePass {
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
-      bokehFocusDistance?: number
+      bokehWorldFocusDistance?: number
       bokehFocalLength?: number
-      bokehFStop?: number
-      bokehMaxBlur?: number
     }
 
-    if (postProcessing?.bokehFocusDistance !== undefined) {
-      this.focusDistance = postProcessing.bokehFocusDistance
+    if (postProcessing?.bokehWorldFocusDistance !== undefined) {
+      this.focusDistance = postProcessing.bokehWorldFocusDistance
     }
     if (postProcessing?.bokehFocalLength !== undefined) {
       this.focalLength = postProcessing.bokehFocalLength
     }
-    if (postProcessing?.bokehFStop !== undefined) {
-      this.fStop = postProcessing.bokehFStop
-    }
-    if (postProcessing?.bokehMaxBlur !== undefined) {
-      this.maxBlur = postProcessing.bokehMaxBlur
-    }
+    // Note: bokehFStop and bokehMaxBlur are not in store - using constructor defaults
   }
 
   /**

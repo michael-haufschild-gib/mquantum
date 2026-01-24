@@ -64,7 +64,6 @@ export class TonemappingPass extends WebGPUBasePass {
   private updateFromStores(ctx: WebGPURenderContext): void {
     const lighting = ctx.frame?.stores?.['lighting'] as {
       exposure?: number
-      gamma?: number
     }
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
       tonemappingMode?: number
@@ -73,9 +72,7 @@ export class TonemappingPass extends WebGPUBasePass {
     if (lighting?.exposure !== undefined) {
       this.exposure = lighting.exposure
     }
-    if (lighting?.gamma !== undefined) {
-      this.gamma = lighting.gamma
-    }
+    // Note: gamma is fixed at 2.2 (standard sRGB)
     if (postProcessing?.tonemappingMode !== undefined) {
       this.mode = postProcessing.tonemappingMode
     }

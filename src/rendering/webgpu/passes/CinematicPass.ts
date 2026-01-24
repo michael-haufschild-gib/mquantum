@@ -203,23 +203,20 @@ export class CinematicPass extends WebGPUBasePass {
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
-      vignetteIntensity?: number
-      vignetteOffset?: number
-      chromaticAberration?: number
-      filmGrain?: number
+      cinematicVignette?: number
+      cinematicAberration?: number
+      cinematicGrain?: number
     }
 
-    if (postProcessing?.vignetteIntensity !== undefined) {
-      this.vignette = postProcessing.vignetteIntensity
+    if (postProcessing?.cinematicVignette !== undefined) {
+      this.vignette = postProcessing.cinematicVignette
     }
-    if (postProcessing?.vignetteOffset !== undefined) {
-      this.vignetteOffset = postProcessing.vignetteOffset
+    // Note: vignetteOffset is not in store - using fixed default of 1.0
+    if (postProcessing?.cinematicAberration !== undefined) {
+      this.aberration = postProcessing.cinematicAberration
     }
-    if (postProcessing?.chromaticAberration !== undefined) {
-      this.aberration = postProcessing.chromaticAberration
-    }
-    if (postProcessing?.filmGrain !== undefined) {
-      this.grain = postProcessing.filmGrain
+    if (postProcessing?.cinematicGrain !== undefined) {
+      this.grain = postProcessing.cinematicGrain
     }
   }
 

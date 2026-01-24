@@ -901,61 +901,6 @@ export class WebGPUQuaternionJuliaRenderer extends WebGPUBasePass {
   }
 
   /**
-   * Update Julia-specific uniforms.
-   */
-  updateJuliaUniforms(
-    juliaConstant: [number, number, number, number],
-    power: number,
-    bailout: number,
-    iterations: number,
-    scale: number = 1.0
-  ): void {
-    if (!this.device || !this.juliaUniformBuffer) return
-
-    const juliaData = new Float32Array([
-      // juliaConstant (vec4f)
-      juliaConstant[0],
-      juliaConstant[1],
-      juliaConstant[2],
-      juliaConstant[3],
-      // effectivePower, effectiveBailout
-      power,
-      bailout,
-      // iterations placeholder (will be set as u32)
-      0,
-      // powerAnimationEnabled (u32)
-      0,
-      // animatedPower (f32)
-      power,
-      // dimensionMixEnabled (u32)
-      0,
-      // mixIntensity, mixTime (f32, f32)
-      0.0,
-      0.0,
-      // lodEnabled (u32)
-      0,
-      // lodDetail (f32)
-      1.0,
-      // phaseEnabled (u32)
-      0,
-      // phaseTheta, phasePhi (f32, f32)
-      0.0,
-      0.0,
-      // scale (f32)
-      scale,
-      // padding (vec2f)
-      0.0,
-      0.0,
-    ])
-
-    // Set iterations as u32 at correct byte offset
-    const dataView = new DataView(juliaData.buffer)
-    dataView.setUint32(6 * 4, iterations, true)
-
-    this.device.queue.writeBuffer(this.juliaUniformBuffer, 0, juliaData)
-  }
-
-  /**
    * Update basis vectors for N-dimensional projection.
    */
   updateBasisVectors(origin: number[], basisX: number[], basisY: number[], basisZ: number[]): void {
