@@ -72,6 +72,28 @@ export class BloomPass extends WebGPUBasePass {
     this.intensity = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      bloomIntensity?: number
+      bloomThreshold?: number
+      bloomKnee?: number
+    }
+
+    if (postProcessing?.bloomIntensity !== undefined) {
+      this.intensity = postProcessing.bloomIntensity
+    }
+    if (postProcessing?.bloomThreshold !== undefined) {
+      this.threshold = postProcessing.bloomThreshold
+    }
+    if (postProcessing?.bloomKnee !== undefined) {
+      this.knee = postProcessing.bloomKnee
+    }
+  }
+
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
 
@@ -201,6 +223,9 @@ export class BloomPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     const { width, height } = ctx.size
     this.ensureTextures(this.device, width, height)

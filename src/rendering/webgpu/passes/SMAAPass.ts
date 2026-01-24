@@ -89,6 +89,24 @@ export class SMAAPass extends WebGPUBasePass {
     this.maxSearchSteps = Math.max(4, Math.min(32, value))
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const performance = ctx.frame?.stores?.['performance'] as {
+      smaaThreshold?: number
+      smaaMaxSearchSteps?: number
+    }
+
+    if (performance?.smaaThreshold !== undefined) {
+      this.threshold = Math.max(0.05, Math.min(0.5, performance.smaaThreshold))
+    }
+    if (performance?.smaaMaxSearchSteps !== undefined) {
+      this.maxSearchSteps = Math.max(4, Math.min(32, performance.smaaMaxSearchSteps))
+    }
+  }
+
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
 
@@ -290,6 +308,9 @@ export class SMAAPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     const { width, height } = ctx.size
     this.ensureTextures(this.device, width, height)

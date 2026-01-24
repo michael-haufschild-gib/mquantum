@@ -266,6 +266,20 @@ export class FrameBlendingPass extends WebGPUBasePass {
     this.blendFactor = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      frameBlendFactor?: number
+    }
+
+    if (postProcessing?.frameBlendFactor !== undefined) {
+      this.blendFactor = postProcessing.frameBlendFactor
+    }
+  }
+
   /**
    * Reset history buffer (e.g., on camera teleport or scene change).
    */
@@ -297,6 +311,9 @@ export class FrameBlendingPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input texture
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

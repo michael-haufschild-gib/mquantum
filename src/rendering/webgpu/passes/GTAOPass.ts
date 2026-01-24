@@ -278,6 +278,24 @@ export class GTAOPass extends WebGPUBasePass {
     this.intensity = intensity
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      aoRadius?: number
+      aoIntensity?: number
+    }
+
+    if (postProcessing?.aoRadius !== undefined) {
+      this.radius = postProcessing.aoRadius
+    }
+    if (postProcessing?.aoIntensity !== undefined) {
+      this.intensity = postProcessing.aoIntensity
+    }
+  }
+
   /**
    * Execute the GTAO pass.
    */
@@ -291,6 +309,9 @@ export class GTAOPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input textures
     const depthView = ctx.getTextureView(this.passConfig.depthInput)

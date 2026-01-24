@@ -316,6 +316,28 @@ export class RefractionPass extends WebGPUBasePass {
     this.strength = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      refractionStrength?: number
+      refractionIOR?: number
+      refractionChromaticAberration?: number
+    }
+
+    if (postProcessing?.refractionStrength !== undefined) {
+      this.strength = postProcessing.refractionStrength
+    }
+    if (postProcessing?.refractionIOR !== undefined) {
+      this.ior = postProcessing.refractionIOR
+    }
+    if (postProcessing?.refractionChromaticAberration !== undefined) {
+      this.chromaticAberration = postProcessing.refractionChromaticAberration
+    }
+  }
+
   /**
    * Set chromatic aberration amount.
    * @param value Chromatic aberration (0 = none)
@@ -337,6 +359,9 @@ export class RefractionPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input textures
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

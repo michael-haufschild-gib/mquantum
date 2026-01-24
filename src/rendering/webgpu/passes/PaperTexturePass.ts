@@ -808,6 +808,60 @@ export class PaperTexturePass extends WebGPUBasePass {
     this.seed = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      paperIntensity?: number
+      paperRoughness?: number
+      paperContrast?: number
+      paperFiber?: number
+      paperFiberSize?: number
+      paperCrumples?: number
+      paperCrumpleSize?: number
+      paperFolds?: number
+      paperFoldCount?: number
+      paperDrops?: number
+      paperFade?: number
+    }
+
+    if (postProcessing?.paperIntensity !== undefined) {
+      this.intensity = postProcessing.paperIntensity
+    }
+    if (postProcessing?.paperRoughness !== undefined) {
+      this.roughness = postProcessing.paperRoughness
+    }
+    if (postProcessing?.paperContrast !== undefined) {
+      this.contrast = postProcessing.paperContrast
+    }
+    if (postProcessing?.paperFiber !== undefined) {
+      this.fiber = postProcessing.paperFiber
+    }
+    if (postProcessing?.paperFiberSize !== undefined) {
+      this.fiberSize = postProcessing.paperFiberSize
+    }
+    if (postProcessing?.paperCrumples !== undefined) {
+      this.crumples = postProcessing.paperCrumples
+    }
+    if (postProcessing?.paperCrumpleSize !== undefined) {
+      this.crumpleSize = postProcessing.paperCrumpleSize
+    }
+    if (postProcessing?.paperFolds !== undefined) {
+      this.folds = postProcessing.paperFolds
+    }
+    if (postProcessing?.paperFoldCount !== undefined) {
+      this.foldCount = postProcessing.paperFoldCount
+    }
+    if (postProcessing?.paperDrops !== undefined) {
+      this.drops = postProcessing.paperDrops
+    }
+    if (postProcessing?.paperFade !== undefined) {
+      this.fade = postProcessing.paperFade
+    }
+  }
+
   setColorFront(hex: string): void {
     this.colorFront = hexToRGBA(hex)
   }
@@ -839,6 +893,9 @@ export class PaperTexturePass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input texture
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

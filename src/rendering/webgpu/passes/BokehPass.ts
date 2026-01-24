@@ -249,6 +249,32 @@ export class BokehPass extends WebGPUBasePass {
     this.fStop = fStop
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      bokehFocusDistance?: number
+      bokehFocalLength?: number
+      bokehFStop?: number
+      bokehMaxBlur?: number
+    }
+
+    if (postProcessing?.bokehFocusDistance !== undefined) {
+      this.focusDistance = postProcessing.bokehFocusDistance
+    }
+    if (postProcessing?.bokehFocalLength !== undefined) {
+      this.focalLength = postProcessing.bokehFocalLength
+    }
+    if (postProcessing?.bokehFStop !== undefined) {
+      this.fStop = postProcessing.bokehFStop
+    }
+    if (postProcessing?.bokehMaxBlur !== undefined) {
+      this.maxBlur = postProcessing.bokehMaxBlur
+    }
+  }
+
   /**
    * Set focal length.
    */
@@ -269,6 +295,9 @@ export class BokehPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input textures
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

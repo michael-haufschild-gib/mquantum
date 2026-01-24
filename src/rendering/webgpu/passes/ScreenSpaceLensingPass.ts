@@ -447,6 +447,42 @@ export class ScreenSpaceLensingPass extends WebGPUBasePass {
     this.mass = mass
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const extended = ctx.frame?.stores?.['extended'] as {
+      blackhole?: {
+        mass?: number
+        horizonRadius?: number
+        lensingIntensity?: number
+        lensingFalloff?: number
+        lensingScale?: number
+        chromaticAberration?: number
+      }
+    }
+
+    if (extended?.blackhole?.mass !== undefined) {
+      this.mass = extended.blackhole.mass
+    }
+    if (extended?.blackhole?.horizonRadius !== undefined) {
+      this.horizonRadius = extended.blackhole.horizonRadius
+    }
+    if (extended?.blackhole?.lensingIntensity !== undefined) {
+      this.intensity = extended.blackhole.lensingIntensity
+    }
+    if (extended?.blackhole?.lensingFalloff !== undefined) {
+      this.falloff = extended.blackhole.lensingFalloff
+    }
+    if (extended?.blackhole?.lensingScale !== undefined) {
+      this.distortionScale = extended.blackhole.lensingScale
+    }
+    if (extended?.blackhole?.chromaticAberration !== undefined) {
+      this.chromaticAberration = extended.blackhole.chromaticAberration
+    }
+  }
+
   /**
    * Set distortion scale (0.1-5).
    * @param scale - Distortion scale value
@@ -522,6 +558,9 @@ export class ScreenSpaceLensingPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input textures
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

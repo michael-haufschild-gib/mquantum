@@ -20,6 +20,10 @@ import { usePerformanceStore } from '@/stores/performanceStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useCameraStore } from '@/stores/cameraStore'
 import { useAnimationStore } from '@/stores/animationStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useRotationStore } from '@/stores/rotationStore'
+import { useTransformStore } from '@/stores/transformStore'
+import { usePBRStore } from '@/stores/pbrStore'
 
 // Passes (import as needed for the pipeline)
 import { ScenePass } from './passes/ScenePass'
@@ -152,6 +156,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
     graph.setStoreGetter('postProcessing', () => usePostProcessingStore.getState())
     graph.setStoreGetter('camera', () => useCameraStore.getState())
     graph.setStoreGetter('animation', () => useAnimationStore.getState())
+    graph.setStoreGetter('extended', () => useExtendedObjectStore.getState())
+    graph.setStoreGetter('rotation', () => useRotationStore.getState())
+    graph.setStoreGetter('transform', () => useTransformStore.getState())
+    graph.setStoreGetter('pbr', () => usePBRStore.getState())
   }, [graph])
 
   // Animation loop

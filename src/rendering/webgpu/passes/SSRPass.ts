@@ -279,6 +279,24 @@ export class SSRPass extends WebGPUBasePass {
     this.maxDistance = distance
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      ssrIntensity?: number
+      ssrMaxDistance?: number
+    }
+
+    if (postProcessing?.ssrIntensity !== undefined) {
+      this.intensity = postProcessing.ssrIntensity
+    }
+    if (postProcessing?.ssrMaxDistance !== undefined) {
+      this.maxDistance = postProcessing.ssrMaxDistance
+    }
+  }
+
   /**
    * Execute the SSR pass.
    */
@@ -292,6 +310,9 @@ export class SSRPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input textures
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

@@ -292,6 +292,30 @@ export class GravitationalLensingPass extends WebGPUBasePass {
     this.chromaticAberration = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const extended = ctx.frame?.stores?.['extended'] as {
+      blackhole?: {
+        lensingStrength?: number
+        lensingScale?: number
+        chromaticAberration?: number
+      }
+    }
+
+    if (extended?.blackhole?.lensingStrength !== undefined) {
+      this.strength = extended.blackhole.lensingStrength
+    }
+    if (extended?.blackhole?.lensingScale !== undefined) {
+      this.distortionScale = extended.blackhole.lensingScale
+    }
+    if (extended?.blackhole?.chromaticAberration !== undefined) {
+      this.chromaticAberration = extended.blackhole.chromaticAberration
+    }
+  }
+
   /**
    * Execute the gravitational lensing pass.
    */
@@ -305,6 +329,9 @@ export class GravitationalLensingPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input texture
     const environmentView = ctx.getTextureView(this.passConfig.environmentInput)

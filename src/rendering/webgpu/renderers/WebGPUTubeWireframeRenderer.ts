@@ -524,6 +524,55 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.tubeUniformBuffer, data)
   }
 
+
+  /**
+   * Update tube uniforms from Zustand stores.
+   */
+  private updateTubeFromStores(ctx: WebGPURenderContext): void {
+    const rotation = ctx.frame?.stores?.['rotation'] as {
+      rotations?: Record<string, number>
+    }
+    const pbr = ctx.frame?.stores?.['pbr'] as {
+      roughness?: number
+      metalness?: number
+    }
+    const appearance = ctx.frame?.stores?.['appearance'] as {
+      colorAlgorithm?: string
+      cosineCoefficients?: { a: number[]; b: number[]; c: number[]; d: number[] }
+    }
+    const transform = ctx.frame?.stores?.['transform'] as {
+      scale?: number
+    }
+
+    const baseColor = this.getBaseColorFromAppearance(appearance)
+    
+    this.updateTubeUniforms({
+      baseColor,
+      roughness: pbr?.roughness ?? 0.5,
+      metalness: pbr?.metalness ?? 0.0,
+      ambientIntensity: 0.3,
+      emissiveIntensity: 0.0,
+    })
+  }
+
+  /**
+   * Extract base color from appearance store.
+   */
+  private getBaseColorFromAppearance(appearance: {
+    colorAlgorithm?: string
+    cosineCoefficients?: { a: number[]; b: number[]; c: number[]; d: number[] }
+  } | undefined): [number, number, number] {
+    if (!appearance?.cosineCoefficients) {
+      return [1.0, 1.0, 1.0]
+    }
+    const { a, b } = appearance.cosineCoefficients
+    return [
+      Math.min(1, (a[0] ?? 0.5) + (b[0] ?? 0.5)),
+      Math.min(1, (a[1] ?? 0.5) + (b[1] ?? 0.5)),
+      Math.min(1, (a[2] ?? 0.5) + (b[2] ?? 0.5)),
+    ]
+  }
+
   /**
    * Execute the render pass.
    */
@@ -541,8 +590,9 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms
+    // Update uniforms from stores
     this.updateCameraUniforms(ctx)
+    this.updateTubeFromStores(ctx)
 
     // Get render targets
     const colorView = ctx.getWriteTarget('hdr-color')

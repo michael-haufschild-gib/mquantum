@@ -736,6 +736,171 @@ export class WebGPUQuaternionJuliaRenderer extends WebGPUBasePass {
   }
 
   /**
+   * Update Julia-specific uniforms from extendedObjectStore.
+   */
+  updateJuliaUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.juliaUniformBuffer) return
+
+    const extended = ctx.frame?.stores?.['extended'] as any
+    if (!extended?.quaternionJulia) return
+
+    const julia = extended.quaternionJulia
+    const data = new Float32Array(32) // 128 bytes
+
+    // Julia constant (4 components for quaternion)
+    const juliaConstant = julia.juliaConstant ?? [0.28, 0.0113, 0.0, 0.0]
+    data[0] = juliaConstant[0] ?? 0.28
+    data[1] = juliaConstant[1] ?? 0.0113
+    data[2] = juliaConstant[2] ?? 0.0
+    data[3] = juliaConstant[3] ?? 0.0
+
+    // Core parameters
+    data[4] = julia.power ?? 2.0
+    data[5] = julia.bailoutRadius ?? 4.0
+    data[6] = julia.surfaceThreshold ?? 0.001
+    data[7] = julia.maxRaymarchSteps ?? 128
+
+    // Quality
+    data[8] = julia.qualityMultiplier ?? 1.0
+    data[9] = this.config.dimension ?? 4
+
+    // Color settings
+    data[10] = julia.colorMode ?? 0
+    data[11] = julia.colorPower ?? 1.0
+    data[12] = julia.colorCycles ?? 1.0
+    data[13] = julia.colorOffset ?? 0.0
+
+    // Scale
+    data[14] = julia.scale ?? 1.0
+
+    this.writeUniformBuffer(this.device, this.juliaUniformBuffer, data)
+  }
+
+  /**
+   * Update N-D basis vectors from rotationStore.
+   */
+  updateBasisUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.basisUniformBuffer) return
+
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const dimension = this.config.dimension ?? 4
+
+    const data = new Float32Array(48) // 192 bytes for 4 vectors × 12 floats
+
+    // Default identity basis vectors
+    data[0] = 1.0 // basisX[0]
+    data[12] = 1.0 // basisY[1]
+    data[24] = 1.0 // basisZ[2]
+
+    // Fill in parameter values for extra dimensions into origin
+    const parameterValues = extended?.quaternionJulia?.parameterValues ?? []
+    for (let i = 3; i < dimension && i < 11; i++) {
+      data[36 + i] = parameterValues[i - 3] ?? 0
+    }
+
+    this.writeUniformBuffer(this.device, this.basisUniformBuffer, data)
+  }
+
+  /**
+   * Update material uniforms from pbrStore and appearanceStore.
+   */
+  updateMaterialUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.materialUniformBuffer) return
+
+    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const appearance = ctx.frame?.stores?.['appearance'] as any
+
+    const data = new Float32Array(32) // 128 bytes
+
+    data[0] = pbr?.face?.roughness ?? 0.5
+    data[1] = pbr?.face?.metallic ?? 0.0
+    data[2] = pbr?.face?.specularIntensity ?? 1.0
+    data[3] = 1.0
+
+    const faceColor = this.parseColor(appearance?.faceColor ?? '#ffffff')
+    data[4] = faceColor[0]
+    data[5] = faceColor[1]
+    data[6] = faceColor[2]
+    data[7] = 1.0
+
+    const edgeColor = this.parseColor(appearance?.edgeColor ?? '#000000')
+    data[8] = edgeColor[0]
+    data[9] = edgeColor[1]
+    data[10] = edgeColor[2]
+    data[11] = 1.0
+
+    data[12] = appearance?.sssEnabled ? 1 : 0
+    data[13] = appearance?.sssIntensity ?? 0.5
+    data[14] = appearance?.sssThickness ?? 1.0
+    data[15] = 0.0
+
+    data[16] = appearance?.fresnelEnabled ? 1 : 0
+    data[17] = appearance?.fresnelIntensity ?? 1.0
+    data[18] = appearance?.colorAlgorithm ?? 0
+
+    this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
+  }
+
+  /**
+   * Update lighting uniforms from lightingStore.
+   */
+  updateLightingUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.lightingUniformBuffer) return
+
+    const lighting = ctx.frame?.stores?.['lighting'] as any
+    if (!lighting) return
+
+    const data = new Float32Array(128) // 512 bytes
+
+    const lights = lighting.lights ?? []
+    data[0] = Math.min(lights.length, 8)
+
+    data[1] = lighting.ambientEnabled ? 1 : 0
+    data[2] = lighting.ambientIntensity ?? 0.3
+    data[3] = 0.0
+
+    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
+    data[4] = ambientColor[0]
+    data[5] = ambientColor[1]
+    data[6] = ambientColor[2]
+    data[7] = 1.0
+
+    for (let i = 0; i < Math.min(lights.length, 8); i++) {
+      const light = lights[i]
+      const offset = 8 + i * 12
+
+      data[offset + 0] = light.type === 'directional' ? 1 : light.type === 'spot' ? 2 : 0
+      data[offset + 1] = light.enabled ? 1 : 0
+      data[offset + 2] = light.intensity ?? 1.0
+      data[offset + 3] = light.range ?? 100.0
+
+      data[offset + 4] = light.position?.[0] ?? 0
+      data[offset + 5] = light.position?.[1] ?? 5
+      data[offset + 6] = light.position?.[2] ?? 0
+      data[offset + 7] = 0.0
+
+      const lightColor = this.parseColor(light.color ?? '#ffffff')
+      data[offset + 8] = lightColor[0]
+      data[offset + 9] = lightColor[1]
+      data[offset + 10] = lightColor[2]
+      data[offset + 11] = 1.0
+    }
+
+    this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
+  }
+
+  private parseColor(hex: string): [number, number, number] {
+    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
+    const val = parseInt(hex.slice(1), 16)
+    if (isNaN(val)) return [1, 1, 1]
+    return [
+      ((val >> 16) & 0xff) / 255,
+      ((val >> 8) & 0xff) / 255,
+      (val & 0xff) / 255,
+    ]
+  }
+
+  /**
    * Update Julia-specific uniforms.
    */
   updateJuliaUniforms(
@@ -837,8 +1002,12 @@ export class WebGPUQuaternionJuliaRenderer extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms
+    // Update all uniforms from stores
     this.updateCameraUniforms(ctx)
+    this.updateJuliaUniforms(ctx)
+    this.updateBasisUniforms(ctx)
+    this.updateMaterialUniforms(ctx)
+    this.updateLightingUniforms(ctx)
 
     // Get render targets
     const colorView = ctx.getWriteTarget('hdr-color')

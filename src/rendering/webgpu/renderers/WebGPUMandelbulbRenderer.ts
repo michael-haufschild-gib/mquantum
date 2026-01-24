@@ -536,6 +536,203 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.cameraUniformBuffer, data)
   }
 
+  /**
+   * Update mandelbulb-specific uniforms from extendedObjectStore.
+   */
+  updateMandelbulbUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.mandelbulbUniformBuffer) return
+
+    const extended = ctx.frame?.stores?.['extended'] as any
+    if (!extended?.mandelbulb) return
+
+    const mb = extended.mandelbulb
+    const data = new Float32Array(32) // 128 bytes / 4
+
+    // Core parameters (matching MandelbulbUniforms struct)
+    data[0] = this.config.dimension ?? 3 // dimension: i32 (stored as f32 for alignment)
+    data[1] = mb.mandelbulbPower ?? 8.0 // power
+    data[2] = mb.maxIterations ?? 48 // iterations
+    data[3] = mb.escapeRadius ?? 4.0 // escapeRadius
+
+    // Quality settings
+    data[4] = mb.sdfMaxIterations ?? 64 // sdfMaxIterations
+    data[5] = mb.sdfSurfaceDistance ?? 0.001 // sdfSurfaceDistance
+
+    // Pre-computed values
+    data[6] = mb.mandelbulbPower ?? 8.0 // effectivePower (same as power for now)
+    data[7] = Math.max(mb.escapeRadius ?? 4.0, 2.0) // effectiveBailout
+
+    // Power animation
+    data[8] = mb.powerAnimationEnabled ? 1 : 0 // powerAnimationEnabled: u32
+    data[9] = mb.mandelbulbPower ?? 8.0 // animatedPower (computed elsewhere if animated)
+
+    // Alternate power blending
+    data[10] = mb.alternatePowerEnabled ? 1 : 0 // alternatePowerEnabled: u32
+    data[11] = mb.alternatePowerValue ?? 8.0 // alternatePowerValue
+    data[12] = mb.alternatePowerBlend ?? 0.0 // alternatePowerBlend
+
+    // Phase shift
+    data[13] = mb.phaseShiftEnabled ? 1 : 0 // phaseEnabled: u32
+    data[14] = 0.0 // phaseTheta (computed from animation)
+    data[15] = 0.0 // phasePhi (computed from animation)
+
+    // Scale
+    data[16] = mb.scale ?? 1.0
+
+    this.writeUniformBuffer(this.device, this.mandelbulbUniformBuffer, data)
+  }
+
+  /**
+   * Update N-D basis vectors from rotationStore.
+   */
+  updateBasisUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.basisUniformBuffer) return
+
+    const rotation = ctx.frame?.stores?.['rotation'] as any
+    const extended = ctx.frame?.stores?.['extended'] as any
+    if (!rotation) return
+
+    const dimension = this.config.dimension ?? 3
+    const rotations = rotation.rotations as Map<string, number> | undefined
+
+    // Import composeRotations dynamically would be complex, so we'll use a simplified
+    // identity basis for now and compute proper rotations when the math module is available
+    // Each basis vector is stored as 3 vec4f (12 floats) for up to 11D
+    const data = new Float32Array(48) // 192 bytes for 4 vectors × 12 floats
+
+    // Default identity basis vectors (will be properly rotated later)
+    // basisX: [1, 0, 0, 0, ...]
+    data[0] = 1.0
+    // basisY: [0, 1, 0, 0, ...]
+    data[12] = 1.0
+    // basisZ: [0, 0, 1, 0, ...]
+    data[24] = 1.0
+    // origin: [0, 0, 0, parameterValues...]
+    // Fill in parameter values for extra dimensions
+    const parameterValues = extended?.mandelbulb?.parameterValues ?? []
+    for (let i = 3; i < dimension && i < 11; i++) {
+      data[36 + i] = parameterValues[i - 3] ?? 0
+    }
+
+    this.writeUniformBuffer(this.device, this.basisUniformBuffer, data)
+  }
+
+  /**
+   * Update material uniforms from pbrStore and appearanceStore.
+   */
+  updateMaterialUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.materialUniformBuffer) return
+
+    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const appearance = ctx.frame?.stores?.['appearance'] as any
+
+    const data = new Float32Array(32) // 128 bytes
+
+    // Material properties
+    data[0] = pbr?.face?.roughness ?? 0.5
+    data[1] = pbr?.face?.metallic ?? 0.0
+    data[2] = pbr?.face?.specularIntensity ?? 1.0
+    data[3] = 1.0 // alpha
+
+    // Face color (parse hex to RGB)
+    const faceColor = this.parseColor(appearance?.faceColor ?? '#ffffff')
+    data[4] = faceColor[0]
+    data[5] = faceColor[1]
+    data[6] = faceColor[2]
+    data[7] = 1.0
+
+    // Edge color
+    const edgeColor = this.parseColor(appearance?.edgeColor ?? '#000000')
+    data[8] = edgeColor[0]
+    data[9] = edgeColor[1]
+    data[10] = edgeColor[2]
+    data[11] = 1.0
+
+    // SSS parameters
+    data[12] = appearance?.sssEnabled ? 1 : 0
+    data[13] = appearance?.sssIntensity ?? 0.5
+    data[14] = appearance?.sssThickness ?? 1.0
+    data[15] = 0.0 // padding
+
+    // Fresnel
+    data[16] = appearance?.fresnelEnabled ? 1 : 0
+    data[17] = appearance?.fresnelIntensity ?? 1.0
+
+    // Color algorithm
+    data[18] = appearance?.colorAlgorithm ?? 0
+
+    this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
+  }
+
+  /**
+   * Update lighting uniforms from lightingStore.
+   */
+  updateLightingUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.lightingUniformBuffer) return
+
+    const lighting = ctx.frame?.stores?.['lighting'] as any
+    if (!lighting) return
+
+    const data = new Float32Array(128) // 512 bytes
+
+    // Number of lights
+    const lights = lighting.lights ?? []
+    data[0] = Math.min(lights.length, 8)
+
+    // Ambient light
+    data[1] = lighting.ambientEnabled ? 1 : 0
+    data[2] = lighting.ambientIntensity ?? 0.3
+    data[3] = 0.0 // padding
+
+    // Ambient color
+    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
+    data[4] = ambientColor[0]
+    data[5] = ambientColor[1]
+    data[6] = ambientColor[2]
+    data[7] = 1.0
+
+    // Per-light data (8 lights max, 12 floats each starting at offset 8)
+    for (let i = 0; i < Math.min(lights.length, 8); i++) {
+      const light = lights[i]
+      const offset = 8 + i * 12
+
+      // Light type (0=point, 1=directional, 2=spot)
+      data[offset + 0] = light.type === 'directional' ? 1 : light.type === 'spot' ? 2 : 0
+      data[offset + 1] = light.enabled ? 1 : 0
+      data[offset + 2] = light.intensity ?? 1.0
+      data[offset + 3] = light.range ?? 100.0
+
+      // Position
+      data[offset + 4] = light.position?.[0] ?? 0
+      data[offset + 5] = light.position?.[1] ?? 5
+      data[offset + 6] = light.position?.[2] ?? 0
+      data[offset + 7] = 0.0
+
+      // Color
+      const lightColor = this.parseColor(light.color ?? '#ffffff')
+      data[offset + 8] = lightColor[0]
+      data[offset + 9] = lightColor[1]
+      data[offset + 10] = lightColor[2]
+      data[offset + 11] = 1.0
+    }
+
+    this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
+  }
+
+  /**
+   * Parse hex color string to RGB array [0-1].
+   */
+  private parseColor(hex: string): [number, number, number] {
+    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
+    const val = parseInt(hex.slice(1), 16)
+    if (isNaN(val)) return [1, 1, 1]
+    return [
+      ((val >> 16) & 0xff) / 255,
+      ((val >> 8) & 0xff) / 255,
+      (val & 0xff) / 255,
+    ]
+  }
+
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
@@ -550,8 +747,12 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms
+    // Update all uniforms from stores
     this.updateCameraUniforms(ctx)
+    this.updateMandelbulbUniforms(ctx)
+    this.updateBasisUniforms(ctx)
+    this.updateMaterialUniforms(ctx)
+    this.updateLightingUniforms(ctx)
 
     // Get render targets
     const colorView = ctx.getWriteTarget('hdr-color')

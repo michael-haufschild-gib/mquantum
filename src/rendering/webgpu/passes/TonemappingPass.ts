@@ -57,6 +57,30 @@ export class TonemappingPass extends WebGPUBasePass {
     this.gamma = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const lighting = ctx.frame?.stores?.['lighting'] as {
+      exposure?: number
+      gamma?: number
+    }
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      tonemappingMode?: number
+    }
+
+    if (lighting?.exposure !== undefined) {
+      this.exposure = lighting.exposure
+    }
+    if (lighting?.gamma !== undefined) {
+      this.gamma = lighting.gamma
+    }
+    if (postProcessing?.tonemappingMode !== undefined) {
+      this.mode = postProcessing.tonemappingMode
+    }
+  }
+
   setMode(value: TonemapMode): void {
     this.mode = value
   }
@@ -119,6 +143,9 @@ export class TonemappingPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Update uniforms
     const uniformData = new Float32Array([

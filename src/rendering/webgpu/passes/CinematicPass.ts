@@ -197,6 +197,32 @@ export class CinematicPass extends WebGPUBasePass {
     this.vignette = value
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      vignetteIntensity?: number
+      vignetteOffset?: number
+      chromaticAberration?: number
+      filmGrain?: number
+    }
+
+    if (postProcessing?.vignetteIntensity !== undefined) {
+      this.vignette = postProcessing.vignetteIntensity
+    }
+    if (postProcessing?.vignetteOffset !== undefined) {
+      this.vignetteOffset = postProcessing.vignetteOffset
+    }
+    if (postProcessing?.chromaticAberration !== undefined) {
+      this.aberration = postProcessing.chromaticAberration
+    }
+    if (postProcessing?.filmGrain !== undefined) {
+      this.grain = postProcessing.filmGrain
+    }
+  }
+
   /**
    * Set film grain intensity.
    */
@@ -217,6 +243,9 @@ export class CinematicPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input texture
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

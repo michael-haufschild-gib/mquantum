@@ -487,6 +487,64 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   }
 
   /**
+   * Update polytope uniforms from stores.
+   */
+  updatePolytopeFromStores(ctx: WebGPURenderContext): void {
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const appearance = ctx.frame?.stores?.['appearance'] as any
+    const transform = ctx.frame?.stores?.['transform'] as any
+
+    const polytope = extended?.polytope
+
+    // Parse colors
+    const faceColor = this.parseColor(appearance?.faceColor ?? '#b3b3e6')
+    const edgeColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
+
+    this.updatePolytopeUniforms({
+      baseColor: [faceColor[0], faceColor[1], faceColor[2]],
+      opacity: polytope?.opacity ?? 1.0,
+      edgeColor: [edgeColor[0], edgeColor[1], edgeColor[2]],
+      edgeWidth: polytope?.edgeWidth ?? 1.0,
+      roughness: pbr?.face?.roughness ?? 0.5,
+      metalness: pbr?.face?.metallic ?? 0.0,
+      ambientIntensity: 0.3,
+      emissiveIntensity: 0.0,
+    })
+  }
+
+  /**
+   * Update basis vectors from rotation and transform stores.
+   */
+  updateBasisUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.basisUniformBuffer) return
+
+    const transform = ctx.frame?.stores?.['transform'] as any
+    const dimension = this.rendererConfig.dimension ?? 4
+
+    const data = new Float32Array(48)
+
+    // Default identity basis with scale applied
+    const scale = transform?.uniformScale ?? 1.0
+    data[0] = scale // basisX[0]
+    data[12] = scale // basisY[1]
+    data[24] = scale // basisZ[2]
+
+    this.writeUniformBuffer(this.device, this.basisUniformBuffer, data)
+  }
+
+  private parseColor(hex: string): [number, number, number] {
+    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
+    const val = parseInt(hex.slice(1), 16)
+    if (isNaN(val)) return [1, 1, 1]
+    return [
+      ((val >> 16) & 0xff) / 255,
+      ((val >> 8) & 0xff) / 255,
+      (val & 0xff) / 255,
+    ]
+  }
+
+  /**
    * Update basis vectors for N-D projection.
    */
   updateBasisVectors(basisX: number[], basisY: number[], basisZ: number[], origin: number[]): void {
@@ -532,8 +590,10 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms
+    // Update all uniforms from stores
     this.updateCameraUniforms(ctx)
+    this.updatePolytopeFromStores(ctx)
+    this.updateBasisUniforms(ctx)
 
     // Get render targets
     const colorView = ctx.getWriteTarget('hdr-color')

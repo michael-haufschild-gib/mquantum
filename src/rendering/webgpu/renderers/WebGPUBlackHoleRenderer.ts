@@ -340,8 +340,9 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
   updateBlackHoleUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.blackHoleUniformBuffer) return
 
-    // Get black hole data from stores
-    const blackhole = ctx.frame?.stores?.['blackhole'] as any
+    // Get black hole data from extendedObjectStore
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const blackhole = extended?.blackhole
     const quality = ctx.frame?.stores?.['quality'] as any
 
     // Pack black hole uniforms (must match BlackHoleUniforms struct layout)
@@ -499,7 +500,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
   updateBasisVectors(ctx: WebGPURenderContext): void {
     if (!this.device || !this.basisUniformBuffer) return
 
-    const blackhole = ctx.frame?.stores?.['blackhole'] as any
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const blackhole = extended?.blackhole
     const dimension = blackhole?.dimension ?? this.rendererConfig.dimension ?? 4
 
     // Pack basis vectors: basisX, basisY, basisZ, origin (each MAX_DIMENSION floats)
@@ -550,6 +552,65 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.basisUniformBuffer, basisData)
   }
 
+  /**
+   * Update lighting uniforms from lightingStore.
+   */
+  updateLightingUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.lightingUniformBuffer) return
+
+    const lighting = ctx.frame?.stores?.['lighting'] as any
+    if (!lighting) return
+
+    const data = new Float32Array(128) // 512 bytes
+
+    const lights = lighting.lights ?? []
+    data[0] = Math.min(lights.length, 8)
+
+    data[1] = lighting.ambientEnabled ? 1 : 0
+    data[2] = lighting.ambientIntensity ?? 0.3
+    data[3] = 0.0
+
+    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
+    data[4] = ambientColor[0]
+    data[5] = ambientColor[1]
+    data[6] = ambientColor[2]
+    data[7] = 1.0
+
+    for (let i = 0; i < Math.min(lights.length, 8); i++) {
+      const light = lights[i]
+      const offset = 8 + i * 12
+
+      data[offset + 0] = light.type === 'directional' ? 1 : light.type === 'spot' ? 2 : 0
+      data[offset + 1] = light.enabled ? 1 : 0
+      data[offset + 2] = light.intensity ?? 1.0
+      data[offset + 3] = light.range ?? 100.0
+
+      data[offset + 4] = light.position?.[0] ?? 0
+      data[offset + 5] = light.position?.[1] ?? 5
+      data[offset + 6] = light.position?.[2] ?? 0
+      data[offset + 7] = 0.0
+
+      const lightColor = this.parseColor(light.color ?? '#ffffff')
+      data[offset + 8] = lightColor[0]
+      data[offset + 9] = lightColor[1]
+      data[offset + 10] = lightColor[2]
+      data[offset + 11] = 1.0
+    }
+
+    this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
+  }
+
+  private parseColor(hex: string): [number, number, number] {
+    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
+    const val = parseInt(hex.slice(1), 16)
+    if (isNaN(val)) return [1, 1, 1]
+    return [
+      ((val >> 16) & 0xff) / 255,
+      ((val >> 8) & 0xff) / 255,
+      (val & 0xff) / 255,
+    ]
+  }
+
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
@@ -563,10 +624,11 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms
+    // Update all uniforms from stores
     this.updateCameraUniforms(ctx)
     this.updateBlackHoleUniforms(ctx)
     this.updateBasisVectors(ctx)
+    this.updateLightingUniforms(ctx)
 
     // Get render target
     const colorView = ctx.getWriteTarget('hdr-color')
