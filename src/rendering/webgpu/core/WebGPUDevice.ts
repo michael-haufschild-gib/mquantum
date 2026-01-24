@@ -8,7 +8,10 @@
  * @module rendering/webgpu/core/WebGPUDevice
  */
 
-import type { WebGPUCapabilities, WebGPUInitResult } from './types'
+import type { WebGPUCapabilities, WebGPUInitResult, WebGPUInitSuccess } from './types'
+
+/** Internal type for raw init data (before wrapping with success flag) */
+type WebGPUInitData = Omit<WebGPUInitSuccess, 'success'>
 
 // =============================================================================
 // Feature Detection
@@ -71,10 +74,18 @@ export class WebGPUDevice {
 
     this.canvas = canvas
     this.initPromise = this.doInitialize(canvas)
+      .then((result) => ({
+        success: true as const,
+        ...result,
+      }))
+      .catch((error) => ({
+        success: false as const,
+        error: error instanceof Error ? error.message : String(error),
+      }))
     return this.initPromise
   }
 
-  private async doInitialize(canvas: HTMLCanvasElement): Promise<WebGPUInitResult> {
+  private async doInitialize(canvas: HTMLCanvasElement): Promise<WebGPUInitData> {
     if (!isWebGPUSupported()) {
       throw new Error('WebGPU is not supported in this browser')
     }
@@ -88,8 +99,8 @@ export class WebGPUDevice {
       throw new Error('Failed to get WebGPU adapter')
     }
 
-    // Query adapter capabilities
-    const adapterInfo = await adapter.requestAdapterInfo()
+    // Query adapter capabilities (use synchronous .info property - requestAdapterInfo() was removed)
+    const adapterInfo = adapter.info
     const adapterInfoString = `${adapterInfo.vendor} ${adapterInfo.architecture} ${adapterInfo.device}`
 
     // Check for timestamp query support

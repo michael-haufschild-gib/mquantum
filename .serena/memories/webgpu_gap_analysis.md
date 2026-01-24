@@ -1,129 +1,88 @@
-# WebGPU Gap Analysis vs WebGL
+# WebGPU Gap Analysis (2026-01-24)
 
-_Last updated: 2026-01-24_
-
-## Executive Summary
-
-| Category | WebGL | WebGPU | Gap Severity |
-|----------|-------|--------|--------------|
-| Object Renderers | 6/6 | 6/6 | ✅ None |
-| Post-Processing Passes | 32/32 active | 32 exist, ~10 active | 🟡 Medium |
-| Shader Features | 100% | ~95% | 🟢 Minor |
-| Store Connections | 14 stores | 5 stores (partial) | 🔴 Critical |
-| UI Option Coverage | ~100% | ~20% | 🔴 Critical |
+## Summary
+- **GLSL Shaders**: 168 files
+- **WGSL Shaders**: 131 files  
+- **Coverage**: ~78%
+- **Critical Gaps**: ~20 files, ~10 user-visible features
 
 ---
 
-## 1. STORE CONNECTION GAPS (Critical)
+## P0 - Visual Parity Blockers
 
-### Completely Missing (0% coverage)
+### BlackHole Renderer
+1. **doppler.wgsl** - Missing Tanner Helland blackbody algorithm, temperature profile, LUT support
+2. **disk-sdf.wgsl** - Missing `getAlgorithmColor()` and lighting mode support
+3. **shell.wgsl** - Missing `shellStepModifierWithMask()` and transmittance logic
+4. **Jets** - Different architecture (dedicated pass vs integrated shader)
+5. **God Rays** - Missing post-processing implementation
 
-| Store | Purpose | Impact |
-|-------|---------|--------|
-| **extendedObjectStore** | Fractal params (power, julia const, quantum modes, BH physics) | ALL object controls broken |
-| **rotationStore** | N-D rotation planes | No rotation works |
-| **transformStore** | Scale (uniform + per-axis) | No scaling works |
-| **pbrStore** | Roughness, metallic, specular (face/edge/ground) | Materials broken |
+### Schrödinger Renderer
+1. **sdf4d-11d.wgsl** - Missing 8 files for high-dimensional SDF
+2. **volume/absorption.wgsl** - Missing volumetric absorption
+3. **volume/integration.wgsl** - Missing volume integration
+4. **temporal/reconstruction.wgsl** - Missing temporal reconstruction
+5. **temporal/reprojection.wgsl** - Missing temporal reprojection
 
-### Partial Coverage (<30%)
-
-| Store | Fields Used | Fields Missing |
-|-------|-------------|----------------|
-| **lightingStore** | Getter only | All light uniforms, shadows, ambient, tone mapping |
-| **appearanceStore** | colorAlgorithm, cosineCoefficients | visibility, faceColor, edgeColor, fresnel, SSS |
-| **postProcessingStore** | bloomEnabled, bloomIntensity, aoEnabled, ssrEnabled | 20+ other fields |
-| **environmentStore** | skyboxEnabled, skyboxMode, groundEnabled | IBL, grid, walls, procedural settings |
-| **performanceStore** | renderResolutionScale, antialiasing | temporal, debug, quality multiplier |
+### TubeWireframe Renderer
+1. **main.wgsl** - Missing main fragment shader
 
 ---
 
-## 2. POST-PROCESSING PASS GAPS
+## P1 - Quality/Feature Differences
 
-### Not Integrated in WebGPU Pipeline
+### Post-Processing (8 files missing)
+- godRays.wgsl
+- gravitationalLensing.wgsl
+- jetVolumetric.wgsl
+- normalComposite.wgsl
+- screenSpaceLensing.wgsl
+- frameBlending.wgsl
+- cloudComposite.wgsl
+- Bokeh/DOF shader
 
-| Pass | File Exists | Integrated |
-|------|-------------|------------|
-| CinematicPass | ✅ | ❌ |
-| SMAAPass | ✅ | ❌ |
-| BokehPass | ✅ | ❌ |
-| RefractionPass | ✅ | ❌ |
-| GravitationalLensingPass | ✅ | ❌ |
-| ScreenSpaceLensingPass | ✅ | ❌ |
-| PaperTexturePass | ✅ | ❌ |
-| FrameBlendingPass | ✅ | ❌ |
+### Mandelbulb/Julia
+- power.wgsl variant shader
+- Phase shift implementation varies
 
-### Integrated but Parameters Not Read
-
-| Pass | Toggle Works | Parameters Read |
-|------|--------------|-----------------|
-| BloomPass | ✅ | ❌ threshold, radius, smoothing, levels |
-| GTAOPass | ✅ | ❌ intensity, quality, radius |
-| SSRPass | ✅ | ❌ intensity, distance, thickness, fade, quality |
+### Feature Simplifications
+- Temporal shader signature changed (explicit vs implicit uniforms)
+- Constants removed HQ/LQ preprocessor macros
 
 ---
 
-## 3. SHADER FEATURE GAPS
+## P2 - Nice-to-have
 
-### Per-Object Uniform Count
-
-| Object | WebGL | WebGPU | Missing |
-|--------|-------|--------|---------|
-| Mandelbulb | 30+ | 15+ | ~15 |
-| Julia | 30+ | 15+ | ~15 |
-| Schrödinger | 40+ | 20+ | ~20 |
-| Black Hole | 80+ | 25+ | ~55 (incl. 28 optimizations) |
-
-### Color Algorithms
-
-| ID | Algorithm | WebGL | WebGPU |
-|----|-----------|-------|--------|
-| 0-10 | Core algorithms | ✅ | ✅ |
-| 11 | Accretion gradient | ✅ | ⚠️ Simplified |
-| 12 | Gravitational redshift | ✅ | ⚠️ Simplified |
-| 13 | Dimension-based | ✅ | ✅ |
-
-### Black Hole Optimizations (WebGL only)
-
-28 named optimizations (OPT-BH-1 through OPT-BH-28) not ported to WebGPU.
+- Polytope simple transform (optimization)
+- Paper texture effect
+- Cinematic effects shader
+- GTAO bilateral upsample
+- Buffer preview shader
 
 ---
 
-## 4. UI SECTIONS AFFECTED
+## Store Parameter Consumption
 
-### Completely Non-Functional
-
-- Extended Object Settings (all fractal/quantum/physics params)
-- Rotation Controls (all N-D planes)
-- Transform Controls (scale)
-- PBR Materials (face/edge/ground)
-
-### Toggle-Only (no parameter control)
-
-- Bloom, GTAO, SSR
-- Skybox, Ground
-
-### Not Available
-
-- Bokeh/DOF, Cinematic, Paper texture
-- Refraction, Gravitational lensing
-- Frame blending, SMAA
+| Renderer | WebGL Params | WebGPU Consumed | Gap |
+|----------|--------------|-----------------|-----|
+| BlackHole | 80+ | ~70 (partial) | Doppler/Jets |
+| Mandelbulb | 67 | 80+ | Covered |
+| Julia | 69 | 85+ | Covered |
+| Schrödinger | 90+ | ~50 | High-D missing |
+| Polytope | 40+ | 40+ | Covered |
+| TubeWireframe | 45+ | 60+ | Main missing |
 
 ---
 
-## 5. ROOT CAUSE
+## Action Items for 100% Parity
 
-WebGL pattern (works):
-```typescript
-// In useFrame (per-frame)
-const state = useExtendedObjectStore.getState()
-shader.uniforms.uPower.value = state.mandelbulb.power
-```
-
-WebGPU pattern (broken):
-```typescript
-// Getter registered but NEVER called
-graph.setStoreGetter('extended', () => useExtendedObjectStore.getState())
-// execute() doesn't call graph.getStoreGetter('extended')()
-```
-
-Fix: Each renderer's `execute()` must call store getters and bind values to uniform buffers.
+1. Port BlackHole Doppler with full Tanner Helland algorithm
+2. Port BlackHole disk-sdf with color algorithm selector
+3. Port BlackHole shell with transmittance logic
+4. Implement Jets rendering in WebGPU
+5. Implement God Rays post-processing
+6. Port Schrödinger SDF 4D-11D (8 files)
+7. Port Schrödinger volume absorption/integration
+8. Port Schrödinger temporal reprojection
+9. Port TubeWireframe main shader
+10. Port missing post-processing shaders (7 files)

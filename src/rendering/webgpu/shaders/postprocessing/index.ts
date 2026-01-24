@@ -26,3 +26,41 @@ export {
   smaaNeighborhoodBlendingShader,
   smaaShaders,
 } from './smaa.wgsl'
+
+// Jet volumetric effects
+export {
+  jetVolumetricUniformsBlock,
+  jetNoiseBlock,
+  jetVolumetricVertexShader,
+  jetVolumetricFragmentShader,
+  jetCompositeVertexShader,
+  jetCompositeFragmentShader,
+} from './jet-volumetric.wgsl'
+
+// Normal compositing
+export {
+  normalCompositeUniformsBlock,
+  normalCompositeVertexShader,
+  normalCompositeFragmentShader,
+} from './normal-composite.wgsl'
+
+// Screen-space lensing
+export {
+  screenSpaceLensingUniformsBlock,
+  screenSpaceLensingVertexShader,
+  screenSpaceLensingFragmentShader,
+} from './screen-space-lensing.wgsl'
+
+// Frame blending
+export {
+  frameBlendingUniformsBlock,
+  frameBlendingVertexShader,
+  frameBlendingFragmentShader,
+} from './frame-blending.wgsl'
+
+// Cloud compositing
+export {
+  cloudCompositeUniformsBlock,
+  cloudCompositeVertexShader,
+  cloudCompositeFragmentShader,
+} from './cloud-composite.wgsl'

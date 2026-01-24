@@ -9,6 +9,11 @@
 
 import { tubeWireframeUniformsBlock } from './uniforms.wgsl'
 import { tubeVertexBlock } from './vertex.wgsl'
+import { tubeMainBlock } from './main.wgsl'
+import { constantsBlock } from '../shared/core/constants.wgsl'
+import { uniformsBlock } from '../shared/core/uniforms.wgsl'
+import { ggxBlock } from '../shared/lighting/ggx.wgsl'
+import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
 
 /**
  * Configuration for tube wireframe shader compilation.
@@ -155,10 +160,29 @@ export function composeTubeWireframeFragmentShader(_config?: TubeWireframeWGSLSh
   features: string[]
 } {
   const wgsl = /* wgsl */ `
-// Tube Wireframe Fragment Shader
+// Tube Wireframe Fragment Shader - Full PBR
 
+// Shared constants
+${constantsBlock}
+
+// Shared uniform structures
+${uniformsBlock}
+
+// Tube wireframe uniforms
 ${tubeWireframeUniformsBlock}
 
+// PBR BRDF functions
+${ggxBlock}
+
+// Multi-light system
+${multiLightBlock}
+
+// Main shader logic
+${tubeMainBlock}
+
+// Bind group declarations
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(1) @binding(0) var<uniform> lighting: LightingUniforms;
 @group(4) @binding(0) var<uniform> tube: TubeWireframeUniforms;
 
 struct FragmentInput {
@@ -167,38 +191,44 @@ struct FragmentInput {
   @location(2) viewDir: vec3f,
 }
 
+struct FragmentOutput {
+  @location(0) color: vec4f,
+  @location(1) normal: vec4f,
+  @location(2) position: vec4f,
+}
+
 @fragment
-fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
+fn fragmentMain(input: FragmentInput) -> FragmentOutput {
   let N = normalize(input.normal);
   let V = normalize(input.viewDir);
 
-  // Simple lighting
-  let lightDir = normalize(vec3f(1.0, 1.0, 1.0));
-  let NdotL = max(dot(N, lightDir), 0.0);
+  // Compute full PBR lighting
+  let color = computeTubeLighting(N, V, input.worldPosition, tube, lighting);
 
-  // Base color from uniforms
-  let baseColor = tube.baseColor;
+  var output: FragmentOutput;
 
-  // Diffuse
-  let diffuse = baseColor * NdotL;
+  // Output to MRT (Multiple Render Targets)
+  // color: Color buffer (RGBA)
+  // normal: Normal buffer (RGB = normal * 0.5 + 0.5, A = reflectivity/metallic)
+  // position: World position for temporal reprojection
+  output.color = vec4f(color, tube.opacity);
+  output.normal = vec4f(N * 0.5 + 0.5, tube.metalness);
+  output.position = vec4f(input.worldPosition, 1.0);
 
-  // Ambient
-  let ambient = baseColor * tube.ambientIntensity;
-
-  // Specular (simplified PBR)
-  let H = normalize(lightDir + V);
-  let NdotH = max(dot(N, H), 0.0);
-  let specular = pow(NdotH, (1.0 - tube.roughness) * 64.0) * 0.5;
-
-  let finalColor = ambient + diffuse + vec3f(specular);
-
-  return vec4f(finalColor, tube.opacity);
+  return output;
 }
 `
 
   return {
     wgsl,
-    modules: ['Tube Wireframe Fragment'],
-    features: ['Tube Wireframe', 'PBR Lighting'],
+    modules: [
+      'Constants',
+      'Shared Uniforms',
+      'Tube Wireframe Uniforms',
+      'GGX PBR',
+      'Multi-Light System',
+      'Tube Main',
+    ],
+    features: ['Tube Wireframe', 'Full PBR Lighting', 'MRT Output'],
   }
 }

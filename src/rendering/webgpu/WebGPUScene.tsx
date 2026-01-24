@@ -226,7 +226,16 @@ interface PassConfig {
  * 10. ToScreenPass - Copy to canvas
  */
 function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
-  // Define resources (using names expected by renderers)
+  // Define resources
+
+  // Initial scene render (before post-processing)
+  graph.addResource('scene-render', {
+    type: 'texture',
+    format: 'rgba16float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  // Final HDR buffer (TonemappingPass reads from this)
   graph.addResource('hdr-color', {
     type: 'texture',
     format: 'rgba16float',
@@ -245,13 +254,23 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   })
 
-  graph.addResource('compositeBuffer', {
+
+  // BloomPass expects this output name
+  graph.addResource('bloom-output', {
     type: 'texture',
     format: 'rgba16float',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   })
 
-  graph.addResource('ldrBuffer', {
+  // TonemappingPass expects this output name
+  graph.addResource('ldr-color', {
+    type: 'texture',
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  // FXAAPass expects this output name
+  graph.addResource('final-color', {
     type: 'texture',
     format: 'rgba8unorm',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -265,12 +284,12 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
     graph.addPass(objectRenderer)
   }
 
-  // 2. Scene pass (environment)
+  // 2. Scene pass (environment) - outputs to scene-render buffer
   graph.addPass(
     new ScenePass({
-      id: 'scene',
-      inputs: ['depth-buffer'],
-      outputs: ['hdr-color'],
+      outputResource: 'scene-render',
+      depthResource: 'depth-buffer',
+      mode: 'clear',
     })
   )
 
@@ -284,9 +303,9 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
 
     graph.addPass(
       new GTAOPass({
-        id: 'gtao',
-        inputs: ['normal-buffer', 'depth-buffer'],
-        outputs: ['aoBuffer'],
+        depthInput: 'depth-buffer',
+        normalInput: 'normal-buffer',
+        outputResource: 'aoBuffer',
       })
     )
   }
@@ -301,62 +320,46 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
 
     graph.addPass(
       new SSRPass({
-        id: 'ssr',
-        inputs: ['hdr-color', 'normal-buffer', 'depth-buffer'],
-        outputs: ['ssrBuffer'],
+        colorInput: 'hdr-color',
+        depthInput: 'depth-buffer',
+        normalInput: 'normal-buffer',
+        outputResource: 'ssrBuffer',
       })
     )
   }
 
-  // 5. Environment composite
+  // 5. Environment composite - reads scene-render, outputs to hdr-color
   graph.addPass(
     new EnvironmentCompositePass({
-      id: 'envComposite',
-      inputs: [
-        'hdr-color',
-        'normal-buffer',
-        ...(config.ssaoEnabled ? ['aoBuffer'] : []),
-        ...(config.ssrEnabled ? ['ssrBuffer'] : []),
-      ],
-      outputs: ['compositeBuffer'],
+      lensedEnvironmentInput: 'scene-render',
+      mainObjectInput: 'scene-render',
+      mainObjectDepthInput: 'depth-buffer',
+      outputResource: 'hdr-color',  // Output to hdr-color for BloomPass/TonemappingPass
     })
   )
 
   // 6. Bloom (optional)
+  // Note: BloomPass uses hardcoded resource names: input='hdr-color', output='bloom-output'
   if (config.bloomEnabled) {
-    graph.addResource('bloomBuffer', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
     graph.addPass(
       new BloomPass({
-        id: 'bloom',
-        inputs: ['compositeBuffer'],
-        outputs: ['bloomBuffer'],
+        threshold: 1.0,
+        intensity: 0.5,
       })
     )
   }
 
-  // 7. Composite
-  graph.addPass(
-    new CompositePass({
-      id: 'composite',
-      inputs: [
-        'compositeBuffer',
-        ...(config.bloomEnabled ? ['bloomBuffer'] : []),
-      ],
-      outputs: ['compositeBuffer'],
-    })
-  )
+  // 7. Composite - combines env composite with bloom
+  // Note: We skip CompositePass for now since TonemappingPass is hardcoded to read 'hdr-color'
+  // and we can't output to 'hdr-color' without creating a cycle.
+  // TODO: Refactor TonemappingPass to accept configurable input resource
+  // For now, the pipeline is: scene → env composite → tonemap (bloom is disabled)
 
   // 8. Tonemapping
   graph.addPass(
     new TonemappingPass({
-      id: 'tonemap',
-      inputs: ['compositeBuffer'],
-      outputs: ['ldrBuffer'],
+      // Note: TonemappingPass hardcodes input='hdr-color', output='ldr-color'
+      exposure: 1.0,
     })
   )
 
@@ -364,9 +367,8 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
   if (config.antiAliasingMethod === 'fxaa') {
     graph.addPass(
       new FXAAPass({
-        id: 'fxaa',
-        inputs: ['ldrBuffer'],
-        outputs: ['ldrBuffer'],
+        // Note: FXAAPass hardcodes input='ldr-color', output='final-color'
+        subpixelQuality: 0.75,
       })
     )
   }
@@ -374,8 +376,9 @@ function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): void {
   // 10. Copy to screen
   graph.addPass(
     new ToScreenPass({
-      id: 'toScreen',
-      inputs: ['ldrBuffer'],
+      // Takes final output to canvas
+      // If FXAA enabled, input is 'final-color', otherwise 'ldr-color'
+      inputResource: config.antiAliasingMethod === 'fxaa' ? 'final-color' : 'ldr-color',
     })
   )
 }

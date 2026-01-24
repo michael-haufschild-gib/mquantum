@@ -7,6 +7,7 @@
  */
 
 export { mandelbulbUniformsBlock } from './uniforms.wgsl'
+export { powerBlock } from './power.wgsl'
 export { sdf3dBlock } from './sdf3d.wgsl'
 export { sdf4dBlock } from './sdf4d.wgsl'
 export { mainBlock, mainBlockWithIBL } from './main.wgsl'

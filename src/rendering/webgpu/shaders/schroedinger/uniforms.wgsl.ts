@@ -127,5 +127,87 @@ struct SchroedingerUniforms {
 
   // Sample count (LOD)
   sampleCount: i32,              // Sample count for loop control
+
+  // Phase shift for isosurface SDF (Mandelbulb-style fractals)
+  phaseEnabled: u32,             // Enable phase shift
+  phaseTheta: f32,               // Phase offset for theta angle
+  phasePhi: f32,                 // Phase offset for phi angle
+  _pad3: f32,                    // Alignment padding
+}
+
+// ============================================
+// N-Dimensional Basis Vectors
+// ============================================
+
+struct BasisVectors {
+  // Each basis vector has up to 11 components (padded to 12)
+  // Stored as 3 vec4f each
+  basisX: array<vec4f, 3>,
+  basisY: array<vec4f, 3>,
+  basisZ: array<vec4f, 3>,
+  origin: array<vec4f, 3>,
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+/**
+ * Get component i from a basis vector array.
+ */
+fn getBasisComponent(basis: array<vec4f, 3>, i: i32) -> f32 {
+  let vecIdx = i / 4;
+  let compIdx = i % 4;
+
+  if (vecIdx == 0) {
+    return basis[0][compIdx];
+  } else if (vecIdx == 1) {
+    return basis[1][compIdx];
+  } else {
+    return basis[2][compIdx];
+  }
+}
+
+/**
+ * Transform a 3D point to D-dimensional space using basis vectors.
+ */
+fn transformToND(
+  p: vec3f,
+  basisX: array<vec4f, 3>,
+  basisY: array<vec4f, 3>,
+  basisZ: array<vec4f, 3>,
+  origin: array<vec4f, 3>,
+  dimension: i32
+) -> array<f32, 11> {
+  var result: array<f32, 11>;
+
+  for (var i = 0; i < dimension && i < 11; i++) {
+    let bx = getBasisComponent(basisX, i);
+    let by = getBasisComponent(basisY, i);
+    let bz = getBasisComponent(basisZ, i);
+    let o = getBasisComponent(origin, i);
+
+    result[i] = p.x * bx + p.y * by + p.z * bz + o;
+  }
+
+  return result;
+}
+
+/**
+ * Compute squared length of an N-dimensional point.
+ */
+fn lengthSquaredND(p: array<f32, 11>, dimension: i32) -> f32 {
+  var sum: f32 = 0.0;
+  for (var i = 0; i < dimension && i < 11; i++) {
+    sum += p[i] * p[i];
+  }
+  return sum;
+}
+
+/**
+ * Compute length of an N-dimensional point.
+ */
+fn lengthND(p: array<f32, 11>, dimension: i32) -> f32 {
+  return sqrt(lengthSquaredND(p, dimension));
 }
 `

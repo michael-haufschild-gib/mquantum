@@ -29,6 +29,117 @@ const ALGO_BLACKBODY: i32 = 10;
 const ALGO_ACCRETION_GRADIENT: i32 = 11;
 const ALGO_GRAVITATIONAL_REDSHIFT: i32 = 12;
 
+// ============================================
+// COSINE PALETTE HELPERS
+// ============================================
+
+/**
+ * Apply distribution function to input parameter.
+ * Transforms linear input using power curve, cycles, and offset.
+ *
+ * @param t - Input value [0, 1]
+ * @param power - Power curve exponent (1.0 = linear)
+ * @param cycles - Number of color cycles
+ * @param offset - Phase offset
+ * @return Transformed value [0, 1]
+ */
+fn applyDistribution(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
+  let clamped = clamp(t, 0.0, 1.0);
+
+  // Apply power curve
+  var curved: f32;
+  if (abs(power - 1.0) < 0.001) {
+    curved = clamped;
+  } else if (abs(power - 2.0) < 0.001) {
+    curved = clamped * clamped;
+  } else if (abs(power - 0.5) < 0.001) {
+    curved = sqrt(clamped);
+  } else {
+    let safePower = max(power, 0.001);
+    let safeBase = max(clamped, 0.0001);
+    curved = pow(safeBase, safePower);
+  }
+
+  // Apply cycles and offset, wrap to [0, 1]
+  let cycled = fract(curved * cycles + offset);
+
+  return cycled;
+}
+
+/**
+ * Base cosine palette function.
+ * Formula: color = a + b * cos(2π * (c * t + d))
+ *
+ * @param t - Input parameter
+ * @param a, b, c, d - Palette coefficients
+ * @return RGB color
+ */
+fn cosinePalette(t: f32, a: vec3f, b: vec3f, c: vec3f, d: vec3f) -> vec3f {
+  return a + b * cos(TAU * (c * t + d));
+}
+
+/**
+ * Get cosine palette color with full distribution controls.
+ *
+ * @param t - Input value (typically face depth or iteration)
+ * @param a, b, c, d - Cosine palette coefficients
+ * @param power, cycles, offset - Distribution parameters
+ * @return RGB color in [0, 1] range
+ */
+fn getCosinePaletteColor(
+  t: f32,
+  a: vec3f, b: vec3f, c: vec3f, d: vec3f,
+  power: f32, cycles: f32, offset: f32
+) -> vec3f {
+  let distributedT = applyDistribution(t, power, cycles, offset);
+  return cosinePalette(distributedT, a, b, c, d);
+}
+
+// ============================================
+// OKLAB / LCH COLOR SPACE
+// ============================================
+
+/**
+ * Convert Oklab to linear sRGB.
+ * Based on Bjorn Ottosson's Oklab color space.
+ */
+fn oklabToLinearSrgb(lab: vec3f) -> vec3f {
+  let l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
+  let m_ = lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z;
+  let s_ = lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z;
+
+  let l = l_ * l_ * l_;
+  let m = m_ * m_ * m_;
+  let s = s_ * s_ * s_;
+
+  return vec3f(
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s
+  );
+}
+
+/**
+ * Generate color from LCH (Lightness, Chroma, Hue) in Oklab space.
+ * Provides perceptually uniform hue transitions.
+ *
+ * @param t - Input value mapped to hue [0, 1] -> [0, 2pi]
+ * @param lightness - Oklab L value (typically 0.5-0.8)
+ * @param chroma - Color saturation (typically 0.1-0.2)
+ * @return RGB color in [0, 1] range
+ */
+fn lchColor(t: f32, lightness: f32, chroma: f32) -> vec3f {
+  let hue = t * TAU; // Map to radians
+  let oklab = vec3f(lightness, chroma * cos(hue), chroma * sin(hue));
+  let rgb = oklabToLinearSrgb(oklab);
+  // Clamp to valid RGB range
+  return clamp(rgb, vec3f(0.0), vec3f(1.0));
+}
+
+// ============================================
+// MAIN COLOR DISPATCHER
+// ============================================
+
 /**
  * Get color from the selected algorithm.
  *
@@ -65,8 +176,8 @@ fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f, uniforms: BlackHoleUnifo
     // Hue shift in RGB using rotation around gray axis
     // Shift amount based on t: center (t=0.5) = no shift
     let hueShift = (t - 0.5) * 0.5; // ±0.25 radians (~±15 degrees)
-    let c = cos(hueShift * 6.283);
-    let s = sin(hueShift * 6.283);
+    let c = cos(hueShift * TAU);
+    let s = sin(hueShift * TAU);
     // RGB rotation matrix (rotate around (1,1,1) axis)
     let hueRotation = mat3x3f(
       0.7071 + 0.2929 * c,  0.2929 * (1.0 - c) - 0.4082 * s,  0.2929 * (1.0 - c) + 0.4082 * s,
@@ -135,7 +246,8 @@ fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f, uniforms: BlackHoleUnifo
   // 9. Gravitational Redshift
   else if (uniforms.colorAlgorithm == ALGO_GRAVITATIONAL_REDSHIFT) {
     let r = length(pos.xz);
-    let redshift = gravitationalRedshift(r, uniforms);
+    // gravitationalRedshift is defined in doppler.wgsl
+    let redshift = gravitationalRedshift(r);
     return mix(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 0.0, 1.0), redshift);
   }
 

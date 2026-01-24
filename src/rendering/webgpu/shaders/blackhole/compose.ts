@@ -24,6 +24,7 @@ import { blackHoleUniformsBlock } from './uniforms.wgsl'
 import { lensingBlock } from './lensing.wgsl'
 import { horizonBlock } from './horizon.wgsl'
 import { shellBlock } from './shell.wgsl'
+import { colorsBlock } from './colors.wgsl'
 import { diskSdfBlock } from './disk-sdf.wgsl'
 import { dopplerBlock } from './doppler.wgsl'
 import { mainBlock, mainBlockWithEnvMap } from './main.wgsl'
@@ -126,6 +127,7 @@ struct VertexOutput {
     { name: 'Horizon', content: horizonBlock },
     { name: 'Photon Shell', content: shellBlock },
     { name: 'Doppler', content: dopplerBlock },
+    { name: 'Colors', content: colorsBlock },
     { name: 'Disk SDF', content: diskSdfBlock },
 
     // Main shader

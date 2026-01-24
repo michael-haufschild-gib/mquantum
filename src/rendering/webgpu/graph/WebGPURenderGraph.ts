@@ -465,21 +465,15 @@ export class WebGPURenderGraph {
         continue
       }
 
-      // Write timestamp (start)
-      if (this.gpuTimingEnabled && this.timestampQuerySet) {
-        encoder.writeTimestamp(this.timestampQuerySet, timestampIndex * 2)
-      }
+      // NOTE: encoder.writeTimestamp() was removed from WebGPU spec (doesn't work on Apple Silicon).
+      // Proper timestamp queries require using timestampWrites in beginRenderPass/beginComputePass.
+      // For now, timing is disabled until passes are refactored to use timestampWrites.
 
       // Execute pass
       try {
         pass.execute(ctx)
       } catch (e) {
         console.error(`Error executing pass '${passId}':`, e)
-      }
-
-      // Write timestamp (end)
-      if (this.gpuTimingEnabled && this.timestampQuerySet) {
-        encoder.writeTimestamp(this.timestampQuerySet, timestampIndex * 2 + 1)
       }
 
       timestampIndex++

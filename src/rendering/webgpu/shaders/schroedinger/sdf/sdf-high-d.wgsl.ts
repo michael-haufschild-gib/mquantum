@@ -1,7 +1,7 @@
 /**
  * WGSL High-dimensional (9D-11D) Mandelbulb-style SDF
  *
- * Uses array-based approach with rotated basis for dimensions 9-11.
+ * Uses array-based approach with BasisVectors for dimensions 9-11.
  *
  * Port of GLSL schroedinger/sdf/sdf-high-d.glsl to WGSL.
  *
@@ -9,29 +9,58 @@
  */
 
 export const sdfHighDBlock = /* wgsl */ `
-// High-dimensional SDF (9D-11D) with array-based approach
-fn sdfHighD(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms: SchroedingerUniforms) -> vec2f {
+// ============================================
+// High-dimensional SDF (9D-11D)
+// ============================================
+
+const MAX_ITER_HIGHD: i32 = 256;
+const EPS_HIGHD: f32 = 1e-6;
+
+/**
+ * High-dimensional SDF (9D-11D) with array-based approach.
+ *
+ * @param pos 3D world position
+ * @param D Dimension (9-11)
+ * @param pwr Power for iteration
+ * @param bail Bailout radius
+ * @param maxIt Maximum iterations
+ * @param basis N-D basis vectors
+ * @param uniforms Schrödinger uniforms
+ * @return vec2f where x = signed distance, y = trap value
+ */
+fn sdfHighD(
+  pos: vec3f,
+  D: i32,
+  pwr: f32,
+  bail: f32,
+  maxIt: i32,
+  basis: BasisVectors,
+  uniforms: SchroedingerUniforms
+) -> vec2f {
   var c: array<f32, 11>;
   var z: array<f32, 11>;
 
-  // Initialize z and c at sample point
+  // Initialize z and c at sample point using basis vectors
   for (var j = 0; j < 11; j++) {
-    c[j] = uniforms.origin[j] + pos.x*uniforms.basisX[j] + pos.y*uniforms.basisY[j] + pos.z*uniforms.basisZ[j];
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
   // Phase shifts for angular twisting
-  let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled);
-  let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled);
+  let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
+  let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
 
-  var dr = 1.0;
-  var r = 0.0;
-  var minP = 1000.0;
-  var minA = 1000.0;
-  var minS = 1000.0;
-  var escIt = 0;
+  var dr: f32 = 1.0;
+  var r: f32 = 0.0;
+  var minP: f32 = 1000.0;
+  var minA: f32 = 1000.0;
+  var minS: f32 = 1000.0;
+  var escIt: i32 = 0;
 
-  for (var i = 0; i < 256; i++) {
+  for (var i = 0; i < MAX_ITER_HIGHD; i++) {
     if (i >= maxIt) { break; }
 
     // Compute r - unrolled for speed
@@ -45,7 +74,7 @@ fn sdfHighD(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms: Schro
     minA = min(minA, sqrt(z[0]*z[0] + z[1]*z[1]));
     minS = min(minS, abs(r - 0.8));
 
-    dr = pow(max(r, EPS), pwr - 1.0) * pwr * dr + 1.0;
+    dr = pow(max(r, EPS_HIGHD), pwr - 1.0) * pwr * dr + 1.0;
 
     // Compute angles
     var t: array<f32, 10>;
@@ -53,14 +82,14 @@ fn sdfHighD(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms: Schro
 
     for (var k = 0; k < 10; k++) {
       if (k >= D - 2) { break; }
-      let tail = sqrt(max(tail2, EPS));
-      t[k] = acos(clamp(z[k] / max(tail, EPS), -1.0, 1.0));
+      let tail = sqrt(max(tail2, EPS_HIGHD));
+      t[k] = acos(clamp(z[k] / max(tail, EPS_HIGHD), -1.0, 1.0));
       tail2 -= z[k] * z[k];
     }
     t[D - 2] = atan2(z[D - 1], z[D - 2]);
 
     // Power map and reconstruct with phase shifts
-    let rp = pow(max(r, EPS), pwr);
+    let rp = pow(max(r, EPS_HIGHD), pwr);
     let s0 = sin((t[0] + phaseT) * pwr);
     let c0 = cos((t[0] + phaseT) * pwr);
     let s1 = sin((t[1] + phaseP) * pwr);
@@ -88,26 +117,40 @@ fn sdfHighD(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms: Schro
 
   let trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 +
              exp(-minS * 8.0) * 0.2 + f32(escIt) / f32(max(maxIt, 1)) * 0.3;
-  let dist = max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
+  let dist = max(0.5 * log(max(r, EPS_HIGHD)) * r / max(dr, EPS_HIGHD), EPS_HIGHD);
   return vec2f(dist, trap);
 }
 
-fn sdfHighD_simple(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms: SchroedingerUniforms) -> f32 {
+/**
+ * High-dimensional SDF - simple version without trap.
+ */
+fn sdfHighD_simple(
+  pos: vec3f,
+  D: i32,
+  pwr: f32,
+  bail: f32,
+  maxIt: i32,
+  basis: BasisVectors,
+  uniforms: SchroedingerUniforms
+) -> f32 {
   var c: array<f32, 11>;
   var z: array<f32, 11>;
 
   for (var j = 0; j < 11; j++) {
-    c[j] = uniforms.origin[j] + pos.x*uniforms.basisX[j] + pos.y*uniforms.basisY[j] + pos.z*uniforms.basisZ[j];
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
-  let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled);
-  let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled);
+  let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
+  let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
 
-  var dr = 1.0;
-  var r = 0.0;
+  var dr: f32 = 1.0;
+  var r: f32 = 0.0;
 
-  for (var i = 0; i < 256; i++) {
+  for (var i = 0; i < MAX_ITER_HIGHD; i++) {
     if (i >= maxIt) { break; }
 
     r = z[0]*z[0] + z[1]*z[1] + z[2]*z[2] + z[3]*z[3] + z[4]*z[4];
@@ -116,19 +159,19 @@ fn sdfHighD_simple(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms
 
     if (r > bail) { break; }
 
-    dr = pow(max(r, EPS), pwr - 1.0) * pwr * dr + 1.0;
+    dr = pow(max(r, EPS_HIGHD), pwr - 1.0) * pwr * dr + 1.0;
 
     var t: array<f32, 10>;
     var tail2 = r * r;
     for (var k = 0; k < 10; k++) {
       if (k >= D - 2) { break; }
-      let tail = sqrt(max(tail2, EPS));
-      t[k] = acos(clamp(z[k] / max(tail, EPS), -1.0, 1.0));
+      let tail = sqrt(max(tail2, EPS_HIGHD));
+      t[k] = acos(clamp(z[k] / max(tail, EPS_HIGHD), -1.0, 1.0));
       tail2 -= z[k] * z[k];
     }
     t[D - 2] = atan2(z[D - 1], z[D - 2]);
 
-    let rp = pow(max(r, EPS), pwr);
+    let rp = pow(max(r, EPS_HIGHD), pwr);
     let s0 = sin((t[0] + phaseT) * pwr);
     let c0 = cos((t[0] + phaseT) * pwr);
     let s1 = sin((t[1] + phaseP) * pwr);
@@ -152,6 +195,6 @@ fn sdfHighD_simple(pos: vec3f, D: i32, pwr: f32, bail: f32, maxIt: i32, uniforms
     for (var k = D; k < 11; k++) { z[k] = 0.0; }
   }
 
-  return max(0.5 * log(max(r, EPS)) * r / max(dr, EPS), EPS);
+  return max(0.5 * log(max(r, EPS_HIGHD)) * r / max(dr, EPS_HIGHD), EPS_HIGHD);
 }
 `

@@ -7,7 +7,6 @@
  * @module rendering/webgpu/shaders/schroedinger/volume
  */
 
+export { absorptionBlock } from './absorption.wgsl'
 export { emissionBlock } from './emission.wgsl'
-
-// Note: absorption.wgsl and integration.wgsl follow similar patterns
-// and can be ported as needed for full volumetric rendering support.
+export { volumeIntegrationBlock } from './integration.wgsl'

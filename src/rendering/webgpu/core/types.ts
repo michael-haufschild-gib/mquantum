@@ -39,15 +39,29 @@ export interface WebGPUCapabilities {
 }
 
 /**
- * WebGPU initialization result.
+ * WebGPU initialization success result.
  */
-export interface WebGPUInitResult {
+export interface WebGPUInitSuccess {
+  success: true
   adapter: GPUAdapter
   device: GPUDevice
   context: GPUCanvasContext
   format: GPUTextureFormat
   capabilities: WebGPUCapabilities
 }
+
+/**
+ * WebGPU initialization failure result.
+ */
+export interface WebGPUInitFailure {
+  success: false
+  error: string
+}
+
+/**
+ * WebGPU initialization result (discriminated union).
+ */
+export type WebGPUInitResult = WebGPUInitSuccess | WebGPUInitFailure
 
 // =============================================================================
 // Resource Types

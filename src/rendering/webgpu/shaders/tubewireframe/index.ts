@@ -8,5 +8,6 @@
 
 export { tubeWireframeUniformsBlock } from './uniforms.wgsl'
 export { tubeVertexBlock } from './vertex.wgsl'
+export { tubeMainBlock } from './main.wgsl'
 export { composeTubeWireframeVertexShader, composeTubeWireframeFragmentShader } from './compose'
 export type { TubeWireframeWGSLShaderConfig } from './compose'

@@ -8,7 +8,11 @@
  */
 
 export { temporalCloudUniformsBlock } from './uniforms.wgsl'
-
-// Note: reprojection.wgsl and reconstruction.wgsl are full shader programs
-// that would be ported as complete vertex/fragment or compute shader pairs.
-// They require additional pipeline setup beyond shader blocks.
+export {
+  reconstructionVertexShader,
+  reconstructionFragmentShader,
+} from './reconstruction.wgsl'
+export {
+  reprojectionVertexShader,
+  reprojectionFragmentShader,
+} from './reprojection.wgsl'

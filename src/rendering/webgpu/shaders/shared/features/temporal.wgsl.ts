@@ -13,6 +13,95 @@ export const temporalBlock = /* wgsl */ `
 // Temporal Reprojection
 // ============================================
 
+// Note: For raymarching temporal skip optimization, use getTemporalDepth()
+// which requires:
+// - prevPositionTexture: texture_2d<f32> bound to previous frame's position buffer
+// - prevPositionSampler: sampler for the texture
+// - temporalEnabled: bool uniform
+// - temporalSafetyMargin: f32 uniform (typically 0.95)
+// - depthBufferResolution: vec2f uniform
+
+/**
+ * Get temporal depth hint for raymarching acceleration.
+ * Uses previous frame's position buffer to skip known empty space.
+ *
+ * Returns model-space ray distance, or -1.0 if invalid/unavailable.
+ * Apply temporalSafetyMargin before using as skip distance.
+ */
+fn getTemporalDepth(
+  ro: vec3f,
+  rd: vec3f,
+  fragCoord: vec2f,
+  depthBufferResolution: vec2f,
+  temporalEnabled: bool,
+  prevPositionTexture: texture_2d<f32>,
+  prevPositionSampler: sampler
+) -> f32 {
+  if (!temporalEnabled) {
+    return -1.0;
+  }
+
+  // Use screen coordinates for sampling the previous frame's MRT
+  let screenUV = fragCoord / depthBufferResolution;
+
+  // Sample previous frame's position buffer at current screen position
+  // gPosition.xyz = model-space position, gPosition.w = model-space ray distance
+  let prevPositionData = textureSample(prevPositionTexture, prevPositionSampler, screenUV);
+
+  // Check if we have valid position data (.w > 0 indicates valid hit)
+  let storedDist = prevPositionData.w;
+  if (storedDist <= 0.01) {
+    return -1.0;  // No valid hit in previous frame at this pixel
+  }
+
+  // Get the MODEL-SPACE position that was hit at this screen location
+  let prevModelPos = prevPositionData.xyz;
+
+  // Calculate distance along CURRENT ray to the previous hit point
+  let toHit = prevModelPos - ro;
+  let projDistance = dot(toHit, rd);
+
+  // Early rejection: point is behind the camera
+  if (projDistance <= 0.0) {
+    return -1.0;
+  }
+
+  // Validation: Is the previous hit actually ON the current ray?
+  let closestOnRay = ro + rd * projDistance;
+  let perpDist = length(prevModelPos - closestOnRay);
+
+  // Reject if perpendicular distance is too large (camera rotated too much)
+  // Threshold: 5% of distance or 0.1 minimum
+  let threshold = max(0.1, projDistance * 0.05);
+  if (perpDist > threshold) {
+    return -1.0;
+  }
+
+  // Disocclusion detection using 2 diagonal samples
+  let texelSize = 1.0 / depthBufferResolution;
+  let distTopLeft = textureSample(prevPositionTexture, prevPositionSampler,
+    screenUV + vec2f(-texelSize.x, texelSize.y)).w;
+  let distBottomRight = textureSample(prevPositionTexture, prevPositionSampler,
+    screenUV + vec2f(texelSize.x, -texelSize.y)).w;
+
+  // Use relative threshold for discontinuity detection
+  let avgDist = (distTopLeft + distBottomRight + storedDist) * 0.333;
+  let maxNeighborDiff = max(
+    abs(storedDist - distTopLeft),
+    abs(storedDist - distBottomRight)
+  );
+
+  // Threshold: 20% relative difference indicates edge/discontinuity
+  let relativeThreshold = max(0.20 * avgDist, 0.05);
+  if (maxNeighborDiff > relativeThreshold) {
+    return -1.0;  // Depth discontinuity - temporal data unreliable
+  }
+
+  // Return the stored distance
+  // Safety margin should be applied by caller: dist * temporalSafetyMargin
+  return max(0.0, storedDist);
+}
+
 /**
  * Temporal reprojection uniforms.
  */

@@ -36,7 +36,7 @@ const GOLDEN_ANGLE: f32 = 2.39996322972; // PI * (3.0 - sqrt(5.0))
 // ============================================
 
 // Division guard - prevents divide by zero
-const EPS_DIVISION: f32 = 1e-6;
+const EPS_DIVISION: f32 = 0.0001;
 
 // Position comparison - for ray origin offsets, etc.
 const EPS_POSITION: f32 = 1e-4;
