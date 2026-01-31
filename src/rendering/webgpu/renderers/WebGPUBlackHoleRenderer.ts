@@ -40,6 +40,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
   // Uniform buffers
   private cameraUniformBuffer: GPUBuffer | null = null
   private lightingUniformBuffer: GPUBuffer | null = null
+  private materialUniformBuffer: GPUBuffer | null = null
+  private qualityUniformBuffer: GPUBuffer | null = null
   private blackHoleUniformBuffer: GPUBuffer | null = null
   private basisUniformBuffer: GPUBuffer | null = null
 
@@ -97,7 +99,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     const vertexModule = this.createShaderModule(device, vertexShader, 'blackhole-vertex')
     const fragmentModule = this.createShaderModule(device, fragmentShader, 'blackhole-fragment')
 
-    // Create bind group layouts
+    // Create bind group layouts - consolidated to stay within 4-group limit
+    // Group 0: Camera
     const cameraBindGroupLayout = device.createBindGroupLayout({
       label: 'blackhole-camera-bgl',
       entries: [
@@ -109,27 +112,17 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       ],
     })
 
-    const lightingBindGroupLayout = device.createBindGroupLayout({
-      label: 'blackhole-lighting-bgl',
+    // Group 1: Combined (Lighting + Material + Quality)
+    const combinedBindGroupLayout = device.createBindGroupLayout({
+      label: 'blackhole-combined-bgl',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Lighting
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Material
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Quality
       ],
     })
 
-    const materialBindGroupLayout = device.createBindGroupLayout({
-      label: 'blackhole-material-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
-      ],
-    })
-
-    const qualityBindGroupLayout = device.createBindGroupLayout({
-      label: 'blackhole-quality-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
-      ],
-    })
-
+    // Group 2: Object (BlackHole + Basis)
     const objectBindGroupLayout = device.createBindGroupLayout({
       label: 'blackhole-object-bgl',
       entries: [
@@ -138,14 +131,12 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Create pipeline layout
+    // Create pipeline layout - max 3 groups for now (no env map)
     const pipelineLayout = device.createPipelineLayout({
       label: 'blackhole-pipeline-layout',
       bindGroupLayouts: [
         cameraBindGroupLayout,
-        lightingBindGroupLayout,
-        materialBindGroupLayout,
-        qualityBindGroupLayout,
+        combinedBindGroupLayout, // Contains combined lighting+material+quality
         objectBindGroupLayout,
       ],
     })
@@ -171,47 +162,45 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       },
       primitive: {
         topology: 'triangle-list' as const,
-        cullMode: 'back' as const,
+        // CRITICAL: Use 'front' to match THREE.BackSide in WebGL
+        // BackSide = render back faces = cull front faces
+        cullMode: 'front' as const,
       },
     })
 
     // Create uniform buffers
-    // Camera: 256 bytes (matches CameraUniforms struct)
-    this.cameraUniformBuffer = this.createUniformBuffer(device, 256, 'blackhole-camera')
-    // Lighting: 512 bytes (multi-light system)
-    this.lightingUniformBuffer = this.createUniformBuffer(device, 512, 'blackhole-lighting')
+    // CameraUniforms: 7 mat4x4f (448) + vec3f+f32 (16) + scalars (32) = 496 bytes, round to 512
+    this.cameraUniformBuffer = this.createUniformBuffer(device, 512, 'blackhole-camera')
+    // LightingUniforms: 8×LightData (512) + vec3f+f32 (16) + i32+pad+vec3f (32) = 560 bytes, round to 576
+    this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'blackhole-lighting')
+    // Material and Quality buffers for combined bind group
+    this.materialUniformBuffer = this.createUniformBuffer(device, 128, 'blackhole-material')
+    this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'blackhole-quality')
     // BlackHole uniforms: 576 bytes (matches BlackHoleUniforms struct - carefully sized)
     this.blackHoleUniformBuffer = this.createUniformBuffer(device, 576, 'blackhole-uniforms')
     // Basis vectors: 176 bytes (4 * 11 floats * 4 bytes = 176)
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'blackhole-basis')
 
-    // Create bind groups
+    // Create bind groups - consolidated layout
+    // Group 0: Camera
     this.cameraBindGroup = device.createBindGroup({
       label: 'blackhole-camera-bg',
       layout: cameraBindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }],
     })
 
+    // Group 1: Combined (Lighting + Material + Quality)
     this.lightingBindGroup = device.createBindGroup({
-      label: 'blackhole-lighting-bg',
-      layout: lightingBindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.lightingUniformBuffer } }],
+      label: 'blackhole-combined-bg',
+      layout: combinedBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.lightingUniformBuffer } },
+        { binding: 1, resource: { buffer: this.materialUniformBuffer } },
+        { binding: 2, resource: { buffer: this.qualityUniformBuffer } },
+      ],
     })
 
-    // Create placeholder bind groups for material and quality
-    const placeholderBuffer = this.createUniformBuffer(device, 128, 'blackhole-placeholder')
-    const materialBindGroup = device.createBindGroup({
-      label: 'blackhole-material-bg',
-      layout: materialBindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: placeholderBuffer } }],
-    })
-
-    const qualityBindGroup = device.createBindGroup({
-      label: 'blackhole-quality-bg',
-      layout: qualityBindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: placeholderBuffer } }],
-    })
-
+    // Group 2: Object (BlackHole + Basis)
     this.objectBindGroup = device.createBindGroup({
       label: 'blackhole-object-bg',
       layout: objectBindGroupLayout,
@@ -220,10 +209,6 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
         { binding: 1, resource: { buffer: this.basisUniformBuffer } },
       ],
     })
-
-    // Store placeholder bind groups for rendering
-    ;(this as any).materialBindGroup = materialBindGroup
-    ;(this as any).qualityBindGroup = qualityBindGroup
 
     // Create bounding geometry (sphere for black hole)
     this.createBoundingGeometry(device)
@@ -298,38 +283,89 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     const camera = ctx.frame?.stores?.['camera'] as any
     if (!camera) return
 
-    // Pack camera uniforms (must match shader struct layout)
-    const data = new Float32Array(64) // 256 bytes / 4
+    // Get animation time (respects pause state)
+    const animation = ctx.frame?.stores?.['animation'] as any
+    const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
-    // viewMatrix (16 floats)
-    if (camera.viewMatrix) {
+    // Get scale for model matrix (BlackHole uses scale=1 typically)
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const scale = extended?.blackhole?.scale ?? 1.0
+
+    // Pack camera uniforms (must match shader struct layout)
+    // CameraUniforms struct layout:
+    // - viewMatrix: mat4x4f (offset 0, 16 floats)
+    // - projectionMatrix: mat4x4f (offset 16, 16 floats)
+    // - viewProjectionMatrix: mat4x4f (offset 32, 16 floats)
+    // - inverseViewMatrix: mat4x4f (offset 48, 16 floats)
+    // - inverseProjectionMatrix: mat4x4f (offset 64, 16 floats)
+    // - modelMatrix: mat4x4f (offset 80, 16 floats)
+    // - inverseModelMatrix: mat4x4f (offset 96, 16 floats)
+    // - cameraPosition: vec3f (offset 112, 3 floats)
+    // - cameraNear: f32 (offset 115, 1 float)
+    // - cameraFar to frameNumber (offset 116-123)
+    // Total: 496 bytes = 124 floats, buffer is 512 bytes
+    const data = new Float32Array(128) // 512 bytes
+
+    // viewMatrix (16 floats, offset 0)
+    if (camera.viewMatrix?.elements) {
       data.set(camera.viewMatrix.elements, 0)
     }
-    // projectionMatrix (16 floats)
-    if (camera.projectionMatrix) {
+    // projectionMatrix (16 floats, offset 16)
+    if (camera.projectionMatrix?.elements) {
       data.set(camera.projectionMatrix.elements, 16)
     }
-    // viewProjectionMatrix (16 floats)
-    if (camera.viewProjectionMatrix) {
+    // viewProjectionMatrix (16 floats, offset 32)
+    if (camera.viewProjectionMatrix?.elements) {
       data.set(camera.viewProjectionMatrix.elements, 32)
     }
-    // cameraPosition (3 floats) + near (1 float)
-    if (camera.position) {
-      data[48] = camera.position.x
-      data[49] = camera.position.y
-      data[50] = camera.position.z
+    // inverseViewMatrix (16 floats, offset 48)
+    if (camera.inverseViewMatrix?.elements) {
+      data.set(camera.inverseViewMatrix.elements, 48)
+    } else {
+      // Identity matrix as fallback
+      data[48] = 1; data[53] = 1; data[58] = 1; data[63] = 1
     }
-    data[51] = camera.near || 0.1
+    // inverseProjectionMatrix (16 floats, offset 64)
+    if (camera.inverseProjectionMatrix?.elements) {
+      data.set(camera.inverseProjectionMatrix.elements, 64)
+    } else {
+      // Identity matrix as fallback
+      data[64] = 1; data[69] = 1; data[74] = 1; data[79] = 1
+    }
 
-    // far, fov, resolution, aspectRatio, time, deltaTime, frameNumber
-    data[52] = camera.far || 1000
-    data[53] = camera.fov || 50
-    data[54] = ctx.size.width
-    data[55] = ctx.size.height
-    data[56] = ctx.size.width / ctx.size.height
-    data[57] = ctx.frame?.time || 0
-    data[58] = ctx.frame?.delta || 0.016
-    data[59] = ctx.frame?.frameNumber || 0
+    // modelMatrix (16 floats, offset 80) - scale matrix
+    data[80] = scale; data[81] = 0; data[82] = 0; data[83] = 0
+    data[84] = 0; data[85] = scale; data[86] = 0; data[87] = 0
+    data[88] = 0; data[89] = 0; data[90] = scale; data[91] = 0
+    data[92] = 0; data[93] = 0; data[94] = 0; data[95] = 1
+
+    // inverseModelMatrix (16 floats, offset 96)
+    const invScale = 1.0 / scale
+    data[96] = invScale; data[97] = 0; data[98] = 0; data[99] = 0
+    data[100] = 0; data[101] = invScale; data[102] = 0; data[103] = 0
+    data[104] = 0; data[105] = 0; data[106] = invScale; data[107] = 0
+    data[108] = 0; data[109] = 0; data[110] = 0; data[111] = 1
+
+    // cameraPosition (3 floats) + cameraNear (1 float), offset 112
+    if (camera.position) {
+      data[112] = camera.position.x ?? 0
+      data[113] = camera.position.y ?? 0
+      data[114] = camera.position.z ?? 0
+    }
+    data[115] = camera.near ?? 0.1
+
+    // cameraFar, fov, resolution, aspectRatio, time, deltaTime (offset 116-122)
+    data[116] = camera.far ?? 1000
+    data[117] = camera.fov ?? 50
+    data[118] = ctx.size.width
+    data[119] = ctx.size.height
+    data[120] = ctx.size.width / ctx.size.height
+    data[121] = animationTime
+    data[122] = ctx.frame?.delta ?? 0.016
+
+    // frameNumber as u32 - use DataView for proper type
+    const dataView = new DataView(data.buffer)
+    dataView.setUint32(123 * 4, ctx.frame?.frameNumber ?? 0, true)
 
     this.writeUniformBuffer(this.device, this.cameraUniformBuffer, data)
   }
@@ -343,7 +379,14 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     // Get black hole data from extendedObjectStore
     const extended = ctx.frame?.stores?.['extended'] as any
     const blackhole = extended?.blackhole
-    const quality = ctx.frame?.stores?.['quality'] as any
+    const performance = ctx.frame?.stores?.['performance'] as any
+    // Get appearance data for SSS/Fresnel (global appearance controls)
+    const appearance = ctx.frame?.stores?.['appearance'] as any
+    // Get gravity settings from postProcessing store (controlled by UI slider)
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as any
+    // Get dimension from geometry store
+    const geometryStore = ctx.frame?.stores?.['geometry'] as any
+    const dimension = geometryStore?.dimension ?? this.rendererConfig.dimension ?? 4
 
     // Pack black hole uniforms (must match BlackHoleUniforms struct layout)
     // Total size: 576 bytes = 144 floats
@@ -356,7 +399,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.spin ?? 0.0 // spin
     data[offset++] = blackhole?.diskTemperature ?? 6500.0 // diskTemperature
 
-    data[offset++] = blackhole?.gravityStrength ?? 1.0 // gravityStrength
+    data[offset++] = postProcessing?.gravityStrength ?? 1.0 // gravityStrength (from global postProcessing)
     data[offset++] = blackhole?.manifoldIntensity ?? 1.0 // manifoldIntensity
     data[offset++] = blackhole?.manifoldThickness ?? 0.15 // manifoldThickness
     data[offset++] = blackhole?.photonShellWidth ?? 0.05 // photonShellWidth
@@ -377,7 +420,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.distanceFalloff ?? 1.6 // distanceFalloff
     data[offset++] = blackhole?.epsilonMul ?? 0.01 // epsilonMul
 
-    data[offset++] = blackhole?.bendScale ?? 1.0 // bendScale
+    data[offset++] = postProcessing?.gravityDistortionScale ?? 1.0 // bendScale (from global postProcessing)
     data[offset++] = blackhole?.bendMaxPerStep ?? 0.25 // bendMaxPerStep
     data[offset++] = blackhole?.lensingClamp ?? 10.0 // lensingClamp
     data[offset++] = RAY_BENDING_MODE_MAP[blackhole?.rayBendingMode] ?? 0 // rayBendingMode
@@ -427,14 +470,14 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.noiseAmount ?? 0.25 // noiseAmount
     data[offset++] = blackhole?.multiIntersectionGain ?? 1.0 // multiIntersectionGain
 
-    // Rendering quality
-    data[offset++] = quality?.maxSteps ?? 256 // maxSteps (i32)
-    data[offset++] = quality?.stepBase ?? 0.08 // stepBase
+    // Rendering quality (from blackhole store - controlled by UI sliders in BlackHoleAdvanced)
+    data[offset++] = blackhole?.maxSteps ?? 256 // maxSteps (i32)
+    data[offset++] = blackhole?.stepBase ?? 0.08 // stepBase
 
-    data[offset++] = quality?.stepMin ?? 0.01 // stepMin
-    data[offset++] = quality?.stepMax ?? 0.2 // stepMax
-    data[offset++] = quality?.stepAdaptG ?? 1.0 // stepAdaptG
-    data[offset++] = quality?.stepAdaptR ?? 0.2 // stepAdaptR
+    data[offset++] = blackhole?.stepMin ?? 0.01 // stepMin
+    data[offset++] = blackhole?.stepMax ?? 0.2 // stepMax
+    data[offset++] = blackhole?.stepAdaptG ?? 1.0 // stepAdaptG
+    data[offset++] = blackhole?.stepAdaptR ?? 0.2 // stepAdaptR
 
     data[offset++] = blackhole?.enableAbsorption ? 1 : 0 // enableAbsorption (u32)
     data[offset++] = blackhole?.absorption ?? 1.0 // absorption
@@ -461,19 +504,19 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.motionBlurSamples ?? 4 // motionBlurSamples (i32)
     data[offset++] = blackhole?.motionBlurRadialFalloff ?? 1.0 // motionBlurRadialFalloff
 
-    // SSS
-    data[offset++] = blackhole?.sssEnabled ? 1 : 0 // sssEnabled (u32)
-    data[offset++] = blackhole?.sssIntensity ?? 1.0 // sssIntensity
+    // SSS (from global appearance store, not per-object blackhole store)
+    data[offset++] = appearance?.sssEnabled ? 1 : 0 // sssEnabled (u32)
+    data[offset++] = appearance?.sssIntensity ?? 1.0 // sssIntensity
 
-    // sssColor (vec3f) + padding
-    const sssColor = blackhole?.sssColor ?? { r: 1.0, g: 0.53, b: 0.27 }
-    data[offset++] = sssColor.r ?? 1.0
-    data[offset++] = sssColor.g ?? 0.53
-    data[offset++] = sssColor.b ?? 0.27
+    // sssColor (vec3f) + padding - parse from hex string
+    const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
+    data[offset++] = sssColor[0]
+    data[offset++] = sssColor[1]
+    data[offset++] = sssColor[2]
     data[offset++] = 0.0 // _padding2
 
-    data[offset++] = blackhole?.sssThickness ?? 1.0 // sssThickness
-    data[offset++] = blackhole?.sssJitter ?? 0.2 // sssJitter
+    data[offset++] = appearance?.sssThickness ?? 1.0 // sssThickness
+    data[offset++] = appearance?.sssJitter ?? 0.2 // sssJitter
 
     // Animation state
     data[offset++] = blackhole?.pulseEnabled ? 1 : 0 // pulseEnabled (u32)
@@ -579,7 +622,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       const light = lights[i]
       const offset = 8 + i * 12
 
-      data[offset + 0] = light.type === 'directional' ? 1 : light.type === 'spot' ? 2 : 0
+      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
+      data[offset + 0] = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
       data[offset + 1] = light.enabled ? 1 : 0
       data[offset + 2] = light.intensity ?? 1.0
       data[offset + 3] = light.range ?? 100.0
@@ -610,6 +654,142 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     ]
   }
 
+  updateMaterialUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.materialUniformBuffer) return
+
+    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const appearance = ctx.frame?.stores?.['appearance'] as any
+
+    // MaterialUniforms struct layout (with SSS + Fresnel):
+    // struct MaterialUniforms {
+    //   baseColor: vec4f,        // offset 0-3
+    //   metallic: f32,           // offset 4
+    //   roughness: f32,          // offset 5
+    //   reflectance: f32,        // offset 6
+    //   ao: f32,                 // offset 7
+    //   emissive: vec3f,         // offset 8-10
+    //   emissiveIntensity: f32,  // offset 11
+    //   ior: f32,                // offset 12
+    //   transmission: f32,       // offset 13
+    //   thickness: f32,          // offset 14
+    //   sssEnabled: u32,         // offset 15
+    //   sssIntensity: f32,       // offset 16
+    //   sssColor: vec3f,         // offset 17-19
+    //   sssThickness: f32,       // offset 20
+    //   sssJitter: f32,          // offset 21
+    //   fresnelEnabled: u32,     // offset 22
+    //   fresnelIntensity: f32,   // offset 23
+    //   rimColor: vec3f,         // offset 24-26
+    //   _padding2: f32,          // offset 27
+    // }
+    // Total: 28 floats = 112 bytes, buffer = 128 bytes
+    const data = new Float32Array(32) // 128 bytes
+    const dataView = new DataView(data.buffer)
+
+    // baseColor: vec4f (offset 0-3)
+    const faceColor = this.parseColor(appearance?.faceColor ?? '#ffffff')
+    data[0] = faceColor[0]
+    data[1] = faceColor[1]
+    data[2] = faceColor[2]
+    data[3] = 1.0
+
+    // metallic, roughness, reflectance, ao (offset 4-7)
+    data[4] = pbr?.face?.metallic ?? 0.0
+    data[5] = pbr?.face?.roughness ?? 0.5
+    data[6] = pbr?.face?.reflectance ?? 0.5
+    data[7] = 1.0 // ao (ambient occlusion factor)
+
+    // emissive: vec3f + emissiveIntensity: f32 (offset 8-11)
+    const emissiveColor = this.parseColor(appearance?.emissiveColor ?? '#000000')
+    data[8] = emissiveColor[0]
+    data[9] = emissiveColor[1]
+    data[10] = emissiveColor[2]
+    data[11] = appearance?.emissiveIntensity ?? 0.0
+
+    // ior, transmission, thickness (offset 12-14)
+    data[12] = pbr?.face?.ior ?? 1.5
+    data[13] = pbr?.face?.transmission ?? 0.0
+    data[14] = pbr?.face?.thickness ?? 1.0
+
+    // sssEnabled: u32 (offset 15)
+    const sssEnabled = appearance?.sssEnabled ?? false
+    dataView.setUint32(15 * 4, sssEnabled ? 1 : 0, true)
+
+    // sssIntensity: f32 (offset 16)
+    data[16] = appearance?.sssIntensity ?? 1.0
+
+    // sssColor: vec3f (offset 17-19)
+    const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
+    data[17] = sssColor[0]
+    data[18] = sssColor[1]
+    data[19] = sssColor[2]
+
+    // sssThickness, sssJitter (offset 20-21)
+    data[20] = appearance?.sssThickness ?? 1.0
+    data[21] = appearance?.sssJitter ?? 0.2
+
+    // fresnelEnabled: u32 (offset 22) - uses edgesVisible from appearance store
+    const fresnelEnabled = appearance?.edgesVisible ?? true
+    dataView.setUint32(22 * 4, fresnelEnabled ? 1 : 0, true)
+
+    // fresnelIntensity: f32 (offset 23)
+    data[23] = appearance?.fresnelIntensity ?? 0.5
+
+    // rimColor: vec3f (offset 24-26) - uses edgeColor from appearance store
+    const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
+    data[24] = rimColor[0]
+    data[25] = rimColor[1]
+    data[26] = rimColor[2]
+
+    // _padding2 (offset 27)
+    data[27] = 0.0
+
+    this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
+  }
+
+  updateQualityUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.qualityUniformBuffer) return
+
+    const performance = ctx.frame?.stores?.['performance'] as any
+    const lighting = ctx.frame?.stores?.['lighting'] as any
+    const environment = ctx.frame?.stores?.['environment'] as any
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as any
+
+    // QualityUniforms struct layout:
+    // sdfMaxIterations: i32 (0)
+    // sdfSurfaceDistance: f32 (1)
+    // shadowQuality: i32 (2)
+    // shadowSoftness: f32 (3)
+    // aoEnabled: i32 (4)
+    // aoSamples: i32 (5)
+    // aoRadius: f32 (6)
+    // aoIntensity: f32 (7)
+    // iblQuality: i32 (8)
+    // iblIntensity: f32 (9)
+    // qualityMultiplier: f32 (10)
+    // _padding: f32 (11)
+    const data = new Float32Array(12)
+
+    // Quality multiplier affects ray march quality
+    const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
+    data[1] = 0.001 / qualityMultiplier // sdfSurfaceDistance (smaller = more precise)
+    data[3] = lighting?.shadowSoftness ?? 0.5 // shadowSoftness
+    data[6] = performance?.aoRadius ?? 0.5 // aoRadius
+    data[7] = performance?.aoIntensity ?? 1.0 // aoIntensity
+    data[9] = environment?.iblIntensity ?? 1.0 // iblIntensity
+    data[10] = qualityMultiplier // qualityMultiplier
+
+    const dataView = new DataView(data.buffer)
+    dataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
+    dataView.setInt32(2 * 4, lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0, true) // shadowQuality
+    // aoEnabled: Use postProcessing.ssaoEnabled (global toggle) like WebGL
+    dataView.setInt32(4 * 4, postProcessing?.ssaoEnabled ? 1 : 0, true) // aoEnabled
+    dataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
+    dataView.setInt32(8 * 4, environment?.iblQuality ?? 1, true) // iblQuality
+
+    this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)
+  }
+
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
@@ -628,6 +808,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     this.updateBlackHoleUniforms(ctx)
     this.updateBasisVectors(ctx)
     this.updateLightingUniforms(ctx)
+    this.updateMaterialUniforms(ctx)
+    this.updateQualityUniforms(ctx)
 
     // Get render target
     const colorView = ctx.getWriteTarget('hdr-color')
@@ -646,12 +828,14 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       ],
     })
 
+    // Set pipeline and bind groups - consolidated layout
+    // Group 0: Camera
+    // Group 1: Combined (Lighting + Material + Quality)
+    // Group 2: Object (BlackHole + Basis)
     passEncoder.setPipeline(this.renderPipeline)
     passEncoder.setBindGroup(0, this.cameraBindGroup)
-    passEncoder.setBindGroup(1, this.lightingBindGroup)
-    passEncoder.setBindGroup(2, (this as any).materialBindGroup)
-    passEncoder.setBindGroup(3, (this as any).qualityBindGroup)
-    passEncoder.setBindGroup(4, this.objectBindGroup)
+    passEncoder.setBindGroup(1, this.lightingBindGroup) // Combined
+    passEncoder.setBindGroup(2, this.objectBindGroup)
 
     passEncoder.setVertexBuffer(0, this.vertexBuffer)
     passEncoder.setIndexBuffer(this.indexBuffer, 'uint16' as const)
@@ -665,6 +849,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     this.indexBuffer?.destroy()
     this.cameraUniformBuffer?.destroy()
     this.lightingUniformBuffer?.destroy()
+    this.materialUniformBuffer?.destroy()
+    this.qualityUniformBuffer?.destroy()
     this.blackHoleUniformBuffer?.destroy()
     this.basisUniformBuffer?.destroy()
 
@@ -672,6 +858,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     this.indexBuffer = null
     this.cameraUniformBuffer = null
     this.lightingUniformBuffer = null
+    this.materialUniformBuffer = null
+    this.qualityUniformBuffer = null
     this.blackHoleUniformBuffer = null
     this.basisUniformBuffer = null
 

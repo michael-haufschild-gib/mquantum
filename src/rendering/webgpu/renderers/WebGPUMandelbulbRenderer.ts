@@ -7,6 +7,8 @@
  * @module rendering/webgpu/renderers/WebGPUMandelbulbRenderer
  */
 
+import { composeRotations } from '@/lib/math/rotation'
+import type { MatrixND } from '@/lib/math/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import {
@@ -14,6 +16,9 @@ import {
   composeMandelbulbVertexShader,
 } from '../shaders/mandelbulb/compose'
 import type { WGSLShaderConfig } from '../shaders/shared/compose-helpers'
+
+/** Maximum dimension supported */
+const MAX_DIMENSION = 11
 
 export interface MandelbulbRendererConfig {
   dimension?: number
@@ -28,6 +33,7 @@ export interface MandelbulbRendererConfig {
  * WebGPU renderer for Mandelbulb fractals.
  */
 export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
+  private _lastDebugLog: number = 0 // DEBUG: throttle logging
   private renderPipeline: GPURenderPipeline | null = null
   private vertexBuffer: GPUBuffer | null = null
   private indexBuffer: GPUBuffer | null = null
@@ -39,12 +45,20 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
   private qualityUniformBuffer: GPUBuffer | null = null
   private mandelbulbUniformBuffer: GPUBuffer | null = null
   private basisUniformBuffer: GPUBuffer | null = null
+  private iblUniformBuffer: GPUBuffer | null = null
 
-  // Bind groups
+  // Bind groups - consolidated layout
+  // Group 0: Camera
+  // Group 1: Combined (Lighting + Material + Quality)
+  // Group 2: Object (Mandelbulb + Basis)
+  // Group 3: IBL (if enabled)
   private cameraBindGroup: GPUBindGroup | null = null
-  private lightingBindGroup: GPUBindGroup | null = null
-  private materialBindGroup: GPUBindGroup | null = null
+  private lightingBindGroup: GPUBindGroup | null = null // Combined bind group
   private objectBindGroup: GPUBindGroup | null = null
+  private iblBindGroup: GPUBindGroup | null = null
+  private iblBindGroupLayout: GPUBindGroupLayout | null = null
+  private envMapTexture: GPUTexture | null = null
+  private envMapSampler: GPUSampler | null = null
 
   // Configuration
   private rendererConfig: MandelbulbRendererConfig
@@ -59,13 +73,13 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
       priority: 100,
       inputs: [],
       outputs: [
-        { resourceId: 'hdr-color', access: 'write', binding: 0 },
+        { resourceId: 'object-color', access: 'write', binding: 0 },
         { resourceId: 'normal-buffer', access: 'write', binding: 1 },
         { resourceId: 'depth-buffer', access: 'write', binding: 2 },
       ],
     })
 
-    this.config = {
+    this.rendererConfig = {
       dimension: 3,
       shadows: true,
       ambientOcclusion: true,
@@ -103,7 +117,8 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const vertexModule = this.createShaderModule(device, vertexShader, 'mandelbulb-vertex')
     const fragmentModule = this.createShaderModule(device, fragmentShader, 'mandelbulb-fragment')
 
-    // Create bind group layouts
+    // Create bind group layouts - consolidated to stay within 4-group limit
+    // Group 0: Camera
     const cameraBindGroupLayout = device.createBindGroupLayout({
       label: 'mandelbulb-camera-bgl',
       entries: [
@@ -115,21 +130,17 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
       ],
     })
 
-    const lightingBindGroupLayout = device.createBindGroupLayout({
-      label: 'mandelbulb-lighting-bgl',
-      entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }],
+    // Group 1: Combined (Lighting + Material + Quality)
+    const combinedBindGroupLayout = device.createBindGroupLayout({
+      label: 'mandelbulb-combined-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, // Lighting
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, // Material
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, // Quality
+      ],
     })
 
-    const materialBindGroupLayout = device.createBindGroupLayout({
-      label: 'mandelbulb-material-bgl',
-      entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }],
-    })
-
-    const qualityBindGroupLayout = device.createBindGroupLayout({
-      label: 'mandelbulb-quality-bgl',
-      entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }],
-    })
-
+    // Group 2: Object (Mandelbulb + Basis)
     const objectBindGroupLayout = device.createBindGroupLayout({
       label: 'mandelbulb-object-bgl',
       entries: [
@@ -138,16 +149,36 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Create pipeline layout
+    // Group 3: IBL (if enabled)
+    if (this.shaderConfig.ibl) {
+      this.iblBindGroupLayout = device.createBindGroupLayout({
+        label: 'mandelbulb-ibl-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, // IBL uniforms
+          {
+            binding: 1,
+            visibility: GPUShaderStage.FRAGMENT,
+            texture: { sampleType: 'float', viewDimension: '2d' }, // PMREM uses 2D texture
+          }, // Environment map
+          { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } }, // Sampler
+        ],
+      })
+    }
+
+    // Create pipeline layout - max 4 groups
+    const bindGroupLayouts: GPUBindGroupLayout[] = [
+      cameraBindGroupLayout,
+      combinedBindGroupLayout, // Contains combined lighting+material+quality
+      objectBindGroupLayout,
+    ]
+
+    if (this.shaderConfig.ibl && this.iblBindGroupLayout) {
+      bindGroupLayouts.push(this.iblBindGroupLayout)
+    }
+
     const pipelineLayout = device.createPipelineLayout({
       label: 'mandelbulb-pipeline-layout',
-      bindGroupLayouts: [
-        cameraBindGroupLayout,
-        lightingBindGroupLayout,
-        materialBindGroupLayout,
-        qualityBindGroupLayout,
-        objectBindGroupLayout,
-      ],
+      bindGroupLayouts,
     })
 
     // Create render pipeline
@@ -172,48 +203,58 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
         module: fragmentModule,
         entryPoint: 'fragmentMain',
         targets: [
-          { format }, // Color output
+          { format: 'rgba16float' }, // HDR color buffer (not canvas format)
           { format: 'rgba16float' }, // Normal buffer
         ],
       },
       primitive: {
         topology: 'triangle-list',
-        cullMode: 'back',
+        // CRITICAL: Use 'front' to match THREE.BackSide in WebGL
+        // BackSide = render back faces = cull front faces
+        // WebGPU cullMode: 'front' = cull front faces = render back faces
+        cullMode: 'front',
       },
       depthStencil: {
-        format: 'depth32float',
+        format: 'depth24plus', // Match the depth buffer created by render graph
         depthWriteEnabled: true,
         depthCompare: 'less',
       },
     })
 
     // Create uniform buffers
-    this.cameraUniformBuffer = this.createUniformBuffer(device, 256, 'mandelbulb-camera')
-    this.lightingUniformBuffer = this.createUniformBuffer(device, 512, 'mandelbulb-lighting')
+    // CameraUniforms: 7 mat4x4f (448) + vec3f+f32 (16) + 4×f32+vec2f (16) + 4×f32 (16) = 496 bytes, round to 512
+    this.cameraUniformBuffer = this.createUniformBuffer(device, 512, 'mandelbulb-camera')
+    // LightingUniforms: 8×LightData (512) + vec3f+f32 (16) + i32+pad+vec3f (32) = 560 bytes, round to 576
+    this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'mandelbulb-lighting')
+    // MaterialUniforms: 112 bytes (with SSS + Fresnel), round to 128
     this.materialUniformBuffer = this.createUniformBuffer(device, 128, 'mandelbulb-material')
+    // QualityUniforms: 48 bytes, round to 64
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'mandelbulb-quality')
+    // MandelbulbUniforms: ~80 bytes, round to 128
     this.mandelbulbUniformBuffer = this.createUniformBuffer(device, 128, 'mandelbulb-uniforms')
+    // BasisVectors: 192 bytes, round to 256
     this.basisUniformBuffer = this.createUniformBuffer(device, 256, 'mandelbulb-basis')
 
-    // Create bind groups
+    // Create bind groups - consolidated layout
+    // Group 0: Camera
     this.cameraBindGroup = device.createBindGroup({
       label: 'mandelbulb-camera-bg',
       layout: cameraBindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }],
     })
 
+    // Group 1: Combined (Lighting + Material + Quality)
     this.lightingBindGroup = device.createBindGroup({
-      label: 'mandelbulb-lighting-bg',
-      layout: lightingBindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.lightingUniformBuffer } }],
+      label: 'mandelbulb-combined-bg',
+      layout: combinedBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.lightingUniformBuffer } },
+        { binding: 1, resource: { buffer: this.materialUniformBuffer } },
+        { binding: 2, resource: { buffer: this.qualityUniformBuffer } },
+      ],
     })
 
-    this.materialBindGroup = device.createBindGroup({
-      label: 'mandelbulb-material-bg',
-      layout: materialBindGroupLayout,
-      entries: [{ binding: 0, resource: { buffer: this.materialUniformBuffer } }],
-    })
-
+    // Group 2: Object (Mandelbulb + Basis)
     this.objectBindGroup = device.createBindGroup({
       label: 'mandelbulb-object-bg',
       layout: objectBindGroupLayout,
@@ -222,6 +263,40 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
         { binding: 1, resource: { buffer: this.basisUniformBuffer } },
       ],
     })
+
+    // Group 3: IBL (if enabled)
+    // Create IBL buffer and placeholder environment map
+    if (this.shaderConfig.ibl && this.iblBindGroupLayout) {
+      // IBLUniforms: envMapSize (f32), iblIntensity (f32), iblQuality (i32), padding (f32) = 16 bytes
+      this.iblUniformBuffer = this.createUniformBuffer(device, 16, 'mandelbulb-ibl')
+
+      // Create a placeholder 2D PMREM texture (proper size would be e.g., 768x1024 for 256px faces)
+      // Using minimal size for placeholder - will be replaced with real env map later
+      this.envMapTexture = device.createTexture({
+        label: 'mandelbulb-env-placeholder-pmrem',
+        size: { width: 64, height: 64 }, // Placeholder size, proper PMREM would be larger
+        format: 'rgba8unorm',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        dimension: '2d',
+      })
+
+      this.envMapSampler = device.createSampler({
+        label: 'mandelbulb-env-sampler',
+        magFilter: 'linear',
+        minFilter: 'linear',
+        mipmapFilter: 'linear',
+      })
+
+      this.iblBindGroup = device.createBindGroup({
+        label: 'mandelbulb-ibl-bg',
+        layout: this.iblBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.iblUniformBuffer } },
+          { binding: 1, resource: this.envMapTexture.createView({ dimension: '2d' }) },
+          { binding: 2, resource: this.envMapSampler },
+        ],
+      })
+    }
 
     // Create bounding geometry (cube)
     this.createBoundingGeometry(device)
@@ -499,45 +574,117 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const camera = ctx.frame?.stores?.['camera'] as any
     if (!camera) return
 
-    // Pack camera uniforms (must match shader struct layout)
-    const data = new Float32Array(64) // 256 bytes / 4
+    // Get animation time (respects pause state)
+    const animation = ctx.frame?.stores?.['animation'] as any
+    const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
-    // viewMatrix (16 floats)
-    if (camera.viewMatrix) {
+    // Get scale from extended store for model matrix
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const scale = extended?.mandelbulb?.scale ?? 1.0
+
+    // DEBUG: Log camera and scale values once per second
+    if (!this._lastDebugLog || Date.now() - this._lastDebugLog > 1000) {
+      this._lastDebugLog = Date.now()
+      console.log('[WebGPU Mandelbulb] Camera uniforms:', {
+        hasCamera: !!camera,
+        hasViewMatrix: !!camera?.viewMatrix?.elements,
+        cameraPosition: camera?.position,
+        scale,
+        hasExtended: !!extended,
+        hasMandelbulb: !!extended?.mandelbulb,
+      })
+    }
+
+    // Pack camera uniforms (must match shader struct layout)
+    // CameraUniforms struct layout:
+    // - viewMatrix: mat4x4f (offset 0, 64 bytes = 16 floats)
+    // - projectionMatrix: mat4x4f (offset 16, 64 bytes)
+    // - viewProjectionMatrix: mat4x4f (offset 32, 64 bytes)
+    // - inverseViewMatrix: mat4x4f (offset 48, 64 bytes)
+    // - inverseProjectionMatrix: mat4x4f (offset 64, 64 bytes)
+    // - modelMatrix: mat4x4f (offset 80, 64 bytes)
+    // - inverseModelMatrix: mat4x4f (offset 96, 64 bytes)
+    // - cameraPosition: vec3f (offset 112, 12 bytes)
+    // - cameraNear: f32 (offset 115, 4 bytes)
+    // - cameraFar: f32 (offset 116, 4 bytes)
+    // - fov: f32 (offset 117, 4 bytes)
+    // - resolution: vec2f (offset 118, 8 bytes)
+    // - aspectRatio: f32 (offset 120, 4 bytes)
+    // - time: f32 (offset 121, 4 bytes)
+    // - deltaTime: f32 (offset 122, 4 bytes)
+    // - frameNumber: u32 (offset 123, 4 bytes)
+    // Total: 496 bytes = 124 floats, buffer is 512 bytes
+    const data = new Float32Array(128) // 512 bytes
+
+    // viewMatrix (16 floats, offset 0)
+    if (camera.viewMatrix?.elements) {
       data.set(camera.viewMatrix.elements, 0)
     }
-    // projectionMatrix (16 floats)
-    if (camera.projectionMatrix) {
+    // projectionMatrix (16 floats, offset 16)
+    if (camera.projectionMatrix?.elements) {
       data.set(camera.projectionMatrix.elements, 16)
     }
-    // viewProjectionMatrix (16 floats)
-    if (camera.viewProjectionMatrix) {
+    // viewProjectionMatrix (16 floats, offset 32)
+    if (camera.viewProjectionMatrix?.elements) {
       data.set(camera.viewProjectionMatrix.elements, 32)
     }
-    // cameraPosition (3 floats) + near (1 float)
-    if (camera.position) {
-      data[48] = camera.position.x
-      data[49] = camera.position.y
-      data[50] = camera.position.z
+    // inverseViewMatrix (16 floats, offset 48)
+    if (camera.inverseViewMatrix?.elements) {
+      data.set(camera.inverseViewMatrix.elements, 48)
+    } else {
+      // Identity matrix as fallback
+      data[48] = 1; data[53] = 1; data[58] = 1; data[63] = 1
     }
-    data[51] = camera.near || 0.1
+    // inverseProjectionMatrix (16 floats, offset 64)
+    if (camera.inverseProjectionMatrix?.elements) {
+      data.set(camera.inverseProjectionMatrix.elements, 64)
+    } else {
+      // Identity matrix as fallback
+      data[64] = 1; data[69] = 1; data[74] = 1; data[79] = 1
+    }
 
-    // far, fov, resolution, aspectRatio, time, deltaTime, frameNumber
-    data[52] = camera.far || 1000
-    data[53] = camera.fov || 50
-    data[54] = ctx.size.width
-    data[55] = ctx.size.height
-    data[56] = ctx.size.width / ctx.size.height
-    data[57] = ctx.frame?.time || 0
-    data[58] = ctx.frame?.delta || 0.016
-    // frameNumber as uint - we'll treat it as float for simplicity
-    data[59] = ctx.frame?.frameNumber || 0
+    // modelMatrix (16 floats, offset 80) - scale matrix matching WebGL mesh.scale
+    // Column-major order: [col0, col1, col2, col3]
+    // Scale matrix: diag(scale, scale, scale, 1)
+    data[80] = scale; data[81] = 0; data[82] = 0; data[83] = 0  // column 0
+    data[84] = 0; data[85] = scale; data[86] = 0; data[87] = 0  // column 1
+    data[88] = 0; data[89] = 0; data[90] = scale; data[91] = 0  // column 2
+    data[92] = 0; data[93] = 0; data[94] = 0; data[95] = 1      // column 3
+
+    // inverseModelMatrix (16 floats, offset 96) - inverse scale = 1/scale
+    const invScale = 1.0 / scale
+    data[96] = invScale; data[97] = 0; data[98] = 0; data[99] = 0    // column 0
+    data[100] = 0; data[101] = invScale; data[102] = 0; data[103] = 0 // column 1
+    data[104] = 0; data[105] = 0; data[106] = invScale; data[107] = 0 // column 2
+    data[108] = 0; data[109] = 0; data[110] = 0; data[111] = 1        // column 3
+
+    // cameraPosition (3 floats) + cameraNear (1 float), offset 112
+    if (camera.position) {
+      data[112] = camera.position.x ?? 0
+      data[113] = camera.position.y ?? 0
+      data[114] = camera.position.z ?? 0
+    }
+    data[115] = camera.near ?? 0.1
+
+    // cameraFar, fov, resolution, aspectRatio, time, deltaTime (offset 116-123)
+    data[116] = camera.far ?? 1000
+    data[117] = camera.fov ?? 50
+    data[118] = ctx.size.width
+    data[119] = ctx.size.height
+    data[120] = ctx.size.width / ctx.size.height
+    data[121] = animationTime // time (respects animation pause state)
+    data[122] = ctx.frame?.delta ?? 0.016
+
+    // frameNumber as u32 - use DataView for proper type
+    const dataView = new DataView(data.buffer)
+    dataView.setUint32(123 * 4, ctx.frame?.frameNumber ?? 0, true)
 
     this.writeUniformBuffer(this.device, this.cameraUniformBuffer, data)
   }
 
   /**
    * Update mandelbulb-specific uniforms from extendedObjectStore.
+   * Computes animated values for power, phase, and slice animations.
    */
   updateMandelbulbUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.mandelbulbUniformBuffer) return
@@ -548,9 +695,13 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const mb = extended.mandelbulb
     const data = new Float32Array(32) // 128 bytes / 4
 
+    // Get animation time (respects pause state)
+    const animation = ctx.frame?.stores?.['animation'] as any
+    const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+
     // Core parameters (matching MandelbulbUniforms struct)
     data[0] = this.rendererConfig.dimension ?? 3 // dimension: i32 (stored as f32 for alignment)
-    data[1] = mb.mandelbulbPower ?? 8.0 // power
+    data[1] = mb.mandelbulbPower ?? 8.0 // power (static, used when animation disabled)
     data[2] = mb.maxIterations ?? 48 // iterations
     data[3] = mb.escapeRadius ?? 4.0 // escapeRadius
 
@@ -562,28 +713,58 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     data[6] = mb.mandelbulbPower ?? 8.0 // effectivePower (same as power for now)
     data[7] = Math.max(mb.escapeRadius ?? 4.0, 2.0) // effectiveBailout
 
-    // Power animation
-    data[8] = mb.powerAnimationEnabled ? 1 : 0 // powerAnimationEnabled: u32
-    data[9] = mb.mandelbulbPower ?? 8.0 // animatedPower (computed elsewhere if animated)
+    // Power animation - compute animated power from time
+    const powerAnimationEnabled = mb.powerAnimationEnabled ?? false
+    data[8] = powerAnimationEnabled ? 1 : 0 // powerAnimationEnabled: u32
+
+    if (powerAnimationEnabled) {
+      // Compute animated power: oscillates between powerMin and powerMax
+      const powerMin = mb.powerMin ?? 2.0
+      const powerMax = mb.powerMax ?? 12.0
+      const powerSpeed = mb.powerSpeed ?? 0.1
+      const t = accumulatedTime * powerSpeed * 2 * Math.PI
+      const normalized = (Math.sin(t) + 1) / 2 // Maps [-1, 1] to [0, 1]
+      data[9] = powerMin + normalized * (powerMax - powerMin) // animatedPower
+    } else {
+      data[9] = mb.mandelbulbPower ?? 8.0 // animatedPower = static power
+    }
 
     // Alternate power blending
     data[10] = mb.alternatePowerEnabled ? 1 : 0 // alternatePowerEnabled: u32
     data[11] = mb.alternatePowerValue ?? 8.0 // alternatePowerValue
     data[12] = mb.alternatePowerBlend ?? 0.0 // alternatePowerBlend
 
-    // Phase shift
-    data[13] = mb.phaseShiftEnabled ? 1 : 0 // phaseEnabled: u32
-    data[14] = 0.0 // phaseTheta (computed from animation)
-    data[15] = 0.0 // phasePhi (computed from animation)
+    // Phase shift animation - compute phase angles from time
+    const phaseShiftEnabled = mb.phaseShiftEnabled ?? false
+    data[13] = phaseShiftEnabled ? 1 : 0 // phaseEnabled: u32
+
+    if (phaseShiftEnabled) {
+      const phaseSpeed = mb.phaseSpeed ?? 0.1
+      const phaseAmplitude = mb.phaseAmplitude ?? 0.5
+      const t = accumulatedTime * phaseSpeed * 2 * Math.PI
+      // Theta and phi use different frequencies for more organic twisting (golden ratio)
+      data[14] = phaseAmplitude * Math.sin(t) // phaseTheta
+      data[15] = phaseAmplitude * Math.sin(t * 1.618033988749895) // phasePhi (golden ratio frequency)
+    } else {
+      data[14] = 0.0 // phaseTheta
+      data[15] = 0.0 // phasePhi
+    }
 
     // Scale
     data[16] = mb.scale ?? 1.0
+
+    // Slice animation parameters (needed for origin computation in updateBasisUniforms)
+    data[17] = mb.sliceAnimationEnabled ? 1 : 0 // sliceAnimationEnabled: u32
+    data[18] = mb.sliceSpeed ?? 0.1 // sliceSpeed
+    data[19] = mb.sliceAmplitude ?? 0.5 // sliceAmplitude
 
     this.writeUniformBuffer(this.device, this.mandelbulbUniformBuffer, data)
   }
 
   /**
    * Update N-D basis vectors from rotationStore.
+   * Computes proper N-dimensional rotation matrices and applies them to basis vectors.
+   * Handles slice animation for 4D+ dimensions.
    */
   updateBasisUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.basisUniformBuffer) return
@@ -595,30 +776,106 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const dimension = this.rendererConfig.dimension ?? 3
     const rotations = rotation.rotations as Map<string, number> | undefined
 
-    // Import composeRotations dynamically would be complex, so we'll use a simplified
-    // identity basis for now and compute proper rotations when the math module is available
     // Each basis vector is stored as 3 vec4f (12 floats) for up to 11D
+    // Layout: basisX (12 floats) | basisY (12 floats) | basisZ (12 floats) | origin (12 floats)
     const data = new Float32Array(48) // 192 bytes for 4 vectors × 12 floats
 
-    // Default identity basis vectors (will be properly rotated later)
-    // basisX: [1, 0, 0, 0, ...]
-    data[0] = 1.0
-    // basisY: [0, 1, 0, 0, ...]
-    data[12] = 1.0
-    // basisZ: [0, 0, 1, 0, ...]
-    data[24] = 1.0
-    // origin: [0, 0, 0, parameterValues...]
-    // Fill in parameter values for extra dimensions
-    const parameterValues = extended?.mandelbulb?.parameterValues ?? []
-    for (let i = 3; i < dimension && i < 11; i++) {
-      data[36 + i] = parameterValues[i - 3] ?? 0
+    // Compute rotation matrix from store rotations
+    const rotationMatrix = composeRotations(dimension, rotations ?? new Map())
+
+    // Create unit vectors
+    const unitX = new Float32Array(MAX_DIMENSION)
+    const unitY = new Float32Array(MAX_DIMENSION)
+    const unitZ = new Float32Array(MAX_DIMENSION)
+    unitX[0] = 1.0
+    unitY[1] = 1.0
+    unitZ[2] = 1.0
+
+    // Apply rotation to basis vectors
+    const rotatedX = new Float32Array(MAX_DIMENSION)
+    const rotatedY = new Float32Array(MAX_DIMENSION)
+    const rotatedZ = new Float32Array(MAX_DIMENSION)
+    this.applyRotation(rotationMatrix, unitX, rotatedX, dimension)
+    this.applyRotation(rotationMatrix, unitY, rotatedY, dimension)
+    this.applyRotation(rotationMatrix, unitZ, rotatedZ, dimension)
+
+    // Copy rotated basis vectors to data buffer
+    for (let i = 0; i < MAX_DIMENSION; i++) {
+      data[i] = rotatedX[i] ?? 0 // basisX at offset 0
+      data[12 + i] = rotatedY[i] ?? 0 // basisY at offset 12
+      data[24 + i] = rotatedZ[i] ?? 0 // basisZ at offset 24
+    }
+
+    // Get mandelbulb state for slice animation
+    const mb = extended?.mandelbulb
+    const parameterValues = mb?.parameterValues ?? []
+    const sliceAnimationEnabled = mb?.sliceAnimationEnabled ?? false
+    const sliceSpeed = mb?.sliceSpeed ?? 0.1
+    const sliceAmplitude = mb?.sliceAmplitude ?? 0.5
+
+    // Get animation time for slice animation
+    const animation = ctx.frame?.stores?.['animation'] as any
+    const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+
+    // Compute origin: start with parameter values for extra dimensions
+    const originUnrotated = new Float32Array(MAX_DIMENSION)
+
+    if (sliceAnimationEnabled && dimension > 3) {
+      // Slice Animation: animate through higher-dimensional cross-sections
+      // Use sine waves with golden ratio phase offsets for organic motion
+      const PHI = 1.618033988749895 // Golden ratio
+
+      for (let i = 3; i < dimension && i < MAX_DIMENSION; i++) {
+        const extraDimIndex = i - 3
+        // Each dimension gets a unique phase offset based on golden ratio
+        const phase = extraDimIndex * PHI
+        // Multi-frequency sine for more interesting motion
+        const t1 = accumulatedTime * sliceSpeed * 2 * Math.PI + phase
+        const t2 = accumulatedTime * sliceSpeed * 1.3 * 2 * Math.PI + phase * 1.5
+        // Blend two frequencies for non-repetitive motion
+        const offset = sliceAmplitude * (0.7 * Math.sin(t1) + 0.3 * Math.sin(t2))
+        originUnrotated[i] = (parameterValues[extraDimIndex] ?? 0) + offset
+      }
+    } else {
+      // No slice animation - use static parameter values
+      for (let i = 3; i < dimension && i < MAX_DIMENSION; i++) {
+        originUnrotated[i] = parameterValues[i - 3] ?? 0
+      }
+    }
+
+    // Apply rotation to origin
+    const rotatedOrigin = new Float32Array(MAX_DIMENSION)
+    this.applyRotation(rotationMatrix, originUnrotated, rotatedOrigin, dimension)
+    for (let i = 0; i < MAX_DIMENSION; i++) {
+      data[36 + i] = rotatedOrigin[i] ?? 0 // origin at offset 36
     }
 
     this.writeUniformBuffer(this.device, this.basisUniformBuffer, data)
   }
 
   /**
+   * Apply rotation matrix to a vector.
+   */
+  private applyRotation(
+    matrix: MatrixND,
+    vec: Float32Array,
+    out: Float32Array,
+    dimension: number
+  ): void {
+    out.fill(0)
+    for (let i = 0; i < dimension; i++) {
+      let sum = 0
+      const rowOffset = i * dimension
+      for (let j = 0; j < dimension; j++) {
+        sum += (matrix[rowOffset + j] ?? 0) * (vec[j] ?? 0)
+      }
+      out[i] = sum
+    }
+  }
+
+  /**
    * Update material uniforms from pbrStore and appearanceStore.
+   * Includes SSS and Fresnel properties for advanced rendering.
    */
   updateMaterialUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.materialUniformBuffer) return
@@ -626,42 +883,161 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const pbr = ctx.frame?.stores?.['pbr'] as any
     const appearance = ctx.frame?.stores?.['appearance'] as any
 
+    // MaterialUniforms struct layout (with SSS + Fresnel):
+    // struct MaterialUniforms {
+    //   baseColor: vec4f,        // offset 0-3
+    //   metallic: f32,           // offset 4
+    //   roughness: f32,          // offset 5
+    //   reflectance: f32,        // offset 6
+    //   ao: f32,                 // offset 7
+    //   emissive: vec3f,         // offset 8-10
+    //   emissiveIntensity: f32,  // offset 11
+    //   ior: f32,                // offset 12
+    //   transmission: f32,       // offset 13
+    //   thickness: f32,          // offset 14
+    //   sssEnabled: u32,         // offset 15
+    //   sssIntensity: f32,       // offset 16
+    //   sssColor: vec3f,         // offset 17-19
+    //   sssThickness: f32,       // offset 20
+    //   sssJitter: f32,          // offset 21
+    //   fresnelEnabled: u32,     // offset 22
+    //   fresnelIntensity: f32,   // offset 23
+    //   rimColor: vec3f,         // offset 24-26
+    //   _padding2: f32,          // offset 27
+    // }
+    // Total: 28 floats = 112 bytes, buffer = 128 bytes
     const data = new Float32Array(32) // 128 bytes
+    const dataView = new DataView(data.buffer)
 
-    // Material properties
-    data[0] = pbr?.face?.roughness ?? 0.5
-    data[1] = pbr?.face?.metallic ?? 0.0
-    data[2] = pbr?.face?.specularIntensity ?? 1.0
-    data[3] = 1.0 // alpha
-
-    // Face color (parse hex to RGB)
+    // baseColor: vec4f (offset 0-3)
     const faceColor = this.parseColor(appearance?.faceColor ?? '#ffffff')
-    data[4] = faceColor[0]
-    data[5] = faceColor[1]
-    data[6] = faceColor[2]
-    data[7] = 1.0
+    data[0] = faceColor[0]
+    data[1] = faceColor[1]
+    data[2] = faceColor[2]
+    data[3] = 1.0
 
-    // Edge color
-    const edgeColor = this.parseColor(appearance?.edgeColor ?? '#000000')
-    data[8] = edgeColor[0]
-    data[9] = edgeColor[1]
-    data[10] = edgeColor[2]
-    data[11] = 1.0
+    // metallic, roughness, reflectance, ao (offset 4-7)
+    data[4] = pbr?.face?.metallic ?? 0.0
+    data[5] = pbr?.face?.roughness ?? 0.5
+    data[6] = pbr?.face?.reflectance ?? 0.5
+    data[7] = 1.0 // ao (ambient occlusion factor)
 
-    // SSS parameters
-    data[12] = appearance?.sssEnabled ? 1 : 0
-    data[13] = appearance?.sssIntensity ?? 0.5
-    data[14] = appearance?.sssThickness ?? 1.0
-    data[15] = 0.0 // padding
+    // emissive: vec3f + emissiveIntensity: f32 (offset 8-11)
+    const emissiveColor = this.parseColor(appearance?.emissiveColor ?? '#000000')
+    data[8] = emissiveColor[0]
+    data[9] = emissiveColor[1]
+    data[10] = emissiveColor[2]
+    data[11] = appearance?.emissiveIntensity ?? 0.0
 
-    // Fresnel
-    data[16] = appearance?.fresnelEnabled ? 1 : 0
-    data[17] = appearance?.fresnelIntensity ?? 1.0
+    // ior, transmission, thickness (offset 12-14)
+    data[12] = pbr?.face?.ior ?? 1.5
+    data[13] = pbr?.face?.transmission ?? 0.0
+    data[14] = pbr?.face?.thickness ?? 1.0
 
-    // Color algorithm
-    data[18] = appearance?.colorAlgorithm ?? 0
+    // sssEnabled: u32 (offset 15)
+    const sssEnabled = appearance?.sssEnabled ?? false
+    dataView.setUint32(15 * 4, sssEnabled ? 1 : 0, true)
+
+    // sssIntensity: f32 (offset 16)
+    data[16] = appearance?.sssIntensity ?? 1.0
+
+    // sssColor: vec3f (offset 17-19)
+    const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
+    data[17] = sssColor[0]
+    data[18] = sssColor[1]
+    data[19] = sssColor[2]
+
+    // sssThickness, sssJitter (offset 20-21)
+    data[20] = appearance?.sssThickness ?? 1.0
+    data[21] = appearance?.sssJitter ?? 0.2
+
+    // fresnelEnabled: u32 (offset 22) - uses edgesVisible from appearance store
+    const fresnelEnabled = appearance?.edgesVisible ?? true
+    dataView.setUint32(22 * 4, fresnelEnabled ? 1 : 0, true)
+
+    // fresnelIntensity: f32 (offset 23)
+    data[23] = appearance?.fresnelIntensity ?? 0.5
+
+    // rimColor: vec3f (offset 24-26) - uses edgeColor from appearance store
+    const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
+    data[24] = rimColor[0]
+    data[25] = rimColor[1]
+    data[26] = rimColor[2]
+
+    // _padding2 (offset 27)
+    data[27] = 0.0
 
     this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
+  }
+
+
+  /**
+   * Update quality uniforms.
+   */
+  updateQualityUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.qualityUniformBuffer) return
+
+    const performance = ctx.frame?.stores?.['performance'] as any
+    const lighting = ctx.frame?.stores?.['lighting'] as any
+    const environment = ctx.frame?.stores?.['environment'] as any
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as any
+
+    // QualityUniforms struct layout:
+    // sdfMaxIterations: i32 (0)
+    // sdfSurfaceDistance: f32 (1)
+    // shadowQuality: i32 (2)
+    // shadowSoftness: f32 (3)
+    // aoEnabled: i32 (4)
+    // aoSamples: i32 (5)
+    // aoRadius: f32 (6)
+    // aoIntensity: f32 (7)
+    // iblQuality: i32 (8)
+    // iblIntensity: f32 (9)
+    // qualityMultiplier: f32 (10)
+    // _padding: f32 (11)
+    const data = new Float32Array(12)
+
+    // Quality multiplier affects ray march quality
+    const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
+    data[1] = 0.001 / qualityMultiplier // sdfSurfaceDistance (smaller = more precise)
+    data[3] = lighting?.shadowSoftness ?? 0.5 // shadowSoftness
+    data[6] = performance?.aoRadius ?? 0.5 // aoRadius
+    data[7] = performance?.aoIntensity ?? 1.0 // aoIntensity
+    data[9] = environment?.iblIntensity ?? 1.0 // iblIntensity
+    data[10] = qualityMultiplier // qualityMultiplier
+
+    const dataView = new DataView(data.buffer)
+    dataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
+    dataView.setInt32(2 * 4, lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0, true) // shadowQuality
+    // aoEnabled: Use postProcessing.ssaoEnabled (global toggle) like WebGL
+    dataView.setInt32(4 * 4, postProcessing?.ssaoEnabled ? 1 : 0, true) // aoEnabled
+    dataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
+    dataView.setInt32(8 * 4, this.rendererConfig.ibl ? (environment?.iblQuality ?? 1) : 0, true) // iblQuality
+
+    this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)
+  }
+
+  /**
+   * Update IBL uniforms from environment store.
+   */
+  updateIBLUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.iblUniformBuffer || !this.rendererConfig.ibl) return
+
+    const environment = ctx.frame?.stores?.['environment'] as any
+
+    // IBLUniforms struct layout:
+    // envMapSize: f32 (0)
+    // iblIntensity: f32 (1)
+    // iblQuality: i32 (2)
+    // _padding: f32 (3)
+    const data = new Float32Array(4)
+    data[0] = environment?.envMapSize ?? 256.0 // envMapSize
+    data[1] = environment?.iblIntensity ?? 1.0 // iblIntensity
+
+    const dataView = new DataView(data.buffer)
+    dataView.setInt32(2 * 4, environment?.iblQuality ?? 1, true) // iblQuality
+
+    this.writeUniformBuffer(this.device, this.iblUniformBuffer, data)
   }
 
   /**
@@ -673,48 +1049,68 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
 
-    const data = new Float32Array(128) // 512 bytes
+    // LightingUniforms struct layout:
+    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
+    // struct LightingUniforms {
+    //   lights: array<LightData, 8>,  // offset 0, 512 bytes
+    //   ambientColor: vec3f,          // offset 512 (128 floats)
+    //   ambientIntensity: f32,        // offset 524 (131 floats)
+    //   lightCount: i32,              // offset 528 (132 floats)
+    //   _padding: vec3f,              // offset 532
+    // }
+    // Total: 544 bytes = 136 floats, buffer is 576 bytes = 144 floats
+    const data = new Float32Array(144)
 
-    // Number of lights
     const lights = lighting.lights ?? []
-    data[0] = Math.min(lights.length, 8)
+    const lightCount = Math.min(lights.length, 8)
 
-    // Ambient light
-    data[1] = lighting.ambientEnabled ? 1 : 0
-    data[2] = lighting.ambientIntensity ?? 0.3
-    data[3] = 0.0 // padding
-
-    // Ambient color
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[4] = ambientColor[0]
-    data[5] = ambientColor[1]
-    data[6] = ambientColor[2]
-    data[7] = 1.0
-
-    // Per-light data (8 lights max, 12 floats each starting at offset 8)
-    for (let i = 0; i < Math.min(lights.length, 8); i++) {
+    // Pack lights array first (offset 0, each light is 16 floats = 64 bytes)
+    for (let i = 0; i < lightCount; i++) {
       const light = lights[i]
-      const offset = 8 + i * 12
+      const offset = i * 16 // 16 floats per LightData
 
-      // Light type (0=point, 1=directional, 2=spot)
-      data[offset + 0] = light.type === 'directional' ? 1 : light.type === 'spot' ? 2 : 0
-      data[offset + 1] = light.enabled ? 1 : 0
-      data[offset + 2] = light.intensity ?? 1.0
-      data[offset + 3] = light.range ?? 100.0
+      // position: vec4f (xyz = position, w = type)
+      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
+      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
+      data[offset + 0] = light.position?.[0] ?? 0
+      data[offset + 1] = light.position?.[1] ?? 5
+      data[offset + 2] = light.position?.[2] ?? 0
+      data[offset + 3] = lightType
 
-      // Position
-      data[offset + 4] = light.position?.[0] ?? 0
-      data[offset + 5] = light.position?.[1] ?? 5
-      data[offset + 6] = light.position?.[2] ?? 0
-      data[offset + 7] = 0.0
+      // direction: vec4f (xyz = direction, w = range)
+      data[offset + 4] = light.direction?.[0] ?? 0
+      data[offset + 5] = light.direction?.[1] ?? -1
+      data[offset + 6] = light.direction?.[2] ?? 0
+      data[offset + 7] = light.range ?? 100.0
 
-      // Color
+      // color: vec4f (rgb = color, a = intensity)
       const lightColor = this.parseColor(light.color ?? '#ffffff')
       data[offset + 8] = lightColor[0]
       data[offset + 9] = lightColor[1]
       data[offset + 10] = lightColor[2]
-      data[offset + 11] = 1.0
+      data[offset + 11] = light.intensity ?? 1.0
+
+      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
+      data[offset + 12] = light.decay ?? 2.0
+      data[offset + 13] = light.spotCosInner ?? 0.9
+      data[offset + 14] = light.spotCosOuter ?? 0.7
+      data[offset + 15] = light.enabled ? 1.0 : 0.0
     }
+
+    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
+    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
+    data[128] = ambientColor[0]
+    data[129] = ambientColor[1]
+    data[130] = ambientColor[2]
+
+    // ambientIntensity: f32 at offset 131
+    data[131] = (lighting.ambientEnabled ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
+
+    // lightCount: i32 at offset 132 - use DataView for proper type
+    const dataView = new DataView(data.buffer)
+    dataView.setInt32(132 * 4, lightCount, true)
+
+    // _padding: vec3f at offset 133-135 (already zeroed)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
   }
@@ -734,16 +1130,18 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
   }
 
   execute(ctx: WebGPURenderContext): void {
-    if (
-      !this.device ||
-      !this.renderPipeline ||
-      !this.vertexBuffer ||
-      !this.indexBuffer ||
-      !this.cameraBindGroup ||
-      !this.lightingBindGroup ||
-      !this.materialBindGroup ||
-      !this.objectBindGroup
-    ) {
+    // DEBUG: Log which resources are missing
+    const missingResources: string[] = []
+    if (!this.device) missingResources.push('device')
+    if (!this.renderPipeline) missingResources.push('renderPipeline')
+    if (!this.vertexBuffer) missingResources.push('vertexBuffer')
+    if (!this.indexBuffer) missingResources.push('indexBuffer')
+    if (!this.cameraBindGroup) missingResources.push('cameraBindGroup')
+    if (!this.lightingBindGroup) missingResources.push('lightingBindGroup')
+    if (!this.objectBindGroup) missingResources.push('objectBindGroup')
+
+    if (missingResources.length > 0) {
+      console.warn('[WebGPU Mandelbulb] Missing resources:', missingResources.join(', '))
       return
     }
 
@@ -753,13 +1151,22 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     this.updateBasisUniforms(ctx)
     this.updateMaterialUniforms(ctx)
     this.updateLightingUniforms(ctx)
+    this.updateQualityUniforms(ctx)
+    this.updateIBLUniforms(ctx)
 
     // Get render targets
-    const colorView = ctx.getWriteTarget('hdr-color')
+    const colorView = ctx.getWriteTarget('object-color')
     const normalView = ctx.getWriteTarget('normal-buffer')
     const depthView = ctx.getWriteTarget('depth-buffer')
 
-    if (!colorView || !normalView || !depthView) return
+    if (!colorView || !normalView || !depthView) {
+      console.warn('[WebGPU Mandelbulb] Missing render targets:', {
+        colorView: !!colorView,
+        normalView: !!normalView,
+        depthView: !!depthView,
+      })
+      return
+    }
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -786,12 +1193,18 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
       },
     })
 
+    // Set pipeline and bind groups - consolidated layout
+    // Group 0: Camera
+    // Group 1: Combined (Lighting + Material + Quality)
+    // Group 2: Object (Mandelbulb + Basis)
+    // Group 3: IBL (if enabled)
     passEncoder.setPipeline(this.renderPipeline)
     passEncoder.setBindGroup(0, this.cameraBindGroup)
-    passEncoder.setBindGroup(1, this.lightingBindGroup)
-    passEncoder.setBindGroup(2, this.materialBindGroup)
-    passEncoder.setBindGroup(3, this.objectBindGroup)
-    passEncoder.setBindGroup(4, this.objectBindGroup) // Placeholder for quality
+    passEncoder.setBindGroup(1, this.lightingBindGroup) // Combined
+    passEncoder.setBindGroup(2, this.objectBindGroup)
+    if (this.rendererConfig.ibl && this.iblBindGroup) {
+      passEncoder.setBindGroup(3, this.iblBindGroup)
+    }
 
     passEncoder.setVertexBuffer(0, this.vertexBuffer)
     passEncoder.setIndexBuffer(this.indexBuffer, 'uint16')
@@ -809,6 +1222,8 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     this.qualityUniformBuffer?.destroy()
     this.mandelbulbUniformBuffer?.destroy()
     this.basisUniformBuffer?.destroy()
+    this.iblUniformBuffer?.destroy()
+    this.envMapTexture?.destroy()
 
     this.vertexBuffer = null
     this.indexBuffer = null
@@ -818,6 +1233,11 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     this.qualityUniformBuffer = null
     this.mandelbulbUniformBuffer = null
     this.basisUniformBuffer = null
+    this.iblUniformBuffer = null
+    this.iblBindGroup = null
+    this.iblBindGroupLayout = null
+    this.envMapTexture = null
+    this.envMapSampler = null
 
     super.dispose()
   }
