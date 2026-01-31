@@ -981,6 +981,8 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const lighting = ctx.frame?.stores?.['lighting'] as any
     const environment = ctx.frame?.stores?.['environment'] as any
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as any
+    const extended = ctx.frame?.stores?.['extended'] as any
+    const mandelbulb = extended?.mandelbulb
 
     // QualityUniforms struct layout:
     // sdfMaxIterations: i32 (0)
@@ -997,9 +999,13 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     // _padding: f32 (11)
     const data = new Float32Array(12)
 
-    // Quality multiplier affects ray march quality
-    const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    data[1] = 0.001 / qualityMultiplier // sdfSurfaceDistance (smaller = more precise)
+    // Read SDF parameters from store (user-configurable), with fallback defaults
+    const sdfMaxIterations = mandelbulb?.sdfMaxIterations ?? 64
+    const sdfSurfaceDistance = mandelbulb?.sdfSurfaceDistance ?? 0.001
+    const qualityMultiplier = mandelbulb?.qualityMultiplier ?? performance?.qualityMultiplier ?? 1.0
+    const aoSamples = mandelbulb?.aoSamples ?? 4
+
+    data[1] = sdfSurfaceDistance / qualityMultiplier // sdfSurfaceDistance (smaller = more precise)
     data[3] = lighting?.shadowSoftness ?? 0.5 // shadowSoftness
     data[6] = performance?.aoRadius ?? 0.5 // aoRadius
     data[7] = performance?.aoIntensity ?? 1.0 // aoIntensity
@@ -1007,11 +1013,11 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     data[10] = qualityMultiplier // qualityMultiplier
 
     const dataView = new DataView(data.buffer)
-    dataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
+    dataView.setInt32(0 * 4, Math.floor(sdfMaxIterations * qualityMultiplier), true) // sdfMaxIterations
     dataView.setInt32(2 * 4, lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0, true) // shadowQuality
     // aoEnabled: Use postProcessing.ssaoEnabled (global toggle) like WebGL
     dataView.setInt32(4 * 4, postProcessing?.ssaoEnabled ? 1 : 0, true) // aoEnabled
-    dataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
+    dataView.setInt32(5 * 4, Math.floor(aoSamples * qualityMultiplier), true) // aoSamples
     dataView.setInt32(8 * 4, this.rendererConfig.ibl ? (environment?.iblQuality ?? 1) : 0, true) // iblQuality
 
     this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)

@@ -652,42 +652,66 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
 
-    const data = new Float32Array(128) // 512 bytes
+    // LightingUniforms struct layout (matches Julia/other renderers):
+    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
+    // struct LightingUniforms {
+    //   lights: array<LightData, 8>,  // offset 0, 512 bytes
+    //   ambientColor: vec3f,          // offset 512 (128 floats)
+    //   ambientIntensity: f32,        // offset 524 (131 floats)
+    //   lightCount: i32,              // offset 528 (132 floats)
+    //   _padding: vec3f,              // offset 532
+    // }
+    // Total: 544 bytes = 136 floats, buffer is 576 bytes = 144 floats
+    const data = new Float32Array(144)
 
     const lights = lighting.lights ?? []
-    data[0] = Math.min(lights.length, 8)
+    const lightCount = Math.min(lights.length, 8)
 
-    data[1] = lighting.ambientEnabled ? 1 : 0
-    data[2] = lighting.ambientIntensity ?? 0.3
-    data[3] = 0.0
-
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[4] = ambientColor[0]
-    data[5] = ambientColor[1]
-    data[6] = ambientColor[2]
-    data[7] = 1.0
-
-    for (let i = 0; i < Math.min(lights.length, 8); i++) {
+    // Pack lights array first (offset 0, each light is 16 floats = 64 bytes)
+    for (let i = 0; i < lightCount; i++) {
       const light = lights[i]
-      const offset = 8 + i * 12
+      const offset = i * 16 // 16 floats per LightData
 
+      // position: vec4f (xyz = position, w = type)
       // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-      data[offset + 0] = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-      data[offset + 1] = light.enabled ? 1 : 0
-      data[offset + 2] = light.intensity ?? 1.0
-      data[offset + 3] = light.range ?? 100.0
+      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
+      data[offset + 0] = light.position?.[0] ?? 0
+      data[offset + 1] = light.position?.[1] ?? 5
+      data[offset + 2] = light.position?.[2] ?? 0
+      data[offset + 3] = lightType
 
-      data[offset + 4] = light.position?.[0] ?? 0
-      data[offset + 5] = light.position?.[1] ?? 5
-      data[offset + 6] = light.position?.[2] ?? 0
-      data[offset + 7] = 0.0
+      // direction: vec4f (xyz = direction, w = range)
+      data[offset + 4] = light.direction?.[0] ?? 0
+      data[offset + 5] = light.direction?.[1] ?? -1
+      data[offset + 6] = light.direction?.[2] ?? 0
+      data[offset + 7] = light.range ?? 100.0
 
+      // color: vec4f (rgb = color, a = intensity)
       const lightColor = this.parseColor(light.color ?? '#ffffff')
       data[offset + 8] = lightColor[0]
       data[offset + 9] = lightColor[1]
       data[offset + 10] = lightColor[2]
-      data[offset + 11] = 1.0
+      data[offset + 11] = light.intensity ?? 1.0
+
+      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
+      data[offset + 12] = light.decay ?? 2.0
+      data[offset + 13] = light.spotCosInner ?? 0.9
+      data[offset + 14] = light.spotCosOuter ?? 0.7
+      data[offset + 15] = light.enabled ? 1.0 : 0.0
     }
+
+    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
+    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
+    data[128] = ambientColor[0]
+    data[129] = ambientColor[1]
+    data[130] = ambientColor[2]
+
+    // ambientIntensity: f32 at offset 131
+    data[131] = (lighting.ambientEnabled ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
+
+    // lightCount: i32 at offset 132 - use DataView for proper type
+    const dataView = new DataView(data.buffer)
+    dataView.setInt32(132 * 4, lightCount, true)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
   }
@@ -735,12 +759,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const data = new Float32Array(32) // 128 bytes
     const dataView = new DataView(data.buffer)
 
-    // baseColor: vec4f (offset 0-3)
+    // baseColor: vec4f (offset 0-3) - includes faceOpacity for alpha
     const faceColor = this.parseColor(appearance?.faceColor ?? '#ffffff')
     data[0] = faceColor[0]
     data[1] = faceColor[1]
     data[2] = faceColor[2]
-    data[3] = 1.0
+    data[3] = appearance?.faceOpacity ?? 1.0
 
     // metallic, roughness, reflectance, ao (offset 4-7)
     data[4] = pbr?.face?.metallic ?? 0.0
@@ -749,11 +773,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[7] = 1.0 // ao (ambient occlusion factor)
 
     // emissive: vec3f + emissiveIntensity: f32 (offset 8-11)
-    const emissiveColor = this.parseColor(appearance?.emissiveColor ?? '#000000')
-    data[8] = emissiveColor[0]
-    data[9] = emissiveColor[1]
-    data[10] = emissiveColor[2]
-    data[11] = appearance?.emissiveIntensity ?? 0.0
+    // Use faceColor as emissive color, scaled by faceEmission intensity
+    const faceEmission = appearance?.faceEmission ?? 0.0
+    data[8] = faceColor[0]
+    data[9] = faceColor[1]
+    data[10] = faceColor[2]
+    data[11] = faceEmission
 
     // ior, transmission, thickness (offset 12-14)
     data[12] = pbr?.face?.ior ?? 1.5
@@ -777,12 +802,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[20] = appearance?.sssThickness ?? 1.0
     data[21] = appearance?.sssJitter ?? 0.2
 
-    // fresnelEnabled: u32 (offset 22) - uses edgesVisible from appearance store
-    const fresnelEnabled = appearance?.edgesVisible ?? true
+    // fresnelEnabled: u32 (offset 22) - uses fresnelEnabled from appearance store
+    const fresnelEnabled = appearance?.fresnelEnabled ?? true
     dataView.setUint32(22 * 4, fresnelEnabled ? 1 : 0, true)
 
-    // fresnelIntensity: f32 (offset 23)
-    data[23] = appearance?.fresnelIntensity ?? 0.5
+    // fresnelIntensity: f32 (offset 23) - combine with faceRimFalloff for effect strength
+    const rimFalloff = appearance?.faceRimFalloff ?? 1.0
+    data[23] = (appearance?.fresnelIntensity ?? 0.5) * rimFalloff
 
     // rimColor: vec3f (offset 24-26) - uses edgeColor from appearance store
     const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
