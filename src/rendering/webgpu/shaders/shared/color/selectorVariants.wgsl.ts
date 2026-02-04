@@ -38,7 +38,7 @@ export function generateColorSelectorBlock(algorithm: ColorAlgorithm): string {
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
   let distributedT = applyDistribution(t, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
   let newL = 0.3 + distributedT * 0.4;
-  return hsl2rgb(vec3f(baseHSL.x, baseHSL.y, newL));
+  return hsl2rgb(baseHSL.x, baseHSL.y, newL);
 }
 `
 
@@ -53,7 +53,7 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
   let distributedT = applyDistribution(t, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
   let hueOffset = (distributedT - 0.5) * 0.167;
   let newH = fract(baseHSL.x + hueOffset);
-  return hsl2rgb(vec3f(newH, baseHSL.y, baseHSL.z));
+  return hsl2rgb(newH, baseHSL.y, baseHSL.z);
 }
 `
 

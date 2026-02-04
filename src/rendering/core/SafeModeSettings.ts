@@ -114,6 +114,7 @@ export function captureCurrentSettings(): SafeModeSnapshot {
 
 /**
  * Restore settings from a snapshot.
+ * @param snapshot
  */
 export function restoreSettings(snapshot: SafeModeSnapshot): void {
   usePerformanceStore.getState().setRenderResolutionScale(snapshot.renderResolutionScale)

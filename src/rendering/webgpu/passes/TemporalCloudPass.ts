@@ -419,24 +419,6 @@ fn main(input: VertexOutput) -> FragmentOutput {
 }
 `
 
-/**
- * Copy Shader for initializing history buffers.
- */
-const COPY_SHADER = /* wgsl */ `
-@group(0) @binding(0) var texSampler: sampler;
-@group(0) @binding(1) var tSource: texture_2d<f32>;
-
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
-
-@fragment
-fn main(input: VertexOutput) -> @location(0) vec4f {
-  return textureSample(tSource, texSampler, input.uv);
-}
-`
-
 // =============================================================================
 // Pass Implementation
 // =============================================================================
@@ -467,12 +449,10 @@ export class TemporalCloudPass extends WebGPUBasePass {
   // Pipelines
   private reprojectionPipeline: GPURenderPipeline | null = null
   private reconstructionPipeline: GPURenderPipeline | null = null
-  private copyPipeline: GPURenderPipeline | null = null
 
   // Bind group layouts
   private passBindGroupLayout: GPUBindGroupLayout | null = null
   private reconstructionBindGroupLayout: GPUBindGroupLayout | null = null
-  private copyBindGroupLayout: GPUBindGroupLayout | null = null
 
   // Uniform buffers
   private reprojectionUniformBuffer: GPUBuffer | null = null
@@ -522,6 +502,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipelines.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -588,23 +569,6 @@ export class TemporalCloudPass extends WebGPUBasePass {
       ],
     })
 
-    // Create copy bind group layout
-    this.copyBindGroupLayout = device.createBindGroupLayout({
-      label: 'temporal-cloud-copy-bgl',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const },
-        },
-      ],
-    })
-
     // Create shader modules
     const reprojectionFragmentModule = this.createShaderModule(
       device,
@@ -616,12 +580,6 @@ export class TemporalCloudPass extends WebGPUBasePass {
       device,
       RECONSTRUCTION_SHADER,
       'temporal-cloud-reconstruction-fragment'
-    )
-
-    const copyFragmentModule = this.createShaderModule(
-      device,
-      COPY_SHADER,
-      'temporal-cloud-copy-fragment'
     )
 
     // Create reprojection pipeline (MRT: 2 outputs)
@@ -640,15 +598,6 @@ export class TemporalCloudPass extends WebGPUBasePass {
       [this.reconstructionBindGroupLayout],
       [this.textureFormat, this.textureFormat],
       { label: 'temporal-cloud-reconstruction' }
-    )
-
-    // Create copy pipeline
-    this.copyPipeline = this.createFullscreenPipeline(
-      device,
-      copyFragmentModule,
-      [this.copyBindGroupLayout],
-      this.textureFormat,
-      { label: 'temporal-cloud-copy' }
     )
 
     // Create uniform buffers
@@ -678,6 +627,12 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
   /**
    * Create a render pipeline with multiple render targets (MRT).
+   * @param device
+   * @param fragmentShader
+   * @param bindGroupLayouts
+   * @param colorFormats
+   * @param options
+   * @param options.label
    */
   private createMRTPipeline(
     device: GPUDevice,
@@ -723,6 +678,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
   /**
    * Set history weight.
+   * @param value
    */
   setHistoryWeight(value: number): void {
     this.historyWeight = value
@@ -730,6 +686,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
   /**
    * Set disocclusion threshold.
+   * @param value
    */
   setDisocclusionThreshold(value: number): void {
     this.disocclusionThreshold = value
@@ -746,6 +703,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
   /**
    * Update camera state from external source.
    * Call this each frame before execute() with the current view-projection matrix.
+   * @param viewProjectionMatrix
    */
   updateCameraState(viewProjectionMatrix: Float32Array): void {
     // Store previous matrix
@@ -754,18 +712,17 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
   /**
    * Execute the temporal cloud pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
       !this.reprojectionPipeline ||
       !this.reconstructionPipeline ||
-      !this.copyPipeline ||
       !this.reprojectionUniformBuffer ||
       !this.reconstructionUniformBuffer ||
       !this.passBindGroupLayout ||
       !this.reconstructionBindGroupLayout ||
-      !this.copyBindGroupLayout ||
       !this.sampler
     ) {
       return
@@ -808,6 +765,42 @@ export class TemporalCloudPass extends WebGPUBasePass {
     const cloudWidth = cloudResource?.width ?? width / 2
     const cloudHeight = cloudResource?.height ?? height / 2
 
+    // Get camera data from stores
+    const camera = ctx.frame?.stores?.['camera'] as {
+      viewProjectionMatrix?: { elements: number[] }
+      position?: { x: number; y: number; z: number } | [number, number, number]
+    }
+
+    // Extract current viewProjectionMatrix from camera store
+    const currentViewProjectionMatrix = new Float32Array(16)
+    if (camera?.viewProjectionMatrix?.elements) {
+      for (let i = 0; i < 16; i++) {
+        currentViewProjectionMatrix[i] = camera.viewProjectionMatrix.elements[i] ?? 0
+      }
+    } else {
+      // Identity matrix fallback
+      currentViewProjectionMatrix[0] = 1
+      currentViewProjectionMatrix[5] = 1
+      currentViewProjectionMatrix[10] = 1
+      currentViewProjectionMatrix[15] = 1
+    }
+
+    // Extract camera position
+    let cameraX = 0,
+      cameraY = 0,
+      cameraZ = 0
+    if (camera?.position) {
+      if (Array.isArray(camera.position)) {
+        cameraX = camera.position[0] ?? 0
+        cameraY = camera.position[1] ?? 0
+        cameraZ = camera.position[2] ?? 0
+      } else {
+        cameraX = camera.position.x ?? 0
+        cameraY = camera.position.y ?? 0
+        cameraZ = camera.position.z ?? 0
+      }
+    }
+
     // === REPROJECTION PASS ===
     if (this.hasValidHistory) {
       // Update reprojection uniforms
@@ -819,16 +812,15 @@ export class TemporalCloudPass extends WebGPUBasePass {
         reprojView.setFloat32(i * 4, this.prevViewProjectionMatrix[i] ?? 0, true)
       }
 
-      // viewProjectionMatrix (offset 64, 64 bytes) - using prev for now
-      // In actual usage, this should come from current frame camera
+      // viewProjectionMatrix (offset 64, 64 bytes) - current frame's matrix
       for (let i = 0; i < 16; i++) {
-        reprojView.setFloat32(64 + i * 4, this.prevViewProjectionMatrix[i] ?? 0, true)
+        reprojView.setFloat32(64 + i * 4, currentViewProjectionMatrix[i] ?? 0, true)
       }
 
       // cameraPosition (offset 128, 12 bytes) + pad
-      reprojView.setFloat32(128, 0, true) // x
-      reprojView.setFloat32(132, 0, true) // y
-      reprojView.setFloat32(136, 0, true) // z
+      reprojView.setFloat32(128, cameraX, true)
+      reprojView.setFloat32(132, cameraY, true)
+      reprojView.setFloat32(136, cameraZ, true)
       reprojView.setFloat32(140, 0, true) // pad
 
       // accumulationResolution (offset 144, 8 bytes) + disocclusionThreshold + pad
@@ -898,10 +890,20 @@ export class TemporalCloudPass extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.reconstructionUniformBuffer, reconData)
 
     // For reconstruction, we need reprojection outputs as inputs
-    // If no valid history, create dummy textures or use cloud textures
-    const reprojHistoryView = this.hasValidHistory ? reprojColorView : cloudColorView
+    // IMPORTANT: Use getTextureView() for reading, not the write targets, to avoid read-after-write hazard
+    // If no valid history, use cloud textures as fallback
+    const reprojHistoryReadView = this.hasValidHistory
+      ? ctx.getTextureView(this.passConfig.reprojectionColorOutput)
+      : cloudColorView
     const reprojPositionView = this.hasValidHistory ? accumPositionReadView : cloudPositionView
-    const validityView = this.hasValidHistory ? reprojValidityView : cloudColorView
+    const validityReadView = this.hasValidHistory
+      ? ctx.getTextureView(this.passConfig.reprojectionValidityOutput)
+      : cloudColorView
+
+    // Guard against missing read views
+    if (!reprojHistoryReadView || !validityReadView) {
+      return
+    }
 
     const reconBindGroup = this.device.createBindGroup({
       label: 'temporal-cloud-reconstruction-bg',
@@ -911,9 +913,9 @@ export class TemporalCloudPass extends WebGPUBasePass {
         { binding: 1, resource: this.sampler },
         { binding: 2, resource: cloudColorView },
         { binding: 3, resource: cloudPositionView },
-        { binding: 4, resource: reprojHistoryView },
+        { binding: 4, resource: reprojHistoryReadView },
         { binding: 5, resource: reprojPositionView },
-        { binding: 6, resource: validityView },
+        { binding: 6, resource: validityReadView },
       ],
     })
 
@@ -941,6 +943,9 @@ export class TemporalCloudPass extends WebGPUBasePass {
     // Update state for next frame
     this.frameIndex = (this.frameIndex + 1) % 4
     this.hasValidHistory = true
+
+    // Store current viewProjectionMatrix for next frame's reprojection
+    this.prevViewProjectionMatrix.set(currentViewProjectionMatrix)
   }
 
   /**
@@ -964,10 +969,8 @@ export class TemporalCloudPass extends WebGPUBasePass {
   dispose(): void {
     this.reprojectionPipeline = null
     this.reconstructionPipeline = null
-    this.copyPipeline = null
     this.passBindGroupLayout = null
     this.reconstructionBindGroupLayout = null
-    this.copyBindGroupLayout = null
     this.reprojectionUniformBuffer?.destroy()
     this.reprojectionUniformBuffer = null
     this.reconstructionUniformBuffer?.destroy()

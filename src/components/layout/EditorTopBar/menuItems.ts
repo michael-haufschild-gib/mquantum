@@ -16,6 +16,8 @@ import type { MenuContext, MenuItem } from './types'
 
 /**
  * Build accent color menu items
+ * @param accent
+ * @param setAccent
  */
 export function buildAccentItems(
   accent: ThemeAccent,
@@ -30,6 +32,8 @@ export function buildAccentItems(
 
 /**
  * Build theme mode menu items
+ * @param mode
+ * @param setMode
  */
 export function buildModeItems(mode: ThemeMode, setMode: (mode: ThemeMode) => void): MenuItem[] {
   const modes: ThemeMode[] = ['light', 'dark', 'system']
@@ -41,6 +45,9 @@ export function buildModeItems(mode: ThemeMode, setMode: (mode: ThemeMode) => vo
 
 /**
  * Build theme preset menu items
+ * @param setPreset
+ * @param modeItems
+ * @param accentItems
  */
 export function buildPresetItems(
   setPreset: (presetId: string) => void,
@@ -68,6 +75,9 @@ export function buildPresetItems(
 
 /**
  * Build saved scene menu items
+ * @param savedScenes
+ * @param loadScene
+ * @param addToast
  */
 export function buildSavedSceneItems(
   savedScenes: SavedScene[],
@@ -86,6 +96,7 @@ export function buildSavedSceneItems(
 
 /**
  * Build example scene menu items
+ * @param addToast
  */
 export function buildExampleSceneItems(
   addToast: (message: string, type?: ToastType) => void
@@ -102,6 +113,11 @@ export function buildExampleSceneItems(
 
 /**
  * Build scenes submenu items
+ * @param savedScenes
+ * @param savedSceneItems
+ * @param exampleSceneItems
+ * @param setSaveSceneOpen
+ * @param setIsSceneManagerOpen
  */
 export function buildSceneSubmenuItems(
   savedScenes: SavedScene[],
@@ -131,6 +147,9 @@ export function buildSceneSubmenuItems(
 
 /**
  * Build saved style menu items
+ * @param savedStyles
+ * @param loadStyle
+ * @param addToast
  */
 export function buildSavedStyleItems(
   savedStyles: SavedStyle[],
@@ -149,6 +168,7 @@ export function buildSavedStyleItems(
 
 /**
  * Build example style menu items
+ * @param addToast
  */
 export function buildExampleStyleItems(
   addToast: (message: string, type?: ToastType) => void
@@ -165,6 +185,11 @@ export function buildExampleStyleItems(
 
 /**
  * Build styles submenu items
+ * @param savedStyles
+ * @param savedStyleItems
+ * @param exampleStyleItems
+ * @param setSaveStyleOpen
+ * @param setIsStyleManagerOpen
  */
 export function buildStyleSubmenuItems(
   savedStyles: SavedStyle[],
@@ -194,6 +219,8 @@ export function buildStyleSubmenuItems(
 
 /**
  * Build File menu items
+ * @param handleExport
+ * @param handleExportVideo
  */
 export function buildFileItems(
   handleExport: () => void,
@@ -218,6 +245,8 @@ export function buildFileItems(
 
 /**
  * Build View menu items
+ * @param ctx
+ * @param presetItems
  */
 export function buildViewItems(
   ctx: Pick<
@@ -263,6 +292,12 @@ export function buildViewItems(
 
 /**
  * Build mobile unified menu items
+ * @param fileItems
+ * @param viewItems
+ * @param sceneSubmenuItems
+ * @param styleSubmenuItems
+ * @param isSoundEnabled
+ * @param toggleSound
  */
 export function buildMobileMenuItems(
   fileItems: MenuItem[],

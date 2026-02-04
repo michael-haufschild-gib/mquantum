@@ -140,26 +140,25 @@ fn getManifoldThicknessScale(dimension: i32, manifoldType: i32, thicknessPerDimM
 fn manifoldDensity(
   pos3d: vec3f,
   ndRadius: f32,
-  time: f32,
-  uniforms: BlackHoleUniforms
+  time: f32
 ) -> f32 {
   let r = diskRadius(pos3d);
   let h = diskHeight(pos3d);
 
   // PERF (OPT-BH-11): Use pre-computed disk radii uniforms
-  let innerR = uniforms.diskInnerR;
-  let outerR = uniforms.diskOuterR;
+  let innerR = blackhole.diskInnerR;
+  let outerR = blackhole.diskOuterR;
 
   // Radial falloff
   var radialFactor = 1.0;
   if (r < innerR) {
-    radialFactor = smoothstep(innerR * (1.0 - uniforms.radialSoftnessMul), innerR, r);
+    radialFactor = smoothstep(innerR * (1.0 - blackhole.radialSoftnessMul), innerR, r);
   } else if (r > outerR) {
-    radialFactor = 1.0 - smoothstep(outerR, outerR * (1.0 + uniforms.radialSoftnessMul), r);
+    radialFactor = 1.0 - smoothstep(outerR, outerR * (1.0 + blackhole.radialSoftnessMul), r);
   }
 
   // PERF (OPT-BH-13): Use pre-computed effective thickness from CPU
-  let thickness = uniforms.effectiveThickness;
+  let thickness = blackhole.effectiveThickness;
 
   // Add extra dimension contributions to height for higher D
   var effectiveH = h;
@@ -168,7 +167,7 @@ fn manifoldDensity(
   // Vertical falloff
   // Guard against zero thickness and extreme exponent values
   let safeThickness = max(thickness, 0.0001);
-  let safeExponent = clamp(uniforms.densityFalloff, 0.1, 10.0);
+  let safeExponent = clamp(blackhole.densityFalloff, 0.1, 10.0);
   let heightRatio = effectiveH / safeThickness;
   // Clamp the ratio before pow to prevent extreme values
   let verticalFactor = exp(-pow(min(heightRatio, 100.0), safeExponent));
@@ -178,11 +177,11 @@ fn manifoldDensity(
 
   // PERF (OPT-BH-25): Use texture-based snoise instead of expensive noise3D
   // Add turbulence noise
-  if (uniforms.noiseAmount > 0.001) {
+  if (blackhole.noiseAmount > 0.001) {
     // Swirl in XZ plane
     let angle = atan2(pos3d.z, pos3d.x);
-    let swirlOffset = uniforms.swirlAmount * r * 0.5 * sin(time);
-    let noisePos = vec3f(r * 0.3, angle * 2.0 + swirlOffset, h * 0.5) * uniforms.noiseScale;
+    let swirlOffset = blackhole.swirlAmount * r * 0.5 * sin(time);
+    let noisePos = vec3f(r * 0.3, angle * 2.0 + swirlOffset, h * 0.5) * blackhole.noiseScale;
 
     // snoise returns [-1, 1], convert to [0, 1] for ridged calculation
     let n = snoise(noisePos + time * 0.1) * 0.5 + 0.5;
@@ -192,7 +191,7 @@ fn manifoldDensity(
     var ridged = 1.0 - abs(2.0 * n - 1.0);
     ridged = ridged * ridged; // PERF: Sharpen ridges (x² instead of pow)
 
-    density *= mix(1.0, ridged, uniforms.noiseAmount);
+    density *= mix(1.0, ridged, blackhole.noiseAmount);
   }
 
   return max(density, 0.0);
@@ -205,36 +204,35 @@ fn manifoldColor(
   pos3d: vec3f,
   ndRadius: f32,
   density: f32,
-  time: f32,
-  uniforms: BlackHoleUniforms
+  time: f32
 ) -> vec3f {
   let r = diskRadius(pos3d);
   // PERF (OPT-BH-11): Use pre-computed disk radii uniforms
-  let innerR = uniforms.diskInnerR;
-  let outerR = uniforms.diskOuterR;
+  let innerR = blackhole.diskInnerR;
+  let outerR = blackhole.diskOuterR;
 
   // Normalized radial position [0, 1]
   // Guard against division by zero when innerR >= outerR
   let radialRange = max(outerR - innerR, 0.001);
   let radialT = clamp((r - innerR) / radialRange, 0.0, 1.0);
 
-  var color = uniforms.baseColor;
+  var color = blackhole.baseColor;
 
   // Palette modes
-  if (uniforms.paletteMode == 0) {
+  if (blackhole.paletteMode == 0) {
     // Disk gradient: hot inner → cool outer
     let innerColor = vec3f(1.0, 0.9, 0.7); // Yellowish-white (hot)
     let outerColor = vec3f(1.0, 0.4, 0.1); // Orange-red (cooler)
     color = mix(innerColor, outerColor, radialT);
-    color *= uniforms.baseColor; // Tint with base color
-  } else if (uniforms.paletteMode == 1) {
+    color *= blackhole.baseColor; // Tint with base color
+  } else if (blackhole.paletteMode == 1) {
     // Normal-based coloring
     let normal = normalize(pos3d);
-    color = abs(normal) * uniforms.baseColor;
-  } else if (uniforms.paletteMode == 2) {
+    color = abs(normal) * blackhole.baseColor;
+  } else if (blackhole.paletteMode == 2) {
     // Shell only - no manifold color
     color = vec3f(0.0);
-  } else if (uniforms.paletteMode == 3) {
+  } else if (blackhole.paletteMode == 3) {
     // Heatmap based on density
     let cold = vec3f(0.1, 0.0, 0.3);
     let mid = vec3f(1.0, 0.3, 0.0);
@@ -247,30 +245,30 @@ fn manifoldColor(
   }
 
   // Add swirl pattern with Keplerian rotation from animation system
-  if (uniforms.swirlAmount > 0.001) {
+  if (blackhole.swirlAmount > 0.001) {
     // Angle in XZ plane
     let angle = atan2(pos3d.z, pos3d.x);
 
     // Keplerian rotation: inner disk rotates faster than outer
     // Skip expensive calculation only when differential is 0 (uniform rotation)
-    var rotationOffset = uniforms.diskRotationAngle;
-    if (uniforms.keplerianDifferential > 0.001) {
+    var rotationOffset = blackhole.diskRotationAngle;
+    if (blackhole.keplerianDifferential > 0.001) {
       // Guard safeR to prevent extreme keplerianFactor when r is near innerR
-      let safeInnerR = max(uniforms.diskInnerR, 0.001);
+      let safeInnerR = max(blackhole.diskInnerR, 0.001);
       let safeR = max(r, max(safeInnerR * 0.1, 0.001));
       let ratio = safeInnerR / safeR;
       // PERF: x^1.5 = x * sqrt(x) is faster than pow(x, 1.5) on GPU
       let keplerianFactor = ratio * sqrt(ratio);
-      rotationOffset *= mix(1.0, keplerianFactor, uniforms.keplerianDifferential);
+      rotationOffset *= mix(1.0, keplerianFactor, blackhole.keplerianDifferential);
     }
 
     let swirlPhase = angle * 3.0 + r * 0.5 + rotationOffset;
     let swirlBright = 0.5 + 0.5 * sin(swirlPhase);
-    color *= mix(0.7, 1.3, swirlBright * uniforms.swirlAmount);
+    color *= mix(0.7, 1.3, swirlBright * blackhole.swirlAmount);
   }
 
   // Apply intensity
-  color *= uniforms.manifoldIntensity * density;
+  color *= blackhole.manifoldIntensity * density;
 
   return color;
 }
@@ -303,17 +301,16 @@ fn manifoldAbsorption(density: f32, stepSize: f32, absorption: f32, enableAbsorp
 fn computeManifoldNormal(
   pos3d: vec3f,
   ndRadius: f32,
-  time: f32,
-  uniforms: BlackHoleUniforms
+  time: f32
 ) -> vec3f {
   // Analytical approach for accretion disk (XZ plane):
   // Normal is primarily vertical (Y) + radial (XZ).
 
   let eps = 0.01;
-  let d0 = manifoldDensity(pos3d, ndRadius, time, uniforms);
+  let d0 = manifoldDensity(pos3d, ndRadius, time);
 
   // Sample only along Y to get vertical gradient
-  let dy = manifoldDensity(pos3d + vec3f(0.0, eps, 0.0), ndRadius, time, uniforms);
+  let dy = manifoldDensity(pos3d + vec3f(0.0, eps, 0.0), ndRadius, time);
   let verticalGrad = (dy - d0) / eps;
 
   // Radial component follows the radial direction in XZ plane
@@ -321,7 +318,7 @@ fn computeManifoldNormal(
   let radialDir = select(vec3f(1.0, 0.0, 0.0), vec3f(pos3d.x / r, 0.0, pos3d.z / r), r > 1e-6);
 
   // Estimate radial gradient (density decreases with radius)
-  let dr = manifoldDensity(pos3d + radialDir * eps, ndRadius, time, uniforms);
+  let dr = manifoldDensity(pos3d + radialDir * eps, ndRadius, time);
   let radialGrad = (dr - d0) / eps;
 
   // Combine vertical (Y) and radial (XZ) components

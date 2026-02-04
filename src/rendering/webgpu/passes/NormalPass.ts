@@ -50,19 +50,20 @@ struct VertexOutput {
 }
 
 // Reconstruct view-space position from UV and depth
+// WebGPU uses depth range [0, 1], not [-1, 1] like OpenGL
 fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
-  // Convert to NDC (clip space)
-  let ndc = vec4f(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+  // Convert to NDC: UV [0,1] -> [-1,1] for X/Y, depth stays [0,1] for WebGPU
+  let ndc = vec4f(uv * 2.0 - 1.0, depth, 1.0);
   // Unproject to view space
   var viewPos = uniforms.inverseProjectionMatrix * ndc;
   viewPos /= viewPos.w;
   return viewPos.xyz;
 }
 
-// Linearize depth for better precision
+// Linearize depth for better precision - WebGPU uses [0, 1] depth range
 fn linearizeDepth(depth: f32) -> f32 {
-  let z = depth * 2.0 - 1.0;
-  return (2.0 * uniforms.near * uniforms.far) / (uniforms.far + uniforms.near - z * (uniforms.far - uniforms.near));
+  // WebGPU depth is already in [0, 1], use the correct formula
+  return (uniforms.near * uniforms.far) / (uniforms.far - depth * (uniforms.far - uniforms.near));
 }
 
 @fragment
@@ -164,6 +165,7 @@ export class NormalPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -219,6 +221,7 @@ export class NormalPass extends WebGPUBasePass {
 
   /**
    * Execute the normal reconstruction pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (

@@ -4,12 +4,16 @@
  * 9-dimensional Mandelbulb signed distance function.
  * Port of GLSL sdf9d.glsl to WGSL.
  *
+ * NOTE: Scale is handled by the dispatch function (GetDist), NOT here.
+ * The SDF works on pure fractal coordinates without scale modification.
+ *
  * @module rendering/webgpu/shaders/mandelbulb/sdf/sdf9d.wgsl
  */
 
 export const sdf9dBlock = /* wgsl */ `
 // ============================================
 // 9D Mandelbulb SDF (Fully unrolled)
+// With proper basis transformation (matching WebGL)
 // ============================================
 
 const MAX_ITER_9D: i32 = 256;
@@ -24,22 +28,54 @@ fn optimizedPow9D(r: f32, p: f32) -> vec2f {
 
 /**
  * 9D Mandelbulb SDF with orbital trap.
+ *
+ * @param pos 3D world position (already scaled by dispatch)
+ * @param basis Basis vectors for N-D transformation
+ * @param uniforms Mandelbulb uniforms
+ * @return vec2f where x = signed distance, y = orbital trap value
  */
 fn mandelbulbSDF9D(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> vec2f {
-  // 9D initialization - unrolled for performance
-  let coord0 = (getBasisComponent(basis.origin, 0) + pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0)) * uniforms.scale;
-  let coord1 = (getBasisComponent(basis.origin, 1) + pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1)) * uniforms.scale;
-  let coord2 = (getBasisComponent(basis.origin, 2) + pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2)) * uniforms.scale;
-  let coord3 = (getBasisComponent(basis.origin, 3) + pos.x * getBasisComponent(basis.basisX, 3) + pos.y * getBasisComponent(basis.basisY, 3) + pos.z * getBasisComponent(basis.basisZ, 3)) * uniforms.scale;
-  let coord4 = (getBasisComponent(basis.origin, 4) + pos.x * getBasisComponent(basis.basisX, 4) + pos.y * getBasisComponent(basis.basisY, 4) + pos.z * getBasisComponent(basis.basisZ, 4)) * uniforms.scale;
-  let coord5 = (getBasisComponent(basis.origin, 5) + pos.x * getBasisComponent(basis.basisX, 5) + pos.y * getBasisComponent(basis.basisY, 5) + pos.z * getBasisComponent(basis.basisZ, 5)) * uniforms.scale;
-  let coord6 = (getBasisComponent(basis.origin, 6) + pos.x * getBasisComponent(basis.basisX, 6) + pos.y * getBasisComponent(basis.basisY, 6) + pos.z * getBasisComponent(basis.basisZ, 6)) * uniforms.scale;
-  let coord7 = (getBasisComponent(basis.origin, 7) + pos.x * getBasisComponent(basis.basisX, 7) + pos.y * getBasisComponent(basis.basisY, 7) + pos.z * getBasisComponent(basis.basisZ, 7)) * uniforms.scale;
-  let coord8 = (getBasisComponent(basis.origin, 8) + pos.x * getBasisComponent(basis.basisX, 8) + pos.y * getBasisComponent(basis.basisY, 8) + pos.z * getBasisComponent(basis.basisZ, 8)) * uniforms.scale;
+  // 9D initialization - transform using basis vectors (matching WebGL)
+  let coord0 = getBasisComponent(basis.origin, 0) +
+               pos.x * getBasisComponent(basis.basisX, 0) +
+               pos.y * getBasisComponent(basis.basisY, 0) +
+               pos.z * getBasisComponent(basis.basisZ, 0);
+  let coord1 = getBasisComponent(basis.origin, 1) +
+               pos.x * getBasisComponent(basis.basisX, 1) +
+               pos.y * getBasisComponent(basis.basisY, 1) +
+               pos.z * getBasisComponent(basis.basisZ, 1);
+  let coord2 = getBasisComponent(basis.origin, 2) +
+               pos.x * getBasisComponent(basis.basisX, 2) +
+               pos.y * getBasisComponent(basis.basisY, 2) +
+               pos.z * getBasisComponent(basis.basisZ, 2);
+  let coord3 = getBasisComponent(basis.origin, 3) +
+               pos.x * getBasisComponent(basis.basisX, 3) +
+               pos.y * getBasisComponent(basis.basisY, 3) +
+               pos.z * getBasisComponent(basis.basisZ, 3);
+  let coord4 = getBasisComponent(basis.origin, 4) +
+               pos.x * getBasisComponent(basis.basisX, 4) +
+               pos.y * getBasisComponent(basis.basisY, 4) +
+               pos.z * getBasisComponent(basis.basisZ, 4);
+  let coord5 = getBasisComponent(basis.origin, 5) +
+               pos.x * getBasisComponent(basis.basisX, 5) +
+               pos.y * getBasisComponent(basis.basisY, 5) +
+               pos.z * getBasisComponent(basis.basisZ, 5);
+  let coord6 = getBasisComponent(basis.origin, 6) +
+               pos.x * getBasisComponent(basis.basisX, 6) +
+               pos.y * getBasisComponent(basis.basisY, 6) +
+               pos.z * getBasisComponent(basis.basisZ, 6);
+  let coord7 = getBasisComponent(basis.origin, 7) +
+               pos.x * getBasisComponent(basis.basisX, 7) +
+               pos.y * getBasisComponent(basis.basisY, 7) +
+               pos.z * getBasisComponent(basis.basisZ, 7);
+  let coord8 = getBasisComponent(basis.origin, 8) +
+               pos.x * getBasisComponent(basis.basisX, 8) +
+               pos.y * getBasisComponent(basis.basisY, 8) +
+               pos.z * getBasisComponent(basis.basisZ, 8);
 
   var z0 = coord0; var z1 = coord1; var z2 = coord2; var z3 = coord3;
   var z4 = coord4; var z5 = coord5; var z6 = coord6; var z7 = coord7; var z8 = coord8;
@@ -53,7 +89,7 @@ fn mandelbulbSDF9D(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
   let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
@@ -121,29 +157,62 @@ fn mandelbulbSDF9D(
   }
 
   let minA = sqrt(minASq);
-  let trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 + exp(-minS * 8.0) * 0.2 + f32(escIt) / f32(max(maxIt, 1)) * 0.3;
-  let dist = max(0.5 * log(max(r, EPS_9D)) * r / max(dr, EPS_9D), EPS_9D) / uniforms.scale;
+  let trap = exp(-minP * 5.0) * 0.3 +
+             exp(-minA * 3.0) * 0.2 +
+             exp(-minS * 8.0) * 0.2 +
+             f32(escIt) / f32(max(maxIt, 1)) * 0.3;
+
+  // Distance estimator (no scale division - handled by dispatch)
+  let dist = max(0.5 * log(max(r, EPS_9D)) * r / max(dr, EPS_9D), EPS_9D);
 
   return vec2f(dist, trap);
 }
 
 /**
- * 9D Mandelbulb SDF - simple version.
+ * 9D Mandelbulb SDF - simple version without trap.
  */
 fn mandelbulbSDF9D_simple(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> f32 {
-  let coord0 = (getBasisComponent(basis.origin, 0) + pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0)) * uniforms.scale;
-  let coord1 = (getBasisComponent(basis.origin, 1) + pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1)) * uniforms.scale;
-  let coord2 = (getBasisComponent(basis.origin, 2) + pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2)) * uniforms.scale;
-  let coord3 = (getBasisComponent(basis.origin, 3) + pos.x * getBasisComponent(basis.basisX, 3) + pos.y * getBasisComponent(basis.basisY, 3) + pos.z * getBasisComponent(basis.basisZ, 3)) * uniforms.scale;
-  let coord4 = (getBasisComponent(basis.origin, 4) + pos.x * getBasisComponent(basis.basisX, 4) + pos.y * getBasisComponent(basis.basisY, 4) + pos.z * getBasisComponent(basis.basisZ, 4)) * uniforms.scale;
-  let coord5 = (getBasisComponent(basis.origin, 5) + pos.x * getBasisComponent(basis.basisX, 5) + pos.y * getBasisComponent(basis.basisY, 5) + pos.z * getBasisComponent(basis.basisZ, 5)) * uniforms.scale;
-  let coord6 = (getBasisComponent(basis.origin, 6) + pos.x * getBasisComponent(basis.basisX, 6) + pos.y * getBasisComponent(basis.basisY, 6) + pos.z * getBasisComponent(basis.basisZ, 6)) * uniforms.scale;
-  let coord7 = (getBasisComponent(basis.origin, 7) + pos.x * getBasisComponent(basis.basisX, 7) + pos.y * getBasisComponent(basis.basisY, 7) + pos.z * getBasisComponent(basis.basisZ, 7)) * uniforms.scale;
-  let coord8 = (getBasisComponent(basis.origin, 8) + pos.x * getBasisComponent(basis.basisX, 8) + pos.y * getBasisComponent(basis.basisY, 8) + pos.z * getBasisComponent(basis.basisZ, 8)) * uniforms.scale;
+  // 9D initialization - transform using basis vectors
+  let coord0 = getBasisComponent(basis.origin, 0) +
+               pos.x * getBasisComponent(basis.basisX, 0) +
+               pos.y * getBasisComponent(basis.basisY, 0) +
+               pos.z * getBasisComponent(basis.basisZ, 0);
+  let coord1 = getBasisComponent(basis.origin, 1) +
+               pos.x * getBasisComponent(basis.basisX, 1) +
+               pos.y * getBasisComponent(basis.basisY, 1) +
+               pos.z * getBasisComponent(basis.basisZ, 1);
+  let coord2 = getBasisComponent(basis.origin, 2) +
+               pos.x * getBasisComponent(basis.basisX, 2) +
+               pos.y * getBasisComponent(basis.basisY, 2) +
+               pos.z * getBasisComponent(basis.basisZ, 2);
+  let coord3 = getBasisComponent(basis.origin, 3) +
+               pos.x * getBasisComponent(basis.basisX, 3) +
+               pos.y * getBasisComponent(basis.basisY, 3) +
+               pos.z * getBasisComponent(basis.basisZ, 3);
+  let coord4 = getBasisComponent(basis.origin, 4) +
+               pos.x * getBasisComponent(basis.basisX, 4) +
+               pos.y * getBasisComponent(basis.basisY, 4) +
+               pos.z * getBasisComponent(basis.basisZ, 4);
+  let coord5 = getBasisComponent(basis.origin, 5) +
+               pos.x * getBasisComponent(basis.basisX, 5) +
+               pos.y * getBasisComponent(basis.basisY, 5) +
+               pos.z * getBasisComponent(basis.basisZ, 5);
+  let coord6 = getBasisComponent(basis.origin, 6) +
+               pos.x * getBasisComponent(basis.basisX, 6) +
+               pos.y * getBasisComponent(basis.basisY, 6) +
+               pos.z * getBasisComponent(basis.basisZ, 6);
+  let coord7 = getBasisComponent(basis.origin, 7) +
+               pos.x * getBasisComponent(basis.basisX, 7) +
+               pos.y * getBasisComponent(basis.basisY, 7) +
+               pos.z * getBasisComponent(basis.basisZ, 7);
+  let coord8 = getBasisComponent(basis.origin, 8) +
+               pos.x * getBasisComponent(basis.basisX, 8) +
+               pos.y * getBasisComponent(basis.basisY, 8) +
+               pos.z * getBasisComponent(basis.basisZ, 8);
 
   var z0 = coord0; var z1 = coord1; var z2 = coord2; var z3 = coord3;
   var z4 = coord4; var z5 = coord5; var z6 = coord6; var z7 = coord7; var z8 = coord8;
@@ -153,7 +222,7 @@ fn mandelbulbSDF9D_simple(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
   let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
@@ -210,6 +279,6 @@ fn mandelbulbSDF9D_simple(
     z8 = sp * s7 + coord8;
   }
 
-  return max(0.5 * log(max(r, EPS_9D)) * r / max(dr, EPS_9D), EPS_9D) / uniforms.scale;
+  return max(0.5 * log(max(r, EPS_9D)) * r / max(dr, EPS_9D), EPS_9D);
 }
 `

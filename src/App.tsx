@@ -70,6 +70,8 @@ import * as THREE from 'three'
  *
  * This is safe because our only interactive 3D element (LightGizmo) only needs
  * click events, not hover states.
+ * @param event
+ * @param state
  */
 const clickOnlyCompute: ComputeFunction = (event, state) => {
   // Skip raycasting setup for move events - this is the key optimization

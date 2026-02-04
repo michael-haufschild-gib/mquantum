@@ -59,6 +59,9 @@ interface DiagnosticData {
   avgFrameTime: number
 }
 
+/**
+ *
+ */
 export function ProdDevDiagnostics() {
   const { gl, size, viewport } = useThree()
   const renderCountRef = useRef(0)

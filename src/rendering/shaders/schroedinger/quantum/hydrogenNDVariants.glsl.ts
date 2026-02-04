@@ -29,6 +29,7 @@ const EXTRA_DIM_THRESHOLD = 18.0
 
 /**
  * Generate coordinate extraction for a given dimension.
+ * @param dimension
  */
 function generateCoordExtraction(dimension: number): string {
   const coords = Array.from({ length: dimension }, (_, i) => `    float x${i} = xND[${i}];`).join(
@@ -40,6 +41,7 @@ function generateCoordExtraction(dimension: number): string {
 /**
  * Generate the extra-dimension early exit check (fully unrolled).
  * Only for dimensions > 3.
+ * @param dimension
  */
 function generateExtraDimEarlyExit(dimension: number): string {
   const extraDimCount = dimension - 3
@@ -76,6 +78,7 @@ ${uCalcs}
 
 /**
  * Generate the ND radius calculation (fully unrolled).
+ * @param dimension
  */
 function generateRadiusCalculation(dimension: number): string {
   // First compute sum3D for reuse
@@ -109,6 +112,7 @@ function generateRadiusCalculation(dimension: number): string {
 /**
  * Generate the extra dimension HO product (fully unrolled, inlined ho1D calls).
  * Only for dimensions > 3.
+ * @param dimension
  */
 function generateExtraDimProduct(dimension: number): string {
   const extraDimCount = dimension - 3
@@ -235,6 +239,7 @@ export const hydrogenNDGen11dBlock = generateHydrogenNDBlock(11)
 /**
  * Get the generated block for a specific dimension.
  * Useful for dynamic dimension selection in compose.ts.
+ * @param dimension
  */
 export function getHydrogenNDBlockForDimension(dimension: number): string {
   const dim = Math.min(Math.max(dimension, 3), 11)

@@ -135,11 +135,15 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipelines.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
-    this.textureFormat = format
+    // Use rgba16float for HDR pipeline - this must match the resource format
+    // in WebGPUScene.tsx where frame-blend-output is created as rgba16float
+    const hdrFormat: GPUTextureFormat = 'rgba16float'
+    this.textureFormat = hdrFormat
 
     // Create blend pass bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -195,21 +199,21 @@ export class FrameBlendingPass extends WebGPUBasePass {
       'frame-blending-copy-fragment'
     )
 
-    // Create blend pipeline
+    // Create blend pipeline - uses HDR format to match output texture
     this.blendPipeline = this.createFullscreenPipeline(
       device,
       blendFragmentModule,
       [this.passBindGroupLayout],
-      format,
+      hdrFormat,
       { label: 'frame-blending' }
     )
 
-    // Create copy pipeline
+    // Create copy pipeline - uses HDR format to match output texture
     this.copyPipeline = this.createFullscreenPipeline(
       device,
       copyFragmentModule,
       [this.copyBindGroupLayout],
-      format,
+      hdrFormat,
       { label: 'frame-blending-copy' }
     )
 
@@ -228,6 +232,9 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
   /**
    * Create or resize the internal history buffer.
+   * @param device
+   * @param width
+   * @param height
    */
   private ensureHistoryBuffer(device: GPUDevice, width: number, height: number): void {
     if (this.historyTexture && this.lastWidth === width && this.lastHeight === height) {
@@ -242,11 +249,12 @@ export class FrameBlendingPass extends WebGPUBasePass {
     }
 
     // Create new texture matching output size
+    // COPY_DST is required for copyTextureToTexture() to copy blended output to history
     this.historyTexture = device.createTexture({
       label: 'frame-blending-history',
       size: { width, height },
       format: this.textureFormat,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
     })
 
     this.historyView = this.historyTexture.createView({
@@ -269,6 +277,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
@@ -298,6 +307,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
   /**
    * Execute the frame blending pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -323,10 +333,14 @@ export class FrameBlendingPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!outputView) return
 
+    // Get output texture for copy operation
+    const outputTexture = ctx.getTexture(this.passConfig.outputResource)
+    if (!outputTexture) return
+
     // Ensure history buffer exists at correct size
     this.ensureHistoryBuffer(this.device, ctx.size.width, ctx.size.height)
 
-    if (!this.historyView) return
+    if (!this.historyView || !this.historyTexture) return
 
     // If first frame, just copy current to output and initialize history
     if (!this.historyInitialized) {
@@ -355,30 +369,13 @@ export class FrameBlendingPass extends WebGPUBasePass {
       this.renderFullscreen(outputPassEncoder, this.copyPipeline, [copyBindGroup])
       outputPassEncoder.end()
 
-      // Create copy bind group for copying output to history
-      const historyInitBindGroup = this.device.createBindGroup({
-        label: 'frame-blending-copy-to-history-bg',
-        layout: this.copyBindGroupLayout,
-        entries: [
-          { binding: 0, resource: this.sampler },
-          { binding: 1, resource: colorView },
-        ],
-      })
-
-      // Copy current to history for next frame
-      const historyPassEncoder = ctx.beginRenderPass({
-        label: 'frame-blending-init-history',
-        colorAttachments: [
-          {
-            view: this.historyView,
-            loadOp: 'clear' as const,
-            storeOp: 'store' as const,
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          },
-        ],
-      })
-      this.renderFullscreen(historyPassEncoder, this.copyPipeline, [historyInitBindGroup])
-      historyPassEncoder.end()
+      // Copy output to history for next frame using GPU texture copy
+      // This is faster than shader-based copy and matches WebGL behavior
+      ctx.encoder.copyTextureToTexture(
+        { texture: outputTexture },
+        { texture: this.historyTexture },
+        { width: ctx.size.width, height: ctx.size.height }
+      )
 
       this.historyInitialized = true
       return
@@ -417,33 +414,14 @@ export class FrameBlendingPass extends WebGPUBasePass {
     this.renderFullscreen(blendPassEncoder, this.blendPipeline, [blendBindGroup])
     blendPassEncoder.end()
 
-    // Copy current frame to history for next frame.
-    // Note: In WebGPU we can't easily copy the blended output back to history within
-    // the same command encoder without introducing additional intermediate textures.
-    // The simpler approach of storing the current frame (not the blended result) to
-    // history is valid for temporal smoothing purposes, just with slightly different
-    // accumulation characteristics than the WebGL version.
-    const historyCopyBindGroup = this.device.createBindGroup({
-      label: 'frame-blending-history-copy-bg',
-      layout: this.copyBindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: colorView },
-      ],
-    })
-    const historyUpdateEncoder = ctx.beginRenderPass({
-      label: 'frame-blending-update-history',
-      colorAttachments: [
-        {
-          view: this.historyView,
-          loadOp: 'clear' as const,
-          storeOp: 'store' as const,
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
-    })
-    this.renderFullscreen(historyUpdateEncoder, this.copyPipeline, [historyCopyBindGroup])
-    historyUpdateEncoder.end()
+    // Copy blended result to history for next frame using GPU texture copy
+    // This matches WebGL behavior where the blended output is stored for the next frame,
+    // creating proper temporal accumulation
+    ctx.encoder.copyTextureToTexture(
+      { texture: outputTexture },
+      { texture: this.historyTexture },
+      { width: ctx.size.width, height: ctx.size.height }
+    )
   }
 
   /**

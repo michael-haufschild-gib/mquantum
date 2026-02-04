@@ -55,6 +55,8 @@ const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
 /**
  * Check if two algorithms use the same parameter sets.
  * Returns the parameters that are new in the target algorithm.
+ * @param prevAlgorithm
+ * @param newAlgorithm
  */
 function getNewParamsForAlgorithm(
   prevAlgorithm: ColorAlgorithm,

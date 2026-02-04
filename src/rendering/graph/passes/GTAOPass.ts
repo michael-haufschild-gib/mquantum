@@ -427,6 +427,9 @@ export class GTAOPass extends BasePass {
    * OPTIMIZATION: glBlitFramebuffer is faster than shader-based copy
    * because it uses dedicated hardware paths and avoids shader overhead.
    *
+   * @param renderer
+   * @param source
+   * @param dest
    * @returns true if blit succeeded, false if fallback is needed
    */
   private blitFramebuffer(

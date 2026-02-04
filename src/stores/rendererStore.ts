@@ -116,6 +116,7 @@ function loadPersistedMode(): RendererMode {
 
 /**
  * Persist preferred mode to localStorage.
+ * @param mode
  */
 function persistPreferredMode(mode: RendererMode): void {
   try {
@@ -266,19 +267,34 @@ export const useRendererStore = create<RendererState>()(
 // Selectors
 // ============================================================================
 
-/** Select current renderer mode */
+/**
+ * Select current renderer mode
+ * @param state
+ */
 export const selectRendererMode = (state: RendererState) => state.mode
 
-/** Select whether WebGPU is available */
+/**
+ * Select whether WebGPU is available
+ * @param state
+ */
 export const selectWebGPUAvailable = (state: RendererState) =>
   state.webgpuCapabilities?.supported ?? false
 
-/** Select whether detection is complete */
+/**
+ * Select whether detection is complete
+ * @param state
+ */
 export const selectDetectionComplete = (state: RendererState) => state.detectionComplete
 
-/** Select whether to show fallback notification */
+/**
+ * Select whether to show fallback notification
+ * @param state
+ */
 export const selectShowFallbackNotification = (state: RendererState) =>
   state.showFallbackNotification
 
-/** Select WebGPU capabilities */
+/**
+ * Select WebGPU capabilities
+ * @param state
+ */
 export const selectWebGPUCapabilities = (state: RendererState) => state.webgpuCapabilities

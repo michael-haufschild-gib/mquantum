@@ -586,7 +586,9 @@ export class JetsRenderPass extends WebGPUBasePass {
 
     // Read settings from frozen frame context stores
     const frame = ctx.frame
-    const blackHole = frame?.stores?.['blackHole'] as
+    // Access blackhole settings via 'extended' store (blackHole is nested, not a separate store)
+    const extended = frame?.stores?.['extended'] as { blackhole?: Record<string, unknown> } | undefined
+    const blackHole = extended?.blackhole as
       | {
           jetsEnabled?: boolean
           jetsColor?: string | number

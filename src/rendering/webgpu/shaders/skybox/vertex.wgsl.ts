@@ -37,6 +37,7 @@ fn getRotationMatrix() -> mat3x3<f32> { return vertexUniforms.rotationMatrix; }
 
 /**
  * Generate vertex output struct based on enabled effects
+ * @param effects
  */
 export function generateVertexOutputStruct(effects: SkyboxEffects): string {
   const fields = [
@@ -58,6 +59,7 @@ struct VertexOutput {
 
 /**
  * Generate the complete vertex shader
+ * @param effects
  */
 export function composeSkyboxVertexShader(effects: SkyboxEffects): string {
   const outputAssignments = [

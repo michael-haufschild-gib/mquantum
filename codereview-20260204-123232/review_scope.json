@@ -1,0 +1,59 @@
+{
+  "scope": "WebGPU Schroedinger Implementation - Full Review",
+  "files_to_review": [
+    "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+    "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+    "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+    "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+    "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/volume/integration.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/volume/absorption.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hoNDVariants.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hoSuperpositionVariants.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDVariants.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenPsi.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenRadial.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDCommon.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/hermite.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/complex.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/laguerre.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/legendre.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/sphericalHarmonics.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+    "src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/sdf/sdf3d.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/sdf/sdf4d.wgsl.ts",
+    "src/rendering/webgpu/shaders/schroedinger/sdf/index.ts",
+    "src/rendering/webgpu/shaders/schroedinger/index.ts",
+    "src/rendering/webgpu/shaders/schroedinger/compute/index.ts"
+  ],
+  "imports_to_verify": [],
+  "new_exports": [],
+  "functions_to_check": [],
+  "categories": {
+    "renderer": ["src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts"],
+    "compute_pass": ["src/rendering/webgpu/passes/DensityGridComputePass.ts"],
+    "shader_compose": [
+      "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts"
+    ],
+    "wgsl_quantum": [
+      "src/rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl.ts",
+      "src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts",
+      "src/rendering/webgpu/shaders/schroedinger/quantum/hoNDVariants.wgsl.ts",
+      "src/rendering/webgpu/shaders/schroedinger/quantum/hoSuperpositionVariants.wgsl.ts"
+    ],
+    "wgsl_volume": [
+      "src/rendering/webgpu/shaders/schroedinger/volume/integration.wgsl.ts",
+      "src/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl.ts",
+      "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts"
+    ]
+  }
+}

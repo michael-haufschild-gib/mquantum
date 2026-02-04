@@ -81,6 +81,7 @@ export class ProfilerAPI {
   /**
    * Attach to a RenderGraph instance.
    * Called internally when the graph is created.
+   * @param graph
    */
   attach(graph: RenderGraph): void {
     this.graph = graph

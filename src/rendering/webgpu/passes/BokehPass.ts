@@ -56,10 +56,10 @@ struct VertexOutput {
 
 const PI: f32 = 3.14159265359;
 
-// Linearize depth
+// Linearize depth - WebGPU uses [0, 1] depth range
 fn linearizeDepth(depth: f32) -> f32 {
-  let z = depth * 2.0 - 1.0;
-  return (2.0 * uniforms.near * uniforms.far) / (uniforms.far + uniforms.near - z * (uniforms.far - uniforms.near));
+  // WebGPU depth is already in [0, 1], use the correct formula
+  return (uniforms.near * uniforms.far) / (uniforms.far - depth * (uniforms.far - uniforms.near));
 }
 
 // Calculate circle of confusion
@@ -79,17 +79,25 @@ fn calculateCoC(depth: f32) -> f32 {
 }
 
 // Sample with bokeh kernel
+// Note: Uses textureLoad instead of textureSample to avoid non-uniform control flow issues
+// cocRadius varies per-pixel based on depth, so we can't use textureSample conditionally
 fn sampleBokeh(uv: vec2f, cocRadius: f32) -> vec4f {
-  if (cocRadius < 0.5) {
-    return textureSample(tColor, texSampler, uv);
-  }
+  let texelSize = 1.0 / uniforms.resolution;
+  let colorDims = textureDimensions(tColor);
+  let depthDims = textureDimensions(tDepth);
+
+  // Always sample center pixel using textureLoad (uniform control flow safe)
+  let centerCoord = vec2i(uv * vec2f(colorDims));
+  let centerColor = textureLoad(tColor, centerCoord, 0);
+
+  // For small CoC, just return center color (no blur needed)
+  // We use select() instead of early return to maintain uniform control flow
+  let needsBlur = cocRadius >= 0.5;
 
   var color = vec3f(0.0);
   var weight = 0.0;
-  let texelSize = 1.0 / uniforms.resolution;
 
   // Hexagonal bokeh pattern (6-sided)
-  let samples = 16;
   let rings = 3;
 
   for (var ring = 1; ring <= rings; ring++) {
@@ -101,15 +109,18 @@ fn sampleBokeh(uv: vec2f, cocRadius: f32) -> vec4f {
       let offset = vec2f(cos(angle), sin(angle)) * ringRadius * texelSize;
       let sampleUV = uv + offset;
 
-      // Sample color and depth at this point
-      let sampleColor = textureSample(tColor, texSampler, sampleUV);
-      let depthDims = textureDimensions(tDepth);
+      // Sample color and depth at this point using textureLoad
+      let sampleCoord = vec2i(sampleUV * vec2f(colorDims));
+      let clampedColorCoord = clamp(sampleCoord, vec2i(0), vec2i(colorDims) - vec2i(1));
+      let sampleColor = textureLoad(tColor, clampedColorCoord, 0);
+
       let depthCoord = vec2i(sampleUV * vec2f(depthDims));
-      let sampleDepth = textureLoad(tDepth, depthCoord, 0).r;
+      let clampedDepthCoord = clamp(depthCoord, vec2i(0), vec2i(depthDims) - vec2i(1));
+      let sampleDepth = textureLoad(tDepth, clampedDepthCoord, 0).r;
       let sampleCoC = calculateCoC(sampleDepth);
 
       // Weight by sample's CoC (foreground should bleed, background should not)
-      let sampleWeight = max(sampleCoC, cocRadius) / cocRadius;
+      let sampleWeight = max(sampleCoC, cocRadius) / max(cocRadius, 0.001);
 
       color += sampleColor.rgb * sampleWeight;
       weight += sampleWeight;
@@ -117,11 +128,13 @@ fn sampleBokeh(uv: vec2f, cocRadius: f32) -> vec4f {
   }
 
   // Add center sample
-  let centerColor = textureSample(tColor, texSampler, uv);
   color += centerColor.rgb;
   weight += 1.0;
 
-  return vec4f(color / weight, centerColor.a);
+  let blurredColor = vec4f(color / weight, centerColor.a);
+
+  // Use select for uniform control flow: return center if no blur needed, else blurred
+  return select(centerColor, blurredColor, needsBlur);
 }
 
 @fragment
@@ -142,6 +155,24 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 `
 
 /**
+ * WGSL Copy Shader for passthrough
+ */
+const COPY_SHADER = /* wgsl */ `
+@group(0) @binding(0) var texSampler: sampler;
+@group(0) @binding(1) var tSource: texture_2d<f32>;
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@fragment
+fn main(input: VertexOutput) -> @location(0) vec4f {
+  return textureSample(tSource, texSampler, input.uv);
+}
+`
+
+/**
  * WebGPU Bokeh Pass.
  *
  * Simulates depth of field with bokeh blur effect.
@@ -151,6 +182,10 @@ export class BokehPass extends WebGPUBasePass {
 
   // Pipeline
   private renderPipeline: GPURenderPipeline | null = null
+
+  // Copy pipeline for passthrough
+  private copyPipeline: GPURenderPipeline | null = null
+  private copyBindGroupLayout: GPUBindGroupLayout | null = null
 
   // Bind group
   private passBindGroupLayout: GPUBindGroupLayout | null = null
@@ -187,6 +222,7 @@ export class BokehPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
@@ -226,8 +262,8 @@ export class BokehPass extends WebGPUBasePass {
       { label: 'bokeh' }
     )
 
-    // Create uniform buffer
-    this.uniformBuffer = this.createUniformBuffer(device, 64, 'bokeh-uniforms')
+    // Create uniform buffer (32 bytes: vec2f + 6x f32)
+    this.uniformBuffer = this.createUniformBuffer(device, 32, 'bokeh-uniforms')
 
     // Create sampler
     this.sampler = device.createSampler({
@@ -237,10 +273,37 @@ export class BokehPass extends WebGPUBasePass {
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     })
+
+    // Create copy pipeline for passthrough (non-perspective cameras, missing inputs)
+    this.copyBindGroupLayout = device.createBindGroupLayout({
+      label: 'bokeh-copy-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' as const },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' as const },
+        },
+      ],
+    })
+
+    const copyFragmentModule = this.createShaderModule(device, COPY_SHADER, 'bokeh-copy-fragment')
+    this.copyPipeline = this.createFullscreenPipeline(
+      device,
+      copyFragmentModule,
+      [this.copyBindGroupLayout],
+      'rgba16float',
+      { label: 'bokeh-copy' }
+    )
   }
 
   /**
    * Set focus distance.
+   * @param distance
    */
   setFocusDistance(distance: number): void {
     this.focusDistance = distance
@@ -248,6 +311,7 @@ export class BokehPass extends WebGPUBasePass {
 
   /**
    * Set aperture (f-stop).
+   * @param fStop
    */
   setFStop(fStop: number): void {
     this.fStop = fStop
@@ -256,6 +320,7 @@ export class BokehPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
@@ -274,6 +339,7 @@ export class BokehPass extends WebGPUBasePass {
 
   /**
    * Set focal length.
+   * @param length
    */
   setFocalLength(length: number): void {
     this.focalLength = length
@@ -281,6 +347,7 @@ export class BokehPass extends WebGPUBasePass {
 
   /**
    * Execute the Bokeh pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -288,7 +355,9 @@ export class BokehPass extends WebGPUBasePass {
       !this.renderPipeline ||
       !this.uniformBuffer ||
       !this.passBindGroupLayout ||
-      !this.sampler
+      !this.sampler ||
+      !this.copyPipeline ||
+      !this.copyBindGroupLayout
     ) {
       return
     }
@@ -300,10 +369,6 @@ export class BokehPass extends WebGPUBasePass {
     const colorView = ctx.getTextureView(this.passConfig.colorInput)
     const depthView = ctx.getTextureView(this.passConfig.depthInput)
 
-    if (!colorView || !depthView) {
-      return
-    }
-
     // Get output target
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!outputView) return
@@ -312,10 +377,28 @@ export class BokehPass extends WebGPUBasePass {
     const camera = ctx.frame?.stores?.['camera'] as {
       near?: number
       far?: number
+      projectionMatrix?: { elements: number[] }
+      isPerspective?: boolean
     }
 
-    // Update uniforms
-    const data = new Float32Array(16)
+    // Check if camera is perspective
+    // A perspective projection matrix has elements[11] = -1 and elements[15] = 0
+    const isPerspective = camera?.isPerspective ?? (
+      camera?.projectionMatrix?.elements &&
+      Math.abs((camera.projectionMatrix.elements[11] ?? 0) + 1) < 0.001 &&
+      Math.abs(camera.projectionMatrix.elements[15] ?? 1) < 0.001
+    )
+
+    // Passthrough if camera is not perspective or required inputs missing
+    if (!isPerspective || !colorView || !depthView) {
+      if (colorView) {
+        this.copyToOutput(ctx, colorView, outputView)
+      }
+      return
+    }
+
+    // Update uniforms (8 floats = 32 bytes)
+    const data = new Float32Array(8)
     data[0] = ctx.size.width
     data[1] = ctx.size.height
     data[2] = this.focusDistance
@@ -359,11 +442,51 @@ export class BokehPass extends WebGPUBasePass {
   }
 
   /**
+   * Copy input directly to output (passthrough for non-perspective cameras)
+   * @param ctx
+   * @param inputView
+   * @param outputView
+   */
+  private copyToOutput(
+    ctx: WebGPURenderContext,
+    inputView: GPUTextureView,
+    outputView: GPUTextureView
+  ): void {
+    if (!this.copyPipeline || !this.copyBindGroupLayout || !this.sampler) return
+
+    const copyBindGroup = this.device!.createBindGroup({
+      label: 'bokeh-copy-bg',
+      layout: this.copyBindGroupLayout,
+      entries: [
+        { binding: 0, resource: this.sampler },
+        { binding: 1, resource: inputView },
+      ],
+    })
+
+    const passEncoder = ctx.beginRenderPass({
+      label: 'bokeh-copy',
+      colorAttachments: [
+        {
+          view: outputView,
+          loadOp: 'clear' as const,
+          storeOp: 'store' as const,
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
+    })
+
+    this.renderFullscreen(passEncoder, this.copyPipeline, [copyBindGroup])
+    passEncoder.end()
+  }
+
+  /**
    * Dispose of resources.
    */
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
+    this.copyPipeline = null
+    this.copyBindGroupLayout = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null

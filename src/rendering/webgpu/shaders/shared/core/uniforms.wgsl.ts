@@ -18,6 +18,10 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  // Model transform matrices (for raymarching coordinate space conversion)
+  // CRITICAL: These enable proper WebGL-style raymarching in model space
+  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
+  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform (for raymarching)
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,
@@ -27,6 +31,9 @@ struct CameraUniforms {
   time: f32,
   deltaTime: f32,
   frameNumber: u32,
+  // Temporal accumulation support
+  bayerOffset: vec2f,            // Bayer pattern offset [0,0], [1,1], [1,0], [0,1]
+  _padding: vec2f,               // Padding for 16-byte alignment
 }
 
 // ============================================
@@ -53,17 +60,36 @@ struct LightingUniforms {
 // ============================================
 
 struct MaterialUniforms {
-  baseColor: vec4f,
-  metallic: f32,
-  roughness: f32,
-  reflectance: f32,
-  ao: f32,
-  emissive: vec3f,
-  emissiveIntensity: f32,
-  ior: f32,
-  transmission: f32,
-  thickness: f32,
-  _padding: f32,
+  // Core PBR (64 bytes / 16 floats)
+  baseColor: vec4f,           // offset 0-3
+  metallic: f32,              // offset 4
+  roughness: f32,             // offset 5
+  reflectance: f32,           // offset 6
+  ao: f32,                    // offset 7
+  emissive: vec3f,            // offset 8-10
+  emissiveIntensity: f32,     // offset 11
+  ior: f32,                   // offset 12
+  transmission: f32,          // offset 13
+  thickness: f32,             // offset 14
+  sssEnabled: u32,            // offset 15
+
+  // Subsurface Scattering (20 bytes / 5 floats)
+  sssIntensity: f32,          // offset 16
+  sssColor: vec3f,            // offset 17-19
+  sssThickness: f32,          // offset 20
+  sssJitter: f32,             // offset 21
+
+  // Fresnel / Rim Lighting (16 bytes / 4 floats)
+  fresnelEnabled: u32,        // offset 22
+  fresnelIntensity: f32,      // offset 23
+  rimColor: vec3f,            // offset 24-26
+  _padding2: f32,             // offset 27 (alignment)
+
+  // Specular (matching WebGL PBRSource: specularIntensity, specularColor)
+  specularIntensity: f32,     // offset 28
+  specularColor: vec3f,       // offset 29-31
+
+  // Total: 32 floats = 128 bytes
 }
 
 // ============================================
@@ -146,7 +172,8 @@ struct QualityUniforms {
   // Global quality multiplier (for fast mode)
   qualityMultiplier: f32,
 
-  _padding: f32,
+  // Debug visualization mode (0=off, 1=iteration heatmap, 2=depth, 3=normals)
+  debugMode: i32,
 }
 
 // ============================================
@@ -168,6 +195,10 @@ struct QualityUniforms {
 
 /**
  * Generate bind group layout code for a specific group.
+ * @param group
+ * @param binding
+ * @param name
+ * @param type
  */
 export function generateBindGroupDeclaration(
   group: number,
@@ -180,6 +211,10 @@ export function generateBindGroupDeclaration(
 
 /**
  * Generate texture binding declaration.
+ * @param group
+ * @param binding
+ * @param name
+ * @param textureType
  */
 export function generateTextureDeclaration(
   group: number,
@@ -195,6 +230,9 @@ export function generateTextureDeclaration(
 
 /**
  * Generate sampler binding declaration.
+ * @param group
+ * @param binding
+ * @param name
  */
 export function generateSamplerDeclaration(group: number, binding: number, name: string): string {
   return /* wgsl */ `@group(${group}) @binding(${binding}) var ${name}: sampler;`

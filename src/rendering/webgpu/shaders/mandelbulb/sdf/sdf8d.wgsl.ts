@@ -4,12 +4,16 @@
  * 8-dimensional Mandelbulb signed distance function.
  * Port of GLSL sdf8d.glsl to WGSL.
  *
+ * NOTE: Scale is handled by the dispatch function (GetDist), NOT here.
+ * The SDF works on pure fractal coordinates without scale modification.
+ *
  * @module rendering/webgpu/shaders/mandelbulb/sdf/sdf8d.wgsl
  */
 
 export const sdf8dBlock = /* wgsl */ `
 // ============================================
 // 8D Mandelbulb SDF (Array-based approach)
+// With proper basis transformation (matching WebGL)
 // ============================================
 
 const MAX_ITER_8D: i32 = 256;
@@ -24,21 +28,26 @@ fn optimizedPow8D(r: f32, p: f32) -> vec2f {
 
 /**
  * 8D Mandelbulb SDF with orbital trap.
+ *
+ * @param pos 3D world position (already scaled by dispatch)
+ * @param basis Basis vectors for N-D transformation
+ * @param uniforms Mandelbulb uniforms
+ * @return vec2f where x = signed distance, y = orbital trap value
  */
 fn mandelbulbSDF8D(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> vec2f {
-  // Transform to 8D using basis vectors
+  // Transform to 8D fractal space using basis vectors (matching WebGL)
   var c: array<f32, 8>;
   var z: array<f32, 8>;
 
   for (var j = 0; j < 8; j++) {
-    c[j] = (getBasisComponent(basis.origin, j) +
-            pos.x * getBasisComponent(basis.basisX, j) +
-            pos.y * getBasisComponent(basis.basisY, j) +
-            pos.z * getBasisComponent(basis.basisZ, j)) * uniforms.scale;
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
@@ -54,7 +63,7 @@ fn mandelbulbSDF8D(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   for (var i = 0; i < MAX_ITER_8D; i++) {
     if (i >= maxIt) { break; }
@@ -113,28 +122,34 @@ fn mandelbulbSDF8D(
   }
 
   let minA = sqrt(minASq);
-  let trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 + exp(-minS * 8.0) * 0.2 + f32(escIt) / f32(max(maxIt, 1)) * 0.3;
-  let dist = max(0.5 * log(max(r, EPS_8D)) * r / max(dr, EPS_8D), EPS_8D) / uniforms.scale;
+  let trap = exp(-minP * 5.0) * 0.3 +
+             exp(-minA * 3.0) * 0.2 +
+             exp(-minS * 8.0) * 0.2 +
+             f32(escIt) / f32(max(maxIt, 1)) * 0.3;
+
+  // Distance estimator (no scale division - handled by dispatch)
+  let dist = max(0.5 * log(max(r, EPS_8D)) * r / max(dr, EPS_8D), EPS_8D);
 
   return vec2f(dist, trap);
 }
 
 /**
- * 8D Mandelbulb SDF - simple version.
+ * 8D Mandelbulb SDF - simple version without trap.
  */
 fn mandelbulbSDF8D_simple(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> f32 {
+  // Transform to 8D fractal space using basis vectors
   var c: array<f32, 8>;
   var z: array<f32, 8>;
 
   for (var j = 0; j < 8; j++) {
-    c[j] = (getBasisComponent(basis.origin, j) +
-            pos.x * getBasisComponent(basis.basisX, j) +
-            pos.y * getBasisComponent(basis.basisY, j) +
-            pos.z * getBasisComponent(basis.basisZ, j)) * uniforms.scale;
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
@@ -146,7 +161,7 @@ fn mandelbulbSDF8D_simple(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   for (var i = 0; i < MAX_ITER_8D; i++) {
     if (i >= maxIt) { break; }
@@ -193,6 +208,6 @@ fn mandelbulbSDF8D_simple(
     z[7] = sp * s6 + c[7];
   }
 
-  return max(0.5 * log(max(r, EPS_8D)) * r / max(dr, EPS_8D), EPS_8D) / uniforms.scale;
+  return max(0.5 * log(max(r, EPS_8D)) * r / max(dr, EPS_8D), EPS_8D);
 }
 `

@@ -34,8 +34,7 @@ export interface BlackHoleRendererConfig {
  */
 export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
   private renderPipeline: GPURenderPipeline | null = null
-  private vertexBuffer: GPUBuffer | null = null
-  private indexBuffer: GPUBuffer | null = null
+  // Uses fullscreen vertex buffer from base class (no custom geometry needed)
 
   // Uniform buffers
   private cameraUniformBuffer: GPUBuffer | null = null
@@ -54,8 +53,14 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
   private rendererConfig: BlackHoleRendererConfig
   private shaderConfig: BlackHoleWGSLShaderConfig
 
-  // Geometry
-  private indexCount = 0
+  // Draw statistics from last execute()
+  private lastDrawStats: import('../core/types').WebGPUPassDrawStats = {
+    calls: 0,
+    triangles: 0,
+    vertices: 0,
+    lines: 0,
+    points: 0,
+  }
 
   constructor(config?: BlackHoleRendererConfig) {
     super({
@@ -141,19 +146,14 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Create render pipeline
+    // Create render pipeline (fullscreen quad)
     this.renderPipeline = device.createRenderPipeline({
       label: 'blackhole-pipeline',
       layout: pipelineLayout,
       vertex: {
         module: vertexModule,
         entryPoint: 'main',
-        buffers: [
-          {
-            arrayStride: 12, // 3 floats position
-            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' as const }],
-          },
-        ],
+        buffers: [this.getFullscreenVertexLayout()],
       },
       fragment: {
         module: fragmentModule,
@@ -162,9 +162,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       },
       primitive: {
         topology: 'triangle-list' as const,
-        // CRITICAL: Use 'front' to match THREE.BackSide in WebGL
-        // BackSide = render back faces = cull front faces
-        cullMode: 'front' as const,
+        // No culling needed for fullscreen quad
+        cullMode: 'none' as const,
       },
     })
 
@@ -174,10 +173,11 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     // LightingUniforms: 8×LightData (512) + vec3f+f32 (16) + i32+pad+vec3f (32) = 560 bytes, round to 576
     this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'blackhole-lighting')
     // Material and Quality buffers for combined bind group
-    this.materialUniformBuffer = this.createUniformBuffer(device, 128, 'blackhole-material')
+    // MaterialUniforms: 160 bytes (vec3f has 16-byte alignment in WGSL)
+    this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'blackhole-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'blackhole-quality')
-    // BlackHole uniforms: 576 bytes (matches BlackHoleUniforms struct - carefully sized)
-    this.blackHoleUniformBuffer = this.createUniformBuffer(device, 576, 'blackhole-uniforms')
+    // BlackHole uniforms: 672 bytes (matches BlackHoleUniforms struct with color algorithm fields)
+    this.blackHoleUniformBuffer = this.createUniformBuffer(device, 672, 'blackhole-uniforms')
     // Basis vectors: 176 bytes (4 * 11 floats * 4 bytes = 176)
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'blackhole-basis')
 
@@ -210,71 +210,12 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Create bounding geometry (sphere for black hole)
-    this.createBoundingGeometry(device)
-  }
-
-  private createBoundingGeometry(device: GPUDevice): void {
-    // Create a sphere for raymarching
-    const radius = 50.0 // Large sphere to contain the far radius
-    const segments = 32
-    const rings = 16
-
-    const vertices: number[] = []
-    const indices: number[] = []
-
-    // Generate sphere vertices
-    for (let ring = 0; ring <= rings; ring++) {
-      const theta = (ring / rings) * Math.PI
-      const sinTheta = Math.sin(theta)
-      const cosTheta = Math.cos(theta)
-
-      for (let seg = 0; seg <= segments; seg++) {
-        const phi = (seg / segments) * 2 * Math.PI
-        const sinPhi = Math.sin(phi)
-        const cosPhi = Math.cos(phi)
-
-        const x = radius * sinTheta * cosPhi
-        const y = radius * cosTheta
-        const z = radius * sinTheta * sinPhi
-
-        vertices.push(x, y, z)
-      }
-    }
-
-    // Generate sphere indices
-    for (let ring = 0; ring < rings; ring++) {
-      for (let seg = 0; seg < segments; seg++) {
-        const first = ring * (segments + 1) + seg
-        const second = first + segments + 1
-
-        indices.push(first, second, first + 1)
-        indices.push(second, second + 1, first + 1)
-      }
-    }
-
-    const vertexData = new Float32Array(vertices)
-    const indexData = new Uint16Array(indices)
-
-    this.vertexBuffer = device.createBuffer({
-      label: 'blackhole-vertices',
-      size: vertexData.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    })
-    device.queue.writeBuffer(this.vertexBuffer, 0, vertexData)
-
-    this.indexBuffer = device.createBuffer({
-      label: 'blackhole-indices',
-      size: indexData.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    })
-    device.queue.writeBuffer(this.indexBuffer, 0, indexData)
-
-    this.indexCount = indices.length
+    // Fullscreen vertex buffer is provided by base class (getFullscreenVertexBuffer)
   }
 
   /**
    * Update camera uniforms from frame context.
+   * @param ctx
    */
   updateCameraUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.cameraUniformBuffer) return
@@ -372,6 +313,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
 
   /**
    * Update black hole uniforms from stores.
+   * @param ctx
    */
   updateBlackHoleUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.blackHoleUniformBuffer) return
@@ -389,8 +331,9 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     const dimension = geometryStore?.dimension ?? this.rendererConfig.dimension ?? 4
 
     // Pack black hole uniforms (must match BlackHoleUniforms struct layout)
-    // Total size: 576 bytes = 144 floats
-    const data = new Float32Array(144)
+    // Total size: 672 bytes = 168 floats (including color algorithm fields)
+    const data = new Float32Array(168)
+    const dataView = new DataView(data.buffer) // For proper integer packing
     let offset = 0
 
     // Physics (Kerr black hole)
@@ -411,7 +354,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = baseColor.r ?? 1.0
     data[offset++] = baseColor.g ?? 0.96
     data[offset++] = baseColor.b ?? 0.9
-    data[offset++] = PALETTE_MODE_MAP[blackhole?.paletteMode] ?? 0 // paletteMode
+    dataView.setInt32(offset * 4, PALETTE_MODE_MAP[blackhole?.paletteMode] ?? 0, true) // paletteMode
+    offset++
 
     data[offset++] = blackhole?.bloomBoost ?? 1.5 // bloomBoost
 
@@ -423,7 +367,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = postProcessing?.gravityDistortionScale ?? 1.0 // bendScale (from global postProcessing)
     data[offset++] = blackhole?.bendMaxPerStep ?? 0.25 // bendMaxPerStep
     data[offset++] = blackhole?.lensingClamp ?? 10.0 // lensingClamp
-    data[offset++] = RAY_BENDING_MODE_MAP[blackhole?.rayBendingMode] ?? 0 // rayBendingMode
+    dataView.setInt32(offset * 4, RAY_BENDING_MODE_MAP[blackhole?.rayBendingMode] ?? 0, true) // rayBendingMode
+    offset++
 
     data[offset++] = blackhole?.dimPower ?? 1.0 // dimPower
     data[offset++] = blackhole?.originOffsetLengthSq ?? 0.0 // originOffsetLengthSq
@@ -452,7 +397,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.shellDeltaPrecomputed ?? 0.32 // shellDeltaPrecomputed
 
     // Manifold / Accretion
-    data[offset++] = MANIFOLD_TYPE_MAP[blackhole?.manifoldType] ?? 0 // manifoldType (i32)
+    dataView.setInt32(offset * 4, MANIFOLD_TYPE_MAP[blackhole?.manifoldType] ?? 0, true) // manifoldType (i32)
+    offset++
     data[offset++] = blackhole?.densityFalloff ?? 6.0 // densityFalloff
     data[offset++] = blackhole?.diskInnerRadiusMul ?? 4.23 // diskInnerRadiusMul
     data[offset++] = blackhole?.diskOuterRadiusMul ?? 15.0 // diskOuterRadiusMul
@@ -471,7 +417,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.multiIntersectionGain ?? 1.0 // multiIntersectionGain
 
     // Rendering quality (from blackhole store - controlled by UI sliders in BlackHoleAdvanced)
-    data[offset++] = blackhole?.maxSteps ?? 256 // maxSteps (i32)
+    dataView.setInt32(offset * 4, blackhole?.maxSteps ?? 256, true) // maxSteps (i32)
+    offset++
     data[offset++] = blackhole?.stepBase ?? 0.08 // stepBase
 
     data[offset++] = blackhole?.stepMin ?? 0.01 // stepMin
@@ -479,15 +426,18 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.stepAdaptG ?? 1.0 // stepAdaptG
     data[offset++] = blackhole?.stepAdaptR ?? 0.2 // stepAdaptR
 
-    data[offset++] = blackhole?.enableAbsorption ? 1 : 0 // enableAbsorption (u32)
+    dataView.setUint32(offset * 4, blackhole?.enableAbsorption ? 1 : 0, true) // enableAbsorption (u32)
+    offset++
     data[offset++] = blackhole?.absorption ?? 1.0 // absorption
     data[offset++] = blackhole?.transmittanceCutoff ?? 0.01 // transmittanceCutoff
     data[offset++] = blackhole?.farRadius ?? 35.0 // farRadius
 
-    data[offset++] = blackhole?.ultraFastMode ? 1 : 0 // ultraFastMode (u32)
+    dataView.setUint32(offset * 4, blackhole?.ultraFastMode ? 1 : 0, true) // ultraFastMode (u32)
+    offset++
 
     // Lighting
-    data[offset++] = LIGHTING_MODE_MAP[blackhole?.lightingMode] ?? 0 // lightingMode (i32)
+    dataView.setInt32(offset * 4, LIGHTING_MODE_MAP[blackhole?.lightingMode] ?? 0, true) // lightingMode (i32)
+    offset++
     data[offset++] = blackhole?.roughness ?? 0.6 // roughness
     data[offset++] = blackhole?.specular ?? 0.2 // specular
 
@@ -495,17 +445,21 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.envMapReady ?? 0.0 // envMapReady
 
     // Doppler effect
-    data[offset++] = blackhole?.dopplerEnabled ? 1 : 0 // dopplerEnabled (u32)
+    dataView.setUint32(offset * 4, blackhole?.dopplerEnabled ? 1 : 0, true) // dopplerEnabled (u32)
+    offset++
     data[offset++] = blackhole?.dopplerStrength ?? 0.6 // dopplerStrength
 
     // Motion blur
-    data[offset++] = blackhole?.motionBlurEnabled ? 1 : 0 // motionBlurEnabled (u32)
+    dataView.setUint32(offset * 4, blackhole?.motionBlurEnabled ? 1 : 0, true) // motionBlurEnabled (u32)
+    offset++
     data[offset++] = blackhole?.motionBlurStrength ?? 0.5 // motionBlurStrength
-    data[offset++] = blackhole?.motionBlurSamples ?? 4 // motionBlurSamples (i32)
+    dataView.setInt32(offset * 4, blackhole?.motionBlurSamples ?? 4, true) // motionBlurSamples (i32)
+    offset++
     data[offset++] = blackhole?.motionBlurRadialFalloff ?? 1.0 // motionBlurRadialFalloff
 
     // SSS (from global appearance store, not per-object blackhole store)
-    data[offset++] = appearance?.sssEnabled ? 1 : 0 // sssEnabled (u32)
+    dataView.setUint32(offset * 4, appearance?.sssEnabled ? 1 : 0, true) // sssEnabled (u32)
+    offset++
     data[offset++] = appearance?.sssIntensity ?? 1.0 // sssIntensity
 
     // sssColor (vec3f) + padding - parse from hex string
@@ -519,7 +473,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = appearance?.sssJitter ?? 0.2 // sssJitter
 
     // Animation state
-    data[offset++] = blackhole?.pulseEnabled ? 1 : 0 // pulseEnabled (u32)
+    dataView.setUint32(offset * 4, blackhole?.pulseEnabled ? 1 : 0, true) // pulseEnabled (u32)
+    offset++
     data[offset++] = blackhole?.pulseSpeed ?? 0.3 // pulseSpeed
 
     data[offset++] = blackhole?.pulseAmount ?? 0.2 // pulseAmount
@@ -534,11 +489,54 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = ctx.size.width // fullResolution.x
     data[offset++] = ctx.size.height // fullResolution.y
 
+    // Color algorithm settings
+    // Get color settings from color slice if available
+    const colorStore = ctx.frame?.stores?.['color'] as any
+    dataView.setInt32(offset * 4, colorStore?.colorAlgorithm ?? 0, true) // colorAlgorithm (i32)
+    offset++
+    dataView.setInt32(offset * 4, dimension, true) // dimension (i32)
+    offset++
+    dataView.setUint32(offset * 4, blackhole?.fastMode ? 1 : 0, true) // fastMode (u32)
+    offset++
+    data[offset++] = 0.0 // _padding3
+
+    // Cosine palette coefficients
+    const cosineA = colorStore?.cosineA ?? { r: 0.5, g: 0.5, b: 0.5 }
+    data[offset++] = cosineA.r ?? 0.5
+    data[offset++] = cosineA.g ?? 0.5
+    data[offset++] = cosineA.b ?? 0.5
+    data[offset++] = 0.0 // _padding4
+
+    const cosineB = colorStore?.cosineB ?? { r: 0.5, g: 0.5, b: 0.5 }
+    data[offset++] = cosineB.r ?? 0.5
+    data[offset++] = cosineB.g ?? 0.5
+    data[offset++] = cosineB.b ?? 0.5
+    data[offset++] = 0.0 // _padding5
+
+    const cosineC = colorStore?.cosineC ?? { r: 1.0, g: 1.0, b: 1.0 }
+    data[offset++] = cosineC.r ?? 1.0
+    data[offset++] = cosineC.g ?? 1.0
+    data[offset++] = cosineC.b ?? 1.0
+    data[offset++] = 0.0 // _padding6
+
+    const cosineD = colorStore?.cosineD ?? { r: 0.0, g: 0.33, b: 0.67 }
+    data[offset++] = cosineD.r ?? 0.0
+    data[offset++] = cosineD.g ?? 0.33
+    data[offset++] = cosineD.b ?? 0.67
+    data[offset++] = 0.0 // _padding7
+
+    // LCH color space settings
+    data[offset++] = colorStore?.lchLightness ?? 0.75 // lchLightness
+    data[offset++] = colorStore?.lchChroma ?? 0.15 // lchChroma
+    data[offset++] = 0.0 // _padding8.x
+    data[offset++] = 0.0 // _padding8.y
+
     this.writeUniformBuffer(this.device, this.blackHoleUniformBuffer, data)
   }
 
   /**
    * Update basis vectors for N-dimensional projection.
+   * @param ctx
    */
   updateBasisVectors(ctx: WebGPURenderContext): void {
     if (!this.device || !this.basisUniformBuffer) return
@@ -596,6 +594,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
 
   /**
    * Update lighting uniforms from lightingStore.
+   * @param ctx
    */
   updateLightingUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.lightingUniformBuffer) return
@@ -820,8 +819,6 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     if (
       !this.device ||
       !this.renderPipeline ||
-      !this.vertexBuffer ||
-      !this.indexBuffer ||
       !this.cameraBindGroup ||
       !this.lightingBindGroup ||
       !this.objectBindGroup
@@ -840,6 +837,9 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     // Get render target
     const colorView = ctx.getWriteTarget('hdr-color')
     if (!colorView) return
+
+    // Get fullscreen vertex buffer from base class
+    const vertexBuffer = this.getFullscreenVertexBuffer(this.device)
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -863,16 +863,31 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     passEncoder.setBindGroup(1, this.lightingBindGroup) // Combined
     passEncoder.setBindGroup(2, this.objectBindGroup)
 
-    passEncoder.setVertexBuffer(0, this.vertexBuffer)
-    passEncoder.setIndexBuffer(this.indexBuffer, 'uint16' as const)
-    passEncoder.drawIndexed(this.indexCount)
+    // Draw fullscreen triangle (3 vertices, no index buffer)
+    passEncoder.setVertexBuffer(0, vertexBuffer)
+    passEncoder.draw(3)
 
     passEncoder.end()
+
+    // Update draw statistics (fullscreen triangle = 1 triangle covering screen)
+    this.lastDrawStats = {
+      calls: 1,
+      triangles: 1,
+      vertices: 3,
+      lines: 0,
+      points: 0,
+    }
+  }
+
+  /**
+   * Get draw statistics from the last execute() call.
+   */
+  getDrawStats(): import('../core/types').WebGPUPassDrawStats {
+    return this.lastDrawStats
   }
 
   dispose(): void {
-    this.vertexBuffer?.destroy()
-    this.indexBuffer?.destroy()
+    // Note: fullscreen vertex buffer is shared and managed by base class
     this.cameraUniformBuffer?.destroy()
     this.lightingUniformBuffer?.destroy()
     this.materialUniformBuffer?.destroy()
@@ -880,8 +895,6 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     this.blackHoleUniformBuffer?.destroy()
     this.basisUniformBuffer?.destroy()
 
-    this.vertexBuffer = null
-    this.indexBuffer = null
     this.cameraUniformBuffer = null
     this.lightingUniformBuffer = null
     this.materialUniformBuffer = null

@@ -9,8 +9,8 @@
 
 import {
   assembleShaderBlocks,
+  generateConsolidatedBindGroups,
   generateObjectBindGroup,
-  generateStandardBindGroups,
   generateTextureBindings,
   type WGSLShaderConfig,
 } from '../shared/compose-helpers'
@@ -25,9 +25,11 @@ import { lensingBlock } from './lensing.wgsl'
 import { horizonBlock } from './horizon.wgsl'
 import { shellBlock } from './shell.wgsl'
 import { colorsBlock } from './colors.wgsl'
-import { diskSdfBlock } from './disk-sdf.wgsl'
+import { diskVolumetricBlock } from './disk-volumetric.wgsl'
+import { manifoldBlock } from './manifold.wgsl'
+import { motionBlurBlock } from './motion-blur.wgsl'
 import { dopplerBlock } from './doppler.wgsl'
-import { mainBlock, mainBlockWithEnvMap } from './main.wgsl'
+import { mainHelpersBlock, mainBlock } from './main.wgsl'
 
 /**
  * BlackHole shader configuration options.
@@ -43,6 +45,7 @@ export interface BlackHoleWGSLShaderConfig extends WGSLShaderConfig {
 
 /**
  * Compose complete BlackHole fragment shader.
+ * @param config
  */
 export function composeBlackHoleShader(config: BlackHoleWGSLShaderConfig): {
   wgsl: string
@@ -85,13 +88,13 @@ export function composeBlackHoleShader(config: BlackHoleWGSLShaderConfig): {
 
   // Build blocks array
   const blocks = [
-    // Vertex inputs
+    // Vertex inputs (fullscreen quad - receives ray direction from vertex shader)
     {
       name: 'Vertex Inputs',
       content: /* wgsl */ `
 struct VertexOutput {
   @builtin(position) clipPosition: vec4f,
-  @location(0) vPosition: vec3f,
+  @location(0) vRayDir: vec3f,
 }
 `,
     },
@@ -103,22 +106,26 @@ struct VertexOutput {
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },
 
-    // Bind groups
-    { name: 'Standard Bind Groups', content: generateStandardBindGroups() },
+    // Bind groups - using consolidated layout to stay within 4-group limit
+    // Group 0: Camera
+    // Group 1: Lighting + Material + Quality
+    // Group 2: Object (BlackHole + Basis)
+    // Group 3: Environment Map (if enabled)
+    { name: 'Standard Bind Groups', content: generateConsolidatedBindGroups() },
     {
       name: 'BlackHole Uniforms',
       content:
         blackHoleUniformsBlock +
         '\n' +
-        generateObjectBindGroup(4, 'BlackHoleUniforms', 'blackhole') +
+        generateObjectBindGroup(2, 'BlackHoleUniforms', 'blackhole', 0) +
         '\n' +
-        generateObjectBindGroup(4, 'BasisVectors', 'basis'),
+        generateObjectBindGroup(2, 'BasisVectors', 'basis', 1),
     },
 
     // Environment map textures
     {
       name: 'Environment Map',
-      content: generateTextureBindings(5, [{ name: 'envMap', type: 'cube' }]),
+      content: generateTextureBindings(3, [{ name: 'envMap', type: 'texture_cube<f32>' }]),
       condition: enableEnvMap,
     },
 
@@ -128,10 +135,15 @@ struct VertexOutput {
     { name: 'Photon Shell', content: shellBlock },
     { name: 'Doppler', content: dopplerBlock },
     { name: 'Colors', content: colorsBlock },
-    { name: 'Disk SDF', content: diskSdfBlock },
 
-    // Main shader
-    { name: 'Main', content: enableEnvMap ? mainBlockWithEnvMap : mainBlock },
+    // Accretion disk modules (volumetric raymarching)
+    { name: 'Disk Manifold', content: manifoldBlock },
+    { name: 'Disk Volumetric', content: diskVolumetricBlock },
+    { name: 'Motion Blur', content: motionBlurBlock },
+
+    // Main shader (helpers + fragment function)
+    { name: 'Main Helpers', content: mainHelpersBlock },
+    { name: 'Main', content: mainBlock },
   ]
 
   // Assemble
@@ -144,12 +156,13 @@ struct VertexOutput {
 }
 
 /**
- * Create vertex shader for BlackHole rendering.
+ * Create vertex shader for BlackHole rendering (fullscreen quad).
+ * Computes ray direction from screen UV using camera matrices.
  */
 export function composeBlackHoleVertexShader(): string {
   return /* wgsl */ `
-// BlackHole Vertex Shader
-// Transforms vertices for raymarching
+// BlackHole Vertex Shader (Fullscreen Quad)
+// Computes ray direction from screen UV for raymarching
 
 struct CameraUniforms {
   viewMatrix: mat4x4f,
@@ -157,6 +170,8 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,
+  inverseModelMatrix: mat4x4f,
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,
@@ -171,24 +186,34 @@ struct CameraUniforms {
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
 struct VertexInput {
-  @location(0) position: vec3f,
+  @location(0) position: vec2f,
+  @location(1) uv: vec2f,
 }
 
 struct VertexOutput {
   @builtin(position) clipPosition: vec4f,
-  @location(0) vPosition: vec3f,
+  @location(0) vRayDir: vec3f,
 }
 
 @vertex
 fn main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
 
-  // World position (model matrix assumed identity)
-  let worldPos = input.position;
-  output.vPosition = worldPos;
+  // Direct clip position from fullscreen quad vertices
+  output.clipPosition = vec4f(input.position, 0.0, 1.0);
 
-  // Clip position
-  output.clipPosition = camera.viewProjectionMatrix * vec4f(worldPos, 1.0);
+  // Compute ray direction from UV
+  // Convert UV (0-1) to NDC (-1 to 1)
+  let ndc = input.position;
+
+  // Reconstruct view-space direction using inverse projection
+  let clipPos = vec4f(ndc.x, ndc.y, 1.0, 1.0);
+  var viewPos = camera.inverseProjectionMatrix * clipPos;
+  viewPos = viewPos / viewPos.w;
+
+  // Transform view direction to world space
+  let worldDir = (camera.inverseViewMatrix * vec4f(normalize(viewPos.xyz), 0.0)).xyz;
+  output.vRayDir = normalize(worldDir);
 
   return output;
 }

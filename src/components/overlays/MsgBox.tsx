@@ -23,6 +23,8 @@ export const MsgBox: React.FC = () => {
   /**
    * Handles action button click.
    * If checkbox is checked, persists the dismiss state before executing the action.
+   * @param action
+   * @param action.onClick
    */
   const handleAction = (action: { onClick: () => void }) => {
     if (dontShowAgain && dismissId) {

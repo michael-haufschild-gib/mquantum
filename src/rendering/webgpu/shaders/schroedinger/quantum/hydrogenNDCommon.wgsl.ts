@@ -88,8 +88,8 @@ fn hydrogenNDTimeEvolution(psiReal: f32, n: i32, t: f32) -> vec2f {
   if (n < 1) {
     return vec2f(psiReal, 0.0);
   }
-  let fn = f32(n);
-  let E = -0.5 / (fn * fn);
+  let nf = f32(n);
+  let E = -0.5 / (nf * nf);
   let phase = -E * t;
   let timeFactor = vec2f(cos(phase), sin(phase));
   return vec2f(psiReal * timeFactor.x, psiReal * timeFactor.y);

@@ -160,6 +160,7 @@ export const hoCombined8Block = generateHOCombinedBlock(8)
 
 /**
  * Get all unrolled HO blocks for a specific term count.
+ * @param termCount
  */
 export function getHOUnrolledBlocks(termCount: number): {
   superposition: string

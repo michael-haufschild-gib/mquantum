@@ -2,7 +2,11 @@ import { Icon } from '@/components/ui/Icon'
 import { useExportStore } from '@/stores/exportStore'
 import { useLayoutEffect, useRef, useState } from 'react'
 
-/** Get export width in pixels based on resolution setting */
+/**
+ * Get export width in pixels based on resolution setting
+ * @param resolution
+ * @param customWidth
+ */
 const getExportWidth = (resolution: string, customWidth: number): number => {
   switch (resolution) {
     case '720p':

@@ -75,6 +75,7 @@ export class BloomPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
@@ -171,11 +172,12 @@ export class BloomPass extends WebGPUBasePass {
       { label: 'bloom-blur' }
     )
 
+    // Composite also uses rgba16float since bloom-output is HDR
     this.compositePipeline = this.createFullscreenPipeline(
       device,
       compositeShaderModule,
       [this.compositeBindGroupLayout],
-      format,
+      'rgba16float',
       { label: 'bloom-composite' }
     )
   }

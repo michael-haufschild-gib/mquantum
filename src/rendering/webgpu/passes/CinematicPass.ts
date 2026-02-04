@@ -136,6 +136,7 @@ export class CinematicPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
@@ -185,6 +186,7 @@ export class CinematicPass extends WebGPUBasePass {
 
   /**
    * Set chromatic aberration intensity.
+   * @param value
    */
   setAberration(value: number): void {
     this.aberration = value
@@ -192,6 +194,7 @@ export class CinematicPass extends WebGPUBasePass {
 
   /**
    * Set vignette darkness.
+   * @param value
    */
   setVignette(value: number): void {
     this.vignette = value
@@ -200,6 +203,7 @@ export class CinematicPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
@@ -222,6 +226,7 @@ export class CinematicPass extends WebGPUBasePass {
 
   /**
    * Set film grain intensity.
+   * @param value
    */
   setGrain(value: number): void {
     this.grain = value
@@ -229,6 +234,7 @@ export class CinematicPass extends WebGPUBasePass {
 
   /**
    * Execute the cinematic pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (

@@ -1,0 +1,128 @@
+{
+  "verified_correct": [
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "component": "TIME_FIELD_OFFSET constant",
+      "status": "CORRECT",
+      "evidence": "Traced through WGSL struct layout: time field is at offset 908 bytes after energyColorEnabled(896), shimmerEnabled(900), shimmerStrength(904), time(908). Constant value matches.",
+      "notes": "Partial buffer update optimization for time-only changes is correctly implemented"
+    },
+    {
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "component": "Workgroup dispatch calculation",
+      "status": "CORRECT",
+      "evidence": "gridSize=64, WORKGROUP_SIZE=8, workgroupCount=ceil(64/8)=8. Dispatch 8x8x8 workgroups with 8x8x8 threads each = 64^3 = 262,144 total threads covering entire grid.",
+      "notes": "Bounds check in shader correctly rejects gid >= gridSize"
+    },
+    {
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "component": "Bind group layout",
+      "status": "CORRECT",
+      "evidence": "Layout matches WGSL: Group 0 binding 0=SchroedingerUniforms, 1=BasisVectors, 2=GridParams, 3=densityGrid storage texture. All bindings consistent.",
+      "notes": "Texture format rgba16float matches storage texture declaration"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts",
+      "component": "World-to-UV coordinate transform",
+      "status": "CORRECT",
+      "evidence": "worldToGridUV correctly maps world [-2,2] to UV [0,1] using (worldPos - min) / (max - min). Matches compute shader inverse transform.",
+      "notes": "See warning about hardcoded constants"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "component": "BasisVectors uniform layout",
+      "status": "CORRECT",
+      "evidence": "STRIDE=12 correctly accounts for array<vec4f,3> packing. Buffer size 192 bytes = 48 floats. Layout: basisX[0-11], basisY[12-23], basisZ[24-35], origin[36-47].",
+      "notes": "Slice animation correctly updates origin at offset STRIDE*3"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/integration.wgsl.ts",
+      "component": "Volume raymarch loop bounds",
+      "status": "CORRECT",
+      "evidence": "Loop uses i < MAX_VOLUME_SAMPLES with break at i >= sampleCount. sampleCount clamped to max(uniforms.sampleCount, 1) preventing division by zero. No off-by-one errors.",
+      "notes": "iterCount correctly tracks actual iterations for debug visualization"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts",
+      "component": "Ray direction calculation",
+      "status": "CORRECT",
+      "evidence": "ro = inverseModelMatrix * cameraPosition (w=1 for position). worldRayDir = normalize(vPosition - cameraPosition). rd = inverseModelMatrix * worldRayDir (w=0 for direction). Correctly transforms to model space.",
+      "notes": "Matches WebGL implementation pattern"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "component": "Vertex shader vPosition output",
+      "status": "CORRECT",
+      "evidence": "worldPos = modelMatrix * input.position. vPosition = worldPos. Fragment shader expects world-space position for ray direction calculation.",
+      "notes": "Consistent with fragment shader ray setup"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "component": "Hydrogen uniform field names",
+      "status": "CORRECT",
+      "evidence": "Reads principalQuantumNumber, azimuthalQuantumNumber, magneticQuantumNumber, bohrRadiusScale from store. Writes to principalN, azimuthalL, magneticM, bohrRadius in buffer. Names were fixed per memory notes.",
+      "notes": "Includes proper validation: validL = min(l, n-1), validM = max(-l, min(m, l))"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "component": "Quantum preset generation",
+      "status": "CORRECT",
+      "evidence": "Correctly calls generateQuantumPreset() and flattenPresetForUniforms() to populate omega, quantum, coeff, energy arrays. Uses caching to avoid regeneration when config unchanged.",
+      "notes": "Spread animation quantizes to 20 steps for performance optimization"
+    }
+  ],
+  "bugs_found": [
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "function": "updateSchroedingerUniforms",
+      "line": 1027,
+      "status": "HAS_BUG",
+      "bug_type": "alignment_mismatch",
+      "code": "floatView[956 / 4] = cosineCoeffs.a?.[0] ?? 0.5\nfloatView[960 / 4] = cosineCoeffs.a?.[1] ?? 0.5\nfloatView[964 / 4] = cosineCoeffs.a?.[2] ?? 0.5\nfloatView[968 / 4] = 0.0 // w unused",
+      "problem": "cosineA vec4f is written at offset 956 bytes, but WGSL 16-byte alignment places it at offset 960. After distOffset ends at byte 956, there are 4 bytes implicit padding before cosineA. This causes cosineA/B/C/D to be misaligned by 4 bytes.",
+      "reproduction": {
+        "input": "colorAlgorithm = 'cosine', cosineCoeffs = { a: [0.5,0.5,0.5], b: [...], c: [...], d: [...] }",
+        "expected": "Shader reads cosineA.x = 0.5 at offset 960",
+        "actual": "Shader reads cosineA.x = garbage (what was written to 960 was cosineA.y=0.5)"
+      },
+      "fix": "Change offsets: cosineA at 960 (not 956), cosineB at 976 (not 972), cosineC at 992 (not 988), cosineD at 1008 (not 1004). Fix code:\n// cosineA (vec4f at offset 960 after alignment padding)\nfloatView[960 / 4] = cosineCoeffs.a?.[0] ?? 0.5\nfloatView[964 / 4] = cosineCoeffs.a?.[1] ?? 0.5\nfloatView[968 / 4] = cosineCoeffs.a?.[2] ?? 0.5\nfloatView[972 / 4] = 0.0 // w unused\n// cosineB (vec4f at offset 976)\nfloatView[976 / 4] = cosineCoeffs.b?.[0] ?? 0.5\n// ...similar for cosineC at 992, cosineD at 1008"
+    }
+  ],
+  "semantic_issues": [],
+  "warnings": [
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts",
+      "component": "Hardcoded grid constants",
+      "line": 42,
+      "status": "WARNING",
+      "issue": "DENSITY_GRID_MIN/MAX/SIZE are hardcoded (-2,+2,64) and could go out of sync with WORLD_BOUND and DEFAULT_GRID_SIZE in DensityGridComputePass.ts",
+      "evidence": "densityGridSampling.wgsl.ts:\nconst DENSITY_GRID_MIN: vec3f = vec3f(-2.0, -2.0, -2.0);\n\nDensityGridComputePass.ts:\nconst WORLD_BOUND = 2.0",
+      "severity": "medium",
+      "recommendation": "Either pass grid bounds via uniform buffer (adding GridParams to render pass bind group) or define constants in a shared location that both files import."
+    }
+  ],
+  "summary": {
+    "functions_checked": 15,
+    "correct": 10,
+    "bugs": 1,
+    "warnings": 1,
+    "semantic_issues": 0
+  },
+  "verification_notes": {
+    "methodology": "Traced uniform buffer layouts byte-by-byte through WGSL struct definitions, verified WGSL 16-byte alignment rules for vec3f/vec4f types, traced execution paths with concrete inputs, checked loop bounds for off-by-one errors.",
+    "edge_cases_tested": [
+      "sampleCount = 0 (clamped to 1)",
+      "Grid boundary sampling (UV 0.0 and 1.0)",
+      "Transmittance early exit (< MIN_TRANSMITTANCE)",
+      "Empty quantum preset (falls back to defaults)"
+    ],
+    "areas_verified": [
+      "Uniform buffer sizes and layouts",
+      "Bind group consistency between TypeScript and WGSL",
+      "Compute shader workgroup dispatch",
+      "Texture coordinate transforms",
+      "Ray direction model/world space transforms",
+      "Volume integration loop correctness"
+    ]
+  }
+}

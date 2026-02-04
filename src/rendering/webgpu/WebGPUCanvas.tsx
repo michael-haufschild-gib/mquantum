@@ -69,6 +69,13 @@ export function useWebGPU(): WebGPUCanvasContext {
  * Initializes WebGPU and provides context to child components.
  * Handles automatic resize and device loss recovery.
  *
+ * @param root0
+ * @param root0.className
+ * @param root0.style
+ * @param root0.onReady
+ * @param root0.onError
+ * @param root0.dpr
+ * @param root0.children
  * @example
  * ```tsx
  * <WebGPUCanvas onReady={(graph) => setupPasses(graph)}>

@@ -18,6 +18,7 @@ const EXTRA_DIM_THRESHOLD = 18.0
 
 /**
  * Generate coordinate extraction for a given dimension.
+ * @param dimension
  */
 function generateCoordExtraction(dimension: number): string {
   const coords = Array.from(
@@ -30,6 +31,7 @@ function generateCoordExtraction(dimension: number): string {
 /**
  * Generate the extra-dimension early exit check (fully unrolled).
  * Only for dimensions > 3.
+ * @param dimension
  */
 function generateExtraDimEarlyExit(dimension: number): string {
   const extraDimCount = dimension - 3
@@ -67,6 +69,7 @@ ${uCalcs}
 
 /**
  * Generate the ND radius calculation (fully unrolled).
+ * @param dimension
  */
 function generateRadiusCalculation(dimension: number): string {
   // First compute sum3D for reuse
@@ -101,6 +104,7 @@ function generateRadiusCalculation(dimension: number): string {
 /**
  * Generate the extra dimension HO product (fully unrolled, inlined ho1D calls).
  * Only for dimensions > 3.
+ * @param dimension
  */
 function generateExtraDimProduct(dimension: number): string {
   const extraDimCount = dimension - 3
@@ -176,7 +180,7 @@ ${extraDimEarlyExit}${radiusCalc}
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, rND, uniforms.bohrRadius);
 
   // Angular part: Y_lm(theta, phi) from first 3 dims
-  let Y = evalHydrogenNDAngular(uniforms.azimuthalL, uniforms.magneticM, theta, phi, uniforms.useRealOrbitals);
+  let Y = evalHydrogenNDAngular(uniforms.azimuthalL, uniforms.magneticM, theta, phi, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
   // Combine: psi = R * Y * extraProduct
   let psiReal = R * Y * extraProduct;

@@ -140,6 +140,8 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
+  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,
@@ -230,6 +232,8 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
+  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,

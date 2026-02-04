@@ -59,6 +59,7 @@ export interface FeatureFlags {
 
 /**
  * Process configuration into feature flags.
+ * @param config
  */
 export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
   const {
@@ -97,6 +98,8 @@ export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
 
 /**
  * Assemble shader blocks into complete WGSL source.
+ * @param blocks
+ * @param overrides
  */
 export function assembleShaderBlocks(
   blocks: ShaderBlock[],
@@ -200,6 +203,7 @@ struct FragmentOutput {
 
 /**
  * Generate bind group declarations for standard uniforms.
+ * Uses 4 separate groups (0-3) for devices with 8+ bind group support.
  */
 export function generateStandardBindGroups(): string {
   return /* wgsl */ `
@@ -218,27 +222,54 @@ export function generateStandardBindGroups(): string {
 }
 
 /**
+ * Generate consolidated bind group declarations for standard uniforms.
+ * Uses only 2 groups (0-1) to stay within 4-group limit.
+ * Group 0: Camera
+ * Group 1: Lighting + Material + Quality (combined)
+ */
+export function generateConsolidatedBindGroups(): string {
+  return /* wgsl */ `
+// Group 0: Camera and frame uniforms
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+
+// Group 1: Combined rendering uniforms (Lighting + Material + Quality)
+@group(1) @binding(0) var<uniform> lighting: LightingUniforms;
+@group(1) @binding(1) var<uniform> material: MaterialUniforms;
+@group(1) @binding(2) var<uniform> quality: QualityUniforms;
+`
+}
+
+/**
  * Generate bind group for object-specific uniforms.
+ * @param group - The bind group index
+ * @param uniformType - The WGSL struct type
+ * @param uniformName - The variable name
+ * @param binding - The binding index within the group (default: 0)
  */
 export function generateObjectBindGroup(
   group: number,
   uniformType: string,
-  uniformName: string
+  uniformName: string,
+  binding: number = 0
 ): string {
   return /* wgsl */ `
-@group(${group}) @binding(0) var<uniform> ${uniformName}: ${uniformType};
+@group(${group}) @binding(${binding}) var<uniform> ${uniformName}: ${uniformType};
 `
 }
 
 /**
  * Generate texture and sampler bindings.
+ * @param group - The bind group index
+ * @param textures - Array of texture definitions
+ * @param startBinding - Starting binding index (default: 0)
  */
 export function generateTextureBindings(
   group: number,
-  textures: Array<{ name: string; type?: string }>
+  textures: Array<{ name: string; type?: string }>,
+  startBinding: number = 0
 ): string {
   const lines: string[] = []
-  let binding = 0
+  let binding = startBinding
 
   for (const tex of textures) {
     const texType = tex.type ?? 'texture_2d<f32>'

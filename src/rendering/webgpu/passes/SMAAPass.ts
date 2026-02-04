@@ -76,6 +76,7 @@ export class SMAAPass extends WebGPUBasePass {
   /**
    * Set the edge detection threshold.
    * Lower values detect more edges but may introduce artifacts.
+   * @param value
    */
   setThreshold(value: number): void {
     this.threshold = Math.max(0.05, Math.min(0.5, value))
@@ -84,6 +85,7 @@ export class SMAAPass extends WebGPUBasePass {
   /**
    * Set the maximum search steps for pattern detection.
    * Higher values improve quality but increase cost.
+   * @param value
    */
   setMaxSearchSteps(value: number): void {
     this.maxSearchSteps = Math.max(4, Math.min(32, value))
@@ -94,6 +96,7 @@ export class SMAAPass extends WebGPUBasePass {
    * Update pass properties from Zustand stores.
    * Note: SMAA threshold and maxSearchSteps are not in any store.
    * Using constructor defaults or values set via setThreshold/setMaxSearchSteps.
+   * @param _ctx
    */
   private updateFromStores(_ctx: WebGPURenderContext): void {
     // No store properties for SMAA - using constructor defaults
@@ -255,6 +258,9 @@ export class SMAAPass extends WebGPUBasePass {
 
   /**
    * Ensure intermediate textures are created and properly sized.
+   * @param device
+   * @param width
+   * @param height
    */
   private ensureTextures(device: GPUDevice, width: number, height: number): void {
     if (this.textureSize.width === width && this.textureSize.height === height) {

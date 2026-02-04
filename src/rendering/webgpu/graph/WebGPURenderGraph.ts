@@ -37,6 +37,7 @@ class RenderContextImpl implements WebGPURenderContext {
 
   private pool: WebGPUResourcePool
   private canvasTextureView: GPUTextureView
+  private resourceAliases: Map<string, string>
 
   constructor(
     device: GPUDevice,
@@ -44,7 +45,8 @@ class RenderContextImpl implements WebGPURenderContext {
     frame: WebGPUFrameContext | null,
     size: { width: number; height: number },
     pool: WebGPUResourcePool,
-    canvasTextureView: GPUTextureView
+    canvasTextureView: GPUTextureView,
+    resourceAliases: Map<string, string>
   ) {
     this.device = device
     this.encoder = encoder
@@ -52,22 +54,55 @@ class RenderContextImpl implements WebGPURenderContext {
     this.size = size
     this.pool = pool
     this.canvasTextureView = canvasTextureView
+    this.resourceAliases = resourceAliases
+  }
+
+  /**
+   * Resolve resource alias chain to find actual resource ID.
+   *
+   * When a pass is disabled with skipPassthrough=true, its output is aliased
+   * to its input. This creates a chain: C → B → A where downstream passes
+   * reading from C should actually read from A.
+   *
+   * @param resourceId - Resource ID to resolve
+   * @returns Resolved resource ID (may be same as input if no alias)
+   */
+  private resolveAlias(resourceId: string): string {
+    let current = resourceId
+    // Use depth counter for cycle detection
+    let depth = 0
+    const maxDepth = 16
+
+    while (this.resourceAliases.has(current)) {
+      if (depth >= maxDepth) {
+        console.warn(`WebGPURenderGraph: Alias chain too long at '${current}' (possible cycle)`)
+        return current
+      }
+      depth++
+      current = this.resourceAliases.get(current)!
+    }
+
+    return current
   }
 
   getTexture(resourceId: string): GPUTexture | null {
-    return this.pool.getTexture(resourceId)
+    const resolved = this.resolveAlias(resourceId)
+    return this.pool.getTexture(resolved)
   }
 
   getTextureView(resourceId: string): GPUTextureView | null {
-    return this.pool.getTextureView(resourceId)
+    const resolved = this.resolveAlias(resourceId)
+    return this.pool.getTextureView(resolved)
   }
 
   getWriteTarget(resourceId: string): GPUTextureView | null {
+    // Don't resolve alias for write targets - we want to write to the actual target
     return this.pool.getWriteTextureView(resourceId)
   }
 
   getReadTextureView(resourceId: string): GPUTextureView | null {
-    return this.pool.getReadTextureView(resourceId)
+    const resolved = this.resolveAlias(resourceId)
+    return this.pool.getReadTextureView(resolved)
   }
 
   getSampler(resourceId: string): GPUSampler | null {
@@ -75,7 +110,8 @@ class RenderContextImpl implements WebGPURenderContext {
   }
 
   getResource(resourceId: string): WebGPUResource | null {
-    return this.pool.getResource(resourceId)
+    const resolved = this.resolveAlias(resourceId)
+    return this.pool.getResource(resolved)
   }
 
   beginRenderPass(descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
@@ -170,6 +206,23 @@ export class WebGPURenderGraph {
   // Setup context
   private setupContext: SetupContextImpl | null = null
 
+  // Debug
+  private _lastPassLog: number = 0
+
+  // Resource aliasing for disabled passes
+  // When a pass is disabled with skipPassthrough=true, its output is aliased
+  // to its input so downstream passes read from the correct source without copying.
+  // Map: outputResourceId → inputResourceId
+  private resourceAliases: Map<string, string> = new Map()
+
+  // Pass state tracking for lazy resource deallocation
+  // Tracks how many frames each pass has been disabled for grace period management
+  // Map: passId → disabledFrameCount
+  private passStateTracking = new Map<string, number>()
+
+  /** Default grace period in frames before resource deallocation (~1s at 60fps) */
+  private static readonly DEFAULT_DISABLE_GRACE_PERIOD = 60
+
   constructor() {
     this.deviceManager = WebGPUDevice.getInstance()
     this.pool = new WebGPUResourcePool()
@@ -226,6 +279,8 @@ export class WebGPURenderGraph {
 
   /**
    * Set viewport size.
+   * @param width
+   * @param height
    */
   setSize(width: number, height: number): void {
     if (this.width === width && this.height === height) return
@@ -238,6 +293,8 @@ export class WebGPURenderGraph {
 
   /**
    * Add a resource configuration.
+   * @param id
+   * @param config
    */
   addResource(
     id: string,
@@ -255,6 +312,7 @@ export class WebGPURenderGraph {
 
   /**
    * Remove a resource.
+   * @param id
    */
   removeResource(id: string): void {
     this.resources.delete(id)
@@ -264,6 +322,7 @@ export class WebGPURenderGraph {
 
   /**
    * Add a render pass.
+   * @param pass
    */
   async addPass(pass: WebGPURenderPass): Promise<void> {
     if (this.passes.has(pass.id)) {
@@ -282,6 +341,7 @@ export class WebGPURenderGraph {
 
   /**
    * Remove a render pass.
+   * @param id
    */
   removePass(id: string): void {
     const pass = this.passes.get(id)
@@ -308,11 +368,16 @@ export class WebGPURenderGraph {
     // Clear resources (pool will recreate them)
     this.resources.clear()
 
+    // Clear state tracking
+    this.passStateTracking.clear()
+    this.resourceAliases.clear()
+
     this.compiled = false
   }
 
   /**
    * Get a pass by ID.
+   * @param id
    */
   getPass(id: string): WebGPURenderPass | undefined {
     return this.passes.get(id)
@@ -331,6 +396,11 @@ export class WebGPURenderGraph {
 
     for (const [id, pass] of this.passes) {
       passConfigs.set(id, pass.config)
+      // Defensive: check if outputs exists and is iterable
+      if (!pass.config.outputs || !Array.isArray(pass.config.outputs)) {
+        console.error(`WebGPURenderGraph: Pass '${id}' has invalid outputs:`, pass.config.outputs)
+        continue
+      }
       for (const output of pass.config.outputs) {
         outputToPass.set(output.resourceId, id)
       }
@@ -393,11 +463,22 @@ export class WebGPURenderGraph {
       }
     }
 
+    // Clean up state tracking for passes no longer in the graph
+    // This prevents memory leaks when passes are removed
+    const currentPassIds = new Set(this.passOrder)
+    for (const passId of this.passStateTracking.keys()) {
+      if (!currentPassIds.has(passId)) {
+        this.passStateTracking.delete(passId)
+      }
+    }
+
     this.compiled = true
   }
 
   /**
    * Register a store getter for frame context.
+   * @param key
+   * @param getter
    */
   setStoreGetter(key: string, getter: () => unknown): void {
     this.storeGetters.set(key, getter)
@@ -405,6 +486,7 @@ export class WebGPURenderGraph {
 
   /**
    * Capture frame context from stores.
+   * @param delta
    */
   private captureFrameContext(delta: number): WebGPUFrameContext {
     const stores: Record<string, unknown> = {}
@@ -427,6 +509,7 @@ export class WebGPURenderGraph {
 
   /**
    * Execute the render graph for one frame.
+   * @param delta
    */
   execute(delta: number): WebGPUFrameStats {
     if (!this.initialized) {
@@ -453,6 +536,10 @@ export class WebGPURenderGraph {
       label: `frame-${this.frameNumber}`,
     })
 
+    // Clear resource aliases from previous frame
+    // Aliases are re-computed each frame based on which passes are enabled
+    this.resourceAliases.clear()
+
     // Create render context
     const ctx = new RenderContextImpl(
       device,
@@ -460,22 +547,126 @@ export class WebGPURenderGraph {
       this.frameContext,
       { width: this.width, height: this.height },
       this.pool,
-      canvasTextureView
+      canvasTextureView,
+      this.resourceAliases
     )
 
     // Execute passes
     const passTimings: Map<string, number> = new Map()
     let timestampIndex = 0
 
+    // DEBUG: Log pass execution once per second
+    const now = Date.now()
+    const shouldLog = !this._lastPassLog || now - this._lastPassLog > 1000
+    if (shouldLog) {
+      this._lastPassLog = now
+      console.log('[WebGPU RenderGraph] Executing passes:', this.passOrder)
+    }
+
+    // Track resources written by enabled passes to prevent passthrough overwriting them
+    const writtenByEnabledPass = new Set<string>()
+
     for (const passId of this.passOrder) {
       const pass = this.passes.get(passId)
-      if (!pass) continue
+      if (!pass) {
+        if (shouldLog) console.warn(`[WebGPU RenderGraph] Pass '${passId}' not found in map`)
+        continue
+      }
 
       // Check if pass is enabled
       const enabled = pass.config.enabled?.(this.frameContext) ?? true
+
+      // ========================================================================
+      // Lazy Resource Deallocation: Track disabled frames and manage grace period
+      // ========================================================================
+      if (enabled) {
+        // Pass is enabled - reset disabled frame counter
+        this.passStateTracking.set(passId, 0)
+      } else {
+        // Pass is disabled - track how long it's been disabled
+        const disabledFrameCount = (this.passStateTracking.get(passId) ?? 0) + 1
+        this.passStateTracking.set(passId, disabledFrameCount)
+
+        // Check if grace period has elapsed and pass has releaseInternalResources
+        const gracePeriod =
+          pass.config.disableGracePeriod ?? WebGPURenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
+        const keepResources = pass.config.keepResourcesWhenDisabled ?? false
+
+        // Only call releaseInternalResources exactly once when grace period elapses
+        if (!keepResources && disabledFrameCount === gracePeriod && pass.releaseInternalResources) {
+          pass.releaseInternalResources()
+        }
+      }
+      // ========================================================================
+
       if (!enabled) {
+        // For disabled passes, maintain the resource chain
+        const inputs = pass.config.inputs ?? []
+        const outputs = pass.config.outputs ?? []
+
+        if (inputs.length >= 1 && outputs.length >= 1) {
+          // First input is typically the color/main input
+          const inputId = inputs[0]!.resourceId
+          const outputId = outputs[0]!.resourceId
+
+          // CRITICAL: Skip if output was already written by an enabled pass
+          // This prevents mutually exclusive passes from overwriting each other's output
+          if (writtenByEnabledPass.has(outputId)) {
+            passTimings.set(passId, 0)
+            if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
+            continue
+          }
+
+          // Check if this pass should use aliasing instead of passthrough
+          const skipPassthrough = pass.config.skipPassthrough ?? false
+
+          if (skipPassthrough) {
+            // Aliasing: output resolves to input (zero GPU cost)
+            this.resourceAliases.set(outputId, inputId)
+            if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
+          } else {
+            // Passthrough: copy input texture to output target using GPU copy
+            const inputTexture = this.pool.getTexture(inputId)
+            const outputTexture = this.pool.getTexture(outputId)
+
+            if (inputTexture && outputTexture) {
+              // WebGPU copyTextureToTexture requires same dimensions AND same format
+              // For safety, verify both match
+              const inputWidth = inputTexture.width
+              const inputHeight = inputTexture.height
+              const outputWidth = outputTexture.width
+              const outputHeight = outputTexture.height
+              const inputFormat = inputTexture.format
+              const outputFormat = outputTexture.format
+
+              const dimensionsMatch = inputWidth === outputWidth && inputHeight === outputHeight
+              const formatsMatch = inputFormat === outputFormat
+
+              if (dimensionsMatch && formatsMatch) {
+                encoder.copyTextureToTexture(
+                  { texture: inputTexture },
+                  { texture: outputTexture },
+                  { width: inputWidth, height: inputHeight }
+                )
+                if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' passthrough copy ${inputId} → ${outputId}`)
+              } else {
+                // Dimensions or format mismatch - fall back to aliasing
+                this.resourceAliases.set(outputId, inputId)
+                const reason = !dimensionsMatch ? 'size mismatch' : `format mismatch (${inputFormat} → ${outputFormat})`
+                if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing (${reason}) ${outputId} → ${inputId}`)
+              }
+            }
+          }
+        }
+
         passTimings.set(passId, 0)
+        if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' is disabled`)
         continue
+      }
+
+      // Track outputs written by this enabled pass
+      for (const output of pass.config.outputs ?? []) {
+        writtenByEnabledPass.add(output.resourceId)
       }
 
       // NOTE: encoder.writeTimestamp() was removed from WebGPU spec (doesn't work on Apple Silicon).
@@ -485,8 +676,9 @@ export class WebGPURenderGraph {
       // Execute pass
       try {
         pass.execute(ctx)
+        if (shouldLog) console.log(`[WebGPU RenderGraph] Executed pass '${passId}'`)
       } catch (e) {
-        console.error(`Error executing pass '${passId}':`, e)
+        console.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
       }
 
       timestampIndex++
@@ -517,6 +709,32 @@ export class WebGPURenderGraph {
       this.pool.swapPingPong(id)
     }
 
+    // Aggregate draw statistics from all passes
+    let totalCalls = 0
+    let totalTriangles = 0
+    let totalVertices = 0
+    let totalLines = 0
+    let totalPoints = 0
+
+    for (const passId of this.passOrder) {
+      const pass = this.passes.get(passId)
+      if (!pass) continue
+
+      // Check if pass was enabled this frame
+      const enabled = pass.config.enabled?.(this.frameContext) ?? true
+      if (!enabled) continue
+
+      // Get draw stats if available
+      const passStats = pass.getDrawStats?.()
+      if (passStats) {
+        totalCalls += passStats.calls
+        totalTriangles += passStats.triangles
+        totalVertices += passStats.vertices
+        totalLines += passStats.lines
+        totalPoints += passStats.points
+      }
+    }
+
     // Build frame stats
     return {
       totalTimeMs: delta * 1000,
@@ -527,6 +745,13 @@ export class WebGPURenderGraph {
       })),
       commandBufferCount: 1,
       vramUsage: this.pool.getVRAMUsage(),
+      drawStats: {
+        calls: totalCalls,
+        triangles: totalTriangles,
+        vertices: totalVertices,
+        lines: totalLines,
+        points: totalPoints,
+      },
     }
   }
 
@@ -545,10 +770,76 @@ export class WebGPURenderGraph {
   }
 
   /**
+   * Get dimensions of all allocated resources.
+   */
+  getResourceDimensions(): Map<string, { width: number; height: number }> {
+    return this.pool.getAllResourceDimensions()
+  }
+
+  /**
    * Check if GPU timing is available.
    */
   isGPUTimingAvailable(): boolean {
     return this.gpuTimingEnabled
+  }
+
+  /**
+   * Get current resource aliases for debugging.
+   *
+   * Shows which output resources are aliased to which input resources
+   * when passes are disabled with skipPassthrough=true.
+   *
+   * @returns Map of outputId → resolvedInputId
+   */
+  getResourceAliases(): Map<string, string> {
+    // Return resolved aliases (follow chains to final source)
+    const resolved = new Map<string, string>()
+    for (const [outputId] of this.resourceAliases) {
+      let current = outputId
+      const visited = new Set<string>()
+      while (this.resourceAliases.has(current) && !visited.has(current)) {
+        visited.add(current)
+        current = this.resourceAliases.get(current)!
+      }
+      resolved.set(outputId, current)
+    }
+    return resolved
+  }
+
+  /**
+   * Get resource deallocation statistics.
+   *
+   * Useful for monitoring memory management and debugging.
+   *
+   * @returns Stats about pass states and pending deallocations
+   */
+  getResourceDeallocationStats(): {
+    enabledPasses: number
+    disabledPasses: number
+    pendingDeallocations: number
+  } {
+    let enabled = 0
+    let disabled = 0
+    let pending = 0
+
+    for (const [passId, disabledFrameCount] of this.passStateTracking) {
+      const pass = this.passes.get(passId)
+      if (!pass) continue
+
+      if (disabledFrameCount === 0) {
+        enabled++
+      } else {
+        disabled++
+        const gracePeriod =
+          pass.config.disableGracePeriod ?? WebGPURenderGraph.DEFAULT_DISABLE_GRACE_PERIOD
+        const keepResources = pass.config.keepResourcesWhenDisabled ?? false
+        if (!keepResources && disabledFrameCount < gracePeriod && pass.releaseInternalResources) {
+          pending++
+        }
+      }
+    }
+
+    return { enabledPasses: enabled, disabledPasses: disabled, pendingDeallocations: pending }
   }
 
   /**

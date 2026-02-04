@@ -8,6 +8,7 @@ export const createPolytopeSlice: StateCreator<ExtendedObjectSlice, [], [], Poly
   /**
    * Wrapped setter that auto-increments polytopeVersion on any polytope change.
    * This avoids manually adding version increment to individual setters.
+   * @param updater
    */
   const setWithVersion: typeof set = (updater) => {
     set((state) => {

@@ -23,6 +23,11 @@ interface CropBoxProps {
 /**
  * Reusable crop box component with drag handles.
  * Used by both ScreenshotModal (inline) and CropEditor (full-screen).
+ * @param root0
+ * @param root0.containerRef
+ * @param root0.crop
+ * @param root0.onCropChange
+ * @param root0.minSize
  */
 export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: CropBoxProps) => {
   const [bounds, setBounds] = useState({ width: 0, height: 0 })

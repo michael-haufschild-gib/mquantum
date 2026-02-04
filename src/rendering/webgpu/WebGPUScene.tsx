@@ -17,9 +17,10 @@ import { WebGPUCamera } from './core/WebGPUCamera'
 // Geometry hooks
 import { useGeometryGenerator } from '@/hooks/useGeometryGenerator'
 import { useFaceDetection } from '@/hooks/useFaceDetection'
-import { useNDTransformUpdates, useProjectionDistanceCache } from '@/rendering/renderers/base'
+import { useNDTransformUpdates, useProjectionDistanceCache, useRotationUpdates } from '@/rendering/renderers/base'
 import type { NdGeometry } from '@/lib/geometry/types'
 import type { VectorND } from '@/lib/math/types'
+import { SCREEN_SPACE_NORMAL_MIN_DIMENSION } from '@/rendering/shaders/constants'
 
 // Stores
 import { useAppearanceStore } from '@/stores/appearanceStore'
@@ -143,6 +144,10 @@ const blackholeSelector = (state: ReturnType<typeof useExtendedObjectStore.getSt
   jetsGodRaysEnabled: state.blackhole?.jetsGodRaysEnabled ?? false,
 })
 
+// Schrodinger selector for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
+const schroedingerSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
+  state.schroedinger?.parameterValues ?? []
+
 // ============================================================================
 // Geometry Buffer Building
 // ============================================================================
@@ -150,51 +155,101 @@ const blackholeSelector = (state: ReturnType<typeof useExtendedObjectStore.getSt
 /**
  * Build WebGPU vertex buffers from NdGeometry and face data.
  *
- * MATCHES WebGL PolytopeScene.tsx screen-space normals mode (lines 605-737):
- * - Normals computed in fragment shader via dFdx/dFdy (screen-space derivatives)
- * - No normal attribute needed in vertex buffer
+ * MATCHES WebGL PolytopeScene.tsx normal computation strategy (lines 605-737):
+ * - For dimensions < SCREEN_SPACE_NORMAL_MIN_DIMENSION (5):
+ *   Uses geometry-based normals computed in vertex shader from neighbor data.
+ *   Vertex layout: 30 floats = 120 bytes (thisVertex + neighbor1 + neighbor2)
+ * - For dimensions >= 5:
+ *   Uses screen-space normals computed in fragment shader via dFdx/dFdy.
+ *   Vertex layout: 10 floats = 40 bytes (thisVertex only)
  *
- * Vertex layout (10 floats = 40 bytes per vertex):
+ * Vertex data block (10 floats per vertex):
  * - position (vec3f): N-D coordinates 0-2 (first 3 dimensions)
  * - extraDims0_3 (vec4f): N-D coordinates 3-6 (dimensions 4-7)
  * - extraDims4_6 (vec3f): N-D coordinates 7-9 (dimensions 8-10)
  *
- * WebGL uses separate attribute arrays; WebGPU uses interleaved buffer.
- * Same data, different memory layout.
+ * @param geometry - The N-D geometry with vertices and edges
+ * @param faces - Array of face vertex indices
+ * @param dimension - Current dimension (determines normal computation strategy)
+ * @returns Face and edge buffer data with useGeometryNormals flag
  */
 function buildWebGPUGeometryBuffers(
   geometry: NdGeometry,
-  faces: number[][]
+  faces: number[][],
+  dimension: number
 ): {
   faceData: { vertices: Float32Array; indices: Uint16Array } | null
   edgeData: { vertices: Float32Array; indices: Uint16Array } | null
+  useGeometryNormals: boolean
 } {
   const baseVertices = geometry.vertices
   const edges = geometry.edges
-  const FLOATS_PER_VERTEX = 10 // position(3) + extraDims0_3(4) + extraDims4_6(3)
+
+  // Matches WebGL SCREEN_SPACE_NORMAL_MIN_DIMENSION threshold
+  const useGeometryNormals = dimension < SCREEN_SPACE_NORMAL_MIN_DIMENSION
+
+  // Face buffer layout depends on normal computation strategy
+  const FACE_FLOATS_PER_VERTEX = useGeometryNormals
+    ? 30 // position(3) + extra(7) + neighbor1(10) + neighbor2(10)
+    : 10 // position(3) + extra(7) for screen-space normals
+
+  // Edge buffer always uses simple layout (no normals needed)
+  const EDGE_FLOATS_PER_VERTEX = 10
 
   /**
-   * Write a single vertex to the interleaved buffer.
-   * Matches WebGL writeTriangleVertex() lines 637-658 (screen-space mode).
+   * Write a single N-D vertex data block (10 floats) to buffer at given offset.
    */
-  const writeVertex = (buffer: Float32Array, outIdx: number, v: VectorND) => {
-    const base = outIdx * FLOATS_PER_VERTEX
-
+  const writeVertexData = (buffer: Float32Array, offset: number, v: VectorND) => {
     // Position (vec3f) - coordinates 0-2
-    buffer[base + 0] = v[0] ?? 0
-    buffer[base + 1] = v[1] ?? 0
-    buffer[base + 2] = v[2] ?? 0
+    buffer[offset + 0] = v[0] ?? 0
+    buffer[offset + 1] = v[1] ?? 0
+    buffer[offset + 2] = v[2] ?? 0
 
-    // extraDims0_3 (vec4f) - coordinates 3-6 (matching WebGL aExtraDims0_3)
-    buffer[base + 3] = v[3] ?? 0
-    buffer[base + 4] = v[4] ?? 0
-    buffer[base + 5] = v[5] ?? 0
-    buffer[base + 6] = v[6] ?? 0
+    // extraDims0_3 (vec4f) - coordinates 3-6
+    buffer[offset + 3] = v[3] ?? 0
+    buffer[offset + 4] = v[4] ?? 0
+    buffer[offset + 5] = v[5] ?? 0
+    buffer[offset + 6] = v[6] ?? 0
 
-    // extraDims4_6 (vec3f) - coordinates 7-9 (matching WebGL aExtraDims4_6)
-    buffer[base + 7] = v[7] ?? 0
-    buffer[base + 8] = v[8] ?? 0
-    buffer[base + 9] = v[9] ?? 0
+    // extraDims4_6 (vec3f) - coordinates 7-9
+    buffer[offset + 7] = v[7] ?? 0
+    buffer[offset + 8] = v[8] ?? 0
+    buffer[offset + 9] = v[9] ?? 0
+  }
+
+  /**
+   * Write triangle vertex with neighbor data for geometry-based normals.
+   * Matches WebGL writeTriangleVertex() lines 637-691.
+   * Each vertex stores: thisVertex(10) + neighbor1(10) + neighbor2(10) = 30 floats
+   */
+  const writeTriangleVertexWithNeighbors = (
+    buffer: Float32Array,
+    outIdx: number,
+    thisIdx: number,
+    neighbor1Idx: number,
+    neighbor2Idx: number
+  ) => {
+    const base = outIdx * FACE_FLOATS_PER_VERTEX
+    const v = baseVertices[thisIdx]!
+    const n1 = baseVertices[neighbor1Idx]!
+    const n2 = baseVertices[neighbor2Idx]!
+
+    // This vertex (offset 0-9)
+    writeVertexData(buffer, base, v)
+
+    // Neighbor 1 (offset 10-19)
+    writeVertexData(buffer, base + 10, n1)
+
+    // Neighbor 2 (offset 20-29)
+    writeVertexData(buffer, base + 20, n2)
+  }
+
+  /**
+   * Write simple vertex without neighbor data for screen-space normals.
+   */
+  const writeSimpleVertex = (buffer: Float32Array, outIdx: number, v: VectorND) => {
+    const base = outIdx * FACE_FLOATS_PER_VERTEX
+    writeVertexData(buffer, base, v)
   }
 
   // Build face data if we have faces
@@ -210,7 +265,7 @@ function buildWebGPUGeometryBuffers(
 
     if (triangleCount > 0) {
       const vertexCount = triangleCount * 3 // Non-indexed, 3 vertices per triangle
-      const faceVertices = new Float32Array(vertexCount * FLOATS_PER_VERTEX)
+      const faceVertices = new Float32Array(vertexCount * FACE_FLOATS_PER_VERTEX)
       const faceIndices = new Uint16Array(vertexCount) // Sequential indices
 
       let outIdx = 0
@@ -225,45 +280,90 @@ function buildWebGPUGeometryBuffers(
         if (!hasValidIndices) continue
 
         if (vis.length === 3) {
-          // Triangle: write 3 vertices
-          writeVertex(faceVertices, outIdx, baseVertices[vis[0]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+          if (useGeometryNormals) {
+            // Triangle: each vertex stores itself + 2 neighbors for normal computation
+            // Matches WebGL lines 706-709
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[0]!, vis[1]!, vis[2]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          writeVertex(faceVertices, outIdx, baseVertices[vis[1]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[1]!, vis[2]!, vis[0]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          writeVertex(faceVertices, outIdx, baseVertices[vis[2]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[2]!, vis[0]!, vis[1]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+          } else {
+            // Screen-space normals: just write vertex positions
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[0]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[1]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[2]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+          }
         } else if (vis.length === 4) {
           // Quad: split into 2 triangles (0,1,2) and (0,2,3) - matches WebGL line 711
-          // Triangle 1: v0, v1, v2
-          writeVertex(faceVertices, outIdx, baseVertices[vis[0]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+          if (useGeometryNormals) {
+            // Triangle 1: v0, v1, v2 (matches WebGL lines 712-714)
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[0]!, vis[1]!, vis[2]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          writeVertex(faceVertices, outIdx, baseVertices[vis[1]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[1]!, vis[2]!, vis[0]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          writeVertex(faceVertices, outIdx, baseVertices[vis[2]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[2]!, vis[0]!, vis[1]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          // Triangle 2: v0, v2, v3
-          writeVertex(faceVertices, outIdx, baseVertices[vis[0]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            // Triangle 2: v0, v2, v3 (matches WebGL lines 715-717)
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[0]!, vis[2]!, vis[3]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          writeVertex(faceVertices, outIdx, baseVertices[vis[2]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[2]!, vis[3]!, vis[0]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
 
-          writeVertex(faceVertices, outIdx, baseVertices[vis[3]!]!)
-          faceIndices[outIdx] = outIdx
-          outIdx++
+            writeTriangleVertexWithNeighbors(faceVertices, outIdx, vis[3]!, vis[0]!, vis[2]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+          } else {
+            // Screen-space normals: simple vertex write
+            // Triangle 1: v0, v1, v2
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[0]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[1]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[2]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            // Triangle 2: v0, v2, v3
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[0]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[2]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+
+            writeSimpleVertex(faceVertices, outIdx, baseVertices[vis[3]!]!)
+            faceIndices[outIdx] = outIdx
+            outIdx++
+          }
         }
       }
 
@@ -273,11 +373,11 @@ function buildWebGPUGeometryBuffers(
 
   // Build edge data
   // Matches WebGL edgeGeometry useMemo lines 739-753 which uses buildNDGeometry
+  // Edges always use simple 10-float layout (no normals needed)
   let edgeData: { vertices: Float32Array; indices: Uint16Array } | null = null
   if (edges.length > 0 && baseVertices.length > 0) {
-    // For edges, we expand edge pairs to vertex pairs (like WebGL)
     const edgeVertexCount = edges.length * 2
-    const edgeVertices = new Float32Array(edgeVertexCount * FLOATS_PER_VERTEX)
+    const edgeVertices = new Float32Array(edgeVertexCount * EDGE_FLOATS_PER_VERTEX)
     const edgeIndices = new Uint16Array(edgeVertexCount)
 
     let outIdx = 0
@@ -285,11 +385,11 @@ function buildWebGPUGeometryBuffers(
       const vA = baseVertices[a]
       const vB = baseVertices[b]
       if (vA && vB) {
-        writeVertex(edgeVertices, outIdx, vA)
+        writeVertexData(edgeVertices, outIdx * EDGE_FLOATS_PER_VERTEX, vA)
         edgeIndices[outIdx] = outIdx
         outIdx++
 
-        writeVertex(edgeVertices, outIdx, vB)
+        writeVertexData(edgeVertices, outIdx * EDGE_FLOATS_PER_VERTEX, vB)
         edgeIndices[outIdx] = outIdx
         outIdx++
       }
@@ -298,7 +398,7 @@ function buildWebGPUGeometryBuffers(
     edgeData = { vertices: edgeVertices, indices: edgeIndices }
   }
 
-  return { faceData, edgeData }
+  return { faceData, edgeData, useGeometryNormals }
 }
 
 // ============================================================================
@@ -390,6 +490,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
   const lighting = useLightingStore(useShallow(lightingSelector))
   const postProcessing = usePostProcessingStore(useShallow(postProcessingSelector))
   const blackholeSettings = useExtendedObjectStore(useShallow(blackholeSelector))
+  // Schroedinger parameterValues for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
+  const schroedingerParamValues = useExtendedObjectStore(schroedingerSelector)
 
   // Animation state
   const isPlaying = useAnimationStore((state) => state.isPlaying)
@@ -402,6 +504,21 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
 
   // N-D transform for polytope rotation and projection (matches WebGL PolytopeScene)
   const ndTransform = useNDTransformUpdates()
+
+  // Rotation basis vectors for Schrodinger renderer (matches WebGL SchroedingerMesh.tsx lines 111, 912)
+  // Computes rotated basis vectors from rotation store for N-D slicing
+  const schroedingerRotation = useRotationUpdates({
+    dimension,
+    parameterValues: schroedingerParamValues,
+  })
+
+  // Cache for computed Schrodinger basis vectors - updated in render loop, read by store getter
+  // Using Float32Array to avoid creating new arrays every frame
+  const schroedingerBasisCacheRef = useRef({
+    basisX: new Float32Array(11), // MAX_DIM = 11
+    basisY: new Float32Array(11),
+    basisZ: new Float32Array(11),
+  })
 
   // Projection distance caching - computed dynamically like WebGL PolytopeScene.tsx line 872
   const projDistCache = useProjectionDistanceCache()
@@ -438,15 +555,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
   // Matches WebGL PolytopeScene.tsx line 415
   const useFatWireframe = appearance.edgeThickness > 1
 
-  // Build geometry buffers when geometry or faces change
+  // Build geometry buffers when geometry, faces, or dimension change
   // Convert Face[] to number[][] (extract vertices array from each Face)
+  // Dimension affects buffer layout: geometry-based normals (dim < 5) vs screen-space (dim >= 5)
   const geometryBuffers = useMemo(() => {
     if (!needsGeometryBuffers || !geometry) return null
     // faces is Face[], we need number[][] - extract face.vertices
     // For torus types without faces, this will be empty
     const faceIndices = faces.map((face) => face.vertices)
-    return buildWebGPUGeometryBuffers(geometry, faceIndices)
-  }, [needsGeometryBuffers, geometry, faces])
+    return buildWebGPUGeometryBuffers(geometry, faceIndices, dimension)
+  }, [needsGeometryBuffers, geometry, faces, dimension])
 
   // Update renderer with geometry data
   // Depends on objectType and useFatWireframe to re-run when renderer type changes
@@ -703,7 +821,26 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
       }
     })
     graph.setStoreGetter('animation', () => useAnimationStore.getState())
-    graph.setStoreGetter('extended', () => useExtendedObjectStore.getState())
+    // Extended store with computed basis vectors for Schrodinger
+    // The basis vectors are computed in the render loop and cached in schroedingerBasisCacheRef
+    // We merge them into the schroedinger slice so the renderer can read them
+    graph.setStoreGetter('extended', () => {
+      const state = useExtendedObjectStore.getState()
+      // For Schrodinger, add cached basis vectors (computed in render loop)
+      // This returns the cached Float32Arrays directly - NO new array creation
+      if (objectType === 'schroedinger') {
+        return {
+          ...state,
+          schroedinger: {
+            ...state.schroedinger,
+            basisX: schroedingerBasisCacheRef.current.basisX,
+            basisY: schroedingerBasisCacheRef.current.basisY,
+            basisZ: schroedingerBasisCacheRef.current.basisZ,
+          },
+        }
+      }
+      return state
+    })
     graph.setStoreGetter('rotation', () => useRotationStore.getState())
     graph.setStoreGetter('transform', () => useTransformStore.getState())
     graph.setStoreGetter('pbr', () => usePBRStore.getState())
@@ -722,7 +859,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
         projectionDistance,
       }
     })
-  }, [graph, ndTransform, geometry, dimension, projDistCache])
+  }, [graph, ndTransform, geometry, dimension, projDistCache, objectType])
 
   // Reusable Map for rotation updates (avoid allocating per frame)
   const rotationUpdatesRef = useRef<Map<string, number>>(new Map())
@@ -763,6 +900,20 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
       ndTransform.update()
     }
 
+    // Update Schrodinger basis vectors from rotation store (matches WebGL SchroedingerMesh.tsx line 912)
+    // Only do this for schroedinger object type to avoid unnecessary computation
+    if (objectType === 'schroedinger') {
+      // getBasisVectors uses internal version tracking - passing false is fine,
+      // it will still detect actual rotation changes via version numbers
+      const { basisX, basisY, basisZ, changed } = schroedingerRotation.getBasisVectors(false)
+      if (changed) {
+        // Copy to cached arrays (basisX/Y/Z are pre-allocated working arrays from the hook)
+        schroedingerBasisCacheRef.current.basisX.set(basisX)
+        schroedingerBasisCacheRef.current.basisY.set(basisY)
+        schroedingerBasisCacheRef.current.basisZ.set(basisZ)
+      }
+    }
+
     // Execute render graph
     graph.execute(deltaTime)
 
@@ -770,7 +921,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(renderFrame)
-  }, [graph, objectType, dimension, isPlaying, onFrame, needsGeometryBuffers, ndTransform])
+  }, [graph, objectType, dimension, isPlaying, onFrame, needsGeometryBuffers, ndTransform, schroedingerRotation])
 
   // Start/stop animation loop
   useEffect(() => {
@@ -1186,7 +1337,8 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
     graph.addResource('frame-blend-output', {
       type: 'texture',
       format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      // COPY_SRC needed for FrameBlendingPass to copy output to history buffer
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     })
 
     await graph.addPass(
@@ -1335,10 +1487,14 @@ function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
       })
 
     case 'schroedinger':
-      // SchrodingerRendererConfig: dimension, isosurface, quantumMode, termCount
+      // SchrodingerRendererConfig: dimension, isosurface, quantumMode, termCount, temporal
       // Note: Schrodinger uses volume rendering, not PBR - no shadows/sss/ibl support
+      // DISABLED: Temporal accumulation requires quarter-res resources (quarter-color,
+      // quarter-position) and WebGPUTemporalCloudPass which are not yet implemented.
+      // Until the full temporal pipeline is wired up, force temporal: false.
       return new WebGPUSchrodingerRenderer({
         dimension,
+        temporal: false, // Disabled - missing quarter-res resources and TemporalCloudPass
       })
 
     case 'blackhole':
@@ -1358,10 +1514,12 @@ function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
       // Edge rendering is handled by the renderer itself (thin edges via line primitives)
       // For thick edges (edgeThickness > 1), edges are disabled here and
       // TubeWireframe is added separately in setupRenderPasses
+      // Use geometry-based normals for dimensions < 5 (matches WebGL SCREEN_SPACE_NORMAL_MIN_DIMENSION)
       return new WebGPUPolytopeRenderer({
         dimension,
         faces: true,
         edges: !useFatWireframe, // Disable line edges when using TubeWireframe
+        useGeometryNormals: dimension < SCREEN_SPACE_NORMAL_MIN_DIMENSION,
       })
 
     case 'root-system':
@@ -1369,10 +1527,12 @@ function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
     case 'nested-torus':
       // Extended polytope types: Use Polytope renderer for faces and edges (like standard polytopes)
       // For thick edges (edgeThickness > 1), TubeWireframe is added separately in setupRenderPasses
+      // Use geometry-based normals for dimensions < 5 (matches WebGL SCREEN_SPACE_NORMAL_MIN_DIMENSION)
       return new WebGPUPolytopeRenderer({
         dimension,
         faces: true,
         edges: !useFatWireframe, // Disable line edges when using TubeWireframe
+        useGeometryNormals: dimension < SCREEN_SPACE_NORMAL_MIN_DIMENSION,
       })
 
     default:

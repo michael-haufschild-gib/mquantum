@@ -24,6 +24,7 @@ export const createSchroedingerSlice: StateCreator<
   /**
    * Wrapped setter that auto-increments schroedingerVersion when schroedinger state changes.
    * This avoids manually adding version increment to 80+ individual setters.
+   * @param updater
    */
   const setWithVersion: typeof set = (updater) => {
     set((state) => {
@@ -39,7 +40,10 @@ export const createSchroedingerSlice: StateCreator<
   // === Setter Factories ===
   // Reduce boilerplate for common setter patterns
 
-  /** Factory for simple value setters (no validation) */
+  /**
+   * Factory for simple value setters (no validation)
+   * @param key
+   */
   const valueSetter =
     <K extends keyof typeof DEFAULT_SCHROEDINGER_CONFIG>(key: K) =>
     (value: (typeof DEFAULT_SCHROEDINGER_CONFIG)[K]) => {
@@ -48,7 +52,12 @@ export const createSchroedingerSlice: StateCreator<
       }))
     }
 
-  /** Factory for clamped numeric setters */
+  /**
+   * Factory for clamped numeric setters
+   * @param key
+   * @param min
+   * @param max
+   */
   const clampedSetter =
     <K extends keyof typeof DEFAULT_SCHROEDINGER_CONFIG>(key: K, min: number, max: number) =>
     (value: number) => {

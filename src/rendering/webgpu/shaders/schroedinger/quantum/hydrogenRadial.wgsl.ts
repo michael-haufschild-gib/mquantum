@@ -22,10 +22,10 @@ export const hydrogenRadialBlock = /* wgsl */ `
  * Uses FACTORIAL_LUT from sphericalHarmonics for O(1) lookup.
  */
 fn hydrogenRadialNorm(n: i32, l: i32, a0: f32) -> f32 {
-  let fn = f32(n);
+  let nf = f32(n);
 
   // (2/na₀)^{3/2}
-  let front = pow(2.0 / (fn * a0), 1.5);
+  let front = pow(2.0 / (nf * a0), 1.5);
 
   // sqrt((n-l-1)! / (2n·(n+l)!))
   let nMinusLMinus1 = n - l - 1;
@@ -35,7 +35,7 @@ fn hydrogenRadialNorm(n: i32, l: i32, a0: f32) -> f32 {
   if (nPlusL <= 12 && nMinusLMinus1 >= 0) {
     // Direct LUT lookup - O(1) instead of O(n+l) loop
     let factNum = FACTORIAL_LUT[nMinusLMinus1];
-    let factDen = 2.0 * fn * FACTORIAL_LUT[nPlusL];
+    let factDen = 2.0 * nf * FACTORIAL_LUT[nPlusL];
     factRatio = factNum / factDen;
   } else {
     // Fallback for edge cases (rare: n ≤ 7 means nPlusL ≤ 12)
@@ -43,7 +43,7 @@ fn hydrogenRadialNorm(n: i32, l: i32, a0: f32) -> f32 {
     for (var i = 1; i <= nMinusLMinus1; i++) {
       factNum *= f32(i);
     }
-    var factDen = 2.0 * fn;
+    var factDen = 2.0 * nf;
     for (var i = 1; i <= nPlusL; i++) {
       factDen *= f32(i);
     }
@@ -70,8 +70,8 @@ fn hydrogenRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
   let a0Safe = max(a0, 0.001);
 
   // Scaled radial coordinate: ρ = 2r / (n·a₀)
-  let fn = f32(n);
-  let rho = 2.0 * r / (fn * a0Safe);
+  let nf = f32(n);
+  let rho = 2.0 * r / (nf * a0Safe);
 
   // Normalization constant (simplified for visualization)
   let norm = hydrogenRadialNorm(n, l, a0Safe);
@@ -116,16 +116,16 @@ fn hydrogenRadialProbability(n: i32, l: i32, r: f32, a0: f32) -> f32 {
  * Used for adaptive scaling in visualization.
  */
 fn hydrogenRadialMaxRadius(n: i32, l: i32, a0: f32) -> f32 {
-  let fn = f32(n);
+  let nf = f32(n);
   let fl = f32(l);
 
   if (l == 0) {
     // s orbitals: max at r ≈ n·a₀
-    return fn * a0;
+    return nf * a0;
   } else {
     // General case: max near r = n·a₀·(1 + sqrt(1 - (l/n)²))
-    let ratio = fl / fn;
-    return fn * a0 * (1.0 + sqrt(max(0.0, 1.0 - ratio * ratio)));
+    let ratio = fl / nf;
+    return nf * a0 * (1.0 + sqrt(max(0.0, 1.0 - ratio * ratio)));
   }
 }
 `

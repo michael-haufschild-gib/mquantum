@@ -5,6 +5,9 @@
  * Array-based fallback for any dimension up to 11.
  * Port of GLSL sdf-high-d.glsl to WGSL.
  *
+ * NOTE: Scale is handled by the dispatch function (GetDist), NOT here.
+ * The SDF works on pure fractal coordinates without scale modification.
+ *
  * @module rendering/webgpu/shaders/mandelbulb/sdf/sdf-high-d.wgsl
  */
 
@@ -12,6 +15,7 @@ export const sdfHighDBlock = /* wgsl */ `
 // ============================================
 // High-D Mandelbulb SDF (Array-based fallback)
 // Supports dimensions 3-11
+// With proper basis transformation (matching WebGL)
 // ============================================
 
 const MAX_ITER_HIGH_D: i32 = 256;
@@ -27,6 +31,12 @@ fn optimizedPowHighD(r: f32, p: f32) -> vec2f {
 /**
  * High-D Mandelbulb SDF with orbital trap.
  * Generic array-based version for any dimension.
+ *
+ * @param pos 3D world position (already scaled by dispatch)
+ * @param dimension The dimension (3-11)
+ * @param basis Basis vectors for N-D transformation
+ * @param uniforms Mandelbulb uniforms
+ * @return vec2f where x = signed distance, y = orbital trap value
  */
 fn mandelbulbSDFHighD(
   pos: vec3f,
@@ -34,7 +44,7 @@ fn mandelbulbSDFHighD(
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> vec2f {
-  // Initialize arrays
+  // Transform to N-D fractal space using basis vectors (matching WebGL)
   var c: array<f32, 11>;
   var z: array<f32, 11>;
 
@@ -44,10 +54,10 @@ fn mandelbulbSDFHighD(
     z[j] = 0.0;
   }
   for (var j = 0; j < dimension; j++) {
-    c[j] = (getBasisComponent(basis.origin, j) +
-            pos.x * getBasisComponent(basis.basisX, j) +
-            pos.y * getBasisComponent(basis.basisY, j) +
-            pos.z * getBasisComponent(basis.basisZ, j)) * uniforms.scale;
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
@@ -63,7 +73,7 @@ fn mandelbulbSDFHighD(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   for (var i = 0; i < MAX_ITER_HIGH_D; i++) {
     if (i >= maxIt) { break; }
@@ -125,8 +135,13 @@ fn mandelbulbSDFHighD(
   }
 
   let minA = sqrt(minASq);
-  let trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 + exp(-minS * 8.0) * 0.2 + f32(escIt) / f32(max(maxIt, 1)) * 0.3;
-  let dist = max(0.5 * log(max(r, EPS_HIGH_D)) * r / max(dr, EPS_HIGH_D), EPS_HIGH_D) / uniforms.scale;
+  let trap = exp(-minP * 5.0) * 0.3 +
+             exp(-minA * 3.0) * 0.2 +
+             exp(-minS * 8.0) * 0.2 +
+             f32(escIt) / f32(max(maxIt, 1)) * 0.3;
+
+  // Distance estimator (no scale division - handled by dispatch)
+  let dist = max(0.5 * log(max(r, EPS_HIGH_D)) * r / max(dr, EPS_HIGH_D), EPS_HIGH_D);
 
   return vec2f(dist, trap);
 }
@@ -140,6 +155,7 @@ fn mandelbulbSDFHighD_simple(
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> f32 {
+  // Transform to N-D fractal space using basis vectors
   var c: array<f32, 11>;
   var z: array<f32, 11>;
 
@@ -148,10 +164,10 @@ fn mandelbulbSDFHighD_simple(
     z[j] = 0.0;
   }
   for (var j = 0; j < dimension; j++) {
-    c[j] = (getBasisComponent(basis.origin, j) +
-            pos.x * getBasisComponent(basis.basisX, j) +
-            pos.y * getBasisComponent(basis.basisY, j) +
-            pos.z * getBasisComponent(basis.basisZ, j)) * uniforms.scale;
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
@@ -163,7 +179,7 @@ fn mandelbulbSDFHighD_simple(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   for (var i = 0; i < MAX_ITER_HIGH_D; i++) {
     if (i >= maxIt) { break; }
@@ -212,6 +228,6 @@ fn mandelbulbSDFHighD_simple(
     z[dimension - 1] = sp * sinT[dimension - 2] + c[dimension - 1];
   }
 
-  return max(0.5 * log(max(r, EPS_HIGH_D)) * r / max(dr, EPS_HIGH_D), EPS_HIGH_D) / uniforms.scale;
+  return max(0.5 * log(max(r, EPS_HIGH_D)) * r / max(dr, EPS_HIGH_D), EPS_HIGH_D);
 }
 `

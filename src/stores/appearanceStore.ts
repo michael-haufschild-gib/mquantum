@@ -23,6 +23,7 @@ export const useAppearanceStore = create<AppearanceStoreState>()(
     /**
      * Wrapped setter that auto-increments appearanceVersion on any change.
      * This avoids manually adding version increment to 50+ individual setters.
+     * @param updater
      */
     const wrappedSet: typeof set = (updater) => {
       set((state) => {

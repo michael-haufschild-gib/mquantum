@@ -157,6 +157,7 @@ export class ScenePass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     // Only create pipeline for passthrough mode
@@ -200,6 +201,10 @@ export class ScenePass extends WebGPUBasePass {
   /**
    * Dynamically set the clear color.
    * @param color - The new clear color (RGBA, each component 0-1)
+   * @param color.r
+   * @param color.g
+   * @param color.b
+   * @param color.a
    */
   setClearColor(color: { r: number; g: number; b: number; a: number }): void {
     this.clearColor = { ...color }
@@ -258,6 +263,7 @@ export class ScenePass extends WebGPUBasePass {
 
   /**
    * Execute the scene pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (!this.device) return
@@ -281,6 +287,7 @@ export class ScenePass extends WebGPUBasePass {
 
   /**
    * Execute in clear mode - simply clear the output target.
+   * @param ctx
    */
   private executeClear(ctx: WebGPURenderContext): void {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
@@ -319,6 +326,7 @@ export class ScenePass extends WebGPUBasePass {
 
   /**
    * Execute in passthrough mode - copy from source to output.
+   * @param ctx
    */
   private executePassthrough(ctx: WebGPURenderContext): void {
     if (!this.renderPipeline || !this.passBindGroupLayout || !this.sampler) return

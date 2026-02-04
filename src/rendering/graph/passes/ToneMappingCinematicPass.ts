@@ -363,6 +363,7 @@ export class ToneMappingCinematicPass extends BasePass {
 
   /**
    * Set tone mapping algorithm (Three.js constant).
+   * @param mode
    */
   setToneMapping(mode: number): void {
     this.material.uniforms['uToneMapping']!.value = mode
@@ -370,6 +371,7 @@ export class ToneMappingCinematicPass extends BasePass {
 
   /**
    * Set exposure value.
+   * @param exposure
    */
   setExposure(exposure: number): void {
     this.material.uniforms['uExposure']!.value = exposure
@@ -377,6 +379,7 @@ export class ToneMappingCinematicPass extends BasePass {
 
   /**
    * Set chromatic aberration intensity.
+   * @param value
    */
   setAberration(value: number): void {
     this.material.uniforms['uDistortion']!.value = value
@@ -384,6 +387,7 @@ export class ToneMappingCinematicPass extends BasePass {
 
   /**
    * Set vignette darkness.
+   * @param value
    */
   setVignette(value: number): void {
     this.material.uniforms['uVignetteDarkness']!.value = value
@@ -391,6 +395,7 @@ export class ToneMappingCinematicPass extends BasePass {
 
   /**
    * Set film grain intensity.
+   * @param value
    */
   setGrain(value: number): void {
     this.material.uniforms['uNoiseIntensity']!.value = value

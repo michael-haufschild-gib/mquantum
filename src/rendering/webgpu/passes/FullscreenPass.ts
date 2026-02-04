@@ -67,6 +67,7 @@ export interface FullscreenPassConfig {
 
 /**
  * Get the byte size of a uniform type.
+ * @param type
  */
 function getUniformSize(type: FullscreenUniformType): number {
   switch (type) {
@@ -89,6 +90,7 @@ function getUniformSize(type: FullscreenUniformType): number {
 
 /**
  * Get the alignment requirement for a uniform type.
+ * @param type
  */
 function getUniformAlignment(type: FullscreenUniformType): number {
   switch (type) {

@@ -27,6 +27,7 @@ export interface TubeWireframeWGSLShaderConfig {
 
 /**
  * Compose tube wireframe vertex shader.
+ * @param _config
  */
 export function composeTubeWireframeVertexShader(_config?: TubeWireframeWGSLShaderConfig): string {
   return /* wgsl */ `
@@ -38,6 +39,8 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
+  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,
@@ -52,7 +55,7 @@ struct CameraUniforms {
 ${tubeWireframeUniformsBlock}
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(3) @binding(0) var<uniform> tube: TubeWireframeUniforms;
+@group(2) @binding(0) var<uniform> tube: TubeWireframeUniforms;
 
 // Cylinder geometry input (instanced)
 struct VertexInput {
@@ -153,6 +156,7 @@ fn main(input: VertexInput) -> VertexOutput {
 
 /**
  * Compose tube wireframe fragment shader.
+ * @param _config
  */
 export function composeTubeWireframeFragmentShader(_config?: TubeWireframeWGSLShaderConfig): {
   wgsl: string
@@ -183,7 +187,7 @@ ${tubeMainBlock}
 // Bind group declarations
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var<uniform> lighting: LightingUniforms;
-@group(3) @binding(0) var<uniform> tube: TubeWireframeUniforms;
+@group(2) @binding(0) var<uniform> tube: TubeWireframeUniforms;
 
 struct FragmentInput {
   @location(0) worldPosition: vec3f,
@@ -191,31 +195,18 @@ struct FragmentInput {
   @location(2) viewDir: vec3f,
 }
 
-struct FragmentOutput {
-  @location(0) color: vec4f,
-  @location(1) normal: vec4f,
-  @location(2) position: vec4f,
-}
-
+// Single color output to match pipeline configuration (1 render target)
+// Matches WebGL TubeWireframe which outputs to a single color buffer
 @fragment
-fn fragmentMain(input: FragmentInput) -> FragmentOutput {
+fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
   let N = normalize(input.normal);
   let V = normalize(input.viewDir);
 
   // Compute full PBR lighting
   let color = computeTubeLighting(N, V, input.worldPosition, tube, lighting);
 
-  var output: FragmentOutput;
-
-  // Output to MRT (Multiple Render Targets)
-  // color: Color buffer (RGBA)
-  // normal: Normal buffer (RGB = normal * 0.5 + 0.5, A = reflectivity/metallic)
-  // position: World position for temporal reprojection
-  output.color = vec4f(color, tube.opacity);
-  output.normal = vec4f(N * 0.5 + 0.5, tube.metalness);
-  output.position = vec4f(input.worldPosition, 1.0);
-
-  return output;
+  // Output color with opacity
+  return vec4f(color, tube.opacity);
 }
 `
 

@@ -107,6 +107,7 @@ export class JetsCompositePass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
@@ -165,6 +166,7 @@ export class JetsCompositePass extends WebGPUBasePass {
 
   /**
    * Execute the composite pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -191,8 +193,9 @@ export class JetsCompositePass extends WebGPUBasePass {
     if (!outputView) return
 
     // Read jet intensity from frozen frame context
-    const blackhole = ctx.frame?.stores?.['blackHole'] as { jetsIntensity?: number } | undefined
-    const jetIntensity = blackhole?.jetsIntensity ?? 1.0
+    // Access blackhole settings via 'extended' store (blackHole is nested, not a separate store)
+    const extended = ctx.frame?.stores?.['extended'] as { blackhole?: { jetsIntensity?: number } } | undefined
+    const jetIntensity = extended?.blackhole?.jetsIntensity ?? 1.0
 
     // Calculate opacity - scale with intensity, allow full brightness
     // The shader uses additive blending so we don't need to cap at 1.0

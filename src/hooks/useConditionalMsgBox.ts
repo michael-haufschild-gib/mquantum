@@ -111,6 +111,11 @@ export function useConditionalMsgBox(): UseConditionalMsgBoxResult {
 /**
  * Internal helper to perform the actual conditional message box show.
  * Assumes hydration has already been verified.
+ * @param dialogId
+ * @param title
+ * @param message
+ * @param type
+ * @param actions
  */
 function doShowConditionalMsgBox(
   dialogId: string,

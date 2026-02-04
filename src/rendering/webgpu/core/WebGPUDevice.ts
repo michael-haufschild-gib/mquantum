@@ -203,10 +203,22 @@ export class WebGPUDevice {
 
   /**
    * Register a callback for device loss events.
+   * @param callback
    */
   onDeviceLost(callback: (reason: string) => void): () => void {
     this.deviceLostCallbacks.add(callback)
     return () => this.deviceLostCallbacks.delete(callback)
+  }
+
+  /**
+   * Get the GPU adapter.
+   * @throws Error if adapter is not available
+   */
+  getAdapter(): GPUAdapter {
+    if (!this._adapter) {
+      throw new Error('WebGPU adapter not available')
+    }
+    return this._adapter
   }
 
   /**

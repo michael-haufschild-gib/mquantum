@@ -9,8 +9,9 @@
 
 import {
   assembleShaderBlocks,
-  generateStandardBindGroups,
+  generateConsolidatedBindGroups,
   generateObjectBindGroup,
+  generateTextureBindings,
   type WGSLShaderConfig,
 } from '../shared/compose-helpers'
 
@@ -25,6 +26,7 @@ import { selectorBlock } from '../shared/color/selector.wgsl'
 
 // Lighting blocks
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
+import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighting/ibl.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
 
 // Polytope-specific blocks
@@ -38,6 +40,20 @@ export interface PolytopeWGSLShaderConfig extends WGSLShaderConfig {
   mode?: 'face' | 'edge'
   /** Use flat shading */
   flatShading?: boolean
+  /**
+   * Use geometry-based normals computed in vertex shader.
+   * When true: Normals are computed from neighbor vertex data (requires 30 floats/vertex).
+   * When false: Normals are computed in fragment shader using dFdx/dFdy (10 floats/vertex).
+   * Matches WebGL SCREEN_SPACE_NORMAL_MIN_DIMENSION threshold (dimension < 5).
+   */
+  useGeometryNormals?: boolean
+  /**
+   * Use compute shader pre-pass for transforms and normals.
+   * When true: Vertex shader reads pre-computed 3D positions and normals from storage buffers.
+   * This provides ~2x performance improvement by eliminating per-vertex N-D transforms.
+   * Requires PolytopeTransformComputePass and PolytopeNormalComputePass to be executed before rendering.
+   */
+  useComputeShaders?: boolean
 }
 
 /**
@@ -85,16 +101,126 @@ struct PolytopeUniforms {
   depthRowSums4_7: vec4f,
   depthRowSums8_10: vec3f,
   _padDepth: f32,
+
+  // Color Algorithm System (matches WebGL palette uniforms)
+  // colorAlgorithm: 0=mono, 1=analogous, 2=cosine, 3=normal, 4=distance, 5=lch, etc.
+  colorAlgorithm: i32,
+  distPower: f32,
+  distCycles: f32,
+  distOffset: f32,
+
+  // Cosine palette coefficients (Inigo Quilez technique)
+  // color = a + b * cos(2π * (c * t + d))
+  cosineA: vec4f,  // xyz = RGB, w unused
+  cosineB: vec4f,
+  cosineC: vec4f,
+  cosineD: vec4f,
+
+  // LCH perceptual color space parameters
+  lchLightness: f32,
+  lchChroma: f32,
+  _padEnd: vec2f,
 }
 `
 
 /**
  * Compose face vertex shader.
+ * Supports two normal computation modes:
+ * - Geometry-based (useGeometryNormals=true): Normals computed from neighbor vertices in vertex shader.
+ *   Requires 30 floats/vertex buffer layout (thisVertex + neighbor1 + neighbor2).
+ * - Screen-space (useGeometryNormals=false): Normals computed in fragment shader via dFdx/dFdy.
+ *   Uses 10 floats/vertex buffer layout.
+ * @param config
  */
-export function composeFaceVertexShader(_config: PolytopeWGSLShaderConfig): string {
+export function composeFaceVertexShader(config: PolytopeWGSLShaderConfig): string {
+  const { useGeometryNormals = false } = config
+
+  // Vertex input struct - extended for geometry-based normals
+  const vertexInputStruct = useGeometryNormals
+    ? /* wgsl */ `
+struct VertexInput {
+  @location(0) position: vec3f,
+  @location(1) extraDims0_3: vec4f,  // Extra dimensions 4-7 (dim indices 3-6)
+  @location(2) extraDims4_6: vec3f,  // Extra dimensions 8-10 (dim indices 7-9)
+  // Neighbor 1 - for geometry-based normal computation
+  @location(3) neighbor1Pos: vec3f,
+  @location(4) neighbor1Extra0_3: vec4f,
+  @location(5) neighbor1Extra4_6: vec3f,
+  // Neighbor 2 - for geometry-based normal computation
+  @location(6) neighbor2Pos: vec3f,
+  @location(7) neighbor2Extra0_3: vec4f,
+  @location(8) neighbor2Extra4_6: vec3f,
+}`
+    : /* wgsl */ `
+struct VertexInput {
+  @location(0) position: vec3f,
+  @location(1) extraDims0_3: vec4f,  // Extra dimensions 4-7 (dim indices 3-6)
+  @location(2) extraDims4_6: vec3f,  // Extra dimensions 8-10 (dim indices 7-9)
+}`
+
+  // Vertex output struct - includes normal for geometry-based mode
+  const vertexOutputStruct = useGeometryNormals
+    ? /* wgsl */ `
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4f,
+  @location(0) worldPosition: vec3f,
+  @location(1) viewDir: vec3f,
+  @location(2) @interpolate(flat) faceDepth: f32,  // Color algorithm input from extra dims
+  @location(3) @interpolate(flat) normal: vec3f,   // Geometry-based normal from vertex shader
+}`
+    : /* wgsl */ `
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4f,
+  @location(0) worldPosition: vec3f,
+  @location(1) viewDir: vec3f,
+  @location(2) @interpolate(flat) faceDepth: f32,  // Color algorithm input from extra dims
+}`
+
+  // Normal computation code - only for geometry-based mode
+  const normalComputation = useGeometryNormals
+    ? /* wgsl */ `
+  // Transform neighbor vertices for normal computation (matches WebGL geometry-based normals)
+  let neighbor1_3d = transformND(
+    input.neighbor1Pos,
+    input.neighbor1Extra0_3,
+    input.neighbor1Extra4_6,
+    polytope.rotationMatrix4D,
+    polytope.dimension,
+    polytope.uniformScale,
+    polytope.projectionDistance,
+    polytope.depthNormFactor,
+    extraRotCols,
+    depthRowSums
+  );
+
+  let neighbor2_3d = transformND(
+    input.neighbor2Pos,
+    input.neighbor2Extra0_3,
+    input.neighbor2Extra4_6,
+    polytope.rotationMatrix4D,
+    polytope.dimension,
+    polytope.uniformScale,
+    polytope.projectionDistance,
+    polytope.depthNormFactor,
+    extraRotCols,
+    depthRowSums
+  );
+
+  // Compute face normal from the 3 triangle vertices after N-D transformation
+  // Matches WebGL computeFaceNormal() in transform-nd.glsl.ts
+  let edge1 = neighbor1_3d - pos3d;
+  let edge2 = neighbor2_3d - pos3d;
+  let faceNormal = cross(edge1, edge2);
+  let normalLen = length(faceNormal);
+  // Guard against degenerate triangles
+  output.normal = select(vec3f(0.0, 0.0, 1.0), faceNormal / normalLen, normalLen > 0.0001);`
+    : /* wgsl */ `
+  // Normal computed in fragment shader using screen-space derivatives (dFdx/dFdy)`
+
   return /* wgsl */ `
 // Polytope Face Vertex Shader
 // Port of WebGL ND_TRANSFORM_GLSL
+// Normal mode: ${useGeometryNormals ? 'geometry-based (vertex shader)' : 'screen-space (fragment shader)'}
 
 struct CameraUniforms {
   viewMatrix: mat4x4f,
@@ -102,6 +228,8 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
+  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,
@@ -116,19 +244,11 @@ struct CameraUniforms {
 ${polytopeUniformsBlock}
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(3) @binding(0) var<uniform> polytope: PolytopeUniforms;
+@group(2) @binding(0) var<uniform> polytope: PolytopeUniforms;
 
-struct VertexInput {
-  @location(0) position: vec3f,
-  @location(1) extraDims0_3: vec4f,  // Extra dimensions 4-7 (dim indices 3-6)
-  @location(2) extraDims4_6: vec3f,  // Extra dimensions 8-10 (dim indices 7-9)
-}
+${vertexInputStruct}
 
-struct VertexOutput {
-  @builtin(position) clipPosition: vec4f,
-  @location(0) worldPosition: vec3f,
-  @location(1) viewDir: vec3f,
-}
+${vertexOutputStruct}
 
 ${transformNDBlock}
 
@@ -160,6 +280,12 @@ fn main(input: VertexInput) -> VertexOutput {
   depthRowSums[9] = polytope.depthRowSums8_10.y;
   depthRowSums[10] = polytope.depthRowSums8_10.z;
 
+  // Compute face depth from extra dimensions (matches WebGL vFaceDepth)
+  // Sum of extra dimensions, mapped to 0-1 range
+  let extraSum = input.extraDims0_3.x + input.extraDims0_3.y + input.extraDims0_3.z + input.extraDims0_3.w
+               + input.extraDims4_6.x + input.extraDims4_6.y + input.extraDims4_6.z;
+  output.faceDepth = clamp(extraSum * 0.15 + 0.5, 0.0, 1.0);
+
   // Transform from N-D to 3D using rotation + perspective projection
   let pos3d = transformND(
     input.position,
@@ -180,8 +306,9 @@ fn main(input: VertexInput) -> VertexOutput {
   // Clip position
   output.clipPosition = camera.viewProjectionMatrix * vec4f(pos3d, 1.0);
 
-  // View direction (normals computed in fragment shader using screen-space derivatives)
+  // View direction
   output.viewDir = normalize(camera.cameraPosition - pos3d);
+${normalComputation}
 
   return output;
 }
@@ -190,80 +317,235 @@ fn main(input: VertexInput) -> VertexOutput {
 
 /**
  * Compose face fragment shader.
+ * @param config
  */
 export function composeFaceFragmentShader(config: PolytopeWGSLShaderConfig): {
   wgsl: string
   modules: string[]
   features: string[]
 } {
+  // IBL defaults to false - requires env map texture to be wired up in renderer
+  const { dimension, ibl: enableIBL = false, useGeometryNormals = false } = config
+
   const defines: string[] = []
   const features: string[] = []
 
-  defines.push(`const DIMENSION: i32 = ${config.dimension};`)
+  defines.push(`const DIMENSION: i32 = ${dimension};`)
+  defines.push(`const IBL_ENABLED: bool = ${enableIBL};`)
+  defines.push(`const USE_GEOMETRY_NORMALS: bool = ${useGeometryNormals};`)
   features.push('Polytope Faces')
   features.push('PBR Lighting')
+  if (enableIBL) {
+    features.push('IBL')
+  }
+  if (useGeometryNormals) {
+    features.push('Geometry Normals')
+  } else {
+    features.push('Screen-Space Normals')
+  }
+
+  // Fragment input struct - extended for geometry-based normals
+  const fragmentInputStruct = useGeometryNormals
+    ? /* wgsl */ `
+struct FragmentInput {
+  @location(0) worldPosition: vec3f,
+  @location(1) viewDir: vec3f,
+  @location(2) @interpolate(flat) faceDepth: f32,  // Color algorithm input from extra dims
+  @location(3) @interpolate(flat) normal: vec3f,   // Geometry-based normal from vertex shader
+}
+`
+    : /* wgsl */ `
+struct FragmentInput {
+  @location(0) worldPosition: vec3f,
+  @location(1) viewDir: vec3f,
+  @location(2) @interpolate(flat) faceDepth: f32,  // Color algorithm input from extra dims
+}
+`
 
   const blocks = [
     { name: 'Defines', content: defines.join('\n') },
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },
-    { name: 'Standard Bind Groups', content: generateStandardBindGroups() },
+    // Bind groups - using consolidated layout to stay within 4-group limit
+    // Group 0: Camera
+    // Group 1: Lighting + Material + Quality
+    // Group 2: Polytope
+    // Group 3: IBL (if enabled)
+    { name: 'Standard Bind Groups', content: generateConsolidatedBindGroups() },
     {
       name: 'Polytope Uniforms',
       content:
         polytopeUniformsBlock +
         '\n' +
-        generateObjectBindGroup(3, 'PolytopeUniforms', 'polytope'),
+        generateObjectBindGroup(2, 'PolytopeUniforms', 'polytope'),
+    },
+    // IBL textures - Group 3: @binding(0)=uniforms, @binding(1)=texture, @binding(2)=sampler
+    {
+      name: 'IBL Textures',
+      content:
+        iblUniformsBlock +
+        '\n' +
+        generateObjectBindGroup(3, 'IBLUniforms', 'iblUniforms', 0) +
+        '\n' +
+        generateTextureBindings(3, [{ name: 'envMap' }], 1),
+      condition: enableIBL,
     },
     { name: 'Color (HSL)', content: hslBlock },
     { name: 'Color (Cosine)', content: cosinePaletteBlock },
     { name: 'Color Selector', content: selectorBlock },
     { name: 'GGX PBR', content: ggxBlock },
+    { name: 'PMREM Sampling', content: pmremSamplingBlock, condition: enableIBL },
+    { name: 'IBL Functions', content: iblBlock, condition: enableIBL },
     { name: 'Multi-Light', content: multiLightBlock },
     {
       name: 'Fragment Input',
+      content: fragmentInputStruct,
+    },
+    {
+      name: 'Color Algorithm',
       content: /* wgsl */ `
-struct FragmentInput {
-  @location(0) worldPosition: vec3f,
-  @location(1) viewDir: vec3f,
+// Apply distribution curve to input value (matches WebGL applyDistribution)
+fn applyDistribution(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
+  let clamped = clamp(t, 0.0, 1.0);
+  let curved = pow(clamped, power);
+  let cycled = fract(curved * cycles + offset);
+  return cycled;
+}
+
+// Cosine palette (Inigo Quilez technique)
+fn cosinePaletteColor(t: f32, a: vec3f, b: vec3f, c: vec3f, d: vec3f) -> vec3f {
+  return a + b * cos(TAU * (c * t + d));
+}
+
+// Get color based on algorithm selection (matches WebGL getColorByAlgorithm)
+fn getAlgorithmColor(t: f32, baseColor: vec3f, normal: vec3f, worldPos: vec3f) -> vec3f {
+  let algorithm = polytope.colorAlgorithm;
+
+  // Apply distribution curve
+  let dt = applyDistribution(t, polytope.distPower, polytope.distCycles, polytope.distOffset);
+
+  switch (algorithm) {
+    // 0 = monochromatic: vary lightness only
+    case 0: {
+      let baseHSL = rgb2hsl(baseColor);
+      return hsl2rgb(baseHSL.x, 0.6, 0.3 + dt * 0.5);
+    }
+    // 1 = analogous: vary hue ±30°
+    case 1: {
+      let baseHSL = rgb2hsl(baseColor);
+      let hue = fract(baseHSL.x + (dt - 0.5) * 0.167);
+      return hsl2rgb(hue, 0.7, 0.5);
+    }
+    // 2 = cosine gradient
+    case 2: {
+      return cosinePaletteColor(
+        dt,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 3 = normal-based (using cosine palette)
+    case 3: {
+      let normalT = normal.y * 0.5 + 0.5;
+      return cosinePaletteColor(
+        normalT,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 4 = distance (radial from center)
+    case 4: {
+      return cosinePaletteColor(
+        dt,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 5 = LCH perceptual (simplified)
+    case 5: {
+      let L = polytope.lchLightness;
+      let C = polytope.lchChroma;
+      let h = dt;
+      // Approximate LCH to RGB via HSL
+      return hsl2rgb(h, C * 2.0, L);
+    }
+    // 6 = multi-source: weighted blend of depth, orbitTrap, normal
+    case 6: {
+      let orbitTrap = length(worldPos) * 0.5;
+      let normalContrib = normal.y * 0.5 + 0.5;
+      let blended = dt * 0.5 + orbitTrap * 0.3 + normalContrib * 0.2;
+      return cosinePaletteColor(
+        blended,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 7 = radial
+    case 7: {
+      let radialT = length(worldPos.xz) / 2.0;
+      return cosinePaletteColor(
+        radialT,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 8 = phase (angular)
+    case 8: {
+      let angle = atan2(worldPos.z, worldPos.x) / TAU + 0.5;
+      return cosinePaletteColor(
+        angle,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 9 = mixed (phase + distance)
+    case 9: {
+      let angle = atan2(worldPos.z, worldPos.x) / TAU + 0.5;
+      let mixed = angle * 0.6 + dt * 0.4;
+      return cosinePaletteColor(
+        mixed,
+        polytope.cosineA.xyz,
+        polytope.cosineB.xyz,
+        polytope.cosineC.xyz,
+        polytope.cosineD.xyz
+      );
+    }
+    // 10 = blackbody (heat)
+    case 10: {
+      // Approximate blackbody: black -> red -> orange -> white
+      let r = clamp(dt * 3.0, 0.0, 1.0);
+      let g = clamp(dt * 3.0 - 1.0, 0.0, 1.0);
+      let b = clamp(dt * 3.0 - 2.0, 0.0, 1.0);
+      return vec3f(r, g, b);
+    }
+    // 13 = dimension (N-D axis coloring)
+    case 13: {
+      let axisColor = abs(normal);
+      return mix(baseColor, axisColor, 0.5 + dt * 0.5);
+    }
+    // Default: use base color
+    default: {
+      return baseColor;
+    }
+  }
 }
 `,
     },
     {
       name: 'Main',
-      content: /* wgsl */ `
-@fragment
-fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
-  // Compute screen-space normal using derivatives (matches WebGL dFdx/dFdy approach)
-  let dPdx = dpdx(input.worldPosition);
-  let dPdy = dpdy(input.worldPosition);
-  let N = normalize(cross(dPdx, dPdy));
-
-  let V = normalize(input.viewDir);
-
-  // Simple lighting
-  let lightDir = normalize(vec3f(1.0, 1.0, 1.0));
-  let NdotL = max(dot(N, lightDir), 0.0);
-
-  // Base color from uniforms
-  let baseColor = polytope.baseColor;
-
-  // Diffuse
-  let diffuse = baseColor * NdotL;
-
-  // Ambient
-  let ambient = baseColor * polytope.ambientIntensity;
-
-  // Specular (GGX simplified)
-  let H = normalize(lightDir + V);
-  let NdotH = max(dot(N, H), 0.0);
-  let specular = pow(NdotH, (1.0 - polytope.roughness) * 64.0) * 0.5;
-
-  let finalColor = ambient + diffuse + vec3f(specular);
-
-  return vec4f(finalColor, polytope.opacity);
-}
-`,
+      content: generatePolytopeMainBlock({ ibl: enableIBL, useGeometryNormals }),
     },
   ]
 
@@ -273,7 +555,93 @@ fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
 }
 
 /**
+ * Generate polytope main block with conditional IBL and normal mode.
+ * This is the WGSL equivalent of GLSL's #ifdef - we exclude the code entirely.
+ * @param config
+ * @param config.ibl
+ * @param config.useGeometryNormals
+ */
+function generatePolytopeMainBlock(config: {
+  ibl?: boolean
+  useGeometryNormals?: boolean
+}): string {
+  const { ibl = false, useGeometryNormals = false } = config
+
+  // IBL section - only include if enabled
+  const iblSection = ibl
+    ? `
+  // ===== IBL (Image-Based Lighting) =====
+  if (IBL_ENABLED && iblUniforms.iblQuality > 0) {
+    finalColor += computeIBL(
+      N, V, F0,
+      roughness, metallic, algorithmColor,
+      envMap, envMapSampler,
+      iblUniforms
+    );
+  }
+`
+    : ''
+
+  // Normal computation - either from vertex shader (geometry) or fragment derivatives (screen-space)
+  const normalComputation = useGeometryNormals
+    ? /* wgsl */ `
+  // Use geometry-based normal from vertex shader (matches WebGL geometry-based normals for dim < 5)
+  var N = normalize(input.normal);`
+    : /* wgsl */ `
+  // Compute screen-space normal using derivatives (matches WebGL dFdx/dFdy approach for dim >= 5)
+  let dPdx = dpdx(input.worldPosition);
+  let dPdy = dpdy(input.worldPosition);
+  var N = normalize(cross(dPdx, dPdy));`
+
+  return /* wgsl */ `
+@fragment
+fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
+${normalComputation}
+
+  // Two-sided lighting (flip normal for back faces)
+  // Note: In WGSL, use @builtin(front_facing) if needed
+
+  let V = normalize(input.viewDir);
+
+  // Clamp roughness (prevent division issues with very smooth surfaces)
+  let roughness = max(polytope.roughness, 0.04);
+  let metallic = polytope.metalness;
+
+  // Get base color from algorithm using faceDepth (matches WebGL)
+  let algorithmColor = getAlgorithmColor(input.faceDepth, polytope.baseColor, N, input.worldPosition);
+
+  // Compute F0 (base reflectivity) - metals use albedo, dielectrics use 0.04
+  let F0 = computeF0(algorithmColor, metallic, 0.04);
+
+  // ===== MULTI-LIGHT PBR LIGHTING =====
+  var finalColor = computeMultiLighting(
+    input.worldPosition,
+    N,
+    V,
+    algorithmColor,
+    roughness,
+    metallic,
+    F0,
+    lighting
+  );
+${iblSection}
+  // ===== FRESNEL RIM LIGHTING =====
+  // (Controlled by material.fresnelEnabled in uniforms - simplified here)
+  let NdotV = max(dot(N, V), 0.0);
+  let rim = pow(1.0 - NdotV, 3.0) * 0.3;
+  finalColor += algorithmColor * rim * 0.5;
+
+  // ===== EMISSIVE =====
+  finalColor += algorithmColor * polytope.emissiveIntensity;
+
+  return vec4f(finalColor, polytope.opacity);
+}
+`
+}
+
+/**
  * Compose edge vertex shader.
+ * @param _config
  */
 export function composeEdgeVertexShader(_config: PolytopeWGSLShaderConfig): string {
   return /* wgsl */ `
@@ -286,6 +654,8 @@ struct CameraUniforms {
   viewProjectionMatrix: mat4x4f,
   inverseViewMatrix: mat4x4f,
   inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,          // LOCAL → WORLD transform
+  inverseModelMatrix: mat4x4f,   // WORLD → LOCAL transform
   cameraPosition: vec3f,
   cameraNear: f32,
   cameraFar: f32,
@@ -300,7 +670,7 @@ struct CameraUniforms {
 ${polytopeUniformsBlock}
 
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
-@group(3) @binding(0) var<uniform> polytope: PolytopeUniforms;
+@group(2) @binding(0) var<uniform> polytope: PolytopeUniforms;
 
 struct VertexInput {
   @location(0) position: vec3f,
@@ -367,6 +737,7 @@ fn main(input: VertexInput) -> VertexOutput {
 
 /**
  * Compose edge fragment shader.
+ * @param _config
  */
 export function composeEdgeFragmentShader(_config: PolytopeWGSLShaderConfig): {
   wgsl: string
@@ -378,7 +749,7 @@ export function composeEdgeFragmentShader(_config: PolytopeWGSLShaderConfig): {
 
 ${polytopeUniformsBlock}
 
-@group(3) @binding(0) var<uniform> polytope: PolytopeUniforms;
+@group(2) @binding(0) var<uniform> polytope: PolytopeUniforms;
 
 struct FragmentInput {
   @location(0) worldPosition: vec3f,
@@ -391,4 +762,209 @@ fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
 `
 
   return { wgsl, modules: ['Edge Fragment'], features: ['Polytope Edges'] }
+}
+
+// ============================================================================
+// Compute-Accelerated Shaders
+// These shaders read pre-computed data from PolytopeTransformComputePass and
+// PolytopeNormalComputePass instead of computing transforms in the vertex shader.
+// ============================================================================
+
+/**
+ * Compose face vertex shader for compute-accelerated mode.
+ *
+ * This simplified vertex shader reads:
+ * - Pre-computed 3D positions and face depths from PolytopeTransformComputePass output buffer
+ * - Pre-computed face normals from PolytopeNormalComputePass output buffer
+ *
+ * The vertex buffer format is simplified:
+ * - Input: Just vertex index (for indexing into storage buffers)
+ * - Storage buffers provide: transformed position, depth, and face normal
+ *
+ * Benefits:
+ * - No N-D transform computation in vertex shader
+ * - No neighbor vertex data needed (67% memory reduction)
+ * - Consistent normal quality across all dimensions
+ * - ~2x faster than geometry-normal mode for high dimensions
+ *
+ * @param config - Shader configuration
+ */
+export function composeFaceVertexShaderCompute(config: PolytopeWGSLShaderConfig): string {
+  const { dimension = 3 } = config
+
+  return /* wgsl */ `
+// Polytope Face Vertex Shader (Compute-Accelerated)
+// Reads pre-computed transforms from storage buffers instead of computing per-vertex.
+// Dimension: ${dimension}D
+
+// ============================================
+// Structures
+// ============================================
+
+struct CameraUniforms {
+  viewMatrix: mat4x4f,
+  projectionMatrix: mat4x4f,
+  viewProjectionMatrix: mat4x4f,
+  inverseViewMatrix: mat4x4f,
+  inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,
+  inverseModelMatrix: mat4x4f,
+  cameraPosition: vec3f,
+  cameraNear: f32,
+  cameraFar: f32,
+  fov: f32,
+  resolution: vec2f,
+  aspectRatio: f32,
+  time: f32,
+  deltaTime: f32,
+  frameNumber: u32,
+}
+
+// Pre-computed vertex from PolytopeTransformComputePass
+struct TransformedVertex {
+  position: vec3f,
+  depth: f32,
+}
+
+// Pre-computed face normal from PolytopeNormalComputePass
+struct FaceNormal {
+  normal: vec3f,
+  _pad: f32,
+}
+
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4f,
+  @location(0) worldPosition: vec3f,
+  @location(1) viewDir: vec3f,
+  @location(2) @interpolate(flat) faceDepth: f32,
+  @location(3) @interpolate(flat) normal: vec3f,
+}
+
+// ============================================
+// Bind Groups
+// ============================================
+
+// Group 0: Camera
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+
+// Group 2: Polytope uniforms (only needed for material properties in fragment shader)
+// Skip group 2 binding in vertex shader - fragment shader handles it
+
+// Group 3: Compute buffers (pre-computed transforms and normals)
+@group(3) @binding(0) var<storage, read> transformedVertices: array<TransformedVertex>;
+@group(3) @binding(1) var<storage, read> faceNormals: array<FaceNormal>;
+
+// ============================================
+// Vertex Shader
+// ============================================
+
+@vertex
+fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+  var output: VertexOutput;
+
+  // Read pre-computed vertex data from storage buffer
+  let vertex = transformedVertices[vertexIndex];
+
+  // World position is the pre-computed 3D position
+  output.worldPosition = vertex.position;
+
+  // Face depth from compute pass (used for color algorithms)
+  output.faceDepth = vertex.depth;
+
+  // Clip position via view-projection transform
+  output.clipPosition = camera.viewProjectionMatrix * vec4f(vertex.position, 1.0);
+
+  // View direction for lighting
+  output.viewDir = normalize(camera.cameraPosition - vertex.position);
+
+  // Look up pre-computed face normal
+  // Each triangle has 3 vertices, so face index = vertex index / 3
+  let faceIndex = vertexIndex / 3u;
+  output.normal = faceNormals[faceIndex].normal;
+
+  return output;
+}
+`
+}
+
+/**
+ * Compose edge vertex shader for compute-accelerated mode.
+ *
+ * Reads pre-computed 3D positions from PolytopeTransformComputePass.
+ * Edges don't need normals.
+ *
+ * @param config - Shader configuration
+ */
+export function composeEdgeVertexShaderCompute(config: PolytopeWGSLShaderConfig): string {
+  const { dimension = 3 } = config
+
+  return /* wgsl */ `
+// Polytope Edge Vertex Shader (Compute-Accelerated)
+// Reads pre-computed transforms from storage buffers.
+// Dimension: ${dimension}D
+
+// ============================================
+// Structures
+// ============================================
+
+struct CameraUniforms {
+  viewMatrix: mat4x4f,
+  projectionMatrix: mat4x4f,
+  viewProjectionMatrix: mat4x4f,
+  inverseViewMatrix: mat4x4f,
+  inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,
+  inverseModelMatrix: mat4x4f,
+  cameraPosition: vec3f,
+  cameraNear: f32,
+  cameraFar: f32,
+  fov: f32,
+  resolution: vec2f,
+  aspectRatio: f32,
+  time: f32,
+  deltaTime: f32,
+  frameNumber: u32,
+}
+
+// Pre-computed vertex from PolytopeTransformComputePass
+struct TransformedVertex {
+  position: vec3f,
+  depth: f32,
+}
+
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4f,
+  @location(0) worldPosition: vec3f,
+}
+
+// ============================================
+// Bind Groups
+// ============================================
+
+// Group 0: Camera
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+
+// Group 3: Compute buffers (pre-computed transforms)
+@group(3) @binding(0) var<storage, read> transformedVertices: array<TransformedVertex>;
+
+// ============================================
+// Vertex Shader
+// ============================================
+
+@vertex
+fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+  var output: VertexOutput;
+
+  // Read pre-computed vertex data from storage buffer
+  let vertex = transformedVertices[vertexIndex];
+
+  // World position is the pre-computed 3D position
+  output.worldPosition = vertex.position;
+
+  // Clip position via view-projection transform
+  output.clipPosition = camera.viewProjectionMatrix * vec4f(vertex.position, 1.0);
+
+  return output;
+}
+`
 }

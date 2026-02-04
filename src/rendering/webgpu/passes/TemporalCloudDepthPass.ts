@@ -246,11 +246,11 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!outputView) return
 
-    // Try to get camera data from frame context
+    // Try to get camera data from frame context (consistent with other passes)
     const camera = ctx.frame?.stores?.['camera'] as {
       near?: number
       far?: number
-      viewProjectionMatrix?: Float32Array
+      viewProjectionMatrix?: { elements: number[] }
     }
 
     // Use camera data if available, otherwise use configured values
@@ -263,8 +263,10 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     const floatView = new Float32Array(data)
 
     // Write view-projection matrix (first 16 floats = 64 bytes)
-    if (camera?.viewProjectionMatrix) {
-      floatView.set(camera.viewProjectionMatrix, 0)
+    if (camera?.viewProjectionMatrix?.elements) {
+      for (let i = 0; i < 16; i++) {
+        floatView[i] = camera.viewProjectionMatrix.elements[i] ?? 0
+      }
     } else {
       // Identity matrix as fallback
       floatView[0] = 1

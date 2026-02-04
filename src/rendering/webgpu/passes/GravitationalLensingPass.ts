@@ -85,15 +85,16 @@ fn computeLensingDisplacementOptimized(
 
 /**
  * Apply chromatic aberration to lensing by sampling RGB at different offsets.
+ * Uses textureSampleLevel with explicit LOD 0.0 to allow non-uniform control flow.
  */
 fn applyLensingChromatic(uv: vec2f, displacement: vec2f) -> vec3f {
   let rScale = 1.0 - uniforms.chromaticAberration * 0.02;
   let gScale = 1.0;
   let bScale = 1.0 + uniforms.chromaticAberration * 0.02;
 
-  let r = textureSample(tEnvironment, texSampler, uv + displacement * rScale).r;
-  let g = textureSample(tEnvironment, texSampler, uv + displacement * gScale).g;
-  let b = textureSample(tEnvironment, texSampler, uv + displacement * bScale).b;
+  let r = textureSampleLevel(tEnvironment, texSampler, uv + displacement * rScale, 0.0).r;
+  let g = textureSampleLevel(tEnvironment, texSampler, uv + displacement * gScale, 0.0).g;
+  let b = textureSampleLevel(tEnvironment, texSampler, uv + displacement * bScale, 0.0).b;
 
   return vec3f(r, g, b);
 }
@@ -121,8 +122,9 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let effectiveStrength = uniforms.strength * uniforms.distortionScale;
 
   // Early exit 1: Effect globally disabled or negligible
+  // Use textureSampleLevel with explicit LOD to allow non-uniform control flow
   if (effectiveStrength < MIN_EFFECTIVE_STRENGTH) {
-    return textureSample(tEnvironment, texSampler, uv);
+    return textureSampleLevel(tEnvironment, texSampler, uv, 0.0);
   }
 
   // Compute distance from gravity center
@@ -154,7 +156,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 
   // Early exit 2: Deflection is sub-pixel, no visible effect
   if (deflection < DEFLECTION_THRESHOLD) {
-    return textureSample(tEnvironment, texSampler, uv);
+    return textureSampleLevel(tEnvironment, texSampler, uv, 0.0);
   }
 
   // Full lensing computation using pre-computed magnitude
@@ -169,7 +171,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   if (uniforms.chromaticAberration > 0.01) {
     color = applyLensingChromatic(uv, displacement);
   } else {
-    color = textureSample(tEnvironment, texSampler, distortedUV).rgb;
+    color = textureSampleLevel(tEnvironment, texSampler, distortedUV, 0.0).rgb;
   }
 
   // Apply subtle Einstein ring boost
@@ -179,7 +181,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   color = color * boost;
 
   // Preserve alpha from original texture
-  let alpha = textureSample(tEnvironment, texSampler, uv).a;
+  let alpha = textureSampleLevel(tEnvironment, texSampler, uv, 0.0).a;
   return vec4f(color, alpha);
 }
 `
@@ -220,6 +222,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
@@ -273,6 +276,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Set gravity strength.
+   * @param value
    */
   setStrength(value: number): void {
     this.strength = value
@@ -280,6 +284,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Set distortion scale.
+   * @param value
    */
   setDistortionScale(value: number): void {
     this.distortionScale = value
@@ -287,6 +292,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Set chromatic aberration amount.
+   * @param value
    */
   setChromaticAberration(value: number): void {
     this.chromaticAberration = value
@@ -295,6 +301,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const extended = ctx.frame?.stores?.['extended'] as {
@@ -318,6 +325,7 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Execute the gravitational lensing pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -359,7 +367,9 @@ export class GravitationalLensingPass extends WebGPUBasePass {
           dimension?: number
         }
       | undefined
-    const bh = frame?.stores?.['blackHole'] as
+    // Access blackhole settings via 'extended' store (blackHole is nested, not a separate store)
+    const extendedForBh = frame?.stores?.['extended'] as { blackhole?: Record<string, unknown> } | undefined
+    const bh = extendedForBh?.blackhole as
       | {
           horizonRadius?: number
           gravityStrength?: number

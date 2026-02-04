@@ -208,6 +208,11 @@ describe('exportStore', () => {
     /**
      * Helper to verify a crop region is properly centered.
      * For a centered crop: x + width/2 = 0.5 AND y + height/2 = 0.5
+     * @param crop
+     * @param crop.x
+     * @param crop.y
+     * @param crop.width
+     * @param crop.height
      */
     const verifyCropCentered = (crop: { x: number; y: number; width: number; height: number }) => {
       const horizontalCenter = crop.x + crop.width / 2
@@ -218,6 +223,11 @@ describe('exportStore', () => {
 
     /**
      * Verify crop boundaries are valid (0-1 range, non-negative dimensions)
+     * @param crop
+     * @param crop.x
+     * @param crop.y
+     * @param crop.width
+     * @param crop.height
      */
     const verifyCropBoundaries = (crop: {
       x: number
@@ -237,6 +247,11 @@ describe('exportStore', () => {
      * Verify the crop region has the expected output aspect ratio.
      * The actual pixels aspect ratio is: (crop.width * canvasWidth) / (crop.height * canvasHeight)
      * = (crop.width / crop.height) * canvasRatio
+     * @param crop
+     * @param crop.width
+     * @param crop.height
+     * @param canvasRatio
+     * @param targetRatio
      */
     const verifyCropAspectRatio = (
       crop: { width: number; height: number },

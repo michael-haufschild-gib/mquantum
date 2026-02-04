@@ -244,6 +244,7 @@ export class CompositePass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -318,6 +319,7 @@ export class CompositePass extends WebGPUBasePass {
 
   /**
    * Convert blend mode string to integer.
+   * @param mode
    */
   private blendModeToInt(mode: BlendMode): number {
     const modeMap: Record<BlendMode, number> = {
@@ -364,6 +366,7 @@ export class CompositePass extends WebGPUBasePass {
 
   /**
    * Execute the composite pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (

@@ -13,5 +13,7 @@ export {
   composeFaceFragmentShader,
   composeEdgeVertexShader,
   composeEdgeFragmentShader,
+  composeFaceVertexShaderCompute,
+  composeEdgeVertexShaderCompute,
 } from './compose'
 export type { PolytopeWGSLShaderConfig } from './compose'

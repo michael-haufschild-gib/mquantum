@@ -29,6 +29,13 @@ export interface TubeWireframeRendererConfig {
   pbr?: boolean
   /** Enable shadows */
   shadows?: boolean
+  /**
+   * Whether to clear the color/depth buffers before rendering.
+   * - true: Clear buffers (use when TubeWireframe is the primary/only renderer, e.g., torus types)
+   * - false: Load existing content (use when rendering on top of another pass, e.g., thick polytope edges)
+   * Default: true
+   */
+  clearBuffer?: boolean
 }
 
 /**
@@ -46,10 +53,12 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   // Bind groups
   private cameraBindGroup: GPUBindGroup | null = null
+  private lightingBindGroup: GPUBindGroup | null = null
   private tubeBindGroup: GPUBindGroup | null = null
 
   // Uniform buffers
   private cameraUniformBuffer: GPUBuffer | null = null
+  private lightingUniformBuffer: GPUBuffer | null = null
   private tubeUniformBuffer: GPUBuffer | null = null
 
   // Geometry buffers
@@ -62,13 +71,26 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
   // Cylinder segments
   private cylinderSegments: number
 
+  // Whether to clear buffers (true for primary renderer, false when adding to existing content)
+  private clearBuffer: boolean
+
+  // Draw statistics from last execute()
+  private lastDrawStats: import('../core/types').WebGPUPassDrawStats = {
+    calls: 0,
+    triangles: 0,
+    vertices: 0,
+    lines: 0,
+    points: 0,
+  }
+
   constructor(config?: TubeWireframeRendererConfig) {
     super({
       id: 'tube-wireframe',
       priority: 100,
       inputs: [],
       outputs: [
-        { resourceId: 'hdr-color', access: 'write' as const, binding: 0 },
+        // Write to object-color to match Polytope renderer (composited over environment later)
+        { resourceId: 'object-color', access: 'write' as const, binding: 0 },
         { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
       ],
     })
@@ -79,9 +101,11 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       cylinderSegments: 8,
       pbr: true,
       shadows: false,
+      clearBuffer: true, // Default: clear (for when TubeWireframe is primary renderer)
       ...config,
     }
 
+    this.clearBuffer = this.rendererConfig.clearBuffer ?? true
     this.cylinderSegments = this.rendererConfig.cylinderSegments ?? 8
 
     this.shaderConfig = {
@@ -92,9 +116,10 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layouts
     const cameraBindGroupLayout = device.createBindGroupLayout({
@@ -108,6 +133,19 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       ],
     })
 
+    // Group 1: Lighting
+    const lightingBindGroupLayout = device.createBindGroupLayout({
+      label: 'tubewireframe-lighting-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' as const },
+        },
+      ],
+    })
+
+    // Group 2: Tube uniforms
     const tubeBindGroupLayout = device.createBindGroupLayout({
       label: 'tubewireframe-object-bgl',
       entries: [
@@ -119,15 +157,13 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Create pipeline layout
+    // Create pipeline layout - consolidated to 3 groups (max 4 allowed)
     const pipelineLayout = device.createPipelineLayout({
       label: 'tubewireframe-pipeline-layout',
       bindGroupLayouts: [
-        cameraBindGroupLayout,
-        cameraBindGroupLayout, // placeholder for lighting (group 1)
-        cameraBindGroupLayout, // placeholder for material (group 2)
-        cameraBindGroupLayout, // placeholder for quality (group 3)
-        tubeBindGroupLayout, // tube uniforms (group 4)
+        cameraBindGroupLayout,    // group 0: camera
+        lightingBindGroupLayout,  // group 1: lighting
+        tubeBindGroupLayout,      // group 2: tube uniforms
       ],
     })
 
@@ -174,42 +210,105 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       fragment: {
         module: fragmentModule,
         entryPoint: 'fragmentMain',
-        targets: [{ format }],
+        // Use HDR format to match render targets (hdr-color is rgba16float)
+        targets: [{ format: 'rgba16float' as GPUTextureFormat }],
       },
       primitive: {
         topology: 'triangle-list' as const,
         cullMode: 'back' as const,
       },
       depthStencil: {
-        format: 'depth32float',
-        depthWriteEnabled: true,
+        // Use depth24plus to match depth-buffer resource
+        format: 'depth24plus',
+        // Match WebGL: depthTest=true, depthWrite=false
+        // Tubes test against depth but don't write, allowing proper layering
+        depthWriteEnabled: false,
         depthCompare: 'less',
       },
     })
 
     // Create uniform buffers
-    this.cameraUniformBuffer = this.createUniformBuffer(device, 256, 'tubewireframe-camera')
+    // CameraUniforms: 7 mat4x4f (448) + vec3f+f32 (16) + 4×f32+vec2f (16) + 4×f32 (16) = 496 bytes, round to 512
+    this.cameraUniformBuffer = this.createUniformBuffer(device, 512, 'tubewireframe-camera')
+    // LightingUniforms: 576 bytes (same as other renderers)
+    this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'tubewireframe-lighting')
     this.tubeUniformBuffer = this.createUniformBuffer(device, 512, 'tubewireframe-uniforms')
 
     // Create bind groups
+    // Group 0: Camera
     this.cameraBindGroup = device.createBindGroup({
       label: 'tubewireframe-camera-bg',
       layout: cameraBindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }],
     })
 
+    // Group 1: Lighting
+    this.lightingBindGroup = device.createBindGroup({
+      label: 'tubewireframe-lighting-bg',
+      layout: lightingBindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.lightingUniformBuffer } }],
+    })
+
+    // Group 2: Tube
     this.tubeBindGroup = device.createBindGroup({
       label: 'tubewireframe-object-bg',
       layout: tubeBindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.tubeUniformBuffer } }],
     })
 
+    // Initialize lighting with default values
+    this.initializeLightingUniforms(device)
+
     // Create cylinder geometry
     this.createCylinderGeometry(device, this.cylinderSegments)
   }
 
   /**
+   * Initialize lighting uniform buffer with default values.
+   * LightingUniforms layout:
+   * - lights[8]: 8 × LightData (64 bytes each) = 512 bytes at offset 0
+   * - ambientColor: vec3f at offset 512
+   * - ambientIntensity: f32 at offset 524
+   * - lightCount: u32 at offset 528
+   * @param device
+   */
+  private initializeLightingUniforms(device: GPUDevice): void {
+    if (!this.lightingUniformBuffer) return
+
+    const data = new ArrayBuffer(576)
+    const floatView = new Float32Array(data)
+    const uintView = new Uint32Array(data)
+
+    // Light 0: Key light (directional from top-right-front)
+    // LightData: direction (vec3f), type (u32), color (vec3f), intensity (f32),
+    //            position (vec3f), range (f32), innerCone (f32), outerCone (f32), padding (vec2f)
+    const light0Offset = 0 // floats
+    floatView[light0Offset + 0] = 0.577 // direction.x (normalized 1,1,1)
+    floatView[light0Offset + 1] = 0.577 // direction.y
+    floatView[light0Offset + 2] = 0.577 // direction.z
+    uintView[light0Offset + 3] = 0 // type: 0 = directional
+    floatView[light0Offset + 4] = 1.0 // color.r
+    floatView[light0Offset + 5] = 1.0 // color.g
+    floatView[light0Offset + 6] = 1.0 // color.b
+    floatView[light0Offset + 7] = 1.0 // intensity
+
+    // Ambient lighting at offset 512 bytes = 128 floats
+    const ambientOffset = 128
+    floatView[ambientOffset + 0] = 0.1 // ambientColor.r
+    floatView[ambientOffset + 1] = 0.1 // ambientColor.g
+    floatView[ambientOffset + 2] = 0.1 // ambientColor.b
+    floatView[ambientOffset + 3] = 1.0 // ambientIntensity
+
+    // Light count at offset 528 bytes = 132 floats
+    uintView[132] = 1 // lightCount
+
+    device.queue.writeBuffer(this.lightingUniformBuffer, 0, data)
+  }
+
+  /**
    * Create cylinder geometry for tube rendering.
+   * @param device
+   * @param segments
    */
   private createCylinderGeometry(device: GPUDevice, segments: number): void {
     // Create a unit cylinder (height 1, radius 1, centered at origin)
@@ -288,6 +387,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   /**
    * Set the dimension of the object.
+   * @param dimension
    */
   setDimension(dimension: number): void {
     this.rendererConfig.dimension = dimension
@@ -295,6 +395,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   /**
    * Set the tube radius.
+   * @param radius
    */
   setRadius(radius: number): void {
     this.rendererConfig.radius = radius
@@ -303,6 +404,8 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
   /**
    * Update tube instances (edges).
    * Each edge is defined by two N-D vertices.
+   * @param device
+   * @param edges
    */
   updateInstances(
     device: GPUDevice,
@@ -398,6 +501,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   /**
    * Update camera uniforms.
+   * @param ctx
    */
   private updateCameraUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.cameraUniformBuffer) return
@@ -407,6 +511,8 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       viewMatrix?: { elements: number[] }
       projectionMatrix?: { elements: number[] }
       viewProjectionMatrix?: { elements: number[] }
+      inverseViewMatrix?: { elements: number[] }
+      inverseProjectionMatrix?: { elements: number[] }
       position?: { x: number; y: number; z: number }
       near?: number
       far?: number
@@ -414,38 +520,65 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     }
     if (!camera) return
 
-    // Pack camera uniforms
-    const data = new Float32Array(64)
+    // CameraUniforms layout (512 bytes = 128 floats):
+    // 7 mat4x4f (7 × 16 floats = 112) + vec3f+f32 (4) + remaining scalars (12)
+    const data = new Float32Array(128)
 
+    // Matrices at correct offsets (each mat4x4f = 16 floats)
     if (camera.viewMatrix) {
-      data.set(camera.viewMatrix.elements, 0)
+      data.set(camera.viewMatrix.elements, 0) // offset 0
     }
     if (camera.projectionMatrix) {
-      data.set(camera.projectionMatrix.elements, 16)
+      data.set(camera.projectionMatrix.elements, 16) // offset 16
     }
     if (camera.viewProjectionMatrix) {
-      data.set(camera.viewProjectionMatrix.elements, 32)
+      data.set(camera.viewProjectionMatrix.elements, 32) // offset 32
     }
+    if (camera.inverseViewMatrix) {
+      data.set(camera.inverseViewMatrix.elements, 48) // offset 48
+    }
+    if (camera.inverseProjectionMatrix) {
+      data.set(camera.inverseProjectionMatrix.elements, 64) // offset 64
+    }
+
+    // Model matrices for raymarching coordinate space conversion
+    // For TubeWireframe, use identity (no scale transformation needed for mesh rendering)
+    // modelMatrix (offset 80): identity
+    data[80] = 1.0; data[85] = 1.0; data[90] = 1.0; data[95] = 1.0
+    // inverseModelMatrix (offset 96): identity
+    data[96] = 1.0; data[101] = 1.0; data[106] = 1.0; data[111] = 1.0
+
+    // Camera position at offset 112 (after 7 matrices)
     if (camera.position) {
-      data[48] = camera.position.x
-      data[49] = camera.position.y
-      data[50] = camera.position.z
+      data[112] = camera.position.x
+      data[113] = camera.position.y
+      data[114] = camera.position.z
     }
-    data[51] = camera.near ?? 0.1
-    data[52] = camera.far ?? 1000
-    data[53] = camera.fov ?? 50
-    data[54] = ctx.size.width
-    data[55] = ctx.size.height
-    data[56] = ctx.size.width / ctx.size.height
-    data[57] = ctx.frame?.time ?? 0
-    data[58] = ctx.frame?.delta ?? 0.016
-    data[59] = ctx.frame?.frameNumber ?? 0
+    data[115] = camera.near ?? 0.1 // cameraNear (packed with cameraPosition)
+    data[116] = camera.far ?? 1000 // cameraFar
+    data[117] = camera.fov ?? 50 // fov
+    data[118] = ctx.size.width // resolution.x
+    data[119] = ctx.size.height // resolution.y
+    data[120] = ctx.size.width / ctx.size.height // aspectRatio
+    data[121] = ctx.frame?.time ?? 0 // time
+    data[122] = ctx.frame?.delta ?? 0.016 // deltaTime
+    data[123] = ctx.frame?.frameNumber ?? 0 // frameNumber
 
     this.writeUniformBuffer(this.device, this.cameraUniformBuffer, data)
   }
 
   /**
    * Update tube uniforms.
+   * @param uniforms
+   * @param uniforms.rotationMatrix4D
+   * @param uniforms.extraRotationCols
+   * @param uniforms.depthRowSums
+   * @param uniforms.baseColor
+   * @param uniforms.opacity
+   * @param uniforms.roughness
+   * @param uniforms.metalness
+   * @param uniforms.ambientIntensity
+   * @param uniforms.emissiveIntensity
    */
   updateTubeUniforms(
     uniforms: {
@@ -527,36 +660,174 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   /**
    * Update tube uniforms from Zustand stores.
+   * Reads ndTransform for N-D rotation data (matching WebGL TubeWireframe.tsx useFrame)
+   * @param ctx
    */
   private updateTubeFromStores(ctx: WebGPURenderContext): void {
-    const rotation = ctx.frame?.stores?.['rotation'] as {
-      rotations?: Record<string, number>
+    // Read N-D transform data (same pattern as WebGPUPolytopeRenderer)
+    const ndTransform = ctx.frame?.stores?.['ndTransform'] as {
+      rotationMatrix4D?: number[]
+      extraRotationCols?: number[]
+      depthRowSums?: number[]
+      projectionDistance?: number
     }
+
+    // Read extended store for uniformScale (polytope.scale acts like camera zoom)
+    const extended = ctx.frame?.stores?.['extended'] as {
+      polytope?: { scale?: number }
+    }
+
     const pbr = ctx.frame?.stores?.['pbr'] as {
+      edge?: { roughness?: number; metallic?: number }
       roughness?: number
       metalness?: number
     }
     const appearance = ctx.frame?.stores?.['appearance'] as {
       colorAlgorithm?: string
+      edgeColor?: string
       cosineCoefficients?: { a: number[]; b: number[]; c: number[]; d: number[] }
     }
-    const transform = ctx.frame?.stores?.['transform'] as {
-      scale?: number
-    }
 
-    const baseColor = this.getBaseColorFromAppearance(appearance)
-    
+    // Parse edge color (WebGL uses appearance.edgeColor)
+    const baseColor = appearance?.edgeColor
+      ? this.parseColor(appearance.edgeColor)
+      : this.getBaseColorFromAppearance(appearance)
+
+    // Get PBR from edge-specific settings if available, otherwise fallback
+    const roughness = pbr?.edge?.roughness ?? pbr?.roughness ?? 0.5
+    const metalness = pbr?.edge?.metallic ?? pbr?.metalness ?? 0.0
+
     this.updateTubeUniforms({
+      // N-D Transform data (critical for proper rendering)
+      rotationMatrix4D: ndTransform?.rotationMatrix4D,
+      extraRotationCols: ndTransform?.extraRotationCols,
+      depthRowSums: ndTransform?.depthRowSums,
+      // Material
       baseColor,
-      roughness: pbr?.roughness ?? 0.5,
-      metalness: pbr?.metalness ?? 0.0,
+      roughness,
+      metalness,
       ambientIntensity: 0.3,
       emissiveIntensity: 0.0,
     })
+
+    // Also update dimension-related uniforms directly in the buffer
+    // These are set in updateTubeUniforms but we need to update projectionDistance from ndTransform
+    if (this.device && this.tubeUniformBuffer && ndTransform) {
+      const data = new Float32Array(4)
+      data[0] = this.rendererConfig.dimension ?? 4 // dimension
+      data[1] = extended?.polytope?.scale ?? 1.0 // uniformScale (visual scale, applied after projection)
+      data[2] = ndTransform.projectionDistance ?? 5.0 // projectionDistance from ndTransform
+      data[3] = (this.rendererConfig.dimension ?? 4) > 4
+        ? Math.sqrt((this.rendererConfig.dimension ?? 4) - 3)
+        : 1.0 // depthNormFactor
+      // Write to offset 64 (16 floats = rotationMatrix4D at offset 0)
+      this.device.queue.writeBuffer(this.tubeUniformBuffer, 64, data)
+    }
+  }
+
+  /**
+   * Parse hex color string to RGB array [0-1].
+   * @param hex
+   */
+  private parseColor(hex: string): [number, number, number] {
+    const cleaned = hex.replace('#', '')
+    const r = parseInt(cleaned.substring(0, 2), 16) / 255
+    const g = parseInt(cleaned.substring(2, 4), 16) / 255
+    const b = parseInt(cleaned.substring(4, 6), 16) / 255
+    return [r, g, b]
+  }
+
+  /**
+   * Update lighting uniforms from stores.
+   * Matches the pattern used in WebGPUMandelbulbRenderer.
+   * @param ctx
+   */
+  private updateLightingUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.lightingUniformBuffer) return
+
+    const lighting = ctx.frame?.stores?.['lighting'] as {
+      lights?: Array<{
+        type?: string
+        position?: [number, number, number]
+        direction?: [number, number, number]
+        color?: string
+        intensity?: number
+        range?: number
+        decay?: number
+        spotCosInner?: number
+        spotCosOuter?: number
+        enabled?: boolean
+      }>
+      ambientColor?: string
+      ambientIntensity?: number
+      ambientEnabled?: boolean
+    }
+    if (!lighting) return
+
+    // LightingUniforms struct layout:
+    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
+    // lights: array<LightData, 8>, offset 0, 512 bytes
+    // ambientColor: vec3f, offset 512 (128 floats)
+    // ambientIntensity: f32, offset 524 (131 floats)
+    // lightCount: i32, offset 528 (132 floats)
+    const data = new Float32Array(144)
+
+    const lights = lighting.lights ?? []
+    const lightCount = Math.min(lights.length, 8)
+
+    // Pack lights array (offset 0, each light is 16 floats = 64 bytes)
+    for (let i = 0; i < lightCount; i++) {
+      const light = lights[i]
+      if (!light) continue
+      const offset = i * 16
+
+      // position: vec4f (xyz = position, w = type: 0=none, 1=point, 2=directional, 3=spot)
+      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
+      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
+      data[offset + 0] = light.position?.[0] ?? 0
+      data[offset + 1] = light.position?.[1] ?? 5
+      data[offset + 2] = light.position?.[2] ?? 0
+      data[offset + 3] = lightType
+
+      // direction: vec4f (xyz = direction, w = range)
+      data[offset + 4] = light.direction?.[0] ?? 0
+      data[offset + 5] = light.direction?.[1] ?? -1
+      data[offset + 6] = light.direction?.[2] ?? 0
+      data[offset + 7] = light.range ?? 100.0
+
+      // color: vec4f (rgb = color, a = intensity)
+      const lightColor = this.parseColor(light.color ?? '#ffffff')
+      data[offset + 8] = lightColor[0]
+      data[offset + 9] = lightColor[1]
+      data[offset + 10] = lightColor[2]
+      data[offset + 11] = light.intensity ?? 1.0
+
+      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
+      data[offset + 12] = light.decay ?? 2.0
+      data[offset + 13] = light.spotCosInner ?? 0.9
+      data[offset + 14] = light.spotCosOuter ?? 0.7
+      data[offset + 15] = light.enabled !== false ? 1.0 : 0.0
+    }
+
+    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
+    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
+    data[128] = ambientColor[0]
+    data[129] = ambientColor[1]
+    data[130] = ambientColor[2]
+
+    // ambientIntensity: f32 at offset 131
+    data[131] = (lighting.ambientEnabled !== false ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
+
+    // lightCount: i32 at offset 132 - use DataView for proper type
+    const dataView = new DataView(data.buffer)
+    dataView.setInt32(132 * 4, lightCount, true)
+
+    this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
   }
 
   /**
    * Extract base color from appearance store.
+   * @param appearance
    */
   private getBaseColorFromAppearance(appearance: {
     colorAlgorithm?: string
@@ -575,6 +846,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
   /**
    * Execute the render pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -583,6 +855,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       !this.cylinderVertexBuffer ||
       !this.cylinderIndexBuffer ||
       !this.cameraBindGroup ||
+      !this.lightingBindGroup ||
       !this.tubeBindGroup ||
       !this.instanceBuffer ||
       this.instanceCount === 0
@@ -592,28 +865,32 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
     // Update uniforms from stores
     this.updateCameraUniforms(ctx)
+    this.updateLightingUniforms(ctx)
     this.updateTubeFromStores(ctx)
 
-    // Get render targets
-    const colorView = ctx.getWriteTarget('hdr-color')
+    // Get render targets (write to object-color to match Polytope renderer)
+    const colorView = ctx.getWriteTarget('object-color')
     const depthView = ctx.getWriteTarget('depth-buffer')
 
     if (!colorView || !depthView) return
 
     // Begin render pass
+    // Use load or clear based on config:
+    // - clearBuffer=true: Clear (for torus types where TubeWireframe is primary renderer)
+    // - clearBuffer=false: Load (for thick polytope edges rendered on top of faces)
     const passEncoder = ctx.beginRenderPass({
       label: 'tubewireframe-render',
       colorAttachments: [
         {
           view: colorView,
-          loadOp: 'clear' as const,
+          loadOp: this.clearBuffer ? 'clear' as const : 'load' as const,
           storeOp: 'store' as const,
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          clearValue: { r: 0, g: 0, b: 0, a: 0 }, // Use alpha=0 for proper compositing
         },
       ],
       depthStencilAttachment: {
         view: depthView,
-        depthLoadOp: 'clear' as const,
+        depthLoadOp: this.clearBuffer ? 'clear' as const : 'load' as const,
         depthStoreOp: 'store' as const,
         depthClearValue: 1.0,
       },
@@ -621,10 +898,8 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
     passEncoder.setPipeline(this.renderPipeline)
     passEncoder.setBindGroup(0, this.cameraBindGroup)
-    passEncoder.setBindGroup(1, this.cameraBindGroup) // placeholder
-    passEncoder.setBindGroup(2, this.cameraBindGroup) // placeholder
-    passEncoder.setBindGroup(3, this.cameraBindGroup) // placeholder
-    passEncoder.setBindGroup(4, this.tubeBindGroup)
+    passEncoder.setBindGroup(1, this.lightingBindGroup)
+    passEncoder.setBindGroup(2, this.tubeBindGroup)
 
     passEncoder.setVertexBuffer(0, this.cylinderVertexBuffer)
     passEncoder.setVertexBuffer(1, this.instanceBuffer)
@@ -634,6 +909,24 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     passEncoder.drawIndexed(this.cylinderIndexCount, this.instanceCount)
 
     passEncoder.end()
+
+    // Update draw statistics
+    // Each cylinder instance draws cylinderIndexCount indices as triangles
+    const trianglesPerCylinder = Math.floor(this.cylinderIndexCount / 3)
+    this.lastDrawStats = {
+      calls: 1, // Instanced draw = 1 call
+      triangles: trianglesPerCylinder * this.instanceCount,
+      vertices: this.cylinderIndexCount * this.instanceCount,
+      lines: this.instanceCount, // Each tube represents one "line" (edge)
+      points: 0,
+    }
+  }
+
+  /**
+   * Get draw statistics from the last execute() call.
+   */
+  getDrawStats(): import('../core/types').WebGPUPassDrawStats {
+    return this.lastDrawStats
   }
 
   /**

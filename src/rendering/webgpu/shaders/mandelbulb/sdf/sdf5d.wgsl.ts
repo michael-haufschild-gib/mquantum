@@ -4,15 +4,19 @@
  * 5-dimensional Mandelbulb signed distance function.
  * Port of GLSL sdf5d.glsl to WGSL.
  *
+ * NOTE: Scale is handled by the dispatch function (GetDist), NOT here.
+ * The SDF works on pure fractal coordinates without scale modification.
+ *
  * @module rendering/webgpu/shaders/mandelbulb/sdf/sdf5d.wgsl
  */
 
 export const sdf5dBlock = /* wgsl */ `
 // ============================================
 // 5D Mandelbulb SDF
+// With proper basis transformation (matching WebGL)
 // ============================================
 
-// Constants for 5D (imported from constants block)
+// Constants for 5D
 const MAX_ITER_5D: i32 = 256;
 const EPS_5D: f32 = 1e-6;
 
@@ -30,7 +34,7 @@ fn optimizedPow5D(r: f32, p: f32) -> vec2f {
 /**
  * 5D Mandelbulb SDF with orbital trap.
  *
- * @param pos 3D world position
+ * @param pos 3D world position (already scaled by dispatch)
  * @param basis Basis vectors for N-D transformation
  * @param uniforms Mandelbulb uniforms
  * @return vec2f where x = signed distance, y = orbital trap value
@@ -40,26 +44,34 @@ fn mandelbulbSDF5D(
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> vec2f {
-  // Transform to 5D using basis vectors
-  let cx = getBasisComponent(basis.origin, 0) + pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0);
-  let cy = getBasisComponent(basis.origin, 1) + pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1);
-  let cz = getBasisComponent(basis.origin, 2) + pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2);
-  let c3 = getBasisComponent(basis.origin, 3) + pos.x * getBasisComponent(basis.basisX, 3) + pos.y * getBasisComponent(basis.basisY, 3) + pos.z * getBasisComponent(basis.basisZ, 3);
-  let c4 = getBasisComponent(basis.origin, 4) + pos.x * getBasisComponent(basis.basisX, 4) + pos.y * getBasisComponent(basis.basisY, 4) + pos.z * getBasisComponent(basis.basisZ, 4);
-
-  // Apply scale
-  let scx = cx * uniforms.scale;
-  let scy = cy * uniforms.scale;
-  let scz = cz * uniforms.scale;
-  let sc3 = c3 * uniforms.scale;
-  let sc4 = c4 * uniforms.scale;
+  // Transform to 5D fractal space using basis vectors (matching WebGL)
+  let cx = getBasisComponent(basis.origin, 0) +
+           pos.x * getBasisComponent(basis.basisX, 0) +
+           pos.y * getBasisComponent(basis.basisY, 0) +
+           pos.z * getBasisComponent(basis.basisZ, 0);
+  let cy = getBasisComponent(basis.origin, 1) +
+           pos.x * getBasisComponent(basis.basisX, 1) +
+           pos.y * getBasisComponent(basis.basisY, 1) +
+           pos.z * getBasisComponent(basis.basisZ, 1);
+  let cz = getBasisComponent(basis.origin, 2) +
+           pos.x * getBasisComponent(basis.basisX, 2) +
+           pos.y * getBasisComponent(basis.basisY, 2) +
+           pos.z * getBasisComponent(basis.basisZ, 2);
+  let c3 = getBasisComponent(basis.origin, 3) +
+           pos.x * getBasisComponent(basis.basisX, 3) +
+           pos.y * getBasisComponent(basis.basisY, 3) +
+           pos.z * getBasisComponent(basis.basisZ, 3);
+  let c4 = getBasisComponent(basis.origin, 4) +
+           pos.x * getBasisComponent(basis.basisX, 4) +
+           pos.y * getBasisComponent(basis.basisY, 4) +
+           pos.z * getBasisComponent(basis.basisZ, 4);
 
   // Mandelbulb mode: z starts at c (sample point)
-  var zx = scx;
-  var zy = scy;
-  var zz = scz;
-  var z3 = sc3;
-  var z4 = sc4;
+  var zx = cx;
+  var zy = cy;
+  var zz = cz;
+  var z3 = c3;
+  var z4 = c4;
 
   var dr: f32 = 1.0;
   var r: f32 = 0.0;
@@ -70,7 +82,7 @@ fn mandelbulbSDF5D(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   // Phase shifts
   let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
@@ -123,11 +135,11 @@ fn mandelbulbSDF5D(
     let p2 = p1 * s1;
     let p3 = p2 * s2;
 
-    zz = p0 * c0 + scz;
-    zx = p1 * c1 + scx;
-    zy = p2 * c2 + scy;
-    z3 = p3 * c3_ + sc3;
-    z4 = p3 * s3 + sc4;
+    zz = p0 * c0 + cz;
+    zx = p1 * c1 + cx;
+    zy = p2 * c2 + cy;
+    z3 = p3 * c3_ + c3;
+    z4 = p3 * s3 + c4;
 
     escIt = i;
   }
@@ -139,8 +151,8 @@ fn mandelbulbSDF5D(
              exp(-minS * 8.0) * 0.2 +
              f32(escIt) / f32(max(maxIt, 1)) * 0.3;
 
-  // Distance estimator (divide by scale to return world-space distance)
-  let dist = max(0.5 * log(max(r, EPS_5D)) * r / max(dr, EPS_5D), EPS_5D) / uniforms.scale;
+  // Distance estimator (no scale division - handled by dispatch)
+  let dist = max(0.5 * log(max(r, EPS_5D)) * r / max(dr, EPS_5D), EPS_5D);
 
   return vec2f(dist, trap);
 }
@@ -153,32 +165,40 @@ fn mandelbulbSDF5D_simple(
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> f32 {
-  // Transform to 5D using basis vectors
-  let cx = getBasisComponent(basis.origin, 0) + pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0);
-  let cy = getBasisComponent(basis.origin, 1) + pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1);
-  let cz = getBasisComponent(basis.origin, 2) + pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2);
-  let c3 = getBasisComponent(basis.origin, 3) + pos.x * getBasisComponent(basis.basisX, 3) + pos.y * getBasisComponent(basis.basisY, 3) + pos.z * getBasisComponent(basis.basisZ, 3);
-  let c4 = getBasisComponent(basis.origin, 4) + pos.x * getBasisComponent(basis.basisX, 4) + pos.y * getBasisComponent(basis.basisY, 4) + pos.z * getBasisComponent(basis.basisZ, 4);
+  // Transform to 5D fractal space using basis vectors
+  let cx = getBasisComponent(basis.origin, 0) +
+           pos.x * getBasisComponent(basis.basisX, 0) +
+           pos.y * getBasisComponent(basis.basisY, 0) +
+           pos.z * getBasisComponent(basis.basisZ, 0);
+  let cy = getBasisComponent(basis.origin, 1) +
+           pos.x * getBasisComponent(basis.basisX, 1) +
+           pos.y * getBasisComponent(basis.basisY, 1) +
+           pos.z * getBasisComponent(basis.basisZ, 1);
+  let cz = getBasisComponent(basis.origin, 2) +
+           pos.x * getBasisComponent(basis.basisX, 2) +
+           pos.y * getBasisComponent(basis.basisY, 2) +
+           pos.z * getBasisComponent(basis.basisZ, 2);
+  let c3 = getBasisComponent(basis.origin, 3) +
+           pos.x * getBasisComponent(basis.basisX, 3) +
+           pos.y * getBasisComponent(basis.basisY, 3) +
+           pos.z * getBasisComponent(basis.basisZ, 3);
+  let c4 = getBasisComponent(basis.origin, 4) +
+           pos.x * getBasisComponent(basis.basisX, 4) +
+           pos.y * getBasisComponent(basis.basisY, 4) +
+           pos.z * getBasisComponent(basis.basisZ, 4);
 
-  // Apply scale
-  let scx = cx * uniforms.scale;
-  let scy = cy * uniforms.scale;
-  let scz = cz * uniforms.scale;
-  let sc3 = c3 * uniforms.scale;
-  let sc4 = c4 * uniforms.scale;
-
-  var zx = scx;
-  var zy = scy;
-  var zz = scz;
-  var z3 = sc3;
-  var z4 = sc4;
+  var zx = cx;
+  var zy = cy;
+  var zz = cz;
+  var z3 = c3;
+  var z4 = c4;
 
   var dr: f32 = 1.0;
   var r: f32 = 0.0;
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
   let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
@@ -218,13 +238,13 @@ fn mandelbulbSDF5D_simple(
     let p2 = p1 * s1;
     let p3 = p2 * s2;
 
-    zz = p0 * c0 + scz;
-    zx = p1 * c1 + scx;
-    zy = p2 * c2 + scy;
-    z3 = p3 * c3_ + sc3;
-    z4 = p3 * s3 + sc4;
+    zz = p0 * c0 + cz;
+    zx = p1 * c1 + cx;
+    zy = p2 * c2 + cy;
+    z3 = p3 * c3_ + c3;
+    z4 = p3 * s3 + c4;
   }
 
-  return max(0.5 * log(max(r, EPS_5D)) * r / max(dr, EPS_5D), EPS_5D) / uniforms.scale;
+  return max(0.5 * log(max(r, EPS_5D)) * r / max(dr, EPS_5D), EPS_5D);
 }
 `

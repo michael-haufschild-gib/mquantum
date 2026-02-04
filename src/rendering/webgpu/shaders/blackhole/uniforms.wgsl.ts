@@ -135,5 +135,82 @@ struct BlackHoleUniforms {
   // Temporal accumulation
   bayerOffset: vec2f,          // Bayer pattern offset
   fullResolution: vec2f,       // Full resolution
+
+  // Color algorithm settings (for getAlgorithmColor)
+  colorAlgorithm: i32,         // Color algorithm mode (0-12)
+  dimension: i32,              // Current dimension (3-11)
+  fastMode: u32,               // Fast mode flag (skip expensive calculations)
+  _padding3: f32,
+
+  // Cosine palette coefficients (for cosine gradient algorithms)
+  cosineA: vec3f,              // Cosine palette A coefficient
+  _padding4: f32,
+  cosineB: vec3f,              // Cosine palette B coefficient
+  _padding5: f32,
+  cosineC: vec3f,              // Cosine palette C coefficient
+  _padding6: f32,
+  cosineD: vec3f,              // Cosine palette D coefficient
+  _padding7: f32,
+
+  // LCH color space settings
+  lchLightness: f32,           // LCH lightness (0.0-1.0)
+  lchChroma: f32,              // LCH chroma (0.0-0.5)
+  _padding8: vec2f,            // Alignment padding
+}
+
+// ============================================
+// N-Dimensional Basis Vectors
+// ============================================
+
+struct BasisVectors {
+  // Each basis vector has up to 11 components (padded to 12)
+  // Stored as 3 vec4f each
+  basisX: array<vec4f, 3>,
+  basisY: array<vec4f, 3>,
+  basisZ: array<vec4f, 3>,
+  origin: array<vec4f, 3>,
+}
+
+// ============================================
+// Helper Functions
+// ============================================
+
+/**
+ * Get component i from a basis vector array.
+ */
+fn getBasisComponent(basis: array<vec4f, 3>, i: i32) -> f32 {
+  let vecIdx = i / 4;
+  let compIdx = i % 4;
+
+  if (vecIdx == 0) {
+    return basis[0][compIdx];
+  } else if (vecIdx == 1) {
+    return basis[1][compIdx];
+  } else {
+    return basis[2][compIdx];
+  }
+}
+
+/**
+ * Transform a 3D point to D-dimensional space using basis vectors.
+ */
+fn transformToND(
+  p: vec3f,
+  basisX: array<vec4f, 3>,
+  basisY: array<vec4f, 3>,
+  basisZ: array<vec4f, 3>,
+  origin: array<vec4f, 3>,
+  dimension: i32
+) -> array<f32, 11> {
+  var result: array<f32, 11>;
+
+  for (var i = 0; i < dimension; i = i + 1) {
+    result[i] = p.x * getBasisComponent(basisX, i) +
+                p.y * getBasisComponent(basisY, i) +
+                p.z * getBasisComponent(basisZ, i) +
+                getBasisComponent(origin, i);
+  }
+
+  return result;
 }
 `

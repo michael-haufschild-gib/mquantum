@@ -633,6 +633,10 @@ export const PolytopeScene = React.memo(function PolytopeScene({
      * Helper to write vertex data at a given output index.
      * For screen-space mode: only writes this vertex data (faster, less memory)
      * For geometry mode: writes this vertex + 2 neighbors (for vertex shader normal computation)
+     * @param outIdx
+     * @param thisIdx
+     * @param neighbor1Idx
+     * @param neighbor2Idx
      */
     const writeTriangleVertex = (
       outIdx: number,

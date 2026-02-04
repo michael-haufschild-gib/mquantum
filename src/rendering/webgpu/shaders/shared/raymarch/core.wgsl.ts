@@ -80,6 +80,64 @@ fn raymarch(
 }
 
 /**
+ * Raymarcher with explicit start/end bounds.
+ * Used with bounding sphere intersection for correct near-geometry handling.
+ *
+ * @param ro Ray origin
+ * @param rd Ray direction (normalized)
+ * @param startT Starting distance (from bounding sphere intersection)
+ * @param maxT Maximum distance (from bounding sphere exit)
+ * @param minDist Minimum surface distance threshold
+ * @param maxSteps Maximum iteration count
+ * @return Raymarch result
+ */
+fn raymarchWithBounds(
+  ro: vec3f,
+  rd: vec3f,
+  startT: f32,
+  maxT: f32,
+  minDist: f32,
+  maxSteps: i32
+) -> RaymarchResult {
+  var result: RaymarchResult;
+  result.hit = false;
+  result.position = ro;
+  result.distance = 0.0;
+  result.iterations = 0.0;
+  result.minDist = maxT;
+  result.orbital = 0.0;
+
+  var t: f32 = startT;
+
+  for (var i = 0; i < maxSteps; i++) {
+    result.iterations = f32(i);
+    let pos = ro + rd * t;
+    let d = GetDist(pos);
+
+    result.minDist = min(result.minDist, d);
+
+    if (d < minDist) {
+      result.hit = true;
+      result.position = pos;
+      result.distance = t;
+      break;
+    }
+
+    if (t > maxT) {
+      break;
+    }
+
+    t += d;
+  }
+
+  if (!result.hit) {
+    result.distance = t;
+  }
+
+  return result;
+}
+
+/**
  * Enhanced raymarcher with orbital trap tracking.
  *
  * @param ro Ray origin

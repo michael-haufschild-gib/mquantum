@@ -25,6 +25,11 @@ const MAX_DIM: i32 = 11;
 const MAX_TERMS: i32 = 8;
 const MAX_EXTRA_DIM: i32 = 8;
 
+// Quantum mode constants (used throughout all quantum modules)
+const QUANTUM_MODE_HARMONIC: i32 = 0;
+const QUANTUM_MODE_HYDROGEN: i32 = 1;
+const QUANTUM_MODE_HYDROGEN_ND: i32 = 2;
+
 // WebGPU uniform buffers require 16-byte alignment for array elements.
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
@@ -156,6 +161,18 @@ struct SchroedingerUniforms {
   phaseTheta: f32,               // Phase offset for theta angle
   phasePhi: f32,                 // Phase offset for phi angle
   _pad3: f32,                    // Alignment padding
+
+  // Color algorithm system (matches WebGL uniform system)
+  colorAlgorithm: i32,           // Color algorithm selector (0-13)
+  distPower: f32,                // Distribution power for distance-based coloring
+  distCycles: f32,               // Distribution cycles
+  distOffset: f32,               // Distribution offset
+
+  // Cosine palette coefficients (packed as vec4f for alignment)
+  cosineA: vec4f,                // Cosine palette A coefficient (xyz used, w unused)
+  cosineB: vec4f,                // Cosine palette B coefficient
+  cosineC: vec4f,                // Cosine palette C coefficient
+  cosineD: vec4f,                // Cosine palette D coefficient
 }
 
 // ============================================

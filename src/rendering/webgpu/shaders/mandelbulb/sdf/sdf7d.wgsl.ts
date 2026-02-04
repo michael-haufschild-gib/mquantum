@@ -4,12 +4,16 @@
  * 7-dimensional Mandelbulb signed distance function.
  * Port of GLSL sdf7d.glsl to WGSL.
  *
+ * NOTE: Scale is handled by the dispatch function (GetDist), NOT here.
+ * The SDF works on pure fractal coordinates without scale modification.
+ *
  * @module rendering/webgpu/shaders/mandelbulb/sdf/sdf7d.wgsl
  */
 
 export const sdf7dBlock = /* wgsl */ `
 // ============================================
 // 7D Mandelbulb SDF
+// With proper basis transformation (matching WebGL)
 // ============================================
 
 const MAX_ITER_7D: i32 = 256;
@@ -24,27 +28,50 @@ fn optimizedPow7D(r: f32, p: f32) -> vec2f {
 
 /**
  * 7D Mandelbulb SDF with orbital trap.
+ *
+ * @param pos 3D world position (already scaled by dispatch)
+ * @param basis Basis vectors for N-D transformation
+ * @param uniforms Mandelbulb uniforms
+ * @return vec2f where x = signed distance, y = orbital trap value
  */
 fn mandelbulbSDF7D(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> vec2f {
-  // Transform to 7D
-  let cx = getBasisComponent(basis.origin, 0) + pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0);
-  let cy = getBasisComponent(basis.origin, 1) + pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1);
-  let cz = getBasisComponent(basis.origin, 2) + pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2);
-  let c3 = getBasisComponent(basis.origin, 3) + pos.x * getBasisComponent(basis.basisX, 3) + pos.y * getBasisComponent(basis.basisY, 3) + pos.z * getBasisComponent(basis.basisZ, 3);
-  let c4 = getBasisComponent(basis.origin, 4) + pos.x * getBasisComponent(basis.basisX, 4) + pos.y * getBasisComponent(basis.basisY, 4) + pos.z * getBasisComponent(basis.basisZ, 4);
-  let c5 = getBasisComponent(basis.origin, 5) + pos.x * getBasisComponent(basis.basisX, 5) + pos.y * getBasisComponent(basis.basisY, 5) + pos.z * getBasisComponent(basis.basisZ, 5);
-  let c6 = getBasisComponent(basis.origin, 6) + pos.x * getBasisComponent(basis.basisX, 6) + pos.y * getBasisComponent(basis.basisY, 6) + pos.z * getBasisComponent(basis.basisZ, 6);
+  // Transform to 7D fractal space using basis vectors (matching WebGL)
+  let cx = getBasisComponent(basis.origin, 0) +
+           pos.x * getBasisComponent(basis.basisX, 0) +
+           pos.y * getBasisComponent(basis.basisY, 0) +
+           pos.z * getBasisComponent(basis.basisZ, 0);
+  let cy = getBasisComponent(basis.origin, 1) +
+           pos.x * getBasisComponent(basis.basisX, 1) +
+           pos.y * getBasisComponent(basis.basisY, 1) +
+           pos.z * getBasisComponent(basis.basisZ, 1);
+  let cz = getBasisComponent(basis.origin, 2) +
+           pos.x * getBasisComponent(basis.basisX, 2) +
+           pos.y * getBasisComponent(basis.basisY, 2) +
+           pos.z * getBasisComponent(basis.basisZ, 2);
+  let c3 = getBasisComponent(basis.origin, 3) +
+           pos.x * getBasisComponent(basis.basisX, 3) +
+           pos.y * getBasisComponent(basis.basisY, 3) +
+           pos.z * getBasisComponent(basis.basisZ, 3);
+  let c4 = getBasisComponent(basis.origin, 4) +
+           pos.x * getBasisComponent(basis.basisX, 4) +
+           pos.y * getBasisComponent(basis.basisY, 4) +
+           pos.z * getBasisComponent(basis.basisZ, 4);
+  let c5 = getBasisComponent(basis.origin, 5) +
+           pos.x * getBasisComponent(basis.basisX, 5) +
+           pos.y * getBasisComponent(basis.basisY, 5) +
+           pos.z * getBasisComponent(basis.basisZ, 5);
+  let c6 = getBasisComponent(basis.origin, 6) +
+           pos.x * getBasisComponent(basis.basisX, 6) +
+           pos.y * getBasisComponent(basis.basisY, 6) +
+           pos.z * getBasisComponent(basis.basisZ, 6);
 
-  let scx = cx * uniforms.scale; let scy = cy * uniforms.scale; let scz = cz * uniforms.scale;
-  let sc3 = c3 * uniforms.scale; let sc4 = c4 * uniforms.scale; let sc5 = c5 * uniforms.scale;
-  let sc6 = c6 * uniforms.scale;
-
-  var zx = scx; var zy = scy; var zz = scz;
-  var z3 = sc3; var z4 = sc4; var z5 = sc5; var z6 = sc6;
+  // Mandelbulb mode: z starts at c (sample point)
+  var zx = cx; var zy = cy; var zz = cz;
+  var z3 = c3; var z4 = c4; var z5 = c5; var z6 = c6;
 
   var dr: f32 = 1.0;
   var r: f32 = 0.0;
@@ -55,7 +82,7 @@ fn mandelbulbSDF7D(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
   let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
@@ -106,53 +133,76 @@ fn mandelbulbSDF7D(
     let p4 = p3 * s3;
     let p5 = p4 * s4;
 
-    zz = p0 * c0 + scz;
-    zx = p1 * c1 + scx;
-    zy = p2 * c2 + scy;
-    z3 = p3 * c3_ + sc3;
-    z4 = p4 * c4_ + sc4;
-    z5 = p5 * c5_ + sc5;
-    z6 = p5 * s5 + sc6;
+    zz = p0 * c0 + cz;
+    zx = p1 * c1 + cx;
+    zy = p2 * c2 + cy;
+    z3 = p3 * c3_ + c3;
+    z4 = p4 * c4_ + c4;
+    z5 = p5 * c5_ + c5;
+    z6 = p5 * s5 + c6;
 
     escIt = i;
   }
 
   let minA = sqrt(minASq);
-  let trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 + exp(-minS * 8.0) * 0.2 + f32(escIt) / f32(max(maxIt, 1)) * 0.3;
-  let dist = max(0.5 * log(max(r, EPS_7D)) * r / max(dr, EPS_7D), EPS_7D) / uniforms.scale;
+  let trap = exp(-minP * 5.0) * 0.3 +
+             exp(-minA * 3.0) * 0.2 +
+             exp(-minS * 8.0) * 0.2 +
+             f32(escIt) / f32(max(maxIt, 1)) * 0.3;
+
+  // Distance estimator (no scale division - handled by dispatch)
+  let dist = max(0.5 * log(max(r, EPS_7D)) * r / max(dr, EPS_7D), EPS_7D);
 
   return vec2f(dist, trap);
 }
 
 /**
- * 7D Mandelbulb SDF - simple version.
+ * 7D Mandelbulb SDF - simple version without trap.
  */
 fn mandelbulbSDF7D_simple(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> f32 {
-  let cx = getBasisComponent(basis.origin, 0) + pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0);
-  let cy = getBasisComponent(basis.origin, 1) + pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1);
-  let cz = getBasisComponent(basis.origin, 2) + pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2);
-  let c3 = getBasisComponent(basis.origin, 3) + pos.x * getBasisComponent(basis.basisX, 3) + pos.y * getBasisComponent(basis.basisY, 3) + pos.z * getBasisComponent(basis.basisZ, 3);
-  let c4 = getBasisComponent(basis.origin, 4) + pos.x * getBasisComponent(basis.basisX, 4) + pos.y * getBasisComponent(basis.basisY, 4) + pos.z * getBasisComponent(basis.basisZ, 4);
-  let c5 = getBasisComponent(basis.origin, 5) + pos.x * getBasisComponent(basis.basisX, 5) + pos.y * getBasisComponent(basis.basisY, 5) + pos.z * getBasisComponent(basis.basisZ, 5);
-  let c6 = getBasisComponent(basis.origin, 6) + pos.x * getBasisComponent(basis.basisX, 6) + pos.y * getBasisComponent(basis.basisY, 6) + pos.z * getBasisComponent(basis.basisZ, 6);
+  // Transform to 7D fractal space using basis vectors
+  let cx = getBasisComponent(basis.origin, 0) +
+           pos.x * getBasisComponent(basis.basisX, 0) +
+           pos.y * getBasisComponent(basis.basisY, 0) +
+           pos.z * getBasisComponent(basis.basisZ, 0);
+  let cy = getBasisComponent(basis.origin, 1) +
+           pos.x * getBasisComponent(basis.basisX, 1) +
+           pos.y * getBasisComponent(basis.basisY, 1) +
+           pos.z * getBasisComponent(basis.basisZ, 1);
+  let cz = getBasisComponent(basis.origin, 2) +
+           pos.x * getBasisComponent(basis.basisX, 2) +
+           pos.y * getBasisComponent(basis.basisY, 2) +
+           pos.z * getBasisComponent(basis.basisZ, 2);
+  let c3 = getBasisComponent(basis.origin, 3) +
+           pos.x * getBasisComponent(basis.basisX, 3) +
+           pos.y * getBasisComponent(basis.basisY, 3) +
+           pos.z * getBasisComponent(basis.basisZ, 3);
+  let c4 = getBasisComponent(basis.origin, 4) +
+           pos.x * getBasisComponent(basis.basisX, 4) +
+           pos.y * getBasisComponent(basis.basisY, 4) +
+           pos.z * getBasisComponent(basis.basisZ, 4);
+  let c5 = getBasisComponent(basis.origin, 5) +
+           pos.x * getBasisComponent(basis.basisX, 5) +
+           pos.y * getBasisComponent(basis.basisY, 5) +
+           pos.z * getBasisComponent(basis.basisZ, 5);
+  let c6 = getBasisComponent(basis.origin, 6) +
+           pos.x * getBasisComponent(basis.basisX, 6) +
+           pos.y * getBasisComponent(basis.basisY, 6) +
+           pos.z * getBasisComponent(basis.basisZ, 6);
 
-  let scx = cx * uniforms.scale; let scy = cy * uniforms.scale; let scz = cz * uniforms.scale;
-  let sc3 = c3 * uniforms.scale; let sc4 = c4 * uniforms.scale; let sc5 = c5 * uniforms.scale;
-  let sc6 = c6 * uniforms.scale;
-
-  var zx = scx; var zy = scy; var zz = scz;
-  var z3 = sc3; var z4 = sc4; var z5 = sc5; var z6 = sc6;
+  var zx = cx; var zy = cy; var zz = cz;
+  var z3 = c3; var z4 = c4; var z5 = c5; var z6 = c6;
 
   var dr: f32 = 1.0;
   var r: f32 = 0.0;
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   let phaseT = select(0.0, uniforms.phaseTheta, uniforms.phaseEnabled != 0u);
   let phaseP = select(0.0, uniforms.phasePhi, uniforms.phaseEnabled != 0u);
@@ -197,15 +247,15 @@ fn mandelbulbSDF7D_simple(
     let p4 = p3 * s3;
     let p5 = p4 * s4;
 
-    zz = p0 * c0 + scz;
-    zx = p1 * c1 + scx;
-    zy = p2 * c2 + scy;
-    z3 = p3 * c3_ + sc3;
-    z4 = p4 * c4_ + sc4;
-    z5 = p5 * c5_ + sc5;
-    z6 = p5 * s5 + sc6;
+    zz = p0 * c0 + cz;
+    zx = p1 * c1 + cx;
+    zy = p2 * c2 + cy;
+    z3 = p3 * c3_ + c3;
+    z4 = p4 * c4_ + c4;
+    z5 = p5 * c5_ + c5;
+    z6 = p5 * s5 + c6;
   }
 
-  return max(0.5 * log(max(r, EPS_7D)) * r / max(dr, EPS_7D), EPS_7D) / uniforms.scale;
+  return max(0.5 * log(max(r, EPS_7D)) * r / max(dr, EPS_7D), EPS_7D);
 }
 `

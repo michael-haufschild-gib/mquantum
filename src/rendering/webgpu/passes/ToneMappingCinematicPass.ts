@@ -361,6 +361,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -418,6 +419,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   /**
    * Set tone mapping algorithm.
+   * @param mode
    */
   setToneMapping(mode: ToneMappingMode): void {
     this.toneMapping = mode
@@ -425,6 +427,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   /**
    * Set exposure value.
+   * @param value
    */
   setExposure(value: number): void {
     this.exposure = value
@@ -432,6 +435,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   /**
    * Set chromatic aberration intensity.
+   * @param value
    */
   setAberration(value: number): void {
     this.aberration = value
@@ -439,6 +443,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   /**
    * Set vignette darkness.
+   * @param value
    */
   setVignette(value: number): void {
     this.vignette = value
@@ -446,6 +451,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   /**
    * Set film grain intensity.
+   * @param value
    */
   setGrain(value: number): void {
     this.grain = value
@@ -461,8 +467,63 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     }
   }
 
+
+  /**
+   * Update pass properties from Zustand stores.
+   * @param ctx
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const lighting = ctx.frame?.stores?.['lighting'] as {
+      exposure?: number
+      toneMappingAlgorithm?: string
+    }
+    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
+      tonemappingMode?: number
+      cinematicVignette?: number
+      cinematicAberration?: number
+      cinematicGrain?: number
+    }
+
+    // Exposure from lighting store
+    if (lighting?.exposure !== undefined) {
+      this.exposure = lighting.exposure
+    }
+
+    // Tonemapping mode - can come from postProcessing store (as number)
+    // or from lighting store (as string algorithm name)
+    if (postProcessing?.tonemappingMode !== undefined) {
+      this.toneMapping = postProcessing.tonemappingMode
+    } else if (lighting?.toneMappingAlgorithm !== undefined) {
+      // Map string algorithm name to ToneMappingMode enum
+      const algorithmMap: Record<string, ToneMappingMode> = {
+        linear: ToneMappingMode.Linear,
+        reinhard: ToneMappingMode.Reinhard,
+        cineon: ToneMappingMode.Cineon,
+        aces: ToneMappingMode.ACESFilmic,
+        agx: ToneMappingMode.AgX,
+        neutral: ToneMappingMode.Neutral,
+      }
+      const mode = algorithmMap[lighting.toneMappingAlgorithm]
+      if (mode !== undefined) {
+        this.toneMapping = mode
+      }
+    }
+
+    // Cinematic effects from postProcessing store
+    if (postProcessing?.cinematicVignette !== undefined) {
+      this.vignette = postProcessing.cinematicVignette
+    }
+    if (postProcessing?.cinematicAberration !== undefined) {
+      this.aberration = postProcessing.cinematicAberration
+    }
+    if (postProcessing?.cinematicGrain !== undefined) {
+      this.grain = postProcessing.cinematicGrain
+    }
+  }
+
   /**
    * Execute the combined tone mapping + cinematic pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -474,6 +535,9 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     ) {
       return
     }
+
+    // Update from stores
+    this.updateFromStores(ctx)
 
     // Get input texture
     const colorView = ctx.getTextureView(this.passConfig.colorInput)

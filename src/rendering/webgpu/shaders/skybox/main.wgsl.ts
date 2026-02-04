@@ -76,6 +76,7 @@ fn main(input: VertexOutput) -> FragmentOutput {
 /**
  * Generate the vertex shader main function
  * @param effects - Which effects are enabled (determines which varyings are needed)
+ * @param effects.vignette
  * @returns WGSL vertex shader main function
  */
 export function generateVertexMain(effects: { vignette: boolean }): string {

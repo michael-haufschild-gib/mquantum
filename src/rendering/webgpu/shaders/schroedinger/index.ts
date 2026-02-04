@@ -91,5 +91,13 @@ export { sdf3dBlock, sdfHighDBlock } from './sdf'
 // Volume rendering modules
 export { emissionBlock } from './volume'
 
-// Temporal accumulation modules
-export { temporalCloudUniformsBlock } from './temporal'
+// Compute shader modules for density grid pre-computation
+export {
+  gridParamsBlock,
+  densityGridBindingsBlock,
+  densityGridComputeBlock,
+  densityGridWithPhaseComputeBlock,
+  composeDensityGridComputeShader,
+  type DensityGridComputeConfig,
+  type ComputeQuantumMode,
+} from './compute'

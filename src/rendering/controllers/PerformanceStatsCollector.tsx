@@ -130,6 +130,7 @@ export function PerformanceStatsCollector() {
 
     /**
      * Gets bytes per pixel based on texture type
+     * @param tex
      */
     const getBytesPerPixel = (tex: THREE.Texture): number => {
       const type = tex.type
@@ -145,6 +146,7 @@ export function PerformanceStatsCollector() {
 
     /**
      * Calculates texture memory from a texture instance
+     * @param tex
      */
     const addTextureMemory = (tex: THREE.Texture) => {
       if (countedTextures.has(tex.uuid)) return

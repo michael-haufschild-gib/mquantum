@@ -13,6 +13,7 @@ export const createMandelbulbSlice: StateCreator<ExtendedObjectSlice, [], [], Ma
   /**
    * Wrapped setter that auto-increments mandelbulbVersion on any mandelbulb change.
    * This avoids manually adding version increment to 40+ individual setters.
+   * @param updater
    */
   const setWithVersion: typeof set = (updater) => {
     set((state) => {

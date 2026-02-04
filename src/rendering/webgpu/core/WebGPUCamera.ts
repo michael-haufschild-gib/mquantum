@@ -56,6 +56,9 @@ export interface WebGPUCameraMatrices {
 /**
  * Create a look-at view matrix (column-major).
  * Transforms from world space to camera/view space.
+ * @param eye
+ * @param target
+ * @param up
  */
 function createLookAtMatrix(
   eye: [number, number, number],
@@ -174,6 +177,8 @@ function createPerspectiveMatrix(
 
 /**
  * Multiply two 4x4 matrices (column-major): result = a * b
+ * @param a
+ * @param b
  */
 function multiplyMat4(a: Float32Array, b: Float32Array): Float32Array {
   const result = new Float32Array(16)
@@ -194,6 +199,7 @@ function multiplyMat4(a: Float32Array, b: Float32Array): Float32Array {
 /**
  * Invert a 4x4 matrix (column-major).
  * Returns identity matrix if singular.
+ * @param m
  */
 function invertMat4(m: Float32Array): Float32Array {
   const inv = new Float32Array(16)
@@ -282,6 +288,9 @@ export class WebGPUCamera {
 
   /**
    * Set camera position.
+   * @param x
+   * @param y
+   * @param z
    */
   setPosition(x: number, y: number, z: number): void {
     this.state.position = [x, y, z]
@@ -290,6 +299,9 @@ export class WebGPUCamera {
 
   /**
    * Set look-at target.
+   * @param x
+   * @param y
+   * @param z
    */
   setTarget(x: number, y: number, z: number): void {
     this.state.target = [x, y, z]
@@ -298,6 +310,7 @@ export class WebGPUCamera {
 
   /**
    * Set field of view in degrees.
+   * @param fov
    */
   setFov(fov: number): void {
     this.state.fov = fov
@@ -306,6 +319,7 @@ export class WebGPUCamera {
 
   /**
    * Set aspect ratio (width / height).
+   * @param aspect
    */
   setAspect(aspect: number): void {
     this.state.aspect = aspect
@@ -314,6 +328,8 @@ export class WebGPUCamera {
 
   /**
    * Set near/far clipping planes.
+   * @param near
+   * @param far
    */
   setClippingPlanes(near: number, far: number): void {
     this.state.near = near

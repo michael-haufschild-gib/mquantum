@@ -29,11 +29,7 @@ export const psiBlock = /* wgsl */ `
 // ============================================
 // Wavefunction Evaluation (Mode-Switching)
 // ============================================
-
-// Quantum mode constants
-const QUANTUM_MODE_HARMONIC: i32 = 0;
-const QUANTUM_MODE_HYDROGEN: i32 = 1;
-const QUANTUM_MODE_HYDROGEN_ND: i32 = 2;
+// Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
 
 // ----------------------------------------
 // Harmonic Oscillator Mode Evaluation (Dynamic Loop)
@@ -80,7 +76,7 @@ fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f
     // Hydrogen orbital mode - use first 3 dimensions as Cartesian
     let pos = vec3f(xND[0], xND[1], xND[2]);
     return evalHydrogenPsiTime(pos, uniforms.principalN, uniforms.azimuthalL, uniforms.magneticM,
-                               uniforms.bohrRadius, uniforms.useRealOrbitals, t, uniforms);
+                               uniforms.bohrRadius, uniforms.useRealOrbitals != 0u, t, uniforms);
   }
 
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
@@ -106,7 +102,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
     let pos = vec3f(xND[0], xND[1], xND[2]);
     let psi = evalHydrogenPsi(pos, uniforms.principalN, uniforms.azimuthalL, uniforms.magneticM,
-                              uniforms.bohrRadius, uniforms.useRealOrbitals, uniforms);
+                              uniforms.bohrRadius, uniforms.useRealOrbitals != 0u, uniforms);
     return atan2(psi.y, psi.x);
   }
 
@@ -139,7 +135,7 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
     let pos = vec3f(xND[0], xND[1], xND[2]);
     let result = evalHydrogenPsiWithPhase(pos, uniforms.principalN, uniforms.azimuthalL, uniforms.magneticM,
-                                          uniforms.bohrRadius, uniforms.useRealOrbitals, t, uniforms);
+                                          uniforms.bohrRadius, uniforms.useRealOrbitals != 0u, t, uniforms);
     return vec4f(result.xy, result.z, 0.0);
   }
 
@@ -152,10 +148,10 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
 
     // Phase animation: compute time-dependent phase rotation when enabled
     var outputPhase = spatialPhase;
-    if (uniforms.phaseAnimationEnabled) {
+    if (uniforms.phaseAnimationEnabled != 0u) {
       // Use simplified hydrogen energy (extra dimension contributions are small)
-      let fn = f32(uniforms.principalN);
-      let E = -0.5 / (fn * fn);
+      let nf = f32(uniforms.principalN);
+      let E = -0.5 / (nf * nf);
 
       // phase(t) = phase_spatial - E * t
       outputPhase = spatialPhase - E * t;
@@ -204,12 +200,7 @@ export const psiBlockDynamic = /* wgsl */ `
 // Wavefunction Evaluation (Mode-Switching)
 // HO functions provided by unrolled dispatch block
 // ============================================
-
-// Quantum mode constants
-const QUANTUM_MODE_HARMONIC: i32 = 0;
-const QUANTUM_MODE_HYDROGEN: i32 = 1;
-const QUANTUM_MODE_HYDROGEN_ND: i32 = 2;
-
+// Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
 // Note: evalHarmonicOscillatorPsi is provided by HO Dispatch (Unrolled) block
 
 // ----------------------------------------
@@ -221,7 +212,7 @@ fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
     let pos = vec3f(xND[0], xND[1], xND[2]);
     return evalHydrogenPsiTime(pos, uniforms.principalN, uniforms.azimuthalL, uniforms.magneticM,
-                               uniforms.bohrRadius, uniforms.useRealOrbitals, t, uniforms);
+                               uniforms.bohrRadius, uniforms.useRealOrbitals != 0u, t, uniforms);
   }
 
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
@@ -244,7 +235,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
     let pos = vec3f(xND[0], xND[1], xND[2]);
     let psi = evalHydrogenPsi(pos, uniforms.principalN, uniforms.azimuthalL, uniforms.magneticM,
-                              uniforms.bohrRadius, uniforms.useRealOrbitals, uniforms);
+                              uniforms.bohrRadius, uniforms.useRealOrbitals != 0u, uniforms);
     return atan2(psi.y, psi.x);
   }
 
@@ -263,7 +254,7 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
     let pos = vec3f(xND[0], xND[1], xND[2]);
     let result = evalHydrogenPsiWithPhase(pos, uniforms.principalN, uniforms.azimuthalL, uniforms.magneticM,
-                                          uniforms.bohrRadius, uniforms.useRealOrbitals, t, uniforms);
+                                          uniforms.bohrRadius, uniforms.useRealOrbitals != 0u, t, uniforms);
     return vec4f(result.xy, result.z, 0.0);
   }
 
@@ -271,9 +262,9 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     let psiSpatial = hydrogenNDOptimized(xND, 0.0, uniforms);
     let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
     var outputPhase = spatialPhase;
-    if (uniforms.phaseAnimationEnabled) {
-      let fn = f32(uniforms.principalN);
-      let E = -0.5 / (fn * fn);
+    if (uniforms.phaseAnimationEnabled != 0u) {
+      let nf = f32(uniforms.principalN);
+      let E = -0.5 / (nf * nf);
       outputPhase = spatialPhase - E * t;
     }
     return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, 0.0);

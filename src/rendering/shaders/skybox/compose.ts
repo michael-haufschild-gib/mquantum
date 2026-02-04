@@ -122,6 +122,7 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig) {
  * Firefox warning: "Output of vertex shader not read by fragment shader"
  *
  * @param effects - Which effects are enabled (determines which varyings are needed)
+ * @param effects.vignette
  * @returns GLSL vertex shader code string for skybox rendering
  */
 export function composeSkyboxVertexShader(effects: { vignette: boolean }) {

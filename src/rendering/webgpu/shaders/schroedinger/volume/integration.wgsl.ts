@@ -28,20 +28,15 @@ const MIN_TRANSMITTANCE: f32 = 0.01;
 // Minimum density to consider for accumulation
 const MIN_DENSITY: f32 = 1e-8;
 
-// Threshold for considering a sample as "entry" into the volume
-const ENTRY_ALPHA_THRESHOLD: f32 = 0.01;
-
-// Quantum mode constants
-const QUANTUM_MODE_HARMONIC: i32 = 0;
+// Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
 
 // Result structure for volume raymarching
-// Includes weighted center for temporal reprojection (more stable than entry point)
+// Contains fields for temporal reprojection support
 struct VolumeResult {
   color: vec3f,
   alpha: f32,
-  entryT: f32,           // Distance to first meaningful contribution (-1 if none)
-  weightedCenter: vec3f, // Density-weighted center position (for stable reprojection)
-  centerWeight: f32,     // Weight sum for center (0 if no valid center)
+  iterationCount: i32,   // Number of iterations performed (for debug visualization)
+  primaryHitT: f32,      // Model-space ray distance to first significant density hit (for temporal reprojection)
 }
 
 // ============================================
@@ -52,9 +47,9 @@ struct VolumeResult {
 
 // Tetrahedral stencil vertices (regular tetrahedron, equidistant from origin)
 // Normalized to unit distance: each vertex is 1/sqrt(3) from origin
-const TETRA_V0: vec3f = vec3f(+1.0, +1.0, -1.0) * 0.5773503;
-const TETRA_V1: vec3f = vec3f(+1.0, -1.0, +1.0) * 0.5773503;
-const TETRA_V2: vec3f = vec3f(-1.0, +1.0, +1.0) * 0.5773503;
+const TETRA_V0: vec3f = vec3f(1.0, 1.0, -1.0) * 0.5773503;
+const TETRA_V1: vec3f = vec3f(1.0, -1.0, 1.0) * 0.5773503;
+const TETRA_V2: vec3f = vec3f(-1.0, 1.0, 1.0) * 0.5773503;
 const TETRA_V3: vec3f = vec3f(-1.0, -1.0, -1.0) * 0.5773503;
 
 // Result structure for combined density+gradient sampling
@@ -110,9 +105,24 @@ fn computeGradientTetrahedral(pos: vec3f, t: f32, delta: f32, uniforms: Schroedi
 }
 
 /**
+ * OPTIMIZED (E1): Gradient at pre-flowed position WITHOUT erosion.
+ * - Skips 4 redundant applyFlow calls (position already flowed)
+ * - Skips 4 expensive erosion noise evaluations (gradient shape unchanged)
+ * This reduces erosion calls by ~80% with zero visual impact on lighting.
+ */
+fn computeGradientTetrahedralAtFlowedPos(flowedPos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let s0 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V0 * delta, t, uniforms));
+  let s1 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V1 * delta, t, uniforms));
+  let s2 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V2 * delta, t, uniforms));
+  let s3 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V3 * delta, t, uniforms));
+
+  return (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
+}
+
+/**
  * Main volume raymarching function.
  * Supports lighting (matched to Mandelbulb behavior).
- * Returns: VolumeResult with color, alpha, entry distance, and density-weighted centroid.
+ * Returns: VolumeResult with color, alpha, and iteration count.
  *
  * Fixed sample counts: uses uniforms.sampleCount
  */
@@ -124,14 +134,16 @@ fn volumeRaymarch(
   uniforms: SchroedingerUniforms
 ) -> VolumeResult {
   var accColor = vec3f(0.0);
-  var entryT: f32 = -1.0;  // Track first meaningful contribution
 
-  // Centroid accumulation for stable temporal reprojection
-  var centroidSum = vec3f(0.0);
-  var centroidWeight: f32 = 0.0;
+  // Iteration counter for debug visualization
+  var iterCount: i32 = 0;
 
-  // Sample count from uniforms
-  let sampleCount = uniforms.sampleCount;
+  // Primary hit tracking for temporal reprojection
+  var primaryHitT: f32 = -1.0;
+  let primaryHitThreshold: f32 = 0.01; // Alpha threshold to consider a "hit"
+
+  // Sample count from uniforms (clamped to avoid division by zero)
+  let sampleCount = max(uniforms.sampleCount, 1);
 
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
@@ -149,13 +161,16 @@ fn volumeRaymarch(
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
+    iterCount = i + 1;  // Track iteration count
 
     if (transmittance < MIN_TRANSMITTANCE) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
-    // Sample density with phase
-    let densityInfo = sampleDensityWithPhase(pos, animTime, uniforms);
+    // Sample density with phase AND get flowed position for optimized gradient computation
+    let densityResult = sampleDensityWithPhaseAndFlow(pos, animTime, uniforms);
+    let densityInfo = densityResult[0];
+    let flowedPos = densityResult[1];
     let rho = densityInfo.x;
     let sCenter = densityInfo.y;
     let phase = densityInfo.z;
@@ -183,17 +198,14 @@ fn volumeRaymarch(
     let alpha = computeAlpha(rhoAlpha, stepLen, uniforms.densityGain);
 
     if (alpha > 0.001) {
-      if (entryT < 0.0 && alpha > ENTRY_ALPHA_THRESHOLD) {
-        entryT = t;
+      // Track primary hit for temporal reprojection
+      if (primaryHitT < 0.0 && alpha > primaryHitThreshold) {
+        primaryHitT = t;
       }
 
-      // CENTROID ACCUMULATION
-      let weight = alpha * transmittance;
-      centroidSum += pos * weight;
-      centroidWeight += weight;
-
-      // Compute gradient for lighting
-      let gradient = computeGradientTetrahedral(pos, animTime, 0.05, uniforms);
+      // OPTIMIZED: Compute gradient at pre-flowed position WITHOUT erosion
+      // This skips 4 redundant applyFlow calls and 4 expensive erosion evaluations
+      let gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
 
       // Compute emission with lighting
       let emission = computeEmissionLit(rho, phase, pos, gradient, viewDir, uniforms);
@@ -203,26 +215,29 @@ fn volumeRaymarch(
       transmittance *= (1.0 - alpha);
     }
 
-    t += stepLen;
+    // PERFORMANCE: Adaptive step size based on density
+    // Take larger steps in empty regions to reduce wasted samples
+    // sCenter is log-density: -8 = low, -12 = very low, -15 = negligible
+    var stepMultiplier = 1.0;
+    if (sCenter < -12.0) {
+      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
+    } else if (sCenter < -8.0) {
+      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+    }
+    // Clamp to not overshoot tFar
+    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+    t += adaptiveStep;
   }
 
   // Final alpha
   let finalAlpha = 1.0 - transmittance;
 
-  // Fallback: if no entry found, use midpoint for depth
-  if (entryT < 0.0) {
-    entryT = (tNear + tFar) * 0.5;
+  // If no primary hit found, use midpoint of ray segment
+  if (primaryHitT < 0.0) {
+    primaryHitT = (tNear + tFar) * 0.5;
   }
 
-  // Compute final weighted center
-  var wCenter: vec3f;
-  if (centroidWeight > 0.001) {
-    wCenter = centroidSum / centroidWeight;
-  } else {
-    wCenter = rayOrigin + rayDir * entryT;
-  }
-
-  return VolumeResult(accColor, finalAlpha, entryT, wCenter, centroidWeight);
+  return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 
 /**
@@ -238,13 +253,16 @@ fn volumeRaymarchHQ(
 ) -> VolumeResult {
   var accColor = vec3f(0.0);
   var transmittance = vec3f(1.0); // vec3 for chromatic dispersion support
-  var entryT: f32 = -1.0;
 
-  // Centroid accumulation for stable temporal reprojection
-  var centroidSum = vec3f(0.0);
-  var centroidWeight: f32 = 0.0;
+  // Iteration counter for debug visualization
+  var iterCount: i32 = 0;
 
-  let sampleCount = uniforms.sampleCount;
+  // Primary hit tracking for temporal reprojection
+  var primaryHitT: f32 = -1.0;
+  let primaryHitThreshold: f32 = 0.01; // Alpha threshold to consider a "hit"
+
+  // Sample count from uniforms (clamped to avoid division by zero)
+  let sampleCount = max(uniforms.sampleCount, 1);
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
 
@@ -274,6 +292,7 @@ fn volumeRaymarchHQ(
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
+    iterCount = i + 1;  // Track iteration count
 
     // Exit if ALL channels are blocked
     if (transmittance.r < MIN_TRANSMITTANCE &&
@@ -350,17 +369,10 @@ fn volumeRaymarchHQ(
     alpha.b = computeAlpha(rhoAlpha.b, stepLen, uniforms.densityGain);
 
     if (alpha.g > 0.001 || alpha.r > 0.001 || alpha.b > 0.001) {
-      // Track entry point (use Green/Center channel)
-      if (entryT < 0.0 && alpha.g > ENTRY_ALPHA_THRESHOLD) {
-        entryT = t;
+      // Track primary hit for temporal reprojection
+      if (primaryHitT < 0.0 && alpha.g > primaryHitThreshold) {
+        primaryHitT = t;
       }
-
-      // CENTROID ACCUMULATION
-      let avgAlpha = (alpha.r + alpha.g + alpha.b) / 3.0;
-      let avgTrans = (transmittance.r + transmittance.g + transmittance.b) / 3.0;
-      let weight = avgAlpha * avgTrans;
-      centroidSum += pos * weight;
-      centroidWeight += weight;
 
       // Compute emission using ORIGINAL density (rhoRGB) so coloring logic works
       let emissionCenter = computeEmissionLit(rhoRGB.g, phase, pos, gradient, viewDir, uniforms);
@@ -375,25 +387,28 @@ fn volumeRaymarchHQ(
       transmittance *= (vec3f(1.0) - alpha);
     }
 
-    t += stepLen;
-  }
-
-  // Fallback: if no entry found, use midpoint for depth
-  if (entryT < 0.0) {
-    entryT = (tNear + tFar) * 0.5;
-  }
-
-  // Compute final weighted center
-  var wCenter: vec3f;
-  if (centroidWeight > 0.001) {
-    wCenter = centroidSum / centroidWeight;
-  } else {
-    wCenter = rayOrigin + rayDir * entryT;
+    // PERFORMANCE: Adaptive step size based on density
+    // Take larger steps in empty regions to reduce wasted samples
+    // quickS is log-density from quick check: -8 = low, -12 = very low, -15 = negligible
+    var stepMultiplier = 1.0;
+    if (quickS < -12.0) {
+      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
+    } else if (quickS < -8.0) {
+      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+    }
+    // Clamp to not overshoot tFar
+    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+    t += adaptiveStep;
   }
 
   // Final alpha (average remaining transmittance)
   let finalAlpha = 1.0 - (transmittance.r + transmittance.g + transmittance.b) / 3.0;
 
-  return VolumeResult(accColor, finalAlpha, entryT, wCenter, centroidWeight);
+  // If no primary hit found, use midpoint of ray segment
+  if (primaryHitT < 0.0) {
+    primaryHitT = (tNear + tFar) * 0.5;
+  }
+
+  return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
 }
 `

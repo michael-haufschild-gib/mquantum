@@ -1,0 +1,1212 @@
+{
+  "verified_imports": [
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 10,
+      "import": "WebGPUBasePass",
+      "from": "../core/WebGPUBasePass",
+      "status": "VERIFIED",
+      "evidence": "Found: export abstract class WebGPUBasePass at src/rendering/webgpu/core/WebGPUBasePass.ts:30"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 11,
+      "import": "WebGPURenderContext",
+      "from": "../core/types",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WebGPURenderContext at src/rendering/webgpu/core/types.ts:254"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 11,
+      "import": "WebGPUSetupContext",
+      "from": "../core/types",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WebGPUSetupContext at src/rendering/webgpu/core/types.ts:239"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 12,
+      "import": "composeSchroedingerShader",
+      "from": "../shaders/schroedinger/compose",
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeSchroedingerShader at src/rendering/webgpu/shaders/schroedinger/compose.ts:158"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 14,
+      "import": "composeSchroedingerVertexShader",
+      "from": "../shaders/schroedinger/compose",
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeSchroedingerVertexShader at src/rendering/webgpu/shaders/schroedinger/compose.ts:519"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 15,
+      "import": "SchroedingerWGSLShaderConfig",
+      "from": "../shaders/schroedinger/compose",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface SchroedingerWGSLShaderConfig at src/rendering/webgpu/shaders/schroedinger/compose.ts:133"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 16,
+      "import": "QuantumModeForShader",
+      "from": "../shaders/schroedinger/compose",
+      "status": "VERIFIED",
+      "evidence": "Found: export type QuantumModeForShader at src/rendering/webgpu/shaders/schroedinger/compose.ts:128"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 18,
+      "import": "MAX_DIM",
+      "from": "../shaders/schroedinger/uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const MAX_DIM at src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts:14"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 18,
+      "import": "MAX_TERMS",
+      "from": "../shaders/schroedinger/uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const MAX_TERMS at src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts:15"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 18,
+      "import": "MAX_EXTRA_DIM",
+      "from": "../shaders/schroedinger/uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const MAX_EXTRA_DIM at src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts:16"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 20,
+      "import": "generateQuantumPreset",
+      "from": "@/lib/geometry/extended/schroedinger/presets",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateQuantumPreset at src/lib/geometry/extended/schroedinger/presets.ts:66"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 21,
+      "import": "getNamedPreset",
+      "from": "@/lib/geometry/extended/schroedinger/presets",
+      "status": "VERIFIED",
+      "evidence": "Found: export function getNamedPreset at src/lib/geometry/extended/schroedinger/presets.ts:233"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 22,
+      "import": "flattenPresetForUniforms",
+      "from": "@/lib/geometry/extended/schroedinger/presets",
+      "status": "VERIFIED",
+      "evidence": "Found: export function flattenPresetForUniforms at src/lib/geometry/extended/schroedinger/presets.ts:268"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 23,
+      "import": "QuantumPreset",
+      "from": "@/lib/geometry/extended/schroedinger/presets",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface QuantumPreset at src/lib/geometry/extended/schroedinger/presets.ts:16"
+    },
+    {
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "line": 25,
+      "import": "DensityGridComputePass",
+      "from": "../passes/DensityGridComputePass",
+      "status": "VERIFIED",
+      "evidence": "Found: export class DensityGridComputePass at src/rendering/webgpu/passes/DensityGridComputePass.ts:54"
+    },
+    {
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "line": 16,
+      "import": "WebGPUBaseComputePass",
+      "from": "../core/WebGPUBasePass",
+      "status": "VERIFIED",
+      "evidence": "Found: export abstract class WebGPUBaseComputePass at src/rendering/webgpu/core/WebGPUBasePass.ts:375"
+    },
+    {
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "line": 17,
+      "import": "WebGPURenderContext",
+      "from": "../core/types",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WebGPURenderContext at src/rendering/webgpu/core/types.ts:254"
+    },
+    {
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "line": 17,
+      "import": "WebGPUSetupContext",
+      "from": "../core/types",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WebGPUSetupContext at src/rendering/webgpu/core/types.ts:239"
+    },
+    {
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "line": 18,
+      "import": "composeDensityGridComputeShader",
+      "from": "../shaders/schroedinger/compute/compose",
+      "status": "VERIFIED",
+      "evidence": "Found: export function composeDensityGridComputeShader at src/rendering/webgpu/shaders/schroedinger/compute/compose.ts:96"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 17,
+      "import": "assembleShaderBlocks",
+      "from": "../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export function assembleShaderBlocks at src/rendering/webgpu/shaders/shared/compose-helpers.ts:104"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 19,
+      "import": "generateConsolidatedBindGroups",
+      "from": "../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateConsolidatedBindGroups at src/rendering/webgpu/shaders/shared/compose-helpers.ts:230"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 20,
+      "import": "generateObjectBindGroup",
+      "from": "../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateObjectBindGroup at src/rendering/webgpu/shaders/shared/compose-helpers.ts:249"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 21,
+      "import": "generateTextureBindings",
+      "from": "../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateTextureBindings at src/rendering/webgpu/shaders/shared/compose-helpers.ts:266"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 22,
+      "import": "mrtOutputBlock",
+      "from": "../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export const mrtOutputBlock at src/rendering/webgpu/shaders/shared/compose-helpers.ts:186"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 23,
+      "import": "WGSLShaderConfig",
+      "from": "../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export interface WGSLShaderConfig at src/rendering/webgpu/shaders/shared/compose-helpers.ts:25"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 27,
+      "import": "constantsBlock",
+      "from": "../shared/core/constants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const constantsBlock at src/rendering/webgpu/shaders/shared/core/constants.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 28,
+      "import": "uniformsBlock",
+      "from": "../shared/core/uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const uniformsBlock at src/rendering/webgpu/shaders/shared/core/uniforms.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 31,
+      "import": "cosinePaletteBlock",
+      "from": "../shared/color/cosine-palette.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const cosinePaletteBlock at src/rendering/webgpu/shaders/shared/color/cosine-palette.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 32,
+      "import": "hslBlock",
+      "from": "../shared/color/hsl.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hslBlock at src/rendering/webgpu/shaders/shared/color/hsl.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 33,
+      "import": "oklabBlock",
+      "from": "../shared/color/oklab.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const oklabBlock at src/rendering/webgpu/shaders/shared/color/oklab.wgsl.ts:13"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 34,
+      "import": "selectorBlock",
+      "from": "../shared/color/selector.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const selectorBlock at src/rendering/webgpu/shaders/shared/color/selector.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 36,
+      "import": "generateColorSelectorBlock",
+      "from": "../shared/color/selectorVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateColorSelectorBlock at src/rendering/webgpu/shaders/shared/color/selectorVariants.wgsl.ts:29"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 37,
+      "import": "getColorModuleDependencies",
+      "from": "../shared/color/selectorVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function getColorModuleDependencies at src/rendering/webgpu/shaders/shared/color/selectorVariants.wgsl.ts:206"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 41,
+      "import": "ggxBlock",
+      "from": "../shared/lighting/ggx.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const ggxBlock at src/rendering/webgpu/shaders/shared/lighting/ggx.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 42,
+      "import": "iblBlock",
+      "from": "../shared/lighting/ibl.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const iblBlock at src/rendering/webgpu/shaders/shared/lighting/ibl.wgsl.ts:208"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 42,
+      "import": "iblUniformsBlock",
+      "from": "../shared/lighting/ibl.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const iblUniformsBlock at src/rendering/webgpu/shaders/shared/lighting/ibl.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 42,
+      "import": "pmremSamplingBlock",
+      "from": "../shared/lighting/ibl.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const pmremSamplingBlock at src/rendering/webgpu/shaders/shared/lighting/ibl.wgsl.ts:24"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 43,
+      "import": "multiLightBlock",
+      "from": "../shared/lighting/multi-light.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const multiLightBlock at src/rendering/webgpu/shaders/shared/lighting/multi-light.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 46,
+      "import": "sphereIntersectBlock",
+      "from": "../shared/raymarch/sphere-intersect.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sphereIntersectBlock at src/rendering/webgpu/shaders/shared/raymarch/sphere-intersect.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 49,
+      "import": "temporalBlock",
+      "from": "../shared/features/temporal.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const temporalBlock at src/rendering/webgpu/shaders/shared/features/temporal.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 52,
+      "import": "schroedingerUniformsBlock",
+      "from": "./uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const schroedingerUniformsBlock at src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts:18"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 54,
+      "import": "mainBlock",
+      "from": "./main.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const mainBlock at src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts:26"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 55,
+      "import": "generateMainBlockIsosurface",
+      "from": "./main.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateMainBlockIsosurface at src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts:114"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 56,
+      "import": "generateMainBlockTemporal",
+      "from": "./main.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateMainBlockTemporal at src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts:387"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 57,
+      "import": "temporalMRTOutputBlock",
+      "from": "./main.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const temporalMRTOutputBlock at src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts:365"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 61,
+      "import": "complexMathBlock",
+      "from": "./quantum/complex.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const complexMathBlock at src/rendering/webgpu/shaders/schroedinger/quantum/complex.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 62,
+      "import": "hermiteBlock",
+      "from": "./quantum/hermite.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hermiteBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hermite.wgsl.ts:14"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 63,
+      "import": "ho1dBlock",
+      "from": "./quantum/ho1d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const ho1dBlock at src/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 65,
+      "import": "hoND3dBlock",
+      "from": "./quantum/hoNDVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hoND3dBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hoNDVariants.wgsl.ts:90"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 74,
+      "import": "generateHoNDDispatchBlock",
+      "from": "./quantum/hoNDVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateHoNDDispatchBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hoNDVariants.wgsl.ts:107"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 77,
+      "import": "getHOUnrolledBlocks",
+      "from": "./quantum/hoSuperpositionVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function getHOUnrolledBlocks at src/rendering/webgpu/shaders/schroedinger/quantum/hoSuperpositionVariants.wgsl.ts:158"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 78,
+      "import": "generateHODispatchBlock",
+      "from": "./quantum/hoSuperpositionVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateHODispatchBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hoSuperpositionVariants.wgsl.ts:207"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 80,
+      "import": "psiBlock",
+      "from": "./quantum/psi.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const psiBlock at src/rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl.ts:28"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 80,
+      "import": "psiBlockDynamic",
+      "from": "./quantum/psi.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const psiBlockDynamic at src/rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl.ts:198"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 81,
+      "import": "densityPreMapBlock",
+      "from": "./quantum/density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityPreMapBlock at src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts:19"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 81,
+      "import": "generateMapPosToND",
+      "from": "./quantum/density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateMapPosToND at src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts:191"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 81,
+      "import": "densityPostMapBlock",
+      "from": "./quantum/density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityPostMapBlock at src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts:234"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 84,
+      "import": "laguerreBlock",
+      "from": "./quantum/laguerre.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const laguerreBlock at src/rendering/webgpu/shaders/schroedinger/quantum/laguerre.wgsl.ts:13"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 85,
+      "import": "legendreBlock",
+      "from": "./quantum/legendre.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const legendreBlock at src/rendering/webgpu/shaders/schroedinger/quantum/legendre.wgsl.ts:13"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 86,
+      "import": "sphericalHarmonicsBlock",
+      "from": "./quantum/sphericalHarmonics.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sphericalHarmonicsBlock at src/rendering/webgpu/shaders/schroedinger/quantum/sphericalHarmonics.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 87,
+      "import": "hydrogenRadialBlock",
+      "from": "./quantum/hydrogenRadial.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hydrogenRadialBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenRadial.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 88,
+      "import": "hydrogenPsiBlock",
+      "from": "./quantum/hydrogenPsi.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hydrogenPsiBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenPsi.wgsl.ts:13"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 89,
+      "import": "hydrogenNDCommonBlock",
+      "from": "./quantum/hydrogenNDCommon.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hydrogenNDCommonBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDCommon.wgsl.ts:14"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 91,
+      "import": "hydrogenNDGen3dBlock",
+      "from": "./quantum/hydrogenNDVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hydrogenNDGen3dBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDVariants.wgsl.ts:219"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 100,
+      "import": "generateHydrogenNDDispatchBlock",
+      "from": "./quantum/hydrogenNDVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export function generateHydrogenNDDispatchBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDVariants.wgsl.ts:201"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 104,
+      "import": "sdf3dBlock",
+      "from": "./sdf/sdf3d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf3dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf3d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 105,
+      "import": "sdf4dBlock",
+      "from": "./sdf/sdf4d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf4dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf4d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 106,
+      "import": "sdf5dBlock",
+      "from": "./sdf/sdf5d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf5dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf5d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 107,
+      "import": "sdf6dBlock",
+      "from": "./sdf/sdf6d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf6dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf6d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 108,
+      "import": "sdf7dBlock",
+      "from": "./sdf/sdf7d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf7dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf7d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 109,
+      "import": "sdf8dBlock",
+      "from": "./sdf/sdf8d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf8dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf8d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 110,
+      "import": "sdf9dBlock",
+      "from": "./sdf/sdf9d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf9dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf9d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 111,
+      "import": "sdf10dBlock",
+      "from": "./sdf/sdf10d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf10dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf10d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 112,
+      "import": "sdf11dBlock",
+      "from": "./sdf/sdf11d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdf11dBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf11d.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 113,
+      "import": "sdfHighDBlock",
+      "from": "./sdf/sdf-high-d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const sdfHighDBlock at src/rendering/webgpu/shaders/schroedinger/sdf/sdf-high-d.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 116,
+      "import": "absorptionBlock",
+      "from": "./volume/absorption.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const absorptionBlock at src/rendering/webgpu/shaders/schroedinger/volume/absorption.wgsl.ts:23"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 117,
+      "import": "emissionBlock",
+      "from": "./volume/emission.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const emissionBlock at src/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl.ts:16"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 118,
+      "import": "volumeIntegrationBlock",
+      "from": "./volume/integration.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const volumeIntegrationBlock at src/rendering/webgpu/shaders/schroedinger/volume/integration.wgsl.ts:17"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 120,
+      "import": "densityGridBindingsBlock",
+      "from": "./volume/densityGridSampling.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityGridBindingsBlock at src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts:32"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 121,
+      "import": "densityGridSamplingBlock",
+      "from": "./volume/densityGridSampling.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityGridSamplingBlock at src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts:51"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 122,
+      "import": "volumeRaymarchGridBlock",
+      "from": "./volume/densityGridSampling.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const volumeRaymarchGridBlock at src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts:149"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "line": 125,
+      "import": "ColorAlgorithm",
+      "from": "../types",
+      "status": "VERIFIED",
+      "evidence": "Found: export type ColorAlgorithm at src/rendering/webgpu/shaders/types.ts:13"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 11,
+      "import": "assembleShaderBlocks",
+      "from": "../../shared/compose-helpers",
+      "status": "VERIFIED",
+      "evidence": "Found: export function assembleShaderBlocks at src/rendering/webgpu/shaders/shared/compose-helpers.ts:104"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 14,
+      "import": "constantsBlock",
+      "from": "../../shared/core/constants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const constantsBlock at src/rendering/webgpu/shaders/shared/core/constants.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 17,
+      "import": "schroedingerUniformsBlock",
+      "from": "../uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const schroedingerUniformsBlock at src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts:18"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 20,
+      "import": "complexMathBlock",
+      "from": "../quantum/complex.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const complexMathBlock at src/rendering/webgpu/shaders/schroedinger/quantum/complex.wgsl.ts:10"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 21,
+      "import": "hermiteBlock",
+      "from": "../quantum/hermite.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const hermiteBlock at src/rendering/webgpu/shaders/schroedinger/quantum/hermite.wgsl.ts:14"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 22,
+      "import": "ho1dBlock",
+      "from": "../quantum/ho1d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const ho1dBlock at src/rendering/webgpu/shaders/schroedinger/quantum/ho1d.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 64,
+      "import": "gridParamsBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const gridParamsBlock at src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts:21"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 65,
+      "import": "densityGridBindingsBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityGridBindingsBlock at src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts (binding block in compute differs from render)"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 66,
+      "import": "densityGridComputeBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityGridComputeBlock at src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts:66"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "line": 67,
+      "import": "densityGridWithPhaseComputeBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityGridWithPhaseComputeBlock at src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts:121"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 9,
+      "import": "schroedingerUniformsBlock",
+      "from": "./uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 9,
+      "import": "MAX_DIM",
+      "from": "./uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 9,
+      "import": "MAX_TERMS",
+      "from": "./uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 9,
+      "import": "MAX_EXTRA_DIM",
+      "from": "./uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 10,
+      "import": "mainBlock",
+      "from": "./main.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 10,
+      "import": "mainBlockIsosurface",
+      "from": "./main.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const mainBlockIsosurface at src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts:350"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 11,
+      "import": "composeSchroedingerShader",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 11,
+      "import": "composeSchroedingerVertexShader",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 12,
+      "import": "SchroedingerWGSLShaderConfig",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 12,
+      "import": "QuantumModeForShader",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 86,
+      "import": "quantum modules",
+      "from": "./quantum",
+      "status": "VERIFIED",
+      "evidence": "Re-exports match quantum/index.ts exports - all verified"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 89,
+      "import": "sdf3dBlock",
+      "from": "./sdf",
+      "status": "VERIFIED",
+      "evidence": "Re-export from sdf/index.ts which re-exports from sdf3d.wgsl.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 89,
+      "import": "sdfHighDBlock",
+      "from": "./sdf",
+      "status": "VERIFIED",
+      "evidence": "Re-export from sdf/index.ts which re-exports from sdf-high-d.wgsl.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 92,
+      "import": "emissionBlock",
+      "from": "./volume",
+      "status": "VERIFIED",
+      "evidence": "Re-export from volume/index.ts which re-exports from emission.wgsl.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 95,
+      "import": "temporalCloudUniformsBlock",
+      "from": "./temporal",
+      "status": "VERIFIED",
+      "evidence": "Found: export const temporalCloudUniformsBlock at src/rendering/webgpu/shaders/schroedinger/temporal/uniforms.wgsl.ts:11"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 99,
+      "import": "gridParamsBlock",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 100,
+      "import": "densityGridBindingsBlock",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 101,
+      "import": "densityGridComputeBlock",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 102,
+      "import": "densityGridWithPhaseComputeBlock",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 103,
+      "import": "composeDensityGridComputeShader",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 104,
+      "import": "DensityGridComputeConfig",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "line": 105,
+      "import": "ComputeQuantumMode",
+      "from": "./compute",
+      "status": "VERIFIED",
+      "evidence": "Re-export from compute/index.ts"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 24,
+      "import": "complexMathBlock",
+      "from": "./complex.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 25,
+      "import": "hermiteBlock",
+      "from": "./hermite.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 26,
+      "import": "laguerreBlock",
+      "from": "./laguerre.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 27,
+      "import": "legendreBlock",
+      "from": "./legendre.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 28,
+      "import": "sphericalHarmonicsBlock",
+      "from": "./sphericalHarmonics.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 29,
+      "import": "ho1dBlock",
+      "from": "./ho1d.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 32,
+      "import": "hydrogenRadialBlock",
+      "from": "./hydrogenRadial.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 33,
+      "import": "hydrogenPsiBlock",
+      "from": "./hydrogenPsi.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 34,
+      "import": "hydrogenNDCommonBlock",
+      "from": "./hydrogenNDCommon.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 37,
+      "import": "hoND variants",
+      "from": "./hoNDVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "All hoND variants verified in source file"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 52,
+      "import": "hoSuperposition variants",
+      "from": "./hoSuperpositionVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "All hoSuperposition, hoSpatial, hoCombined variants verified in source file"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 82,
+      "import": "hydrogenND variants",
+      "from": "./hydrogenNDVariants.wgsl",
+      "status": "VERIFIED",
+      "evidence": "All hydrogenND variants verified in source file"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 97,
+      "import": "psiBlock",
+      "from": "./psi.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 97,
+      "import": "psiBlockDynamic",
+      "from": "./psi.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 101,
+      "import": "densityPreMapBlock",
+      "from": "./density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 102,
+      "import": "generateMapPosToND",
+      "from": "./density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 103,
+      "import": "densityPostMapBlock",
+      "from": "./density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/quantum/index.ts",
+      "line": 104,
+      "import": "densityBlock",
+      "from": "./density.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const densityBlock at src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts:433"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+      "line": 10,
+      "import": "absorptionBlock",
+      "from": "./absorption.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+      "line": 11,
+      "import": "emissionBlock",
+      "from": "./emission.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+      "line": 12,
+      "import": "volumeIntegrationBlock",
+      "from": "./integration.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+      "line": 14,
+      "import": "densityGridBindingsBlock",
+      "from": "./densityGridSampling.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+      "line": 15,
+      "import": "densityGridSamplingBlock",
+      "from": "./densityGridSampling.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/index.ts",
+      "line": 16,
+      "import": "volumeRaymarchGridBlock",
+      "from": "./densityGridSampling.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 11,
+      "import": "gridParamsBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 12,
+      "import": "densityGridBindingsBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 13,
+      "import": "densityGridComputeBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 14,
+      "import": "densityGridWithPhaseComputeBlock",
+      "from": "./densityGrid.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 18,
+      "import": "composeDensityGridComputeShader",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 19,
+      "import": "DensityGridComputeConfig",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/index.ts",
+      "line": 20,
+      "import": "ComputeQuantumMode",
+      "from": "./compose",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "line": 10,
+      "import": "temporalCloudUniformsBlock",
+      "from": "./uniforms.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Re-export of verified export"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "line": 12,
+      "import": "reconstructionVertexShader",
+      "from": "./reconstruction.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const reconstructionVertexShader at src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "line": 13,
+      "import": "reconstructionFragmentShader",
+      "from": "./reconstruction.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const reconstructionFragmentShader at src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts:28"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "line": 16,
+      "import": "reprojectionVertexShader",
+      "from": "./reprojection.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const reprojectionVertexShader at src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts:12"
+    },
+    {
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "line": 17,
+      "import": "reprojectionFragmentShader",
+      "from": "./reprojection.wgsl",
+      "status": "VERIFIED",
+      "evidence": "Found: export const reprojectionFragmentShader at src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts:28"
+    }
+  ],
+  "hallucinated_imports": [],
+  "unresolved_modules": [],
+  "summary": {
+    "total_imports": 134,
+    "verified": 134,
+    "hallucinated": 0,
+    "module_not_found": 0
+  }
+}

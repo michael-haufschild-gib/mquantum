@@ -62,7 +62,7 @@ fn softThreshold(lum: f32, threshold: f32, knee: f32) -> f32 {
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn main(input: VertexOutput) -> @location(0) vec4f {
   let color = textureSample(tInput, linearSampler, input.uv).rgb;
   let lum = luminance(color);
 
@@ -113,7 +113,7 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn main(input: VertexOutput) -> @location(0) vec4f {
   let texelSize = 1.0 / uniforms.resolution;
   let offset = uniforms.direction * texelSize;
 
@@ -176,7 +176,7 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 
 @fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+fn main(input: VertexOutput) -> @location(0) vec4f {
   let sceneColor = textureSample(tScene, linearSampler, input.uv).rgb;
   let bloomColor = textureSample(tBloom, linearSampler, input.uv).rgb;
 

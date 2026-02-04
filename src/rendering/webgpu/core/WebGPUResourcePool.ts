@@ -49,6 +49,7 @@ export class WebGPUResourcePool {
 
   /**
    * Initialize the pool with a GPU device.
+   * @param device
    */
   initialize(device: GPUDevice): void {
     this.device = device
@@ -72,6 +73,8 @@ export class WebGPUResourcePool {
 
   /**
    * Set the viewport size and resize resources as needed.
+   * @param width
+   * @param height
    */
   setSize(width: number, height: number): void {
     if (this.width === width && this.height === height) {
@@ -92,6 +95,7 @@ export class WebGPUResourcePool {
   /**
    * Add a resource configuration.
    * The actual resource is allocated lazily when first accessed.
+   * @param config
    */
   addResource(config: WebGPURenderResourceConfig): void {
     this.configs.set(config.id, config)
@@ -99,6 +103,7 @@ export class WebGPUResourcePool {
 
   /**
    * Remove a resource and free GPU memory.
+   * @param id
    */
   removeResource(id: string): void {
     const resource = this.resources.get(id)
@@ -119,6 +124,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get a resource, allocating if necessary.
+   * @param id
    */
   getResource(id: string): WebGPUResource | null {
     // Check if already allocated
@@ -140,6 +146,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get the texture for a resource.
+   * @param id
    */
   getTexture(id: string): GPUTexture | null {
     return this.getResource(id)?.texture ?? null
@@ -147,6 +154,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get the texture view for a resource.
+   * @param id
    */
   getTextureView(id: string): GPUTextureView | null {
     return this.getResource(id)?.view ?? null
@@ -154,6 +162,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get the sampler for a resource.
+   * @param id
    */
   getSampler(id: string): GPUSampler | null {
     return this.getResource(id)?.sampler ?? null
@@ -162,6 +171,7 @@ export class WebGPUResourcePool {
   /**
    * Mark a resource as needing ping-pong buffers.
    * Called by the graph compiler for read-write resources.
+   * @param id
    */
   enablePingPong(id: string): void {
     if (this.pingPongResources.has(id)) {
@@ -189,6 +199,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get the read texture view for ping-pong resources.
+   * @param id
    */
   getReadTextureView(id: string): GPUTextureView | null {
     const pingPong = this.pingPongResources.get(id)
@@ -200,6 +211,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get the write texture view for ping-pong resources.
+   * @param id
    */
   getWriteTextureView(id: string): GPUTextureView | null {
     const pingPong = this.pingPongResources.get(id)
@@ -211,6 +223,7 @@ export class WebGPUResourcePool {
 
   /**
    * Swap ping-pong buffers after a pass writes to them.
+   * @param id
    */
   swapPingPong(id: string): void {
     const pingPong = this.pingPongResources.get(id)
@@ -223,6 +236,7 @@ export class WebGPUResourcePool {
 
   /**
    * Get resource dimensions.
+   * @param id
    */
   getResourceDimensions(id: string): { width: number; height: number } | null {
     const resource = this.getResource(id)
@@ -257,6 +271,26 @@ export class WebGPUResourcePool {
     }
 
     return total
+  }
+
+  /**
+   * Get dimensions of all allocated resources.
+   *
+   * @returns Map of resource ID to { width, height }
+   */
+  getAllResourceDimensions(): Map<string, { width: number; height: number }> {
+    const dimensions = new Map<string, { width: number; height: number }>()
+
+    for (const [id, resource] of this.resources) {
+      dimensions.set(id, { width: resource.width, height: resource.height })
+    }
+
+    for (const [id, pingPong] of this.pingPongResources) {
+      // Use read buffer dimensions (both should be same size)
+      dimensions.set(id, { width: pingPong.read.width, height: pingPong.read.height })
+    }
+
+    return dimensions
   }
 
   /**

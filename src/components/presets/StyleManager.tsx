@@ -10,7 +10,10 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { Button } from '@/components/ui/Button'
 import { InlineEdit } from '@/components/ui/InlineEdit'
 
-/** Format a timestamp to a readable date string */
+/**
+ * Format a timestamp to a readable date string
+ * @param timestamp
+ */
 const formatDate = (timestamp: number): string => {
   return new Date(timestamp).toLocaleDateString(undefined, {
     year: 'numeric',

@@ -1,3 +1,13 @@
+=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-000)===
+## KEEP THE BIG PICTURE IN MIND
+This is a scientific research project for my PHD thesis. Students will use this project to study multi-dimensional objects, fractals and physics. It is very important for my work and my career, we have to do it in steps, carefully , without mistakes and rush. Avoid hallucinations. Don't jump into coding without first researching. Don't patch bugs reactively. Use WebSearch extensively. Understand the purpose of code before changing it.
+
+## CHECK WEBGL BEFORE WORKING ON WEBGPU
+WebGL is working perfectly. WebGPU is supposed to give the user the option to use WebGPU rendering instead of WebGL without losing any functionality, configuration options, visual quality. Always check first how WebGL is doing it before working on a WebGPU feature.
+
+=== END CIB-000 ===
+
+
 === CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-001)===
 
 ## MANDATORY DOCUMENT READS
@@ -44,25 +54,9 @@ gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 // ✓ CORRECT - direct NDC for PlaneGeometry(2, 2)
 gl_Position = vec4(position.xy, 0.0, 1.0);
 ```
-
-**Use custom UI component library**: `src/components/ui`: Do not use default html controls. Use the custom components of this project.
-
-**Integrate UI components into theming solution**: Do not hardcode styles, always use the theme.
-
 **Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
 
 === END CIB-001 ===
-
-## FOLDER USAGE RULES
-
-| Activity | Required Directory | Agent Enforcement |
-| --- | --- | --- |
-| Browser automation (Playwright/Puppeteer runners, recorders) | `scripts/playwright/` | Keep every `.js`/`.mjs` harness here. Subfolders allowed, but **never** place these scripts in the repo root. |
-| Physics, RNG, or analytics utilities | `scripts/tools/` | Import from `../../src` or `../../dist` as needed. No tooling lives in the project root. |
-| Visual artifacts (screenshots, videos, GIFs) | `screenshots/` | Always persist captured assets here. Create nested folders like `screenshots/quality-test/` or `screenshots/videos/` to stay organized. |
-| Documentation, research notes | `docs/` | Long-form analysis belongs in this directory instead of new markdown files at the root. |
-| Temporary experiments / sandboxes | `src/dev-tools/` | Use this workspace for throwaway UI/physics spikes and clean it up after. |
-| 🚫 Forbidden | Project root | Keep root pristine—no scripts, screenshots, or scratch docs. |
 
 ## TECH STACK
 
@@ -81,16 +75,13 @@ gl_Position = vec4(position.xy, 0.0, 1.0);
 ### UI & Styling
 - **Tailwind CSS** 4.1.18 - Utility-first CSS framework
 - **@tailwindcss/vite** 4.1.18 - Vite plugin for Tailwind
-- **Motion** 12.23.26 - Animation library
 
 ### State Management & Utilities
 - **Zustand** 5.0.2 - State management
-- **convex-hull** 1.0.3 - Computational geometry
 
 ### Testing
 - **vitest** 4.0.15 - Unit testing framework
 - **happy-dom** 15.11.7 - DOM implementation for testing
-- **playwright** 1.57.0 - E2E testing framework
 
 ### Development Tools
 - **ESLint** 9.15.0 - Code linting

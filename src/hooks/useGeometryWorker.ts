@@ -276,6 +276,15 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
   // This ensures the worker is available on the very first render.
   const workerRef = useRef<Worker | null>(workerAvailable.current ? getWorker() : null)
 
+  // Re-initialize worker if ref was cleared (e.g., by React StrictMode cleanup)
+  // useRef initial value only applies on first mount, so we need this effect
+  // to restore the worker reference after StrictMode's double-invoke pattern.
+  useEffect(() => {
+    if (!workerRef.current && workerAvailable.current) {
+      workerRef.current = getWorker()
+    }
+  }, [])
+
   // Cleanup on unmount
   useEffect(() => {
     // Capture ref values at effect setup time for cleanup
@@ -318,6 +327,11 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
         if (!workerAvailable.current) {
           reject(new Error('Worker not available in this environment'))
           return
+        }
+
+        // Try to restore worker ref if it was cleared (React StrictMode can cause this)
+        if (!workerRef.current) {
+          workerRef.current = getWorker()
         }
 
         if (!workerRef.current) {

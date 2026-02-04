@@ -68,19 +68,20 @@ fn loadDepth(uv: vec2f) -> f32 {
 }
 
 // Reconstruct view-space position from depth
+// WebGPU uses depth range [0, 1], not [-1, 1] like OpenGL
 fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
-  // NDC position
-  let ndc = vec4f(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+  // NDC position: UV [0,1] -> [-1,1] for X/Y, depth stays [0,1] for WebGPU
+  let ndc = vec4f(uv * 2.0 - 1.0, depth, 1.0);
   // Unproject to view space
   var viewPos = uniforms.inverseProjectionMatrix * ndc;
   viewPos /= viewPos.w;
   return viewPos.xyz;
 }
 
-// Linearize depth
+// Linearize depth - WebGPU uses [0, 1] depth range
 fn linearizeDepth(depth: f32) -> f32 {
-  let z = depth * 2.0 - 1.0;
-  return (2.0 * uniforms.near * uniforms.far) / (uniforms.far + uniforms.near - z * (uniforms.far - uniforms.near));
+  // WebGPU depth is already in [0, 1], use the correct formula
+  return (uniforms.near * uniforms.far) / (uniforms.far - depth * (uniforms.far - uniforms.near));
 }
 
 // Simple hash for pseudo-random rotation
@@ -219,6 +220,7 @@ export class GTAOPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -249,17 +251,17 @@ export class GTAOPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, GTAO_SHADER, 'gtao-fragment')
 
-    // Create pipeline
+    // Create pipeline - use r8unorm to match aoBuffer resource format
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'r8unorm',
       { label: 'gtao' }
     )
 
-    // Create uniform buffer (matrices + params)
-    this.uniformBuffer = this.createUniformBuffer(device, 256, 'gtao-uniforms')
+    // Create uniform buffer (176 bytes: 2x mat4x4f (128) + vec2f (8) + 8x f32 (32) + padding (8))
+    this.uniformBuffer = this.createUniformBuffer(device, 176, 'gtao-uniforms')
 
     // Create sampler
     this.sampler = device.createSampler({
@@ -273,6 +275,7 @@ export class GTAOPass extends WebGPUBasePass {
 
   /**
    * Set AO radius.
+   * @param radius
    */
   setRadius(radius: number): void {
     this.radius = radius
@@ -280,6 +283,7 @@ export class GTAOPass extends WebGPUBasePass {
 
   /**
    * Set AO intensity.
+   * @param intensity
    */
   setIntensity(intensity: number): void {
     this.intensity = intensity
@@ -288,6 +292,7 @@ export class GTAOPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
@@ -301,6 +306,7 @@ export class GTAOPass extends WebGPUBasePass {
 
   /**
    * Execute the GTAO pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -336,8 +342,8 @@ export class GTAOPass extends WebGPUBasePass {
       far?: number
     }
 
-    // Update uniforms
-    const data = new Float32Array(64)
+    // Update uniforms (44 floats = 176 bytes)
+    const data = new Float32Array(44)
 
     // Projection matrix (16 floats)
     if (camera?.projectionMatrix?.elements) {

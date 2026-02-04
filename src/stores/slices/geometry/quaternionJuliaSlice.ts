@@ -30,6 +30,7 @@ export const createQuaternionJuliaSlice: StateCreator<
   /**
    * Wrapped setter that auto-increments quaternionJuliaVersion on any quaternionJulia change.
    * This avoids manually adding version increment to 40+ individual setters.
+   * @param updater
    */
   const setWithVersion: typeof set = (updater) => {
     set((state) => {

@@ -133,6 +133,19 @@ device.popErrorScope().then(handleError)
 - **Group 2**: Per-object data (transforms) - changes every draw
 - **Group 3**: Dynamic/misc data
 
+### Uniform Buffer Sizes (CRITICAL)
+
+Calculate struct sizes using WGSL alignment rules:
+- `mat4x4f`: 16-byte align, 64 bytes
+- `vec3f`: 16-byte align, 12 bytes (padding follows)
+- `vec2f`: 8-byte align, 8 bytes
+- `f32/i32/u32`: 4-byte align, 4 bytes
+
+**CameraUniforms**: **384 bytes** (368 actual + padding)
+**LightingUniforms**: **576 bytes** (560 actual + padding)
+
+⚠️ NEVER use 256 for camera or 512 for lighting buffers - these overflow!
+
 ### Buffer Uploads
 - Use `writeBuffer()` as default (simple, optimized by browser)
 - Use `mappedAtCreation: true` for static buffers
@@ -159,6 +172,211 @@ device.popErrorScope().then(handleError)
 - [ ] All referenced struct types are defined in the shader
 - [ ] Fragment shaders don't declare bind groups they don't use
 - [ ] All GPU objects have descriptive `label` properties
+
+---
+
+## Render Graph Architecture Pitfalls
+
+### 1. Renderer Output Resources Must Be Registered
+
+**Problem**: When a renderer declares outputs (e.g., `temporal: true` expects `quarter-color`), those resources MUST be registered in `setupRenderPasses`. Missing resources cause silent failures.
+
+**Error**: `[WebGPU Renderer] Missing color render target`
+
+```typescript
+// ❌ BAD - renderer expects resources that don't exist
+new WebGPUSchrodingerRenderer({ temporal: true })  // Expects quarter-color, quarter-position
+// But setupRenderPasses never registers these!
+
+// ✅ GOOD - disable feature until full pipeline exists
+new WebGPUSchrodingerRenderer({ temporal: false })
+
+// OR register the resources:
+graph.addResource('quarter-color', { type: 'texture', format: 'rgba16float', ... })
+graph.addResource('quarter-position', { type: 'texture', format: 'rgba16float', ... })
+// AND add the pass that consumes them
+```
+
+**Rule**: A renderer feature requiring custom resources needs BOTH resource registration AND any consuming pass (e.g., `WebGPUTemporalCloudPass`).
+
+### 2. Store Getters Run Many Times Per Frame
+
+**Problem**: `graph.setStoreGetter()` callbacks run multiple times per frame. Expensive operations inside cause severe FPS drops.
+
+```typescript
+// ❌ BAD - 0-1 FPS, animation jumping
+graph.setStoreGetter('extended', () => {
+  const { basisX, basisY, basisZ } = rotation.getBasisVectors(true)  // Forces recomputation!
+  return { ...state, basisX: new Float32Array(basisX) }  // Allocates memory!
+})
+
+// ✅ GOOD - 60 FPS
+// 1. Compute in render loop, cache in ref
+const basisCacheRef = useRef({ basisX: new Float32Array(11), ... })
+
+// In render loop:
+const { basisX, changed } = rotation.getBasisVectors(false)  // Uses version tracking
+if (changed) basisCacheRef.current.basisX.set(basisX)
+
+// 2. Store getter returns cached ref (no computation, no allocation)
+graph.setStoreGetter('extended', () => ({
+  ...state,
+  basisX: basisCacheRef.current.basisX,  // Direct ref, no copy
+}))
+```
+
+**Rules**:
+- Never call computation functions in store getters
+- Never allocate (new Array, new Float32Array) in store getters  
+- Cache expensive results in refs, update in render loop
+- Use version-based dirty tracking to skip unchanged data
+
+---
+
+## Pipeline Format Must Match Render Target (CRITICAL)
+
+**Problem**: When creating a render pipeline, the `colorFormat` must exactly match the texture format being rendered to. Using `ctx.format` (canvas format, typically `bgra8unorm`) when rendering to HDR textures (`rgba16float`) causes validation errors.
+
+**Error**: `Attachment state of [RenderPipeline] is not compatible with [RenderPassEncoder]`
+
+```typescript
+// ❌ BAD - pipeline format doesn't match target
+protected async createPipeline(ctx: WebGPUSetupContext) {
+  const { device, format } = ctx  // format = bgra8unorm (canvas)
+  
+  this.pipeline = this.createFullscreenPipeline(
+    device, shader, [bindGroupLayout],
+    format,  // ← Wrong! Renders to rgba16float texture
+    { label: 'my-pass' }
+  )
+}
+
+// ✅ GOOD - use explicit format matching target texture
+this.pipeline = this.createFullscreenPipeline(
+  device, shader, [bindGroupLayout],
+  'rgba16float',  // ← Matches HDR texture resource
+  { label: 'my-pass' }
+)
+```
+
+**Format Guidelines**:
+| Render Target | Pipeline Format |
+|---------------|-----------------|
+| Canvas | `format` from ctx (`bgra8unorm`) |
+| HDR textures (scene, bloom, jets, etc.) | `'rgba16float'` |
+| LDR textures (ldr-color, final-color) | `'rgba8unorm'` |
+| AO buffer | `'r8unorm'` |
+| Edge detection (SMAA) | `'rg8unorm'` |
+
+---
+
+## Texture Usage Flags for Copy Operations
+
+**Problem**: Using `copyTextureToTexture()` requires the source texture to have `COPY_SRC` usage flag.
+
+**Error**: `usage doesn't include TextureUsage::CopySrc`
+
+```typescript
+// ❌ BAD - can't copy from this texture
+graph.addResource('frame-blend-output', {
+  type: 'texture',
+  format: 'rgba16float',
+  usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+})
+
+// ✅ GOOD - add COPY_SRC for copy operations
+graph.addResource('frame-blend-output', {
+  type: 'texture',
+  format: 'rgba16float',
+  usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+})
+```
+
+---
+
+## WGSL Struct Size Calculation (CRITICAL)
+
+**Problem**: WGSL alignment rules often make structs larger than expected. `vec3f` aligns to 16 bytes, not 12. Buffer size must be >= actual struct size.
+
+**Error**: `Buffer bound with size X is too small. Pipeline requires at least Y bytes.`
+
+```wgsl
+// This struct is 48 bytes, NOT 32!
+struct FXAAUniforms {
+  resolution: vec2f,      // offset 0,  8 bytes
+  subpixelQuality: f32,   // offset 8,  4 bytes
+  edgeThreshold: f32,     // offset 12, 4 bytes
+  edgeThresholdMin: f32,  // offset 16, 4 bytes
+  // implicit padding      // offset 20, 12 bytes (to align vec3f to 16)
+  _padding: vec3f,        // offset 32, 12 bytes
+  // struct padding         // offset 44, 4 bytes (round to 16)
+}                          // total: 48 bytes
+```
+
+**Quick Size Reference**:
+| Type | Size | Alignment |
+|------|------|-----------|
+| f32, i32, u32 | 4 | 4 |
+| vec2f | 8 | 8 |
+| vec3f | 12 | **16** ← Common pitfall! |
+| vec4f | 16 | 16 |
+| mat4x4f | 64 | 16 |
+| Struct total | rounds up to largest member alignment |
+
+---
+
+## Non-Uniform Control Flow: The select() Solution
+
+**Problem**: Early returns before `textureSample` calls create non-uniform control flow.
+
+```wgsl
+// ❌ BAD - early return breaks uniform control flow
+@fragment fn main(input: VertexOutput) -> @location(0) vec4f {
+  let colorC = textureSample(tex, samp, input.uv);
+  
+  if (shouldSkip(colorC)) {
+    return vec4f(colorC, 1.0);  // Early return!
+  }
+  
+  // These fail - some threads returned, some didn't
+  let colorN = textureSample(tex, samp, input.uv + offset);  // ← Error!
+  ...
+}
+
+// ✅ GOOD - sample ALL textures first, use select() for result
+@fragment fn main(input: VertexOutput) -> @location(0) vec4f {
+  // All samples BEFORE any conditionals
+  let colorC = textureSample(tex, samp, input.uv);
+  let colorN = textureSample(tex, samp, input.uv + offset);
+  let colorS = textureSample(tex, samp, input.uv - offset);
+  
+  let skipProcessing = shouldSkip(colorC);
+  
+  // Compute result unconditionally
+  let processedColor = doExpensiveProcessing(colorC, colorN, colorS);
+  
+  // Use select() instead of if/else
+  return vec4f(select(processedColor, colorC.rgb, skipProcessing), 1.0);
+}
+```
+
+---
+
+## Base Class Entry Point Convention
+
+The `WebGPUBasePass.createFullscreenPipeline()` uses `entryPoint: 'main'` for both vertex and fragment shaders. Always name your entry points `main`:
+
+```wgsl
+// ❌ BAD - won't match pipeline
+@vertex fn vertexMain(...) -> VertexOutput { ... }
+@fragment fn fragmentMain(...) -> @location(0) vec4f { ... }
+
+// ✅ GOOD - matches createFullscreenPipeline expectations
+@vertex fn main(...) -> VertexOutput { ... }
+@fragment fn main(...) -> @location(0) vec4f { ... }
+```
+
+Note: The base class creates its own vertex shader, so only the fragment entry point matters for passes using `createFullscreenPipeline()`.
 
 ---
 

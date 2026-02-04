@@ -136,6 +136,8 @@ export class FrameBlendingPass extends BasePass {
 
   /**
    * Create or resize the internal history buffer.
+   * @param width
+   * @param height
    */
   private ensureHistoryBuffer(width: number, height: number): void {
     if (this.historyBuffer && this.lastWidth === width && this.lastHeight === height) {

@@ -141,6 +141,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -252,6 +253,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
 
   /**
    * Execute the debug overlay pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     // Skip if no debug input configured

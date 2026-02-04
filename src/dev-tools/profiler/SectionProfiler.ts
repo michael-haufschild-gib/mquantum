@@ -127,9 +127,12 @@ export class SectionProfiler {
    * available in all render configurations. Falls back to estimation.
    *
    * @param shaderName - Identifier for the shader to profile
+   * @param _shaderName
    * @param sectionName - Name of section to measure
    * @param warmupFrames - Number of frames to wait after shader swap (default: 30)
    * @param measureFrames - Number of frames to average (default: 60)
+   * @param _warmupFrames
+   * @param _measureFrames
    * @returns Promise resolving to section timing data
    */
   async measureSection(

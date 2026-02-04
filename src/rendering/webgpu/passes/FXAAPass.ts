@@ -64,8 +64,9 @@ export class FXAAPass extends WebGPUBasePass {
       ],
     })
 
-    // Create uniform buffer (32 bytes for vec2 + 3 floats + padding)
-    this.uniformBuffer = this.createUniformBuffer(device, 32, 'fxaa-uniforms')
+    // Create uniform buffer (48 bytes - WGSL struct with vec3f padding aligns to 16)
+    // Layout: vec2f(8) + f32(4) + f32(4) + f32(4) + pad(12) + vec3f(12) = 44, rounded to 48
+    this.uniformBuffer = this.createUniformBuffer(device, 48, 'fxaa-uniforms')
 
     // Create sampler
     this.sampler = device.createSampler({
@@ -97,16 +98,18 @@ export class FXAAPass extends WebGPUBasePass {
 
     const { width, height } = ctx.size
 
-    // Update uniforms
+    // Update uniforms - must match WGSL struct layout (48 bytes)
+    // struct FXAAUniforms { resolution: vec2f, subpixelQuality: f32, edgeThreshold: f32,
+    //                       edgeThresholdMin: f32, _padding: vec3f }
     const uniformData = new Float32Array([
-      width,
-      height,
-      this.subpixelQuality,
-      this.edgeThreshold,
-      this.edgeThresholdMin,
-      0,
-      0,
-      0, // padding to 32 bytes
+      width,                    // offset 0: resolution.x
+      height,                   // offset 4: resolution.y
+      this.subpixelQuality,     // offset 8
+      this.edgeThreshold,       // offset 12
+      this.edgeThresholdMin,    // offset 16
+      0, 0, 0,                  // offset 20: padding to align vec3f to 16-byte boundary
+      0, 0, 0,                  // offset 32: _padding vec3f
+      0,                        // offset 44: struct padding to 48 bytes
     ])
     this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
 

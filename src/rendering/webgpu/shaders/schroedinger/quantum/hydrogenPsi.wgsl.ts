@@ -133,8 +133,8 @@ fn evalHydrogenPsiTime(
   let psi0 = evalHydrogenPsi(pos, n, l, m, a0, useReal, uniforms);
 
   // Energy eigenvalue: E_n = -1/(2n²) in atomic units
-  let fn = f32(n);
-  let E = -0.5 / (fn * fn);
+  let nf = f32(n);
+  let E = -0.5 / (nf * nf);
 
   // Time evolution: ψ(t) = ψ(0) · e^{-iEt}
   let phase = -E * t;
@@ -169,8 +169,8 @@ fn evalHydrogenPsiWithPhase(
   let spatialPhase = atan2(psi0.y, psi0.x);
 
   // Apply time evolution: ψ(t) = ψ(0) · e^{-iEt}
-  let fn = f32(n);
-  let E = -0.5 / (fn * fn);
+  let nf = f32(n);
+  let E = -0.5 / (nf * nf);
   let phase = -E * t;
   let timeFactor = vec2f(cos(phase), sin(phase));
 

@@ -47,6 +47,19 @@ export interface GroundPlaneMaterialProps {
 /**
  * Custom shader material for ground plane that matches GGX BRDF of other objects.
  * React 19: Uses ref as regular prop instead of forwardRef.
+ * @param root0
+ * @param root0.color
+ * @param root0.opacity
+ * @param root0.side
+ * @param root0.showGrid
+ * @param root0.gridColor
+ * @param root0.sectionColor
+ * @param root0.gridSpacing
+ * @param root0.gridThickness
+ * @param root0.sectionThickness
+ * @param root0.gridFadeDistance
+ * @param root0.gridFadeStrength
+ * @param root0.ref
  */
 export function GroundPlaneMaterial({
   color,

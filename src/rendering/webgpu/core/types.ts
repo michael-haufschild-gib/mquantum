@@ -170,6 +170,21 @@ export interface WebGPURenderPassConfig {
   isCompute?: boolean
   /** Workgroup size for compute passes */
   workgroupSize?: [number, number, number]
+  /**
+   * If true, when disabled, alias output to input instead of copying.
+   * More efficient but may break multi-input passes.
+   */
+  skipPassthrough?: boolean
+  /**
+   * Grace period in frames before releasing internal resources when disabled.
+   * Prevents memory churn on frequent toggles. Defaults to 60 (~1 second at 60fps).
+   */
+  disableGracePeriod?: number
+  /**
+   * If true, keep resources allocated even when disabled.
+   * Useful for passes that need instant re-enable without reallocation.
+   */
+  keepResourcesWhenDisabled?: boolean
 }
 
 /**
@@ -205,6 +220,12 @@ export interface WebGPURenderPass {
    * Release internal resources when disabled.
    */
   releaseInternalResources?(): void
+
+  /**
+   * Get draw statistics from the last execute() call.
+   * Returns null if the pass doesn't track draw stats.
+   */
+  getDrawStats?(): WebGPUPassDrawStats | null
 }
 
 // =============================================================================
@@ -371,6 +392,38 @@ export interface WebGPUPassTiming {
 }
 
 /**
+ * Draw statistics from a single pass.
+ */
+export interface WebGPUPassDrawStats {
+  /** Number of draw calls */
+  calls: number
+  /** Number of triangles drawn */
+  triangles: number
+  /** Number of vertices processed */
+  vertices: number
+  /** Number of lines drawn */
+  lines: number
+  /** Number of points drawn */
+  points: number
+}
+
+/**
+ * Aggregated draw statistics for the entire frame.
+ */
+export interface WebGPUFrameDrawStats {
+  /** Total draw calls across all passes */
+  calls: number
+  /** Total triangles drawn */
+  triangles: number
+  /** Total vertices processed */
+  vertices: number
+  /** Total lines drawn */
+  lines: number
+  /** Total points drawn */
+  points: number
+}
+
+/**
  * Frame statistics from graph execution.
  */
 export interface WebGPUFrameStats {
@@ -378,4 +431,6 @@ export interface WebGPUFrameStats {
   passTiming: WebGPUPassTiming[]
   commandBufferCount: number
   vramUsage: number
+  /** Aggregated draw statistics for the frame */
+  drawStats: WebGPUFrameDrawStats
 }

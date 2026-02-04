@@ -27,6 +27,9 @@ export const temporalBlock = /* wgsl */ `
  *
  * Returns model-space ray distance, or -1.0 if invalid/unavailable.
  * Apply temporalSafetyMargin before using as skip distance.
+ *
+ * Note: Uses textureSampleLevel instead of textureSample to avoid
+ * WGSL uniform control flow restrictions.
  */
 fn getTemporalDepth(
   ro: vec3f,
@@ -46,7 +49,8 @@ fn getTemporalDepth(
 
   // Sample previous frame's position buffer at current screen position
   // gPosition.xyz = model-space position, gPosition.w = model-space ray distance
-  let prevPositionData = textureSample(prevPositionTexture, prevPositionSampler, screenUV);
+  // Use textureSampleLevel with LOD 0 to avoid uniform control flow issues
+  let prevPositionData = textureSampleLevel(prevPositionTexture, prevPositionSampler, screenUV, 0.0);
 
   // Check if we have valid position data (.w > 0 indicates valid hit)
   let storedDist = prevPositionData.w;
@@ -78,11 +82,12 @@ fn getTemporalDepth(
   }
 
   // Disocclusion detection using 2 diagonal samples
+  // Use textureSampleLevel to avoid uniform control flow issues
   let texelSize = 1.0 / depthBufferResolution;
-  let distTopLeft = textureSample(prevPositionTexture, prevPositionSampler,
-    screenUV + vec2f(-texelSize.x, texelSize.y)).w;
-  let distBottomRight = textureSample(prevPositionTexture, prevPositionSampler,
-    screenUV + vec2f(texelSize.x, -texelSize.y)).w;
+  let distTopLeft = textureSampleLevel(prevPositionTexture, prevPositionSampler,
+    screenUV + vec2f(-texelSize.x, texelSize.y), 0.0).w;
+  let distBottomRight = textureSampleLevel(prevPositionTexture, prevPositionSampler,
+    screenUV + vec2f(texelSize.x, -texelSize.y), 0.0).w;
 
   // Use relative threshold for discontinuity detection
   let avgDist = (distTopLeft + distBottomRight + storedDist) * 0.333;

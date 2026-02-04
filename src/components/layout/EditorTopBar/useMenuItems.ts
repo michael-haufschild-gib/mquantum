@@ -26,6 +26,11 @@ import type { MenuItem } from './types'
 
 /**
  * Hook for theme-related menu items (accent, mode, presets)
+ * @param accent
+ * @param setAccent
+ * @param mode
+ * @param setMode
+ * @param setPreset
  */
 export function useThemeMenuItems(
   accent: ThemeAccent,
@@ -48,6 +53,11 @@ export function useThemeMenuItems(
 
 /**
  * Hook for scene menu items
+ * @param savedScenes
+ * @param loadScene
+ * @param addToast
+ * @param setSaveSceneOpen
+ * @param setIsSceneManagerOpen
  */
 export function useSceneMenuItems(
   savedScenes: SavedScene[],
@@ -80,6 +90,11 @@ export function useSceneMenuItems(
 
 /**
  * Hook for style menu items
+ * @param savedStyles
+ * @param loadStyle
+ * @param addToast
+ * @param setSaveStyleOpen
+ * @param setIsStyleManagerOpen
  */
 export function useStyleMenuItems(
   savedStyles: SavedStyle[],
@@ -112,6 +127,8 @@ export function useStyleMenuItems(
 
 /**
  * Hook for file menu items
+ * @param handleExport
+ * @param handleExportVideo
  */
 export function useFileMenuItems(handleExport: () => void, handleExportVideo: () => void) {
   return useMemo(
@@ -122,6 +139,14 @@ export function useFileMenuItems(handleExport: () => void, handleExportVideo: ()
 
 /**
  * Hook for view menu items
+ * @param showLeftPanel
+ * @param toggleLeftPanel
+ * @param showRightPanel
+ * @param toggleRightPanel
+ * @param toggleCinematicMode
+ * @param toggleShortcuts
+ * @param isMobile
+ * @param presetItems
  */
 export function useViewMenuItems(
   showLeftPanel: boolean,
@@ -162,6 +187,12 @@ export function useViewMenuItems(
 
 /**
  * Hook for mobile menu items
+ * @param fileItems
+ * @param viewItems
+ * @param sceneSubmenuItems
+ * @param styleSubmenuItems
+ * @param isSoundEnabled
+ * @param toggleSound
  */
 export function useMobileMenuItems(
   fileItems: MenuItem[],

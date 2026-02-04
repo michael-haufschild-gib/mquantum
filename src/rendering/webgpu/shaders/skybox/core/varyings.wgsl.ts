@@ -10,6 +10,7 @@ import { SkyboxEffects } from '../types'
 /**
  * Vertex output / Fragment input struct
  * Only includes fields that are actually used to avoid warnings
+ * @param effects
  */
 export function generateVertexOutputStruct(effects: SkyboxEffects): string {
   const fields = [

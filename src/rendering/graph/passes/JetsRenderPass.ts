@@ -142,6 +142,8 @@ export class JetsRenderPass extends BasePass {
 
   /**
    * Update jet mesh scale based on configuration.
+   * @param height
+   * @param width
    */
   private updateJetGeometry(height: number, width: number): void {
     const radius = height * width

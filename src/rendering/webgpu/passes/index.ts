@@ -114,6 +114,22 @@ export type {
   MRTPipelineConfig,
 } from './MainObjectMRTPass'
 
+// Compute passes
+export { DensityGridComputePass } from './DensityGridComputePass'
+export type { DensityGridComputeConfig } from './DensityGridComputePass'
+
+export { MandelbulbSDFGridPass } from './MandelbulbSDFGridPass'
+export type { MandelbulbSDFGridConfig } from './MandelbulbSDFGridPass'
+
+export { JuliaSDFGridPass } from './JuliaSDFGridPass'
+export type { JuliaSDFGridConfig } from './JuliaSDFGridPass'
+
+export { PolytopeTransformComputePass } from './PolytopeTransformComputePass'
+export type { PolytopeTransformComputeConfig } from './PolytopeTransformComputePass'
+
+export { PolytopeNormalComputePass } from './PolytopeNormalComputePass'
+export type { PolytopeNormalComputeConfig } from './PolytopeNormalComputePass'
+
 // Scene passes
 export { ScenePass } from './ScenePass'
 export type { ScenePassConfig, SceneRenderStats } from './ScenePass'

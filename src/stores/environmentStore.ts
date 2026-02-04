@@ -25,6 +25,7 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
   subscribeWithSelector((set, get, api) => {
     /**
      * Wrapped setter that auto-increments version counters based on changed keys.
+     * @param updater
      */
     const wrappedSet: typeof set = (updater) => {
       set((state) => {

@@ -73,6 +73,7 @@ export class TonemappingPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const lighting = ctx.frame?.stores?.['lighting'] as {
@@ -157,14 +158,17 @@ export class TonemappingPass extends WebGPUBasePass {
     // Update from stores
     this.updateFromStores(ctx)
 
-    // Update uniforms
-    const uniformData = new Float32Array([
-      this.exposure,
-      this.gamma,
-      this.mode,
-      0, // padding
-    ])
-    this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
+    // Update uniforms - use dual views for mixed f32/i32 types
+    const buffer = new ArrayBuffer(16)
+    const floatView = new Float32Array(buffer)
+    const intView = new Int32Array(buffer)
+
+    floatView[0] = this.exposure
+    floatView[1] = this.gamma
+    intView[2] = this.mode  // i32 - must use Int32Array
+    floatView[3] = 0  // padding
+
+    this.writeUniformBuffer(this.device, this.uniformBuffer, new Uint8Array(buffer))
 
     // Get textures (using configurable resource names)
     const inputView = ctx.getTextureView(this.inputResource)

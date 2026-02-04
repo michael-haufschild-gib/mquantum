@@ -63,8 +63,10 @@ struct VertexOutput {
 }
 
 // Get view-space position from UV and depth
+// WebGPU uses depth range [0, 1], not [-1, 1] like OpenGL
 fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
-  let clipPos = vec4f(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+  // UV [0,1] -> [-1,1] for X/Y, depth stays [0,1] for WebGPU
+  let clipPos = vec4f(uv * 2.0 - 1.0, depth, 1.0);
   var viewPos = uniforms.invProjMatrix * clipPos;
   // Guard against w=0
   let safeW = select(viewPos.w, 0.0001, abs(viewPos.w) < 0.0001);
@@ -109,41 +111,47 @@ fn reconstructNormal(coord: vec2f) -> vec3f {
 }
 
 // Get normal from G-buffer (encoded as RGB = normal * 0.5 + 0.5)
-// Falls back to depth reconstruction if normal buffer not available
-fn getNormal(coord: vec2f) -> vec3f {
-  let normalData = textureSample(tNormal, texSampler, coord);
+// Uses select() instead of branching to maintain uniform control flow
+fn getNormal(coord: vec2f, normalData: vec4f) -> vec3f {
+  // Decode the normal from G-buffer
+  let decoded = normalData.rgb * 2.0 - 1.0;
+  let decodedLen = length(decoded);
 
-  // Check if we have valid normal data (non-zero alpha or valid RGB)
-  if (length(normalData.rgb) > 0.01) {
-    let decoded = normalData.rgb * 2.0 - 1.0;
-    let decodedLen = length(decoded);
-    // Guard against zero-length normal
-    return select(vec3f(0.0, 0.0, 1.0), decoded / decodedLen, decodedLen > 0.0001);
-  }
+  // Check if we have valid normal data (non-zero length)
+  let hasValidNormal = decodedLen > 0.0001;
 
-  // Fallback: reconstruct from depth
-  return reconstructNormal(coord);
+  // Reconstruct from depth as fallback
+  let reconstructed = reconstructNormal(coord);
+
+  // Guard against zero-length decoded normal
+  let decodedNormal = select(vec3f(0.0, 0.0, 1.0), decoded / max(decodedLen, 0.0001), decodedLen > 0.0001);
+
+  // Use decoded normal if valid, otherwise use reconstructed
+  return select(reconstructed, decodedNormal, hasValidNormal);
 }
 
 // Check if this pixel has valid G-buffer data (not background)
-fn hasGBufferData(coord: vec2f) -> bool {
+fn isBackground(coord: vec2f) -> bool {
   let depthDims = textureDimensions(tDepth);
   let depthCoord = vec2i(coord * vec2f(depthDims));
   let depth = textureLoad(tDepth, depthCoord, 0).x;
-  return depth < 0.9999;
+  return depth >= 0.9999;
 }
 
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Early exit if no G-buffer data at this pixel
-  if (!hasGBufferData(uv)) {
-    return textureSample(tDiffuse, texSampler, uv);
-  }
+  // Sample all textures first (uniform control flow requirement)
+  // We must sample textures before any non-uniform branching
+  let originalColor = textureSample(tDiffuse, texSampler, uv);
+  let normalData = textureSample(tNormal, texSampler, uv);
 
-  // Sample normal
-  let normal = getNormal(uv);
+  // Check if this is background (no G-buffer data)
+  let isBg = isBackground(uv);
+
+  // Get normal from G-buffer (handles fallback internally)
+  let normal = getNormal(uv, normalData);
 
   // Calculate refraction offset based on normal deviation from camera-facing
   // Normal facing camera = (0, 0, 1) in view space, deviation causes distortion
@@ -159,31 +167,36 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Adjust for aspect ratio
   offset.x *= uniforms.resolution.y / uniforms.resolution.x;
 
-  if (uniforms.chromaticAberration > 0.0) {
-    // Chromatic aberration: sample R, G, B at different offsets
-    // Red bends less, blue bends more (matches real-world dispersion)
-    // Scale by 0.3 to make effect visible while keeping it subtle at low values
-    let caOffset = uniforms.chromaticAberration * 0.3;
+  // Chromatic aberration: sample R, G, B at different offsets
+  // Red bends less, blue bends more (matches real-world dispersion)
+  // Scale by 0.3 to make effect visible while keeping it subtle at low values
+  let caOffset = uniforms.chromaticAberration * 0.3;
 
-    let offsetR = offset * (1.0 - caOffset);
-    let offsetG = offset;
-    let offsetB = offset * (1.0 + caOffset);
+  let offsetR = offset * (1.0 - caOffset);
+  let offsetG = offset;
+  let offsetB = offset * (1.0 + caOffset);
 
-    // Clamp UVs to prevent sampling outside texture
-    let uvR = clamp(uv + offsetR, vec2f(0.0), vec2f(1.0));
-    let uvG = clamp(uv + offsetG, vec2f(0.0), vec2f(1.0));
-    let uvB = clamp(uv + offsetB, vec2f(0.0), vec2f(1.0));
+  // Clamp UVs to prevent sampling outside texture
+  let uvR = clamp(uv + offsetR, vec2f(0.0), vec2f(1.0));
+  let uvG = clamp(uv + offsetG, vec2f(0.0), vec2f(1.0));
+  let uvB = clamp(uv + offsetB, vec2f(0.0), vec2f(1.0));
 
-    let r = textureSample(tDiffuse, texSampler, uvR).r;
-    let g = textureSample(tDiffuse, texSampler, uvG).g;
-    let b = textureSample(tDiffuse, texSampler, uvB).b;
+  // Always sample all channels (uniform control flow)
+  let sampleR = textureSample(tDiffuse, texSampler, uvR).r;
+  let sampleG = textureSample(tDiffuse, texSampler, uvG).g;
+  let sampleB = textureSample(tDiffuse, texSampler, uvB).b;
 
-    return vec4f(r, g, b, 1.0);
-  } else {
-    // No chromatic aberration - simple offset
-    let refractedUV = clamp(uv + offset, vec2f(0.0), vec2f(1.0));
-    return textureSample(tDiffuse, texSampler, refractedUV);
-  }
+  // Simple offset UV for non-CA case
+  let refractedUV = clamp(uv + offset, vec2f(0.0), vec2f(1.0));
+  let simpleRefracted = textureSample(tDiffuse, texSampler, refractedUV);
+
+  // Build refracted color - use chromatic aberration result if CA > 0
+  let hasCA = uniforms.chromaticAberration > 0.0;
+  let caColor = vec4f(sampleR, sampleG, sampleB, 1.0);
+  let refractedColor = select(simpleRefracted, caColor, hasCA);
+
+  // Final output: use original color for background, refracted color otherwise
+  return select(refractedColor, originalColor, isBg);
 }
 `
 
@@ -246,6 +259,7 @@ export class RefractionPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
@@ -323,6 +337,7 @@ export class RefractionPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
@@ -352,6 +367,7 @@ export class RefractionPass extends WebGPUBasePass {
 
   /**
    * Execute the refraction pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (

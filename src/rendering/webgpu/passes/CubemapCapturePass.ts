@@ -176,6 +176,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipelines.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -214,6 +215,11 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Create a render pipeline for cubemap face rendering.
+   * @param device
+   * @param shaderModule
+   * @param bindGroupLayouts
+   * @param format
+   * @param label
    */
   private createCubemapPipeline(
     device: GPUDevice,
@@ -253,6 +259,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Initialize temporal cubemap history (2-frame buffer).
+   * @param device
    */
   private initializeCubemapHistory(device: GPUDevice): void {
     for (let i = 0; i < 2; i++) {
@@ -263,6 +270,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Create a cubemap resource with all face views.
+   * @param device
    */
   private createCubemapResource(device: GPUDevice): CubemapResource {
     const resolution = this.backgroundResolution
@@ -331,6 +339,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Set the background capture resolution.
+   * @param resolution
    */
   setBackgroundResolution(resolution: number): void {
     if (resolution !== this.backgroundResolution) {
@@ -378,6 +387,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Check if history at the given offset is valid.
+   * @param frameOffset
    */
   private hasValidHistory(frameOffset: number): boolean {
     return this.framesSinceReset > frameOffset
@@ -400,6 +410,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Compute the view matrix for a cube face.
+   * @param faceIndex
    */
   private computeFaceViewMatrix(faceIndex: number): Float32Array {
     const face = CUBE_FACE_DIRECTIONS[faceIndex]
@@ -469,6 +480,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Execute the cubemap capture pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -527,6 +539,8 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Determine if the skybox is currently animating.
+   * @param env
+   * @param isPlaying
    */
   private isSkyboxAnimating(
     env: {
@@ -555,6 +569,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   /**
    * Execute the actual cubemap capture.
+   * @param ctx
    */
   private executeCapture(ctx: WebGPURenderContext): void {
     if (

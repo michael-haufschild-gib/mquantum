@@ -12,6 +12,7 @@
  * - Kerr black hole disk warping (Bardeen-Petterson effect)
  *
  * Port of GLSL blackhole/gravity/disk-volumetric.glsl to WGSL.
+ * Uses global 'blackhole' uniform binding directly for consistency.
  *
  * @module rendering/webgpu/shaders/blackhole/disk-volumetric.wgsl
  */
@@ -189,12 +190,11 @@ fn flowNoise(p: vec3f, time: f32, noiseScale: f32, fastMode: bool, ultraFastMode
 /**
  * Calculate density of the accretion disk at a given point.
  *
- * PERF (OPT-BH-3): Accepts pre-computed r to avoid redundant length() calls.
+ * Uses global 'blackhole' uniform binding directly.
  *
  * @param pos - Position in space (relative to black hole center)
  * @param time - Animation time
  * @param r - Pre-computed radial distance length(pos.xz)
- * @param uniforms - BlackHole uniforms struct
  * @param fragCoord - Fragment coordinates for dithering
  * @returns Density value (0.0 to ~1.0+)
  */
@@ -202,31 +202,28 @@ fn getDiskDensity(
   pos: vec3f,
   time: f32,
   r: f32,
-  uniforms: BlackHoleUniforms,
   fragCoord: vec2f
 ) -> f32 {
-  // PERF (OPT-BH-6): Use pre-computed disk radii uniforms
-  let innerR = uniforms.diskInnerR;
-  let outerR = uniforms.diskOuterR;
+  // Use pre-computed disk radii from global blackhole uniforms
+  let innerR = blackhole.diskInnerR;
+  let outerR = blackhole.diskOuterR;
 
   // 1. Basic Bounds Check
   if (r < innerR * DISK_INNER_EDGE_SOFTNESS || r > outerR * DISK_OUTER_FADE_END) { return 0.0; }
 
   // 2. Vertical Profile (Gaussian with flaring)
-  // PERF (OPT-BH-31): Replace pow(x, 2.5) with x*x*sqrt(x)
   let rNorm = r / outerR;
   let flare = 1.0 + (rNorm * rNorm * sqrt(rNorm)) * DISK_FLARE_SCALE;
-  let thickness = uniforms.manifoldThickness * uniforms.horizonRadius * 0.5 * flare;
+  let thickness = blackhole.manifoldThickness * blackhole.horizonRadius * 0.5 * flare;
 
   // === Kerr disk warp (Bardeen-Petterson effect) ===
   // Calculate warped midplane offset based on spin
-  let warpOffset = getDiskWarp(pos, r, innerR, thickness, uniforms.spin, uniforms.diskRotationAngle);
+  let warpOffset = getDiskWarp(pos, r, innerR, thickness, blackhole.spin, blackhole.diskRotationAngle);
 
   // Height relative to warped midplane (not flat y=0 plane)
   let h = abs(pos.y - warpOffset);
 
   // Very sharp vertical falloff for "thin disk" look at center
-  // PERF: Pre-multiply h*h and thick*thick
   let hSq = h * h;
   let tSq = thickness * thickness;
   let hDensity = exp(-hSq / tSq);
@@ -235,9 +232,7 @@ fn getDiskDensity(
   if (hDensity < DENSITY_CUTOFF) { return 0.0; }
 
   // PERF (OPT-BH-3): Ultra-fast mode - skip ALL noise computation
-  // During rapid camera movement, return smooth radial density gradient only.
-  // The motion blur and low detail make noise patterns imperceptible.
-  if (uniforms.ultraFastMode) {
+  if (blackhole.ultraFastMode != 0u) {
     // Simple radial profile without noise
     var rDensity = smoothstep(innerR * DISK_INNER_EDGE_SOFTNESS, innerR, r)
                  * (1.0 - smoothstep(outerR * DISK_OUTER_EDGE_SOFTNESS, outerR * DISK_OUTER_FADE_END, r));
@@ -245,7 +240,7 @@ fn getDiskDensity(
     let rOverInner = r / max(innerR, 0.001);
     rDensity *= 2.0 / (rOverInner * rOverInner + 0.1);
 
-    return hDensity * rDensity * uniforms.manifoldIntensity * DISK_BASE_INTENSITY;
+    return hDensity * rDensity * blackhole.manifoldIntensity * DISK_BASE_INTENSITY;
   }
 
   // 3. Radial Profile
@@ -253,9 +248,9 @@ fn getDiskDensity(
 
   // Asymmetric ISCO: Modulate inner radius based on spin and angle
   var spinMod = 0.0;
-  if (uniforms.spin > 0.01) {
+  if (blackhole.spin > 0.01) {
     let spinFactor = pos.x / (r + 0.001);
-    spinMod = -spinFactor * uniforms.spin * 0.4;
+    spinMod = -spinFactor * blackhole.spin * 0.4;
   }
 
   let effectiveInnerR = innerR * (1.0 + spinMod);
@@ -266,30 +261,28 @@ fn getDiskDensity(
                * (1.0 - smoothstep(outerR * DISK_OUTER_EDGE_SOFTNESS, outerR * DISK_OUTER_FADE_END, r));
 
   // Inverse square falloff for bulk density (denser inside)
-  // PERF: Use multiplication instead of pow(x, 2.0)
   let rOverInner = r / safeInnerR;
   rDensity *= 2.0 / (rOverInner * rOverInner + 0.1);
 
   // 4. Volumetric Detail (The "Interstellar" Look)
 
   // PERF (OPT-BH-32): Conditional noise setup - skip if not needed
-  if (uniforms.noiseAmount > 0.01) {
-    // PERF: Compute sin/cos directly from position, avoiding expensive atan()
-    // cos(angle) = x/r, sin(angle) = z/r (unit circle definition)
+  if (blackhole.noiseAmount > 0.01) {
+    // Compute sin/cos directly from position, avoiding expensive atan()
     let invR = 1.0 / max(r, 0.001);
     let cosAngle = pos.x * invR;
     let sinAngle = pos.z * invR;
 
     // Apply disk rotation using angle addition formulas (avoids atan + sin/cos)
-    var cosRot = cos(uniforms.diskRotationAngle);
-    var sinRot = sin(uniforms.diskRotationAngle);
+    var cosRot = cos(blackhole.diskRotationAngle);
+    var sinRot = sin(blackhole.diskRotationAngle);
 
     // Keplerian differential rotation
-    if (uniforms.keplerianDifferential > 0.001) {
+    if (blackhole.keplerianDifferential > 0.001) {
       let ratio = safeInnerR / max(r, safeInnerR * 0.1);
       let keplerianFactor = ratio * sqrt(ratio);
-      let rotSpeed = mix(1.0, keplerianFactor, uniforms.keplerianDifferential);
-      let adjustedRot = uniforms.diskRotationAngle * rotSpeed;
+      let rotSpeed = mix(1.0, keplerianFactor, blackhole.keplerianDifferential);
+      let adjustedRot = blackhole.diskRotationAngle * rotSpeed;
       cosRot = cos(adjustedRot);
       sinRot = sin(adjustedRot);
     }
@@ -298,7 +291,7 @@ fn getDiskDensity(
     let rotCos = cosAngle * cosRot - sinAngle * sinRot;
     let rotSin = sinAngle * cosRot + cosAngle * sinRot;
 
-    // PERF: Simplified per-pixel dither using just fragment coords
+    // Simplified per-pixel dither using just fragment coords
     let noiseOffset = fract(dot(fragCoord, vec2f(0.0671056, 0.00583715))) * 0.1;
 
     // SEAM-FREE noise coordinates using rotated sin/cos
@@ -309,29 +302,29 @@ fn getDiskDensity(
       h * 2.0 + rotSin * 0.3 * RING_ANGULAR_FREQ
     );
 
-    // PERF: Use ridgedMF directly instead of flowNoise to skip domain warp snoise
-    let warped = ridgedMF(noiseCoord * uniforms.noiseScale + vec3f(time * 0.02, time * 0.01, 0.0), uniforms.fastMode, uniforms.dimension);
+    // Use ridgedMF directly instead of flowNoise to skip domain warp snoise
+    let warped = ridgedMF(noiseCoord * blackhole.noiseScale + vec3f(time * 0.02, time * 0.01, 0.0), blackhole.fastMode != 0u, blackhole.dimension);
 
     // Sharpen to create thin bright lines on dark background
     var noiseVal = smoothstep(0.15, 0.85, warped);
     noiseVal = noiseVal * noiseVal * sqrt(max(noiseVal, 0.001));
 
     // Apply noise modulation
-    rDensity *= mix(0.3, 1.0, noiseVal) * mix(1.0, 2.0, uniforms.noiseAmount);
+    rDensity *= mix(0.3, 1.0, noiseVal) * mix(1.0, 2.0, blackhole.noiseAmount);
 
     // Dust lanes (radial banding)
-    var dustLanes = 0.5 + 0.5 * sin((r + noiseOffset) * DUST_LANE_FREQUENCY / uniforms.horizonRadius);
+    var dustLanes = 0.5 + 0.5 * sin((r + noiseOffset) * DUST_LANE_FREQUENCY / blackhole.horizonRadius);
     dustLanes = sqrt(dustLanes);
-    rDensity *= mix(1.0, dustLanes, DUST_LANE_STRENGTH * uniforms.noiseAmount);
+    rDensity *= mix(1.0, dustLanes, DUST_LANE_STRENGTH * blackhole.noiseAmount);
   }
 
-  return hDensity * rDensity * uniforms.manifoldIntensity * DISK_BASE_INTENSITY;
+  return hDensity * rDensity * blackhole.manifoldIntensity * DISK_BASE_INTENSITY;
 }
 
 /**
  * Calculate emission color for a point in the disk.
  *
- * PERF: r and innerR are passed as parameters to avoid redundant length() calls.
+ * Uses global 'blackhole' uniform binding directly.
  *
  * @param pos - Position
  * @param density - Calculated density
@@ -340,7 +333,6 @@ fn getDiskDensity(
  * @param normal - Surface normal (for ALGO_NORMAL coloring)
  * @param r - Pre-computed radial distance length(pos.xz)
  * @param innerR - Pre-computed inner radius
- * @param uniforms - BlackHole uniforms struct
  * @returns Emission color
  */
 fn getDiskEmission(
@@ -350,8 +342,7 @@ fn getDiskEmission(
   rayDir: vec3f,
   normal: vec3f,
   r: f32,
-  innerR: f32,
-  uniforms: BlackHoleUniforms
+  innerR: f32
 ) -> vec3f {
   // Temperature Profile with Stress-Free ISCO Boundary
   let safeInnerR = max(innerR, 0.001);
@@ -364,11 +355,11 @@ fn getDiskEmission(
   var color: vec3f;
 
   // Normalized radial position: 0 at inner edge, 1 at outer edge
-  let normalizedR = clamp((r - innerR) / (uniforms.diskOuterR - innerR), 0.0, 1.0);
+  let normalizedR = clamp((r - innerR) / (blackhole.diskOuterR - innerR), 0.0, 1.0);
 
-  if (uniforms.colorAlgorithm == 10) { // ALGO_BLACKBODY
+  if (blackhole.colorAlgorithm == 10) { // ALGO_BLACKBODY
     // Map ratio to temperature
-    let temp = uniforms.diskTemperature * tempRatio;
+    let temp = blackhole.diskTemperature * tempRatio;
     color = blackbodyColor(temp);
 
     // Boost intensity heavily for the "core" look
@@ -376,7 +367,7 @@ fn getDiskEmission(
   } else {
     // Use normalized radius for color gradient (0 = inner/hot, 1 = outer/cool)
     let t = pow(normalizedR, 0.7);  // Slight non-linearity to push colors outward
-    color = getAlgorithmColor(t, pos, normal, uniforms);
+    color = getAlgorithmColor(t, pos, normal);
 
     // Add "thermal core" - lighter/whiter at inner edge
     let coreColor = vec3f(1.0, 0.98, 0.9);
@@ -389,11 +380,11 @@ fn getDiskEmission(
   }
 
   // Gravitational Redshift
-  let gRedshift = gravitationalRedshift(r, uniforms);
+  let gRedshift = gravitationalRedshift(r);
   color *= gRedshift;
 
   // Doppler Shift (Relativistic Beaming)
-  let dopplerFac = dopplerFactor(pos, rayDir, uniforms);
+  let dopplerFac = dopplerFactor(pos, rayDir);
   color = applyDopplerShift(color, dopplerFac);
 
   // Limb Darkening
@@ -411,12 +402,12 @@ fn getDiskEmission(
  * Compute disk surface normal from analytical approximation.
  * Used for volumetric lighting/shading interactions.
  *
- * PERF OPTIMIZATION (OPT-BH-18): ALWAYS uses analytical approximation.
+ * Uses global 'blackhole' uniform binding directly.
  */
-fn computeVolumetricDiskNormal(pos: vec3f, rayDir: vec3f, uniforms: BlackHoleUniforms) -> vec3f {
+fn computeVolumetricDiskNormal(pos: vec3f, rayDir: vec3f) -> vec3f {
   let r = length(pos.xz);
-  let innerR = uniforms.diskInnerR;
-  let outerR = uniforms.diskOuterR;
+  let innerR = blackhole.diskInnerR;
+  let outerR = blackhole.diskOuterR;
 
   // Radial direction in XZ plane (outward from center)
   let radialDir = select(vec3f(1.0, 0.0, 0.0), vec3f(pos.x / r, 0.0, pos.z / r), r > 0.001);
@@ -424,20 +415,20 @@ fn computeVolumetricDiskNormal(pos: vec3f, rayDir: vec3f, uniforms: BlackHoleUni
   // Calculate thickness for warp computation
   let rNorm = r / outerR;
   let flare = 1.0 + (rNorm * rNorm * sqrt(max(rNorm, 0.0))) * DISK_FLARE_SCALE;
-  let thickness = uniforms.manifoldThickness * uniforms.horizonRadius * 0.5 * flare;
+  let thickness = blackhole.manifoldThickness * blackhole.horizonRadius * 0.5 * flare;
 
   // === Warp gradient for Kerr black holes ===
   var warpGradient = vec3f(0.0);
-  if (abs(uniforms.spin) > 0.01) {
-    let eps = 0.05 * uniforms.horizonRadius;
+  if (abs(blackhole.spin) > 0.01) {
+    let eps = 0.05 * blackhole.horizonRadius;
     let px = pos + vec3f(eps, 0.0, 0.0);
     let pz = pos + vec3f(0.0, 0.0, eps);
     let rx = length(px.xz);
     let rz = length(pz.xz);
 
-    let warpCenter = getDiskWarp(pos, r, innerR, thickness, uniforms.spin, uniforms.diskRotationAngle);
-    let warpX = getDiskWarp(px, rx, innerR, thickness, uniforms.spin, uniforms.diskRotationAngle);
-    let warpZ = getDiskWarp(pz, rz, innerR, thickness, uniforms.spin, uniforms.diskRotationAngle);
+    let warpCenter = getDiskWarp(pos, r, innerR, thickness, blackhole.spin, blackhole.diskRotationAngle);
+    let warpX = getDiskWarp(px, rx, innerR, thickness, blackhole.spin, blackhole.diskRotationAngle);
+    let warpZ = getDiskWarp(pz, rz, innerR, thickness, blackhole.spin, blackhole.diskRotationAngle);
 
     // Gradient: how much warp changes in X and Z directions
     warpGradient.x = (warpX - warpCenter) / eps;
@@ -445,7 +436,7 @@ fn computeVolumetricDiskNormal(pos: vec3f, rayDir: vec3f, uniforms: BlackHoleUni
   }
 
   // Vertical component: dominant, points away from warped disk plane
-  let warpOffset = getDiskWarp(pos, r, innerR, thickness, uniforms.spin, uniforms.diskRotationAngle);
+  let warpOffset = getDiskWarp(pos, r, innerR, thickness, blackhole.spin, blackhole.diskRotationAngle);
   let ySign = select(-1.0, 1.0, (pos.y - warpOffset) > 0.0);
 
   // Slight radial tilt at outer edge (disk flare)

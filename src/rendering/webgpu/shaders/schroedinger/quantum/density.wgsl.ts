@@ -158,7 +158,7 @@ fn curlNoise(p: vec3f) -> vec3f {
 
 // Apply Curl Noise Flow to position
 fn applyFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
-  if (!uniforms.curlEnabled || uniforms.curlStrength <= 0.001) { return pos; }
+  if (uniforms.curlEnabled == 0u || uniforms.curlStrength <= 0.001) { return pos; }
 
   let flowPos = pos * uniforms.curlScale + vec3f(0.0, 0.0, t * uniforms.curlSpeed * 0.2);
 
@@ -182,17 +182,25 @@ fn applyFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
 /**
  * Generate dimension-specific mapPosToND function.
  *
+ * Uses the global `basis` uniform (BasisVectors) for coordinate transformation.
+ * The basis vectors are packed as array<vec4f, 3> each (12 f32 slots for 11 components).
+ *
  * @param dimension - The dimension (3-11)
  * @returns WGSL mapPosToND function for the specified dimension
  */
 export function generateMapPosToND(dimension: number): string {
   const dim = Math.min(Math.max(dimension, 3), 11)
 
-  // Generate unrolled coordinate assignments
+  // Generate unrolled coordinate assignments using getBasisComponent helper
+  // The basis uniform is globally available from the bind group
   const assignments = []
   for (let j = 0; j < dim; j++) {
     assignments.push(
-      `  xND[${j}] = (uniforms.origin[${j}] + pos.x*uniforms.basisX[${j}] + pos.y*uniforms.basisY[${j}] + pos.z*uniforms.basisZ[${j}]) * uniforms.fieldScale;`
+      `  let bx${j} = getBasisComponent(basis.basisX, ${j});
+  let by${j} = getBasisComponent(basis.basisY, ${j});
+  let bz${j} = getBasisComponent(basis.basisZ, ${j});
+  let o${j} = getBasisComponent(basis.origin, ${j});
+  xND[${j}] = (o${j} + pos.x*bx${j} + pos.y*by${j} + pos.z*bz${j}) * uniforms.fieldScale;`
     )
   }
 
@@ -210,6 +218,7 @@ export function generateMapPosToND(dimension: number): string {
 // ============================================
 
 // Maps 3D position to ND coordinates using rotated basis vectors.
+// Uses global 'basis' uniform (BasisVectors) for basis vectors and origin.
 // Unrolled for dimension ${dim} - no runtime branching.
 fn mapPosToND(pos: vec3f, uniforms: SchroedingerUniforms) -> array<f32, 11> {
   var xND: array<f32, 11>;
@@ -305,7 +314,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   rho = erodeDensity(rho, flowedPos, uniforms);
 
   // Apply shimmer if enabled
-  if (uniforms.shimmerEnabled && uniforms.shimmerStrength > 0.0) {
+  if (uniforms.shimmerEnabled != 0u && uniforms.shimmerStrength > 0.0) {
     if (rho > 0.001 && rho < 0.5) {
       let time = uniforms.time * uniforms.timeScale;
       let noisePos = flowedPos * 5.0 + vec3f(0.0, 0.0, time * 2.0);
@@ -351,7 +360,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   rho = erodeDensity(rho, flowedPos, uniforms);
 
   // Apply shimmer if enabled
-  if (uniforms.shimmerEnabled && uniforms.shimmerStrength > 0.0) {
+  if (uniforms.shimmerEnabled != 0u && uniforms.shimmerStrength > 0.0) {
     if (rho > 0.001 && rho < 0.5) {
       let time = uniforms.time * uniforms.timeScale;
       let noisePos = flowedPos * 5.0 + vec3f(0.0, 0.0, time * 2.0);
@@ -419,23 +428,20 @@ fn sampleDensityAtFlowedPosNoErosion(flowedPos: vec3f, t: f32, uniforms: Schroed
 
 /**
  * Legacy combined block - kept for backwards compatibility
- * Uses generic loop-based mapping
+ * Uses generic loop-based mapping with global basis uniform
  */
 export const densityBlock =
   densityPreMapBlock +
   /* wgsl */ `
-// Fallback: generic loop-based mapping
+// Fallback: generic loop-based mapping using basis uniform
 fn mapPosToND(pos: vec3f, uniforms: SchroedingerUniforms) -> array<f32, 11> {
   var xND: array<f32, 11>;
   for (var j = 0; j < 11; j++) {
-    if (j >= uniforms.dimension) {
-      xND[j] = 0.0;
-    } else {
-      xND[j] = (uniforms.origin[j]
-             + pos.x * uniforms.basisX[j]
-             + pos.y * uniforms.basisY[j]
-             + pos.z * uniforms.basisZ[j]) * uniforms.fieldScale;
-    }
+    let bx = getBasisComponent(basis.basisX, j);
+    let by = getBasisComponent(basis.basisY, j);
+    let bz = getBasisComponent(basis.basisZ, j);
+    let o = getBasisComponent(basis.origin, j);
+    xND[j] = (o + pos.x * bx + pos.y * by + pos.z * bz) * uniforms.fieldScale;
   }
   return xND;
 }

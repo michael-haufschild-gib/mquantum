@@ -15,6 +15,7 @@ import type { ManagedUniformBuffer, UniformBufferDescriptor, UniformEntry } from
 
 /**
  * Get the alignment requirement for a WGSL type.
+ * @param type
  */
 function getTypeAlignment(type: UniformEntry['type']): number {
   switch (type) {
@@ -37,6 +38,7 @@ function getTypeAlignment(type: UniformEntry['type']): number {
 
 /**
  * Get the size of a WGSL type in bytes.
+ * @param type
  */
 function getTypeSize(type: UniformEntry['type']): number {
   switch (type) {
@@ -61,6 +63,8 @@ function getTypeSize(type: UniformEntry['type']): number {
 
 /**
  * Align an offset to the required alignment.
+ * @param offset
+ * @param alignment
  */
 function alignOffset(offset: number, alignment: number): number {
   return Math.ceil(offset / alignment) * alignment
@@ -91,6 +95,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a f32 uniform.
+   * @param name
    */
   addFloat(name: string): this {
     return this.addEntry(name, 'f32')
@@ -98,6 +103,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add an i32 uniform.
+   * @param name
    */
   addInt(name: string): this {
     return this.addEntry(name, 'i32')
@@ -105,6 +111,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a u32 uniform.
+   * @param name
    */
   addUint(name: string): this {
     return this.addEntry(name, 'u32')
@@ -112,6 +119,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a vec2f uniform.
+   * @param name
    */
   addVec2(name: string): this {
     return this.addEntry(name, 'vec2f')
@@ -119,6 +127,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a vec3f uniform.
+   * @param name
    */
   addVec3(name: string): this {
     return this.addEntry(name, 'vec3f')
@@ -126,6 +135,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a vec4f uniform.
+   * @param name
    */
   addVec4(name: string): this {
     return this.addEntry(name, 'vec4f')
@@ -133,6 +143,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a mat3x3f uniform.
+   * @param name
    */
   addMat3(name: string): this {
     return this.addEntry(name, 'mat3x3f')
@@ -140,6 +151,7 @@ export class UniformBufferBuilder {
 
   /**
    * Add a mat4x4f uniform.
+   * @param name
    */
   addMat4(name: string): this {
     return this.addEntry(name, 'mat4x4f')
@@ -147,6 +159,8 @@ export class UniformBufferBuilder {
 
   /**
    * Add an array of floats.
+   * @param name
+   * @param length
    */
   addFloatArray(name: string, length: number): this {
     return this.addEntry(name, 'f32', length)
@@ -154,6 +168,8 @@ export class UniformBufferBuilder {
 
   /**
    * Add an array of vec4f.
+   * @param name
+   * @param length
    */
   addVec4Array(name: string, length: number): this {
     return this.addEntry(name, 'vec4f', length)
@@ -161,6 +177,9 @@ export class UniformBufferBuilder {
 
   /**
    * Add a custom entry.
+   * @param name
+   * @param type
+   * @param arrayLength
    */
   private addEntry(name: string, type: UniformEntry['type'], arrayLength?: number): this {
     const alignment = getTypeAlignment(type)
@@ -210,6 +229,9 @@ export class UniformBufferBuilder {
 
 /**
  * Create a managed uniform buffer.
+ * @param device
+ * @param descriptor
+ * @param label
  */
 export function createManagedUniformBuffer(
   device: GPUDevice,
@@ -256,6 +278,8 @@ export class UniformBufferWriter {
 
   /**
    * Set a f32 value.
+   * @param name
+   * @param value
    */
   setFloat(name: string, value: number): this {
     const entry = this.entryMap.get(name)
@@ -268,6 +292,8 @@ export class UniformBufferWriter {
 
   /**
    * Set an i32 value.
+   * @param name
+   * @param value
    */
   setInt(name: string, value: number): this {
     const entry = this.entryMap.get(name)
@@ -280,6 +306,8 @@ export class UniformBufferWriter {
 
   /**
    * Set a u32 value.
+   * @param name
+   * @param value
    */
   setUint(name: string, value: number): this {
     const entry = this.entryMap.get(name)
@@ -292,6 +320,9 @@ export class UniformBufferWriter {
 
   /**
    * Set a vec2f value.
+   * @param name
+   * @param x
+   * @param y
    */
   setVec2(name: string, x: number, y: number): this {
     const entry = this.entryMap.get(name)
@@ -306,6 +337,10 @@ export class UniformBufferWriter {
 
   /**
    * Set a vec3f value.
+   * @param name
+   * @param x
+   * @param y
+   * @param z
    */
   setVec3(name: string, x: number, y: number, z: number): this {
     const entry = this.entryMap.get(name)
@@ -321,6 +356,11 @@ export class UniformBufferWriter {
 
   /**
    * Set a vec4f value.
+   * @param name
+   * @param x
+   * @param y
+   * @param z
+   * @param w
    */
   setVec4(name: string, x: number, y: number, z: number, w: number): this {
     const entry = this.entryMap.get(name)
@@ -338,6 +378,8 @@ export class UniformBufferWriter {
   /**
    * Set a mat3x3f value from array (9 floats, column-major).
    * Note: In WGSL, mat3x3f is stored as 3 vec4f (padded).
+   * @param name
+   * @param values
    */
   setMat3(name: string, values: ArrayLike<number>): this {
     const entry = this.entryMap.get(name)
@@ -362,6 +404,8 @@ export class UniformBufferWriter {
 
   /**
    * Set a mat4x4f value from array (16 floats, column-major).
+   * @param name
+   * @param values
    */
   setMat4(name: string, values: ArrayLike<number>): this {
     const entry = this.entryMap.get(name)
@@ -377,6 +421,8 @@ export class UniformBufferWriter {
 
   /**
    * Set a float array.
+   * @param name
+   * @param values
    */
   setFloatArray(name: string, values: ArrayLike<number>): this {
     const entry = this.entryMap.get(name)
@@ -394,6 +440,8 @@ export class UniformBufferWriter {
 
   /**
    * Set a vec4 array.
+   * @param name
+   * @param values
    */
   setVec4Array(name: string, values: ArrayLike<number>): this {
     const entry = this.entryMap.get(name)
@@ -410,6 +458,7 @@ export class UniformBufferWriter {
 
   /**
    * Upload dirty buffer to GPU.
+   * @param device
    */
   upload(device: GPUDevice): void {
     if (this.managed.dirty) {
@@ -420,6 +469,7 @@ export class UniformBufferWriter {
 
   /**
    * Force upload (ignore dirty flag).
+   * @param device
    */
   forceUpload(device: GPUDevice): void {
     device.queue.writeBuffer(this.managed.buffer, 0, this.managed.data)

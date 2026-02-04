@@ -148,31 +148,32 @@ fn lchColor(t: f32, lightness: f32, chroma: f32) -> vec3f {
  * - Use direct RGB lightness variation instead
  * - Simplified PHASE to reuse existing angle if available
  *
+ * Uses global 'blackhole' uniform binding directly for consistency with other shader functions.
+ *
  * @param t - Input parameter [0, 1] (usually normalized radial distance)
  * @param pos - 3D position (for normal/phase based algorithms)
  * @param normal - Surface normal (for normal-based coloring)
- * @param uniforms - BlackHole uniforms struct
  * @return RGB color
  */
-fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f, uniforms: BlackHoleUniforms) -> vec3f {
+fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f) -> vec3f {
   // 1. Monochromatic (Direct RGB lightness variation)
   // PERF (OPT-BH-20): Replaced HSL round-trip with direct RGB interpolation
-  if (uniforms.colorAlgorithm == ALGO_MONOCHROMATIC) {
+  if (blackhole.colorAlgorithm == ALGO_MONOCHROMATIC) {
     // Compute luminance for consistent lightness perception
-    let luminance = dot(uniforms.baseColor, vec3f(0.299, 0.587, 0.114));
+    let luminance = dot(blackhole.baseColor, vec3f(0.299, 0.587, 0.114));
     // Interpolate between black, base color, and white based on t
     // t=0 -> dark, t=0.5 -> base, t=1 -> bright
-    let dark = uniforms.baseColor * 0.2;
-    let bright = mix(uniforms.baseColor, vec3f(1.0), 0.5);
+    let dark = blackhole.baseColor * 0.2;
+    let bright = mix(blackhole.baseColor, vec3f(1.0), 0.5);
     return select(
-      mix(uniforms.baseColor, bright, (t - 0.5) * 2.0),
-      mix(dark, uniforms.baseColor, t * 2.0),
+      mix(blackhole.baseColor, bright, (t - 0.5) * 2.0),
+      mix(dark, blackhole.baseColor, t * 2.0),
       t < 0.5
     );
   }
   // 2. Analogous (Direct RGB hue shift approximation)
   // PERF (OPT-BH-20): Replaced HSL round-trip with RGB rotation
-  else if (uniforms.colorAlgorithm == ALGO_ANALOGOUS) {
+  else if (blackhole.colorAlgorithm == ALGO_ANALOGOUS) {
     // Hue shift in RGB using rotation around gray axis
     // Shift amount based on t: center (t=0.5) = no shift
     let hueShift = (t - 0.5) * 0.5; // ±0.25 radians (~±15 degrees)
@@ -184,53 +185,53 @@ fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f, uniforms: BlackHoleUnifo
       0.2929 * (1.0 - c) + 0.4082 * s,  0.7071 + 0.2929 * c,  0.2929 * (1.0 - c) - 0.4082 * s,
       0.2929 * (1.0 - c) - 0.4082 * s,  0.2929 * (1.0 - c) + 0.4082 * s,  0.7071 + 0.2929 * c
     );
-    let shifted = hueRotation * uniforms.baseColor;
+    let shifted = hueRotation * blackhole.baseColor;
     // Also vary lightness
     let lightness = 0.3 + t * 0.7;
     return clamp(shifted * lightness, vec3f(0.0), vec3f(1.0));
   }
   // 3. Cosine Gradient (Standard Radial)
-  else if (uniforms.colorAlgorithm == ALGO_COSINE ||
-           uniforms.colorAlgorithm == ALGO_DISTANCE ||
-           uniforms.colorAlgorithm == ALGO_RADIAL) {
+  else if (blackhole.colorAlgorithm == ALGO_COSINE ||
+           blackhole.colorAlgorithm == ALGO_DISTANCE ||
+           blackhole.colorAlgorithm == ALGO_RADIAL) {
     return getCosinePaletteColor(
       t,
-      uniforms.cosineA, uniforms.cosineB, uniforms.cosineC, uniforms.cosineD,
+      blackhole.cosineA, blackhole.cosineB, blackhole.cosineC, blackhole.cosineD,
       1.0, 1.0, 0.0
     );
   }
   // 4. Normal Based
-  else if (uniforms.colorAlgorithm == ALGO_NORMAL) {
+  else if (blackhole.colorAlgorithm == ALGO_NORMAL) {
     let nt = normal.y * 0.5 + 0.5;
     return getCosinePaletteColor(
       nt,
-      uniforms.cosineA, uniforms.cosineB, uniforms.cosineC, uniforms.cosineD,
+      blackhole.cosineA, blackhole.cosineB, blackhole.cosineC, blackhole.cosineD,
       1.0, 1.0, 0.0
     );
   }
   // 5. Phase (Angular)
-  else if (uniforms.colorAlgorithm == ALGO_PHASE) {
+  else if (blackhole.colorAlgorithm == ALGO_PHASE) {
     let angle = atan2(pos.z, pos.x);
     let pt = angle * 0.15915 + 0.5; // [-PI, PI] -> [0, 1]
     return getCosinePaletteColor(
       pt,
-      uniforms.cosineA, uniforms.cosineB, uniforms.cosineC, uniforms.cosineD,
+      blackhole.cosineA, blackhole.cosineB, blackhole.cosineC, blackhole.cosineD,
       1.0, 1.0, 0.0
     );
   }
   // 6. LCH
-  else if (uniforms.colorAlgorithm == ALGO_LCH) {
-    return lchColor(t, uniforms.lchLightness, uniforms.lchChroma);
+  else if (blackhole.colorAlgorithm == ALGO_LCH) {
+    return lchColor(t, blackhole.lchLightness, blackhole.lchChroma);
   }
   // 7. Blackbody
-  else if (uniforms.colorAlgorithm == ALGO_BLACKBODY) {
+  else if (blackhole.colorAlgorithm == ALGO_BLACKBODY) {
     let safeBase = max(t + 0.1, 0.01);
     // PERF: Use multiplication instead of pow(x, -0.5) = 1/sqrt(x)
-    let temp = uniforms.diskTemperature * inverseSqrt(safeBase);
+    let temp = blackhole.diskTemperature * inverseSqrt(safeBase);
     return blackbodyColor(temp);
   }
   // 8. Accretion Gradient (Interstellar-style: white/yellow inner -> deep red outer)
-  else if (uniforms.colorAlgorithm == ALGO_ACCRETION_GRADIENT) {
+  else if (blackhole.colorAlgorithm == ALGO_ACCRETION_GRADIENT) {
     // Three-color gradient for realistic accretion disk appearance
     let hotCore = vec3f(1.0, 0.95, 0.8);    // White/pale yellow (hottest, inner)
     let midOrange = vec3f(1.0, 0.6, 0.15);  // Bright orange (middle)
@@ -244,7 +245,7 @@ fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f, uniforms: BlackHoleUnifo
     }
   }
   // 9. Gravitational Redshift
-  else if (uniforms.colorAlgorithm == ALGO_GRAVITATIONAL_REDSHIFT) {
+  else if (blackhole.colorAlgorithm == ALGO_GRAVITATIONAL_REDSHIFT) {
     let r = length(pos.xz);
     // gravitationalRedshift is defined in doppler.wgsl
     let redshift = gravitationalRedshift(r);
@@ -252,6 +253,6 @@ fn getAlgorithmColor(t: f32, pos: vec3f, normal: vec3f, uniforms: BlackHoleUnifo
   }
 
   // Fallback
-  return uniforms.baseColor;
+  return blackhole.baseColor;
 }
 `

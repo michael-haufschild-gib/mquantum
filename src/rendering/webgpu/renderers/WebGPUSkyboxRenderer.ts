@@ -31,6 +31,7 @@ export interface SkyboxRendererConfig {
 
 /**
  * Maps store skybox mode to shader mode string.
+ * @param storeMode
  */
 function mapSkyboxModeToShader(storeMode: SkyboxMode): ShaderSkyboxMode {
   switch (storeMode) {
@@ -54,6 +55,7 @@ function mapSkyboxModeToShader(storeMode: SkyboxMode): ShaderSkyboxMode {
 
 /**
  * Maps shader mode string to numeric mode value for uniforms.
+ * @param mode
  */
 function modeToNumeric(mode: ShaderSkyboxMode): number {
   switch (mode) {
@@ -124,6 +126,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   /**
    * Set the skybox mode.
    * This will trigger pipeline recreation on next frame.
+   * @param mode
    */
   setMode(mode: SkyboxMode): void {
     const shaderMode = mapSkyboxModeToShader(mode)
@@ -142,6 +145,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   /**
    * Create pipeline for specific skybox mode.
+   * @param device
+   * @param format
+   * @param mode
    */
   private async createPipelineForMode(
     device: GPUDevice,
@@ -245,6 +251,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   /**
    * Create placeholder cube texture for when no real texture is loaded.
+   * @param device
    */
   private createPlaceholderTexture(device: GPUDevice): void {
     // Create a 1x1 cube texture filled with default color
@@ -276,6 +283,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   /**
    * Recreate bind groups (called when textures or buffers change).
+   * @param device
    */
   private recreateBindGroups(device: GPUDevice): void {
     if (
@@ -311,6 +319,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   /**
    * Update skybox uniforms from environment store.
+   * @param ctx
    */
   private updateUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.uniformBuffer) return
@@ -427,6 +436,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   /**
    * Update vertex uniforms (matrices for skybox rendering).
+   * @param ctx
    */
   private updateVertexUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.uniformBuffer) return

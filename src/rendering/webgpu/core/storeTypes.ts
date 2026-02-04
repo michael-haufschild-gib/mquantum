@@ -15,15 +15,37 @@ import type { WebGPUFrameContext } from './types'
 
 /**
  * Camera store state accessible to renderers.
+ *
+ * Note: The camera data is flattened when passed to passes via frame context.
+ * This interface reflects the actual structure received by WebGPU passes.
  */
 export interface CameraStoreState {
-  controls: {
-    object: {
-      position: { x: number; y: number; z: number }
-      projectionMatrix: { elements: number[] }
-      matrixWorldInverse: { elements: number[] }
+  // Position data
+  position?: { x: number; y: number; z: number } | [number, number, number]
+
+  // Matrices with elements array (Three.js Matrix4 format)
+  viewMatrix?: { elements: number[] }
+  projectionMatrix?: { elements: number[] }
+  inverseViewMatrix?: { elements: number[] }
+  inverseProjectionMatrix?: { elements: number[] }
+  viewProjectionMatrix?: { elements: number[] }
+  matrixWorldInverse?: { elements: number[] }
+
+  // Camera parameters
+  near?: number
+  far?: number
+  fov?: number
+  aspect?: number
+  isPerspective?: boolean
+
+  // Legacy controls structure (if still used in some places)
+  controls?: {
+    object?: {
+      position?: { x: number; y: number; z: number }
+      projectionMatrix?: { elements: number[] }
+      matrixWorldInverse?: { elements: number[] }
     }
-    target: { x: number; y: number; z: number }
+    target?: { x: number; y: number; z: number }
   } | null
 }
 
@@ -169,6 +191,9 @@ export interface WebGPUStoreMap {
 /**
  * Get typed store state from frame context.
  *
+ * @param ctx
+ * @param ctx.frame
+ * @param key
  * @example
  * ```typescript
  * const camera = getStore(ctx, 'camera')
@@ -186,6 +211,10 @@ export function getStore<K extends keyof WebGPUStoreMap>(
 /**
  * Get typed store state with default fallback.
  *
+ * @param ctx
+ * @param ctx.frame
+ * @param key
+ * @param defaultValue
  * @example
  * ```typescript
  * const extended = getStoreOrDefault(ctx, 'extended', { power: 8, iterations: 100 })

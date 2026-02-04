@@ -21,6 +21,9 @@ import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 import { useThree, useFrame } from '@react-three/fiber'
 import { useEffect, useRef, useCallback } from 'react'
 
+/**
+ *
+ */
 export function ScreenshotCaptureController() {
   const { gl, advance } = useThree()
 

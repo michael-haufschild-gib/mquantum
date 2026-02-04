@@ -52,7 +52,7 @@ export interface BufferPreviewPassConfig {
  */
 const BUFFER_PREVIEW_SHADER = /* wgsl */ `
 struct Uniforms {
-  type: i32,          // 0=Copy, 1=Depth, 2=Normal, 3=TemporalDepth
+  bufferType: i32,    // 0=Copy, 1=Depth, 2=Normal, 3=TemporalDepth
   depthMode: i32,     // 0=Raw, 1=Linear, 2=FocusZones
   nearClip: f32,
   farClip: f32,
@@ -82,7 +82,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let texel = textureSample(tInput, texSampler, uv);
 
   // Type 1: Depth Buffer
-  if (uniforms.type == 1) {
+  if (uniforms.bufferType == 1) {
     let depth = texel.x;
 
     // Mode 0: Raw Depth (Inverted: near=white, far=black)
@@ -116,7 +116,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   }
 
   // Type 2: Normal Buffer
-  if (uniforms.type == 2) {
+  if (uniforms.bufferType == 2) {
     let normal = texel.rgb;
 
     // Check for valid data (empty/background = near-zero)
@@ -133,7 +133,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 
   // Type 3: Temporal Depth
   // gPosition buffer: xyz = model-space position, w = model-space ray distance
-  if (uniforms.type == 3) {
+  if (uniforms.bufferType == 3) {
     let temporalDepth = texel.w;  // Use .w (ray distance), NOT .r (X position)!
 
     // 0.0 indicates invalid/empty data (no hit)
@@ -240,9 +240,10 @@ export class BufferPreviewPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -265,12 +266,13 @@ export class BufferPreviewPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, BUFFER_PREVIEW_SHADER, 'buffer-preview-fragment')
 
-    // Create pipeline
+    // Create pipeline with rgba8unorm format to match the output resource
+    // (not canvas format which may be bgra8unorm)
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba8unorm',
       { label: 'buffer-preview' }
     )
 
@@ -344,6 +346,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
 
   /**
    * Execute the buffer preview pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -354,6 +357,22 @@ export class BufferPreviewPass extends WebGPUBasePass {
       !this.sampler
     ) {
       return
+    }
+
+    // Dynamic configuration from stores (if available)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const previewConfig = ctx.frame?.stores?.['bufferPreview'] as any
+    if (previewConfig) {
+      // Update buffer type and input based on which debug flag is active
+      if (previewConfig.bufferType !== undefined) {
+        this.setBufferType(previewConfig.bufferType)
+      }
+      if (previewConfig.bufferInput !== undefined) {
+        this.setBufferInput(previewConfig.bufferInput)
+      }
+      if (previewConfig.depthMode !== undefined) {
+        this.setDepthMode(previewConfig.depthMode)
+      }
     }
 
     // Get input texture

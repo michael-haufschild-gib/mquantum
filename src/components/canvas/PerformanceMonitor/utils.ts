@@ -1,4 +1,10 @@
 // --- Helper Functions ---
+/**
+ *
+ * @param value
+ * @param unit
+ * @param decimals
+ */
 export function formatMetric(value: number, unit = '', decimals = 1): string {
   if (value === 0) return `0${unit}`
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(decimals)}M${unit}`
@@ -6,6 +12,11 @@ export function formatMetric(value: number, unit = '', decimals = 1): string {
   return `${Math.round(value)}${unit}`
 }
 
+/**
+ *
+ * @param bytes
+ * @param decimals
+ */
 export function formatBytes(bytes: number, decimals = 1): string {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -14,6 +25,12 @@ export function formatBytes(bytes: number, decimals = 1): string {
   return `${(bytes / Math.pow(k, i)).toFixed(decimals)} ${sizes[i]}`
 }
 
+/**
+ *
+ * @param fps
+ * @param high
+ * @param low
+ */
 export function getHealthColor(fps: number, high: number, low: number) {
   if (fps >= high)
     return {
@@ -37,6 +54,11 @@ export function getHealthColor(fps: number, high: number, low: number) {
   }
 }
 
+/**
+ *
+ * @param key
+ * @param objectType
+ */
 export function formatShaderName(key: string, objectType: string): string {
   if (key.toLowerCase() === 'object') {
     return objectType
@@ -56,6 +78,10 @@ export const FPS_COLORS = {
   low: { text: 'health-low', bg: 'bg-health-low', stroke: 'var(--health-low-stroke)' },
 } as const
 
+/**
+ *
+ * @param fps
+ */
 export function getFpsColorLevel(fps: number): FpsColorLevel {
   if (fps >= 55) return 'high'
   if (fps >= 30) return 'medium'

@@ -19,6 +19,7 @@ import type { WythoffPolytopeConfig } from '@/lib/geometry/wythoff/types'
 
 /**
  * Create test geometry for testing
+ * @param dimension
  */
 function createTestGeometry(dimension: number = 4): PolytopeGeometry {
   const vertices: number[][] = []

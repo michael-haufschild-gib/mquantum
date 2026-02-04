@@ -199,6 +199,7 @@ export class DepthPass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
@@ -288,6 +289,7 @@ export class DepthPass extends WebGPUBasePass {
 
   /**
    * Execute the depth pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (

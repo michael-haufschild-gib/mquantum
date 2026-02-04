@@ -4,12 +4,16 @@
  * 11-dimensional Mandelbulb signed distance function.
  * Port of GLSL sdf11d.glsl to WGSL.
  *
+ * NOTE: Scale is handled by the dispatch function (GetDist), NOT here.
+ * The SDF works on pure fractal coordinates without scale modification.
+ *
  * @module rendering/webgpu/shaders/mandelbulb/sdf/sdf11d.wgsl
  */
 
 export const sdf11dBlock = /* wgsl */ `
 // ============================================
-// 11D Mandelbulb SDF (Fully unrolled)
+// 11D Mandelbulb SDF (Array-based)
+// With proper basis transformation (matching WebGL)
 // ============================================
 
 const MAX_ITER_11D: i32 = 256;
@@ -24,21 +28,26 @@ fn optimizedPow11D(r: f32, p: f32) -> vec2f {
 
 /**
  * 11D Mandelbulb SDF with orbital trap.
+ *
+ * @param pos 3D world position (already scaled by dispatch)
+ * @param basis Basis vectors for N-D transformation
+ * @param uniforms Mandelbulb uniforms
+ * @return vec2f where x = signed distance, y = orbital trap value
  */
 fn mandelbulbSDF11D(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> vec2f {
-  // Transform to 11D using basis vectors
+  // Transform to 11D fractal space using basis vectors (matching WebGL)
   var c: array<f32, 11>;
   var z: array<f32, 11>;
 
   for (var j = 0; j < 11; j++) {
-    c[j] = (getBasisComponent(basis.origin, j) +
-            pos.x * getBasisComponent(basis.basisX, j) +
-            pos.y * getBasisComponent(basis.basisY, j) +
-            pos.z * getBasisComponent(basis.basisZ, j)) * uniforms.scale;
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
@@ -54,7 +63,7 @@ fn mandelbulbSDF11D(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   for (var i = 0; i < MAX_ITER_11D; i++) {
     if (i >= maxIt) { break; }
@@ -120,28 +129,34 @@ fn mandelbulbSDF11D(
   }
 
   let minA = sqrt(minASq);
-  let trap = exp(-minP * 5.0) * 0.3 + exp(-minA * 3.0) * 0.2 + exp(-minS * 8.0) * 0.2 + f32(escIt) / f32(max(maxIt, 1)) * 0.3;
-  let dist = max(0.5 * log(max(r, EPS_11D)) * r / max(dr, EPS_11D), EPS_11D) / uniforms.scale;
+  let trap = exp(-minP * 5.0) * 0.3 +
+             exp(-minA * 3.0) * 0.2 +
+             exp(-minS * 8.0) * 0.2 +
+             f32(escIt) / f32(max(maxIt, 1)) * 0.3;
+
+  // Distance estimator (no scale division - handled by dispatch)
+  let dist = max(0.5 * log(max(r, EPS_11D)) * r / max(dr, EPS_11D), EPS_11D);
 
   return vec2f(dist, trap);
 }
 
 /**
- * 11D Mandelbulb SDF - simple version.
+ * 11D Mandelbulb SDF - simple version without trap.
  */
 fn mandelbulbSDF11D_simple(
   pos: vec3f,
   basis: BasisVectors,
   uniforms: MandelbulbUniforms
 ) -> f32 {
+  // Transform to 11D fractal space using basis vectors
   var c: array<f32, 11>;
   var z: array<f32, 11>;
 
   for (var j = 0; j < 11; j++) {
-    c[j] = (getBasisComponent(basis.origin, j) +
-            pos.x * getBasisComponent(basis.basisX, j) +
-            pos.y * getBasisComponent(basis.basisY, j) +
-            pos.z * getBasisComponent(basis.basisZ, j)) * uniforms.scale;
+    c[j] = getBasisComponent(basis.origin, j) +
+           pos.x * getBasisComponent(basis.basisX, j) +
+           pos.y * getBasisComponent(basis.basisY, j) +
+           pos.z * getBasisComponent(basis.basisZ, j);
     z[j] = c[j];
   }
 
@@ -153,7 +168,7 @@ fn mandelbulbSDF11D_simple(
 
   let pwr = uniforms.effectivePower;
   let bail = uniforms.effectiveBailout;
-  let maxIt = i32(uniforms.sdfMaxIterations);
+  let maxIt = i32(uniforms.iterations);
 
   for (var i = 0; i < MAX_ITER_11D; i++) {
     if (i >= maxIt) { break; }
@@ -207,6 +222,6 @@ fn mandelbulbSDF11D_simple(
     z[10] = sp * s9 + c[10];
   }
 
-  return max(0.5 * log(max(r, EPS_11D)) * r / max(dr, EPS_11D), EPS_11D) / uniforms.scale;
+  return max(0.5 * log(max(r, EPS_11D)) * r / max(dr, EPS_11D), EPS_11D);
 }
 `

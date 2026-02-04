@@ -88,21 +88,20 @@ fn applyMotionBlur(
   pos3d: vec3f,
   ndRadius: f32,
   density: f32,
-  time: f32,
-  uniforms: BlackHoleUniforms
+  time: f32
 ) -> vec3f {
-  if (!uniforms.motionBlurEnabled || uniforms.motionBlurStrength < 0.001) {
+  if (blackhole.motionBlurEnabled == 0u || blackhole.motionBlurStrength < 0.001) {
     return baseColor;
   }
 
   // Disk is in XZ plane, so radius is in XZ
   let radius = length(pos3d.xz);
-  let innerR = uniforms.horizonRadius * uniforms.diskInnerRadiusMul;
-  let outerR = uniforms.horizonRadius * uniforms.diskOuterRadiusMul;
+  let innerR = blackhole.horizonRadius * blackhole.diskInnerRadiusMul;
+  let outerR = blackhole.horizonRadius * blackhole.diskOuterRadiusMul;
 
   // Compute blur amount based on orbital velocity
-  let velocityFactor = orbitalVelocityFactor(radius, innerR, outerR, uniforms.motionBlurRadialFalloff);
-  let blurAmount = velocityFactor * uniforms.motionBlurStrength;
+  let velocityFactor = orbitalVelocityFactor(radius, innerR, outerR, blackhole.motionBlurRadialFalloff);
+  let blurAmount = velocityFactor * blackhole.motionBlurStrength;
 
   if (blurAmount < 0.001) {
     return baseColor;
@@ -112,7 +111,7 @@ fn applyMotionBlur(
   let blurDir = getMotionBlurDirection(pos3d);
 
   // Sample count (capped lower for performance)
-  let samples = min(uniforms.motionBlurSamples, 4);
+  let samples = min(blackhole.motionBlurSamples, 4);
   if (samples < 2) {
     return baseColor;
   }
@@ -134,10 +133,10 @@ fn applyMotionBlur(
     // Position offset along blur direction (tangent)
     let samplePos = pos3d + blurDir * t * blurScale;
 
-    let sampleDensity = manifoldDensity(samplePos, ndRadius, time, uniforms);
+    let sampleDensity = manifoldDensity(samplePos, ndRadius, time);
 
     if (sampleDensity > 0.001) {
-      let sampleColor = manifoldColor(samplePos, ndRadius, sampleDensity, time, uniforms);
+      let sampleColor = manifoldColor(samplePos, ndRadius, sampleDensity, time);
 
       // Weight by distance from center of blur kernel (triangle kernel)
       let weight = 1.0 - abs(t);

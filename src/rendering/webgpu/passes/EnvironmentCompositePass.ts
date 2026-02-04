@@ -192,6 +192,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
@@ -255,6 +256,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
 
   /**
    * Set shell glow configuration.
+   * @param config
    */
   setShellConfig(config: Partial<ShellGlowConfig>): void {
     if (config.enabled !== undefined) this.shellConfig.enabled = config.enabled
@@ -271,6 +273,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
 
   /**
    * Execute the composite pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (
@@ -301,21 +304,24 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     const near = camera?.near ?? 0.1
     const far = camera?.far ?? 100
 
-    // Update uniforms
-    const data = new Float32Array(16)
-    data[0] = near
-    data[1] = far
-    data[2] = this.shellConfig.enabled ? 1 : 0
-    data[3] = this.shellConfig.strength
-    data[4] = this.shellConfig.color[0]
-    data[5] = this.shellConfig.color[1]
-    data[6] = this.shellConfig.color[2]
-    data[7] = 0 // padding
-    data[8] = ctx.size.width
-    data[9] = ctx.size.height
-    // data[10-11] padding
+    // Update uniforms - use dual views for mixed f32/u32 types
+    const buffer = new ArrayBuffer(64)
+    const floatView = new Float32Array(buffer)
+    const uintView = new Uint32Array(buffer)
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
+    floatView[0] = near
+    floatView[1] = far
+    uintView[2] = this.shellConfig.enabled ? 1 : 0  // u32 - must use Uint32Array
+    floatView[3] = this.shellConfig.strength
+    floatView[4] = this.shellConfig.color[0]
+    floatView[5] = this.shellConfig.color[1]
+    floatView[6] = this.shellConfig.color[2]
+    floatView[7] = 0 // padding
+    floatView[8] = ctx.size.width
+    floatView[9] = ctx.size.height
+    // floatView[10-11] padding (vec2f)
+
+    this.writeUniformBuffer(this.device, this.uniformBuffer, new Uint8Array(buffer))
 
     // Create bind group with current textures
     const bindGroup = this.device.createBindGroup({

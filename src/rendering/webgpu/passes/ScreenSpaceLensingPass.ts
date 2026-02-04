@@ -454,6 +454,7 @@ export class ScreenSpaceLensingPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const extended = ctx.frame?.stores?.['extended'] as {

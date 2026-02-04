@@ -33,6 +33,8 @@ class ResourceTrackingPass extends BasePass {
 
   /**
    * Simulates ensureInitialized() pattern - allocates on first execute or size change.
+   * @param width
+   * @param height
    */
   private ensureInitialized(width: number, height: number): void {
     if (!this.resourcesAllocated || width !== this.lastWidth || height !== this.lastHeight) {

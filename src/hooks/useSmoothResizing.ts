@@ -24,6 +24,9 @@ const SPRING_CONFIG = { damping: 25, stiffness: 200 }
 /** Threshold for detecting when zoom has settled */
 const ZOOM_SETTLED_THRESHOLD = 0.001
 
+/**
+ *
+ */
 export function useSmoothResizing() {
   const { size, camera } = useThree()
   const prevHeight = useRef(size.height)

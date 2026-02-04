@@ -48,6 +48,7 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
   /**
    * Initialize GPU resources.
    * Subclasses should override this to create pipelines.
+   * @param ctx
    */
   async initialize(ctx: WebGPUSetupContext): Promise<void> {
     this.device = ctx.device
@@ -92,16 +93,44 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   /**
    * Create a shader module from WGSL source.
+   * Includes async compilation error checking.
+   * @param device
+   * @param code
+   * @param label
    */
   protected createShaderModule(device: GPUDevice, code: string, label?: string): GPUShaderModule {
-    return device.createShaderModule({
-      label: label ?? `${this.id}-shader`,
+    const shaderLabel = label ?? `${this.id}-shader`
+    const module = device.createShaderModule({
+      label: shaderLabel,
       code,
     })
+
+    // Check for shader compilation errors asynchronously
+    module.getCompilationInfo().then((info) => {
+      for (const message of info.messages) {
+        const type = message.type === 'error' ? 'ERROR' : message.type === 'warning' ? 'WARN' : 'INFO'
+        console.log(`[WGSL ${type}] ${shaderLabel}: ${message.message}`)
+        if (message.lineNum) {
+          console.log(`  at line ${message.lineNum}, col ${message.linePos}`)
+          // Log the offending line from source
+          const lines = code.split('\n')
+          if (lines[message.lineNum - 1]) {
+            console.log(`  > ${lines[message.lineNum - 1]}`)
+          }
+        }
+      }
+    }).catch((error) => {
+      console.warn(`[WGSL] Failed to get compilation info for ${shaderLabel}:`, error)
+    })
+
+    return module
   }
 
   /**
    * Create a uniform buffer.
+   * @param device
+   * @param size
+   * @param label
    */
   protected createUniformBuffer(device: GPUDevice, size: number, label?: string): GPUBuffer {
     return device.createBuffer({
@@ -113,6 +142,10 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   /**
    * Create a storage buffer.
+   * @param device
+   * @param size
+   * @param label
+   * @param readOnly
    */
   protected createStorageBuffer(
     device: GPUDevice,
@@ -130,6 +163,10 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   /**
    * Write data to a uniform buffer.
+   * @param device
+   * @param buffer
+   * @param data
+   * @param offset
    */
   protected writeUniformBuffer(
     device: GPUDevice,
@@ -142,6 +179,10 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   /**
    * Create a bind group with the given entries.
+   * @param device
+   * @param layout
+   * @param entries
+   * @param label
    */
   protected createBindGroup(
     device: GPUDevice,
@@ -159,6 +200,7 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
   /**
    * Get or create the fullscreen quad vertex buffer.
    * Shared across all fullscreen passes.
+   * @param device
    */
   protected getFullscreenVertexBuffer(device: GPUDevice): GPUBuffer {
     if (!WebGPUBasePass.fullscreenVertexBuffer) {
@@ -206,6 +248,14 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   /**
    * Create a standard render pipeline for fullscreen passes.
+   * @param device
+   * @param fragmentShader
+   * @param bindGroupLayouts
+   * @param colorFormat
+   * @param options
+   * @param options.label
+   * @param options.depthStencilFormat
+   * @param options.blendState
    */
   protected createFullscreenPipeline(
     device: GPUDevice,
@@ -267,6 +317,9 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   /**
    * Render a fullscreen pass.
+   * @param passEncoder
+   * @param pipeline
+   * @param bindGroups
    */
   protected renderFullscreen(
     passEncoder: GPURenderPassEncoder,
@@ -326,6 +379,10 @@ export abstract class WebGPUBaseComputePass extends WebGPUBasePass {
 
   /**
    * Create a compute pipeline.
+   * @param device
+   * @param shaderModule
+   * @param bindGroupLayouts
+   * @param label
    */
   protected createComputePipeline(
     device: GPUDevice,
@@ -352,6 +409,12 @@ export abstract class WebGPUBaseComputePass extends WebGPUBasePass {
 
   /**
    * Dispatch a compute pass.
+   * @param passEncoder
+   * @param pipeline
+   * @param bindGroups
+   * @param workgroupCountX
+   * @param workgroupCountY
+   * @param workgroupCountZ
    */
   protected dispatchCompute(
     passEncoder: GPUComputePassEncoder,

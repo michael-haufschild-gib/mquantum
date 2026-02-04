@@ -1,0 +1,223 @@
+{
+  "integrated": [
+    {
+      "export": "WebGPUSchrodingerRenderer",
+      "file": "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (definition)",
+        "src/rendering/webgpu/WebGPUScene.tsx:70 (CALL: new WebGPUSchrodingerRenderer())",
+        "src/App.tsx:296 (CALL: <WebGPUScene />)",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx"
+    },
+    {
+      "export": "DensityGridComputePass",
+      "file": "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/passes/DensityGridComputePass.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts:410 (CALL: new DensityGridComputePass())",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: new WebGPUSchrodingerRenderer())",
+        "src/App.tsx:296 (CALL: <WebGPUScene />)",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx",
+      "note": "Instantiated conditionally when useDensityGrid=true and isosurface=false"
+    },
+    {
+      "export": "composeSchroedingerShader",
+      "file": "src/rendering/webgpu/shaders/schroedinger/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts (definition)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts:17 (IMPORT)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (CALL: composeSchroedingerShader())",
+        "src/rendering/webgpu/WebGPUScene.tsx (CALL: renderer)",
+        "src/App.tsx (CALL: <WebGPUScene />)",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx"
+    },
+    {
+      "export": "composeDensityGridComputeShader",
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts (definition)",
+        "src/rendering/webgpu/passes/DensityGridComputePass.ts:100 (CALL: composeDensityGridComputeShader())",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (CALL: new DensityGridComputePass())",
+        "src/rendering/webgpu/WebGPUScene.tsx (uses renderer)",
+        "src/App.tsx (CALL: <WebGPUScene />)",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx"
+    },
+    {
+      "export": "densityGridBindingsBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts:461 (CALL: used in shader composition)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (CALL: composeSchroedingerShader())",
+        "src/rendering/webgpu/WebGPUScene.tsx",
+        "src/App.tsx",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx",
+      "note": "Used conditionally when useDensityGrid=true and isosurface=false"
+    },
+    {
+      "export": "densityGridSamplingBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts:466 (CALL: used in shader composition)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (CALL: composeSchroedingerShader())",
+        "src/rendering/webgpu/WebGPUScene.tsx",
+        "src/App.tsx",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx",
+      "note": "Used conditionally when useDensityGrid=true and isosurface=false"
+    },
+    {
+      "export": "volumeRaymarchGridBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/volume/densityGridSampling.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/compose.ts:471 (CALL: used in shader composition)",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts (CALL: composeSchroedingerShader())",
+        "src/rendering/webgpu/WebGPUScene.tsx",
+        "src/App.tsx",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx",
+      "note": "Used conditionally when useDensityGrid=true and isosurface=false"
+    },
+    {
+      "export": "gridParamsBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts:200 (CALL: used in shader composition)",
+        "src/rendering/webgpu/passes/DensityGridComputePass.ts (CALL: composeDensityGridComputeShader())",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+        "src/rendering/webgpu/WebGPUScene.tsx",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx"
+    },
+    {
+      "export": "densityGridComputeBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts:270 (CALL: conditionally used when includePhase=false)",
+        "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+        "src/rendering/webgpu/WebGPUScene.tsx",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx"
+    },
+    {
+      "export": "densityGridWithPhaseComputeBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts",
+      "status": "INTEGRATED",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/compute/densityGrid.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/compute/compose.ts:270 (CALL: conditionally used when includePhase=true)",
+        "src/rendering/webgpu/passes/DensityGridComputePass.ts",
+        "src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts",
+        "src/rendering/webgpu/WebGPUScene.tsx",
+        "src/main.tsx (entry point)"
+      ],
+      "entry_point": "src/main.tsx"
+    }
+  ],
+  "orphaned": [
+    {
+      "export": "temporalCloudUniformsBlock",
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/uniforms.wgsl.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from schroedinger/temporal/index.ts and schroedinger/index.ts but never imported by any WebGPU code. Grep found zero imports from this path.",
+      "dead_end_at": "src/rendering/webgpu/shaders/schroedinger/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/temporal/uniforms.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts (RE_EXPORT)",
+        "src/rendering/webgpu/shaders/schroedinger/index.ts:95 (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Either: (1) Import and use in composeSchroedingerShader when temporal accumulation is enabled, or (2) Delete the WGSL version if WebGPUTemporalCloudPass doesn't need Schroedinger-specific uniforms"
+    },
+    {
+      "export": "reconstructionVertexShader (WGSL schroedinger version)",
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from schroedinger/temporal/index.ts but WebGPUTemporalCloudPass imports from a DIFFERENT path: '/shaders/temporal/reconstruction.wgsl' (not '/shaders/schroedinger/temporal/'). This is a DUPLICATE that is never used.",
+      "dead_end_at": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts:12 (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND - WebGPUTemporalCloudPass uses different path"
+      ],
+      "suggested_fix": "Delete src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts or merge with src/rendering/webgpu/shaders/temporal/reconstruction.wgsl.ts if they differ"
+    },
+    {
+      "export": "reconstructionFragmentShader (WGSL schroedinger version)",
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts",
+      "status": "ORPHANED",
+      "evidence": "Same as reconstructionVertexShader - duplicate file that is never used",
+      "dead_end_at": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/temporal/reconstruction.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts:13 (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Delete or consolidate with the used version at src/rendering/webgpu/shaders/temporal/reconstruction.wgsl.ts"
+    },
+    {
+      "export": "reprojectionVertexShader (WGSL schroedinger version)",
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts",
+      "status": "ORPHANED",
+      "evidence": "Exported from schroedinger/temporal/index.ts but WebGPUTemporalCloudPass imports from '/shaders/temporal/reprojection.wgsl' - different path. This is a DUPLICATE.",
+      "dead_end_at": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts:16 (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Delete src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts or consolidate"
+    },
+    {
+      "export": "reprojectionFragmentShader (WGSL schroedinger version)",
+      "file": "src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts",
+      "status": "ORPHANED",
+      "evidence": "Same as reprojectionVertexShader - duplicate file never used",
+      "dead_end_at": "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts",
+      "call_chain": [
+        "src/rendering/webgpu/shaders/schroedinger/temporal/reprojection.wgsl.ts (definition)",
+        "src/rendering/webgpu/shaders/schroedinger/temporal/index.ts:17 (RE_EXPORT)",
+        "NO FURTHER IMPORTS FOUND"
+      ],
+      "suggested_fix": "Delete or consolidate with the used version"
+    }
+  ],
+  "summary": {
+    "total_exports": 15,
+    "integrated": 10,
+    "orphaned": 5,
+    "notes": [
+      "The orphaned temporal shaders in schroedinger/temporal/ appear to be duplicates of the shaders in /shaders/temporal/ which ARE used by WebGPUTemporalCloudPass",
+      "The density grid exports are conditionally integrated - only used when useDensityGrid=true configuration is passed to renderer",
+      "All core Schroedinger rendering exports (renderer, passes, shader composition) are properly integrated to entry point"
+    ]
+  }
+}

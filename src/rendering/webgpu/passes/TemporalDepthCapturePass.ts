@@ -152,6 +152,7 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
   /**
    * Set a Float32Array to identity matrix.
+   * @param matrix
    */
   private setIdentityMatrix(matrix: Float32Array): void {
     matrix.fill(0)
@@ -163,6 +164,9 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
   /**
    * Multiply two 4x4 matrices: result = a * b
+   * @param result
+   * @param a
+   * @param b
    */
   private multiplyMatrices(result: Float32Array, a: Float32Array, b: Float32Array): void {
     for (let i = 0; i < 4; i++) {
@@ -178,6 +182,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
   /**
    * Invert a 4x4 matrix in-place using Gauss-Jordan elimination.
+   * @param result
+   * @param m
    */
   private invertMatrix(result: Float32Array, m: Float32Array): boolean {
     const augmented = new Float32Array(32)
@@ -243,11 +249,14 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
   /**
    * Create the rendering pipeline.
+   * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
-    this.textureFormat = format
+    // Always use rgba16float for position data (high precision required)
+    // Don't use canvas format - position data needs float precision
+    this.textureFormat = 'rgba16float'
 
     // Create bind group layout for position copy
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -273,12 +282,12 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
       'temporal-depth-capture-fragment'
     )
 
-    // Create pipeline
+    // Create pipeline - use rgba16float for position data output
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      this.textureFormat,
       { label: 'temporal-depth-capture' }
     )
 
@@ -294,6 +303,9 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
   /**
    * Create or resize the internal history buffer.
+   * @param device
+   * @param width
+   * @param height
    */
   private ensureHistoryBuffer(device: GPUDevice, width: number, height: number): void {
     if (this.historyTexture && this.lastWidth === width && this.lastHeight === height) {
@@ -373,6 +385,7 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
   /**
    * Execute the temporal depth capture pass.
+   * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
     if (!this.device || !this.renderPipeline || !this.passBindGroupLayout || !this.sampler) {
@@ -453,16 +466,26 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     historyPassEncoder.end()
 
     // Update camera matrices for next frame
-    // We need to get camera matrices from the frame context
+    // Get camera data from stores (consistent with other passes)
     const camera = ctx.frame?.stores?.['camera'] as {
-      projectionMatrix?: number[]
-      matrixWorldInverse?: number[]
+      projectionMatrix?: { elements: number[] }
+      viewMatrix?: { elements: number[] }
+      matrixWorldInverse?: { elements: number[] }
     }
 
-    if (camera?.projectionMatrix && camera?.matrixWorldInverse) {
+    // Get view matrix - prefer viewMatrix, fallback to matrixWorldInverse
+    const viewMatrixElements = camera?.viewMatrix?.elements ?? camera?.matrixWorldInverse?.elements
+    const projMatrixElements = camera?.projectionMatrix?.elements
+
+    if (projMatrixElements && viewMatrixElements) {
       // Convert projection and view matrices to Float32Arrays
-      const projMatrix = new Float32Array(camera.projectionMatrix)
-      const viewMatrix = new Float32Array(camera.matrixWorldInverse)
+      const projMatrix = new Float32Array(16)
+      const viewMatrix = new Float32Array(16)
+
+      for (let i = 0; i < 16; i++) {
+        projMatrix[i] = projMatrixElements[i] ?? 0
+        viewMatrix[i] = viewMatrixElements[i] ?? 0
+      }
 
       // Compute view-projection matrix
       this.multiplyMatrices(this.tempViewProjMatrix, projMatrix, viewMatrix)
