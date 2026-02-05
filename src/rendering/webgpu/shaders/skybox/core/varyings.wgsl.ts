@@ -32,7 +32,7 @@ struct VertexOutput {
 }
 
 /**
- * Fragment output struct
+ * Fragment output struct (MRT: color + normal + world position)
  * In WebGPU we need to declare outputs explicitly
  */
 export const fragmentOutputStruct = `
@@ -41,5 +41,16 @@ struct FragmentOutput {
   @location(0) color: vec4<f32>,
   @location(1) normal: vec4<f32>,
   @location(2) worldPosition: vec4<f32>,
+}
+`
+
+/**
+ * Fragment output struct (single target: color only)
+ * Used when the skybox renders to a single color buffer without MRT.
+ */
+export const fragmentOutputStructSingle = `
+// --- Fragment Output (single target) ---
+struct FragmentOutput {
+  @location(0) color: vec4<f32>,
 }
 `

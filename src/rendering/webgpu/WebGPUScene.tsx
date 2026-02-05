@@ -18,7 +18,11 @@ import { WebGPUCamera } from './core/WebGPUCamera'
 // Geometry hooks
 import { useGeometryGenerator } from '@/hooks/useGeometryGenerator'
 import { useFaceDetection } from '@/hooks/useFaceDetection'
-import { useNDTransformUpdates, useProjectionDistanceCache, useRotationUpdates } from '@/rendering/renderers/base'
+import {
+  useNDTransformUpdates,
+  useProjectionDistanceCache,
+  useRotationUpdates,
+} from '@/rendering/renderers/base'
 import type { NdGeometry } from '@/lib/geometry/types'
 import type { VectorND } from '@/lib/math/types'
 import { SCREEN_SPACE_NORMAL_MIN_DIMENSION } from '@/rendering/shaders/constants'
@@ -67,7 +71,9 @@ import { WebGPUBlackHoleRenderer } from './renderers/WebGPUBlackHoleRenderer'
 import { WebGPUPolytopeRenderer } from './renderers/WebGPUPolytopeRenderer'
 import { WebGPUTubeWireframeRenderer } from './renderers/WebGPUTubeWireframeRenderer'
 import { WebGPUGroundPlaneRenderer } from './renderers/WebGPUGroundPlaneRenderer'
+import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
 import type { ObjectType } from '@/lib/geometry/types'
+import type { SkyboxMode, WallPosition } from '@/stores/defaults/visualDefaults'
 
 // ============================================================================
 // Types
@@ -99,7 +105,6 @@ const appearanceSelector = (state: ReturnType<typeof useAppearanceStore.getState
 const environmentSelector = (state: ReturnType<typeof useEnvironmentStore.getState>) => ({
   skyboxEnabled: state.skyboxEnabled,
   skyboxMode: state.skyboxMode,
-  groundEnabled: state.groundEnabled,
   activeWalls: state.activeWalls,
   groundPlaneOffset: state.groundPlaneOffset,
   groundPlaneColor: state.groundPlaneColor,
@@ -145,9 +150,15 @@ const blackholeSelector = (state: ReturnType<typeof useExtendedObjectStore.getSt
   jetsGodRaysEnabled: state.blackhole?.jetsGodRaysEnabled ?? false,
 })
 
+// Schrodinger isosurface selector (compile-time shader flag, triggers renderer recreation)
+const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
+  state.schroedinger?.isoEnabled ?? false
+
 // Schrodinger selector for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
+// Stable empty array to avoid new reference on every render when parameterValues is undefined
+const EMPTY_PARAM_VALUES: number[] = []
 const schroedingerSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
-  state.schroedinger?.parameterValues ?? []
+  state.schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
 
 // ============================================================================
 // Geometry Buffer Building
@@ -412,11 +423,7 @@ function buildWebGPUGeometryBuffers(
  * Sets up the complete render pipeline with all necessary passes.
  * Connects to Zustand stores for uniforms and settings.
  */
-export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
-  objectType,
-  dimension,
-  onFrame,
-}) => {
+export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension, onFrame }) => {
   const { graph, size } = useWebGPU()
   const animationFrameRef = useRef<number>(0)
   const lastTimeRef = useRef<number>(performance.now())
@@ -491,6 +498,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
   const lighting = useLightingStore(useShallow(lightingSelector))
   const postProcessing = usePostProcessingStore(useShallow(postProcessingSelector))
   const blackholeSettings = useExtendedObjectStore(useShallow(blackholeSelector))
+  // Schroedinger isosurface flag (compile-time shader selection, triggers renderer recreation)
+  const schroedingerIsoEnabled = useExtendedObjectStore(schroedingerIsoSelector)
   // Schroedinger parameterValues for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
   const schroedingerParamValues = useExtendedObjectStore(schroedingerSelector)
 
@@ -599,27 +608,49 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
     const buildTubeInstances = () => {
       const edges = geometry.edges
       const vertices = geometry.vertices
-      return edges.map(([a, b]) => {
-        const vA = vertices[a]
-        const vB = vertices[b]
-        if (!vA || !vB) return null
-        return {
-          start: {
-            x: vA[0] ?? 0,
-            y: vA[1] ?? 0,
-            z: vA[2] ?? 0,
-            extraA: [vA[3] ?? 0, vA[4] ?? 0, vA[5] ?? 0, vA[6] ?? 0] as [number, number, number, number],
-            extraB: [vA[7] ?? 0, vA[8] ?? 0, vA[9] ?? 0, vA[10] ?? 0] as [number, number, number, number],
-          },
-          end: {
-            x: vB[0] ?? 0,
-            y: vB[1] ?? 0,
-            z: vB[2] ?? 0,
-            extraA: [vB[3] ?? 0, vB[4] ?? 0, vB[5] ?? 0, vB[6] ?? 0] as [number, number, number, number],
-            extraB: [vB[7] ?? 0, vB[8] ?? 0, vB[9] ?? 0, vB[10] ?? 0] as [number, number, number, number],
-          },
-        }
-      }).filter((e): e is NonNullable<typeof e> => e !== null)
+      return edges
+        .map(([a, b]) => {
+          const vA = vertices[a]
+          const vB = vertices[b]
+          if (!vA || !vB) return null
+          return {
+            start: {
+              x: vA[0] ?? 0,
+              y: vA[1] ?? 0,
+              z: vA[2] ?? 0,
+              extraA: [vA[3] ?? 0, vA[4] ?? 0, vA[5] ?? 0, vA[6] ?? 0] as [
+                number,
+                number,
+                number,
+                number,
+              ],
+              extraB: [vA[7] ?? 0, vA[8] ?? 0, vA[9] ?? 0, vA[10] ?? 0] as [
+                number,
+                number,
+                number,
+                number,
+              ],
+            },
+            end: {
+              x: vB[0] ?? 0,
+              y: vB[1] ?? 0,
+              z: vB[2] ?? 0,
+              extraA: [vB[3] ?? 0, vB[4] ?? 0, vB[5] ?? 0, vB[6] ?? 0] as [
+                number,
+                number,
+                number,
+                number,
+              ],
+              extraB: [vB[7] ?? 0, vB[8] ?? 0, vB[9] ?? 0, vB[10] ?? 0] as [
+                number,
+                number,
+                number,
+                number,
+              ],
+            },
+          }
+        })
+        .filter((e): e is NonNullable<typeof e> => e !== null)
     }
 
     // Determine which renderer(s) to update based on object type and edge thickness
@@ -637,7 +668,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
         polytopeRenderer.updateGeometry(
           device,
           geometryBuffers.faceData ?? undefined,
-          useFatWireframe ? undefined : geometryBuffers.edgeData ?? undefined // Only pass edge data if NOT using fat wireframe
+          useFatWireframe ? undefined : (geometryBuffers.edgeData ?? undefined) // Only pass edge data if NOT using fat wireframe
         )
       } else {
         console.warn('[WebGPUScene] Polytope pass not found - passes may not be initialized yet')
@@ -645,17 +676,31 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
 
       // If thick edges, also update TubeWireframe renderer
       if (useFatWireframe) {
-        const tubeRenderer = graph.getPass('tube-wireframe') as WebGPUTubeWireframeRenderer | undefined
+        const tubeRenderer = graph.getPass('tube-wireframe') as
+          | WebGPUTubeWireframeRenderer
+          | undefined
         if (tubeRenderer) {
           const instances = buildTubeInstances()
-          console.log('[WebGPUScene] Updating tube wireframe instances for thick edges:', instances.length)
+          console.log(
+            '[WebGPUScene] Updating tube wireframe instances for thick edges:',
+            instances.length
+          )
           tubeRenderer.updateInstances(device, instances)
         } else {
           console.warn('[WebGPUScene] TubeWireframe pass not found for thick edges')
         }
       }
     }
-  }, [graph, needsGeometryBuffers, isStandardPolytope, useFatWireframe, geometryBuffers, objectType, geometry, faces])
+  }, [
+    graph,
+    needsGeometryBuffers,
+    isStandardPolytope,
+    useFatWireframe,
+    geometryBuffers,
+    objectType,
+    geometry,
+    faces,
+  ])
 
   // Initialize passes - rebuild when dependencies change
   useEffect(() => {
@@ -685,8 +730,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
           frameBlendingEnabled: postProcessing.frameBlendingEnabled,
           cinematicEnabled: postProcessing.cinematicEnabled,
           jetsGodRaysEnabled: blackholeSettings.jetsGodRaysEnabled,
-          // Ground plane settings
-          groundEnabled: environment.groundEnabled,
+          // Ground plane settings (no separate "enabled" flag — matches WebGL where
+          // activeWalls being non-empty means ground is enabled)
           activeWalls: environment.activeWalls,
           groundPlaneOffset: environment.groundPlaneOffset,
           groundPlaneColor: environment.groundPlaneColor,
@@ -697,11 +742,15 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
           // Shader feature flags (from stores, affect shader compilation)
           shadowEnabled: lighting.shadowEnabled,
           temporalEnabled: performance_.temporalEnabled,
+          isosurface: schroedingerIsoEnabled,
           sssEnabled: appearance.sssEnabled,
           fresnelEnabled: appearance.edgesVisible,
           iblQuality: environment.iblQuality,
           // Edge thickness: >1 uses TubeWireframe, <=1 uses line edges
           edgeThickness: appearance.edgeThickness,
+          // Skybox settings
+          skyboxEnabled: environment.skyboxEnabled,
+          skyboxMode: environment.skyboxMode as SkyboxMode,
         })
       } catch (err) {
         console.error('[WebGPUScene] CRITICAL: setupRenderPasses failed:', err)
@@ -724,27 +773,49 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
           const buildTubeInstancesForSetup = () => {
             const edges = geometry.edges
             const vertices = geometry.vertices
-            return edges.map(([a, b]) => {
-              const vA = vertices[a]
-              const vB = vertices[b]
-              if (!vA || !vB) return null
-              return {
-                start: {
-                  x: vA[0] ?? 0,
-                  y: vA[1] ?? 0,
-                  z: vA[2] ?? 0,
-                  extraA: [vA[3] ?? 0, vA[4] ?? 0, vA[5] ?? 0, vA[6] ?? 0] as [number, number, number, number],
-                  extraB: [vA[7] ?? 0, vA[8] ?? 0, vA[9] ?? 0, vA[10] ?? 0] as [number, number, number, number],
-                },
-                end: {
-                  x: vB[0] ?? 0,
-                  y: vB[1] ?? 0,
-                  z: vB[2] ?? 0,
-                  extraA: [vB[3] ?? 0, vB[4] ?? 0, vB[5] ?? 0, vB[6] ?? 0] as [number, number, number, number],
-                  extraB: [vB[7] ?? 0, vB[8] ?? 0, vB[9] ?? 0, vB[10] ?? 0] as [number, number, number, number],
-                },
-              }
-            }).filter((e): e is NonNullable<typeof e> => e !== null)
+            return edges
+              .map(([a, b]) => {
+                const vA = vertices[a]
+                const vB = vertices[b]
+                if (!vA || !vB) return null
+                return {
+                  start: {
+                    x: vA[0] ?? 0,
+                    y: vA[1] ?? 0,
+                    z: vA[2] ?? 0,
+                    extraA: [vA[3] ?? 0, vA[4] ?? 0, vA[5] ?? 0, vA[6] ?? 0] as [
+                      number,
+                      number,
+                      number,
+                      number,
+                    ],
+                    extraB: [vA[7] ?? 0, vA[8] ?? 0, vA[9] ?? 0, vA[10] ?? 0] as [
+                      number,
+                      number,
+                      number,
+                      number,
+                    ],
+                  },
+                  end: {
+                    x: vB[0] ?? 0,
+                    y: vB[1] ?? 0,
+                    z: vB[2] ?? 0,
+                    extraA: [vB[3] ?? 0, vB[4] ?? 0, vB[5] ?? 0, vB[6] ?? 0] as [
+                      number,
+                      number,
+                      number,
+                      number,
+                    ],
+                    extraB: [vB[7] ?? 0, vB[8] ?? 0, vB[9] ?? 0, vB[10] ?? 0] as [
+                      number,
+                      number,
+                      number,
+                      number,
+                    ],
+                  },
+                }
+              })
+              .filter((e): e is NonNullable<typeof e> => e !== null)
           }
 
           if (isStandardPolytope) {
@@ -758,7 +829,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
               polytopeRenderer.updateGeometry(
                 device,
                 geometryBuffers.faceData ?? undefined,
-                useFat ? undefined : geometryBuffers.edgeData ?? undefined
+                useFat ? undefined : (geometryBuffers.edgeData ?? undefined)
               )
             } else {
               console.warn('[WebGPUScene] Polytope pass not found after setup')
@@ -766,19 +837,29 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
 
             // If thick edges, also update TubeWireframe renderer
             if (useFat) {
-              const tubeRenderer = graph.getPass('tube-wireframe') as WebGPUTubeWireframeRenderer | undefined
+              const tubeRenderer = graph.getPass('tube-wireframe') as
+                | WebGPUTubeWireframeRenderer
+                | undefined
               if (tubeRenderer) {
                 const instances = buildTubeInstancesForSetup()
-                console.log('[WebGPUScene] Updating tube instances for thick polytope edges after setup:', instances.length)
+                console.log(
+                  '[WebGPUScene] Updating tube instances for thick polytope edges after setup:',
+                  instances.length
+                )
                 tubeRenderer.updateInstances(device, instances)
               }
             }
           } else {
             // Torus types: Always use TubeWireframe
-            const tubeRenderer = graph.getPass('tube-wireframe') as WebGPUTubeWireframeRenderer | undefined
+            const tubeRenderer = graph.getPass('tube-wireframe') as
+              | WebGPUTubeWireframeRenderer
+              | undefined
             if (tubeRenderer) {
               const instances = buildTubeInstancesForSetup()
-              console.log('[WebGPUScene] Updating tube instances for torus after pass setup:', instances.length)
+              console.log(
+                '[WebGPUScene] Updating tube instances for torus after pass setup:',
+                instances.length
+              )
               tubeRenderer.updateInstances(device, instances)
             }
           }
@@ -793,7 +874,37 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
     return () => {
       cancelled = true
     }
-  }, [graph, objectType, dimension, needsGeometryBuffers, isStandardPolytope, geometryBuffers, geometry, postProcessing.bloomEnabled, postProcessing.ssaoEnabled, postProcessing.ssrEnabled, postProcessing.antiAliasingMethod, postProcessing.bokehEnabled, postProcessing.refractionEnabled, postProcessing.gravityEnabled, postProcessing.paperEnabled, postProcessing.frameBlendingEnabled, postProcessing.cinematicEnabled, blackholeSettings.jetsGodRaysEnabled, environment.groundEnabled, environment.activeWalls, environment.groundPlaneSizeScale, environment.iblQuality, lighting.shadowEnabled, performance_.temporalEnabled, appearance.sssEnabled, appearance.edgesVisible, appearance.edgeThickness])
+  }, [
+    graph,
+    objectType,
+    dimension,
+    needsGeometryBuffers,
+    isStandardPolytope,
+    geometryBuffers,
+    geometry,
+    postProcessing.bloomEnabled,
+    postProcessing.ssaoEnabled,
+    postProcessing.ssrEnabled,
+    postProcessing.antiAliasingMethod,
+    postProcessing.bokehEnabled,
+    postProcessing.refractionEnabled,
+    postProcessing.gravityEnabled,
+    postProcessing.paperEnabled,
+    postProcessing.frameBlendingEnabled,
+    postProcessing.cinematicEnabled,
+    blackholeSettings.jetsGodRaysEnabled,
+    environment.activeWalls,
+    environment.groundPlaneSizeScale,
+    environment.iblQuality,
+    environment.skyboxEnabled,
+    environment.skyboxMode,
+    lighting.shadowEnabled,
+    performance_.temporalEnabled,
+    appearance.sssEnabled,
+    appearance.edgesVisible,
+    appearance.edgeThickness,
+    schroedingerIsoEnabled,
+  ])
 
   // Update camera aspect ratio when canvas size changes
   useEffect(() => {
@@ -802,10 +913,36 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
     }
   }, [size.width, size.height])
 
+  // Compute bounding radius for ground plane wall distance (matches WebGL calculateWallDistance)
+  // For geometry-based objects: max 3D distance from origin across all vertices
+  // For raymarched objects: use BOUND_R (2.0), the bounding sphere radius
+  const boundingRadius = useMemo(() => {
+    const isRaymarched =
+      objectType === 'mandelbulb' ||
+      objectType === 'quaternion-julia' ||
+      objectType === 'schroedinger' ||
+      objectType === 'blackhole'
+
+    if (isRaymarched) return 2.0
+
+    if (!geometry?.vertices || geometry.vertices.length === 0) return 0
+
+    let maxR = 0
+    for (const v of geometry.vertices) {
+      const d = Math.sqrt((v[0] ?? 0) ** 2 + (v[1] ?? 0) ** 2 + (v[2] ?? 0) ** 2)
+      if (d > maxR) maxR = d
+    }
+    // Round up to nearest 0.25 to prevent jitter from small position changes
+    return Math.ceil(maxR * 4) / 4
+  }, [geometry?.vertices, objectType])
+
   // Set up store getters for uniform updates
   useEffect(() => {
     graph.setStoreGetter('appearance', () => useAppearanceStore.getState())
-    graph.setStoreGetter('environment', () => useEnvironmentStore.getState())
+    graph.setStoreGetter('environment', () => ({
+      ...useEnvironmentStore.getState(),
+      _computedBoundingRadius: boundingRadius,
+    }))
     graph.setStoreGetter('lighting', () => useLightingStore.getState())
     graph.setStoreGetter('performance', () => usePerformanceStore.getState())
     graph.setStoreGetter('postProcessing', () => usePostProcessingStore.getState())
@@ -864,7 +1001,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
         projectionDistance,
       }
     })
-  }, [graph, ndTransform, geometry, dimension, projDistCache, objectType])
+  }, [graph, ndTransform, geometry, dimension, projDistCache, objectType, boundingRadius])
 
   // Reusable Map for rotation updates (avoid allocating per frame)
   const rotationUpdatesRef = useRef<Map<string, number>>(new Map())
@@ -926,7 +1063,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(renderFrame)
-  }, [graph, objectType, dimension, isPlaying, onFrame, needsGeometryBuffers, ndTransform, schroedingerRotation])
+  }, [
+    graph,
+    objectType,
+    dimension,
+    isPlaying,
+    onFrame,
+    needsGeometryBuffers,
+    ndTransform,
+    schroedingerRotation,
+  ])
 
   // Start/stop animation loop
   useEffect(() => {
@@ -984,9 +1130,8 @@ interface PassConfig {
   cinematicEnabled: boolean
   // Jets god rays (black hole only)
   jetsGodRaysEnabled: boolean
-  // Ground plane settings
-  groundEnabled: boolean
-  activeWalls: Set<string>
+  // Ground plane settings (no separate "enabled" flag — activeWalls.length > 0 means enabled)
+  activeWalls: WallPosition[]
   groundPlaneOffset: number
   groundPlaneColor: string
   groundPlaneSizeScale: number
@@ -996,11 +1141,16 @@ interface PassConfig {
   // Shader feature flags (affect shader compilation, read from stores)
   shadowEnabled: boolean
   temporalEnabled: boolean
+  // Schrodinger isosurface mode (compile-time shader selection)
+  isosurface: boolean
   sssEnabled: boolean
   fresnelEnabled: boolean // edgesVisible in appearance store
   iblQuality: 'off' | 'low' | 'high' // IBL quality from environment store
   // Edge thickness: >1 uses TubeWireframe, <=1 uses line edges (Polytope renderer)
   edgeThickness: number
+  // Skybox settings
+  skyboxEnabled: boolean
+  skyboxMode: SkyboxMode
 }
 
 /**
@@ -1028,7 +1178,11 @@ interface PassConfig {
  * 19. ToScreenPass - Copy to canvas
  */
 /** Safely add a pass — logs and continues on failure instead of aborting the pipeline. */
-async function safeAddPass(graph: WebGPURenderGraph, pass: WebGPURenderPass, label: string): Promise<boolean> {
+async function safeAddPass(
+  graph: WebGPURenderGraph,
+  pass: WebGPURenderPass,
+  label: string
+): Promise<boolean> {
   try {
     await graph.addPass(pass)
     return true
@@ -1128,28 +1282,56 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
   // 1.5. Add TubeWireframe for standard polytopes with thick edges
   // Standard polytopes use PolytopeRenderer for faces, but need TubeWireframe for thick edges (>1)
   // This is separate from torus types which ONLY use TubeWireframe (no faces)
-  const isStandardPolytope = ['hypercube', 'simplex', 'cross-polytope', 'wythoff-polytope'].includes(config.objectType)
+  const isStandardPolytope = [
+    'hypercube',
+    'simplex',
+    'cross-polytope',
+    'wythoff-polytope',
+  ].includes(config.objectType)
   const useFatWireframe = config.edgeThickness > 1
   if (isStandardPolytope && useFatWireframe) {
-    await safeAddPass(graph, new WebGPUTubeWireframeRenderer({
-      dimension: config.dimension,
-      // Match WebGL: radius = edgeThickness * 0.015
-      radius: config.edgeThickness * 0.015,
-      shadows: config.shadowEnabled,
-      // Don't clear - preserve face geometry from Polytope renderer
-      clearBuffer: false,
-    }), 'tube-wireframe')
+    await safeAddPass(
+      graph,
+      new WebGPUTubeWireframeRenderer({
+        dimension: config.dimension,
+        // Match WebGL: radius = edgeThickness * 0.015
+        radius: config.edgeThickness * 0.015,
+        shadows: config.shadowEnabled,
+        // Don't clear - preserve face geometry from Polytope renderer
+        clearBuffer: false,
+      }),
+      'tube-wireframe'
+    )
   }
 
-  // 2. Scene pass (environment) - outputs to scene-render buffer
-  await safeAddPass(graph, new ScenePass({
-    outputResource: 'scene-render',
-    depthResource: 'depth-buffer',
-    mode: 'clear',
-  }), 'scene-pass')
+  // 2. Skybox or scene clear pass - outputs to scene-render buffer
+  if (config.skyboxEnabled) {
+    // Skybox renderer clears scene-render + depth-buffer and renders procedural skybox
+    await safeAddPass(
+      graph,
+      new WebGPUSkyboxRenderer({
+        mode: config.skyboxMode,
+        sun: false,
+        vignette: false,
+      }),
+      'skybox'
+    )
+  } else {
+    // No skybox: just clear the scene-render buffer to black
+    await safeAddPass(
+      graph,
+      new ScenePass({
+        outputResource: 'scene-render',
+        depthResource: 'depth-buffer',
+        mode: 'clear',
+      }),
+      'scene-pass'
+    )
+  }
 
   // 2.5. Ground plane (optional) - renders walls/floor into the scene
-  if (config.groundEnabled && config.activeWalls.size > 0) {
+  // Matches WebGL: ground is enabled when activeWalls has items (no separate flag)
+  if (config.activeWalls.length > 0) {
     // Calculate ground size based on scale
     const baseSize = 20
     const groundSize = baseSize * config.groundPlaneSizeScale
@@ -1157,6 +1339,7 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
     const groundPlanePass = new WebGPUGroundPlaneRenderer({
       size: groundSize,
       shadows: false, // TODO: Wire up shadow settings
+      ibl: true,
     })
 
     await safeAddPass(graph, groundPlanePass, 'ground-plane')
@@ -1170,11 +1353,15 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await safeAddPass(graph, new GTAOPass({
-      depthInput: 'depth-buffer',
-      normalInput: 'normal-buffer',
-      outputResource: 'aoBuffer',
-    }), 'gtao')
+    await safeAddPass(
+      graph,
+      new GTAOPass({
+        depthInput: 'depth-buffer',
+        normalInput: 'normal-buffer',
+        outputResource: 'aoBuffer',
+      }),
+      'gtao'
+    )
   }
 
   // 4. SSR (optional) - Screen-space reflections
@@ -1185,12 +1372,16 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await safeAddPass(graph, new SSRPass({
-      colorInput: 'hdr-color',
-      depthInput: 'depth-buffer',
-      normalInput: 'normal-buffer',
-      outputResource: 'ssrBuffer',
-    }), 'ssr')
+    await safeAddPass(
+      graph,
+      new SSRPass({
+        colorInput: 'hdr-color',
+        depthInput: 'depth-buffer',
+        normalInput: 'normal-buffer',
+        outputResource: 'ssrBuffer',
+      }),
+      'ssr'
+    )
   }
 
   // 5. Screen-space lensing (black hole only) - distorts the scene around black hole
@@ -1201,36 +1392,53 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await safeAddPass(graph, new ScreenSpaceLensingPass({
-      colorInput: 'scene-render',
-      depthInput: 'depth-buffer',
-      outputResource: 'lensed-scene',
-    }), 'screen-space-lensing')
+    await safeAddPass(
+      graph,
+      new ScreenSpaceLensingPass({
+        colorInput: 'scene-render',
+        depthInput: 'depth-buffer',
+        outputResource: 'lensed-scene',
+      }),
+      'screen-space-lensing'
+    )
 
     // Also apply gravitational lensing to environment/skybox
-    await safeAddPass(graph, new GravitationalLensingPass({
-      environmentInput: 'scene-render',
-      outputResource: 'lensed-environment',
-    }), 'gravitational-lensing')
+    await safeAddPass(
+      graph,
+      new GravitationalLensingPass({
+        environmentInput: 'scene-render',
+        outputResource: 'lensed-environment',
+      }),
+      'gravitational-lensing'
+    )
   }
 
   // 6. Jets rendering (black hole only) - render relativistic jets
   if (isBlackhole) {
-    await safeAddPass(graph, new JetsRenderPass({
-      sceneDepthInput: 'depth-buffer',
-      outputResource: 'jets-buffer',
-    }), 'jets-render')
+    await safeAddPass(
+      graph,
+      new JetsRenderPass({
+        sceneDepthInput: 'depth-buffer',
+        outputResource: 'jets-buffer',
+      }),
+      'jets-render'
+    )
   }
 
   // 7. Environment composite - composites object over environment, outputs to hdr-color
   // Use lensed scene if gravitational lensing was applied
   const envInput = isBlackhole && config.gravityEnabled ? 'lensed-scene' : 'scene-render'
-  await safeAddPass(graph, new EnvironmentCompositePass({
-    lensedEnvironmentInput: isBlackhole && config.gravityEnabled ? 'lensed-environment' : envInput,
-    mainObjectInput: 'object-color', // Read from object renderer output
-    mainObjectDepthInput: 'depth-buffer',
-    outputResource: 'hdr-color',
-  }), 'environment-composite')
+  await safeAddPass(
+    graph,
+    new EnvironmentCompositePass({
+      lensedEnvironmentInput:
+        isBlackhole && config.gravityEnabled ? 'lensed-environment' : envInput,
+      mainObjectInput: 'object-color', // Read from object renderer output
+      mainObjectDepthInput: 'depth-buffer',
+      outputResource: 'hdr-color',
+    }),
+    'environment-composite'
+  )
 
   // 8. Jets composite (black hole only) - blend jets with scene
   if (isBlackhole) {
@@ -1240,11 +1448,15 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await safeAddPass(graph, new JetsCompositePass({
-      sceneInput: 'hdr-color',
-      jetsInput: 'jets-buffer',
-      outputResource: 'jets-composited',
-    }), 'jets-composite')
+    await safeAddPass(
+      graph,
+      new JetsCompositePass({
+        sceneInput: 'hdr-color',
+        jetsInput: 'jets-buffer',
+        outputResource: 'jets-composited',
+      }),
+      'jets-composite'
+    )
 
     currentHDRBuffer = 'jets-composited'
   }
@@ -1258,16 +1470,15 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    const ok = await safeAddPass(graph, new GodRaysPass({
-      colorInput: currentHDRBuffer,
-      outputResource: 'god-rays-output',
-      lightPosition: [0, 0.5], // Center-top for jets
-      exposure: 0.34,
-      decay: 0.96,
-      density: 0.6,
-      weight: 0.4,
-      samples: 64,
-    }), 'god-rays')
+    const ok = await safeAddPass(
+      graph,
+      new GodRaysPass({
+        jetsInput: 'jets-buffer',
+        sceneInput: currentHDRBuffer,
+        outputResource: 'god-rays-output',
+      }),
+      'god-rays'
+    )
 
     if (ok) currentHDRBuffer = 'god-rays-output'
   }
@@ -1282,10 +1493,14 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    const ok = await safeAddPass(graph, new BloomPass({
-      inputResource: currentHDRBuffer,
-      outputResource: 'bloom-output',
-    }), 'bloom')
+    const ok = await safeAddPass(
+      graph,
+      new BloomPass({
+        inputResource: currentHDRBuffer,
+        outputResource: 'bloom-output',
+      }),
+      'bloom'
+    )
 
     if (ok) currentHDRBuffer = 'bloom-output'
   }
@@ -1298,11 +1513,15 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    const ok = await safeAddPass(graph, new BokehPass({
-      colorInput: currentHDRBuffer,
-      depthInput: 'depth-buffer',
-      outputResource: 'bokeh-output',
-    }), 'bokeh')
+    const ok = await safeAddPass(
+      graph,
+      new BokehPass({
+        colorInput: currentHDRBuffer,
+        depthInput: 'depth-buffer',
+        outputResource: 'bokeh-output',
+      }),
+      'bokeh'
+    )
 
     if (ok) currentHDRBuffer = 'bokeh-output'
   }
@@ -1315,12 +1534,16 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    const ok = await safeAddPass(graph, new RefractionPass({
-      colorInput: currentHDRBuffer,
-      normalInput: 'normal-buffer',
-      depthInput: 'depth-buffer',
-      outputResource: 'refraction-output',
-    }), 'refraction')
+    const ok = await safeAddPass(
+      graph,
+      new RefractionPass({
+        colorInput: currentHDRBuffer,
+        normalInput: 'normal-buffer',
+        depthInput: 'depth-buffer',
+        outputResource: 'refraction-output',
+      }),
+      'refraction'
+    )
 
     if (ok) currentHDRBuffer = 'refraction-output'
   }
@@ -1331,23 +1554,34 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       type: 'texture',
       format: 'rgba16float',
       // COPY_SRC needed for FrameBlendingPass to copy output to history buffer
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      usage:
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_SRC,
     })
 
-    const ok = await safeAddPass(graph, new FrameBlendingPass({
-      colorInput: currentHDRBuffer,
-      outputResource: 'frame-blend-output',
-      blendFactor: 0.15,
-    }), 'frame-blending')
+    const ok = await safeAddPass(
+      graph,
+      new FrameBlendingPass({
+        colorInput: currentHDRBuffer,
+        outputResource: 'frame-blend-output',
+        blendFactor: 0.15,
+      }),
+      'frame-blending'
+    )
 
     if (ok) currentHDRBuffer = 'frame-blend-output'
   }
 
   // 15. Tonemapping - HDR to LDR conversion (CRITICAL — always required)
-  await safeAddPass(graph, new TonemappingPass({
-    inputResource: currentHDRBuffer,
-    exposure: 1.0,
-  }), 'tonemapping')
+  await safeAddPass(
+    graph,
+    new TonemappingPass({
+      inputResource: currentHDRBuffer,
+      exposure: 1.0,
+    }),
+    'tonemapping'
+  )
 
   // Track current LDR buffer for post-tonemapping effects
   let currentLDRBuffer = 'ldr-color'
@@ -1360,10 +1594,14 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    const ok = await safeAddPass(graph, new CinematicPass({
-      colorInput: currentLDRBuffer,
-      outputResource: 'cinematic-output',
-    }), 'cinematic')
+    const ok = await safeAddPass(
+      graph,
+      new CinematicPass({
+        colorInput: currentLDRBuffer,
+        outputResource: 'cinematic-output',
+      }),
+      'cinematic'
+    )
 
     if (ok) currentLDRBuffer = 'cinematic-output'
   }
@@ -1376,46 +1614,57 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    const ok = await safeAddPass(graph, new PaperTexturePass({
-      colorInput: currentLDRBuffer,
-      outputResource: 'paper-output',
-    }), 'paper-texture')
+    const ok = await safeAddPass(
+      graph,
+      new PaperTexturePass({
+        colorInput: currentLDRBuffer,
+        outputResource: 'paper-output',
+      }),
+      'paper-texture'
+    )
 
     if (ok) currentLDRBuffer = 'paper-output'
   }
 
   // 18. Anti-aliasing (optional) - FXAA or SMAA
-  // Both read from 'ldr-color' and write to 'final-color' by default
-  const hasAntiAliasing = config.antiAliasingMethod === 'fxaa' || config.antiAliasingMethod === 'smaa'
-
+  // Reads from currentLDRBuffer (after cinematic/paper) to match WebGL pass ordering
   if (config.antiAliasingMethod === 'fxaa') {
-    await safeAddPass(graph, new FXAAPass({
-      subpixelQuality: 0.75,
-    }), 'fxaa')
+    const ok = await safeAddPass(
+      graph,
+      new FXAAPass({
+        colorInput: currentLDRBuffer,
+        outputResource: 'final-color',
+        subpixelQuality: 0.75,
+      }),
+      'fxaa'
+    )
+    if (ok) currentLDRBuffer = 'final-color'
   } else if (config.antiAliasingMethod === 'smaa') {
-    await safeAddPass(graph, new SMAAPass({
-      threshold: 0.1,
-      maxSearchSteps: 16,
-    }), 'smaa')
+    const ok = await safeAddPass(
+      graph,
+      new SMAAPass({
+        colorInput: currentLDRBuffer,
+        outputResource: 'final-color',
+        threshold: 0.1,
+        maxSearchSteps: 16,
+      }),
+      'smaa'
+    )
+    if (ok) currentLDRBuffer = 'final-color'
   }
 
   // 19. Copy to screen (CRITICAL — always required)
-  // Determine final input based on what passes ran
-  let finalInput: string
-  if (hasAntiAliasing) {
-    finalInput = 'final-color'
-  } else if (config.paperEnabled) {
-    finalInput = 'paper-output'
-  } else if (config.cinematicEnabled) {
-    finalInput = 'cinematic-output'
-  } else {
-    finalInput = 'ldr-color'
-  }
+  // Use currentLDRBuffer which tracks the last active pass in the chain
+  const finalInput = currentLDRBuffer
 
-  await safeAddPass(graph, new ToScreenPass({
-    inputResource: finalInput,
-    gammaCorrection: true,
-  }), 'to-screen')
+  await safeAddPass(
+    graph,
+    new ToScreenPass({
+      inputResource: finalInput,
+      gammaCorrection: true,
+    }),
+    'to-screen'
+  )
 }
 
 /**
@@ -1436,7 +1685,16 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
  * @returns The appropriate renderer pass or null if not supported
  */
 function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
-  const { dimension, shadowEnabled, temporalEnabled, sssEnabled, ssaoEnabled, iblQuality, edgeThickness } = config
+  const {
+    dimension,
+    shadowEnabled,
+    temporalEnabled,
+    sssEnabled,
+    ssaoEnabled,
+    iblQuality,
+    edgeThickness,
+    isosurface,
+  } = config
   // Note: fresnelEnabled (edgesVisible) is handled at uniform level, not shader compilation
   // IBL is controlled by iblQuality from environment store ('off' | 'low' | 'high')
   const iblEnabled = iblQuality !== 'off'
@@ -1474,6 +1732,7 @@ function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
       // Until the full temporal pipeline is wired up, force temporal: false.
       return new WebGPUSchrodingerRenderer({
         dimension,
+        isosurface,
         temporal: false, // Disabled - missing quarter-res resources and TemporalCloudPass
       })
 
@@ -1483,7 +1742,7 @@ function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
       return new WebGPUBlackHoleRenderer({
         dimension,
         doppler: true,
-        envMap: true,
+        envMap: false, // Disabled: no group 3 bind group layout/texture exists yet
       })
 
     case 'hypercube':

@@ -6,7 +6,7 @@ import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
 
 import { constantsBlock } from './core/constants.wgsl'
 import { uniformStructBlock, uniformBindingsBlock } from './core/uniforms.wgsl'
-import { generateVertexOutputStruct, fragmentOutputStruct } from './core/varyings.wgsl'
+import { generateVertexOutputStruct, fragmentOutputStruct, fragmentOutputStructSingle } from './core/varyings.wgsl'
 
 import { colorBlock } from './utils/color.wgsl'
 import { noiseBlock } from './utils/noise.wgsl'
@@ -37,7 +37,7 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig): {
   modules: string[]
   features: string[]
 } {
-  const { mode, effects, overrides = [] } = config
+  const { mode, effects, overrides = [], mrt = true } = config
 
   const features = [`Mode: ${mode}`]
 
@@ -84,7 +84,7 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig): {
     { name: 'Uniform Struct', content: uniformStructBlock },
     { name: 'Uniform Bindings', content: uniformBindingsBlock },
     { name: 'Varyings', content: varyingsBlock },
-    { name: 'Fragment Output', content: fragmentOutputStruct },
+    { name: 'Fragment Output', content: mrt ? fragmentOutputStruct : fragmentOutputStructSingle },
     { name: 'Color Utils', content: colorBlock },
     { name: 'Cosine Palette', content: cosinePaletteBlock },
     { name: 'Rotation Utils', content: rotationBlock },
@@ -97,7 +97,7 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig): {
       content: generateMain(mode, {
         sun: useSun,
         vignette: useVignette,
-      }),
+      }, { mrt }),
     },
   ]
 

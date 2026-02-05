@@ -22,7 +22,7 @@ struct GridUniforms {
   _pad3: f32,
 }
 
-@group(2) @binding(0) var<uniform> gridUniforms: GridUniforms;
+@group(1) @binding(1) var<uniform> gridUniforms: GridUniforms;
 `
 
 export const gridFunctionsBlock = `

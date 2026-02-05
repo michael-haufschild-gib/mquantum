@@ -1,8 +1,20 @@
 /**
  * WebGPU God Rays Pass (Volumetric Light Scattering)
  *
- * Creates volumetric light scattering effect (crepuscular rays).
- * Simulates light scattering through atmospheric particles.
+ * Two-pass implementation matching the WebGL GodRaysPass:
+ * Pass 1: GPU Gems 3 radial blur on jet buffer toward light source
+ * Pass 2: Composite god rays over scene with adaptive soft light blending
+ *
+ * Features (matching WebGL):
+ * - Blue noise dithering to reduce banding
+ * - Luminance-based filtering with soft knee compression
+ * - Color preservation (hue-preserving brightness control)
+ * - Distance-based exposure falloff (stronger near light)
+ * - Saturation boost to counteract desaturation
+ * - Radial fade (vignette)
+ * - Adaptive composite (soft light + additive based on scene luminance)
+ * - Per-frame store reads for dynamic parameters
+ * - Camera-projected light position tracking
  *
  * @module rendering/webgpu/passes/GodRaysPass
  */
@@ -14,26 +26,22 @@ import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
  * God rays pass configuration.
  */
 export interface GodRaysPassConfig {
-  /** Color input resource ID */
-  colorInput: string
+  /** Jet buffer input resource ID (just the jet rendering, no scene) */
+  jetsInput: string
+  /** Scene input resource ID (scene with jets composited) */
+  sceneInput: string
   /** Output resource ID */
   outputResource: string
-  /** Light position in screen space (0-1) */
-  lightPosition?: [number, number]
-  /** Exposure (overall brightness) */
-  exposure?: number
-  /** Decay (falloff rate) */
-  decay?: number
-  /** Density (number of samples) */
-  density?: number
-  /** Weight (intensity multiplier) */
-  weight?: number
-  /** Number of samples */
-  samples?: number
 }
 
+// ============================================================
+// WGSL Shaders
+// ============================================================
+
 /**
- * WGSL God Rays Fragment Shader
+ * Pass 1: Radial blur shader (GPU Gems 3 technique)
+ * Samples from jet buffer toward light source with exponential decay.
+ * Matches WebGL godRaysFragmentShader features.
  */
 const GOD_RAYS_SHADER = /* wgsl */ `
 struct Uniforms {
@@ -44,204 +52,476 @@ struct Uniforms {
   density: f32,
   weight: f32,
   samples: f32,
-  _pad: vec3f,
+  _pad1: f32,
+  _pad2: f32,
+  _pad3: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var texSampler: sampler;
-@group(0) @binding(2) var tDiffuse: texture_2d<f32>;
+@group(0) @binding(2) var tInput: texture_2d<f32>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
 }
 
+const PI: f32 = 3.14159265359;
+
+// High-quality noise for dithering (matches WebGL hash12)
+fn hash12(p: vec2f) -> f32 {
+  var p3 = fract(vec3f(p.x, p.y, p.x) * 0.1031);
+  p3 += dot(p3, vec3f(p3.y, p3.z, p3.x) + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+// Blue noise approximation (matches WebGL blueNoise)
+fn blueNoise(uv: vec2f) -> f32 {
+  var noise = hash12(uv * 1000.0);
+  noise += hash12(uv * 1000.0 + 0.5) * 0.5;
+  noise += hash12(uv * 1000.0 + 0.25) * 0.25;
+  return fract(noise);
+}
+
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Original color
-  let originalColor = textureSample(tDiffuse, texSampler, uv).rgb;
-
-  // Vector from current pixel to light source
+  // Vector from current pixel toward light source
   var deltaTexCoord = uv - uniforms.lightPosition;
-  deltaTexCoord *= 1.0 / uniforms.samples * uniforms.density;
 
-  // Start position
+  // Distance from light source for intensity falloff
+  let distFromLight = length(deltaTexCoord);
+
+  // Scale by density and sample count
+  let sampleCount = uniforms.samples;
+  deltaTexCoord *= uniforms.density / sampleCount;
+
+  // Start at current pixel
   var texCoord = uv;
 
-  // Accumulate light scattering
-  var illuminationDecay = 1.0;
-  var godRays = vec3f(0.0);
+  // Apply blue noise dithering to reduce banding
+  let jitter = blueNoise(input.position.xy);
+  texCoord -= deltaTexCoord * jitter;
 
-  let sampleCount = i32(uniforms.samples);
-  for (var i = 0; i < sampleCount; i++) {
+  // Accumulate samples with color preservation
+  var color = vec3f(0.0);
+  var totalWeight: f32 = 0.0;
+  var illuminationDecay: f32 = 1.0;
+
+  let iSampleCount = i32(sampleCount);
+  for (var i = 0; i < iSampleCount; i++) {
+    // Step toward light source
     texCoord -= deltaTexCoord;
 
-    // Sample the scene
-    var sampleColor = textureSample(tDiffuse, texSampler, texCoord).rgb;
+    // Clamp to valid UV range
+    let sampleCoord = clamp(texCoord, vec2f(0.0), vec2f(1.0));
 
-    // Extract brightness (only bright areas contribute)
-    let luminance = dot(sampleColor, vec3f(0.299, 0.587, 0.114));
-    sampleColor *= max(0.0, luminance - 0.5) * 2.0;
+    // Sample the jet buffer
+    let sampleColor = textureSampleLevel(tInput, texSampler, sampleCoord, 0.0);
 
-    // Apply decay and weight
-    sampleColor *= illuminationDecay * uniforms.weight;
-    godRays += sampleColor;
+    // Calculate luminance
+    let luminance = dot(sampleColor.rgb, vec3f(0.299, 0.587, 0.114));
 
-    // Decay illumination
+    // Only accumulate visible samples (low threshold, matches WebGL 0.005)
+    if (luminance > 0.005) {
+      // Preserve color saturation while controlling brightness
+      // Soft knee compression for HDR values (matches WebGL)
+      let knee: f32 = 0.5;
+      let compressed = luminance / (1.0 + luminance * knee);
+
+      // Scale sample while preserving hue
+      let normalizedColor = sampleColor.rgb / max(luminance, 0.001);
+      let processedSample = normalizedColor * compressed;
+
+      let sampleWeight = illuminationDecay * uniforms.weight;
+      color += processedSample * sampleWeight;
+      totalWeight += sampleWeight;
+    }
+
+    // Exponential decay
     illuminationDecay *= uniforms.decay;
   }
 
-  // Apply exposure
-  godRays *= uniforms.exposure;
+  // Normalize by total weight
+  if (totalWeight > 0.001) {
+    color /= totalWeight;
+  }
 
-  // Combine with original (additive)
-  let result = originalColor + godRays;
+  // Apply exposure with HDR-aware curve (matches WebGL)
+  // Higher exposure near light source for more dramatic effect
+  let distanceFalloff = 1.0 - smoothstep(0.0, 1.5, distFromLight);
+  let effectiveExposure = uniforms.exposure * (1.0 + distanceFalloff * 0.5);
+  color *= effectiveExposure * 2.5;
 
-  return vec4f(result, 1.0);
+  // Boost saturation to counteract desaturation from blending (matches WebGL 1.15x)
+  let colorLum = dot(color, vec3f(0.299, 0.587, 0.114));
+  if (colorLum > 0.01) {
+    let gray = vec3f(colorLum);
+    color = mix(gray, color, 1.15);
+  }
+
+  // Apply soft radial fade (matches WebGL)
+  let radialFade = 1.0 - smoothstep(0.3, 1.8, distFromLight);
+  color *= mix(0.3, 1.0, radialFade);
+
+  return vec4f(color, 1.0);
+}
+`
+
+/**
+ * Pass 2: Composite shader - adaptive soft light + additive blending
+ * Matches WebGL godRaysCompositeFragmentShader.
+ */
+const GOD_RAYS_COMPOSITE_SHADER = /* wgsl */ `
+struct CompositeUniforms {
+  intensity: f32,
+  _pad1: f32,
+  _pad2: f32,
+  _pad3: f32,
+}
+
+@group(0) @binding(0) var<uniform> uniforms: CompositeUniforms;
+@group(0) @binding(1) var texSampler: sampler;
+@group(0) @binding(2) var tScene: texture_2d<f32>;
+@group(0) @binding(3) var tGodRays: texture_2d<f32>;
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
+
+// Soft light blend mode (matches WebGL softLight function)
+fn softLight(base: vec3f, blend: vec3f) -> vec3f {
+  return mix(
+    sqrt(base) * (2.0 * blend - 1.0) + 2.0 * base * (1.0 - blend),
+    2.0 * base * blend + base * base * (1.0 - 2.0 * blend),
+    step(base, vec3f(0.5))
+  );
+}
+
+@fragment
+fn main(input: VertexOutput) -> @location(0) vec4f {
+  let sceneColor = textureSample(tScene, texSampler, input.uv);
+  let godRaysColor = textureSample(tGodRays, texSampler, input.uv);
+
+  // Apply intensity to god rays
+  let godRays = godRaysColor.rgb * uniforms.intensity;
+
+  // Calculate luminance for adaptive blending
+  let rayLum = dot(godRays, vec3f(0.299, 0.587, 0.114));
+  let sceneLum = dot(sceneColor.rgb, vec3f(0.299, 0.587, 0.114));
+
+  // Soft compress god rays to prevent harsh blowout (matches WebGL)
+  let godRaysCompressed = godRays / (1.0 + godRays * 0.03);
+
+  // Mix between pure additive and soft light for natural look (matches WebGL)
+  // More soft light in brighter areas to prevent wash-out
+  let blendMode = smoothstep(0.3, 0.8, sceneLum);
+
+  let additive = sceneColor.rgb + godRaysCompressed;
+  let softLightBlend = softLight(sceneColor.rgb, godRaysCompressed * 0.5 + 0.5);
+
+  var combined = mix(additive, softLightBlend, blendMode * 0.3);
+
+  // Subtle bloom-like glow in ray areas (matches WebGL)
+  let glowMask = smoothstep(0.1, 0.5, rayLum);
+  combined += godRaysCompressed * glowMask * 0.2;
+
+  return vec4f(combined, sceneColor.a);
 }
 `
 
 /**
  * WebGPU God Rays Pass.
+ *
+ * Two-pass implementation:
+ * 1. Radial blur on jet buffer → intermediate texture
+ * 2. Composite over scene with adaptive blending → output
+ *
+ * Reads per-frame from blackHole store: jetsGodRaysIntensity, jetsGodRaysSamples,
+ * jetsGodRaysDecay. Projects world origin to screen space for light position.
  */
 export class GodRaysPass extends WebGPUBasePass {
   private passConfig: GodRaysPassConfig
 
-  private renderPipeline: GPURenderPipeline | null = null
-  private passBindGroupLayout: GPUBindGroupLayout | null = null
-  private uniformBuffer: GPUBuffer | null = null
-  private sampler: GPUSampler | null = null
+  // Pass 1: Radial blur pipeline
+  private radialBlurPipeline: GPURenderPipeline | null = null
+  private radialBlurBGL: GPUBindGroupLayout | null = null
+  private radialBlurUniformBuffer: GPUBuffer | null = null
+  private radialBlurSampler: GPUSampler | null = null
 
-  private lightPosition: [number, number]
-  private exposure: number
-  private decay: number
-  private density: number
-  private weight: number
-  private samples: number
+  // Pass 2: Composite pipeline
+  private compositePipeline: GPURenderPipeline | null = null
+  private compositeBGL: GPUBindGroupLayout | null = null
+  private compositeUniformBuffer: GPUBuffer | null = null
+
+  // Intermediate render target for radial blur output
+  private intermediateTexture: GPUTexture | null = null
+  private intermediateView: GPUTextureView | null = null
+  private lastWidth = 0
+  private lastHeight = 0
+
+  // Light position in screen space (0-1), updated per-frame from camera projection
+  private lightPosition: [number, number] = [0.5, 0.5]
+
+  // Parameters from stores
+  private intensity: number = 0.8
+  private samples: number = 64
+  private decay: number = 0.96
 
   constructor(config: GodRaysPassConfig) {
+    // sceneInput first for passthrough (when disabled, copy scene to output)
     super({
       id: 'god-rays',
       priority: 186,
-      inputs: [{ resourceId: config.colorInput, access: 'read' as const, binding: 0 }],
+      inputs: [
+        { resourceId: config.sceneInput, access: 'read' as const, binding: 0 },
+        { resourceId: config.jetsInput, access: 'read' as const, binding: 1 },
+      ],
       outputs: [{ resourceId: config.outputResource, access: 'write' as const, binding: 0 }],
     })
 
     this.passConfig = config
-    this.lightPosition = config.lightPosition ?? [0.5, 0.5]
-    this.exposure = config.exposure ?? 0.34
-    this.decay = config.decay ?? 0.96
-    this.density = config.density ?? 0.97
-    this.weight = config.weight ?? 0.4
-    this.samples = config.samples ?? 100
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
-    this.passBindGroupLayout = device.createBindGroupLayout({
-      label: 'god-rays-bgl',
+    // --- Pass 1: Radial blur ---
+    this.radialBlurBGL = device.createBindGroupLayout({
+      label: 'god-rays-blur-bgl',
       entries: [
         { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const },
-        },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' as const } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' as const } },
       ],
     })
 
-    const fragmentModule = this.createShaderModule(device, GOD_RAYS_SHADER, 'god-rays-fragment')
-
-    this.renderPipeline = this.createFullscreenPipeline(
+    const blurModule = this.createShaderModule(device, GOD_RAYS_SHADER, 'god-rays-blur')
+    this.radialBlurPipeline = this.createFullscreenPipeline(
       device,
-      fragmentModule,
-      [this.passBindGroupLayout],
-      format,
-      { label: 'god-rays' }
+      blurModule,
+      [this.radialBlurBGL],
+      'rgba16float', // HDR intermediate output
+      { label: 'god-rays-blur' }
     )
 
-    this.uniformBuffer = this.createUniformBuffer(device, 48, 'god-rays-uniforms')
+    // 48 bytes: 12 x f32 (9 values + 3 padding)
+    this.radialBlurUniformBuffer = this.createUniformBuffer(device, 48, 'god-rays-blur-uniforms')
 
-    this.sampler = device.createSampler({
+    this.radialBlurSampler = device.createSampler({
       label: 'god-rays-sampler',
       magFilter: 'linear',
       minFilter: 'linear',
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     })
+
+    // --- Pass 2: Composite ---
+    this.compositeBGL = device.createBindGroupLayout({
+      label: 'god-rays-composite-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' as const } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' as const } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' as const } },
+      ],
+    })
+
+    const compositeModule = this.createShaderModule(device, GOD_RAYS_COMPOSITE_SHADER, 'god-rays-composite')
+    this.compositePipeline = this.createFullscreenPipeline(
+      device,
+      compositeModule,
+      [this.compositeBGL],
+      'rgba16float', // HDR output
+      { label: 'god-rays-composite' }
+    )
+
+    // 16 bytes: 1 f32 + 3 padding
+    this.compositeUniformBuffer = this.createUniformBuffer(device, 16, 'god-rays-composite-uniforms')
   }
 
-  setLightPosition(x: number, y: number): void {
-    this.lightPosition = [x, y]
+  /**
+   * Ensure intermediate texture exists at half resolution.
+   */
+  private ensureIntermediateTexture(device: GPUDevice, width: number, height: number): void {
+    const halfWidth = Math.max(1, Math.floor(width / 2))
+    const halfHeight = Math.max(1, Math.floor(height / 2))
+
+    if (this.intermediateTexture && this.lastWidth === halfWidth && this.lastHeight === halfHeight) {
+      return
+    }
+
+    this.intermediateTexture?.destroy()
+
+    this.intermediateTexture = device.createTexture({
+      label: 'god-rays-intermediate',
+      size: { width: halfWidth, height: halfHeight },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    this.intermediateView = this.intermediateTexture.createView({ label: 'god-rays-intermediate-view' })
+
+    this.lastWidth = halfWidth
+    this.lastHeight = halfHeight
   }
 
-  setExposure(value: number): void {
-    this.exposure = value
+  /**
+   * Update from stores per-frame.
+   */
+  private updateFromStores(ctx: WebGPURenderContext): void {
+    const blackhole = ctx.frame?.stores?.['blackHole'] as {
+      jetsGodRaysIntensity?: number
+      jetsGodRaysSamples?: number
+      jetsGodRaysDecay?: number
+    }
+
+    if (blackhole?.jetsGodRaysIntensity !== undefined) {
+      this.intensity = blackhole.jetsGodRaysIntensity
+    }
+    if (blackhole?.jetsGodRaysSamples !== undefined) {
+      this.samples = blackhole.jetsGodRaysSamples
+    }
+    if (blackhole?.jetsGodRaysDecay !== undefined) {
+      this.decay = blackhole.jetsGodRaysDecay
+    }
   }
 
-  setDecay(value: number): void {
-    this.decay = value
-  }
+  /**
+   * Project world origin (black hole center) to screen space UV.
+   */
+  private updateLightPosition(ctx: WebGPURenderContext): void {
+    const camera = ctx.frame?.stores?.['camera'] as {
+      projectionMatrix?: { elements: number[] }
+      viewMatrix?: { elements: number[] }
+    }
 
-  setDensity(value: number): void {
-    this.density = value
-  }
+    if (!camera?.projectionMatrix?.elements || !camera?.viewMatrix?.elements) {
+      return
+    }
 
-  setWeight(value: number): void {
-    this.weight = value
-  }
+    const p = camera.projectionMatrix.elements
+    const v = camera.viewMatrix.elements
 
-  setSamples(value: number): void {
-    this.samples = value
+    // Transform world origin (0,0,0) by view matrix → view space
+    // For origin, this is just the translation column of the view matrix
+    const vx = v[12] ?? 0
+    const vy = v[13] ?? 0
+    const vz = v[14] ?? 0
+    const vw = v[15] ?? 1
+
+    // Transform view space by projection matrix → clip space
+    const cx = p[0]! * vx + p[4]! * vy + p[8]! * vz + p[12]! * vw
+    const cy = p[1]! * vx + p[5]! * vy + p[9]! * vz + p[13]! * vw
+    const cw = p[3]! * vx + p[7]! * vy + p[11]! * vz + p[15]! * vw
+
+    // Perspective divide → NDC (-1 to 1)
+    if (Math.abs(cw) > 0.0001) {
+      const ndcX = cx / cw
+      const ndcY = cy / cw
+
+      // Convert NDC to UV (0 to 1)
+      // WebGPU UV convention: Y=0 is top, Y=1 is bottom (flip from NDC)
+      this.lightPosition = [
+        (ndcX + 1) * 0.5,
+        (1.0 - ndcY) * 0.5,
+      ]
+    }
   }
 
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
-      !this.renderPipeline ||
-      !this.uniformBuffer ||
-      !this.passBindGroupLayout ||
-      !this.sampler
-    )
+      !this.radialBlurPipeline ||
+      !this.radialBlurBGL ||
+      !this.radialBlurUniformBuffer ||
+      !this.radialBlurSampler ||
+      !this.compositePipeline ||
+      !this.compositeBGL ||
+      !this.compositeUniformBuffer
+    ) {
       return
+    }
 
-    const colorView = ctx.getTextureView(this.passConfig.colorInput)
+    // Update from stores
+    this.updateFromStores(ctx)
+    this.updateLightPosition(ctx)
+
+    // Get input textures
+    const jetsView = ctx.getTextureView(this.passConfig.jetsInput)
+    const sceneView = ctx.getTextureView(this.passConfig.sceneInput)
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
-    if (!colorView || !outputView) return
 
-    const data = new Float32Array(12)
-    data[0] = ctx.size.width
-    data[1] = ctx.size.height
-    data[2] = this.lightPosition[0]
-    data[3] = this.lightPosition[1]
-    data[4] = this.exposure
-    data[5] = this.decay
-    data[6] = this.density
-    data[7] = this.weight
-    data[8] = this.samples
+    if (!jetsView || !sceneView || !outputView) return
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
+    // Ensure intermediate texture at half resolution
+    const { width, height } = ctx.size
+    this.ensureIntermediateTexture(this.device, width, height)
+    if (!this.intermediateView) return
 
-    const bindGroup = this.device.createBindGroup({
-      label: 'god-rays-bg',
-      layout: this.passBindGroupLayout,
+    // === Pass 1: Radial blur on jet buffer → intermediate ===
+
+    const blurData = new Float32Array(12)
+    blurData[0] = Math.max(1, Math.floor(width / 2))    // half-res width
+    blurData[1] = Math.max(1, Math.floor(height / 2))   // half-res height
+    blurData[2] = this.lightPosition[0]                  // lightPosition.x
+    blurData[3] = this.lightPosition[1]                  // lightPosition.y
+    blurData[4] = 0.3                                    // exposure (matches WebGL fixed 0.3)
+    blurData[5] = this.decay                             // decay (from store)
+    blurData[6] = 1.0                                    // density (matches WebGL fixed 1.0)
+    blurData[7] = 1.0                                    // weight (matches WebGL fixed 1.0)
+    blurData[8] = this.samples                           // samples (from store)
+    // 9-11: padding
+
+    this.writeUniformBuffer(this.device, this.radialBlurUniformBuffer, blurData)
+
+    const blurBindGroup = this.device.createBindGroup({
+      label: 'god-rays-blur-bg',
+      layout: this.radialBlurBGL,
       entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: colorView },
+        { binding: 0, resource: { buffer: this.radialBlurUniformBuffer } },
+        { binding: 1, resource: this.radialBlurSampler },
+        { binding: 2, resource: jetsView },
       ],
     })
 
-    const passEncoder = ctx.beginRenderPass({
-      label: 'god-rays-render',
+    const blurPass = ctx.beginRenderPass({
+      label: 'god-rays-blur',
+      colorAttachments: [
+        {
+          view: this.intermediateView,
+          loadOp: 'clear' as const,
+          storeOp: 'store' as const,
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
+    })
+
+    this.renderFullscreen(blurPass, this.radialBlurPipeline, [blurBindGroup])
+    blurPass.end()
+
+    // === Pass 2: Composite god rays over scene → output ===
+
+    const compositeData = new Float32Array(4)
+    compositeData[0] = this.intensity   // intensity (from store)
+    // 1-3: padding
+
+    this.writeUniformBuffer(this.device, this.compositeUniformBuffer, compositeData)
+
+    const compositeBindGroup = this.device.createBindGroup({
+      label: 'god-rays-composite-bg',
+      layout: this.compositeBGL,
+      entries: [
+        { binding: 0, resource: { buffer: this.compositeUniformBuffer } },
+        { binding: 1, resource: this.radialBlurSampler },
+        { binding: 2, resource: sceneView },
+        { binding: 3, resource: this.intermediateView },
+      ],
+    })
+
+    const compositePass = ctx.beginRenderPass({
+      label: 'god-rays-composite',
       colorAttachments: [
         {
           view: outputView,
@@ -252,15 +532,26 @@ export class GodRaysPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
-    passEncoder.end()
+    this.renderFullscreen(compositePass, this.compositePipeline, [compositeBindGroup])
+    compositePass.end()
   }
 
   dispose(): void {
-    this.renderPipeline = null
-    this.passBindGroupLayout = null
-    this.uniformBuffer?.destroy()
-    this.sampler = null
+    this.radialBlurPipeline = null
+    this.radialBlurBGL = null
+    this.radialBlurUniformBuffer?.destroy()
+    this.radialBlurUniformBuffer = null
+    this.radialBlurSampler = null
+
+    this.compositePipeline = null
+    this.compositeBGL = null
+    this.compositeUniformBuffer?.destroy()
+    this.compositeUniformBuffer = null
+
+    this.intermediateTexture?.destroy()
+    this.intermediateTexture = null
+    this.intermediateView = null
+
     super.dispose()
   }
 }

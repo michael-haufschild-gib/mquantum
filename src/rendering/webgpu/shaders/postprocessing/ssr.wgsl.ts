@@ -111,8 +111,9 @@ fn reconstructNormal(coord: vec2f) -> vec3f {
   let posB = getViewPosition(coord - vec2f(0.0, texel.y), depthB);
   let posT = getViewPosition(coord + vec2f(0.0, texel.y), depthT);
 
-  let ddx = select(posR - posC, posC - posL, abs(posR.z - posC.z) < abs(posC.z - posL.z));
-  let ddy = select(posT - posC, posC - posB, abs(posT.z - posC.z) < abs(posC.z - posB.z));
+  // select(falseVal, trueVal, cond): when right diff is smaller, use right diff
+  let ddx = select(posC - posL, posR - posC, abs(posR.z - posC.z) < abs(posC.z - posL.z));
+  let ddy = select(posC - posB, posT - posC, abs(posT.z - posC.z) < abs(posC.z - posB.z));
 
   let crossProd = cross(ddy, ddx);
   let crossLen = length(crossProd);

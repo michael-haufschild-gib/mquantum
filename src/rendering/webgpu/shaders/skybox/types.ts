@@ -21,6 +21,8 @@ export interface SkyboxShaderConfig {
   mode: SkyboxMode
   effects: SkyboxEffects
   overrides?: string[]
+  /** When false, shader outputs single color target instead of MRT (color+normal+worldPos). Default true. */
+  mrt?: boolean
 }
 
 /**

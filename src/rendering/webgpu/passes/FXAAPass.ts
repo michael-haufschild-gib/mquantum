@@ -11,6 +11,10 @@ import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { fxaaShader } from '../shaders/postprocessing/fxaa.wgsl'
 
 export interface FXAAPassOptions {
+  /** Input color resource (default: 'ldr-color') */
+  colorInput?: string
+  /** Output resource (default: 'final-color') */
+  outputResource?: string
   subpixelQuality?: number
   edgeThreshold?: number
   edgeThresholdMin?: number
@@ -28,13 +32,22 @@ export class FXAAPass extends WebGPUBasePass {
   private edgeThreshold = 0.125
   private edgeThresholdMin = 0.0625
 
+  private readonly colorInputId: string
+  private readonly outputResourceId: string
+
   constructor(options?: FXAAPassOptions) {
+    const colorInput = options?.colorInput ?? 'ldr-color'
+    const outputResource = options?.outputResource ?? 'final-color'
+
     super({
       id: 'fxaa',
       priority: 950, // After tonemapping
-      inputs: [{ resourceId: 'ldr-color', access: 'read', binding: 0 }],
-      outputs: [{ resourceId: 'final-color', access: 'write', binding: 0 }],
+      inputs: [{ resourceId: colorInput, access: 'read', binding: 0 }],
+      outputs: [{ resourceId: outputResource, access: 'write', binding: 0 }],
     })
+
+    this.colorInputId = colorInput
+    this.outputResourceId = outputResource
 
     if (options?.subpixelQuality !== undefined) this.subpixelQuality = options.subpixelQuality
     if (options?.edgeThreshold !== undefined) this.edgeThreshold = options.edgeThreshold
@@ -114,8 +127,8 @@ export class FXAAPass extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
 
     // Get textures
-    const inputView = ctx.getTextureView('ldr-color')
-    const outputView = ctx.getWriteTarget('final-color') ?? ctx.getCanvasTextureView()
+    const inputView = ctx.getTextureView(this.colorInputId)
+    const outputView = ctx.getWriteTarget(this.outputResourceId) ?? ctx.getCanvasTextureView()
 
     if (!inputView) return
 

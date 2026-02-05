@@ -10,7 +10,8 @@ import { SkyboxEffects, SkyboxMode } from './types'
  * @param effects - Which post-processing effects are enabled
  * @returns WGSL main function code
  */
-export function generateMain(mode: SkyboxMode, effects: SkyboxEffects): string {
+export function generateMain(mode: SkyboxMode, effects: SkyboxEffects, options?: { mrt?: boolean }): string {
+  const useMRT = options?.mrt !== false
   let modeCall = ''
   switch (mode) {
     case 'classic':
@@ -40,6 +41,18 @@ export function generateMain(mode: SkyboxMode, effects: SkyboxEffects): string {
   if (effects.sun) effectCalls.push('color = applySun(color, dir);')
   if (effects.vignette) effectCalls.push('color = applyVignette(color, input.screenUV);')
 
+  const outputBlock = useMRT
+    ? `  // Output to MRT - write to all 3 locations
+  var output: FragmentOutput;
+  output.color = vec4<f32>(color, 1.0);
+  output.normal = vec4<f32>(0.5, 0.5, 1.0, 0.0);  // Neutral skybox normal (facing camera)
+  output.worldPosition = vec4<f32>(0.0);  // Skybox has no world position
+  return output;`
+    : `  // Single color output
+  var output: FragmentOutput;
+  output.color = vec4<f32>(color, 1.0);
+  return output;`
+
   return `
 // --- Main Fragment Entry Point ---
 @fragment
@@ -63,12 +76,7 @@ fn main(input: VertexOutput) -> FragmentOutput {
   // 3. Post-Process Effects
   ${effectCalls.join('\n  ')}
 
-  // Output to MRT - must write to all 3 locations for compatibility
-  var output: FragmentOutput;
-  output.color = vec4<f32>(color, 1.0);
-  output.normal = vec4<f32>(0.5, 0.5, 1.0, 0.0);  // Neutral skybox normal (facing camera)
-  output.worldPosition = vec4<f32>(0.0);  // Skybox has no world position
-  return output;
+${outputBlock}
 }
 `
 }

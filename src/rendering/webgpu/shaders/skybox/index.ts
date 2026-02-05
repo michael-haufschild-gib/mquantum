@@ -24,6 +24,7 @@ export {
 export {
   generateVertexOutputStruct,
   fragmentOutputStruct,
+  fragmentOutputStructSingle,
 } from './core/varyings.wgsl'
 
 // Utility modules

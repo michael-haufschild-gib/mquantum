@@ -1231,7 +1231,7 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
           view: colorView,
           loadOp: 'clear',
           storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
         },
         {
           view: normalView,

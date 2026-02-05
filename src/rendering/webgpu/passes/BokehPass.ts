@@ -2,7 +2,10 @@
  * WebGPU Bokeh Pass (Depth of Field)
  *
  * Simulates camera depth of field with bokeh blur effect.
- * Blurs areas outside the focal plane based on circle of confusion.
+ * Matches the WebGL BokehShader implementation:
+ * - Focus range "dead zone" for sharp in-focus regions
+ * - Hexagonal bokeh blur pattern (37 samples)
+ * - Aspect ratio correction
  *
  * @module rendering/webgpu/passes/BokehPass
  */
@@ -20,137 +23,113 @@ export interface BokehPassConfig {
   depthInput: string
   /** Output resource ID */
   outputResource: string
-  /** Focus distance from camera */
-  focusDistance?: number
-  /** Focal length in mm */
-  focalLength?: number
-  /** F-stop (aperture) */
-  fStop?: number
-  /** Maximum blur radius in pixels */
-  maxBlur?: number
 }
 
 /**
  * WGSL Bokeh Fragment Shader
+ *
+ * Matches WebGL BokehShader: dead zone CoC model, hexagonal blur, aspect correction.
+ * Uses textureSampleLevel for color (linear filtering), textureLoad for depth.
  */
 const BOKEH_SHADER = /* wgsl */ `
 struct Uniforms {
   resolution: vec2f,
-  focusDistance: f32,
-  focalLength: f32,
-  fStop: f32,
-  maxBlur: f32,
+  focus: f32,
+  focusRange: f32,
+  aperture: f32,
+  maxblur: f32,
   near: f32,
   far: f32,
+  aspect: f32,
+  _pad1: f32,
+  _pad2: f32,
+  _pad3: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 @group(0) @binding(1) var texSampler: sampler;
 @group(0) @binding(2) var tColor: texture_2d<f32>;
-@group(0) @binding(3) var tDepth: texture_2d<f32>;
+@group(0) @binding(3) var tDepth: texture_depth_2d;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
 }
 
-const PI: f32 = 3.14159265359;
-
-// Linearize depth - WebGPU uses [0, 1] depth range
+// Linearize depth from [0,1] NDC to view-space Z (positive distance from camera)
+// Matches Three.js perspectiveDepthToViewZ then negated:
+//   viewZ = near * far / (far - depth * (far - near))
 fn linearizeDepth(depth: f32) -> f32 {
-  // WebGPU depth is already in [0, 1], use the correct formula
   return (uniforms.near * uniforms.far) / (uniforms.far - depth * (uniforms.far - uniforms.near));
 }
 
-// Calculate circle of confusion
-fn calculateCoC(depth: f32) -> f32 {
-  let linearDepth = linearizeDepth(depth);
+// Hexagonal bokeh blur (matches WebGL BokehShader hexagonalBlur)
+// 3 rings + center = 37 total samples with distance-based weighting
+fn hexagonalBlur(uv: vec2f, blur: vec2f) -> vec4f {
+  var col = vec4f(0.0);
+  var total: f32 = 0.0;
 
-  // CoC formula based on thin lens model
-  // CoC = abs(aperture * focalLength * (focusDistance - depth) / (depth * (focusDistance - focalLength)))
-  let aperture = uniforms.focalLength / uniforms.fStop;
-  let focusDist = uniforms.focusDistance;
-  let focalLen = uniforms.focalLength * 0.001; // Convert mm to meters
+  // Ring 0: center
+  col += textureSampleLevel(tColor, texSampler, uv, 0.0) * 1.0;
+  total += 1.0;
 
-  // Simplified CoC calculation
-  let coc = abs(aperture * (linearDepth - focusDist) / linearDepth) * 100.0;
-
-  return clamp(coc, 0.0, uniforms.maxBlur);
-}
-
-// Sample with bokeh kernel
-// Note: Uses textureLoad instead of textureSample to avoid non-uniform control flow issues
-// cocRadius varies per-pixel based on depth, so we can't use textureSample conditionally
-fn sampleBokeh(uv: vec2f, cocRadius: f32) -> vec4f {
-  let texelSize = 1.0 / uniforms.resolution;
-  let colorDims = textureDimensions(tColor);
-  let depthDims = textureDimensions(tDepth);
-
-  // Always sample center pixel using textureLoad (uniform control flow safe)
-  let centerCoord = vec2i(uv * vec2f(colorDims));
-  let centerColor = textureLoad(tColor, centerCoord, 0);
-
-  // For small CoC, just return center color (no blur needed)
-  // We use select() instead of early return to maintain uniform control flow
-  let needsBlur = cocRadius >= 0.5;
-
-  var color = vec3f(0.0);
-  var weight = 0.0;
-
-  // Hexagonal bokeh pattern (6-sided)
-  let rings = 3;
-
-  for (var ring = 1; ring <= rings; ring++) {
-    let ringRadius = f32(ring) / f32(rings) * cocRadius;
-    let pointsInRing = ring * 6;
-
-    for (var i = 0; i < pointsInRing; i++) {
-      let angle = f32(i) / f32(pointsInRing) * PI * 2.0;
-      let offset = vec2f(cos(angle), sin(angle)) * ringRadius * texelSize;
-      let sampleUV = uv + offset;
-
-      // Sample color and depth at this point using textureLoad
-      let sampleCoord = vec2i(sampleUV * vec2f(colorDims));
-      let clampedColorCoord = clamp(sampleCoord, vec2i(0), vec2i(colorDims) - vec2i(1));
-      let sampleColor = textureLoad(tColor, clampedColorCoord, 0);
-
-      let depthCoord = vec2i(sampleUV * vec2f(depthDims));
-      let clampedDepthCoord = clamp(depthCoord, vec2i(0), vec2i(depthDims) - vec2i(1));
-      let sampleDepth = textureLoad(tDepth, clampedDepthCoord, 0).r;
-      let sampleCoC = calculateCoC(sampleDepth);
-
-      // Weight by sample's CoC (foreground should bleed, background should not)
-      let sampleWeight = max(sampleCoC, cocRadius) / max(cocRadius, 0.001);
-
-      color += sampleColor.rgb * sampleWeight;
-      weight += sampleWeight;
-    }
+  // Ring 1: 6 samples at distance 0.33
+  let r1: f32 = 0.33;
+  for (var i = 0; i < 6; i++) {
+    let angle = f32(i) * 1.0472; // 60 degrees = PI/3
+    let offset = vec2f(cos(angle), sin(angle)) * r1;
+    col += textureSampleLevel(tColor, texSampler, uv + blur * offset, 0.0) * 0.9;
+    total += 0.9;
   }
 
-  // Add center sample
-  color += centerColor.rgb;
-  weight += 1.0;
+  // Ring 2: 12 samples at distance 0.67
+  let r2: f32 = 0.67;
+  for (var i = 0; i < 12; i++) {
+    let angle = f32(i) * 0.5236; // 30 degrees = PI/6
+    let offset = vec2f(cos(angle), sin(angle)) * r2;
+    col += textureSampleLevel(tColor, texSampler, uv + blur * offset, 0.0) * 0.7;
+    total += 0.7;
+  }
 
-  let blurredColor = vec4f(color / weight, centerColor.a);
+  // Ring 3: 18 samples at distance 1.0
+  let r3: f32 = 1.0;
+  for (var i = 0; i < 18; i++) {
+    let angle = f32(i) * 0.349; // 20 degrees
+    let offset = vec2f(cos(angle), sin(angle)) * r3;
+    col += textureSampleLevel(tColor, texSampler, uv + blur * offset, 0.0) * 0.5;
+    total += 0.5;
+  }
 
-  // Use select for uniform control flow: return center if no blur needed, else blurred
-  return select(centerColor, blurredColor, needsBlur);
+  return col / max(total, 0.0001);
 }
 
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
 
-  // Sample depth using textureLoad (depth texture is unfilterable-float)
+  // Sample depth using textureLoad (texture_depth_2d returns f32 directly)
   let depthDims = textureDimensions(tDepth);
   let depthCoord = vec2i(uv * vec2f(depthDims));
-  let depth = textureLoad(tDepth, depthCoord, 0).r;
+  let clampedCoord = clamp(depthCoord, vec2i(0), vec2i(depthDims) - vec2i(1));
+  let depth = textureLoad(tDepth, clampedCoord, 0);
 
-  // Calculate circle of confusion
-  let coc = calculateCoC(depth);
+  // Linearize depth to view-space distance (positive, away from camera)
+  let viewZ = linearizeDepth(depth);
 
-  // Apply bokeh blur
-  return sampleBokeh(uv, coc);
+  // Calculate blur factor with focus range dead zone (matches WebGL BokehShader)
+  // Objects within ±focusRange of the focus point stay sharp
+  let diff = viewZ - uniforms.focus;
+  let absDiff = abs(diff);
+  var blurFactor = max(0.0, absDiff - uniforms.focusRange) * uniforms.aperture;
+  blurFactor = min(blurFactor, uniforms.maxblur);
+
+  // Apply blur with aspect ratio correction (matches WebGL)
+  let dofblur = vec2f(blurFactor, blurFactor * uniforms.aspect);
+
+  // Apply hexagonal bokeh blur
+  var col = hexagonalBlur(uv, dofblur);
+  col.a = 1.0;
+  return col;
 }
 `
 
@@ -176,6 +155,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
  * WebGPU Bokeh Pass.
  *
  * Simulates depth of field with bokeh blur effect.
+ * Reads bokehWorldFocusDistance, bokehWorldFocusRange, bokehScale from the
+ * postProcessing store to match WebGL behavior.
  */
 export class BokehPass extends WebGPUBasePass {
   private passConfig: BokehPassConfig
@@ -196,11 +177,11 @@ export class BokehPass extends WebGPUBasePass {
   // Sampler
   private sampler: GPUSampler | null = null
 
-  // Configuration
-  private focusDistance: number
-  private focalLength: number
-  private fStop: number
-  private maxBlur: number
+  // Configuration — matches WebGL BokehPass fields
+  private focus: number = 15.0
+  private focusRange: number = 10.0
+  private aperture: number = 0.0    // bokehScale * 0.005
+  private maxBlur: number = 0.0     // bokehScale * 0.02
 
   constructor(config: BokehPassConfig) {
     super({
@@ -214,20 +195,13 @@ export class BokehPass extends WebGPUBasePass {
     })
 
     this.passConfig = config
-    this.focusDistance = config.focusDistance ?? 10.0
-    this.focalLength = config.focalLength ?? 50.0
-    this.fStop = config.fStop ?? 2.8
-    this.maxBlur = config.maxBlur ?? 10.0
   }
 
-  /**
-   * Create the rendering pipeline.
-   * @param ctx
-   */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
 
     // Create bind group layout
+    // Depth uses texture_depth_2d + sampleType:'depth' to match depth24plus format
     this.passBindGroupLayout = device.createBindGroupLayout({
       label: 'bokeh-bgl',
       entries: [
@@ -245,7 +219,7 @@ export class BokehPass extends WebGPUBasePass {
         {
           binding: 3,
           visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'unfilterable-float' as const },
+          texture: { sampleType: 'depth' as const },
         },
       ],
     })
@@ -262,8 +236,8 @@ export class BokehPass extends WebGPUBasePass {
       { label: 'bokeh' }
     )
 
-    // Create uniform buffer (32 bytes: vec2f + 6x f32)
-    this.uniformBuffer = this.createUniformBuffer(device, 32, 'bokeh-uniforms')
+    // Create uniform buffer (48 bytes: 12 x f32, includes padding)
+    this.uniformBuffer = this.createUniformBuffer(device, 48, 'bokeh-uniforms')
 
     // Create sampler
     this.sampler = device.createSampler({
@@ -302,53 +276,57 @@ export class BokehPass extends WebGPUBasePass {
   }
 
   /**
-   * Set focus distance.
-   * @param distance
+   * Set focus distance (world units).
    */
-  setFocusDistance(distance: number): void {
-    this.focusDistance = distance
+  setFocus(distance: number): void {
+    this.focus = distance
   }
 
   /**
-   * Set aperture (f-stop).
-   * @param fStop
+   * Set focus range (dead zone, world units).
    */
-  setFStop(fStop: number): void {
-    this.fStop = fStop
+  setFocusRange(range: number): void {
+    this.focusRange = range
   }
 
+  /**
+   * Set aperture (derived from bokehScale * 0.005).
+   */
+  setAperture(value: number): void {
+    this.aperture = value
+  }
+
+  /**
+   * Set maximum blur (derived from bokehScale * 0.02).
+   */
+  setMaxBlur(value: number): void {
+    this.maxBlur = value
+  }
 
   /**
    * Update pass properties from Zustand stores.
-   * @param ctx
+   * Reads the same fields as WebGL: bokehWorldFocusDistance, bokehWorldFocusRange, bokehScale.
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
       bokehWorldFocusDistance?: number
-      bokehFocalLength?: number
+      bokehWorldFocusRange?: number
+      bokehScale?: number
     }
 
     if (postProcessing?.bokehWorldFocusDistance !== undefined) {
-      this.focusDistance = postProcessing.bokehWorldFocusDistance
+      this.focus = postProcessing.bokehWorldFocusDistance
     }
-    if (postProcessing?.bokehFocalLength !== undefined) {
-      this.focalLength = postProcessing.bokehFocalLength
+    if (postProcessing?.bokehWorldFocusRange !== undefined) {
+      this.focusRange = postProcessing.bokehWorldFocusRange
     }
-    // Note: bokehFStop and bokehMaxBlur are not in store - using constructor defaults
+    if (postProcessing?.bokehScale !== undefined) {
+      // Match WebGL: aperture = bokehScale * 0.005, maxBlur = bokehScale * 0.02
+      this.aperture = postProcessing.bokehScale * 0.005
+      this.maxBlur = postProcessing.bokehScale * 0.02
+    }
   }
 
-  /**
-   * Set focal length.
-   * @param length
-   */
-  setFocalLength(length: number): void {
-    this.focalLength = length
-  }
-
-  /**
-   * Execute the Bokeh pass.
-   * @param ctx
-   */
   execute(ctx: WebGPURenderContext): void {
     if (
       !this.device ||
@@ -397,16 +375,22 @@ export class BokehPass extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms (8 floats = 32 bytes)
-    const data = new Float32Array(8)
-    data[0] = ctx.size.width
-    data[1] = ctx.size.height
-    data[2] = this.focusDistance
-    data[3] = this.focalLength
-    data[4] = this.fStop
-    data[5] = this.maxBlur
-    data[6] = camera?.near ?? 0.1
-    data[7] = camera?.far ?? 100
+    const { width, height } = ctx.size
+
+    // Update uniforms (12 floats = 48 bytes, matches WGSL struct)
+    const data = new Float32Array(12)
+    data[0] = width                       // resolution.x
+    data[1] = height                      // resolution.y
+    data[2] = this.focus                  // focus (world units)
+    data[3] = this.focusRange             // focusRange (dead zone, world units)
+    data[4] = this.aperture               // aperture (bokehScale * 0.005)
+    data[5] = this.maxBlur                // maxblur (bokehScale * 0.02)
+    data[6] = camera?.near ?? 0.1         // near clip
+    data[7] = camera?.far ?? 100          // far clip
+    data[8] = height / width              // aspect (height/width, matches WebGL)
+    data[9] = 0                           // _pad1
+    data[10] = 0                          // _pad2
+    data[11] = 0                          // _pad3
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 
@@ -443,9 +427,6 @@ export class BokehPass extends WebGPUBasePass {
 
   /**
    * Copy input directly to output (passthrough for non-perspective cameras)
-   * @param ctx
-   * @param inputView
-   * @param outputView
    */
   private copyToOutput(
     ctx: WebGPURenderContext,
@@ -479,9 +460,6 @@ export class BokehPass extends WebGPUBasePass {
     passEncoder.end()
   }
 
-  /**
-   * Dispose of resources.
-   */
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null

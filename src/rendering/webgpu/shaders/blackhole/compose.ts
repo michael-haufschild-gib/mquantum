@@ -88,13 +88,13 @@ export function composeBlackHoleShader(config: BlackHoleWGSLShaderConfig): {
 
   // Build blocks array
   const blocks = [
-    // Vertex inputs (fullscreen quad - receives ray direction from vertex shader)
+    // Vertex inputs (fullscreen quad - receives NDC position for per-pixel ray computation)
     {
       name: 'Vertex Inputs',
       content: /* wgsl */ `
 struct VertexOutput {
   @builtin(position) clipPosition: vec4f,
-  @location(0) vRayDir: vec3f,
+  @location(0) vNDC: vec2f,
 }
 `,
     },
@@ -161,29 +161,12 @@ struct VertexOutput {
  */
 export function composeBlackHoleVertexShader(): string {
   return /* wgsl */ `
-// BlackHole Vertex Shader (Fullscreen Quad)
-// Computes ray direction from screen UV for raymarching
-
-struct CameraUniforms {
-  viewMatrix: mat4x4f,
-  projectionMatrix: mat4x4f,
-  viewProjectionMatrix: mat4x4f,
-  inverseViewMatrix: mat4x4f,
-  inverseProjectionMatrix: mat4x4f,
-  modelMatrix: mat4x4f,
-  inverseModelMatrix: mat4x4f,
-  cameraPosition: vec3f,
-  cameraNear: f32,
-  cameraFar: f32,
-  fov: f32,
-  resolution: vec2f,
-  aspectRatio: f32,
-  time: f32,
-  deltaTime: f32,
-  frameNumber: u32,
-}
-
-@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+// BlackHole Vertex Shader (Fullscreen Triangle)
+// Passes NDC position to fragment shader for per-pixel ray direction computation.
+// Ray direction MUST be computed per-pixel (not per-vertex) because the oversized
+// triangle trick uses vertices at (-1,-1), (3,-1), (-1,3) and normalize() is
+// non-linear — interpolating normalized vectors from oversized positions produces
+// distorted ray directions that shift the black hole off-center.
 
 struct VertexInput {
   @location(0) position: vec2f,
@@ -192,28 +175,18 @@ struct VertexInput {
 
 struct VertexOutput {
   @builtin(position) clipPosition: vec4f,
-  @location(0) vRayDir: vec3f,
+  @location(0) vNDC: vec2f,
 }
 
 @vertex
 fn main(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
 
-  // Direct clip position from fullscreen quad vertices
+  // Direct clip position from fullscreen triangle vertices
   output.clipPosition = vec4f(input.position, 0.0, 1.0);
 
-  // Compute ray direction from UV
-  // Convert UV (0-1) to NDC (-1 to 1)
-  let ndc = input.position;
-
-  // Reconstruct view-space direction using inverse projection
-  let clipPos = vec4f(ndc.x, ndc.y, 1.0, 1.0);
-  var viewPos = camera.inverseProjectionMatrix * clipPos;
-  viewPos = viewPos / viewPos.w;
-
-  // Transform view direction to world space
-  let worldDir = (camera.inverseViewMatrix * vec4f(normalize(viewPos.xyz), 0.0)).xyz;
-  output.vRayDir = normalize(worldDir);
+  // Pass NDC position (will be correctly interpolated since it's linear)
+  output.vNDC = input.position;
 
   return output;
 }

@@ -23,6 +23,7 @@ import {
   MANIFOLD_TYPE_MAP,
   LIGHTING_MODE_MAP,
 } from '../../renderers/BlackHole/types'
+import { computeKerrRadii } from '@/lib/geometry/extended/kerr-physics'
 
 export interface BlackHoleRendererConfig {
   dimension?: number
@@ -69,7 +70,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       id: 'blackhole',
       priority: 100,
       inputs: [],
-      outputs: [{ resourceId: 'hdr-color', access: 'write', binding: 0 }],
+      outputs: [{ resourceId: 'object-color', access: 'write', binding: 0 }],
     })
 
     this.rendererConfig = {
@@ -96,7 +97,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Compose shaders
     const { wgsl: fragmentShader } = composeBlackHoleShader(this.shaderConfig)
@@ -160,7 +161,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
       fragment: {
         module: fragmentModule,
         entryPoint: 'fragmentMain',
-        targets: [{ format }],
+        targets: [{ format: 'rgba16float' as GPUTextureFormat }],
       },
       primitive: {
         topology: 'triangle-list' as const,
@@ -178,8 +179,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     // MaterialUniforms: 160 bytes (vec3f has 16-byte alignment in WGSL)
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'blackhole-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'blackhole-quality')
-    // BlackHole uniforms: 672 bytes (matches BlackHoleUniforms struct with color algorithm fields)
-    this.blackHoleUniformBuffer = this.createUniformBuffer(device, 672, 'blackhole-uniforms')
+    // BlackHole uniforms: 480 bytes (120 floats, matches BlackHoleUniforms WGSL struct with alignment padding)
+    this.blackHoleUniformBuffer = this.createUniformBuffer(device, 480, 'blackhole-uniforms')
     // Basis vectors: 176 bytes (4 * 11 floats * 4 bytes = 176)
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'blackhole-basis')
 
@@ -333,15 +334,22 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     const dimension = geometryStore?.dimension ?? this.rendererConfig.dimension ?? 4
 
     // Pack black hole uniforms (must match BlackHoleUniforms struct layout)
-    // Total size: 672 bytes = 168 floats (including color algorithm fields)
-    const data = new Float32Array(168)
+    // Total size: 480 bytes = 120 floats (including WGSL alignment padding for vec3f/vec2f)
+    const data = new Float32Array(120)
     const dataView = new DataView(data.buffer) // For proper integer packing
     let offset = 0
 
     // Physics (Kerr black hole)
-    data[offset++] = blackhole?.horizonRadius ?? 0.5 // horizonRadius
-    data[offset++] = blackhole?.visualEventHorizon ?? 1.285 // visualEventHorizon
-    data[offset++] = blackhole?.spin ?? 0.0 // spin
+    const horizonRadiusVal = blackhole?.horizonRadius ?? 0.5
+    const spinVal = blackhole?.spin ?? 0.0
+    // Compute visual event horizon dynamically from Kerr physics (matches WebGL)
+    const M = horizonRadiusVal / 2
+    const kerrRadii = computeKerrRadii(M, spinVal)
+    const visualEventHorizon = kerrRadii.shadowRadius
+
+    data[offset++] = horizonRadiusVal // horizonRadius
+    data[offset++] = visualEventHorizon // visualEventHorizon (computed from Kerr physics)
+    data[offset++] = spinVal // spin
     data[offset++] = blackhole?.diskTemperature ?? 6500.0 // diskTemperature
 
     data[offset++] = postProcessing?.gravityStrength ?? 1.0 // gravityStrength (from global postProcessing)
@@ -350,6 +358,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.photonShellWidth ?? 0.05 // photonShellWidth
 
     data[offset++] = blackhole?.timeScale ?? 1.0 // timeScale
+    offset += 3 // WGSL alignment padding: vec3f baseColor requires 16-byte alignment (byte 36 → 48)
 
     // baseColor (vec3f) + paletteMode (i32)
     const baseColor = blackhole?.baseColor ?? { r: 1.0, g: 0.96, b: 0.9 }
@@ -375,11 +384,10 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = blackhole?.dimPower ?? 1.0 // dimPower
     data[offset++] = blackhole?.originOffsetLengthSq ?? 0.0 // originOffsetLengthSq
 
-    // Pre-computed lensing falloff boundaries
-    const horizonRadius = blackhole?.horizonRadius ?? 0.5
-    data[offset++] = blackhole?.lensingFalloffStart ?? horizonRadius * 3.5 // lensingFalloffStart
-    data[offset++] = blackhole?.lensingFalloffEnd ?? horizonRadius * 8.0 // lensingFalloffEnd
-    data[offset++] = blackhole?.horizonRadiusInv ?? 1.0 / horizonRadius // horizonRadiusInv
+    // Pre-computed lensing falloff boundaries (use horizonRadiusVal from above)
+    data[offset++] = horizonRadiusVal * 3.5 // lensingFalloffStart
+    data[offset++] = horizonRadiusVal * 8.0 // lensingFalloffEnd
+    data[offset++] = 1.0 / Math.max(horizonRadiusVal, 0.001) // horizonRadiusInv
 
     // Photon shell
     data[offset++] = blackhole?.photonShellRadiusMul ?? 1.3 // photonShellRadiusMul
@@ -395,19 +403,44 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
 
     data[offset++] = blackhole?.shellStepMul ?? 0.35 // shellStepMul
     data[offset++] = blackhole?.shellContrastBoost ?? 1.0 // shellContrastBoost
-    data[offset++] = blackhole?.shellRpPrecomputed ?? 1.48 // shellRpPrecomputed
-    data[offset++] = blackhole?.shellDeltaPrecomputed ?? 0.32 // shellDeltaPrecomputed
+    // Compute shell precomputed values from visual event horizon (matches WebGL)
+    // Shell center 15% outside shadow radius
+    const shellRp = visualEventHorizon * 1.15
+    const shellDelta = visualEventHorizon * (blackhole?.photonShellWidth ?? 0.05)
+    data[offset++] = shellRp // shellRpPrecomputed
+    data[offset++] = shellDelta // shellDeltaPrecomputed
 
     // Manifold / Accretion
     dataView.setInt32(offset * 4, MANIFOLD_TYPE_MAP[blackhole?.manifoldType] ?? 0, true) // manifoldType (i32)
     offset++
     data[offset++] = blackhole?.densityFalloff ?? 6.0 // densityFalloff
-    data[offset++] = blackhole?.diskInnerRadiusMul ?? 4.23 // diskInnerRadiusMul
-    data[offset++] = blackhole?.diskOuterRadiusMul ?? 15.0 // diskOuterRadiusMul
+    const diskInnerMul = blackhole?.diskInnerRadiusMul ?? 4.23
+    const diskOuterMul = blackhole?.diskOuterRadiusMul ?? 15.0
+    data[offset++] = diskInnerMul // diskInnerRadiusMul
+    data[offset++] = diskOuterMul // diskOuterRadiusMul
 
-    data[offset++] = blackhole?.diskInnerR ?? horizonRadius * 4.23 // diskInnerR
-    data[offset++] = blackhole?.diskOuterR ?? horizonRadius * 15.0 // diskOuterR
-    data[offset++] = blackhole?.effectiveThickness ?? 0.15 // effectiveThickness
+    // Pre-compute disk radii (matches WebGL: horizonRadius * mul)
+    const diskInnerR = horizonRadiusVal * diskInnerMul
+    const diskOuterR = horizonRadiusVal * diskOuterMul
+    data[offset++] = diskInnerR // diskInnerR
+    data[offset++] = diskOuterR // diskOuterR
+
+    // Compute effective thickness (matches WebGL manifold thickness scaling)
+    const manifoldThicknessVal = blackhole?.manifoldThickness ?? 0.15
+    const manifoldTypeInt = MANIFOLD_TYPE_MAP[blackhole?.manifoldType] ?? 0
+    const thicknessPerDimMax = blackhole?.thicknessPerDimMax ?? 4.0
+    let thicknessScale = 1.0
+    if (manifoldTypeInt === 0) { // AUTO
+      if (dimension <= 3) thicknessScale = 1.0
+      else if (dimension === 4) thicknessScale = 2.0
+      else if (dimension <= 6) thicknessScale = Math.min(dimension - 2, thicknessPerDimMax)
+      else thicknessScale = Math.min(dimension, thicknessPerDimMax)
+    } else if (manifoldTypeInt === 1) thicknessScale = 1.0
+    else if (manifoldTypeInt === 2) thicknessScale = 2.0
+    else if (manifoldTypeInt === 3) thicknessScale = Math.min(dimension - 2, thicknessPerDimMax)
+    else thicknessScale = Math.min(dimension, thicknessPerDimMax)
+    const effectiveThickness = manifoldThicknessVal * horizonRadiusVal * thicknessScale
+    data[offset++] = effectiveThickness // effectiveThickness
     data[offset++] = blackhole?.radialSoftnessMul ?? 0.2 // radialSoftnessMul
 
     data[offset++] = blackhole?.thicknessPerDimMax ?? 4.0 // thicknessPerDimMax
@@ -463,6 +496,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     dataView.setUint32(offset * 4, appearance?.sssEnabled ? 1 : 0, true) // sssEnabled (u32)
     offset++
     data[offset++] = appearance?.sssIntensity ?? 1.0 // sssIntensity
+    offset += 2 // WGSL alignment padding: vec3f sssColor requires 16-byte alignment (byte 312 → 320)
 
     // sssColor (vec3f) + padding - parse from hex string
     const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
@@ -484,6 +518,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     // Keplerian disk rotation
     data[offset++] = blackhole?.diskRotationAngle ?? 0.0 // diskRotationAngle
     data[offset++] = blackhole?.keplerianDifferential ?? 0.5 // keplerianDifferential
+    offset += 1 // WGSL alignment padding: vec2f bayerOffset requires 8-byte alignment (byte 364 → 368)
 
     // Temporal accumulation
     data[offset++] = blackhole?.bayerOffset?.x ?? 0.0 // bayerOffset.x
@@ -756,7 +791,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     this.updateQualityUniforms(ctx)
 
     // Get render target
-    const colorView = ctx.getWriteTarget('hdr-color')
+    const colorView = ctx.getWriteTarget('object-color')
     if (!colorView) return
 
     // Get fullscreen vertex buffer from base class
@@ -770,7 +805,7 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
           view: colorView,
           loadOp: 'clear' as const,
           storeOp: 'store' as const,
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
         },
       ],
     })

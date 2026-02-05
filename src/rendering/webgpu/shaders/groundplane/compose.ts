@@ -9,7 +9,9 @@
 
 import { constantsBlock } from '../shared/core/constants.wgsl'
 import { uniformsBlock } from '../shared/core/uniforms.wgsl'
+import { generateObjectBindGroup, generateTextureBindings } from '../shared/compose-helpers'
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
+import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighting/ibl.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
 
 import { gridFunctionsBlock, gridUniformsBlock } from './grid.wgsl'
@@ -27,10 +29,21 @@ export interface GroundPlaneShaderConfig {
    * This flag is reserved for future use.
    */
   shadows?: boolean
+
+  /**
+   * Enable image-based lighting / environment reflections (default: false).
+   */
+  ibl?: boolean
 }
 
 /**
  * Compose ground plane fragment shader with conditional features.
+ *
+ * Bind group layout:
+ *   Group 0: Vertex uniforms (dynamic offset)
+ *   Group 1: Material (binding 0) + Grid (binding 1)
+ *   Group 2: Lighting
+ *   Group 3: IBL (uniform + env map texture + sampler) — conditional
  *
  * @param config - Configuration for conditional compilation
  * @returns Object with wgsl string, modules, and features
@@ -40,20 +53,20 @@ export function composeGroundPlaneFragmentShader(config: GroundPlaneShaderConfig
   modules: string[]
   features: string[]
 } {
-  const { shadows: enableShadows = false } = config
+  const { shadows: enableShadows = false, ibl: enableIBL = false } = config
 
   const defines: string[] = []
   const features: string[] = ['PBR Lighting', 'Multi-Light', 'Grid']
   if (enableShadows) {
     features.push('Shadow Maps')
   }
+  if (enableIBL) {
+    features.push('IBL')
+  }
 
-  const blocks = [
+  const blocks: Array<{ name: string; content: string; condition?: boolean }> = [
     { name: 'Defines', content: defines.join('\n') },
-    {
-      name: 'Vertex Output',
-      content: vertexOutputStruct,
-    },
+    { name: 'Vertex Output', content: vertexOutputStruct },
     { name: 'Fragment Output', content: fragmentOutputStruct },
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },
@@ -62,7 +75,21 @@ export function composeGroundPlaneFragmentShader(config: GroundPlaneShaderConfig
     { name: 'Multi-Light System', content: multiLightBlock },
     { name: 'Grid Uniforms', content: gridUniformsBlock },
     { name: 'Grid Functions', content: gridFunctionsBlock },
-    { name: 'Main', content: generateMainBlock(enableShadows) },
+    // IBL blocks (conditional on enableIBL)
+    {
+      name: 'IBL Textures',
+      content:
+        iblUniformsBlock +
+        '\n' +
+        generateObjectBindGroup(3, 'IBLUniforms', 'iblUniforms', 0) +
+        '\n' +
+        generateTextureBindings(3, [{ name: 'envMap' }], 1),
+      condition: enableIBL,
+    },
+    { name: 'PMREM Sampling', content: pmremSamplingBlock, condition: enableIBL },
+    { name: 'IBL Functions', content: iblBlock, condition: enableIBL },
+    // Main block (must come last)
+    { name: 'Main', content: generateMainBlock(enableShadows, enableIBL) },
   ]
 
   const modules: string[] = []

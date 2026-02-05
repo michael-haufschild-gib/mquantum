@@ -15,7 +15,16 @@ import {
   SKYBOX_BIND_GROUPS,
   type SkyboxMode as ShaderSkyboxMode,
 } from '../shaders/skybox'
-import type { SkyboxProceduralSettings, SkyboxMode } from '@/stores/defaults/visualDefaults'
+import type { SkyboxProceduralSettings, SkyboxMode, SkyboxTexture } from '@/stores/defaults/visualDefaults'
+
+/**
+ * Resolved URLs for skybox face PNG images (eagerly loaded by Vite).
+ * Used to load classic cubemap textures for WebGPU without Three.js.
+ */
+const skyboxFaceAssets = import.meta.glob<string>(
+  '/src/assets/skyboxes/*/{right,left,top,bottom,front,back}.png',
+  { eager: true, import: 'default', query: '?url' },
+)
 
 /**
  * Configuration for the skybox renderer.
@@ -66,13 +75,13 @@ function modeToNumeric(mode: ShaderSkyboxMode): number {
     case 'nebula':
       return 2
     case 'crystalline':
-      return 3
-    case 'horizon':
       return 4
-    case 'ocean':
+    case 'horizon':
       return 5
-    case 'twilight':
+    case 'ocean':
       return 6
+    case 'twilight':
+      return 7
     default:
       return 0
   }
@@ -80,12 +89,16 @@ function modeToNumeric(mode: ShaderSkyboxMode): number {
 
 /**
  * WebGPU renderer for procedural skybox backgrounds.
+ * Renders to scene-render buffer with single color output (no MRT needed for skybox).
  */
 export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private renderPipeline: GPURenderPipeline | null = null
 
   // Uniform buffer for skybox parameters
   private uniformBuffer: GPUBuffer | null = null
+
+  // Persistent vertex buffer (created once, reused every frame)
+  private vertexBuffer: GPUBuffer | null = null
 
   // Bind groups
   private uniformBindGroup: GPUBindGroup | null = null
@@ -106,12 +119,32 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private currentShaderMode: ShaderSkyboxMode = 'aurora'
   private pipelineNeedsRecreation = false
 
+  // Cached setup context for pipeline recreation
+  private cachedSetupCtx: WebGPUSetupContext | null = null
+
+  // Animation time tracking (skybox accumulates its own time, like WebGL Skybox.tsx)
+  private skyboxTime = 0
+  private lastFrameTime = -1
+
+  // Animation-computed rotation adjustments (set in updateUniforms, consumed in updateVertexUniforms)
+  private animRotX = 0
+  private animRotY = 0
+  private animRotZ = 0
+
+  // Classic cube texture loading state
+  private loadedTextureName: string | null = null
+  private cubeTextureLoading = false
+  private loadedCubeTexture: GPUTexture | null = null
+
   constructor(config?: SkyboxRendererConfig) {
     super({
       id: 'skybox',
       priority: 50, // Render before main objects
       inputs: [],
-      outputs: [{ resourceId: 'hdr-color', access: 'write', binding: 0 }],
+      outputs: [
+        { resourceId: 'scene-render', access: 'write', binding: 0 },
+        { resourceId: 'depth-buffer', access: 'write', binding: 1 },
+      ],
     })
 
     this.skyboxConfig = {
@@ -137,28 +170,37 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
-    await this.createPipelineForMode(device, format, this.currentShaderMode)
+    // Cache setup context for pipeline recreation on mode change
+    this.cachedSetupCtx = ctx
+
+    // Create placeholder texture and vertex buffer BEFORE pipeline,
+    // because createPipelineForMode() calls recreateBindGroups() which
+    // needs the placeholder cube texture to exist.
     this.createPlaceholderTexture(device)
+    this.createVertexBuffer(device)
+
+    await this.createPipelineForMode(device, this.currentShaderMode)
   }
 
   /**
    * Create pipeline for specific skybox mode.
+   * Uses rgba16float format to match scene-render resource.
+   * Uses depth24plus to match depth-buffer resource.
    * @param device
-   * @param format
    * @param mode
    */
   private async createPipelineForMode(
     device: GPUDevice,
-    format: GPUTextureFormat,
     mode: ShaderSkyboxMode
   ): Promise<void> {
-    // Compose shaders
+    // Compose shaders (non-MRT: single color output for skybox)
     const effects = { sun: this.skyboxConfig.sun, vignette: this.skyboxConfig.vignette }
     const { wgsl: fragmentShader } = composeSkyboxFragmentShader({
       mode,
       effects,
+      mrt: false,
     })
     const vertexShader = composeSkyboxVertexShader(effects)
 
@@ -212,6 +254,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     this.pipelineLayout = pipelineLayout
 
     // Create render pipeline
+    // Format: rgba16float to match scene-render resource
+    // Depth: depth24plus to match depth-buffer resource
     this.renderPipeline = device.createRenderPipeline({
       label: 'skybox-pipeline',
       layout: pipelineLayout,
@@ -227,22 +271,22 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       },
       fragment: {
         module: fragmentModule,
-        entryPoint: 'fragmentMain',
-        targets: [{ format }],
+        entryPoint: 'main',
+        targets: [{ format: 'rgba16float' }],
       },
       primitive: {
         topology: 'triangle-list',
         cullMode: 'front', // Cull front faces since we're inside the skybox
       },
       depthStencil: {
-        format: 'depth32float',
+        format: 'depth24plus',
         depthWriteEnabled: false,
         depthCompare: 'less-equal', // Skybox renders at far plane
       },
     })
 
     // Create uniform buffer
-    // SkyboxUniforms struct size: 256 bytes (aligned)
+    // SkyboxUniforms: 256 bytes + VertexUniforms: 256 bytes = 512 bytes total
     this.uniformBuffer = this.createUniformBuffer(device, 512, 'skybox-uniforms')
 
     // Create bind groups (will be recreated when textures change)
@@ -279,6 +323,120 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       minFilter: 'linear',
       mipmapFilter: 'linear',
     })
+  }
+
+  /**
+   * Load a classic cube texture from PNG face images and bind it.
+   * Replaces the placeholder with a real cubemap loaded from the asset folder.
+   * @param device - GPU device
+   * @param textureName - Skybox texture identifier (e.g. 'space_blue')
+   */
+  private async loadCubeTexture(device: GPUDevice, textureName: string): Promise<void> {
+    // Face names in WebGPU cubemap layer order: +X, -X, +Y, -Y, +Z, -Z
+    const faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'] as const
+
+    // Resolve face URLs from Vite glob
+    const faceURLs: string[] = []
+    for (const face of faceNames) {
+      const key = `/src/assets/skyboxes/${textureName}/${face}.png`
+      const url = skyboxFaceAssets[key]
+      if (!url) {
+        console.warn(`[WebGPU Skybox] Missing face asset: ${key}`)
+        return
+      }
+      faceURLs.push(url)
+    }
+
+    // Load all 6 face images in parallel
+    const bitmaps = await Promise.all(
+      faceURLs.map(async (url) => {
+        const response = await fetch(url)
+        const blob = await response.blob()
+        return createImageBitmap(blob, { colorSpaceConversion: 'none' })
+      }),
+    )
+
+    const width = bitmaps[0]!.width
+    const height = bitmaps[0]!.height
+
+    // Create cube texture (sRGB for correct color space from PNG sources)
+    const cubeTexture = device.createTexture({
+      label: `skybox-cube-${textureName}`,
+      size: { width, height, depthOrArrayLayers: 6 },
+      format: 'rgba8unorm',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    })
+
+    // Upload each face
+    for (let i = 0; i < 6; i++) {
+      device.queue.copyExternalImageToTexture(
+        { source: bitmaps[i]! },
+        { texture: cubeTexture, origin: { x: 0, y: 0, z: i } },
+        { width, height },
+      )
+    }
+
+    // Clean up ImageBitmaps
+    for (const bm of bitmaps) bm.close()
+
+    // Destroy previous loaded texture (not the placeholder — keep it for fallback)
+    this.loadedCubeTexture?.destroy()
+    this.loadedCubeTexture = cubeTexture
+
+    // Update bind groups to use the new texture
+    if (this.textureBindGroupLayout && this.placeholderCubeSampler) {
+      this.textureBindGroup = device.createBindGroup({
+        label: 'skybox-texture-bg',
+        layout: this.textureBindGroupLayout,
+        entries: [
+          { binding: 0, resource: cubeTexture.createView({ dimension: 'cube' }) },
+          { binding: 1, resource: this.placeholderCubeSampler },
+        ],
+      })
+    }
+
+    console.log(`[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height})`)
+  }
+
+  /**
+   * Create persistent vertex buffer for skybox cube geometry.
+   * Created once and reused every frame (not per-frame allocation).
+   * @param device
+   */
+  private createVertexBuffer(device: GPUDevice): void {
+    const size = 1.0
+
+    // Cube vertices (position only) - 36 vertices (6 faces x 2 triangles x 3 vertices)
+    const vertices = new Float32Array([
+      // Front face
+      -size, -size, size, size, -size, size, size, size, size,
+      -size, -size, size, size, size, size, -size, size, size,
+      // Back face
+      size, -size, -size, -size, -size, -size, -size, size, -size,
+      size, -size, -size, -size, size, -size, size, size, -size,
+      // Top face
+      -size, size, size, size, size, size, size, size, -size,
+      -size, size, size, size, size, -size, -size, size, -size,
+      // Bottom face
+      -size, -size, -size, size, -size, -size, size, -size, size,
+      -size, -size, -size, size, -size, size, -size, -size, size,
+      // Right face
+      size, -size, size, size, -size, -size, size, size, -size,
+      size, -size, size, size, size, -size, size, size, size,
+      // Left face
+      -size, -size, -size, -size, -size, size, -size, size, size,
+      -size, -size, -size, -size, size, size, -size, size, -size,
+    ])
+
+    this.vertexBuffer = device.createBuffer({
+      label: 'skybox-vertices',
+      size: vertices.byteLength,
+      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    })
+    device.queue.writeBuffer(this.vertexBuffer, 0, vertices)
   }
 
   /**
@@ -324,12 +482,19 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private updateUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.uniformBuffer) return
 
-    // Access skybox store from frame context
+    // Access stores from frame context
     const env = ctx.frame?.stores?.['environment'] as {
       skyboxMode?: SkyboxMode
+      skyboxTexture?: SkyboxTexture
       skyboxIntensity?: number
       skyboxRotation?: number
+      skyboxAnimationMode?: string
+      skyboxAnimationSpeed?: number
       proceduralSettings?: SkyboxProceduralSettings
+    } | undefined
+
+    const anim = ctx.frame?.stores?.['animation'] as {
+      isPlaying?: boolean
     } | undefined
 
     // Get current mode and check for mode changes
@@ -341,17 +506,96 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       this.pipelineNeedsRecreation = true
     }
 
-    const settings = env?.proceduralSettings
-    const time = ctx.frame?.time ?? 0
+    // Load classic cube texture when mode is 'classic' and texture name changes
+    if (shaderMode === 'classic' && this.device) {
+      const textureName = env?.skyboxTexture ?? 'space_blue'
+      if (textureName !== 'none' && textureName !== this.loadedTextureName && !this.cubeTextureLoading) {
+        this.cubeTextureLoading = true
+        this.loadedTextureName = textureName
+        this.loadCubeTexture(this.device, textureName)
+          .catch((err) => {
+            console.error('[WebGPU Skybox] Failed to load cube texture:', err)
+            this.loadedTextureName = null // Allow retry
+          })
+          .finally(() => {
+            this.cubeTextureLoading = false
+          })
+      }
+    }
 
-    // Pack SkyboxUniforms (must match WGSL struct layout)
+    const settings = env?.proceduralSettings
+    const isPlaying = anim?.isPlaying ?? false
+    const skyboxAnimationMode = env?.skyboxAnimationMode ?? 'none'
+    const skyboxAnimationSpeed = env?.skyboxAnimationSpeed ?? 1.0
+
+    // --- Animation time accumulation (matches WebGL Skybox.tsx pattern) ---
+    const frameTime = ctx.frame?.time ?? 0
+    if (this.lastFrameTime < 0) {
+      this.lastFrameTime = frameTime
+    }
+    const delta = frameTime - this.lastFrameTime
+    this.lastFrameTime = frameTime
+
+    if (isPlaying && delta > 0 && delta < 0.1) {
+      // For classic mode with animation: use skyboxAnimationSpeed as multiplier
+      // For procedural modes: use timeScale (no special speed multiplier)
+      const speed = storeMode === 'classic' && skyboxAnimationMode !== 'none'
+        ? skyboxAnimationSpeed
+        : 1.0
+      this.skyboxTime += delta * speed
+    }
+
+    const t = this.skyboxTime
+
+    // --- Compute animation mode effects (classic mode only, matches WebGL) ---
+    this.animRotX = 0
+    this.animRotY = 0
+    this.animRotZ = 0
+    let animHue = 0
+    let animIntensityMul = 1.0
+    let animDistortion = 0
+
+    if (isPlaying && storeMode === 'classic' && skyboxAnimationMode !== 'none') {
+      switch (skyboxAnimationMode) {
+        case 'cinematic':
+          this.animRotY = t * 0.1
+          this.animRotX = Math.sin(t * 0.5) * 0.005
+          this.animRotZ = Math.cos(t * 0.3) * 0.003
+          break
+        case 'heatwave':
+          animDistortion = 1.0 + Math.sin(t * 0.5) * 0.5
+          this.animRotY = t * 0.02
+          break
+        case 'tumble':
+          this.animRotX = t * 0.05
+          this.animRotY = t * 0.07
+          this.animRotZ = t * 0.03
+          break
+        case 'ethereal':
+          this.animRotY = t * 0.05
+          animHue = Math.sin(t * 0.1) * 0.1
+          animIntensityMul = 1.0 + Math.sin(t * 10) * 0.02
+          break
+        case 'nebula':
+          animHue = (t * 0.05) % 1.0
+          this.animRotY = t * 0.03
+          animIntensityMul = 1.1
+          break
+      }
+    }
+
+    // --- Pack SkyboxUniforms (must match WGSL struct layout) ---
     const data = new Float32Array(64) // 256 bytes / 4
+
+    const baseIntensity = env?.skyboxIntensity ?? 1.0
+    const baseHue = settings?.hue ?? 0.0
+    const baseDistortion = settings?.turbulence ?? 0.3
 
     // Core uniforms (first 64 bytes / 16 floats)
     data[0] = modeToNumeric(shaderMode) // mode
-    data[1] = time * (settings?.timeScale ?? 0.2) // time (scaled)
-    data[2] = env?.skyboxIntensity ?? 1.0 // intensity
-    data[3] = settings?.hue ?? 0.0 // hue
+    data[1] = t // time (raw — shader multiplies by timeScale, matching WebGL)
+    data[2] = baseIntensity * animIntensityMul // intensity (with animation)
+    data[3] = baseHue + animHue // hue (with animation)
 
     data[4] = settings?.saturation ?? 1.0 // saturation
     data[5] = settings?.scale ?? 1.0 // scale
@@ -360,10 +604,10 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     data[8] = settings?.evolution ?? 0.0 // evolution
     data[9] = settings?.syncWithObject ? 1.0 : 0.0 // usePalette (sync = use object palette)
-    data[10] = 0.0 // distortion
+    data[10] = animDistortion // distortion (animation-driven for heatwave)
     data[11] = 0.0 // vignette
 
-    data[12] = settings?.turbulence ?? 0.3 // turbulence
+    data[12] = baseDistortion // turbulence
     data[13] = settings?.dualToneContrast ?? 0.5 // dualTone
     data[14] = settings?.sunIntensity ?? 0.0 // sunIntensity
     data[15] = 0.0 // padding
@@ -450,53 +694,68 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       skyboxRotation?: number
     } | undefined
 
-    const rotation = env?.skyboxRotation ?? 0
+    const baseRotation = env?.skyboxRotation ?? 0
 
-    // Create rotation matrix for skybox
-    const cos = Math.cos(rotation)
-    const sin = Math.sin(rotation)
+    // Compose final rotation: base rotation + animation-driven rotation
+    const rotX = this.animRotX
+    const rotY = baseRotation + this.animRotY
+    const rotZ = this.animRotZ
+
+    // Precompute trig values for Euler rotation (XYZ order)
+    const cx = Math.cos(rotX)
+    const sx = Math.sin(rotX)
+    const cy = Math.cos(rotY)
+    const sy = Math.sin(rotY)
+    const cz = Math.cos(rotZ)
+    const sz = Math.sin(rotZ)
+
+    // Compose rotation matrix (Euler XYZ: Rz * Ry * Rx)
+    const m00 = cy * cz
+    const m01 = sx * sy * cz - cx * sz
+    const m02 = cx * sy * cz + sx * sz
+    const m10 = cy * sz
+    const m11 = sx * sy * sz + cx * cz
+    const m12 = cx * sy * sz - sx * cz
+    const m20 = -sy
+    const m21 = sx * cy
+    const m22 = cx * cy
 
     // VertexUniforms struct (matrices)
     const data = new Float32Array(64) // 256 bytes / 4
 
-    // modelMatrix (identity with Y rotation)
-    data[0] = cos
-    data[1] = 0
-    data[2] = -sin
+    // modelMatrix (4x4 rotation matrix, column-major)
+    data[0] = m00
+    data[1] = m10
+    data[2] = m20
     data[3] = 0
-    data[4] = 0
-    data[5] = 1
-    data[6] = 0
+    data[4] = m01
+    data[5] = m11
+    data[6] = m21
     data[7] = 0
-    data[8] = sin
-    data[9] = 0
-    data[10] = cos
+    data[8] = m02
+    data[9] = m12
+    data[10] = m22
     data[11] = 0
     data[12] = 0
     data[13] = 0
     data[14] = 0
     data[15] = 1
 
-    // modelViewMatrix (copy view matrix for now, ignoring translation)
+    // modelViewMatrix (copy view matrix, ignoring translation for skybox)
     if (camera?.viewMatrix?.elements && camera.viewMatrix.elements.length >= 16) {
-      const vm = camera.viewMatrix.elements as [
-        number, number, number, number,
-        number, number, number, number,
-        number, number, number, number,
-        number, number, number, number
-      ]
+      const vm = camera.viewMatrix.elements
       // Remove translation from view matrix for skybox
-      data[16] = vm[0]
-      data[17] = vm[1]
-      data[18] = vm[2]
+      data[16] = vm[0]!
+      data[17] = vm[1]!
+      data[18] = vm[2]!
       data[19] = 0
-      data[20] = vm[4]
-      data[21] = vm[5]
-      data[22] = vm[6]
+      data[20] = vm[4]!
+      data[21] = vm[5]!
+      data[22] = vm[6]!
       data[23] = 0
-      data[24] = vm[8]
-      data[25] = vm[9]
-      data[26] = vm[10]
+      data[24] = vm[8]!
+      data[25] = vm[9]!
+      data[26] = vm[10]!
       data[27] = 0
       data[28] = 0
       data[29] = 0
@@ -521,50 +780,48 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       data[47] = 1
     }
 
-    // rotationMatrix (mat3x3 stored as 3 vec4 for alignment)
-    // Rotation around Y axis
-    data[48] = cos
-    data[49] = 0
-    data[50] = -sin
+    // rotationMatrix (mat3x3 stored as 3 columns with 16-byte alignment each)
+    // Uses the same composed rotation as modelMatrix
+    data[48] = m00
+    data[49] = m10
+    data[50] = m20
     data[51] = 0 // padding
 
-    data[52] = 0
-    data[53] = 1
-    data[54] = 0
+    data[52] = m01
+    data[53] = m11
+    data[54] = m21
     data[55] = 0 // padding
 
-    data[56] = sin
-    data[57] = 0
-    data[58] = cos
+    data[56] = m02
+    data[57] = m12
+    data[58] = m22
     data[59] = 0 // padding
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data, 256)
   }
 
   execute(ctx: WebGPURenderContext): void {
-    if (!this.device || !this.renderPipeline || !this.uniformBindGroup || !this.textureBindGroup) {
+    if (!this.device || !this.renderPipeline || !this.uniformBindGroup || !this.textureBindGroup || !this.vertexBuffer) {
       return
     }
 
-    // Check if pipeline needs recreation due to mode change
-    if (this.pipelineNeedsRecreation) {
-      // For now, skip recreation during execute - would need async handling
-      // In production, this would trigger pipeline recreation
+    // Handle pipeline recreation for mode changes
+    if (this.pipelineNeedsRecreation && this.cachedSetupCtx) {
       this.pipelineNeedsRecreation = false
+      // Trigger async recreation - pipeline will update for next frame
+      this.createPipelineForMode(this.device, this.currentShaderMode).catch((err) => {
+        console.error('[WebGPU Skybox] Failed to recreate pipeline for mode change:', err)
+      })
     }
 
     // Update uniforms from stores
     this.updateUniforms(ctx)
 
     // Get render targets
-    const colorView = ctx.getWriteTarget('hdr-color')
+    const colorView = ctx.getWriteTarget('scene-render')
     const depthView = ctx.getWriteTarget('depth-buffer')
 
     if (!colorView) return
-
-    // Create skybox geometry (cube vertices)
-    const vertexBuffer = this.createSkyboxGeometry()
-    if (!vertexBuffer) return
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -590,67 +847,31 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     passEncoder.setPipeline(this.renderPipeline)
     passEncoder.setBindGroup(SKYBOX_BIND_GROUPS.UNIFORMS, this.uniformBindGroup)
     passEncoder.setBindGroup(SKYBOX_BIND_GROUPS.TEXTURES, this.textureBindGroup)
-    passEncoder.setVertexBuffer(0, vertexBuffer)
+    passEncoder.setVertexBuffer(0, this.vertexBuffer)
     passEncoder.draw(36, 1, 0, 0) // 6 faces * 2 triangles * 3 vertices
 
     passEncoder.end()
-
-    // Destroy temporary vertex buffer
-    vertexBuffer.destroy()
-  }
-
-  /**
-   * Create skybox cube geometry.
-   */
-  private createSkyboxGeometry(): GPUBuffer | null {
-    if (!this.device) return null
-
-    const size = 1.0
-
-    // Cube vertices (position only)
-    const vertices = new Float32Array([
-      // Front face
-      -size, -size, size, size, -size, size, size, size, size, -size, -size, size, size, size,
-      size, -size, size, size,
-      // Back face
-      size, -size, -size, -size, -size, -size, -size, size, -size, size, -size, -size, -size,
-      size, -size, size, size, -size,
-      // Top face
-      -size, size, size, size, size, size, size, size, -size, -size, size, size, size, size,
-      -size, -size, size, -size,
-      // Bottom face
-      -size, -size, -size, size, -size, -size, size, -size, size, -size, -size, -size, size,
-      -size, size, -size, -size, size,
-      // Right face
-      size, -size, size, size, -size, -size, size, size, -size, size, -size, size, size, size,
-      -size, size, size, size,
-      // Left face
-      -size, -size, -size, -size, -size, size, -size, size, size, -size, -size, -size, -size,
-      size, size, -size, size, -size,
-    ])
-
-    const buffer = this.device.createBuffer({
-      label: 'skybox-vertices',
-      size: vertices.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    })
-    this.device.queue.writeBuffer(buffer, 0, vertices)
-
-    return buffer
   }
 
   dispose(): void {
     this.uniformBuffer?.destroy()
+    this.vertexBuffer?.destroy()
     this.placeholderCubeTexture?.destroy()
+    this.loadedCubeTexture?.destroy()
 
     this.uniformBuffer = null
+    this.vertexBuffer = null
     this.placeholderCubeTexture = null
     this.placeholderCubeSampler = null
+    this.loadedCubeTexture = null
+    this.loadedTextureName = null
+    this.cubeTextureLoading = false
     this.uniformBindGroup = null
     this.textureBindGroup = null
     this.uniformBindGroupLayout = null
     this.textureBindGroupLayout = null
     this.renderPipeline = null
+    this.cachedSetupCtx = null
 
     super.dispose()
   }

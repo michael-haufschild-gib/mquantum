@@ -139,6 +139,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private lastSchroedingerVersion = -1
   private lastAppearanceVersion = -1
   private lastIblVersion = -1
+  // Separate appearance version tracker for the Schroedinger uniform buffer.
+  // Emission/Rim parameters are sourced from the appearance store (matching WebGL),
+  // so the Schroedinger buffer must also be updated when appearance changes.
+  private lastSchrodingerAppearanceVersion = -1
 
   // Time field offset in SchroedingerUniforms buffer (bytes)
   // Used for partial buffer writes when only time changes
@@ -187,10 +191,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       quantumMode: 'harmonicOscillator',
       temporal: false,
       ibl: true,
-      // PERFORMANCE: Enable density grid by default for 3-6x FPS improvement
-      // Pre-computes density in a 64³ texture, replacing expensive per-pixel wavefunction evaluation
-      // with cheap texture lookups. Only applies to volumetric mode (not isosurface).
-      useDensityGrid: true,
+      // Density grid disabled by default: while it provides 3-6x FPS improvement via
+      // pre-computed 64³ texture lookups, it loses phase data (returns phase=0.0),
+      // breaks chromatic dispersion, shimmer, and phase-based coloring.
+      // Enable explicitly when performance is prioritized over visual quality.
+      useDensityGrid: false,
       ...config,
     }
 
@@ -313,8 +318,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       bindGroupLayouts,
     })
 
-    // Create render pipeline
-    this.renderPipeline = device.createRenderPipeline({
+    // Create render pipeline (async to avoid freezing browser during compilation)
+    // The Schroedinger shader is 3000-5000 lines of WGSL (quantum math, volume integration,
+    // PBR lighting, etc.) and synchronous compilation blocks the main thread for seconds.
+    this.renderPipeline = await device.createRenderPipelineAsync({
       label: 'schroedinger-pipeline',
       layout: pipelineLayout,
       vertex: {
@@ -680,10 +687,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const spreadAnimationSpeed = schroedinger?.spreadAnimationSpeed ?? 0.5
 
     // === DIRTY-FLAG OPTIMIZATION ===
-    // When schroedinger settings unchanged AND no spread animation,
+    // When schroedinger settings unchanged AND appearance unchanged AND no spread animation,
     // only update the time field (4 bytes) instead of full buffer (~1KB)
+    // Note: Emission/Rim parameters come from the appearance store (matching WebGL),
+    // so we must also check appearanceVersion to detect those changes.
+    const appearanceVersion = appearance?.appearanceVersion ?? 0
     const versionChanged = schroedingerVersion !== this.lastSchroedingerVersion
-    if (!versionChanged && !spreadAnimationEnabled && this.lastSchroedingerVersion !== -1) {
+    const appearanceChanged = appearanceVersion !== this.lastSchrodingerAppearanceVersion
+    if (!versionChanged && !appearanceChanged && !spreadAnimationEnabled && this.lastSchroedingerVersion !== -1) {
       // Partial buffer write: only update time field at offset 908
       // Uses pre-allocated buffer to avoid per-frame allocation
       this.timeUpdateBuffer[0] = animationTime
@@ -695,8 +706,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       return
     }
 
-    // Full buffer update needed - version changed or spread animation active
+    // Full buffer update needed - version changed, appearance changed, or spread animation active
     this.lastSchroedingerVersion = schroedingerVersion
+    this.lastSchrodingerAppearanceVersion = appearanceVersion
 
     // Reuse pre-allocated staging buffer to avoid per-frame GC pressure
     // See uniforms.wgsl.ts for the exact layout with packed arrays
@@ -918,11 +930,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[680 / 4] = schroedinger?.fieldScale ?? 1.0
     floatView[684 / 4] = schroedinger?.densityGain ?? 2.0 // WebGL default: 2.0
     floatView[688 / 4] = schroedinger?.powderScale ?? 1.0 // WebGL default: 1.0
-    floatView[692 / 4] = schroedinger?.emissionIntensity ?? 0.0 // WebGL default: 0.0
-    floatView[696 / 4] = schroedinger?.emissionThreshold ?? 0.3 // WebGL default: 0.3
-    floatView[700 / 4] = schroedinger?.emissionColorShift ?? 0.0
-    intView[704 / 4] = schroedinger?.emissionPulsing ? 1 : 0
-    floatView[708 / 4] = schroedinger?.rimExponent ?? 3.0
+    // Emission & Rim: read from appearance store (matching WebGL SchroedingerMesh.tsx lines 782-791)
+    // The UI (SchroedingerAdvanced.tsx) writes to appearance.faceEmission, etc.
+    floatView[692 / 4] = appearance?.faceEmission ?? 0.0
+    floatView[696 / 4] = appearance?.faceEmissionThreshold ?? 0.0
+    floatView[700 / 4] = appearance?.faceEmissionColorShift ?? 0.0
+    intView[704 / 4] = appearance?.faceEmissionPulsing ? 1 : 0
+    floatView[708 / 4] = appearance?.faceRimFalloff ?? 3.0
     floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
     floatView[716 / 4] = pbr?.face?.roughness ?? 0.3 // WebGL uses 'pbr-face' source
 
@@ -1008,16 +1022,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[936 / 4] = 0.0 // _pad3
 
     // Color algorithm system (offset 940+)
-    // Map color algorithm string to integer (like WebGL)
+    // Use canonical mapping shared with WebGL (palette/types.ts COLOR_ALGORITHM_TO_INT)
     const colorAlgorithmMap: Record<string, number> = {
       monochromatic: 0,
-      complement: 1,
-      analogous: 2,
-      triadic: 3,
-      cosine: 4,
-      oklab: 5,
-      lch: 6,
-      spectral: 7,
+      analogous: 1,
+      cosine: 2,
+      normal: 3,
+      distance: 4,
+      lch: 5,
+      multiSource: 6,
+      radial: 7,
       phase: 8,
       mixed: 9,
       blackbody: 10,

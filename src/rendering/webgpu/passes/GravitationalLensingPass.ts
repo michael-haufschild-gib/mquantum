@@ -301,25 +301,24 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
   /**
    * Update pass properties from Zustand stores.
+   * Reads from postProcessing store (gravity* fields), same as WebGL.
    * @param ctx
    */
   private updateFromStores(ctx: WebGPURenderContext): void {
-    const extended = ctx.frame?.stores?.['extended'] as {
-      blackhole?: {
-        lensingStrength?: number
-        lensingScale?: number
-        chromaticAberration?: number
-      }
+    const pp = ctx.frame?.stores?.['postProcessing'] as {
+      gravityStrength?: number
+      gravityDistortionScale?: number
+      gravityChromaticAberration?: number
     }
 
-    if (extended?.blackhole?.lensingStrength !== undefined) {
-      this.strength = extended.blackhole.lensingStrength
+    if (pp?.gravityStrength !== undefined) {
+      this.strength = pp.gravityStrength
     }
-    if (extended?.blackhole?.lensingScale !== undefined) {
-      this.distortionScale = extended.blackhole.lensingScale
+    if (pp?.gravityDistortionScale !== undefined) {
+      this.distortionScale = pp.gravityDistortionScale
     }
-    if (extended?.blackhole?.chromaticAberration !== undefined) {
-      this.chromaticAberration = extended.blackhole.chromaticAberration
+    if (pp?.gravityChromaticAberration !== undefined) {
+      this.chromaticAberration = pp.gravityChromaticAberration
     }
   }
 
@@ -445,7 +444,8 @@ export class GravitationalLensingPass extends WebGPUBasePass {
 
         // Convert from NDC (-1 to 1) to UV (0 to 1)
         gravityCenterX = (ndcX + 1) * 0.5
-        gravityCenterY = (ndcY + 1) * 0.5
+        // WebGPU UV convention: Y=0 is top, Y=1 is bottom (opposite of WebGL)
+        gravityCenterY = (1.0 - ndcY) * 0.5
       }
 
       // Calculate apparent horizon radius for zoom scaling

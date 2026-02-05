@@ -7,6 +7,9 @@
  * Based on the original SMAA paper by Jimenez et al. (2012)
  * "SMAA: Enhanced Subpixel Morphological Antialiasing"
  *
+ * Uses textureSampleLevel instead of textureSample to avoid WGSL uniform control flow
+ * restrictions in conditional branches and iterative search loops.
+ *
  * @module rendering/webgpu/shaders/postprocessing/smaa.wgsl
  */
 
@@ -85,10 +88,15 @@ fn luminance(color: vec3f) -> f32 {
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let threshold = uniforms.threshold;
 
-  // Sample luminance at current position and neighbors
-  let L = luminance(textureSample(tInput, linearSampler, input.uv).rgb);
-  let Lleft = luminance(textureSample(tInput, linearSampler, input.offset0.xy).rgb);
-  let Ltop = luminance(textureSample(tInput, linearSampler, input.offset0.zw).rgb);
+  // Sample luminance at current position and all neighbors upfront
+  // Uses textureSampleLevel to allow calling from any control flow
+  let L = luminance(textureSampleLevel(tInput, linearSampler, input.uv, 0.0).rgb);
+  let Lleft = luminance(textureSampleLevel(tInput, linearSampler, input.offset0.xy, 0.0).rgb);
+  let Ltop = luminance(textureSampleLevel(tInput, linearSampler, input.offset0.zw, 0.0).rgb);
+  let Lright = luminance(textureSampleLevel(tInput, linearSampler, input.offset1.xy, 0.0).rgb);
+  let Lbottom = luminance(textureSampleLevel(tInput, linearSampler, input.offset1.zw, 0.0).rgb);
+  let Lleftleft = luminance(textureSampleLevel(tInput, linearSampler, input.offset2.xy, 0.0).rgb);
+  let Ltoptop = luminance(textureSampleLevel(tInput, linearSampler, input.offset2.zw, 0.0).rgb);
 
   // Calculate deltas
   var delta = vec4f(
@@ -106,23 +114,18 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   }
 
   // Calculate right and bottom deltas for local contrast adaptation
-  let Lright = luminance(textureSample(tInput, linearSampler, input.offset1.xy).rgb);
-  let Lbottom = luminance(textureSample(tInput, linearSampler, input.offset1.zw).rgb);
   delta = vec4f(delta.xy, abs(L - Lright), abs(L - Lbottom));
 
   // Calculate maximum delta for local contrast adaptation
   var maxDelta = max(delta.xy, delta.zw);
 
-  // Sample second neighbors for more accurate edge detection
-  let Lleftleft = luminance(textureSample(tInput, linearSampler, input.offset2.xy).rgb);
-  let Ltoptop = luminance(textureSample(tInput, linearSampler, input.offset2.zw).rgb);
-
+  // Use already-sampled second neighbors
   delta = vec4f(delta.x, delta.y, abs(Lleft - Lleftleft), abs(Ltop - Ltoptop));
   maxDelta = max(maxDelta, delta.zw);
 
   // Local contrast adaptation
   let finalDelta = max(maxDelta.x, maxDelta.y);
-  edges *= step(finalDelta * 0.5, delta.xy);
+  edges *= step(vec2f(finalDelta * 0.5), delta.xy);
 
   return vec4f(edges, 0.0, 1.0);
 }
@@ -134,6 +137,9 @@ export const smaaBlendingWeightShader = /* wgsl */ `
 // ============================================
 // Calculates blending weights for detected edges.
 // Uses pattern recognition to determine the correct blending factors.
+//
+// Uses textureSampleLevel instead of textureSample to satisfy WGSL
+// uniform control flow requirements in iterative search loops.
 
 struct SMAAUniforms {
   resolution: vec2f,
@@ -194,13 +200,14 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 }
 
 // Search for the end of horizontal/vertical edge
+// Uses textureSampleLevel to avoid WGSL uniform control flow restrictions
 fn searchXLeft(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
   var coord = texcoord;
 
   for (var i = 0; i < 16; i++) {
     if (coord.x <= end) { break; }
-    let e = textureSample(tEdges, linearSampler, coord).rg;
+    let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.g < 0.8281) { break; }  // Found a discontinuity
     coord.x -= 2.0 * texelSize.x;
   }
@@ -215,7 +222,7 @@ fn searchXRight(texcoord: vec2f, end: f32) -> f32 {
 
   for (var i = 0; i < 16; i++) {
     if (coord.x >= end) { break; }
-    let e = textureSample(tEdges, linearSampler, coord).rg;
+    let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.g < 0.8281) { break; }
     coord.x += 2.0 * texelSize.x;
   }
@@ -229,7 +236,7 @@ fn searchYUp(texcoord: vec2f, end: f32) -> f32 {
 
   for (var i = 0; i < 16; i++) {
     if (coord.y <= end) { break; }
-    let e = textureSample(tEdges, linearSampler, coord).rg;
+    let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.r < 0.8281) { break; }
     coord.y -= 2.0 * texelSize.y;
   }
@@ -243,7 +250,7 @@ fn searchYDown(texcoord: vec2f, end: f32) -> f32 {
 
   for (var i = 0; i < 16; i++) {
     if (coord.y >= end) { break; }
-    let e = textureSample(tEdges, linearSampler, coord).rg;
+    let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.r < 0.8281) { break; }
     coord.y += 2.0 * texelSize.y;
   }
@@ -255,10 +262,6 @@ fn searchYDown(texcoord: vec2f, end: f32) -> f32 {
 fn area(dist: vec2f, e1: f32, e2: f32) -> vec2f {
   // Simplified area calculation without lookup texture
   // Uses a smooth approximation based on distance
-  let sqrt2 = 1.41421356;
-
-  // Calculate the subpixel offset
-  let texelCenter = 0.5;
   var offset: vec2f;
 
   if (e1 > e2) {
@@ -283,8 +286,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   var weights = vec4f(0.0);
   let texelSize = 1.0 / uniforms.resolution;
 
-  // Get edges at current pixel
-  let e = textureSample(tEdges, pointSampler, input.uv).rg;
+  // Get edges at current pixel (textureSampleLevel for uniform control flow safety)
+  let e = textureSampleLevel(tEdges, pointSampler, input.uv, 0.0).rg;
 
   // Process horizontal edges (edge.r)
   if (e.r > 0.0) {
@@ -294,12 +297,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       searchXRight(input.offset0.zw, 1.0)
     );
 
-    // Fetch crossing edges
-    let e1 = textureSample(tEdges, linearSampler, input.uv - vec2f((d.x + 0.5) * texelSize.x, 0.0)).g;
-    let e2 = textureSample(tEdges, linearSampler, input.uv + vec2f((d.y + 0.5) * texelSize.x, 0.0)).g;
+    // Fetch crossing edges (textureSampleLevel for non-uniform branch)
+    let e1 = textureSampleLevel(tEdges, linearSampler, input.uv - vec2f((d.x + 0.5) * texelSize.x, 0.0), 0.0).g;
+    let e2 = textureSampleLevel(tEdges, linearSampler, input.uv + vec2f((d.y + 0.5) * texelSize.x, 0.0), 0.0).g;
 
     // Calculate area
-    weights.rg = area(abs(d), e1, e2);
+    weights.r = area(abs(d), e1, e2).x;
+    weights.g = area(abs(d), e1, e2).y;
   }
 
   // Process vertical edges (edge.g)
@@ -310,12 +314,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       searchYDown(input.offset1.zw, 1.0)
     );
 
-    // Fetch crossing edges
-    let e1 = textureSample(tEdges, linearSampler, input.uv - vec2f(0.0, (d.x + 0.5) * texelSize.y)).r;
-    let e2 = textureSample(tEdges, linearSampler, input.uv + vec2f(0.0, (d.y + 0.5) * texelSize.y)).r;
+    // Fetch crossing edges (textureSampleLevel for non-uniform branch)
+    let e1 = textureSampleLevel(tEdges, linearSampler, input.uv - vec2f(0.0, (d.x + 0.5) * texelSize.y), 0.0).r;
+    let e2 = textureSampleLevel(tEdges, linearSampler, input.uv + vec2f(0.0, (d.y + 0.5) * texelSize.y), 0.0).r;
 
     // Calculate area
-    weights.ba = area(abs(d), e1, e2);
+    weights.b = area(abs(d), e1, e2).x;
+    weights.a = area(abs(d), e1, e2).y;
   }
 
   return weights;
@@ -327,6 +332,9 @@ export const smaaNeighborhoodBlendingShader = /* wgsl */ `
 // SMAA Neighborhood Blending Pass
 // ============================================
 // Applies the final anti-aliasing blend using the calculated weights.
+//
+// All texture samples use textureSampleLevel to avoid WGSL uniform control flow
+// restrictions with early returns and data-dependent branching.
 
 struct SMAAUniforms {
   resolution: vec2f,
@@ -379,41 +387,46 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let texelSize = 1.0 / uniforms.resolution;
 
   // Fetch the blending weights for this pixel and neighbors
+  // All samples done upfront using textureSampleLevel for uniform control flow safety
   var a = vec4f(
-    textureSample(tBlendWeights, linearSampler, input.offset.xy).a,  // Right
-    textureSample(tBlendWeights, linearSampler, input.offset.zw).g,  // Bottom
-    textureSample(tBlendWeights, linearSampler, input.uv).zw        // Current (ba)
+    textureSampleLevel(tBlendWeights, linearSampler, input.offset.xy, 0.0).a,  // Right
+    textureSampleLevel(tBlendWeights, linearSampler, input.offset.zw, 0.0).g,  // Bottom
+    textureSampleLevel(tBlendWeights, linearSampler, input.uv, 0.0).zw         // Current (ba)
   );
 
+  // Sample the center color unconditionally
+  let colorCenter = textureSampleLevel(tInput, linearSampler, input.uv, 0.0);
+
   // Is there any blending weight with a value greater than 0.0?
-  if (dot(a, vec4f(1.0)) < 1e-5) {
+  let totalWeight = dot(a, vec4f(1.0));
+  if (totalWeight < 1e-5) {
     // No blending needed, return original color
-    return textureSample(tInput, linearSampler, input.uv);
+    return colorCenter;
   }
 
   // Calculate the blending direction
   var blendFactor = vec2f(0.0);
   var offset = vec2f(0.0);
 
-  // Horizontal blending
-  if (max(a.x, a.z) > max(a.y, a.w)) {
+  let isHorizontalDominant = max(a.x, a.z) > max(a.y, a.w);
+
+  if (isHorizontalDominant) {
     // Horizontal direction dominates
     blendFactor = vec2f(a.x, a.z);
-    offset.x = blendFactor.y > blendFactor.x ? texelSize.x : -texelSize.x;
+    offset.x = select(-texelSize.x, texelSize.x, blendFactor.y > blendFactor.x);
     offset.x *= abs(blendFactor.y - blendFactor.x) / (blendFactor.x + blendFactor.y);
   } else {
     // Vertical direction dominates
     blendFactor = vec2f(a.y, a.w);
-    offset.y = blendFactor.y > blendFactor.x ? texelSize.y : -texelSize.y;
+    offset.y = select(-texelSize.y, texelSize.y, blendFactor.y > blendFactor.x);
     offset.y *= abs(blendFactor.y - blendFactor.x) / (blendFactor.x + blendFactor.y);
   }
 
-  // Fetch the original colors and blend
-  let color1 = textureSample(tInput, linearSampler, input.uv).rgb;
-  let color2 = textureSample(tInput, linearSampler, input.uv + offset).rgb;
+  // Fetch the offset neighbor color (textureSampleLevel for uniform control flow)
+  let colorNeighbor = textureSampleLevel(tInput, linearSampler, input.uv + offset, 0.0);
 
   let maxWeight = max(max(a.x, a.y), max(a.z, a.w));
-  let result = mix(color1, color2, maxWeight);
+  let result = mix(colorCenter.rgb, colorNeighbor.rgb, maxWeight);
 
   return vec4f(result, 1.0);
 }

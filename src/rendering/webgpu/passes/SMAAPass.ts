@@ -6,6 +6,10 @@
  *
  * Based on the SMAA paper by Jimenez et al. (2012)
  *
+ * Uses custom pipeline creation (not the base class createFullscreenPipeline) because
+ * each SMAA sub-pass has its own vertex shader with custom inter-stage varyings
+ * (offset0, offset1, offset2, pixcoord) that the base class vertex shader doesn't provide.
+ *
  * @module rendering/webgpu/passes/SMAAPass
  */
 
@@ -18,6 +22,10 @@ import {
 } from '../shaders/postprocessing/smaa.wgsl'
 
 export interface SMAAPassOptions {
+  /** Input color resource (default: 'ldr-color') */
+  colorInput?: string
+  /** Output resource (default: 'final-color') */
+  outputResource?: string
   /** Edge detection threshold (default: 0.1, range: 0.05-0.5) */
   threshold?: number
   /** Maximum search steps (default: 16, range: 4-32) */
@@ -38,7 +46,7 @@ export class SMAAPass extends WebGPUBasePass {
   private blendWeightPipeline: GPURenderPipeline | null = null
   private neighborhoodBlendPipeline: GPURenderPipeline | null = null
 
-  // Bind group layouts for each pass (using passBindGroupLayout to avoid base class conflict)
+  // Bind group layouts for each pass
   private edgeDetectionBindGroupLayout: GPUBindGroupLayout | null = null
   private blendWeightBindGroupLayout: GPUBindGroupLayout | null = null
   private neighborhoodBlendBindGroupLayout: GPUBindGroupLayout | null = null
@@ -61,13 +69,23 @@ export class SMAAPass extends WebGPUBasePass {
   private threshold = 0.1
   private maxSearchSteps = 16
 
+  // Configurable resources
+  private readonly colorInputId: string
+  private readonly outputResourceId: string
+
   constructor(options?: SMAAPassOptions) {
+    const colorInput = options?.colorInput ?? 'ldr-color'
+    const outputResource = options?.outputResource ?? 'final-color'
+
     super({
       id: 'smaa',
       priority: 950, // After tonemapping, same priority as FXAA
-      inputs: [{ resourceId: 'ldr-color', access: 'read', binding: 0 }],
-      outputs: [{ resourceId: 'final-color', access: 'write', binding: 0 }],
+      inputs: [{ resourceId: colorInput, access: 'read', binding: 0 }],
+      outputs: [{ resourceId: outputResource, access: 'write', binding: 0 }],
     })
+
+    this.colorInputId = colorInput
+    this.outputResourceId = outputResource
 
     if (options?.threshold !== undefined) this.threshold = options.threshold
     if (options?.maxSearchSteps !== undefined) this.maxSearchSteps = options.maxSearchSteps
@@ -76,7 +94,6 @@ export class SMAAPass extends WebGPUBasePass {
   /**
    * Set the edge detection threshold.
    * Lower values detect more edges but may introduce artifacts.
-   * @param value
    */
   setThreshold(value: number): void {
     this.threshold = Math.max(0.05, Math.min(0.5, value))
@@ -85,21 +102,50 @@ export class SMAAPass extends WebGPUBasePass {
   /**
    * Set the maximum search steps for pattern detection.
    * Higher values improve quality but increase cost.
-   * @param value
    */
   setMaxSearchSteps(value: number): void {
     this.maxSearchSteps = Math.max(4, Math.min(32, value))
   }
 
-
   /**
-   * Update pass properties from Zustand stores.
-   * Note: SMAA threshold and maxSearchSteps are not in any store.
-   * Using constructor defaults or values set via setThreshold/setMaxSearchSteps.
-   * @param _ctx
+   * Create a render pipeline using the shader module's own vertex and fragment entry points.
+   * Unlike createFullscreenPipeline, this preserves custom SMAA vertex shaders with
+   * inter-stage varyings (offsets, pixcoord) needed by the fragment shaders.
    */
-  private updateFromStores(_ctx: WebGPURenderContext): void {
-    // No store properties for SMAA - using constructor defaults
+  private createSMAAPipeline(
+    device: GPUDevice,
+    shaderModule: GPUShaderModule,
+    bindGroupLayout: GPUBindGroupLayout,
+    colorFormat: GPUTextureFormat,
+    label: string
+  ): GPURenderPipeline {
+    const pipelineLayout = device.createPipelineLayout({
+      label: `${label}-pipeline-layout`,
+      bindGroupLayouts: [bindGroupLayout],
+    })
+
+    return device.createRenderPipeline({
+      label: `${label}-pipeline`,
+      layout: pipelineLayout,
+      vertex: {
+        module: shaderModule,
+        entryPoint: 'vertexMain',
+        // No vertex buffer layout - SMAA uses @builtin(vertex_index)
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: 'fragmentMain',
+        targets: [
+          {
+            format: colorFormat,
+            writeMask: GPUColorWrite.ALL,
+          },
+        ],
+      },
+      primitive: {
+        topology: 'triangle-list',
+      },
+    })
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
@@ -163,12 +209,12 @@ export class SMAAPass extends WebGPUBasePass {
 
     this.edgeUniformBuffer = this.createUniformBuffer(device, 16, 'smaa-edge-uniforms')
 
-    this.edgeDetectionPipeline = this.createFullscreenPipeline(
+    this.edgeDetectionPipeline = this.createSMAAPipeline(
       device,
       edgeShaderModule,
-      [this.edgeDetectionBindGroupLayout],
+      this.edgeDetectionBindGroupLayout,
       'rg8unorm', // Edge texture only needs R and G channels
-      { label: 'smaa-edge-detection' }
+      'smaa-edge-detection'
     )
 
     // === Pass 2: Blending Weight Calculation ===
@@ -205,12 +251,12 @@ export class SMAAPass extends WebGPUBasePass {
 
     this.blendUniformBuffer = this.createUniformBuffer(device, 16, 'smaa-blend-uniforms')
 
-    this.blendWeightPipeline = this.createFullscreenPipeline(
+    this.blendWeightPipeline = this.createSMAAPipeline(
       device,
       blendShaderModule,
-      [this.blendWeightBindGroupLayout],
+      this.blendWeightBindGroupLayout,
       'rgba8unorm', // Blend weights need all 4 channels
-      { label: 'smaa-blend-weight' }
+      'smaa-blend-weight'
     )
 
     // === Pass 3: Neighborhood Blending ===
@@ -247,20 +293,17 @@ export class SMAAPass extends WebGPUBasePass {
     )
 
     // Use rgba8unorm for LDR final-color output buffer
-    this.neighborhoodBlendPipeline = this.createFullscreenPipeline(
+    this.neighborhoodBlendPipeline = this.createSMAAPipeline(
       device,
       neighborhoodShaderModule,
-      [this.neighborhoodBlendBindGroupLayout],
+      this.neighborhoodBlendBindGroupLayout,
       'rgba8unorm',
-      { label: 'smaa-neighborhood-blend' }
+      'smaa-neighborhood-blend'
     )
   }
 
   /**
    * Ensure intermediate textures are created and properly sized.
-   * @param device
-   * @param width
-   * @param height
    */
   private ensureTextures(device: GPUDevice, width: number, height: number): void {
     if (this.textureSize.width === width && this.textureSize.height === height) {
@@ -308,9 +351,6 @@ export class SMAAPass extends WebGPUBasePass {
       return
     }
 
-    // Update from stores
-    this.updateFromStores(ctx)
-
     const { width, height } = ctx.size
     this.ensureTextures(this.device, width, height)
 
@@ -318,8 +358,8 @@ export class SMAAPass extends WebGPUBasePass {
       return
     }
 
-    const inputView = ctx.getTextureView('ldr-color')
-    const outputView = ctx.getWriteTarget('final-color') ?? ctx.getCanvasTextureView()
+    const inputView = ctx.getTextureView(this.colorInputId)
+    const outputView = ctx.getWriteTarget(this.outputResourceId) ?? ctx.getCanvasTextureView()
 
     if (!inputView) return
 
@@ -349,7 +389,9 @@ export class SMAAPass extends WebGPUBasePass {
         },
       ],
     })
-    this.renderFullscreen(edgePass, this.edgeDetectionPipeline, [edgeBindGroup])
+    edgePass.setPipeline(this.edgeDetectionPipeline)
+    edgePass.setBindGroup(0, edgeBindGroup)
+    edgePass.draw(3, 1, 0, 0) // Fullscreen triangle via vertex_index
     edgePass.end()
 
     // === Pass 2: Blending Weight Calculation ===
@@ -375,7 +417,9 @@ export class SMAAPass extends WebGPUBasePass {
         },
       ],
     })
-    this.renderFullscreen(blendPass, this.blendWeightPipeline, [blendBindGroup])
+    blendPass.setPipeline(this.blendWeightPipeline)
+    blendPass.setBindGroup(0, blendBindGroup)
+    blendPass.draw(3, 1, 0, 0) // Fullscreen triangle via vertex_index
     blendPass.end()
 
     // === Pass 3: Neighborhood Blending ===
@@ -409,7 +453,9 @@ export class SMAAPass extends WebGPUBasePass {
         },
       ],
     })
-    this.renderFullscreen(neighborhoodPass, this.neighborhoodBlendPipeline, [neighborhoodBindGroup])
+    neighborhoodPass.setPipeline(this.neighborhoodBlendPipeline)
+    neighborhoodPass.setBindGroup(0, neighborhoodBindGroup)
+    neighborhoodPass.draw(3, 1, 0, 0) // Fullscreen triangle via vertex_index
     neighborhoodPass.end()
   }
 

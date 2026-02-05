@@ -154,8 +154,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let metallic = material.metallic;
   let roughness = material.roughness;
 
-  // Compute F0 (base reflectivity)
-  let F0 = computeF0(albedo, metallic, material.reflectance);
+  // Compute F0 (base reflectivity) — 0.04 for dielectrics (matches WebGL)
+  let F0 = computeF0(albedo, metallic, 0.04);
 
   // ---- Lighting ----
   var finalColor = vec3f(0.0);

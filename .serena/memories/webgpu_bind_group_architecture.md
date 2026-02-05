@@ -86,3 +86,29 @@ passEncoder.setBindGroup(2, this.objectBindGroup)
 - WebGPUSchrodingerRenderer
 - WebGPUBlackHoleRenderer
 - WebGPUPolytopeRenderer
+
+## Ground Plane Bind Group Layout (2026-02-05)
+
+The ground plane uses a **non-consolidated** layout optimized for its unique needs:
+
+```
+Group 0: Vertex uniforms (dynamic offset per wall)
+  - @binding(0) vertexUniforms: VertexUniforms (hasDynamicOffset=true)
+
+Group 1: Material + Grid (consolidated)
+  - @binding(0) groundPlaneUniforms: GroundPlaneUniforms
+  - @binding(1) gridUniforms: GridUniforms
+
+Group 2: Lighting
+  - @binding(0) lighting: LightingUniforms
+
+Group 3: IBL (optional, enabled by default)
+  - @binding(0) iblUniforms: IBLUniforms
+  - @binding(1) envMap: texture_2d<f32>
+  - @binding(2) envMapSampler: sampler
+```
+
+Features added:
+- MRT output: @location(0) color + @location(1) normal (for SSAO/SSR)
+- Wall distance from bounding radius (matches WebGL calculateWallDistance)
+- IBL environment reflections via shared PMREM sampling code

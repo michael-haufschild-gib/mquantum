@@ -55,7 +55,7 @@ struct Uniforms {
 @group(0) @binding(1) var texSampler: sampler;
 @group(0) @binding(2) var tDiffuse: texture_2d<f32>;
 @group(0) @binding(3) var tNormal: texture_2d<f32>;
-@group(0) @binding(4) var tDepth: texture_2d<f32>;
+@group(0) @binding(4) var tDepth: texture_depth_2d;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -79,15 +79,14 @@ fn getViewPosition(uv: vec2f, depth: f32) -> vec3f {
 fn reconstructNormal(coord: vec2f) -> vec3f {
   let texel = 1.0 / uniforms.resolution;
 
-  // Sample depth at center and neighboring pixels using textureLoad (unfilterable-float)
-  // In WebGPU: V=0 is bottom, V=1 is top
+  // Sample depth at center and neighboring pixels using textureLoad (texture_depth_2d returns f32)
   let depthDims = textureDimensions(tDepth);
   let depthCoord = vec2i(coord * vec2f(depthDims));
-  let depthC = textureLoad(tDepth, depthCoord, 0).x;
-  let depthL = textureLoad(tDepth, depthCoord + vec2i(-1, 0), 0).x;
-  let depthR = textureLoad(tDepth, depthCoord + vec2i(1, 0), 0).x;
-  let depthB = textureLoad(tDepth, depthCoord + vec2i(0, -1), 0).x;
-  let depthT = textureLoad(tDepth, depthCoord + vec2i(0, 1), 0).x;
+  let depthC = textureLoad(tDepth, depthCoord, 0);
+  let depthL = textureLoad(tDepth, depthCoord + vec2i(-1, 0), 0);
+  let depthR = textureLoad(tDepth, depthCoord + vec2i(1, 0), 0);
+  let depthB = textureLoad(tDepth, depthCoord + vec2i(0, -1), 0);
+  let depthT = textureLoad(tDepth, depthCoord + vec2i(0, 1), 0);
 
   // Reconstruct view-space positions
   let posC = getViewPosition(coord, depthC);
@@ -98,8 +97,9 @@ fn reconstructNormal(coord: vec2f) -> vec3f {
 
   // Calculate tangent vectors using central differences for better accuracy
   // Use the smaller difference to avoid artifacts at depth discontinuities
-  let ddx = select(posR - posC, posC - posL, abs(posR.z - posC.z) < abs(posC.z - posL.z));
-  let ddy = select(posT - posC, posC - posB, abs(posT.z - posC.z) < abs(posC.z - posB.z));
+  // select(falseVal, trueVal, cond): when right diff is smaller (cond=true), use right diff (posR-posC)
+  let ddx = select(posC - posL, posR - posC, abs(posR.z - posC.z) < abs(posC.z - posL.z));
+  let ddy = select(posC - posB, posT - posC, abs(posT.z - posC.z) < abs(posC.z - posB.z));
 
   // Cross product gives the surface normal in view space
   let crossProd = cross(ddy, ddx);
@@ -134,7 +134,7 @@ fn getNormal(coord: vec2f, normalData: vec4f) -> vec3f {
 fn isBackground(coord: vec2f) -> bool {
   let depthDims = textureDimensions(tDepth);
   let depthCoord = vec2i(coord * vec2f(depthDims));
-  let depth = textureLoad(tDepth, depthCoord, 0).x;
+  let depth = textureLoad(tDepth, depthCoord, 0);
   return depth >= 0.9999;
 }
 
@@ -287,7 +287,7 @@ export class RefractionPass extends WebGPUBasePass {
         {
           binding: 4,
           visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'unfilterable-float' as const },
+          texture: { sampleType: 'depth' as const },
         },
       ],
     })

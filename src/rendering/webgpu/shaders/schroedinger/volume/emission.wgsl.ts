@@ -48,9 +48,14 @@ fn henyeyGreenstein(dotLH: f32, g: f32) -> f32 {
 }
 
 // Apply distribution function for color algorithms
+// Matches WebGL order: pow() first, then fract(curved * cycles + offset)
 fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
-  let cycled = fract(t * cycles + offset);
-  return pow(cycled, power);
+  let clamped = clamp(t, 0.0, 1.0);
+  // Guard pow() - ensure base > 0 and power >= small value
+  let safePower = max(power, 0.001);
+  let safeBase = max(clamped, 0.0001);
+  let curved = pow(safeBase, safePower);
+  return fract(curved * cycles + offset);
 }
 
 // Compute base surface color (no lighting applied)
@@ -61,7 +66,17 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
   let normalized = clamp((s + 8.0) / 8.0, 0.0, 1.0);
 
   // Get base color from material's base color
-  let baseHSL = rgb2hsl(material.baseColor.rgb);
+  var baseHSL = rgb2hsl(material.baseColor.rgb);
+
+  // Energy level coloring: map radial distance to spectral hue
+  // Center (low energy) → Red, Edge (high energy) → Violet
+  if (uniforms.energyColorEnabled != 0u) {
+    let r = length(pos);
+    let energyProxy = clamp(r * 0.5, 0.0, 1.0);
+    let hue = 0.8 * energyProxy;
+    baseHSL = vec3f(hue, 1.0, 0.5);
+  }
+
   let algorithm = uniforms.colorAlgorithm;
 
   var col = vec3f(0.0);
@@ -95,66 +110,69 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
     let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
 
     if (algorithm == 0) {
-      // Monochromatic - same hue, varying lightness
+      // 0: Monochromatic - same hue, varying lightness
       let newL = 0.3 + distributedT * 0.4;
       col = hsl2rgb(baseHSL.x, baseHSL.y, newL);
     }
     else if (algorithm == 1) {
-      // Analogous - hue varies ±30° from base
+      // 1: Analogous - hue varies ±30° from base, preserves material lightness
       let hueOffset = (distributedT - 0.5) * 0.167;
       let newH = fract(baseHSL.x + hueOffset);
-      col = hsl2rgb(newH, baseHSL.y, 0.35 + distributedT * 0.3);
+      col = hsl2rgb(newH, baseHSL.y, baseHSL.z);
     }
     else if (algorithm == 2) {
-      // Complementary - flip between base and complement
-      let complement = fract(baseHSL.x + 0.5);
-      let newH = mix(baseHSL.x, complement, distributedT);
-      col = hsl2rgb(newH, baseHSL.y, 0.35 + distributedT * 0.3);
-    }
-    else if (algorithm == 3) {
-      // Triadic - three evenly spaced colors
-      let triadic1 = fract(baseHSL.x + 0.333);
-      let triadic2 = fract(baseHSL.x + 0.666);
-      var newH: f32;
-      if (distributedT < 0.333) {
-        newH = mix(baseHSL.x, triadic1, distributedT * 3.0);
-      } else if (distributedT < 0.666) {
-        newH = mix(triadic1, triadic2, (distributedT - 0.333) * 3.0);
-      } else {
-        newH = mix(triadic2, baseHSL.x, (distributedT - 0.666) * 3.0);
-      }
-      col = hsl2rgb(newH, baseHSL.y, 0.35 + distributedT * 0.3);
-    }
-    else if (algorithm == 4) {
-      // Split-complementary
-      let split1 = fract(baseHSL.x + 0.417);
-      let split2 = fract(baseHSL.x + 0.583);
-      var newH: f32;
-      if (distributedT < 0.5) {
-        newH = mix(baseHSL.x, split1, distributedT * 2.0);
-      } else {
-        newH = mix(split1, split2, (distributedT - 0.5) * 2.0);
-      }
-      col = hsl2rgb(newH, baseHSL.y, 0.35 + distributedT * 0.3);
-    }
-    else if (algorithm == 5) {
-      // Cosine palette
+      // 2: Cosine gradient (Inigo Quilez palette)
       let a = uniforms.cosineA.xyz;
       let b = uniforms.cosineB.xyz;
       let c = uniforms.cosineC.xyz;
       let d = uniforms.cosineD.xyz;
       col = cosinePalette(distributedT, a, b, c, d);
     }
+    else if (algorithm == 3) {
+      // 3: Normal-based - color by vertical position as normal proxy
+      let normalT = pos.y * 0.5 + 0.5;
+      let a = uniforms.cosineA.xyz;
+      let b = uniforms.cosineB.xyz;
+      let c = uniforms.cosineC.xyz;
+      let d = uniforms.cosineD.xyz;
+      col = cosinePalette(normalT, a, b, c, d);
+    }
+    else if (algorithm == 4) {
+      // 4: Distance field - cosine palette on density (primary signal for volume)
+      let a = uniforms.cosineA.xyz;
+      let b = uniforms.cosineB.xyz;
+      let c = uniforms.cosineC.xyz;
+      let d = uniforms.cosineD.xyz;
+      col = cosinePalette(distributedT, a, b, c, d);
+    }
+    else if (algorithm == 5) {
+      // 5: LCH/Oklab perceptual hue rotation (matches WebGL lchColor)
+      // Maps distributedT to hue angle, using constant lightness and chroma
+      let lchLightness = 0.7;  // Default from store (DEFAULT_LCH_LIGHTNESS)
+      let lchChroma = 0.15;    // Default from store (DEFAULT_LCH_CHROMA)
+      let hue = distributedT * TAU;
+      let oklab = vec3f(lchLightness, lchChroma * cos(hue), lchChroma * sin(hue));
+      col = clamp(oklab2rgb(oklab), vec3f(0.0), vec3f(1.0));
+    }
     else if (algorithm == 6) {
-      // Oklab gradient
-      let oklA = rgb2oklab(hsl2rgb(baseHSL.x, baseHSL.y, 0.3));
-      let oklB = rgb2oklab(hsl2rgb(fract(baseHSL.x + 0.5), baseHSL.y, 0.7));
-      let oklMix = mix(oklA, oklB, distributedT);
-      col = oklab2rgb(oklMix);
+      // 6: Multi-source - blend density + radial + vertical through cosine palette
+      let radialT = clamp(length(pos) / 2.0, 0.0, 1.0);
+      let verticalT = pos.y * 0.5 + 0.5;
+      let blendedT = 0.5 * distributedT + 0.3 * radialT + 0.2 * verticalT;
+      let a = uniforms.cosineA.xyz;
+      let b = uniforms.cosineB.xyz;
+      let c = uniforms.cosineC.xyz;
+      let d = uniforms.cosineD.xyz;
+      col = cosinePalette(blendedT, a, b, c, d);
     }
     else if (algorithm == 7) {
-      // Rainbow
-      col = hsl2rgb(distributedT, 0.8, 0.5);
+      // 7: Radial - color by distance from center through cosine palette
+      let radialT = clamp(length(pos) / 2.0, 0.0, 1.0);
+      let a = uniforms.cosineA.xyz;
+      let b = uniforms.cosineB.xyz;
+      let c = uniforms.cosineC.xyz;
+      let d = uniforms.cosineD.xyz;
+      col = cosinePalette(radialT, a, b, c, d);
     }
     else {
       // Default fallback to mixed
