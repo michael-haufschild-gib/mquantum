@@ -257,6 +257,8 @@ fn computeEmissionLit(
     if (i >= lighting.lightCount) { break; }
 
     let light = lighting.lights[i];
+    // Enabled flag packed in params.w (0 or 1)
+    if (light.params.w < 0.5) { continue; }
     let lightIntensity = light.color.a;
     if (lightIntensity < 0.001) { continue; }
 

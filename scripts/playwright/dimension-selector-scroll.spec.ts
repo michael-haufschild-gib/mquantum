@@ -204,9 +204,7 @@ test.describe('Dimension Selector - Scroll Button Event Isolation', () => {
     const scrollRightVisible = await scrollRightButton.isVisible();
 
     if (scrollRightVisible) {
-      // Click the scroll right button multiple times
-      await scrollRightButton.click();
-      await page.waitForTimeout(300);
+      // Click the scroll right button once (it may hide at the end of the list)
       await scrollRightButton.click();
       await page.waitForTimeout(300);
 
@@ -221,9 +219,7 @@ test.describe('Dimension Selector - Scroll Button Event Isolation', () => {
     const scrollLeftVisible = await scrollLeftButton.isVisible();
 
     if (scrollLeftVisible) {
-      // Click the scroll left button multiple times
-      await scrollLeftButton.click();
-      await page.waitForTimeout(300);
+      // Click the scroll left button once (it may hide at the start of the list)
       await scrollLeftButton.click();
       await page.waitForTimeout(300);
 
@@ -330,7 +326,6 @@ test.describe('Dimension Selector - Scroll Button Event Isolation', () => {
     });
   });
 });
-
 
 
 

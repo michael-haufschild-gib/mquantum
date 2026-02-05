@@ -2,7 +2,7 @@
  * WebGPU Tonemapping Pass
  *
  * Converts HDR image to LDR using various tonemapping operators.
- * Supports Linear, Reinhard, ACES, and Filmic tonemapping.
+ * Supports Linear, Reinhard, ACES, Filmic, and Cineon tonemapping.
  *
  * @module rendering/webgpu/passes/TonemappingPass
  */
@@ -16,6 +16,20 @@ export enum TonemapMode {
   Reinhard = 1,
   ACES = 2,
   Filmic = 3,
+  Cineon = 4,
+  AgX = 5,
+  Neutral = 6,
+}
+
+/** Maps store's ToneMappingAlgorithm string to shader mode integer. */
+const ALGORITHM_TO_MODE: Record<string, TonemapMode> = {
+  none: TonemapMode.Linear,
+  linear: TonemapMode.Linear,
+  reinhard: TonemapMode.Reinhard,
+  cineon: TonemapMode.Cineon,
+  aces: TonemapMode.ACES,
+  agx: TonemapMode.AgX,
+  neutral: TonemapMode.Neutral,
 }
 
 export interface TonemappingPassOptions {
@@ -37,7 +51,11 @@ export class TonemappingPass extends WebGPUBasePass {
   private sampler: GPUSampler | null = null
 
   private exposure = 1.0
-  private gamma = 2.2
+  // Keep TonemappingPass output in LINEAR space.
+  // The final linear->sRGB conversion happens in ToScreenPass so that all
+  // post-tonemapping effects (cinematic, paper, AA) operate in linear space
+  // like the WebGL render graph.
+  private gamma = 1.0
   private mode = TonemapMode.ACES
 
   private readonly inputResource: string
@@ -78,18 +96,22 @@ export class TonemappingPass extends WebGPUBasePass {
   private updateFromStores(ctx: WebGPURenderContext): void {
     const lighting = ctx.frame?.stores?.['lighting'] as {
       exposure?: number
-    }
-    const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
-      tonemappingMode?: number
+      toneMappingEnabled?: boolean
+      toneMappingAlgorithm?: string
     }
 
     if (lighting?.exposure !== undefined) {
       this.exposure = lighting.exposure
     }
-    // Note: gamma is fixed at 2.2 (standard sRGB)
-    if (postProcessing?.tonemappingMode !== undefined) {
-      this.mode = postProcessing.tonemappingMode
+
+    // Tone mapping algorithm: read from lighting store (matches WebGL)
+    // When toneMappingEnabled is false, use Linear mode (no curve, just clamp)
+    if (lighting?.toneMappingEnabled === false) {
+      this.mode = TonemapMode.Linear
+    } else if (lighting?.toneMappingAlgorithm !== undefined) {
+      this.mode = ALGORITHM_TO_MODE[lighting.toneMappingAlgorithm] ?? TonemapMode.ACES
     }
+    // Note: gamma is fixed at 1.0 (keep linear; ToScreenPass handles sRGB output)
   }
 
   setMode(value: TonemapMode): void {

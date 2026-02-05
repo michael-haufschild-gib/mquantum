@@ -11,6 +11,7 @@ import React, { useEffect, useRef, useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useWebGPU } from './WebGPUCanvas'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
+import type { WebGPURenderPass } from './core/types'
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPUCamera } from './core/WebGPUCamera'
 
@@ -669,38 +670,42 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({
 
       console.log('[WebGPUScene] Setting up render passes for:', objectType)
 
-      await setupRenderPasses(graph, {
-        objectType,
-        dimension,
-        bloomEnabled: postProcessing.bloomEnabled,
-        ssaoEnabled: postProcessing.ssaoEnabled,
-        ssrEnabled: postProcessing.ssrEnabled,
-        antiAliasingMethod: postProcessing.antiAliasingMethod,
-        bokehEnabled: postProcessing.bokehEnabled,
-        refractionEnabled: postProcessing.refractionEnabled,
-        gravityEnabled: postProcessing.gravityEnabled,
-        paperEnabled: postProcessing.paperEnabled,
-        frameBlendingEnabled: postProcessing.frameBlendingEnabled,
-        cinematicEnabled: postProcessing.cinematicEnabled,
-        jetsGodRaysEnabled: blackholeSettings.jetsGodRaysEnabled,
-        // Ground plane settings
-        groundEnabled: environment.groundEnabled,
-        activeWalls: environment.activeWalls,
-        groundPlaneOffset: environment.groundPlaneOffset,
-        groundPlaneColor: environment.groundPlaneColor,
-        groundPlaneSizeScale: environment.groundPlaneSizeScale,
-        showGroundGrid: environment.showGroundGrid,
-        groundGridColor: environment.groundGridColor,
-        groundGridSpacing: environment.groundGridSpacing,
-        // Shader feature flags (from stores, affect shader compilation)
-        shadowEnabled: lighting.shadowEnabled,
-        temporalEnabled: performance_.temporalEnabled,
-        sssEnabled: appearance.sssEnabled,
-        fresnelEnabled: appearance.edgesVisible,
-        iblQuality: environment.iblQuality,
-        // Edge thickness: >1 uses TubeWireframe, <=1 uses line edges
-        edgeThickness: appearance.edgeThickness,
-      })
+      try {
+        await setupRenderPasses(graph, {
+          objectType,
+          dimension,
+          bloomEnabled: postProcessing.bloomEnabled,
+          ssaoEnabled: postProcessing.ssaoEnabled,
+          ssrEnabled: postProcessing.ssrEnabled,
+          antiAliasingMethod: postProcessing.antiAliasingMethod,
+          bokehEnabled: postProcessing.bokehEnabled,
+          refractionEnabled: postProcessing.refractionEnabled,
+          gravityEnabled: postProcessing.gravityEnabled,
+          paperEnabled: postProcessing.paperEnabled,
+          frameBlendingEnabled: postProcessing.frameBlendingEnabled,
+          cinematicEnabled: postProcessing.cinematicEnabled,
+          jetsGodRaysEnabled: blackholeSettings.jetsGodRaysEnabled,
+          // Ground plane settings
+          groundEnabled: environment.groundEnabled,
+          activeWalls: environment.activeWalls,
+          groundPlaneOffset: environment.groundPlaneOffset,
+          groundPlaneColor: environment.groundPlaneColor,
+          groundPlaneSizeScale: environment.groundPlaneSizeScale,
+          showGroundGrid: environment.showGroundGrid,
+          groundGridColor: environment.groundGridColor,
+          groundGridSpacing: environment.groundGridSpacing,
+          // Shader feature flags (from stores, affect shader compilation)
+          shadowEnabled: lighting.shadowEnabled,
+          temporalEnabled: performance_.temporalEnabled,
+          sssEnabled: appearance.sssEnabled,
+          fresnelEnabled: appearance.edgesVisible,
+          iblQuality: environment.iblQuality,
+          // Edge thickness: >1 uses TubeWireframe, <=1 uses line edges
+          edgeThickness: appearance.edgeThickness,
+        })
+      } catch (err) {
+        console.error('[WebGPUScene] CRITICAL: setupRenderPasses failed:', err)
+      }
 
       if (cancelled) return
 
@@ -1011,16 +1016,28 @@ interface PassConfig {
  * 7. JetsRenderPass (black hole only) - Render relativistic jets
  * 8. EnvironmentCompositePass - Composite environment with main object
  * 9. JetsCompositePass (black hole only) - Blend jets with scene
- * 10. RefractionPass (optional) - Screen-space refraction
- * 11. BokehPass (optional) - Depth of field
- * 12. BloomPass (optional) - Bloom effect
- * 13. FrameBlendingPass (optional) - Temporal smoothing
- * 14. TonemappingPass - HDR to LDR conversion
- * 15. CinematicPass (optional) - Vignette, chromatic aberration, film grain
- * 16. PaperTexturePass (optional) - Paper texture overlay
- * 17. FXAA/SMAAPass (optional) - Anti-aliasing
- * 18. ToScreenPass - Copy to canvas
+ * 10. GodRaysPass (black hole only) - Volumetric light scattering from jets
+ * 11. BloomPass (optional) - Bloom effect (before bokeh/refraction, matches WebGL)
+ * 12. BokehPass (optional) - Depth of field
+ * 13. RefractionPass (optional) - Screen-space refraction
+ * 14. FrameBlendingPass (optional) - Temporal smoothing
+ * 15. TonemappingPass - HDR to LDR conversion
+ * 16. CinematicPass (optional) - Vignette, chromatic aberration, film grain
+ * 17. PaperTexturePass (optional) - Paper texture overlay
+ * 18. FXAA/SMAAPass (optional) - Anti-aliasing
+ * 19. ToScreenPass - Copy to canvas
  */
+/** Safely add a pass — logs and continues on failure instead of aborting the pipeline. */
+async function safeAddPass(graph: WebGPURenderGraph, pass: WebGPURenderPass, label: string): Promise<boolean> {
+  try {
+    await graph.addPass(pass)
+    return true
+  } catch (err) {
+    console.error(`[WebGPU setupRenderPasses] Failed to add pass '${label}':`, err)
+    return false
+  }
+}
+
 async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): Promise<void> {
   // ============================================================================
   // Define Resources
@@ -1058,13 +1075,6 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
   graph.addResource('depth-buffer', {
     type: 'texture',
     format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // BloomPass expects this output name
-  graph.addResource('bloom-output', {
-    type: 'texture',
-    format: 'rgba16float',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   })
 
@@ -1112,7 +1122,7 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
   // Uses shader feature flags from config (read from stores) for shader compilation
   const objectRenderer = createObjectRenderer(config.objectType, config)
   if (objectRenderer) {
-    await graph.addPass(objectRenderer)
+    await safeAddPass(graph, objectRenderer, `object-renderer(${config.objectType})`)
   }
 
   // 1.5. Add TubeWireframe for standard polytopes with thick edges
@@ -1121,24 +1131,22 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
   const isStandardPolytope = ['hypercube', 'simplex', 'cross-polytope', 'wythoff-polytope'].includes(config.objectType)
   const useFatWireframe = config.edgeThickness > 1
   if (isStandardPolytope && useFatWireframe) {
-    await graph.addPass(new WebGPUTubeWireframeRenderer({
+    await safeAddPass(graph, new WebGPUTubeWireframeRenderer({
       dimension: config.dimension,
       // Match WebGL: radius = edgeThickness * 0.015
       radius: config.edgeThickness * 0.015,
       shadows: config.shadowEnabled,
       // Don't clear - preserve face geometry from Polytope renderer
       clearBuffer: false,
-    }))
+    }), 'tube-wireframe')
   }
 
   // 2. Scene pass (environment) - outputs to scene-render buffer
-  await graph.addPass(
-    new ScenePass({
-      outputResource: 'scene-render',
-      depthResource: 'depth-buffer',
-      mode: 'clear',
-    })
-  )
+  await safeAddPass(graph, new ScenePass({
+    outputResource: 'scene-render',
+    depthResource: 'depth-buffer',
+    mode: 'clear',
+  }), 'scene-pass')
 
   // 2.5. Ground plane (optional) - renders walls/floor into the scene
   if (config.groundEnabled && config.activeWalls.size > 0) {
@@ -1151,7 +1159,7 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       shadows: false, // TODO: Wire up shadow settings
     })
 
-    await graph.addPass(groundPlanePass)
+    await safeAddPass(graph, groundPlanePass, 'ground-plane')
   }
 
   // 3. GTAO (optional) - Ambient occlusion
@@ -1162,13 +1170,11 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new GTAOPass({
-        depthInput: 'depth-buffer',
-        normalInput: 'normal-buffer',
-        outputResource: 'aoBuffer',
-      })
-    )
+    await safeAddPass(graph, new GTAOPass({
+      depthInput: 'depth-buffer',
+      normalInput: 'normal-buffer',
+      outputResource: 'aoBuffer',
+    }), 'gtao')
   }
 
   // 4. SSR (optional) - Screen-space reflections
@@ -1179,14 +1185,12 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new SSRPass({
-        colorInput: 'hdr-color',
-        depthInput: 'depth-buffer',
-        normalInput: 'normal-buffer',
-        outputResource: 'ssrBuffer',
-      })
-    )
+    await safeAddPass(graph, new SSRPass({
+      colorInput: 'hdr-color',
+      depthInput: 'depth-buffer',
+      normalInput: 'normal-buffer',
+      outputResource: 'ssrBuffer',
+    }), 'ssr')
   }
 
   // 5. Screen-space lensing (black hole only) - distorts the scene around black hole
@@ -1197,44 +1201,36 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new ScreenSpaceLensingPass({
-        colorInput: 'scene-render',
-        depthInput: 'depth-buffer',
-        outputResource: 'lensed-scene',
-      })
-    )
+    await safeAddPass(graph, new ScreenSpaceLensingPass({
+      colorInput: 'scene-render',
+      depthInput: 'depth-buffer',
+      outputResource: 'lensed-scene',
+    }), 'screen-space-lensing')
 
     // Also apply gravitational lensing to environment/skybox
-    await graph.addPass(
-      new GravitationalLensingPass({
-        environmentInput: 'scene-render',
-        outputResource: 'lensed-environment',
-      })
-    )
+    await safeAddPass(graph, new GravitationalLensingPass({
+      environmentInput: 'scene-render',
+      outputResource: 'lensed-environment',
+    }), 'gravitational-lensing')
   }
 
   // 6. Jets rendering (black hole only) - render relativistic jets
   if (isBlackhole) {
-    await graph.addPass(
-      new JetsRenderPass({
-        sceneDepthInput: 'depth-buffer',
-        outputResource: 'jets-buffer',
-      })
-    )
+    await safeAddPass(graph, new JetsRenderPass({
+      sceneDepthInput: 'depth-buffer',
+      outputResource: 'jets-buffer',
+    }), 'jets-render')
   }
 
   // 7. Environment composite - composites object over environment, outputs to hdr-color
   // Use lensed scene if gravitational lensing was applied
   const envInput = isBlackhole && config.gravityEnabled ? 'lensed-scene' : 'scene-render'
-  await graph.addPass(
-    new EnvironmentCompositePass({
-      lensedEnvironmentInput: isBlackhole && config.gravityEnabled ? 'lensed-environment' : envInput,
-      mainObjectInput: 'object-color', // Read from object renderer output
-      mainObjectDepthInput: 'depth-buffer',
-      outputResource: 'hdr-color',
-    })
-  )
+  await safeAddPass(graph, new EnvironmentCompositePass({
+    lensedEnvironmentInput: isBlackhole && config.gravityEnabled ? 'lensed-environment' : envInput,
+    mainObjectInput: 'object-color', // Read from object renderer output
+    mainObjectDepthInput: 'depth-buffer',
+    outputResource: 'hdr-color',
+  }), 'environment-composite')
 
   // 8. Jets composite (black hole only) - blend jets with scene
   if (isBlackhole) {
@@ -1244,57 +1240,17 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new JetsCompositePass({
-        sceneInput: 'hdr-color',
-        jetsInput: 'jets-buffer',
-        outputResource: 'jets-composited',
-      })
-    )
+    await safeAddPass(graph, new JetsCompositePass({
+      sceneInput: 'hdr-color',
+      jetsInput: 'jets-buffer',
+      outputResource: 'jets-composited',
+    }), 'jets-composite')
 
     currentHDRBuffer = 'jets-composited'
   }
 
-  // 9. Refraction (optional) - screen-space refraction effects
-  if (config.refractionEnabled) {
-    graph.addResource('refraction-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    await graph.addPass(
-      new RefractionPass({
-        colorInput: currentHDRBuffer,
-        normalInput: 'normal-buffer',
-        depthInput: 'depth-buffer',
-        outputResource: 'refraction-output',
-      })
-    )
-
-    currentHDRBuffer = 'refraction-output'
-  }
-
-  // 10. Bokeh / Depth of Field (optional)
-  if (config.bokehEnabled) {
-    graph.addResource('bokeh-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    await graph.addPass(
-      new BokehPass({
-        colorInput: currentHDRBuffer,
-        depthInput: 'depth-buffer',
-        outputResource: 'bokeh-output',
-      })
-    )
-
-    currentHDRBuffer = 'bokeh-output'
-  }
-
-  // 11. God Rays (optional, black hole only) - volumetric light scattering
+  // 9. God Rays (optional, black hole only) - volumetric light scattering
+  // Placed before bloom to match WebGL: god rays contribute to the bloom input
   if (isBlackhole && config.jetsGodRaysEnabled) {
     graph.addResource('god-rays-output', {
       type: 'texture',
@@ -1302,37 +1258,74 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new GodRaysPass({
-        colorInput: currentHDRBuffer,
-        outputResource: 'god-rays-output',
-        lightPosition: [0, 0.5], // Center-top for jets
-        exposure: 0.34,
-        decay: 0.96,
-        density: 0.6,
-        weight: 0.4,
-        samples: 64,
-      })
-    )
+    const ok = await safeAddPass(graph, new GodRaysPass({
+      colorInput: currentHDRBuffer,
+      outputResource: 'god-rays-output',
+      lightPosition: [0, 0.5], // Center-top for jets
+      exposure: 0.34,
+      decay: 0.96,
+      density: 0.6,
+      weight: 0.4,
+      samples: 64,
+    }), 'god-rays')
 
-    currentHDRBuffer = 'god-rays-output'
+    if (ok) currentHDRBuffer = 'god-rays-output'
   }
 
-  // 12. Bloom (optional)
-  // Note: BloomPass uses hardcoded resource names: input='hdr-color', output='bloom-output'
-  // If we've modified currentHDRBuffer, we need to copy to hdr-color first
+  // 10. Bloom (optional) - multi-scale MIP pyramid matching UnrealBloomPass
+  // Matches WebGL order: bloom runs BEFORE bokeh and refraction
+  // WebGL chain: GTAO → Bloom → Bokeh → SSR → Refraction → Tonemapping
   if (config.bloomEnabled) {
-    // If current buffer isn't hdr-color, we need the bloom to read from where we are
-    // For now, bloom reads from hdr-color so effects after env composite go into bloom
-    await graph.addPass(
-      new BloomPass({
-        threshold: 1.0,
-        intensity: 0.5,
-      })
-    )
+    graph.addResource('bloom-output', {
+      type: 'texture',
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+
+    const ok = await safeAddPass(graph, new BloomPass({
+      inputResource: currentHDRBuffer,
+      outputResource: 'bloom-output',
+    }), 'bloom')
+
+    if (ok) currentHDRBuffer = 'bloom-output'
   }
 
-  // 13. Frame Blending (optional) - temporal smoothing
+  // 11. Bokeh / Depth of Field (optional)
+  if (config.bokehEnabled) {
+    graph.addResource('bokeh-output', {
+      type: 'texture',
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+
+    const ok = await safeAddPass(graph, new BokehPass({
+      colorInput: currentHDRBuffer,
+      depthInput: 'depth-buffer',
+      outputResource: 'bokeh-output',
+    }), 'bokeh')
+
+    if (ok) currentHDRBuffer = 'bokeh-output'
+  }
+
+  // 12. Refraction (optional) - screen-space refraction effects
+  if (config.refractionEnabled) {
+    graph.addResource('refraction-output', {
+      type: 'texture',
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+
+    const ok = await safeAddPass(graph, new RefractionPass({
+      colorInput: currentHDRBuffer,
+      normalInput: 'normal-buffer',
+      depthInput: 'depth-buffer',
+      outputResource: 'refraction-output',
+    }), 'refraction')
+
+    if (ok) currentHDRBuffer = 'refraction-output'
+  }
+
+  // 14. Frame Blending (optional) - temporal smoothing
   if (config.frameBlendingEnabled) {
     graph.addResource('frame-blend-output', {
       type: 'texture',
@@ -1341,29 +1334,25 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     })
 
-    await graph.addPass(
-      new FrameBlendingPass({
-        colorInput: currentHDRBuffer,
-        outputResource: 'frame-blend-output',
-        blendFactor: 0.15,
-      })
-    )
+    const ok = await safeAddPass(graph, new FrameBlendingPass({
+      colorInput: currentHDRBuffer,
+      outputResource: 'frame-blend-output',
+      blendFactor: 0.15,
+    }), 'frame-blending')
 
-    currentHDRBuffer = 'frame-blend-output'
+    if (ok) currentHDRBuffer = 'frame-blend-output'
   }
 
-  // 14. Tonemapping - HDR to LDR conversion
-  // Note: TonemappingPass hardcodes input='hdr-color', output='ldr-color'
-  await graph.addPass(
-    new TonemappingPass({
-      exposure: 1.0,
-    })
-  )
+  // 15. Tonemapping - HDR to LDR conversion (CRITICAL — always required)
+  await safeAddPass(graph, new TonemappingPass({
+    inputResource: currentHDRBuffer,
+    exposure: 1.0,
+  }), 'tonemapping')
 
   // Track current LDR buffer for post-tonemapping effects
   let currentLDRBuffer = 'ldr-color'
 
-  // 15. Cinematic effects (optional) - vignette, chromatic aberration, film grain
+  // 16. Cinematic effects (optional) - vignette, chromatic aberration, film grain
   if (config.cinematicEnabled) {
     graph.addResource('cinematic-output', {
       type: 'texture',
@@ -1371,17 +1360,15 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new CinematicPass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'cinematic-output',
-      })
-    )
+    const ok = await safeAddPass(graph, new CinematicPass({
+      colorInput: currentLDRBuffer,
+      outputResource: 'cinematic-output',
+    }), 'cinematic')
 
-    currentLDRBuffer = 'cinematic-output'
+    if (ok) currentLDRBuffer = 'cinematic-output'
   }
 
-  // 16. Paper Texture (optional) - paper/parchment overlay effect
+  // 17. Paper Texture (optional) - paper/parchment overlay effect
   if (config.paperEnabled) {
     graph.addResource('paper-output', {
       type: 'texture',
@@ -1389,36 +1376,30 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
 
-    await graph.addPass(
-      new PaperTexturePass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'paper-output',
-      })
-    )
+    const ok = await safeAddPass(graph, new PaperTexturePass({
+      colorInput: currentLDRBuffer,
+      outputResource: 'paper-output',
+    }), 'paper-texture')
 
-    currentLDRBuffer = 'paper-output'
+    if (ok) currentLDRBuffer = 'paper-output'
   }
 
-  // 17. Anti-aliasing (optional) - FXAA or SMAA
+  // 18. Anti-aliasing (optional) - FXAA or SMAA
   // Both read from 'ldr-color' and write to 'final-color' by default
   const hasAntiAliasing = config.antiAliasingMethod === 'fxaa' || config.antiAliasingMethod === 'smaa'
 
   if (config.antiAliasingMethod === 'fxaa') {
-    await graph.addPass(
-      new FXAAPass({
-        subpixelQuality: 0.75,
-      })
-    )
+    await safeAddPass(graph, new FXAAPass({
+      subpixelQuality: 0.75,
+    }), 'fxaa')
   } else if (config.antiAliasingMethod === 'smaa') {
-    await graph.addPass(
-      new SMAAPass({
-        threshold: 0.1,
-        maxSearchSteps: 16,
-      })
-    )
+    await safeAddPass(graph, new SMAAPass({
+      threshold: 0.1,
+      maxSearchSteps: 16,
+    }), 'smaa')
   }
 
-  // 18. Copy to screen
+  // 19. Copy to screen (CRITICAL — always required)
   // Determine final input based on what passes ran
   let finalInput: string
   if (hasAntiAliasing) {
@@ -1431,11 +1412,10 @@ async function setupRenderPasses(graph: WebGPURenderGraph, config: PassConfig): 
     finalInput = 'ldr-color'
   }
 
-  await graph.addPass(
-    new ToScreenPass({
-      inputResource: finalInput,
-    })
-  )
+  await safeAddPass(graph, new ToScreenPass({
+    inputResource: finalInput,
+    gammaCorrection: true,
+  }), 'to-screen')
 }
 
 /**

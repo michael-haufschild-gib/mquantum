@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const devServerPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100);
+
 export default defineConfig({
   testDir: './scripts/playwright',
   fullyParallel: true,
@@ -8,7 +10,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'line',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${devServerPort}`,
     trace: 'on-first-retry',
   },
   projects: [
@@ -18,9 +20,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    command: `npm run dev -- --port ${devServerPort} --strictPort`,
+    url: `http://localhost:${devServerPort}`,
+    reuseExistingServer: false,
     stdout: 'ignore',
     stderr: 'pipe',
   },

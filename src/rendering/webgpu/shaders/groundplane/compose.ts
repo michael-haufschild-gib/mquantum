@@ -9,9 +9,7 @@
 
 import { constantsBlock } from '../shared/core/constants.wgsl'
 import { uniformsBlock } from '../shared/core/uniforms.wgsl'
-import { shadowMapsFunctionsBlock, shadowMapsUniformsBlock } from '../shared/features/shadowMaps.wgsl'
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
-import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighting/ibl.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
 
 import { gridFunctionsBlock, gridUniformsBlock } from './grid.wgsl'
@@ -22,7 +20,12 @@ import { vertexBlock, vertexOutputStruct } from './vertex.wgsl'
  * Configuration for ground plane shader compilation
  */
 export interface GroundPlaneShaderConfig {
-  /** Enable shadow map sampling (default: true) */
+  /**
+   * Enable shadow map sampling (default: false).
+   *
+   * NOTE: Shadow maps are not wired for the WebGPU ground plane yet.
+   * This flag is reserved for future use.
+   */
   shadows?: boolean
 }
 
@@ -37,13 +40,11 @@ export function composeGroundPlaneFragmentShader(config: GroundPlaneShaderConfig
   modules: string[]
   features: string[]
 } {
-  const { shadows: enableShadows = true } = config
+  const { shadows: enableShadows = false } = config
 
   const defines: string[] = []
-  const features: string[] = ['PBR Lighting', 'Multi-Light', 'IBL']
-
+  const features: string[] = ['PBR Lighting', 'Multi-Light', 'Grid']
   if (enableShadows) {
-    defines.push('// USE_SHADOWS enabled')
     features.push('Shadow Maps')
   }
 
@@ -59,11 +60,6 @@ export function composeGroundPlaneFragmentShader(config: GroundPlaneShaderConfig
     { name: 'Ground Plane Uniforms', content: fragmentUniformsBlock },
     { name: 'GGX PBR', content: ggxBlock },
     { name: 'Multi-Light System', content: multiLightBlock },
-    { name: 'IBL Uniforms', content: iblUniformsBlock },
-    { name: 'PMREM Sampling', content: pmremSamplingBlock },
-    { name: 'IBL Functions', content: iblBlock },
-    { name: 'Shadow Maps Uniforms', content: shadowMapsUniformsBlock, condition: enableShadows },
-    { name: 'Shadow Maps Functions', content: shadowMapsFunctionsBlock, condition: enableShadows },
     { name: 'Grid Uniforms', content: gridUniformsBlock },
     { name: 'Grid Functions', content: gridFunctionsBlock },
     { name: 'Main', content: generateMainBlock(enableShadows) },

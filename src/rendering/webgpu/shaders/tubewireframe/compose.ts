@@ -13,7 +13,9 @@ import { tubeMainBlock } from './main.wgsl'
 import { constantsBlock } from '../shared/core/constants.wgsl'
 import { uniformsBlock } from '../shared/core/uniforms.wgsl'
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
+import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighting/ibl.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
+import { sssBlock } from '../shared/lighting/sss.wgsl'
 
 /**
  * Configuration for tube wireframe shader compilation.
@@ -178,8 +180,16 @@ ${tubeWireframeUniformsBlock}
 // PBR BRDF functions
 ${ggxBlock}
 
+// IBL (environment reflections)
+${pmremSamplingBlock}
+${iblUniformsBlock}
+${iblBlock}
+
 // Multi-light system
 ${multiLightBlock}
+
+// Rim SSS (backlight transmission)
+${sssBlock}
 
 // Main shader logic
 ${tubeMainBlock}
@@ -188,8 +198,12 @@ ${tubeMainBlock}
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(1) @binding(0) var<uniform> lighting: LightingUniforms;
 @group(2) @binding(0) var<uniform> tube: TubeWireframeUniforms;
+@group(3) @binding(0) var<uniform> iblUniforms: IBLUniforms;
+@group(3) @binding(1) var envMap: texture_2d<f32>;
+@group(3) @binding(2) var envMapSampler: sampler;
 
 struct FragmentInput {
+  @builtin(position) position: vec4f,
   @location(0) worldPosition: vec3f,
   @location(1) normal: vec3f,
   @location(2) viewDir: vec3f,
@@ -201,9 +215,20 @@ struct FragmentInput {
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
   let N = normalize(input.normal);
   let V = normalize(input.viewDir);
+  let fragCoord = input.position.xy;
 
   // Compute full PBR lighting
-  let color = computeTubeLighting(N, V, input.worldPosition, tube, lighting);
+  let color = computeTubeLighting(
+    N,
+    V,
+    input.worldPosition,
+    fragCoord,
+    tube,
+    lighting,
+    envMap,
+    envMapSampler,
+    iblUniforms
+  );
 
   // Output color with opacity
   return vec4f(color, tube.opacity);
@@ -217,7 +242,9 @@ fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
       'Shared Uniforms',
       'Tube Wireframe Uniforms',
       'GGX PBR',
+      'IBL',
       'Multi-Light System',
+      'SSS',
       'Tube Main',
     ],
     features: ['Tube Wireframe', 'Full PBR Lighting', 'MRT Output'],

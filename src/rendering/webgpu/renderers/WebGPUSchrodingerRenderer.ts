@@ -23,6 +23,8 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
+import { parseHexColorToLinearRgb } from '../utils/color'
+import { packLightingUniforms } from '../utils/lighting'
 
 export interface SchrodingerRendererConfig {
   dimension?: number
@@ -120,7 +122,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private basisUniformData = new Float32Array(48)
   // Lighting: 576 bytes (144 floats)
   private lightingUniformData = new Float32Array(144)
-  private lightingDataView = new DataView(this.lightingUniformData.buffer)
   // Material: 160 bytes (40 floats) - WGSL vec3f has 16-byte alignment
   private materialUniformData = new Float32Array(40)
   private materialDataView = new DataView(this.materialUniformData.buffer)
@@ -610,7 +611,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Model matrices for raymarching coordinate space conversion
     // Read transform from store for position/scale
     const transform = ctx.frame?.stores?.['transform'] as any
-    const scale = transform?.scale ?? 1.0
+    const scale = transform?.uniformScale ?? 1.0
     const position = transform?.position ?? [0, 0, 0]
 
     // Build model matrix: translation * scale
@@ -966,22 +967,24 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // AO fields
     floatView[824 / 4] = schroedinger?.aoStrength ?? 1.0 // WebGL default: 1.0
-    intView[828 / 4] = schroedinger?.aoSteps ?? 4
+    intView[828 / 4] = schroedinger?.aoQuality ?? 4
     floatView[832 / 4] = schroedinger?.aoRadius ?? 0.5
 
     // aoColor (vec3f needs 16-byte alignment at offset 848 after padding)
-    floatView[848 / 4] = schroedinger?.aoColor?.[0] ?? 0.0
-    floatView[852 / 4] = schroedinger?.aoColor?.[1] ?? 0.0
-    floatView[856 / 4] = schroedinger?.aoColor?.[2] ?? 0.0
+    const aoColor = this.parseColor(schroedinger?.aoColor ?? '#000000')
+    floatView[848 / 4] = aoColor[0]
+    floatView[852 / 4] = aoColor[1]
+    floatView[856 / 4] = aoColor[2]
     floatView[860 / 4] = 0.0 // _pad2
 
     // Nodal fields
     intView[864 / 4] = schroedinger?.nodalEnabled ? 1 : 0
 
     // nodalColor (vec3f at offset 880 after padding) - WebGL default: cyan (#00ffff)
-    floatView[880 / 4] = schroedinger?.nodalColor?.[0] ?? 0.0 // R: 0 for cyan
-    floatView[884 / 4] = schroedinger?.nodalColor?.[1] ?? 1.0 // G: 1 for cyan
-    floatView[888 / 4] = schroedinger?.nodalColor?.[2] ?? 1.0 // B: 1 for cyan
+    const nodalColor = this.parseColor(schroedinger?.nodalColor ?? '#00ffff')
+    floatView[880 / 4] = nodalColor[0]
+    floatView[884 / 4] = nodalColor[1]
+    floatView[888 / 4] = nodalColor[2]
     floatView[892 / 4] = schroedinger?.nodalStrength ?? 1.0 // WebGL default: 1.0
 
     // More fields
@@ -999,7 +1002,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[920 / 4] = schroedinger?.sampleCount ?? defaultSampleCount
 
     // Phase shift fields
-    intView[924 / 4] = schroedinger?.phaseEnabled ? 1 : 0
+    intView[924 / 4] = schroedinger?.phaseAnimationEnabled ? 1 : 0
     floatView[928 / 4] = schroedinger?.phaseTheta ?? 0.0
     floatView[932 / 4] = schroedinger?.phasePhi ?? 0.0
     floatView[936 / 4] = 0.0 // _pad3
@@ -1024,9 +1027,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
     const colorAlgorithm = colorAlgorithmMap[appearance?.colorAlgorithm ?? 'mixed'] ?? 9
     intView[940 / 4] = colorAlgorithm
-    floatView[944 / 4] = appearance?.distPower ?? 1.0
-    floatView[948 / 4] = appearance?.distCycles ?? 1.0
-    floatView[952 / 4] = appearance?.distOffset ?? 0.0
+    floatView[944 / 4] = appearance?.distribution?.power ?? 1.0
+    floatView[948 / 4] = appearance?.distribution?.cycles ?? 1.0
+    floatView[952 / 4] = appearance?.distribution?.offset ?? 0.0
 
     // Cosine palette coefficients (offset 960-1024)
     // Note: distOffset ends at byte 956, but vec4f requires 16-byte alignment
@@ -1162,83 +1165,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
 
-    // LightingUniforms struct layout (matches Julia/other renderers):
-    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
-    // struct LightingUniforms {
-    //   lights: array<LightData, 8>,  // offset 0, 512 bytes
-    //   ambientColor: vec3f,          // offset 512 (128 floats)
-    //   ambientIntensity: f32,        // offset 524 (131 floats)
-    //   lightCount: i32,              // offset 528 (132 floats)
-    //   _padding: vec3f,              // offset 532
-    // }
-    // Total: 544 bytes = 136 floats, buffer is 576 bytes = 144 floats
-    // Use pre-allocated buffer to avoid per-frame GC pressure
     const data = this.lightingUniformData
-    // Reset unused light slots to zero
-    data.fill(0)
-
-    const lights = lighting.lights ?? []
-    const lightCount = Math.min(lights.length, 8)
-
-    // Pack lights array first (offset 0, each light is 16 floats = 64 bytes)
-    for (let i = 0; i < lightCount; i++) {
-      const light = lights[i]
-      const offset = i * 16 // 16 floats per LightData
-
-      // position: vec4f (xyz = position, w = type)
-      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-      data[offset + 0] = light.position?.[0] ?? 0
-      data[offset + 1] = light.position?.[1] ?? 5
-      data[offset + 2] = light.position?.[2] ?? 0
-      data[offset + 3] = lightType
-
-      // direction: vec4f (xyz = direction, w = range)
-      data[offset + 4] = light.direction?.[0] ?? 0
-      data[offset + 5] = light.direction?.[1] ?? -1
-      data[offset + 6] = light.direction?.[2] ?? 0
-      data[offset + 7] = light.range ?? 100.0
-
-      // color: vec4f (rgb = color, a = intensity)
-      const lightColor = this.parseColor(light.color ?? '#ffffff')
-      data[offset + 8] = lightColor[0]
-      data[offset + 9] = lightColor[1]
-      data[offset + 10] = lightColor[2]
-      data[offset + 11] = light.intensity ?? 1.0
-
-      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
-      data[offset + 12] = light.decay ?? 2.0
-      data[offset + 13] = light.spotCosInner ?? 0.9
-      data[offset + 14] = light.spotCosOuter ?? 0.7
-      data[offset + 15] = light.enabled ? 1.0 : 0.0
-    }
-
-    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[128] = ambientColor[0]
-    data[129] = ambientColor[1]
-    data[130] = ambientColor[2]
-
-    // ambientIntensity: f32 at offset 131
-    data[131] = (lighting.ambientEnabled ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
-
-    // lightCount: i32 at offset 132 - use pre-allocated DataView for proper type
-    this.lightingDataView.setInt32(132 * 4, lightCount, true)
+    packLightingUniforms(data, lighting)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
   }
 
   private parseColor(hex: string): [number, number, number] {
-    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
-    const val = parseInt(hex.slice(1), 16)
-    if (isNaN(val)) return [1, 1, 1]
-    // Convert sRGB to linear (pow 2.2 gamma correction like THREE.Color.convertSRGBToLinear)
-    const srgbToLinear = (c: number) => Math.pow(c, 2.2)
-    return [
-      srgbToLinear(((val >> 16) & 0xff) / 255),
-      srgbToLinear(((val >> 8) & 0xff) / 255),
-      srgbToLinear((val & 0xff) / 255),
-    ]
+    const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
+    return [rgb[0], rgb[1], rgb[2]]
   }
 
   updateMaterialUniforms(ctx: WebGPURenderContext): void {

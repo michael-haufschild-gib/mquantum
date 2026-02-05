@@ -164,6 +164,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   finalColor += computeMultiLighting(
     pos, nor, V,
     albedo, roughness, metallic, F0,
+    material.specularColor, material.specularIntensity,
+    false,
     lighting
   );
 ${iblSection}${shadowSection}${aoSection}${sssSection}

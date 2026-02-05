@@ -124,12 +124,19 @@ fn computeMultiLighting(
   roughness: f32,
   metallic: f32,
   F0: vec3f,
+  specularColor: vec3f,
+  specularIntensity: f32,
+  twoSided: bool,
   lighting: LightingUniforms
 ) -> vec3f {
   var totalLight = vec3f(0.0);
 
-  // Ambient contribution
-  totalLight += lighting.ambientColor * lighting.ambientIntensity * albedo;
+  // Ambient contribution (energy-conserved: metals don't scatter diffuse light)
+  totalLight +=
+    albedo *
+    max(1.0 - metallic, 0.0) *
+    lighting.ambientColor *
+    lighting.ambientIntensity;
 
   // Per-light contribution
   for (var i = 0; i < lighting.lightCount && i < MAX_LIGHTS; i++) {
@@ -140,40 +147,212 @@ fn computeMultiLighting(
       continue;
     }
 
-    // Get light direction
-    let L = getLightDirection(light, fragPos);
-    let NdotL = max(dot(N, L), 0.0);
-
-    if (NdotL <= 0.0) {
-      continue;  // Light is behind surface
+    // Enabled flag packed in params.w (0 or 1)
+    var attenuation = light.params.w;
+    if (attenuation < 0.5) {
+      continue;
     }
 
-    // Light color and intensity
-    var lightColor = light.color.rgb * light.color.a;
+    // Get light direction (Surface -> Light)
+    let L = getLightDirection(light, fragPos);
 
-    // Apply attenuation
+    let nDotLRaw = dot(N, L);
+    let NdotL = select(max(nDotLRaw, 0.0), abs(nDotLRaw), twoSided);
+    if (NdotL <= 0.0) {
+      continue;
+    }
+
+    // Distance attenuation for point and spot lights
     if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
       let distance = length(light.position.xyz - fragPos);
-      lightColor *= getDistanceAttenuation(light, distance);
+      attenuation *= getDistanceAttenuation(light, distance);
     }
 
     // Spot light cone attenuation
     if (lightType == LIGHT_TYPE_SPOT) {
       let lightToFrag = normalize(fragPos - light.position.xyz);
-      lightColor *= getSpotAttenuation(light, lightToFrag);
+      attenuation *= getSpotAttenuation(light, lightToFrag);
     }
 
-    // Diffuse contribution (Lambertian)
-    let kD = (1.0 - metallic);
-    let diffuse = albedo * kD / PI;
+    // Skip negligible contributions
+    if (attenuation < 0.001) {
+      continue;
+    }
 
-    // Specular contribution (Cook-Torrance)
+    // Radiance = linear RGB * intensity * attenuation
+    let radiance = light.color.rgb * light.color.a * attenuation;
+
+    // Energy conservation: kS is specular reflectance, kD is diffuse
+    let halfSum = V + L;
+    let halfLen = length(halfSum);
+    var H: vec3f;
+    if (halfLen > EPS_DIVISION) {
+      H = halfSum / halfLen;
+    } else {
+      H = N;
+    }
+
+    let F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+    let kS = F;
+    let kD = (vec3f(1.0) - kS) * (1.0 - metallic);
+
+    // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI)
+    let diffuse = kD * albedo / PI;
+
+    // Specular (Cook-Torrance, with artist-controlled tint/intensity)
     let specular = computePBRSpecular(N, V, L, roughness, F0);
+    let specularTerm = specular * specularColor * specularIntensity;
 
-    // Combine
-    totalLight += (diffuse + specular) * lightColor * NdotL;
+    totalLight += (diffuse + specularTerm) * radiance * NdotL;
   }
 
   return totalLight;
+}
+
+/**
+ * Multi-light PBR with per-light shadow factors.
+ * Identical to computeMultiLighting but multiplies each light's contribution
+ * by shadowFactors[i]. Pass 1.0 for unshadowed lights.
+ * Matches WebGL pattern: diffuse * shadow, specular * shadow per light.
+ */
+fn computeMultiLightingShadowed(
+  fragPos: vec3f,
+  N: vec3f,
+  V: vec3f,
+  albedo: vec3f,
+  roughness: f32,
+  metallic: f32,
+  F0: vec3f,
+  specularColor: vec3f,
+  specularIntensity: f32,
+  twoSided: bool,
+  lighting: LightingUniforms,
+  shadowFactors: array<f32, 8>
+) -> vec3f {
+  var totalLight = vec3f(0.0);
+
+  // Ambient contribution (not affected by shadows)
+  totalLight +=
+    albedo *
+    max(1.0 - metallic, 0.0) *
+    lighting.ambientColor *
+    lighting.ambientIntensity;
+
+  // Per-light contribution
+  for (var i = 0; i < lighting.lightCount && i < MAX_LIGHTS; i++) {
+    let light = lighting.lights[i];
+    let lightType = i32(light.position.w);
+
+    if (lightType == LIGHT_TYPE_NONE) {
+      continue;
+    }
+
+    // Enabled flag packed in params.w (0 or 1)
+    var attenuation = light.params.w;
+    if (attenuation < 0.5) {
+      continue;
+    }
+
+    // Get light direction (Surface -> Light)
+    let L = getLightDirection(light, fragPos);
+
+    let nDotLRaw = dot(N, L);
+    let NdotL = select(max(nDotLRaw, 0.0), abs(nDotLRaw), twoSided);
+    if (NdotL <= 0.0) {
+      continue;
+    }
+
+    // Distance attenuation for point and spot lights
+    if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
+      let distance = length(light.position.xyz - fragPos);
+      attenuation *= getDistanceAttenuation(light, distance);
+    }
+
+    // Spot light cone attenuation
+    if (lightType == LIGHT_TYPE_SPOT) {
+      let lightToFrag = normalize(fragPos - light.position.xyz);
+      attenuation *= getSpotAttenuation(light, lightToFrag);
+    }
+
+    // Skip negligible contributions
+    if (attenuation < 0.001) {
+      continue;
+    }
+
+    // Radiance = linear RGB * intensity * attenuation
+    let radiance = light.color.rgb * light.color.a * attenuation;
+
+    // Energy conservation: kS is specular reflectance, kD is diffuse
+    let halfSum = V + L;
+    let halfLen = length(halfSum);
+    var H: vec3f;
+    if (halfLen > EPS_DIVISION) {
+      H = halfSum / halfLen;
+    } else {
+      H = N;
+    }
+
+    let F = fresnelSchlick(max(dot(H, V), 0.0), F0);
+    let kS = F;
+    let kD = (vec3f(1.0) - kS) * (1.0 - metallic);
+
+    // Diffuse (energy-conserved, Lambertian BRDF = albedo/PI)
+    let diffuse = kD * albedo / PI;
+
+    // Specular (Cook-Torrance, with artist-controlled tint/intensity)
+    let specular = computePBRSpecular(N, V, L, roughness, F0);
+    let specularTerm = specular * specularColor * specularIntensity;
+
+    // Apply per-light shadow factor (matches WebGL: * shadow per light)
+    let shadow = shadowFactors[i];
+    totalLight += (diffuse + specularTerm) * radiance * NdotL * shadow;
+  }
+
+  return totalLight;
+}
+
+/**
+ * Compute total weighted NdotL across all lights (for fresnel rim modulation).
+ * Matches WebGL's totalNdotL accumulation in per-light loop.
+ */
+fn computeTotalNdotL(
+  fragPos: vec3f,
+  N: vec3f,
+  twoSided: bool,
+  lighting: LightingUniforms
+) -> f32 {
+  var total = 0.0;
+
+  for (var i = 0; i < lighting.lightCount && i < MAX_LIGHTS; i++) {
+    let light = lighting.lights[i];
+    let lightType = i32(light.position.w);
+
+    if (lightType == LIGHT_TYPE_NONE) {
+      continue;
+    }
+
+    var attenuation = light.params.w;
+    if (attenuation < 0.5) {
+      continue;
+    }
+
+    let L = getLightDirection(light, fragPos);
+    let nDotLRaw = dot(N, L);
+    let NdotL = select(max(nDotLRaw, 0.0), abs(nDotLRaw), twoSided);
+
+    if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
+      let distance = length(light.position.xyz - fragPos);
+      attenuation *= getDistanceAttenuation(light, distance);
+    }
+
+    if (lightType == LIGHT_TYPE_SPOT) {
+      let lightToFrag = normalize(fragPos - light.position.xyz);
+      attenuation *= getSpotAttenuation(light, lightToFrag);
+    }
+
+    total += NdotL * attenuation;
+  }
+
+  return total;
 }
 `

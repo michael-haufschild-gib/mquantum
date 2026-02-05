@@ -185,6 +185,15 @@ async function triggerScreenshotExport(page: Page): Promise<void> {
 
   // Wait for modal to appear
   await expect(page.locator('[data-testid="screenshot-modal"]')).toBeVisible({ timeout: 10000 });
+
+  // Wait for the preview image to load and the crop box to render.
+  const previewImage = page.locator('[data-testid="crop-preview-image"]');
+  await expect(previewImage).toBeVisible({ timeout: 10000 });
+  await page.waitForFunction(() => {
+    const img = document.querySelector('[data-testid="crop-preview-image"]') as HTMLImageElement | null;
+    return !!img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+  }, { timeout: 10000 });
+  await expect(page.locator('[data-testid="crop-box"]')).toBeVisible({ timeout: 10000 });
 }
 
 // Test viewports
@@ -309,11 +318,10 @@ test.describe('Screenshot Modal Responsive - Mobile (360px)', () => {
     const cropDimensions = page.locator('[data-testid="crop-dimensions"]');
     await expect(cropDimensions).toBeVisible();
 
-    const text = await cropDimensions.textContent();
-    // On mobile, should show abbreviated "Drag to crop" not full instructions
-    expect(text).toContain('Drag to crop');
-    // Full text should be hidden
-    expect(text).not.toContain('Click and drag box to move');
+    // On mobile, the instruction prefix is hidden; only crop dimensions are visible.
+    const text = await cropDimensions.innerText();
+    expect(text).toMatch(/\d+\s*×\s*\d+\s*px/);
+    expect(text).not.toContain('Drag corners to crop');
 
     verifyNoErrors(collector);
   });
@@ -349,7 +357,7 @@ test.describe('Screenshot Modal Responsive - Mobile (360px)', () => {
     await expect(cropBox).toBeVisible();
 
     // Get initial dimensions
-    const dimensionDisplay = page.locator('[data-testid="crop-size-display"]');
+    const dimensionDisplay = page.locator('[data-testid="crop-dimensions"]');
     const initialText = await dimensionDisplay.textContent();
     const initialMatch = initialText?.match(/(\d+)\s*×\s*(\d+)/);
     const initialWidth = initialMatch ? parseInt(initialMatch[1]) : 0;
@@ -445,8 +453,8 @@ test.describe('Screenshot Modal Responsive - Tablet (640px)', () => {
     const copyText = await copyButton.textContent();
     const saveText = await saveButton.textContent();
 
-    expect(copyText).toContain('Copy to Clipboard');
-    expect(saveText).toContain('Save Image');
+    expect(copyText).toContain('Copy');
+    expect(saveText).toContain('Save');
 
     verifyNoErrors(collector);
   });
@@ -462,10 +470,9 @@ test.describe('Screenshot Modal Responsive - Tablet (640px)', () => {
     const cropDimensions = page.locator('[data-testid="crop-dimensions"]');
     await expect(cropDimensions).toBeVisible();
 
-    const text = await cropDimensions.textContent();
-    // At tablet size, should show full instructions
+    const text = await cropDimensions.innerText();
     expect(text).toContain('Drag corners to crop');
-    expect(text).toContain('Click and drag box to move');
+    expect(text).toMatch(/\d+\s*×\s*\d+\s*px/);
 
     verifyNoErrors(collector);
   });
@@ -484,9 +491,11 @@ test.describe('Screenshot Modal Responsive - Tablet (640px)', () => {
     const handleBox = await seHandle.boundingBox();
     expect(handleBox).not.toBeNull();
 
-    // At tablet size (sm: breakpoint), handles should be 12x12 (w-3 h-3 = 0.75rem = 12px)
-    expect(handleBox!.width).toBeLessThanOrEqual(16);
-    expect(handleBox!.height).toBeLessThanOrEqual(16);
+    // At tablet size (sm breakpoint), handles should use the smaller bracket hitbox.
+    expect(handleBox!.width).toBeGreaterThanOrEqual(24);
+    expect(handleBox!.width).toBeLessThanOrEqual(40);
+    expect(handleBox!.height).toBeGreaterThanOrEqual(24);
+    expect(handleBox!.height).toBeLessThanOrEqual(40);
 
     verifyNoErrors(collector);
   });
@@ -544,8 +553,8 @@ test.describe('Screenshot Modal Responsive - Desktop (1024px)', () => {
     // Verify full text labels
     const copyText = await copyButton.textContent();
     const saveText = await saveButton.textContent();
-    expect(copyText).toContain('Copy to Clipboard');
-    expect(saveText).toContain('Save Image');
+    expect(copyText).toContain('Copy');
+    expect(saveText).toContain('Save');
 
     verifyNoErrors(collector);
   });
@@ -558,15 +567,15 @@ test.describe('Screenshot Modal Responsive - Desktop (1024px)', () => {
     await waitForAppReady(page);
     await triggerScreenshotExport(page);
 
-    // Verify all 8 handles are visible
-    const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    // Verify corner handles are visible
+    const handles = ['nw', 'ne', 'se', 'sw'];
     for (const handle of handles) {
       const handleElement = page.locator(`[data-testid="crop-handle-${handle}"]`);
       await expect(handleElement).toBeVisible();
     }
 
     // Test resize with one handle
-    const dimensionDisplay = page.locator('[data-testid="crop-size-display"]');
+    const dimensionDisplay = page.locator('[data-testid="crop-dimensions"]');
     const initialText = await dimensionDisplay.textContent();
     const initialMatch = initialText?.match(/(\d+)\s*×\s*(\d+)/);
     const initialWidth = initialMatch ? parseInt(initialMatch[1]) : 0;
@@ -641,4 +650,3 @@ test.describe('Screenshot Modal Visual Regression', () => {
     await page.screenshot({ path: 'screenshots/screenshot-modal-1024px.png', fullPage: false });
   });
 });
-

@@ -323,8 +323,8 @@ test.describe('Mobile Timeline Controls - Functionality', () => {
     const mobileTimeline = page.locator('[data-testid="mobile-timeline-controls"]');
     await expect(mobileTimeline).toBeVisible({ timeout: 10000 });
 
-    // Find and click the Rotation button
-    const rotationButton = mobileTimeline.getByText('Rotation');
+    // Find and click the Rotate button
+    const rotationButton = mobileTimeline.getByText('Rotate');
     await expect(rotationButton).toBeVisible();
     await rotationButton.click();
 
@@ -332,8 +332,8 @@ test.describe('Mobile Timeline Controls - Functionality', () => {
     await page.waitForTimeout(300);
 
     // Rotation drawer content should appear (Select All, Deselect All buttons)
-    await expect(page.getByText('Select All')).toBeVisible();
-    await expect(page.getByText('Deselect All')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Select All', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Deselect All', exact: true })).toBeVisible();
 
     verifyNoErrors(collector);
   });
@@ -380,4 +380,3 @@ test.describe('Mobile Timeline Controls - Visual', () => {
     });
   });
 });
-

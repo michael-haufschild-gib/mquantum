@@ -16,6 +16,7 @@
 
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
+import { parseHexColorToLinearRgb, srgbToLinearChannel } from '../utils/color'
 
 /**
  * Configuration for JetsRenderPass.
@@ -653,15 +654,18 @@ export class JetsRenderPass extends WebGPUBasePass {
     let jetColorB = 1.0
     const colorValue = blackHole.jetsColor ?? this.jetColor
     if (typeof colorValue === 'number') {
-      jetColorR = ((colorValue >> 16) & 0xff) / 255
-      jetColorG = ((colorValue >> 8) & 0xff) / 255
-      jetColorB = (colorValue & 0xff) / 255
+      // Treat numeric colors as sRGB hex (matches Three.js Color.set()) and convert to linear.
+      const srgbR = ((colorValue >> 16) & 0xff) / 255
+      const srgbG = ((colorValue >> 8) & 0xff) / 255
+      const srgbB = (colorValue & 0xff) / 255
+      jetColorR = srgbToLinearChannel(srgbR)
+      jetColorG = srgbToLinearChannel(srgbG)
+      jetColorB = srgbToLinearChannel(srgbB)
     } else if (typeof colorValue === 'string') {
-      // Parse hex string like "#3399ff"
-      const hex = colorValue.replace('#', '')
-      jetColorR = parseInt(hex.substring(0, 2), 16) / 255
-      jetColorG = parseInt(hex.substring(2, 4), 16) / 255
-      jetColorB = parseInt(hex.substring(4, 6), 16) / 255
+      const linear = parseHexColorToLinearRgb(colorValue, [jetColorR, jetColorG, jetColorB])
+      jetColorR = linear[0]
+      jetColorG = linear[1]
+      jetColorB = linear[2]
     }
 
     // Calculate jet start radius based on black hole shadow radius

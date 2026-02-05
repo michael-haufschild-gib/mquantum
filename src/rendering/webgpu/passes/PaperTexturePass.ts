@@ -17,6 +17,7 @@
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
+import { parseHexColorToLinearRgb } from '../utils/color'
 
 /**
  * Paper texture pass configuration.
@@ -567,15 +568,14 @@ function generatePaperNoiseData(size: number): Uint8Array {
 }
 
 /**
- * Converts a hex color string to RGBA values (0-1).
+ * Convert a hex sRGB color to linear RGBA values (0-1).
+ * Paper texture pass operates in linear space like the WebGL render graph.
  * @param hex - Hex color string (e.g., '#ff0000')
- * @returns Tuple of [r, g, b, a] values in 0-1 range
+ * @returns Tuple of [r, g, b, a] values in 0-1 range (linear RGB)
  */
 function hexToRGBA(hex: string): [number, number, number, number] {
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
-  return [r, g, b, 1.0]
+  const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
+  return [rgb[0], rgb[1], rgb[2], 1.0]
 }
 
 /**
@@ -826,6 +826,10 @@ export class PaperTexturePass extends WebGPUBasePass {
       paperFoldCount?: number
       paperDrops?: number
       paperFade?: number
+      paperSeed?: number
+      paperColorFront?: string
+      paperColorBack?: string
+      paperQuality?: string
     }
 
     if (postProcessing?.paperIntensity !== undefined) {
@@ -860,6 +864,18 @@ export class PaperTexturePass extends WebGPUBasePass {
     }
     if (postProcessing?.paperFade !== undefined) {
       this.fade = postProcessing.paperFade
+    }
+    if (postProcessing?.paperSeed !== undefined) {
+      this.seed = postProcessing.paperSeed
+    }
+    if (postProcessing?.paperColorFront !== undefined) {
+      this.colorFront = hexToRGBA(postProcessing.paperColorFront)
+    }
+    if (postProcessing?.paperColorBack !== undefined) {
+      this.colorBack = hexToRGBA(postProcessing.paperColorBack)
+    }
+    if (postProcessing?.paperQuality !== undefined) {
+      this.quality = qualityToNumber(postProcessing.paperQuality as PaperQuality)
     }
   }
 

@@ -20,16 +20,24 @@ export const tubeMainBlock = /* wgsl */ `
  * @param N Surface normal (normalized)
  * @param V View direction (normalized)
  * @param worldPos World position
+ * @param fragCoord Fragment coordinates (SSS jitter seed)
  * @param tube Tube wireframe uniforms
  * @param lighting Lighting uniforms
+ * @param envMap PMREM environment map
+ * @param envSampler PMREM sampler
+ * @param iblUniforms IBL uniforms
  * @return Lit color
  */
 fn computeTubeLighting(
   N: vec3f,
   V: vec3f,
   worldPos: vec3f,
+  fragCoord: vec2f,
   tube: TubeWireframeUniforms,
-  lighting: LightingUniforms
+  lighting: LightingUniforms,
+  envMap: texture_2d<f32>,
+  envSampler: sampler,
+  iblUniforms: IBLUniforms
 ) -> vec3f {
   // Clamp roughness to prevent numerical issues (roughness=0 causes NDF=0)
   let roughness = max(tube.roughness, 0.04);
@@ -51,6 +59,10 @@ fn computeTubeLighting(
     let lightType = i32(light.position.w);
 
     if (lightType == LIGHT_TYPE_NONE) {
+      continue;
+    }
+    // Enabled flag packed in params.w (0 or 1)
+    if (light.params.w < 0.5) {
       continue;
     }
 
@@ -113,11 +125,39 @@ fn computeTubeLighting(
 
     // Add light contribution (energy-conserved PBR)
     let radiance = light.color.rgb * attenuation;
-    Lo += (kD * tube.baseColor / PI + specular) * radiance * NdotL;
+    Lo += (kD * tube.baseColor / PI + specular * tube.specularColor * tube.specularIntensity) *
+          radiance *
+          NdotL;
+
+    // Rim SSS (backlight transmission)
+    if (tube.sssEnabled != 0u && tube.sssIntensity > 0.0) {
+      let sss = computeSSS(
+        L,
+        V,
+        N,
+        0.5,
+        tube.sssThickness * 4.0,
+        0.0,
+        tube.sssJitter,
+        fragCoord
+      );
+      Lo += sss * tube.sssColor * light.color.rgb * tube.sssIntensity * attenuation;
+    }
 
     // Track total light for fresnel calculation
     totalNdotL = max(totalNdotL, NdotL * attenuation);
   }
+
+  // Fresnel rim lighting
+  if (tube.fresnelEnabled != 0u && tube.fresnelIntensity > 0.0) {
+    let NdotV = max(dot(N, V), 0.0);
+    let t = 1.0 - NdotV;
+    let rim = t * t * t * tube.fresnelIntensity * 2.0;
+    Lo += tube.rimColor * rim * (0.3 + 0.7 * totalNdotL);
+  }
+
+  // IBL (environment reflections)
+  Lo += computeIBL(N, V, F0, roughness, tube.metalness, tube.baseColor, envMap, envSampler, iblUniforms);
 
   return Lo;
 }

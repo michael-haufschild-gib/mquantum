@@ -13,7 +13,7 @@ export { environmentCompositeShader } from './environment-composite.wgsl'
 export { ssrShader } from './ssr.wgsl'
 
 // Bloom
-export { bloomThresholdShader, bloomBlurShader, bloomCompositeShader } from './bloom.wgsl'
+export { bloomThresholdShader, createBloomBlurShader, bloomCompositeShader } from './bloom.wgsl'
 
 // Tonemapping
 export { tonemappingShader } from './tonemapping.wgsl'

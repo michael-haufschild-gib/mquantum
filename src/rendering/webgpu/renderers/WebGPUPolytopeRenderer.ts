@@ -28,6 +28,8 @@ import {
 } from '../shaders/polytope'
 import { PolytopeTransformComputePass } from '../passes/PolytopeTransformComputePass'
 import { PolytopeNormalComputePass } from '../passes/PolytopeNormalComputePass'
+import { parseHexColorToLinearRgb } from '../utils/color'
+import { packLightingUniforms } from '../utils/lighting'
 
 /**
  * Polytope renderer configuration.
@@ -87,6 +89,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   // Uniform buffers
   private cameraUniformBuffer: GPUBuffer | null = null
   private lightingUniformBuffer: GPUBuffer | null = null
+  private materialUniformBuffer: GPUBuffer | null = null
+  private qualityUniformBuffer: GPUBuffer | null = null
   private polytopeUniformBuffer: GPUBuffer | null = null
 
   // Geometry buffers (provided externally or created from polytope data)
@@ -510,9 +514,9 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     // Polytope: 384 bytes (288 base + 96 color algorithm fields)
     this.cameraUniformBuffer = this.createUniformBuffer(device, 512, 'polytope-camera')
     this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'polytope-lighting')
-    const materialUniformBuffer = this.createUniformBuffer(device, 160, 'polytope-material')
-    const qualityUniformBuffer = this.createUniformBuffer(device, 64, 'polytope-quality')
-    this.polytopeUniformBuffer = this.createUniformBuffer(device, 384, 'polytope-uniforms')
+    this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'polytope-material')
+    this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'polytope-quality')
+    this.polytopeUniformBuffer = this.createUniformBuffer(device, 400, 'polytope-uniforms')
 
     // Create bind groups - consolidated layout
     // Group 0: Camera
@@ -528,8 +532,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       layout: combinedBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.lightingUniformBuffer } },
-        { binding: 1, resource: { buffer: materialUniformBuffer } },
-        { binding: 2, resource: { buffer: qualityUniformBuffer } },
+        { binding: 1, resource: { buffer: this.materialUniformBuffer } },
+        { binding: 2, resource: { buffer: this.qualityUniformBuffer } },
       ],
     })
 
@@ -838,6 +842,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       metalness?: number
       ambientIntensity?: number
       emissiveIntensity?: number
+      specularColor?: [number, number, number]
+      specularIntensity?: number
       // Color Algorithm
       colorAlgorithm?: number
       distPower?: number
@@ -859,15 +865,17 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     // baseColor: vec3f, opacity: f32 (16 bytes, indices 20-23)
     // edgeColor: vec3f, edgeWidth: f32 (16 bytes, indices 24-27)
     // roughness, metalness, ambientIntensity, emissiveIntensity: f32 (16 bytes, indices 28-31)
-    // extraRotCol0-6: 7 * vec4f (112 bytes, indices 32-59)
-    // depthRowSums0_3: vec4f, depthRowSums4_7: vec4f (32 bytes, indices 60-67)
-    // depthRowSums8_10: vec3f, _padDepth: f32 (16 bytes, indices 68-71)
-    // colorAlgorithm, distPower, distCycles, distOffset: (16 bytes, indices 72-75)
-    // cosineA, cosineB, cosineC, cosineD: 4 * vec4f (64 bytes, indices 76-91)
-    // lchLightness, lchChroma, _padEnd: (16 bytes, indices 92-95)
-    // Total: 384 bytes = 96 floats
+    // specularColor: vec3f, specularIntensity: f32 (16 bytes, indices 32-35)
+    // extraRotCol0-6: 7 * vec4f (112 bytes, indices 36-63)
+    // depthRowSums0_3: vec4f, depthRowSums4_7: vec4f (32 bytes, indices 64-71)
+    // depthRowSums8_10: vec3f, _padDepth: f32 (16 bytes, indices 72-75)
+    // colorAlgorithm, distPower, distCycles, distOffset: (16 bytes, indices 76-79)
+    // cosineA, cosineB, cosineC, cosineD: 4 * vec4f (64 bytes, indices 80-95)
+    // lchLightness, lchChroma, _padEnd: (16 bytes, indices 96-99)
+    // Total: 400 bytes = 100 floats
 
-    const data = new Float32Array(96)
+    const data = new Float32Array(100)
+    const intView = new Int32Array(data.buffer)
 
     // rotationMatrix4D (16 floats, offset 0)
     if (uniforms.rotationMatrix4D) {
@@ -885,7 +893,7 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
 
     // dimension, uniformScale, projectionDistance, depthNormFactor (offset 16)
     const dimension = this.rendererConfig.dimension ?? 4
-    data[16] = dimension
+    intView[16] = dimension
     data[17] = uniforms.uniformScale ?? 1.0
     data[18] = uniforms.projectionDistance ?? 5.0
     data[19] = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 // depthNormFactor
@@ -910,59 +918,65 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     data[30] = uniforms.ambientIntensity ?? 0.3
     data[31] = uniforms.emissiveIntensity ?? 0.0
 
-    // extraRotCols (7 * 4 = 28 floats, offset 32)
+    // specularColor + specularIntensity (offset 32)
+    const specularColor = uniforms.specularColor ?? [1.0, 1.0, 1.0]
+    data[32] = specularColor[0]
+    data[33] = specularColor[1]
+    data[34] = specularColor[2]
+    data[35] = uniforms.specularIntensity ?? 0.8
+
+    // extraRotCols (7 * 4 = 28 floats, offset 36)
     if (uniforms.extraRotationCols) {
       for (let i = 0; i < 28 && i < uniforms.extraRotationCols.length; i++) {
         const value = uniforms.extraRotationCols[i]
-        if (value !== undefined) data[32 + i] = value
+        if (value !== undefined) data[36 + i] = value
       }
     }
 
-    // depthRowSums (12 floats for alignment, offset 60)
+    // depthRowSums (12 floats for alignment, offset 64)
     if (uniforms.depthRowSums) {
       for (let i = 0; i < 11 && i < uniforms.depthRowSums.length; i++) {
         const value = uniforms.depthRowSums[i]
-        if (value !== undefined) data[60 + i] = value
+        if (value !== undefined) data[64 + i] = value
       }
     }
-    // _padDepth at index 71 remains 0
+    // _padDepth at index 75 remains 0
 
-    // Color Algorithm System (offset 72)
-    const intView = new Int32Array(data.buffer)
-    intView[72] = uniforms.colorAlgorithm ?? 0 // monochromatic default
-    data[73] = uniforms.distPower ?? 1.0
-    data[74] = uniforms.distCycles ?? 1.0
-    data[75] = uniforms.distOffset ?? 0.0
+    // Color Algorithm System (offset 76)
+    intView[76] = uniforms.colorAlgorithm ?? 0 // monochromatic default
+    data[77] = uniforms.distPower ?? 1.0
+    data[78] = uniforms.distCycles ?? 1.0
+    data[79] = uniforms.distOffset ?? 0.0
 
-    // Cosine coefficients (offset 76-91, as vec4f)
+    // Cosine coefficients (offset 80-95, as vec4f)
     const cosineA = uniforms.cosineA ?? [0.6, 0.2, 0.3]
-    data[76] = cosineA[0]
-    data[77] = cosineA[1]
-    data[78] = cosineA[2]
-    data[79] = 0.0 // w unused
+    data[80] = cosineA[0]
+    data[81] = cosineA[1]
+    data[82] = cosineA[2]
+    data[83] = 0.0 // w unused
 
     const cosineB = uniforms.cosineB ?? [0.4, 0.3, 0.3]
-    data[80] = cosineB[0]
-    data[81] = cosineB[1]
-    data[82] = cosineB[2]
-    data[83] = 0.0
-
-    const cosineC = uniforms.cosineC ?? [0.5, 0.5, 0.5]
-    data[84] = cosineC[0]
-    data[85] = cosineC[1]
-    data[86] = cosineC[2]
+    data[84] = cosineB[0]
+    data[85] = cosineB[1]
+    data[86] = cosineB[2]
     data[87] = 0.0
 
-    const cosineD = uniforms.cosineD ?? [0.0, 0.0, 0.0]
-    data[88] = cosineD[0]
-    data[89] = cosineD[1]
-    data[90] = cosineD[2]
+    const cosineC = uniforms.cosineC ?? [0.5, 0.5, 0.5]
+    data[88] = cosineC[0]
+    data[89] = cosineC[1]
+    data[90] = cosineC[2]
     data[91] = 0.0
 
-    // LCH parameters (offset 92)
-    data[92] = uniforms.lchLightness ?? 0.7
-    data[93] = uniforms.lchChroma ?? 0.15
-    // _padEnd at indices 94-95 remains 0
+    const cosineD = uniforms.cosineD ?? [0.0, 0.0, 0.0]
+    data[92] = cosineD[0]
+    data[93] = cosineD[1]
+    data[94] = cosineD[2]
+    data[95] = 0.0
+
+    // LCH parameters (offset 96)
+    data[96] = uniforms.lchLightness ?? 0.7
+    data[97] = uniforms.lchChroma ?? 0.15
+    // _padEnd at indices 98-99 remains 0
 
     this.writeUniformBuffer(this.device, this.polytopeUniformBuffer, data)
   }
@@ -1039,6 +1053,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
       edgeWidth: edgeThickness,
       roughness: pbr?.face?.roughness ?? 0.5,
       metalness: pbr?.face?.metallic ?? 0.0,
+      specularIntensity: pbr?.face?.specularIntensity ?? 0.8,
+      specularColor: this.parseColor(pbr?.face?.specularColor ?? '#ffffff'),
       ambientIntensity: 0.3,
       emissiveIntensity: 0.0,
       // Color Algorithm
@@ -1056,14 +1072,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   }
 
   private parseColor(hex: string): [number, number, number] {
-    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
-    const val = parseInt(hex.slice(1), 16)
-    if (isNaN(val)) return [1, 1, 1]
-    return [
-      ((val >> 16) & 0xff) / 255,
-      ((val >> 8) & 0xff) / 255,
-      (val & 0xff) / 255,
-    ]
+    const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
+    return [rgb[0], rgb[1], rgb[2]]
   }
 
   /**
@@ -1135,84 +1145,111 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
   private updateLightingUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.lightingUniformBuffer) return
 
-    const lighting = ctx.frame?.stores?.['lighting'] as {
-      lights?: Array<{
-        type?: string
-        position?: [number, number, number]
-        direction?: [number, number, number]
-        color?: string
-        intensity?: number
-        range?: number
-        decay?: number
-        spotCosInner?: number
-        spotCosOuter?: number
-        enabled?: boolean
-      }>
-      ambientColor?: string
-      ambientIntensity?: number
-      ambientEnabled?: boolean
-    }
+    const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
 
-    // LightingUniforms struct layout:
-    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
-    // lights: array<LightData, 8>, offset 0, 512 bytes
-    // ambientColor: vec3f, offset 512 (128 floats)
-    // ambientIntensity: f32, offset 524 (131 floats)
-    // lightCount: i32, offset 528 (132 floats)
     const data = new Float32Array(144)
-
-    const lights = lighting.lights ?? []
-    const lightCount = Math.min(lights.length, 8)
-
-    // Pack lights array (offset 0, each light is 16 floats = 64 bytes)
-    for (let i = 0; i < lightCount; i++) {
-      const light = lights[i]
-      if (!light) continue
-      const offset = i * 16
-
-      // position: vec4f (xyz = position, w = type)
-      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-      data[offset + 0] = light.position?.[0] ?? 0
-      data[offset + 1] = light.position?.[1] ?? 5
-      data[offset + 2] = light.position?.[2] ?? 0
-      data[offset + 3] = lightType
-
-      // direction: vec4f (xyz = direction, w = range)
-      data[offset + 4] = light.direction?.[0] ?? 0
-      data[offset + 5] = light.direction?.[1] ?? -1
-      data[offset + 6] = light.direction?.[2] ?? 0
-      data[offset + 7] = light.range ?? 100.0
-
-      // color: vec4f (rgb = color, a = intensity)
-      const lightColor = this.parseColor(light.color ?? '#ffffff')
-      data[offset + 8] = lightColor[0]
-      data[offset + 9] = lightColor[1]
-      data[offset + 10] = lightColor[2]
-      data[offset + 11] = light.intensity ?? 1.0
-
-      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
-      data[offset + 12] = light.decay ?? 2.0
-      data[offset + 13] = light.spotCosInner ?? 0.9
-      data[offset + 14] = light.spotCosOuter ?? 0.7
-      data[offset + 15] = light.enabled !== false ? 1.0 : 0.0
-    }
-
-    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[128] = ambientColor[0]
-    data[129] = ambientColor[1]
-    data[130] = ambientColor[2]
-
-    // ambientIntensity: f32 at offset 131
-    data[131] = (lighting.ambientEnabled !== false ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
-
-    // lightCount: i32 at offset 132 - use DataView for proper type
-    const dataView = new DataView(data.buffer)
-    dataView.setInt32(132 * 4, lightCount, true)
+    packLightingUniforms(data, lighting)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
+  }
+
+  /**
+   * Pack MaterialUniforms from stores (matches WGSL MaterialUniforms struct layout).
+   * Maps appearance/PBR store fields to the 160-byte material buffer,
+   * matching WebGL PolytopeScene uniform wiring (lines 847-937).
+   */
+  private updateMaterialUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.materialUniformBuffer) return
+
+    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const appearance = ctx.frame?.stores?.['appearance'] as any
+
+    // MaterialUniforms packing (WGSL host-shareable layout).
+    // vec3f has 16-byte alignment, so there are padding gaps. Total size = 160 bytes (40 floats).
+    // Packing indices:
+    //  0-3:   baseColor (vec4f)
+    //  4-7:   metallic, roughness, reflectance, ao (f32)
+    //  8-11:  emissive (vec3f) + emissiveIntensity (f32)
+    //  12-14: ior, transmission, thickness (f32)
+    //  15:    sssEnabled (u32)
+    //  16:    sssIntensity (f32)
+    //  20-22: sssColor (vec3f)
+    //  23-24: sssThickness, sssJitter (f32)
+    //  25:    fresnelEnabled (u32)
+    //  26:    fresnelIntensity (f32)
+    //  28-30: rimColor (vec3f)
+    //  31:    _padding2
+    //  32:    specularIntensity (f32)
+    //  36-38: specularColor (vec3f)
+    const data = new Float32Array(40) // 160 bytes
+    const dataView = new DataView(data.buffer)
+
+    // baseColor: vec4f (offset 0-3)
+    const faceColor = this.parseColor(appearance?.faceColor ?? '#b3b3e6')
+    data[0] = faceColor[0]
+    data[1] = faceColor[1]
+    data[2] = faceColor[2]
+    data[3] = 1.0
+
+    // metallic, roughness, reflectance, ao (offset 4-7)
+    data[4] = pbr?.face?.metallic ?? 0.0
+    data[5] = pbr?.face?.roughness ?? 0.5
+    data[6] = pbr?.face?.reflectance ?? 0.5
+    data[7] = 1.0 // ao
+
+    // emissive: vec3f + emissiveIntensity: f32 (offset 8-11)
+    // WebGL polytope has NO emissive — zero it out
+    data[8] = 0.0
+    data[9] = 0.0
+    data[10] = 0.0
+    data[11] = 0.0
+
+    // ior, transmission, thickness (offset 12-14)
+    data[12] = pbr?.face?.ior ?? 1.5
+    data[13] = pbr?.face?.transmission ?? 0.0
+    data[14] = pbr?.face?.thickness ?? 1.0
+
+    // sssEnabled: u32 (offset 15) — matches WebGL PolytopeScene line 856
+    const sssEnabled = appearance?.sssEnabled ?? false
+    dataView.setUint32(15 * 4, sssEnabled ? 1 : 0, true)
+
+    // sssIntensity: f32 (offset 16) — matches WebGL PolytopeScene line 857
+    data[16] = appearance?.sssIntensity ?? 1.0
+
+    // sssColor: vec3f (idx 20-22) — matches WebGL PolytopeScene line 858
+    const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
+    data[20] = sssColor[0]
+    data[21] = sssColor[1]
+    data[22] = sssColor[2]
+
+    // sssThickness, sssJitter (idx 23-24) — matches WebGL PolytopeScene lines 859-860
+    data[23] = appearance?.sssThickness ?? 1.0
+    data[24] = appearance?.sssJitter ?? 0.2
+
+    // fresnelEnabled: u32 (idx 25) — matches WebGL PolytopeScene line 847
+    // WebGL reads from: appearanceState.shaderSettings.surface.fresnelEnabled
+    const fresnelEnabled = appearance?.shaderSettings?.surface?.fresnelEnabled ?? false
+    dataView.setUint32(25 * 4, fresnelEnabled ? 1 : 0, true)
+
+    // fresnelIntensity: f32 (idx 26) — matches WebGL PolytopeScene line 848
+    data[26] = appearance?.fresnelIntensity ?? 0.1
+
+    // rimColor: vec3f (idx 28-30) — matches WebGL PolytopeScene line 849
+    // WebGL uses edgeColor as rimColor
+    const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
+    data[28] = rimColor[0]
+    data[29] = rimColor[1]
+    data[30] = rimColor[2]
+
+    // specularIntensity (idx 32) + specularColor (idx 36-38)
+    data[32] = pbr?.face?.specularIntensity ?? 0.8
+    const specularColor = this.parseColor(pbr?.face?.specularColor ?? '#ffffff')
+    data[36] = specularColor[0]
+    data[37] = specularColor[1]
+    data[38] = specularColor[2]
+
+    this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
   }
 
   // Debug: Track last log time to throttle logging
@@ -1243,6 +1280,7 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     // Update all uniforms from stores
     this.updateCameraUniforms(ctx)
     this.updateLightingUniforms(ctx)
+    this.updateMaterialUniforms(ctx)
     this.updatePolytopeFromStores(ctx)
 
     // === COMPUTE MODE: Execute compute passes before rendering ===
@@ -1522,6 +1560,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
     // Uniform buffers
     this.cameraUniformBuffer?.destroy()
     this.lightingUniformBuffer?.destroy()
+    this.materialUniformBuffer?.destroy()
+    this.qualityUniformBuffer?.destroy()
     this.polytopeUniformBuffer?.destroy()
 
     // Vertex/index buffers
@@ -1532,6 +1572,8 @@ export class WebGPUPolytopeRenderer extends WebGPUBasePass {
 
     this.cameraUniformBuffer = null
     this.lightingUniformBuffer = null
+    this.materialUniformBuffer = null
+    this.qualityUniformBuffer = null
     this.polytopeUniformBuffer = null
     this.faceVertexBuffer = null
     this.faceIndexBuffer = null

@@ -14,6 +14,8 @@ import {
   composeBlackHoleVertexShader,
   type BlackHoleWGSLShaderConfig,
 } from '../shaders/blackhole/compose'
+import { parseHexColorToLinearRgb } from '../utils/color'
+import { packLightingUniforms } from '../utils/lighting'
 import {
   MAX_DIMENSION,
   PALETTE_MODE_MAP,
@@ -489,10 +491,8 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     data[offset++] = ctx.size.width // fullResolution.x
     data[offset++] = ctx.size.height // fullResolution.y
 
-    // Color algorithm settings
-    // Get color settings from color slice if available
-    const colorStore = ctx.frame?.stores?.['color'] as any
-    dataView.setInt32(offset * 4, colorStore?.colorAlgorithm ?? 0, true) // colorAlgorithm (i32)
+    // Color algorithm settings (from appearance store, which includes colorSlice)
+    dataView.setInt32(offset * 4, appearance?.colorAlgorithm ?? 0, true) // colorAlgorithm (i32)
     offset++
     dataView.setInt32(offset * 4, dimension, true) // dimension (i32)
     offset++
@@ -500,34 +500,36 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     offset++
     data[offset++] = 0.0 // _padding3
 
-    // Cosine palette coefficients
-    const cosineA = colorStore?.cosineA ?? { r: 0.5, g: 0.5, b: 0.5 }
-    data[offset++] = cosineA.r ?? 0.5
-    data[offset++] = cosineA.g ?? 0.5
-    data[offset++] = cosineA.b ?? 0.5
+    // Cosine palette coefficients (from appearance.cosineCoefficients)
+    const cosineCoeffs = appearance?.cosineCoefficients ?? {
+      a: [0.5, 0.5, 0.5],
+      b: [0.5, 0.5, 0.5],
+      c: [1.0, 1.0, 1.0],
+      d: [0.0, 0.33, 0.67],
+    }
+    data[offset++] = cosineCoeffs.a?.[0] ?? 0.5
+    data[offset++] = cosineCoeffs.a?.[1] ?? 0.5
+    data[offset++] = cosineCoeffs.a?.[2] ?? 0.5
     data[offset++] = 0.0 // _padding4
 
-    const cosineB = colorStore?.cosineB ?? { r: 0.5, g: 0.5, b: 0.5 }
-    data[offset++] = cosineB.r ?? 0.5
-    data[offset++] = cosineB.g ?? 0.5
-    data[offset++] = cosineB.b ?? 0.5
+    data[offset++] = cosineCoeffs.b?.[0] ?? 0.5
+    data[offset++] = cosineCoeffs.b?.[1] ?? 0.5
+    data[offset++] = cosineCoeffs.b?.[2] ?? 0.5
     data[offset++] = 0.0 // _padding5
 
-    const cosineC = colorStore?.cosineC ?? { r: 1.0, g: 1.0, b: 1.0 }
-    data[offset++] = cosineC.r ?? 1.0
-    data[offset++] = cosineC.g ?? 1.0
-    data[offset++] = cosineC.b ?? 1.0
+    data[offset++] = cosineCoeffs.c?.[0] ?? 1.0
+    data[offset++] = cosineCoeffs.c?.[1] ?? 1.0
+    data[offset++] = cosineCoeffs.c?.[2] ?? 1.0
     data[offset++] = 0.0 // _padding6
 
-    const cosineD = colorStore?.cosineD ?? { r: 0.0, g: 0.33, b: 0.67 }
-    data[offset++] = cosineD.r ?? 0.0
-    data[offset++] = cosineD.g ?? 0.33
-    data[offset++] = cosineD.b ?? 0.67
+    data[offset++] = cosineCoeffs.d?.[0] ?? 0.0
+    data[offset++] = cosineCoeffs.d?.[1] ?? 0.33
+    data[offset++] = cosineCoeffs.d?.[2] ?? 0.67
     data[offset++] = 0.0 // _padding7
 
     // LCH color space settings
-    data[offset++] = colorStore?.lchLightness ?? 0.75 // lchLightness
-    data[offset++] = colorStore?.lchChroma ?? 0.15 // lchChroma
+    data[offset++] = appearance?.lchLightness ?? 0.75 // lchLightness
+    data[offset++] = appearance?.lchChroma ?? 0.15 // lchChroma
     data[offset++] = 0.0 // _padding8.x
     data[offset++] = 0.0 // _padding8.y
 
@@ -602,79 +604,15 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
 
-    // LightingUniforms struct layout (matches Julia/other renderers):
-    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
-    // struct LightingUniforms {
-    //   lights: array<LightData, 8>,  // offset 0, 512 bytes
-    //   ambientColor: vec3f,          // offset 512 (128 floats)
-    //   ambientIntensity: f32,        // offset 524 (131 floats)
-    //   lightCount: i32,              // offset 528 (132 floats)
-    //   _padding: vec3f,              // offset 532
-    // }
-    // Total: 544 bytes = 136 floats, buffer is 576 bytes = 144 floats
     const data = new Float32Array(144)
-
-    const lights = lighting.lights ?? []
-    const lightCount = Math.min(lights.length, 8)
-
-    // Pack lights array first (offset 0, each light is 16 floats = 64 bytes)
-    for (let i = 0; i < lightCount; i++) {
-      const light = lights[i]
-      const offset = i * 16 // 16 floats per LightData
-
-      // position: vec4f (xyz = position, w = type)
-      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-      data[offset + 0] = light.position?.[0] ?? 0
-      data[offset + 1] = light.position?.[1] ?? 5
-      data[offset + 2] = light.position?.[2] ?? 0
-      data[offset + 3] = lightType
-
-      // direction: vec4f (xyz = direction, w = range)
-      data[offset + 4] = light.direction?.[0] ?? 0
-      data[offset + 5] = light.direction?.[1] ?? -1
-      data[offset + 6] = light.direction?.[2] ?? 0
-      data[offset + 7] = light.range ?? 100.0
-
-      // color: vec4f (rgb = color, a = intensity)
-      const lightColor = this.parseColor(light.color ?? '#ffffff')
-      data[offset + 8] = lightColor[0]
-      data[offset + 9] = lightColor[1]
-      data[offset + 10] = lightColor[2]
-      data[offset + 11] = light.intensity ?? 1.0
-
-      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
-      data[offset + 12] = light.decay ?? 2.0
-      data[offset + 13] = light.spotCosInner ?? 0.9
-      data[offset + 14] = light.spotCosOuter ?? 0.7
-      data[offset + 15] = light.enabled ? 1.0 : 0.0
-    }
-
-    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[128] = ambientColor[0]
-    data[129] = ambientColor[1]
-    data[130] = ambientColor[2]
-
-    // ambientIntensity: f32 at offset 131
-    data[131] = (lighting.ambientEnabled ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
-
-    // lightCount: i32 at offset 132 - use DataView for proper type
-    const dataView = new DataView(data.buffer)
-    dataView.setInt32(132 * 4, lightCount, true)
+    packLightingUniforms(data, lighting)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
   }
 
   private parseColor(hex: string): [number, number, number] {
-    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
-    const val = parseInt(hex.slice(1), 16)
-    if (isNaN(val)) return [1, 1, 1]
-    return [
-      ((val >> 16) & 0xff) / 255,
-      ((val >> 8) & 0xff) / 255,
-      (val & 0xff) / 255,
-    ]
+    const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
+    return [rgb[0], rgb[1], rgb[2]]
   }
 
   updateMaterialUniforms(ctx: WebGPURenderContext): void {
@@ -683,30 +621,9 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     const pbr = ctx.frame?.stores?.['pbr'] as any
     const appearance = ctx.frame?.stores?.['appearance'] as any
 
-    // MaterialUniforms struct layout (with SSS + Fresnel):
-    // struct MaterialUniforms {
-    //   baseColor: vec4f,        // offset 0-3
-    //   metallic: f32,           // offset 4
-    //   roughness: f32,          // offset 5
-    //   reflectance: f32,        // offset 6
-    //   ao: f32,                 // offset 7
-    //   emissive: vec3f,         // offset 8-10
-    //   emissiveIntensity: f32,  // offset 11
-    //   ior: f32,                // offset 12
-    //   transmission: f32,       // offset 13
-    //   thickness: f32,          // offset 14
-    //   sssEnabled: u32,         // offset 15
-    //   sssIntensity: f32,       // offset 16
-    //   sssColor: vec3f,         // offset 17-19
-    //   sssThickness: f32,       // offset 20
-    //   sssJitter: f32,          // offset 21
-    //   fresnelEnabled: u32,     // offset 22
-    //   fresnelIntensity: f32,   // offset 23
-    //   rimColor: vec3f,         // offset 24-26
-    //   _padding2: f32,          // offset 27
-    // }
-    // Total: 28 floats = 112 bytes, buffer = 128 bytes
-    const data = new Float32Array(32) // 128 bytes
+    // MaterialUniforms packing (WGSL host-shareable layout).
+    // vec3f has 16-byte alignment, so there are padding gaps. Total size = 160 bytes (40 floats).
+    const data = new Float32Array(40) // 160 bytes
     const dataView = new DataView(data.buffer)
 
     // baseColor: vec4f (offset 0-3) - includes faceOpacity for alpha
@@ -742,32 +659,36 @@ export class WebGPUBlackHoleRenderer extends WebGPUBasePass {
     // sssIntensity: f32 (offset 16)
     data[16] = appearance?.sssIntensity ?? 1.0
 
-    // sssColor: vec3f (offset 17-19)
+    // sssColor: vec3f (idx 20-22)
     const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
-    data[17] = sssColor[0]
-    data[18] = sssColor[1]
-    data[19] = sssColor[2]
+    data[20] = sssColor[0]
+    data[21] = sssColor[1]
+    data[22] = sssColor[2]
 
-    // sssThickness, sssJitter (offset 20-21)
-    data[20] = appearance?.sssThickness ?? 1.0
-    data[21] = appearance?.sssJitter ?? 0.2
+    // sssThickness, sssJitter (idx 23-24)
+    data[23] = appearance?.sssThickness ?? 1.0
+    data[24] = appearance?.sssJitter ?? 0.2
 
-    // fresnelEnabled: u32 (offset 22) - uses fresnelEnabled from appearance store
+    // fresnelEnabled: u32 (idx 25) - uses fresnelEnabled from appearance store
     const fresnelEnabled = appearance?.fresnelEnabled ?? true
-    dataView.setUint32(22 * 4, fresnelEnabled ? 1 : 0, true)
+    dataView.setUint32(25 * 4, fresnelEnabled ? 1 : 0, true)
 
-    // fresnelIntensity: f32 (offset 23) - combine with faceRimFalloff for effect strength
+    // fresnelIntensity: f32 (idx 26) - combine with faceRimFalloff for effect strength
     const rimFalloff = appearance?.faceRimFalloff ?? 1.0
-    data[23] = (appearance?.fresnelIntensity ?? 0.5) * rimFalloff
+    data[26] = (appearance?.fresnelIntensity ?? 0.5) * rimFalloff
 
-    // rimColor: vec3f (offset 24-26) - uses edgeColor from appearance store
+    // rimColor: vec3f (idx 28-30) - uses edgeColor from appearance store
     const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
-    data[24] = rimColor[0]
-    data[25] = rimColor[1]
-    data[26] = rimColor[2]
+    data[28] = rimColor[0]
+    data[29] = rimColor[1]
+    data[30] = rimColor[2]
 
-    // _padding2 (offset 27)
-    data[27] = 0.0
+    // specularIntensity + specularColor (idx 32, 36-38)
+    data[32] = pbr?.face?.specularIntensity ?? 0.8
+    const specularColor = this.parseColor(pbr?.face?.specularColor ?? '#ffffff')
+    data[36] = specularColor[0]
+    data[37] = specularColor[1]
+    data[38] = specularColor[2]
 
     this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
   }

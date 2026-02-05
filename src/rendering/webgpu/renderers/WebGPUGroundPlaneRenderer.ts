@@ -14,6 +14,8 @@ import {
   composeGroundPlaneFragmentShader,
   type GroundPlaneShaderConfig,
 } from '../shaders/groundplane'
+import { parseHexColorToLinearRgb, parseHexColorToSrgbRgb, srgbToLinearChannel } from '../utils/color'
+import { packLightingUniforms } from '../utils/lighting'
 
 /**
  * Ground plane renderer configuration.
@@ -42,11 +44,13 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
   private vertexBindGroup: GPUBindGroup | null = null
   private materialBindGroup: GPUBindGroup | null = null
   private gridBindGroup: GPUBindGroup | null = null
+  private lightingBindGroup: GPUBindGroup | null = null
 
   // Uniform buffers
   private vertexUniformBuffer: GPUBuffer | null = null
   private materialUniformBuffer: GPUBuffer | null = null
   private gridUniformBuffer: GPUBuffer | null = null
+  private lightingUniformBuffer: GPUBuffer | null = null
 
   // Geometry buffers
   private vertexBuffer: GPUBuffer | null = null
@@ -62,7 +66,7 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
       priority: 90, // Render before main objects
       inputs: [],
       outputs: [
-        { resourceId: 'hdr-color', access: 'write' as const, binding: 0 },
+        { resourceId: 'scene-render', access: 'write' as const, binding: 0 },
         { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
       ],
     })
@@ -85,7 +89,7 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
    * @param ctx - WebGPU setup context with device and format
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layouts
     // Group 0: Vertex uniforms (model, view, projection matrices)
@@ -124,6 +128,18 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
       ],
     })
 
+    // Group 3: Lighting uniforms (shared multi-light system)
+    const lightingBindGroupLayout = device.createBindGroupLayout({
+      label: 'groundplane-lighting-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' as const },
+        },
+      ],
+    })
+
     // Create pipeline layout
     const pipelineLayout = device.createPipelineLayout({
       label: 'groundplane-pipeline-layout',
@@ -131,6 +147,7 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
         vertexBindGroupLayout,
         materialBindGroupLayout,
         gridBindGroupLayout,
+        lightingBindGroupLayout,
       ],
     })
 
@@ -164,14 +181,15 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
       fragment: {
         module: fragmentModule,
         entryPoint: 'main',
-        targets: [{ format }],
+        targets: [{ format: 'rgba16float' }],
       },
       primitive: {
         topology: 'triangle-list' as const,
         cullMode: 'none' as const, // Double-sided plane
       },
       depthStencil: {
-        format: 'depth32float',
+        // Must match render graph depth buffer format
+        format: 'depth24plus',
         depthWriteEnabled: true,
         depthCompare: 'less',
       },
@@ -186,6 +204,9 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
 
     // GridUniforms: showGrid (4) + gridSpacing (4) + sectionSpacing (4) + gridThickness (4) + sectionThickness (4) + gridFadeDistance (4) + gridFadeStrength (4) + pad (4) + gridColor (12) + pad2 (4) + sectionColor (12) + pad3 (4) = 64 bytes
     this.gridUniformBuffer = this.createUniformBuffer(device, 64, 'groundplane-grid-uniforms')
+
+    // LightingUniforms: 8×LightData (512) + vec3f+f32 (16) + i32+pad+vec3f (32) = 560 bytes, round to 576
+    this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'groundplane-lighting-uniforms')
 
     // Create bind groups
     this.vertexBindGroup = device.createBindGroup({
@@ -204,6 +225,12 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
       label: 'groundplane-grid-bg',
       layout: gridBindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.gridUniformBuffer } }],
+    })
+
+    this.lightingBindGroup = device.createBindGroup({
+      label: 'groundplane-lighting-bg',
+      layout: lightingBindGroupLayout,
+      entries: [{ binding: 0, resource: { buffer: this.lightingUniformBuffer } }],
     })
 
     // Create plane geometry
@@ -291,7 +318,7 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
     if (!camera) return
 
     // Get ground plane settings from stores
-    const ground = ctx.frame?.stores?.['ground'] as {
+    const ground = ctx.frame?.stores?.['environment'] as {
       groundPlaneOffset?: number
     }
     const offset = -(ground?.groundPlaneOffset ?? 0) // Negative Y offset
@@ -345,7 +372,7 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
     if (!this.device || !this.materialUniformBuffer) return
 
     // Get ground plane settings from stores
-    const ground = ctx.frame?.stores?.['ground'] as {
+    const ground = ctx.frame?.stores?.['environment'] as {
       groundPlaneColor?: string
     }
     const pbr = ctx.frame?.stores?.['pbr'] as {
@@ -360,17 +387,8 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
       position?: { x: number; y: number; z: number }
     }
 
-    // Parse hex color to RGB (0-1 range)
-    const parseHexColor = (hex: string): [number, number, number] => {
-      const clean = hex.replace('#', '')
-      const r = parseInt(clean.substring(0, 2), 16) / 255
-      const g = parseInt(clean.substring(2, 4), 16) / 255
-      const b = parseInt(clean.substring(4, 6), 16) / 255
-      return [r, g, b]
-    }
-
-    const groundColor = parseHexColor(ground?.groundPlaneColor ?? '#ead6e8')
-    const specularColor = parseHexColor(pbr?.ground?.specularColor ?? '#ffffff')
+    const groundColor = parseHexColorToLinearRgb(ground?.groundPlaneColor ?? '#ead6e8', [1, 1, 1])
+    const specularColor = parseHexColorToLinearRgb(pbr?.ground?.specularColor ?? '#ffffff', [1, 1, 1])
 
     // Pack material uniforms
     const data = new Float32Array(16) // 64 bytes
@@ -410,23 +428,27 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
     if (!this.device || !this.gridUniformBuffer) return
 
     // Get ground grid settings from stores
-    const ground = ctx.frame?.stores?.['ground'] as {
+    const ground = ctx.frame?.stores?.['environment'] as {
       showGroundGrid?: boolean
       groundGridColor?: string
       groundGridSpacing?: number
     }
 
-    // Parse hex color to RGB (0-1 range)
-    const parseHexColor = (hex: string): [number, number, number] => {
-      const clean = hex.replace('#', '')
-      const r = parseInt(clean.substring(0, 2), 16) / 255
-      const g = parseInt(clean.substring(2, 4), 16) / 255
-      const b = parseInt(clean.substring(4, 6), 16) / 255
-      return [r, g, b]
-    }
-
-    const gridColor = parseHexColor(ground?.groundGridColor ?? '#dbdcdb')
-    const sectionColor = parseHexColor('#808080') // Darker for section lines
+    const gridColor = parseHexColorToLinearRgb(ground?.groundGridColor ?? '#dbdcdb', [1, 1, 1])
+    // Section color: lighten grid color by ~15% in sRGB space (matches WebGL lightenColor(hex, 15))
+    const gridSrgb = parseHexColorToSrgbRgb(ground?.groundGridColor ?? '#dbdcdb')
+    const lightenedSrgb: [number, number, number] = gridSrgb
+      ? [
+          Math.min(1, gridSrgb[0] + 0.15),
+          Math.min(1, gridSrgb[1] + 0.15),
+          Math.min(1, gridSrgb[2] + 0.15),
+        ]
+      : [0.65, 0.65, 0.65]
+    const sectionColor: [number, number, number] = [
+      srgbToLinearChannel(lightenedSrgb[0]),
+      srgbToLinearChannel(lightenedSrgb[1]),
+      srgbToLinearChannel(lightenedSrgb[2]),
+    ]
 
     // Pack grid uniforms
     const data = new Float32Array(16) // 64 bytes
@@ -459,6 +481,23 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
   }
 
   /**
+   * Update lighting uniforms from lighting store.
+   * Matches the shared WebGPU LightingUniforms layout.
+   * @param ctx
+   */
+  private updateLightingUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.lightingUniformBuffer) return
+
+    const lighting = ctx.frame?.stores?.['lighting'] as any
+    if (!lighting) return
+
+    const data = new Float32Array(144)
+    packLightingUniforms(data, lighting)
+
+    this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
+  }
+
+  /**
    * Execute the render pass.
    * @param ctx - WebGPU render context with encoder and render targets
    */
@@ -470,13 +509,14 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
       !this.indexBuffer ||
       !this.vertexBindGroup ||
       !this.materialBindGroup ||
-      !this.gridBindGroup
+      !this.gridBindGroup ||
+      !this.lightingBindGroup
     ) {
       return
     }
 
     // Check if ground plane is enabled (any walls active)
-    const ground = ctx.frame?.stores?.['ground'] as {
+    const ground = ctx.frame?.stores?.['environment'] as {
       activeWalls?: string[]
     }
     if (!ground?.activeWalls || ground.activeWalls.length === 0) {
@@ -487,9 +527,10 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
     this.updateVertexUniforms(ctx)
     this.updateMaterialUniforms(ctx)
     this.updateGridUniforms(ctx)
+    this.updateLightingUniforms(ctx)
 
     // Get render targets
-    const colorView = ctx.getWriteTarget('hdr-color')
+    const colorView = ctx.getWriteTarget('scene-render')
     const depthView = ctx.getWriteTarget('depth-buffer')
 
     if (!colorView || !depthView) return
@@ -515,6 +556,7 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
     passEncoder.setBindGroup(0, this.vertexBindGroup)
     passEncoder.setBindGroup(1, this.materialBindGroup)
     passEncoder.setBindGroup(2, this.gridBindGroup)
+    passEncoder.setBindGroup(3, this.lightingBindGroup)
 
     passEncoder.setVertexBuffer(0, this.vertexBuffer)
     passEncoder.setIndexBuffer(this.indexBuffer, 'uint16' as const)
@@ -533,16 +575,19 @@ export class WebGPUGroundPlaneRenderer extends WebGPUBasePass {
     this.vertexBindGroup = null
     this.materialBindGroup = null
     this.gridBindGroup = null
+    this.lightingBindGroup = null
 
     this.vertexUniformBuffer?.destroy()
     this.materialUniformBuffer?.destroy()
     this.gridUniformBuffer?.destroy()
+    this.lightingUniformBuffer?.destroy()
     this.vertexBuffer?.destroy()
     this.indexBuffer?.destroy()
 
     this.vertexUniformBuffer = null
     this.materialUniformBuffer = null
     this.gridUniformBuffer = null
+    this.lightingUniformBuffer = null
     this.vertexBuffer = null
     this.indexBuffer = null
 

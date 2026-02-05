@@ -195,18 +195,20 @@ async function waitForAppReady(page: Page): Promise<void> {
  * This is the most reliable method for Playwright testing.
  */
 async function triggerScreenshotExport(page: Page): Promise<void> {
-  // Click on File menu
-  const fileMenu = page.locator('button:has-text("File")');
-  await expect(fileMenu).toBeVisible({ timeout: 5000 });
-  await fileMenu.click();
-
-  // Wait for menu to appear and click export
-  const exportMenuItem = page.locator('[data-testid="menu-export"]');
-  await expect(exportMenuItem).toBeVisible({ timeout: 5000 });
-  await exportMenuItem.click();
+  await page.getByTestId('menu-file').click();
+  await page.getByTestId('menu-export').click();
 
   // Wait for modal to appear
   await expect(page.locator('[data-testid="screenshot-modal"]')).toBeVisible({ timeout: 10000 });
+
+  // Wait for the preview image to load and the crop box to render.
+  const previewImage = page.locator('[data-testid="crop-preview-image"]');
+  await expect(previewImage).toBeVisible({ timeout: 10000 });
+  await page.waitForFunction(() => {
+    const img = document.querySelector('[data-testid="crop-preview-image"]') as HTMLImageElement | null;
+    return !!img && img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
+  }, { timeout: 10000 });
+  await expect(page.locator('[data-testid="crop-box"]')).toBeVisible({ timeout: 10000 });
 }
 
 /**
@@ -253,13 +255,12 @@ test.describe('Image Export Feature', () => {
     await waitForAppReady(page);
     await triggerScreenshotExport(page);
 
-    // Check that the image cropper is present
-    const imageCropper = page.locator('[data-testid="image-cropper"]');
-    await expect(imageCropper).toBeVisible();
-
     // Check that the preview image is present
     const previewImage = page.locator('[data-testid="crop-preview-image"]');
     await expect(previewImage).toBeVisible();
+
+    // Crop box should render once the image is loaded
+    await expect(page.locator('[data-testid="crop-box"]')).toBeVisible();
 
     // Verify image has a src (data URL)
     const src = await previewImage.getAttribute('src');
@@ -282,8 +283,8 @@ test.describe('Image Export Feature', () => {
     const cropBox = getCropBox(page);
     await expect(cropBox).toBeVisible();
 
-    // Verify all 8 handles are present
-    const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+    // Verify corner handles are present (video-editor bracket style)
+    const handles = ['nw', 'ne', 'se', 'sw'];
     for (const handle of handles) {
       const handleElement = getCropHandle(page, handle);
       await expect(handleElement).toBeVisible();
@@ -302,7 +303,7 @@ test.describe('Image Export Feature', () => {
     await triggerScreenshotExport(page);
 
     // Check dimension display
-    const dimensionDisplay = page.locator('[data-testid="crop-size-display"]');
+    const dimensionDisplay = page.locator('[data-testid="crop-dimensions"]');
     await expect(dimensionDisplay).toBeVisible();
 
     // Verify it shows dimensions in expected format (e.g., "1920 × 1080 px")
@@ -323,7 +324,7 @@ test.describe('Image Export Feature', () => {
 
     const copyButton = page.locator('[data-testid="screenshot-copy-button"]');
     await expect(copyButton).toBeVisible();
-    await expect(copyButton).toContainText('Copy to Clipboard');
+    await expect(copyButton).toContainText('Copy');
 
     // Note: We can't fully test clipboard functionality in headless mode
     // but we can verify the button is interactive
@@ -343,7 +344,7 @@ test.describe('Image Export Feature', () => {
 
     const saveButton = page.locator('[data-testid="screenshot-save-button"]');
     await expect(saveButton).toBeVisible();
-    await expect(saveButton).toContainText('Save Image');
+    await expect(saveButton).toContainText('Save');
     await expect(saveButton).toBeEnabled();
 
     // Verify no console errors
@@ -418,7 +419,7 @@ test.describe('Image Export Feature', () => {
     await expect(seHandle).toBeVisible();
 
     // Get initial dimensions from the display
-    const dimensionDisplay = page.locator('[data-testid="crop-size-display"]');
+    const dimensionDisplay = page.locator('[data-testid="crop-dimensions"]');
     const initialText = await dimensionDisplay.textContent();
     const initialMatch = initialText?.match(/(\d+)\s*×\s*(\d+)/);
     const initialWidth = initialMatch ? parseInt(initialMatch[1]) : 0;
@@ -462,7 +463,7 @@ test.describe('Image Export Feature', () => {
     await expect(nwHandle).toBeVisible();
 
     // Get initial dimensions
-    const dimensionDisplay = page.locator('[data-testid="crop-size-display"]');
+    const dimensionDisplay = page.locator('[data-testid="crop-dimensions"]');
     const initialText = await dimensionDisplay.textContent();
     const initialMatch = initialText?.match(/(\d+)\s*×\s*(\d+)/);
     const initialWidth = initialMatch ? parseInt(initialMatch[1]) : 0;
@@ -493,49 +494,6 @@ test.describe('Image Export Feature', () => {
     verifyNoErrors(collector);
   });
 
-  test('Edge handles resize in single dimension', async ({ page }) => {
-    await installWebGLShaderCompileLinkGuard(page);
-    const collector = setupErrorCollection(page);
-
-    await page.goto('/');
-    await waitForAppReady(page);
-    await triggerScreenshotExport(page);
-
-    // Test East edge (right side - affects width only)
-    const eHandle = getCropHandle(page, 'e');
-    await expect(eHandle).toBeVisible();
-
-    const dimensionDisplay = page.locator('[data-testid="crop-size-display"]');
-    const initialText = await dimensionDisplay.textContent();
-    const initialMatch = initialText?.match(/(\d+)\s*×\s*(\d+)/);
-    const initialWidth = initialMatch ? parseInt(initialMatch[1]) : 0;
-    const initialHeight = initialMatch ? parseInt(initialMatch[2]) : 0;
-
-    // Drag E handle to make crop narrower
-    const handleBox = await eHandle.boundingBox();
-    expect(handleBox).not.toBeNull();
-
-    await eHandle.hover();
-    await page.mouse.down();
-    await page.mouse.move(handleBox!.x - 100, handleBox!.y);
-    await page.mouse.up();
-
-    await page.waitForTimeout(200);
-
-    const newText = await dimensionDisplay.textContent();
-    const newMatch = newText?.match(/(\d+)\s*×\s*(\d+)/);
-    const newWidth = newMatch ? parseInt(newMatch[1]) : 0;
-    const newHeight = newMatch ? parseInt(newMatch[2]) : 0;
-
-    // Width should have decreased, height should stay approximately the same
-    expect(newWidth).toBeLessThan(initialWidth);
-    // Height might change slightly due to rounding, but should be close
-    expect(Math.abs(newHeight - initialHeight)).toBeLessThan(10);
-
-    // Verify no console errors
-    verifyNoErrors(collector);
-  });
-
   test('Crop box stays within image bounds', async ({ page }) => {
     await installWebGLShaderCompileLinkGuard(page);
     const collector = setupErrorCollection(page);
@@ -545,28 +503,32 @@ test.describe('Image Export Feature', () => {
     await triggerScreenshotExport(page);
 
     const cropBox = getCropBox(page);
-    const imageCropper = page.locator('[data-testid="image-cropper"]');
+    const previewImage = page.locator('[data-testid="crop-preview-image"]');
 
     await expect(cropBox).toBeVisible();
-    await expect(imageCropper).toBeVisible();
+    await expect(previewImage).toBeVisible();
 
-    // Try to drag crop box far to the right (beyond bounds)
+    const cropperBox = await previewImage.boundingBox();
+    expect(cropperBox).not.toBeNull();
+
+    // Drag crop box towards the right edge of the image (stay within the modal to avoid backdrop close).
     const cropBoxPos = await cropBox.boundingBox();
     expect(cropBoxPos).not.toBeNull();
 
-    await cropBox.hover();
+    const startX = cropBoxPos!.x + cropBoxPos!.width / 2;
+    const startY = cropBoxPos!.y + cropBoxPos!.height / 2;
+    const targetX = cropperBox!.x + cropperBox!.width - 10;
+
+    await page.mouse.move(startX, startY);
     await page.mouse.down();
-    // Try to move way off to the right
-    await page.mouse.move(cropBoxPos!.x + 1000, cropBoxPos!.y);
+    await page.mouse.move(targetX, startY);
     await page.mouse.up();
 
     await page.waitForTimeout(200);
 
     // Get positions after drag
-    const cropperBox = await imageCropper.boundingBox();
     const finalCropBox = await cropBox.boundingBox();
 
-    expect(cropperBox).not.toBeNull();
     expect(finalCropBox).not.toBeNull();
 
     // Crop box should still be within the cropper bounds
@@ -662,13 +624,9 @@ test.describe('Image Export Feature', () => {
     // Check cursor styles on handles
     const handleCursors: Record<string, string> = {
       nw: 'nw-resize',
-      n: 'n-resize',
       ne: 'ne-resize',
-      e: 'e-resize',
       se: 'se-resize',
-      s: 's-resize',
       sw: 'sw-resize',
-      w: 'w-resize',
     };
 
     for (const [handle, expectedCursor] of Object.entries(handleCursors)) {

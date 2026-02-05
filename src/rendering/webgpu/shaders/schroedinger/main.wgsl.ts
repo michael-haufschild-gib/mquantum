@@ -381,6 +381,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     if (i >= lighting.lightCount) { break; }
 
     let light = lighting.lights[i];
+    // Enabled flag packed in params.w (0 or 1)
+    if (light.params.w < 0.5) { continue; }
     let lightIntensity = light.color.a;
     if (lightIntensity < 0.001) { continue; }
 
@@ -421,7 +423,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
     // Specular
     let specular = computePBRSpecular(n, viewDir, l, roughness, F0);
-    col += specular * light.color.rgb * NdotL * attenuation;
+    // Specular tint + intensity (matches WebGL uSpecularColor/uSpecularIntensity)
+    col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;
   }
 ${iblSection}
   // Fresnel rim from material uniforms

@@ -17,6 +17,8 @@ import {
   type MandelbulbShaderConfig,
 } from '../shaders/mandelbulb/compose'
 import { MandelbulbSDFGridPass } from '../passes/MandelbulbSDFGridPass'
+import { parseHexColorToLinearRgb } from '../utils/color'
+import { packLightingUniforms } from '../utils/lighting'
 
 /** Maximum dimension supported */
 const MAX_DIMENSION = 11
@@ -984,30 +986,23 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const pbr = ctx.frame?.stores?.['pbr'] as any
     const appearance = ctx.frame?.stores?.['appearance'] as any
 
-    // MaterialUniforms struct layout (with SSS + Fresnel):
-    // struct MaterialUniforms {
-    //   baseColor: vec4f,        // offset 0-3
-    //   metallic: f32,           // offset 4
-    //   roughness: f32,          // offset 5
-    //   reflectance: f32,        // offset 6
-    //   ao: f32,                 // offset 7
-    //   emissive: vec3f,         // offset 8-10
-    //   emissiveIntensity: f32,  // offset 11
-    //   ior: f32,                // offset 12
-    //   transmission: f32,       // offset 13
-    //   thickness: f32,          // offset 14
-    //   sssEnabled: u32,         // offset 15
-    //   sssIntensity: f32,       // offset 16
-    //   sssColor: vec3f,         // offset 17-19
-    //   sssThickness: f32,       // offset 20
-    //   sssJitter: f32,          // offset 21
-    //   fresnelEnabled: u32,     // offset 22
-    //   fresnelIntensity: f32,   // offset 23
-    //   rimColor: vec3f,         // offset 24-26
-    //   _padding2: f32,          // offset 27
-    // }
-    // Total: 28 floats = 112 bytes, buffer = 128 bytes
-    const data = new Float32Array(32) // 128 bytes
+    // MaterialUniforms packing (WGSL host-shareable layout).
+    // vec3f has 16-byte alignment, so there are padding gaps. Total size = 160 bytes (40 floats).
+    // Packing indices:
+    //  0-3:   baseColor (vec4f)
+    //  4-7:   metallic, roughness, reflectance, ao (f32)
+    //  8-11:  emissive (vec3f) + emissiveIntensity (f32)
+    //  12-14: ior, transmission, thickness (f32)
+    //  15:    sssEnabled (u32)
+    //  16:    sssIntensity (f32)
+    //  20-22: sssColor (vec3f)
+    //  23-24: sssThickness, sssJitter (f32)
+    //  25:    fresnelEnabled (u32)
+    //  26:    fresnelIntensity (f32)
+    //  28-30: rimColor (vec3f)
+    //  32:    specularIntensity (f32)
+    //  36-38: specularColor (vec3f)
+    const data = new Float32Array(40) // 160 bytes
     const dataView = new DataView(data.buffer)
 
     // baseColor: vec4f (offset 0-3)
@@ -1042,31 +1037,35 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     // sssIntensity: f32 (offset 16)
     data[16] = appearance?.sssIntensity ?? 1.0
 
-    // sssColor: vec3f (offset 17-19)
+    // sssColor: vec3f (idx 20-22)
     const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
-    data[17] = sssColor[0]
-    data[18] = sssColor[1]
-    data[19] = sssColor[2]
+    data[20] = sssColor[0]
+    data[21] = sssColor[1]
+    data[22] = sssColor[2]
 
-    // sssThickness, sssJitter (offset 20-21)
-    data[20] = appearance?.sssThickness ?? 1.0
-    data[21] = appearance?.sssJitter ?? 0.2
+    // sssThickness, sssJitter (idx 23-24)
+    data[23] = appearance?.sssThickness ?? 1.0
+    data[24] = appearance?.sssJitter ?? 0.2
 
-    // fresnelEnabled: u32 (offset 22) - uses edgesVisible from appearance store
+    // fresnelEnabled: u32 (idx 25) - uses edgesVisible from appearance store
     const fresnelEnabled = appearance?.edgesVisible ?? true
-    dataView.setUint32(22 * 4, fresnelEnabled ? 1 : 0, true)
+    dataView.setUint32(25 * 4, fresnelEnabled ? 1 : 0, true)
 
-    // fresnelIntensity: f32 (offset 23)
-    data[23] = appearance?.fresnelIntensity ?? 0.5
+    // fresnelIntensity: f32 (idx 26)
+    data[26] = appearance?.fresnelIntensity ?? 0.5
 
-    // rimColor: vec3f (offset 24-26) - uses edgeColor from appearance store
+    // rimColor: vec3f (idx 28-30) - uses edgeColor from appearance store
     const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
-    data[24] = rimColor[0]
-    data[25] = rimColor[1]
-    data[26] = rimColor[2]
+    data[28] = rimColor[0]
+    data[29] = rimColor[1]
+    data[30] = rimColor[2]
 
-    // _padding2 (offset 27)
-    data[27] = 0.0
+    // specularIntensity + specularColor (idx 32, 36-38)
+    data[32] = pbr?.face?.specularIntensity ?? 0.8
+    const specularColor = this.parseColor(pbr?.face?.specularColor ?? '#ffffff')
+    data[36] = specularColor[0]
+    data[37] = specularColor[1]
+    data[38] = specularColor[2]
 
     this.writeUniformBuffer(this.device, this.materialUniformBuffer, data)
   }
@@ -1159,68 +1158,8 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
     const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
 
-    // LightingUniforms struct layout:
-    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
-    // struct LightingUniforms {
-    //   lights: array<LightData, 8>,  // offset 0, 512 bytes
-    //   ambientColor: vec3f,          // offset 512 (128 floats)
-    //   ambientIntensity: f32,        // offset 524 (131 floats)
-    //   lightCount: i32,              // offset 528 (132 floats)
-    //   _padding: vec3f,              // offset 532
-    // }
-    // Total: 544 bytes = 136 floats, buffer is 576 bytes = 144 floats
     const data = new Float32Array(144)
-
-    const lights = lighting.lights ?? []
-    const lightCount = Math.min(lights.length, 8)
-
-    // Pack lights array first (offset 0, each light is 16 floats = 64 bytes)
-    for (let i = 0; i < lightCount; i++) {
-      const light = lights[i]
-      const offset = i * 16 // 16 floats per LightData
-
-      // position: vec4f (xyz = position, w = type)
-      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-      data[offset + 0] = light.position?.[0] ?? 0
-      data[offset + 1] = light.position?.[1] ?? 5
-      data[offset + 2] = light.position?.[2] ?? 0
-      data[offset + 3] = lightType
-
-      // direction: vec4f (xyz = direction, w = range)
-      data[offset + 4] = light.direction?.[0] ?? 0
-      data[offset + 5] = light.direction?.[1] ?? -1
-      data[offset + 6] = light.direction?.[2] ?? 0
-      data[offset + 7] = light.range ?? 100.0
-
-      // color: vec4f (rgb = color, a = intensity)
-      const lightColor = this.parseColor(light.color ?? '#ffffff')
-      data[offset + 8] = lightColor[0]
-      data[offset + 9] = lightColor[1]
-      data[offset + 10] = lightColor[2]
-      data[offset + 11] = light.intensity ?? 1.0
-
-      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
-      data[offset + 12] = light.decay ?? 2.0
-      data[offset + 13] = light.spotCosInner ?? 0.9
-      data[offset + 14] = light.spotCosOuter ?? 0.7
-      data[offset + 15] = light.enabled ? 1.0 : 0.0
-    }
-
-    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[128] = ambientColor[0]
-    data[129] = ambientColor[1]
-    data[130] = ambientColor[2]
-
-    // ambientIntensity: f32 at offset 131
-    data[131] = (lighting.ambientEnabled ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
-
-    // lightCount: i32 at offset 132 - use DataView for proper type
-    const dataView = new DataView(data.buffer)
-    dataView.setInt32(132 * 4, lightCount, true)
-
-    // _padding: vec3f at offset 133-135 (already zeroed)
+    packLightingUniforms(data, lighting)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
   }
@@ -1230,14 +1169,8 @@ export class WebGPUMandelbulbRenderer extends WebGPUBasePass {
    * @param hex
    */
   private parseColor(hex: string): [number, number, number] {
-    if (!hex || !hex.startsWith('#')) return [1, 1, 1]
-    const val = parseInt(hex.slice(1), 16)
-    if (isNaN(val)) return [1, 1, 1]
-    return [
-      ((val >> 16) & 0xff) / 255,
-      ((val >> 8) & 0xff) / 255,
-      (val & 0xff) / 255,
-    ]
+    const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
+    return [rgb[0], rgb[1], rgb[2]]
   }
 
   execute(ctx: WebGPURenderContext): void {

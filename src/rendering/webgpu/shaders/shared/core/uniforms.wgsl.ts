@@ -44,7 +44,7 @@ struct LightData {
   position: vec4f,      // xyz = position, w = type
   direction: vec4f,     // xyz = direction (for directional/spot), w = range
   color: vec4f,         // rgb = color, a = intensity
-  params: vec4f,        // x = decay, y = spotCosInner, z = spotCosOuter, w = unused
+  params: vec4f,        // x = decay, y = spotCosInner, z = spotCosOuter, w = enabled (0/1)
 }
 
 struct LightingUniforms {
@@ -60,36 +60,43 @@ struct LightingUniforms {
 // ============================================
 
 struct MaterialUniforms {
-  // Core PBR (64 bytes / 16 floats)
-  baseColor: vec4f,           // offset 0-3
-  metallic: f32,              // offset 4
-  roughness: f32,             // offset 5
-  reflectance: f32,           // offset 6
-  ao: f32,                    // offset 7
-  emissive: vec3f,            // offset 8-10
-  emissiveIntensity: f32,     // offset 11
-  ior: f32,                   // offset 12
-  transmission: f32,          // offset 13
-  thickness: f32,             // offset 14
-  sssEnabled: u32,            // offset 15
+  // NOTE: This struct is host-shareable and follows WGSL alignment rules.
+  // vec3f has 16-byte alignment, so some sequences introduce padding gaps.
+  // The effective packed size is 160 bytes (40 floats) in uniform buffers.
+  // See WebGPU renderers for the authoritative packing indices.
 
-  // Subsurface Scattering (20 bytes / 5 floats)
-  sssIntensity: f32,          // offset 16
-  sssColor: vec3f,            // offset 17-19
-  sssThickness: f32,          // offset 20
-  sssJitter: f32,             // offset 21
+  // Core PBR
+  baseColor: vec4f,
+  metallic: f32,
+  roughness: f32,
+  reflectance: f32,
+  ao: f32,
+  // emissive.rgb + emissiveIntensity pack into one 16-byte slot
+  emissive: vec3f,
+  emissiveIntensity: f32,
+  ior: f32,
+  transmission: f32,
+  thickness: f32,
+  sssEnabled: u32,
 
-  // Fresnel / Rim Lighting (16 bytes / 4 floats)
-  fresnelEnabled: u32,        // offset 22
-  fresnelIntensity: f32,      // offset 23
-  rimColor: vec3f,            // offset 24-26
-  _padding2: f32,             // offset 27 (alignment)
+  // Subsurface Scattering
+  // (sssIntensity followed by vec3f introduces padding before sssColor)
+  sssIntensity: f32,
+  sssColor: vec3f,
+  sssThickness: f32,
+  sssJitter: f32,
 
-  // Specular (matching WebGL PBRSource: specularIntensity, specularColor)
-  specularIntensity: f32,     // offset 28
-  specularColor: vec3f,       // offset 29-31
+  // Fresnel / Rim Lighting
+  // (fresnelIntensity followed by vec3f can introduce padding before rimColor)
+  fresnelEnabled: u32,
+  fresnelIntensity: f32,
+  rimColor: vec3f,
+  _padding2: f32, // alignment
 
-  // Total: 32 floats = 128 bytes
+  // Specular (artist controls; matches WebGL PBRSource)
+  // (specularIntensity followed by vec3f introduces padding before specularColor)
+  specularIntensity: f32,
+  specularColor: vec3f,
 }
 
 // ============================================

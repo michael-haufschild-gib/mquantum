@@ -14,6 +14,8 @@ import {
   composeTubeWireframeFragmentShader,
   type TubeWireframeWGSLShaderConfig,
 } from '../shaders/tubewireframe'
+import { parseHexColorToLinearRgb } from '../utils/color'
+import { packLightingUniforms, type WebGPULightingState } from '../utils/lighting'
 
 /**
  * Tube wireframe renderer configuration.
@@ -55,11 +57,17 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
   private cameraBindGroup: GPUBindGroup | null = null
   private lightingBindGroup: GPUBindGroup | null = null
   private tubeBindGroup: GPUBindGroup | null = null
+  private iblBindGroup: GPUBindGroup | null = null
 
   // Uniform buffers
   private cameraUniformBuffer: GPUBuffer | null = null
   private lightingUniformBuffer: GPUBuffer | null = null
   private tubeUniformBuffer: GPUBuffer | null = null
+  private iblUniformBuffer: GPUBuffer | null = null
+
+  // IBL resources (placeholder PMREM texture + sampler)
+  private envMapTexture: GPUTexture | null = null
+  private envMapSampler: GPUSampler | null = null
 
   // Geometry buffers
   private cylinderVertexBuffer: GPUBuffer | null = null
@@ -157,13 +165,36 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Create pipeline layout - consolidated to 3 groups (max 4 allowed)
+    // Group 3: IBL (PMREM texture + sampler)
+    const iblBindGroupLayout = device.createBindGroupLayout({
+      label: 'tubewireframe-ibl-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' as const },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' as const, viewDimension: '2d' as const },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' as const },
+        },
+      ],
+    })
+
+    // Create pipeline layout - consolidated to 4 groups (max 4 allowed)
     const pipelineLayout = device.createPipelineLayout({
       label: 'tubewireframe-pipeline-layout',
       bindGroupLayouts: [
         cameraBindGroupLayout,    // group 0: camera
         lightingBindGroupLayout,  // group 1: lighting
         tubeBindGroupLayout,      // group 2: tube uniforms
+        iblBindGroupLayout,       // group 3: IBL
       ],
     })
 
@@ -215,7 +246,8 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       },
       primitive: {
         topology: 'triangle-list' as const,
-        cullMode: 'back' as const,
+        // Match WebGL TubeWireframe: DoubleSide
+        cullMode: 'none' as const,
       },
       depthStencil: {
         // Use depth24plus to match depth-buffer resource
@@ -233,6 +265,24 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     // LightingUniforms: 576 bytes (same as other renderers)
     this.lightingUniformBuffer = this.createUniformBuffer(device, 576, 'tubewireframe-lighting')
     this.tubeUniformBuffer = this.createUniformBuffer(device, 512, 'tubewireframe-uniforms')
+    // IBLUniforms: 16 bytes (envMapSize, iblIntensity, iblQuality, padding)
+    this.iblUniformBuffer = this.createUniformBuffer(device, 16, 'tubewireframe-ibl')
+
+    // Placeholder PMREM texture (will be replaced with a real environment map later)
+    this.envMapTexture = device.createTexture({
+      label: 'tubewireframe-env-placeholder-pmrem',
+      size: { width: 64, height: 64 },
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      dimension: '2d',
+    })
+
+    this.envMapSampler = device.createSampler({
+      label: 'tubewireframe-env-sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      mipmapFilter: 'linear',
+    })
 
     // Create bind groups
     // Group 0: Camera
@@ -254,6 +304,17 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       label: 'tubewireframe-object-bg',
       layout: tubeBindGroupLayout,
       entries: [{ binding: 0, resource: { buffer: this.tubeUniformBuffer } }],
+    })
+
+    // Group 3: IBL
+    this.iblBindGroup = device.createBindGroup({
+      label: 'tubewireframe-ibl-bg',
+      layout: iblBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.iblUniformBuffer } },
+        { binding: 1, resource: this.envMapTexture.createView({ dimension: '2d' }) },
+        { binding: 2, resource: this.envMapSampler },
+      ],
     })
 
     // Initialize lighting with default values
@@ -579,6 +640,16 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
    * @param uniforms.metalness
    * @param uniforms.ambientIntensity
    * @param uniforms.emissiveIntensity
+   * @param uniforms.specularColor
+   * @param uniforms.specularIntensity
+   * @param uniforms.sssEnabled
+   * @param uniforms.sssIntensity
+   * @param uniforms.sssColor
+   * @param uniforms.sssThickness
+   * @param uniforms.sssJitter
+   * @param uniforms.fresnelEnabled
+   * @param uniforms.fresnelIntensity
+   * @param uniforms.rimColor
    */
   updateTubeUniforms(
     uniforms: {
@@ -591,12 +662,24 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       metalness?: number
       ambientIntensity?: number
       emissiveIntensity?: number
+      specularColor?: [number, number, number]
+      specularIntensity?: number
+      sssEnabled?: boolean
+      sssIntensity?: number
+      sssColor?: [number, number, number]
+      sssThickness?: number
+      sssJitter?: number
+      fresnelEnabled?: boolean
+      fresnelIntensity?: number
+      rimColor?: [number, number, number]
     } = {}
   ): void {
     if (!this.device || !this.tubeUniformBuffer) return
 
     // Tube uniform layout (must match TubeWireframeUniforms struct)
     const data = new Float32Array(128) // 512 bytes
+    const intView = new Int32Array(data.buffer)
+    const dataView = new DataView(data.buffer)
 
     // rotationMatrix4D (16 floats, offset 0)
     if (uniforms.rotationMatrix4D) {
@@ -614,7 +697,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
 
     // dimension, uniformScale, projectionDistance, depthNormFactor (offset 16)
     const dimension = this.rendererConfig.dimension ?? 4
-    data[16] = dimension
+    intView[16] = dimension
     data[17] = 1.0 // uniformScale
     data[18] = 5.0 // projectionDistance (default)
     data[19] = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0 // depthNormFactor
@@ -651,8 +734,33 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     // PBR (offset 68)
     data[68] = uniforms.roughness ?? 0.5
     data[69] = uniforms.metalness ?? 0.0
-    data[70] = uniforms.ambientIntensity ?? 0.3
+    data[70] = uniforms.ambientIntensity ?? 1.0
     data[71] = uniforms.emissiveIntensity ?? 0.0
+
+    // Specular (offset 72)
+    const specularColor = uniforms.specularColor ?? [1.0, 1.0, 1.0]
+    data[72] = specularColor[0]
+    data[73] = specularColor[1]
+    data[74] = specularColor[2]
+    data[75] = uniforms.specularIntensity ?? 0.5
+
+    // Rim SSS (offset 76)
+    dataView.setUint32(76 * 4, uniforms.sssEnabled ? 1 : 0, true)
+    data[77] = uniforms.sssIntensity ?? 1.0
+    data[78] = uniforms.sssThickness ?? 1.0
+    data[79] = uniforms.sssJitter ?? 0.2
+    const sssColor = uniforms.sssColor ?? [1.0, 0.533, 0.266]
+    data[80] = sssColor[0]
+    data[81] = sssColor[1]
+    data[82] = sssColor[2]
+
+    // Fresnel rim lighting (offset 84)
+    dataView.setUint32(84 * 4, uniforms.fresnelEnabled ? 1 : 0, true)
+    data[85] = uniforms.fresnelIntensity ?? 0.1
+    const rimColor = uniforms.rimColor ?? [1.0, 1.0, 1.0]
+    data[88] = rimColor[0]
+    data[89] = rimColor[1]
+    data[90] = rimColor[2]
 
     this.writeUniformBuffer(this.device, this.tubeUniformBuffer, data)
   }
@@ -677,15 +785,28 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       polytope?: { scale?: number }
     }
 
-    const pbr = ctx.frame?.stores?.['pbr'] as {
-      edge?: { roughness?: number; metallic?: number }
-      roughness?: number
-      metalness?: number
-    }
+    const pbr = ctx.frame?.stores?.['pbr'] as
+      | {
+          edge?: {
+            roughness?: number
+            metallic?: number
+            specularIntensity?: number
+            specularColor?: string
+          }
+        }
+      | undefined
     const appearance = ctx.frame?.stores?.['appearance'] as {
       colorAlgorithm?: string
       edgeColor?: string
       cosineCoefficients?: { a: number[]; b: number[]; c: number[]; d: number[] }
+      faceOpacity?: number
+      sssEnabled?: boolean
+      sssIntensity?: number
+      sssColor?: string
+      sssThickness?: number
+      sssJitter?: number
+      fresnelIntensity?: number
+      shaderSettings?: { surface?: { fresnelEnabled?: boolean; faceOpacity?: number } }
     }
 
     // Parse edge color (WebGL uses appearance.edgeColor)
@@ -693,9 +814,11 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       ? this.parseColor(appearance.edgeColor)
       : this.getBaseColorFromAppearance(appearance)
 
-    // Get PBR from edge-specific settings if available, otherwise fallback
-    const roughness = pbr?.edge?.roughness ?? pbr?.roughness ?? 0.5
-    const metalness = pbr?.edge?.metallic ?? pbr?.metalness ?? 0.0
+    // Get PBR from edge-specific settings if available
+    const roughness = pbr?.edge?.roughness ?? 0.5
+    const metalness = pbr?.edge?.metallic ?? 0.0
+    const specularIntensity = pbr?.edge?.specularIntensity ?? 0.5
+    const specularColor = this.parseColor(pbr?.edge?.specularColor ?? '#ffffff')
 
     this.updateTubeUniforms({
       // N-D Transform data (critical for proper rendering)
@@ -704,24 +827,40 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       depthRowSums: ndTransform?.depthRowSums,
       // Material
       baseColor,
+      opacity: appearance?.shaderSettings?.surface?.faceOpacity ?? appearance?.faceOpacity ?? 1.0,
       roughness,
       metalness,
-      ambientIntensity: 0.3,
+      ambientIntensity: 1.0,
       emissiveIntensity: 0.0,
+      specularIntensity,
+      specularColor,
+      sssEnabled: appearance?.sssEnabled ?? false,
+      sssIntensity: appearance?.sssIntensity ?? 1.0,
+      sssColor: this.parseColor(appearance?.sssColor ?? '#ff8844'),
+      sssThickness: appearance?.sssThickness ?? 1.0,
+      sssJitter: appearance?.sssJitter ?? 0.2,
+      fresnelEnabled: appearance?.shaderSettings?.surface?.fresnelEnabled ?? false,
+      fresnelIntensity: appearance?.fresnelIntensity ?? 0.1,
+      rimColor: this.parseColor(appearance?.edgeColor ?? '#ffffff'),
     })
 
     // Also update dimension-related uniforms directly in the buffer
     // These are set in updateTubeUniforms but we need to update projectionDistance from ndTransform
     if (this.device && this.tubeUniformBuffer && ndTransform) {
-      const data = new Float32Array(4)
-      data[0] = this.rendererConfig.dimension ?? 4 // dimension
-      data[1] = extended?.polytope?.scale ?? 1.0 // uniformScale (visual scale, applied after projection)
-      data[2] = ndTransform.projectionDistance ?? 5.0 // projectionDistance from ndTransform
-      data[3] = (this.rendererConfig.dimension ?? 4) > 4
-        ? Math.sqrt((this.rendererConfig.dimension ?? 4) - 3)
-        : 1.0 // depthNormFactor
-      // Write to offset 64 (16 floats = rotationMatrix4D at offset 0)
-      this.device.queue.writeBuffer(this.tubeUniformBuffer, 64, data)
+      const dimension = this.rendererConfig.dimension ?? 4
+      const uniformScale = extended?.polytope?.scale ?? 1.0
+      const projectionDistance = ndTransform.projectionDistance ?? 5.0
+      const depthNormFactor = dimension > 4 ? Math.sqrt(dimension - 3) : 1.0
+
+      const partial = new ArrayBuffer(16)
+      const view = new DataView(partial)
+      view.setInt32(0, dimension, true)
+      view.setFloat32(4, uniformScale, true)
+      view.setFloat32(8, projectionDistance, true)
+      view.setFloat32(12, depthNormFactor, true)
+
+      // Write to offset 64 bytes (after rotationMatrix4D = 16 floats)
+      this.device.queue.writeBuffer(this.tubeUniformBuffer, 64, new Uint8Array(partial))
     }
   }
 
@@ -730,11 +869,8 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
    * @param hex
    */
   private parseColor(hex: string): [number, number, number] {
-    const cleaned = hex.replace('#', '')
-    const r = parseInt(cleaned.substring(0, 2), 16) / 255
-    const g = parseInt(cleaned.substring(2, 4), 16) / 255
-    const b = parseInt(cleaned.substring(4, 6), 16) / 255
-    return [r, g, b]
+    const rgb = parseHexColorToLinearRgb(hex, [1, 1, 1])
+    return [rgb[0], rgb[1], rgb[2]]
   }
 
   /**
@@ -745,84 +881,40 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
   private updateLightingUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.lightingUniformBuffer) return
 
-    const lighting = ctx.frame?.stores?.['lighting'] as {
-      lights?: Array<{
-        type?: string
-        position?: [number, number, number]
-        direction?: [number, number, number]
-        color?: string
-        intensity?: number
-        range?: number
-        decay?: number
-        spotCosInner?: number
-        spotCosOuter?: number
-        enabled?: boolean
-      }>
-      ambientColor?: string
-      ambientIntensity?: number
-      ambientEnabled?: boolean
-    }
+    const lighting = ctx.frame?.stores?.['lighting'] as unknown as WebGPULightingState | undefined
     if (!lighting) return
 
-    // LightingUniforms struct layout:
-    // struct LightData { position: vec4f, direction: vec4f, color: vec4f, params: vec4f } = 64 bytes
-    // lights: array<LightData, 8>, offset 0, 512 bytes
-    // ambientColor: vec3f, offset 512 (128 floats)
-    // ambientIntensity: f32, offset 524 (131 floats)
-    // lightCount: i32, offset 528 (132 floats)
     const data = new Float32Array(144)
-
-    const lights = lighting.lights ?? []
-    const lightCount = Math.min(lights.length, 8)
-
-    // Pack lights array (offset 0, each light is 16 floats = 64 bytes)
-    for (let i = 0; i < lightCount; i++) {
-      const light = lights[i]
-      if (!light) continue
-      const offset = i * 16
-
-      // position: vec4f (xyz = position, w = type: 0=none, 1=point, 2=directional, 3=spot)
-      // Must match WGSL constants: LIGHT_TYPE_POINT=1, LIGHT_TYPE_DIRECTIONAL=2, LIGHT_TYPE_SPOT=3
-      const lightType = light.type === 'directional' ? 2 : light.type === 'spot' ? 3 : 1
-      data[offset + 0] = light.position?.[0] ?? 0
-      data[offset + 1] = light.position?.[1] ?? 5
-      data[offset + 2] = light.position?.[2] ?? 0
-      data[offset + 3] = lightType
-
-      // direction: vec4f (xyz = direction, w = range)
-      data[offset + 4] = light.direction?.[0] ?? 0
-      data[offset + 5] = light.direction?.[1] ?? -1
-      data[offset + 6] = light.direction?.[2] ?? 0
-      data[offset + 7] = light.range ?? 100.0
-
-      // color: vec4f (rgb = color, a = intensity)
-      const lightColor = this.parseColor(light.color ?? '#ffffff')
-      data[offset + 8] = lightColor[0]
-      data[offset + 9] = lightColor[1]
-      data[offset + 10] = lightColor[2]
-      data[offset + 11] = light.intensity ?? 1.0
-
-      // params: vec4f (x = decay, y = spotCosInner, z = spotCosOuter, w = enabled)
-      data[offset + 12] = light.decay ?? 2.0
-      data[offset + 13] = light.spotCosInner ?? 0.9
-      data[offset + 14] = light.spotCosOuter ?? 0.7
-      data[offset + 15] = light.enabled !== false ? 1.0 : 0.0
-    }
-
-    // ambientColor: vec3f at offset 128 (after 8 lights × 16 floats)
-    const ambientColor = this.parseColor(lighting.ambientColor ?? '#ffffff')
-    data[128] = ambientColor[0]
-    data[129] = ambientColor[1]
-    data[130] = ambientColor[2]
-
-    // ambientIntensity: f32 at offset 131
-    data[131] = (lighting.ambientEnabled !== false ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
-
-    // lightCount: i32 at offset 132 - use DataView for proper type
-    const dataView = new DataView(data.buffer)
-    dataView.setInt32(132 * 4, lightCount, true)
+    packLightingUniforms(data, lighting)
 
     this.writeUniformBuffer(this.device, this.lightingUniformBuffer, data)
+  }
+
+  /**
+   * Update IBL uniforms from environment store.
+   * @param ctx
+   */
+  private updateIBLUniforms(ctx: WebGPURenderContext): void {
+    if (!this.device || !this.iblUniformBuffer) return
+
+    const environment = ctx.frame?.stores?.['environment'] as
+      | { envMapSize?: number; iblIntensity?: number; iblQuality?: 'off' | 'low' | 'high' }
+      | undefined
+
+    // IBLUniforms struct layout:
+    // envMapSize: f32 (0)
+    // iblIntensity: f32 (1)
+    // iblQuality: i32 (2)
+    // _padding: f32 (3)
+    const data = new Float32Array(4)
+    data[0] = environment?.envMapSize ?? 256.0
+    data[1] = environment?.iblIntensity ?? 0.5
+
+    const view = new DataView(data.buffer)
+    const quality = environment?.iblQuality === 'high' ? 2 : environment?.iblQuality === 'low' ? 1 : 0
+    view.setInt32(2 * 4, quality, true)
+
+    this.writeUniformBuffer(this.device, this.iblUniformBuffer, data)
   }
 
   /**
@@ -857,6 +949,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
       !this.cameraBindGroup ||
       !this.lightingBindGroup ||
       !this.tubeBindGroup ||
+      !this.iblBindGroup ||
       !this.instanceBuffer ||
       this.instanceCount === 0
     ) {
@@ -867,6 +960,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     this.updateCameraUniforms(ctx)
     this.updateLightingUniforms(ctx)
     this.updateTubeFromStores(ctx)
+    this.updateIBLUniforms(ctx)
 
     // Get render targets (write to object-color to match Polytope renderer)
     const colorView = ctx.getWriteTarget('object-color')
@@ -900,6 +994,7 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
     passEncoder.setBindGroup(0, this.cameraBindGroup)
     passEncoder.setBindGroup(1, this.lightingBindGroup)
     passEncoder.setBindGroup(2, this.tubeBindGroup)
+    passEncoder.setBindGroup(3, this.iblBindGroup)
 
     passEncoder.setVertexBuffer(0, this.cylinderVertexBuffer)
     passEncoder.setVertexBuffer(1, this.instanceBuffer)
@@ -935,19 +1030,28 @@ export class WebGPUTubeWireframeRenderer extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.cameraBindGroup = null
+    this.lightingBindGroup = null
     this.tubeBindGroup = null
+    this.iblBindGroup = null
 
     this.cameraUniformBuffer?.destroy()
+    this.lightingUniformBuffer?.destroy()
     this.tubeUniformBuffer?.destroy()
+    this.iblUniformBuffer?.destroy()
     this.cylinderVertexBuffer?.destroy()
     this.cylinderIndexBuffer?.destroy()
     this.instanceBuffer?.destroy()
+    this.envMapTexture?.destroy()
 
     this.cameraUniformBuffer = null
+    this.lightingUniformBuffer = null
     this.tubeUniformBuffer = null
+    this.iblUniformBuffer = null
     this.cylinderVertexBuffer = null
     this.cylinderIndexBuffer = null
     this.instanceBuffer = null
+    this.envMapTexture = null
+    this.envMapSampler = null
 
     super.dispose()
   }

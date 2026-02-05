@@ -91,6 +91,21 @@ async function waitForRenderStable(page: Page, waitMs = 3000): Promise<void> {
   await page.waitForTimeout(waitMs)
 }
 
+async function gotoObjectType(page: Page, objectType: string): Promise<void> {
+  const url = `/?t=${objectType}`
+  const maxAttempts = 2
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 })
+      return
+    } catch (error) {
+      if (attempt === maxAttempts) throw error
+      await page.waitForTimeout(500)
+    }
+  }
+}
+
 test.describe('Schrödinger Tetrahedral Gradient Rendering', () => {
   test('Schrödinger shader compiles and renders without errors', async ({ page }) => {
     // Install WebGL shader compile/link guard
@@ -100,7 +115,7 @@ test.describe('Schrödinger Tetrahedral Gradient Rendering', () => {
     const collector = setupErrorCollection(page)
 
     // Navigate to Schrödinger object type
-    await page.goto('/?t=schroedinger')
+    await gotoObjectType(page, 'schroedinger')
     await waitForRenderStable(page, 4000)
 
     // Verify no WebGL errors
@@ -119,7 +134,7 @@ test.describe('Schrödinger Tetrahedral Gradient Rendering', () => {
     const collector = setupErrorCollection(page)
 
     // Navigate with volumetric mode (default for Schrödinger)
-    await page.goto('/?t=schroedinger')
+    await gotoObjectType(page, 'schroedinger')
     await waitForRenderStable(page, 4000)
 
     // No WebGL errors
@@ -135,7 +150,7 @@ test.describe('Schrödinger Tetrahedral Gradient Rendering', () => {
     const collector = setupErrorCollection(page)
 
     // Navigate to Schrödinger
-    await page.goto('/?t=schroedinger')
+    await gotoObjectType(page, 'schroedinger')
     await waitForRenderStable(page, 4000)
 
     // No WebGL errors (dispersion uses the gradient for extrapolation)
@@ -147,18 +162,17 @@ test.describe('Schrödinger Tetrahedral Gradient Rendering', () => {
     const collector = setupErrorCollection(page)
 
     // Initial render
-    await page.goto('/?t=schroedinger')
+    await gotoObjectType(page, 'schroedinger')
     await waitForRenderStable(page, 3000)
 
     // Force a re-render by toggling away and back
-    await page.goto('/?t=hypercube')
+    await gotoObjectType(page, 'hypercube')
     await waitForRenderStable(page, 2000)
 
-    await page.goto('/?t=schroedinger')
+    await gotoObjectType(page, 'schroedinger')
     await waitForRenderStable(page, 3000)
 
     // No accumulated errors after re-renders
     expect(collector.webglErrors).toHaveLength(0)
   })
 })
-

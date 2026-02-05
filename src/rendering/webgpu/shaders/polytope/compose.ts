@@ -28,6 +28,7 @@ import { selectorBlock } from '../shared/color/selector.wgsl'
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
 import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighting/ibl.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
+import { sssBlock } from '../shared/lighting/sss.wgsl'
 
 // Polytope-specific blocks
 import { transformNDBlock } from './transform-nd.wgsl'
@@ -85,6 +86,10 @@ struct PolytopeUniforms {
   metalness: f32,
   ambientIntensity: f32,
   emissiveIntensity: f32,
+
+  // Specular (artist controls; matches WebGL uSpecularColor, uSpecularIntensity)
+  specularColor: vec3f,
+  specularIntensity: f32,
 
   // Extra rotation columns (7 * 4 = 28 floats for 5D-11D)
   // Stored as 7 vec4s for alignment
@@ -212,8 +217,10 @@ struct VertexOutput {
   let edge2 = neighbor2_3d - pos3d;
   let faceNormal = cross(edge1, edge2);
   let normalLen = length(faceNormal);
-  // Guard against degenerate triangles
-  output.normal = select(vec3f(0.0, 0.0, 1.0), faceNormal / normalLen, normalLen > 0.0001);`
+  // Guard against degenerate triangles, then transform to world space
+  // Matches WebGL: normalize(mat3(modelMatrix) * faceNormal)
+  let localNormal = select(vec3f(0.0, 0.0, 1.0), faceNormal / normalLen, normalLen > 0.0001);
+  output.normal = normalize((camera.modelMatrix * vec4f(localNormal, 0.0)).xyz);`
     : /* wgsl */ `
   // Normal computed in fragment shader using screen-space derivatives (dFdx/dFdy)`
 
@@ -300,14 +307,15 @@ fn main(input: VertexInput) -> VertexOutput {
     depthRowSums
   );
 
-  // World position
-  output.worldPosition = pos3d;
+  // Transform to world space (matches WebGL: modelMatrix * vec4(v0_projected, 1.0))
+  let worldPos = (camera.modelMatrix * vec4f(pos3d, 1.0)).xyz;
+  output.worldPosition = worldPos;
 
-  // Clip position
-  output.clipPosition = camera.viewProjectionMatrix * vec4f(pos3d, 1.0);
+  // Clip position (proj * view * worldPos)
+  output.clipPosition = camera.viewProjectionMatrix * vec4f(worldPos, 1.0);
 
   // View direction
-  output.viewDir = normalize(camera.cameraPosition - pos3d);
+  output.viewDir = normalize(camera.cameraPosition - worldPos);
 ${normalComputation}
 
   return output;
@@ -325,18 +333,23 @@ export function composeFaceFragmentShader(config: PolytopeWGSLShaderConfig): {
   features: string[]
 } {
   // IBL defaults to false - requires env map texture to be wired up in renderer
-  const { dimension, ibl: enableIBL = false, useGeometryNormals = false } = config
+  // Shadows default to false - requires shadow map textures to be wired up in renderer
+  const { dimension, ibl: enableIBL = false, shadows: enableShadows = false, useGeometryNormals = false } = config
 
   const defines: string[] = []
   const features: string[] = []
 
   defines.push(`const DIMENSION: i32 = ${dimension};`)
   defines.push(`const IBL_ENABLED: bool = ${enableIBL};`)
+  defines.push(`const SHADOW_ENABLED: bool = ${enableShadows};`)
   defines.push(`const USE_GEOMETRY_NORMALS: bool = ${useGeometryNormals};`)
   features.push('Polytope Faces')
   features.push('PBR Lighting')
   if (enableIBL) {
     features.push('IBL')
+  }
+  if (enableShadows) {
+    features.push('Shadow Maps')
   }
   if (useGeometryNormals) {
     features.push('Geometry Normals')
@@ -348,16 +361,20 @@ export function composeFaceFragmentShader(config: PolytopeWGSLShaderConfig): {
   const fragmentInputStruct = useGeometryNormals
     ? /* wgsl */ `
 struct FragmentInput {
+  @builtin(position) position: vec4f,
   @location(0) worldPosition: vec3f,
   @location(1) viewDir: vec3f,
+  @builtin(front_facing) frontFacing: bool,
   @location(2) @interpolate(flat) faceDepth: f32,  // Color algorithm input from extra dims
   @location(3) @interpolate(flat) normal: vec3f,   // Geometry-based normal from vertex shader
 }
 `
     : /* wgsl */ `
 struct FragmentInput {
+  @builtin(position) position: vec4f,
   @location(0) worldPosition: vec3f,
   @location(1) viewDir: vec3f,
+  @builtin(front_facing) frontFacing: bool,
   @location(2) @interpolate(flat) faceDepth: f32,  // Color algorithm input from extra dims
 }
 `
@@ -397,6 +414,7 @@ struct FragmentInput {
     { name: 'PMREM Sampling', content: pmremSamplingBlock, condition: enableIBL },
     { name: 'IBL Functions', content: iblBlock, condition: enableIBL },
     { name: 'Multi-Light', content: multiLightBlock },
+    { name: 'SSS', content: sssBlock },
     {
       name: 'Fragment Input',
       content: fragmentInputStruct,
@@ -545,7 +563,7 @@ fn getAlgorithmColor(t: f32, baseColor: vec3f, normal: vec3f, worldPos: vec3f) -
     },
     {
       name: 'Main',
-      content: generatePolytopeMainBlock({ ibl: enableIBL, useGeometryNormals }),
+      content: generatePolytopeMainBlock({ ibl: enableIBL, shadows: enableShadows, useGeometryNormals }),
     },
   ]
 
@@ -559,13 +577,15 @@ fn getAlgorithmColor(t: f32, baseColor: vec3f, normal: vec3f, worldPos: vec3f) -
  * This is the WGSL equivalent of GLSL's #ifdef - we exclude the code entirely.
  * @param config
  * @param config.ibl
+ * @param config.shadows
  * @param config.useGeometryNormals
  */
 function generatePolytopeMainBlock(config: {
   ibl?: boolean
+  shadows?: boolean
   useGeometryNormals?: boolean
 }): string {
-  const { ibl = false, useGeometryNormals = false } = config
+  const { ibl = false, shadows = false, useGeometryNormals = false } = config
 
   // IBL section - only include if enabled
   const iblSection = ibl
@@ -573,7 +593,7 @@ function generatePolytopeMainBlock(config: {
   // ===== IBL (Image-Based Lighting) =====
   if (IBL_ENABLED && iblUniforms.iblQuality > 0) {
     finalColor += computeIBL(
-      N, V, F0,
+      faceNormal, V, F0,
       roughness, metallic, algorithmColor,
       envMap, envMapSampler,
       iblUniforms
@@ -581,6 +601,50 @@ function generatePolytopeMainBlock(config: {
   }
 `
     : ''
+
+  // Shadow section - compute per-light shadow factors
+  // When shadow maps are wired in the renderer, replace the all-1.0 factors with real shadow sampling
+  const shadowSection = shadows
+    ? `
+  // ===== SHADOW FACTORS =====
+  // Per-light shadow factors (1.0 = fully lit, 0.0 = fully shadowed)
+  // TODO: Wire shadow map textures and compute real shadow factors
+  var shadowFactors: array<f32, 8>;
+  for (var si = 0; si < 8; si++) {
+    shadowFactors[si] = 1.0;
+  }
+`
+    : ''
+
+  // Shadow-aware vs standard lighting call
+  const shadowCall = shadows
+    ? `computeMultiLightingShadowed(
+    input.worldPosition,
+    faceNormal,
+    V,
+    algorithmColor,
+    roughness,
+    metallic,
+    F0,
+    polytope.specularColor,
+    polytope.specularIntensity,
+    true,
+    lighting,
+    shadowFactors
+  )`
+    : `computeMultiLighting(
+    input.worldPosition,
+    faceNormal,
+    V,
+    algorithmColor,
+    roughness,
+    metallic,
+    F0,
+    polytope.specularColor,
+    polytope.specularIntensity,
+    true,
+    lighting
+  )`
 
   // Normal computation - either from vertex shader (geometry) or fragment derivatives (screen-space)
   const normalComputation = useGeometryNormals
@@ -598,9 +662,8 @@ function generatePolytopeMainBlock(config: {
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
 ${normalComputation}
 
-  // Two-sided lighting (flip normal for back faces)
-  // Note: In WGSL, use @builtin(front_facing) if needed
-
+  // Two-sided lighting: flip normal to face viewer for back faces (matches WebGL gl_FrontFacing)
+  let faceNormal = select(-N, N, input.frontFacing);
   let V = normalize(input.viewDir);
 
   // Clamp roughness (prevent division issues with very smooth surfaces)
@@ -613,26 +676,31 @@ ${normalComputation}
   // Compute F0 (base reflectivity) - metals use albedo, dielectrics use 0.04
   let F0 = computeF0(algorithmColor, metallic, 0.04);
 
+${shadowSection}
   // ===== MULTI-LIGHT PBR LIGHTING =====
-  var finalColor = computeMultiLighting(
-    input.worldPosition,
-    N,
-    V,
-    algorithmColor,
-    roughness,
-    metallic,
-    F0,
-    lighting
-  );
+  var finalColor = ${shadowCall};
 ${iblSection}
-  // ===== FRESNEL RIM LIGHTING =====
-  // (Controlled by material.fresnelEnabled in uniforms - simplified here)
-  let NdotV = max(dot(N, V), 0.0);
-  let rim = pow(1.0 - NdotV, 3.0) * 0.3;
-  finalColor += algorithmColor * rim * 0.5;
+  // ===== SUBSURFACE SCATTERING =====
+  // Matches WebGL: per-light SSS contribution, gated behind sssEnabled
+  // WebGL params: distortion=0.5, power=sssThickness*4.0, thickness=0.0, jitter=sssJitter
+  if (material.sssEnabled != 0u && material.sssIntensity > 0.0) {
+    let sssParams = vec4f(0.5, material.sssThickness * 4.0, 0.0, material.sssJitter);
+    let sssResult = computeMultiLightSSS(
+      input.worldPosition, V, faceNormal, sssParams, input.position.xy, lighting
+    );
+    finalColor += sssResult * material.sssColor * material.sssIntensity;
+  }
 
-  // ===== EMISSIVE =====
-  finalColor += algorithmColor * polytope.emissiveIntensity;
+  // ===== FRESNEL RIM LIGHTING =====
+  // Matches WebGL: gated behind fresnelEnabled, uses rimColor, modulated by totalNdotL
+  if (material.fresnelEnabled != 0u && material.fresnelIntensity > 0.0) {
+    let NdotV = max(dot(faceNormal, V), 0.0);
+    let totalNdotL = computeTotalNdotL(input.worldPosition, faceNormal, true, lighting);
+    let t = 1.0 - NdotV;
+    let rim = t * t * t * material.fresnelIntensity * 2.0;
+    let rimModulated = rim * (0.3 + 0.7 * totalNdotL);
+    finalColor += material.rimColor * rimModulated;
+  }
 
   return vec4f(finalColor, polytope.opacity);
 }
@@ -727,8 +795,9 @@ fn main(input: VertexInput) -> VertexOutput {
     depthRowSums
   );
 
-  output.worldPosition = pos3d;
-  output.clipPosition = camera.viewProjectionMatrix * vec4f(pos3d, 1.0);
+  let worldPos = (camera.modelMatrix * vec4f(pos3d, 1.0)).xyz;
+  output.worldPosition = worldPos;
+  output.clipPosition = camera.viewProjectionMatrix * vec4f(worldPos, 1.0);
 
   return output;
 }
@@ -865,22 +934,22 @@ fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
   // Read pre-computed vertex data from storage buffer
   let vertex = transformedVertices[vertexIndex];
 
-  // World position is the pre-computed 3D position
-  output.worldPosition = vertex.position;
+  // Transform to world space (matches WebGL: modelMatrix * vec4(pos, 1.0))
+  let worldPos = (camera.modelMatrix * vec4f(vertex.position, 1.0)).xyz;
+  output.worldPosition = worldPos;
 
   // Face depth from compute pass (used for color algorithms)
   output.faceDepth = vertex.depth;
 
   // Clip position via view-projection transform
-  output.clipPosition = camera.viewProjectionMatrix * vec4f(vertex.position, 1.0);
+  output.clipPosition = camera.viewProjectionMatrix * vec4f(worldPos, 1.0);
 
   // View direction for lighting
-  output.viewDir = normalize(camera.cameraPosition - vertex.position);
+  output.viewDir = normalize(camera.cameraPosition - worldPos);
 
-  // Look up pre-computed face normal
-  // Each triangle has 3 vertices, so face index = vertex index / 3
+  // Look up pre-computed face normal, transform to world space
   let faceIndex = vertexIndex / 3u;
-  output.normal = faceNormals[faceIndex].normal;
+  output.normal = normalize((camera.modelMatrix * vec4f(faceNormals[faceIndex].normal, 0.0)).xyz);
 
   return output;
 }
@@ -958,11 +1027,12 @@ fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
   // Read pre-computed vertex data from storage buffer
   let vertex = transformedVertices[vertexIndex];
 
-  // World position is the pre-computed 3D position
-  output.worldPosition = vertex.position;
+  // Transform to world space
+  let worldPos = (camera.modelMatrix * vec4f(vertex.position, 1.0)).xyz;
+  output.worldPosition = worldPos;
 
   // Clip position via view-projection transform
-  output.clipPosition = camera.viewProjectionMatrix * vec4f(vertex.position, 1.0);
+  output.clipPosition = camera.viewProjectionMatrix * vec4f(worldPos, 1.0);
 
   return output;
 }

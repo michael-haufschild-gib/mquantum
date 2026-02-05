@@ -92,8 +92,37 @@ fn computeLightSSS(
   sssParams: vec4f,
   fragCoord: vec2f
 ) -> vec3f {
+  let lightType = i32(light.position.w);
+
+  if (lightType == LIGHT_TYPE_NONE) {
+    return vec3f(0.0);
+  }
+
   let L = getLightDirection(light, fragPos);
-  let lightColor = light.color.rgb * light.color.a;
+
+  // Enabled flag packed in params.w (0 or 1)
+  var attenuation = light.params.w;
+  if (attenuation < 0.5) {
+    return vec3f(0.0);
+  }
+
+  // Distance attenuation for point and spot lights
+  if (lightType == LIGHT_TYPE_POINT || lightType == LIGHT_TYPE_SPOT) {
+    let distance = length(light.position.xyz - fragPos);
+    attenuation *= getDistanceAttenuation(light, distance);
+  }
+
+  // Spot light cone attenuation
+  if (lightType == LIGHT_TYPE_SPOT) {
+    let lightToFrag = normalize(fragPos - light.position.xyz);
+    attenuation *= getSpotAttenuation(light, lightToFrag);
+  }
+
+  if (attenuation < 0.001) {
+    return vec3f(0.0);
+  }
+
+  let lightColor = light.color.rgb * light.color.a * attenuation;
 
   let sss = computeSSS(
     L,
@@ -124,12 +153,6 @@ fn computeMultiLightSSS(
 
   for (var i = 0; i < lighting.lightCount && i < MAX_LIGHTS; i++) {
     let light = lighting.lights[i];
-    let lightType = i32(light.position.w);
-
-    if (lightType == LIGHT_TYPE_NONE) {
-      continue;
-    }
-
     totalSSS += computeLightSSS(light, fragPos, V, N, sssParams, fragCoord);
   }
 

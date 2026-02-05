@@ -51,5 +51,24 @@ struct TubeWireframeUniforms {
   metalness: f32,
   ambientIntensity: f32,
   emissiveIntensity: f32,
+
+  // Specular (artist controls; matches WebGL uSpecularColor, uSpecularIntensity)
+  specularColor: vec3f,
+  specularIntensity: f32,
+
+  // Rim SSS (subsurface scattering for backlight transmission)
+  sssEnabled: u32,
+  sssIntensity: f32,
+  sssThickness: f32,
+  sssJitter: f32,
+  sssColor: vec3f,
+  _padSss: f32,
+
+  // Fresnel rim lighting
+  fresnelEnabled: u32,
+  fresnelIntensity: f32,
+  _padFresnel: vec2f,
+  rimColor: vec3f,
+  _padRim: f32,
 }
 `

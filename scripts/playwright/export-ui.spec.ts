@@ -1,4 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+
+async function openVideoExportModal(page: Page): Promise<Locator> {
+  // Open File Menu
+  await page.getByTestId('menu-file').click();
+
+  // Click Export Video
+  await page.getByTestId('menu-export-video').click();
+
+  // Check Modal Visibility and wait for animation
+  const dialog = page.getByRole('dialog', { name: 'Video Export Studio' });
+  await expect(dialog).toBeVisible();
+  await page.waitForTimeout(300);
+
+  return dialog;
+}
 
 test.describe('Video Export UI', () => {
   test.beforeEach(async ({ page }) => {
@@ -8,70 +23,66 @@ test.describe('Video Export UI', () => {
   });
 
   test('should open export modal and show all tabs', async ({ page }) => {
-    // Open File Menu
-    await page.getByTestId('menu-file').click();
-    
-    // Click Export Video
-    await page.getByTestId('menu-export-video').click();
-    
-    // Check Modal Visibility and wait for animation
-    const modal = page.locator('text=Video Export Studio');
-    await expect(modal).toBeVisible();
-    
-    // Wait a bit for animation to settle
-    await page.waitForTimeout(500);
+    const dialog = await openVideoExportModal(page);
 
     // Check Tabs exist
-    const presetsTab = page.getByRole('tab', { name: 'Presets' });
+    const presetsTab = dialog.getByRole('tab', { name: 'Presets' });
     await expect(presetsTab).toBeVisible();
 
     // Check default tab (Presets) content
-    await expect(page.getByText('Default', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /Instagram/i })).toBeVisible();
 
     // Switch to Settings
     // Use force: true to bypass potential animation blocking or slight overlays during transition
-    await page.getByRole('tab', { name: 'Settings' }).click({ force: true });
+    await dialog.getByRole('tab', { name: 'Settings' }).click({ force: true });
     
     // Wait for content
-    await expect(page.getByText('Output Format')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Resolution')).toBeVisible();
+    await expect(dialog.getByText('Output Format')).toBeVisible({ timeout: 10000 });
+    await expect(dialog.getByText('Resolution')).toBeVisible();
 
     // Switch to Text
-    await page.getByRole('tab', { name: 'Text' }).click({ force: true });
-    await expect(page.getByText('Enable Overlay')).toBeVisible({ timeout: 10000 });
+    await dialog.getByRole('tab', { name: 'Text' }).click({ force: true });
+    await expect(dialog.getByText('Enable Overlay')).toBeVisible({ timeout: 10000 });
 
     // Switch to Advanced
-    await page.getByRole('tab', { name: 'Advanced' }).click({ force: true });
-    await expect(page.getByText('Target Bitrate')).toBeVisible({ timeout: 10000 });
+    await dialog.getByRole('tab', { name: 'Advanced' }).click({ force: true });
+    await expect(dialog.getByText('Target Bitrate')).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show correct estimated size', async ({ page }) => {
-    await page.getByTestId('menu-file').click();
-    await page.getByTestId('menu-export-video').click();
-    
-    // Check initial size estimate (should be > 0)
-    const sizeText = page.locator('text=~').first();
-    await expect(sizeText).toBeVisible();
+  test('should show processing mode and quick stats', async ({ page }) => {
+    const dialog = await openVideoExportModal(page);
+
+    // The label appears in both desktop and mobile layouts; assert at least one instance is visible.
+    await expect(dialog.getByText('Processing Mode', { exact: true }).first()).toBeVisible();
+
+    // Quick stats (desktop left panel or mobile header)
+    await expect(dialog.getByText('Res', { exact: true }).first()).toBeVisible();
+    await expect(dialog.getByText('FPS', { exact: true }).first()).toBeVisible();
+    await expect(dialog.getByText('Dur', { exact: true }).first()).toBeVisible();
+
+    // Footer action should be visible and actionable
+    await expect(
+      dialog.getByRole('button', { name: /Start Rendering|Select File & Start/i })
+    ).toBeVisible();
   });
 
   test('should toggle crop mode', async ({ page }) => {
-    await page.getByTestId('menu-file').click();
-    await page.getByTestId('menu-export-video').click();
+    const dialog = await openVideoExportModal(page);
     
     // Switch to Settings
-    await page.getByRole('tab', { name: 'Settings' }).click({ force: true });
+    await dialog.getByRole('tab', { name: 'Settings' }).click({ force: true });
 
     // Wait for content
-    await expect(page.getByText('Output Format')).toBeVisible();
+    await expect(dialog.getByText('Output Format')).toBeVisible();
 
     // Toggle crop
     // The text "Crop Frame" should be visible in the card
-    await expect(page.getByText('Crop Frame')).toBeVisible();
+    await expect(dialog.getByText('Crop Frame')).toBeVisible();
     
     // Click the "Crop Frame" text (part of the card)
-    await page.getByText('Crop Frame').click({ force: true });
+    await dialog.getByText('Crop Frame').click({ force: true });
     
     // Verify "Custom area active" text appears
-    await expect(page.getByText('Custom area active')).toBeVisible();
+    await expect(dialog.getByText('Custom area active')).toBeVisible();
   });
 });
