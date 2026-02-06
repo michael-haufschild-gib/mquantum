@@ -32,6 +32,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setEnergyColorEnabled: state.setSchroedingerEnergyColorEnabled,
     setShimmerEnabled: state.setSchroedingerShimmerEnabled,
     setShimmerStrength: state.setSchroedingerShimmerStrength,
+    setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
+    setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
     setIsoEnabled: state.setSchroedingerIsoEnabled,
     setIsoThreshold: state.setSchroedingerIsoThreshold,
     // Erosion
@@ -61,6 +63,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setEnergyColorEnabled,
     setShimmerEnabled,
     setShimmerStrength,
+    setPhaseMaterialityEnabled,
+    setPhaseMaterialityStrength,
     setIsoEnabled,
     setIsoThreshold,
     setErosionStrength,
@@ -360,6 +364,34 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
               onChange={setShimmerStrength}
               showValue
               data-testid="schroedinger-shimmer-strength"
+            />
+          )}
+        </div>
+
+        {/* Phase Materiality */}
+        <div className="space-y-1 mt-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-text-secondary">Phase Materiality</label>
+            <ToggleButton
+              pressed={config.phaseMaterialityEnabled ?? false}
+              onToggle={() => setPhaseMaterialityEnabled(!(config.phaseMaterialityEnabled ?? false))}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle phase materiality"
+              data-testid="schroedinger-phase-materiality-toggle"
+            >
+              {config.phaseMaterialityEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          {config.phaseMaterialityEnabled && (
+            <Slider
+              label="Strength"
+              min={0}
+              max={1}
+              step={0.05}
+              value={config.phaseMaterialityStrength ?? 1.0}
+              onChange={setPhaseMaterialityStrength}
+              showValue
+              data-testid="schroedinger-phase-materiality-strength"
             />
           )}
         </div>

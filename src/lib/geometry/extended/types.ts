@@ -321,6 +321,10 @@ export interface SchroedingerConfig {
   shimmerEnabled: boolean
   /** Shimmer strength (0.0-1.0) */
   shimmerStrength: number
+  /** Enable phase-dependent materiality (plasma vs smoke based on wavefunction phase) */
+  phaseMaterialityEnabled: boolean
+  /** Blend strength for phase materiality effect (0.0-1.0) */
+  phaseMaterialityStrength: number
 
   // === Isosurface Mode (Optional) ===
   /** Enable isosurface rendering instead of volumetric */
@@ -486,6 +490,8 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   energyColorEnabled: false,
   shimmerEnabled: false,
   shimmerStrength: 0.5,
+  phaseMaterialityEnabled: false,
+  phaseMaterialityStrength: 1.0,
 
   // Isosurface (disabled by default)
   isoEnabled: false,

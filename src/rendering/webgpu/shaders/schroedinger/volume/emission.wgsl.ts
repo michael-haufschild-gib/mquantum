@@ -203,8 +203,23 @@ fn computeNodalIntensity(rho: f32, gradient: vec3f, pos: vec3f) -> f32 {
 
 // Compute emission with ambient lighting only (for fast mode)
 fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  let baseColor = computeBaseColor(rho, phase, pos, uniforms);
-  var col = baseColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;
+  var surfaceColor = computeBaseColor(rho, phase, pos, uniforms);
+
+  // Phase materiality: matter (plasma) vs anti-matter (smoke)
+  if (uniforms.phaseMaterialityEnabled != 0u) {
+    let phaseMod = fract((phase + PI) / TAU); // 0..1, 0.5 = positive real
+    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
+    let smokeWeight = 1.0 - plasmaWeight;
+    let str = uniforms.phaseMaterialityStrength;
+    let normalizedRho = clamp((sFromRho(rho) + 8.0) / 8.0, 0.0, 1.0);
+    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
+    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
+    surfaceColor = mix(surfaceColor,
+      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
+      str);
+  }
+
+  var col = surfaceColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;
 
   return col;
 }
@@ -259,7 +274,21 @@ fn computeEmissionLit(
     return computeEmission(rho, phase, p, uniforms);
   }
 
-  let surfaceColor = computeBaseColor(rho, phase, p, uniforms);
+  var surfaceColor = computeBaseColor(rho, phase, p, uniforms);
+
+  // Phase materiality: matter (plasma) vs anti-matter (smoke)
+  if (uniforms.phaseMaterialityEnabled != 0u) {
+    let phaseMod = fract((phase + PI) / TAU); // 0..1, 0.5 = positive real
+    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
+    let smokeWeight = 1.0 - plasmaWeight;
+    let str = uniforms.phaseMaterialityStrength;
+    let normalizedRho = clamp((sFromRho(rho) + 8.0) / 8.0, 0.0, 1.0);
+    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
+    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
+    surfaceColor = mix(surfaceColor,
+      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
+      str);
+  }
 
   // Start with ambient
   var col = surfaceColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;

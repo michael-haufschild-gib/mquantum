@@ -1123,8 +1123,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Dynamic bounding radius (offset 1040+)
     floatView[1040 / 4] = this.boundingRadius
     floatView[1044 / 4] = 1.0 / this.boundingRadius
-    floatView[1048 / 4] = 0.0 // _padBound0
-    floatView[1052 / 4] = 0.0 // _padBound1
+    intView[1048 / 4] = schroedinger?.phaseMaterialityEnabled ? 1 : 0
+    floatView[1052 / 4] = schroedinger?.phaseMaterialityStrength ?? 1.0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }

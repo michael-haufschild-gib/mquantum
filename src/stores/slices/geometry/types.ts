@@ -145,6 +145,8 @@ export interface SchroedingerSliceActions {
   setSchroedingerEnergyColorEnabled: (enabled: boolean) => void
   setSchroedingerShimmerEnabled: (enabled: boolean) => void
   setSchroedingerShimmerStrength: (strength: number) => void
+  setSchroedingerPhaseMaterialityEnabled: (enabled: boolean) => void
+  setSchroedingerPhaseMaterialityStrength: (strength: number) => void
 
   // Isosurface Mode
   setSchroedingerIsoEnabled: (enabled: boolean) => void

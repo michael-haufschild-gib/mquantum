@@ -493,6 +493,8 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerEnergyColorEnabled: valueSetter('energyColorEnabled'),
     setSchroedingerShimmerEnabled: valueSetter('shimmerEnabled'),
     setSchroedingerShimmerStrength: clampedSetter('shimmerStrength', 0.0, 1.0),
+    setSchroedingerPhaseMaterialityEnabled: valueSetter('phaseMaterialityEnabled'),
+    setSchroedingerPhaseMaterialityStrength: clampedSetter('phaseMaterialityStrength', 0.0, 1.0),
     setSchroedingerIsoEnabled: valueSetter('isoEnabled'),
     setSchroedingerIsoThreshold: clampedSetter('isoThreshold', -6, 0),
 

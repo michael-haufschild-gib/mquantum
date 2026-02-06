@@ -219,7 +219,14 @@ fn volumeRaymarch(
     // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
-    let alpha = computeAlpha(rho, adaptiveStep, uniforms.densityGain);
+    // Phase materiality: smoke regions are denser (more absorbing)
+    var effectiveRho = rho;
+    if (uniforms.phaseMaterialityEnabled != 0u) {
+      let pmPhase = fract((phase + PI) / TAU);
+      let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
+      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+    }
+    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
       // Track primary hit for temporal reprojection
@@ -395,11 +402,18 @@ fn volumeRaymarchHQ(
     // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
+    // Phase materiality: smoke regions are denser (more absorbing)
+    var pmDensityMod = 1.0;
+    if (uniforms.phaseMaterialityEnabled != 0u) {
+      let pmPhase = fract((phase + PI) / TAU);
+      let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
+      pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+    }
     // Alpha per channel
     var alpha: vec3f;
-    alpha.r = computeAlpha(rhoRGB.r, adaptiveStep, uniforms.densityGain);
-    alpha.g = computeAlpha(rhoRGB.g, adaptiveStep, uniforms.densityGain);
-    alpha.b = computeAlpha(rhoRGB.b, adaptiveStep, uniforms.densityGain);
+    alpha.r = computeAlpha(rhoRGB.r * pmDensityMod, adaptiveStep, uniforms.densityGain);
+    alpha.g = computeAlpha(rhoRGB.g * pmDensityMod, adaptiveStep, uniforms.densityGain);
+    alpha.b = computeAlpha(rhoRGB.b * pmDensityMod, adaptiveStep, uniforms.densityGain);
 
     if (alpha.g > 0.001 || alpha.r > 0.001 || alpha.b > 0.001) {
       // Track primary hit for temporal reprojection

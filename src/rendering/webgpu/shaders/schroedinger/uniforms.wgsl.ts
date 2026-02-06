@@ -182,8 +182,8 @@ struct SchroedingerUniforms {
   // Dynamic bounding radius (replaces fixed BOUND_R constant)
   boundingRadius: f32,           // Bounding sphere radius (physics-based, ≥ 2.0)
   invBoundingRadius: f32,        // Precomputed 1.0 / boundingRadius
-  _padBound0: f32,               // Alignment padding
-  _padBound1: f32,               // Alignment padding
+  phaseMaterialityEnabled: u32,  // Enable phase-dependent materiality (plasma vs smoke)
+  phaseMaterialityStrength: f32, // Blend strength for phase materiality (0.0-1.0)
 }
 
 // ============================================
