@@ -184,6 +184,10 @@ struct SchroedingerUniforms {
   invBoundingRadius: f32,        // Precomputed 1.0 / boundingRadius
   phaseMaterialityEnabled: u32,  // Enable phase-dependent materiality (plasma vs smoke)
   phaseMaterialityStrength: f32, // Blend strength for phase materiality (0.0-1.0)
+  interferenceEnabled: u32,      // Enable interference fringing
+  interferenceAmp: f32,          // Fringe amplitude (0.0-1.0)
+  interferenceFreq: f32,         // Fringe frequency / number of rings (1.0-50.0)
+  interferenceSpeed: f32,        // Animation speed of fringe flow
 }
 
 // ============================================

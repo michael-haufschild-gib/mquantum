@@ -495,6 +495,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerShimmerStrength: clampedSetter('shimmerStrength', 0.0, 1.0),
     setSchroedingerPhaseMaterialityEnabled: valueSetter('phaseMaterialityEnabled'),
     setSchroedingerPhaseMaterialityStrength: clampedSetter('phaseMaterialityStrength', 0.0, 1.0),
+    setSchroedingerInterferenceEnabled: valueSetter('interferenceEnabled'),
+    setSchroedingerInterferenceAmp: clampedSetter('interferenceAmp', 0.0, 1.0),
+    setSchroedingerInterferenceFreq: clampedSetter('interferenceFreq', 1.0, 50.0),
+    setSchroedingerInterferenceSpeed: clampedSetter('interferenceSpeed', 0.0, 10.0),
     setSchroedingerIsoEnabled: valueSetter('isoEnabled'),
     setSchroedingerIsoThreshold: clampedSetter('isoThreshold', -6, 0),
 

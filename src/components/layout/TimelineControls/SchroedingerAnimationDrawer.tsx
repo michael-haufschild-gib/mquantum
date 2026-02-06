@@ -62,6 +62,11 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setSliceAmplitude: state.setSchroedingerSliceAmplitude,
       // Phase Animation (Hydrogen ND only)
       setPhaseAnimationEnabled: state.setSchroedingerPhaseAnimationEnabled,
+      // Interference Fringing
+      setInterferenceEnabled: state.setSchroedingerInterferenceEnabled,
+      setInterferenceAmp: state.setSchroedingerInterferenceAmp,
+      setInterferenceFreq: state.setSchroedingerInterferenceFreq,
+      setInterferenceSpeed: state.setSchroedingerInterferenceSpeed,
     }))
 
     const {
@@ -82,6 +87,11 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setSliceAmplitude,
       // Phase Animation - Hydrogen ND only
       setPhaseAnimationEnabled,
+      // Interference Fringing
+      setInterferenceEnabled,
+      setInterferenceAmp,
+      setInterferenceFreq,
+      setInterferenceSpeed,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Check quantum mode for UI visibility
@@ -182,6 +192,54 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               step={0.1}
               value={config.curlSpeed}
               onChange={setCurlSpeed}
+              showValue
+            />
+          </div>
+        </div>
+
+        {/* Interference Fringing */}
+        <div className="space-y-4" data-testid="animation-panel-interference">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+              Interference Fringing
+            </label>
+            <ToggleButton
+              pressed={config.interferenceEnabled}
+              onToggle={() => setInterferenceEnabled(!config.interferenceEnabled)}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle interference fringing"
+            >
+              {config.interferenceEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          <div
+            className={`space-y-3 ${!config.interferenceEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <Slider
+              label="Amplitude"
+              min={0}
+              max={1}
+              step={0.05}
+              value={config.interferenceAmp ?? 0.5}
+              onChange={setInterferenceAmp}
+              showValue
+            />
+            <Slider
+              label="Frequency"
+              min={1}
+              max={50}
+              step={1}
+              value={config.interferenceFreq ?? 10.0}
+              onChange={setInterferenceFreq}
+              showValue
+            />
+            <Slider
+              label="Speed"
+              min={0}
+              max={10}
+              step={0.5}
+              value={config.interferenceSpeed ?? 1.0}
+              onChange={setInterferenceSpeed}
               showValue
             />
           </div>

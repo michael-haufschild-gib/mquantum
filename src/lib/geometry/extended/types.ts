@@ -325,6 +325,14 @@ export interface SchroedingerConfig {
   phaseMaterialityEnabled: boolean
   /** Blend strength for phase materiality effect (0.0-1.0) */
   phaseMaterialityStrength: number
+  /** Enable interference fringing (density modulation by phase bands) */
+  interferenceEnabled: boolean
+  /** Interference fringe amplitude (0.0-1.0) */
+  interferenceAmp: number
+  /** Interference fringe frequency / number of rings (1.0-50.0) */
+  interferenceFreq: number
+  /** Interference fringe animation speed (0.0-10.0) */
+  interferenceSpeed: number
 
   // === Isosurface Mode (Optional) ===
   /** Enable isosurface rendering instead of volumetric */
@@ -492,6 +500,10 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   shimmerStrength: 0.5,
   phaseMaterialityEnabled: false,
   phaseMaterialityStrength: 1.0,
+  interferenceEnabled: false,
+  interferenceAmp: 0.5,
+  interferenceFreq: 10.0,
+  interferenceSpeed: 1.0,
 
   // Isosurface (disabled by default)
   isoEnabled: false,

@@ -147,6 +147,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerShimmerStrength: (strength: number) => void
   setSchroedingerPhaseMaterialityEnabled: (enabled: boolean) => void
   setSchroedingerPhaseMaterialityStrength: (strength: number) => void
+  setSchroedingerInterferenceEnabled: (enabled: boolean) => void
+  setSchroedingerInterferenceAmp: (amp: number) => void
+  setSchroedingerInterferenceFreq: (freq: number) => void
+  setSchroedingerInterferenceSpeed: (speed: number) => void
 
   // Isosurface Mode
   setSchroedingerIsoEnabled: (enabled: boolean) => void

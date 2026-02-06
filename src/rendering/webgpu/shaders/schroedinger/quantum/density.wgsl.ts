@@ -365,6 +365,14 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
     }
   }
 
+  // Apply interference fringing if enabled
+  if (uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
+    let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
+    let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
+    rho *= fringe;
+    rho = max(rho, 0.0);
+  }
+
   let s = sFromRho(rho);
 
   return vec3f(rho, s, spatialPhase);
@@ -404,6 +412,14 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
       let uncertainty = 1.0 - clamp(rho * 2.0, 0.0, 1.0);
       rho *= (1.0 + (shimmer - 0.5) * uniforms.shimmerStrength * uncertainty);
     }
+  }
+
+  // Apply interference fringing if enabled
+  if (uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
+    let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
+    let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
+    rho *= fringe;
+    rho = max(rho, 0.0);
   }
 
   let s = sFromRho(rho);

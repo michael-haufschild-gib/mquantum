@@ -125,8 +125,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1056 bytes (264 floats) - includes boundingRadius/invBoundingRadius + padding
-  private schroedingerUniformData = new ArrayBuffer(1056)
+  // Schroedinger: 1072 bytes (268 floats) - includes boundingRadius/invBoundingRadius + phase materiality + interference
+  private schroedingerUniformData = new ArrayBuffer(1072)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -404,7 +404,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
     // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1056, 'schroedinger-uniforms')
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1072, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create density grid compute pass if enabled
@@ -1125,6 +1125,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1044 / 4] = 1.0 / this.boundingRadius
     intView[1048 / 4] = schroedinger?.phaseMaterialityEnabled ? 1 : 0
     floatView[1052 / 4] = schroedinger?.phaseMaterialityStrength ?? 1.0
+
+    // Interference fringing (offset 1056+)
+    intView[1056 / 4] = schroedinger?.interferenceEnabled ? 1 : 0
+    floatView[1060 / 4] = schroedinger?.interferenceAmp ?? 0.5
+    floatView[1064 / 4] = schroedinger?.interferenceFreq ?? 10.0
+    floatView[1068 / 4] = schroedinger?.interferenceSpeed ?? 1.0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }

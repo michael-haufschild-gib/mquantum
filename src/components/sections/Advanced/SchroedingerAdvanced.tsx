@@ -395,6 +395,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             />
           )}
         </div>
+
       </ControlGroup>
 
       {/* Artistic - Chromatic Dispersion & Erosion */}
