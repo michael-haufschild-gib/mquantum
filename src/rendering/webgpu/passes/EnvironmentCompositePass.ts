@@ -55,7 +55,7 @@ struct Uniforms {
 @group(0) @binding(1) var texSampler: sampler;
 @group(0) @binding(2) var tLensedEnvironment: texture_2d<f32>;
 @group(0) @binding(3) var tMainObject: texture_2d<f32>;
-@group(0) @binding(4) var tMainObjectDepth: texture_2d<f32>;
+@group(0) @binding(4) var tMainObjectDepth: texture_depth_2d;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -74,7 +74,7 @@ fn detectHorizonEdge(uv: vec2f) -> f32 {
 
   // Check if current pixel is horizon using textureLoad
   let centerColor = textureLoad(tMainObject, texCoord, 0);
-  let centerDepth = textureLoad(tMainObjectDepth, texCoord, 0).r;
+  let centerDepth = textureLoad(tMainObjectDepth, texCoord, 0);
   let centerIsHorizon = centerDepth >= 0.999 && centerColor.a > 0.9;
 
   // Only glow OUTSIDE the horizon
@@ -100,7 +100,7 @@ fn detectHorizonEdge(uv: vec2f) -> f32 {
     let clampedCoord = clamp(sampleCoord, vec2i(0), vec2i(texDims) - vec2i(1));
 
     let sampleColor = textureLoad(tMainObject, clampedCoord, 0);
-    let sampleDepth = textureLoad(tMainObjectDepth, clampedCoord, 0).r;
+    let sampleDepth = textureLoad(tMainObjectDepth, clampedCoord, 0);
 
     if (sampleDepth >= 0.999 && sampleColor.a > 0.9) {
       let dist = length(vec2f(offsets[i]));
@@ -119,10 +119,10 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let envColor = textureSample(tLensedEnvironment, texSampler, uv);
   let objColor = textureSample(tMainObject, texSampler, uv);
 
-  // Use textureLoad for depth (unfilterable-float texture can't use textureSample)
+  // Use textureLoad for depth (texture_depth_2d can't use textureSample)
   let texDims = textureDimensions(tMainObjectDepth);
   let depthCoord = vec2i(uv * vec2f(texDims));
-  let objDepth = textureLoad(tMainObjectDepth, depthCoord, 0).r;
+  let objDepth = textureLoad(tMainObjectDepth, depthCoord, 0);
 
   var finalColor: vec3f;
   var finalAlpha: f32;
@@ -227,7 +227,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
         {
           binding: 4,
           visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'unfilterable-float' as const },
+          texture: { sampleType: 'depth' as const },
         },
       ],
     })
