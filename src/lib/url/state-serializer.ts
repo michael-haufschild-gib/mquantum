@@ -9,19 +9,11 @@ import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { AllShaderSettings, ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
 import {
-  DEFAULT_SHADOW_ANIMATION_MODE,
-  DEFAULT_SHADOW_QUALITY,
-  DEFAULT_SHADOW_SOFTNESS,
-  SHADOW_ANIMATION_MODE_OPTIONS,
-  SHADOW_QUALITY_OPTIONS,
-  SHADOW_SOFTNESS_RANGE,
-  URL_KEY_SHADOW_ANIMATION_MODE,
-  URL_KEY_SHADOW_ENABLED,
-  URL_KEY_SHADOW_QUALITY,
-  URL_KEY_SHADOW_SOFTNESS,
-} from '@/rendering/shadows/constants'
-import type { ShadowAnimationMode, ShadowQuality } from '@/rendering/shadows/types'
-import {
+  DEFAULT_BLOOM_INTENSITY,
+  DEFAULT_BLOOM_LEVELS,
+  DEFAULT_BLOOM_RADIUS,
+  DEFAULT_BLOOM_SMOOTHING,
+  DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_EXPOSURE,
   DEFAULT_SHADER_SETTINGS,
   DEFAULT_SHADER_TYPE,
@@ -59,11 +51,6 @@ export interface ShareableState {
   toneMappingEnabled?: boolean
   toneMappingAlgorithm?: ToneMappingAlgorithm
   exposure?: number
-  // Shadow settings
-  shadowEnabled?: boolean
-  shadowQuality?: ShadowQuality
-  shadowSoftness?: number
-  shadowAnimationMode?: ShadowAnimationMode
 }
 
 /**
@@ -99,23 +86,23 @@ export function serializeState(state: ShareableState): string {
     params.set('be', '0')
   }
 
-  if (state.bloomIntensity !== undefined && state.bloomIntensity !== 1.6) {
+  if (state.bloomIntensity !== undefined && state.bloomIntensity !== DEFAULT_BLOOM_INTENSITY) {
     params.set('bi', state.bloomIntensity.toFixed(2))
   }
 
-  if (state.bloomThreshold !== undefined && state.bloomThreshold !== 0) {
+  if (state.bloomThreshold !== undefined && state.bloomThreshold !== DEFAULT_BLOOM_THRESHOLD) {
     params.set('bt', state.bloomThreshold.toFixed(2))
   }
 
-  if (state.bloomRadius !== undefined && state.bloomRadius !== 0.65) {
+  if (state.bloomRadius !== undefined && state.bloomRadius !== DEFAULT_BLOOM_RADIUS) {
     params.set('br', state.bloomRadius.toFixed(2))
   }
 
-  if (state.bloomSoftKnee !== undefined && state.bloomSoftKnee !== 0) {
+  if (state.bloomSoftKnee !== undefined && state.bloomSoftKnee !== DEFAULT_BLOOM_SMOOTHING) {
     params.set('bk', state.bloomSoftKnee.toFixed(2))
   }
 
-  if (state.bloomLevels !== undefined && state.bloomLevels !== 4) {
+  if (state.bloomLevels !== undefined && state.bloomLevels !== DEFAULT_BLOOM_LEVELS) {
     params.set('bl', state.bloomLevels.toString())
   }
 
@@ -166,20 +153,6 @@ export function serializeState(state: ShareableState): string {
         params.set('ss', settingsParts.join(','))
       }
     }
-  }
-
-  // Shadow settings (omit defaults for shorter URLs)
-  if (state.shadowEnabled === true) {
-    params.set(URL_KEY_SHADOW_ENABLED, '1')
-  }
-  if (state.shadowQuality && state.shadowQuality !== DEFAULT_SHADOW_QUALITY) {
-    params.set(URL_KEY_SHADOW_QUALITY, state.shadowQuality)
-  }
-  if (state.shadowSoftness !== undefined && state.shadowSoftness !== DEFAULT_SHADOW_SOFTNESS) {
-    params.set(URL_KEY_SHADOW_SOFTNESS, state.shadowSoftness.toFixed(1))
-  }
-  if (state.shadowAnimationMode && state.shadowAnimationMode !== DEFAULT_SHADOW_ANIMATION_MODE) {
-    params.set(URL_KEY_SHADOW_ANIMATION_MODE, state.shadowAnimationMode)
   }
 
   return params.toString()
@@ -294,7 +267,7 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
   const bloomLevels = params.get('bl')
   if (bloomLevels) {
     const bl = parseInt(bloomLevels, 10)
-    if (!isNaN(bl) && bl >= 1 && bl <= 8) {
+    if (!isNaN(bl) && bl >= 1 && bl <= 5) {
       state.bloomLevels = bl
     }
   }
@@ -374,43 +347,6 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     })
 
     state.shaderSettings = shaderSettings
-  }
-
-  // Shadow settings
-  const shadowEnabled = params.get(URL_KEY_SHADOW_ENABLED)
-  if (shadowEnabled === '1') {
-    state.shadowEnabled = true
-  } else if (shadowEnabled === '0') {
-    state.shadowEnabled = false
-  }
-
-  const shadowQuality = params.get(URL_KEY_SHADOW_QUALITY)
-  if (shadowQuality) {
-    if (SHADOW_QUALITY_OPTIONS.includes(shadowQuality as ShadowQuality)) {
-      state.shadowQuality = shadowQuality as ShadowQuality
-    } else {
-      // Invalid quality param = disable shadows (PRD AC: invalid defaults to OFF)
-      state.shadowEnabled = false
-    }
-  }
-
-  const shadowSoftness = params.get(URL_KEY_SHADOW_SOFTNESS)
-  if (shadowSoftness) {
-    const softness = parseFloat(shadowSoftness)
-    if (
-      !isNaN(softness) &&
-      softness >= SHADOW_SOFTNESS_RANGE.min &&
-      softness <= SHADOW_SOFTNESS_RANGE.max
-    ) {
-      state.shadowSoftness = softness
-    }
-  }
-
-  const shadowAnimationMode = params.get(URL_KEY_SHADOW_ANIMATION_MODE)
-  if (shadowAnimationMode) {
-    if (SHADOW_ANIMATION_MODE_OPTIONS.includes(shadowAnimationMode as ShadowAnimationMode)) {
-      state.shadowAnimationMode = shadowAnimationMode as ShadowAnimationMode
-    }
   }
 
   return state

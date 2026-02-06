@@ -340,29 +340,6 @@ fn computeEmissionLit(
     // Diffuse
     col += surfaceColor / PI * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
 
-    // Volumetric self-shadowing (simplified for WGSL)
-    // PERFORMANCE: Skip shadow calculation in very low density regions
-    // where the visual contribution is negligible (saves up to 8 sampleDensity calls)
-    var shadowFactor = 1.0;
-    let shadowDensityThreshold = 0.001;  // Skip shadows below this density
-    if (FEATURE_SHADOWS && uniforms.shadowsEnabled != 0u && uniforms.shadowStrength > 0.0 && rho > shadowDensityThreshold) {
-      var shadowDens: f32 = 0.0;
-      var shadowStep: f32 = 0.1;
-      var tShadow: f32 = 0.05;
-
-      let effectiveShadowSteps = select(uniforms.shadowSteps, max(uniforms.shadowSteps / 2, 1), quality.qualityMultiplier < 0.75);
-      for (var s = 0; s < 8; s++) {
-        if (s >= effectiveShadowSteps) { break; }
-        let shadowPos = p + l * tShadow;
-        let rhoS = sampleDensity(shadowPos, uniforms.time * uniforms.timeScale, uniforms);
-        shadowDens += rhoS * shadowStep;
-        shadowStep *= 1.5;
-        tShadow += shadowStep;
-      }
-
-      shadowFactor = exp(-shadowDens * uniforms.densityGain * uniforms.shadowStrength);
-    }
-
     // Subsurface Scattering (SSS) - port from WebGL emission.glsl.ts lines 259-278
     if (material.sssEnabled != 0u && material.sssIntensity > 0.0) {
       // Screen-space noise for jitter (uses fragment position)
@@ -373,57 +350,10 @@ fn computeEmissionLit(
       let halfVec = normalize(l + n * jitteredDistortion);
       let trans = pow(clamp(dot(viewDir, -halfVec), 0.0, 1.0), material.sssThickness * 4.0);
 
-      var transmission = trans;
-      if (FEATURE_SHADOWS && uniforms.shadowsEnabled != 0u) {
-        transmission *= shadowFactor;
-      } else {
-        transmission *= exp(-rho * material.sssThickness);
-      }
+      let transmission = trans * exp(-rho * material.sssThickness);
 
       col += material.sssColor * light.color.rgb * transmission * material.sssIntensity * attenuation;
     }
-  }
-
-  // Volumetric Ambient Occlusion (port from WebGL emission.glsl.ts lines 281-315)
-  // PERFORMANCE: Skip AO calculation in very low density regions
-  // where the visual contribution is negligible (saves up to 8 sampleDensity calls)
-  var aoFactor: f32 = 1.0;
-  let aoDensityThreshold = 0.001;  // Skip AO below this density
-  if (FEATURE_AO && quality.aoEnabled != 0 && uniforms.aoStrength > 0.0 && rho > aoDensityThreshold) {
-    var ao: f32 = 0.0;
-    let radius = uniforms.aoRadius;
-    // Halve AO steps in fast mode for better interactivity (min 2 for basic coverage)
-    let effectiveAoSteps = select(uniforms.aoSteps, max(uniforms.aoSteps / 2, 2), quality.qualityMultiplier < 0.75);
-
-    // Compute tangent basis for cone sampling
-    let t1 = normalize(cross(n, vec3f(0.0, 1.0, 0.0) + vec3f(0.001)));
-    let t2 = cross(n, t1);
-
-    // Sample in cone directions around normal
-    for (var k = 0; k < 8; k++) {
-      if (k >= effectiveAoSteps) { break; }
-
-      var dir = n;
-      if (k == 1) { dir = normalize(n + t1); }
-      if (k == 2) { dir = normalize(n - t1); }
-      if (k == 3) { dir = normalize(n + t2); }
-      if (k == 4) { dir = normalize(n - t2); }
-      if (k == 5) { dir = normalize(n + t1 + t2); }
-      if (k == 6) { dir = normalize(n - t1 - t2); }
-      if (k == 7) { dir = normalize(n + t1 - t2); }
-
-      let samplePos = p + dir * radius;
-      let sampleRho = sampleDensity(samplePos, uniforms.time * uniforms.timeScale, uniforms);
-
-      ao += sampleRho;
-    }
-
-    ao = ao / f32(effectiveAoSteps);
-    aoFactor = exp(-ao * uniforms.densityGain * uniforms.aoStrength * 2.0);
-
-    // Apply AO tint color
-    let aoModulator = mix(uniforms.aoColor, vec3f(1.0), aoFactor);
-    col *= aoModulator;
   }
 
   // Cache sFromRho for reuse in HDR Emission and Nodal sections (saves log() call)
@@ -466,55 +396,3 @@ fn computeEmissionLit(
 }
 `
 
-/**
- * Configuration for emission block generator.
- */
-export interface EmissionBlockConfig {
-  /**
-   * Use pre-computed density grid for shadow/AO sampling.
-   * When true, replaces expensive sampleDensity() calls with cheap texture lookups.
-   */
-  useDensityGrid?: boolean
-}
-
-/**
- * Generate emission block with optional density grid support.
- *
- * When useDensityGrid is true, shadow and AO calculations use the pre-computed
- * density grid texture instead of evaluating the wavefunction per-sample.
- * This provides ~15-25% GPU time reduction for these effects.
- *
- * @param config - Configuration options
- * @returns WGSL emission block string
- */
-export function generateEmissionBlock(config: EmissionBlockConfig = {}): string {
-  const { useDensityGrid = false } = config
-
-  // When density grid is enabled, use texture sampling instead of wavefunction evaluation
-  // This is much cheaper: ~10 ops vs ~300-460 ops per sample
-  const shadowSampleCall = useDensityGrid
-    ? 'sampleDensityOnlyFromGrid(shadowPos)'
-    : 'sampleDensity(shadowPos, uniforms.time * uniforms.timeScale, uniforms)'
-
-  const aoSampleCall = useDensityGrid
-    ? 'sampleDensityOnlyFromGrid(samplePos)'
-    : 'sampleDensity(samplePos, uniforms.time * uniforms.timeScale, uniforms)'
-
-  // Replace the density sampling calls in the emission block
-  // The emissionBlock is a template literal, so we use string replacement
-  let result = emissionBlock
-
-  // Replace shadow sampling
-  result = result.replace(
-    'let rhoS = sampleDensity(shadowPos, uniforms.time * uniforms.timeScale, uniforms);',
-    `let rhoS = ${shadowSampleCall};`
-  )
-
-  // Replace AO sampling
-  result = result.replace(
-    'let sampleRho = sampleDensity(samplePos, uniforms.time * uniforms.timeScale, uniforms);',
-    `let sampleRho = ${aoSampleCall};`
-  )
-
-  return result
-}

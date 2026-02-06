@@ -3,14 +3,11 @@
  *
  * Manages post-processing effects:
  * - Bloom (glow effect)
- * - Bokeh (depth of field)
  */
 
 import type { StateCreator } from 'zustand'
 import {
   type AntiAliasingMethod,
-  type BokehBlurMethod,
-  type BokehFocusMode,
   type PaperQuality,
   DEFAULT_ANTI_ALIASING_METHOD,
   DEFAULT_BLOOM_ENABLED,
@@ -19,15 +16,6 @@ import {
   DEFAULT_BLOOM_RADIUS,
   DEFAULT_BLOOM_SMOOTHING,
   DEFAULT_BLOOM_THRESHOLD,
-  DEFAULT_BOKEH_BLUR_METHOD,
-  DEFAULT_BOKEH_ENABLED,
-  DEFAULT_BOKEH_FOCAL_LENGTH,
-  DEFAULT_BOKEH_FOCUS_MODE,
-  DEFAULT_BOKEH_SCALE,
-  DEFAULT_BOKEH_SHOW_DEBUG,
-  DEFAULT_BOKEH_SMOOTH_TIME,
-  DEFAULT_BOKEH_WORLD_FOCUS_DISTANCE,
-  DEFAULT_BOKEH_WORLD_FOCUS_RANGE,
   DEFAULT_FRAME_BLENDING_ENABLED,
   DEFAULT_FRAME_BLENDING_FACTOR,
   DEFAULT_OBJECT_ONLY_DEPTH,
@@ -47,8 +35,6 @@ import {
   DEFAULT_PAPER_QUALITY,
   DEFAULT_PAPER_ROUGHNESS,
   DEFAULT_PAPER_SEED,
-  DEFAULT_SSAO_ENABLED,
-  DEFAULT_SSAO_INTENSITY,
 } from '../defaults/visualDefaults'
 
 // ============================================================================
@@ -66,19 +52,8 @@ export interface PostProcessingSliceState {
   bloomRadius: number
   /** Luminance smoothing - softens the threshold transition (0-1) */
   bloomSmoothing: number
-  /** Number of blur levels/mip levels (1-8) */
+  /** Number of blur levels/mip levels (1-5) */
   bloomLevels: number
-
-  // --- Bokeh (Depth of Field) ---
-  bokehEnabled: boolean
-  bokehFocusMode: BokehFocusMode
-  bokehBlurMethod: BokehBlurMethod
-  bokehWorldFocusDistance: number
-  bokehWorldFocusRange: number
-  bokehScale: number
-  bokehFocalLength: number
-  bokehSmoothTime: number
-  bokehShowDebug: boolean
 
   // --- Anti-aliasing ---
   antiAliasingMethod: AntiAliasingMethod
@@ -92,12 +67,6 @@ export interface PostProcessingSliceState {
   // --- Depth Buffer ---
   /** When true, depth-based effects use object-only depth. */
   objectOnlyDepth: boolean
-
-  // --- SSAO (Screen-Space Ambient Occlusion) ---
-  /** Global AO toggle - affects all object types (SSAO for polytopes, SDF AO for fractals) */
-  ssaoEnabled: boolean
-  /** AO intensity/strength (0-2 range) */
-  ssaoIntensity: number
 
   // --- Paper Texture Effect ---
   /** Whether paper texture effect is enabled */
@@ -149,17 +118,6 @@ export interface PostProcessingSliceActions {
   setBloomSmoothing: (smoothing: number) => void
   setBloomLevels: (levels: number) => void
 
-  // --- Bokeh Actions ---
-  setBokehEnabled: (enabled: boolean) => void
-  setBokehFocusMode: (mode: BokehFocusMode) => void
-  setBokehBlurMethod: (method: BokehBlurMethod) => void
-  setBokehWorldFocusDistance: (distance: number) => void
-  setBokehWorldFocusRange: (range: number) => void
-  setBokehScale: (scale: number) => void
-  setBokehFocalLength: (length: number) => void
-  setBokehSmoothTime: (time: number) => void
-  setBokehShowDebug: (show: boolean) => void
-
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => void
 
@@ -171,10 +129,6 @@ export interface PostProcessingSliceActions {
 
   // --- Depth Buffer Actions ---
   setObjectOnlyDepth: (objectOnly: boolean) => void
-
-  // --- SSAO Actions ---
-  setSSAOEnabled: (enabled: boolean) => void
-  setSSAOIntensity: (intensity: number) => void
 
   // --- Paper Texture Actions ---
   setPaperEnabled: (enabled: boolean) => void
@@ -214,17 +168,6 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   bloomSmoothing: DEFAULT_BLOOM_SMOOTHING,
   bloomLevels: DEFAULT_BLOOM_LEVELS,
 
-  // Bokeh
-  bokehEnabled: DEFAULT_BOKEH_ENABLED,
-  bokehFocusMode: DEFAULT_BOKEH_FOCUS_MODE,
-  bokehBlurMethod: DEFAULT_BOKEH_BLUR_METHOD,
-  bokehWorldFocusDistance: DEFAULT_BOKEH_WORLD_FOCUS_DISTANCE,
-  bokehWorldFocusRange: DEFAULT_BOKEH_WORLD_FOCUS_RANGE,
-  bokehScale: DEFAULT_BOKEH_SCALE,
-  bokehFocalLength: DEFAULT_BOKEH_FOCAL_LENGTH,
-  bokehSmoothTime: DEFAULT_BOKEH_SMOOTH_TIME,
-  bokehShowDebug: DEFAULT_BOKEH_SHOW_DEBUG,
-
   // Anti-aliasing
   antiAliasingMethod: DEFAULT_ANTI_ALIASING_METHOD,
 
@@ -236,10 +179,6 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
 
   // Depth Buffer
   objectOnlyDepth: DEFAULT_OBJECT_ONLY_DEPTH,
-
-  // SSAO (Screen-Space Ambient Occlusion)
-  ssaoEnabled: DEFAULT_SSAO_ENABLED,
-  ssaoIntensity: DEFAULT_SSAO_INTENSITY,
 
   // Paper Texture
   paperEnabled: DEFAULT_PAPER_ENABLED,
@@ -301,43 +240,6 @@ export const createPostProcessingSlice: StateCreator<
     set({ bloomLevels: Math.max(1, Math.min(5, Math.round(levels))) })
   },
 
-  // --- Bokeh Actions ---
-  setBokehEnabled: (enabled: boolean) => {
-    set({ bokehEnabled: enabled })
-  },
-
-  setBokehFocusMode: (mode: BokehFocusMode) => {
-    set({ bokehFocusMode: mode })
-  },
-
-  setBokehBlurMethod: (method: BokehBlurMethod) => {
-    set({ bokehBlurMethod: method })
-  },
-
-  setBokehWorldFocusDistance: (distance: number) => {
-    set({ bokehWorldFocusDistance: Math.max(1, Math.min(50, distance)) })
-  },
-
-  setBokehWorldFocusRange: (range: number) => {
-    set({ bokehWorldFocusRange: Math.max(1, Math.min(100, range)) })
-  },
-
-  setBokehScale: (scale: number) => {
-    set({ bokehScale: Math.max(0, Math.min(3, scale)) })
-  },
-
-  setBokehFocalLength: (length: number) => {
-    set({ bokehFocalLength: Math.max(0.01, Math.min(1, length)) })
-  },
-
-  setBokehSmoothTime: (time: number) => {
-    set({ bokehSmoothTime: Math.max(0, Math.min(2, time)) })
-  },
-
-  setBokehShowDebug: (show: boolean) => {
-    set({ bokehShowDebug: show })
-  },
-
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => {
     set({ antiAliasingMethod: method })
@@ -363,15 +265,6 @@ export const createPostProcessingSlice: StateCreator<
   // --- Depth Buffer Actions ---
   setObjectOnlyDepth: (objectOnly: boolean) => {
     set({ objectOnlyDepth: objectOnly })
-  },
-
-  // --- SSAO Actions ---
-  setSSAOEnabled: (enabled: boolean) => {
-    set({ ssaoEnabled: enabled })
-  },
-
-  setSSAOIntensity: (intensity: number) => {
-    set({ ssaoIntensity: Math.max(0, Math.min(2, intensity)) })
   },
 
   // --- Paper Texture Actions ---

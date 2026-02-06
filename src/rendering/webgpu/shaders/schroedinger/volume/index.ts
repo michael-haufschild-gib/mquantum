@@ -9,7 +9,7 @@
 
 export { absorptionBlock } from './absorption.wgsl'
 export { emissionBlock } from './emission.wgsl'
-export { volumeIntegrationBlock } from './integration.wgsl'
+export { volumeGradientBlock, volumeIntegrationBlock } from './integration.wgsl'
 export {
   densityGridBindingsBlock,
   densityGridSamplingBlock,

@@ -2,14 +2,13 @@
  * WebGPU Normal Pass
  *
  * Reconstructs world-space normals from a depth buffer using screen-space derivatives.
- * Useful for SSAO, edge detection, and other screen-space effects.
+ * Useful for edge detection and other screen-space effects.
  *
  * **Note:** This pass computes normals from depth buffer reconstruction, which works
  * well for smooth surfaces but may produce artifacts at depth discontinuities.
  * For raymarched objects, normals should ideally come from the shader's SDF gradient
  * evaluation via MRT outputs.
  *
- * @see GTAOPass for a pass that consumes the normal buffer
  * @module rendering/webgpu/passes/NormalPass
  */
 

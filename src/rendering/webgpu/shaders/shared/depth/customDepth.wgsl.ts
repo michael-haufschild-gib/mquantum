@@ -1,15 +1,7 @@
 /**
  * Custom Depth Material Shaders (WGSL)
  *
- * These shaders are used for shadow map rendering when objects have custom
- * vertex transformations (like nD projection). Without these, shadow maps
- * don't apply the custom transformation, causing shadows to be static even
- * when the object animates.
- *
- * UNIFIED SHADOW MATERIAL APPROACH:
- * To avoid the double shadow bug (caused by having separate depth and distance
- * materials), we use a SINGLE unified material that handles both depth mode
- * (directional/spot lights) and distance mode (point lights).
+ * Depth packing, depth uniforms, and N-D transformation for depth rendering.
  *
  * ## Depth Normalization
  * All shaders use sqrt(dimension - 3) normalization for consistent visual scaling
@@ -18,8 +10,6 @@
  * ## Scale Applied AFTER Projection
  * IMPORTANT: Scale is applied AFTER projection to 3D (like camera zoom).
  * This preserves N-D geometry and prevents extreme values during rotation.
- *
- * Port of GLSL shared/depth/customDepth.glsl to WGSL.
  *
  * @module rendering/webgpu/shaders/shared/depth/customDepth.wgsl
  */
@@ -50,11 +40,11 @@ fn unpackRGBAToDepth(v: vec4f) -> f32 {
 `
 
 /**
- * Depth uniforms struct for shadow rendering
+ * Depth uniforms struct for depth rendering
  */
 export const depthUniformsBlock = /* wgsl */ `
 // ============================================
-// Depth/Shadow Uniforms
+// Depth Uniforms
 // ============================================
 
 const MAX_EXTRA_DIMS: i32 = 7;
@@ -81,7 +71,7 @@ struct DepthUniforms {
   depthRowSums1: vec4f,
   depthRowSums2: vec4f, // .xyz used
 
-  // Point light shadow uniforms
+  // Point light depth uniforms
   referencePosition: vec3f,
   isPointLight: f32,  // 0 = depth mode, 1 = distance mode
   nearDistance: f32,
@@ -196,24 +186,3 @@ fn transformNDForDepth(
 }
 `
 
-/**
- * Unified shadow fragment shader logic block
- */
-export const unifiedShadowFragmentBlock = /* wgsl */ `
-// ============================================
-// Unified Shadow Fragment Logic
-// ============================================
-
-fn computeShadowOutput(worldPosition: vec3f, fragDepth: f32, uniforms: DepthUniforms) -> vec4f {
-  if (uniforms.isPointLight > 0.5) {
-    // Point light mode: output distance from light
-    var dist = length(worldPosition - uniforms.referencePosition);
-    dist = (dist - uniforms.nearDistance) / (uniforms.farDistance - uniforms.nearDistance);
-    dist = clamp(dist, 0.0, 1.0);
-    return packDepthToRGBA(dist);
-  } else {
-    // Depth mode: output fragment depth (directional/spot lights)
-    return packDepthToRGBA(fragDepth);
-  }
-}
-`

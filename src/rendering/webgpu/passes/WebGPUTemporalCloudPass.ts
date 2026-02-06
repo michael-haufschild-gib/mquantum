@@ -41,6 +41,18 @@ const BAYER_OFFSETS: [number, number][] = [
   [0.0, 1.0], // Frame 3
 ]
 
+interface ReprojectionTextureBindGroupCacheEntry {
+  accumulationView: GPUTextureView
+  positionView: GPUTextureView
+  bindGroup: GPUBindGroup
+}
+
+interface ReconstructionTextureBindGroupCacheEntry {
+  quarterColorView: GPUTextureView
+  historyView: GPUTextureView
+  bindGroup: GPUBindGroup
+}
+
 /**
  * Temporal accumulation pass for volumetric rendering.
  * Orchestrates reprojection and reconstruction from quarter-res input.
@@ -81,6 +93,12 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   // Samplers
   private linearSampler: GPUSampler | null = null
   private nearestSampler: GPUSampler | null = null
+
+  // Cached bind groups to avoid per-frame allocations
+  private reprojectionBindGroup0: GPUBindGroup | null = null
+  private reprojectionBindGroup1Cache: ReprojectionTextureBindGroupCacheEntry[] = []
+  private reconstructionBindGroup0: GPUBindGroup | null = null
+  private reconstructionBindGroup1Cache: ReconstructionTextureBindGroupCacheEntry[] = []
 
   // Configuration
   private historyWeight: number
@@ -227,6 +245,89 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     )
   }
 
+  private getOrCreateReprojectionUniformBindGroup(): GPUBindGroup {
+    if (!this.reprojectionBindGroup0) {
+      this.reprojectionBindGroup0 = this.createBindGroup(
+        this.device,
+        this.reprojectionBindGroupLayout0!,
+        [{ binding: 0, resource: { buffer: this.temporalUniformBuffer! } }],
+        'temporal-reprojection-bg0'
+      )
+    }
+
+    return this.reprojectionBindGroup0
+  }
+
+  private getOrCreateReprojectionTextureBindGroup(
+    accumulationView: GPUTextureView,
+    positionView: GPUTextureView
+  ): GPUBindGroup {
+    const cached = this.reprojectionBindGroup1Cache.find(
+      (entry) => entry.accumulationView === accumulationView && entry.positionView === positionView
+    )
+    if (cached) {
+      return cached.bindGroup
+    }
+
+    const bindGroup = this.createBindGroup(
+      this.device,
+      this.reprojectionBindGroupLayout1!,
+      [
+        { binding: 0, resource: accumulationView },
+        { binding: 1, resource: positionView },
+        { binding: 2, resource: this.linearSampler! },
+      ],
+      'temporal-reprojection-bg1'
+    )
+    this.reprojectionBindGroup1Cache.push({ accumulationView, positionView, bindGroup })
+    return bindGroup
+  }
+
+  private getOrCreateReconstructionUniformBindGroup(): GPUBindGroup {
+    if (!this.reconstructionBindGroup0) {
+      this.reconstructionBindGroup0 = this.createBindGroup(
+        this.device,
+        this.reconstructionBindGroupLayout0!,
+        [{ binding: 0, resource: { buffer: this.temporalUniformBuffer! } }],
+        'temporal-reconstruction-bg0'
+      )
+    }
+
+    return this.reconstructionBindGroup0
+  }
+
+  private getOrCreateReconstructionTextureBindGroup(
+    quarterColorView: GPUTextureView,
+    historyView: GPUTextureView
+  ): GPUBindGroup {
+    const cached = this.reconstructionBindGroup1Cache.find(
+      (entry) => entry.quarterColorView === quarterColorView && entry.historyView === historyView
+    )
+    if (cached) {
+      return cached.bindGroup
+    }
+
+    const bindGroup = this.createBindGroup(
+      this.device,
+      this.reconstructionBindGroupLayout1!,
+      [
+        { binding: 0, resource: quarterColorView },
+        { binding: 1, resource: historyView },
+        { binding: 2, resource: this.nearestSampler! },
+      ],
+      'temporal-reconstruction-bg1'
+    )
+    this.reconstructionBindGroup1Cache.push({ quarterColorView, historyView, bindGroup })
+    return bindGroup
+  }
+
+  private resetBindGroupCaches(): void {
+    this.reprojectionBindGroup0 = null
+    this.reprojectionBindGroup1Cache = []
+    this.reconstructionBindGroup0 = null
+    this.reconstructionBindGroup1Cache = []
+  }
+
   /**
    * Ensure internal textures are allocated at correct size.
    * @param device
@@ -285,6 +386,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.lastWidth = width
     this.lastHeight = height
     this.hasValidHistory = false
+    this.resetBindGroupCaches()
   }
 
   /**
@@ -504,7 +606,13 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       !this.device ||
       !this.reprojectionPipeline ||
       !this.reconstructionPipeline ||
-      !this.temporalUniformBuffer
+      !this.temporalUniformBuffer ||
+      !this.reprojectionBindGroupLayout0 ||
+      !this.reprojectionBindGroupLayout1 ||
+      !this.reconstructionBindGroupLayout0 ||
+      !this.reconstructionBindGroupLayout1 ||
+      !this.linearSampler ||
+      !this.nearestSampler
     ) {
       return
     }
@@ -570,22 +678,10 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // Pass 1: Reprojection (if we have history)
     // ========================================
     if (this.hasValidHistory) {
-      const reprojectionBindGroup0 = this.createBindGroup(
-        this.device,
-        this.reprojectionBindGroupLayout0!,
-        [{ binding: 0, resource: { buffer: this.temporalUniformBuffer } }],
-        'temporal-reprojection-bg0'
-      )
-
-      const reprojectionBindGroup1 = this.createBindGroup(
-        this.device,
-        this.reprojectionBindGroupLayout1!,
-        [
-          { binding: 0, resource: readAccumulationView },
-          { binding: 1, resource: quarterPositionView },
-          { binding: 2, resource: this.linearSampler! },
-        ],
-        'temporal-reprojection-bg1'
+      const reprojectionBindGroup0 = this.getOrCreateReprojectionUniformBindGroup()
+      const reprojectionBindGroup1 = this.getOrCreateReprojectionTextureBindGroup(
+        readAccumulationView,
+        quarterPositionView
       )
 
       const reprojectionPass = ctx.beginRenderPass({
@@ -610,26 +706,15 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // ========================================
     // Pass 2: Reconstruction
     // ========================================
-    const reconstructionBindGroup0 = this.createBindGroup(
-      this.device,
-      this.reconstructionBindGroupLayout0!,
-      [{ binding: 0, resource: { buffer: this.temporalUniformBuffer } }],
-      'temporal-reconstruction-bg0'
-    )
+    const reconstructionBindGroup0 = this.getOrCreateReconstructionUniformBindGroup()
 
     const reprojectedInput = this.hasValidHistory
       ? this.reprojectedHistoryView!
       : quarterColorView // Use quarter color directly if no history
 
-    const reconstructionBindGroup1 = this.createBindGroup(
-      this.device,
-      this.reconstructionBindGroupLayout1!,
-      [
-        { binding: 0, resource: quarterColorView },
-        { binding: 1, resource: reprojectedInput },
-        { binding: 2, resource: this.nearestSampler! },
-      ],
-      'temporal-reconstruction-bg1'
+    const reconstructionBindGroup1 = this.getOrCreateReconstructionTextureBindGroup(
+      quarterColorView,
+      reprojectedInput
     )
 
     // Render to output
@@ -712,7 +797,10 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.reprojectedHistoryView = null
     this.accumulationViewA = null
     this.accumulationViewB = null
+    this.lastWidth = 0
+    this.lastHeight = 0
     this.hasValidHistory = false
+    this.resetBindGroupCaches()
   }
 
   override dispose(): void {

@@ -556,10 +556,8 @@ export const selectTemporalReprojection = (state: PerformanceState) => ({
  * Quality level orderings for discrete quality settings.
  * Used to interpolate between lowest and user's target quality.
  */
-const SHADOW_QUALITY_ORDER = ['low', 'medium', 'high', 'ultra'] as const
 const SAMPLE_QUALITY_ORDER = ['low', 'medium', 'high'] as const
 
-export type ShadowQualityLevel = (typeof SHADOW_QUALITY_ORDER)[number]
 export type SampleQualityLevel = (typeof SAMPLE_QUALITY_ORDER)[number]
 
 /**
@@ -590,20 +588,6 @@ function computeEffectiveQuality<T extends string>(
   // Interpolate from index 0 to targetIndex
   const effectiveIndex = Math.round(normalizedMultiplier * targetIndex)
   return qualityOrder[effectiveIndex]!
-}
-
-/**
- * Get effective shadow quality based on progressive refinement state.
- *
- * @param targetQuality - User's shadow quality setting
- * @param qualityMultiplier - Current quality multiplier (0.25-1.0)
- * @returns Effective shadow quality level
- */
-export function getEffectiveShadowQuality(
-  targetQuality: ShadowQualityLevel,
-  qualityMultiplier: number
-): ShadowQualityLevel {
-  return computeEffectiveQuality(SHADOW_QUALITY_ORDER, targetQuality, qualityMultiplier)
 }
 
 /**

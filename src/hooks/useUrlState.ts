@@ -57,10 +57,6 @@ function applyUrlStateParams(urlState: Partial<ShareableState>): void {
   if (urlState.exposure !== undefined) {
     useLightingStore.getState().setExposure(urlState.exposure)
   }
-  if (urlState.shadowEnabled !== undefined) {
-    useLightingStore.getState().setShadowEnabled(urlState.shadowEnabled)
-  }
-
   // Apply to post-processing store (bloom settings moved here from lighting)
   if (urlState.bloomEnabled !== undefined) {
     usePostProcessingStore.getState().setBloomEnabled(urlState.bloomEnabled)
@@ -70,6 +66,15 @@ function applyUrlStateParams(urlState: Partial<ShareableState>): void {
   }
   if (urlState.bloomThreshold !== undefined) {
     usePostProcessingStore.getState().setBloomThreshold(urlState.bloomThreshold)
+  }
+  if (urlState.bloomRadius !== undefined) {
+    usePostProcessingStore.getState().setBloomRadius(urlState.bloomRadius)
+  }
+  if (urlState.bloomSoftKnee !== undefined) {
+    usePostProcessingStore.getState().setBloomSmoothing(urlState.bloomSoftKnee)
+  }
+  if (urlState.bloomLevels !== undefined) {
+    usePostProcessingStore.getState().setBloomLevels(urlState.bloomLevels)
   }
 
 }

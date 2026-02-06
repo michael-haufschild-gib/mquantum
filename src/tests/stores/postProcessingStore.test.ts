@@ -81,68 +81,6 @@ describe('postProcessingStore', () => {
     })
   })
 
-  describe('bokeh (depth of field)', () => {
-    it('should toggle bokeh enabled', () => {
-      const { setBokehEnabled } = usePostProcessingStore.getState()
-
-      setBokehEnabled(true)
-      expect(usePostProcessingStore.getState().bokehEnabled).toBe(true)
-
-      setBokehEnabled(false)
-      expect(usePostProcessingStore.getState().bokehEnabled).toBe(false)
-    })
-
-    it('should set bokeh focus mode', () => {
-      const { setBokehFocusMode } = usePostProcessingStore.getState()
-
-      setBokehFocusMode('auto-center')
-      expect(usePostProcessingStore.getState().bokehFocusMode).toBe('auto-center')
-
-      setBokehFocusMode('manual')
-      expect(usePostProcessingStore.getState().bokehFocusMode).toBe('manual')
-    })
-
-    it('should set bokeh blur method', () => {
-      const { setBokehBlurMethod } = usePostProcessingStore.getState()
-
-      setBokehBlurMethod('hexagonal')
-      expect(usePostProcessingStore.getState().bokehBlurMethod).toBe('hexagonal')
-    })
-
-    it('should set bokeh world focus distance with clamping', () => {
-      const { setBokehWorldFocusDistance } = usePostProcessingStore.getState()
-
-      setBokehWorldFocusDistance(10)
-      expect(usePostProcessingStore.getState().bokehWorldFocusDistance).toBe(10)
-
-      setBokehWorldFocusDistance(0)
-      expect(usePostProcessingStore.getState().bokehWorldFocusDistance).toBe(1)
-
-      setBokehWorldFocusDistance(100)
-      expect(usePostProcessingStore.getState().bokehWorldFocusDistance).toBe(50)
-    })
-
-    it('should set bokeh scale with clamping', () => {
-      const { setBokehScale } = usePostProcessingStore.getState()
-
-      setBokehScale(1)
-      expect(usePostProcessingStore.getState().bokehScale).toBe(1)
-
-      setBokehScale(-1)
-      expect(usePostProcessingStore.getState().bokehScale).toBe(0)
-
-      setBokehScale(5)
-      expect(usePostProcessingStore.getState().bokehScale).toBe(3)
-    })
-
-    it('should toggle bokeh debug', () => {
-      const { setBokehShowDebug } = usePostProcessingStore.getState()
-
-      setBokehShowDebug(true)
-      expect(usePostProcessingStore.getState().bokehShowDebug).toBe(true)
-    })
-  })
-
   describe('anti-aliasing', () => {
     it('should set anti-aliasing method', () => {
       const { setAntiAliasingMethod } = usePostProcessingStore.getState()
@@ -194,25 +132,6 @@ describe('postProcessingStore', () => {
 
       setCinematicGrain(0.5)
       expect(usePostProcessingStore.getState().cinematicGrain).toBe(0.2)
-    })
-  })
-
-  describe('SSAO', () => {
-    it('should toggle SSAO enabled', () => {
-      const { setSSAOEnabled } = usePostProcessingStore.getState()
-
-      setSSAOEnabled(true)
-      expect(usePostProcessingStore.getState().ssaoEnabled).toBe(true)
-    })
-
-    it('should set SSAO intensity with clamping', () => {
-      const { setSSAOIntensity } = usePostProcessingStore.getState()
-
-      setSSAOIntensity(1)
-      expect(usePostProcessingStore.getState().ssaoIntensity).toBe(1)
-
-      setSSAOIntensity(5)
-      expect(usePostProcessingStore.getState().ssaoIntensity).toBe(2)
     })
   })
 

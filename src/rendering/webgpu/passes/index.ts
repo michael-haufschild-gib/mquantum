@@ -22,17 +22,11 @@ export type { SMAAPassOptions } from './SMAAPass'
 export { EnvironmentCompositePass } from './EnvironmentCompositePass'
 export type { EnvironmentCompositePassConfig, ShellGlowConfig } from './EnvironmentCompositePass'
 
-export { GTAOPass } from './GTAOPass'
-export type { GTAOPassConfig } from './GTAOPass'
-
 export { NormalPass } from './NormalPass'
 export type { NormalPassConfig } from './NormalPass'
 
 export { DepthPass } from './DepthPass'
 export type { DepthPassConfig, DepthFormat } from './DepthPass'
-
-export { BokehPass } from './BokehPass'
-export type { BokehPassConfig } from './BokehPass'
 
 export { CinematicPass } from './CinematicPass'
 export type { CinematicPassConfig } from './CinematicPass'

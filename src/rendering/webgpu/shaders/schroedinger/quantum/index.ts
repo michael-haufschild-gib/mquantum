@@ -92,7 +92,16 @@ export {
 } from './hydrogenNDVariants.wgsl'
 
 // Mode-switching wavefunction evaluation
-export { psiBlock, psiBlockDynamic } from './psi.wgsl'
+export {
+  psiBlock,
+  psiBlockDynamic,
+  psiBlockHarmonic,
+  psiBlockDynamicHarmonic,
+  psiBlockHydrogenND,
+} from './psi.wgsl'
+
+// Hydrogen fallback stubs for family-specialized composition
+export { hydrogenFamilyFallbackBlock } from './hydrogenFallback.wgsl'
 
 // Density field calculations
 export {

@@ -37,11 +37,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setDispersionStrength: state.setSchroedingerDispersionStrength,
     setDispersionDirection: state.setSchroedingerDispersionDirection,
     setDispersionQuality: state.setSchroedingerDispersionQuality,
-    // Shadows/AO
-    setShadowsEnabled: state.setSchroedingerShadowsEnabled,
-    setShadowStrength: state.setSchroedingerShadowStrength,
-    setAoEnabled: state.setSchroedingerAoEnabled,
-    setAoStrength: state.setSchroedingerAoStrength,
     // Quantum Effects
     setNodalEnabled: state.setSchroedingerNodalEnabled,
     setNodalColor: state.setSchroedingerNodalColor,
@@ -80,10 +75,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setDispersionStrength,
     setDispersionDirection,
     setDispersionQuality,
-    setShadowsEnabled,
-    setShadowStrength,
-    setAoEnabled,
-    setAoStrength,
     setNodalEnabled,
     setNodalColor,
     setNodalStrength,
@@ -226,54 +217,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           <p className="text-xs text-text-tertiary">
             Density grid acceleration is available in volumetric mode only.
           </p>
-        )}
-
-        {/* Volumetric Shadows */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
-          <label className="text-xs text-text-secondary">Volumetric Shadows</label>
-          <ToggleButton
-            pressed={config.shadowsEnabled ?? false}
-            onToggle={() => setShadowsEnabled(!(config.shadowsEnabled ?? false))}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle shadows"
-          >
-            {config.shadowsEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
-        </div>
-        {config.shadowsEnabled && (
-          <Slider
-            label="Shadow Strength"
-            min={0}
-            max={2}
-            step={0.1}
-            value={config.shadowStrength ?? 1.0}
-            onChange={setShadowStrength}
-            showValue
-          />
-        )}
-
-        {/* Volumetric AO */}
-        <div className="flex items-center justify-between mt-2">
-          <label className="text-xs text-text-secondary">Volumetric AO</label>
-          <ToggleButton
-            pressed={config.aoEnabled ?? false}
-            onToggle={() => setAoEnabled(!(config.aoEnabled ?? false))}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle AO"
-          >
-            {config.aoEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
-        </div>
-        {config.aoEnabled && (
-          <Slider
-            label="AO Strength"
-            min={0}
-            max={2}
-            step={0.1}
-            value={config.aoStrength ?? 1.0}
-            onChange={setAoStrength}
-            showValue
-          />
         )}
 
         {/* Isosurface Mode */}

@@ -2,7 +2,7 @@
  * WebGPU Temporal Cloud Depth Pass
  *
  * Extracts depth from the temporal cloud accumulation buffer's world position data.
- * This enables post-processing effects (SSR, Bokeh, Refraction) to work with
+ * This enables post-processing effects (SSR, Refraction) to work with
  * Schroedinger when temporal cloud accumulation is active.
  *
  * The temporal accumulation buffer stores world position in attachment [1].
@@ -95,7 +95,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
  *
  * This pass is needed because when Schroedinger uses temporal cloud accumulation,
  * it renders to the VOLUMETRIC layer at 1/4 resolution and doesn't write to the
- * standard depth buffer. Post-processing effects that need depth (SSR, Bokeh,
+ * standard depth buffer. Post-processing effects that need depth (SSR,
  * Refraction) can use the output of this pass instead.
  *
  * @example

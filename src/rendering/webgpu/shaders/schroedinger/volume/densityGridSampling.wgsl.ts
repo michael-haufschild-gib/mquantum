@@ -92,8 +92,8 @@ fn sampleDensityFromGrid(worldPos: vec3f) -> vec3f {
  * Faster for cases where only rho is needed.
  *
  * IMPORTANT: Uses textureSampleLevel instead of textureSample to allow
- * calling from non-uniform control flow (e.g., gradient calculations,
- * shadow sampling, AO sampling inside conditionals).
+ * calling from non-uniform control flow (e.g., gradient calculations
+ * inside conditionals).
  */
 fn sampleDensityOnlyFromGrid(worldPos: vec3f) -> f32 {
   let uv = worldToGridUV(worldPos, schroedinger);

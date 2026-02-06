@@ -119,18 +119,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerDispersionDirection: (direction: number) => void
   setSchroedingerDispersionQuality: (quality: number) => void
 
-  // Shadow Settings
-  setSchroedingerShadowsEnabled: (enabled: boolean) => void
-  setSchroedingerShadowStrength: (strength: number) => void
-  setSchroedingerShadowSteps: (steps: number) => void
-
-  // AO Settings
-  setSchroedingerAoEnabled: (enabled: boolean) => void
-  setSchroedingerAoStrength: (strength: number) => void
-  setSchroedingerAoQuality: (quality: number) => void
-  setSchroedingerAoRadius: (radius: number) => void
-  setSchroedingerAoColor: (color: string) => void
-
   // Quantum Effects
   setSchroedingerNodalEnabled: (enabled: boolean) => void
   setSchroedingerNodalColor: (color: string) => void

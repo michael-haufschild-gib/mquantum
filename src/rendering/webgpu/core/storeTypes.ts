@@ -147,9 +147,6 @@ export interface RotationStoreState {
  */
 export interface QualityStoreState {
   rayMarchSteps: number
-  shadowSteps: number
-  aoSteps: number
-  shadowSoftness: number
 }
 
 /**
@@ -158,7 +155,6 @@ export interface QualityStoreState {
 export interface PerformanceStoreState {
   renderResolutionScale: number
   sampleQuality: string
-  shadowQuality: string
 }
 
 // =============================================================================

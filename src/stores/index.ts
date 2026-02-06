@@ -43,7 +43,6 @@ export { useUIStore } from './uiStore'
 export { useEnvironmentStore } from './environmentStore'
 export {
   getEffectiveSampleQuality,
-  getEffectiveShadowQuality,
   INTERACTION_RESTORE_DELAY,
   REFINEMENT_STAGE_QUALITY,
   REFINEMENT_STAGE_TIMING,
@@ -55,7 +54,6 @@ export {
 export type {
   RefinementStage,
   SampleQualityLevel,
-  ShadowQualityLevel,
 } from './performanceStore'
 export { useCameraStore } from './cameraStore'
 export { useExportStore } from './exportStore'

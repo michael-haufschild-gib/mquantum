@@ -36,8 +36,6 @@ import { FXAAPass } from './passes/FXAAPass'
 import { SMAAPass } from './passes/SMAAPass'
 import { ToScreenPass } from './passes/ToScreenPass'
 import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
-import { GTAOPass } from './passes/GTAOPass'
-import { BokehPass } from './passes/BokehPass'
 import { PaperTexturePass } from './passes/PaperTexturePass'
 import { FrameBlendingPass } from './passes/FrameBlendingPass'
 import { CinematicPass } from './passes/CinematicPass'
@@ -87,10 +85,7 @@ const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getSta
 
 const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.getState>) => ({
   bloomEnabled: state.bloomEnabled,
-  ssaoEnabled: state.ssaoEnabled,
   antiAliasingMethod: state.antiAliasingMethod,
-  // Depth of field
-  bokehEnabled: state.bokehEnabled,
   // Paper texture
   paperEnabled: state.paperEnabled,
   // Frame blending
@@ -109,8 +104,6 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   useDensityGrid: state.schroedinger?.useDensityGrid ?? false,
   nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
   dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
-  shadowsEnabled: state.schroedinger?.shadowsEnabled ?? false,
-  aoEnabled: state.schroedinger?.aoEnabled ?? false,
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
   emissionPulsing: state.schroedinger?.emissionPulsing ?? false,
   interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
@@ -287,9 +280,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           objectType,
           dimension,
           bloomEnabled: postProcessing.bloomEnabled,
-          ssaoEnabled: postProcessing.ssaoEnabled,
           antiAliasingMethod: postProcessing.antiAliasingMethod,
-          bokehEnabled: postProcessing.bokehEnabled,
           paperEnabled: postProcessing.paperEnabled,
           frameBlendingEnabled: postProcessing.frameBlendingEnabled,
           cinematicEnabled: postProcessing.cinematicEnabled,
@@ -299,8 +290,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           useDensityGrid: schroedingerCompile.useDensityGrid,
           nodalEnabled: schroedingerCompile.nodalEnabled,
           dispersionEnabled: schroedingerCompile.dispersionEnabled,
-          shadowsEnabled: schroedingerCompile.shadowsEnabled,
-          aoEnabled: schroedingerCompile.aoEnabled,
           phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
           emissionPulsingEnabled: schroedingerCompile.emissionPulsing,
           interferenceEnabled: schroedingerCompile.interferenceEnabled,
@@ -345,9 +334,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     objectType,
     dimension,
     postProcessing.bloomEnabled,
-    postProcessing.ssaoEnabled,
     postProcessing.antiAliasingMethod,
-    postProcessing.bokehEnabled,
     postProcessing.paperEnabled,
     postProcessing.frameBlendingEnabled,
     postProcessing.cinematicEnabled,
@@ -359,8 +346,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.useDensityGrid,
     schroedingerCompile.nodalEnabled,
     schroedingerCompile.dispersionEnabled,
-    schroedingerCompile.shadowsEnabled,
-    schroedingerCompile.aoEnabled,
     schroedingerCompile.phaseMaterialityEnabled,
     schroedingerCompile.emissionPulsing,
     schroedingerCompile.interferenceEnabled,
@@ -582,10 +567,7 @@ export interface PassConfig {
   objectType: ObjectType
   dimension: number
   bloomEnabled: boolean
-  ssaoEnabled: boolean
   antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
-  // Depth of field
-  bokehEnabled: boolean
   // Paper texture overlay
   paperEnabled: boolean
   // Frame blending for smoother motion
@@ -599,8 +581,6 @@ export interface PassConfig {
   useDensityGrid: boolean
   nodalEnabled: boolean
   dispersionEnabled: boolean
-  shadowsEnabled: boolean
-  aoEnabled: boolean
   phaseMaterialityEnabled: boolean
   emissionPulsingEnabled: boolean
   interferenceEnabled: boolean
@@ -619,16 +599,14 @@ export interface PassConfig {
  * 1. Object Renderer - Render main object to MRT (color, normal, depth/quarter buffers)
  * 2. Temporal Cloud Accumulation (optional) - Reconstruct full-res object-color from quarter-res
  * 3. ScenePass - Render environment/clear target
- * 4. GTAOPass (optional) - Ambient occlusion
- * 5. EnvironmentCompositePass - Composite environment with main object
- * 6. BloomPass (optional) - Bloom effect
- * 7. BokehPass (optional) - Depth of field
- * 8. FrameBlendingPass (optional) - Temporal smoothing
- * 9. TonemappingPass - HDR to LDR conversion
- * 10. CinematicPass (optional) - Vignette, chromatic aberration, film grain
- * 11. PaperTexturePass (optional) - Paper texture overlay
- * 12. FXAA/SMAAPass (optional) - Anti-aliasing
- * 13. ToScreenPass - Copy to canvas
+ * 4. EnvironmentCompositePass - Composite environment with main object
+ * 5. BloomPass (optional) - Bloom effect
+ * 6. FrameBlendingPass (optional) - Temporal smoothing
+ * 7. TonemappingPass - HDR to LDR conversion
+ * 8. CinematicPass (optional) - Vignette, chromatic aberration, film grain
+ * 9. PaperTexturePass (optional) - Paper texture overlay
+ * 10. FXAA/SMAAPass (optional) - Anti-aliasing
+ * 11. ToScreenPass - Copy to canvas
  */
 /** Safely add a pass -- logs and continues on failure instead of aborting the pipeline. */
 async function safeAddPass(
@@ -813,27 +791,7 @@ export async function setupRenderPasses(
     )
   }
 
-  // 4. GTAO (optional) - Ambient occlusion
-  if (config.ssaoEnabled) {
-    graph.addResource('aoBuffer', {
-      type: 'texture',
-      format: 'r8unorm',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    await safeAddPass(
-      graph,
-      new GTAOPass({
-        depthInput: 'depth-buffer',
-        normalInput: 'normal-buffer',
-        outputResource: 'aoBuffer',
-      }),
-      'gtao',
-      shouldAbort
-    )
-  }
-
-  // 5. Environment composite - composites object over environment, outputs to hdr-color
+  // 4. Environment composite - composites object over environment, outputs to hdr-color
   await safeAddPass(
     graph,
     new EnvironmentCompositePass({
@@ -867,29 +825,7 @@ export async function setupRenderPasses(
     if (ok) currentHDRBuffer = 'bloom-output'
   }
 
-  // 7. Bokeh / Depth of Field (optional)
-  if (config.bokehEnabled) {
-    graph.addResource('bokeh-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new BokehPass({
-        colorInput: currentHDRBuffer,
-        depthInput: 'depth-buffer',
-        outputResource: 'bokeh-output',
-      }),
-      'bokeh',
-      shouldAbort
-    )
-
-    if (ok) currentHDRBuffer = 'bokeh-output'
-  }
-
-  // 8. Frame Blending (optional) - temporal smoothing
+  // 7. Frame Blending (optional) - temporal smoothing
   if (config.frameBlendingEnabled) {
     graph.addResource('frame-blend-output', {
       type: 'texture',
@@ -1034,8 +970,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     useDensityGrid,
     nodalEnabled,
     dispersionEnabled,
-    shadowsEnabled,
-    aoEnabled,
     phaseMaterialityEnabled,
     emissionPulsingEnabled,
     interferenceEnabled,
@@ -1060,8 +994,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         useDensityGrid,
         nodalEnabled,
         dispersionEnabled,
-        shadowsEnabled,
-        aoEnabled,
         phaseMaterialityEnabled,
         emissionPulsing: emissionPulsingEnabled,
         interferenceEnabled,

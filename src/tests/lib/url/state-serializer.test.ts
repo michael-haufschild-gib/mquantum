@@ -68,13 +68,13 @@ describe('state-serializer', () => {
         dimension: 4,
         objectType: 'schroedinger',
         bloomEnabled: false,
-        bloomIntensity: 0.5,
+        bloomIntensity: 0.75,
         bloomThreshold: 0.3,
         bloomRadius: 0.2,
       }
       const result = serializeState(state)
       expect(result).toContain('be=0')
-      expect(result).toContain('bi=0.50')
+      expect(result).toContain('bi=0.75')
       expect(result).toContain('bt=0.30')
       expect(result).toContain('br=0.20')
     })
@@ -166,6 +166,11 @@ describe('state-serializer', () => {
       expect(result.bloomIntensity).toBeUndefined()
       expect(result.bloomThreshold).toBeUndefined()
       expect(result.bloomRadius).toBeUndefined()
+    })
+
+    it('should ignore bloomLevels above the implemented max', () => {
+      const result = deserializeState('bl=8')
+      expect(result.bloomLevels).toBeUndefined()
     })
 
     it('should deserialize tone mapping settings', () => {

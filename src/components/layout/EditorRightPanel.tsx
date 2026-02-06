@@ -11,7 +11,6 @@ import { LightsSection } from '@/components/sections/Lights/LightsSection'
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
 import { PostProcessingSection } from '@/components/sections/PostProcessing/PostProcessingSection'
 import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
-import { ShadowsSection } from '@/components/sections/Shadows/ShadowsSection'
 
 export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
@@ -29,9 +28,8 @@ export const EditorRightPanel: React.FC = React.memo(() => {
         ),
         content: (
           <div>
-            {/* The "Subject" - Materials, Lines, Shadows, Reflections */}
+            {/* The "Subject" - Materials, Colors, Advanced */}
             <FacesSection defaultOpen={true} />
-            <ShadowsSection defaultOpen={false} />
             <AdvancedObjectControls />
           </div>
         ),

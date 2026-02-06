@@ -57,10 +57,6 @@ export interface SchrodingerRendererConfig {
   nodalEnabled?: boolean
   /** Compile-time specialization flag for chromatic dispersion. */
   dispersionEnabled?: boolean
-  /** Compile-time specialization flag for volumetric shadows. */
-  shadowsEnabled?: boolean
-  /** Compile-time specialization flag for volumetric AO. */
-  aoEnabled?: boolean
   /** Compile-time specialization flag for phase materiality. */
   phaseMaterialityEnabled?: boolean
   /** Compile-time specialization flag for emission pulsing. */
@@ -230,8 +226,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       densityGridPhaseRequired: false,
       nodalEnabled: true,
       dispersionEnabled: true,
-      shadowsEnabled: true,
-      aoEnabled: true,
       phaseMaterialityEnabled: true,
       emissionPulsing: true,
       interferenceEnabled: true,
@@ -247,8 +241,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isosurface: this.rendererConfig.isosurface,
       quantumMode: this.rendererConfig.quantumMode,
       termCount: this.rendererConfig.termCount,
-      shadows: this.rendererConfig.shadowsEnabled ?? true,
-      ambientOcclusion: this.rendererConfig.aoEnabled ?? true,
       nodal: this.rendererConfig.nodalEnabled ?? true,
       dispersion: this.rendererConfig.dispersionEnabled ?? true,
       colorAlgorithm: this.rendererConfig.colorAlgorithm,
@@ -1087,22 +1079,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[804 / 4] = schroedinger?.dispersionDirection ?? 0
     intView[808 / 4] = schroedinger?.dispersionQuality ?? 0
 
-    // Shadow fields
-    intView[812 / 4] = schroedinger?.shadowsEnabled ? 1 : 0
-    floatView[816 / 4] = schroedinger?.shadowStrength ?? 1.0 // WebGL default: 1.0
-    intView[820 / 4] = schroedinger?.shadowSteps ?? 4
-
-    // AO fields
-    floatView[824 / 4] = schroedinger?.aoStrength ?? 1.0 // WebGL default: 1.0
-    intView[828 / 4] = schroedinger?.aoQuality ?? 4
-    floatView[832 / 4] = schroedinger?.aoRadius ?? 0.5
-
-    // aoColor (vec3f needs 16-byte alignment at offset 848 after padding)
-    const aoColor = this.parseColor(schroedinger?.aoColor ?? '#000000')
-    floatView[848 / 4] = aoColor[0]
-    floatView[852 / 4] = aoColor[1]
-    floatView[856 / 4] = aoColor[2]
-    floatView[860 / 4] = 0.0 // _pad2
+    // Reserved fields (formerly shadows + AO — removed, keeping layout for buffer compatibility)
+    intView[812 / 4] = 0   // _reservedShadow0
+    floatView[816 / 4] = 0 // _reservedShadow1
+    intView[820 / 4] = 0   // _reservedShadow2
+    floatView[824 / 4] = 0 // _reservedAo0
+    intView[828 / 4] = 0   // _reservedAo1
+    floatView[832 / 4] = 0 // _reservedAo2
+    // _reservedAoColor (vec3f at offset 848 + _pad2)
+    floatView[848 / 4] = 0
+    floatView[852 / 4] = 0
+    floatView[856 / 4] = 0
+    floatView[860 / 4] = 0 // _pad2
 
     // Nodal fields
     intView[864 / 4] = schroedinger?.nodalEnabled ? 1 : 0
@@ -1519,20 +1507,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (!this.device || !this.qualityUniformBuffer) return
 
     const performance = ctx.frame?.stores?.['performance'] as any
-    const lighting = ctx.frame?.stores?.['lighting'] as any
-    // Get schroedinger store for aoEnabled (WebGL uses per-object AO toggle from schroedinger store)
-    const extended = ctx.frame?.stores?.['extended'] as any
-    const schroedinger = extended?.schroedinger
 
     // QualityUniforms struct layout:
     // sdfMaxIterations: i32 (0)
     // sdfSurfaceDistance: f32 (1)
-    // shadowQuality: i32 (2)
-    // shadowSoftness: f32 (3)
-    // aoEnabled: i32 (4)
-    // aoSamples: i32 (5)
-    // aoRadius: f32 (6)
-    // aoIntensity: f32 (7)
+    // _reservedShadowQuality: i32 (2)
+    // _reservedShadowSoftness: f32 (3)
+    // _reservedAoEnabled: i32 (4)
+    // _reservedAoSamples: i32 (5)
+    // _reservedAoRadius: f32 (6)
+    // _reservedAoIntensity: f32 (7)
     // qualityMultiplier: f32 (8)
     // debugMode: i32 (9)
     // Use pre-allocated buffer to avoid per-frame GC pressure
@@ -1540,20 +1524,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Quality multiplier affects ray march quality
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    const shadowQuality = lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0
-    const aoEnabled = schroedinger?.aoEnabled ? 1 : 0
-    const aoRadius = performance?.aoRadius ?? 0.5
-    const aoIntensity = performance?.aoIntensity ?? 1.0
-    const shadowSoftness = lighting?.shadowSoftness ?? 0.5
     const debugMode = performance?.debugMode ?? 0
 
     const qualitySignature = [
       qualityMultiplier.toFixed(4),
-      shadowQuality,
-      shadowSoftness.toFixed(4),
-      aoEnabled,
-      aoRadius.toFixed(4),
-      aoIntensity.toFixed(4),
       debugMode,
     ].join('|')
     if (qualitySignature === this.lastQualitySignature) {
@@ -1562,17 +1536,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastQualitySignature = qualitySignature
 
     data[1] = 0.001 / qualityMultiplier // sdfSurfaceDistance (smaller = more precise)
-    data[3] = shadowSoftness // shadowSoftness
-    data[6] = aoRadius // aoRadius
-    data[7] = aoIntensity // aoIntensity
+    data[3] = 0 // _reservedShadowSoftness
+    data[6] = 0 // _reservedAoRadius
+    data[7] = 0 // _reservedAoIntensity
     data[8] = qualityMultiplier
 
     // Use pre-allocated DataView for integer writes
     this.qualityDataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
-    this.qualityDataView.setInt32(2 * 4, shadowQuality, true) // shadowQuality
-    // aoEnabled: Use schroedinger store's aoEnabled (WebGL uses per-object AO toggle, not global ssaoEnabled)
-    this.qualityDataView.setInt32(4 * 4, aoEnabled, true) // aoEnabled
-    this.qualityDataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
+    this.qualityDataView.setInt32(2 * 4, 0, true) // _reservedShadowQuality
+    this.qualityDataView.setInt32(4 * 4, 0, true) // _reservedAoEnabled
+    this.qualityDataView.setInt32(5 * 4, 0, true) // _reservedAoSamples
     this.qualityDataView.setInt32(9 * 4, debugMode, true) // debugMode
 
     this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)

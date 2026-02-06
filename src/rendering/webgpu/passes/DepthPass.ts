@@ -139,9 +139,9 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
  * texture and outputs processed depth in various formats.
  *
  * Use cases:
- * - Linearizing depth for screen-space effects (SSAO, SSR)
+ * - Linearizing depth for screen-space effects (SSR)
  * - RGBA packing for effects that need higher precision
- * - Depth-based post-processing (fog, DOF)
+ * - Depth-based post-processing (fog)
  *
  * @example
  * ```typescript

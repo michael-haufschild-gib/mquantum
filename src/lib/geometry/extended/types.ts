@@ -288,26 +288,6 @@ export interface SchroedingerConfig {
   /** Dispersion quality/accuracy (0=Gradient Hack, 1=Full Sampling) */
   dispersionQuality: number
 
-  // === Volumetric Self-Shadowing ===
-  /** Enable volumetric self-shadowing */
-  shadowsEnabled: boolean
-  /** Shadow strength/darkness (0.0-2.0) */
-  shadowStrength: number
-  /** Shadow quality steps (1-8) */
-  shadowSteps: number
-
-  // === Volumetric Ambient Occlusion (AO) ===
-  /** Enable volumetric ambient occlusion */
-  aoEnabled: boolean
-  /** AO strength/darkness (0.0-2.0) */
-  aoStrength: number
-  /** AO quality steps/cones (3-8) */
-  aoQuality: number
-  /** AO radius (0.1-2.0) */
-  aoRadius: number
-  /** AO tint color (hex string) */
-  aoColor: string
-
   // === Quantum Effects ===
   /** Enable nodal surface highlighting */
   nodalEnabled: boolean
@@ -492,18 +472,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   dispersionStrength: 0.2,
   dispersionDirection: 0,
   dispersionQuality: 0,
-
-  // Shadows
-  shadowsEnabled: false,
-  shadowStrength: 1.0,
-  shadowSteps: 4,
-
-  // AO
-  aoEnabled: false,
-  aoStrength: 1.0,
-  aoQuality: 4,
-  aoRadius: 0.5,
-  aoColor: '#000000',
 
   // Quantum Effects
   nodalEnabled: false,

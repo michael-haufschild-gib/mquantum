@@ -36,7 +36,11 @@ import {
   getHOUnrolledBlocks,
   generateHODispatchBlock,
 } from '../quantum/hoSuperpositionVariants.wgsl'
-import { psiBlock, psiBlockDynamic } from '../quantum/psi.wgsl'
+import {
+  psiBlockDynamicHarmonic,
+  psiBlockHarmonic,
+  psiBlockHydrogenND,
+} from '../quantum/psi.wgsl'
 import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from '../quantum/density.wgsl'
 
 // Hydrogen blocks (shared by hydrogen ND mode)
@@ -118,19 +122,20 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Quantum`)
 
-  // Quantum mode flags (must include all for shader linking)
-  // WGSL requires all functions to be defined even if not called at runtime
-  const includeHydrogen = true
-  const includeHydrogenND = true
-  const hydrogenNDDimension = Math.min(Math.max(dimension, 3), 11)
+  const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const includeHydrogen = isHydrogenFamily
+  const includeHydrogenND = isHydrogenFamily
+  const includeHarmonic = !isHydrogenFamily
+  const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
 
-  defines.push('const HYDROGEN_MODE_ENABLED: bool = true;')
-  defines.push('const HYDROGEN_ND_MODE_ENABLED: bool = true;')
-  defines.push(`const HYDROGEN_ND_DIMENSION: i32 = ${hydrogenNDDimension};`)
+  defines.push(`const HYDROGEN_MODE_ENABLED: bool = ${includeHydrogen};`)
+  defines.push(`const HYDROGEN_ND_MODE_ENABLED: bool = ${includeHydrogenND};`)
+  if (includeHydrogenND) {
+    defines.push(`const HYDROGEN_ND_DIMENSION: i32 = ${hydrogenNDDimension};`)
+  }
 
   // HO unrolled optimization when term count is known at compile time
-  const useUnrolledHO =
-    termCount !== undefined && (quantumMode === 'harmonicOscillator' || quantumMode === undefined)
+  const useUnrolledHO = includeHarmonic && termCount !== undefined
 
   if (useUnrolledHO && termCount) {
     defines.push('const HO_UNROLLED: bool = true;')
@@ -188,6 +193,12 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   }
   const hydrogenNDBlock = hydrogenNDBlockMap[hydrogenNDDimension] || ''
 
+  const selectedPsiBlock = isHydrogenFamily
+    ? psiBlockHydrogenND
+    : useUnrolledHO
+      ? psiBlockDynamicHarmonic
+      : psiBlockHarmonic
+
   // Build blocks array in dependency order
   const blocks = [
     // Defines - must come first
@@ -215,8 +226,8 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'HO 1D Eigenfunction', content: ho1dBlock },
 
     // HO ND dimension-specific variant
-    { name: `HO ND ${actualDim}D`, content: hoNDBlock },
-    { name: 'HO ND Dispatch', content: generateHoNDDispatchBlock(actualDim) },
+    { name: `HO ND ${actualDim}D`, content: hoNDBlock, condition: includeHarmonic },
+    { name: 'HO ND Dispatch', content: generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
 
     // Hydrogen orbital basis functions
     { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen },
@@ -260,7 +271,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
       : []),
 
     // Unified wavefunction evaluation
-    { name: 'Wavefunction (Psi)', content: useUnrolledHO ? psiBlockDynamic : psiBlock },
+    { name: 'Wavefunction (Psi)', content: selectedPsiBlock },
 
     // Density field blocks
     { name: 'Density Pre-Map', content: densityPreMapBlock },

@@ -70,21 +70,12 @@ export function needsVolumetricSeparation(state: {
  * Returns true if any effect requires depth that should exclude environment objects.
  *
  * @param state - Current post-processing state
- * @param state.bokehEnabled
- * @param state.bokehFocusMode
  * @param state.temporalReprojectionEnabled
  * @returns True if object-only depth pass should be rendered
  */
 export function needsObjectOnlyDepth(state: {
-  bokehEnabled: boolean
-  bokehFocusMode: string
   temporalReprojectionEnabled?: boolean
 }): boolean {
-  // Bokeh always needs object-only depth so blur is based on the main object only
-  if (state.bokehEnabled) {
-    return true
-  }
-
   // Temporal reprojection needs depth for raymarching acceleration
   if (state.temporalReprojectionEnabled) {
     return true

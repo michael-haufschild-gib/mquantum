@@ -14,35 +14,11 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/integration.wgsl
  */
 
-export const volumeIntegrationBlock = /* wgsl */ `
-// ============================================
-// Volume Integration (Beer-Lambert Compositing)
-// ============================================
-
-// Maximum samples per ray
-const MAX_VOLUME_SAMPLES: i32 = 128;
-
-// Minimum transmittance before early exit
-const MIN_TRANSMITTANCE: f32 = 0.01;
-
-// Minimum density to consider for accumulation
-const MIN_DENSITY: f32 = 1e-8;
-const EMPTY_SKIP_THRESHOLD: f32 = 1e-7;
-const EMPTY_SKIP_FACTOR: f32 = 4.0;
-const MIN_REMAINING_CONTRIBUTION: f32 = 0.001;
-const MAX_REMAINING_DENSITY_BOUND: f32 = 8.0;
-
-// Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
-
-// Result structure for volume raymarching
-// Contains fields for temporal reprojection support
-struct VolumeResult {
-  color: vec3f,
-  alpha: f32,
-  iterationCount: i32,   // Number of iterations performed (for debug visualization)
-  primaryHitT: f32,      // Model-space ray distance to first significant density hit (for temporal reprojection)
-}
-
+/**
+ * Tetrahedral gradient sampling - shared between isosurface and volumetric modes.
+ * Extracted so both rendering paths can compute surface/volume normals.
+ */
+export const volumeGradientBlock = /* wgsl */ `
 // ============================================
 // Tetrahedral Gradient Sampling
 // ============================================
@@ -62,24 +38,6 @@ struct TetraSample {
   s: f32,         // Log-density (averaged)
   phase: f32,     // Spatial phase (averaged)
   gradient: vec3f // Gradient of log-density
-}
-
-/**
- * Compute time value for animation.
- */
-fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
-  return uniforms.time * uniforms.timeScale;
-}
-
-/**
- * Compute per-step internal fog alpha for volumetric integration.
- */
-fn computeInternalFogAlpha(stepLen: f32, uniforms: SchroedingerUniforms) -> f32 {
-  if (uniforms.fogIntegrationEnabled == 0u) { return 0.0; }
-  if (uniforms.fogContribution <= 0.0 || uniforms.internalFogDensity <= 0.0) { return 0.0; }
-
-  let fogDensity = uniforms.internalFogDensity * uniforms.fogContribution;
-  return 1.0 - exp(-fogDensity * stepLen);
 }
 
 /**
@@ -131,6 +89,54 @@ fn computeGradientTetrahedralAtFlowedPos(flowedPos: vec3f, t: f32, delta: f32, u
   let s3 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V3 * delta, t, uniforms));
 
   return (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
+}
+`
+
+export const volumeIntegrationBlock = /* wgsl */ `
+// ============================================
+// Volume Integration (Beer-Lambert Compositing)
+// ============================================
+
+// Maximum samples per ray
+const MAX_VOLUME_SAMPLES: i32 = 128;
+
+// Minimum transmittance before early exit
+const MIN_TRANSMITTANCE: f32 = 0.01;
+
+// Minimum density to consider for accumulation
+const MIN_DENSITY: f32 = 1e-8;
+const EMPTY_SKIP_THRESHOLD: f32 = 1e-7;
+const EMPTY_SKIP_FACTOR: f32 = 4.0;
+const MIN_REMAINING_CONTRIBUTION: f32 = 0.001;
+const MAX_REMAINING_DENSITY_BOUND: f32 = 8.0;
+
+// Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
+
+// Result structure for volume raymarching
+// Contains fields for temporal reprojection support
+struct VolumeResult {
+  color: vec3f,
+  alpha: f32,
+  iterationCount: i32,   // Number of iterations performed (for debug visualization)
+  primaryHitT: f32,      // Model-space ray distance to first significant density hit (for temporal reprojection)
+}
+
+/**
+ * Compute time value for animation.
+ */
+fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
+  return uniforms.time * uniforms.timeScale;
+}
+
+/**
+ * Compute per-step internal fog alpha for volumetric integration.
+ */
+fn computeInternalFogAlpha(stepLen: f32, uniforms: SchroedingerUniforms) -> f32 {
+  if (uniforms.fogIntegrationEnabled == 0u) { return 0.0; }
+  if (uniforms.fogContribution <= 0.0 || uniforms.internalFogDensity <= 0.0) { return 0.0; }
+
+  let fogDensity = uniforms.internalFogDensity * uniforms.fogContribution;
+  return 1.0 - exp(-fogDensity * stepLen);
 }
 
 // ============================================

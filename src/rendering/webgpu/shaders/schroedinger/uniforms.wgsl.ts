@@ -132,16 +132,14 @@ struct SchroedingerUniforms {
 
   dispersionQuality: i32,        // 0=Fast, 1=High
 
-  // Shadows
-  shadowsEnabled: u32,           // Enable volumetric self-shadowing
-  shadowStrength: f32,           // Shadow strength (0.0-2.0)
-  shadowSteps: i32,              // Shadow march steps (1-8)
-
-  // Ambient Occlusion
-  aoStrength: f32,               // AO strength (0.0-2.0)
-  aoSteps: i32,                  // AO cones/steps (3-8)
-  aoRadius: f32,                 // AO radius (0.1-2.0)
-  aoColor: vec3f,                // AO tint color
+  // Reserved (formerly shadows + AO — removed, keeping layout for buffer compatibility)
+  _reservedShadow0: u32,
+  _reservedShadow1: f32,
+  _reservedShadow2: i32,
+  _reservedAo0: f32,
+  _reservedAo1: i32,
+  _reservedAo2: f32,
+  _reservedAoColor: vec3f,
   _pad2: f32,
 
   // Nodal surfaces

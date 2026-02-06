@@ -4,6 +4,7 @@ import { FrameBlendingPass } from '@/rendering/webgpu/passes/FrameBlendingPass'
 import { TemporalCloudPass } from '@/rendering/webgpu/passes/TemporalCloudPass'
 import { TemporalCloudDepthPass } from '@/rendering/webgpu/passes/TemporalCloudDepthPass'
 import { TemporalDepthCapturePass } from '@/rendering/webgpu/passes/TemporalDepthCapturePass'
+import { WebGPUTemporalCloudPass } from '@/rendering/webgpu/passes/WebGPUTemporalCloudPass'
 
 function createRenderPassEncoder(): GPURenderPassEncoder {
   return {
@@ -139,6 +140,80 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
 
     expect((device as any).createBindGroup).toHaveBeenCalledTimes(2)
+  })
+
+  it('reuses WebGPUTemporalCloud bind groups across ping-pong frames', () => {
+    const pass = new WebGPUTemporalCloudPass({
+      quarterColorInput: 'quarterColor',
+      quarterPositionInput: 'quarterPosition',
+      outputResource: 'temporalOut',
+    })
+
+    const device = {
+      queue: { writeBuffer: vi.fn() },
+      createBindGroup: vi.fn(() => ({}) as GPUBindGroup),
+    } as unknown as GPUDevice
+
+    const quarterColorView = {} as GPUTextureView
+    const quarterPositionView = {} as GPUTextureView
+    const outputView = {} as GPUTextureView
+    const outputTexture = {} as GPUTexture
+    const reprojHistoryView = {} as GPUTextureView
+    const accumulationViewA = {} as GPUTextureView
+    const accumulationViewB = {} as GPUTextureView
+    const accumulationTextureA = {} as GPUTexture
+    const accumulationTextureB = {} as GPUTexture
+
+    ;(pass as any).device = device
+    ;(pass as any).reprojectionPipeline = {} as GPURenderPipeline
+    ;(pass as any).reconstructionPipeline = {} as GPURenderPipeline
+    ;(pass as any).reprojectionBindGroupLayout0 = {} as GPUBindGroupLayout
+    ;(pass as any).reprojectionBindGroupLayout1 = {} as GPUBindGroupLayout
+    ;(pass as any).reconstructionBindGroupLayout0 = {} as GPUBindGroupLayout
+    ;(pass as any).reconstructionBindGroupLayout1 = {} as GPUBindGroupLayout
+    ;(pass as any).temporalUniformBuffer = {} as GPUBuffer
+    ;(pass as any).linearSampler = {} as GPUSampler
+    ;(pass as any).nearestSampler = {} as GPUSampler
+    ;(pass as any).reprojectedHistoryView = reprojHistoryView
+    ;(pass as any).accumulationViewA = accumulationViewA
+    ;(pass as any).accumulationViewB = accumulationViewB
+    ;(pass as any).accumulationTextureA = accumulationTextureA
+    ;(pass as any).accumulationTextureB = accumulationTextureB
+    ;(pass as any).hasValidHistory = true
+    ;(pass as any).lastWidth = 800
+    ;(pass as any).lastHeight = 600
+    ;(pass as any).renderFullscreen = vi.fn()
+
+    const renderContext = {
+      size: { width: 800, height: 600 },
+      encoder: { copyTextureToTexture: vi.fn() },
+      beginRenderPass: vi.fn(() => createRenderPassEncoder()),
+      getTextureView: vi.fn((id: string) => {
+        if (id === 'quarterColor') return quarterColorView
+        if (id === 'quarterPosition') return quarterPositionView
+        return null
+      }),
+      getWriteTarget: vi.fn((id: string) => (id === 'temporalOut' ? outputView : null)),
+      getResource: vi.fn((id: string) => (id === 'temporalOut' ? { texture: outputTexture } : null)),
+      frame: {
+        stores: {
+          camera: {
+            viewProjectionMatrix: {
+              elements: Array.from({ length: 16 }, (_, i) => (i % 5 === 0 ? 1 : 0)),
+            },
+            position: [0, 0, 0],
+          },
+        },
+      },
+    } as unknown as Parameters<WebGPUTemporalCloudPass['execute']>[0]
+
+    pass.execute(renderContext)
+    pass.execute(renderContext)
+    pass.execute(renderContext)
+
+    // 1x reprojection uniforms + 2x reprojection ping-pong variants +
+    // 1x reconstruction uniforms + 1x reconstruction textures.
+    expect((device as any).createBindGroup).toHaveBeenCalledTimes(5)
   })
 
   it('reuses TemporalCloudDepth bind groups when input view is unchanged', () => {

@@ -229,3 +229,159 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   return evalHOCombinedPsi(xND, t, uniforms);
 }
 `
+
+/**
+ * Harmonic-oscillator-only psi block with dynamic HO superposition loop.
+ * Does not reference hydrogen symbols, enabling family-specific shader composition.
+ */
+export const psiBlockHarmonic = /* wgsl */ `
+// ============================================
+// Wavefunction Evaluation (Harmonic Oscillator)
+// ============================================
+
+// Evaluate harmonic oscillator wavefunction with runtime term count
+fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  var psi = vec2f(0.0, 0.0);
+
+  for (var k = 0; k < 8; k++) {
+    if (k >= uniforms.termCount) { break; }
+
+    // Time phase factor: e^{-iE_k t}
+    let phase = -getEnergy(uniforms, k) * t;
+    let timeFactor = cexp_i(phase);
+
+    // Complex coefficient c_k
+    let coeff = getCoeff(uniforms, k);
+
+    // Combined: c_k · e^{-iE_k t}
+    let term = cmul(coeff, timeFactor);
+
+    // Spatial eigenfunction Φ_k(x)
+    let spatial = hoNDOptimized(xND, k, uniforms);
+
+    // Accumulate: ψ += c_k · Φ_k(x) · e^{-iE_k t}
+    psi += cscale(spatial, term);
+  }
+
+  return psi;
+}
+
+// Evaluate wavefunction ψ(x,t) at D-dimensional point xND and time t.
+fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  return evalHarmonicOscillatorPsi(xND, t, uniforms);
+}
+
+// Evaluate ψ with phase information for coloring.
+fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let psi = evalPsi(xND, t, uniforms);
+  let phase = atan2(psi.y, psi.x);
+  return vec3f(psi.x, psi.y, phase);
+}
+
+// Evaluate spatial-only phase (t=0) for stable coloring.
+fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
+  var psi = vec2f(0.0, 0.0);
+
+  for (var k = 0; k < 8; k++) {
+    if (k >= uniforms.termCount) { break; }
+
+    let coeff = getCoeff(uniforms, k);
+    let spatial = hoNDOptimized(xND, k, uniforms);
+    psi += cscale(spatial, coeff);
+  }
+
+  return atan2(psi.y, psi.x);
+}
+
+// Evaluate time-dependent ψ and spatial-only phase in one pass.
+// Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, unused)
+fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+  var psiTime = vec2f(0.0, 0.0);
+  var psiSpatial = vec2f(0.0, 0.0);
+
+  for (var k = 0; k < 8; k++) {
+    if (k >= uniforms.termCount) { break; }
+
+    let spatial = hoNDOptimized(xND, k, uniforms);
+    let coeff = getCoeff(uniforms, k);
+
+    psiSpatial += cscale(spatial, coeff);
+
+    let phase = -getEnergy(uniforms, k) * t;
+    let timeFactor = cexp_i(phase);
+    let term = cmul(coeff, timeFactor);
+    psiTime += cscale(spatial, term);
+  }
+
+  let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
+  return vec4f(psiTime.x, psiTime.y, spatialPhase, 0.0);
+}
+`
+
+/**
+ * Harmonic-oscillator-only psi block for unrolled HO superposition variants.
+ * Requires evalHarmonicOscillatorPsi/evalHOSpatialOnly/evalHOCombinedPsi from HO dispatch.
+ */
+export const psiBlockDynamicHarmonic = /* wgsl */ `
+// ============================================
+// Wavefunction Evaluation (Harmonic Oscillator, Unrolled)
+// ============================================
+
+fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  return evalHarmonicOscillatorPsi(xND, t, uniforms);
+}
+
+fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let psi = evalPsi(xND, t, uniforms);
+  let phase = atan2(psi.y, psi.x);
+  return vec3f(psi.x, psi.y, phase);
+}
+
+fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
+  let psi = evalHOSpatialOnly(xND, uniforms);
+  return atan2(psi.y, psi.x);
+}
+
+fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+  return evalHOCombinedPsi(xND, t, uniforms);
+}
+`
+
+/**
+ * Hydrogen-ND-only psi block.
+ * Does not reference HO-specific symbols, enabling family-specific shader composition.
+ */
+export const psiBlockHydrogenND = /* wgsl */ `
+// ============================================
+// Wavefunction Evaluation (Hydrogen ND)
+// ============================================
+
+fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  return hydrogenNDOptimized(xND, t, uniforms);
+}
+
+fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let psi = evalPsi(xND, t, uniforms);
+  let phase = atan2(psi.y, psi.x);
+  return vec3f(psi.x, psi.y, phase);
+}
+
+fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
+  let psi = hydrogenNDOptimized(xND, 0.0, uniforms);
+  return atan2(psi.y, psi.x);
+}
+
+fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
+  let psiSpatial = hydrogenNDOptimized(xND, 0.0, uniforms);
+  let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
+
+  var outputPhase = spatialPhase;
+  if (uniforms.phaseAnimationEnabled != 0u) {
+    let nf = f32(uniforms.principalN);
+    let E = -0.5 / (nf * nf);
+    outputPhase = spatialPhase - E * t;
+  }
+
+  return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, 0.0);
+}
+`

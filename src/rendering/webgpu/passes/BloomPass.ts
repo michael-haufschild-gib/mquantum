@@ -493,9 +493,11 @@ export class BloomPass extends WebGPUBasePass {
     thresholdPass.end()
 
     // === Pass 2: Progressive MIP Chain Blur ===
+    const activeLevels = Math.max(1, Math.min(NUM_MIPS, this.levels))
+
     // Each level reads from previous level's vertical output (progressive cascade).
     // Level 0 reads from threshold. Resolution halves at each level due to texture size.
-    for (let level = 0; level < NUM_MIPS; level++) {
+    for (let level = 0; level < activeLevels; level++) {
       const pipeline = this.blurPipelines[level]!
 
       // Horizontal blur input: threshold for level 0, previous vertical for others
@@ -556,7 +558,7 @@ export class BloomPass extends WebGPUBasePass {
     // Compute bloom factors matching UnrealBloomPass base factors.
     // "levels" masks out high mips but does not re-scale remaining factors.
     const baseFactors = [1.0, 0.8, 0.6, 0.4, 0.2]
-    const factors = baseFactors.map((f, i) => (i < this.levels ? f : 0.0))
+    const factors = baseFactors.map((f, i) => (i < activeLevels ? f : 0.0))
 
     if (
       this.intensity !== this.lastIntensity ||

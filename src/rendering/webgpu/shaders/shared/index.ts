@@ -31,9 +31,6 @@ export { sphereIntersectBlock } from './raymarch/sphere-intersect.wgsl'
 export { safeMathBlock } from './math/safe-math.wgsl'
 
 // Features
-export { aoBlock } from './features/ao.wgsl'
-export { shadowsBlock } from './features/shadows.wgsl'
-export { shadowMapsUniformsBlock, shadowMapsFunctionsBlock } from './features/shadowMaps.wgsl'
 export { temporalBlock } from './features/temporal.wgsl'
 
 // Depth rendering
@@ -41,7 +38,6 @@ export {
   packDepthBlock,
   depthUniformsBlock,
   ndTransformDepthBlock,
-  unifiedShadowFragmentBlock,
 } from './depth/customDepth.wgsl'
 
 // Composition helpers

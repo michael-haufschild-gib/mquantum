@@ -7,7 +7,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   usePerformanceStore,
   REFINEMENT_STAGE_QUALITY,
-  getEffectiveShadowQuality,
   getEffectiveSampleQuality,
   hasPersistedResolutionScale,
   hasPersistedMaxFps,
@@ -191,7 +190,7 @@ describe('performanceStore', () => {
         vertexShaderLength: 100,
         fragmentShaderLength: 200,
         activeModules: ['lighting'],
-        features: ['shadows'],
+        features: ['lighting'],
       }
       setShaderDebugInfo('testKey', debugInfo)
 
@@ -227,7 +226,7 @@ describe('performanceStore', () => {
       const { toggleShaderModule, resetShaderOverrides } = usePerformanceStore.getState()
 
       toggleShaderModule('lighting')
-      toggleShaderModule('shadows')
+      toggleShaderModule('emission')
       resetShaderOverrides()
 
       expect(usePerformanceStore.getState().shaderOverrides).toHaveLength(0)
@@ -258,16 +257,6 @@ describe('performanceStore', () => {
 })
 
 describe('quality interpolation utilities', () => {
-  describe('getEffectiveShadowQuality', () => {
-    it('should return target at maximum multiplier', () => {
-      expect(getEffectiveShadowQuality('ultra', 1.0)).toBe('ultra')
-    })
-
-    it('should return low at minimum multiplier', () => {
-      expect(getEffectiveShadowQuality('ultra', 0.25)).toBe('low')
-    })
-  })
-
   describe('getEffectiveSampleQuality', () => {
     it('should return target at maximum multiplier', () => {
       expect(getEffectiveSampleQuality('high', 1.0)).toBe('high')

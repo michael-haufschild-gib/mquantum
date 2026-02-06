@@ -77,6 +77,10 @@ export {
   // Mode-switching wavefunction evaluation
   psiBlock,
   psiBlockDynamic,
+  psiBlockHarmonic,
+  psiBlockDynamicHarmonic,
+  psiBlockHydrogenND,
+  hydrogenFamilyFallbackBlock,
   // Density field calculations
   densityPreMapBlock,
   generateMapPosToND,

@@ -72,7 +72,11 @@ import {
   getHOUnrolledBlocks,
   generateHODispatchBlock,
 } from './quantum/hoSuperpositionVariants.wgsl'
-import { psiBlock, psiBlockDynamic } from './quantum/psi.wgsl'
+import {
+  psiBlockDynamicHarmonic,
+  psiBlockHarmonic,
+  psiBlockHydrogenND,
+} from './quantum/psi.wgsl'
 import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from './quantum/density.wgsl'
 
 // Hydrogen blocks (conditional)
@@ -81,6 +85,7 @@ import { legendreBlock } from './quantum/legendre.wgsl'
 import { sphericalHarmonicsBlock } from './quantum/sphericalHarmonics.wgsl'
 import { hydrogenRadialBlock } from './quantum/hydrogenRadial.wgsl'
 import { hydrogenNDCommonBlock } from './quantum/hydrogenNDCommon.wgsl'
+import { hydrogenFamilyFallbackBlock } from './quantum/hydrogenFallback.wgsl'
 import {
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
@@ -108,8 +113,8 @@ import { sdfHighDBlock } from './sdf/sdf-high-d.wgsl'
 
 // Volume blocks
 import { absorptionBlock } from './volume/absorption.wgsl'
-import { emissionBlock, generateEmissionBlock } from './volume/emission.wgsl'
-import { volumeIntegrationBlock } from './volume/integration.wgsl'
+import { emissionBlock } from './volume/emission.wgsl'
+import { volumeGradientBlock, volumeIntegrationBlock } from './volume/integration.wgsl'
 import {
   densityGridBindingsBlock,
   densityGridSamplingBlock,
@@ -168,8 +173,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     termCount,
     useDensityGrid = false,
     densityGridHasPhase = false,
-    shadows = true,
-    ambientOcclusion = true,
     nodal = true,
     dispersion = true,
     phaseMateriality = true,
@@ -181,22 +184,18 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const defines: string[] = []
   const features: string[] = []
 
-  // IMPORTANT: In WGSL, ALL function references must resolve at compile time,
-  // even if inside branches that are never executed at runtime.
-  // Since psiBlock references hydrogenNDOptimized, we MUST include hydrogen ND
-  // dependencies regardless of selected mode.
-  const includeHydrogen = true
-  const includeHydrogenND = true
-
-  // For hydrogenND mode, include only the specific dimension block
-  const hydrogenNDDimension = includeHydrogenND ? Math.min(Math.max(dimension, 3), 11) : 0
-
-  // Determine if we should use unrolled HO superposition
-  const useUnrolledHO =
-    termCount !== undefined && (quantumMode === 'harmonicOscillator' || quantumMode === undefined)
-
   // Compile-time dimension
   const actualDim = Math.min(Math.max(dimension, 3), 11)
+  const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const includeHydrogen = isHydrogenFamily
+  const includeHydrogenND = isHydrogenFamily
+  const includeHarmonic = !isHydrogenFamily
+
+  // For hydrogenND mode, include only the specific dimension block
+  const hydrogenNDDimension = includeHydrogenND ? actualDim : 0
+
+  // Determine if we should use unrolled HO superposition
+  const useUnrolledHO = includeHarmonic && termCount !== undefined
 
   // Add dimension define
   defines.push(`const DIMENSION: i32 = ${dimension};`)
@@ -259,8 +258,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Density grid compile-time flags
   defines.push(`const DENSITY_GRID_ENABLED: bool = ${useDensityGrid && !isosurface};`)
   defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${useDensityGrid && !isosurface && densityGridHasPhase};`)
-  defines.push(`const FEATURE_SHADOWS: bool = ${shadows};`)
-  defines.push(`const FEATURE_AO: bool = ${ambientOcclusion};`)
   defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
   defines.push(`const FEATURE_DISPERSION: bool = ${dispersion};`)
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
@@ -318,6 +315,12 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     11: sdf11dBlock,
   }
   const sdfBlock = sdfBlockMap[actualDim] || sdfHighDBlock
+
+  const selectedPsiBlock = isHydrogenFamily
+    ? psiBlockHydrogenND
+    : useUnrolledHO
+      ? psiBlockDynamicHarmonic
+      : psiBlockHarmonic
 
   // Generate SDF dispatch that calls the dimension-specific function
   const sdfDispatchBlock = /* wgsl */ `
@@ -379,15 +382,20 @@ struct VertexOutput {
     { name: 'HO 1D Eigenfunction', content: ho1dBlock },
 
     // HO ND dimension-specific variant (only ONE is included based on actualDim)
-    { name: `HO ND ${actualDim}D`, content: hoNDBlock },
+    { name: `HO ND ${actualDim}D`, content: hoNDBlock, condition: includeHarmonic },
     // Generated dispatch: directly calls hoND${actualDim}D
-    { name: 'HO ND Dispatch', content: generateHoNDDispatchBlock(actualDim) },
+    { name: 'HO ND Dispatch', content: generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
 
     // Hydrogen orbital basis functions (conditionally included)
     { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen },
     { name: 'Legendre Polynomials', content: legendreBlock, condition: includeHydrogen },
     { name: 'Spherical Harmonics', content: sphericalHarmonicsBlock, condition: includeHydrogen },
     { name: 'Hydrogen Radial', content: hydrogenRadialBlock, condition: includeHydrogen },
+    {
+      name: 'Hydrogen Family Fallbacks',
+      content: hydrogenFamilyFallbackBlock,
+      condition: !includeHydrogen,
+    },
 
     // Hydrogen ND modules
     { name: 'Hydrogen ND Common', content: hydrogenNDCommonBlock, condition: includeHydrogenND },
@@ -425,7 +433,7 @@ struct VertexOutput {
       : []),
 
     // Unified wavefunction evaluation (mode-switching)
-    { name: 'Wavefunction (Psi)', content: useUnrolledHO ? psiBlockDynamic : psiBlock },
+    { name: 'Wavefunction (Psi)', content: selectedPsiBlock },
 
     // Density field blocks - split for dimension-specific mapPosToND generation
     { name: 'Density Pre-Map', content: densityPreMapBlock },
@@ -446,13 +454,11 @@ struct VertexOutput {
 
     // ===== VOLUME RENDERING =====
     { name: 'Beer-Lambert Absorption', content: absorptionBlock },
-    // Use density-grid-optimized emission when grid is enabled (cheaper shadow/AO sampling)
     {
       name: 'Volume Emission',
-      content: useDensityGrid && !isosurface
-        ? generateEmissionBlock({ useDensityGrid: true })
-        : emissionBlock,
+      content: emissionBlock,
     },
+    { name: 'Volume Gradient', content: volumeGradientBlock },
     { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !isosurface },
 
     // ===== DENSITY GRID (optional compute shader acceleration) =====

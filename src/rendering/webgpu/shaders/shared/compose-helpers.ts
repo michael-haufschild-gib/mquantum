@@ -25,12 +25,8 @@ export interface ShaderBlock {
 export interface WGSLShaderConfig {
   /** Dimension (3-11) */
   dimension: number
-  /** Enable soft shadows */
-  shadows?: boolean
   /** Enable temporal reprojection */
   temporal?: boolean
-  /** Enable ambient occlusion */
-  ambientOcclusion?: boolean
   /** Enable subsurface scattering */
   sss?: boolean
   /** Enable fresnel/rim shading modules */
@@ -49,10 +45,6 @@ export interface WGSLShaderConfig {
   colorAlgorithm?: number
   /** Compile-time lighting mode hint */
   lightingMode?: 'none' | 'simple' | 'pbr'
-  /** Shadow quality (0-3) */
-  shadowQuality?: number
-  /** AO quality (0-2) */
-  aoQuality?: number
   /** Custom overrides for shader blocks */
   overrides?: Array<{ target: string; replacement: string }>
 }
@@ -63,9 +55,7 @@ export interface WGSLShaderConfig {
 export interface FeatureFlags {
   defines: string[]
   features: {
-    shadows: boolean
     temporal: boolean
-    ao: boolean
     sss: boolean
   }
 }
@@ -77,30 +67,20 @@ export interface FeatureFlags {
 export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
   const {
     dimension,
-    shadows = false,
     temporal = false,
-    ambientOcclusion = false,
     sss = false,
-    shadowQuality = 1,
-    aoQuality = 1,
   } = config
 
   const defines: string[] = [
     `const DIMENSION: i32 = ${dimension};`,
-    `const SHADOW_ENABLED: bool = ${shadows};`,
-    `const SHADOW_QUALITY: i32 = ${shadowQuality};`,
     `const TEMPORAL_ENABLED: bool = ${temporal};`,
-    `const AO_ENABLED: bool = ${ambientOcclusion};`,
-    `const AO_QUALITY: i32 = ${aoQuality};`,
     `const SSS_ENABLED: bool = ${sss};`,
   ]
 
   return {
     defines,
     features: {
-      shadows,
       temporal,
-      ao: ambientOcclusion,
       sss,
     },
   }

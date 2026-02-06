@@ -131,9 +131,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     it(`composes WGSL fragment shader for dimension ${dimension}`, () => {
       const { wgsl, features } = composeSchroedingerShader({
         dimension,
-        shadows: false,
+  
         temporal: true,
-        ambientOcclusion: false,
+  
         sss: false,
         quantumMode: 'hydrogenND',
       })
@@ -156,9 +156,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     for (const quantumMode of modes) {
       const { wgsl } = composeSchroedingerShader({
         dimension: 4,
-        shadows: false,
+  
         temporal: false,
-        ambientOcclusion: false,
+  
         sss: false,
         quantumMode,
       })
@@ -167,12 +167,52 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     }
   })
 
+  it('specializes harmonic-oscillator family by excluding hydrogen modules', () => {
+    const { wgsl, modules } = composeSchroedingerShader({
+      dimension: 6,
+
+      temporal: false,
+
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(modules).toContain('HO ND 6D')
+    expect(modules).toContain('Hydrogen Family Fallbacks')
+    expect(modules).not.toContain('Hydrogen ND Common')
+    expect(modules).not.toContain('Hydrogen ND Dispatch')
+    expect(modules).not.toContain('Laguerre Polynomials')
+    expect(wgsl).toContain('return evalHarmonicOscillatorPsi(xND, t, uniforms);')
+    expect(wgsl).not.toContain('return hydrogenNDOptimized(xND, t, uniforms);')
+  })
+
+  it('specializes hydrogen-ND family by excluding HO ND modules', () => {
+    const { wgsl, modules } = composeSchroedingerShader({
+      dimension: 7,
+
+      temporal: false,
+
+      sss: false,
+      quantumMode: 'hydrogenND',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(modules).toContain('Hydrogen ND Common')
+    expect(modules).toContain('Hydrogen ND Dispatch')
+    expect(modules).not.toContain('Hydrogen Family Fallbacks')
+    expect(modules).not.toContain('HO ND 7D')
+    expect(modules).not.toContain('HO ND Dispatch')
+    expect(wgsl).toContain('return hydrogenNDOptimized(xND, t, uniforms);')
+    expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsi(')
+  })
+
   it('supports density grid acceleration mode', () => {
     const { wgsl, features } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
       useDensityGrid: true,
@@ -188,9 +228,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('specializes optional physics toggles via compile-time feature defines', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 5,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       nodal: false,
       dispersion: false,
@@ -200,16 +240,14 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     verifyWgsl(wgsl, true)
     expect(wgsl).toContain('const FEATURE_NODAL: bool = false;')
     expect(wgsl).toContain('const FEATURE_DISPERSION: bool = false;')
-    expect(wgsl).toContain('const FEATURE_SHADOWS: bool = false;')
-    expect(wgsl).toContain('const FEATURE_AO: bool = false;')
   })
 
   it('uses dynamic bounding radius for density-grid sampling space', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 6,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
       useDensityGrid: true,
@@ -224,9 +262,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('adds conservative empty-space skipping and physically bounded early termination guards', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
       useDensityGrid: true,
@@ -241,9 +279,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('reuses center density when computing grid gradients', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
       useDensityGrid: true,
@@ -257,9 +295,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('uses uncertainty boundary uniforms instead of legacy shimmer uniforms', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
       useDensityGrid: true,
@@ -278,9 +316,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('keeps runtime color modules when compile-time colorAlgorithm is provided', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
       colorAlgorithm: 0,
@@ -296,9 +334,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('uses normalized harmonic oscillator basis (no visual damping)', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
     })
@@ -311,9 +349,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('does not redeclare shared constants in composed Schrödinger shader', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
     })
@@ -325,9 +363,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('uses physical wavefunction-based nodal classification', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporal: false,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
     })
@@ -340,9 +378,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   it('uses half-pixel temporal jitter offsets for quarter-res reprojection', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
-      shadows: false,
+
       temporalAccumulation: true,
-      ambientOcclusion: false,
+
       sss: false,
       quantumMode: 'harmonicOscillator',
     })
@@ -381,6 +419,37 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
 
       verifyWgslCompute(wgsl)
     }
+  })
+
+  it('specializes compute harmonic family by excluding hydrogen modules', () => {
+    const { wgsl, modules } = composeDensityGridComputeShader({
+      dimension: 5,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgslCompute(wgsl)
+    expect(modules).toContain('HO ND 5D')
+    expect(modules).toContain('HO ND Dispatch')
+    expect(modules).not.toContain('Hydrogen ND Common')
+    expect(modules).not.toContain('Hydrogen ND Dispatch')
+    expect(modules).not.toContain('Laguerre Polynomials')
+    expect(wgsl).toContain('return evalHarmonicOscillatorPsi(xND, t, uniforms);')
+    expect(wgsl).not.toContain('return hydrogenNDOptimized(xND, t, uniforms);')
+  })
+
+  it('specializes compute hydrogen-ND family by excluding HO ND modules', () => {
+    const { wgsl, modules } = composeDensityGridComputeShader({
+      dimension: 8,
+      quantumMode: 'hydrogenND',
+    })
+
+    verifyWgslCompute(wgsl)
+    expect(modules).toContain('Hydrogen ND Common')
+    expect(modules).toContain('Hydrogen ND Dispatch')
+    expect(modules).not.toContain('HO ND 8D')
+    expect(modules).not.toContain('HO ND Dispatch')
+    expect(wgsl).toContain('return hydrogenNDOptimized(xND, t, uniforms);')
+    expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsi(')
   })
 
   it('supports unrolled HO superposition', () => {

@@ -50,28 +50,8 @@ export const DEFAULT_BLOOM_THRESHOLD = 0.8
 export const DEFAULT_BLOOM_RADIUS = 0.4
 /** Luminance smoothing - softens the threshold transition (0-1, default 0.01) */
 export const DEFAULT_BLOOM_SMOOTHING = 0.01
-/** Number of blur levels/mip levels (1-8, default 5) */
+/** Number of blur levels/mip levels (1-5, default 5) */
 export const DEFAULT_BLOOM_LEVELS = 5
-
-// ============================================================================
-// Bokeh (Depth of Field) Defaults
-// ============================================================================
-
-/** Bokeh focus mode type */
-export type BokehFocusMode = 'auto-center' | 'auto-mouse' | 'manual'
-
-/** Bokeh blur method type */
-export type BokehBlurMethod = 'disc' | 'jittered' | 'separable' | 'hexagonal'
-
-export const DEFAULT_BOKEH_ENABLED = false
-export const DEFAULT_BOKEH_FOCUS_MODE: BokehFocusMode = 'auto-center'
-export const DEFAULT_BOKEH_BLUR_METHOD: BokehBlurMethod = 'hexagonal'
-export const DEFAULT_BOKEH_WORLD_FOCUS_DISTANCE = 15
-export const DEFAULT_BOKEH_WORLD_FOCUS_RANGE = 10
-export const DEFAULT_BOKEH_SCALE = 0.0
-export const DEFAULT_BOKEH_FOCAL_LENGTH = 0.1
-export const DEFAULT_BOKEH_SMOOTH_TIME = 0.25
-export const DEFAULT_BOKEH_SHOW_DEBUG = false
 
 // ============================================================================
 // Anti-aliasing Defaults
@@ -84,16 +64,6 @@ export const DEFAULT_ANTI_ALIASING_METHOD: AntiAliasingMethod = 'none'
 
 /** Whether depth-based effects use object-only depth or full scene depth */
 export const DEFAULT_OBJECT_ONLY_DEPTH = true
-
-// ============================================================================
-// SSAO (Screen-Space Ambient Occlusion) Defaults
-// ============================================================================
-
-/** Global AO enabled by default (enhances depth perception) */
-export const DEFAULT_SSAO_ENABLED = false
-
-/** AO intensity/strength (0-2 range, 1.0 = normal) */
-export const DEFAULT_SSAO_INTENSITY = 1.0
 
 // ============================================================================
 // Paper Texture Effect Defaults
@@ -187,16 +157,6 @@ export const DEFAULT_LIGHTS = [createDefaultLight(), createDefaultSpotLight()]
 export const DEFAULT_SELECTED_LIGHT_ID: string | null = null
 export const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate'
 export const DEFAULT_SHOW_LIGHT_GIZMOS = false
-
-// Shadow system - re-export from lib for convenience
-export {
-  DEFAULT_SHADOW_ANIMATION_MODE,
-  DEFAULT_SHADOW_ENABLED,
-  DEFAULT_SHADOW_QUALITY,
-  DEFAULT_SHADOW_SOFTNESS,
-  SHADOW_SOFTNESS_RANGE,
-} from '@/rendering/shadows/constants'
-export type { ShadowAnimationMode, ShadowQuality } from '@/rendering/shadows/types'
 
 // ============================================================================
 // Surface Effect Defaults

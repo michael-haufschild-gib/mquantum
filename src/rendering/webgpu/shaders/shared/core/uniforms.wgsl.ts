@@ -161,15 +161,13 @@ struct QualityUniforms {
   sdfMaxIterations: i32,
   sdfSurfaceDistance: f32,
 
-  // Shadow quality (0=off, 1=low, 2=medium, 3=high)
-  shadowQuality: i32,
-  shadowSoftness: f32,
-
-  // AO quality
-  aoEnabled: i32,
-  aoSamples: i32,
-  aoRadius: f32,
-  aoIntensity: f32,
+  // Reserved (formerly shadow + AO quality — removed, keeping layout)
+  _reservedShadowQuality: i32,
+  _reservedShadowSoftness: f32,
+  _reservedAoEnabled: i32,
+  _reservedAoSamples: i32,
+  _reservedAoRadius: f32,
+  _reservedAoIntensity: f32,
 
   // Global quality multiplier (for fast mode)
   qualityMultiplier: f32,

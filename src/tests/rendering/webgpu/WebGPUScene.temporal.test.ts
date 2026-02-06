@@ -6,9 +6,7 @@ interface ScenePassConfig {
   objectType: 'schroedinger'
   dimension: number
   bloomEnabled: boolean
-  ssaoEnabled: boolean
   antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
-  bokehEnabled: boolean
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   cinematicEnabled: boolean
@@ -18,8 +16,6 @@ interface ScenePassConfig {
   useDensityGrid: boolean
   nodalEnabled: boolean
   dispersionEnabled: boolean
-  shadowsEnabled: boolean
-  aoEnabled: boolean
   phaseMaterialityEnabled: boolean
   emissionPulsingEnabled: boolean
   interferenceEnabled: boolean
@@ -64,9 +60,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     objectType: 'schroedinger',
     dimension: 4,
     bloomEnabled: false,
-    ssaoEnabled: false,
     antiAliasingMethod: 'none',
-    bokehEnabled: false,
     paperEnabled: false,
     frameBlendingEnabled: false,
     cinematicEnabled: false,
@@ -76,8 +70,6 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     useDensityGrid: false,
     nodalEnabled: false,
     dispersionEnabled: false,
-    shadowsEnabled: false,
-    aoEnabled: false,
     phaseMaterialityEnabled: false,
     emissionPulsingEnabled: false,
     interferenceEnabled: false,

@@ -1,9 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { BloomControls } from './BloomControls'
-import { BokehControls } from './BokehControls'
 import { CinematicControls } from './CinematicControls'
 import { PaperControls } from './PaperControls'
-// NOTE: GravityControls moved to Advanced Rendering section (AdvancedObjectControls)
 import { Switch } from '@/components/ui/Switch'
 import { Tabs } from '@/components/ui/Tabs'
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
@@ -18,8 +16,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
     setBloomEnabled: state.setBloomEnabled,
     cinematicEnabled: state.cinematicEnabled,
     setCinematicEnabled: state.setCinematicEnabled,
-    bokehEnabled: state.bokehEnabled,
-    setBokehEnabled: state.setBokehEnabled,
     paperEnabled: state.paperEnabled,
     setPaperEnabled: state.setPaperEnabled,
   }))
@@ -28,8 +24,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
     setBloomEnabled,
     cinematicEnabled,
     setCinematicEnabled,
-    bokehEnabled,
-    setBokehEnabled,
     paperEnabled,
     setPaperEnabled,
   } = usePostProcessingStore(postProcessingSelector)
@@ -69,22 +63,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
         ),
       },
       {
-        id: 'dof',
-        label: 'DoF',
-        content: (
-          <div className="space-y-4">
-            <Switch
-              checked={bokehEnabled}
-              onCheckedChange={setBokehEnabled}
-              label="Enable Depth of Field"
-            />
-            <div className={!bokehEnabled ? 'opacity-50 pointer-events-none' : ''}>
-              <BokehControls />
-            </div>
-          </div>
-        ),
-      },
-      {
         id: 'paper',
         label: 'Paper',
         content: (
@@ -109,15 +87,12 @@ export const PostProcessingControls: React.FC = React.memo(() => {
           </div>
         ),
       },
-      // NOTE: Gravity tab removed - controls moved to Advanced Rendering section
     ],
     [
       bloomEnabled,
       setBloomEnabled,
       cinematicEnabled,
       setCinematicEnabled,
-      bokehEnabled,
-      setBokehEnabled,
       paperEnabled,
       setPaperEnabled,
     ]

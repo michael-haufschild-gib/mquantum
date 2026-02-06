@@ -34,9 +34,7 @@ export type LightingMode =
 
 export interface WGSLShaderConfig {
   dimension: number
-  shadows: boolean
   temporal: boolean
-  ambientOcclusion: boolean
   overrides?: string[]
   /** Enable SSS module compilation (conditionally compiled) */
   sss?: boolean

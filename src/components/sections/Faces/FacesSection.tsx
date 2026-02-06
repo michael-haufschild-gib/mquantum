@@ -6,7 +6,6 @@
  * - Material: Opacity, diffuse, and specular settings
  * - FX: Fresnel rim effects
  *
- * Shadow controls moved to ShadowsSection.
  */
 
 import { Section } from '@/components/sections/Section'

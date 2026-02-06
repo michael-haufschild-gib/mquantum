@@ -20,8 +20,6 @@ import {
   normalizeRotationTupleSigned,
 } from '@/rendering/lights/types'
 import type { ToneMappingAlgorithm } from '@/rendering/shaders/types'
-import type { ShadowAnimationMode, ShadowQuality } from '@/rendering/shadows/types'
-import { SHADOW_SOFTNESS_RANGE } from '@/rendering/shadows/constants'
 import {
   DEFAULT_AMBIENT_COLOR,
   DEFAULT_AMBIENT_ENABLED,
@@ -34,10 +32,6 @@ import {
   DEFAULT_LIGHT_VERTICAL_ANGLE,
   DEFAULT_LIGHTS,
   DEFAULT_SELECTED_LIGHT_ID,
-  DEFAULT_SHADOW_ANIMATION_MODE,
-  DEFAULT_SHADOW_ENABLED,
-  DEFAULT_SHADOW_QUALITY,
-  DEFAULT_SHADOW_SOFTNESS,
   DEFAULT_SHOW_LIGHT_GIZMOS,
   DEFAULT_SHOW_LIGHT_INDICATOR,
   DEFAULT_TONE_MAPPING_ALGORITHM,
@@ -79,17 +73,6 @@ export interface LightingSliceState {
   showLightGizmos: boolean
   isDraggingLight: boolean
 
-  // --- Shadow System ---
-  shadowEnabled: boolean
-  shadowQuality: ShadowQuality
-  shadowSoftness: number
-  shadowAnimationMode: ShadowAnimationMode
-
-  // --- Shadow Map Settings (for mesh-based objects like polytopes) ---
-  /** Shadow map bias to prevent shadow acne (0-0.01 range) */
-  shadowMapBias: number
-  /** Shadow map blur radius for softer edges (0-10 range) */
-  shadowMapBlur: number
 }
 
 export interface LightingSliceActions {
@@ -118,16 +101,6 @@ export interface LightingSliceActions {
   setTransformMode: (mode: TransformMode) => void
   setShowLightGizmos: (show: boolean) => void
   setIsDraggingLight: (dragging: boolean) => void
-
-  // --- Shadow System Actions ---
-  setShadowEnabled: (enabled: boolean) => void
-  setShadowQuality: (quality: ShadowQuality) => void
-  setShadowSoftness: (softness: number) => void
-  setShadowAnimationMode: (mode: ShadowAnimationMode) => void
-
-  // --- Shadow Map Actions (for mesh-based objects like polytopes) ---
-  setShadowMapBias: (bias: number) => void
-  setShadowMapBlur: (blur: number) => void
 
   // --- Version Bump (for preset loading) ---
   /** Manually bump version counter (used after direct setState calls) */
@@ -167,15 +140,6 @@ export const LIGHTING_INITIAL_STATE: LightingSliceState = {
   showLightGizmos: DEFAULT_SHOW_LIGHT_GIZMOS,
   isDraggingLight: false,
 
-  // Shadow system
-  shadowEnabled: DEFAULT_SHADOW_ENABLED,
-  shadowQuality: DEFAULT_SHADOW_QUALITY,
-  shadowSoftness: DEFAULT_SHADOW_SOFTNESS,
-  shadowAnimationMode: DEFAULT_SHADOW_ANIMATION_MODE,
-
-  // Shadow map settings (for mesh-based objects)
-  shadowMapBias: 0.001,
-  shadowMapBlur: 2,
 }
 
 // ============================================================================
@@ -328,37 +292,6 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   setIsDraggingLight: (dragging: boolean) => {
     set({ isDraggingLight: dragging })
-  },
-
-  // --- Shadow System Actions ---
-  setShadowEnabled: (enabled: boolean) => {
-    set({ shadowEnabled: enabled })
-  },
-
-  setShadowQuality: (quality: ShadowQuality) => {
-    set({ shadowQuality: quality })
-  },
-
-  setShadowSoftness: (softness: number) => {
-    set({
-      shadowSoftness: Math.max(
-        SHADOW_SOFTNESS_RANGE.min,
-        Math.min(SHADOW_SOFTNESS_RANGE.max, softness)
-      ),
-    })
-  },
-
-  setShadowAnimationMode: (mode: ShadowAnimationMode) => {
-    set({ shadowAnimationMode: mode })
-  },
-
-  // --- Shadow Map Actions (for mesh-based objects) ---
-  setShadowMapBias: (bias: number) => {
-    set({ shadowMapBias: Math.max(0, Math.min(0.01, bias)) })
-  },
-
-  setShadowMapBlur: (blur: number) => {
-    set({ shadowMapBlur: Math.max(0, Math.min(10, blur)) })
   },
 
   bumpVersion: () => {

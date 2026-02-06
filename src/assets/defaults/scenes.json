@@ -11,10 +11,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "phase",
         "cosineCoefficients": {
-          "a": [0.6, 0.2, 0.3],
-          "b": [0.4, 0.3, 0.3],
-          "c": [0.5, 0.5, 0.5],
-          "d": [0, 0, 0]
+          "a": [
+            0.6,
+            0.2,
+            0.3
+          ],
+          "b": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "c": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "d": [
+            0,
+            0,
+            0
+          ]
         },
         "distribution": {
           "power": 1,
@@ -75,8 +91,16 @@
             "name": "Main Light",
             "type": "point",
             "enabled": false,
-            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
-            "rotation": [0, 0, 0],
+            "position": [
+              -3.1816363437043065,
+              5.362311101832846,
+              -3.1816363437043056
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -89,8 +113,16 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": false,
-            "position": [-5, 5, 5],
-            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
+            "position": [
+              -5,
+              5,
+              5
+            ],
+            "rotation": [
+              -0.6154797086703874,
+              -0.7853981633974483,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -100,13 +132,7 @@
           }
         ],
         "selectedLightId": "__ambient__",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
+        "transformMode": "translate"
       },
       "postProcessing": {
         "bloomEnabled": true,
@@ -115,23 +141,12 @@
         "bloomRadius": 0.05,
         "bloomSmoothing": 0.95,
         "bloomLevels": 1,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
         "antiAliasingMethod": "smaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0.005,
         "cinematicVignette": 0,
         "cinematicGrain": 0.019,
         "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
         "gravityEnabled": false,
         "gravityStrength": 1,
         "gravityDistortionScale": 1,
@@ -175,10 +190,26 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.6, 0.2, 0.3],
-            "b": [0.4, 0.3, 0.3],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.6,
+              0.2,
+              0.3
+            ],
+            "b": [
+              0.4,
+              0.3,
+              0.3
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -192,7 +223,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -288,9 +323,20 @@
           "escapeRadius": 8,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
-          "parameterValues": [0],
-          "center": [0, 0, 0, 0],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
+          "parameterValues": [
+            0
+          ],
+          "center": [
+            0,
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "boundaryOnly",
           "palette": "complement",
@@ -304,7 +350,10 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [0.1, 0.9],
+          "boundaryThreshold": [
+            0.1,
+            0.9
+          ],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -334,7 +383,12 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [-0.2, 0.8, 0, 0],
+          "juliaConstant": [
+            -0.2,
+            0.8,
+            0,
+            0
+          ],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -342,14 +396,32 @@
           "surfaceThreshold": 0.002,
           "maxRaymarchSteps": 128,
           "qualityMultiplier": 1,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -361,10 +433,6 @@
           "layerCount": 2,
           "layerOpacity": 0.5,
           "volumetricDensity": 1,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
           "roughness": 0.3,
           "sssEnabled": false,
           "sssIntensity": 1,
@@ -378,9 +446,20 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
-          "parameterValues": [0],
-          "center": [0, 0, 0, 0],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
+          "parameterValues": [
+            0
+          ],
+          "center": [
+            0,
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -390,10 +469,26 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -409,8 +504,26 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
-          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
+          "extraDimQuantumNumbers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "extraDimOmega": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.8,
           "fieldScale": 1,
@@ -441,14 +554,6 @@
           "dispersionStrength": 0.5,
           "dispersionDirection": 0,
           "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
           "nodalEnabled": true,
           "nodalColor": "#ff00c5",
           "nodalStrength": 0.4,
@@ -516,13 +621,12 @@
           "roughness": 0.6,
           "specular": 0.2,
           "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -548,7 +652,12 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [1, 1, 1, 1],
+        "perAxisScale": [
+          1,
+          1,
+          1,
+          1
+        ],
         "scaleLocked": true,
         "dimension": 4
       },
@@ -567,12 +676,27 @@
         "isPlaying": true,
         "speed": 0.2,
         "direction": 1,
-        "animatingPlanes": ["XY", "XZ", "XW", "YZ", "YW", "ZW"],
+        "animatingPlanes": [
+          "XY",
+          "XZ",
+          "XW",
+          "YZ",
+          "YW",
+          "ZW"
+        ],
         "accumulatedTime": 317.42555281951365
       },
       "camera": {
-        "position": [0, 1.4155839248890447, 3.397401419733704],
-        "target": [0, 0, 0]
+        "position": [
+          0,
+          1.4155839248890447,
+          3.397401419733704
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
       },
       "ui": {
         "showDepthBuffer": false,
@@ -605,10 +729,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "phase",
         "cosineCoefficients": {
-          "a": [0.5, 0.5, 0.5],
-          "b": [0.5, 0.5, 0.5],
-          "c": [0.8, 0.8, 0.8],
-          "d": [0, 0.1, 0.2]
+          "a": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "b": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "c": [
+            0.8,
+            0.8,
+            0.8
+          ],
+          "d": [
+            0,
+            0.1,
+            0.2
+          ]
         },
         "distribution": {
           "power": 2.95,
@@ -669,8 +809,16 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
-            "rotation": [0, 0, 0],
+            "position": [
+              -3.1816363437043065,
+              5.362311101832846,
+              -3.1816363437043056
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -683,8 +831,16 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [-5, 5, 5],
-            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
+            "position": [
+              -5,
+              5,
+              5
+            ],
+            "rotation": [
+              -0.6154797086703874,
+              -0.7853981633974483,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -694,13 +850,7 @@
           }
         ],
         "selectedLightId": "__ambient__",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
+        "transformMode": "translate"
       },
       "postProcessing": {
         "bloomEnabled": true,
@@ -709,23 +859,12 @@
         "bloomRadius": 0.05,
         "bloomSmoothing": 0.95,
         "bloomLevels": 1,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
         "antiAliasingMethod": "smaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0.005,
         "cinematicVignette": 0,
         "cinematicGrain": 0.019,
         "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
         "gravityEnabled": false,
         "gravityStrength": 1,
         "gravityDistortionScale": 1,
@@ -769,10 +908,26 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.6, 0.2, 0.3],
-            "b": [0.4, 0.3, 0.3],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.6,
+              0.2,
+              0.3
+            ],
+            "b": [
+              0.4,
+              0.3,
+              0.3
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -786,7 +941,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -882,9 +1041,20 @@
           "escapeRadius": 8,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
-          "parameterValues": [0],
-          "center": [0, 0, 0, 0],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
+          "parameterValues": [
+            0
+          ],
+          "center": [
+            0,
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "boundaryOnly",
           "palette": "complement",
@@ -898,7 +1068,10 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [0.1, 0.9],
+          "boundaryThreshold": [
+            0.1,
+            0.9
+          ],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -928,7 +1101,12 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [-0.2, 0.8, 0, 0],
+          "juliaConstant": [
+            -0.2,
+            0.8,
+            0,
+            0
+          ],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -936,14 +1114,32 @@
           "surfaceThreshold": 0.002,
           "maxRaymarchSteps": 128,
           "qualityMultiplier": 1,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -955,10 +1151,6 @@
           "layerCount": 2,
           "layerOpacity": 0.5,
           "volumetricDensity": 1,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
           "roughness": 0.3,
           "sssEnabled": false,
           "sssIntensity": 1,
@@ -972,9 +1164,26 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
-          "parameterValues": [0, 0, 0, 0],
-          "center": [0, 0, 0, 0, 0, 0, 0],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
+          "parameterValues": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "center": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -984,10 +1193,26 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -1003,8 +1228,26 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
-          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
+          "extraDimQuantumNumbers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "extraDimOmega": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.8,
           "fieldScale": 1,
@@ -1035,14 +1278,6 @@
           "dispersionStrength": 0.25,
           "dispersionDirection": 0,
           "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
           "nodalEnabled": false,
           "nodalColor": "#ff00c5",
           "nodalStrength": 0.1,
@@ -1110,13 +1345,12 @@
           "roughness": 0.6,
           "specular": 0.2,
           "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -1142,7 +1376,15 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [1, 1, 1, 1, 1, 1, 1],
+        "perAxisScale": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
         "scaleLocked": true,
         "dimension": 7
       },
@@ -1199,8 +1441,16 @@
         "accumulatedTime": 453.58617831164344
       },
       "camera": {
-        "position": [3.171553383754365, -1.5076819510167225, -1.1019793663165716],
-        "target": [0, 0, 0]
+        "position": [
+          3.171553383754365,
+          -1.5076819510167225,
+          -1.1019793663165716
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
       },
       "ui": {
         "showDepthBuffer": false,
@@ -1233,10 +1483,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "radial",
         "cosineCoefficients": {
-          "a": [0.5, 0.5, 0.5],
-          "b": [0.5, 0.5, 0.5],
-          "c": [3, 3, 3],
-          "d": [0, 0, 0]
+          "a": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "b": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "c": [
+            3,
+            3,
+            3
+          ],
+          "d": [
+            0,
+            0,
+            0
+          ]
         },
         "distribution": {
           "power": 3.05,
@@ -1297,8 +1563,16 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
-            "rotation": [0, 0, 0],
+            "position": [
+              -3.1816363437043065,
+              5.362311101832846,
+              -3.1816363437043056
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 2,
             "coneAngle": 30,
@@ -1311,8 +1585,16 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [-5, 15, 5],
-            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
+            "position": [
+              -5,
+              15,
+              5
+            ],
+            "rotation": [
+              -0.6154797086703874,
+              -0.7853981633974483,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 2.6,
             "coneAngle": 76,
@@ -1322,13 +1604,7 @@
           }
         ],
         "selectedLightId": "light-default-spot",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
+        "transformMode": "translate"
       },
       "postProcessing": {
         "bloomEnabled": true,
@@ -1337,23 +1613,12 @@
         "bloomRadius": 0.1,
         "bloomSmoothing": 0.77,
         "bloomLevels": 3,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
         "antiAliasingMethod": "fxaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0.005,
         "cinematicVignette": 1.2,
         "cinematicGrain": 0,
         "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
         "gravityEnabled": false,
         "gravityStrength": 1,
         "gravityDistortionScale": 1,
@@ -1397,10 +1662,26 @@
           "timeScale": 0.1,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.6, 0.2, 0.3],
-            "b": [0.4, 0.3, 0.3],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.6,
+              0.2,
+              0.3
+            ],
+            "b": [
+              0.4,
+              0.3,
+              0.3
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -1414,7 +1695,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -1510,7 +1795,11 @@
           "escapeRadius": 4,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
           "parameterValues": [],
           "center": [],
           "extent": 2,
@@ -1526,7 +1815,10 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [0.1, 0.9],
+          "boundaryThreshold": [
+            0.1,
+            0.9
+          ],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -1556,7 +1848,12 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [-0.2, 0.8, 0, 0],
+          "juliaConstant": [
+            -0.2,
+            0.8,
+            0,
+            0
+          ],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -1568,10 +1865,26 @@
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -1583,10 +1896,6 @@
           "layerCount": 2,
           "layerOpacity": 0.5,
           "volumetricDensity": 1,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
           "roughness": 0.3,
           "sssEnabled": false,
           "sssIntensity": 1,
@@ -1600,9 +1909,17 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
           "parameterValues": [],
-          "center": [0, 0, 0],
+          "center": [
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -1612,10 +1929,26 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -1631,8 +1964,26 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
-          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
+          "extraDimQuantumNumbers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "extraDimOmega": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.8,
           "fieldScale": 1,
@@ -1663,14 +2014,6 @@
           "dispersionStrength": 1,
           "dispersionDirection": 1,
           "dispersionQuality": 1,
-          "shadowsEnabled": false,
-          "shadowStrength": 2,
-          "shadowSteps": 8,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
           "nodalEnabled": false,
           "nodalColor": "#00ffff",
           "nodalStrength": 2,
@@ -1738,13 +2081,19 @@
           "roughness": 0.6,
           "specular": 0.2,
           "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [0, 0, 0, 0, 0, 0, 0, 0],
+          "parameterValues": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -1770,7 +2119,11 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [1, 1, 1],
+        "perAxisScale": [
+          1,
+          1,
+          1
+        ],
         "scaleLocked": true,
         "dimension": 3
       },
@@ -1786,12 +2139,22 @@
         "isPlaying": true,
         "speed": 0.3,
         "direction": 1,
-        "animatingPlanes": ["XZ"],
+        "animatingPlanes": [
+          "XZ"
+        ],
         "accumulatedTime": 832.5923192292396
       },
       "camera": {
-        "position": [1.8055929515134794, -1.9228933696992911, -2.325036257307802],
-        "target": [0, 0, 0]
+        "position": [
+          1.8055929515134794,
+          -1.9228933696992911,
+          -2.325036257307802
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
       },
       "ui": {
         "showDepthBuffer": false,
@@ -1824,10 +2187,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "phase",
         "cosineCoefficients": {
-          "a": [0.65, 0.62, 0.6],
-          "b": [0.18, 0.18, 0.2],
-          "c": [0.5, 0.5, 0.5],
-          "d": [0, 0, 0.5]
+          "a": [
+            0.65,
+            0.62,
+            0.6
+          ],
+          "b": [
+            0.18,
+            0.18,
+            0.2
+          ],
+          "c": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "d": [
+            0,
+            0,
+            0.5
+          ]
         },
         "distribution": {
           "power": 1.25,
@@ -1888,8 +2267,16 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
-            "rotation": [0, 0, 0],
+            "position": [
+              -3.1816363437043065,
+              5.362311101832846,
+              -3.1816363437043056
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -1902,8 +2289,16 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [-5, 5, 5],
-            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
+            "position": [
+              -5,
+              5,
+              5
+            ],
+            "rotation": [
+              -0.6154797086703874,
+              -0.7853981633974483,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -1913,13 +2308,7 @@
           }
         ],
         "selectedLightId": null,
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
+        "transformMode": "translate"
       },
       "postProcessing": {
         "bloomEnabled": true,
@@ -1928,23 +2317,12 @@
         "bloomRadius": 0.1,
         "bloomSmoothing": 0.84,
         "bloomLevels": 3,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
         "antiAliasingMethod": "none",
         "cinematicEnabled": true,
         "cinematicAberration": 0.005,
         "cinematicVignette": 1.9,
         "cinematicGrain": 0,
         "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
         "gravityEnabled": false,
         "gravityStrength": 1,
         "gravityDistortionScale": 1,
@@ -1988,10 +2366,26 @@
           "timeScale": 0.19,
           "syncWithObject": false,
           "cosineCoefficients": {
-            "a": [0.15, 0.1, 0.2],
-            "b": [0.35, 0.25, 0.5],
-            "c": [0.25, 0.25, 0.25],
-            "d": [0, 0, 0]
+            "a": [
+              0.15,
+              0.1,
+              0.2
+            ],
+            "b": [
+              0.35,
+              0.25,
+              0.5
+            ],
+            "c": [
+              0.25,
+              0.25,
+              0.25
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -2005,7 +2399,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 0,
           "aurora": {
@@ -2088,7 +2486,11 @@
           "escapeRadius": 4,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
           "parameterValues": [],
           "center": [],
           "extent": 2,
@@ -2104,7 +2506,10 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [0.1, 0.9],
+          "boundaryThreshold": [
+            0.1,
+            0.9
+          ],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -2129,7 +2534,12 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [-0.2, 0.8, 0, 0],
+          "juliaConstant": [
+            -0.2,
+            0.8,
+            0,
+            0
+          ],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -2139,24 +2549,38 @@
           "sdfMaxIterations": 30,
           "sdfSurfaceDistance": 0.002,
           "qualityMultiplier": 1,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "colorPower": 1,
           "colorCycles": 1,
           "colorOffset": 0,
           "lchLightness": 0.7,
           "lchChroma": 0.15,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
           "roughness": 0.3,
           "sssEnabled": false,
           "sssIntensity": 1,
@@ -2170,9 +2594,22 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
-          "parameterValues": [0, 0],
-          "center": [0, 0, 0, 0, 0],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
+          "parameterValues": [
+            0,
+            0
+          ],
+          "center": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -2182,10 +2619,26 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -2201,8 +2654,26 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
-          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
+          "extraDimQuantumNumbers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "extraDimOmega": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.3,
           "fieldScale": 0.5,
@@ -2234,14 +2705,6 @@
           "dispersionStrength": 0.6,
           "dispersionDirection": 1,
           "dispersionQuality": 0,
-          "shadowsEnabled": true,
-          "shadowStrength": 1.9,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
           "nodalEnabled": false,
           "nodalColor": "#00ffff",
           "nodalStrength": 1.5,
@@ -2309,13 +2772,19 @@
           "roughness": 0.6,
           "specular": 0.2,
           "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [0, 0, 0, 0, 0, 0, 0, 0],
+          "parameterValues": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -2341,7 +2810,13 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [1, 1, 1, 1, 1],
+        "perAxisScale": [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
         "scaleLocked": true,
         "dimension": 5
       },
@@ -2364,12 +2839,24 @@
         "isPlaying": true,
         "speed": 0.4,
         "direction": 1,
-        "animatingPlanes": ["XY", "XZ", "YZ"],
+        "animatingPlanes": [
+          "XY",
+          "XZ",
+          "YZ"
+        ],
         "accumulatedTime": 379.08384669044875
       },
       "camera": {
-        "position": [0, 1.6886252739457375, 4.052700657469769],
-        "target": [0, 0, 0]
+        "position": [
+          0,
+          1.6886252739457375,
+          4.052700657469769
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
       }
     }
   },
@@ -2385,10 +2872,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "mixed",
         "cosineCoefficients": {
-          "a": [0.5, 0.5, 0.5],
-          "b": [0.5, 0.5, 0.5],
-          "c": [0.8, 0.8, 0.8],
-          "d": [0, 0.1, 0.2]
+          "a": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "b": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "c": [
+            0.8,
+            0.8,
+            0.8
+          ],
+          "d": [
+            0,
+            0.1,
+            0.2
+          ]
         },
         "distribution": {
           "power": 1,
@@ -2445,13 +2948,7 @@
         "exposure": 1.7,
         "lights": [],
         "selectedLightId": "__ambient__",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
+        "transformMode": "translate"
       },
       "postProcessing": {
         "bloomEnabled": false,
@@ -2460,23 +2957,12 @@
         "bloomRadius": 0.05,
         "bloomSmoothing": 0.95,
         "bloomLevels": 1,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 59,
-        "bokehScale": 0.2,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
         "antiAliasingMethod": "smaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0,
         "cinematicVignette": 1.2,
         "cinematicGrain": 0.027,
         "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
         "gravityEnabled": false,
         "gravityStrength": 1,
         "gravityDistortionScale": 1,
@@ -2520,10 +3006,26 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.6, 0.2, 0.3],
-            "b": [0.4, 0.3, 0.3],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.6,
+              0.2,
+              0.3
+            ],
+            "b": [
+              0.4,
+              0.3,
+              0.3
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -2537,7 +3039,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -2633,9 +3139,20 @@
           "escapeRadius": 8,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
-          "parameterValues": [0],
-          "center": [0, 0, 0, 0],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
+          "parameterValues": [
+            0
+          ],
+          "center": [
+            0,
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "boundaryOnly",
           "palette": "complement",
@@ -2649,7 +3166,10 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [0.1, 0.9],
+          "boundaryThreshold": [
+            0.1,
+            0.9
+          ],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -2681,7 +3201,12 @@
           "driftFrequencySpread": 0.2
         },
         "quaternionJulia": {
-          "juliaConstant": [-0.2, 0.8, 0, 0],
+          "juliaConstant": [
+            -0.2,
+            0.8,
+            0,
+            0
+          ],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -2691,24 +3216,38 @@
           "sdfMaxIterations": 30,
           "sdfSurfaceDistance": 0.002,
           "qualityMultiplier": 1,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "colorPower": 1,
           "colorCycles": 1,
           "colorOffset": 0,
           "lchLightness": 0.7,
           "lchChroma": 0.15,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
           "roughness": 0.3,
           "sssEnabled": false,
           "sssIntensity": 1,
@@ -2727,9 +3266,17 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [0, 1, 2],
+          "visualizationAxes": [
+            0,
+            1,
+            2
+          ],
           "parameterValues": [],
-          "center": [0, 0, 0],
+          "center": [
+            0,
+            0,
+            0
+          ],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -2739,10 +3286,26 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [0.5, 0.5, 0.5],
-            "b": [0.5, 0.5, 0.5],
-            "c": [1, 1, 1],
-            "d": [0, 0.33, 0.67]
+            "a": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "b": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "c": [
+              1,
+              1,
+              1
+            ],
+            "d": [
+              0,
+              0.33,
+              0.67
+            ]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -2758,8 +3321,26 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
-          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
+          "extraDimQuantumNumbers": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "extraDimOmega": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.1,
           "fieldScale": 1.1,
@@ -2791,14 +3372,6 @@
           "dispersionStrength": 0.85,
           "dispersionDirection": 0,
           "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 2,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
           "nodalEnabled": false,
           "nodalColor": "#ff00c5",
           "nodalStrength": 1.4,
@@ -2866,13 +3439,12 @@
           "roughness": 0.6,
           "specular": 0.2,
           "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [0],
+          "parameterValues": [
+            0
+          ],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -2898,7 +3470,11 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [1, 1, 1],
+        "perAxisScale": [
+          1,
+          1,
+          1
+        ],
         "scaleLocked": true,
         "dimension": 3
       },
@@ -2931,12 +3507,23 @@
         "isPlaying": true,
         "speed": 0.2,
         "direction": 1,
-        "animatingPlanes": ["XY", "XZ"],
+        "animatingPlanes": [
+          "XY",
+          "XZ"
+        ],
         "accumulatedTime": 573.9529972492733
       },
       "camera": {
-        "position": [0, 1.1015175238864832, 2.643642057327557],
-        "target": [0, 0, 0]
+        "position": [
+          0,
+          1.1015175238864832,
+          2.643642057327557
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ]
       }
     }
   }

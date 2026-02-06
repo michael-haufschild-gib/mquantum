@@ -464,18 +464,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerDispersionDirection: valueSetter('dispersionDirection'),
     setSchroedingerDispersionQuality: valueSetter('dispersionQuality'),
 
-    // === Shadows ===
-    setSchroedingerShadowsEnabled: valueSetter('shadowsEnabled'),
-    setSchroedingerShadowStrength: clampedSetter('shadowStrength', 0.0, 2.0),
-    setSchroedingerShadowSteps: clampedSetter('shadowSteps', 1, 8),
-
-    // === Ambient Occlusion ===
-    setSchroedingerAoEnabled: valueSetter('aoEnabled'),
-    setSchroedingerAoStrength: clampedSetter('aoStrength', 0.0, 2.0),
-    setSchroedingerAoQuality: clampedSetter('aoQuality', 3, 8),
-    setSchroedingerAoRadius: clampedSetter('aoRadius', 0.1, 2.0),
-    setSchroedingerAoColor: valueSetter('aoColor'),
-
     // === Nodal Surfaces ===
     setSchroedingerNodalEnabled: valueSetter('nodalEnabled'),
     setSchroedingerNodalColor: valueSetter('nodalColor'),
