@@ -29,20 +29,23 @@ import { DistributionControls } from './DistributionControls'
 import { LchPresetSelector } from './LchPresetSelector'
 import { PresetSelector } from './PresetSelector'
 
-/**
- * Color algorithms that share the same cosine gradient controls:
- * PresetSelector, CosineGradientEditor, and DistributionControls.
- */
-const COSINE_GRADIENT_ALGORITHMS = new Set([
+/** Algorithms that use the cosine palette (preset selector + advanced editor) */
+const USES_COSINE_PALETTE = new Set(['cosine', 'normal', 'distance', 'radial', 'multiSource'])
+
+/** Algorithms that use distribution controls (power, cycles, offset) */
+const USES_DISTRIBUTION = new Set([
+  'monochromatic',
+  'analogous',
   'cosine',
   'normal',
   'distance',
+  'lch',
+  'multiSource',
   'radial',
-  'phase',
-  'mixed',
-  'blackbody',
-  'dimension',
 ])
+
+/** Algorithms that use the base/face color (HSL-based) */
+const USES_BASE_COLOR = new Set(['monochromatic', 'analogous', 'phase', 'mixed'])
 
 export interface FacesSectionProps {
   defaultOpen?: boolean
@@ -245,30 +248,27 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
         {/* Live Preview */}
         <ColorPreview />
 
-        {/* Algorithm-Specific Controls */}
-
-        {/* Monochromatic and Analogous use base color */}
-        {(colorAlgorithm === 'monochromatic' || colorAlgorithm === 'analogous') && (
+        {/* Base color picker (HSL-based algorithms) */}
+        {USES_BASE_COLOR.has(colorAlgorithm) && (
           <ColorPicker
             label="Base Color"
             value={faceColor}
             onChange={setFaceColor}
-            // Opacity is handled by Material tab for now
             disableAlpha={true}
           />
         )}
 
-        {/* Cosine gradient algorithms share the same controls */}
-        {COSINE_GRADIENT_ALGORITHMS.has(colorAlgorithm) && (
-          <div className="space-y-4">
+        {/* Cosine palette controls (preset + advanced editor) */}
+        {USES_COSINE_PALETTE.has(colorAlgorithm) && (
+          <>
             <PresetSelector />
             <CosineGradientEditor />
-            <DistributionControls />
-          </div>
+          </>
         )}
 
+        {/* LCH perceptual color controls */}
         {colorAlgorithm === 'lch' && (
-          <div className="space-y-4">
+          <>
             <LchPresetSelector />
             <Slider
               label="Lightness"
@@ -288,18 +288,14 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
               onChange={setLchChroma}
               showValue
             />
-            <DistributionControls />
-          </div>
+          </>
         )}
 
-        {colorAlgorithm === 'multiSource' && (
-          <div className="space-y-4">
-            <PresetSelector />
-            <CosineGradientEditor />
-            <DistributionControls />
-            <MultiSourceWeightsEditor />
-          </div>
-        )}
+        {/* Multi-source weight editor */}
+        {colorAlgorithm === 'multiSource' && <MultiSourceWeightsEditor />}
+
+        {/* Distribution controls (power, cycles, offset) */}
+        {USES_DISTRIBUTION.has(colorAlgorithm) && <DistributionControls />}
       </div>
     )
   }

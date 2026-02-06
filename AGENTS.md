@@ -22,7 +22,6 @@ Read at the start of a new session:
 - Development environment: `docs/testing.md`
 - Testing setup: `docs/testing.md`
 - Frontend setup: `docs/frontend.md`
-- Understanding math used for object creation, transformation and projection: `docs/research/nd-dimensional-react-threejs-guide.md`
 
 ## MANDATORY CODE STYLE AND ARCHITECTURE RULES
 Coding agents must follow `docs/meta/styleguide.md` - No exceptions!

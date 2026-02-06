@@ -5,6 +5,7 @@
 
 import { getRotationPlanes } from '@/lib/math/rotation'
 import { create } from 'zustand'
+import { useExtendedObjectStore } from './extendedObjectStore'
 
 /** Minimum animation speed multiplier */
 export const MIN_SPEED = 0.1
@@ -157,9 +158,17 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   clearAllPlanes: () => {
-    // Clear all planes and stop animation to prevent invalid state
-    // where isPlaying=true but animatingPlanes is empty
-    set({ animatingPlanes: new Set(), isPlaying: false })
+    // Clear all planes, but only pause if no other animations are active
+    const { schroedinger } = useExtendedObjectStore.getState()
+    const hasOtherAnimations =
+      schroedinger.interferenceEnabled ||
+      schroedinger.probabilityFlowEnabled ||
+      schroedinger.sliceAnimationEnabled ||
+      schroedinger.phaseAnimationEnabled
+    set({
+      animatingPlanes: new Set(),
+      isPlaying: hasOtherAnimations ? get().isPlaying : false,
+    })
   },
 
   stopAll: () => {

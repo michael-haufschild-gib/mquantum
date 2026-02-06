@@ -152,11 +152,39 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const a_oklab = lchChroma * Math.cos(hue)
           const b_oklab = lchChroma * Math.sin(hue)
           ;[r, g, b] = oklabToLinearSrgb(lchLightness, a_oklab, b_oklab)
+        } else if (colorAlgorithm === 'phase') {
+          // Phase: hue shift around base color (t = wavefunction phase 0..1)
+          // Matches shader: hue = fract(baseHSL.x + (phaseNorm - 0.5) * 0.4)
+          const [baseHue] = hexToHsl(faceColor)
+          const hueShift = (t - 0.5) * 0.4
+          const hue = (((baseHue + hueShift) % 1) + 1) % 1
+          ;[r, g, b] = hslToRgb(hue, 0.75, 0.35)
+        } else if (colorAlgorithm === 'mixed') {
+          // Mixed: phase hue + density-dependent lightness/saturation
+          // Matches shader: hue varies with phase, lightness = 0.15 + 0.35 * density
+          const [baseHue] = hexToHsl(faceColor)
+          const hueShift = (t - 0.5) * 0.4
+          const hue = (((baseHue + hueShift) % 1) + 1) % 1
+          const lightness = 0.15 + 0.35 * t
+          const saturation = 0.7 + 0.25 * t
+          ;[r, g, b] = hslToRgb(hue, saturation, lightness)
+        } else if (colorAlgorithm === 'blackbody') {
+          // Blackbody: analytic temperature ramp (t = normalized density)
+          // Matches shader: temp = normalized * 12000, blackbody(temp)
+          const temp = t * 12000
+          if (temp < 500) {
+            r = 0
+            g = 0
+            b = 0
+          } else {
+            const invTemp = Math.pow(temp, -1.5)
+            r = Math.min(1, Math.max(0, (56100000 * invTemp + 148) / 255))
+            g = Math.min(1, Math.max(0, (100040000 * invTemp + 66) / 255))
+            b = Math.min(1, Math.max(0, (194180000 * invTemp + 30) / 255))
+          }
         } else {
-          // Cosine palette (works for cosine, normal, distance, multiSource, radial)
-          // Note: normal/multiSource depend on 3D surface properties, so preview
-          // shows the underlying palette colors that will be used.
-          // Radial uses distance from origin (0-1) mapped to the cosine palette.
+          // Cosine palette (cosine, normal, distance, multiSource, radial)
+          // Shows the underlying palette that will be sampled by position/density.
           const color = getCosinePaletteColorTS(
             t,
             cosineCoefficients.a,

@@ -123,10 +123,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // visually significant wavefunction density. Updated per state change.
   private boundingRadius = 2.0
 
-
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1168 bytes (292 floats) - includes physical nodal controls + probability flow
-  private schroedingerUniformData = new ArrayBuffer(1168)
+  // Schroedinger: 1200 bytes (300 floats) - includes physical nodal controls + probability flow + LCH/multiSource
+  private schroedingerUniformData = new ArrayBuffer(1200)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -147,6 +146,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Dirty-flag version tracking - skip uniform updates when unchanged
   // Schroedinger uses partial buffer writes: only time field (4 bytes) when settings unchanged
   private lastSchroedingerVersion = -1
+  private lastLightingVersion = -1
   private lastAppearanceVersion = -1
   // Separate appearance version tracker for the Schroedinger uniform buffer.
   // Emission/Rim parameters are sourced from the appearance store (matching WebGL),
@@ -236,6 +236,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
+    // Force a lighting buffer write on first frame after (re)initialization.
+    this.lastLightingVersion = -1
 
     // Compose shaders
     const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
@@ -284,7 +286,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         {
           binding: 2,
           visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as GPUTextureSampleType, viewDimension: '3d' as GPUTextureViewDimension },
+          texture: {
+            sampleType: 'float' as GPUTextureSampleType,
+            viewDimension: '3d' as GPUTextureViewDimension,
+          },
         }, // Density grid texture (rgba16float)
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' as const } } // Trilinear sampler
       )
@@ -404,7 +409,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
     // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1168, 'schroedinger-uniforms')
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1200, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create density grid compute pass if enabled
@@ -578,18 +583,42 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Build model matrix: translation * scale
     // Column-major order for WebGPU (same as Three.js)
     // modelMatrix (offset 80): [scale, 0, 0, 0, 0, scale, 0, 0, 0, 0, scale, 0, tx, ty, tz, 1]
-    data[80] = scale; data[81] = 0; data[82] = 0; data[83] = 0
-    data[84] = 0; data[85] = scale; data[86] = 0; data[87] = 0
-    data[88] = 0; data[89] = 0; data[90] = scale; data[91] = 0
-    data[92] = position[0]; data[93] = position[1]; data[94] = position[2]; data[95] = 1.0
+    data[80] = scale
+    data[81] = 0
+    data[82] = 0
+    data[83] = 0
+    data[84] = 0
+    data[85] = scale
+    data[86] = 0
+    data[87] = 0
+    data[88] = 0
+    data[89] = 0
+    data[90] = scale
+    data[91] = 0
+    data[92] = position[0]
+    data[93] = position[1]
+    data[94] = position[2]
+    data[95] = 1.0
 
     // inverseModelMatrix (offset 96): inverse of translation * scale
     // inv(T*S) = inv(S) * inv(T) = [1/s, 0, 0, 0, 0, 1/s, 0, 0, 0, 0, 1/s, 0, -tx/s, -ty/s, -tz/s, 1]
     const invScale = scale !== 0 ? 1.0 / scale : 1.0
-    data[96] = invScale; data[97] = 0; data[98] = 0; data[99] = 0
-    data[100] = 0; data[101] = invScale; data[102] = 0; data[103] = 0
-    data[104] = 0; data[105] = 0; data[106] = invScale; data[107] = 0
-    data[108] = -position[0] * invScale; data[109] = -position[1] * invScale; data[110] = -position[2] * invScale; data[111] = 1.0
+    data[96] = invScale
+    data[97] = 0
+    data[98] = 0
+    data[99] = 0
+    data[100] = 0
+    data[101] = invScale
+    data[102] = 0
+    data[103] = 0
+    data[104] = 0
+    data[105] = 0
+    data[106] = invScale
+    data[107] = 0
+    data[108] = -position[0] * invScale
+    data[109] = -position[1] * invScale
+    data[110] = -position[2] * invScale
+    data[111] = 1.0
 
     // Camera position at offset 112 (after 7 matrices)
     if (camera.position) {
@@ -636,7 +665,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
    */
   private computeCanonicalCompensation(preset: QuantumPreset, dimension: number): number {
     // HO_NORM[n] = 1/sqrt(2^n * n!) - must match ho1d.wgsl.ts
-    const HO_NORM = [1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.0510310363080, 0.0161374306092, 0.00465847495312]
+    const HO_NORM = [
+      1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.051031036308, 0.0161374306092,
+      0.00465847495312,
+    ]
     const INV_PI = 1 / Math.PI
 
     if (preset.termCount === 0) return 1.0
@@ -829,7 +861,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         schroedinger?.principalQuantumNumber ?? 2,
         schroedinger?.bohrRadiusScale ?? 1.0,
         extraDimQuantumNumbers,
-        extraDimOmega,
+        extraDimOmega
       )
       // Rebuild bounding geometry if radius changed significantly
       if (Math.abs(newBoundR - this.boundingRadius) > 0.01 && this.device) {
@@ -1049,9 +1081,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       phase: 8,
       mixed: 9,
       blackbody: 10,
-      accretionGradient: 11,
-      gravitationalRedshift: 12,
-      dimension: 13,
     }
     const colorAlgorithm = colorAlgorithmMap[appearance?.colorAlgorithm ?? 'mixed'] ?? 9
     intView[940 / 4] = colorAlgorithm
@@ -1154,6 +1183,19 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1156 / 4] = schroedinger?.probabilityFlowSpeed ?? 1.0
     floatView[1160 / 4] = schroedinger?.probabilityFlowStrength ?? 0.3
     floatView[1164 / 4] = 0.0 // _padFlow0
+
+    // LCH perceptual color parameters (offset 1168-1180)
+    floatView[1168 / 4] = appearance?.lchLightness ?? 0.7
+    floatView[1172 / 4] = appearance?.lchChroma ?? 0.15
+    floatView[1176 / 4] = 0.0 // _padLch0
+    floatView[1180 / 4] = 0.0 // _padLch1
+
+    // Multi-source blend weights (offset 1184-1200, vec4f)
+    const msWeights = appearance?.multiSourceWeights
+    floatView[1184 / 4] = msWeights?.depth ?? 0.5
+    floatView[1188 / 4] = msWeights?.orbitTrap ?? 0.3
+    floatView[1192 / 4] = msWeights?.normal ?? 0.2
+    floatView[1196 / 4] = 0.0 // w unused
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1258,6 +1300,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const lighting = ctx.frame?.stores?.['lighting'] as any
     if (!lighting) return
+    const lightingVersion = lighting?.version ?? 0
+    if (lightingVersion === this.lastLightingVersion) return
+    this.lastLightingVersion = lightingVersion
 
     const data = this.lightingUniformData
     packLightingUniforms(data, lighting)
@@ -1421,7 +1466,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Use pre-allocated DataView for integer writes
     this.qualityDataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
-    this.qualityDataView.setInt32(2 * 4, lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0, true) // shadowQuality
+    this.qualityDataView.setInt32(
+      2 * 4,
+      lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0,
+      true
+    ) // shadowQuality
     // aoEnabled: Use schroedinger store's aoEnabled (WebGL uses per-object AO toggle, not global ssaoEnabled)
     this.qualityDataView.setInt32(4 * 4, schroedinger?.aoEnabled ? 1 : 0, true) // aoEnabled
     this.qualityDataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
@@ -1459,7 +1508,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // but the buffer write must happen each frame for animation to work
     this.updateSchroedingerUniforms(ctx)
 
-    // ALWAYS update: Lighting (no version tracking available, cheap operation)
+    // CONDITIONAL: Lighting uniforms - update only when lighting.version changes
     this.updateLightingUniforms(ctx)
 
     // CONDITIONAL: Material uniforms - depends on appearance version
@@ -1487,7 +1536,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       // Sync uniform data from renderer to compute pass
       // The compute pass needs the same Schroedinger and Basis uniforms
       // Pass versions to enable smart dirty tracking - only recompute when parameters change
-      gridPass.updateSchroedingerUniforms(ctx.device, this.schroedingerUniformData, schroedingerVersion)
+      gridPass.updateSchroedingerUniforms(
+        ctx.device,
+        this.schroedingerUniformData,
+        schroedingerVersion
+      )
       gridPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, rotationVersion)
       // Sync bounding radius so density grid covers the full wavefunction extent
       gridPass.updateWorldBound(ctx.device, this.boundingRadius)

@@ -219,6 +219,15 @@ struct SchroedingerUniforms {
   probabilityFlowSpeed: f32,      // Flow animation speed (0.1-5.0)
   probabilityFlowStrength: f32,   // Flow modulation strength (0.0-1.0)
   _padFlow0: f32,                 // Alignment padding
+
+  // LCH perceptual color parameters (algorithm 5)
+  lchLightness: f32,              // Oklab perceptual lightness (0.1-1.0)
+  lchChroma: f32,                 // Oklab perceptual chroma (0.0-0.4)
+  _padLch0: f32,                  // Alignment padding for vec4f
+  _padLch1: f32,                  // Alignment padding for vec4f
+
+  // Multi-source blend weights (algorithm 6)
+  multiSourceWeights: vec4f,      // xyz = depth/radial/normal weights, w = unused
 }
 
 // ============================================

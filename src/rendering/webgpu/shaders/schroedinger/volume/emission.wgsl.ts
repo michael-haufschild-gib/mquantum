@@ -132,11 +132,12 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
     else if (algorithm == 3) {
       // 3: Normal-based - color by vertical position as normal proxy
       let normalT = pos.y * 0.5 + 0.5;
+      let distNormalT = applyDistributionS(normalT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
       let a = uniforms.cosineA.xyz;
       let b = uniforms.cosineB.xyz;
       let c = uniforms.cosineC.xyz;
       let d = uniforms.cosineD.xyz;
-      col = cosinePalette(normalT, a, b, c, d);
+      col = cosinePalette(distNormalT, a, b, c, d);
     }
     else if (algorithm == 4) {
       // 4: Distance field - cosine palette on density (primary signal for volume)
@@ -147,19 +148,19 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
       col = cosinePalette(distributedT, a, b, c, d);
     }
     else if (algorithm == 5) {
-      // 5: LCH/Oklab perceptual hue rotation (matches WebGL lchColor)
-      // Maps distributedT to hue angle, using constant lightness and chroma
-      let lchLightness = 0.7;  // Default from store (DEFAULT_LCH_LIGHTNESS)
-      let lchChroma = 0.15;    // Default from store (DEFAULT_LCH_CHROMA)
+      // 5: LCH/Oklab perceptual hue rotation
+      // Maps distributedT to hue angle in Oklab color space
       let hue = distributedT * TAU;
-      let oklab = vec3f(lchLightness, lchChroma * cos(hue), lchChroma * sin(hue));
+      let oklab = vec3f(uniforms.lchLightness, uniforms.lchChroma * cos(hue), uniforms.lchChroma * sin(hue));
       col = clamp(oklab2rgb(oklab), vec3f(0.0), vec3f(1.0));
     }
     else if (algorithm == 6) {
       // 6: Multi-source - blend density + radial + vertical through cosine palette
-      let radialT = clamp(length(pos) / 2.0, 0.0, 1.0);
+      let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
+      let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
+      let radialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
       let verticalT = pos.y * 0.5 + 0.5;
-      let blendedT = 0.5 * distributedT + 0.3 * radialT + 0.2 * verticalT;
+      let blendedT = w.x * distributedT + w.y * radialT + w.z * verticalT;
       let a = uniforms.cosineA.xyz;
       let b = uniforms.cosineB.xyz;
       let c = uniforms.cosineC.xyz;
@@ -168,7 +169,8 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
     }
     else if (algorithm == 7) {
       // 7: Radial - color by distance from center through cosine palette
-      let radialT = clamp(length(pos) / 2.0, 0.0, 1.0);
+      let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+      let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
       let a = uniforms.cosineA.xyz;
       let b = uniforms.cosineB.xyz;
       let c = uniforms.cosineC.xyz;

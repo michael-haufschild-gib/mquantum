@@ -19,9 +19,9 @@ export type ColorAlgorithm =
   | 5 // LCH/Oklab perceptual
   | 6 // Multi-source (Cosine)
   | 7 // Radial (Cosine)
-  | 8 // Phase/Angular (Cosine)
-  | 9 // Mixed Phase+Distance (Cosine)
-  | 10 // Blackbody (no dependencies)
+  | 8 // Phase/Angular (HSL, wavefunction phase)
+  | 9 // Mixed Phase+Distance (HSL, default)
+  | 10 // Blackbody (analytic, no user color params)
 
 /**
  * Lighting mode for compile-time optimization

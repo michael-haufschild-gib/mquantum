@@ -30,21 +30,22 @@ import type { AppearanceSlice, ColorSlice, ColorSliceState } from './types'
 type AlgorithmParamSet = 'distribution' | 'cosine' | 'lch' | 'multiSource'
 
 const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
-  // HSL-based (only uses distribution for value mapping)
+  // HSL-based (uses base color + distribution)
   monochromatic: ['distribution'],
   analogous: ['distribution'],
-  // Cosine palette-based
+  // Cosine palette-based (+ distribution)
   cosine: ['distribution', 'cosine'],
   normal: ['distribution', 'cosine'],
   distance: ['distribution', 'cosine'],
   radial: ['distribution', 'cosine'],
-  phase: ['distribution', 'cosine'],
-  mixed: ['distribution', 'cosine'],
   multiSource: ['distribution', 'cosine', 'multiSource'],
-  // LCH-based
+  // LCH perceptual (uses lightness/chroma + distribution)
   lch: ['distribution', 'lch'],
-  // Simple gradient (blackbody uses distribution)
-  blackbody: ['distribution'],
+  // Phase-based (uses base color only, no distribution or cosine)
+  phase: [],
+  mixed: [],
+  // Analytic (no user-controllable color parameters)
+  blackbody: [],
 }
 
 /**
