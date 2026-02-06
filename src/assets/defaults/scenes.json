@@ -11,26 +11,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "phase",
         "cosineCoefficients": {
-          "a": [
-            0.6,
-            0.2,
-            0.3
-          ],
-          "b": [
-            0.4,
-            0.3,
-            0.3
-          ],
-          "c": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
+          "a": [0.6, 0.2, 0.3],
+          "b": [0.4, 0.3, 0.3],
+          "c": [0.5, 0.5, 0.5],
+          "d": [0, 0, 0]
         },
         "distribution": {
           "power": 1,
@@ -91,16 +75,8 @@
             "name": "Main Light",
             "type": "point",
             "enabled": false,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -113,16 +89,8 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": false,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
+            "position": [-5, 5, 5],
+            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -207,26 +175,10 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -240,11 +192,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -340,20 +288,9 @@
           "escapeRadius": 8,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0
-          ],
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0],
+          "center": [0, 0, 0, 0],
           "extent": 2,
           "colorMode": "boundaryOnly",
           "palette": "complement",
@@ -367,10 +304,7 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
+          "boundaryThreshold": [0.1, 0.9],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -400,12 +334,7 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
+          "juliaConstant": [-0.2, 0.8, 0, 0],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -413,32 +342,14 @@
           "surfaceThreshold": 0.002,
           "maxRaymarchSteps": 128,
           "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -467,20 +378,9 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0
-          ],
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0],
+          "center": [0, 0, 0, 0],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -490,26 +390,10 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -525,26 +409,8 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
+          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
+          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.8,
           "fieldScale": 1,
@@ -663,9 +529,7 @@
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -691,12 +555,7 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1
-        ],
+        "perAxisScale": [1, 1, 1, 1],
         "scaleLocked": true,
         "dimension": 4
       },
@@ -715,1565 +574,12 @@
         "isPlaying": true,
         "speed": 0.2,
         "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "XW",
-          "YZ",
-          "YW",
-          "ZW"
-        ],
+        "animatingPlanes": ["XY", "XZ", "XW", "YZ", "YW", "ZW"],
         "accumulatedTime": 317.42555281951365
       },
       "camera": {
-        "position": [
-          0,
-          1.4155839248890447,
-          3.397401419733704
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      },
-      "ui": {
-        "showDepthBuffer": false,
-        "showNormalBuffer": false,
-        "showTemporalDepthBuffer": false,
-        "animationBias": 0,
-        "maxFps": 60,
-        "opacitySettings": {
-          "mode": "solid",
-          "simpleAlphaOpacity": 0.7,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "sampleQuality": "medium",
-          "volumetricAnimationQuality": "reduce"
-        },
-        "hasSeenVolumetricWarning": false
-      }
-    }
-  },
-  {
-    "id": "2780b2a6-9089-4fd1-93c8-d975be6975a8",
-    "name": "Nested Torus Metallic",
-    "timestamp": 1767175714209,
-    "data": {
-      "appearance": {
-        "edgeColor": "#d8d8d8",
-        "faceColor": "#969696",
-        "backgroundColor": "#0F0F1A",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "monochromatic",
-        "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            3,
-            3,
-            3
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 3.05,
-          "cycles": 1,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1.7,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": false,
-        "shaderType": "wireframe",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 1,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": true
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.3,
-        "sssEnabled": true,
-        "sssIntensity": 1.6,
-        "sssColor": "#f3e5e5",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.3,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "cineon",
-        "exposure": 1.6,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1.5,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 0.9
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 0.9
-          }
-        ],
-        "selectedLightId": "light-default",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.75,
-        "bloomThreshold": 0.45,
-        "bloomRadius": 0.1,
-        "bloomSmoothing": 0.59,
-        "bloomLevels": 4,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "fxaa",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.005,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0.012,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": true,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "procedural_twilight",
-        "skyboxEnabled": true,
-        "skyboxMode": "procedural_twilight",
-        "skyboxTexture": "space_blue",
-        "skyboxBlur": 0,
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 0.4,
-          "complexity": 0.17,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.85,
-              0.82,
-              0.92
-            ],
-            "b": [
-              0.1,
-              0.1,
-              0.08
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "chromaticAberration": 0.1,
-          "horizon": 0,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "noiseGrain": 0,
-          "evolution": 2.05,
-          "starfield": {
-            "density": 0.5,
-            "brightness": 1,
-            "size": 0.5,
-            "twinkle": 0.3,
-            "glow": 0.5,
-            "colorVariation": 0.5
-          },
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          },
-          "parallaxEnabled": false,
-          "parallaxStrength": 0.5
-        },
-        "backgroundColor": "#070707",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.5,
-          "metallic": 0.65,
-          "specularIntensity": 1.5,
-          "specularColor": "#8a0397"
-        },
-        "edge": {
-          "roughness": 0.43,
-          "metallic": 0.78,
-          "specularIntensity": 1.6,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 7,
-        "objectType": "nested-torus"
-      },
-      "extended": {
-        "polytope": {
-          "scale": 1.8,
-          "facetOffsetEnabled": true,
-          "facetOffsetAmplitude": 0.2,
-          "facetOffsetFrequency": 0.01,
-          "facetOffsetPhaseSpread": 0.12,
-          "facetOffsetBias": 1
-        },
-        "wythoffPolytope": {
-          "symmetryGroup": "B",
-          "preset": "regular",
-          "customSymbol": [],
-          "scale": 2,
-          "snub": false
-        },
-        "rootSystem": {
-          "rootType": "A",
-          "scale": 2
-        },
-        "cliffordTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "mode": "classic",
-          "resolutionU": 32,
-          "resolutionV": 32,
-          "k": 2,
-          "stepsPerCircle": 16
-        },
-        "nestedTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "eta": 0.7853981633974483,
-          "resolutionXi1": 48,
-          "resolutionXi2": 48,
-          "showNestedTori": false,
-          "numberOfTori": 3,
-          "fiberResolution": 6,
-          "baseResolution": 8,
-          "showFiberStructure": true
-        },
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 80,
-          "escapeRadius": 4,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "escapeTime",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 8,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 12,
-          "powerSpeed": 0.03,
-          "alternatePowerEnabled": false,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "dimensionMixEnabled": false,
-          "mixIntensity": 0.1,
-          "mixFrequency": 0.5,
-          "originDriftEnabled": false,
-          "driftAmplitude": 0.03,
-          "driftBaseFrequency": 0.04,
-          "driftFrequencySpread": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.03,
-          "phaseAmplitude": 0.3,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "qualityMultiplier": 1,
-          "parameterValues": [],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
-        "schroedinger": {
-          "scale": 0.6,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "mixed",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "invertColors": false,
-          "renderStyle": "rayMarching",
-          "quantumMode": "harmonicOscillator",
-          "presetName": "custom",
-          "seed": 42,
-          "termCount": 1,
-          "maxQuantumNumber": 6,
-          "frequencySpread": 0.01,
-          "principalQuantumNumber": 2,
-          "azimuthalQuantumNumber": 1,
-          "magneticQuantumNumber": 0,
-          "useRealOrbitals": true,
-          "bohrRadiusScale": 1,
-          "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
-          "extraDimFrequencySpread": 0,
-          "timeScale": 0.8,
-          "fieldScale": 1,
-          "densityGain": 2,
-          "powderScale": 1,
-          "sampleCount": 32,
-          "emissionIntensity": 0,
-          "emissionThreshold": 0.3,
-          "emissionColorShift": 0,
-          "emissionPulsing": false,
-          "rimExponent": 3,
-          "scatteringAnisotropy": 0,
-          "roughness": 0.3,
-          "fogIntegrationEnabled": true,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "raymarchQuality": "balanced",
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "sssJitter": 0.2,
-          "erosionStrength": 0,
-          "erosionScale": 1,
-          "erosionTurbulence": 0.5,
-          "erosionNoiseType": 0,
-          "curlEnabled": false,
-          "curlStrength": 0.3,
-          "curlScale": 1,
-          "curlSpeed": 1,
-          "curlBias": 0,
-          "dispersionEnabled": false,
-          "dispersionStrength": 0.2,
-          "dispersionDirection": 0,
-          "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
-          "nodalEnabled": false,
-          "nodalColor": "#00ffff",
-          "nodalStrength": 1,
-          "energyColorEnabled": false,
-          "shimmerEnabled": false,
-          "shimmerStrength": 0.5,
-          "isoEnabled": false,
-          "isoThreshold": -0.76,
-          "originDriftEnabled": false,
-          "driftAmplitude": 0.03,
-          "driftBaseFrequency": 0.04,
-          "driftFrequencySpread": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "spreadAnimationEnabled": false,
-          "spreadAnimationSpeed": 0.5,
-          "phaseAnimationEnabled": false
-        },
-        "blackhole": {
-          "horizonRadius": 0.5,
-          "spin": 0.3,
-          "diskTemperature": 6500,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 2,
-          "manifoldThickness": 0.8,
-          "photonShellWidth": 0.05,
-          "timeScale": 1,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 1,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1.3,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 8,
-          "shellGlowColor": "#aaccff",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 4.23,
-          "diskOuterRadiusMul": 15,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 1.2,
-          "noiseScale": 1,
-          "noiseAmount": 0.6,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 0.3,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": false,
-          "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0.5,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "swirlAnimationEnabled": false,
-          "swirlAnimationSpeed": 0.5,
-          "pulseEnabled": false,
-          "pulseSpeed": 0.3,
-          "pulseAmount": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "keplerianDifferential": 0.5
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 7
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 1.5333527017793553,
-          "XZ": 4.140937674874301,
-          "XW": 4.479214017979796,
-          "XV": 0.8450690520860142,
-          "YZ": 4.108166305895015,
-          "YW": 4.610903851601538,
-          "YV": 4.638966560300194,
-          "ZW": 6.1961524214226795,
-          "ZV": 5.647061051016905,
-          "WV": 2.281777129593026,
-          "XU": 5.662621470136338,
-          "XA6": 0.7919329017405232,
-          "YU": 0.9294498244968166,
-          "YA6": 5.429109006308867,
-          "ZU": 0.8558511188220885,
-          "ZA6": 4.386206317891027,
-          "WU": 2.3737874563733836,
-          "WA6": 3.629650314125188,
-          "VU": 1.8715326418245102,
-          "VA6": 3.4665203359593697,
-          "UA6": 2.700047412704194
-        },
-        "dimension": 7
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.3,
-        "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "XW",
-          "XV",
-          "XU",
-          "XA6",
-          "YZ",
-          "YW",
-          "YV",
-          "YU",
-          "YA6",
-          "ZW",
-          "ZV",
-          "ZU",
-          "ZA6",
-          "WV",
-          "WU",
-          "WA6",
-          "VU",
-          "VA6",
-          "UA6"
-        ],
-        "accumulatedTime": 645.7613542704896
-      },
-      "camera": {
-        "position": [
-          -0.40494779012859494,
-          -0.10614702016447651,
-          -1.9556968316638879
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      },
-      "ui": {
-        "showDepthBuffer": false,
-        "showNormalBuffer": false,
-        "showTemporalDepthBuffer": false,
-        "animationBias": 0.6,
-        "maxFps": 60,
-        "opacitySettings": {
-          "mode": "solid",
-          "simpleAlphaOpacity": 0.7,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "sampleQuality": "medium",
-          "volumetricAnimationQuality": "reduce"
-        },
-        "hasSeenVolumetricWarning": false
-      }
-    }
-  },
-  {
-    "id": "21645851-11d9-49b9-9e24-4c540412e559",
-    "name": "4D Hypercube on Paper",
-    "timestamp": 1767175714209,
-    "data": {
-      "appearance": {
-        "edgeColor": "#000501",
-        "faceColor": "#dd2727",
-        "backgroundColor": "#0F0F1A",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "phase",
-        "cosineCoefficients": {
-          "a": [
-            0.38,
-            0.38,
-            0.4
-          ],
-          "b": [
-            0.32,
-            0.32,
-            0.32
-          ],
-          "c": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 1,
-          "cycles": 1,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0.9,
-        "faceEmissionThreshold": 0.15,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 0.6,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": false
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.1,
-        "sssEnabled": false,
-        "sssIntensity": 1,
-        "sssColor": "#ff8844",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.65,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "cineon",
-        "exposure": 1.7,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": false,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 0.9
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 0.9
-          }
-        ],
-        "selectedLightId": "__ambient__",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": false,
-        "bloomIntensity": 0.85,
-        "bloomThreshold": 0.2,
-        "bloomRadius": 0.05,
-        "bloomSmoothing": 0.95,
-        "bloomLevels": 1,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 59,
-        "bokehScale": 0.2,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "smaa",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0.027,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": true,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.99,
-        "paperFiber": 0.5,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f1f1f1",
-        "paperColorBack": "#e9e9e9",
-        "paperQuality": "high",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "none",
-        "skyboxEnabled": false,
-        "skyboxMode": "classic",
-        "skyboxTexture": "none",
-        "skyboxBlur": 0,
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 1,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "chromaticAberration": 0.1,
-          "horizon": 0,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "noiseGrain": 0,
-          "evolution": 0,
-          "starfield": {
-            "density": 0.5,
-            "brightness": 1,
-            "size": 0.5,
-            "twinkle": 0.3,
-            "glow": 0.5,
-            "colorVariation": 0.5
-          },
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          },
-          "parallaxEnabled": false,
-          "parallaxStrength": 0.5
-        },
-        "backgroundColor": "#f8f5f5",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.65,
-          "metallic": 0.2,
-          "specularIntensity": 1.9,
-          "specularColor": "#ffffff"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 4,
-        "objectType": "hypercube"
-      },
-      "extended": {
-        "polytope": {
-          "scale": 1.8,
-          "facetOffsetEnabled": true,
-          "facetOffsetAmplitude": 0.2,
-          "facetOffsetFrequency": 0.01,
-          "facetOffsetPhaseSpread": 0.12,
-          "facetOffsetBias": 1
-        },
-        "wythoffPolytope": {
-          "symmetryGroup": "B",
-          "preset": "regular",
-          "customSymbol": [],
-          "scale": 2,
-          "snub": false
-        },
-        "rootSystem": {
-          "rootType": "A",
-          "scale": 2
-        },
-        "cliffordTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "mode": "classic",
-          "resolutionU": 32,
-          "resolutionV": 32,
-          "k": 2,
-          "stepsPerCircle": 16
-        },
-        "nestedTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "eta": 0.7853981633974483,
-          "resolutionXi1": 48,
-          "resolutionXi2": 48,
-          "showNestedTori": false,
-          "numberOfTori": 3,
-          "fiberResolution": 6,
-          "baseResolution": 8,
-          "showFiberStructure": true
-        },
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 50,
-          "escapeRadius": 8,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0
-          ],
-          "extent": 2,
-          "colorMode": "boundaryOnly",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 8,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 12,
-          "powerSpeed": 0.03,
-          "alternatePowerEnabled": false,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "dimensionMixEnabled": false,
-          "mixIntensity": 0.1,
-          "mixFrequency": 0.5,
-          "originDriftEnabled": false,
-          "driftAmplitude": 0.03,
-          "driftBaseFrequency": 0.04,
-          "driftFrequencySpread": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.03,
-          "phaseAmplitude": 0.3,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
-        "schroedinger": {
-          "scale": 0.6,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0
-          ],
-          "extent": 2,
-          "colorMode": "mixed",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "invertColors": false,
-          "renderStyle": "rayMarching",
-          "quantumMode": "harmonicOscillator",
-          "presetName": "custom",
-          "seed": 42,
-          "termCount": 1,
-          "maxQuantumNumber": 6,
-          "frequencySpread": 0.01,
-          "principalQuantumNumber": 2,
-          "azimuthalQuantumNumber": 1,
-          "magneticQuantumNumber": 0,
-          "useRealOrbitals": true,
-          "bohrRadiusScale": 1,
-          "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
-          "extraDimFrequencySpread": 0,
-          "timeScale": 0.8,
-          "fieldScale": 1,
-          "densityGain": 3.8,
-          "powderScale": 1.6,
-          "sampleCount": 32,
-          "emissionIntensity": 0,
-          "emissionThreshold": 0.3,
-          "emissionColorShift": 0,
-          "emissionPulsing": false,
-          "rimExponent": 3,
-          "scatteringAnisotropy": -0.6,
-          "roughness": 0.3,
-          "fogIntegrationEnabled": true,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "raymarchQuality": "balanced",
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "sssJitter": 0.2,
-          "erosionStrength": 0.75,
-          "erosionScale": 0.75,
-          "erosionTurbulence": 0.5,
-          "erosionNoiseType": 0,
-          "curlEnabled": true,
-          "curlStrength": 0.3,
-          "curlScale": 1,
-          "curlSpeed": 1,
-          "curlBias": 0,
-          "dispersionEnabled": true,
-          "dispersionStrength": 0.5,
-          "dispersionDirection": 0,
-          "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
-          "nodalEnabled": true,
-          "nodalColor": "#ff00c5",
-          "nodalStrength": 0.4,
-          "energyColorEnabled": true,
-          "shimmerEnabled": true,
-          "shimmerStrength": 0.5,
-          "isoEnabled": false,
-          "isoThreshold": -0.76,
-          "originDriftEnabled": false,
-          "driftAmplitude": 0.03,
-          "driftBaseFrequency": 0.04,
-          "driftFrequencySpread": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "spreadAnimationEnabled": false,
-          "spreadAnimationSpeed": 0.5,
-          "phaseAnimationEnabled": false
-        },
-        "blackhole": {
-          "horizonRadius": 0.5,
-          "spin": 0.3,
-          "diskTemperature": 6500,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 2,
-          "manifoldThickness": 0.165,
-          "photonShellWidth": 0.05,
-          "timeScale": 1,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 1,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1.3,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 8,
-          "shellGlowColor": "#aaccff",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 4.23,
-          "diskOuterRadiusMul": 15,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 1.2,
-          "noiseScale": 1,
-          "noiseAmount": 0.6,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 0.3,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": false,
-          "dopplerStrength": 0.6,
-          "parameterValues": [
-            0
-          ],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0.5,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "swirlAnimationEnabled": false,
-          "swirlAnimationSpeed": 0.5,
-          "pulseEnabled": false,
-          "pulseSpeed": 0.3,
-          "pulseAmount": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "keplerianDifferential": 0.5
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 4
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 0.9104440516407726,
-          "XZ": 0.9104440516407726,
-          "XW": 0.9104440516407726,
-          "YZ": 0.9104440516407726,
-          "YW": 0.9104440516407726,
-          "ZW": 0.9104440516407726
-        },
-        "dimension": 4
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.2,
-        "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "XW",
-          "YZ",
-          "YW",
-          "ZW"
-        ],
-        "accumulatedTime": 410.45878153178614
-      },
-      "camera": {
-        "position": [
-          0,
-          1.1015175238864832,
-          2.643642057327557
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
+        "position": [0, 1.4155839248890447, 3.397401419733704],
+        "target": [0, 0, 0]
       },
       "ui": {
         "showDepthBuffer": false,
@@ -2306,26 +612,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "phase",
         "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            0.8,
-            0.8,
-            0.8
-          ],
-          "d": [
-            0,
-            0.1,
-            0.2
-          ]
+          "a": [0.5, 0.5, 0.5],
+          "b": [0.5, 0.5, 0.5],
+          "c": [0.8, 0.8, 0.8],
+          "d": [0, 0.1, 0.2]
         },
         "distribution": {
           "power": 2.95,
@@ -2386,16 +676,8 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -2408,16 +690,8 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
+            "position": [-5, 5, 5],
+            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -2502,26 +776,10 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -2535,11 +793,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -2635,20 +889,9 @@
           "escapeRadius": 8,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0
-          ],
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0],
+          "center": [0, 0, 0, 0],
           "extent": 2,
           "colorMode": "boundaryOnly",
           "palette": "complement",
@@ -2662,10 +905,7 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
+          "boundaryThreshold": [0.1, 0.9],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -2695,12 +935,7 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
+          "juliaConstant": [-0.2, 0.8, 0, 0],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -2708,32 +943,14 @@
           "surfaceThreshold": 0.002,
           "maxRaymarchSteps": 128,
           "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -2762,26 +979,9 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0, 0, 0, 0],
+          "center": [0, 0, 0, 0, 0, 0, 0],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -2791,26 +991,10 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -2826,26 +1010,8 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
+          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
+          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.8,
           "fieldScale": 1,
@@ -2964,9 +1130,7 @@
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -2992,15 +1156,7 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
+        "perAxisScale": [1, 1, 1, 1, 1, 1, 1],
         "scaleLocked": true,
         "dimension": 7
       },
@@ -3057,773 +1213,14 @@
         "accumulatedTime": 453.58617831164344
       },
       "camera": {
-        "position": [
-          3.171553383754365,
-          -1.5076819510167225,
-          -1.1019793663165716
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
+        "position": [3.171553383754365, -1.5076819510167225, -1.1019793663165716],
+        "target": [0, 0, 0]
       },
       "ui": {
         "showDepthBuffer": false,
         "showNormalBuffer": false,
         "showTemporalDepthBuffer": false,
         "animationBias": 0.55,
-        "maxFps": 60,
-        "opacitySettings": {
-          "mode": "solid",
-          "simpleAlphaOpacity": 0.7,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "sampleQuality": "medium",
-          "volumetricAnimationQuality": "reduce"
-        },
-        "hasSeenVolumetricWarning": false
-      }
-    }
-  },
-  {
-    "id": "9223902f-2da6-43c7-ae34-6bce7b9d5cf1",
-    "name": "5D Hypercube",
-    "timestamp": 1767175714209,
-    "data": {
-      "appearance": {
-        "edgeColor": "#941894",
-        "faceColor": "#33cc9e",
-        "backgroundColor": "#0F0F1A",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "lch",
-        "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            3,
-            3,
-            3
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 3.05,
-          "cycles": 1,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.93,
-        "lchChroma": 0.22,
-        "edgeThickness": 1,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 0.2,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": true
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.3,
-        "sssEnabled": true,
-        "sssIntensity": 1.6,
-        "sssColor": "#df01ff",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.3,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "aces",
-        "exposure": 0.9,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1.5,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 0.9
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 0.9
-          }
-        ],
-        "selectedLightId": "light-default",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.75,
-        "bloomThreshold": 0.45,
-        "bloomRadius": 0.1,
-        "bloomSmoothing": 0.59,
-        "bloomLevels": 4,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "fxaa",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.005,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0.012,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": true,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "procedural_horizon",
-        "skyboxEnabled": true,
-        "skyboxMode": "procedural_horizon",
-        "skyboxTexture": "space_blue",
-        "skyboxBlur": 0,
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 1,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "chromaticAberration": 0.1,
-          "horizon": 0,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "noiseGrain": 0,
-          "evolution": 0,
-          "starfield": {
-            "density": 0.5,
-            "brightness": 1,
-            "size": 0.5,
-            "twinkle": 0.3,
-            "glow": 0.5,
-            "colorVariation": 0.5
-          },
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          },
-          "parallaxEnabled": false,
-          "parallaxStrength": 0.5
-        },
-        "backgroundColor": "#070707",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.5,
-          "metallic": 0.65,
-          "specularIntensity": 1.5,
-          "specularColor": "#ffffff"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 5,
-        "objectType": "hypercube"
-      },
-      "extended": {
-        "polytope": {
-          "scale": 1.8,
-          "facetOffsetEnabled": true,
-          "facetOffsetAmplitude": 0.2,
-          "facetOffsetFrequency": 0.01,
-          "facetOffsetPhaseSpread": 0.12,
-          "facetOffsetBias": 1
-        },
-        "wythoffPolytope": {
-          "symmetryGroup": "B",
-          "preset": "regular",
-          "customSymbol": [],
-          "scale": 2,
-          "snub": false
-        },
-        "rootSystem": {
-          "rootType": "A",
-          "scale": 2
-        },
-        "cliffordTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "mode": "classic",
-          "resolutionU": 32,
-          "resolutionV": 32,
-          "k": 2,
-          "stepsPerCircle": 16
-        },
-        "nestedTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "eta": 0.7853981633974483,
-          "resolutionXi1": 48,
-          "resolutionXi2": 48,
-          "showNestedTori": false,
-          "numberOfTori": 3,
-          "fiberResolution": 6,
-          "baseResolution": 8,
-          "showFiberStructure": true
-        },
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 80,
-          "escapeRadius": 4,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "escapeTime",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 8,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 12,
-          "powerSpeed": 0.03,
-          "alternatePowerEnabled": false,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "dimensionMixEnabled": false,
-          "mixIntensity": 0.1,
-          "mixFrequency": 0.5,
-          "originDriftEnabled": false,
-          "driftAmplitude": 0.03,
-          "driftBaseFrequency": 0.04,
-          "driftFrequencySpread": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.03,
-          "phaseAmplitude": 0.3,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "qualityMultiplier": 1,
-          "parameterValues": [],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
-        "schroedinger": {
-          "scale": 0.6,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "mixed",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "invertColors": false,
-          "renderStyle": "rayMarching",
-          "quantumMode": "harmonicOscillator",
-          "presetName": "custom",
-          "seed": 42,
-          "termCount": 1,
-          "maxQuantumNumber": 6,
-          "frequencySpread": 0.01,
-          "principalQuantumNumber": 2,
-          "azimuthalQuantumNumber": 1,
-          "magneticQuantumNumber": 0,
-          "useRealOrbitals": true,
-          "bohrRadiusScale": 1,
-          "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
-          "extraDimFrequencySpread": 0,
-          "timeScale": 0.8,
-          "fieldScale": 1,
-          "densityGain": 2,
-          "powderScale": 1,
-          "sampleCount": 32,
-          "emissionIntensity": 0,
-          "emissionThreshold": 0.3,
-          "emissionColorShift": 0,
-          "emissionPulsing": false,
-          "rimExponent": 3,
-          "scatteringAnisotropy": 0,
-          "roughness": 0.3,
-          "fogIntegrationEnabled": true,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "raymarchQuality": "balanced",
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "sssJitter": 0.2,
-          "erosionStrength": 0,
-          "erosionScale": 1,
-          "erosionTurbulence": 0.5,
-          "erosionNoiseType": 0,
-          "curlEnabled": false,
-          "curlStrength": 0.3,
-          "curlScale": 1,
-          "curlSpeed": 1,
-          "curlBias": 0,
-          "dispersionEnabled": false,
-          "dispersionStrength": 0.2,
-          "dispersionDirection": 0,
-          "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
-          "nodalEnabled": false,
-          "nodalColor": "#00ffff",
-          "nodalStrength": 1,
-          "energyColorEnabled": false,
-          "shimmerEnabled": false,
-          "shimmerStrength": 0.5,
-          "isoEnabled": false,
-          "isoThreshold": -0.76,
-          "originDriftEnabled": false,
-          "driftAmplitude": 0.03,
-          "driftBaseFrequency": 0.04,
-          "driftFrequencySpread": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "spreadAnimationEnabled": false,
-          "spreadAnimationSpeed": 0.5,
-          "phaseAnimationEnabled": false
-        },
-        "blackhole": {
-          "horizonRadius": 0.5,
-          "spin": 0.3,
-          "diskTemperature": 6500,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 2,
-          "manifoldThickness": 0.8,
-          "photonShellWidth": 0.05,
-          "timeScale": 1,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 1,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1.3,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 8,
-          "shellGlowColor": "#aaccff",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 4.23,
-          "diskOuterRadiusMul": 15,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 1.2,
-          "noiseScale": 1,
-          "noiseAmount": 0.6,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 0.3,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": false,
-          "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0.5,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "swirlAnimationEnabled": false,
-          "swirlAnimationSpeed": 0.5,
-          "pulseEnabled": false,
-          "pulseSpeed": 0.3,
-          "pulseAmount": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "keplerianDifferential": 0.5
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 5
-      },
-      "rotation": {
-        "rotations": {
-          "XW": 4.696309271430735,
-          "XV": 4.201050704008582,
-          "YW": 4.900227432814615,
-          "YV": 1.1691920093210904,
-          "ZW": 5.646865122837379,
-          "ZV": 5.5898717236915,
-          "WV": 4.627274315917859
-        },
-        "dimension": 5
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.2,
-        "direction": 1,
-        "animatingPlanes": [
-          "XW",
-          "XV",
-          "YW",
-          "YV",
-          "ZW",
-          "ZV",
-          "WV"
-        ],
-        "accumulatedTime": 421.79221539688405
-      },
-      "camera": {
-        "position": [
-          -0.3061248042895202,
-          1.1269658249837742,
-          2.305854703570394
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      },
-      "ui": {
-        "showDepthBuffer": false,
-        "showNormalBuffer": false,
-        "showTemporalDepthBuffer": false,
-        "animationBias": 0.6,
         "maxFps": 60,
         "opacitySettings": {
           "mode": "solid",
@@ -3850,26 +1247,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "radial",
         "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            3,
-            3,
-            3
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
+          "a": [0.5, 0.5, 0.5],
+          "b": [0.5, 0.5, 0.5],
+          "c": [3, 3, 3],
+          "d": [0, 0, 0]
         },
         "distribution": {
           "power": 3.05,
@@ -3930,16 +1311,8 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
             "color": "#FFFFFF",
             "intensity": 2,
             "coneAngle": 30,
@@ -3952,16 +1325,8 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [
-              -5,
-              15,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
+            "position": [-5, 15, 5],
+            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
             "color": "#FFFFFF",
             "intensity": 2.6,
             "coneAngle": 76,
@@ -4046,26 +1411,10 @@
           "timeScale": 0.1,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -4079,11 +1428,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -4179,11 +1524,7 @@
           "escapeRadius": 4,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
+          "visualizationAxes": [0, 1, 2],
           "parameterValues": [],
           "center": [],
           "extent": 2,
@@ -4199,10 +1540,7 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
+          "boundaryThreshold": [0.1, 0.9],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -4232,12 +1570,7 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
+          "juliaConstant": [-0.2, 0.8, 0, 0],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -4249,26 +1582,10 @@
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -4297,17 +1614,9 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
+          "visualizationAxes": [0, 1, 2],
           "parameterValues": [],
-          "center": [
-            0,
-            0,
-            0
-          ],
+          "center": [0, 0, 0],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -4317,26 +1626,10 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -4352,26 +1645,8 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
+          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
+          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.8,
           "fieldScale": 1,
@@ -4490,16 +1765,7 @@
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "parameterValues": [0, 0, 0, 0, 0, 0, 0, 0],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -4525,11 +1791,7 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1
-        ],
+        "perAxisScale": [1, 1, 1],
         "scaleLocked": true,
         "dimension": 3
       },
@@ -4545,22 +1807,12 @@
         "isPlaying": true,
         "speed": 0.3,
         "direction": 1,
-        "animatingPlanes": [
-          "XZ"
-        ],
+        "animatingPlanes": ["XZ"],
         "accumulatedTime": 832.5923192292396
       },
       "camera": {
-        "position": [
-          1.8055929515134794,
-          -1.9228933696992911,
-          -2.325036257307802
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
+        "position": [1.8055929515134794, -1.9228933696992911, -2.325036257307802],
+        "target": [0, 0, 0]
       },
       "ui": {
         "showDepthBuffer": false,
@@ -4593,26 +1845,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "phase",
         "cosineCoefficients": {
-          "a": [
-            0.65,
-            0.62,
-            0.6
-          ],
-          "b": [
-            0.18,
-            0.18,
-            0.2
-          ],
-          "c": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "d": [
-            0,
-            0,
-            0.5
-          ]
+          "a": [0.65, 0.62, 0.6],
+          "b": [0.18, 0.18, 0.2],
+          "c": [0.5, 0.5, 0.5],
+          "d": [0, 0, 0.5]
         },
         "distribution": {
           "power": 1.25,
@@ -4673,16 +1909,8 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -4695,16 +1923,8 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
+            "position": [-5, 5, 5],
+            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -4789,26 +2009,10 @@
           "timeScale": 0.19,
           "syncWithObject": false,
           "cosineCoefficients": {
-            "a": [
-              0.15,
-              0.1,
-              0.2
-            ],
-            "b": [
-              0.35,
-              0.25,
-              0.5
-            ],
-            "c": [
-              0.25,
-              0.25,
-              0.25
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.15, 0.1, 0.2],
+            "b": [0.35, 0.25, 0.5],
+            "c": [0.25, 0.25, 0.25],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -4822,11 +2026,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "noiseGrain": 0,
           "evolution": 0,
           "aurora": {
@@ -4909,11 +2109,7 @@
           "escapeRadius": 4,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
+          "visualizationAxes": [0, 1, 2],
           "parameterValues": [],
           "center": [],
           "extent": 2,
@@ -4929,10 +2125,7 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
+          "boundaryThreshold": [0.1, 0.9],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -4957,12 +2150,7 @@
           "sssThickness": 1
         },
         "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
+          "juliaConstant": [-0.2, 0.8, 0, 0],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -4972,32 +2160,14 @@
           "sdfMaxIterations": 30,
           "sdfSurfaceDistance": 0.002,
           "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -5021,22 +2191,9 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0,
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0, 0],
+          "center": [0, 0, 0, 0, 0],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -5046,26 +2203,10 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -5081,26 +2222,8 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
+          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
+          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.3,
           "fieldScale": 0.5,
@@ -5220,16 +2343,7 @@
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "parameterValues": [0, 0, 0, 0, 0, 0, 0, 0],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -5255,13 +2369,7 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
+        "perAxisScale": [1, 1, 1, 1, 1],
         "scaleLocked": true,
         "dimension": 5
       },
@@ -5284,24 +2392,12 @@
         "isPlaying": true,
         "speed": 0.4,
         "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "YZ"
-        ],
+        "animatingPlanes": ["XY", "XZ", "YZ"],
         "accumulatedTime": 379.08384669044875
       },
       "camera": {
-        "position": [
-          0,
-          1.6886252739457375,
-          4.052700657469769
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
+        "position": [0, 1.6886252739457375, 4.052700657469769],
+        "target": [0, 0, 0]
       }
     }
   },
@@ -5317,26 +2413,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "mixed",
         "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            0.8,
-            0.8,
-            0.8
-          ],
-          "d": [
-            0,
-            0.1,
-            0.2
-          ]
+          "a": [0.5, 0.5, 0.5],
+          "b": [0.5, 0.5, 0.5],
+          "c": [0.8, 0.8, 0.8],
+          "d": [0, 0.1, 0.2]
         },
         "distribution": {
           "power": 1,
@@ -5468,26 +2548,10 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -5501,11 +2565,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -5601,20 +2661,9 @@
           "escapeRadius": 8,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0
-          ],
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [0],
+          "center": [0, 0, 0, 0],
           "extent": 2,
           "colorMode": "boundaryOnly",
           "palette": "complement",
@@ -5628,10 +2677,7 @@
           "paletteCycles": 1,
           "renderStyle": "rayMarching",
           "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
+          "boundaryThreshold": [0.1, 0.9],
           "mandelbulbPower": 8,
           "epsilon": 1e-12,
           "powerAnimationEnabled": false,
@@ -5663,12 +2709,7 @@
           "driftFrequencySpread": 0.2
         },
         "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
+          "juliaConstant": [-0.2, 0.8, 0, 0],
           "power": 2,
           "maxIterations": 64,
           "bailoutRadius": 4,
@@ -5678,32 +2719,14 @@
           "sdfMaxIterations": 30,
           "sdfSurfaceDistance": 0.002,
           "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "colorMode": 2,
           "baseColor": "#4488ff",
           "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "colorPower": 1,
           "colorCycles": 1,
@@ -5732,17 +2755,9 @@
           "scale": 0.6,
           "qualityPreset": "standard",
           "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
+          "visualizationAxes": [0, 1, 2],
           "parameterValues": [],
-          "center": [
-            0,
-            0,
-            0
-          ],
+          "center": [0, 0, 0],
           "extent": 2,
           "colorMode": "mixed",
           "palette": "complement",
@@ -5752,26 +2767,10 @@
             "end": "#ff8000"
           },
           "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
           },
           "invertColors": false,
           "renderStyle": "rayMarching",
@@ -5787,26 +2786,8 @@
           "useRealOrbitals": true,
           "bohrRadiusScale": 1,
           "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
+          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
+          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
           "extraDimFrequencySpread": 0,
           "timeScale": 0.1,
           "fieldScale": 1.1,
@@ -5926,9 +2907,7 @@
           "temporalAccumulationEnabled": false,
           "dopplerEnabled": false,
           "dopplerStrength": 0.6,
-          "parameterValues": [
-            0
-          ],
+          "parameterValues": [0],
           "motionBlurEnabled": false,
           "motionBlurStrength": 0.5,
           "motionBlurSamples": 4,
@@ -5954,11 +2933,7 @@
       },
       "transform": {
         "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1
-        ],
+        "perAxisScale": [1, 1, 1],
         "scaleLocked": true,
         "dimension": 3
       },
@@ -5991,2939 +2966,12 @@
         "isPlaying": true,
         "speed": 0.2,
         "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ"
-        ],
+        "animatingPlanes": ["XY", "XZ"],
         "accumulatedTime": 573.9529972492733
       },
       "camera": {
-        "position": [
-          0,
-          1.1015175238864832,
-          2.643642057327557
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      }
-    }
-  },
-  {
-    "id": "003d767c-01dc-4494-8a2a-3faf8ba6de57",
-    "name": "5D Mandelbulb Fluid",
-    "timestamp": 1767899248997,
-    "data": {
-      "appearance": {
-        "edgeColor": "#831bff",
-        "faceColor": "#e92a2a",
-        "backgroundColor": "#232323",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "radial",
-        "cosineCoefficients": {
-          "a": [
-            0.74,
-            0.2,
-            0.3
-          ],
-          "b": [
-            0.4,
-            0.3,
-            0.3
-          ],
-          "c": [
-            1.89,
-            0.5,
-            0.5
-          ],
-          "d": [
-            2,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 3.35,
-          "cycles": 4.1,
-          "offset": 0.03
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 1,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": false
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.1,
-        "sssEnabled": false,
-        "sssIntensity": 1,
-        "sssColor": "#ff8844",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.75,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "aces",
-        "exposure": 1.5,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1.8,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 0.9
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1.6,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 0.9
-          }
-        ],
-        "selectedLightId": "__ambient__",
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.5,
-        "bloomThreshold": 0.8,
-        "bloomRadius": 0.4,
-        "bloomSmoothing": 0.1,
-        "bloomLevels": 5,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "none",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.005,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "none",
-        "skyboxEnabled": false,
-        "skyboxMode": "procedural_aurora",
-        "skyboxTexture": "space_blue",
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 1,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "evolution": 0,
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          }
-        },
-        "backgroundColor": "#232323",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.05,
-          "metallic": 0.4,
-          "specularIntensity": 1.7,
-          "specularColor": "#fff3f3"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 5,
-        "objectType": "mandelbulb"
-      },
-      "extended": {
-        "polytope": {
-          "scale": 1.8
-        },
-        "wythoffPolytope": {
-          "symmetryGroup": "B",
-          "preset": "regular",
-          "customSymbol": [],
-          "scale": 2,
-          "snub": false
-        },
-        "rootSystem": {
-          "rootType": "A",
-          "scale": 2
-        },
-        "cliffordTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "mode": "classic",
-          "resolutionU": 32,
-          "resolutionV": 32,
-          "k": 2,
-          "stepsPerCircle": 16
-        },
-        "nestedTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "eta": 0.7853981633974483,
-          "resolutionXi1": 48,
-          "resolutionXi2": 48,
-          "showNestedTori": false,
-          "numberOfTori": 3,
-          "fiberResolution": 6,
-          "baseResolution": 8,
-          "showFiberStructure": true
-        },
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 50,
-          "escapeRadius": 8,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0,
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extent": 2,
-          "colorMode": "boundaryOnly",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 2,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 22,
-          "powerSpeed": 0.02,
-          "alternatePowerEnabled": false,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.03,
-          "phaseAmplitude": 0.3,
-          "sdfMaxIterations": 53,
-          "sdfSurfaceDistance": 0.00605,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "sdfMaxIterations": 30,
-          "sdfSurfaceDistance": 0.002,
-          "qualityMultiplier": 1,
-          "parameterValues": [],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
-        "schroedinger": {
-          "scale": 0.6,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "mixed",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "invertColors": false,
-          "renderStyle": "rayMarching",
-          "quantumMode": "harmonicOscillator",
-          "presetName": "custom",
-          "seed": 42,
-          "termCount": 1,
-          "maxQuantumNumber": 6,
-          "frequencySpread": 0.01,
-          "principalQuantumNumber": 2,
-          "azimuthalQuantumNumber": 1,
-          "magneticQuantumNumber": 0,
-          "useRealOrbitals": true,
-          "bohrRadiusScale": 1,
-          "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
-          "extraDimFrequencySpread": 0,
-          "timeScale": 0.8,
-          "fieldScale": 1,
-          "densityGain": 2,
-          "powderScale": 1,
-          "sampleCount": 32,
-          "emissionIntensity": 0,
-          "emissionThreshold": 0.3,
-          "emissionColorShift": 0,
-          "emissionPulsing": false,
-          "rimExponent": 3,
-          "scatteringAnisotropy": 0,
-          "roughness": 0.3,
-          "fogIntegrationEnabled": true,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "raymarchQuality": "balanced",
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "sssJitter": 0.2,
-          "erosionStrength": 0,
-          "erosionScale": 1,
-          "erosionTurbulence": 0.5,
-          "erosionNoiseType": 0,
-          "erosionHQ": false,
-          "curlEnabled": false,
-          "curlStrength": 0.3,
-          "curlScale": 1,
-          "curlSpeed": 1,
-          "curlBias": 0,
-          "dispersionEnabled": false,
-          "dispersionStrength": 0.2,
-          "dispersionDirection": 0,
-          "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
-          "nodalEnabled": false,
-          "nodalColor": "#00ffff",
-          "nodalStrength": 1,
-          "energyColorEnabled": false,
-          "shimmerEnabled": false,
-          "shimmerStrength": 0.5,
-          "isoEnabled": false,
-          "isoThreshold": -0.76,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "spreadAnimationEnabled": false,
-          "spreadAnimationSpeed": 0.5,
-          "phaseAnimationEnabled": false
-        },
-        "blackhole": {
-          "horizonRadius": 0.5,
-          "spin": 0.3,
-          "diskTemperature": 6500,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 2,
-          "manifoldThickness": 0.8,
-          "photonShellWidth": 0.05,
-          "timeScale": 1,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 1,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1.3,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 8,
-          "shellGlowColor": "#aaccff",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 4.23,
-          "diskOuterRadiusMul": 15,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 1.2,
-          "noiseScale": 1,
-          "noiseAmount": 0.6,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 0.3,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": false,
-          "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0.5,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "pulseEnabled": false,
-          "pulseSpeed": 0.3,
-          "pulseAmount": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "keplerianDifferential": 0.5
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 5
-      },
-      "ui": {
-        "animationBias": 0.9
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 2.711849475833194,
-          "XZ": 0.9043512649121208,
-          "XW": 3.3332824442586233,
-          "XV": 4.5294621801459645,
-          "YZ": 5.310416619697332,
-          "YW": 5.434947621743882,
-          "YV": 2.203251777569948,
-          "ZW": 4.295568580211803,
-          "ZV": 5.775800789271393,
-          "WV": 1.6378533849516126
-        },
-        "dimension": 5
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.1,
-        "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "XW",
-          "XV",
-          "YZ",
-          "YW",
-          "YV",
-          "ZW",
-          "ZV",
-          "WV"
-        ],
-        "accumulatedTime": 70.83006750000163
-      },
-      "camera": {
-        "position": [
-          0.47127373150554464,
-          0.8680831458631207,
-          2.6882181653581143
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      }
-    }
-  },
-  {
-    "id": "c6a813ea-3b19-4371-ac1c-e17f99359218",
-    "name": "Julia Chrome",
-    "timestamp": 1767905050867,
-    "data": {
-      "appearance": {
-        "edgeColor": "#ecffec",
-        "faceColor": "#ecf4f0",
-        "backgroundColor": "#232323",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "cosine",
-        "cosineCoefficients": {
-          "a": [
-            0.62,
-            0.48,
-            0.55
-          ],
-          "b": [
-            0.2,
-            0.18,
-            0.2
-          ],
-          "c": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 3.2,
-          "cycles": 0.5,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 1,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": true
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.1,
-        "sssEnabled": true,
-        "sssIntensity": 1,
-        "sssColor": "#ff8844",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.15,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "aces",
-        "exposure": 2.1,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 2
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 2
-          }
-        ],
-        "selectedLightId": null,
-        "transformMode": "translate",
-        "shadowEnabled": true,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.25,
-        "bloomThreshold": 0.8,
-        "bloomRadius": 0.4,
-        "bloomSmoothing": 0.67,
-        "bloomLevels": 3,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "none",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.005,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "none",
-        "skyboxEnabled": false,
-        "skyboxMode": "procedural_aurora",
-        "skyboxTexture": "space_blue",
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 1,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "evolution": 0,
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          }
-        },
-        "backgroundColor": "#232323",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.3,
-          "metallic": 0.7,
-          "specularIntensity": 1.7,
-          "specularColor": "#ffffff"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 4,
-        "objectType": "quaternion-julia"
-      },
-      "extended": {
-        "polytope": {
-          "scale": 1.8
-        },
-        "wythoffPolytope": {
-          "symmetryGroup": "B",
-          "preset": "regular",
-          "customSymbol": [],
-          "scale": 2,
-          "snub": false
-        },
-        "rootSystem": {
-          "rootType": "A",
-          "scale": 2
-        },
-        "cliffordTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "mode": "classic",
-          "resolutionU": 32,
-          "resolutionV": 32,
-          "k": 2,
-          "stepsPerCircle": 16
-        },
-        "nestedTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "eta": 0.7853981633974483,
-          "resolutionXi1": 48,
-          "resolutionXi2": 48,
-          "showNestedTori": false,
-          "numberOfTori": 3,
-          "fiberResolution": 6,
-          "baseResolution": 8,
-          "showFiberStructure": true
-        },
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 80,
-          "escapeRadius": 4,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "escapeTime",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 8,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 12,
-          "powerSpeed": 0.03,
-          "alternatePowerEnabled": false,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.03,
-          "phaseAmplitude": 0.3,
-          "sdfMaxIterations": 30,
-          "sdfSurfaceDistance": 0.002,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            0.285,
-            0.01,
-            -0.81,
-            0
-          ],
-          "power": 4,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "sdfMaxIterations": 68,
-          "sdfSurfaceDistance": 0.00895,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
-        "schroedinger": {
-          "scale": 0.6,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "mixed",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "invertColors": false,
-          "renderStyle": "rayMarching",
-          "quantumMode": "harmonicOscillator",
-          "presetName": "custom",
-          "seed": 42,
-          "termCount": 1,
-          "maxQuantumNumber": 6,
-          "frequencySpread": 0.01,
-          "principalQuantumNumber": 2,
-          "azimuthalQuantumNumber": 1,
-          "magneticQuantumNumber": 0,
-          "useRealOrbitals": true,
-          "bohrRadiusScale": 1,
-          "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
-          "extraDimFrequencySpread": 0,
-          "timeScale": 0.8,
-          "fieldScale": 1,
-          "densityGain": 2,
-          "powderScale": 1,
-          "sampleCount": 32,
-          "emissionIntensity": 0,
-          "emissionThreshold": 0.3,
-          "emissionColorShift": 0,
-          "emissionPulsing": false,
-          "rimExponent": 3,
-          "scatteringAnisotropy": 0,
-          "roughness": 0.3,
-          "fogIntegrationEnabled": true,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "raymarchQuality": "balanced",
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "sssJitter": 0.2,
-          "erosionStrength": 0,
-          "erosionScale": 1,
-          "erosionTurbulence": 0.5,
-          "erosionNoiseType": 0,
-          "erosionHQ": false,
-          "curlEnabled": false,
-          "curlStrength": 0.3,
-          "curlScale": 1,
-          "curlSpeed": 1,
-          "curlBias": 0,
-          "dispersionEnabled": false,
-          "dispersionStrength": 0.2,
-          "dispersionDirection": 0,
-          "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
-          "nodalEnabled": false,
-          "nodalColor": "#00ffff",
-          "nodalStrength": 1,
-          "energyColorEnabled": false,
-          "shimmerEnabled": false,
-          "shimmerStrength": 0.5,
-          "isoEnabled": false,
-          "isoThreshold": -0.76,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "spreadAnimationEnabled": false,
-          "spreadAnimationSpeed": 0.5,
-          "phaseAnimationEnabled": false
-        },
-        "blackhole": {
-          "horizonRadius": 0.5,
-          "spin": 0.3,
-          "diskTemperature": 6500,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 2,
-          "manifoldThickness": 0.8,
-          "photonShellWidth": 0.05,
-          "timeScale": 1,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 1,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1.3,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 8,
-          "shellGlowColor": "#aaccff",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 4.23,
-          "diskOuterRadiusMul": 15,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 1.2,
-          "noiseScale": 1,
-          "noiseAmount": 0.6,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 0.3,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": false,
-          "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0.5,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "pulseEnabled": false,
-          "pulseSpeed": 0.3,
-          "pulseAmount": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "keplerianDifferential": 0.5
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 4
-      },
-      "ui": {
-        "animationBias": 0
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 5.567149739662611,
-          "YZ": 0.5133701687976417,
-          "XZ": 2.17629558511471,
-          "XW": 6.162173671437856,
-          "YW": 2.450737579509946,
-          "ZW": 3.7912237488701575
-        },
-        "dimension": 4
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.4,
-        "direction": 1,
-        "animatingPlanes": [
-          "XW",
-          "YZ",
-          "YW",
-          "ZW",
-          "XZ",
-          "XY"
-        ],
-        "accumulatedTime": 123.24372600000808
-      },
-      "camera": {
-        "position": [
-          0.687324607479904,
-          3.084585676406176,
-          2.278601366469633
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      }
-    }
-  },
-  {
-    "id": "e60c6d54-e185-4c46-9d3e-f0e7b17d5da4",
-    "name": "Julia Bubblegum",
-    "timestamp": 1767965732578,
-    "data": {
-      "appearance": {
-        "edgeColor": "#f60d15",
-        "faceColor": "#33cc9e",
-        "backgroundColor": "#232323",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "normal",
-        "cosineCoefficients": {
-          "a": [
-            0.6,
-            0.93,
-            1.27
-          ],
-          "b": [
-            2,
-            0.3,
-            0.3
-          ],
-          "c": [
-            0,
-            1.31,
-            1.41
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 4,
-          "cycles": 0.5,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 1,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": true
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.1,
-        "sssEnabled": false,
-        "sssIntensity": 1,
-        "sssColor": "#ff8844",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.15,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "aces",
-        "exposure": 1.5,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 2
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 2
-          }
-        ],
-        "selectedLightId": null,
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.5,
-        "bloomThreshold": 0.8,
-        "bloomRadius": 0.4,
-        "bloomSmoothing": 0.1,
-        "bloomLevels": 5,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "none",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.005,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "procedural_nebula",
-        "skyboxEnabled": true,
-        "skyboxMode": "procedural_nebula",
-        "skyboxTexture": "space_blue",
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 1.9,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "turbulence": 0.49,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "evolution": 0,
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          }
-        },
-        "backgroundColor": "#232323",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 1,
-          "metallic": 0,
-          "specularIntensity": 0.7,
-          "specularColor": "#ffffff"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 5,
-        "objectType": "quaternion-julia"
-      },
-      "extended": {
-        "polytope": {
-          "scale": 1.8
-        },
-        "wythoffPolytope": {
-          "symmetryGroup": "B",
-          "preset": "regular",
-          "customSymbol": [],
-          "scale": 2,
-          "snub": false
-        },
-        "rootSystem": {
-          "rootType": "A",
-          "scale": 2
-        },
-        "cliffordTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "mode": "classic",
-          "resolutionU": 32,
-          "resolutionV": 32,
-          "k": 2,
-          "stepsPerCircle": 16
-        },
-        "nestedTorus": {
-          "radius": 3,
-          "edgeMode": "grid",
-          "eta": 0.7853981633974483,
-          "resolutionXi1": 48,
-          "resolutionXi2": 48,
-          "showNestedTori": false,
-          "numberOfTori": 3,
-          "fiberResolution": 6,
-          "baseResolution": 8,
-          "showFiberStructure": true
-        },
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 80,
-          "escapeRadius": 4,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "escapeTime",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 8,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 12,
-          "powerSpeed": 0.03,
-          "alternatePowerEnabled": false,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.03,
-          "phaseAmplitude": 0.3,
-          "sdfMaxIterations": 30,
-          "sdfSurfaceDistance": 0.002,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            0.285,
-            0.01,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1.25,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "sdfMaxIterations": 38,
-          "sdfSurfaceDistance": 0.00425,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0,
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "shadowEnabled": false,
-          "shadowQuality": 1,
-          "shadowSoftness": 1,
-          "shadowAnimationMode": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
-        "schroedinger": {
-          "scale": 0.6,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [],
-          "center": [],
-          "extent": 2,
-          "colorMode": "mixed",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "cosineParams": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "invertColors": false,
-          "renderStyle": "rayMarching",
-          "quantumMode": "harmonicOscillator",
-          "presetName": "custom",
-          "seed": 42,
-          "termCount": 1,
-          "maxQuantumNumber": 6,
-          "frequencySpread": 0.01,
-          "principalQuantumNumber": 2,
-          "azimuthalQuantumNumber": 1,
-          "magneticQuantumNumber": 0,
-          "useRealOrbitals": true,
-          "bohrRadiusScale": 1,
-          "hydrogenNDPreset": "2pz_4d",
-          "extraDimQuantumNumbers": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extraDimOmega": [
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1
-          ],
-          "extraDimFrequencySpread": 0,
-          "timeScale": 0.8,
-          "fieldScale": 1,
-          "densityGain": 2,
-          "powderScale": 1,
-          "sampleCount": 32,
-          "emissionIntensity": 0,
-          "emissionThreshold": 0.3,
-          "emissionColorShift": 0,
-          "emissionPulsing": false,
-          "rimExponent": 3,
-          "scatteringAnisotropy": 0,
-          "roughness": 0.3,
-          "fogIntegrationEnabled": true,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "raymarchQuality": "balanced",
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "sssJitter": 0.2,
-          "erosionStrength": 0,
-          "erosionScale": 1,
-          "erosionTurbulence": 0.5,
-          "erosionNoiseType": 0,
-          "erosionHQ": false,
-          "curlEnabled": false,
-          "curlStrength": 0.3,
-          "curlScale": 1,
-          "curlSpeed": 1,
-          "curlBias": 0,
-          "dispersionEnabled": false,
-          "dispersionStrength": 0.2,
-          "dispersionDirection": 0,
-          "dispersionQuality": 0,
-          "shadowsEnabled": false,
-          "shadowStrength": 1,
-          "shadowSteps": 4,
-          "aoEnabled": false,
-          "aoStrength": 1,
-          "aoQuality": 4,
-          "aoRadius": 0.5,
-          "aoColor": "#000000",
-          "nodalEnabled": false,
-          "nodalColor": "#00ffff",
-          "nodalStrength": 1,
-          "energyColorEnabled": false,
-          "shimmerEnabled": false,
-          "shimmerStrength": 0.5,
-          "isoEnabled": false,
-          "isoThreshold": -0.76,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "spreadAnimationEnabled": false,
-          "spreadAnimationSpeed": 0.5,
-          "phaseAnimationEnabled": false
-        },
-        "blackhole": {
-          "horizonRadius": 0.5,
-          "spin": 0.3,
-          "diskTemperature": 6500,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 2,
-          "manifoldThickness": 0.8,
-          "photonShellWidth": 0.05,
-          "timeScale": 1,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 1,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1.3,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 8,
-          "shellGlowColor": "#aaccff",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 4.23,
-          "diskOuterRadiusMul": 15,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 1.2,
-          "noiseScale": 1,
-          "noiseAmount": 0.6,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 0.3,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": false,
-          "dopplerStrength": 0.6,
-          "parameterValues": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0.5,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "pulseEnabled": false,
-          "pulseSpeed": 0.3,
-          "pulseAmount": 0.2,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "keplerianDifferential": 0.5
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 5
-      },
-      "ui": {
-        "animationBias": 0
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 0.37151233163951414,
-          "YZ": 3.672071423083384,
-          "XZ": 2.863403949662768,
-          "XW": 4.119033858187311,
-          "XV": 2.0322051823443275,
-          "YW": 4.5047631046241285,
-          "YV": 0.45207921604996404,
-          "ZW": 3.1424623045111133,
-          "ZV": 3.414136813214462,
-          "WV": 0.34830878760228945
-        },
-        "dimension": 5
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.1,
-        "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "XW",
-          "XV",
-          "YZ",
-          "YW",
-          "YV",
-          "ZW",
-          "ZV",
-          "WV"
-        ],
-        "accumulatedTime": 69.34780299999649
-      },
-      "camera": {
-        "position": [
-          0,
-          1.6927948794298637,
-          4.06270771063167
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      }
-    }
-  },
-  {
-    "id": "75bc4e9c-c4e2-4cc6-9958-8a538a7604bc",
-    "name": "Black Hole (Extreme load)",
-    "timestamp": 1768008953030,
-    "data": {
-      "appearance": {
-        "edgeColor": "#19e697",
-        "faceColor": "#33cc9e",
-        "backgroundColor": "#232323",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "accretionGradient",
-        "cosineCoefficients": {
-          "a": [
-            0.85,
-            0.88,
-            0.95
-          ],
-          "b": [
-            0.1,
-            0.08,
-            0.05
-          ],
-          "c": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 1,
-          "cycles": 1,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 0,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 1,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": false
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 1,
-        "sssEnabled": false,
-        "sssIntensity": 2,
-        "sssColor": "#ff8844",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.15,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "aces",
-        "exposure": 1.2,
-        "lights": [],
-        "selectedLightId": null,
-        "transformMode": "translate",
-        "shadowEnabled": false,
-        "shadowQuality": "medium",
-        "shadowSoftness": 1,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.9,
-        "bloomThreshold": 0.45,
-        "bloomRadius": 0.25,
-        "bloomSmoothing": 1,
-        "bloomLevels": 2,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 50,
-        "bokehScale": 0.2,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "none",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.006,
-        "cinematicVignette": 1.6,
-        "cinematicGrain": 0.039,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 2,
-        "gravityEnabled": true,
-        "gravityStrength": 0.8,
-        "gravityDistortionScale": 0.8,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0.3,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "space_lightblue",
-        "skyboxEnabled": true,
-        "skyboxMode": "classic",
-        "skyboxTexture": "space_lightblue",
-        "skyboxIntensity": 1.2,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "cinematic",
-        "skyboxAnimationSpeed": 0.1,
-        "skyboxHighQuality": true,
-        "proceduralSettings": {
-          "scale": 1,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": -0.5,
-          "saturation": 1,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "evolution": 0,
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          }
-        },
-        "backgroundColor": "#232323",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.8,
-          "specularColor": "#ffffff"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 3,
-        "objectType": "blackhole"
-      },
-      "extended": {
-        "blackhole": {
-          "horizonRadius": 0.7,
-          "spin": 0.764,
-          "diskTemperature": 19700,
-          "gravityStrength": 0.8,
-          "manifoldIntensity": 1.1,
-          "manifoldThickness": 0.94,
-          "photonShellWidth": 0.1,
-          "timeScale": 3,
-          "baseColor": "#fff5e6",
-          "paletteMode": "diskGradient",
-          "bloomBoost": 3.3,
-          "dimensionEmphasis": 0.8,
-          "distanceFalloff": 1.6,
-          "epsilonMul": 0.01,
-          "bendScale": 0.8,
-          "bendMaxPerStep": 0.25,
-          "lensingClamp": 10,
-          "rayBendingMode": "orbital",
-          "photonShellRadiusMul": 1,
-          "photonShellRadiusDimBias": 0.05,
-          "shellGlowStrength": 1.5,
-          "shellGlowColor": "#000000",
-          "shellStepMul": 0.15,
-          "shellContrastBoost": 1,
-          "manifoldType": "autoByN",
-          "diskInnerRadiusMul": 1.544758213672399,
-          "diskOuterRadiusMul": 16,
-          "radialSoftnessMul": 0.2,
-          "thicknessPerDimMax": 4,
-          "highDimWScale": 2,
-          "swirlAmount": 2,
-          "noiseScale": 0.5,
-          "noiseAmount": 0.2,
-          "multiIntersectionGain": 1,
-          "raymarchQuality": "balanced",
-          "maxSteps": 256,
-          "stepBase": 0.08,
-          "stepMin": 0.01,
-          "stepMax": 0.2,
-          "stepAdaptG": 1,
-          "stepAdaptR": 0.2,
-          "enableAbsorption": true,
-          "absorption": 1.1,
-          "transmittanceCutoff": 0.005,
-          "farRadius": 35,
-          "lightingMode": "emissiveOnly",
-          "roughness": 0.6,
-          "specular": 0.2,
-          "ambientTint": 0.1,
-          "shadowEnabled": false,
-          "shadowSteps": 16,
-          "shadowDensity": 2,
-          "temporalAccumulationEnabled": false,
-          "dopplerEnabled": true,
-          "dopplerStrength": 1.4,
-          "parameterValues": [],
-          "motionBlurEnabled": false,
-          "motionBlurStrength": 0,
-          "motionBlurSamples": 4,
-          "motionBlurRadialFalloff": 2,
-          "deferredLensingEnabled": false,
-          "deferredLensingStrength": 1,
-          "deferredLensingRadius": 5,
-          "deferredLensingChromaticAberration": 0.3,
-          "skyCubemapResolution": 512,
-          "lensingFalloff": 1.5,
-          "sceneObjectLensingEnabled": true,
-          "sceneObjectLensingStrength": 1,
-          "pulseEnabled": false,
-          "pulseSpeed": 1.5,
-          "pulseAmount": 0.7,
-          "sliceAnimationEnabled": true,
-          "sliceSpeed": 0.1,
-          "sliceAmplitude": 0.8,
-          "keplerianDifferential": 0.5,
-          "jetsEnabled": false,
-          "jetsHeight": 21,
-          "jetsWidth": 0.12,
-          "jetsIntensity": 1.1,
-          "jetsColor": "#4d0505",
-          "jetsFalloff": 1.6,
-          "jetsNoiseAmount": 1,
-          "jetsPulsation": 0,
-          "jetsGodRaysEnabled": true,
-          "jetsGodRaysIntensity": 0.15,
-          "jetsGodRaysSamples": 128,
-          "jetsGodRaysDecay": 0.96
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 3
-      },
-      "ui": {
-        "animationBias": 0
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 222.12249153699258,
-          "YZ": 222.12249153699258,
-          "XZ": 222.12249153699258
-        },
-        "dimension": 3
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 1.2,
-        "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "YZ",
-          "XZ"
-        ],
-        "accumulatedTime": 1275.823814999933
-      },
-      "camera": {
-        "position": [
-          -6.075417033360507,
-          3.8269554384180124,
-          7.697210146724449
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
-      }
-    }
-  },
-  {
-    "id": "91081403-5831-452a-9023-ef9f01d5e80b",
-    "name": "Mandelblob (High load)",
-    "timestamp": 1768133545673,
-    "data": {
-      "appearance": {
-        "edgeColor": "#1c020f",
-        "faceColor": "#33cc9e",
-        "backgroundColor": "#232323",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "radial",
-        "cosineCoefficients": {
-          "a": [
-            1.04,
-            0.08,
-            0.23
-          ],
-          "b": [
-            0.5,
-            0.08,
-            0
-          ],
-          "c": [
-            0.93,
-            0.88,
-            1.76
-          ],
-          "d": [
-            2,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 2.7,
-          "cycles": 5,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.2,
-          "normal": 0
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1,
-        "faceOpacity": 1,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceEmissionPulsing": false,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "faceOpacity": 1,
-            "specularIntensity": 0.8,
-            "fresnelEnabled": true
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 1,
-        "sssEnabled": true,
-        "sssIntensity": 0.9,
-        "sssColor": "#35272a",
-        "sssThickness": 1.6,
-        "sssJitter": 0.45
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.35,
-        "ambientColor": "#ffaff1",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "aces",
-        "exposure": 1.7,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#770e5c",
-            "intensity": 2.2,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 2
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#ed26ef",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 2
-          }
-        ],
-        "selectedLightId": "__ambient__",
-        "transformMode": "translate",
-        "shadowEnabled": true,
-        "shadowQuality": "high",
-        "shadowSoftness": 0.6,
-        "shadowAnimationMode": "low",
-        "shadowMapBias": 0.001,
-        "shadowMapBlur": 2
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomIntensity": 0.4,
-        "bloomThreshold": 0.1,
-        "bloomRadius": 0.15,
-        "bloomSmoothing": 0.16,
-        "bloomLevels": 5,
-        "bokehEnabled": false,
-        "bokehFocusMode": "auto-center",
-        "bokehBlurMethod": "hexagonal",
-        "bokehWorldFocusDistance": 15,
-        "bokehWorldFocusRange": 10,
-        "bokehScale": 0,
-        "bokehFocalLength": 0.1,
-        "bokehSmoothTime": 0.25,
-        "bokehShowDebug": false,
-        "antiAliasingMethod": "none",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0.041,
-        "objectOnlyDepth": true,
-        "ssaoEnabled": false,
-        "ssaoIntensity": 1.7,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "none",
-        "skyboxEnabled": false,
-        "skyboxMode": "procedural_aurora",
-        "skyboxTexture": "space_blue",
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 1,
-          "complexity": 0.5,
-          "timeScale": 0.2,
-          "syncWithObject": true,
-          "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "evolution": 0,
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          }
-        },
-        "backgroundColor": "#44152d",
-        "backgroundBlendMode": "normal"
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.2,
-          "metallic": 0.2,
-          "specularIntensity": 0.8,
-          "specularColor": "#ec21c5"
-        },
-        "edge": {
-          "roughness": 0.3,
-          "metallic": 0,
-          "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        }
-      },
-      "geometry": {
-        "dimension": 5,
-        "objectType": "mandelbulb"
-      },
-      "extended": {
-        "mandelbulb": {
-          "scale": 1,
-          "maxIterations": 50,
-          "escapeRadius": 8,
-          "qualityPreset": "standard",
-          "resolution": 32,
-          "visualizationAxes": [
-            0,
-            1,
-            2
-          ],
-          "parameterValues": [
-            0,
-            0
-          ],
-          "center": [
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
-          "extent": 2,
-          "colorMode": "boundaryOnly",
-          "palette": "complement",
-          "customPalette": {
-            "start": "#0000ff",
-            "mid": "#ffffff",
-            "end": "#ff8000"
-          },
-          "invertColors": false,
-          "interiorColor": "#000000",
-          "paletteCycles": 1,
-          "renderStyle": "rayMarching",
-          "pointSize": 3,
-          "boundaryThreshold": [
-            0.1,
-            0.9
-          ],
-          "mandelbulbPower": 8,
-          "epsilon": 1e-12,
-          "powerAnimationEnabled": false,
-          "powerMin": 5,
-          "powerMax": 12,
-          "powerSpeed": 0.02,
-          "alternatePowerEnabled": true,
-          "alternatePowerValue": 4,
-          "alternatePowerBlend": 0.5,
-          "sliceAnimationEnabled": false,
-          "sliceSpeed": 0.02,
-          "sliceAmplitude": 0.3,
-          "phaseShiftEnabled": false,
-          "phaseSpeed": 0.02,
-          "phaseAmplitude": 0.67,
-          "sdfMaxIterations": 31,
-          "sdfSurfaceDistance": 0.01,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1
-        }
-      },
-      "transform": {
-        "uniformScale": 1,
-        "perAxisScale": [
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "scaleLocked": true,
-        "dimension": 5
-      },
-      "ui": {
-        "animationBias": 0.05
-      },
-      "rotation": {
-        "rotations": {
-          "XY": 51.85083464379176,
-          "XZ": 48.3285549009094,
-          "XW": 51.95679654630762,
-          "XV": 50.018040286720606,
-          "YZ": 49.079842797310114,
-          "YW": 52.31515609910291,
-          "YV": 48.550033284732834,
-          "ZW": 51.0495183233563,
-          "ZV": 51.301915973635175,
-          "WV": 48.45362596100573
-        },
-        "dimension": 5
-      },
-      "animation": {
-        "isPlaying": true,
-        "speed": 0.2,
-        "direction": 1,
-        "animatingPlanes": [
-          "XY",
-          "XZ",
-          "XW",
-          "XV",
-          "YZ",
-          "YW",
-          "YV",
-          "ZW",
-          "ZV",
-          "WV"
-        ],
-        "accumulatedTime": 378.3215004999728
-      },
-      "camera": {
-        "position": [
-          1.7313933819434637,
-          -0.09282997382238872,
-          1.916869800842743
-        ],
-        "target": [
-          0,
-          0,
-          0
-        ]
+        "position": [0, 1.1015175238864832, 2.643642057327557],
+        "target": [0, 0, 0]
       }
     }
   }
