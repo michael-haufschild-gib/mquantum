@@ -98,6 +98,20 @@ export type SchroedingerRenderStyle = 'rayMarching'
 export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND'
 
 /**
+ * Physically grounded nodal set definitions.
+ */
+export type SchroedingerNodalDefinition =
+  | 'psiAbs'
+  | 'realPart'
+  | 'imagPart'
+  | 'complexIntersection'
+
+/**
+ * Optional node-family filter for hydrogen/hydrogenND.
+ */
+export type SchroedingerNodalFamilyFilter = 'all' | 'radial' | 'angular'
+
+/**
  * Named presets for Hydrogen ND mode (n-dimensional hydrogen orbitals)
  * Format: {orbital}_{dimension}d (e.g., '2pz_4d' = 2pz orbital in 4D)
  */
@@ -315,6 +329,22 @@ export interface SchroedingerConfig {
   nodalColor: string
   /** Nodal surface strength (0.0-2.0) */
   nodalStrength: number
+  /** Node definition in wavefunction space (|psi|, Re, Im, Re∩Im) */
+  nodalDefinition: SchroedingerNodalDefinition
+  /** Numerical tolerance epsilon used by physical nodal classification */
+  nodalTolerance: number
+  /** Optional hydrogen node-family filter (all/radial/angular) */
+  nodalFamilyFilter: SchroedingerNodalFamilyFilter
+  /** Enable sign/lobe-aware nodal coloring */
+  nodalLobeColoringEnabled: boolean
+  /** Color for Re(psi)=0 nodal visualization */
+  nodalColorReal: string
+  /** Color for Im(psi)=0 nodal visualization */
+  nodalColorImag: string
+  /** Color for positive lobe/phase sign */
+  nodalColorPositive: string
+  /** Color for negative lobe/phase sign */
+  nodalColorNegative: string
   /** Enable energy level coloring */
   energyColorEnabled: boolean
   /** Enable uncertainty shimmer */
@@ -495,6 +525,14 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   nodalEnabled: false,
   nodalColor: '#00ffff', // Cyan
   nodalStrength: 1.0,
+  nodalDefinition: 'psiAbs',
+  nodalTolerance: 0.02,
+  nodalFamilyFilter: 'all',
+  nodalLobeColoringEnabled: false,
+  nodalColorReal: '#00ffff',
+  nodalColorImag: '#ff66ff',
+  nodalColorPositive: '#22c55e',
+  nodalColorNegative: '#ef4444',
   energyColorEnabled: false,
   shimmerEnabled: false,
   shimmerStrength: 0.5,

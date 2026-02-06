@@ -142,6 +142,14 @@ export interface SchroedingerSliceActions {
   setSchroedingerNodalEnabled: (enabled: boolean) => void
   setSchroedingerNodalColor: (color: string) => void
   setSchroedingerNodalStrength: (strength: number) => void
+  setSchroedingerNodalDefinition: (definition: SchroedingerConfig['nodalDefinition']) => void
+  setSchroedingerNodalTolerance: (tolerance: number) => void
+  setSchroedingerNodalFamilyFilter: (filter: SchroedingerConfig['nodalFamilyFilter']) => void
+  setSchroedingerNodalLobeColoringEnabled: (enabled: boolean) => void
+  setSchroedingerNodalColorReal: (color: string) => void
+  setSchroedingerNodalColorImag: (color: string) => void
+  setSchroedingerNodalColorPositive: (color: string) => void
+  setSchroedingerNodalColorNegative: (color: string) => void
   setSchroedingerEnergyColorEnabled: (enabled: boolean) => void
   setSchroedingerShimmerEnabled: (enabled: boolean) => void
   setSchroedingerShimmerStrength: (strength: number) => void

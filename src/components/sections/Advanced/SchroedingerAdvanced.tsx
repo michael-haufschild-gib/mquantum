@@ -4,10 +4,27 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleButton } from '@/components/ui/ToggleButton'
+import type {
+  SchroedingerNodalDefinition,
+  SchroedingerNodalFamilyFilter,
+} from '@/lib/geometry/extended/types'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+const NODAL_DEFINITION_OPTIONS: { value: SchroedingerNodalDefinition; label: string }[] = [
+  { value: 'psiAbs', label: '|ψ| (Nodal Envelope)' },
+  { value: 'realPart', label: 'Re(ψ) = 0' },
+  { value: 'imagPart', label: 'Im(ψ) = 0' },
+  { value: 'complexIntersection', label: 'Re(ψ) ∩ Im(ψ)' },
+]
+
+const NODAL_FAMILY_OPTIONS: { value: SchroedingerNodalFamilyFilter; label: string }[] = [
+  { value: 'all', label: 'All Nodes' },
+  { value: 'radial', label: 'Radial Only' },
+  { value: 'angular', label: 'Angular Only' },
+]
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
@@ -29,6 +46,14 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setNodalEnabled: state.setSchroedingerNodalEnabled,
     setNodalColor: state.setSchroedingerNodalColor,
     setNodalStrength: state.setSchroedingerNodalStrength,
+    setNodalDefinition: state.setSchroedingerNodalDefinition,
+    setNodalTolerance: state.setSchroedingerNodalTolerance,
+    setNodalFamilyFilter: state.setSchroedingerNodalFamilyFilter,
+    setNodalLobeColoringEnabled: state.setSchroedingerNodalLobeColoringEnabled,
+    setNodalColorReal: state.setSchroedingerNodalColorReal,
+    setNodalColorImag: state.setSchroedingerNodalColorImag,
+    setNodalColorPositive: state.setSchroedingerNodalColorPositive,
+    setNodalColorNegative: state.setSchroedingerNodalColorNegative,
     setEnergyColorEnabled: state.setSchroedingerEnergyColorEnabled,
     setShimmerEnabled: state.setSchroedingerShimmerEnabled,
     setShimmerStrength: state.setSchroedingerShimmerStrength,
@@ -60,6 +85,14 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setNodalEnabled,
     setNodalColor,
     setNodalStrength,
+    setNodalDefinition,
+    setNodalTolerance,
+    setNodalFamilyFilter,
+    setNodalLobeColoringEnabled,
+    setNodalColorReal,
+    setNodalColorImag,
+    setNodalColorPositive,
+    setNodalColorNegative,
     setEnergyColorEnabled,
     setShimmerEnabled,
     setShimmerStrength,
@@ -302,7 +335,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             </ToggleButton>
           </div>
           {config.nodalEnabled && (
-            <div className="ps-2 border-s border-border-default">
+            <div className="ps-2 border-s border-border-default space-y-2">
               <Slider
                 label="Strength"
                 min={0.0}
@@ -313,15 +346,123 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
                 showValue
                 data-testid="schroedinger-nodal-strength"
               />
-              <div className="flex items-center justify-between mt-1">
-                <label className="text-xs text-text-secondary">Color</label>
-                <ColorPicker
-                  value={config.nodalColor ?? '#00ffff'}
-                  onChange={(c) => setNodalColor(c)}
-                  disableAlpha={true}
-                  className="w-24"
-                />
+
+              <Select
+                label="Definition"
+                options={NODAL_DEFINITION_OPTIONS}
+                value={config.nodalDefinition ?? 'psiAbs'}
+                onChange={setNodalDefinition}
+                data-testid="schroedinger-nodal-definition"
+              />
+
+              <Slider
+                label="Zero Tolerance ε"
+                min={0.00001}
+                max={0.5}
+                step={0.001}
+                value={config.nodalTolerance ?? 0.02}
+                onChange={setNodalTolerance}
+                showValue
+                formatValue={(value) => value.toFixed(4)}
+                data-testid="schroedinger-nodal-tolerance"
+              />
+
+              <Select
+                label="Hydrogen Node Family"
+                options={NODAL_FAMILY_OPTIONS}
+                value={config.nodalFamilyFilter ?? 'all'}
+                onChange={setNodalFamilyFilter}
+                disabled={config.quantumMode !== 'hydrogenND'}
+                data-testid="schroedinger-nodal-family-filter"
+              />
+              {config.quantumMode !== 'hydrogenND' && (
+                <p className="text-xs text-text-tertiary">
+                  Family filtering is available in Hydrogen ND mode.
+                </p>
+              )}
+
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-text-secondary">Lobe Sign Colors</label>
+                <ToggleButton
+                  pressed={config.nodalLobeColoringEnabled ?? false}
+                  onToggle={() =>
+                    setNodalLobeColoringEnabled(!(config.nodalLobeColoringEnabled ?? false))
+                  }
+                  className="text-xs px-2 py-1 h-auto"
+                  ariaLabel="Toggle lobe sign coloring"
+                  data-testid="schroedinger-nodal-lobe-toggle"
+                >
+                  {config.nodalLobeColoringEnabled ? 'ON' : 'OFF'}
+                </ToggleButton>
               </div>
+
+              {config.nodalLobeColoringEnabled ? (
+                <>
+                  <div
+                    className="flex items-center justify-between"
+                    data-testid="schroedinger-nodal-color-positive"
+                  >
+                    <label className="text-xs text-text-secondary">Positive Lobe</label>
+                    <ColorPicker
+                      value={config.nodalColorPositive ?? '#22c55e'}
+                      onChange={setNodalColorPositive}
+                      disableAlpha={true}
+                      className="w-24"
+                    />
+                  </div>
+                  <div
+                    className="flex items-center justify-between"
+                    data-testid="schroedinger-nodal-color-negative"
+                  >
+                    <label className="text-xs text-text-secondary">Negative Lobe</label>
+                    <ColorPicker
+                      value={config.nodalColorNegative ?? '#ef4444'}
+                      onChange={setNodalColorNegative}
+                      disableAlpha={true}
+                      className="w-24"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="flex items-center justify-between"
+                    data-testid="schroedinger-nodal-color-abs"
+                  >
+                    <label className="text-xs text-text-secondary">|ψ| Color</label>
+                    <ColorPicker
+                      value={config.nodalColor ?? '#00ffff'}
+                      onChange={setNodalColor}
+                      disableAlpha={true}
+                      className="w-24"
+                    />
+                  </div>
+                  <div
+                    className="flex items-center justify-between"
+                    data-testid="schroedinger-nodal-color-real"
+                  >
+                    <label className="text-xs text-text-secondary">Re(ψ) Color</label>
+                    <ColorPicker
+                      value={config.nodalColorReal ?? '#00ffff'}
+                      onChange={setNodalColorReal}
+                      disableAlpha={true}
+                      className="w-24"
+                    />
+                  </div>
+                  <div
+                    className="flex items-center justify-between"
+                    data-testid="schroedinger-nodal-color-imag"
+                  >
+                    <label className="text-xs text-text-secondary">Im(ψ) Color</label>
+                    <ColorPicker
+                      value={config.nodalColorImag ?? '#ff66ff'}
+                      onChange={setNodalColorImag}
+                      disableAlpha={true}
+                      className="w-24"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

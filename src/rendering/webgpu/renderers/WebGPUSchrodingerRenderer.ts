@@ -125,8 +125,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1072 bytes (268 floats) - includes boundingRadius/invBoundingRadius + phase materiality + interference
-  private schroedingerUniformData = new ArrayBuffer(1072)
+  // Schroedinger: 1152 bytes (288 floats) - includes physical nodal controls
+  private schroedingerUniformData = new ArrayBuffer(1152)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -404,7 +404,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
     // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1072, 'schroedinger-uniforms')
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1152, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create density grid compute pass if enabled
@@ -1131,6 +1131,48 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1060 / 4] = schroedinger?.interferenceAmp ?? 0.5
     floatView[1064 / 4] = schroedinger?.interferenceFreq ?? 10.0
     floatView[1068 / 4] = schroedinger?.interferenceSpeed ?? 1.0
+
+    // Physical nodal controls (offset 1072+)
+    const nodalDefinitionMap: Record<string, number> = {
+      psiAbs: 0,
+      realPart: 1,
+      imagPart: 2,
+      complexIntersection: 3,
+    }
+    const nodalFamilyMap: Record<string, number> = {
+      all: 0,
+      radial: 1,
+      angular: 2,
+    }
+
+    intView[1072 / 4] = nodalDefinitionMap[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
+    floatView[1076 / 4] = schroedinger?.nodalTolerance ?? 0.02
+    intView[1080 / 4] = nodalFamilyMap[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
+    intView[1084 / 4] = schroedinger?.nodalLobeColoringEnabled ? 1 : 0
+
+    const nodalColorReal = this.parseColor(schroedinger?.nodalColorReal ?? '#00ffff')
+    floatView[1088 / 4] = nodalColorReal[0]
+    floatView[1092 / 4] = nodalColorReal[1]
+    floatView[1096 / 4] = nodalColorReal[2]
+    floatView[1100 / 4] = 0.0 // _padNodal0
+
+    const nodalColorImag = this.parseColor(schroedinger?.nodalColorImag ?? '#ff66ff')
+    floatView[1104 / 4] = nodalColorImag[0]
+    floatView[1108 / 4] = nodalColorImag[1]
+    floatView[1112 / 4] = nodalColorImag[2]
+    floatView[1116 / 4] = 0.0 // _padNodal1
+
+    const nodalColorPositive = this.parseColor(schroedinger?.nodalColorPositive ?? '#22c55e')
+    floatView[1120 / 4] = nodalColorPositive[0]
+    floatView[1124 / 4] = nodalColorPositive[1]
+    floatView[1128 / 4] = nodalColorPositive[2]
+    floatView[1132 / 4] = 0.0 // _padNodal2
+
+    const nodalColorNegative = this.parseColor(schroedinger?.nodalColorNegative ?? '#ef4444')
+    floatView[1136 / 4] = nodalColorNegative[0]
+    floatView[1140 / 4] = nodalColorNegative[1]
+    floatView[1144 / 4] = nodalColorNegative[2]
+    floatView[1148 / 4] = 0.0 // _padNodal3
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }

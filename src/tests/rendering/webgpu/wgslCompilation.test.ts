@@ -232,7 +232,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(invPiMatches).toHaveLength(1)
   })
 
-  it('avoids radial density-band nodal shell highlighting', () => {
+  it('uses physical wavefunction-based nodal classification', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
       shadows: false,
@@ -243,8 +243,8 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     })
 
     verifyWgsl(wgsl, true)
-    expect(wgsl).not.toContain('smoothstep(-12.0, -5.0')
-    expect(wgsl).toContain('computeNodalIntensity')
+    expect(wgsl).toContain('fn computePhysicalNodalField(')
+    expect(wgsl).not.toContain('fn computeNodalIntensity(')
   })
 
   it('uses half-pixel temporal jitter offsets for quarter-res reprojection', () => {

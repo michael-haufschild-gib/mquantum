@@ -29,6 +29,17 @@ const MAX_EXTRA_DIM: i32 = 8;
 const QUANTUM_MODE_HARMONIC: i32 = 0;
 const QUANTUM_MODE_HYDROGEN_ND: i32 = 1;
 
+// Physical nodal-definition constants
+const NODAL_DEFINITION_PSI_ABS: i32 = 0;
+const NODAL_DEFINITION_REAL: i32 = 1;
+const NODAL_DEFINITION_IMAG: i32 = 2;
+const NODAL_DEFINITION_COMPLEX_INTERSECTION: i32 = 3;
+
+// Hydrogen node-family filter constants
+const NODAL_FAMILY_ALL: i32 = 0;
+const NODAL_FAMILY_RADIAL: i32 = 1;
+const NODAL_FAMILY_ANGULAR: i32 = 2;
+
 // WebGPU uniform buffers require 16-byte alignment for array elements.
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
@@ -188,6 +199,20 @@ struct SchroedingerUniforms {
   interferenceAmp: f32,          // Fringe amplitude (0.0-1.0)
   interferenceFreq: f32,         // Fringe frequency / number of rings (1.0-50.0)
   interferenceSpeed: f32,        // Animation speed of fringe flow
+
+  // Physical nodal controls (appended for stable offsets of existing fields)
+  nodalDefinition: i32,          // 0=|psi|, 1=Re, 2=Im, 3=Re∩Im
+  nodalTolerance: f32,           // Epsilon in wavefunction-space
+  nodalFamilyFilter: i32,        // 0=all, 1=radial, 2=angular (hydrogen only)
+  nodalLobeColoringEnabled: u32, // Use sign/lobe color mapping
+  nodalColorReal: vec3f,         // Color for Re(psi)=0
+  _padNodal0: f32,
+  nodalColorImag: vec3f,         // Color for Im(psi)=0
+  _padNodal1: f32,
+  nodalColorPositive: vec3f,     // Positive lobe color
+  _padNodal2: f32,
+  nodalColorNegative: vec3f,     // Negative lobe color
+  _padNodal3: f32,
 }
 
 // ============================================

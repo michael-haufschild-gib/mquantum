@@ -189,18 +189,6 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
   return col;
 }
 
-// Approximate nodal-surface intensity from low density + strong log-density gradient.
-// This avoids broad radial shells from simple log-density band tests.
-fn computeNodalIntensity(rho: f32, gradient: vec3f, pos: vec3f) -> f32 {
-  // Near nodes: rho is low.
-  let lowDensityMask = 1.0 - smoothstep(1e-5, 2e-3, rho);
-  // Near nodes: grad(log(rho)) spikes, unlike smooth far-field Gaussian decay.
-  let gradientMask = smoothstep(6.0, 24.0, length(gradient));
-  // Suppress outer boundary where truncation/edge effects can resemble rings.
-  let interiorMask = 1.0 - smoothstep(schroedinger.boundingRadius * 0.78, schroedinger.boundingRadius * 0.98, length(pos));
-  return lowDensityMask * gradientMask * interiorMask;
-}
-
 // Compute emission with ambient lighting only (for fast mode)
 fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   var surfaceColor = computeBaseColor(rho, phase, pos, uniforms);
@@ -496,12 +484,6 @@ fn computeEmissionLit(
 
       col += emissionColor * uniforms.emissionIntensity * emissionFactor * pulse;
     }
-  }
-
-  // Nodal surface highlighting
-  if (uniforms.nodalEnabled != 0u) {
-    let nodeIntensity = computeNodalIntensity(rho, gradient, p);
-    col += uniforms.nodalColor * uniforms.nodalStrength * nodeIntensity * 2.0;
   }
 
   return col;

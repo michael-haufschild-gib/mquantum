@@ -488,6 +488,14 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerNodalEnabled: valueSetter('nodalEnabled'),
     setSchroedingerNodalColor: valueSetter('nodalColor'),
     setSchroedingerNodalStrength: clampedSetter('nodalStrength', 0.0, 2.0),
+    setSchroedingerNodalDefinition: valueSetter('nodalDefinition'),
+    setSchroedingerNodalTolerance: clampedSetter('nodalTolerance', 0.00001, 0.5),
+    setSchroedingerNodalFamilyFilter: valueSetter('nodalFamilyFilter'),
+    setSchroedingerNodalLobeColoringEnabled: valueSetter('nodalLobeColoringEnabled'),
+    setSchroedingerNodalColorReal: valueSetter('nodalColorReal'),
+    setSchroedingerNodalColorImag: valueSetter('nodalColorImag'),
+    setSchroedingerNodalColorPositive: valueSetter('nodalColorPositive'),
+    setSchroedingerNodalColorNegative: valueSetter('nodalColorNegative'),
 
     // === Visual Effects ===
     setSchroedingerEnergyColorEnabled: valueSetter('energyColorEnabled'),

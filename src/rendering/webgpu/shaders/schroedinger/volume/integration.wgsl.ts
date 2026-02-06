@@ -130,6 +130,164 @@ fn computeGradientTetrahedralAtFlowedPos(flowedPos: vec3f, t: f32, delta: f32, u
   return (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
 }
 
+// ============================================
+// Physical Nodal Classification
+// ============================================
+
+struct NodalSample {
+  intensity: f32,
+  signValue: f32,
+  colorMode: i32,
+  _pad: f32,
+}
+
+// Sample complex wavefunction ψ at world position with flow applied.
+fn samplePsiWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  let flowedPos = applyFlow(pos, t, uniforms);
+  let xND = mapPosToND(flowedPos, uniforms);
+  return evalPsi(xND, t, uniforms);
+}
+
+// Evaluate hydrogen radial/angular node factors from ND coordinates.
+fn evalHydrogenNodeFactorsAtXND(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> vec2f {
+  let x0 = xND[0];
+  let x1 = xND[1];
+  let x2 = xND[2];
+
+  let sum3D = x0 * x0 + x1 * x1 + x2 * x2;
+  var sumND = sum3D;
+  for (var j: i32 = 3; j < ACTUAL_DIM; j++) {
+    let xj = xND[j];
+    sumND += xj * xj;
+  }
+
+  let r3D = sqrt(max(sum3D, 0.0));
+  let rND = sqrt(max(sumND, 0.0));
+  let angles = sphericalAngles3D(x0, x1, x2, r3D);
+  let radial = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, rND, uniforms.bohrRadius);
+  let angular = evalHydrogenNDAngular(
+    uniforms.azimuthalL,
+    uniforms.magneticM,
+    angles.x,
+    angles.y,
+    uniforms.useRealOrbitals != 0u
+  );
+  return vec2f(radial, angular);
+}
+
+// Sample hydrogen radial/angular factors at world position with flow applied.
+fn sampleHydrogenNodeFactorsWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  let flowedPos = applyFlow(pos, t, uniforms);
+  let xND = mapPosToND(flowedPos, uniforms);
+  return evalHydrogenNodeFactorsAtXND(xND, uniforms);
+}
+
+// Convert a zero-crossing scalar field into a nodal intensity.
+fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {
+  let epsSafe = max(eps, 1e-6);
+  let band = 1.0 - smoothstep(epsSafe, epsSafe * 3.0, abs(value));
+  let gradMask = smoothstep(epsSafe * 0.5, epsSafe * 8.0, length(gradient));
+  return band * gradMask;
+}
+
+// Select nodal color based on active mode and lobe-coloring options.
+fn selectPhysicalNodalColor(uniforms: SchroedingerUniforms, colorMode: i32, signValue: f32) -> vec3f {
+  if (uniforms.nodalLobeColoringEnabled != 0u) {
+    if (signValue >= 0.0) {
+      return uniforms.nodalColorPositive;
+    }
+    return uniforms.nodalColorNegative;
+  }
+
+  if (colorMode == NODAL_DEFINITION_REAL) {
+    return uniforms.nodalColorReal;
+  }
+  if (colorMode == NODAL_DEFINITION_IMAG) {
+    return uniforms.nodalColorImag;
+  }
+  if (colorMode == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
+    return 0.5 * (uniforms.nodalColorReal + uniforms.nodalColorImag);
+  }
+  return uniforms.nodalColor;
+}
+
+// Compute physically grounded nodal intensity from ψ, Re(ψ), Im(ψ), and hydrogen factors.
+fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> NodalSample {
+  let eps = max(uniforms.nodalTolerance, 1e-6);
+  let delta = 0.05;
+
+  // Tetrahedral ψ sampling
+  let p0 = samplePsiWithFlow(pos + TETRA_V0 * delta, t, uniforms);
+  let p1 = samplePsiWithFlow(pos + TETRA_V1 * delta, t, uniforms);
+  let p2 = samplePsiWithFlow(pos + TETRA_V2 * delta, t, uniforms);
+  let p3 = samplePsiWithFlow(pos + TETRA_V3 * delta, t, uniforms);
+
+  let psiCenter = (p0 + p1 + p2 + p3) * 0.25;
+  let gradRe = (TETRA_V0 * p0.x + TETRA_V1 * p1.x + TETRA_V2 * p2.x + TETRA_V3 * p3.x) * (0.75 / delta);
+  let gradIm = (TETRA_V0 * p0.y + TETRA_V1 * p1.y + TETRA_V2 * p2.y + TETRA_V3 * p3.y) * (0.75 / delta);
+
+  var intensity = 0.0;
+  var signValue = psiCenter.x;
+  var colorMode = uniforms.nodalDefinition;
+
+  // Optional hydrogen node-family filtering.
+  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+    let h0 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V0 * delta, t, uniforms);
+    let h1 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V1 * delta, t, uniforms);
+    let h2 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V2 * delta, t, uniforms);
+    let h3 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V3 * delta, t, uniforms);
+
+    var f0 = 0.0;
+    var f1 = 0.0;
+    var f2 = 0.0;
+    var f3 = 0.0;
+    if (uniforms.nodalFamilyFilter == NODAL_FAMILY_RADIAL) {
+      f0 = h0.x;
+      f1 = h1.x;
+      f2 = h2.x;
+      f3 = h3.x;
+    } else {
+      f0 = h0.y;
+      f1 = h1.y;
+      f2 = h2.y;
+      f3 = h3.y;
+    }
+
+    let fCenter = (f0 + f1 + f2 + f3) * 0.25;
+    let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
+    intensity = nodalBandMask(fCenter, fGrad, eps);
+    signValue = fCenter;
+    colorMode = NODAL_DEFINITION_PSI_ABS;
+  } else {
+    if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
+      intensity = nodalBandMask(psiCenter.x, gradRe, eps);
+      signValue = psiCenter.x;
+      colorMode = NODAL_DEFINITION_REAL;
+    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
+      intensity = nodalBandMask(psiCenter.y, gradIm, eps);
+      signValue = psiCenter.y;
+      colorMode = NODAL_DEFINITION_IMAG;
+    } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
+      let maskRe = nodalBandMask(psiCenter.x, gradRe, eps);
+      let maskIm = nodalBandMask(psiCenter.y, gradIm, eps);
+      intensity = sqrt(maskRe * maskIm);
+      signValue = psiCenter.x;
+      colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
+    } else {
+      let psiAbs = length(psiCenter);
+      var gradAbs = vec3f(0.0);
+      if (psiAbs > 1e-6) {
+        gradAbs = (psiCenter.x * gradRe + psiCenter.y * gradIm) / psiAbs;
+      }
+      intensity = nodalBandMask(psiAbs, gradAbs, eps);
+      signValue = psiCenter.x;
+      colorMode = NODAL_DEFINITION_PSI_ABS;
+    }
+  }
+
+  return NodalSample(clamp(intensity, 0.0, 1.0), signValue, colorMode, 0.0);
+}
+
 /**
  * Main volume raymarching function.
  * Supports lighting (matched to Mandelbulb behavior).
@@ -218,6 +376,16 @@ fn volumeRaymarch(
     }
     // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
+    // Physically grounded nodal overlay (independent from density alpha threshold).
+    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0) {
+      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
+      if (nodal.intensity > 1e-4) {
+        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
+        let nodalAlpha = clamp(nodal.intensity * uniforms.nodalStrength * adaptiveStep * 2.5, 0.0, 1.0);
+        accColor += transmittance * nodalAlpha * nodalColor;
+      }
+    }
 
     // Phase materiality: smoke regions are denser (more absorbing)
     var effectiveRho = rho;
@@ -401,6 +569,16 @@ fn volumeRaymarchHQ(
     }
     // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
+    // Physically grounded nodal overlay (independent from density alpha threshold).
+    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0) {
+      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
+      if (nodal.intensity > 1e-4) {
+        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
+        let nodalAlpha = clamp(nodal.intensity * uniforms.nodalStrength * adaptiveStep * 2.5, 0.0, 1.0);
+        accColor += transmittance * nodalAlpha * nodalColor;
+      }
+    }
 
     // Phase materiality: smoke regions are denser (more absorbing)
     var pmDensityMod = 1.0;

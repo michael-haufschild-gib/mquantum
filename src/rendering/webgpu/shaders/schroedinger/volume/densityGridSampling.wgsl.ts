@@ -182,6 +182,7 @@ fn volumeRaymarchGrid(
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
 
+  let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
   let fogColor = lighting.ambientColor * lighting.ambientIntensity;
 
@@ -199,7 +200,6 @@ fn volumeRaymarchGrid(
     // Sample from pre-computed density grid (FAST!)
     let densityInfo = sampleDensityFromGrid(pos);
     let rho = densityInfo.x;
-    let sCenter = densityInfo.y;
     let phase = densityInfo.z;
 
     // Early exit if density is consistently low
@@ -210,6 +210,16 @@ fn volumeRaymarchGrid(
       continue;
     } else {
       lowDensityCount = 0;
+    }
+
+    // Physically grounded nodal overlay (consistent with direct-sampling paths).
+    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0) {
+      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
+      if (nodal.intensity > 1e-4) {
+        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
+        let nodalAlpha = clamp(nodal.intensity * uniforms.nodalStrength * stepLen * 2.5, 0.0, 1.0);
+        accColor += transmittance * nodalAlpha * nodalColor;
+      }
     }
 
     let alpha = computeAlpha(rho, stepLen, uniforms.densityGain);
