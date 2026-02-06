@@ -197,7 +197,7 @@ fn computeNodalIntensity(rho: f32, gradient: vec3f, pos: vec3f) -> f32 {
   // Near nodes: grad(log(rho)) spikes, unlike smooth far-field Gaussian decay.
   let gradientMask = smoothstep(6.0, 24.0, length(gradient));
   // Suppress outer boundary where truncation/edge effects can resemble rings.
-  let interiorMask = 1.0 - smoothstep(BOUND_R * 0.78, BOUND_R * 0.98, length(pos));
+  let interiorMask = 1.0 - smoothstep(schroedinger.boundingRadius * 0.78, schroedinger.boundingRadius * 0.98, length(pos));
   return lowDensityMask * gradientMask * interiorMask;
 }
 

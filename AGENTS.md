@@ -1,134 +1,39 @@
-=== CRITICAL TOOL USE INSTRUCTION BLOCK (CIB-001)===
+=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-000)===
+## KEEP THE BIG PICTURE IN MIND
+This is a scientific research project for my PhD thesis. Students will use this project to study **quantum physics simulations in N dimensions** - specifically Schroedinger wavefunctions including harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions). It is very important for my work and my career, we have to do it in steps, carefully, without mistakes and rush. Avoid hallucinations. Don't jump into coding without first researching. Don't patch bugs reactively. Use WebSearch extensively. Understand the purpose of code before changing it.
 
-## NEVER COMMIT TO GIT
-- Never commit / push yourself, unless instructed by the user
+## RENDERING: WEBGPU ONLY
+This project uses a **custom WebGPU renderer** - there is no WebGL, no Three.js rendering path. All GPU shaders are written in **WGSL** (not GLSL). The rendering pipeline is a declarative render graph built on raw `GPUDevice` / `GPUCommandEncoder` APIs.
 
-## MANDATORY TOOLS
+## QUANTUM PHYSICS SCOPE
+The project has a **single object type**: `ObjectType = 'schroedinger'`. There are no polytopes, fractals, black holes, or other geometric objects. All development should focus on expanding and improving the quantum physics simulation capabilities:
+- **Harmonic Oscillator**: Superposition of up to 8 terms, per-dimension frequencies, Hermite polynomial basis (1D-11D)
+- **Hydrogen Orbital**: Laguerre polynomials + spherical harmonics, real orbital variants (3D)
+- **Hydrogen N-Dimensional**: 3D hydrogen radial core + independent harmonic oscillators for extra dimensions (4D-11D)
 
-### For Complex Tasks (research, analysis, debugging)
-```
-USE: mcp__mcp_docker__sequentialthinking
-WHEN: Multi-step problems, research, complex reasoning
-WHY: Prevents cognitive overload, ensures systematic approach
-```
+=== END CIB-000 ===
 
-### For Task Management
-```
-USE: Todos
-WHEN: Any task with 3+ steps
-WHY: Tracks progress, maintains focus
-```
 
-### For Research and Validation of Solutions
-```
-USE: WebSearch
-WHEN: Any non-trivial debugging, planning, solution design task
-WHY: Offers quick access to best practices and solutions
-```
-=== END CIB-001 ===
+=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-001)===
 
-=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-002)===
+## MANDATORY DOCUMENT READS
+Read at the start of a new session:
+- Project architecture and folder structure: `docs/architecture.md`
+- Development environment: `docs/testing.md`
+- Testing setup: `docs/testing.md`
+- Frontend setup: `docs/frontend.md`
+- Understanding math used for object creation, transformation and projection: `docs/research/nd-dimensional-react-threejs-guide.md`
 
 ## MANDATORY CODE STYLE AND ARCHITECTURE RULES
 Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
 
-**All shaders MUST use WebGL2 and GLSL ES 3.00 syntax.** This is a mandatory requirement with no exceptions.
+**All GPU shaders MUST be written in WGSL.** This project does not use GLSL. Shaders are TypeScript files exporting template literal strings (`.wgsl.ts`) composed via `composeWGSL()`.
 
-*** Required GLSL ES 3.00 Syntax ***
+**WGSL shader files**: `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
 
-| WebGL1 (Forbidden) | WebGL2 (Required) |
-|-------------------|-------------------|
-| `attribute` | `in` (vertex shader) |
-| `varying` (vertex) | `out` |
-| `varying` (fragment) | `in` |
-| `gl_FragColor` | `layout(location = N) out vec4 varName;` |
-| `texture2D()` | `texture()` |
-| `textureCube()` | `texture()` |
+**Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
 
-**CRITICAL THREE.JS DPR/VIEWPORT GOTCHA**: When rendering to WebGLRenderTarget at non-standard resolutions, NEVER use `gl.setViewport()`. It internally multiplies by device pixel ratio (DPR), causing incorrect rendering on high-DPI displays.
-
-```typescript
-// ✗ WRONG - DPR multiplication breaks non-standard resolution targets
-gl.setRenderTarget(target);
-gl.setViewport(0, 0, target.width, target.height);
-
-// ✓ CORRECT - exact pixel values, no DPR multiplication
-target.viewport.set(0, 0, target.width, target.height);
-gl.setRenderTarget(target);
-```
-
-For fullscreen quad shaders rendered manually (not via ShaderPass), use direct NDC coordinates:
-```glsl
-// ✗ WRONG - camera matrices affected by DPR
-gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-
-// ✓ CORRECT - direct NDC for PlaneGeometry(2, 2)
-gl_Position = vec4(position.xy, 0.0, 1.0);
-```
-
-See: https://github.com/mrdoob/three.js/issues/27655
-
-**Use custom UI component library**: `src/components/ui`: Do not use default html controls. Use the custom components of this project.
-
-**Integrate UI components into theming solution**: Do not hardcode styles, always use the theme.
-
-**Critical useShallow instructions**: In React 19 / Zustand 5, useShallow is a hook and cannot be called as an argument to another hook (nested hook call).
-
-**Use strict TypeScript typing**: Be specific. Using 'any' is lazy.
-
-=== END CIB-002 ===
-
-## MANDATORY EXECUTION PROTOCOL
-1. Always complete all tasks fully. Do not simplify approaches, do not skip tasks.
-2. Always keep tests up to date and maintain 100% test coverage.
-3. Always test. 100% of tests must pass.
-4. Always fix bugs. Never changes tests only to make them pass if the cause is in the code it is testing.
-5. Never run Vitest in watch mode; automation must use `npm test`. Only set `ALLOW_VITEST_WATCH=1` when a human explicitly authorizes interactive debugging.
-6. **CRITICAL**: After implementing new functionality, ALWAYS create comprehensive tests:
-   - Unit tests for logic and components (Vitest)
-   - Integration tests for game flow
-   - Playwright tests for frontend functionality (must visually confirm UI works)
-   - All tests must be in `src/tests/` or `scripts/playwright/`
-   - Run ALL tests before considering task complete
-   - Maintain 100% test coverage - no exceptions
-
-## TEST MEMORY MANAGEMENT
-
-**CRITICAL**: The test suite previously caused memory exhaustion by spawning 13 workers consuming 9GB+ RAM. This has been fixed but requires vigilance.
-
-### Configuration Safeguards (DO NOT MODIFY without review)
-- `maxWorkers: 4` in `vitest.config.ts` - Prevents excessive process spawning
-- `pool: 'threads'` - Uses memory-efficient threading instead of forks
-- `environment: 'happy-dom'` - Fast DOM implementation for all tests
-
-### Before Changing Test Configuration
-1. **VERIFY**: Worker count stays ≤ 4, total memory < 2GB
-2. **DOCUMENT**: Update guide if making configuration changes
-
-### Writing Memory-Safe Tests
-- **DON'T**: Generate 1000+ data points in a single test without batching
-- **DO**: Process in batches of 100 and clear arrays between batches
-- **DON'T**: Rely on DOM for pure logic tests if not needed (keep them simple)
-- **DO**: Use component tests (`.test.tsx`) only for UI components
-- **DON'T**: Forget to cleanup timers/listeners in afterEach
-- **DO**: Call `cleanup()` from @testing-library/react in test teardown
-
-### Emergency Response
-If system becomes unresponsive during tests:
-```bash
-killall -9 node  # Force kill all Node processes
-node scripts/cleanup-vitest.mjs  # Clean up lingering workers
-```
-## FOLDER USAGE RULES
-
-| Activity | Required Directory | Agent Enforcement |
-| --- | --- | --- |
-| Browser automation (Playwright/Puppeteer runners, recorders) | `scripts/playwright/` | Keep every `.js`/`.mjs` harness here. Subfolders allowed, but **never** place these scripts in the repo root. |
-| Physics, RNG, or analytics utilities | `scripts/tools/` | Import from `../../src` or `../../dist` as needed. No tooling lives in the project root. |
-| Visual artifacts (screenshots, videos, GIFs) | `screenshots/` | Always persist captured assets here. Create nested folders like `screenshots/quality-test/` or `screenshots/videos/` to stay organized. |
-| Documentation, research notes | `docs/` | Long-form analysis belongs in this directory instead of new markdown files at the root. |
-| Temporary experiments / sandboxes | `src/dev-tools/` | Use this workspace for throwaway UI/physics spikes and clean it up after. |
-| 🚫 Forbidden | Project root | Keep root pristine—no scripts, screenshots, or scratch docs. |
+=== END CIB-001 ===
 
 ## TECH STACK
 
@@ -138,25 +43,25 @@ node scripts/cleanup-vitest.mjs  # Clean up lingering workers
 - **Vite** 7.2.7 - Build tool and dev server
 
 ### 3D Graphics & Rendering
-- **Three.js** 0.181.0 - WebGL 3D library
-- **@react-three/fiber** 9.4.2 - React renderer for Three.js
-- **@react-three/drei** 10.7.7 - Three.js utilities
-- **@react-three/postprocessing** 3.0.4 - Post-processing effects
-- **postprocessing** 6.38.0 - Post-processing library
+- **Custom WebGPU Renderer** - Pure `GPUDevice` / `GPUCommandEncoder` APIs
+- **WGSL** - All GPU shaders (vertex, fragment, compute)
+- **Declarative Render Graph** - Automatic pass ordering via topological sort
 
 ### UI & Styling
 - **Tailwind CSS** 4.1.18 - Utility-first CSS framework
 - **@tailwindcss/vite** 4.1.18 - Vite plugin for Tailwind
-- **Motion** 12.23.26 - Animation library
 
 ### State Management & Utilities
 - **Zustand** 5.0.2 - State management
-- **convex-hull** 1.0.3 - Computational geometry
+
+### Performance-Critical Math (WASM)
+- **Rust/wasm-pack** - Animation-loop math (rotation composition, nD projection, matrix/vector ops)
+- JS fallback for all WASM functions (graceful degradation)
 
 ### Testing
 - **vitest** 4.0.15 - Unit testing framework
 - **happy-dom** 15.11.7 - DOM implementation for testing
-- **playwright** 1.57.0 - E2E testing framework
+- **Playwright** - E2E testing with actual GPU rendering
 
 ### Development Tools
 - **ESLint** 9.15.0 - Code linting
@@ -167,13 +72,3 @@ node scripts/cleanup-vitest.mjs  # Clean up lingering workers
 - **eslint-plugin-jsdoc** 61.5.0 - JSDoc linting
 - **Prettier** 3.4.1 - Code formatting
 - **@vitejs/plugin-react** 5.1.2 - Vite React plugin
-
-## MANDATORY DOCUMENT READS
-- Project architecture and folder structure: `docs/architecture.md`
-- Development environment: `docs/testing.md`
-- Testing setup: `docs/testing.md`
-- Frontend setup: `docs/frontend.md`
-- Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
-- Understanding math used for object creation, transformation and projection: `docs/research/nd-dimensional-react-threejs-guide.md`
-- PRD: `docs/prd/ndimensional-visualizer.md`
-- Rendering pipeline PRD: `docs/prd/enhanced-visuals-rendering-pipeline.md`

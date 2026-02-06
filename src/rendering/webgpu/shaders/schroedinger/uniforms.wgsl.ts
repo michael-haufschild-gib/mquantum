@@ -178,6 +178,12 @@ struct SchroedingerUniforms {
   fogContribution: f32,          // Fog contribution strength
   internalFogDensity: f32,       // Internal object-space fog density
   erosionHQ: u32,                // High-quality erosion mode toggle
+
+  // Dynamic bounding radius (replaces fixed BOUND_R constant)
+  boundingRadius: f32,           // Bounding sphere radius (physics-based, ≥ 2.0)
+  invBoundingRadius: f32,        // Precomputed 1.0 / boundingRadius
+  _padBound0: f32,               // Alignment padding
+  _padBound1: f32,               // Alignment padding
 }
 
 // ============================================

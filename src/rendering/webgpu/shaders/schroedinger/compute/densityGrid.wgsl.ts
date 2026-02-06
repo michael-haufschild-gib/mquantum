@@ -83,10 +83,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Convert to world-space position within bounding volume
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
-  // Check if position is within the bounding sphere (radius = BOUND_R = 2.0)
+  // Check if position is within the bounding sphere (dynamic radius)
   // Grid is a cube, but quantum volume is spherical - skip corners
   let distFromCenter = length(worldPos);
-  if (distFromCenter > BOUND_R) {
+  if (distFromCenter > schroedinger.boundingRadius) {
     // Outside bounding sphere - store zero density
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
@@ -135,9 +135,9 @@ fn computeDensityGridWithPhase(@builtin(global_invocation_id) gid: vec3u) {
   let uvw = (vec3f(gid) + 0.5) / gridSizeF;
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
-  // Skip positions outside bounding sphere
+  // Skip positions outside bounding sphere (dynamic radius)
   let distFromCenter = length(worldPos);
-  if (distFromCenter > BOUND_R) {
+  if (distFromCenter > schroedinger.boundingRadius) {
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
   }

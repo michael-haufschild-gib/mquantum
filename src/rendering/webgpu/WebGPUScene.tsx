@@ -11,8 +11,9 @@ import React, { useEffect, useRef, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useWebGPU } from './WebGPUCanvas'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
-import type { WebGPURenderPass } from './core/types'
+import type { WebGPUFrameStats, WebGPURenderPass } from './core/types'
 import { WebGPUCamera } from './core/WebGPUCamera'
+import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
 // Stores
 import { useAppearanceStore } from '@/stores/appearanceStore'
@@ -125,12 +126,13 @@ const schroedingerSelector = (state: ReturnType<typeof useExtendedObjectStore.ge
  * Connects to Zustand stores for uniforms and settings.
  */
 export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension, onFrame }) => {
-  const { graph, size } = useWebGPU()
+  const { graph, size, canvas, device } = useWebGPU()
   const animationFrameRef = useRef<number>(0)
   const lastTimeRef = useRef<number>(performance.now())
   const currentObjectTypeRef = useRef<ObjectType | null>(null)
   const setupGenerationRef = useRef(0)
   const setupTaskRef = useRef<Promise<void>>(Promise.resolve())
+  const statsCollectorRef = useRef<WebGPUStatsCollector>(new WebGPUStatsCollector())
 
   // WebGPU camera for view/projection matrices (since we don't have THREE.js camera)
   const cameraRef = useRef<WebGPUCamera | null>(null)
@@ -193,6 +195,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       overlay.removeEventListener('wheel', handleWheel)
     }
   }, [])
+
+  // Initialize collector with adapter metadata for GPU name.
+  useEffect(() => {
+    const collector = statsCollectorRef.current
+    collector.initialize(device.getAdapter())
+
+    return () => {
+      collector.reset()
+    }
+  }, [device])
 
   // Store subscriptions with shallow comparison
   const appearance = useAppearanceStore(useShallow(appearanceSelector))
@@ -447,14 +459,36 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       }
     }
 
-    // Execute render graph
-    graph.execute(deltaTime)
+    // Execute render graph and publish performance metrics to the monitor store.
+    const effectiveDpr =
+      canvas.clientWidth > 0
+        ? size.width / canvas.clientWidth
+        : typeof window !== 'undefined'
+          ? window.devicePixelRatio
+          : 1
+
+    executeFrameAndCollectMetrics({
+      graph,
+      collector: statsCollectorRef.current,
+      deltaTime,
+      size,
+      dpr: effectiveDpr,
+    })
 
     onFrame?.(deltaTime)
 
     // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(renderFrame)
-  }, [graph, objectType, isPlaying, onFrame, schroedingerRotation, performance_.maxFps])
+  }, [
+    canvas,
+    graph,
+    isPlaying,
+    objectType,
+    onFrame,
+    performance_.maxFps,
+    schroedingerRotation,
+    size,
+  ])
 
   // Start/stop animation loop
   useEffect(() => {
@@ -490,6 +524,32 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 // ============================================================================
 // Pass Setup
 // ============================================================================
+
+interface FrameMetricsArgs {
+  graph: WebGPURenderGraph
+  collector: WebGPUStatsCollector
+  deltaTime: number
+  size: { width: number; height: number }
+  dpr: number
+}
+
+/**
+ * Execute one render-graph frame and publish the resulting metrics to the
+ * performance monitor store.
+ */
+export function executeFrameAndCollectMetrics({
+  graph,
+  collector,
+  deltaTime,
+  size,
+  dpr,
+}: FrameMetricsArgs): WebGPUFrameStats {
+  const cpuStartMs = performance.now()
+  const frameStats = graph.execute(deltaTime)
+  const cpuTimeMs = performance.now() - cpuStartMs
+  collector.recordFrame(cpuTimeMs, frameStats, graph, size, dpr)
+  return frameStats
+}
 
 export interface PassConfig {
   objectType: ObjectType

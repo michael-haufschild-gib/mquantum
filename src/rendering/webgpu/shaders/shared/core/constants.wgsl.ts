@@ -67,7 +67,8 @@ const MIN_DIST: f32 = 0.001;
 // Shadow ray offset to avoid self-intersection
 const SHADOW_BIAS: f32 = 0.002;
 
-// Bounding radius for fractal containment
+// Bounding radius: now dynamic via SchroedingerUniforms.boundingRadius
+// Kept as fallback for non-Schroedinger shaders (color selectors)
 const BOUND_R: f32 = 2.0;
 
 // ============================================

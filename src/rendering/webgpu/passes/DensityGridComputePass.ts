@@ -24,8 +24,8 @@ const GRID_PARAMS_SIZE = 48
 // Default grid size (64³ = 262,144 voxels)
 const DEFAULT_GRID_SIZE = 64
 
-// World space bounds (matches BOUND_R = 2.0 from constants.wgsl)
-const WORLD_BOUND = 2.0
+// Default world space bounds (matches original BOUND_R = 2.0)
+const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
@@ -75,6 +75,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private gridParamsData = new ArrayBuffer(GRID_PARAMS_SIZE)
   private gridParamsU32View = new Uint32Array(this.gridParamsData)
   private gridParamsF32View = new Float32Array(this.gridParamsData)
+
+  // Dynamic world bound (matches renderer's boundingRadius)
+  private worldBound = DEFAULT_WORLD_BOUND
 
   // Dirty tracking
   private needsRecompute = true
@@ -148,8 +151,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     })
 
     // Create uniform buffers
-    // SchroedingerUniforms: ~1KB (matches renderer)
-    this.schroedingerBuffer = this.createUniformBuffer(device, 1040, 'density-schroedinger')
+    // SchroedingerUniforms: ~1KB (matches renderer, includes boundingRadius)
+    this.schroedingerBuffer = this.createUniformBuffer(device, 1056, 'density-schroedinger')
     // BasisVectors: 192 bytes (4 × 3 × vec4f)
     this.basisBuffer = this.createUniformBuffer(device, 192, 'density-basis')
     // GridParams: 48 bytes
@@ -230,17 +233,17 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // u32 _pad0 (offset 12, 4 bytes)
     this.gridParamsU32View[3] = 0
 
-    // vec3f worldMin (offset 16, 12 bytes)
-    this.gridParamsF32View[4] = -WORLD_BOUND
-    this.gridParamsF32View[5] = -WORLD_BOUND
-    this.gridParamsF32View[6] = -WORLD_BOUND
+    // vec3f worldMin (offset 16, 12 bytes) - dynamic bounds from bounding radius
+    this.gridParamsF32View[4] = -this.worldBound
+    this.gridParamsF32View[5] = -this.worldBound
+    this.gridParamsF32View[6] = -this.worldBound
     // f32 _pad1 (offset 28, 4 bytes)
     this.gridParamsF32View[7] = 0
 
-    // vec3f worldMax (offset 32, 12 bytes)
-    this.gridParamsF32View[8] = WORLD_BOUND
-    this.gridParamsF32View[9] = WORLD_BOUND
-    this.gridParamsF32View[10] = WORLD_BOUND
+    // vec3f worldMax (offset 32, 12 bytes) - dynamic bounds from bounding radius
+    this.gridParamsF32View[8] = this.worldBound
+    this.gridParamsF32View[9] = this.worldBound
+    this.gridParamsF32View[10] = this.worldBound
     // f32 _pad2 (offset 44, 4 bytes)
     this.gridParamsF32View[11] = 0
 
@@ -387,7 +390,18 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * Get world bounds for coordinate conversion.
    */
   getWorldBounds(): { min: number; max: number } {
-    return { min: -WORLD_BOUND, max: WORLD_BOUND }
+    return { min: -this.worldBound, max: this.worldBound }
+  }
+
+  /**
+   * Update the world bounds to match the renderer's bounding radius.
+   * Call when quantum state changes (per preset regeneration, not per frame).
+   */
+  updateWorldBound(device: GPUDevice, boundingRadius: number): void {
+    if (Math.abs(boundingRadius - this.worldBound) < 0.01) return
+    this.worldBound = boundingRadius
+    this.updateGridParams(device)
+    this.needsRecompute = true
   }
 
   /**

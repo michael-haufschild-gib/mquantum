@@ -179,6 +179,16 @@ fn volumeRaymarch(
 
     let pos = rayOrigin + rayDir * t;
 
+    // PERFORMANCE: Gaussian envelope early-skip for deep tail region.
+    // The outer ~15% shell of the bounding sphere is exponentially low density.
+    // Skip expensive wavefunction evaluation and take 8x steps through it.
+    let r2 = dot(pos, pos);
+    let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+    if (r2 > boundR2 * 0.85) {
+      t += stepLen * 8.0;
+      continue;
+    }
+
     // Sample density with phase AND get flowed position for optimized gradient computation
     let densityResult = sampleDensityWithPhaseAndFlow(pos, animTime, uniforms);
     let densityInfo = densityResult[0];
@@ -311,6 +321,14 @@ fn volumeRaymarchHQ(
         transmittance.b < MIN_TRANSMITTANCE) { break; }
 
     let pos = rayOrigin + rayDir * t;
+
+    // PERFORMANCE: Gaussian envelope early-skip for deep tail region.
+    let r2 = dot(pos, pos);
+    let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+    if (r2 > boundR2 * 0.85) {
+      t += stepLen * 8.0;
+      continue;
+    }
 
     // Update radial dispersion offset per sample
     if (dispersionActive && uniforms.dispersionDirection == 0) {

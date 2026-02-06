@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Icons } from './icons'
 import { Sparkline } from './subcomponents'
 import { BuffersTabContent, ShaderTabContent, StatsTabContent, SystemTabContent } from './tabs'
-import { getHealthColor } from './utils'
+import { formatFpsBound, getHealthColor } from './utils'
 
 // ============================================================================
 // FPS HEADER - Isolated subscription for FPS graph area
@@ -24,6 +24,8 @@ const FPSHeader = React.memo(function FPSHeader() {
   )
 
   const fpsColor = getHealthColor(fps, 55, 30)
+  const minFpsLabel = formatFpsBound(minFps)
+  const maxFpsLabel = formatFpsBound(maxFps)
 
   return (
     <div className="px-5 py-5 space-y-4 bg-gradient-to-b from-[var(--bg-hover)] to-transparent">
@@ -36,7 +38,7 @@ const FPSHeader = React.memo(function FPSHeader() {
             </span>
           </div>
           <div className="text-[10px] text-text-tertiary uppercase tracking-wider mt-1 font-medium">
-            Min {minFps} • Max {maxFps}
+            Min {minFpsLabel} • Max {maxFpsLabel}
           </div>
         </div>
         <div className="text-right">

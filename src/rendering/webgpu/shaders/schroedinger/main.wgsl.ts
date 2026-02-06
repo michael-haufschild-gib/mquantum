@@ -40,7 +40,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
   // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, BOUND_R);
+  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
 
   // No intersection with bounding volume
   if (tSphere.y < 0.0) {
@@ -158,7 +158,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
   // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, BOUND_R);
+  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
 
   // No intersection with bounding volume
   if (tSphere.y < 0.0) {
@@ -257,7 +257,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
   // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, BOUND_R);
+  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
   if (tSphere.y < 0.0) {
     discard;
   }
@@ -545,7 +545,7 @@ ${bayerJitterSection}
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
   // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, BOUND_R);
+  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
 
   // No intersection with bounding volume
   if (tSphere.y < 0.0) {

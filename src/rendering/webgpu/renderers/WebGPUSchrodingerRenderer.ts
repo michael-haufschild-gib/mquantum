@@ -23,6 +23,7 @@ import {
   flattenPresetForUniforms,
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
+import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
@@ -118,10 +119,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // the same visual brightness as the old visual-damping normalization.
   private canonicalDensityCompensation = 1.0
 
+  // Dynamic bounding radius: physics-based sphere that contains all
+  // visually significant wavefunction density. Updated per state change.
+  private boundingRadius = 2.0
+
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1040 bytes (260 floats)
-  private schroedingerUniformData = new ArrayBuffer(1040)
+  // Schroedinger: 1056 bytes (264 floats) - includes boundingRadius/invBoundingRadius + padding
+  private schroedingerUniformData = new ArrayBuffer(1056)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -398,8 +403,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // 160 bytes due to WGSL vec3f 16-byte alignment requirements
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
-    // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ controls
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1040, 'schroedinger-uniforms')
+    // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1056, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create density grid compute pass if enabled
@@ -463,8 +468,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   private createBoundingGeometry(device: GPUDevice): void {
-    // Create a box (4×4×4) for volume raymarching - matches WebGL BoxGeometry(4,4,4)
-    const halfSize = 2.0
+    // Create a cube for volume raymarching sized to bounding radius
+    const halfSize = this.boundingRadius
 
     // 8 vertices of a cube (each corner)
     // prettier-ignore
@@ -837,6 +842,25 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
       // Compute auto-compensation for canonical normalization
       this.canonicalDensityCompensation = this.computeCanonicalCompensation(preset, dimension)
+
+      // Compute physics-based bounding radius for this state
+      const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
+      const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
+      const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
+      const newBoundR = computeBoundingRadius(
+        quantumModeStr,
+        preset,
+        dimension,
+        schroedinger?.principalQuantumNumber ?? 2,
+        schroedinger?.bohrRadiusScale ?? 1.0,
+        extraDimQuantumNumbers,
+        extraDimOmega,
+      )
+      // Rebuild bounding geometry if radius changed significantly
+      if (Math.abs(newBoundR - this.boundingRadius) > 0.01 && this.device) {
+        this.boundingRadius = newBoundR
+        this.createBoundingGeometry(this.device)
+      }
     }
 
     // Use cached flattened preset data
@@ -1020,11 +1044,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[912 / 4] = schroedinger?.isoEnabled ? 1 : 0
     floatView[916 / 4] = schroedinger?.isoThreshold ?? -3.0 // WebGL default: -3.0
     // HQ mode (quality >= 0.75) uses 64 samples, fast mode uses 32
+    // Scale sample count by bounding radius ratio to maintain step density
     const performance = ctx.frame?.stores?.['performance'] as any
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
     const fastMode = qualityMultiplier < 0.75
     const defaultSampleCount = fastMode ? 32 : 64
-    intView[920 / 4] = schroedinger?.sampleCount ?? defaultSampleCount
+    const baseSampleCount = schroedinger?.sampleCount ?? defaultSampleCount
+    const radiusScale = this.boundingRadius / 2.0
+    const effectiveSampleCount = Math.ceil(baseSampleCount * radiusScale)
+    intView[920 / 4] = effectiveSampleCount
 
     // Phase shift fields
     intView[924 / 4] = schroedinger?.phaseAnimationEnabled ? 1 : 0
@@ -1091,6 +1119,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1028 / 4] = schroedinger?.fogContribution ?? 1.0
     floatView[1032 / 4] = schroedinger?.internalFogDensity ?? 0.0
     intView[1036 / 4] = schroedinger?.erosionHQ ? 1 : 0
+
+    // Dynamic bounding radius (offset 1040+)
+    floatView[1040 / 4] = this.boundingRadius
+    floatView[1044 / 4] = 1.0 / this.boundingRadius
+    floatView[1048 / 4] = 0.0 // _padBound0
+    floatView[1052 / 4] = 0.0 // _padBound1
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1426,6 +1460,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       // Pass versions to enable smart dirty tracking - only recompute when parameters change
       gridPass.updateSchroedingerUniforms(ctx.device, this.schroedingerUniformData, schroedingerVersion)
       gridPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, rotationVersion)
+      // Sync bounding radius so density grid covers the full wavefunction extent
+      gridPass.updateWorldBound(ctx.device, this.boundingRadius)
 
       // Execute compute pass - fills the 3D density texture
       gridPass.execute(ctx)

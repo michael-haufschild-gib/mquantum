@@ -87,3 +87,16 @@ export function getFpsColorLevel(fps: number): FpsColorLevel {
   if (fps >= 30) return 'medium'
   return 'low'
 }
+
+/**
+ * Format min/max FPS bounds for monitor labels.
+ *
+ * Uses a placeholder for uninitialized sentinel values such as Infinity.
+ */
+export function formatFpsBound(value: number): string {
+  if (!Number.isFinite(value)) {
+    return '--'
+  }
+
+  return Math.round(value).toString()
+}

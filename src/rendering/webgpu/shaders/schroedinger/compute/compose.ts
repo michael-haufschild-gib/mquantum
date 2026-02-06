@@ -186,7 +186,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     // Defines - must come first
     { name: 'Defines', content: defines.join('\n') },
 
-    // Core constants (includes BOUND_R = 2.0)
+    // Core constants (BOUND_R kept as fallback; Schroedinger uses dynamic boundingRadius)
     { name: 'Constants', content: constantsBlock },
 
     // Uniform structs (SchroedingerUniforms, BasisVectors)
