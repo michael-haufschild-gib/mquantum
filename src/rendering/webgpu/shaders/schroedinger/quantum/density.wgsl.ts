@@ -165,19 +165,19 @@ fn distortPositionHQ(p: vec3f, strength: f32) -> vec3f {
   return p + displacement * (strength * 0.5);
 }
 
-// Erode density based on noise
-fn erodeDensity(rho: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
+// Erode density based on noise — surface-aware edge erosion.
+// IMPORTANT: quantumPos must be the basis-rotated quantum-space position
+// (first 3 components of xND), NOT the raw model-space ray position.
+// Using model-space would make the noise static while lobes rotate via basis vectors.
+fn erodeDensity(rho: f32, quantumPos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
   // Early exit: erosion disabled
   if (uniforms.erosionStrength <= 0.001) { return rho; }
 
   // Skip erosion for very low density (invisible samples)
   if (rho < 0.001) { return rho; }
 
-  // Skip erosion for high-density core
-  if (rho > 2.0) { return rho; }
-
-  // Scale position for noise
-  var noisePos = pos * uniforms.erosionScale;
+  // Scale position for noise (quantumPos already includes fieldScale from mapPosToND)
+  var noisePos = quantumPos * uniforms.erosionScale;
 
   // Add turbulence/distortion
   if (uniforms.erosionTurbulence > 0.0) {
@@ -194,8 +194,16 @@ fn erodeDensity(rho: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
   // Sample noise
   let noise = getErosionNoise(noisePos, uniforms);
 
-  // Direct subtraction in linear space
-  let erodedRho = max(0.0, rho - noise * uniforms.erosionStrength * 2.0);
+  // Surface-proximity weighting:
+  // normalizedRho ≈ per-step opacity contribution (rho * densityGain).
+  //   Edge  (normalizedRho small, ~0-0.3)  → full erosion  → carves lobe boundary
+  //   Core  (normalizedRho large, >2)       → zero erosion  → preserves interior
+  // This prevents volumetric noise from acting as a view-dependent overlay.
+  let normalizedRho = rho * max(uniforms.densityGain, 0.01);
+  let surfaceWeight = 1.0 - smoothstep(0.3, 2.0, normalizedRho);
+
+  // Subtract noise scaled by surface weight
+  let erodedRho = max(0.0, rho - noise * uniforms.erosionStrength * surfaceWeight * 2.0);
 
   // Smooth blending to avoid hard cuts
   return mix(rho, erodedRho, uniforms.erosionStrength);
@@ -315,8 +323,9 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
     rho *= uniforms.hydrogenNDBoost;
   }
 
-  // Apply Edge Erosion
-  rho = erodeDensity(rho, flowedPos, uniforms);
+  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
+  let qPos = vec3f(xND[0], xND[1], xND[2]);
+  rho = erodeDensity(rho, qPos, uniforms);
 
   return rho;
 }
@@ -341,8 +350,9 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
     rho *= uniforms.hydrogenNDBoost;
   }
 
-  // Apply Edge Erosion
-  rho = erodeDensity(rho, flowedPos, uniforms);
+  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
+  let qPos = vec3f(xND[0], xND[1], xND[2]);
+  rho = erodeDensity(rho, qPos, uniforms);
 
   // Confidence-boundary emphasis around an iso-probability surface
   let boundaryLogRho = sFromRho(rho);
@@ -392,8 +402,9 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     rho *= uniforms.hydrogenNDBoost;
   }
 
-  // Apply Edge Erosion
-  rho = erodeDensity(rho, flowedPos, uniforms);
+  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
+  let qPos = vec3f(xND[0], xND[1], xND[2]);
+  rho = erodeDensity(rho, qPos, uniforms);
 
   // Confidence-boundary emphasis around an iso-probability surface
   let boundaryLogRho = sFromRho(rho);
@@ -437,8 +448,9 @@ fn sampleDensityAtFlowedPos(flowedPos: vec3f, t: f32, uniforms: SchroedingerUnif
     rho *= uniforms.hydrogenNDBoost;
   }
 
-  // Apply Edge Erosion
-  rho = erodeDensity(rho, flowedPos, uniforms);
+  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
+  let qPos = vec3f(xND[0], xND[1], xND[2]);
+  rho = erodeDensity(rho, qPos, uniforms);
 
   return rho;
 }

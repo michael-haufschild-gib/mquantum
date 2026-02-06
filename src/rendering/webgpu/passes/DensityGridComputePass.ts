@@ -76,6 +76,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private densityReadbackBuffer: GPUBuffer | null = null
   private readbackBytesPerRow = 0
   private readbackInFlight = false
+  private readbackPendingSubmit = false
   private shouldRefreshDistribution = true
   private densityTextureFormat: 'r16float' | 'rgba16float' = 'rgba16float'
   private hasPhasePayload = false
@@ -428,6 +429,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       !this.densityTexture ||
       !this.densityReadbackBuffer ||
       this.readbackInFlight ||
+      this.readbackPendingSubmit ||
       !this.shouldRefreshDistribution
     ) {
       return
@@ -450,11 +452,33 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     )
 
     this.readbackInFlight = true
+    this.readbackPendingSubmit = true
     this.shouldRefreshDistribution = false
+  }
 
-    readbackBuffer
-      .mapAsync(GPUMapMode.READ)
+  /**
+   * Start CPU readback after queued copy work has been submitted.
+   */
+  private startPendingReadback(): void {
+    if (!this.readbackPendingSubmit || !this.device || !this.densityReadbackBuffer) {
+      return
+    }
+
+    const readbackBuffer = this.densityReadbackBuffer
+    this.readbackPendingSubmit = false
+
+    this.device.queue
+      .onSubmittedWorkDone()
       .then(() => {
+        if (this.densityReadbackBuffer !== readbackBuffer) {
+          return
+        }
+        return readbackBuffer.mapAsync(GPUMapMode.READ)
+      })
+      .then(() => {
+        if (this.densityReadbackBuffer !== readbackBuffer) {
+          return
+        }
         const mapped = readbackBuffer.getMappedRange()
         const halfView = new Uint16Array(mapped)
         this.buildDensityDistribution(halfView)
@@ -606,6 +630,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.lastQuantumMode = this.passConfig.quantumMode
   }
 
+  postFrame(): void {
+    this.startPendingReadback()
+  }
+
   /**
    * Get the density texture for use in render pass.
    */
@@ -681,6 +709,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.densityReadbackBuffer = null
     this.readbackBytesPerRow = 0
     this.readbackInFlight = false
+    this.readbackPendingSubmit = false
     this.shouldRefreshDistribution = true
     this.sortedRhoValues = null
     this.prefixMass = null

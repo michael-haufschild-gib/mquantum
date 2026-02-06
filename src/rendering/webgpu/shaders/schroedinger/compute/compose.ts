@@ -151,6 +151,9 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
   // Temporal disabled for compute (not needed)
   defines.push('const TEMPORAL_ENABLED: bool = false;')
+  // Density modules reference FEATURE_INTERFERENCE; keep it defined in compute shaders.
+  // Set to true so runtime uniform toggles still control the effect in compute mode.
+  defines.push('const FEATURE_INTERFERENCE: bool = true;')
 
   features.push('Density Grid Compute')
   if (includePhase) {

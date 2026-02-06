@@ -4,8 +4,8 @@
  * Multi-scale bloom effect matching Three.js UnrealBloomPass quality.
  * Uses 5 MIP levels with progressive downsampling and Gaussian blur.
  *
- * - Threshold: HDR-aware luminance extraction with peak normalization
- * - Blur: Per-level Gaussian with precomputed coefficients (kernel sizes [3,5,7,9,11])
+ * - Threshold: luminance high-pass extraction
+ * - Blur: Per-level Gaussian with precomputed coefficients (kernel sizes [6,10,14,18,22])
  * - Composite: 5 MIP level weighted sum with lerpBloomFactor and 3.0x strength multiplier
  *
  * Fragment-only shaders: vertex stage provided by WebGPUBasePass FULLSCREEN_VERTEX_SHADER.
@@ -14,18 +14,18 @@
  */
 
 /**
- * Brightness threshold shader with HDR peak normalization.
- * Extracts bright areas matching WebGL HDRLuminosityHighPassShader behavior.
+ * Brightness threshold shader.
+ * Extracts bright areas matching LuminosityHighPassShader behavior.
  *
  * Uniform layout (16 bytes):
- *   threshold: f32, knee: f32, hdrPeak: f32, _padding: f32
+ *   threshold: f32, knee: f32, _padding0: f32, _padding1: f32
  */
 export const bloomThresholdShader = /* wgsl */ `
 struct ThresholdUniforms {
   threshold: f32,
   knee: f32,
-  hdrPeak: f32,
-  _padding: f32,
+  _padding0: f32,
+  _padding1: f32,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: ThresholdUniforms;
@@ -44,10 +44,7 @@ fn luminance(color: vec3f) -> f32 {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let color = textureSample(tInput, linearSampler, input.uv).rgb;
-
-  // Normalize luminance by HDR peak (matches WebGL HDRLuminosityHighPassShader)
-  // This makes threshold=0.8 mean "80% of peak brightness"
-  let lum = luminance(color) / uniforms.hdrPeak;
+  let lum = luminance(color);
 
   // Smoothstep threshold with knee as smooth width
   let alpha = smoothstep(uniforms.threshold, uniforms.threshold + uniforms.knee, lum);
@@ -59,14 +56,14 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 /**
  * Creates a Gaussian blur shader for a specific kernel radius.
  * Each MIP level gets a shader with a fixed loop bound for optimal GPU performance.
- * Kernel sizes match UnrealBloomPass: [3, 5, 7, 9, 11] per MIP level.
+ * Kernel sizes match UnrealBloomPass: [6, 10, 14, 18, 22] per MIP level.
  *
- * Coefficients are precomputed on CPU and passed as uniforms packed in array<vec4f, 3>.
+ * Coefficients are precomputed on CPU and passed as uniforms packed in array<vec4f, 6>.
  *
- * Uniform layout (64 bytes):
- *   direction: vec2f, texelSize: vec2f, coefficients: array<vec4f, 3>
+ * Uniform layout (112 bytes):
+ *   direction: vec2f, texelSize: vec2f, coefficients: array<vec4f, 6>
  *
- * @param kernelRadius - Number of samples on each side of center (3, 5, 7, 9, or 11)
+ * @param kernelRadius - Number of coefficients/samples (6, 10, 14, 18, or 22)
  * @returns WGSL fragment shader source
  */
 export function createBloomBlurShader(kernelRadius: number): string {
@@ -74,7 +71,7 @@ export function createBloomBlurShader(kernelRadius: number): string {
 struct BlurUniforms {
   direction: vec2f,
   texelSize: vec2f,
-  coefficients: array<vec4f, 3>,
+  coefficients: array<vec4f, 6>,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: BlurUniforms;
@@ -97,8 +94,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Center sample
   var result = textureSample(tInput, linearSampler, input.uv).rgb * getCoeff(0u);
 
-  // Symmetric Gaussian samples (${kernelRadius} on each side)
-  for (var i = 1u; i < ${kernelRadius + 1}u; i++) {
+  // Symmetric Gaussian samples (i in [1, kernelRadius))
+  for (var i = 1u; i < ${kernelRadius}u; i++) {
     let w = getCoeff(i);
     let o = offset * f32(i);
     result += textureSample(tInput, linearSampler, input.uv + o).rgb * w;

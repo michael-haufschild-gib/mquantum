@@ -48,8 +48,8 @@ export const DEFAULT_BLOOM_INTENSITY = 0.5
 export const DEFAULT_BLOOM_THRESHOLD = 0.8
 /** Blur radius/spread (0-1, default 0.4) */
 export const DEFAULT_BLOOM_RADIUS = 0.4
-/** Luminance smoothing - softens the threshold transition (0-1, default 0.1) */
-export const DEFAULT_BLOOM_SMOOTHING = 0.1
+/** Luminance smoothing - softens the threshold transition (0-1, default 0.01) */
+export const DEFAULT_BLOOM_SMOOTHING = 0.01
 /** Number of blur levels/mip levels (1-8, default 5) */
 export const DEFAULT_BLOOM_LEVELS = 5
 

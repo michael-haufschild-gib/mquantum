@@ -1646,6 +1646,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
       // Execute compute pass - fills the 3D density texture
       gridPass.execute(ctx)
+      // Internal compute pass is not graph-registered, so trigger its post-frame hook here.
+      // This schedules readback mapping via queue.onSubmittedWorkDone() after submit.
+      gridPass.postFrame?.()
     }
 
     // DIAGNOSTIC: Log key parameters once per second to help debug performance issues

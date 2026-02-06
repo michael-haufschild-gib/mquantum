@@ -6,7 +6,7 @@
  * and weighted composite with lerpBloomFactor.
  *
  * Architecture:
- * 1. Threshold: HDR-aware brightness extraction (normalized by hdrPeak)
+ * 1. Threshold: luminance high-pass extraction
  * 2. Progressive MIP chain: 5 levels at 1/2, 1/4, 1/8, 1/16, 1/32 resolution
  *    Each level does H+V separable Gaussian blur, reading from previous level
  * 3. Composite: Weighted blend of all 5 levels onto scene with 3.0x multiplier
@@ -23,7 +23,10 @@ import {
 } from '../shaders/postprocessing/bloom.wgsl'
 
 /** Kernel sizes per MIP level matching UnrealBloomPass */
-const KERNEL_SIZES = [3, 5, 7, 9, 11] as const
+const KERNEL_SIZES = [6, 10, 14, 18, 22] as const
+
+/** Packed coefficient slots (array<vec4f, 6> = 24 floats) */
+const COEFF_SLOTS = 24
 
 /** Number of MIP levels */
 const NUM_MIPS = 5
@@ -38,7 +41,7 @@ export interface BloomPassOptions {
   outputResource?: string
   /** Luminance threshold, normalized 0-1 (default: 0.8) */
   threshold?: number
-  /** Threshold smoothing / knee (default: 0.1) */
+  /** Threshold smoothing / knee (default: 0.01) */
   knee?: number
   /** Bloom strength / intensity (default: 0.5) */
   intensity?: number
@@ -46,8 +49,6 @@ export interface BloomPassOptions {
   radius?: number
   /** Number of active blur levels 1-5 (default: 5) */
   levels?: number
-  /** HDR peak luminance for normalization (default: 5.0) */
-  hdrPeak?: number
 }
 
 /**
@@ -71,7 +72,7 @@ export class BloomPass extends WebGPUBasePass {
   private compositeUB: GPUBuffer | null = null
   private thresholdUniformData = new Float32Array(4)
   private compositeUniformData = new Float32Array(12)
-  private blurUniformScratch = new Float32Array(16)
+  private blurUniformScratch = new Float32Array(4 + COEFF_SLOTS)
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -101,14 +102,12 @@ export class BloomPass extends WebGPUBasePass {
 
   // Parameters matching WebGL defaults from visualDefaults.ts
   private threshold = 0.8
-  private knee = 0.1
+  private knee = 0.01
   private intensity = 0.5
   private radius = 0.4
   private levels = 5
-  private hdrPeak = 5.0
   private lastThreshold = Number.NaN
   private lastKnee = Number.NaN
-  private lastHdrPeak = Number.NaN
   private lastIntensity = Number.NaN
   private lastRadius = Number.NaN
   private lastLevels = -1
@@ -135,13 +134,12 @@ export class BloomPass extends WebGPUBasePass {
     if (options?.intensity !== undefined) this.intensity = options.intensity
     if (options?.radius !== undefined) this.radius = options.radius
     if (options?.levels !== undefined) this.levels = options.levels
-    if (options?.hdrPeak !== undefined) this.hdrPeak = options.hdrPeak
 
     this.precomputeGaussianCoefficients()
   }
 
   /**
-   * Precompute normalized Gaussian coefficients for each MIP level.
+   * Precompute Gaussian coefficients for each MIP level.
    * Matches UnrealBloomPass formula:
    *   gaussian(x) = 0.39894 * exp(-0.5 * x^2 / sigma^2) / sigma
    *   sigma = kernelRadius / 3
@@ -152,20 +150,11 @@ export class BloomPass extends WebGPUBasePass {
     for (let level = 0; level < NUM_MIPS; level++) {
       const kernelRadius = KERNEL_SIZES[level]!
       const sigma = kernelRadius / 3.0
-      const coeffs = new Float32Array(12) // Max 12 slots (center + 11 offsets)
-      let sum = 0
+      const coeffs = new Float32Array(COEFF_SLOTS)
 
-      // Compute Gaussian weights
-      for (let i = 0; i <= kernelRadius; i++) {
+      // Matches UnrealBloomPass: i in [0, kernelRadius), no post-normalization step.
+      for (let i = 0; i < kernelRadius; i++) {
         coeffs[i] = (0.39894 * Math.exp((-0.5 * i * i) / (sigma * sigma))) / sigma
-        sum += i === 0 ? coeffs[i]! : 2 * coeffs[i]!
-      }
-
-      // Normalize so weights sum to 1.0
-      if (sum > 0) {
-        for (let i = 0; i <= kernelRadius; i++) {
-          coeffs[i] = coeffs[i]! / sum
-        }
       }
 
       // Slots beyond kernelRadius remain 0 (no contribution)
@@ -262,19 +251,19 @@ export class BloomPass extends WebGPUBasePass {
 
     // --- Uniform Buffers ---
 
-    // Threshold: 16 bytes (threshold, knee, hdrPeak, padding)
+    // Threshold: 16 bytes (threshold, knee, padding, padding)
     this.thresholdUB = this.createUniformBuffer(device, 16, 'bloom-threshold-ub')
 
     // Composite: 48 bytes (strength, radius, pad, pad, factors[4], factor4+pad[3])
     this.compositeUB = this.createUniformBuffer(device, 48, 'bloom-composite-ub')
 
-    // 10 blur uniform buffers: 5 levels x 2 directions, each 64 bytes
+    // 10 blur uniform buffers: 5 levels x 2 directions, each 112 bytes
     // Separate buffers avoid queue.writeBuffer overwrite bug
     this.blurUBs = []
     for (let level = 0; level < NUM_MIPS; level++) {
       for (let dir = 0; dir < 2; dir++) {
         const label = `bloom-blur-ub-L${level}-${dir === 0 ? 'H' : 'V'}`
-        this.blurUBs.push(this.createUniformBuffer(device, 64, label))
+        this.blurUBs.push(this.createUniformBuffer(device, 112, label))
       }
     }
 
@@ -348,8 +337,8 @@ export class BloomPass extends WebGPUBasePass {
     // Create MIP chain textures at progressively halved resolutions
     // Level 0: width/2, Level 1: width/4, ... Level 4: width/32
     for (let i = 0; i < NUM_MIPS; i++) {
-      const mipWidth = Math.max(1, Math.floor(width / Math.pow(2, i + 1)))
-      const mipHeight = Math.max(1, Math.floor(height / Math.pow(2, i + 1)))
+      const mipWidth = Math.max(1, Math.round(width / Math.pow(2, i + 1)))
+      const mipHeight = Math.max(1, Math.round(height / Math.pow(2, i + 1)))
 
       const desc = {
         size: { width: mipWidth, height: mipHeight },
@@ -364,8 +353,8 @@ export class BloomPass extends WebGPUBasePass {
     }
 
     // Threshold texture at level 0 resolution (same as MIP 0)
-    const threshW = Math.max(1, Math.floor(width / 2))
-    const threshH = Math.max(1, Math.floor(height / 2))
+    const threshW = Math.max(1, Math.round(width / 2))
+    const threshH = Math.max(1, Math.round(height / 2))
     this.thresholdTexture = device.createTexture({
       label: 'bloom-threshold-tex',
       size: { width: threshW, height: threshH },
@@ -399,8 +388,8 @@ export class BloomPass extends WebGPUBasePass {
    */
   private writeBlurUniforms(device: GPUDevice): void {
     for (let level = 0; level < NUM_MIPS; level++) {
-      const mipWidth = Math.max(1, Math.floor(this.textureSize.width / Math.pow(2, level + 1)))
-      const mipHeight = Math.max(1, Math.floor(this.textureSize.height / Math.pow(2, level + 1)))
+      const mipWidth = Math.max(1, Math.round(this.textureSize.width / Math.pow(2, level + 1)))
+      const mipHeight = Math.max(1, Math.round(this.textureSize.height / Math.pow(2, level + 1)))
 
       const coeffs = this.gaussianCoefficients[level]!
 
@@ -408,23 +397,15 @@ export class BloomPass extends WebGPUBasePass {
         const bufferIndex = level * 2 + dir
         const buffer = this.blurUBs[bufferIndex]!
 
-        // Layout: direction(vec2f) + texelSize(vec2f) + coefficients(array<vec4f, 3>)
+        // Layout: direction(vec2f) + texelSize(vec2f) + coefficients(array<vec4f, 6>)
+        this.blurUniformScratch.fill(0)
         this.blurUniformScratch[0] = dir === 0 ? 1 : 0
         this.blurUniformScratch[1] = dir === 0 ? 0 : 1
         this.blurUniformScratch[2] = 1 / mipWidth
         this.blurUniformScratch[3] = 1 / mipHeight
-        this.blurUniformScratch[4] = coeffs[0]!
-        this.blurUniformScratch[5] = coeffs[1]!
-        this.blurUniformScratch[6] = coeffs[2]!
-        this.blurUniformScratch[7] = coeffs[3]!
-        this.blurUniformScratch[8] = coeffs[4]!
-        this.blurUniformScratch[9] = coeffs[5]!
-        this.blurUniformScratch[10] = coeffs[6]!
-        this.blurUniformScratch[11] = coeffs[7]!
-        this.blurUniformScratch[12] = coeffs[8]!
-        this.blurUniformScratch[13] = coeffs[9]!
-        this.blurUniformScratch[14] = coeffs[10]!
-        this.blurUniformScratch[15] = coeffs[11]!
+        for (let i = 0; i < COEFF_SLOTS; i++) {
+          this.blurUniformScratch[4 + i] = coeffs[i]!
+        }
 
         this.writeUniformBuffer(device, buffer, this.blurUniformScratch)
       }
@@ -478,19 +459,14 @@ export class BloomPass extends WebGPUBasePass {
     if (!inputView) return
 
     // === Pass 1: Brightness Threshold ===
-    if (
-      this.threshold !== this.lastThreshold ||
-      this.knee !== this.lastKnee ||
-      this.hdrPeak !== this.lastHdrPeak
-    ) {
+    if (this.threshold !== this.lastThreshold || this.knee !== this.lastKnee) {
       this.thresholdUniformData[0] = this.threshold
       this.thresholdUniformData[1] = this.knee
-      this.thresholdUniformData[2] = this.hdrPeak
+      this.thresholdUniformData[2] = 0
       this.thresholdUniformData[3] = 0
       this.writeUniformBuffer(this.device, this.thresholdUB, this.thresholdUniformData)
       this.lastThreshold = this.threshold
       this.lastKnee = this.knee
-      this.lastHdrPeak = this.hdrPeak
     }
 
     if (!this.thresholdBindGroup || this.thresholdBindGroupInputView !== inputView) {
@@ -540,8 +516,8 @@ export class BloomPass extends WebGPUBasePass {
         colorAttachments: [
           {
             view: this.horizontalTextureViews[level]!,
-            loadOp: 'clear' as GPULoadOp,
-            storeOp: 'store' as GPUStoreOp,
+            loadOp: 'clear',
+            storeOp: 'store',
             clearValue: { r: 0, g: 0, b: 0, a: 0 },
           },
         ],
@@ -566,8 +542,8 @@ export class BloomPass extends WebGPUBasePass {
         colorAttachments: [
           {
             view: this.verticalTextureViews[level]!,
-            loadOp: 'clear' as GPULoadOp,
-            storeOp: 'store' as GPUStoreOp,
+            loadOp: 'clear',
+            storeOp: 'store',
             clearValue: { r: 0, g: 0, b: 0, a: 0 },
           },
         ],
@@ -577,13 +553,10 @@ export class BloomPass extends WebGPUBasePass {
     }
 
     // === Pass 3: Composite ===
-    // Compute bloom factors matching WebGL: baseFactors * mipScale * levelScale
+    // Compute bloom factors matching UnrealBloomPass base factors.
+    // "levels" masks out high mips but does not re-scale remaining factors.
     const baseFactors = [1.0, 0.8, 0.6, 0.4, 0.2]
-    const levelScale = this.levels / 5
-    const factors = baseFactors.map((f, i) => {
-      const mipScale = i < this.levels ? 1.0 : 0.0
-      return f * mipScale * (i === 0 ? 1.0 : levelScale)
-    })
+    const factors = baseFactors.map((f, i) => (i < this.levels ? f : 0.0))
 
     if (
       this.intensity !== this.lastIntensity ||
