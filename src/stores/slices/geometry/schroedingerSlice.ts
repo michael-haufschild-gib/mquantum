@@ -459,13 +459,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerErosionNoiseType: valueSetter('erosionNoiseType'),
     setSchroedingerErosionHQ: valueSetter('erosionHQ'),
 
-    // === Curl Noise Animation ===
-    setSchroedingerCurlEnabled: valueSetter('curlEnabled'),
-    setSchroedingerCurlStrength: clampedSetter('curlStrength', 0.0, 1.0),
-    setSchroedingerCurlScale: clampedSetter('curlScale', 0.25, 4.0),
-    setSchroedingerCurlSpeed: clampedSetter('curlSpeed', 0.1, 5.0),
-    setSchroedingerCurlBias: valueSetter('curlBias'),
-
     // === Dispersion ===
     setSchroedingerDispersionEnabled: valueSetter('dispersionEnabled'),
     setSchroedingerDispersionStrength: clampedSetter('dispersionStrength', 0.0, 1.0),
@@ -507,6 +500,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerInterferenceAmp: clampedSetter('interferenceAmp', 0.0, 1.0),
     setSchroedingerInterferenceFreq: clampedSetter('interferenceFreq', 1.0, 50.0),
     setSchroedingerInterferenceSpeed: clampedSetter('interferenceSpeed', 0.0, 10.0),
+    // Probability Current Flow
+    setSchroedingerProbabilityFlowEnabled: valueSetter('probabilityFlowEnabled'),
+    setSchroedingerProbabilityFlowSpeed: clampedSetter('probabilityFlowSpeed', 0.1, 5.0),
+    setSchroedingerProbabilityFlowStrength: clampedSetter('probabilityFlowStrength', 0.0, 1.0),
     setSchroedingerIsoEnabled: valueSetter('isoEnabled'),
     setSchroedingerIsoThreshold: clampedSetter('isoThreshold', -6, 0),
 
@@ -514,10 +511,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerSliceAnimationEnabled: valueSetter('sliceAnimationEnabled'),
     setSchroedingerSliceSpeed: clampedSetter('sliceSpeed', 0.01, 0.1),
     setSchroedingerSliceAmplitude: clampedSetter('sliceAmplitude', 0.1, 1.0),
-
-    // === Spread Animation ===
-    setSchroedingerSpreadAnimationEnabled: valueSetter('spreadAnimationEnabled'),
-    setSchroedingerSpreadAnimationSpeed: clampedSetter('spreadAnimationSpeed', 0.1, 2.0),
 
     // === Phase Animation (Hydrogen ND only) ===
     setSchroedingerPhaseAnimationEnabled: valueSetter('phaseAnimationEnabled'),

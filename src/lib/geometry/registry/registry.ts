@@ -73,45 +73,6 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
             },
           },
 
-          spreadAnimation: {
-            name: 'Wavepacket Dispersion',
-            description: 'Animates the frequency spread (breathing effect)',
-            enabledByDefault: false,
-            enabledKey: 'spreadAnimationEnabled',
-            params: {
-              spreadAnimationSpeed: {
-                min: 0.1,
-                max: 2.0,
-                default: 0.5,
-                step: 0.1,
-                label: 'Speed',
-                description: 'Speed of dispersion breathing',
-              },
-            },
-          },
-
-          flowAnimation: {
-            name: 'Animated Flow',
-            description: 'Curl noise turbulence flow',
-            enabledByDefault: false,
-            enabledKey: 'curlEnabled',
-            params: {
-              curlStrength: {
-                min: 0.0,
-                max: 1.0,
-                default: 0.3,
-                step: 0.05,
-                label: 'Strength',
-              },
-              curlSpeed: {
-                min: 0.1,
-                max: 5.0,
-                default: 1.0,
-                step: 0.1,
-                label: 'Speed',
-              },
-            },
-          },
         },
       },
 

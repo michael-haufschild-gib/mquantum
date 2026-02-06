@@ -280,18 +280,6 @@ export interface SchroedingerConfig {
   /** High quality erosion mode (3×3×3 Worley + 4-sample curl vs 2×2×2 + 2-sample) */
   erosionHQ: boolean
 
-  // === Curl Noise Turbulence ===
-  /** Enable curl noise flow animation */
-  curlEnabled: boolean
-  /** Strength of flow distortion (0.0-1.0) */
-  curlStrength: number
-  /** Scale of flow patterns (0.25-4.0) */
-  curlScale: number
-  /** Speed of flow animation (0.1-5.0) */
-  curlSpeed: number
-  /** Flow direction bias (0=None, 1=Up, 2=Out, 3=In) */
-  curlBias: number
-
   // === Chromatic Dispersion ===
   /** Enable chromatic dispersion */
   dispersionEnabled: boolean
@@ -364,6 +352,14 @@ export interface SchroedingerConfig {
   /** Interference fringe animation speed (0.0-10.0) */
   interferenceSpeed: number
 
+  // === Probability Current Flow ===
+  /** Enable probability current flow animation */
+  probabilityFlowEnabled: boolean
+  /** Flow animation speed (0.1-5.0) */
+  probabilityFlowSpeed: number
+  /** Flow modulation strength (0.0-1.0) */
+  probabilityFlowStrength: number
+
   // === Isosurface Mode (Optional) ===
   /** Enable isosurface rendering instead of volumetric */
   isoEnabled: boolean
@@ -377,12 +373,6 @@ export interface SchroedingerConfig {
   sliceSpeed: number
   /** Slice animation amplitude (0.1-1.0) */
   sliceAmplitude: number
-
-  // === Spread Animation ===
-  /** Enable frequency spread animation (animates frequencySpread parameter) */
-  spreadAnimationEnabled: boolean
-  /** Spread animation speed (0.1-2.0) */
-  spreadAnimationSpeed: number
 
   // === Phase Animation (Hydrogen ND only) ===
   /** Enable quantum phase evolution animation for Hydrogen ND mode */
@@ -496,13 +486,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   erosionNoiseType: 0,
   erosionHQ: false,
 
-  // Curl Noise
-  curlEnabled: false,
-  curlStrength: 0.3,
-  curlScale: 1.0,
-  curlSpeed: 1.0,
-  curlBias: 0,
-
   // Dispersion
   dispersionEnabled: false,
   dispersionStrength: 0.2,
@@ -543,6 +526,11 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   interferenceFreq: 10.0,
   interferenceSpeed: 1.0,
 
+  // Probability Current Flow
+  probabilityFlowEnabled: false,
+  probabilityFlowSpeed: 1.0,
+  probabilityFlowStrength: 0.3,
+
   // Isosurface (disabled by default)
   isoEnabled: false,
   isoThreshold: -0.76,
@@ -551,10 +539,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   sliceAnimationEnabled: false,
   sliceSpeed: 0.02,
   sliceAmplitude: 0.3,
-
-  // Spread Animation
-  spreadAnimationEnabled: false,
-  spreadAnimationSpeed: 0.5,
 
   // Phase Animation (Hydrogen ND only)
   phaseAnimationEnabled: false,

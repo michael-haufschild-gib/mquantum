@@ -116,8 +116,7 @@ fn computeGradientTetrahedral(pos: vec3f, t: f32, delta: f32, uniforms: Schroedi
 }
 
 /**
- * OPTIMIZED (E1): Gradient at pre-flowed position WITHOUT erosion.
- * - Skips 4 redundant applyFlow calls (position already flowed)
+ * OPTIMIZED (E1): Gradient WITHOUT erosion.
  * - Skips 4 expensive erosion noise evaluations (gradient shape unchanged)
  * This reduces erosion calls by ~80% with zero visual impact on lighting.
  */
@@ -141,10 +140,9 @@ struct NodalSample {
   _pad: f32,
 }
 
-// Sample complex wavefunction ψ at world position with flow applied.
+// Sample complex wavefunction ψ at world position.
 fn samplePsiWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
-  let flowedPos = applyFlow(pos, t, uniforms);
-  let xND = mapPosToND(flowedPos, uniforms);
+  let xND = mapPosToND(pos, uniforms);
   return evalPsi(xND, t, uniforms);
 }
 
@@ -155,16 +153,10 @@ fn evalHydrogenNodeFactorsAtXND(xND: array<f32, 11>, uniforms: SchroedingerUnifo
   let x2 = xND[2];
 
   let sum3D = x0 * x0 + x1 * x1 + x2 * x2;
-  var sumND = sum3D;
-  for (var j: i32 = 3; j < ACTUAL_DIM; j++) {
-    let xj = xND[j];
-    sumND += xj * xj;
-  }
-
   let r3D = sqrt(max(sum3D, 0.0));
-  let rND = sqrt(max(sumND, 0.0));
   let angles = sphericalAngles3D(x0, x1, x2, r3D);
-  let radial = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, rND, uniforms.bohrRadius);
+  // For node-family decomposition, radial nodes are defined by the 3D hydrogen core.
+  let radial = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
   let angular = evalHydrogenNDAngular(
     uniforms.azimuthalL,
     uniforms.magneticM,
@@ -175,19 +167,34 @@ fn evalHydrogenNodeFactorsAtXND(xND: array<f32, 11>, uniforms: SchroedingerUnifo
   return vec2f(radial, angular);
 }
 
-// Sample hydrogen radial/angular factors at world position with flow applied.
+// Sample hydrogen radial/angular factors at world position.
 fn sampleHydrogenNodeFactorsWithFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
-  let flowedPos = applyFlow(pos, t, uniforms);
-  let xND = mapPosToND(flowedPos, uniforms);
+  let xND = mapPosToND(pos, uniforms);
   return evalHydrogenNodeFactorsAtXND(xND, uniforms);
 }
 
 // Convert a zero-crossing scalar field into a nodal intensity.
 fn nodalBandMask(value: f32, gradient: vec3f, eps: f32) -> f32 {
   let epsSafe = max(eps, 1e-6);
-  let band = 1.0 - smoothstep(epsSafe, epsSafe * 3.0, abs(value));
-  let gradMask = smoothstep(epsSafe * 0.5, epsSafe * 8.0, length(gradient));
-  return band * gradMask;
+  let gradMag = length(gradient);
+  if (gradMag < 1e-6) { return 0.0; }
+
+  // First-order distance to the nodal manifold: d ~= |f| / |grad f|
+  let signedDistance = abs(value) / gradMag;
+  return 1.0 - smoothstep(epsSafe, epsSafe * 2.0, signedDistance);
+}
+
+// Gate nodal response to neighborhoods that actually straddle f=0.
+// Requires a true sign change: at least one sample < 0 AND at least one > 0.
+// The eps parameter is NOT used here — it controls band width in nodalBandMask only.
+fn nodalCrossingMask(f0: f32, f1: f32, f2: f32, f3: f32, eps: f32) -> f32 {
+  let minF = min(min(f0, f1), min(f2, f3));
+  let maxF = max(max(f0, f1), max(f2, f3));
+  // Both sides of zero must be represented
+  if (minF >= 0.0 || maxF <= 0.0) {
+    return 0.0;
+  }
+  return 1.0;
 }
 
 // Select nodal color based on active mode and lobe-coloring options.
@@ -222,9 +229,20 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
   let p2 = samplePsiWithFlow(pos + TETRA_V2 * delta, t, uniforms);
   let p3 = samplePsiWithFlow(pos + TETRA_V3 * delta, t, uniforms);
 
+  let re0 = p0.x;
+  let re1 = p1.x;
+  let re2 = p2.x;
+  let re3 = p3.x;
+  let im0 = p0.y;
+  let im1 = p1.y;
+  let im2 = p2.y;
+  let im3 = p3.y;
+
   let psiCenter = (p0 + p1 + p2 + p3) * 0.25;
-  let gradRe = (TETRA_V0 * p0.x + TETRA_V1 * p1.x + TETRA_V2 * p2.x + TETRA_V3 * p3.x) * (0.75 / delta);
-  let gradIm = (TETRA_V0 * p0.y + TETRA_V1 * p1.y + TETRA_V2 * p2.y + TETRA_V3 * p3.y) * (0.75 / delta);
+  let gradRe = (TETRA_V0 * re0 + TETRA_V1 * re1 + TETRA_V2 * re2 + TETRA_V3 * re3) * (0.75 / delta);
+  let gradIm = (TETRA_V0 * im0 + TETRA_V1 * im1 + TETRA_V2 * im2 + TETRA_V3 * im3) * (0.75 / delta);
+  let crossingRe = nodalCrossingMask(re0, re1, re2, re3, eps);
+  let crossingIm = nodalCrossingMask(im0, im1, im2, im3, eps);
 
   var intensity = 0.0;
   var signValue = psiCenter.x;
@@ -255,31 +273,35 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
 
     let fCenter = (f0 + f1 + f2 + f3) * 0.25;
     let fGrad = (TETRA_V0 * f0 + TETRA_V1 * f1 + TETRA_V2 * f2 + TETRA_V3 * f3) * (0.75 / delta);
-    intensity = nodalBandMask(fCenter, fGrad, eps);
+    let crossing = nodalCrossingMask(f0, f1, f2, f3, eps);
+    intensity = nodalBandMask(fCenter, fGrad, eps) * crossing;
     signValue = fCenter;
     colorMode = NODAL_DEFINITION_PSI_ABS;
   } else {
     if (uniforms.nodalDefinition == NODAL_DEFINITION_REAL) {
-      intensity = nodalBandMask(psiCenter.x, gradRe, eps);
+      intensity = nodalBandMask(psiCenter.x, gradRe, eps) * crossingRe;
       signValue = psiCenter.x;
       colorMode = NODAL_DEFINITION_REAL;
     } else if (uniforms.nodalDefinition == NODAL_DEFINITION_IMAG) {
-      intensity = nodalBandMask(psiCenter.y, gradIm, eps);
+      intensity = nodalBandMask(psiCenter.y, gradIm, eps) * crossingIm;
       signValue = psiCenter.y;
       colorMode = NODAL_DEFINITION_IMAG;
     } else if (uniforms.nodalDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
       let maskRe = nodalBandMask(psiCenter.x, gradRe, eps);
       let maskIm = nodalBandMask(psiCenter.y, gradIm, eps);
-      intensity = sqrt(maskRe * maskIm);
+      intensity = sqrt(maskRe * maskIm) * crossingRe * crossingIm;
       signValue = psiCenter.x;
       colorMode = NODAL_DEFINITION_COMPLEX_INTERSECTION;
     } else {
-      let psiAbs = length(psiCenter);
-      var gradAbs = vec3f(0.0);
-      if (psiAbs > 1e-6) {
-        gradAbs = (psiCenter.x * gradRe + psiCenter.y * gradIm) / psiAbs;
-      }
-      intensity = nodalBandMask(psiAbs, gradAbs, eps);
+      // |psi| mode: near-zero envelope, gated by true sign changes in Re/Im
+      let abs0 = length(p0);
+      let abs1 = length(p1);
+      let abs2 = length(p2);
+      let abs3 = length(p3);
+      let psiAbsCenter = 0.25 * (abs0 + abs1 + abs2 + abs3);
+      let gradAbs = (TETRA_V0 * abs0 + TETRA_V1 * abs1 + TETRA_V2 * abs2 + TETRA_V3 * abs3) * (0.75 / delta);
+      let crossingAny = max(crossingRe, crossingIm);
+      intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;
       signValue = psiCenter.x;
       colorMode = NODAL_DEFINITION_PSI_ABS;
     }
@@ -377,13 +399,26 @@ fn volumeRaymarch(
     // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
-    // Physically grounded nodal overlay (independent from density alpha threshold).
-    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0) {
+    // Physically neutral nodal visualization:
+    // Smooth spatial fade: nodal intensity tapers to zero toward the cloud boundary,
+    // matching the Gaussian envelope falloff. No hard cutoff (which creates circle artifacts).
+    // Cannot use density gating because ρ=|ψ|²≈0 at nodes by definition.
+    let nodalRadialFade = 1.0 - smoothstep(0.25, 0.65, r2 / boundR2);
+    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFade > 0.01) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
-      if (nodal.intensity > 1e-4) {
+      let fadedIntensity = nodal.intensity * nodalRadialFade;
+      if (fadedIntensity > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
-        let nodalAlpha = clamp(nodal.intensity * uniforms.nodalStrength * adaptiveStep * 2.5, 0.0, 1.0);
-        accColor += transmittance * nodalAlpha * nodalColor;
+        let nodalAlpha = clamp(
+          1.0 - exp(-max(fadedIntensity * uniforms.nodalStrength, 0.0) * adaptiveStep),
+          0.0,
+          1.0
+        );
+        if (nodalAlpha > 1e-5) {
+          let nodalScattered = nodalColor * fogColor;
+          accColor += transmittance * nodalAlpha * nodalScattered;
+          transmittance *= (1.0 - nodalAlpha);
+        }
       }
     }
 
@@ -402,8 +437,7 @@ fn volumeRaymarch(
         primaryHitT = t;
       }
 
-      // OPTIMIZED: Compute gradient at pre-flowed position WITHOUT erosion
-      // This skips 4 redundant applyFlow calls and 4 expensive erosion evaluations
+      // OPTIMIZED: Compute gradient WITHOUT erosion (skips 4 expensive erosion evaluations)
       let gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
 
       // Compute emission with lighting
@@ -570,13 +604,24 @@ fn volumeRaymarchHQ(
     // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
-    // Physically grounded nodal overlay (independent from density alpha threshold).
-    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0) {
+    // Physically neutral nodal visualization:
+    // Smooth spatial fade matching the Gaussian envelope falloff.
+    let nodalRadialFadeHQ = 1.0 - smoothstep(0.25, 0.65, r2 / boundR2);
+    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeHQ > 0.01) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
-      if (nodal.intensity > 1e-4) {
+      let fadedIntensityHQ = nodal.intensity * nodalRadialFadeHQ;
+      if (fadedIntensityHQ > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
-        let nodalAlpha = clamp(nodal.intensity * uniforms.nodalStrength * adaptiveStep * 2.5, 0.0, 1.0);
-        accColor += transmittance * nodalAlpha * nodalColor;
+        let nodalAlpha = clamp(
+          1.0 - exp(-max(fadedIntensityHQ * uniforms.nodalStrength, 0.0) * adaptiveStep),
+          0.0,
+          1.0
+        );
+        if (nodalAlpha > 1e-5) {
+          let nodalScattered = nodalColor * fogColor;
+          accColor += transmittance * nodalAlpha * nodalScattered;
+          transmittance *= vec3f(1.0 - nodalAlpha);
+        }
       }
     }
 

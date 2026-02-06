@@ -6,6 +6,7 @@
  * if WASM is not yet ready.
  *
  * Functions:
+ * - composeRotationsIndexedWasm: Compose rotation matrices from precomputed axis index pairs
  * - composeRotationsWasm: Compose rotation matrices from plane names and angles
  * - projectVerticesWasm: Project nD vertices to 3D positions
  * - projectEdgesWasm: Project nD edges to 3D positions
@@ -22,6 +23,12 @@ import type { MatrixND, VectorND } from '@/lib/math/types'
 // WASM module types
 interface WasmModule {
   // Phase 1: Animation operations
+  compose_rotations_indexed_wasm?: (
+    dimension: number,
+    plane_indices: Uint32Array,
+    angles: Float64Array,
+    rotation_count: number
+  ) => Float64Array
   compose_rotations_wasm: (
     dimension: number,
     plane_names: string[],
@@ -154,6 +161,51 @@ export function composeRotationsWasm(
   } catch (err) {
     if (import.meta.env.DEV) {
       console.warn('[AnimationWASM] compose_rotations_wasm failed:', err)
+    }
+    return null
+  }
+}
+
+/**
+ * Compose multiple rotations using index pairs and preallocated typed arrays.
+ * Falls back to null if the indexed ABI is unavailable.
+ *
+ * @param dimension - The dimensionality of the space (must be >= 2)
+ * @param planeIndices - Flattened plane index pairs [i0, j0, i1, j1, ...]
+ * @param angles - Rotation angles in radians (pooled buffer)
+ * @param rotationCount - Number of active rotations inside the provided buffers
+ * @returns Flat rotation matrix as Float64Array, or null if WASM not ready/invalid/unavailable
+ */
+export function composeRotationsIndexedWasm(
+  dimension: number,
+  planeIndices: Uint32Array,
+  angles: Float64Array,
+  rotationCount: number
+): Float64Array | null {
+  if (!wasmReady || !wasmModule) {
+    return null
+  }
+
+  if (!Number.isInteger(dimension) || dimension < 2) {
+    return null
+  }
+  if (!Number.isInteger(rotationCount) || rotationCount < 0) {
+    return null
+  }
+  if (planeIndices.length < rotationCount * 2 || angles.length < rotationCount) {
+    return null
+  }
+
+  const indexedFn = wasmModule.compose_rotations_indexed_wasm
+  if (typeof indexedFn !== 'function') {
+    return null
+  }
+
+  try {
+    return indexedFn(dimension, planeIndices, angles, rotationCount)
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.warn('[AnimationWASM] compose_rotations_indexed_wasm failed:', err)
     }
     return null
   }

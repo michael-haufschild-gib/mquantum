@@ -3,8 +3,9 @@
  *
  * Tests quantum wavefunction animation controls:
  * - Time Evolution
- * - Animated Flow (Curl)
  * - Wavepacket Dispersion
+ * - Interference Fringing
+ * - Probability Flow
  * - Slice Animation (4D+ only)
  */
 
@@ -52,21 +53,21 @@ describe('SchroedingerAnimationDrawer', () => {
 
     // Each toggleable system has a toggle button with "OFF" initially
     const offButtons = screen.getAllByText('OFF')
-    expect(offButtons.length).toBeGreaterThanOrEqual(1) // flow, dispersion
+    expect(offButtons.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('should toggle Animated Flow', () => {
+  it('should toggle Probability Flow', () => {
     render(<SchroedingerAnimationDrawer />)
 
-    const toggleBtn = screen.getByRole('button', { name: /toggle flow animation/i })
+    const toggleBtn = screen.getByRole('button', { name: /toggle probability current flow/i })
     expect(toggleBtn).toBeInTheDocument()
 
     // Initially off
-    expect(useExtendedObjectStore.getState().schroedinger.curlEnabled).toBe(false)
+    expect(useExtendedObjectStore.getState().schroedinger.probabilityFlowEnabled).toBe(false)
 
     // Click to enable
     fireEvent.click(toggleBtn)
-    expect(useExtendedObjectStore.getState().schroedinger.curlEnabled).toBe(true)
+    expect(useExtendedObjectStore.getState().schroedinger.probabilityFlowEnabled).toBe(true)
   })
 
   it('should toggle Slice Animation for 4D', () => {
@@ -98,8 +99,8 @@ describe('SchroedingerAnimationDrawer', () => {
   it('should have disabled state styling when animation is off', () => {
     render(<SchroedingerAnimationDrawer />)
 
-    // Flow is off, its parameter container should have opacity-50
-    const flowPanel = screen.getByTestId('animation-panel-flow')
+    // Probability Flow is off, its parameter container should have opacity-50
+    const flowPanel = screen.getByTestId('animation-panel-probabilityFlow')
     const paramContainer = flowPanel.querySelector('.opacity-50')
     expect(paramContainer).toBeInTheDocument()
   })

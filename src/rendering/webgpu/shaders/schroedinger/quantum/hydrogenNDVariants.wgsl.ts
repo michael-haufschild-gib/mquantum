@@ -79,24 +79,14 @@ function generateRadiusCalculation(dimension: number): string {
     return `
   // 3D radius
   let r3D = sqrt(${sum3D});
-  let rND = r3D;
 `
   }
 
-  // For dimensions > 3, compute sum of extra dimension squares
-  const extraSqTerms = Array.from(
-    { length: dimension - 3 },
-    (_, i) => `x${i + 3}*x${i + 3}`
-  ).join(' + ')
-
   return `
-  // PERF: Compute sum3D once, reuse for both rND and r3D
+  // PERF: Compute sum3D once, reuse for angular/radial hydrogen core terms.
   let sum3D = ${sum3D};
 
-  // ${dimension}D radius
-  let rND = sqrt(sum3D + ${extraSqTerms});
-
-  // 3D radius (reusing sum3D)
+  // 3D hydrogen-core radius (reusing sum3D)
   let r3D = sqrt(sum3D);
 `
 }
@@ -167,7 +157,7 @@ fn evalHydrogenNDPsi${dimension}D(xND: array<f32, 11>, t: f32, uniforms: Schroed
 ${coordExtraction}
 ${extraDimEarlyExit}${radiusCalc}
   // EARLY EXIT 2: Check hydrogen radial threshold
-  if (hydrogenRadialEarlyExit(rND, uniforms)) {
+  if (hydrogenRadialEarlyExit(r3D, uniforms)) {
     return vec2f(0.0, 0.0);
   }
 
@@ -176,8 +166,8 @@ ${extraDimEarlyExit}${radiusCalc}
   let theta = angles.x;
   let phi = angles.y;
 
-  // Radial part: R_nl(r_ND) using ND radius
-  let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, rND, uniforms.bohrRadius);
+  // Radial part: R_nl(r_3D) from the 3D hydrogen core
+  let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
   // Angular part: Y_lm(theta, phi) from first 3 dims
   let Y = evalHydrogenNDAngular(uniforms.azimuthalL, uniforms.magneticM, theta, phi, uniforms.useRealOrbitals != 0u);

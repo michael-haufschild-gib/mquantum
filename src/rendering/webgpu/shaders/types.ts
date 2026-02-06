@@ -42,8 +42,6 @@ export interface WGSLShaderConfig {
   sss?: boolean
   /** Enable Fresnel rim lighting module compilation (conditionally compiled) */
   fresnel?: boolean
-  /** Enable Curl noise flow distortion (conditionally compiled) */
-  curl?: boolean
   /** Enable Chromatic dispersion effect (conditionally compiled) */
   dispersion?: boolean
   /** Enable Nodal surface highlighting (conditionally compiled) */

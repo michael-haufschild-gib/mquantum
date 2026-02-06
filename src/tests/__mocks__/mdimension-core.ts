@@ -38,6 +38,24 @@ export function compose_rotations_wasm(
 }
 
 /**
+ * Compose rotation matrices from index pairs mock
+ * @param _dimension - Dimension
+ * @param _plane_indices - Flattened index pairs
+ * @param _angles - Rotation angles
+ * @param _rotation_count - Number of active rotations
+ * @returns Identity matrix
+ */
+export function compose_rotations_indexed_wasm(
+  _dimension: number,
+  _plane_indices: Uint32Array,
+  _angles: Float64Array,
+  _rotation_count: number
+): Float64Array {
+  // Return identity matrix for 4D case (most common)
+  return new Float64Array(16).fill(0).map((_, i) => (i % 5 === 0 ? 1 : 0))
+}
+
+/**
  * Project vertices mock
  * @param _flat_vertices - Flat vertex array
  * @param _dimension - Dimension
@@ -137,4 +155,3 @@ export function normalize_vector_wasm(_v: Float64Array): Float64Array {
 export function subtract_vectors_wasm(_a: Float64Array, _b: Float64Array): Float64Array {
   return new Float64Array(0)
 }
-

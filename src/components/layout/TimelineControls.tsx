@@ -76,20 +76,18 @@ export const TimelineControls: FC = () => {
 
     if (configKey === 'schroedinger') {
       return [
-        schroedingerConfig.curlEnabled,
         schroedingerConfig.sliceAnimationEnabled,
-        schroedingerConfig.spreadAnimationEnabled,
         schroedingerConfig.interferenceEnabled,
+        schroedingerConfig.probabilityFlowEnabled,
       ].filter(Boolean).length
     }
 
     return 0
   }, [
     objectType,
-    schroedingerConfig.curlEnabled,
     schroedingerConfig.sliceAnimationEnabled,
-    schroedingerConfig.spreadAnimationEnabled,
     schroedingerConfig.interferenceEnabled,
+    schroedingerConfig.probabilityFlowEnabled,
   ])
 
   // Check if any animation is active

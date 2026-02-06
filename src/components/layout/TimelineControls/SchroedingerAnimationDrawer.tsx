@@ -10,8 +10,8 @@
  *
  * Animation Systems:
  * - Time Evolution: Controls the speed of quantum phase evolution (both modes)
- * - Animated Flow: Curl noise turbulence (both modes)
- * - Wavepacket Dispersion: Animates frequency spread
+ * - Interference Fringing: Phase-modulated density ripples
+ * - Probability Flow: Density-gradient-modulated flowing noise
  * - Slice Animation: 4D+ only, animates the 4D slice position
  *
  * @see docs/prd/ndimensional-visualizer.md
@@ -48,14 +48,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       config: state.schroedinger,
       // Time Evolution
       setTimeScale: state.setSchroedingerTimeScale,
-      // Animated Flow
-      setCurlEnabled: state.setSchroedingerCurlEnabled,
-      setCurlStrength: state.setSchroedingerCurlStrength,
-      setCurlScale: state.setSchroedingerCurlScale,
-      setCurlSpeed: state.setSchroedingerCurlSpeed,
-      // Spread Animation
-      setSpreadAnimationEnabled: state.setSchroedingerSpreadAnimationEnabled,
-      setSpreadAnimationSpeed: state.setSchroedingerSpreadAnimationSpeed,
       // Slice Animation
       setSliceAnimationEnabled: state.setSchroedingerSliceAnimationEnabled,
       setSliceSpeed: state.setSchroedingerSliceSpeed,
@@ -67,20 +59,16 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setInterferenceAmp: state.setSchroedingerInterferenceAmp,
       setInterferenceFreq: state.setSchroedingerInterferenceFreq,
       setInterferenceSpeed: state.setSchroedingerInterferenceSpeed,
+      // Probability Current Flow
+      setProbabilityFlowEnabled: state.setSchroedingerProbabilityFlowEnabled,
+      setProbabilityFlowSpeed: state.setSchroedingerProbabilityFlowSpeed,
+      setProbabilityFlowStrength: state.setSchroedingerProbabilityFlowStrength,
     }))
 
     const {
       config,
       // Time Evolution
       setTimeScale,
-      // Animated Flow (Curl)
-      setCurlEnabled,
-      setCurlStrength,
-      setCurlScale,
-      setCurlSpeed,
-      // Spread Animation (Dispersion)
-      setSpreadAnimationEnabled,
-      setSpreadAnimationSpeed,
       // Slice Animation - 4D+
       setSliceAnimationEnabled,
       setSliceSpeed,
@@ -92,6 +80,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setInterferenceAmp,
       setInterferenceFreq,
       setInterferenceSpeed,
+      // Probability Current Flow
+      setProbabilityFlowEnabled,
+      setProbabilityFlowSpeed,
+      setProbabilityFlowStrength,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Check quantum mode for UI visibility
@@ -114,84 +106,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               step={0.1}
               value={config.timeScale}
               onChange={setTimeScale}
-              showValue
-            />
-          </div>
-        </div>
-
-        {/* Wavepacket Dispersion (Spread Animation) */}
-        <div className="space-y-4" data-testid="animation-panel-dispersion">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Wavepacket Dispersion
-            </label>
-            <ToggleButton
-              pressed={config.spreadAnimationEnabled}
-              onToggle={() => setSpreadAnimationEnabled(!config.spreadAnimationEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle spread animation"
-            >
-              {config.spreadAnimationEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <div
-            className={`space-y-3 ${!config.spreadAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Slider
-              label="Breathing Speed"
-              min={0.1}
-              max={2.0}
-              step={0.1}
-              value={config.spreadAnimationSpeed ?? 0.5}
-              onChange={setSpreadAnimationSpeed}
-              showValue
-            />
-          </div>
-        </div>
-
-        {/* Animated Flow (Curl Noise) */}
-        <div className="space-y-4" data-testid="animation-panel-flow">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Animated Flow
-            </label>
-            <ToggleButton
-              pressed={config.curlEnabled}
-              onToggle={() => setCurlEnabled(!config.curlEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle flow animation"
-            >
-              {config.curlEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <div
-            className={`space-y-3 ${!config.curlEnabled ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Slider
-              label="Strength"
-              min={0.0}
-              max={1.0}
-              step={0.05}
-              value={config.curlStrength}
-              onChange={setCurlStrength}
-              showValue
-            />
-            <Slider
-              label="Scale"
-              min={0.25}
-              max={4.0}
-              step={0.25}
-              value={config.curlScale}
-              onChange={setCurlScale}
-              showValue
-            />
-            <Slider
-              label="Speed"
-              min={0.1}
-              max={5.0}
-              step={0.1}
-              value={config.curlSpeed}
-              onChange={setCurlSpeed}
               showValue
             />
           </div>
@@ -240,6 +154,45 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               step={0.5}
               value={config.interferenceSpeed ?? 1.0}
               onChange={setInterferenceSpeed}
+              showValue
+            />
+          </div>
+        </div>
+
+        {/* Probability Current Flow */}
+        <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+              Probability Flow
+            </label>
+            <ToggleButton
+              pressed={config.probabilityFlowEnabled}
+              onToggle={() => setProbabilityFlowEnabled(!config.probabilityFlowEnabled)}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle probability current flow"
+            >
+              {config.probabilityFlowEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          <div
+            className={`space-y-3 ${!config.probabilityFlowEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <Slider
+              label="Strength"
+              min={0}
+              max={1}
+              step={0.05}
+              value={config.probabilityFlowStrength ?? 0.3}
+              onChange={setProbabilityFlowStrength}
+              showValue
+            />
+            <Slider
+              label="Speed"
+              min={0.1}
+              max={5}
+              step={0.1}
+              value={config.probabilityFlowSpeed ?? 1.0}
+              onChange={setProbabilityFlowSpeed}
               showValue
             />
           </div>

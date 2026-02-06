@@ -212,13 +212,27 @@ fn volumeRaymarchGrid(
       lowDensityCount = 0;
     }
 
-    // Physically grounded nodal overlay (consistent with direct-sampling paths).
-    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0) {
+    // Physically neutral nodal visualization:
+    // Smooth spatial fade matching the Gaussian envelope falloff.
+    // Cannot use density gating because ρ=|ψ|²≈0 at nodes by definition.
+    let nodalR2Grid = dot(pos, pos);
+    let nodalBoundR2Grid = uniforms.boundingRadius * uniforms.boundingRadius;
+    let nodalRadialFadeGrid = 1.0 - smoothstep(0.25, 0.65, nodalR2Grid / nodalBoundR2Grid);
+    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeGrid > 0.01) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
-      if (nodal.intensity > 1e-4) {
+      let fadedIntensityGrid = nodal.intensity * nodalRadialFadeGrid;
+      if (fadedIntensityGrid > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
-        let nodalAlpha = clamp(nodal.intensity * uniforms.nodalStrength * stepLen * 2.5, 0.0, 1.0);
-        accColor += transmittance * nodalAlpha * nodalColor;
+        let nodalAlpha = clamp(
+          1.0 - exp(-max(fadedIntensityGrid * uniforms.nodalStrength, 0.0) * stepLen),
+          0.0,
+          1.0
+        );
+        if (nodalAlpha > 1e-5) {
+          let nodalScattered = nodalColor * fogColor;
+          accColor += transmittance * nodalAlpha * nodalScattered;
+          transmittance *= (1.0 - nodalAlpha);
+        }
       }
     }
 

@@ -113,13 +113,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerErosionNoiseType: (type: number) => void
   setSchroedingerErosionHQ: (hq: boolean) => void
 
-  // Curl Noise Settings
-  setSchroedingerCurlEnabled: (enabled: boolean) => void
-  setSchroedingerCurlStrength: (strength: number) => void
-  setSchroedingerCurlScale: (scale: number) => void
-  setSchroedingerCurlSpeed: (speed: number) => void
-  setSchroedingerCurlBias: (bias: number) => void
-
   // Dispersion Settings
   setSchroedingerDispersionEnabled: (enabled: boolean) => void
   setSchroedingerDispersionStrength: (strength: number) => void
@@ -159,6 +152,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerInterferenceAmp: (amp: number) => void
   setSchroedingerInterferenceFreq: (freq: number) => void
   setSchroedingerInterferenceSpeed: (speed: number) => void
+  // Probability Current Flow
+  setSchroedingerProbabilityFlowEnabled: (enabled: boolean) => void
+  setSchroedingerProbabilityFlowSpeed: (speed: number) => void
+  setSchroedingerProbabilityFlowStrength: (strength: number) => void
 
   // Isosurface Mode
   setSchroedingerIsoEnabled: (enabled: boolean) => void
@@ -168,10 +165,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerSliceAnimationEnabled: (enabled: boolean) => void
   setSchroedingerSliceSpeed: (speed: number) => void
   setSchroedingerSliceAmplitude: (amplitude: number) => void
-
-  // Spread Animation
-  setSchroedingerSpreadAnimationEnabled: (enabled: boolean) => void
-  setSchroedingerSpreadAnimationSpeed: (speed: number) => void
 
   // Phase Animation (Hydrogen ND only)
   setSchroedingerPhaseAnimationEnabled: (enabled: boolean) => void

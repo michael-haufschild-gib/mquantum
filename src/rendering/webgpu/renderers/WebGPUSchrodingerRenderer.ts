@@ -125,8 +125,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1152 bytes (288 floats) - includes physical nodal controls
-  private schroedingerUniformData = new ArrayBuffer(1152)
+  // Schroedinger: 1168 bytes (292 floats) - includes physical nodal controls + probability flow
+  private schroedingerUniformData = new ArrayBuffer(1168)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -404,7 +404,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
     // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1152, 'schroedinger-uniforms')
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1168, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create density grid compute pass if enabled
@@ -694,21 +694,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const animation = ctx.frame?.stores?.['animation'] as any
     const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
-    // === Spread Animation ===
-    // Wavepacket Dispersion Animation - oscillates spread to show "breathing"
-    // between localized (low spread) and delocalized (high spread)
-    const spreadAnimationEnabled = schroedinger?.spreadAnimationEnabled ?? false
-    const spreadAnimationSpeed = schroedinger?.spreadAnimationSpeed ?? 0.5
-
     // === DIRTY-FLAG OPTIMIZATION ===
-    // When schroedinger settings unchanged AND appearance unchanged AND no spread animation,
+    // When schroedinger settings unchanged AND appearance unchanged,
     // only update the time field (4 bytes) instead of full buffer (~1KB)
     // Note: Emission/Rim parameters come from the appearance store (matching WebGL),
     // so we must also check appearanceVersion to detect those changes.
     const appearanceVersion = appearance?.appearanceVersion ?? 0
     const versionChanged = schroedingerVersion !== this.lastSchroedingerVersion
     const appearanceChanged = appearanceVersion !== this.lastSchrodingerAppearanceVersion
-    if (!versionChanged && !appearanceChanged && !spreadAnimationEnabled && this.lastSchroedingerVersion !== -1) {
+    if (!versionChanged && !appearanceChanged && this.lastSchroedingerVersion !== -1) {
       // Partial buffer write: only update time field at offset 908
       // Uses pre-allocated buffer to avoid per-frame allocation
       this.timeUpdateBuffer[0] = animationTime
@@ -778,23 +772,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const seed = schroedinger?.seed ?? 42
     const termCount = schroedinger?.termCount ?? 1
     const maxQuantumNumber = schroedinger?.maxQuantumNumber ?? 6
-    const baseFrequencySpread = schroedinger?.frequencySpread ?? 0.01
-
-    // Compute effective spread for preset generation (like WebGL)
-    let effectiveSpread = baseFrequencySpread
-    if (spreadAnimationEnabled) {
-      const t = animationTime * spreadAnimationSpeed
-      const phase = (Math.sin(t) + 1.0) * 0.5 // 0 to 1
-      effectiveSpread = 0.01 + phase * 0.44 // Range: 0.01 to 0.45
-
-      // PERFORMANCE FIX: Quantize spread to 20 discrete steps during animation
-      // This reduces preset regeneration from ~60/sec to ~20/cycle (much fewer)
-      // Without this, generateQuantumPreset() is called every frame
-      const SPREAD_STEPS = 20
-      const spreadRange = 0.44
-      const quantizedPhase = Math.round(phase * SPREAD_STEPS) / SPREAD_STEPS
-      effectiveSpread = 0.01 + quantizedPhase * spreadRange
-    }
+    const frequencySpread = schroedinger?.frequencySpread ?? 0.01
 
     // Check if preset needs regeneration
     const currentConfig = {
@@ -802,20 +780,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       seed,
       termCount,
       maxQuantumNumber,
-      frequencySpread: effectiveSpread,
+      frequencySpread,
       dimension,
     }
 
-    // Use coarser threshold during spread animation (quantized values change in ~0.022 steps)
-    // Static mode uses fine threshold for precise control
-    const spreadThreshold = spreadAnimationEnabled ? 0.01 : 0.001
     const needsPresetRegen =
       !this.cachedPresetConfig ||
       this.cachedPresetConfig.presetName !== currentConfig.presetName ||
       this.cachedPresetConfig.seed !== currentConfig.seed ||
       this.cachedPresetConfig.termCount !== currentConfig.termCount ||
       this.cachedPresetConfig.maxQuantumNumber !== currentConfig.maxQuantumNumber ||
-      Math.abs(this.cachedPresetConfig.frequencySpread - currentConfig.frequencySpread) > spreadThreshold ||
+      Math.abs(this.cachedPresetConfig.frequencySpread - currentConfig.frequencySpread) > 0.001 ||
       this.cachedPresetConfig.dimension !== currentConfig.dimension
 
     if (needsPresetRegen) {
@@ -827,12 +802,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           dimension,
           termCount,
           maxQuantumNumber,
-          effectiveSpread
+          frequencySpread
         )
       } else {
         preset =
           getNamedPreset(presetName, dimension) ??
-          generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, effectiveSpread)
+          generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
       }
 
       // Cache the preset and its flattened form
@@ -996,12 +971,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[768 / 4] = schroedinger?.erosionTurbulence ?? 0.5 // WebGL default: 0.5
     intView[772 / 4] = schroedinger?.erosionNoiseType ?? 0
 
-    // Curl fields
-    intView[776 / 4] = schroedinger?.curlEnabled ? 1 : 0
-    floatView[780 / 4] = schroedinger?.curlStrength ?? 0.3 // WebGL default: 0.3
-    floatView[784 / 4] = schroedinger?.curlScale ?? 1.0
-    floatView[788 / 4] = schroedinger?.curlSpeed ?? 1.0
-    intView[792 / 4] = schroedinger?.curlBias ?? 0
+    // Reserved (formerly curl noise flow, removed)
+    intView[776 / 4] = 0
+    floatView[780 / 4] = 0.0
+    floatView[784 / 4] = 0.0
+    floatView[788 / 4] = 0.0
+    intView[792 / 4] = 0
 
     // Dispersion fields
     intView[796 / 4] = schroedinger?.dispersionEnabled ? 1 : 0
@@ -1173,6 +1148,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1140 / 4] = nodalColorNegative[1]
     floatView[1144 / 4] = nodalColorNegative[2]
     floatView[1148 / 4] = 0.0 // _padNodal3
+
+    // Probability Current Flow (offset 1152-1164)
+    intView[1152 / 4] = schroedinger?.probabilityFlowEnabled ? 1 : 0
+    floatView[1156 / 4] = schroedinger?.probabilityFlowSpeed ?? 1.0
+    floatView[1160 / 4] = schroedinger?.probabilityFlowStrength ?? 0.3
+    floatView[1164 / 4] = 0.0 // _padFlow0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1473,7 +1454,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.updateCameraUniforms(ctx)
     this.updateBasisVectors(ctx)
 
-    // ALWAYS update: Schroedinger uniforms contain time-dependent data (animationTime, spreadAnimation)
+    // ALWAYS update: Schroedinger uniforms contain time-dependent data (animationTime)
     // Internal preset regeneration caching uses schroedingerVersion within updateSchroedingerUniforms()
     // but the buffer write must happen each frame for animation to work
     this.updateSchroedingerUniforms(ctx)

@@ -1,6 +1,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
 export const magnitude_wasm: (a: number, b: number) => number;

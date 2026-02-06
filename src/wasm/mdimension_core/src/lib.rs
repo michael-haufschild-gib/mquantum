@@ -30,8 +30,32 @@ mod animation;
 /// # Returns
 /// Flat rotation matrix (dimension × dimension) as Float64Array
 #[wasm_bindgen]
-pub fn compose_rotations_wasm(dimension: usize, plane_names: Vec<String>, angles: Vec<f64>) -> Vec<f64> {
+pub fn compose_rotations_wasm(
+    dimension: usize,
+    plane_names: Vec<String>,
+    angles: Vec<f64>,
+) -> Vec<f64> {
     animation::compose_rotations(dimension, &plane_names, &angles)
+}
+
+/// Composes multiple rotations from flattened plane indices and angles.
+///
+/// # Arguments
+/// * `dimension` - The dimensionality of the space
+/// * `plane_indices` - Flattened plane pairs [i0, j0, i1, j1, ...]
+/// * `angles` - Rotation angles in radians
+/// * `rotation_count` - Number of active rotations in the buffers
+///
+/// # Returns
+/// Flat rotation matrix (dimension × dimension) as Float64Array
+#[wasm_bindgen]
+pub fn compose_rotations_indexed_wasm(
+    dimension: usize,
+    plane_indices: &[u32],
+    angles: &[f64],
+    rotation_count: usize,
+) -> Vec<f64> {
+    animation::compose_rotations_indexed(dimension, plane_indices, angles, rotation_count)
 }
 
 /// Projects n-dimensional vertices to 3D positions using perspective projection.
@@ -44,7 +68,11 @@ pub fn compose_rotations_wasm(dimension: usize, plane_names: Vec<String>, angles
 /// # Returns
 /// Flat array of 3D positions as Float32Array [x0, y0, z0, x1, y1, z1, ...]
 #[wasm_bindgen]
-pub fn project_vertices_wasm(flat_vertices: &[f64], dimension: usize, projection_distance: f64) -> Vec<f32> {
+pub fn project_vertices_wasm(
+    flat_vertices: &[f64],
+    dimension: usize,
+    projection_distance: f64,
+) -> Vec<f32> {
     animation::project_vertices_to_positions(flat_vertices, dimension, projection_distance)
 }
 
@@ -59,7 +87,12 @@ pub fn project_vertices_wasm(flat_vertices: &[f64], dimension: usize, projection
 /// # Returns
 /// Flat array of edge positions [e0_x1, e0_y1, e0_z1, e0_x2, e0_y2, e0_z2, ...]
 #[wasm_bindgen]
-pub fn project_edges_wasm(flat_vertices: &[f64], dimension: usize, flat_edges: &[u32], projection_distance: f64) -> Vec<f32> {
+pub fn project_edges_wasm(
+    flat_vertices: &[f64],
+    dimension: usize,
+    flat_edges: &[u32],
+    projection_distance: f64,
+) -> Vec<f32> {
     animation::project_edges_to_positions(flat_vertices, dimension, flat_edges, projection_distance)
 }
 

@@ -118,12 +118,12 @@ struct SchroedingerUniforms {
   erosionTurbulence: f32,        // Edge erosion turbulence (0.0-1.0)
   erosionNoiseType: i32,         // 0=Worley, 1=Perlin, 2=Hybrid
 
-  // Curl
-  curlEnabled: u32,              // Enable curl noise flow
-  curlStrength: f32,             // Flow strength (0.0-1.0)
-  curlScale: f32,                // Flow scale (0.25-4.0)
-  curlSpeed: f32,                // Flow speed (0.1-5.0)
-  curlBias: i32,                 // Flow bias (0=None, 1=Up, 2=Out, 3=In)
+  // Reserved (formerly curl noise flow, removed)
+  _reservedCurl0: u32,
+  _reservedCurl1: f32,
+  _reservedCurl2: f32,
+  _reservedCurl3: f32,
+  _reservedCurl4: i32,
 
   // Dispersion
   dispersionEnabled: u32,        // Enable chromatic dispersion
@@ -213,6 +213,12 @@ struct SchroedingerUniforms {
   _padNodal2: f32,
   nodalColorNegative: vec3f,     // Negative lobe color
   _padNodal3: f32,
+
+  // Probability Current Flow
+  probabilityFlowEnabled: u32,    // Enable density-modulated flow noise
+  probabilityFlowSpeed: f32,      // Flow animation speed (0.1-5.0)
+  probabilityFlowStrength: f32,   // Flow modulation strength (0.0-1.0)
+  _padFlow0: f32,                 // Alignment padding
 }
 
 // ============================================

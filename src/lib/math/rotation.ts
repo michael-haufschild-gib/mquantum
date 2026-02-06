@@ -8,7 +8,7 @@
 import { copyMatrix, createIdentityMatrix, multiplyMatricesInto } from './matrix'
 import { fcos, fsin } from './trig'
 import type { MatrixND, RotationPlane } from './types'
-import { composeRotationsWasm, isAnimationWasmReady } from '@/lib/wasm'
+import { composeRotationsIndexedWasm, isAnimationWasmReady } from '@/lib/wasm'
 
 /**
  * Axis naming convention for display
@@ -109,6 +109,26 @@ const planesCache = new Map<number, RotationPlane[]>()
 
 // OPT-ROT-1: Cache plane name to indices mapping for O(1) lookup
 const planeIndicesCache = new Map<number, Map<string, [number, number]>>()
+
+type WasmComposeBuffers = {
+  planeIndices: Uint32Array
+  angles: Float64Array
+}
+
+// OPT-WASM-ROT-ABI: Reuse typed input buffers to avoid per-frame allocations.
+const wasmComposeBuffersPool = new Map<number, WasmComposeBuffers>()
+
+function getWasmComposeBuffers(rotationCount: number): WasmComposeBuffers {
+  let buffers = wasmComposeBuffersPool.get(rotationCount)
+  if (!buffers) {
+    buffers = {
+      planeIndices: new Uint32Array(rotationCount * 2),
+      angles: new Float64Array(rotationCount),
+    }
+    wasmComposeBuffersPool.set(rotationCount, buffers)
+  }
+  return buffers
+}
 
 /**
  * Gets cached plane indices lookup for a dimension
@@ -261,19 +281,41 @@ export function composeRotations(
     return result
   }
 
+  // OPT-ROT-1: Use cached lookup for O(1) plane name to indices resolution
+  const planeIndices = getPlaneIndicesLookup(dimension)
+
   // Try WASM path if available
   if (isAnimationWasmReady()) {
-    const planeNames: string[] = []
-    const angleValues: number[] = []
-    for (const [name, angle] of angles.entries()) {
-      planeNames.push(name)
-      angleValues.push(angle)
+    const buffers = getWasmComposeBuffers(angles.size)
+    let rotationCount = 0
+
+    for (const [planeName, angle] of angles.entries()) {
+      const indices = planeIndices.get(planeName)
+
+      // Validate plane name (DEV only)
+      if (import.meta.env.DEV && !indices) {
+        throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
+      }
+
+      // Skip invalid planes in production (shouldn't happen with valid input)
+      if (!indices) continue
+
+      const pairOffset = rotationCount * 2
+      buffers.planeIndices[pairOffset] = indices[0]
+      buffers.planeIndices[pairOffset + 1] = indices[1]
+      buffers.angles[rotationCount] = angle
+      rotationCount++
     }
 
-    const wasmResult = composeRotationsWasm(dimension, planeNames, angleValues)
+    const wasmResult = composeRotationsIndexedWasm(
+      dimension,
+      buffers.planeIndices,
+      buffers.angles,
+      rotationCount
+    )
     if (wasmResult) {
-      // Copy Float64Array result to Float32Array output
-      result.set(new Float32Array(wasmResult))
+      // Copy Float64Array result into Float32Array output without intermediate allocation.
+      result.set(wasmResult)
       return result
     }
     // WASM failed, fall through to JS implementation
@@ -283,9 +325,6 @@ export function composeRotations(
   if (out) {
     resetToIdentity(result, dimension)
   }
-
-  // OPT-ROT-1: Use cached lookup for O(1) plane name to indices resolution
-  const planeIndices = getPlaneIndicesLookup(dimension)
 
   // Get scratch matrices for this dimension
   const scratch = getScratchMatrices(dimension)

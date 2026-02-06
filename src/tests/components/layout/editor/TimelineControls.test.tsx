@@ -70,9 +70,9 @@ vi.mock('@/stores/extendedObjectStore', () => ({
         explodeEnabled: false,
       },
       schroedinger: {
-        curlEnabled: false,
         sliceAnimationEnabled: false,
-        spreadAnimationEnabled: false,
+        interferenceEnabled: false,
+        probabilityFlowEnabled: false,
       },
       blackhole: {
         swirlAnimationEnabled: false,

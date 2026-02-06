@@ -201,32 +201,6 @@ fn erodeDensity(rho: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
   return mix(rho, erodedRho, uniforms.erosionStrength);
 }
 
-// Procedural Curl Noise (Divergence Free)
-fn curlNoise(p: vec3f) -> vec3f {
-  return distortPosition(p, 1.0) - p;
-}
-
-// Apply Curl Noise Flow to position
-fn applyFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
-  if (uniforms.curlEnabled == 0u || uniforms.curlStrength <= 0.001) { return pos; }
-
-  let flowPos = pos * uniforms.curlScale + vec3f(0.0, 0.0, t * uniforms.curlSpeed * 0.2);
-
-  // Base curl vector
-  var curl = curlNoise(flowPos);
-
-  // Apply bias
-  if (uniforms.curlBias == 1) { // Upward
-    curl += vec3f(0.0, 1.0, 0.0) * 0.5;
-  } else if (uniforms.curlBias == 2) { // Outward
-    curl += normalize(pos) * 0.5;
-  } else if (uniforms.curlBias == 3) { // Inward
-    curl -= normalize(pos) * 0.5;
-  }
-
-  // Distort sampling position by the curl vector
-  return pos - curl * uniforms.curlStrength;
-}
 `
 
 /**
@@ -308,8 +282,7 @@ fn densityPair(psi: vec2f) -> vec2f {
 
 // Sample density at a 3D position, mapping through ND basis
 fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
-  // Apply Animated Flow (Curl Noise)
-  let flowedPos = applyFlow(pos, t, uniforms);
+  let flowedPos = pos;
 
   // Map 3D position to ND coordinates
   let xND = mapPosToND(flowedPos, uniforms);
@@ -332,8 +305,7 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
 // Sample density with phase information for coloring
 // Returns: vec3f(rho, logRho, spatialPhase)
 fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
-  // Apply Animated Flow (Curl Noise)
-  let flowedPos = applyFlow(pos, t, uniforms);
+  let flowedPos = pos;
 
   // Map 3D position to ND coordinates
   let xND = mapPosToND(flowedPos, uniforms);
@@ -373,6 +345,17 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
     rho = max(rho, 0.0);
   }
 
+  // Apply probability current flow if enabled
+  // Approximates |nabla rho|: edges flow fast, core stays still
+  if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
+    let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
+    let pcfTime = uniforms.time * uniforms.timeScale * uniforms.probabilityFlowSpeed;
+    let pcfOffset = pcfTime * pcfSpeedMod;
+    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(pcfOffset, 0.0, pcfOffset * 0.7));
+    rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
+    rho = max(rho, 0.0);
+  }
+
   let s = sFromRho(rho);
 
   return vec3f(rho, s, spatialPhase);
@@ -381,8 +364,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
 // Sample density with phase, also returning the flowed position for gradient reuse
 // Returns tuple: (vec3f density info, vec3f flowed position)
 fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> array<vec3f, 2> {
-  // Apply Animated Flow (Curl Noise) - computed once and returned
-  let flowedPos = applyFlow(pos, t, uniforms);
+  let flowedPos = pos;
 
   // Map 3D position to ND coordinates
   let xND = mapPosToND(flowedPos, uniforms);
@@ -419,6 +401,17 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
     let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
     rho *= fringe;
+    rho = max(rho, 0.0);
+  }
+
+  // Apply probability current flow if enabled
+  // Approximates |nabla rho|: edges flow fast, core stays still
+  if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
+    let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
+    let pcfTime = uniforms.time * uniforms.timeScale * uniforms.probabilityFlowSpeed;
+    let pcfOffset = pcfTime * pcfSpeedMod;
+    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(pcfOffset, 0.0, pcfOffset * 0.7));
+    rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }
 

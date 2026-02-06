@@ -2,6 +2,20 @@
 /* eslint-disable */
 
 /**
+ * Composes multiple rotations from flattened plane indices and angles.
+ *
+ * # Arguments
+ * * `dimension` - The dimensionality of the space
+ * * `plane_indices` - Flattened plane pairs [i0, j0, i1, j1, ...]
+ * * `angles` - Rotation angles in radians
+ * * `rotation_count` - Number of active rotations in the buffers
+ *
+ * # Returns
+ * Flat rotation matrix (dimension × dimension) as Float64Array
+ */
+export function compose_rotations_indexed_wasm(dimension: number, plane_indices: Uint32Array, angles: Float64Array, rotation_count: number): Float64Array;
+
+/**
  * Composes multiple rotations from plane names and angles.
  *
  * # Arguments
@@ -119,6 +133,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
   readonly magnitude_wasm: (a: number, b: number) => number;

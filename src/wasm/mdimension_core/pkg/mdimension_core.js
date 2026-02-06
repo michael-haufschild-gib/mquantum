@@ -178,6 +178,41 @@ if (!('encodeInto' in cachedTextEncoder)) {
 let WASM_VECTOR_LEN = 0;
 
 /**
+ * Composes multiple rotations from flattened plane indices and angles.
+ *
+ * # Arguments
+ * * `dimension` - The dimensionality of the space
+ * * `plane_indices` - Flattened plane pairs [i0, j0, i1, j1, ...]
+ * * `angles` - Rotation angles in radians
+ * * `rotation_count` - Number of active rotations in the buffers
+ *
+ * # Returns
+ * Flat rotation matrix (dimension × dimension) as Float64Array
+ * @param {number} dimension
+ * @param {Uint32Array} plane_indices
+ * @param {Float64Array} angles
+ * @param {number} rotation_count
+ * @returns {Float64Array}
+ */
+export function compose_rotations_indexed_wasm(dimension, plane_indices, angles, rotation_count) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        const ptr0 = passArray32ToWasm0(plane_indices, wasm.__wbindgen_export);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF64ToWasm0(angles, wasm.__wbindgen_export);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.compose_rotations_indexed_wasm(retptr, dimension, ptr0, len0, ptr1, len1, rotation_count);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v3 = getArrayF64FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 8, 8);
+        return v3;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
+}
+
+/**
  * Composes multiple rotations from plane names and angles.
  *
  * # Arguments

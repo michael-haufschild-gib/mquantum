@@ -10,6 +10,7 @@ export {
   initAnimationWasm,
   isAnimationWasmReady,
   // Phase 1: Animation functions
+  composeRotationsIndexedWasm,
   composeRotationsWasm,
   projectVerticesWasm,
   projectEdgesWasm,
