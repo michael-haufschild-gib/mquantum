@@ -11,7 +11,7 @@ export const Z_INDEX = {
   /** Base canvas layer */
   CANVAS: 0,
 
-  /** Ground plane and 3D gizmos */
+  /** 3D gizmos and debug helpers */
   GROUND_PLANE: 10,
 
   /** UI controls and panels */

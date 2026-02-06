@@ -12,49 +12,39 @@
 - **Hooks**: `useCamelCase.ts`
 - **Stores**: `camelCaseStore.ts`
 - **Slices**: `*Slice.ts`
+- **WGSL shaders**: `name.wgsl.ts` (TypeScript exporting template literal strings)
 - **Tests**: `*.test.ts` or `*.test.tsx`
 - **Playwright**: `*.spec.ts`
 
-## WebGL2 / GLSL ES 3.00 (MANDATORY)
+## WebGPU / WGSL (MANDATORY)
 
-All shaders MUST use WebGL2 syntax. WebGL1 is forbidden.
+All GPU shaders use WGSL. There is no GLSL/WebGL in this project.
 
-| WebGL1 (Forbidden) | WebGL2 (Required) |
-|-------------------|-------------------|
-| `attribute` | `in` (vertex shader) |
-| `varying` (vertex) | `out` |
-| `varying` (fragment) | `in` |
-| `gl_FragColor` | `layout(location = N) out vec4 varName;` |
-| `texture2D()` | `texture()` |
-| `textureCube()` | `texture()` |
-
-```typescript
-// Three.js ShaderMaterial
-const material = new THREE.ShaderMaterial({
-  glslVersion: THREE.GLSL3,  // REQUIRED
-  vertexShader: ...,
-  fragmentShader: ...
-});
-```
+- Shaders are `.wgsl.ts` files exporting template literal strings
+- Composition via `composeWGSL()` from `src/rendering/webgpu/shaders/shared/compose-helpers.ts`
+- Entry points must be named `main` (matches `WebGPUBasePass.createFullscreenPipeline()`)
+- Maximum 4 bind groups (0-3)
+- All `textureSample` calls must be in uniform control flow
+- Depth/unfilterable textures use `textureLoad`, not `textureSample`
 
 ## Zustand State Management
 
 ```typescript
-// ✅ CORRECT: Individual selectors
+// CORRECT: Individual selectors
 const dimension = useGeometryStore((s) => s.dimension);
 const setDimension = useGeometryStore((s) => s.setDimension);
 
-// ✅ CORRECT: useShallow for multiple values
+// CORRECT: useShallow for multiple values
 const uiSelector = useShallow((s: ...) => ({
   isOpen: s.isOpen,
   setOpen: s.setOpen,
 }));
 const { isOpen, setOpen } = useUIStore(uiSelector);
 
-// ❌ WRONG: Full store subscription
+// WRONG: Full store subscription
 const { dimension, setDimension } = useGeometryStore();
 
-// ❌ WRONG: useShallow inside hook call
+// WRONG: useShallow inside hook call
 const { isOpen } = useUIStore(useShallow((s) => ({ isOpen: s.isOpen })));
 ```
 
@@ -72,21 +62,8 @@ const { isOpen } = useUIStore(useShallow((s) => ({ isOpen: s.isOpen })));
 | Media queries for fluid typography | `clamp(min, preferred, max)` |
 | Media queries for component layouts | Container queries `@container` |
 | JavaScript for parent styling | `:has()` pseudo-class |
-| Padding hack for aspect ratio | `aspect-ratio: width / height` |
 | Physical properties (`margin-left`) | Logical properties (`margin-inline-start`) |
 | Hex/RGB for design colors | `oklch()` for perceptual uniformity |
-
-## Three.js DPR/Viewport Gotcha
-
-```typescript
-// ❌ WRONG - DPR multiplication breaks non-standard resolution targets
-gl.setRenderTarget(target);
-gl.setViewport(0, 0, target.width, target.height);
-
-// ✅ CORRECT - exact pixel values, no DPR multiplication
-target.viewport.set(0, 0, target.width, target.height);
-gl.setRenderTarget(target);
-```
 
 ## JSDoc Documentation
 
@@ -101,9 +78,9 @@ All exported components, hooks, and public APIs require JSDoc with:
 Prefer **direct file imports** over barrel exports:
 
 ```typescript
-// ✅ Good: Direct imports
+// Good: Direct imports
 import { AnimationSection } from './Animation/AnimationSection'
 
-// ❌ Avoid: Barrel imports
+// Avoid: Barrel imports
 import { AnimationSection } from './Animation'
 ```

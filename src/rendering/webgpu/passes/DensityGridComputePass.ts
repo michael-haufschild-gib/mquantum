@@ -39,7 +39,7 @@ export interface DensityGridComputeConfig {
   /** Number of dimensions (3-11) */
   dimension: number
   /** Quantum mode */
-  quantumMode?: 'harmonicOscillator' | 'hydrogenOrbital' | 'hydrogenND'
+  quantumMode?: 'harmonicOscillator' | 'hydrogenND'
   /** Number of HO superposition terms for compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
 }
@@ -149,7 +149,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
     // Create uniform buffers
     // SchroedingerUniforms: ~1KB (matches renderer)
-    this.schroedingerBuffer = this.createUniformBuffer(device, 1024, 'density-schroedinger')
+    this.schroedingerBuffer = this.createUniformBuffer(device, 1040, 'density-schroedinger')
     // BasisVectors: 192 bytes (4 × 3 × vec4f)
     this.basisBuffer = this.createUniformBuffer(device, 192, 'density-basis')
     // GridParams: 48 bytes
@@ -257,15 +257,18 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * @param version - Store version number for dirty tracking
    */
   updateSchroedingerUniforms(device: GPUDevice, data: ArrayBuffer, version: number): void {
-    if (this.schroedingerBuffer) {
-      device.queue.writeBuffer(this.schroedingerBuffer, 0, data)
-      // Only mark dirty if parameters actually changed (version change)
-      // Note: Density |ψ|² is time-independent, so time changes don't trigger recomputation
-      if (version !== this.lastSchroedingerVersion) {
-        this.needsRecompute = true
-        this.lastSchroedingerVersion = version
-      }
+    if (!this.schroedingerBuffer) {
+      return
     }
+
+    if (version === this.lastSchroedingerVersion) {
+      return
+    }
+
+    device.queue.writeBuffer(this.schroedingerBuffer, 0, data)
+    // Density |ψ|² is time-independent, so recompute only when tracked parameters change.
+    this.needsRecompute = true
+    this.lastSchroedingerVersion = version
   }
 
   /**
@@ -277,14 +280,18 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    * @param version - Rotation/animation version for dirty tracking
    */
   updateBasisUniforms(device: GPUDevice, data: ArrayBuffer, version: number): void {
-    if (this.basisBuffer) {
-      device.queue.writeBuffer(this.basisBuffer, 0, data)
-      // Only mark dirty if basis actually changed
-      if (version !== this.lastBasisVersion) {
-        this.needsRecompute = true
-        this.lastBasisVersion = version
-      }
+    if (!this.basisBuffer) {
+      return
     }
+
+    if (version === this.lastBasisVersion) {
+      return
+    }
+
+    device.queue.writeBuffer(this.basisBuffer, 0, data)
+    // Basis vectors affect density sampling space, so any version change needs recompute.
+    this.needsRecompute = true
+    this.lastBasisVersion = version
   }
 
   /**

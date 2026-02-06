@@ -104,7 +104,7 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = React.memo(
     // Determine object category - direct checks for clarity
     const isSchroedinger = objectType === 'schroedinger'
     const isPolytope = isPolytopeCategory(objectType)
-    const isSdfFractal = objectType === 'mandelbulb' || objectType === 'quaternion-julia'
+    const isSdfFractal = false
 
     // Check if there are any enabled lights (shadows require lights)
     const hasEnabledLights = lights.some((light: LightSource) => light.enabled)
@@ -146,7 +146,7 @@ export const ShadowsSection: React.FC<ShadowsSectionProps> = React.memo(
       if (isPolytope) {
         return {
           label: 'Environment Shadow',
-          description: 'Casts shadows onto walls and floors',
+          description: 'Casts shadows onto scene surfaces',
         }
       }
       return {

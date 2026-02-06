@@ -68,6 +68,17 @@ fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
 }
 
 /**
+ * Compute per-step internal fog alpha for volumetric integration.
+ */
+fn computeInternalFogAlpha(stepLen: f32, uniforms: SchroedingerUniforms) -> f32 {
+  if (uniforms.fogIntegrationEnabled == 0u) { return 0.0; }
+  if (uniforms.fogContribution <= 0.0 || uniforms.internalFogDensity <= 0.0) { return 0.0; }
+
+  let fogDensity = uniforms.internalFogDensity * uniforms.fogContribution;
+  return 1.0 - exp(-fogDensity * stepLen);
+}
+
+/**
  * Combined density+gradient via tetrahedral finite differences.
  * Samples 4 points in symmetric tetrahedral pattern.
  * Returns: averaged density/phase at center + O(h^2) accurate gradient.
@@ -151,6 +162,7 @@ fn volumeRaymarch(
   // Time for animation
   let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
+  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
 
   // Transmittance (scalar for non-dispersion path)
   var transmittance: f32 = 1.0;
@@ -185,17 +197,19 @@ fn volumeRaymarch(
       lowDensityCount = 0;
     }
 
-    var rhoAlpha = rho;
-
-    // Nodal Surface Opacity Boost
-    if (uniforms.nodalEnabled != 0u) {
-      if (sCenter < -5.0 && sCenter > -12.0) {
-        let intensity = 1.0 - smoothstep(-12.0, -5.0, sCenter);
-        rhoAlpha += 5.0 * uniforms.nodalStrength * intensity;
-      }
+    // PERFORMANCE: Adaptive step size based on density
+    // Take larger steps in empty regions to reduce wasted samples.
+    // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
+    var stepMultiplier = 1.0;
+    if (sCenter < -12.0) {
+      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
+    } else if (sCenter < -8.0) {
+      stepMultiplier = 2.0;  // 2x larger steps in low density regions
     }
+    // Clamp to not overshoot tFar
+    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
-    let alpha = computeAlpha(rhoAlpha, stepLen, uniforms.densityGain);
+    let alpha = computeAlpha(rho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
       // Track primary hit for temporal reprojection
@@ -215,17 +229,13 @@ fn volumeRaymarch(
       transmittance *= (1.0 - alpha);
     }
 
-    // PERFORMANCE: Adaptive step size based on density
-    // Take larger steps in empty regions to reduce wasted samples
-    // sCenter is log-density: -8 = low, -12 = very low, -15 = negligible
-    var stepMultiplier = 1.0;
-    if (sCenter < -12.0) {
-      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
-    } else if (sCenter < -8.0) {
-      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+    // Internal fog integration (scene atmosphere inside volume)
+    let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
+    if (fogAlpha > 0.0001) {
+      accColor += transmittance * fogAlpha * fogColor;
+      transmittance *= (1.0 - fogAlpha);
     }
-    // Clamp to not overshoot tFar
-    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
     t += adaptiveStep;
   }
 
@@ -268,6 +278,7 @@ fn volumeRaymarchHQ(
 
   let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
+  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
 
   // Dispersion offsets
   var dispOffsetR = vec3f(0.0);
@@ -317,11 +328,6 @@ fn volumeRaymarchHQ(
     // Skip expensive tetrahedral gradient when density is negligible
     var skipGradient = (quickS < -15.0);
 
-    // Nodal can boost low-density samples
-    if (uniforms.nodalEnabled != 0u && quickS > -12.0 && quickS < -5.0) {
-      skipGradient = false;
-    }
-
     var rho: f32;
     var sCenter: f32;
     var phase: f32;
@@ -344,29 +350,38 @@ fn volumeRaymarchHQ(
     var rhoRGB = vec3f(rho);
 
     if (dispersionActive) {
-      // Gradient extrapolation for R/B channels
-      let s_r = sCenter + dot(gradient, dispOffsetR);
-      let s_b = sCenter + dot(gradient, dispOffsetB);
-      rhoRGB.r = exp(s_r);
-      rhoRGB.b = exp(s_b);
-    }
-
-    // Nodal Surface Opacity Boost
-    var rhoAlpha = rhoRGB;
-
-    if (uniforms.nodalEnabled != 0u) {
-      if (sCenter < -5.0 && sCenter > -12.0) {
-        let intensity = 1.0 - smoothstep(-12.0, -5.0, sCenter);
-        let boost = 5.0 * uniforms.nodalStrength * intensity;
-        rhoAlpha += vec3f(boost);
+      if (uniforms.dispersionQuality > 0) {
+        // High quality mode: explicit R/B re-sampling
+        let rhoR = sampleDensityWithPhase(pos + dispOffsetR, animTime, uniforms).x;
+        let rhoB = sampleDensityWithPhase(pos + dispOffsetB, animTime, uniforms).x;
+        rhoRGB.r = rhoR;
+        rhoRGB.b = rhoB;
+      } else {
+        // Fast mode: gradient extrapolation for R/B channels
+        let s_r = sCenter + dot(gradient, dispOffsetR);
+        let s_b = sCenter + dot(gradient, dispOffsetB);
+        rhoRGB.r = exp(s_r);
+        rhoRGB.b = exp(s_b);
       }
     }
 
-    // Alpha per channel (using boosted density)
+    // PERFORMANCE: Adaptive step size based on density
+    // Take larger steps in empty regions to reduce wasted samples.
+    // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
+    var stepMultiplier = 1.0;
+    if (quickS < -12.0) {
+      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
+    } else if (quickS < -8.0) {
+      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+    }
+    // Clamp to not overshoot tFar
+    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
+    // Alpha per channel
     var alpha: vec3f;
-    alpha.r = computeAlpha(rhoAlpha.r, stepLen, uniforms.densityGain);
-    alpha.g = computeAlpha(rhoAlpha.g, stepLen, uniforms.densityGain);
-    alpha.b = computeAlpha(rhoAlpha.b, stepLen, uniforms.densityGain);
+    alpha.r = computeAlpha(rhoRGB.r, adaptiveStep, uniforms.densityGain);
+    alpha.g = computeAlpha(rhoRGB.g, adaptiveStep, uniforms.densityGain);
+    alpha.b = computeAlpha(rhoRGB.b, adaptiveStep, uniforms.densityGain);
 
     if (alpha.g > 0.001 || alpha.r > 0.001 || alpha.b > 0.001) {
       // Track primary hit for temporal reprojection
@@ -387,17 +402,13 @@ fn volumeRaymarchHQ(
       transmittance *= (vec3f(1.0) - alpha);
     }
 
-    // PERFORMANCE: Adaptive step size based on density
-    // Take larger steps in empty regions to reduce wasted samples
-    // quickS is log-density from quick check: -8 = low, -12 = very low, -15 = negligible
-    var stepMultiplier = 1.0;
-    if (quickS < -12.0) {
-      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
-    } else if (quickS < -8.0) {
-      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+    // Internal fog integration (scene atmosphere inside volume)
+    let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
+    if (fogAlpha > 0.0001) {
+      accColor += transmittance * fogAlpha * fogColor;
+      transmittance *= vec3f(1.0 - fogAlpha);
     }
-    // Clamp to not overshoot tFar
-    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
     t += adaptiveStep;
   }
 

@@ -1,8 +1,6 @@
 import { StateCreator } from 'zustand'
 import { AppearanceSlice, RenderSlice, RenderSliceState } from './types'
 import {
-  DEFAULT_EDGES_VISIBLE,
-  DEFAULT_FACES_VISIBLE,
   DEFAULT_FRESNEL_ENABLED,
   DEFAULT_FRESNEL_INTENSITY,
   DEFAULT_SHADER_SETTINGS,
@@ -10,8 +8,6 @@ import {
 } from '@/stores/defaults/visualDefaults'
 
 export const RENDER_INITIAL_STATE: RenderSliceState = {
-  edgesVisible: DEFAULT_EDGES_VISIBLE,
-  facesVisible: DEFAULT_FACES_VISIBLE,
   shaderType: DEFAULT_SHADER_TYPE,
   shaderSettings: { ...DEFAULT_SHADER_SETTINGS },
   fresnelEnabled: DEFAULT_FRESNEL_ENABLED,
@@ -20,26 +16,6 @@ export const RENDER_INITIAL_STATE: RenderSliceState = {
 
 export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlice> = (set) => ({
   ...RENDER_INITIAL_STATE,
-
-  setEdgesVisible: (visible) =>
-    set((state) => {
-      let newThickness = state.edgeThickness
-      if (visible) {
-        if (state.edgeThickness < 1) newThickness = 1
-      } else {
-        newThickness = 0
-      }
-      return {
-        edgesVisible: visible,
-        edgeThickness: newThickness,
-      }
-    }),
-
-  setFacesVisible: (visible) =>
-    set({
-      facesVisible: visible,
-      shaderType: visible ? 'surface' : 'wireframe',
-    }),
 
   setShaderType: (shaderType) => set({ shaderType }),
 

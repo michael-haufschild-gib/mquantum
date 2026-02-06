@@ -41,9 +41,6 @@ export const DEFAULT_EDGE_SPECULAR_COLOR = '#ffffff'
 // Tube wireframe caps (false = hollow tubes for performance, true = capped ends)
 export const DEFAULT_TUBE_CAPS = false
 
-export const DEFAULT_EDGES_VISIBLE = true
-export const DEFAULT_FACES_VISIBLE = true
-
 // ============================================================================
 // Bloom Defaults
 // ============================================================================
@@ -81,37 +78,6 @@ export const DEFAULT_BOKEH_SMOOTH_TIME = 0.25
 export const DEFAULT_BOKEH_SHOW_DEBUG = false
 
 // ============================================================================
-// SSR (Screen-Space Reflections) Defaults
-// ============================================================================
-
-/** SSR quality level - controls ray march steps */
-export type SSRQuality = 'low' | 'medium' | 'high'
-
-export const DEFAULT_SSR_ENABLED = false
-export const DEFAULT_SSR_INTENSITY = 0.5
-export const DEFAULT_SSR_MAX_DISTANCE = 30
-export const DEFAULT_SSR_THICKNESS = 0.5
-export const DEFAULT_SSR_FADE_START = 0.7
-export const DEFAULT_SSR_FADE_END = 1.0
-export const DEFAULT_SSR_QUALITY: SSRQuality = 'high'
-
-/** Map SSR quality to ray march steps */
-export const SSR_QUALITY_STEPS: Record<SSRQuality, number> = {
-  low: 16,
-  medium: 32,
-  high: 64,
-}
-
-// ============================================================================
-// Screen-Space Refraction Defaults
-// ============================================================================
-
-export const DEFAULT_REFRACTION_ENABLED = false
-export const DEFAULT_REFRACTION_IOR = 1.5
-export const DEFAULT_REFRACTION_STRENGTH = 0.0
-export const DEFAULT_REFRACTION_CHROMATIC_ABERRATION = 0.0
-
-// ============================================================================
 // Anti-aliasing Defaults
 // ============================================================================
 
@@ -120,7 +86,7 @@ export type AntiAliasingMethod = 'none' | 'fxaa' | 'smaa'
 
 export const DEFAULT_ANTI_ALIASING_METHOD: AntiAliasingMethod = 'none'
 
-/** Whether depth-based effects use object-only depth (excludes walls) or full scene depth */
+/** Whether depth-based effects use object-only depth or full scene depth */
 export const DEFAULT_OBJECT_ONLY_DEPTH = true
 
 // ============================================================================
@@ -132,25 +98,6 @@ export const DEFAULT_SSAO_ENABLED = false
 
 /** AO intensity/strength (0-2 range, 1.0 = normal) */
 export const DEFAULT_SSAO_INTENSITY = 1.0
-
-// ============================================================================
-// Gravitational Lensing Defaults
-// ============================================================================
-
-/** Gravitational lensing enabled (global effect applied to environment) */
-export const DEFAULT_GRAVITY_ENABLED = false
-
-/** Gravity strength (0.1-10, affects lensing intensity) */
-export const DEFAULT_GRAVITY_STRENGTH = 1.0
-
-/** Distortion scale (0.1-5, affects warping strength) */
-export const DEFAULT_GRAVITY_DISTORTION_SCALE = 1.0
-
-/** Distance falloff exponent (0.5-4, how quickly effect fades with distance) */
-export const DEFAULT_GRAVITY_FALLOFF = 1.5
-
-/** Chromatic aberration for lensing (0-1, color fringing effect) */
-export const DEFAULT_GRAVITY_CHROMATIC_ABERRATION = 0.0
 
 // ============================================================================
 // Paper Texture Effect Defaults
@@ -271,33 +218,12 @@ export const DEFAULT_LCH_LIGHTNESS = 0.7
 export const DEFAULT_LCH_CHROMA = 0.15
 
 // ============================================================================
-// Ground Plane Defaults
-// ============================================================================
-
-/** Wall position types for environment surfaces */
-export type WallPosition = 'floor' | 'back' | 'left' | 'right' | 'top'
-
-/** All wall positions */
-export const ALL_WALL_POSITIONS: WallPosition[] = ['floor', 'back', 'left', 'right', 'top']
-
-/** Ground plane surface type */
-export type GroundPlaneType = 'two-sided' | 'plane'
-export const DEFAULT_ACTIVE_WALLS: WallPosition[] = []
-export const DEFAULT_GROUND_PLANE_OFFSET = 10
-export const DEFAULT_GROUND_PLANE_COLOR = '#ead6e8'
-export const DEFAULT_GROUND_PLANE_TYPE: GroundPlaneType = 'plane'
-export const DEFAULT_GROUND_PLANE_SIZE_SCALE = 10
-export const DEFAULT_SHOW_GROUND_GRID = true
-export const DEFAULT_GROUND_GRID_COLOR = '#dbdcdb'
-export const DEFAULT_GROUND_GRID_SPACING = 5.0
-
-// ============================================================================
-// PBR Settings Defaults (Unified for Face, Edge, Ground)
+// PBR Settings Defaults (Face + Edge)
 // ============================================================================
 
 /**
  * PBR configuration for a single object type.
- * All three object types (face, edge, ground) use this structure.
+ * Face and edge use this structure.
  */
 export interface PBRConfig {
   roughness: number // 0.04-1.0 (min 0.04 avoids GGX divide-by-zero)
@@ -321,27 +247,6 @@ export const DEFAULT_EDGE_PBR: PBRConfig = {
   specularIntensity: 0.5,
   specularColor: '#ffffff',
 }
-
-/** PBR for ground plane and walls */
-export const DEFAULT_GROUND_PBR: PBRConfig = {
-  roughness: 0.2,
-  metallic: 0.6,
-  specularIntensity: 0.8,
-  specularColor: '#ffffff',
-}
-
-// ============================================================================
-// IBL (Image-Based Lighting) Defaults
-// ============================================================================
-
-/** IBL quality level for wall/environment reflections on objects */
-export type IBLQuality = 'off' | 'low' | 'high'
-
-/** Default IBL quality - high for testing */
-export const DEFAULT_IBL_QUALITY: IBLQuality = 'off'
-
-/** IBL intensity multiplier */
-export const DEFAULT_IBL_INTENSITY = 0.5
 
 // ============================================================================
 // Skybox Defaults

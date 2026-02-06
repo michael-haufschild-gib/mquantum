@@ -91,10 +91,6 @@ export type MaterialSlice = MaterialSliceState & MaterialSliceActions
 // ============================================================================
 
 export interface RenderSliceState {
-  // Mode Toggles
-  edgesVisible: boolean
-  facesVisible: boolean
-
   // Shader System
   shaderType: ShaderType
   shaderSettings: AllShaderSettings
@@ -105,8 +101,6 @@ export interface RenderSliceState {
 }
 
 export interface RenderSliceActions {
-  setEdgesVisible: (visible: boolean) => void
-  setFacesVisible: (visible: boolean) => void
   setShaderType: (shaderType: ShaderType) => void
   setWireframeSettings: (settings: Partial<WireframeSettings>) => void
   setSurfaceSettings: (settings: Partial<SurfaceSettings>) => void

@@ -163,8 +163,12 @@ export class ToScreenPass extends WebGPUBasePass {
 
   private renderPipeline: GPURenderPipeline | null = null
   private passBindGroupLayout: GPUBindGroupLayout | null = null
+  private passBindGroup: GPUBindGroup | null = null
+  private bindGroupSourceView: GPUTextureView | null = null
   private sampler: GPUSampler | null = null
   private uniformBuffer: GPUBuffer | null = null
+  private uniformData = new ArrayBuffer(16)
+  private uniformDataView = new DataView(this.uniformData)
 
   // Current parameter values
   private gammaCorrection: boolean
@@ -238,14 +242,12 @@ export class ToScreenPass extends WebGPUBasePass {
   private updateUniformBuffer(): void {
     if (!this.device || !this.uniformBuffer) return
 
-    const data = new ArrayBuffer(16)
-    const view = new DataView(data)
-    view.setUint32(0, this.gammaCorrection ? 1 : 0, true)
-    view.setUint32(4, this.toneMapping ? 1 : 0, true)
-    view.setFloat32(8, this.exposure, true)
-    view.setFloat32(12, this.sharpness, true)
+    this.uniformDataView.setUint32(0, this.gammaCorrection ? 1 : 0, true)
+    this.uniformDataView.setUint32(4, this.toneMapping ? 1 : 0, true)
+    this.uniformDataView.setFloat32(8, this.exposure, true)
+    this.uniformDataView.setFloat32(12, this.sharpness, true)
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
+    this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
   }
 
   execute(ctx: WebGPURenderContext): void {
@@ -259,15 +261,18 @@ export class ToScreenPass extends WebGPUBasePass {
 
     const canvasView = ctx.getCanvasTextureView()
 
-    const bindGroup = this.device.createBindGroup({
-      label: 'toScreen-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: sourceView },
-        { binding: 2, resource: { buffer: this.uniformBuffer } },
-      ],
-    })
+    if (!this.passBindGroup || this.bindGroupSourceView !== sourceView) {
+      this.passBindGroup = this.device.createBindGroup({
+        label: 'toScreen-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: this.sampler },
+          { binding: 1, resource: sourceView },
+          { binding: 2, resource: { buffer: this.uniformBuffer } },
+        ],
+      })
+      this.bindGroupSourceView = sourceView
+    }
 
     const passEncoder = ctx.beginRenderPass({
       label: 'toScreen-render',
@@ -281,7 +286,7 @@ export class ToScreenPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [this.passBindGroup])
     passEncoder.end()
   }
 
@@ -353,6 +358,8 @@ export class ToScreenPass extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
+    this.passBindGroup = null
+    this.bindGroupSourceView = null
     this.sampler = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null

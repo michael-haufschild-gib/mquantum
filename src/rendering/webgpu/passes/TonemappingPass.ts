@@ -48,6 +48,7 @@ export interface TonemappingPassOptions {
 export class TonemappingPass extends WebGPUBasePass {
   private uniformBuffer: GPUBuffer | null = null
   private bindGroup: GPUBindGroup | null = null
+  private bindGroupInputView: GPUTextureView | null = null
   private sampler: GPUSampler | null = null
 
   private exposure = 1.0
@@ -60,6 +61,12 @@ export class TonemappingPass extends WebGPUBasePass {
 
   private readonly inputResource: string
   private readonly outputResource: string
+  private uniformData = new ArrayBuffer(16)
+  private uniformFloatView = new Float32Array(this.uniformData)
+  private uniformIntView = new Int32Array(this.uniformData)
+  private lastUniformExposure = Number.NaN
+  private lastUniformGamma = Number.NaN
+  private lastUniformMode = -1
 
   constructor(options?: TonemappingPassOptions) {
     const inputResource = options?.inputResource ?? 'hdr-color'
@@ -116,6 +123,29 @@ export class TonemappingPass extends WebGPUBasePass {
 
   setMode(value: TonemapMode): void {
     this.mode = value
+  }
+
+  private updateUniforms(): void {
+    if (!this.device || !this.uniformBuffer) return
+
+    if (
+      this.exposure === this.lastUniformExposure &&
+      this.gamma === this.lastUniformGamma &&
+      this.mode === this.lastUniformMode
+    ) {
+      return
+    }
+
+    this.uniformFloatView[0] = this.exposure
+    this.uniformFloatView[1] = this.gamma
+    this.uniformIntView[2] = this.mode // i32 slot
+    this.uniformFloatView[3] = 0 // padding
+
+    this.writeUniformBuffer(this.device, this.uniformBuffer, new Uint8Array(this.uniformData))
+
+    this.lastUniformExposure = this.exposure
+    this.lastUniformGamma = this.gamma
+    this.lastUniformMode = this.mode
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
@@ -180,17 +210,7 @@ export class TonemappingPass extends WebGPUBasePass {
     // Update from stores
     this.updateFromStores(ctx)
 
-    // Update uniforms - use dual views for mixed f32/i32 types
-    const buffer = new ArrayBuffer(16)
-    const floatView = new Float32Array(buffer)
-    const intView = new Int32Array(buffer)
-
-    floatView[0] = this.exposure
-    floatView[1] = this.gamma
-    intView[2] = this.mode  // i32 - must use Int32Array
-    floatView[3] = 0  // padding
-
-    this.writeUniformBuffer(this.device, this.uniformBuffer, new Uint8Array(buffer))
+    this.updateUniforms()
 
     // Get textures (using configurable resource names)
     const inputView = ctx.getTextureView(this.inputResource)
@@ -198,17 +218,19 @@ export class TonemappingPass extends WebGPUBasePass {
 
     if (!inputView) return
 
-    // Create bind group
-    this.bindGroup = this.createBindGroup(
-      this.device,
-      this.bindGroupLayout,
-      [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: inputView },
-        { binding: 2, resource: this.sampler },
-      ],
-      'tonemap-bindgroup'
-    )
+    if (!this.bindGroup || this.bindGroupInputView !== inputView) {
+      this.bindGroup = this.createBindGroup(
+        this.device,
+        this.bindGroupLayout,
+        [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: inputView },
+          { binding: 2, resource: this.sampler },
+        ],
+        'tonemap-bindgroup'
+      )
+      this.bindGroupInputView = inputView
+    }
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -231,6 +253,7 @@ export class TonemappingPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.bindGroup = null
+    this.bindGroupInputView = null
     this.sampler = null
     super.dispose()
   }

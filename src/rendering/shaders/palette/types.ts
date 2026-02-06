@@ -39,11 +39,6 @@ export type ColorAlgorithm =
   | 'phase'
   | 'mixed'
   | 'blackbody'
-  // Black hole-specific algorithms
-  | 'accretionGradient' // Color by disk radial position
-  | 'gravitationalRedshift' // Gravitational redshift effect
-  // Polytope-specific algorithms
-  | 'dimension' // Color by primary dimension axis (X=red, Y=green, Z=blue, W=magenta, etc.)
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -60,11 +55,6 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'phase' as const, label: 'Angular (XZ Rotation)' },
   { value: 'mixed' as const, label: 'Angular + Depth' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
-  // Black hole-specific
-  { value: 'accretionGradient' as const, label: 'Accretion Gradient' },
-  { value: 'gravitationalRedshift' as const, label: 'Gravitational Redshift' },
-  // Polytope-specific
-  { value: 'dimension' as const, label: 'Dimension (N-D Axis)' },
 ] as const
 
 /**
@@ -82,11 +72,6 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   phase: 8,
   mixed: 9,
   blackbody: 10,
-  // Black hole-specific
-  accretionGradient: 11,
-  gravitationalRedshift: 12,
-  // Polytope-specific
-  dimension: 13,
 }
 
 /**
@@ -99,7 +84,7 @@ export const QUANTUM_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
 
 /**
  * Color algorithms that use geometric angular/position data.
- * These work for all object types EXCEPT blackhole (which has its own specialized algorithms).
+ * These work for all object types.
  * Uses azimuth angle in XZ plane for coloring.
  */
 export const GEOMETRIC_PHASE_ALGORITHMS: readonly ColorAlgorithm[] = ['phase', 'mixed'] as const
@@ -114,7 +99,7 @@ export function isQuantumOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
 }
 
 /**
- * Check if a color algorithm is geometric-phase-based (not for blackhole).
+ * Check if a color algorithm is geometric-phase-based.
  * @param algorithm - The color algorithm to check
  * @returns True if the algorithm uses geometric phase
  */
@@ -123,38 +108,31 @@ export function isGeometricPhaseAlgorithm(algorithm: ColorAlgorithm): boolean {
 }
 
 /**
- * Color algorithms that are only meaningful for Black Hole objects.
- * These use gravitational/accretion-specific data.
- * For non-black-hole objects, these should be hidden from the UI.
+ * Black hole algorithms - empty since blackhole type is removed.
  */
-export const BLACKHOLE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [
-  'accretionGradient',
-  'gravitationalRedshift',
-] as const
+export const BLACKHOLE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
 
 /**
  * Check if a color algorithm is black-hole-specific.
  * @param algorithm - The color algorithm to check
- * @returns True if the algorithm is black-hole-only
+ * @returns Always false since blackhole type is removed
  */
-export function isBlackHoleOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
-  return BLACKHOLE_ONLY_ALGORITHMS.includes(algorithm)
+export function isBlackHoleOnlyAlgorithm(_algorithm: ColorAlgorithm): boolean {
+  return false
 }
 
 /**
- * Color algorithms that are only meaningful for Polytope objects.
- * These use N-dimensional geometry data specific to polytopes.
- * For non-polytope objects, these should be hidden from the UI.
+ * Polytope algorithms - empty since polytope types are removed.
  */
-export const POLYTOPE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = ['dimension'] as const
+export const POLYTOPE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
 
 /**
  * Check if a color algorithm is polytope-specific.
  * @param algorithm - The color algorithm to check
- * @returns True if the algorithm is polytope-only
+ * @returns Always false since polytope types are removed
  */
-export function isPolytopeOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
-  return POLYTOPE_ONLY_ALGORITHMS.includes(algorithm)
+export function isPolytopeOnlyAlgorithm(_algorithm: ColorAlgorithm): boolean {
+  return false
 }
 
 /**
@@ -167,32 +145,31 @@ export function isPolytopeOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
  */
 export function isColorAlgorithmAvailable(
   algorithm: ColorAlgorithm,
-  objectType: ObjectType
+  _objectType: ObjectType
 ): boolean {
-  // Special case: Blackbody is shared by Schroedinger and Black Hole
+  // Special case: Blackbody is available for Schroedinger
   if (algorithm === 'blackbody') {
-    return objectType === 'schroedinger' || objectType === 'blackhole'
+    return true
   }
 
   // Quantum algorithms only for Schroedinger
   if (isQuantumOnlyAlgorithm(algorithm)) {
-    return objectType === 'schroedinger'
+    return true
   }
 
-  // Geometric phase algorithms (phase, mixed) available for all EXCEPT blackhole
-  // Blackhole has its own specialized algorithms instead
+  // Geometric phase algorithms available for all
   if (isGeometricPhaseAlgorithm(algorithm)) {
-    return objectType !== 'blackhole'
+    return true
   }
 
-  // Black hole algorithms only for Black Hole
+  // Black hole algorithms - none exist now
   if (isBlackHoleOnlyAlgorithm(algorithm)) {
-    return objectType === 'blackhole'
+    return false
   }
 
-  // Polytope algorithms only for Polytope types (hypercube, simplex, cross-polytope, wythoff)
+  // Polytope algorithms - none exist now
   if (isPolytopeOnlyAlgorithm(algorithm)) {
-    return isPolytopeType(objectType)
+    return isPolytopeType(_objectType)
   }
 
   // All other algorithms are available for all objects
@@ -252,7 +229,7 @@ export const DEFAULT_DISTRIBUTION: DistributionSettings = {
 /**
  * Default color algorithm for new sessions.
  */
-export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'monochromatic'
+export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'mixed'
 
 /**
  * Multi-source weight configuration for blending different value sources.

@@ -4,7 +4,6 @@
  * Provides independent PBR settings for three object types:
  * - Face: Main objects (polytope faces, mandelbulb, julia, schroedinger, blackhole)
  * - Edge: TubeWireframe (when edgeThickness > 1)
- * - Ground: Walls and ground plane
  *
  * Each object type has its own complete set of PBR properties:
  * - roughness (0.04-1.0)
@@ -21,7 +20,6 @@ import { StateCreator } from 'zustand'
 import {
   DEFAULT_EDGE_PBR,
   DEFAULT_FACE_PBR,
-  DEFAULT_GROUND_PBR,
   type PBRConfig,
 } from '@/stores/defaults/visualDefaults'
 
@@ -30,15 +28,13 @@ import {
 // ============================================================================
 
 /** PBR target object type */
-export type PBRTarget = 'face' | 'edge' | 'ground'
+export type PBRTarget = 'face' | 'edge'
 
 export interface PBRSliceState {
   /** PBR settings for main objects (faces) */
   face: PBRConfig
   /** PBR settings for TubeWireframe (edges) */
   edge: PBRConfig
-  /** PBR settings for ground plane and walls */
-  ground: PBRConfig
   /** Version counter - incremented on ANY PBR change for efficient uniform updates */
   pbrVersion: number
 }
@@ -57,13 +53,6 @@ export interface PBRSliceActions {
   setEdgeSpecularIntensity: (intensity: number) => void
   setEdgeSpecularColor: (color: string) => void
   setEdgePBR: (config: Partial<PBRConfig>) => void
-
-  // Ground setters
-  setGroundRoughness: (roughness: number) => void
-  setGroundMetallic: (metallic: number) => void
-  setGroundSpecularIntensity: (intensity: number) => void
-  setGroundSpecularColor: (color: string) => void
-  setGroundPBR: (config: Partial<PBRConfig>) => void
 
   // Version bump (for preset loading)
   /** Manually bump version counter (used after direct setState calls) */
@@ -107,7 +96,6 @@ const clampSpecularIntensity = (value: number): number => Math.max(0.0, Math.min
 export const PBR_INITIAL_STATE: PBRSliceState = {
   face: { ...DEFAULT_FACE_PBR },
   edge: { ...DEFAULT_EDGE_PBR },
-  ground: { ...DEFAULT_GROUND_PBR },
   pbrVersion: 0,
 }
 
@@ -186,45 +174,6 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
     set((state) => ({
       edge: {
         ...state.edge,
-        ...(config.roughness !== undefined && { roughness: clampRoughness(config.roughness) }),
-        ...(config.metallic !== undefined && { metallic: clampMetallic(config.metallic) }),
-        ...(config.specularIntensity !== undefined && {
-          specularIntensity: clampSpecularIntensity(config.specularIntensity),
-        }),
-        ...(config.specularColor !== undefined && { specularColor: config.specularColor }),
-      },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  // --- Ground Setters ---
-  setGroundRoughness: (roughness) =>
-    set((state) => ({
-      ground: { ...state.ground, roughness: clampRoughness(roughness) },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setGroundMetallic: (metallic) =>
-    set((state) => ({
-      ground: { ...state.ground, metallic: clampMetallic(metallic) },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setGroundSpecularIntensity: (intensity) =>
-    set((state) => ({
-      ground: { ...state.ground, specularIntensity: clampSpecularIntensity(intensity) },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setGroundSpecularColor: (color) =>
-    set((state) => ({
-      ground: { ...state.ground, specularColor: color },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setGroundPBR: (config) =>
-    set((state) => ({
-      ground: {
-        ...state.ground,
         ...(config.roughness !== undefined && { roughness: clampRoughness(config.roughness) }),
         ...(config.metallic !== undefined && { metallic: clampMetallic(config.metallic) }),
         ...(config.specularIntensity !== undefined && {

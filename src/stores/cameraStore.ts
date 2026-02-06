@@ -1,5 +1,11 @@
 import { create } from 'zustand'
-import { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+
+interface CameraControls {
+  object: { position: { x: number; y: number; z: number; set(...args: number[]): void } }
+  target: { x: number; y: number; z: number; set(...args: number[]): void }
+  update(): void
+  reset(): void
+}
 
 interface CameraState {
   position: [number, number, number]
@@ -7,12 +13,12 @@ interface CameraState {
 }
 
 interface CameraStore {
-  controls: OrbitControlsImpl | null
+  controls: CameraControls | null
   savedState: CameraState | null
   /** Pending camera state to apply when controls become available (race condition fix) */
   pendingState: CameraState | null
 
-  registerControls: (controls: OrbitControlsImpl | null) => void
+  registerControls: (controls: CameraControls | null) => void
   captureState: () => CameraState | null
   applyState: (state: CameraState) => void
   reset: () => void

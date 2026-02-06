@@ -12,7 +12,6 @@ import {
   type BokehBlurMethod,
   type BokehFocusMode,
   type PaperQuality,
-  type SSRQuality,
   DEFAULT_ANTI_ALIASING_METHOD,
   DEFAULT_BLOOM_ENABLED,
   DEFAULT_BLOOM_INTENSITY,
@@ -31,11 +30,6 @@ import {
   DEFAULT_BOKEH_WORLD_FOCUS_RANGE,
   DEFAULT_FRAME_BLENDING_ENABLED,
   DEFAULT_FRAME_BLENDING_FACTOR,
-  DEFAULT_GRAVITY_CHROMATIC_ABERRATION,
-  DEFAULT_GRAVITY_DISTORTION_SCALE,
-  DEFAULT_GRAVITY_ENABLED,
-  DEFAULT_GRAVITY_FALLOFF,
-  DEFAULT_GRAVITY_STRENGTH,
   DEFAULT_OBJECT_ONLY_DEPTH,
   DEFAULT_PAPER_COLOR_BACK,
   DEFAULT_PAPER_COLOR_FRONT,
@@ -53,19 +47,8 @@ import {
   DEFAULT_PAPER_QUALITY,
   DEFAULT_PAPER_ROUGHNESS,
   DEFAULT_PAPER_SEED,
-  DEFAULT_REFRACTION_CHROMATIC_ABERRATION,
-  DEFAULT_REFRACTION_ENABLED,
-  DEFAULT_REFRACTION_IOR,
-  DEFAULT_REFRACTION_STRENGTH,
   DEFAULT_SSAO_ENABLED,
   DEFAULT_SSAO_INTENSITY,
-  DEFAULT_SSR_ENABLED,
-  DEFAULT_SSR_FADE_END,
-  DEFAULT_SSR_FADE_START,
-  DEFAULT_SSR_INTENSITY,
-  DEFAULT_SSR_MAX_DISTANCE,
-  DEFAULT_SSR_QUALITY,
-  DEFAULT_SSR_THICKNESS,
 } from '../defaults/visualDefaults'
 
 // ============================================================================
@@ -97,21 +80,6 @@ export interface PostProcessingSliceState {
   bokehSmoothTime: number
   bokehShowDebug: boolean
 
-  // --- SSR (Screen-Space Reflections) ---
-  ssrEnabled: boolean
-  ssrIntensity: number
-  ssrMaxDistance: number
-  ssrThickness: number
-  ssrFadeStart: number
-  ssrFadeEnd: number
-  ssrQuality: SSRQuality
-
-  // --- Screen-Space Refraction ---
-  refractionEnabled: boolean
-  refractionIOR: number
-  refractionStrength: number
-  refractionChromaticAberration: number
-
   // --- Anti-aliasing ---
   antiAliasingMethod: AntiAliasingMethod
 
@@ -122,7 +90,7 @@ export interface PostProcessingSliceState {
   cinematicGrain: number
 
   // --- Depth Buffer ---
-  /** When true, depth-based effects exclude walls/environment. When false, walls are included. */
+  /** When true, depth-based effects use object-only depth. */
   objectOnlyDepth: boolean
 
   // --- SSAO (Screen-Space Ambient Occlusion) ---
@@ -130,20 +98,6 @@ export interface PostProcessingSliceState {
   ssaoEnabled: boolean
   /** AO intensity/strength (0-2 range) */
   ssaoIntensity: number
-
-  // --- Gravitational Lensing (Environment Effect) ---
-  /** Whether gravitational lensing is enabled (applies to environment layer) */
-  gravityEnabled: boolean
-  /** Gravity strength / mass parameter (0.1-10) */
-  gravityStrength: number
-  /** Distortion scale (0.1-5) */
-  gravityDistortionScale: number
-  /** Distance falloff exponent (0.5-4) */
-  gravityFalloff: number
-  /** Chromatic aberration for lensing (0-1) */
-  gravityChromaticAberration: number
-  /** Version counter for gravity settings (dirty-flag tracking) */
-  gravityVersion: number
 
   // --- Paper Texture Effect ---
   /** Whether paper texture effect is enabled */
@@ -206,21 +160,6 @@ export interface PostProcessingSliceActions {
   setBokehSmoothTime: (time: number) => void
   setBokehShowDebug: (show: boolean) => void
 
-  // --- SSR Actions ---
-  setSSREnabled: (enabled: boolean) => void
-  setSSRIntensity: (intensity: number) => void
-  setSSRMaxDistance: (distance: number) => void
-  setSSRThickness: (thickness: number) => void
-  setSSRFadeStart: (start: number) => void
-  setSSRFadeEnd: (end: number) => void
-  setSSRQuality: (quality: SSRQuality) => void
-
-  // --- Refraction Actions ---
-  setRefractionEnabled: (enabled: boolean) => void
-  setRefractionIOR: (ior: number) => void
-  setRefractionStrength: (strength: number) => void
-  setRefractionChromaticAberration: (ca: number) => void
-
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => void
 
@@ -236,15 +175,6 @@ export interface PostProcessingSliceActions {
   // --- SSAO Actions ---
   setSSAOEnabled: (enabled: boolean) => void
   setSSAOIntensity: (intensity: number) => void
-
-  // --- Gravity Actions ---
-  setGravityEnabled: (enabled: boolean) => void
-  setGravityStrength: (strength: number) => void
-  setGravityDistortionScale: (scale: number) => void
-  setGravityFalloff: (falloff: number) => void
-  setGravityChromaticAberration: (aberration: number) => void
-  /** Manually bump gravity version counter (used after direct setState calls) */
-  bumpGravityVersion: () => void
 
   // --- Paper Texture Actions ---
   setPaperEnabled: (enabled: boolean) => void
@@ -295,21 +225,6 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   bokehSmoothTime: DEFAULT_BOKEH_SMOOTH_TIME,
   bokehShowDebug: DEFAULT_BOKEH_SHOW_DEBUG,
 
-  // SSR
-  ssrEnabled: DEFAULT_SSR_ENABLED,
-  ssrIntensity: DEFAULT_SSR_INTENSITY,
-  ssrMaxDistance: DEFAULT_SSR_MAX_DISTANCE,
-  ssrThickness: DEFAULT_SSR_THICKNESS,
-  ssrFadeStart: DEFAULT_SSR_FADE_START,
-  ssrFadeEnd: DEFAULT_SSR_FADE_END,
-  ssrQuality: DEFAULT_SSR_QUALITY,
-
-  // Refraction
-  refractionEnabled: DEFAULT_REFRACTION_ENABLED,
-  refractionIOR: DEFAULT_REFRACTION_IOR,
-  refractionStrength: DEFAULT_REFRACTION_STRENGTH,
-  refractionChromaticAberration: DEFAULT_REFRACTION_CHROMATIC_ABERRATION,
-
   // Anti-aliasing
   antiAliasingMethod: DEFAULT_ANTI_ALIASING_METHOD,
 
@@ -325,14 +240,6 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   // SSAO (Screen-Space Ambient Occlusion)
   ssaoEnabled: DEFAULT_SSAO_ENABLED,
   ssaoIntensity: DEFAULT_SSAO_INTENSITY,
-
-  // Gravitational Lensing
-  gravityEnabled: DEFAULT_GRAVITY_ENABLED,
-  gravityStrength: DEFAULT_GRAVITY_STRENGTH,
-  gravityDistortionScale: DEFAULT_GRAVITY_DISTORTION_SCALE,
-  gravityFalloff: DEFAULT_GRAVITY_FALLOFF,
-  gravityChromaticAberration: DEFAULT_GRAVITY_CHROMATIC_ABERRATION,
-  gravityVersion: 0, // Dirty-flag tracking for uniform updates
 
   // Paper Texture
   paperEnabled: DEFAULT_PAPER_ENABLED,
@@ -366,7 +273,7 @@ export const createPostProcessingSlice: StateCreator<
   [],
   [],
   PostProcessingSlice
-> = (set, get) => ({
+> = (set) => ({
   ...POST_PROCESSING_INITIAL_STATE,
 
   // --- Bloom Actions ---
@@ -431,58 +338,6 @@ export const createPostProcessingSlice: StateCreator<
     set({ bokehShowDebug: show })
   },
 
-  // --- SSR Actions ---
-  setSSREnabled: (enabled: boolean) => {
-    set({ ssrEnabled: enabled })
-  },
-
-  setSSRIntensity: (intensity: number) => {
-    set({ ssrIntensity: Math.max(0, Math.min(1, intensity)) })
-  },
-
-  setSSRMaxDistance: (distance: number) => {
-    set({ ssrMaxDistance: Math.max(1, Math.min(50, distance)) })
-  },
-
-  setSSRThickness: (thickness: number) => {
-    set({ ssrThickness: Math.max(0.01, Math.min(2, thickness)) })
-  },
-
-  setSSRFadeStart: (start: number) => {
-    const clamped = Math.max(0, Math.min(1, start))
-    const { ssrFadeEnd } = get()
-    // Ensure fadeStart is always less than fadeEnd
-    set({ ssrFadeStart: Math.min(clamped, ssrFadeEnd - 0.01) })
-  },
-
-  setSSRFadeEnd: (end: number) => {
-    const clamped = Math.max(0, Math.min(1, end))
-    const { ssrFadeStart } = get()
-    // Ensure fadeEnd is always greater than fadeStart
-    set({ ssrFadeEnd: Math.max(clamped, ssrFadeStart + 0.01) })
-  },
-
-  setSSRQuality: (quality: SSRQuality) => {
-    set({ ssrQuality: quality })
-  },
-
-  // --- Refraction Actions ---
-  setRefractionEnabled: (enabled: boolean) => {
-    set({ refractionEnabled: enabled })
-  },
-
-  setRefractionIOR: (ior: number) => {
-    set({ refractionIOR: Math.max(1.0, Math.min(2.5, ior)) })
-  },
-
-  setRefractionStrength: (strength: number) => {
-    set({ refractionStrength: Math.max(0, Math.min(1, strength)) })
-  },
-
-  setRefractionChromaticAberration: (ca: number) => {
-    set({ refractionChromaticAberration: Math.max(0, Math.min(1, ca)) })
-  },
-
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => {
     set({ antiAliasingMethod: method })
@@ -517,44 +372,6 @@ export const createPostProcessingSlice: StateCreator<
 
   setSSAOIntensity: (intensity: number) => {
     set({ ssaoIntensity: Math.max(0, Math.min(2, intensity)) })
-  },
-
-  // --- Gravity Actions ---
-  // All gravity setters increment gravityVersion for dirty-flag tracking
-  setGravityEnabled: (enabled: boolean) => {
-    set((s) => ({ gravityEnabled: enabled, gravityVersion: s.gravityVersion + 1 }))
-  },
-
-  setGravityStrength: (strength: number) => {
-    set((s) => ({
-      gravityStrength: Math.max(0.1, Math.min(10, strength)),
-      gravityVersion: s.gravityVersion + 1,
-    }))
-  },
-
-  setGravityDistortionScale: (scale: number) => {
-    set((s) => ({
-      gravityDistortionScale: Math.max(0.1, Math.min(5, scale)),
-      gravityVersion: s.gravityVersion + 1,
-    }))
-  },
-
-  setGravityFalloff: (falloff: number) => {
-    set((s) => ({
-      gravityFalloff: Math.max(0.5, Math.min(4, falloff)),
-      gravityVersion: s.gravityVersion + 1,
-    }))
-  },
-
-  setGravityChromaticAberration: (aberration: number) => {
-    set((s) => ({
-      gravityChromaticAberration: Math.max(0, Math.min(1, aberration)),
-      gravityVersion: s.gravityVersion + 1,
-    }))
-  },
-
-  bumpGravityVersion: () => {
-    set((s) => ({ gravityVersion: s.gravityVersion + 1 }))
   },
 
   // --- Paper Texture Actions ---

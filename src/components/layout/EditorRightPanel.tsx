@@ -5,13 +5,13 @@ import React, { useMemo, useState } from 'react'
 // Import existing sidebar sections
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { DocumentationSection } from '@/components/sections/Documentation/DocumentationSection'
+import { EdgeGeometrySection } from '@/components/sections/Edges/EdgeGeometrySection'
 import { EdgesSection } from '@/components/sections/Edges/EdgesSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
 import { LightsSection } from '@/components/sections/Lights/LightsSection'
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
 import { PostProcessingSection } from '@/components/sections/PostProcessing/PostProcessingSection'
-import { ReflectionsSection } from '@/components/sections/Reflections/ReflectionsSection'
 import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
 import { ShadowsSection } from '@/components/sections/Shadows/ShadowsSection'
 
@@ -34,8 +34,8 @@ export const EditorRightPanel: React.FC = React.memo(() => {
             {/* The "Subject" - Materials, Lines, Shadows, Reflections */}
             <FacesSection defaultOpen={true} />
             <EdgesSection defaultOpen={false} />
+            <EdgeGeometrySection defaultOpen={false} />
             <ShadowsSection defaultOpen={false} />
-            <ReflectionsSection defaultOpen={false} />
             <AdvancedObjectControls />
           </div>
         ),

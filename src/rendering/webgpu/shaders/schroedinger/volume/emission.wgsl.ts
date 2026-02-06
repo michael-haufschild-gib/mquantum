@@ -55,7 +55,8 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   let safePower = max(power, 0.001);
   let safeBase = max(clamped, 0.0001);
   let curved = pow(safeBase, safePower);
-  return fract(curved * cycles + offset);
+  // Clamp before fract to avoid fract(1.0)=0 discontinuity at peak density
+  return fract(clamp(curved * cycles + offset, 0.0, 0.999));
 }
 
 // Compute base surface color (no lighting applied)
@@ -188,20 +189,22 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
   return col;
 }
 
+// Approximate nodal-surface intensity from low density + strong log-density gradient.
+// This avoids broad radial shells from simple log-density band tests.
+fn computeNodalIntensity(rho: f32, gradient: vec3f, pos: vec3f) -> f32 {
+  // Near nodes: rho is low.
+  let lowDensityMask = 1.0 - smoothstep(1e-5, 2e-3, rho);
+  // Near nodes: grad(log(rho)) spikes, unlike smooth far-field Gaussian decay.
+  let gradientMask = smoothstep(6.0, 24.0, length(gradient));
+  // Suppress outer boundary where truncation/edge effects can resemble rings.
+  let interiorMask = 1.0 - smoothstep(BOUND_R * 0.78, BOUND_R * 0.98, length(pos));
+  return lowDensityMask * gradientMask * interiorMask;
+}
+
 // Compute emission with ambient lighting only (for fast mode)
 fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   let baseColor = computeBaseColor(rho, phase, pos, uniforms);
   var col = baseColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;
-
-  // Nodal surface highlighting (port from WebGL emission.glsl.ts lines 136-144)
-  if (uniforms.nodalEnabled != 0u) {
-    let s = sFromRho(rho);
-    if (s < -5.0 && s > -12.0) {
-      let intensity = 1.0 - smoothstep(-12.0, -5.0, s);
-      // Additive self-luminous glow for nodes (ignores ambient level)
-      col += uniforms.nodalColor * uniforms.nodalStrength * intensity * 2.0;
-    }
-  }
 
   return col;
 }
@@ -261,11 +264,15 @@ fn computeEmissionLit(
   // Start with ambient
   var col = surfaceColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;
 
-  // Normalize gradient as pseudo-normal
+  // Normalize gradient as pseudo-normal; fallback to view direction at wavefunction peak
+  // where gradient of log(rho) is exactly zero (avoids division by zero)
   let gradLen = length(gradient);
-  if (gradLen < 0.0001) { return col; }
-
-  let n = gradient / gradLen;
+  var n: vec3f;
+  if (gradLen < 0.0001) {
+    n = viewDir;
+  } else {
+    n = gradient / gradLen;
+  }
 
   // Clamp roughness to prevent numerical issues
   let roughness = max(material.roughness, 0.04);
@@ -462,14 +469,10 @@ fn computeEmissionLit(
     }
   }
 
-  // Nodal surface highlighting (port from WebGL emission.glsl.ts lines 364-373)
+  // Nodal surface highlighting
   if (uniforms.nodalEnabled != 0u) {
-    // Nodes are low-density regions between high-density lobes
-    if (cachedS < -5.0 && cachedS > -12.0) {
-      let intensity = 1.0 - smoothstep(-12.0, -5.0, cachedS);
-      // Additive self-luminous glow for nodes (ignores shadows/lighting)
-      col += uniforms.nodalColor * uniforms.nodalStrength * intensity * 2.0;
-    }
+    let nodeIntensity = computeNodalIntensity(rho, gradient, p);
+    col += uniforms.nodalColor * uniforms.nodalStrength * nodeIntensity * 2.0;
   }
 
   return col;

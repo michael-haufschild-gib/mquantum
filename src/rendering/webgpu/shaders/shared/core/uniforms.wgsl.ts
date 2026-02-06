@@ -172,10 +172,6 @@ struct QualityUniforms {
   aoRadius: f32,
   aoIntensity: f32,
 
-  // IBL quality (0=off, 1=low, 2=high)
-  iblQuality: i32,
-  iblIntensity: f32,
-
   // Global quality multiplier (for fast mode)
   qualityMultiplier: f32,
 

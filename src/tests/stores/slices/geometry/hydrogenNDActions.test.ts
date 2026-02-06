@@ -35,14 +35,11 @@ describe('Hydrogen ND Store Actions', () => {
       expect(config.quantumMode).toBe('hydrogenND')
     })
 
-    it('should switch between all three modes', () => {
+    it('should switch between both supported modes', () => {
       const store = useExtendedObjectStore.getState()
 
       store.setSchroedingerQuantumMode('hydrogenND')
       expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('hydrogenND')
-
-      store.setSchroedingerQuantumMode('hydrogenOrbital')
-      expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('hydrogenOrbital')
 
       store.setSchroedingerQuantumMode('harmonicOscillator')
       expect(useExtendedObjectStore.getState().schroedinger.quantumMode).toBe('harmonicOscillator')
@@ -231,22 +228,6 @@ describe('Hydrogen ND Store Actions', () => {
 
       // Verify extra dim quantum numbers match preset
       expect(config.extraDimQuantumNumbers).toEqual(preset.extraDimN)
-    })
-
-    it('should maintain independence between hydrogen orbital and hydrogen ND presets', () => {
-      const store = useExtendedObjectStore.getState()
-
-      // Set hydrogen orbital preset
-      store.setSchroedingerHydrogenPreset('3dxy')
-
-      // Set hydrogen ND preset
-      store.setSchroedingerHydrogenNDPreset('2pz_4d')
-
-      const config = useExtendedObjectStore.getState().schroedinger
-
-      // Both presets should be set independently
-      expect(config.hydrogenPreset).toBe('3dxy')
-      expect(config.hydrogenNDPreset).toBe('2pz_4d')
     })
 
     it('should handle maximum extra dimension quantum numbers', () => {

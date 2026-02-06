@@ -11,7 +11,6 @@
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import { parseCurrentUrl, type ShareableState } from '@/lib/url/state-serializer'
 import { useAppearanceStore } from '@/stores/appearanceStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
@@ -41,12 +40,6 @@ function applyUrlStateParams(urlState: Partial<ShareableState>): void {
   }
 
   // Apply to appearance store
-  if (urlState.facesVisible !== undefined) {
-    useAppearanceStore.getState().setFacesVisible(urlState.facesVisible)
-  }
-  if (urlState.edgesVisible !== undefined) {
-    useAppearanceStore.getState().setEdgesVisible(urlState.edgesVisible)
-  }
   if (urlState.edgeColor !== undefined) {
     useAppearanceStore.getState().setEdgeColor(urlState.edgeColor)
   }
@@ -79,14 +72,6 @@ function applyUrlStateParams(urlState: Partial<ShareableState>): void {
     usePostProcessingStore.getState().setBloomThreshold(urlState.bloomThreshold)
   }
 
-  // Apply to extended object store for mandelbulb settings
-  // Note: These use the mandelbulb config-based setters
-
-  // Apply uniformScale if present
-  if (urlState.uniformScale !== undefined) {
-    // Scale is applied to the polytope config
-    useExtendedObjectStore.getState().setPolytopeScale(urlState.uniformScale)
-  }
 }
 
 /**
@@ -123,7 +108,7 @@ function loadSceneByName(sceneName: string): void {
  * Parses URL search params and applies them to the appropriate stores.
  *
  * URL formats supported:
- * - Individual params: /?t=hypercube&d=4&fv=1&ev=0
+ * - Individual params: /?t=schroedinger&d=4
  * - Scene preset: /?scene=schroedinger%20bloom
  *
  * When `scene` param is present, it takes priority and other params are ignored

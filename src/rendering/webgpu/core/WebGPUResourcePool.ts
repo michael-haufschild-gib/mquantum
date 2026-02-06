@@ -45,7 +45,6 @@ export class WebGPUResourcePool {
 
   // Default samplers (cached for reuse)
   private linearSampler: GPUSampler | null = null
-  private _nearestSampler: GPUSampler | null = null
 
   /**
    * Initialize the pool with a GPU device.
@@ -63,12 +62,6 @@ export class WebGPUResourcePool {
       addressModeV: 'clamp-to-edge',
     })
 
-    this._nearestSampler = device.createSampler({
-      magFilter: 'nearest',
-      minFilter: 'nearest',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    })
   }
 
   /**
@@ -311,7 +304,6 @@ export class WebGPUResourcePool {
     this.configs.clear()
     this.device = null
     this.linearSampler = null
-    this._nearestSampler = null
   }
 
   // ===========================================================================

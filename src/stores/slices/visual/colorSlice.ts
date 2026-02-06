@@ -45,11 +45,6 @@ const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
   lch: ['distribution', 'lch'],
   // Simple gradient (blackbody uses distribution)
   blackbody: ['distribution'],
-  // Black hole specific algorithms
-  accretionGradient: ['distribution'],
-  gravitationalRedshift: ['distribution'],
-  // Polytope specific algorithms (uses cosine palette for configurable colors)
-  dimension: ['distribution', 'cosine'],
 }
 
 /**

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   DEFAULT_DIMENSION,
   MAX_DIMENSION,
@@ -37,38 +37,20 @@ describe('geometryStore (invariants)', () => {
     expect(useAnimationStore.getState().animatingPlanes.has('XV')).toBe(false)
   })
 
-  it('rejects invalid object types and ignores types unavailable for the current dimension', () => {
+  it('rejects invalid object types', () => {
     // Invalid type throws
     // @ts-expect-error intentional invalid input
     expect(() => useGeometryStore.getState().setObjectType('not-a-real-type')).toThrow(
       /Invalid object type/i
     )
-
-    // Unavailable type is ignored (warns)
-    useGeometryStore.getState().setDimension(3)
-    useGeometryStore.getState().setObjectType('hypercube')
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    useGeometryStore.getState().setObjectType('nested-torus') // requires >= 4
-    expect(useGeometryStore.getState().objectType).toBe('hypercube')
-    expect(warn).toHaveBeenCalled()
   })
 
-  it('switching to a recommended-dimension object (mandelbulb) updates dimension and filters planes (regression)', () => {
-    useGeometryStore.getState().setDimension(8)
-    useAnimationStore.getState().animateAll(8)
-    expect(useAnimationStore.getState().animatingPlanes.has('XV')).toBe(true)
-
-    useGeometryStore.getState().setObjectType('mandelbulb') // recommended dimension 4
-    expect(useGeometryStore.getState().dimension).toBe(4)
-    expect(useRotationStore.getState().dimension).toBe(4)
-    expect(useAnimationStore.getState().animatingPlanes.has('XV')).toBe(false)
+  it('setObjectType accepts schroedinger', () => {
+    useGeometryStore.getState().setObjectType('schroedinger')
+    expect(useGeometryStore.getState().objectType).toBe('schroedinger')
   })
 
-  it('raymarching fractals force facesVisible=true so they can render', () => {
-    useAppearanceStore.getState().setFacesVisible(false)
-    expect(useAppearanceStore.getState().facesVisible).toBe(false)
-
-    useGeometryStore.getState().setObjectType('mandelbulb')
-    expect(useAppearanceStore.getState().facesVisible).toBe(true)
+  it('appearance store no longer exposes faces visibility toggle', () => {
+    expect('facesVisible' in useAppearanceStore.getState()).toBe(false)
   })
 })

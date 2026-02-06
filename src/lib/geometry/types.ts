@@ -1,84 +1,32 @@
 /**
  * Type definitions for n-dimensional geometry
  *
- * Supports both traditional polytopes (hypercube, simplex, cross-polytope)
- * and extended objects (root systems, Clifford torus, Mandelbulb)
- *
- * Note: Type guards below delegate to registry helpers for the actual logic,
- * ensuring a single source of truth. The TypeScript type narrowing is maintained
- * through explicit type predicates.
+ * Supports Schroedinger quantum objects rendered via WebGPU.
  */
 
 import type { VectorND } from '@/lib/math'
-// Import registry helpers for runtime checks
-// Using dynamic import pattern to avoid circular dependency
-import { isPolytopeCategory, isExtendedCategory, isFractalCategory } from './registry/helpers'
-
-/**
- * Supported polytope types (traditional finite vertex/edge objects)
- */
-export type PolytopeType = 'hypercube' | 'simplex' | 'cross-polytope' | 'wythoff-polytope'
-
-/**
- * Extended object types (point clouds and special mathematical objects)
- */
-export type ExtendedObjectType =
-  | 'root-system'
-  | 'clifford-torus'
-  | 'nested-torus'
-  | 'mandelbulb'
-  | 'quaternion-julia'
-  | 'schroedinger'
-  | 'blackhole'
 
 /**
  * All supported object types
  */
-export type ObjectType = PolytopeType | ExtendedObjectType
+export type ObjectType = 'schroedinger'
 
 /**
- * Type guard for polytope types
- * Delegates to registry's isPolytopeCategory for the actual check.
- * Accepts string to allow validation of unknown inputs.
- *
- * @param type - String or ObjectType to check
- * @returns True if type is a polytope (category === 'polytope' in registry)
- *
- * @see src/lib/geometry/registry for category-based helpers
+ * Type guard for polytope types (none remaining)
+ * @param type - String to check
+ * @returns Always false - no polytope types remain
  */
-export function isPolytopeType(type: string): type is PolytopeType {
-  return isPolytopeCategory(type)
+export function isPolytopeType(_type: string): _type is never {
+  return false
 }
 
 /**
- * Type guard for extended object types (non-polytope, non-fractal)
- * Delegates to registry's isExtendedCategory for the actual check.
- * Accepts string to allow validation of unknown inputs.
- *
- * @param type - String or ObjectType to check
- * @returns True if type is an extended object (category === 'extended' in registry)
- *
- * @see src/lib/geometry/registry for category-based helpers
+ * Type guard for extended object types
+ * @param type - String to check
+ * @returns True if type is an extended object type
  */
-export function isExtendedObjectType(type: string): type is ExtendedObjectType {
-  // Extended category includes tori and root-system, but fractals are a separate category
-  return isExtendedCategory(type) || isFractalCategory(type)
-}
-
-/**
- * Geometric representation of an n-dimensional polytope
- */
-export interface PolytopeGeometry {
-  /** Array of vertex positions in n-dimensional space */
-  vertices: VectorND[]
-  /** Array of edge pairs (vertex indices) */
-  edges: [number, number][]
-  /** Dimensionality of the polytope */
-  dimension: number
-  /** Type of polytope */
-  type: PolytopeType
-  /** Optional metadata for extended polytope information */
-  metadata?: GeometryMetadata
+export function isExtendedObjectType(type: string): type is ObjectType {
+  return type === 'schroedinger'
 }
 
 /**
@@ -95,7 +43,6 @@ export interface GeometryMetadata {
 
 /**
  * Unified geometry representation for all n-dimensional objects
- * Supports both polytopes (finite vertex sets) and point clouds
  */
 export interface NdGeometry {
   /** Dimensionality of the object */
@@ -106,21 +53,6 @@ export interface NdGeometry {
   vertices: VectorND[]
   /** Array of edge pairs (vertex indices) - may be empty for point clouds */
   edges: [number, number][]
-
   /** Optional metadata about the geometry */
   metadata?: GeometryMetadata
-}
-
-/**
- * Mathematical properties of a polytope
- */
-export interface PolytopeProperties {
-  /** Number of vertices in the polytope */
-  vertexCount: number
-  /** Number of edges in the polytope */
-  edgeCount: number
-  /** Formula for vertex count as function of dimension */
-  vertexFormula: string
-  /** Formula for edge count as function of dimension */
-  edgeFormula: string
 }

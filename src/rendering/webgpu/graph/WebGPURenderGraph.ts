@@ -38,6 +38,14 @@ class RenderContextImpl implements WebGPURenderContext {
   private pool: WebGPUResourcePool
   private canvasTextureView: GPUTextureView
   private resourceAliases: Map<string, string>
+  private activeTimestampWrites:
+    | {
+        querySet: GPUQuerySet
+        beginningOfPassWriteIndex: number
+        endOfPassWriteIndex: number
+      }
+    | null = null
+  private passUsedTimestampWrites = false
 
   constructor(
     device: GPUDevice,
@@ -115,15 +123,55 @@ class RenderContextImpl implements WebGPURenderContext {
   }
 
   beginRenderPass(descriptor: GPURenderPassDescriptor): GPURenderPassEncoder {
-    return this.encoder.beginRenderPass(descriptor)
+    const renderDescriptor: GPURenderPassDescriptor =
+      this.activeTimestampWrites && !descriptor.timestampWrites
+        ? {
+            ...descriptor,
+            timestampWrites: this.activeTimestampWrites as GPURenderPassTimestampWrites,
+          }
+        : descriptor
+    if (renderDescriptor.timestampWrites) {
+      this.passUsedTimestampWrites = true
+    }
+    return this.encoder.beginRenderPass(renderDescriptor)
   }
 
   beginComputePass(descriptor?: GPUComputePassDescriptor): GPUComputePassEncoder {
-    return this.encoder.beginComputePass(descriptor)
+    const computeDescriptor: GPUComputePassDescriptor | undefined =
+      this.activeTimestampWrites && !descriptor?.timestampWrites
+        ? {
+            ...descriptor,
+            timestampWrites: this.activeTimestampWrites as GPUComputePassTimestampWrites,
+          }
+        : descriptor
+    if (computeDescriptor?.timestampWrites) {
+      this.passUsedTimestampWrites = true
+    }
+    return this.encoder.beginComputePass(computeDescriptor)
   }
 
   getCanvasTextureView(): GPUTextureView {
     return this.canvasTextureView
+  }
+
+  setPassTimestampWrites(querySet: GPUQuerySet, startIndex: number): void {
+    this.activeTimestampWrites = {
+      querySet,
+      beginningOfPassWriteIndex: startIndex,
+      endOfPassWriteIndex: startIndex + 1,
+    }
+    this.passUsedTimestampWrites = false
+  }
+
+  clearPassTimestampWrites(): void {
+    this.activeTimestampWrites = null
+    this.passUsedTimestampWrites = false
+  }
+
+  consumePassUsedTimestampWrites(): boolean {
+    const used = this.passUsedTimestampWrites
+    this.passUsedTimestampWrites = false
+    return used
   }
 }
 
@@ -198,6 +246,7 @@ export class WebGPURenderGraph {
   private timestampBuffer: GPUBuffer | null = null
   private timestampReadBuffer: GPUBuffer | null = null
   private lastPassTimings: Map<string, number> = new Map()
+  private timestampReadbackInFlight = false
 
   // Frame context
   private frameContext: WebGPUFrameContext | null = null
@@ -275,6 +324,53 @@ export class WebGPURenderGraph {
     })
 
     this.gpuTimingEnabled = true
+  }
+
+  private scheduleTimestampReadback(
+    device: GPUDevice,
+    measuredPassCount: number,
+    timedPassIds: string[]
+  ): void {
+    if (
+      measuredPassCount <= 0 ||
+      this.timestampReadbackInFlight ||
+      !this.timestampReadBuffer
+    ) {
+      return
+    }
+
+    const byteLength = measuredPassCount * 16 // 2 timestamps (u64) per pass
+    const readBuffer = this.timestampReadBuffer
+    const passIds = timedPassIds.slice(0, measuredPassCount)
+    this.timestampReadbackInFlight = true
+
+    device.queue
+      .onSubmittedWorkDone()
+      .then(async () => {
+        await readBuffer.mapAsync(GPUMapMode.READ, 0, byteLength)
+        try {
+          const range = readBuffer.getMappedRange(0, byteLength)
+          const timestamps = new BigUint64Array(range)
+          const nextTimings = new Map<string, number>()
+
+          for (let i = 0; i < passIds.length; i++) {
+            const start = timestamps[i * 2]!
+            const end = timestamps[i * 2 + 1]!
+            const delta = end > start ? Number(end - start) : 0
+            nextTimings.set(passIds[i]!, delta / 1_000_000)
+          }
+
+          this.lastPassTimings = nextTimings
+        } finally {
+          readBuffer.unmap()
+        }
+      })
+      .catch((err) => {
+        console.warn('[WebGPU RenderGraph] Timestamp readback failed:', err)
+      })
+      .finally(() => {
+        this.timestampReadbackInFlight = false
+      })
   }
 
   /**
@@ -365,7 +461,13 @@ export class WebGPURenderGraph {
     this.passes.clear()
     this.passOrder = []
 
-    // Clear resources (pool will recreate them)
+    // Dispose graph-owned resources in the pool before clearing bookkeeping.
+    // Prevents leaked resource configs/textures across repeated graph rebuilds.
+    for (const resourceId of this.resources.keys()) {
+      this.pool.removeResource(resourceId)
+    }
+
+    // Clear resources (pool resources were disposed above and will be recreated)
     this.resources.clear()
 
     // Clear state tracking
@@ -554,10 +656,17 @@ export class WebGPURenderGraph {
     // Execute passes
     const passTimings: Map<string, number> = new Map()
     let timestampIndex = 0
+    const timedPassIds: string[] = []
+    const canCollectGpuTimings =
+      this.gpuTimingEnabled &&
+      !!this.timestampQuerySet &&
+      !!this.timestampBuffer &&
+      !!this.timestampReadBuffer &&
+      !this.timestampReadbackInFlight
 
     // DEBUG: Log pass execution once per second
     const now = Date.now()
-    const shouldLog = !this._lastPassLog || now - this._lastPassLog > 1000
+    const shouldLog = import.meta.env.DEV && (!this._lastPassLog || now - this._lastPassLog > 1000)
     if (shouldLog) {
       this._lastPassLog = now
       console.log('[WebGPU RenderGraph] Executing passes:', this.passOrder)
@@ -669,9 +778,9 @@ export class WebGPURenderGraph {
         writtenByEnabledPass.add(output.resourceId)
       }
 
-      // NOTE: encoder.writeTimestamp() was removed from WebGPU spec (doesn't work on Apple Silicon).
-      // Proper timestamp queries require using timestampWrites in beginRenderPass/beginComputePass.
-      // For now, timing is disabled until passes are refactored to use timestampWrites.
+      if (canCollectGpuTimings) {
+        ctx.setPassTimestampWrites(this.timestampQuerySet!, timestampIndex * 2)
+      }
 
       // Execute pass
       try {
@@ -679,25 +788,41 @@ export class WebGPURenderGraph {
         if (shouldLog) console.log(`[WebGPU RenderGraph] Executed pass '${passId}'`)
       } catch (e) {
         console.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
+      } finally {
+        if (canCollectGpuTimings) {
+          const usedTimestampWrites = ctx.consumePassUsedTimestampWrites()
+          ctx.clearPassTimestampWrites()
+          if (usedTimestampWrites) {
+            timedPassIds.push(passId)
+            timestampIndex++
+          }
+        }
       }
-
-      timestampIndex++
     }
 
+    const resolvedTimestampCount = timestampIndex * 2
     // Resolve timestamps
-    if (this.gpuTimingEnabled && this.timestampQuerySet && this.timestampBuffer) {
+    if (canCollectGpuTimings && resolvedTimestampCount > 0) {
       encoder.resolveQuerySet(
-        this.timestampQuerySet,
+        this.timestampQuerySet!,
         0,
-        timestampIndex * 2,
-        this.timestampBuffer,
+        resolvedTimestampCount,
+        this.timestampBuffer!,
         0
+      )
+      encoder.copyBufferToBuffer(
+        this.timestampBuffer!,
+        0,
+        this.timestampReadBuffer!,
+        0,
+        resolvedTimestampCount * 8
       )
     }
 
     // Submit command buffer
     const commandBuffer = encoder.finish()
     device.queue.submit([commandBuffer])
+    this.scheduleTimestampReadback(device, timestampIndex, timedPassIds)
 
     // Post-frame hooks
     for (const pass of this.passes.values()) {

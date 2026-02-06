@@ -7,7 +7,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   usePerformanceStore,
   REFINEMENT_STAGE_QUALITY,
-  getEffectiveSSRQuality,
   getEffectiveShadowQuality,
   getEffectiveSampleQuality,
   hasPersistedResolutionScale,
@@ -259,23 +258,6 @@ describe('performanceStore', () => {
 })
 
 describe('quality interpolation utilities', () => {
-  describe('getEffectiveSSRQuality', () => {
-    it('should return low at minimum multiplier', () => {
-      expect(getEffectiveSSRQuality('high', 0.25)).toBe('low')
-    })
-
-    it('should return target at maximum multiplier', () => {
-      expect(getEffectiveSSRQuality('high', 1.0)).toBe('high')
-      expect(getEffectiveSSRQuality('medium', 1.0)).toBe('medium')
-    })
-
-    it('should interpolate between low and target', () => {
-      // At 0.5 multiplier with high target, should be around medium
-      const result = getEffectiveSSRQuality('high', 0.5)
-      expect(['low', 'medium']).toContain(result)
-    })
-  })
-
   describe('getEffectiveShadowQuality', () => {
     it('should return target at maximum multiplier', () => {
       expect(getEffectiveShadowQuality('ultra', 1.0)).toBe('ultra')

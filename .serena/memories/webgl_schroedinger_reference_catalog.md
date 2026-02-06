@@ -1,7 +1,9 @@
-# WebGL Schrödinger Renderer - Complete Reference Catalog
+# Schrödinger Renderer - Feature & Uniform Reference Catalog
 
 ## Executive Summary
-This is a complete feature and uniform inventory of the WebGL Schrödinger quantum wavefunction renderer. Used as the reference implementation for WebGPU porting.
+Complete feature and uniform inventory of the Schrödinger quantum wavefunction renderer. Originally documented from the WebGL implementation, this serves as the **canonical specification** for the WebGPU renderer to achieve feature parity. The WebGL code has been removed; this document describes what the renderer SHOULD implement.
+
+**Status**: WebGPU is the only rendering backend. Use this as the target specification.
 
 ---
 

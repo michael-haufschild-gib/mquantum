@@ -17,22 +17,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
  * All available object types for testing.
  */
 const OBJECT_TYPES: { value: ObjectType; label: string }[] = [
-  // Polytopes
-  { value: 'hypercube', label: 'Hypercube' },
-  { value: 'simplex', label: 'Simplex' },
-  { value: 'cross-polytope', label: 'Cross-Polytope' },
-  { value: 'wythoff-polytope', label: 'Wythoff Polytope' },
-  { value: 'root-system', label: 'Root System' },
-  // Tori
-  { value: 'clifford-torus', label: 'Clifford Torus' },
-  { value: 'nested-torus', label: 'Nested Torus' },
-  // Fractals
-  { value: 'mandelbulb', label: 'Mandelbulb' },
-  { value: 'quaternion-julia', label: 'Quaternion Julia' },
-  // Quantum
   { value: 'schroedinger', label: 'Schrödinger' },
-  // Special
-  { value: 'blackhole', label: 'Black Hole' },
 ]
 
 /**

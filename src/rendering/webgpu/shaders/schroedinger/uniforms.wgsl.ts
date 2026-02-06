@@ -27,14 +27,13 @@ const MAX_EXTRA_DIM: i32 = 8;
 
 // Quantum mode constants (used throughout all quantum modules)
 const QUANTUM_MODE_HARMONIC: i32 = 0;
-const QUANTUM_MODE_HYDROGEN: i32 = 1;
-const QUANTUM_MODE_HYDROGEN_ND: i32 = 2;
+const QUANTUM_MODE_HYDROGEN_ND: i32 = 1;
 
 // WebGPU uniform buffers require 16-byte alignment for array elements.
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
   // Quantum mode selection
-  quantumMode: i32,              // 0 = harmonic oscillator, 1 = hydrogen orbital
+  quantumMode: i32,              // 0 = harmonic oscillator, 1 = hydrogen ND
 
   // Harmonic oscillator state configuration
   termCount: i32,                // Number of superposition terms (1-8)
@@ -54,7 +53,7 @@ struct SchroedingerUniforms {
   // energy: 8 f32 values packed into 2 vec4f
   energy: array<vec4f, 2>,
 
-  // Hydrogen orbital configuration (scalar block)
+  // Hydrogen configuration (scalar block)
   principalN: i32,               // Principal quantum number n (1-7)
   azimuthalL: i32,               // Azimuthal quantum number l (0 to n-1)
   magneticM: i32,                // Magnetic quantum number m (-l to +l)
@@ -173,6 +172,12 @@ struct SchroedingerUniforms {
   cosineB: vec4f,                // Cosine palette B coefficient
   cosineC: vec4f,                // Cosine palette C coefficient
   cosineD: vec4f,                // Cosine palette D coefficient
+
+  // Volumetric fog and erosion quality controls
+  fogIntegrationEnabled: u32,    // Enable internal fog integration
+  fogContribution: f32,          // Fog contribution strength
+  internalFogDensity: f32,       // Internal object-space fog density
+  erosionHQ: u32,                // High-quality erosion mode toggle
 }
 
 // ============================================

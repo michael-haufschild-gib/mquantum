@@ -80,19 +80,44 @@ fn worleyNoiseSquared(p: vec3f) -> f32 {
   return m;
 }
 
+// Higher quality Worley noise - 3×3×3 neighborhood search
+fn worleyNoiseSquaredHQ(p: vec3f) -> f32 {
+  let id = floor(p);
+  let f = fract(p);
+  var minDist = 1e9;
+
+  for (var z: i32 = -1; z <= 1; z++) {
+    for (var y: i32 = -1; y <= 1; y++) {
+      for (var x: i32 = -1; x <= 1; x++) {
+        let cell = vec3f(f32(x), f32(y), f32(z));
+        let jitter = hash33(id + cell) * 0.5 + 0.5;
+        let d = cell + jitter - f;
+        minDist = min(minDist, dot(d, d));
+      }
+    }
+  }
+
+  return minDist;
+}
+
 // Unified Noise Function based on type
 // 0=Worley (Billowy), 1=Perlin (Smooth), 2=Hybrid
-fn getErosionNoise(p: vec3f, noiseType: i32) -> f32 {
+fn getErosionNoise(p: vec3f, uniforms: SchroedingerUniforms) -> f32 {
+  let noiseType = uniforms.erosionNoiseType;
+  let hqMode = uniforms.erosionHQ != 0u;
+
   if (noiseType == 0) {
     // Worley: sqrt of squared distance, inverted for billowy clouds
-    return 1.0 - sqrt(worleyNoiseSquared(p));
+    let worleySq = select(worleyNoiseSquared(p), worleyNoiseSquaredHQ(p), hqMode);
+    return 1.0 - sqrt(worleySq);
   } else if (noiseType == 1) {
     // Perlin: -1 to 1. Map to 0..1
     return gradientNoise(p) * 0.5 + 0.5;
   } else {
     // Hybrid: Perlin-Worley
     let pN = gradientNoise(p) * 0.5 + 0.5;
-    let wN = 1.0 - sqrt(worleyNoiseSquared(p * 2.0));
+    let worleySq = select(worleyNoiseSquared(p * 2.0), worleyNoiseSquaredHQ(p * 2.0), hqMode);
+    let wN = 1.0 - sqrt(worleySq);
     return mix(pN, wN, 0.5);
   }
 }
@@ -119,6 +144,27 @@ fn distortPosition(p: vec3f, strength: f32) -> vec3f {
   return p + displacement * strength;
 }
 
+// HQ pseudo-curl distortion with central differences (4 samples)
+fn distortPositionHQ(p: vec3f, strength: f32) -> vec3f {
+  if (strength < 0.1) { return p; }
+
+  let eps = 0.1;
+  let nx1 = gradientNoise(p + vec3f(eps, 0.0, 0.0));
+  let nx2 = gradientNoise(p - vec3f(eps, 0.0, 0.0));
+  let ny1 = gradientNoise(p + vec3f(0.0, eps, 0.0));
+  let ny2 = gradientNoise(p - vec3f(0.0, eps, 0.0));
+
+  let dx = nx1 - nx2;
+  let dy = ny1 - ny2;
+  let displacement = vec3f(
+    dy,
+    -dx,
+    dx - dy
+  );
+
+  return p + displacement * (strength * 0.5);
+}
+
 // Erode density based on noise
 fn erodeDensity(rho: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
   // Early exit: erosion disabled
@@ -138,11 +184,15 @@ fn erodeDensity(rho: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
     // Animate swirl
     let t = uniforms.time * uniforms.timeScale * 0.2;
     noisePos += vec3f(0.0, -t, 0.0);
-    noisePos = distortPosition(noisePos, uniforms.erosionTurbulence);
+    if (uniforms.erosionHQ != 0u) {
+      noisePos = distortPositionHQ(noisePos, uniforms.erosionTurbulence);
+    } else {
+      noisePos = distortPosition(noisePos, uniforms.erosionTurbulence);
+    }
   }
 
   // Sample noise
-  let noise = getErosionNoise(noisePos, uniforms.erosionNoiseType);
+  let noise = getErosionNoise(noisePos, uniforms);
 
   // Direct subtraction in linear space
   let erodedRho = max(0.0, rho - noise * uniforms.erosionStrength * 2.0);
@@ -268,11 +318,6 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
   let psi = evalPsi(xND, t, uniforms);
   var rho = rhoFromPsi(psi);
 
-  // Hydrogen orbital density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
-    rho *= uniforms.hydrogenBoost;
-  }
-
   // Hydrogen ND density boost
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
@@ -299,11 +344,6 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   let spatialPhase = psiResult.z;
 
   var rho = rhoFromPsi(psi);
-
-  // Hydrogen orbital density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
-    rho *= uniforms.hydrogenBoost;
-  }
 
   // Hydrogen ND density boost
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
@@ -346,11 +386,6 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
 
   var rho = rhoFromPsi(psi);
 
-  // Hydrogen orbital density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
-    rho *= uniforms.hydrogenBoost;
-  }
-
   // Hydrogen ND density boost
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
@@ -385,11 +420,6 @@ fn sampleDensityAtFlowedPos(flowedPos: vec3f, t: f32, uniforms: SchroedingerUnif
   let psi = evalPsi(xND, t, uniforms);
   var rho = rhoFromPsi(psi);
 
-  // Hydrogen orbital density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
-    rho *= uniforms.hydrogenBoost;
-  }
-
   // Hydrogen ND density boost
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
@@ -411,12 +441,7 @@ fn sampleDensityAtFlowedPosNoErosion(flowedPos: vec3f, t: f32, uniforms: Schroed
   let psi = evalPsi(xND, t, uniforms);
   var rho = rhoFromPsi(psi);
 
-  // Hydrogen orbital density boost (still needed for correct gradient magnitude)
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN) {
-    rho *= uniforms.hydrogenBoost;
-  }
-
-  // Hydrogen ND density boost
+  // Hydrogen ND density boost (still needed for correct gradient magnitude)
   if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }

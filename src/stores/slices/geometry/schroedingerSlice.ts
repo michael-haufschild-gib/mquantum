@@ -5,12 +5,10 @@ import {
   SCHROEDINGER_QUALITY_PRESETS,
   SchroedingerColorMode,
   SchroedingerPresetName,
-  HydrogenOrbitalPresetName,
   HydrogenNDPresetName,
 } from '@/lib/geometry/extended/types'
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
-import { getHydrogenPreset } from '@/lib/geometry/extended/schroedinger/hydrogenPresets'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { StateCreator } from 'zustand'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
@@ -264,34 +262,6 @@ export const createSchroedingerSlice: StateCreator<
     // === Quantum Mode Selection ===
     setSchroedingerQuantumMode: valueSetter('quantumMode'),
 
-    // === Hydrogen Orbital Configuration ===
-    setSchroedingerHydrogenPreset: (presetName: HydrogenOrbitalPresetName) => {
-      // For 'custom', only update the preset name - preserve existing quantum numbers
-      if (presetName === 'custom') {
-        set((state) => ({
-          schroedinger: {
-            ...state.schroedinger,
-            hydrogenPreset: presetName,
-          },
-        }))
-        return
-      }
-
-      // For named presets, apply all preset values
-      const preset = getHydrogenPreset(presetName)
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          hydrogenPreset: presetName,
-          principalQuantumNumber: preset.n,
-          azimuthalQuantumNumber: preset.l,
-          magneticQuantumNumber: preset.m,
-          useRealOrbitals: preset.useReal,
-          bohrRadiusScale: preset.bohrRadiusScale,
-        },
-      }))
-    },
-
     setSchroedingerPrincipalQuantumNumber: (n: number) => {
       const clamped = Math.max(1, Math.min(7, Math.floor(n)))
       const currentL = get().schroedinger.azimuthalQuantumNumber
@@ -308,7 +278,7 @@ export const createSchroedingerSlice: StateCreator<
           principalQuantumNumber: clamped,
           azimuthalQuantumNumber: newL,
           magneticQuantumNumber: newM,
-          hydrogenPreset: 'custom',
+          hydrogenNDPreset: 'custom',
         },
       }))
     },
@@ -327,7 +297,7 @@ export const createSchroedingerSlice: StateCreator<
           ...state.schroedinger,
           azimuthalQuantumNumber: clamped,
           magneticQuantumNumber: newM,
-          hydrogenPreset: 'custom',
+          hydrogenNDPreset: 'custom',
         },
       }))
     },
@@ -341,13 +311,30 @@ export const createSchroedingerSlice: StateCreator<
         schroedinger: {
           ...state.schroedinger,
           magneticQuantumNumber: clamped,
-          hydrogenPreset: 'custom',
+          hydrogenNDPreset: 'custom',
         },
       }))
     },
 
-    setSchroedingerUseRealOrbitals: valueSetter('useRealOrbitals'),
-    setSchroedingerBohrRadiusScale: clampedSetter('bohrRadiusScale', 0.5, 3.0),
+    setSchroedingerUseRealOrbitals: (useRealOrbitals) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          useRealOrbitals,
+          hydrogenNDPreset: 'custom',
+        },
+      }))
+    },
+    setSchroedingerBohrRadiusScale: (bohrRadiusScale) => {
+      const clamped = Math.max(0.5, Math.min(3.0, bohrRadiusScale))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bohrRadiusScale: clamped,
+          hydrogenNDPreset: 'custom',
+        },
+      }))
+    },
 
     // === Hydrogen ND Configuration ===
     setSchroedingerHydrogenNDPreset: (preset: HydrogenNDPresetName) => {
@@ -436,6 +423,7 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerDensityGain: clampedSetter('densityGain', 0.1, 5.0),
     setSchroedingerPowderScale: clampedSetter('powderScale', 0.0, 2.0),
     setSchroedingerSampleCount: clampedSetter('sampleCount', 16, 128),
+    setSchroedingerUseDensityGrid: valueSetter('useDensityGrid'),
     setSchroedingerEmissionIntensity: clampedSetter('emissionIntensity', 0.0, 5.0),
     setSchroedingerEmissionThreshold: clampedSetter('emissionThreshold', 0.0, 1.0),
     setSchroedingerEmissionColorShift: clampedSetter('emissionColorShift', -1.0, 1.0),

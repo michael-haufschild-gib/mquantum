@@ -5,8 +5,7 @@
  * - Basic colors (edge, face, background)
  * - Advanced color system (algorithms, cosine coefficients, LCH)
  * - Shader system (wireframe, surface settings)
- * - Render mode toggles (edges/faces visible)
- * - Depth effects (attenuation, fresnel)
+ * - Fresnel rim controls
  * - Visual presets
  *
  * Re-exports decomposed slices.

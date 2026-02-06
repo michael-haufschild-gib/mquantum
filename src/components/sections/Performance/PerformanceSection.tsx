@@ -5,7 +5,6 @@
 
 import { Section } from '@/components/sections/Section'
 import React from 'react'
-import { FractalAnimationQualityControls } from './FractalAnimationQualityControls'
 import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'
 import { TemporalReprojectionControls } from './TemporalReprojectionControls'
 
@@ -31,12 +30,7 @@ export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(
           <ProgressiveRefinementControls />
         </div>
 
-        {/* Fractal Animation Quality - Fractals only */}
-        <div className="pb-3 mb-3 border-b border-panel-border">
-          <FractalAnimationQualityControls />
-        </div>
-
-        {/* Temporal Reprojection - Fractals only */}
+        {/* Temporal Reprojection */}
         <TemporalReprojectionControls />
       </Section>
     )

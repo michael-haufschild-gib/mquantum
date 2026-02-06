@@ -7,19 +7,7 @@ import type { SavedScene, SavedStyle } from '../presetManagerStore'
  * and to apply only the relevant config when loading a scene.
  */
 export const OBJECT_TYPE_TO_CONFIG_KEY: Record<ObjectType, string> = {
-  // Polytopes
-  hypercube: 'polytope',
-  simplex: 'polytope',
-  'cross-polytope': 'polytope',
-  'wythoff-polytope': 'wythoffPolytope',
-  // Extended objects
-  'root-system': 'rootSystem',
-  'clifford-torus': 'cliffordTorus',
-  'nested-torus': 'nestedTorus',
-  mandelbulb: 'mandelbulb',
-  'quaternion-julia': 'quaternionJulia',
   schroedinger: 'schroedinger',
-  blackhole: 'blackhole',
 }
 
 /**
@@ -58,13 +46,47 @@ export const TRANSIENT_FIELDS = new Set([
   'groundVersion',
   'skyboxVersion',
   'version', // Used by rotationStore and lightingSlice
-  'gravityVersion',
   'pbrVersion',
+  'schroedingerVersion',
+
+  // Legacy version counters from removed object types - strip from imported presets
+  'gravityVersion',
   'polytopeVersion',
   'blackholeVersion',
-  'schroedingerVersion',
   'mandelbulbVersion',
   'quaternionJuliaVersion',
+
+  // Legacy environment fields removed from the quantum-only fork
+  'activeWalls',
+  'groundPlaneOffset',
+  'groundPlaneColor',
+  'groundPlaneType',
+  'groundPlaneSizeScale',
+  'showGroundGrid',
+  'groundGridColor',
+  'groundGridSpacing',
+  'iblQuality',
+  'iblIntensity',
+
+  // Legacy post-processing fields removed from the quantum-only fork
+  'ssrEnabled',
+  'ssrIntensity',
+  'ssrMaxDistance',
+  'ssrThickness',
+  'ssrFadeStart',
+  'ssrFadeEnd',
+  'ssrQuality',
+  'refractionEnabled',
+  'refractionIOR',
+  'refractionStrength',
+  'refractionChromaticAberration',
+
+  // Legacy PBR field for removed environment surfaces
+  'ground',
+
+  // Legacy appearance fields removed from render mode controls
+  'edgesVisible',
+  'facesVisible',
 ])
 
 /**

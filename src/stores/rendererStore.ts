@@ -1,8 +1,8 @@
 /**
  * Renderer state management using Zustand
  *
- * Manages WebGL/WebGPU renderer selection and fallback behavior.
- * Handles automatic detection of WebGPU support and graceful fallback.
+ * Manages WebGPU renderer state and detection.
+ * WebGPU is the only supported renderer.
  *
  * @module stores/rendererStore
  */
@@ -15,7 +15,7 @@ import { subscribeWithSelector } from 'zustand/middleware'
 // ============================================================================
 
 /** Available rendering backends */
-export type RendererMode = 'webgl' | 'webgpu'
+export type RendererMode = 'webgpu'
 
 /** WebGPU support status */
 export type WebGPUSupportStatus = 'unknown' | 'checking' | 'supported' | 'unsupported'
@@ -26,7 +26,6 @@ export type WebGPUUnavailableReason =
   | 'no_adapter' // requestAdapter() returned null
   | 'device_lost' // Device was lost and couldn't recover
   | 'initialization_error' // Error during initialization
-  | 'user_disabled' // User explicitly chose WebGL
 
 /** WebGPU capability information */
 export interface WebGPUCapabilityInfo {
@@ -46,11 +45,8 @@ export interface WebGPUCapabilityInfo {
 export interface RendererState {
   // --- State ---
 
-  /** Current active rendering mode */
+  /** Current active rendering mode (always webgpu) */
   mode: RendererMode
-
-  /** Preferred rendering mode (user choice) */
-  preferredMode: RendererMode
 
   /** WebGPU support detection status */
   webgpuStatus: WebGPUSupportStatus
@@ -61,13 +57,10 @@ export interface RendererState {
   /** Whether auto-detection has run */
   detectionComplete: boolean
 
-  /** Whether to show a notification when falling back to WebGL */
+  /** Whether to show a notification when WebGPU is unavailable */
   showFallbackNotification: boolean
 
   // --- Actions ---
-
-  /** Set the preferred renderer mode */
-  setPreferredMode: (mode: RendererMode) => void
 
   /** Set WebGPU support status */
   setWebGPUStatus: (status: WebGPUSupportStatus) => void
@@ -84,46 +77,8 @@ export interface RendererState {
   /** Dismiss fallback notification */
   dismissFallbackNotification: () => void
 
-  /** Force switch to WebGL (emergency fallback) */
-  forceWebGL: (reason: WebGPUUnavailableReason) => void
-
   /** Reset to initial state */
   reset: () => void
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/** localStorage key for persisting preferred mode */
-const PREFERRED_MODE_KEY = 'mdim_preferred_renderer'
-
-/**
- * Load persisted preferred mode from localStorage.
- */
-function loadPersistedMode(): RendererMode {
-  try {
-    const stored = localStorage.getItem(PREFERRED_MODE_KEY)
-    if (stored === 'webgl' || stored === 'webgpu') {
-      return stored
-    }
-  } catch {
-    // Silent fail - localStorage may not be available
-  }
-  // Default to WebGPU preference (will fall back if not supported)
-  return 'webgpu'
-}
-
-/**
- * Persist preferred mode to localStorage.
- * @param mode
- */
-function persistPreferredMode(mode: RendererMode): void {
-  try {
-    localStorage.setItem(PREFERRED_MODE_KEY, mode)
-  } catch {
-    // Silent fail - localStorage may not be available
-  }
 }
 
 // ============================================================================
@@ -132,17 +87,14 @@ function persistPreferredMode(mode: RendererMode): void {
 
 const initialState: Omit<
   RendererState,
-  | 'setPreferredMode'
   | 'setWebGPUStatus'
   | 'setWebGPUCapabilities'
   | 'completeDetection'
   | 'handleDeviceLost'
   | 'dismissFallbackNotification'
-  | 'forceWebGL'
   | 'reset'
 > = {
-  mode: 'webgl', // Start with WebGL until detection completes
-  preferredMode: loadPersistedMode(),
+  mode: 'webgpu',
   webgpuStatus: 'unknown',
   webgpuCapabilities: null,
   detectionComplete: false,
@@ -154,38 +106,8 @@ const initialState: Omit<
 // ============================================================================
 
 export const useRendererStore = create<RendererState>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector((set) => ({
     ...initialState,
-
-    setPreferredMode: (mode: RendererMode) => {
-      persistPreferredMode(mode)
-      const state = get()
-
-      // If WebGPU is preferred but not supported, stay on WebGL
-      if (mode === 'webgpu' && state.webgpuCapabilities?.supported === false) {
-        set({
-          preferredMode: mode,
-          mode: 'webgl',
-          showFallbackNotification: true,
-        })
-        return
-      }
-
-      // If WebGL is preferred, switch immediately
-      if (mode === 'webgl') {
-        set({
-          preferredMode: mode,
-          mode: 'webgl',
-        })
-        return
-      }
-
-      // WebGPU is preferred and either supported or unknown
-      set({
-        preferredMode: mode,
-        mode: state.webgpuCapabilities?.supported ? 'webgpu' : state.mode,
-      })
-    },
 
     setWebGPUStatus: (status: WebGPUSupportStatus) => {
       set({ webgpuStatus: status })
@@ -196,31 +118,12 @@ export const useRendererStore = create<RendererState>()(
     },
 
     completeDetection: (capabilities: WebGPUCapabilityInfo) => {
-      const state = get()
-
-      // Determine active mode based on preference and support
-      let activeMode: RendererMode = 'webgl'
-      let showNotification = false
-
-      if (state.preferredMode === 'webgpu') {
-        if (capabilities.supported) {
-          activeMode = 'webgpu'
-        } else {
-          // User wanted WebGPU but it's not available
-          activeMode = 'webgl'
-          showNotification = true
-        }
-      } else {
-        // User prefers WebGL
-        activeMode = 'webgl'
-      }
-
       set({
         webgpuCapabilities: capabilities,
         webgpuStatus: capabilities.supported ? 'supported' : 'unsupported',
         detectionComplete: true,
-        mode: activeMode,
-        showFallbackNotification: showNotification,
+        mode: 'webgpu',
+        showFallbackNotification: !capabilities.supported,
       })
     },
 
@@ -228,7 +131,6 @@ export const useRendererStore = create<RendererState>()(
       console.warn(`[RendererStore] WebGPU device lost: ${reason}`)
 
       set({
-        mode: 'webgl',
         webgpuStatus: 'unsupported',
         webgpuCapabilities: {
           supported: false,
@@ -242,23 +144,8 @@ export const useRendererStore = create<RendererState>()(
       set({ showFallbackNotification: false })
     },
 
-    forceWebGL: (reason: WebGPUUnavailableReason) => {
-      set({
-        mode: 'webgl',
-        webgpuStatus: 'unsupported',
-        webgpuCapabilities: {
-          supported: false,
-          unavailableReason: reason,
-        },
-        showFallbackNotification: reason !== 'user_disabled',
-      })
-    },
-
     reset: () => {
-      set({
-        ...initialState,
-        preferredMode: loadPersistedMode(),
-      })
+      set({ ...initialState })
     },
   }))
 )

@@ -4,11 +4,6 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 
-// Initialize uniform sources for the UniformManager system
-// This must be called before any renderers attempt to use UniformManager
-import { initUniformSources } from '@/rendering/uniforms/init'
-initUniformSources()
-
 // Initialize WASM module for high-performance animation operations
 // This is async and non-blocking - functions fallback to JS until ready
 import { initAnimationWasm } from '@/lib/wasm'
@@ -39,9 +34,6 @@ if (import.meta.env.DEV) {
   // @ts-expect-error - Dev-only debug store access
   window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
 
-  // GPU Profiler API - set when RenderGraph is initialized
-  // @ts-expect-error - Dev-only profiler access
-  window.__PROFILER__ = null
 }
 
 const rootElement = document.getElementById('root')

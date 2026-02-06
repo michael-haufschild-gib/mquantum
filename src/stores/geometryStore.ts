@@ -11,11 +11,10 @@ import {
   getRecommendedDimension,
   getUnavailabilityReason,
   isAvailableForDimension,
-  isRaymarchingFractal,
   isValidObjectType as isValidObjectTypeRegistry,
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
-import { invalidateAllTemporalDepth } from '@/rendering/core/temporalDepth'
+import { invalidateAllTemporalDepthWebGPU } from '@/rendering/webgpu/passes'
 import {
   DEFAULT_COLOR_ALGORITHM,
   isColorAlgorithmAvailable,
@@ -24,7 +23,6 @@ import { create } from 'zustand'
 import { useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
 import { usePerformanceStore } from './performanceStore'
-import { usePostProcessingStore } from './postProcessingStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
 
@@ -61,7 +59,7 @@ export const MAX_DIMENSION = 11
 export const DEFAULT_DIMENSION = 3
 
 /** Default object type */
-export const DEFAULT_OBJECT_TYPE: ObjectType = 'hypercube'
+export const DEFAULT_OBJECT_TYPE: ObjectType = 'schroedinger'
 
 export interface GeometryState {
   /** Current dimension (3-11) */
@@ -128,7 +126,7 @@ export function validateObjectTypeForDimension(
     const reason = getUnavailabilityReason(type, dimension)
     return {
       valid: false,
-      fallbackType: 'hypercube',
+      fallbackType: 'schroedinger',
       message: reason ?? `${type} is not available for dimension ${dimension}`,
     }
   }
@@ -144,7 +142,7 @@ export function validateObjectTypeForDimension(
  */
 function getFallbackObjectType(type: ObjectType, dimension: number): ObjectType {
   const validation = validateObjectTypeForDimension(type, dimension)
-  return validation.valid ? type : (validation.fallbackType ?? 'hypercube')
+  return validation.valid ? type : (validation.fallbackType ?? 'schroedinger')
 }
 
 export const useGeometryStore = create<GeometryState>((set, get) => ({
@@ -165,7 +163,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     const newType = getFallbackObjectType(currentType, clampedDimension)
 
     // Invalidate temporal depth data - dimensions change depth completely
-    invalidateAllTemporalDepth()
+    invalidateAllTemporalDepthWebGPU()
 
     // All store updates execute synchronously and are batched by React 18's automatic batching
     // Trigger progressive refinement: start at low quality during dimension switch
@@ -210,7 +208,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     }
 
     // Invalidate temporal data - object types have completely different depth/accumulation values
-    invalidateAllTemporalDepth()
+    invalidateAllTemporalDepthWebGPU()
 
     // Check if this object type has a recommended dimension (from registry)
     const recommendedDimension = getRecommendedDimension(type)
@@ -225,22 +223,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     const appearanceStore = useAppearanceStore.getState()
     if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, type)) {
       appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
-    }
-
-    // Raymarched fractals require facesVisible=true to render (determineRenderMode returns 'none' otherwise)
-    // Ensure it's set when switching to a raymarching type
-    if (isRaymarchingFractal(type, targetDimension)) {
-      if (!appearanceStore.facesVisible) {
-        appearanceStore.setFacesVisible(true)
-      }
-    }
-
-    // Gravitational lensing is only available for black holes - auto-toggle based on object type
-    const ppStore = usePostProcessingStore.getState()
-    if (type === 'blackhole') {
-      ppStore.setGravityEnabled(true)
-    } else {
-      ppStore.setGravityEnabled(false)
     }
 
     // Trigger progressive refinement: start at low quality during content type switch
@@ -274,8 +256,8 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
 
     // Validate that objectType is valid for dimension
     if (!isValidObjectType(objectType)) {
-      console.warn(`Invalid object type for scene load: ${objectType}, using hypercube`)
-      objectType = 'hypercube'
+      console.warn(`Invalid object type for scene load: ${objectType}, using schroedinger`)
+      objectType = 'schroedinger'
     }
 
     const validation = validateObjectTypeForDimension(objectType, clampedDimension)
@@ -283,7 +265,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
       console.warn(
         `Object type ${objectType} is not valid for dimension ${clampedDimension} during scene load: ${validation.message}`
       )
-      objectType = validation.fallbackType ?? 'hypercube'
+      objectType = validation.fallbackType ?? 'schroedinger'
     }
 
     // Skip if nothing changed
@@ -292,7 +274,7 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     }
 
     // Invalidate temporal depth data
-    invalidateAllTemporalDepth()
+    invalidateAllTemporalDepthWebGPU()
 
     // Update dimension-dependent stores for new dimension
     if (clampedDimension !== currentDimension) {
@@ -305,21 +287,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
     const appearanceStore = useAppearanceStore.getState()
     if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, objectType)) {
       appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
-    }
-
-    // Raymarched fractals require facesVisible=true
-    if (isRaymarchingFractal(objectType, clampedDimension)) {
-      if (!appearanceStore.facesVisible) {
-        appearanceStore.setFacesVisible(true)
-      }
-    }
-
-    // Gravitational lensing toggle based on object type
-    const ppStore = usePostProcessingStore.getState()
-    if (objectType === 'blackhole') {
-      ppStore.setGravityEnabled(true)
-    } else {
-      ppStore.setGravityEnabled(false)
     }
 
     // Set both atomically - no auto-adjustments

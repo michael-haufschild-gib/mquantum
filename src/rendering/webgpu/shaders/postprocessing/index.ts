@@ -6,12 +6,6 @@
  * @module rendering/webgpu/shaders/postprocessing
  */
 
-// Environment compositing
-export { environmentCompositeShader } from './environment-composite.wgsl'
-
-// Reflections
-export { ssrShader } from './ssr.wgsl'
-
 // Bloom
 export { bloomThresholdShader, createBloomBlurShader, bloomCompositeShader } from './bloom.wgsl'
 
@@ -27,29 +21,12 @@ export {
   smaaShaders,
 } from './smaa.wgsl'
 
-// Jet volumetric effects
-export {
-  jetVolumetricUniformsBlock,
-  jetNoiseBlock,
-  jetVolumetricVertexShader,
-  jetVolumetricFragmentShader,
-  jetCompositeVertexShader,
-  jetCompositeFragmentShader,
-} from './jet-volumetric.wgsl'
-
 // Normal compositing
 export {
   normalCompositeUniformsBlock,
   normalCompositeVertexShader,
   normalCompositeFragmentShader,
 } from './normal-composite.wgsl'
-
-// Screen-space lensing
-export {
-  screenSpaceLensingUniformsBlock,
-  screenSpaceLensingVertexShader,
-  screenSpaceLensingFragmentShader,
-} from './screen-space-lensing.wgsl'
 
 // Frame blending
 export {

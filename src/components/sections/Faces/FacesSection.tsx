@@ -7,8 +7,6 @@
  * - FX: Fresnel rim effects
  *
  * Shadow controls moved to ShadowsSection.
- *
- * Only visible when facesVisible is true.
  */
 
 import { Section } from '@/components/sections/Section'
@@ -68,7 +66,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
-    facesVisible: state.facesVisible,
     colorAlgorithm: state.colorAlgorithm,
     faceColor: state.faceColor,
     setFaceColor: state.setFaceColor,
@@ -81,7 +78,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     shaderType: state.shaderType,
   }))
   const {
-    facesVisible,
     colorAlgorithm,
     faceColor,
     setFaceColor,
@@ -202,9 +198,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
 
   return (
     <Section title="Faces" defaultOpen={defaultOpen} data-testid="section-faces">
-      <div
-        className={`transition-opacity duration-300 ${!facesVisible ? 'opacity-40 pointer-events-none grayscale' : ''}`}
-      >
+      <div className="transition-opacity duration-300">
         <Tabs
           tabs={tabs}
           value={activeTab}
@@ -212,11 +206,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
           tabListClassName="mb-4"
           data-testid="faces-tabs"
         />
-        {!facesVisible && (
-          <div className="text-center p-4 mt-2 border border-dashed border-border-default rounded-lg bg-[var(--bg-hover)]">
-            <p className="text-xs text-text-secondary">Enable Faces to edit settings</p>
-          </div>
-        )}
       </div>
     </Section>
   )

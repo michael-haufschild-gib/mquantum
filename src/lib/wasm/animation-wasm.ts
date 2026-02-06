@@ -58,7 +58,6 @@ interface WasmModule {
 let wasmModule: WasmModule | null = null
 let wasmInitPromise: Promise<void> | null = null
 let wasmReady = false
-let wasmError: Error | null = null
 
 /**
  * Initialize the WASM module for animation operations.
@@ -81,13 +80,12 @@ export async function initAnimationWasm(): Promise<void> {
   wasmInitPromise = (async () => {
     // Skip WASM loading in test environment
     if (import.meta.env.MODE === 'test' || import.meta.env.SSR) {
-      wasmError = new Error('WASM disabled in test environment')
       return
     }
 
     try {
       // Dynamic import - the module path must be a literal for Vite's analysis
-      const wasm = await import('mdimension-core')
+      const wasm = await import('@/wasm/mdimension_core/pkg/mdimension_core.js')
 
       await wasm.default()
       wasm.start()
@@ -100,7 +98,7 @@ export async function initAnimationWasm(): Promise<void> {
         console.log('[AnimationWASM] Initialized successfully')
       }
     } catch (err) {
-      wasmError = err instanceof Error ? err : new Error(String(err))
+      const wasmError = err instanceof Error ? err : new Error(String(err))
       if (import.meta.env.DEV) {
         console.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
       }

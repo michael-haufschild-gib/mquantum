@@ -133,7 +133,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     finalAlpha = envColor.a;
   } else {
     // Object exists - blend based on alpha
-    finalColor = objColor.rgb * objColor.a + envColor.rgb * (1.0 - objColor.a);
+    finalColor = objColor.rgb + envColor.rgb * (1.0 - objColor.a);
     finalAlpha = max(envColor.a, objColor.a);
   }
 
@@ -167,6 +167,13 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
 
   // Sampler
   private sampler: GPUSampler | null = null
+  private bindGroup: GPUBindGroup | null = null
+  private bindGroupLensedEnvView: GPUTextureView | null = null
+  private bindGroupMainObjectView: GPUTextureView | null = null
+  private bindGroupMainObjectDepthView: GPUTextureView | null = null
+  private uniformData = new ArrayBuffer(64)
+  private uniformFloatView = new Float32Array(this.uniformData)
+  private uniformUintView = new Uint32Array(this.uniformData)
 
   // Shell glow config
   private shellConfig: ShellGlowConfig = {
@@ -271,6 +278,26 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     return { ...this.shellConfig }
   }
 
+  private updateUniforms(ctx: WebGPURenderContext, near: number, far: number): void {
+    if (!this.device || !this.uniformBuffer) return
+
+    // Uniform layout matches WGSL `Uniforms` struct.
+    this.uniformFloatView[0] = near
+    this.uniformFloatView[1] = far
+    this.uniformUintView[2] = this.shellConfig.enabled ? 1 : 0
+    this.uniformFloatView[3] = this.shellConfig.strength
+    this.uniformFloatView[4] = this.shellConfig.color[0]
+    this.uniformFloatView[5] = this.shellConfig.color[1]
+    this.uniformFloatView[6] = this.shellConfig.color[2]
+    this.uniformFloatView[7] = 0
+    this.uniformFloatView[8] = ctx.size.width
+    this.uniformFloatView[9] = ctx.size.height
+    this.uniformFloatView[10] = 0
+    this.uniformFloatView[11] = 0
+
+    this.writeUniformBuffer(this.device, this.uniformBuffer, new Uint8Array(this.uniformData))
+  }
+
   /**
    * Execute the composite pass.
    * @param ctx
@@ -304,37 +331,29 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     const near = camera?.near ?? 0.1
     const far = camera?.far ?? 100
 
-    // Update uniforms - use dual views for mixed f32/u32 types
-    const buffer = new ArrayBuffer(64)
-    const floatView = new Float32Array(buffer)
-    const uintView = new Uint32Array(buffer)
+    this.updateUniforms(ctx, near, far)
 
-    floatView[0] = near
-    floatView[1] = far
-    uintView[2] = this.shellConfig.enabled ? 1 : 0  // u32 - must use Uint32Array
-    floatView[3] = this.shellConfig.strength
-    floatView[4] = this.shellConfig.color[0]
-    floatView[5] = this.shellConfig.color[1]
-    floatView[6] = this.shellConfig.color[2]
-    floatView[7] = 0 // padding
-    floatView[8] = ctx.size.width
-    floatView[9] = ctx.size.height
-    // floatView[10-11] padding (vec2f)
-
-    this.writeUniformBuffer(this.device, this.uniformBuffer, new Uint8Array(buffer))
-
-    // Create bind group with current textures
-    const bindGroup = this.device.createBindGroup({
-      label: 'environment-composite-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: lensedEnvView },
-        { binding: 3, resource: mainObjectView },
-        { binding: 4, resource: mainObjectDepthView },
-      ],
-    })
+    if (
+      !this.bindGroup ||
+      this.bindGroupLensedEnvView !== lensedEnvView ||
+      this.bindGroupMainObjectView !== mainObjectView ||
+      this.bindGroupMainObjectDepthView !== mainObjectDepthView
+    ) {
+      this.bindGroup = this.device.createBindGroup({
+        label: 'environment-composite-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: lensedEnvView },
+          { binding: 3, resource: mainObjectView },
+          { binding: 4, resource: mainObjectDepthView },
+        ],
+      })
+      this.bindGroupLensedEnvView = lensedEnvView
+      this.bindGroupMainObjectView = mainObjectView
+      this.bindGroupMainObjectDepthView = mainObjectDepthView
+    }
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -350,7 +369,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
     })
 
     // Render fullscreen
-    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [this.bindGroup])
 
     passEncoder.end()
   }
@@ -361,6 +380,10 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
+    this.bindGroup = null
+    this.bindGroupLensedEnvView = null
+    this.bindGroupMainObjectView = null
+    this.bindGroupMainObjectDepthView = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null

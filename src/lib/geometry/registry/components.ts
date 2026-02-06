@@ -23,53 +23,9 @@ const componentCache = new Map<string, ComponentType<unknown>>()
  * Keys must match the controlsComponentKey in registry entries.
  */
 const componentLoaders: Record<string, () => Promise<{ default: ComponentType<unknown> }>> = {
-  // Polytopes (all share same component)
-  PolytopeSettings: () =>
-    import('@/components/sections/Geometry/settings/PolytopeSettings').then((m) => ({
-      default: m.PolytopeSettings as ComponentType<unknown>,
-    })),
-
-  // Wythoff Polytope (has its own controls)
-  WythoffPolytopeSettings: () =>
-    import('@/components/sections/Geometry/settings/WythoffPolytopeSettings').then((m) => ({
-      default: m.WythoffPolytopeSettings as ComponentType<unknown>,
-    })),
-
-  // Extended objects
-  RootSystemSettings: () =>
-    import('@/components/sections/Geometry/settings/RootSystemSettings').then((m) => ({
-      default: m.RootSystemSettings as ComponentType<unknown>,
-    })),
-
-  CliffordTorusSettings: () =>
-    import('@/components/sections/Geometry/settings/CliffordTorusSettings').then((m) => ({
-      default: m.CliffordTorusSettings as ComponentType<unknown>,
-    })),
-
-  NestedTorusSettings: () =>
-    import('@/components/sections/Geometry/settings/NestedTorusSettings').then((m) => ({
-      default: m.NestedTorusSettings as ComponentType<unknown>,
-    })),
-
-  // Fractals
-  MandelbulbControls: () =>
-    import('@/components/sections/Geometry/MandelbulbControls').then((m) => ({
-      default: m.MandelbulbControls as ComponentType<unknown>,
-    })),
-
-  QuaternionJuliaControls: () =>
-    import('@/components/sections/Geometry/QuaternionJuliaControls').then((m) => ({
-      default: m.QuaternionJuliaControls as ComponentType<unknown>,
-    })),
-
   SchroedingerControls: () =>
     import('@/components/sections/Geometry/SchroedingerControls').then((m) => ({
       default: m.SchroedingerControls as ComponentType<unknown>,
-    })),
-
-  BlackHoleControls: () =>
-    import('@/components/sections/Geometry/BlackHoleControls').then((m) => ({
-      default: m.BlackHoleControls as ComponentType<unknown>,
     })),
 }
 

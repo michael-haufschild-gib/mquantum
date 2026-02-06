@@ -26,6 +26,7 @@ export interface FXAAPassOptions {
 export class FXAAPass extends WebGPUBasePass {
   private uniformBuffer: GPUBuffer | null = null
   private bindGroup: GPUBindGroup | null = null
+  private bindGroupInputView: GPUTextureView | null = null
   private sampler: GPUSampler | null = null
 
   private subpixelQuality = 0.75
@@ -34,6 +35,12 @@ export class FXAAPass extends WebGPUBasePass {
 
   private readonly colorInputId: string
   private readonly outputResourceId: string
+  private uniformData = new Float32Array(12)
+  private lastUniformWidth = -1
+  private lastUniformHeight = -1
+  private lastUniformSubpixelQuality = Number.NaN
+  private lastUniformEdgeThreshold = Number.NaN
+  private lastUniformEdgeThresholdMin = Number.NaN
 
   constructor(options?: FXAAPassOptions) {
     const colorInput = options?.colorInput ?? 'ldr-color'
@@ -60,6 +67,43 @@ export class FXAAPass extends WebGPUBasePass {
 
   setEdgeThreshold(value: number): void {
     this.edgeThreshold = value
+  }
+
+  private updateUniforms(width: number, height: number): void {
+    if (!this.device || !this.uniformBuffer) return
+
+    if (
+      width === this.lastUniformWidth &&
+      height === this.lastUniformHeight &&
+      this.subpixelQuality === this.lastUniformSubpixelQuality &&
+      this.edgeThreshold === this.lastUniformEdgeThreshold &&
+      this.edgeThresholdMin === this.lastUniformEdgeThresholdMin
+    ) {
+      return
+    }
+
+    // Must match WGSL struct layout (48 bytes):
+    // vec2f(8) + f32(4) + f32(4) + f32(4) + vec3f(12) + trailing padding(8)
+    this.uniformData[0] = width
+    this.uniformData[1] = height
+    this.uniformData[2] = this.subpixelQuality
+    this.uniformData[3] = this.edgeThreshold
+    this.uniformData[4] = this.edgeThresholdMin
+    this.uniformData[5] = 0
+    this.uniformData[6] = 0
+    this.uniformData[7] = 0
+    this.uniformData[8] = 0
+    this.uniformData[9] = 0
+    this.uniformData[10] = 0
+    this.uniformData[11] = 0
+
+    this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
+
+    this.lastUniformWidth = width
+    this.lastUniformHeight = height
+    this.lastUniformSubpixelQuality = this.subpixelQuality
+    this.lastUniformEdgeThreshold = this.edgeThreshold
+    this.lastUniformEdgeThresholdMin = this.edgeThresholdMin
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
@@ -111,20 +155,7 @@ export class FXAAPass extends WebGPUBasePass {
 
     const { width, height } = ctx.size
 
-    // Update uniforms - must match WGSL struct layout (48 bytes)
-    // struct FXAAUniforms { resolution: vec2f, subpixelQuality: f32, edgeThreshold: f32,
-    //                       edgeThresholdMin: f32, _padding: vec3f }
-    const uniformData = new Float32Array([
-      width,                    // offset 0: resolution.x
-      height,                   // offset 4: resolution.y
-      this.subpixelQuality,     // offset 8
-      this.edgeThreshold,       // offset 12
-      this.edgeThresholdMin,    // offset 16
-      0, 0, 0,                  // offset 20: padding to align vec3f to 16-byte boundary
-      0, 0, 0,                  // offset 32: _padding vec3f
-      0,                        // offset 44: struct padding to 48 bytes
-    ])
-    this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
+    this.updateUniforms(width, height)
 
     // Get textures
     const inputView = ctx.getTextureView(this.colorInputId)
@@ -132,17 +163,19 @@ export class FXAAPass extends WebGPUBasePass {
 
     if (!inputView) return
 
-    // Create bind group
-    this.bindGroup = this.createBindGroup(
-      this.device,
-      this.bindGroupLayout,
-      [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: inputView },
-        { binding: 2, resource: this.sampler },
-      ],
-      'fxaa-bindgroup'
-    )
+    if (!this.bindGroup || this.bindGroupInputView !== inputView) {
+      this.bindGroup = this.createBindGroup(
+        this.device,
+        this.bindGroupLayout,
+        [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: inputView },
+          { binding: 2, resource: this.sampler },
+        ],
+        'fxaa-bindgroup'
+      )
+      this.bindGroupInputView = inputView
+    }
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -165,6 +198,7 @@ export class FXAAPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.bindGroup = null
+    this.bindGroupInputView = null
     this.sampler = null
     super.dispose()
   }

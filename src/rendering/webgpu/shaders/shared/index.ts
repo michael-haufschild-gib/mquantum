@@ -19,7 +19,6 @@ export { generateColorSelectorBlock, getColorModuleDependencies } from './color/
 
 // Lighting
 export { ggxBlock } from './lighting/ggx.wgsl'
-export { iblBlock, iblUniformsBlock, pmremSamplingBlock } from './lighting/ibl.wgsl'
 export { multiLightBlock } from './lighting/multi-light.wgsl'
 export { sssBlock } from './lighting/sss.wgsl'
 

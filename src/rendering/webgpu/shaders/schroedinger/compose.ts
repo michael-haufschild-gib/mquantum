@@ -18,7 +18,6 @@ import {
   assembleShaderBlocks,
   generateConsolidatedBindGroups,
   generateObjectBindGroup,
-  generateTextureBindings,
   mrtOutputBlock,
   type WGSLShaderConfig,
 } from '../shared/compose-helpers'
@@ -32,14 +31,9 @@ import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
 import { hslBlock } from '../shared/color/hsl.wgsl'
 import { oklabBlock } from '../shared/color/oklab.wgsl'
 import { selectorBlock } from '../shared/color/selector.wgsl'
-import {
-  generateColorSelectorBlock,
-  getColorModuleDependencies,
-} from '../shared/color/selectorVariants.wgsl'
 
 // Lighting blocks (for isosurface mode)
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
-import { iblBlock, iblUniformsBlock, pmremSamplingBlock } from '../shared/lighting/ibl.wgsl'
 import { multiLightBlock } from '../shared/lighting/multi-light.wgsl'
 
 // Raymarching blocks
@@ -86,7 +80,6 @@ import { laguerreBlock } from './quantum/laguerre.wgsl'
 import { legendreBlock } from './quantum/legendre.wgsl'
 import { sphericalHarmonicsBlock } from './quantum/sphericalHarmonics.wgsl'
 import { hydrogenRadialBlock } from './quantum/hydrogenRadial.wgsl'
-import { hydrogenPsiBlock } from './quantum/hydrogenPsi.wgsl'
 import { hydrogenNDCommonBlock } from './quantum/hydrogenNDCommon.wgsl'
 import {
   hydrogenNDGen3dBlock,
@@ -126,7 +119,7 @@ import {
 import type { ColorAlgorithm } from '../types'
 
 /** Quantum physics mode for Schrödinger visualization */
-export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenOrbital' | 'hydrogenND'
+export type QuantumModeForShader = 'harmonicOscillator' | 'hydrogenND'
 
 /**
  * Schrödinger shader configuration options.
@@ -140,10 +133,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   quantumMode?: QuantumModeForShader
   /** Number of HO superposition terms (1-8) */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Color algorithm for compile-time optimization */
+  /** Preferred color algorithm hint (Schrödinger currently evaluates color branches at runtime) */
   colorAlgorithm?: ColorAlgorithm
-  /** Enable IBL (Image-Based Lighting) */
-  ibl?: boolean
   /**
    * Use pre-computed density grid texture instead of direct wavefunction evaluation.
    * Requires the DensityGridComputePass to run before the render pass.
@@ -167,8 +158,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     temporalAccumulation: enableTemporal = false,
     quantumMode = 'harmonicOscillator',
     termCount,
-    colorAlgorithm,
-    ibl: enableIBL = true,
     useDensityGrid = false,
     overrides = [],
   } = config
@@ -178,20 +167,13 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   // IMPORTANT: In WGSL, ALL function references must resolve at compile time,
   // even if inside branches that are never executed at runtime.
-  // Since psiBlock references evalHydrogenPsiTime and hydrogenNDOptimized,
-  // we MUST always include these blocks regardless of quantumMode.
-  // The runtime uniform check handles mode switching correctly.
+  // Since psiBlock references hydrogenNDOptimized, we MUST include hydrogen ND
+  // dependencies regardless of selected mode.
   const includeHydrogen = true
   const includeHydrogenND = true
 
   // For hydrogenND mode, include only the specific dimension block
   const hydrogenNDDimension = includeHydrogenND ? Math.min(Math.max(dimension, 3), 11) : 0
-
-  // Determine which color modules to include
-  const colorDeps =
-    colorAlgorithm !== undefined
-      ? getColorModuleDependencies(colorAlgorithm)
-      : { hsl: true, cosine: true, oklab: true }
 
   // Determine if we should use unrolled HO superposition
   const useUnrolledHO =
@@ -235,11 +217,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   // Add quantum mode constant for runtime dispatch
-  if (quantumMode === 'hydrogenOrbital') {
+  if (quantumMode === 'hydrogenND') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
-    features.push('Hydrogen Orbital')
-  } else if (quantumMode === 'hydrogenND') {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
     features.push('Hydrogen ND')
   } else {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 0;')
@@ -259,11 +238,10 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   // Select main block based on mode
-  // Isosurface mode uses generator function for conditional IBL support
   // Temporal volumetric mode outputs MRT (color + world position)
   // Volumetric mode with density grid uses optimized raymarcher
   const selectedMainBlock = isosurface
-    ? generateMainBlockIsosurface({ ibl: enableIBL })
+    ? generateMainBlockIsosurface()
     : enableTemporal
       ? generateMainBlockTemporal({ bayerJitter: true })
       : useDensityGrid
@@ -346,11 +324,10 @@ struct VertexOutput {
     { name: 'Constants', content: constantsBlock },
     { name: 'Shared Uniforms', content: uniformsBlock },
 
-    // Bind groups - using consolidated layout to stay within 4-group limit
+    // Bind groups - using consolidated layout
     // Group 0: Camera
     // Group 1: Combined (Lighting + Material + Quality)
     // Group 2: Object (Schrödinger + Basis)
-    // Group 3: IBL (if enabled)
     { name: 'Standard Bind Groups', content: generateConsolidatedBindGroups() },
     {
       name: 'Schrödinger Uniforms',
@@ -360,18 +337,6 @@ struct VertexOutput {
         generateObjectBindGroup(2, 'SchroedingerUniforms', 'schroedinger', 0) +
         '\n' +
         generateObjectBindGroup(2, 'BasisVectors', 'basis', 1),
-    },
-
-    // IBL textures - Group 3: @binding(0)=uniforms, @binding(1)=texture, @binding(2)=sampler
-    {
-      name: 'IBL Textures',
-      content:
-        iblUniformsBlock +
-        '\n' +
-        generateObjectBindGroup(3, 'IBLUniforms', 'iblUniforms', 0) +
-        '\n' +
-        generateTextureBindings(3, [{ name: 'envMap' }], 1), // Start at binding 1
-      condition: enableIBL,
     },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
@@ -393,7 +358,6 @@ struct VertexOutput {
     { name: 'Legendre Polynomials', content: legendreBlock, condition: includeHydrogen },
     { name: 'Spherical Harmonics', content: sphericalHarmonicsBlock, condition: includeHydrogen },
     { name: 'Hydrogen Radial', content: hydrogenRadialBlock, condition: includeHydrogen },
-    { name: 'Hydrogen Psi', content: hydrogenPsiBlock, condition: includeHydrogen },
 
     // Hydrogen ND modules
     { name: 'Hydrogen ND Common', content: hydrogenNDCommonBlock, condition: includeHydrogenND },
@@ -439,19 +403,15 @@ struct VertexOutput {
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
     // ===== COLOR SYSTEM =====
-    { name: 'Color (HSL)', content: hslBlock, condition: colorDeps.hsl },
-    { name: 'Color (Cosine)', content: cosinePaletteBlock, condition: colorDeps.cosine },
-    { name: 'Color (Oklab)', content: oklabBlock, condition: colorDeps.oklab },
-    {
-      name: 'Color Selector',
-      content:
-        colorAlgorithm !== undefined ? generateColorSelectorBlock(colorAlgorithm) : selectorBlock,
-    },
+    // Always include the full color stack for Schrödinger emission.
+    // computeBaseColor() in emission.wgsl dispatches at runtime and references HSL, cosine, and Oklab paths.
+    { name: 'Color (HSL)', content: hslBlock },
+    { name: 'Color (Cosine)', content: cosinePaletteBlock },
+    { name: 'Color (Oklab)', content: oklabBlock },
+    { name: 'Color Selector', content: selectorBlock },
 
     // ===== LIGHTING (GGX needed for both volumetric emission and isosurface) =====
     { name: 'GGX PBR', content: ggxBlock },
-    { name: 'PMREM Sampling', content: pmremSamplingBlock, condition: enableIBL },
-    { name: 'IBL Functions', content: iblBlock, condition: enableIBL },
     { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface },
 
     // ===== VOLUME RENDERING =====

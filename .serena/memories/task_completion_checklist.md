@@ -23,12 +23,14 @@ npm test
 - **Maintain 100% test coverage** for new functionality
 - **Max 4 workers** - never modify `maxWorkers` in vitest.config.ts
 
-## 3. Verify WebGL2 Compliance
+## 3. Verify WGSL Compliance
 
 If you modified shaders:
-- All shaders use GLSL ES 3.00 syntax
-- `glslVersion: THREE.GLSL3` set on ShaderMaterial
-- No `gl_FragColor`, `attribute`, `varying`, `texture2D`
+- All shaders use WGSL syntax in `.wgsl.ts` files
+- Entry points named `main` (matches `WebGPUBasePass.createFullscreenPipeline()`)
+- Maximum 4 bind groups (0-3)
+- `textureSample` only in uniform control flow
+- Struct definitions included in each shader that uses them
 
 ## 4. Verify Zustand Usage
 
@@ -54,7 +56,7 @@ Ensure tests are in correct locations:
 
 For changes affecting visual output:
 - Run Playwright E2E tests
-- Check for WebGL/shader/render-graph errors in console
+- Check for WebGPU/shader/render-graph errors in console
 
 ## 8. Documentation
 
@@ -67,5 +69,5 @@ For changes affecting visual output:
 - [ ] No raw HTML controls (use `src/components/ui/*`)
 - [ ] No hardcoded colors (use Tailwind tokens)
 - [ ] No inline `useShallow` calls
-- [ ] No WebGL1 shader syntax
-- [ ] No `gl.setViewport()` with RenderTargets
+- [ ] WGSL shaders only (no GLSL)
+- [ ] Uniform buffer sizes match WGSL struct alignment

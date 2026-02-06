@@ -1,10 +1,11 @@
 /**
  * Tests for color algorithm availability filtering
  *
- * Verifies that color algorithms are correctly filtered based on object type:
- * - Quantum-only algorithms: Only available for Schroedinger
- * - Blackhole-only algorithms: Only available for Blackhole
- * - Geometric phase algorithms: Available for all EXCEPT blackhole
+ * Verifies that color algorithms are correctly filtered based on object type.
+ * After cleanup, only 'schroedinger' object type remains.
+ * - Quantum-only algorithms: Empty (phase uses geometric data)
+ * - Blackhole-only algorithms: Empty (blackhole removed)
+ * - Geometric phase algorithms: Available for all types
  * - General algorithms: Available for all object types
  */
 
@@ -21,7 +22,6 @@ import {
   POLYTOPE_ONLY_ALGORITHMS,
   type ColorAlgorithm,
 } from '@/rendering/shaders/palette/types'
-import type { ObjectType } from '@/lib/geometry/types'
 
 describe('Color Algorithm Availability', () => {
   describe('algorithm classification', () => {
@@ -38,129 +38,32 @@ describe('Color Algorithm Availability', () => {
       expect(isGeometricPhaseAlgorithm('mixed')).toBe(true)
     })
 
-    it('should classify accretionGradient and gravitationalRedshift as blackhole-only', () => {
-      expect(BLACKHOLE_ONLY_ALGORITHMS).toContain('accretionGradient')
-      expect(BLACKHOLE_ONLY_ALGORITHMS).toContain('gravitationalRedshift')
-      expect(isBlackHoleOnlyAlgorithm('accretionGradient')).toBe(true)
-      expect(isBlackHoleOnlyAlgorithm('gravitationalRedshift')).toBe(true)
+    it('should have no blackhole-only algorithms', () => {
+      expect(BLACKHOLE_ONLY_ALGORITHMS).toHaveLength(0)
     })
 
-    it('should classify dimension as polytope-only', () => {
-      expect(POLYTOPE_ONLY_ALGORITHMS).toContain('dimension')
-      expect(isPolytopeOnlyAlgorithm('dimension')).toBe(true)
+    it('should have no polytope-only algorithms', () => {
+      expect(POLYTOPE_ONLY_ALGORITHMS).toHaveLength(0)
     })
   })
 
   describe('isColorAlgorithmAvailable', () => {
-    const objectTypes: ObjectType[] = [
-      'hypercube',
-      'simplex',
-      'mandelbulb',
-      'schroedinger',
-      'blackhole',
-      'clifford-torus',
-    ]
-
     describe('geometric phase algorithms (phase, mixed)', () => {
       const geometricAlgorithms: ColorAlgorithm[] = ['phase', 'mixed']
 
-      it('should NOT be available for blackhole', () => {
+      it('should be available for schroedinger', () => {
         for (const algo of geometricAlgorithms) {
-          expect(isColorAlgorithmAvailable(algo, 'blackhole')).toBe(false)
-        }
-      })
-
-      it('should be available for all non-blackhole object types', () => {
-        const nonBlackholeTypes = objectTypes.filter((t) => t !== 'blackhole')
-
-        for (const algo of geometricAlgorithms) {
-          for (const objectType of nonBlackholeTypes) {
-            expect(
-              isColorAlgorithmAvailable(algo, objectType),
-              `${algo} should be available for ${objectType}`
-            ).toBe(true)
-          }
-        }
-      })
-    })
-
-    describe('blackhole-only algorithms', () => {
-      const blackholeAlgorithms: ColorAlgorithm[] = ['accretionGradient', 'gravitationalRedshift']
-
-      it('should only be available for blackhole', () => {
-        for (const algo of blackholeAlgorithms) {
-          expect(isColorAlgorithmAvailable(algo, 'blackhole')).toBe(true)
-        }
-      })
-
-      it('should NOT be available for non-blackhole types', () => {
-        const nonBlackholeTypes = objectTypes.filter((t) => t !== 'blackhole')
-
-        for (const algo of blackholeAlgorithms) {
-          for (const objectType of nonBlackholeTypes) {
-            expect(
-              isColorAlgorithmAvailable(algo, objectType),
-              `${algo} should NOT be available for ${objectType}`
-            ).toBe(false)
-          }
+          expect(
+            isColorAlgorithmAvailable(algo, 'schroedinger'),
+            `${algo} should be available for schroedinger`
+          ).toBe(true)
         }
       })
     })
 
     describe('blackbody algorithm', () => {
-      it('should be available for schroedinger and blackhole only', () => {
+      it('should be available for schroedinger', () => {
         expect(isColorAlgorithmAvailable('blackbody', 'schroedinger')).toBe(true)
-        expect(isColorAlgorithmAvailable('blackbody', 'blackhole')).toBe(true)
-      })
-
-      it('should NOT be available for other object types', () => {
-        const otherTypes = objectTypes.filter((t) => t !== 'schroedinger' && t !== 'blackhole')
-
-        for (const objectType of otherTypes) {
-          expect(
-            isColorAlgorithmAvailable('blackbody', objectType),
-            `blackbody should NOT be available for ${objectType}`
-          ).toBe(false)
-        }
-      })
-    })
-
-    describe('polytope-only algorithms', () => {
-      const polytopeAlgorithms: ColorAlgorithm[] = ['dimension']
-      const polytopeTypes: ObjectType[] = [
-        'hypercube',
-        'simplex',
-        'cross-polytope',
-        'wythoff-polytope',
-      ]
-
-      it('should be available for polytope types', () => {
-        for (const algo of polytopeAlgorithms) {
-          for (const objectType of polytopeTypes) {
-            expect(
-              isColorAlgorithmAvailable(algo, objectType),
-              `${algo} should be available for ${objectType}`
-            ).toBe(true)
-          }
-        }
-      })
-
-      it('should NOT be available for non-polytope types', () => {
-        const nonPolytopeTypes: ObjectType[] = [
-          'mandelbulb',
-          'schroedinger',
-          'blackhole',
-          'clifford-torus',
-        ]
-
-        for (const algo of polytopeAlgorithms) {
-          for (const objectType of nonPolytopeTypes) {
-            expect(
-              isColorAlgorithmAvailable(algo, objectType),
-              `${algo} should NOT be available for ${objectType}`
-            ).toBe(false)
-          }
-        }
       })
     })
 
@@ -176,14 +79,12 @@ describe('Color Algorithm Availability', () => {
         'radial',
       ]
 
-      it('should be available for all object types', () => {
+      it('should be available for schroedinger', () => {
         for (const algo of generalAlgorithms) {
-          for (const objectType of objectTypes) {
-            expect(
-              isColorAlgorithmAvailable(algo, objectType),
-              `${algo} should be available for ${objectType}`
-            ).toBe(true)
-          }
+          expect(
+            isColorAlgorithmAvailable(algo, 'schroedinger'),
+            `${algo} should be available for schroedinger`
+          ).toBe(true)
         }
       })
     })
@@ -201,6 +102,20 @@ describe('Color Algorithm Availability', () => {
     it('should return false for general algorithms', () => {
       expect(isQuantumOnlyAlgorithm('monochromatic')).toBe(false)
       expect(isQuantumOnlyAlgorithm('cosine')).toBe(false)
+    })
+  })
+
+  describe('isBlackHoleOnlyAlgorithm', () => {
+    it('should return false for all algorithms (no blackhole types remain)', () => {
+      expect(isBlackHoleOnlyAlgorithm('monochromatic')).toBe(false)
+      expect(isBlackHoleOnlyAlgorithm('cosine')).toBe(false)
+    })
+  })
+
+  describe('isPolytopeOnlyAlgorithm', () => {
+    it('should return false for all algorithms (no polytope-only algorithms remain)', () => {
+      expect(isPolytopeOnlyAlgorithm('monochromatic')).toBe(false)
+      expect(isPolytopeOnlyAlgorithm('cosine')).toBe(false)
     })
   })
 })

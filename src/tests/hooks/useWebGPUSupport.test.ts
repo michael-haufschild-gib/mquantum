@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useWebGPUSupport, hasWebGPUAPI } from '@/hooks/useWebGPUSupport'
 import { useRendererStore } from '@/stores/rendererStore'
 
@@ -31,11 +31,11 @@ describe('useWebGPUSupport', () => {
       expect(result.current.isComplete).toBe(false)
     })
 
-    it('returns webgl mode by default', () => {
+    it('returns webgpu mode by default', () => {
       const { result } = renderHook(() => useWebGPUSupport())
 
-      // Default mode is webgl until detection completes
-      expect(result.current.mode).toBe('webgl')
+      // Default mode is webgpu
+      expect(result.current.mode).toBe('webgpu')
     })
   })
 
@@ -61,19 +61,6 @@ describe('useWebGPUSupport', () => {
       })
 
       expect(result.current.mode).toBe('webgpu')
-    })
-
-    it('stays on webgl mode when webgl is preferred', async () => {
-      // Set preference to webgl before detection
-      useRendererStore.getState().setPreferredMode('webgl')
-
-      const { result } = renderHook(() => useWebGPUSupport())
-
-      await waitFor(() => {
-        expect(result.current.isComplete).toBe(true)
-      })
-
-      expect(result.current.mode).toBe('webgl')
     })
 
     it('returns capabilities after detection', async () => {

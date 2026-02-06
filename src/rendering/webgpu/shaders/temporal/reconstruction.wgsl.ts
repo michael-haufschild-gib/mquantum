@@ -99,7 +99,8 @@ fn spatialInterpolate(fullCoord: vec2i, quarterDims: vec2i) -> vec4f {
 
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
-  let fullCoord = vec2i(input.uv * temporal.fullResolution);
+  let fullDims = vec2i(temporal.fullResolution);
+  let fullCoord = clamp(vec2i(input.uv * temporal.fullResolution), vec2i(0), fullDims - vec2i(1));
   let quarterCoord = fullCoord / 2;
 
   // Get quarter-res texture dimensions
@@ -131,8 +132,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   if (isRenderedPixel) {
     // This pixel was rendered this frame
     if (validity > 0.5) {
-      // Valid history - blend with reduced weight to favor new data
-      let blendWeight = temporal.historyWeight * validity * 0.5;
+      // Valid history - use configured history weight to suppress Bayer shimmer.
+      let blendWeight = temporal.historyWeight * validity;
       result = mix(current.rgb, clampedHistory, blendWeight);
     } else {
       // No valid history - use current frame directly
@@ -144,6 +145,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     if (validity > 0.5) {
       // Have valid history - use it
       result = clampedHistory;
+      // History alpha is not stored in reprojectedHistory (A holds validity),
+      // so keep reconstructed pixels opaque to avoid dark/translucent "shadow" artifacts.
       alpha = 1.0;
     } else {
       // No valid history - spatial interpolation from current quarter-res

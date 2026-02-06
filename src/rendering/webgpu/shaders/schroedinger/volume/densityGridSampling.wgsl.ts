@@ -182,8 +182,8 @@ fn volumeRaymarchGrid(
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
 
-  let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
+  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
 
   var lowDensityCount: i32 = 0;
   let allowEarlyExit = (uniforms.quantumMode == QUANTUM_MODE_HARMONIC);
@@ -212,17 +212,7 @@ fn volumeRaymarchGrid(
       lowDensityCount = 0;
     }
 
-    var rhoAlpha = rho;
-
-    // Nodal Surface Opacity Boost
-    if (uniforms.nodalEnabled != 0u) {
-      if (sCenter < -5.0 && sCenter > -12.0) {
-        let intensity = 1.0 - smoothstep(-12.0, -5.0, sCenter);
-        rhoAlpha += 5.0 * uniforms.nodalStrength * intensity;
-      }
-    }
-
-    let alpha = computeAlpha(rhoAlpha, stepLen, uniforms.densityGain);
+    let alpha = computeAlpha(rho, stepLen, uniforms.densityGain);
 
     if (alpha > 0.001) {
       // Track primary hit
@@ -239,6 +229,13 @@ fn volumeRaymarchGrid(
       // Front-to-back compositing
       accColor += transmittance * alpha * emission;
       transmittance *= (1.0 - alpha);
+    }
+
+    // Internal fog integration (scene atmosphere inside volume)
+    let fogAlpha = computeInternalFogAlpha(stepLen, uniforms);
+    if (fogAlpha > 0.0001) {
+      accColor += transmittance * fogAlpha * fogColor;
+      transmittance *= (1.0 - fogAlpha);
     }
 
     t += stepLen;

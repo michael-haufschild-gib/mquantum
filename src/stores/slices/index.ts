@@ -21,14 +21,6 @@ export type {
 } from './visual/types'
 
 export {
-  GROUND_INITIAL_STATE,
-  createGroundSlice,
-  type GroundSlice,
-  type GroundSliceActions,
-  type GroundSliceState,
-} from './groundSlice'
-
-export {
   LIGHTING_INITIAL_STATE,
   createLightingSlice,
   type LightingSlice,

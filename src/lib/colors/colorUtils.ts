@@ -1,5 +1,3 @@
-import { Color } from 'three'
-
 // Types
 export interface HSVA {
   h: number // 0-1
@@ -13,6 +11,20 @@ export interface RGBA {
   g: number // 0-255
   b: number // 0-255
   a: number // 0-1
+}
+
+/**
+ * Parse a hex color string (#RGB or #RRGGBB) into {r, g, b} (0-255).
+ */
+const parseHexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+  let h = hex.startsWith('#') ? hex.slice(1) : hex
+  if (h.length === 3) {
+    h = (h[0] ?? '') + (h[0] ?? '') + (h[1] ?? '') + (h[1] ?? '') + (h[2] ?? '') + (h[2] ?? '')
+  }
+  if (h.length !== 6) return null
+  const num = parseInt(h, 16)
+  if (isNaN(num)) return null
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
 }
 
 /**
@@ -44,14 +56,8 @@ export const parseColorToHsv = (input: string): HSVA => {
     return rgbToHsv(r, g, b, a)
   }
 
-  // Fallback using Three.js (ignores alpha)
-  try {
-    const color = new Color(input)
-    const { h, s, v } = rgbToHsvStruct(color.r * 255, color.g * 255, color.b * 255)
-    return { h, s, v, a: 1 }
-  } catch {
-    return { h: 0, s: 0, v: 0, a: 1 }
-  }
+  // Fallback: black
+  return { h: 0, s: 0, v: 0, a: 1 }
 }
 
 /**
@@ -60,13 +66,10 @@ export const parseColorToHsv = (input: string): HSVA => {
  * @returns The HSVA color object.
  */
 export const hexToHsv = (hex: string): HSVA => {
-  try {
-    const color = new Color(hex)
-    const { h, s, v } = rgbToHsvStruct(color.r * 255, color.g * 255, color.b * 255)
-    return { h, s, v, a: 1 }
-  } catch {
-    return { h: 0, s: 0, v: 0, a: 1 }
-  }
+  const rgb = parseHexToRgb(hex)
+  if (!rgb) return { h: 0, s: 0, v: 0, a: 1 }
+  const { h, s, v } = rgbToHsvStruct(rgb.r, rgb.g, rgb.b)
+  return { h, s, v, a: 1 }
 }
 
 /**
@@ -192,9 +195,7 @@ export const hsvToRgb = (h: number, s: number, v: number, a: number = 1): RGBA =
  * @returns Hex string.
  */
 export const rgbToHex = (r: number, g: number, b: number): string => {
-  const color = new Color()
-  color.setRGB(r / 255, g / 255, b / 255)
-  return '#' + color.getHexString()
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
 }
 
 /**

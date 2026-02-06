@@ -28,21 +28,14 @@ export interface HarmonicOscillatorActions {
 }
 
 /**
- * Actions for Hydrogen Orbital mode (3D)
+ * Actions for Hydrogen ND mode
  */
-export interface HydrogenOrbitalActions {
-  setHydrogenPreset: ExtendedObjectState['setSchroedingerHydrogenPreset']
+export interface HydrogenNDActions {
   setPrincipalQuantumNumber: ExtendedObjectState['setSchroedingerPrincipalQuantumNumber']
   setAzimuthalQuantumNumber: ExtendedObjectState['setSchroedingerAzimuthalQuantumNumber']
   setMagneticQuantumNumber: ExtendedObjectState['setSchroedingerMagneticQuantumNumber']
   setUseRealOrbitals: ExtendedObjectState['setSchroedingerUseRealOrbitals']
   setBohrRadiusScale: ExtendedObjectState['setSchroedingerBohrRadiusScale']
-}
-
-/**
- * Actions for Hydrogen ND mode
- */
-export interface HydrogenNDActions extends HydrogenOrbitalActions {
   setHydrogenNDPreset: ExtendedObjectState['setSchroedingerHydrogenNDPreset']
   setExtraDimQuantumNumber: ExtendedObjectState['setSchroedingerExtraDimQuantumNumber']
   setExtraDimFrequencySpread: ExtendedObjectState['setSchroedingerExtraDimFrequencySpread']
@@ -55,14 +48,6 @@ export interface HarmonicOscillatorControlsProps {
   config: SchroedingerConfig
   dimension: number
   actions: HarmonicOscillatorActions
-}
-
-/**
- * Props for Hydrogen Orbital Controls (3D)
- */
-export interface HydrogenOrbitalControlsProps {
-  config: SchroedingerConfig
-  actions: HydrogenOrbitalActions
 }
 
 /**

@@ -2,20 +2,20 @@
  * Render Layer Constants
  *
  * Defines Three.js render layers for separating main objects from environment.
- * Used by PostProcessing to render object-only depth for SSR, refraction, and bokeh.
+ * Used by PostProcessing to render object-only depth for depth-aware effects.
  *
- * Layer 0: Environment (walls, grid, gizmos, axes) - always visible
- * Layer 1: Main Object (polytope, mandelbulb, etc.) - used for depth-based effects
- * Layer 2: Skybox - excluded from normal buffer (skybox normals shouldn't affect SSR)
+ * Layer 0: Environment (gizmos, helpers, axes) - always visible
+ * Layer 1: Main Object - used for depth-based effects
+ * Layer 2: Skybox - excluded from normal buffer
  */
 
 /**
  * Render layer assignments for scene objects
  */
 export const RENDER_LAYERS = {
-  /** Environment elements: walls, grid */
+  /** Environment elements: helpers and gizmos */
   ENVIRONMENT: 0,
-  /** Main n-dimensional object: polytope, mandelbulb, point cloud */
+  /** Main n-dimensional object */
   MAIN_OBJECT: 1,
   /** Skybox - excluded from normal pass to avoid polluting normal buffer */
   SKYBOX: 2,
@@ -33,21 +33,10 @@ export const RENDER_LAYERS = {
    * - Light gizmos (icons, direction arrows, cones)
    * - Transform controls (translate/rotate/scale helpers)
    * - Axis helpers (global coordinate system display)
-   * - Ground plane visualizations (light intersection circles/ellipses)
+   * - Light projection visualizations (intersection circles/ellipses)
    * - Any debug visualization that shouldn't affect post-processing
    */
   DEBUG: 4,
-  /**
-   * Polar jets layer for black hole visualization.
-   *
-   * Rendered as a separate pass with additive blending over the scene.
-   * Uses volumetric cone geometry with John Chapman's "Good Enough Volumetrics"
-   * technique: distance attenuation, edge softness via normal·view dot product,
-   * and soft depth intersections at the accretion disk.
-   *
-   * Optionally followed by GPU Gems 3 god rays (radial blur) for light scattering.
-   */
-  JETS: 5,
 } as const
 
 export type RenderLayer = (typeof RENDER_LAYERS)[keyof typeof RENDER_LAYERS]
@@ -63,11 +52,6 @@ export type RenderLayer = (typeof RENDER_LAYERS)[keyof typeof RENDER_LAYERS]
  * 3. Reconstructs full resolution by blending new pixels with history
  * 4. Composites over the main scene
  *
- * NOTE: Black hole is intentionally excluded. The full-screen reconstruction pass
- * (3×3 neighborhood = 9 texture samples per pixel) is too expensive and negates
- * the quarter-res rendering savings. Black hole rendering benefits more from
- * adaptive quality (step reduction) than temporal accumulation.
- *
  * @param state - State containing temporal and object type info
  * @param state.temporalCloudAccumulation - Whether temporal accumulation is enabled
  * @param state.objectType - The current object type
@@ -78,7 +62,6 @@ export function needsVolumetricSeparation(state: {
   objectType?: string
 }): boolean {
   // Only Schroedinger benefits from temporal accumulation
-  // Black hole excluded: reconstruction overhead > quarter-res savings
   return Boolean(state.temporalCloudAccumulation && state.objectType === 'schroedinger')
 }
 
@@ -87,26 +70,17 @@ export function needsVolumetricSeparation(state: {
  * Returns true if any effect requires depth that should exclude environment objects.
  *
  * @param state - Current post-processing state
- * @param state.ssrEnabled
- * @param state.refractionEnabled
  * @param state.bokehEnabled
  * @param state.bokehFocusMode
  * @param state.temporalReprojectionEnabled
  * @returns True if object-only depth pass should be rendered
  */
 export function needsObjectOnlyDepth(state: {
-  ssrEnabled: boolean
-  refractionEnabled: boolean
   bokehEnabled: boolean
   bokehFocusMode: string
   temporalReprojectionEnabled?: boolean
 }): boolean {
-  // SSR and refraction always need object-only depth
-  if (state.ssrEnabled || state.refractionEnabled) {
-    return true
-  }
-
-  // Bokeh always needs object-only depth so blur is based on main object, not walls
+  // Bokeh always needs object-only depth so blur is based on the main object only
   if (state.bokehEnabled) {
     return true
   }

@@ -556,11 +556,9 @@ export const selectTemporalReprojection = (state: PerformanceState) => ({
  * Quality level orderings for discrete quality settings.
  * Used to interpolate between lowest and user's target quality.
  */
-const SSR_QUALITY_ORDER = ['low', 'medium', 'high'] as const
 const SHADOW_QUALITY_ORDER = ['low', 'medium', 'high', 'ultra'] as const
 const SAMPLE_QUALITY_ORDER = ['low', 'medium', 'high'] as const
 
-export type SSRQualityLevel = (typeof SSR_QUALITY_ORDER)[number]
 export type ShadowQualityLevel = (typeof SHADOW_QUALITY_ORDER)[number]
 export type SampleQualityLevel = (typeof SAMPLE_QUALITY_ORDER)[number]
 
@@ -569,15 +567,6 @@ export type SampleQualityLevel = (typeof SAMPLE_QUALITY_ORDER)[number]
  *
  * Progressive refinement scales from lowest quality (at multiplier=0.25)
  * up to the user's target setting (at multiplier=1.0).
- *
- * Examples (SSR with target='high'):
- * - multiplier=0.25 → 'low'
- * - multiplier=0.5  → 'medium'
- * - multiplier=1.0  → 'high'
- *
- * Examples (SSR with target='medium'):
- * - multiplier=0.25 → 'low'
- * - multiplier=1.0  → 'medium'
  *
  * @param qualityOrder - Ordered array of quality levels (lowest to highest)
  * @param targetQuality - User's target quality setting
@@ -601,20 +590,6 @@ function computeEffectiveQuality<T extends string>(
   // Interpolate from index 0 to targetIndex
   const effectiveIndex = Math.round(normalizedMultiplier * targetIndex)
   return qualityOrder[effectiveIndex]!
-}
-
-/**
- * Get effective SSR quality based on progressive refinement state.
- *
- * @param targetQuality - User's SSR quality setting
- * @param qualityMultiplier - Current quality multiplier (0.25-1.0)
- * @returns Effective SSR quality level
- */
-export function getEffectiveSSRQuality(
-  targetQuality: SSRQualityLevel,
-  qualityMultiplier: number
-): SSRQualityLevel {
-  return computeEffectiveQuality(SSR_QUALITY_ORDER, targetQuality, qualityMultiplier)
 }
 
 /**

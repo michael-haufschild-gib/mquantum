@@ -1,6 +1,6 @@
 /**
  * Temporal Reprojection Controls Component
- * Controls for reusing previous frame depth data (fractals only)
+ * Controls for temporal accumulation and reprojection.
  */
 
 import { Switch } from '@/components/ui/Switch'
@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 /**
  * Temporal reprojection controls for the Performance section.
- * Only affects fractal objects (Mandelbulb).
+ * Affects Schrödinger volumetric rendering modes.
  * @returns The temporal reprojection controls UI component
  */
 export const TemporalReprojectionControls: React.FC = () => {
@@ -29,7 +29,9 @@ export const TemporalReprojectionControls: React.FC = () => {
         label="Temporal Reprojection"
         data-testid="temporal-reprojection-toggle"
       />
-      <p className="text-xs text-text-tertiary ml-4">Fractals only. 30-50% faster during motion.</p>
+      <p className="text-xs text-text-tertiary ml-4">
+        Schrödinger volumetrics only. Quarter-resolution accumulation for smoother motion.
+      </p>
     </div>
   )
 }

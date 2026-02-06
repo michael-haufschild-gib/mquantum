@@ -6,7 +6,6 @@ import { useRotationStore } from '@/stores/rotationStore'
 import { useTransformStore } from '@/stores/transformStore'
 import { useAnimationStore } from '@/stores/animationStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 
 describe('useSyncedDimension', () => {
   beforeEach(() => {
@@ -60,62 +59,7 @@ describe('useSyncedDimension', () => {
     expect(useAnimationStore.getState().animatingPlanes.has('XV')).toBe(false)
   })
 
-  it('resets rotations when object type changes', () => {
-    // Start at dimension 4 with hypercube
-    act(() => {
-      useGeometryStore.getState().setDimension(4)
-      useGeometryStore.getState().setObjectType('hypercube')
-    })
-
-    // Render the hook after initial setup
-    const { rerender } = renderHook(() => useSyncedDimension())
-
-    // Set some rotations (manually, after initial sync happened)
-    useRotationStore.getState().setRotation('XY', Math.PI / 4)
-    useRotationStore.getState().setRotation('XW', Math.PI / 3)
-    expect(useRotationStore.getState().rotations.get('XY')).not.toBe(0)
-
-    // Change object type - this should trigger the hook to reset rotations
-    act(() => {
-      useGeometryStore.getState().setObjectType('simplex')
-    })
-    rerender()
-
-    // Rotations should be reset to 0
-    for (const [, angle] of useRotationStore.getState().rotations) {
-      expect(angle).toBe(0)
-    }
-  })
-
   describe('scene loading behavior', () => {
-    it('skips rotation reset during scene loading', () => {
-      // Start at dimension 4 with hypercube
-      act(() => {
-        useGeometryStore.getState().setDimension(4)
-        useGeometryStore.getState().setObjectType('hypercube')
-      })
-
-      const { rerender } = renderHook(() => useSyncedDimension())
-
-      // Set some rotations
-      useRotationStore.getState().setRotation('XY', Math.PI / 4)
-      useRotationStore.getState().setRotation('XW', Math.PI / 3)
-      const initialXY = useRotationStore.getState().rotations.get('XY')
-      expect(initialXY).not.toBe(0)
-
-      // Simulate scene loading starting BEFORE changing object type
-      usePerformanceStore.getState().setIsLoadingScene(true)
-
-      // Change object type during scene load
-      act(() => {
-        useGeometryStore.getState().setObjectType('simplex')
-      })
-      rerender()
-
-      // Rotations should be preserved during scene loading
-      expect(useRotationStore.getState().rotations.get('XY')).toBe(initialXY)
-    })
-
     it('skips dimension sync during scene loading', () => {
       // Start with dimension 4
       act(() => {
@@ -177,126 +121,6 @@ describe('useSyncedDimension', () => {
       // Dimension should be 6 (synced by geometry store's setDimension)
       expect(useRotationStore.getState().dimension).toBe(6)
       expect(useTransformStore.getState().dimension).toBe(6)
-    })
-
-    it('resets rotations after scene loading when object type changes again', () => {
-      // Start with dimension 4 and hypercube
-      act(() => {
-        useGeometryStore.getState().setDimension(4)
-        useGeometryStore.getState().setObjectType('hypercube')
-      })
-
-      const { rerender } = renderHook(() => useSyncedDimension())
-
-      // Set rotations
-      useRotationStore.getState().setRotation('XY', Math.PI / 2)
-      expect(useRotationStore.getState().rotations.get('XY')).not.toBe(0)
-
-      // During scene loading, change to simplex (should preserve rotations)
-      usePerformanceStore.getState().setIsLoadingScene(true)
-
-      act(() => {
-        useGeometryStore.getState().setObjectType('simplex')
-      })
-      rerender()
-
-      expect(useGeometryStore.getState().objectType).toBe('simplex')
-      expect(useRotationStore.getState().rotations.get('XY')).not.toBe(0)
-
-      // End scene loading
-      usePerformanceStore.getState().setIsLoadingScene(false)
-
-      // Now change object type again - should reset rotations
-      act(() => {
-        useGeometryStore.getState().setObjectType('cross-polytope')
-      })
-      rerender()
-
-      // Rotations should be reset to 0
-      for (const [, angle] of useRotationStore.getState().rotations) {
-        expect(angle).toBe(0)
-      }
-    })
-  })
-
-  describe('blackhole color algorithm behavior', () => {
-    it('sets blackbody color algorithm when transitioning TO blackhole', () => {
-      // Start with hypercube
-      act(() => {
-        useGeometryStore.getState().setDimension(4)
-        useGeometryStore.getState().setObjectType('hypercube')
-      })
-
-      const { rerender } = renderHook(() => useSyncedDimension())
-
-      // Set a non-blackbody color algorithm
-      useAppearanceStore.getState().setColorAlgorithm('cosine')
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('cosine')
-
-      // Switch to blackhole - should set blackbody
-      act(() => {
-        useGeometryStore.getState().setObjectType('blackhole')
-      })
-      rerender()
-
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('blackbody')
-    })
-
-    it('preserves color algorithm when changing dimension on existing blackhole', () => {
-      // Start with blackhole
-      act(() => {
-        useGeometryStore.getState().setDimension(4)
-        useGeometryStore.getState().setObjectType('blackhole')
-      })
-
-      const { rerender } = renderHook(() => useSyncedDimension())
-
-      // Set a different valid color algorithm for blackhole
-      useAppearanceStore.getState().setColorAlgorithm('accretionGradient')
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
-
-      // Change dimension - should NOT reset to blackbody
-      act(() => {
-        useGeometryStore.getState().setDimension(5)
-      })
-      rerender()
-
-      // Color algorithm should be preserved
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
-    })
-
-    it('preserves color algorithm when loading blackhole scene', () => {
-      // Start with hypercube
-      act(() => {
-        useGeometryStore.getState().setDimension(4)
-        useGeometryStore.getState().setObjectType('hypercube')
-      })
-
-      const { rerender } = renderHook(() => useSyncedDimension())
-
-      // Simulate scene loading - set the color algorithm BEFORE changing object type
-      usePerformanceStore.getState().setIsLoadingScene(true)
-      useAppearanceStore.getState().setColorAlgorithm('accretionGradient')
-
-      // Change to blackhole during scene loading
-      act(() => {
-        useGeometryStore.getState().setObjectType('blackhole')
-      })
-      rerender()
-
-      // Color algorithm should be preserved (not reset to blackbody)
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
-
-      // End scene loading
-      usePerformanceStore.getState().setIsLoadingScene(false)
-
-      // Change dimension - should still preserve color algorithm
-      act(() => {
-        useGeometryStore.getState().setDimension(5)
-      })
-      rerender()
-
-      expect(useAppearanceStore.getState().colorAlgorithm).toBe('accretionGradient')
     })
   })
 })

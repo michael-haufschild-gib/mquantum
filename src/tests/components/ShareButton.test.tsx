@@ -63,7 +63,7 @@ describe('ShareButton', () => {
   })
 
   it('should include object type in URL', async () => {
-    useGeometryStore.getState().setObjectType('simplex')
+    useGeometryStore.getState().setObjectType('schroedinger')
     render(<ShareButton />)
     const button = screen.getByRole('button')
 
@@ -72,7 +72,7 @@ describe('ShareButton', () => {
     await waitFor(() => {
       expect(mockClipboard.writeText).toHaveBeenCalled()
       const url = mockClipboard.writeText.mock.calls[0]?.[0] as string
-      expect(url).toContain('t=simplex')
+      expect(url).toContain('t=schroedinger')
     })
   })
 })

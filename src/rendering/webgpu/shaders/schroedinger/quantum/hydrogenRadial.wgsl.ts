@@ -15,6 +15,15 @@ export const hydrogenRadialBlock = /* wgsl */ `
 // ============================================
 
 /**
+ * Check if radial contribution is negligible.
+ *
+ * Uses precomputed threshold uniform for performance.
+ */
+fn hydrogenRadialEarlyExit(r: f32, uniforms: SchroedingerUniforms) -> bool {
+  return r > uniforms.hydrogenRadialThreshold;
+}
+
+/**
  * Compute normalization constant for R_nl(r)
  *
  * N_nl = sqrt((2/na₀)³ · (n-l-1)! / (2n·(n+l)!))

@@ -194,6 +194,14 @@ export class GTAOPass extends WebGPUBasePass {
   // Sampler
   private sampler: GPUSampler | null = null
 
+  // Cached bind group and the views it was created with
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedDepthView: GPUTextureView | null = null
+  private cachedNormalView: GPUTextureView | null = null
+
+  // Pre-allocated uniform data array
+  private readonly uniformData = new Float32Array(44)
+
   // Configuration
   private radius: number
   private intensity: number
@@ -223,7 +231,7 @@ export class GTAOPass extends WebGPUBasePass {
    * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -342,8 +350,8 @@ export class GTAOPass extends WebGPUBasePass {
       far?: number
     }
 
-    // Update uniforms (44 floats = 176 bytes)
-    const data = new Float32Array(44)
+    // Update uniforms (44 floats = 176 bytes) using pre-allocated array
+    const data = this.uniformData
 
     // Projection matrix (16 floats)
     if (camera?.projectionMatrix?.elements) {
@@ -375,17 +383,26 @@ export class GTAOPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'gtao-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: depthView },
-        { binding: 3, resource: normalView },
-      ],
-    })
+    // Cache bind group, invalidate when texture views change
+    if (
+      !this.cachedBindGroup ||
+      depthView !== this.cachedDepthView ||
+      normalView !== this.cachedNormalView
+    ) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'gtao-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: depthView },
+          { binding: 3, resource: normalView },
+        ],
+      })
+      this.cachedDepthView = depthView
+      this.cachedNormalView = normalView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -415,6 +432,9 @@ export class GTAOPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedDepthView = null
+    this.cachedNormalView = null
 
     super.dispose()
   }

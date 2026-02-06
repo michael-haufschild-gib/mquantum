@@ -43,10 +43,12 @@ struct VertexOutput {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
-  let fullCoord = vec2i(uv * temporal.fullResolution);
+  let fullDims = vec2i(temporal.fullResolution);
+  let fullCoord = clamp(vec2i(uv * temporal.fullResolution), vec2i(0), fullDims - vec2i(1));
 
   // Quarter-res coordinate (current frame's position data)
-  let quarterCoord = fullCoord / 2;
+  let quarterDims = vec2i(textureDimensions(quarterPosition));
+  let quarterCoord = clamp(fullCoord / 2, vec2i(0), quarterDims - vec2i(1));
 
   // Sample world position from quarter-res buffer (stored in xyz, depth in w)
   let positionData = textureLoad(quarterPosition, quarterCoord, 0);
@@ -90,9 +92,10 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 
   // Depth discontinuity check using position neighbors
   // This helps detect disocclusion
-  let texelSize = 1.0 / temporal.fullResolution;
-  let topLeftDepth = textureLoad(quarterPosition, quarterCoord + vec2i(-1, 1), 0).w;
-  let bottomRightDepth = textureLoad(quarterPosition, quarterCoord + vec2i(1, -1), 0).w;
+  let topLeftCoord = clamp(quarterCoord + vec2i(-1, 1), vec2i(0), quarterDims - vec2i(1));
+  let bottomRightCoord = clamp(quarterCoord + vec2i(1, -1), vec2i(0), quarterDims - vec2i(1));
+  let topLeftDepth = textureLoad(quarterPosition, topLeftCoord, 0).w;
+  let bottomRightDepth = textureLoad(quarterPosition, bottomRightCoord, 0).w;
 
   let avgDepth = (depth + topLeftDepth + bottomRightDepth) / 3.0;
   let maxDepthDiff = max(

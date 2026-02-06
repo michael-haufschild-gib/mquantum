@@ -136,6 +136,10 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private cubeTextureLoading = false
   private loadedCubeTexture: GPUTexture | null = null
 
+  // Reused uniform packing buffers to avoid per-frame allocations.
+  private skyboxUniformData = new Float32Array(64)
+  private skyboxVertexUniformData = new Float32Array(64)
+
   constructor(config?: SkyboxRendererConfig) {
     super({
       id: 'skybox',
@@ -585,7 +589,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     }
 
     // --- Pack SkyboxUniforms (must match WGSL struct layout) ---
-    const data = new Float32Array(64) // 256 bytes / 4
+    const data = this.skyboxUniformData
+    data.fill(0)
 
     const baseIntensity = env?.skyboxIntensity ?? 1.0
     const baseHue = settings?.hue ?? 0.0
@@ -721,7 +726,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     const m22 = cx * cy
 
     // VertexUniforms struct (matrices)
-    const data = new Float32Array(64) // 256 bytes / 4
+    const data = this.skyboxVertexUniformData
+    data.fill(0)
 
     // modelMatrix (4x4 rotation matrix, column-major)
     data[0] = m00

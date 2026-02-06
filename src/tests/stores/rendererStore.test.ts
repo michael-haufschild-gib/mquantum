@@ -1,30 +1,23 @@
 /**
- * Tests for rendererStore - WebGL/WebGPU mode management
+ * Tests for rendererStore - WebGPU mode management
  *
  * @module tests/stores/rendererStore.test
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { useRendererStore } from '@/stores/rendererStore'
 import type { WebGPUCapabilityInfo } from '@/stores/rendererStore'
 
 describe('rendererStore', () => {
   beforeEach(() => {
-    // Clear localStorage mock before each test
-    localStorage.clear()
     // Reset store to initial state
     useRendererStore.getState().reset()
   })
 
   describe('initial state', () => {
-    it('starts with webgl mode before detection', () => {
+    it('starts with webgpu mode', () => {
       const state = useRendererStore.getState()
-      expect(state.mode).toBe('webgl')
-    })
-
-    it('starts with webgpu as preferred mode by default', () => {
-      const state = useRendererStore.getState()
-      expect(state.preferredMode).toBe('webgpu')
+      expect(state.mode).toBe('webgpu')
     })
 
     it('has unknown webgpuStatus initially', () => {
@@ -45,54 +38,6 @@ describe('rendererStore', () => {
     it('does not show fallback notification initially', () => {
       const state = useRendererStore.getState()
       expect(state.showFallbackNotification).toBe(false)
-    })
-  })
-
-  describe('setPreferredMode', () => {
-    it('persists webgl preference to localStorage', () => {
-      useRendererStore.getState().setPreferredMode('webgl')
-      expect(localStorage.getItem('mdim_preferred_renderer')).toBe('webgl')
-    })
-
-    it('persists webgpu preference to localStorage', () => {
-      useRendererStore.getState().setPreferredMode('webgpu')
-      expect(localStorage.getItem('mdim_preferred_renderer')).toBe('webgpu')
-    })
-
-    it('switches mode to webgl when webgl is preferred', () => {
-      useRendererStore.getState().setPreferredMode('webgl')
-      expect(useRendererStore.getState().mode).toBe('webgl')
-    })
-
-    it('shows fallback when webgpu preferred but not supported', () => {
-      // First complete detection with WebGPU unsupported
-      useRendererStore.getState().completeDetection({
-        supported: false,
-        unavailableReason: 'no_adapter',
-      })
-
-      // Then try to set preferred mode to webgpu
-      useRendererStore.getState().setPreferredMode('webgpu')
-
-      const state = useRendererStore.getState()
-      expect(state.preferredMode).toBe('webgpu')
-      expect(state.mode).toBe('webgl') // Falls back
-      expect(state.showFallbackNotification).toBe(true)
-    })
-
-    it('switches to webgpu when supported and preferred', () => {
-      // First complete detection with WebGPU supported
-      useRendererStore.getState().completeDetection({
-        supported: true,
-        vendor: 'Test',
-      })
-
-      // Then set preferred mode to webgpu
-      useRendererStore.getState().setPreferredMode('webgpu')
-
-      const state = useRendererStore.getState()
-      expect(state.preferredMode).toBe('webgpu')
-      expect(state.mode).toBe('webgpu')
     })
   })
 
@@ -135,8 +80,7 @@ describe('rendererStore', () => {
       expect(state.webgpuCapabilities).toEqual(caps)
     })
 
-    it('switches to webgpu when supported and preferred', () => {
-      // Default preferred mode is webgpu
+    it('sets mode to webgpu when supported', () => {
       useRendererStore.getState().completeDetection({
         supported: true,
       })
@@ -145,41 +89,20 @@ describe('rendererStore', () => {
       expect(useRendererStore.getState().webgpuStatus).toBe('supported')
     })
 
-    it('stays on webgl when webgpu not supported but preferred', () => {
+    it('shows fallback notification when webgpu not supported', () => {
       useRendererStore.getState().completeDetection({
         supported: false,
         unavailableReason: 'not_in_browser',
       })
 
       const state = useRendererStore.getState()
-      expect(state.mode).toBe('webgl')
+      expect(state.mode).toBe('webgpu')
       expect(state.webgpuStatus).toBe('unsupported')
       expect(state.showFallbackNotification).toBe(true)
-    })
-
-    it('stays on webgl when user prefers webgl', () => {
-      useRendererStore.getState().setPreferredMode('webgl')
-      useRendererStore.getState().completeDetection({
-        supported: true,
-      })
-
-      expect(useRendererStore.getState().mode).toBe('webgl')
-      expect(useRendererStore.getState().showFallbackNotification).toBe(false)
     })
   })
 
   describe('handleDeviceLost', () => {
-    it('switches to webgl mode', () => {
-      // Start with webgpu mode
-      useRendererStore.getState().completeDetection({ supported: true })
-      expect(useRendererStore.getState().mode).toBe('webgpu')
-
-      // Simulate device lost
-      useRendererStore.getState().handleDeviceLost('GPU device removed')
-
-      expect(useRendererStore.getState().mode).toBe('webgl')
-    })
-
     it('marks webgpu as unsupported', () => {
       useRendererStore.getState().handleDeviceLost('Test reason')
 
@@ -206,80 +129,19 @@ describe('rendererStore', () => {
     })
   })
 
-  describe('forceWebGL', () => {
-    it('switches to webgl mode', () => {
-      useRendererStore.getState().completeDetection({ supported: true })
-      useRendererStore.getState().forceWebGL('initialization_error')
-
-      expect(useRendererStore.getState().mode).toBe('webgl')
-    })
-
-    it('marks webgpu as unsupported with reason', () => {
-      useRendererStore.getState().forceWebGL('no_adapter')
-
-      const state = useRendererStore.getState()
-      expect(state.webgpuStatus).toBe('unsupported')
-      expect(state.webgpuCapabilities?.unavailableReason).toBe('no_adapter')
-    })
-
-    it('shows notification for non-user reasons', () => {
-      useRendererStore.getState().forceWebGL('initialization_error')
-      expect(useRendererStore.getState().showFallbackNotification).toBe(true)
-    })
-
-    it('does not show notification for user_disabled', () => {
-      useRendererStore.getState().forceWebGL('user_disabled')
-      expect(useRendererStore.getState().showFallbackNotification).toBe(false)
-    })
-  })
-
   describe('reset', () => {
     it('resets to initial state', () => {
       // Modify state
       useRendererStore.getState().completeDetection({ supported: true })
-      useRendererStore.getState().setPreferredMode('webgl')
 
       // Reset
       useRendererStore.getState().reset()
 
       const state = useRendererStore.getState()
-      expect(state.mode).toBe('webgl')
+      expect(state.mode).toBe('webgpu')
       expect(state.webgpuStatus).toBe('unknown')
       expect(state.webgpuCapabilities).toBeNull()
       expect(state.detectionComplete).toBe(false)
-    })
-
-    it('respects persisted preference after reset', () => {
-      // Set preference
-      localStorage.setItem('mdim_preferred_renderer', 'webgl')
-
-      // Reset
-      useRendererStore.getState().reset()
-
-      expect(useRendererStore.getState().preferredMode).toBe('webgl')
-    })
-  })
-
-  describe('localStorage persistence', () => {
-    it('loads webgl preference from localStorage', () => {
-      localStorage.setItem('mdim_preferred_renderer', 'webgl')
-      useRendererStore.getState().reset()
-
-      expect(useRendererStore.getState().preferredMode).toBe('webgl')
-    })
-
-    it('loads webgpu preference from localStorage', () => {
-      localStorage.setItem('mdim_preferred_renderer', 'webgpu')
-      useRendererStore.getState().reset()
-
-      expect(useRendererStore.getState().preferredMode).toBe('webgpu')
-    })
-
-    it('defaults to webgpu for invalid stored value', () => {
-      localStorage.setItem('mdim_preferred_renderer', 'invalid')
-      useRendererStore.getState().reset()
-
-      expect(useRendererStore.getState().preferredMode).toBe('webgpu')
     })
   })
 })

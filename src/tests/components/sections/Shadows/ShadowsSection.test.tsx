@@ -1,9 +1,8 @@
 /**
  * Tests for ShadowsSection component
  *
- * Tests centralized shadow controls for all object types:
+ * Tests centralized shadow controls for Schroedinger object type:
  * - Basic rendering and no-lights state
- * - Object type switching (SDF, Volumetric, Polytope)
  * - Shadow toggle behavior
  * - Disabled state styling
  */
@@ -90,30 +89,6 @@ describe('ShadowsSection', () => {
       })
     })
 
-    it('should show SDF controls (Quality, Softness) for mandelbulb', () => {
-      useGeometryStore.getState().setObjectType('mandelbulb')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      // Component shows the shadow type label, not a settings header
-      expect(screen.getByText(/Self-Shadow \(Raymarched\)/)).toBeInTheDocument()
-      expect(screen.getByTestId('shadow-quality-select')).toBeInTheDocument()
-      expect(screen.getByTestId('shadow-softness-slider')).toBeInTheDocument()
-    })
-
-    it('should show SDF controls for quaternion-julia', () => {
-      useGeometryStore.getState().setObjectType('quaternion-julia')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      // Component shows the shadow type label, not a settings header
-      expect(screen.getByText(/Self-Shadow \(Raymarched\)/)).toBeInTheDocument()
-      expect(screen.getByTestId('shadow-quality-select')).toBeInTheDocument()
-      expect(screen.getByTestId('shadow-softness-slider')).toBeInTheDocument()
-    })
-
     it('should show Volumetric controls (Strength, Steps) for schroedinger', () => {
       useGeometryStore.getState().setObjectType('schroedinger')
       useGeometryStore.getState().setDimension(4)
@@ -126,18 +101,6 @@ describe('ShadowsSection', () => {
       expect(screen.getByTestId('schroedinger-shadow-steps')).toBeInTheDocument()
     })
 
-    it('should show Shadow Map controls (Bias, Blur) for polytope', () => {
-      useGeometryStore.getState().setObjectType('wythoff-polytope')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      // Component shows "Environment Shadow" label, no separate header
-      expect(screen.getByText(/Environment Shadow/)).toBeInTheDocument()
-      expect(screen.getByTestId('shadow-map-bias')).toBeInTheDocument()
-      expect(screen.getByTestId('shadow-map-blur')).toBeInTheDocument()
-    })
-
     it('should not show SDF controls when object is schroedinger', () => {
       useGeometryStore.getState().setObjectType('schroedinger')
       useGeometryStore.getState().setDimension(4)
@@ -146,26 +109,6 @@ describe('ShadowsSection', () => {
 
       expect(screen.queryByText('Raymarched Shadows')).not.toBeInTheDocument()
       expect(screen.queryByTestId('shadow-quality-select')).not.toBeInTheDocument()
-    })
-
-    it('should not show Volumetric controls when object is mandelbulb', () => {
-      useGeometryStore.getState().setObjectType('mandelbulb')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      expect(screen.queryByText('Volumetric Self-Shadowing')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('schroedinger-shadow-strength')).not.toBeInTheDocument()
-    })
-
-    it('should not show Shadow Map controls when object is SDF fractal', () => {
-      useGeometryStore.getState().setObjectType('mandelbulb')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      expect(screen.queryByText('Shadow Map Settings')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('shadow-map-bias')).not.toBeInTheDocument()
     })
   })
 
@@ -177,19 +120,6 @@ describe('ShadowsSection', () => {
         lights: createLightsWithOneEnabled(),
         shadowEnabled: false,
       })
-    })
-
-    it('should toggle global shadowEnabled for SDF fractals', () => {
-      useGeometryStore.getState().setObjectType('mandelbulb')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      const toggle = screen.getByTestId('shadow-enabled-toggle')
-      expect(useLightingStore.getState().shadowEnabled).toBe(false)
-
-      fireEvent.click(toggle)
-      expect(useLightingStore.getState().shadowEnabled).toBe(true)
     })
 
     it('should toggle schroedingerShadowsEnabled for schroedinger', () => {
@@ -205,19 +135,6 @@ describe('ShadowsSection', () => {
       fireEvent.click(toggle)
       expect(useExtendedObjectStore.getState().schroedinger.shadowsEnabled).toBe(true)
     })
-
-    it('should toggle global shadowEnabled for polytopes', () => {
-      useGeometryStore.getState().setObjectType('wythoff-polytope')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      const toggle = screen.getByTestId('shadow-enabled-toggle')
-      expect(useLightingStore.getState().shadowEnabled).toBe(false)
-
-      fireEvent.click(toggle)
-      expect(useLightingStore.getState().shadowEnabled).toBe(true)
-    })
   })
 
   describe('Disabled State', () => {
@@ -230,35 +147,6 @@ describe('ShadowsSection', () => {
       })
     })
 
-    it('should show disabled styling when shadows are off for SDF fractals', () => {
-      useGeometryStore.getState().setObjectType('mandelbulb')
-      useGeometryStore.getState().setDimension(4)
-
-      render(<ShadowsSection defaultOpen />)
-
-      // Find the container with disabled styling using a control inside the settings area
-      const settingsContainer = screen
-        .getByTestId('shadow-quality-select')
-        .closest('[aria-disabled]')
-      expect(settingsContainer).toHaveAttribute('aria-disabled', 'true')
-    })
-
-    it('should remove disabled styling when shadows are enabled', () => {
-      useGeometryStore.getState().setObjectType('mandelbulb')
-      useGeometryStore.getState().setDimension(4)
-      useLightingStore.setState({
-        ...useLightingStore.getState(),
-        shadowEnabled: true,
-      })
-
-      render(<ShadowsSection defaultOpen />)
-
-      const settingsContainer = screen
-        .getByTestId('shadow-quality-select')
-        .closest('[aria-disabled]')
-      expect(settingsContainer).toHaveAttribute('aria-disabled', 'false')
-    })
-
     it('should show disabled styling for schroedinger when shadows are off', () => {
       useGeometryStore.getState().setObjectType('schroedinger')
       useGeometryStore.getState().setDimension(4)
@@ -266,7 +154,7 @@ describe('ShadowsSection', () => {
 
       render(<ShadowsSection defaultOpen />)
 
-      // For Schrödinger, use the shadow strength control
+      // For Schroedinger, use the shadow strength control
       const settingsContainer = screen
         .getByTestId('schroedinger-shadow-strength')
         .closest('[aria-disabled]')

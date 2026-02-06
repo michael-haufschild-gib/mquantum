@@ -3,13 +3,11 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { GravityAdvanced } from './GravityAdvanced'
+
 
 export const SharedAdvancedControls: React.FC = React.memo(() => {
-  const objectType = useGeometryStore((state) => state.objectType)
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
     sssEnabled: state.sssEnabled,
     setSssEnabled: state.setSssEnabled,
@@ -98,8 +96,6 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
         />
       </ControlGroup>
 
-      {/* Gravitational Lensing - only available for black hole */}
-      {objectType === 'blackhole' && <GravityAdvanced />}
     </div>
   )
 })

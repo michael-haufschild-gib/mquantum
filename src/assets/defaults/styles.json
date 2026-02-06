@@ -11,10 +11,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "monochromatic",
         "cosineCoefficients": {
-          "a": [0.5, 0.5, 0.5],
-          "b": [0.5, 0.5, 0.5],
-          "c": [3, 3, 3],
-          "d": [0, 0, 0]
+          "a": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "b": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "c": [
+            3,
+            3,
+            3
+          ],
+          "d": [
+            0,
+            0,
+            0
+          ]
         },
         "distribution": {
           "power": 3.05,
@@ -36,7 +52,6 @@
         "faceEmissionColorShift": 0,
         "faceEmissionPulsing": false,
         "faceRimFalloff": 0,
-        "edgesVisible": true,
         "facesVisible": true,
         "shaderType": "surface",
         "shaderSettings": {
@@ -76,8 +91,16 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
-            "rotation": [0, 0, 0],
+            "position": [
+              -3.1816363437043065,
+              5.362311101832846,
+              -3.1816363437043056
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1.5,
             "coneAngle": 30,
@@ -90,8 +113,16 @@
             "name": "Spot Light",
             "type": "spot",
             "enabled": true,
-            "position": [-5, 5, 5],
-            "rotation": [-0.6154797086703874, -0.7853981633974483, 0],
+            "position": [
+              -5,
+              5,
+              5
+            ],
+            "rotation": [
+              -0.6154797086703874,
+              -0.7853981633974483,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1,
             "coneAngle": 30,
@@ -125,17 +156,6 @@
         "bokehFocalLength": 0.1,
         "bokehSmoothTime": 0.25,
         "bokehShowDebug": false,
-        "ssrEnabled": false,
-        "ssrIntensity": 0.95,
-        "ssrMaxDistance": 30,
-        "ssrThickness": 0.5,
-        "ssrFadeStart": 0.1,
-        "ssrFadeEnd": 0.45,
-        "ssrQuality": "high",
-        "refractionEnabled": false,
-        "refractionIOR": 1.5,
-        "refractionStrength": 0,
-        "refractionChromaticAberration": 0,
         "antiAliasingMethod": "fxaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0.005,
@@ -170,15 +190,7 @@
       },
       "environment": {
         "activeWalls": [],
-        "groundPlaneOffset": 10,
-        "groundPlaneColor": "#ead6e8",
-        "groundPlaneType": "plane",
-        "groundPlaneSizeScale": 10,
         "showGroundGrid": true,
-        "groundGridColor": "#dbdcdb",
-        "groundGridSpacing": 5,
-        "iblQuality": "off",
-        "iblIntensity": 0.5,
         "skyboxSelection": "procedural_twilight",
         "skyboxEnabled": true,
         "skyboxMode": "procedural_twilight",
@@ -194,10 +206,26 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.85, 0.82, 0.92],
-            "b": [0.1, 0.1, 0.08],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.85,
+              0.82,
+              0.92
+            ],
+            "b": [
+              0.1,
+              0.1,
+              0.08
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -211,7 +239,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 2.05,
           "starfield": {
@@ -255,12 +287,6 @@
           "metallic": 0.78,
           "specularIntensity": 1.6,
           "specularColor": "#ffffff"
-        },
-        "ground": {
-          "roughness": 0.2,
-          "metallic": 0.6,
-          "specularIntensity": 0.8,
-          "specularColor": "#ffffff"
         }
       }
     }
@@ -277,10 +303,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "mixed",
         "cosineCoefficients": {
-          "a": [0.5, 0.5, 0.5],
-          "b": [0.5, 0.5, 0.5],
-          "c": [0.8, 0.8, 0.8],
-          "d": [0, 0.1, 0.2]
+          "a": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "b": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "c": [
+            0.8,
+            0.8,
+            0.8
+          ],
+          "d": [
+            0,
+            0.1,
+            0.2
+          ]
         },
         "distribution": {
           "power": 1,
@@ -302,7 +344,6 @@
         "faceEmissionColorShift": 0,
         "faceEmissionPulsing": false,
         "faceRimFalloff": 0,
-        "edgesVisible": true,
         "facesVisible": true,
         "shaderType": "surface",
         "shaderSettings": {
@@ -362,17 +403,6 @@
         "bokehFocalLength": 0.1,
         "bokehSmoothTime": 0.25,
         "bokehShowDebug": false,
-        "ssrEnabled": false,
-        "ssrIntensity": 0.5,
-        "ssrMaxDistance": 30,
-        "ssrThickness": 0.5,
-        "ssrFadeStart": 0.7,
-        "ssrFadeEnd": 1,
-        "ssrQuality": "high",
-        "refractionEnabled": false,
-        "refractionIOR": 1,
-        "refractionStrength": 0.25,
-        "refractionChromaticAberration": 0,
         "antiAliasingMethod": "smaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0,
@@ -407,15 +437,7 @@
       },
       "environment": {
         "activeWalls": [],
-        "groundPlaneOffset": 10,
-        "groundPlaneColor": "#ead6e8",
-        "groundPlaneType": "plane",
-        "groundPlaneSizeScale": 10,
         "showGroundGrid": true,
-        "groundGridColor": "#dbdcdb",
-        "groundGridSpacing": 5,
-        "iblQuality": "off",
-        "iblIntensity": 0.5,
         "skyboxSelection": "none",
         "skyboxEnabled": false,
         "skyboxMode": "classic",
@@ -431,10 +453,26 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.6, 0.2, 0.3],
-            "b": [0.4, 0.3, 0.3],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.6,
+              0.2,
+              0.3
+            ],
+            "b": [
+              0.4,
+              0.3,
+              0.3
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -448,7 +486,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -492,12 +534,6 @@
           "metallic": 0,
           "specularIntensity": 0.5,
           "specularColor": "#ffffff"
-        },
-        "ground": {
-          "roughness": 0.2,
-          "metallic": 0.6,
-          "specularIntensity": 0.8,
-          "specularColor": "#ffffff"
         }
       }
     }
@@ -514,10 +550,26 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "monochromatic",
         "cosineCoefficients": {
-          "a": [0.6, 0.2, 0.3],
-          "b": [0.4, 0.3, 0.3],
-          "c": [0.5, 0.5, 0.5],
-          "d": [0, 0, 0]
+          "a": [
+            0.6,
+            0.2,
+            0.3
+          ],
+          "b": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "c": [
+            0.5,
+            0.5,
+            0.5
+          ],
+          "d": [
+            0,
+            0,
+            0
+          ]
         },
         "distribution": {
           "power": 1,
@@ -539,7 +591,6 @@
         "faceEmissionColorShift": 0,
         "faceEmissionPulsing": false,
         "faceRimFalloff": 0,
-        "edgesVisible": true,
         "facesVisible": true,
         "shaderType": "surface",
         "shaderSettings": {
@@ -579,8 +630,16 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
-            "rotation": [0, 0, 0],
+            "position": [
+              -3.1816363437043065,
+              5.362311101832846,
+              -3.1816363437043056
+            ],
+            "rotation": [
+              0,
+              0,
+              0
+            ],
             "color": "#FFFFFF",
             "intensity": 1.3,
             "coneAngle": 30,
@@ -614,17 +673,6 @@
         "bokehFocalLength": 0.1,
         "bokehSmoothTime": 0.25,
         "bokehShowDebug": false,
-        "ssrEnabled": false,
-        "ssrIntensity": 0.5,
-        "ssrMaxDistance": 30,
-        "ssrThickness": 0.5,
-        "ssrFadeStart": 0.7,
-        "ssrFadeEnd": 1,
-        "ssrQuality": "high",
-        "refractionEnabled": false,
-        "refractionIOR": 1.5,
-        "refractionStrength": 0,
-        "refractionChromaticAberration": 0,
         "antiAliasingMethod": "none",
         "cinematicEnabled": false,
         "cinematicAberration": 0.005,
@@ -658,16 +706,10 @@
         "frameBlendingFactor": 0.3
       },
       "environment": {
-        "activeWalls": ["floor"],
-        "groundPlaneOffset": 10,
-        "groundPlaneColor": "#ead6e8",
-        "groundPlaneType": "plane",
-        "groundPlaneSizeScale": 10,
+        "activeWalls": [
+          "floor"
+        ],
         "showGroundGrid": true,
-        "groundGridColor": "#ffffff",
-        "groundGridSpacing": 5,
-        "iblQuality": "off",
-        "iblIntensity": 0.5,
         "skyboxSelection": "none",
         "skyboxEnabled": false,
         "skyboxMode": "procedural_aurora",
@@ -683,10 +725,26 @@
           "timeScale": 0.2,
           "syncWithObject": true,
           "cosineCoefficients": {
-            "a": [0.6, 0.2, 0.3],
-            "b": [0.4, 0.3, 0.3],
-            "c": [0.5, 0.5, 0.5],
-            "d": [0, 0, 0]
+            "a": [
+              0.6,
+              0.2,
+              0.3
+            ],
+            "b": [
+              0.4,
+              0.3,
+              0.3
+            ],
+            "c": [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "d": [
+              0,
+              0,
+              0
+            ]
           },
           "distribution": {
             "power": 1,
@@ -698,7 +756,11 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [10, 10, 10],
+          "sunPosition": [
+            10,
+            10,
+            10
+          ],
           "evolution": 0,
           "aurora": {
             "curtainHeight": 0.5,
@@ -729,12 +791,6 @@
           "roughness": 0.18,
           "metallic": 0,
           "specularIntensity": 0.5,
-          "specularColor": "#ffffff"
-        },
-        "ground": {
-          "roughness": 0.64,
-          "metallic": 0.02,
-          "specularIntensity": 0,
           "specularColor": "#ffffff"
         }
       }

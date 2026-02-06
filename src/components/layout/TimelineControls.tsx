@@ -11,14 +11,12 @@ import {
   type AnimationState,
 } from '@/stores/animationStore'
 import { MAX_ANIMATION_BIAS, MIN_ANIMATION_BIAS } from '@/stores/defaults/visualDefaults'
-import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 import { AnimatePresence, m } from 'motion/react'
 import { useMemo, useState, type FC } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { BlackHoleAnimationDrawer } from './TimelineControls/BlackHoleAnimationDrawer'
-import { MandelbulbAnimationDrawer } from './TimelineControls/MandelbulbAnimationDrawer'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 
 export const TimelineControls: FC = () => {
@@ -67,62 +65,29 @@ export const TimelineControls: FC = () => {
   )
 
   // Extended object configs for animation state checking
-  // NOTE: quaternionJulia has no animations - shape morphing is achieved via 4D+ rotation
-  const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
-    mandelbulbConfig: state.mandelbulb,
-    schroedingerConfig: state.schroedinger,
-    blackholeConfig: state.blackhole,
-  }))
-
-  const { mandelbulbConfig, schroedingerConfig, blackholeConfig } =
-    useExtendedObjectStore(extendedObjectSelector)
-
-  // Black hole specific: Keplerian differential control
-  const setKeplerianDifferential = useExtendedObjectStore(
-    (state) => state.setBlackHoleKeplerianDifferential
-  )
-  const isBlackHole = getConfigStoreKey(objectType) === 'blackhole'
+  const schroedingerConfig = useExtendedObjectStore((state) => state.schroedinger)
 
   const planes = useMemo(() => getRotationPlanes(dimension), [dimension])
   const hasAnimatingPlanes = animatingPlanes.size > 0
 
-  // Count active animations per object type
+  // Count active animations for Schroedinger
   const activeAnimationCount = useMemo(() => {
     const configKey = getConfigStoreKey(objectType)
 
-    switch (configKey) {
-      case 'mandelbulb':
-        return [
-          mandelbulbConfig.powerAnimationEnabled,
-          mandelbulbConfig.sliceAnimationEnabled,
-          mandelbulbConfig.phaseShiftEnabled,
-        ].filter(Boolean).length
-
-      case 'quaternionJulia':
-        return 0
-
-      case 'schroedinger':
-        return [
-          schroedingerConfig.curlEnabled,
-          schroedingerConfig.sliceAnimationEnabled,
-          schroedingerConfig.spreadAnimationEnabled,
-        ].filter(Boolean).length
-
-      case 'blackhole':
-        return [blackholeConfig.pulseEnabled].filter(Boolean).length
-
-      default:
-        return 0
+    if (configKey === 'schroedinger') {
+      return [
+        schroedingerConfig.curlEnabled,
+        schroedingerConfig.sliceAnimationEnabled,
+        schroedingerConfig.spreadAnimationEnabled,
+      ].filter(Boolean).length
     }
+
+    return 0
   }, [
     objectType,
-    mandelbulbConfig.powerAnimationEnabled,
-    mandelbulbConfig.sliceAnimationEnabled,
-    mandelbulbConfig.phaseShiftEnabled,
     schroedingerConfig.curlEnabled,
     schroedingerConfig.sliceAnimationEnabled,
     schroedingerConfig.spreadAnimationEnabled,
-    blackholeConfig.pulseEnabled,
   ])
 
   // Check if any animation is active
@@ -208,41 +173,13 @@ export const TimelineControls: FC = () => {
                 })}
               </div>
 
-              {/* Keplerian Differential - Black Hole Only */}
-              {isBlackHole && (
-                <div className="mt-4 pt-4 border-t border-border-default">
-                  <Slider
-                    label="Keplerian Differential"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={blackholeConfig.keplerianDifferential}
-                    onChange={setKeplerianDifferential}
-                    showValue
-                    tooltip="0 = uniform rotation, 1 = inner disk rotates faster"
-                  />
-                </div>
-              )}
             </div>
           </m.div>
-        )}
-
-        {/* NOTE: Quaternion Julia has no animation drawer - smooth shape morphing
-          is achieved via 4D+ rotation (handled by the rotation system) */}
-
-        {/* Mandelbulb/Mandelbulb Fractal Animation Drawer */}
-        {showFractalAnim && getConfigStoreKey(objectType) === 'mandelbulb' && (
-          <MandelbulbAnimationDrawer onClose={() => setShowFractalAnim(false)} />
         )}
 
         {/* Schroedinger Animation Drawer */}
         {showFractalAnim && getConfigStoreKey(objectType) === 'schroedinger' && (
           <SchroedingerAnimationDrawer onClose={() => setShowFractalAnim(false)} />
-        )}
-
-        {/* Black Hole Animation Drawer */}
-        {showFractalAnim && getConfigStoreKey(objectType) === 'blackhole' && (
-          <BlackHoleAnimationDrawer onClose={() => setShowFractalAnim(false)} />
         )}
       </AnimatePresence>
 

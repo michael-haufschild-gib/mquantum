@@ -3,7 +3,6 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceMetricsStore, type BufferStats } from '@/stores/performanceMetricsStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
-import { useWebGLContextStore } from '@/stores/webglContextStore'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Icons } from '../icons'
@@ -34,22 +33,11 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
     }))
   )
 
-  const { triggerContextLoss, contextStatus } = useWebGLContextStore(
-    useShallow((s) => ({
-      triggerContextLoss: s.debugTriggerContextLoss,
-      contextStatus: s.status,
-    }))
-  )
-
   const [bufferStats, setBufferStats] = useState<BufferStats | null>(null)
-  const isDevelopment = import.meta.env.MODE !== 'production'
 
   // Temporal preview availability
   const temporalPreviewAvailable =
-    temporalReprojectionEnabled &&
-    (objectType === 'mandelbulb' ||
-      objectType === 'quaternion-julia' ||
-      objectType === 'schroedinger')
+    temporalReprojectionEnabled && objectType === 'schroedinger'
 
   // Graceful handling: turn off temporal preview when object type changes to unsupported
   useEffect(() => {
@@ -133,39 +121,6 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
           />
         </div>
       </div>
-      {isDevelopment && (
-        <div className="space-y-3 pt-3 border-t border-border-subtle">
-          <SectionHeader icon={<Icons.AlertTriangle />} label="Debug Tools" />
-          <div className="space-y-2">
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={triggerContextLoss}
-              disabled={contextStatus !== 'active'}
-              className="w-full text-[10px] font-bold uppercase tracking-wider"
-            >
-              <Icons.AlertTriangle className="w-3 h-3" />
-              Simulate Context Loss
-            </Button>
-            <div className="text-[9px] text-[var(--text-tertiary)] text-center">
-              Status:{' '}
-              <span
-                className={
-                  contextStatus === 'active'
-                    ? 'text-success'
-                    : contextStatus === 'restoring'
-                      ? 'text-warning'
-                      : contextStatus === 'failed'
-                        ? 'text-[var(--text-danger)]'
-                        : 'text-[var(--text-tertiary)]'
-                }
-              >
-                {contextStatus}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 })

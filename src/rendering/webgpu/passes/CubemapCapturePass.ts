@@ -27,7 +27,7 @@ export interface CubemapCapturePassConfig {
   backgroundResolution?: number
   /** Resolution for PMREM environment map (default 256) - reserved for future use */
   environmentResolution?: number
-  /** Whether to generate PMREM for scene.environment (for wall reflections) */
+  /** Whether to generate PMREM for scene.environment (for environment reflections) */
   generatePMREM?: () => boolean
   /** Callback to get external CubeTexture UUID for classic skybox mode */
   getExternalCubeTextureUuid?: () => string | null
@@ -139,6 +139,12 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+
+  // Cached bind group (uniform buffer never changes, only its contents)
+  private cachedBindGroup: GPUBindGroup | null = null
+
+  // Pre-allocated uniform data array (2 mat4x4 + 1 vec4 = 36 floats)
+  private readonly uniformData = new Float32Array(36)
 
   // Cubemap resources (temporal history - 2 frames)
   private cubemapHistory: CubemapResource[] = []
@@ -593,8 +599,8 @@ export class CubemapCapturePass extends WebGPUBasePass {
       const faceView = writeCubemap.faceViews[face]
       if (!faceView) continue
 
-      // Update uniform buffer
-      const uniformData = new Float32Array(36) // 2 mat4x4 + 1 vec4
+      // Update uniform buffer using pre-allocated array
+      const uniformData = this.uniformData
       uniformData.set(viewMatrix, 0) // viewMatrix at offset 0
       uniformData.set(projectionMatrix, 16) // projectionMatrix at offset 16
       uniformData[32] = time // time
@@ -602,12 +608,15 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
       this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
 
-      // Create bind group for this face
-      const bindGroup = this.device.createBindGroup({
-        label: `cubemap-capture-bg-face-${face}`,
-        layout: this.proceduralBindGroupLayout,
-        entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
-      })
+      // Cache bind group (uniform buffer reference never changes, only its contents)
+      if (!this.cachedBindGroup) {
+        this.cachedBindGroup = this.device.createBindGroup({
+          label: 'cubemap-capture-bg',
+          layout: this.proceduralBindGroupLayout,
+          entries: [{ binding: 0, resource: { buffer: this.uniformBuffer } }],
+        })
+      }
+      const bindGroup = this.cachedBindGroup
 
       // Begin render pass for this face
       const passEncoder = ctx.beginRenderPass({
@@ -690,6 +699,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
     this.proceduralBindGroupLayout = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
+    this.cachedBindGroup = null
 
     super.dispose()
   }

@@ -169,7 +169,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
       let defaultText = ''
       if (objectType === 'schroedinger') {
         const modeName =
-          quantumMode === 'harmonicOscillator' ? 'Harmonic Oscillator' : 'Hydrogen Orbitals'
+          quantumMode === 'hydrogenND' ? 'Hydrogen ND' : 'Harmonic Oscillator'
         defaultText = `${dimension}D ${modeName}`
       } else {
         const entry = OBJECT_TYPE_REGISTRY.get(objectType)

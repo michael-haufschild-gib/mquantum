@@ -3,8 +3,6 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { useRotationStore } from '@/stores/rotationStore'
 import { useTransformStore } from '@/stores/transformStore'
 import { useAnimationStore } from '@/stores/animationStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -37,11 +35,6 @@ export function useSyncedDimension() {
   const setTransformDimension = useTransformStore((state) => state.setDimension)
   const setAnimationDimension = useAnimationStore((state) => state.setDimension)
 
-  // Extended object re-initialization
-  const initializeBlackHoleForDimension = useExtendedObjectStore(
-    (state) => state.initializeBlackHoleForDimension
-  )
-
   // Track previous object type to detect changes
   const prevObjectTypeRef = useRef(objectType)
 
@@ -53,25 +46,15 @@ export function useSyncedDimension() {
     setRotationDimension(dimension)
     setTransformDimension(dimension)
     setAnimationDimension(dimension)
-
-    // Object-specific re-initialization for dimension changes
-    // Note: Color algorithm is NOT set here - only when transitioning TO blackhole
-    // (see second useLayoutEffect). This preserves the user's color algorithm choice
-    // when changing dimensions on an existing black hole.
-    if (objectType === 'blackhole') {
-      initializeBlackHoleForDimension(dimension)
-    }
   }, [
     dimension,
     objectType,
     setRotationDimension,
     setTransformDimension,
     setAnimationDimension,
-    initializeBlackHoleForDimension,
   ])
 
   // Reset rotations when object type changes (but not during scene loading)
-  // Also set default color algorithm when transitioning TO blackhole
   useLayoutEffect(() => {
     // Check if a scene is being loaded - skip rotation reset during scene load
     // because the scene loader will restore rotations from saved state
@@ -82,14 +65,6 @@ export function useSyncedDimension() {
 
     if (prevObjectTypeRef.current !== objectType) {
       resetAllRotations()
-
-      // When transitioning TO blackhole, set default color algorithm to blackbody.
-      // This only runs on object type CHANGE, not on dimension changes,
-      // so loaded scenes preserve their color algorithm setting.
-      if (objectType === 'blackhole') {
-        useAppearanceStore.getState().setColorAlgorithm('blackbody')
-      }
-
       prevObjectTypeRef.current = objectType
     }
   }, [objectType, resetAllRotations])

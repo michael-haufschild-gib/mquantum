@@ -9,11 +9,6 @@
 // Shared blocks and utilities
 export * from './shared'
 
-// Object-specific shaders
-export * from './mandelbulb'
-export * from './julia'
-export * from './blackhole'
-
 // Post-processing shaders
 export * from './postprocessing'
 

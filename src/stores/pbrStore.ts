@@ -4,7 +4,6 @@
  * Provides independent PBR settings for three object types:
  * - Face: Main objects (polytope faces, mandelbulb, julia, schroedinger, blackhole)
  * - Edge: TubeWireframe (when edgeThickness > 1)
- * - Ground: Walls and ground plane
  *
  * @module stores/pbrStore
  */

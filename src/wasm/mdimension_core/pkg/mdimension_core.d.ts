@@ -2,34 +2,6 @@
 /* eslint-disable */
 
 /**
- * Builds edges connecting each point to its k nearest neighbors.
- *
- * # Arguments
- * * `flat_points` - Flattened array of point coordinates [p0_d0, p0_d1, ..., p1_d0, ...]
- * * `dimension` - Dimensionality of each point
- * * `k` - Number of nearest neighbors to connect
- *
- * # Returns
- * Flattened edge indices [e0_v0, e0_v1, e1_v0, e1_v1, ...]
- */
-export function build_knn_edges_wasm(flat_points: Float64Array, dimension: number, k: number): Uint32Array;
-
-/**
- * Builds edges connecting vertices at minimum nonzero distance.
- *
- * Used for root systems and mathematically structured point sets.
- *
- * # Arguments
- * * `flat_vertices` - Flattened array of vertex coordinates
- * * `dimension` - Dimensionality of each vertex
- * * `epsilon_factor` - Tolerance factor for distance matching (e.g., 0.01)
- *
- * # Returns
- * Flattened edge indices [e0_v0, e0_v1, e1_v0, e1_v1, ...]
- */
-export function build_short_edges_wasm(flat_vertices: Float64Array, dimension: number, epsilon_factor: number): Uint32Array;
-
-/**
  * Composes multiple rotations from plane names and angles.
  *
  * # Arguments
@@ -42,10 +14,6 @@ export function build_short_edges_wasm(flat_vertices: Float64Array, dimension: n
  */
 export function compose_rotations_wasm(dimension: number, plane_names: string[], angles: Float64Array): Float64Array;
 
-export function compute_convex_hull_wasm(flat_vertices: Float64Array, dimension: number): Uint32Array;
-
-export function detect_faces_wasm(flat_vertices: Float64Array, flat_edges: Uint32Array, dimension: number, method: string): Uint32Array;
-
 /**
  * Computes the dot product of two vectors
  *
@@ -57,21 +25,6 @@ export function detect_faces_wasm(flat_vertices: Float64Array, flat_edges: Uint3
  * The scalar dot product
  */
 export function dot_product_wasm(a: Float64Array, b: Float64Array): number;
-
-/**
- * Generates a complete root system with vertices and edges.
- *
- * # Arguments
- * * `root_type` - Type of root system: "A", "D", or "E8"
- * * `dimension` - Ambient dimension
- * * `scale` - Scale factor
- *
- * # Returns
- * Complete root system result as JsValue
- */
-export function generate_root_system_wasm(root_type: string, dimension: number, scale: number): any;
-
-export function generate_wythoff_wasm(val: any): any;
 
 /**
  * Computes the magnitude (length) of a vector
@@ -166,14 +119,8 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
-  readonly build_knn_edges_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly build_short_edges_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
-  readonly compute_convex_hull_wasm: (a: number, b: number, c: number, d: number) => void;
-  readonly detect_faces_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
   readonly dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
-  readonly generate_root_system_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly generate_wythoff_wasm: (a: number, b: number) => void;
   readonly magnitude_wasm: (a: number, b: number) => number;
   readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
@@ -184,8 +131,7 @@ export interface InitOutput {
   readonly start: () => void;
   readonly __wbindgen_export: (a: number, b: number) => number;
   readonly __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbindgen_export3: (a: number) => void;
-  readonly __wbindgen_export4: (a: number, b: number, c: number) => void;
+  readonly __wbindgen_export3: (a: number, b: number, c: number) => void;
   readonly __wbindgen_add_to_stack_pointer: (a: number) => number;
   readonly __wbindgen_start: () => void;
 }

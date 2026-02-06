@@ -212,9 +212,6 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
         ArrowDown: () => {
           if (dimension > 3) setDimension(dimension - 1)
         },
-        '1': () => setObjectType('hypercube'),
-        '2': () => setObjectType('simplex'),
-        '3': () => setObjectType('cross-polytope'),
       }
 
       if (globalKeyMap[key]) {

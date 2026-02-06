@@ -1,155 +1,18 @@
 /**
  * Tests for environmentStore
- * Verifies environment (ground + skybox) state management
+ * Verifies environment (skybox/background) state management
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { useEnvironmentStore } from '@/stores/environmentStore'
-import { GROUND_INITIAL_STATE } from '@/stores/slices/groundSlice'
 import { SKYBOX_INITIAL_STATE } from '@/stores/slices/skyboxSlice'
 
 describe('environmentStore', () => {
   beforeEach(() => {
     // Reset store state before each test
     useEnvironmentStore.setState({
-      ...GROUND_INITIAL_STATE,
       ...SKYBOX_INITIAL_STATE,
-    })
-  })
-
-  describe('ground slice', () => {
-    describe('active walls', () => {
-      it('should set active walls', () => {
-        const { setActiveWalls } = useEnvironmentStore.getState()
-
-        setActiveWalls(['floor', 'back'])
-
-        expect(useEnvironmentStore.getState().activeWalls).toEqual(['floor', 'back'])
-      })
-
-      it('should toggle wall on', () => {
-        const { setActiveWalls, toggleWall } = useEnvironmentStore.getState()
-
-        setActiveWalls(['floor'])
-        toggleWall('back')
-
-        expect(useEnvironmentStore.getState().activeWalls).toContain('back')
-        expect(useEnvironmentStore.getState().activeWalls).toContain('floor')
-      })
-
-      it('should toggle wall off', () => {
-        const { setActiveWalls, toggleWall } = useEnvironmentStore.getState()
-
-        setActiveWalls(['floor', 'back'])
-        toggleWall('back')
-
-        expect(useEnvironmentStore.getState().activeWalls).not.toContain('back')
-        expect(useEnvironmentStore.getState().activeWalls).toContain('floor')
-      })
-    })
-
-    describe('ground plane properties', () => {
-      it('should set ground plane offset with clamping', () => {
-        const { setGroundPlaneOffset } = useEnvironmentStore.getState()
-
-        setGroundPlaneOffset(5)
-        expect(useEnvironmentStore.getState().groundPlaneOffset).toBe(5)
-
-        setGroundPlaneOffset(-1)
-        expect(useEnvironmentStore.getState().groundPlaneOffset).toBe(0)
-
-        setGroundPlaneOffset(15)
-        expect(useEnvironmentStore.getState().groundPlaneOffset).toBe(10)
-      })
-
-      it('should set ground plane color with validation', () => {
-        const { setGroundPlaneColor } = useEnvironmentStore.getState()
-
-        setGroundPlaneColor('#ff0000')
-        expect(useEnvironmentStore.getState().groundPlaneColor).toBe('#ff0000')
-
-        // Invalid color should be ignored
-        const currentColor = useEnvironmentStore.getState().groundPlaneColor
-        setGroundPlaneColor('invalid')
-        expect(useEnvironmentStore.getState().groundPlaneColor).toBe(currentColor)
-      })
-
-      it('should set ground plane type', () => {
-        const { setGroundPlaneType } = useEnvironmentStore.getState()
-
-        setGroundPlaneType('plane')
-        expect(useEnvironmentStore.getState().groundPlaneType).toBe('plane')
-      })
-
-      it('should set ground plane size scale with clamping', () => {
-        const { setGroundPlaneSizeScale } = useEnvironmentStore.getState()
-
-        setGroundPlaneSizeScale(5)
-        expect(useEnvironmentStore.getState().groundPlaneSizeScale).toBe(5)
-
-        setGroundPlaneSizeScale(0)
-        expect(useEnvironmentStore.getState().groundPlaneSizeScale).toBe(1)
-
-        setGroundPlaneSizeScale(20)
-        expect(useEnvironmentStore.getState().groundPlaneSizeScale).toBe(10)
-      })
-    })
-
-    describe('ground grid', () => {
-      it('should toggle ground grid visibility', () => {
-        const { setShowGroundGrid } = useEnvironmentStore.getState()
-
-        setShowGroundGrid(true)
-        expect(useEnvironmentStore.getState().showGroundGrid).toBe(true)
-
-        setShowGroundGrid(false)
-        expect(useEnvironmentStore.getState().showGroundGrid).toBe(false)
-      })
-
-      it('should set ground grid color with validation', () => {
-        const { setGroundGridColor } = useEnvironmentStore.getState()
-
-        setGroundGridColor('#00ff00')
-        expect(useEnvironmentStore.getState().groundGridColor).toBe('#00ff00')
-      })
-
-      it('should set ground grid spacing with clamping', () => {
-        const { setGroundGridSpacing } = useEnvironmentStore.getState()
-
-        setGroundGridSpacing(2)
-        expect(useEnvironmentStore.getState().groundGridSpacing).toBe(2)
-
-        setGroundGridSpacing(0.1)
-        expect(useEnvironmentStore.getState().groundGridSpacing).toBe(0.5)
-
-        setGroundGridSpacing(10)
-        expect(useEnvironmentStore.getState().groundGridSpacing).toBe(5)
-      })
-    })
-
-    describe('IBL settings', () => {
-      it('should set IBL quality', () => {
-        const { setIBLQuality } = useEnvironmentStore.getState()
-
-        setIBLQuality('high')
-        expect(useEnvironmentStore.getState().iblQuality).toBe('high')
-
-        setIBLQuality('off')
-        expect(useEnvironmentStore.getState().iblQuality).toBe('off')
-      })
-
-      it('should set IBL intensity with clamping', () => {
-        const { setIBLIntensity } = useEnvironmentStore.getState()
-
-        setIBLIntensity(1)
-        expect(useEnvironmentStore.getState().iblIntensity).toBe(1)
-
-        setIBLIntensity(-1)
-        expect(useEnvironmentStore.getState().iblIntensity).toBe(0)
-
-        setIBLIntensity(5)
-        expect(useEnvironmentStore.getState().iblIntensity).toBe(2)
-      })
+      skyboxVersion: 0,
     })
   })
 
@@ -299,6 +162,24 @@ describe('environmentStore', () => {
 
         setBackgroundBlendMode('normal')
         expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('normal')
+      })
+    })
+
+    describe('version tracking', () => {
+      it('should bump skybox version when skybox settings change', () => {
+        const { setSkyboxIntensity } = useEnvironmentStore.getState()
+
+        expect(useEnvironmentStore.getState().skyboxVersion).toBe(0)
+        setSkyboxIntensity(2)
+        expect(useEnvironmentStore.getState().skyboxVersion).toBe(1)
+      })
+
+      it('should bump all versions manually', () => {
+        const { bumpAllVersions } = useEnvironmentStore.getState()
+
+        expect(useEnvironmentStore.getState().skyboxVersion).toBe(0)
+        bumpAllVersions()
+        expect(useEnvironmentStore.getState().skyboxVersion).toBe(1)
       })
     })
 

@@ -33,8 +33,6 @@ export interface WGSLShaderConfig {
   ambientOcclusion?: boolean
   /** Enable subsurface scattering */
   sss?: boolean
-  /** Enable IBL */
-  ibl?: boolean
   /** Shadow quality (0-3) */
   shadowQuality?: number
   /** AO quality (0-2) */
@@ -53,7 +51,6 @@ export interface FeatureFlags {
     temporal: boolean
     ao: boolean
     sss: boolean
-    ibl: boolean
   }
 }
 
@@ -68,7 +65,6 @@ export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
     temporal = false,
     ambientOcclusion = false,
     sss = false,
-    ibl = true,
     shadowQuality = 1,
     aoQuality = 1,
   } = config
@@ -81,7 +77,6 @@ export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
     `const AO_ENABLED: bool = ${ambientOcclusion};`,
     `const AO_QUALITY: i32 = ${aoQuality};`,
     `const SSS_ENABLED: bool = ${sss};`,
-    `const IBL_ENABLED: bool = ${ibl};`,
   ]
 
   return {
@@ -91,7 +86,6 @@ export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
       temporal,
       ao: ambientOcclusion,
       sss,
-      ibl,
     },
   }
 }
@@ -110,7 +104,6 @@ export function assembleShaderBlocks(
 
   // Header
   parts.push('// Auto-generated WGSL shader')
-  parts.push('// Generated at: ' + new Date().toISOString())
   parts.push('')
 
   for (const block of blocks) {

@@ -192,7 +192,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // This is necessary because setState bypasses the wrapped setters that auto-increment versions
         useAppearanceStore.getState().bumpVersion()
         useLightingStore.getState().bumpVersion()
-        usePostProcessingStore.getState().bumpGravityVersion()
+
         useEnvironmentStore.getState().bumpAllVersions()
         usePBRStore.getState().bumpVersion()
 
@@ -477,7 +477,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // This is necessary because setState bypasses the wrapped setters that auto-increment versions
         useAppearanceStore.getState().bumpVersion()
         useLightingStore.getState().bumpVersion()
-        usePostProcessingStore.getState().bumpGravityVersion()
+
         useEnvironmentStore.getState().bumpAllVersions()
         usePBRStore.getState().bumpVersion()
         useRotationStore.getState().bumpVersion()

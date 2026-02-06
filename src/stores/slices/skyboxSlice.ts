@@ -1,4 +1,3 @@
-import type * as THREE from 'three'
 import type { StateCreator } from 'zustand'
 import {
   type BackgroundBlendMode,
@@ -44,7 +43,7 @@ export interface SkyboxSliceState {
    * Set by SkyboxLoader when KTX2 texture finishes loading.
    * Used by CubemapCapturePass to set scene.background and generate PMREM.
    */
-  classicCubeTexture: THREE.CubeTexture | null
+  classicCubeTexture: unknown | null
   /** Background color shown behind skybox */
   backgroundColor: string
   /** Blend mode for compositing skybox with background color */
@@ -65,7 +64,7 @@ export interface SkyboxSliceActions {
   setSkyboxLoading: (loading: boolean) => void
   setProceduralSettings: (settings: Partial<SkyboxProceduralSettings>) => void
   /** Set the loaded CubeTexture for classic skybox mode (used by render graph) */
-  setClassicCubeTexture: (texture: THREE.CubeTexture | null) => void
+  setClassicCubeTexture: (texture: unknown | null) => void
   /** Set background color */
   setBackgroundColor: (color: string) => void
   /** Set background blend mode */
@@ -164,7 +163,7 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
     set((state) => ({
       proceduralSettings: { ...state.proceduralSettings, ...settings },
     })),
-  setClassicCubeTexture: (texture: THREE.CubeTexture | null) =>
+  setClassicCubeTexture: (texture: unknown | null) =>
     set({ classicCubeTexture: texture }),
   setBackgroundColor: (color: string) => set({ backgroundColor: color }),
   setBackgroundBlendMode: (mode: BackgroundBlendMode) => set({ backgroundBlendMode: mode }),

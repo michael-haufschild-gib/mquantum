@@ -56,7 +56,6 @@ export default defineConfig(({ mode }) => ({
       '@/stores': path.resolve(import.meta.dirname, './src/stores'),
       '@/types': path.resolve(import.meta.dirname, './src/types'),
       '@/utils': path.resolve(import.meta.dirname, './src/utils'),
-      'mdimension-core': path.resolve(import.meta.dirname, './src/wasm/mdimension_core/pkg'),
     },
   },
   server: {
@@ -83,10 +82,6 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
-          'three-core': ['three'],
-          'r3f-fiber': ['@react-three/fiber'],
-          'r3f-drei': ['@react-three/drei'],
-          'r3f-postprocessing': ['@react-three/postprocessing', 'postprocessing'],
           zustand: ['zustand'],
           motion: ['motion'],
         },

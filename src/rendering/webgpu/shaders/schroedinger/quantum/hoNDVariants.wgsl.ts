@@ -11,45 +11,12 @@
  */
 
 /**
- * Compute dimension-scaled early-exit threshold.
- *
- * The threshold is based on the χ² distribution - in higher dimensions,
- * the sum of squared Gaussians has a higher expected value, so we need
- * a larger threshold to capture the same fraction of the probability mass.
- *
- * Formula: 2 * dimension + ln(dimension) * 3
- *
- * @param dimension - The dimension (3-11)
- * @returns The early-exit threshold for distSq comparison
- */
-function computeEarlyExitThreshold(dimension: number): number {
-  return 2 * dimension + Math.log(dimension) * 3
-}
-
-/**
  * Generate a dimension-specific hoND function for WGSL.
  *
  * @param dimension - The dimension (3-11)
  * @returns WGSL function code for hoND{dimension}D
  */
 function generateHoNDBlock(dimension: number): string {
-  const threshold = computeEarlyExitThreshold(dimension).toFixed(1)
-
-  // Generate alpha declarations
-  const alphaDecls = Array.from(
-    { length: dimension },
-    (_, i) => `  let alpha${i} = sqrt(max(getOmega(uniforms, ${i}), 0.01));`
-  ).join('\n')
-
-  // Generate u calculations
-  const uCalcs = Array.from(
-    { length: dimension },
-    (_, i) => `  let u${i} = alpha${i} * xND[${i}];`
-  ).join('\n')
-
-  // Generate distSq sum
-  const distSqTerms = Array.from({ length: dimension }, (_, i) => `u${i}*u${i}`).join(' + ')
-
   // Generate ho1D product chain
   const ho1DChain = Array.from({ length: dimension }, (_, i) => {
     if (i === 0) {
@@ -69,24 +36,16 @@ function generateHoNDBlock(dimension: number): string {
   return `
 // ============================================
 // Harmonic Oscillator ND - ${dimension}D (Unrolled)
-// Early-exit threshold: ${threshold} (dimension-scaled)
 // ============================================
 
 fn hoND${dimension}D(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUniforms) -> f32 {
-${alphaDecls}
-
-${uCalcs}
-
-  let distSq = ${distSqTerms};
-  if (distSq > ${threshold}) { return 0.0; }
-
   let base = termIdx * 11;
 ${ho1DChain}
 }
 `
 }
 
-// Pre-generate all dimension-specific blocks with computed thresholds
+// Pre-generate all dimension-specific blocks
 export const hoND3dBlock = generateHoNDBlock(3)
 export const hoND4dBlock = generateHoNDBlock(4)
 export const hoND5dBlock = generateHoNDBlock(5)
@@ -106,11 +65,10 @@ export const hoND11dBlock = generateHoNDBlock(11)
  */
 export function generateHoNDDispatchBlock(dimension: number): string {
   const dim = Math.min(Math.max(dimension, 3), 11)
-  const threshold = computeEarlyExitThreshold(dim).toFixed(1)
   return `
 // ============================================
 // Harmonic Oscillator ND - Compile-time Dispatch
-// Dimension: ${dim}, Early-exit threshold: ${threshold}
+// Dimension: ${dim}
 // ============================================
 
 // hoNDOptimized: Direct call to dimension-specific unrolled variant

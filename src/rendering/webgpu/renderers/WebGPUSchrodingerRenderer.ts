@@ -2,7 +2,7 @@
  * WebGPU Schrödinger Renderer
  *
  * Renders N-dimensional quantum wavefunctions using WebGPU volume raymarching.
- * Supports harmonic oscillator and hydrogen orbital modes.
+ * Supports harmonic oscillator and hydrogen ND modes.
  *
  * @module rendering/webgpu/renderers/WebGPUSchrodingerRenderer
  */
@@ -15,6 +15,7 @@ import {
   type SchroedingerWGSLShaderConfig,
   type QuantumModeForShader,
 } from '../shaders/schroedinger/compose'
+import type { ColorAlgorithm as WGSLColorAlgorithm } from '../shaders/types'
 import { MAX_DIM, MAX_TERMS, MAX_EXTRA_DIM } from '../shaders/schroedinger/uniforms.wgsl'
 import {
   generateQuantumPreset,
@@ -26,15 +27,23 @@ import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
 
+/** Bayer pattern offsets for 4-frame temporal jitter cycle */
+const BAYER_OFFSETS: [number, number][] = [
+  [0, 0],
+  [1, 1],
+  [1, 0],
+  [0, 1],
+]
+
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
   quantumMode?: QuantumModeForShader
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  /** Compile-time color module selection (0-10) */
+  colorAlgorithm?: WGSLColorAlgorithm
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean
-  /** Enable IBL (Image-Based Lighting) */
-  ibl?: boolean
   /**
    * Use pre-computed density grid for 3-6x faster volumetric rendering.
    * Requires compute shader support. Only applies to volumetric mode (not isosurface).
@@ -63,15 +72,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Group 0: Camera
   // Group 1: Combined (Lighting + Material + Quality)
   // Group 2: Object (Schrödinger + Basis + optional DensityGrid)
-  // Group 3: IBL (if enabled)
   private cameraBindGroup: GPUBindGroup | null = null
   private lightingBindGroup: GPUBindGroup | null = null
   private objectBindGroup: GPUBindGroup | null = null
-  private iblBindGroup: GPUBindGroup | null = null
-  private iblBindGroupLayout: GPUBindGroupLayout | null = null
-  private iblUniformBuffer: GPUBuffer | null = null
-  private envMapTexture: GPUTexture | null = null
-  private envMapSampler: GPUSampler | null = null
 
   // Density Grid Compute Pass (for accelerated volumetric rendering)
   private densityGridPass: DensityGridComputePass | null = null
@@ -110,10 +113,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     energy: Float32Array
   } | null = null
 
+  // Auto-compensation factor for canonical HO normalization.
+  // Multiplied into densityGain so canonical normalization produces
+  // the same visual brightness as the old visual-damping normalization.
+  private canonicalDensityCompensation = 1.0
+
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1024 bytes (256 floats)
-  private schroedingerUniformData = new ArrayBuffer(1024)
+  // Schroedinger: 1040 bytes (260 floats)
+  private schroedingerUniformData = new ArrayBuffer(1040)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -128,9 +136,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Quality: 48 bytes (12 floats)
   private qualityUniformData = new Float32Array(12)
   private qualityDataView = new DataView(this.qualityUniformData.buffer)
-  // IBL: 16 bytes (4 floats)
-  private iblUniformData = new Float32Array(4)
-  private iblDataView = new DataView(this.iblUniformData.buffer)
   // Time update: 4 bytes (1 float) - for dirty-flag optimization partial writes
   private timeUpdateBuffer = new Float32Array(1)
 
@@ -138,7 +143,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Schroedinger uses partial buffer writes: only time field (4 bytes) when settings unchanged
   private lastSchroedingerVersion = -1
   private lastAppearanceVersion = -1
-  private lastIblVersion = -1
   // Separate appearance version tracker for the Schroedinger uniform buffer.
   // Emission/Rim parameters are sourced from the appearance store (matching WebGL),
   // so the Schroedinger buffer must also be updated when appearance changes.
@@ -169,7 +173,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       : isTemporal
         ? [
             // Temporal volumetric: quarter-res color + position for temporal accumulation
-            // No depth buffer needed - all targets are quarter-res, uses alpha blending
+            // No depth buffer needed - all targets are quarter-res, composited in environment pass
             { resourceId: 'quarter-color', access: 'write' as const, binding: 0 },
             { resourceId: 'quarter-position', access: 'write' as const, binding: 1 },
           ]
@@ -190,7 +194,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isosurface: false,
       quantumMode: 'harmonicOscillator',
       temporal: false,
-      ibl: true,
       // Density grid disabled by default: while it provides 3-6x FPS improvement via
       // pre-computed 64³ texture lookups, it loses phase data (returns phase=0.0),
       // breaks chromatic dispersion, shimmer, and phase-based coloring.
@@ -208,8 +211,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isosurface: this.rendererConfig.isosurface,
       quantumMode: this.rendererConfig.quantumMode,
       termCount: this.rendererConfig.termCount,
+      colorAlgorithm: this.rendererConfig.colorAlgorithm,
       temporalAccumulation: this.rendererConfig.temporal,
-      ibl: this.rendererConfig.ibl,
       useDensityGrid: effectiveUseDensityGrid,
     }
   }
@@ -286,32 +289,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       label: 'schroedinger-object-bgl',
       entries: objectLayoutEntries,
     })
-    // Group 3: IBL (if enabled)
-    if (this.shaderConfig.ibl) {
-      this.iblBindGroupLayout = device.createBindGroupLayout({
-        label: 'schroedinger-ibl-bgl',
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // IBL uniforms
-          {
-            binding: 1,
-            visibility: GPUShaderStage.FRAGMENT,
-            texture: { sampleType: 'float' as GPUTextureSampleType, viewDimension: '2d' as GPUTextureViewDimension }, // PMREM uses 2D texture
-          }, // Environment map
-          { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: {} }, // Sampler
-        ],
-      })
-    }
-
-    // Create pipeline layout - 3-4 groups depending on IBL
+    // Create pipeline layout
     const bindGroupLayouts: GPUBindGroupLayout[] = [
       cameraBindGroupLayout,
       combinedBindGroupLayout, // Contains combined lighting+material+quality
       objectBindGroupLayout,
     ]
-
-    if (this.shaderConfig.ibl && this.iblBindGroupLayout) {
-      bindGroupLayouts.push(this.iblBindGroupLayout)
-    }
 
     const pipelineLayout = device.createPipelineLayout({
       label: 'schroedinger-pipeline-layout',
@@ -415,8 +398,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // 160 bytes due to WGSL vec3f 16-byte alignment requirements
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
-    // Schroedinger uniforms: ~1KB for all quantum parameters
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1024, 'schroedinger-uniforms')
+    // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ controls
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1040, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create density grid compute pass if enabled
@@ -474,40 +457,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       layout: objectBindGroupLayout,
       entries: objectBindGroupEntries,
     })
-
-    // Group 3: IBL (if enabled)
-    // Create IBL buffer and placeholder environment map
-    if (this.shaderConfig.ibl && this.iblBindGroupLayout) {
-      // IBLUniforms: envMapSize (f32), iblIntensity (f32), iblQuality (i32), padding (f32) = 16 bytes
-      this.iblUniformBuffer = this.createUniformBuffer(device, 16, 'schroedinger-ibl')
-
-      // Create a placeholder 2D PMREM texture (proper size would be e.g., 768x1024 for 256px faces)
-      // Using minimal size for placeholder - will be replaced with real env map later
-      this.envMapTexture = device.createTexture({
-        label: 'schroedinger-env-placeholder-pmrem',
-        size: { width: 64, height: 64 }, // Placeholder size, proper PMREM would be larger
-        format: 'rgba8unorm',
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        dimension: '2d',
-      })
-
-      this.envMapSampler = device.createSampler({
-        label: 'schroedinger-env-sampler',
-        magFilter: 'linear',
-        minFilter: 'linear',
-        mipmapFilter: 'linear',
-      })
-
-      this.iblBindGroup = device.createBindGroup({
-        label: 'schroedinger-ibl-bg',
-        layout: this.iblBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.iblUniformBuffer } },
-          { binding: 1, resource: this.envMapTexture.createView({ dimension: '2d' }) },
-          { binding: 2, resource: this.envMapSampler },
-        ],
-      })
-    }
 
     // Create bounding geometry (sphere for volume)
     this.createBoundingGeometry(device)
@@ -645,25 +594,85 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
     data[115] = camera.near || 0.1 // cameraNear (packed with cameraPosition)
     data[116] = camera.far || 1000 // cameraFar
-    data[117] = camera.fov || 50 // fov
+    // Shader code expects FOV in radians for temporal jitter ray offset math.
+    data[117] = ((camera.fov || 50) * Math.PI) / 180 // fov (radians)
     data[118] = ctx.size.width // resolution.x
     data[119] = ctx.size.height // resolution.y
     data[120] = ctx.size.width / ctx.size.height // aspectRatio
     data[121] = animationTime // time (respects animation pause state)
     data[122] = ctx.frame?.delta || 0.016 // deltaTime
-    data[123] = ctx.frame?.frameNumber || 0 // frameNumber
+    // frameNumber is u32 in WGSL - write as uint32 via DataView
+    new DataView(data.buffer).setUint32(123 * 4, ctx.frame?.frameNumber || 0, true)
 
-    // Temporal accumulation: Bayer offset for quarter-res rendering
-    // Cycles through [0,0], [1,1], [1,0], [0,1] pattern
-    const frameIndex = ctx.frame?.frameNumber || 0
-    const bayerOffsets: [number, number][] = [[0, 0], [1, 1], [1, 0], [0, 1]]
-    const bayerOffset = bayerOffsets[frameIndex % 4]!
+    // Temporal accumulation: Bayer offset for quarter-res rendering.
+    // Align with WebGPUTemporalCloudPass frameIndex cycle, which starts at 0
+    // on the first rendered frame.
+    const frameNumber = ctx.frame?.frameNumber ?? 1
+    const frameIndex = (((frameNumber - 1) % 4) + 4) % 4
+    const bayerOffset = BAYER_OFFSETS[frameIndex % 4]!
     data[124] = bayerOffset[0] // bayerOffset.x
     data[125] = bayerOffset[1] // bayerOffset.y
     data[126] = 0 // padding
     data[127] = 0 // padding
 
     this.writeUniformBuffer(this.device, this.cameraUniformBuffer, data)
+  }
+
+  /**
+   * Compute auto-compensation factor for canonical HO normalization.
+   *
+   * The canonical normalization (probability-normalized) produces peak densities
+   * ~30x lower than the old visual-damping normalization. This method computes
+   * the exact ratio between old and new for the dominant superposition term,
+   * so we can fold it into densityGain for equivalent visual brightness.
+   *
+   * ratio_per_dim = damp(n) / (alphaNorm * HO_NORM[n])
+   * compensation = product(ratio_per_dim^2) across dimensions
+   */
+  private computeCanonicalCompensation(preset: QuantumPreset, dimension: number): number {
+    // HO_NORM[n] = 1/sqrt(2^n * n!) - must match ho1d.wgsl.ts
+    const HO_NORM = [1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.0510310363080, 0.0161374306092, 0.00465847495312]
+    const INV_PI = 1 / Math.PI
+
+    if (preset.termCount === 0) return 1.0
+
+    // Find the dominant term (largest |c_k|)
+    let dominantIdx = 0
+    let maxCoeffMag = 0
+    for (let k = 0; k < preset.termCount; k++) {
+      const [cRe, cIm] = preset.coefficients[k]
+      const mag = cRe * cRe + cIm * cIm
+      if (mag > maxCoeffMag) {
+        maxCoeffMag = mag
+        dominantIdx = k
+      }
+    }
+
+    const qn = preset.quantumNumbers[dominantIdx]
+    const dim = Math.min(dimension, qn.length)
+
+    let ratioProduct = 1.0
+    for (let j = 0; j < dim; j++) {
+      const n = qn[j]
+      if (n < 0 || n > 6) continue
+
+      const omega = preset.omega[j] ?? 1.0
+      const alpha = Math.sqrt(Math.max(omega, 0.01))
+
+      // Canonical normalization factor
+      const alphaNorm = Math.sqrt(Math.sqrt(alpha * INV_PI))
+      const norm = HO_NORM[n]
+
+      // Old visual damping factor
+      const damp = 1.0 / (1.0 + 0.15 * n * n)
+
+      // Ratio: old / new (per dimension, for the wavefunction not density)
+      const ratio = damp / (alphaNorm * norm)
+      // Density is |psi|^2, so square the ratio
+      ratioProduct *= ratio * ratio
+    }
+
+    return ratioProduct
   }
 
   updateSchroedingerUniforms(ctx: WebGPURenderContext): void {
@@ -754,8 +763,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
     const modeMap: Record<string, number> = {
       harmonicOscillator: 0,
-      hydrogenOrbital: 1,
-      hydrogenND: 2,
+      hydrogenND: 1,
     }
     const quantumModeInt = modeMap[quantumModeStr] ?? 0
 
@@ -826,6 +834,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.cachedPreset = preset
       this.cachedPresetConfig = { ...currentConfig }
       this.flattenedPreset = flattenPresetForUniforms(preset)
+
+      // Compute auto-compensation for canonical normalization
+      this.canonicalDensityCompensation = this.computeCanonicalCompensation(preset, dimension)
     }
 
     // Use cached flattened preset data
@@ -928,7 +939,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Volume rendering parameters - defaults match DEFAULT_SCHROEDINGER_CONFIG
     floatView[676 / 4] = schroedinger?.timeScale ?? 0.8 // WebGL default: 0.8
     floatView[680 / 4] = schroedinger?.fieldScale ?? 1.0
-    floatView[684 / 4] = schroedinger?.densityGain ?? 2.0 // WebGL default: 2.0
+    floatView[684 / 4] = (schroedinger?.densityGain ?? 2.0) * this.canonicalDensityCompensation
     floatView[688 / 4] = schroedinger?.powderScale ?? 1.0 // WebGL default: 1.0
     // Emission & Rim: read from appearance store (matching WebGL SchroedingerMesh.tsx lines 782-791)
     // The UI (SchroedingerAdvanced.tsx) writes to appearance.faceEmission, etc.
@@ -1074,6 +1085,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1012 / 4] = cosineCoeffs.d?.[1] ?? 0.33
     floatView[1016 / 4] = cosineCoeffs.d?.[2] ?? 0.67
     floatView[1020 / 4] = 0.0 // w unused
+
+    // Fog and erosion quality controls (offset 1024+)
+    intView[1024 / 4] = schroedinger?.fogIntegrationEnabled ? 1 : 0
+    floatView[1028 / 4] = schroedinger?.fogContribution ?? 1.0
+    floatView[1032 / 4] = schroedinger?.internalFogDensity ?? 0.0
+    intView[1036 / 4] = schroedinger?.erosionHQ ? 1 : 0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1313,7 +1330,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const performance = ctx.frame?.stores?.['performance'] as any
     const lighting = ctx.frame?.stores?.['lighting'] as any
-    const environment = ctx.frame?.stores?.['environment'] as any
     // Get schroedinger store for aoEnabled (WebGL uses per-object AO toggle from schroedinger store)
     const extended = ctx.frame?.stores?.['extended'] as any
     const schroedinger = extended?.schroedinger
@@ -1327,10 +1343,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // aoSamples: i32 (5)
     // aoRadius: f32 (6)
     // aoIntensity: f32 (7)
-    // iblQuality: i32 (8)
-    // iblIntensity: f32 (9)
-    // qualityMultiplier: f32 (10)
-    // _padding: f32 (11)
+    // qualityMultiplier: f32 (8)
+    // debugMode: i32 (9)
     // Use pre-allocated buffer to avoid per-frame GC pressure
     const data = this.qualityUniformData
 
@@ -1340,8 +1354,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[3] = lighting?.shadowSoftness ?? 0.5 // shadowSoftness
     data[6] = performance?.aoRadius ?? 0.5 // aoRadius
     data[7] = performance?.aoIntensity ?? 1.0 // aoIntensity
-    data[9] = environment?.iblIntensity ?? 1.0 // iblIntensity
-    data[10] = qualityMultiplier // qualityMultiplier
+    data[8] = qualityMultiplier
 
     // Use pre-allocated DataView for integer writes
     this.qualityDataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
@@ -1349,37 +1362,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // aoEnabled: Use schroedinger store's aoEnabled (WebGL uses per-object AO toggle, not global ssaoEnabled)
     this.qualityDataView.setInt32(4 * 4, schroedinger?.aoEnabled ? 1 : 0, true) // aoEnabled
     this.qualityDataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
-    this.qualityDataView.setInt32(8 * 4, environment?.iblQuality ?? 1, true) // iblQuality
-    this.qualityDataView.setInt32(11 * 4, performance?.debugMode ?? 0, true) // debugMode
+    this.qualityDataView.setInt32(9 * 4, performance?.debugMode ?? 0, true) // debugMode
 
     this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)
-  }
-
-
-  /**
-   * Update IBL uniforms from environment store.
-   * @param ctx
-   */
-  updateIBLUniforms(ctx: WebGPURenderContext): void {
-    if (!this.device || !this.iblUniformBuffer || !this.rendererConfig.ibl) return
-
-    const environment = ctx.frame?.stores?.['environment'] as any
-
-    // IBLUniforms struct layout:
-    // envMapSize: f32 (0)
-    // iblIntensity: f32 (1)
-    // iblQuality: i32 (2)
-    // _padding: f32 (3)
-    // Use pre-allocated buffer to avoid per-frame GC pressure
-    const data = this.iblUniformData
-
-    data[0] = 64.0 // envMapSize (placeholder texture is 64x64)
-    data[1] = environment?.iblIntensity ?? 1.0 // iblIntensity
-
-    // Use pre-allocated DataView for integer write
-    this.iblDataView.setInt32(2 * 4, environment?.iblQuality ?? 1, true) // iblQuality
-
-    this.writeUniformBuffer(this.device, this.iblUniformBuffer, data)
   }
 
   execute(ctx: WebGPURenderContext): void {
@@ -1400,10 +1385,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // Get store versions for dirty checking
     const appearance = ctx.frame?.stores?.['appearance'] as any
-    const environment = ctx.frame?.stores?.['environment'] as any
-
     const appearanceVersion = appearance?.appearanceVersion ?? 0
-    const iblVersion = environment?.iblVersion ?? 0
 
     // ALWAYS update: Camera (mouse movement) and Basis (rotation animation)
     this.updateCameraUniforms(ctx)
@@ -1425,12 +1407,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // ALWAYS update: Quality (cheap, needed for fast/slow toggle responsiveness)
     this.updateQualityUniforms(ctx)
-
-    // CONDITIONAL: IBL uniforms - only when environment version changed
-    if (iblVersion !== this.lastIblVersion) {
-      this.updateIBLUniforms(ctx)
-      this.lastIblVersion = iblVersion
-    }
 
     // ============================================
     // DENSITY GRID COMPUTE PASS (if enabled)
@@ -1489,8 +1465,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ? ctx.getWriteTarget('quarter-color')
       : ctx.getWriteTarget('object-color')
 
-    // Depth buffer - only needed for non-temporal modes
-    // Temporal mode uses alpha blending without depth testing since all targets are quarter-res
+    // Depth buffer - only needed for non-temporal modes.
+    // Temporal mode renders to quarter-res without depth testing and is composited later.
     const depthView = isTemporal ? null : ctx.getWriteTarget('depth-buffer')
 
     if (!colorView) {
@@ -1552,8 +1528,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       })
     }
 
-    // Begin render pass - depth buffer only for non-temporal modes
-    // Temporal mode renders to quarter-res without depth testing (alpha blending handles compositing)
+    // Begin render pass - depth buffer only for non-temporal modes.
+    // Temporal mode renders to quarter-res without depth testing.
     const passEncoder = ctx.beginRenderPass({
       label: 'schroedinger-render',
       colorAttachments,
@@ -1571,14 +1547,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Group 0: Camera
     // Group 1: Combined (Lighting + Material + Quality)
     // Group 2: Object (Schroedinger + Basis)
-    // Group 3: IBL (if enabled)
     passEncoder.setPipeline(this.renderPipeline)
     passEncoder.setBindGroup(0, this.cameraBindGroup)
     passEncoder.setBindGroup(1, this.lightingBindGroup) // Combined
     passEncoder.setBindGroup(2, this.objectBindGroup)
-    if (this.rendererConfig.ibl && this.iblBindGroup) {
-      passEncoder.setBindGroup(3, this.iblBindGroup)
-    }
 
     passEncoder.setVertexBuffer(0, this.vertexBuffer)
     passEncoder.setIndexBuffer(this.indexBuffer, 'uint16' as const)
@@ -1617,8 +1589,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.qualityUniformBuffer?.destroy()
     this.schroedingerUniformBuffer?.destroy()
     this.basisUniformBuffer?.destroy()
-    this.iblUniformBuffer?.destroy()
-    this.envMapTexture?.destroy()
 
     this.vertexBuffer = null
     this.indexBuffer = null
@@ -1628,11 +1598,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.qualityUniformBuffer = null
     this.schroedingerUniformBuffer = null
     this.basisUniformBuffer = null
-    this.iblUniformBuffer = null
-    this.iblBindGroup = null
-    this.iblBindGroupLayout = null
-    this.envMapTexture = null
-    this.envMapSampler = null
 
     super.dispose()
   }

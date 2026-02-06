@@ -13,7 +13,7 @@
 
 import type { VectorND } from '@/lib/math'
 import { BINARY_FORMAT_VERSION } from '../config'
-import type { PolytopeGeometry } from '../types'
+import type { NdGeometry } from '../types'
 
 /**
  * Binary representation of polytope geometry
@@ -41,7 +41,7 @@ export interface BinaryPolytopeData {
  * @param geometry - Polytope geometry to serialize
  * @returns Binary representation
  */
-export function serializeToBinary(geometry: PolytopeGeometry): BinaryPolytopeData {
+export function serializeToBinary(geometry: NdGeometry): BinaryPolytopeData {
   const { vertices, edges, metadata } = geometry
   const vertexCount = vertices.length
   const edgeCount = edges.length
@@ -81,7 +81,7 @@ export function serializeToBinary(geometry: PolytopeGeometry): BinaryPolytopeDat
  * @param data - Binary representation
  * @returns Polytope geometry
  */
-export function deserializeFromBinary(data: BinaryPolytopeData): PolytopeGeometry {
+export function deserializeFromBinary(data: BinaryPolytopeData): NdGeometry {
   const { dimension, vertexCount, edgeCount, metadata } = data
 
   // Unpack vertices
@@ -105,7 +105,7 @@ export function deserializeFromBinary(data: BinaryPolytopeData): PolytopeGeometr
   }
 
   // Parse metadata
-  let parsedMetadata: PolytopeGeometry['metadata']
+  let parsedMetadata: NdGeometry['metadata']
   try {
     parsedMetadata = JSON.parse(metadata)
   } catch {
@@ -113,7 +113,7 @@ export function deserializeFromBinary(data: BinaryPolytopeData): PolytopeGeometr
   }
 
   return {
-    type: 'wythoff-polytope',
+    type: 'schroedinger',
     dimension,
     vertices,
     edges,
@@ -197,7 +197,7 @@ export function isBinaryFormat(data: unknown): data is BinaryPolytopeData {
  * @param geometry - Geometry to estimate
  * @returns Object with JSON and binary sizes
  */
-export function estimateStorageSizes(geometry: PolytopeGeometry): {
+export function estimateStorageSizes(geometry: NdGeometry): {
   jsonBytes: number
   binaryBytes: number
   ratio: number

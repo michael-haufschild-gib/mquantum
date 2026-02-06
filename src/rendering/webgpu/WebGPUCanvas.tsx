@@ -100,7 +100,6 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const [isInitialized, setIsInitialized] = useState(false)
   const [initError, setInitError] = useState<Error | null>(null)
 
-  const forceWebGL = useRendererStore((state) => state.forceWebGL)
   const handleDeviceLost = useRendererStore((state) => state.handleDeviceLost)
 
   // Initialize WebGPU
@@ -166,7 +165,6 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         console.error('[WebGPUCanvas] Initialization failed:', error)
         const err = error instanceof Error ? error : new Error(String(error))
         setInitError(err)
-        forceWebGL('initialization_error')
         onError?.(err)
       }
     }
@@ -183,7 +181,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         cancelAnimationFrame(frameIdRef.current)
       }
     }
-  }, [dpr, onReady, onError, forceWebGL, handleDeviceLost])
+  }, [dpr, onReady, onError, handleDeviceLost])
 
   // Handle resize
   const handleResize = useCallback(() => {

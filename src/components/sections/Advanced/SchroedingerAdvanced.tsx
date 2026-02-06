@@ -14,6 +14,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     config: state.schroedinger,
     setDensityGain: state.setSchroedingerDensityGain,
     setPowderScale: state.setSchroedingerPowderScale,
+    setUseDensityGrid: state.setSchroedingerUseDensityGrid,
     setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
     setDispersionEnabled: state.setSchroedingerDispersionEnabled,
     setDispersionStrength: state.setSchroedingerDispersionStrength,
@@ -44,6 +45,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     config,
     setDensityGain,
     setPowderScale,
+    setUseDensityGrid,
     setScatteringAnisotropy,
     setDispersionEnabled,
     setDispersionStrength,
@@ -180,6 +182,24 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-anisotropy"
         />
+        <div className="flex items-center justify-between mt-2">
+          <label className="text-xs text-text-secondary">Density Grid Acceleration</label>
+          <ToggleButton
+            pressed={config.useDensityGrid ?? false}
+            onToggle={() => setUseDensityGrid(!(config.useDensityGrid ?? false))}
+            className="text-xs px-2 py-1 h-auto"
+            ariaLabel="Toggle density grid acceleration"
+            disabled={config.isoEnabled}
+            data-testid="schroedinger-density-grid"
+          >
+            {config.useDensityGrid ? 'ON' : 'OFF'}
+          </ToggleButton>
+        </div>
+        {config.isoEnabled && (
+          <p className="text-xs text-text-tertiary">
+            Density grid acceleration is available in volumetric mode only.
+          </p>
+        )}
 
         {/* Volumetric Shadows */}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">

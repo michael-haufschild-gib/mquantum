@@ -30,8 +30,7 @@ export type ColorAlgorithm =
 export type LightingMode =
   | 'none' // No lighting modules (~400 lines saved)
   | 'simple' // Basic diffuse only (no modules needed)
-  | 'pbr' // GGX + Multi-Light (no IBL)
-  | 'full' // GGX + Multi-Light + IBL (default)
+  | 'pbr' // GGX + Multi-Light
 
 export interface WGSLShaderConfig {
   dimension: number
@@ -69,9 +68,8 @@ export interface WGSLShaderConfig {
    * Lighting mode for compile-time optimization
    * - 'none': No lighting modules (~400 lines saved)
    * - 'simple': Basic diffuse only
-   * - 'pbr': GGX + Multi-Light (no IBL)
-   * - 'full': All lighting including IBL (default)
-   * If undefined, defaults to 'full'
+   * - 'pbr': GGX + Multi-Light
+   * If undefined, defaults to 'pbr'
    */
   lightingMode?: LightingMode
 }

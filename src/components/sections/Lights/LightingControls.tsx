@@ -39,7 +39,7 @@ export const LightingControls: React.FC<LightingControlsProps> = React.memo(
     // Get current object type for AO type switching
     const objectType = useGeometryStore((state) => state.objectType)
     const isSchroedinger = objectType === 'schroedinger'
-    const isBlackHole = objectType === 'blackhole'
+    const isBlackHole = false
 
     const { selectedLightId, showLightGizmos, setShowLightGizmos } = useLightingStore(
       useShallow((state: LightingSlice) => ({

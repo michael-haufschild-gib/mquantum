@@ -1,66 +1,61 @@
 # Codebase Structure
 
 ```
-mdimension/
+mquantum/
 ├── src/
 │   ├── components/
 │   │   ├── ui/              # Reusable UI primitives (Button, Slider, Modal, etc.)
 │   │   ├── layout/          # Layout frames, panels, top bars, drawers
 │   │   ├── sections/        # Sidebar/editor sections (feature groupings)
-│   │   ├── canvas/          # R3F helpers (controllers, gizmos)
-│   │   └── ...              # Domain components (presets, share, etc.)
+│   │   ├── canvas/          # Performance monitor, gizmos, debug overlays
+│   │   ├── controls/        # Domain controls (export, share buttons)
+│   │   ├── overlays/        # Modals and notifications
+│   │   └── presets/         # Scene/style preset managers
 │   │
 │   ├── hooks/               # React hooks (wire stores + rendering + UI)
 │   │
 │   ├── lib/                 # Pure logic (no React)
 │   │   ├── math/            # N-dimensional math utilities
-│   │   ├── geometry/        # Object generation algorithms
-│   │   └── projection/      # Projection algorithms
+│   │   ├── geometry/        # Object type registry, Schroedinger config, presets
+│   │   ├── cache/           # IndexedDB cache + Hermite polynomial constants
+│   │   ├── wasm/            # WASM bridge (animation math only)
+│   │   ├── url/             # URL state serialization
+│   │   ├── colors/          # Color utilities
+│   │   ├── export/          # Image/video export
+│   │   └── animation/       # Animation bias calculations
 │   │
-│   ├── rendering/           # Rendering pipeline
-│   │   ├── renderers/       # Specific renderers (polytope, mandelbulb, etc.)
-│   │   └── shaders/         # GLSL shader code
+│   ├── rendering/
+│   │   └── webgpu/          # WebGPU rendering pipeline (ONLY renderer)
+│   │       ├── core/        # WebGPUDevice, Camera, BasePass, UniformBuffer, ResourcePool
+│   │       ├── graph/       # Declarative render graph (pass ordering, resource allocation)
+│   │       ├── renderers/   # WebGPUSchrodingerRenderer, Skybox, GroundPlane
+│   │       ├── passes/      # Post-processing passes (Bloom, SSAO, SSR, Bokeh, etc.)
+│   │       ├── shaders/     # All WGSL shaders
+│   │       │   ├── shared/        # Shared WGSL modules (lighting, color, math, depth)
+│   │       │   ├── schroedinger/  # Schroedinger SDF, quantum functions, volume integration
+│   │       │   ├── postprocessing/# Bloom, tonemapping, FXAA, SMAA, SSR shaders
+│   │       │   ├── skybox/        # 7 procedural skybox modes
+│   │       │   ├── groundplane/   # Ground plane + grid shaders
+│   │       │   └── temporal/      # Temporal reprojection/reconstruction
+│   │       └── utils/       # WebGPU-specific utilities (lighting, color)
 │   │
-│   ├── stores/              # Zustand stores + slices
-│   │   ├── slices/          # Store slices
-│   │   └── defaults/        # Default constants
+│   ├── stores/              # Zustand stores + slices (global state)
+│   │   ├── slices/
+│   │   │   ├── visual/      # Material, color, render, PBR slices
+│   │   │   └── geometry/    # Schroedinger slice
+│   │   ├── defaults/        # Default values
+│   │   └── utils/           # Preset serialization, merge helpers
 │   │
-│   ├── workers/             # Web Workers (expensive computations)
-│   │
-│   ├── types/               # TypeScript type definitions
-│   │
-│   ├── contexts/            # React context providers
-│   │
-│   ├── utils/               # Utility functions
-│   │
-│   ├── styles/              # Additional styles
-│   │
-│   ├── assets/              # Static assets
-│   │
-│   ├── constants/           # Application constants
-│   │
-│   ├── dev-tools/           # Development tools (debug panels)
-│   │
-│   ├── wasm/                # Optional Rust WASM module
-│   │   └── mdimension_core/ # WASM package (wasm-pack)
-│   │
-│   ├── tests/               # Vitest tests (mirror src structure)
-│   │   ├── __mocks__/       # Test mocks
-│   │   ├── lib/             # lib tests
-│   │   ├── stores/          # store tests
-│   │   ├── hooks/           # hook tests
-│   │   ├── components/      # component tests
-│   │   └── rendering/       # rendering tests
-│   │
-│   ├── App.tsx              # Root component
-│   ├── main.tsx             # Entry point
-│   └── index.css            # Tailwind CSS with @theme tokens
+│   ├── types/               # TypeScript type declarations
+│   ├── wasm/                # Rust WASM source (animation math only)
+│   │   └── mdimension_core/ # WASM package (wasm-pack) - rotation, projection, matrix/vector ops
+│   ├── theme/               # CSS helper utilities
+│   └── tests/               # Vitest tests (mirror src structure)
+│       └── __mocks__/       # Test mocks (WASM module mock)
 │
 ├── scripts/
 │   ├── playwright/          # Playwright E2E tests (*.spec.ts)
 │   └── tools/               # Utility scripts
-│
-├── screenshots/             # Visual artifacts (png, jpg, json)
 │
 ├── docs/                    # Documentation
 │   ├── architecture.md      # Architecture guide
@@ -68,8 +63,6 @@ mdimension/
 │   ├── frontend.md          # Frontend patterns
 │   └── meta/
 │       └── styleguide.md    # Style guide
-│
-├── public/                  # Static public assets
 │
 └── [config files]           # vite.config.ts, vitest.config.ts, etc.
 ```
@@ -79,13 +72,13 @@ mdimension/
 | Directory | Purpose |
 |-----------|---------|
 | `src/components/ui/` | All reusable UI primitives |
-| `src/rendering/` | Three.js render pipeline, shaders |
+| `src/rendering/webgpu/` | WebGPU render pipeline, WGSL shaders, passes |
+| `src/rendering/webgpu/shaders/schroedinger/` | Quantum physics WGSL shaders |
 | `src/stores/` | Zustand state management |
-| `src/lib/` | Pure math/geometry logic |
+| `src/lib/` | Pure math/geometry/WASM logic |
 | `src/hooks/` | React hooks |
 | `src/tests/` | Vitest tests |
 | `scripts/playwright/` | E2E tests |
-| `screenshots/` | Visual outputs |
 
 ## Forbidden Locations
 

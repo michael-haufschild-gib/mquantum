@@ -25,7 +25,7 @@ export const MATERIAL_INITIAL_STATE: MaterialSliceState = {
   tubeCaps: DEFAULT_TUBE_CAPS,
 
   // Emission
-  faceEmission: 0.0,
+  faceEmission: 0.3,
   faceEmissionThreshold: 0.0,
   faceEmissionColorShift: 0.0,
   faceEmissionPulsing: false,
@@ -37,10 +37,7 @@ export const createMaterialSlice: StateCreator<AppearanceSlice, [], [], Material
 
   setEdgeThickness: (thickness) => {
     const clamped = Math.max(0, Math.min(5, thickness))
-    set({
-      edgeThickness: clamped,
-      edgesVisible: clamped > 0,
-    })
+    set({ edgeThickness: clamped })
   },
   setFaceOpacity: (opacity) => set({ faceOpacity: Math.max(0, Math.min(1, opacity)) }),
   setTubeCaps: (caps) => set({ tubeCaps: caps }),

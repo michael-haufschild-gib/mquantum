@@ -21,29 +21,22 @@ describe('Enhanced Features Stores (invariants)', () => {
   })
 
   describe('Appearance coupling invariants', () => {
-    it('setFacesVisible(false) forces shaderType=wireframe (raymarchers rely on render mode)', () => {
+    it('setShaderType switches between wireframe and surface modes', () => {
       useAppearanceStore.getState().setShaderType('surface')
-      useAppearanceStore.getState().setFacesVisible(false)
-      expect(useAppearanceStore.getState().facesVisible).toBe(false)
-      expect(useAppearanceStore.getState().shaderType).toBe('wireframe')
-
-      useAppearanceStore.getState().setFacesVisible(true)
-      expect(useAppearanceStore.getState().facesVisible).toBe(true)
       expect(useAppearanceStore.getState().shaderType).toBe('surface')
+      useAppearanceStore.getState().setShaderType('wireframe')
+      expect(useAppearanceStore.getState().shaderType).toBe('wireframe')
     })
 
-    it('setEdgesVisible(false) forces edgeThickness=0; enabling edges enforces thickness>=1', () => {
+    it('setEdgeThickness clamps to [0, 5] without coupling to visibility toggles', () => {
       useAppearanceStore.getState().setEdgeThickness(2)
       expect(useAppearanceStore.getState().edgeThickness).toBe(2)
 
-      useAppearanceStore.getState().setEdgesVisible(false)
-      expect(useAppearanceStore.getState().edgesVisible).toBe(false)
+      useAppearanceStore.getState().setEdgeThickness(-5)
       expect(useAppearanceStore.getState().edgeThickness).toBe(0)
 
-      // If edges are enabled while thickness is 0, store should bump to a visible thickness.
-      useAppearanceStore.getState().setEdgesVisible(true)
-      expect(useAppearanceStore.getState().edgesVisible).toBe(true)
-      expect(useAppearanceStore.getState().edgeThickness).toBeGreaterThanOrEqual(1)
+      useAppearanceStore.getState().setEdgeThickness(99)
+      expect(useAppearanceStore.getState().edgeThickness).toBe(5)
     })
   })
 

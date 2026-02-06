@@ -1,10 +1,10 @@
 # Testing Guide for LLM Coding Agents
 
-**Purpose**: This teaches you HOW to write, place, and run tests in this repo (Vitest + Playwright) while staying memory-safe and WebGL-aware.
+**Purpose**: Instructions for writing, placing, and running tests in this WebGPU quantum visualization project (Vitest + Playwright).
 
 **Non-negotiable**:
 - Maintain **100% test coverage** for new functionality.
-- Do **not** “fix” failing tests by weakening assertions. Fix the code.
+- Do **not** "fix" failing tests by weakening assertions. Fix the code.
 - Do **not** use fetch-based debugging. For runtime debugging use **Playwright + console logs**.
 
 ## Test Stack
@@ -21,14 +21,15 @@
 
 ### Decision tree: where does this test go?
 
-| If you changed… | Put tests in… |
+| If you changed... | Put tests in... |
 |---|---|
 | Pure math/geometry `src/lib/...` | `src/tests/lib/...` |
 | Zustand store `src/stores/...` | `src/tests/stores/...` |
 | Hook `src/hooks/...` | `src/tests/hooks/...` |
 | UI primitive `src/components/ui/...` | `src/tests/components/ui/...` |
-| Rendering pipeline `src/rendering/...` | `src/tests/rendering/...` and/or `src/tests/integration/...` |
-| Visual correctness / WebGL errors / render graph issues | `scripts/playwright/*.spec.ts` |
+| WebGPU rendering `src/rendering/webgpu/...` | `src/tests/rendering/webgpu/...` |
+| WGSL shader logic (string composition) | `src/tests/rendering/webgpu/...` |
+| Visual correctness / WebGPU errors / render issues | `scripts/playwright/*.spec.ts` |
 
 ## What the Test Environment Already Provides (Do not re-implement)
 
@@ -36,10 +37,15 @@ Vitest is configured with `src/tests/setup.ts` which already:
 - Calls `cleanup()` after each test.
 - Mocks `ResizeObserver` and `matchMedia`.
 - Provides in-memory `localStorage`/`sessionStorage` (for Zustand persist).
-- Provides a **comprehensive WebGL2 mock** for Three.js.
-- Suppresses known benign R3F warnings (so tests fail on real problems).
+- Suppresses known benign R3F warnings.
 - Mocks the WASM module via alias:
   - `mdimension-core` is aliased to `src/tests/__mocks__/mdimension-core.ts`
+
+**Important**: WebGPU APIs (`GPUDevice`, `GPUAdapter`, etc.) are **not** available in the happy-dom test environment. Test WebGPU passes by:
+- Testing shader string composition (WGSL output correctness)
+- Testing store logic and uniform value computation
+- Testing pass configuration (enabled/disabled logic)
+- Using Playwright for actual GPU rendering validation
 
 ## How to Run Tests (Commands)
 
@@ -92,22 +98,20 @@ Create: `src/tests/stores/<store>.test.ts`
 
 ```ts
 import { beforeEach, describe, expect, it } from 'vitest'
-import { use<Domain>Store } from '@/stores'
+import { use<Domain>Store } from '@/stores/<domain>Store'
 
 describe('use<Domain>Store', () => {
   beforeEach(() => {
-    // Prefer store-provided reset; otherwise setState to initial values.
     use<Domain>Store.getState().reset?.()
   })
 
-  it('has stable initial state', () => {
+  it('has correct initial state', () => {
     const s = use<Domain>Store.getState()
-    expect(s).toBeDefined()
+    expect(s.value).toBe(DEFAULT_VALUE)
   })
 
   it('updates state via an action', () => {
-    const { setValue } = use<Domain>Store.getState()
-    setValue(123)
+    use<Domain>Store.getState().setValue(123)
     expect(use<Domain>Store.getState().value).toBe(123)
   })
 })
@@ -126,7 +130,6 @@ import { <Component> } from '@/components/ui/<Component>'
 describe('<Component>', () => {
   it('renders', () => {
     render(<<Component> />)
-    // Prefer role-based queries
     expect(screen.getByTestId('<test-id>')).toBeInTheDocument()
   })
 
@@ -159,11 +162,52 @@ describe('use<Hook>', () => {
 })
 ```
 
-## Playwright Patterns (This project’s way)
+### Template: WGSL shader composition test
+
+Create: `src/tests/rendering/webgpu/<shader>.test.ts`
+
+```ts
+import { describe, expect, it } from 'vitest'
+import { <shaderBlock> } from '@/rendering/webgpu/shaders/<category>/<module>'
+
+describe('<shader> WGSL', () => {
+  it('contains required function declarations', () => {
+    expect(<shaderBlock>).toContain('fn <functionName>')
+  })
+
+  it('declares correct uniform bindings', () => {
+    expect(<shaderBlock>).toContain('@group(0) @binding(0)')
+  })
+})
+```
+
+### Template: WebGPU pass configuration test
+
+Create: `src/tests/rendering/webgpu/<pass>.test.ts`
+
+```ts
+import { describe, expect, it } from 'vitest'
+import { <Pass>Pass } from '@/rendering/webgpu/passes/<Pass>Pass'
+
+describe('<Pass>Pass', () => {
+  it('declares correct inputs and outputs', () => {
+    const decl = <Pass>Pass.declare()
+    expect(decl.inputs).toContain('hdr-color')
+    expect(decl.outputs).toContain('<pass>-output')
+  })
+
+  it('is disabled when feature is off', () => {
+    const ctx = { stores: { postProcessing: { <pass>Enabled: false } } }
+    expect(<Pass>Pass.declare().enabled(ctx)).toBe(false)
+  })
+})
+```
+
+## Playwright Patterns
 
 ### When to use Playwright (decision tree)
 
-- If the change can cause **WebGL errors**, **shader compile issues**, **render graph warnings**, or “canvas is black” → write/extend a Playwright test.
+- If the change can cause **WebGPU errors**, **shader compile issues**, **render graph warnings**, or "canvas is black" -> write/extend a Playwright test.
 - If you need to debug runtime behavior: use **Playwright + page console collection**, not fetch.
 
 ### Template: Playwright acceptance test with console collection
@@ -173,7 +217,7 @@ Create: `scripts/playwright/<feature>.spec.ts`
 ```ts
 import { ConsoleMessage, expect, test } from '@playwright/test'
 
-test('<feature> does not emit WebGL or render graph errors', async ({ page }) => {
+test('<feature> does not emit WebGPU or render graph errors', async ({ page }) => {
   const errors: string[] = []
   const warnings: string[] = []
 
@@ -189,15 +233,15 @@ test('<feature> does not emit WebGL or render graph errors', async ({ page }) =>
   await page.waitForSelector('canvas', { state: 'visible' })
   await page.waitForTimeout(1500)
 
-  // Fast “gate”: fail on hard errors
-  expect(errors.join('\n')).not.toMatch(/WebGL|GLSL|shader|RenderGraph|Graph compilation/i)
+  // Fast "gate": fail on hard errors
+  expect(errors.join('\n')).not.toMatch(/WebGPU|WGSL|shader|RenderGraph|Graph compilation/i)
 })
 ```
 
-### Recommended “gates” (order by cost)
+### Recommended "gates" (order by cost)
 
-1. **Console gate**: fail fast on WebGL/shader/render-graph errors.
-2. **Center pixel gate**: sample a small canvas region to detect “all black” renders.
+1. **Console gate**: fail fast on WebGPU/shader/render-graph errors.
+2. **Center pixel gate**: sample a small canvas region to detect "all black" renders.
 3. **Full screenshot analysis**: only when necessary (most expensive).
 
 ## Memory-Safe Testing Rules (Do not break these)
@@ -208,23 +252,23 @@ test('<feature> does not emit WebGL or render graph errors', async ({ page }) =>
 
 ## Common Mistakes
 
-❌ **Don't**: Write tests outside `src/tests/` or Playwright specs outside `scripts/playwright/`.
-✅ **Do**: Follow the placement rules and mirror source structure.
+- **Don't**: Write tests outside `src/tests/` or Playwright specs outside `scripts/playwright/`.
+  **Do**: Follow the placement rules and mirror source structure.
 
-❌ **Don't**: Add ad-hoc WebGL mocks inside individual tests.
-✅ **Do**: Use the shared environment in `src/tests/setup.ts` and only mock narrowly when needed.
+- **Don't**: Try to instantiate WebGPU APIs (`GPUDevice`, `GPUAdapter`) in Vitest.
+  **Do**: Test shader string composition and store logic in Vitest; use Playwright for GPU validation.
 
-❌ **Don't**: Use fetch-based debugging or remote logging in tests.
-✅ **Do**: Use Playwright console capture (`page.on('console')`) and assert on collected logs.
+- **Don't**: Use fetch-based debugging or remote logging in tests.
+  **Do**: Use Playwright console capture (`page.on('console')`) and assert on collected logs.
 
-❌ **Don't**: Run Vitest watch mode in automation.
-✅ **Do**: Use `npm test` (`vitest run`) for CI-safe execution.
+- **Don't**: Run Vitest watch mode in automation.
+  **Do**: Use `npm test` (`vitest run`) for CI-safe execution.
 
-❌ **Don't**: Test Three.js internals (exact matrices, internal renderer state) in Vitest.
-✅ **Do**: Test your own inputs/outputs and use Playwright for visual/WebGL validation.
+- **Don't**: Forget store resets (test pollution).
+  **Do**: Reset stores in `beforeEach` (or `setState` to initial state).
 
-❌ **Don't**: Forget store resets (test pollution).
-✅ **Do**: Reset stores in `beforeEach` (or `setState` to initial state).
+- **Don't**: Change `maxWorkers`/pool config to "make tests faster".
+  **Do**: Keep worker limits stable to prevent memory exhaustion.
 
-❌ **Don't**: Change `maxWorkers`/pool config to “make tests faster”.
-✅ **Do**: Keep worker limits stable to prevent memory exhaustion.
+- **Don't**: Test WebGPU internals (exact buffer contents, pipeline state) in Vitest.
+  **Do**: Test your own inputs/outputs and use Playwright for visual/rendering validation.

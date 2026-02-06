@@ -1,5 +1,4 @@
-import { getConfigStoreKey, isRaymarchingType } from '@/lib/geometry/registry'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { isRaymarchingType } from '@/lib/geometry/registry'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
 import React from 'react'
@@ -22,23 +21,11 @@ export const StatsTabContent = React.memo(function StatsTabContent() {
   )
 
   const objectType = useGeometryStore((s) => s.objectType)
-  const { mandelbulbConfig, quaternionJuliaConfig } = useExtendedObjectStore(
-    useShallow((s) => ({
-      mandelbulbConfig: s.mandelbulb,
-      quaternionJuliaConfig: s.quaternionJulia,
-    }))
-  )
 
   const sceneVertices = sceneGpu.triangles * 3 + sceneGpu.lines * 2 + sceneGpu.points
   const totalVertices = gpu.triangles * 3 + gpu.lines * 2 + gpu.points
   const isRaymarching = isRaymarchingType(objectType)
-  const configKey = getConfigStoreKey(objectType)
-  const raySteps =
-    configKey === 'mandelbulb'
-      ? mandelbulbConfig.maxIterations
-      : configKey === 'quaternionJulia'
-        ? quaternionJuliaConfig.maxIterations
-        : 0
+  const raySteps = 0
 
   return (
     <div className="grid grid-cols-1 gap-5 p-5">

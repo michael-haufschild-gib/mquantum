@@ -9,13 +9,12 @@
  * 5. sphericalHarmonics - Y_lm (depends on legendre)
  * 6. ho1d - 1D harmonic oscillator (depends on hermite)
  * 7. hydrogenRadial - Hydrogen radial R_nl (depends on laguerre)
- * 8. hydrogenPsi - Full hydrogen ψ_nlm (depends on hydrogenRadial, sphericalHarmonics)
- * 9. hydrogenNDCommon - Shared hydrogen ND utilities
- * 10. hoNDVariants - Dimension-specific HO ND (depends on ho1d)
- * 11. hoSuperpositionVariants - Unrolled HO superposition (depends on hoNDVariants)
- * 12. hydrogenNDVariants - Dimension-specific hydrogen ND (depends on hydrogenNDCommon)
- * 13. psi - Mode-switching wavefunction evaluation (depends on all above)
- * 14. density - Density field calculations (depends on psi)
+ * 8. hydrogenNDCommon - Shared hydrogen ND utilities
+ * 9. hoNDVariants - Dimension-specific HO ND (depends on ho1d)
+ * 10. hoSuperpositionVariants - Unrolled HO superposition (depends on hoNDVariants)
+ * 11. hydrogenNDVariants - Dimension-specific hydrogen ND (depends on hydrogenNDCommon)
+ * 12. psi - Mode-switching wavefunction evaluation (depends on all above)
+ * 13. density - Density field calculations (depends on psi)
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum
  */
@@ -30,7 +29,6 @@ export { ho1dBlock } from './ho1d.wgsl'
 
 // Hydrogen atom modules
 export { hydrogenRadialBlock } from './hydrogenRadial.wgsl'
-export { hydrogenPsiBlock } from './hydrogenPsi.wgsl'
 export { hydrogenNDCommonBlock } from './hydrogenNDCommon.wgsl'
 
 // Dimension-specific HO ND variants with generators

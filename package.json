@@ -17,9 +17,6 @@
     "format:rust": "cargo fmt --manifest-path src/wasm/mdimension_core/Cargo.toml"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.5.0",
-    "@react-three/postprocessing": "^3.0.4",
     "@tailwindcss/vite": "^4.1.18",
     "@testing-library/dom": "^10.4.1",
     "convex-hull": "^1.0.3",
@@ -27,11 +24,9 @@
     "ktx-parse": "^1.1.0",
     "mediabunny": "^1.27.4",
     "motion": "^12.24.12",
-    "postprocessing": "^6.38.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwindcss": "^4.1.18",
-    "three": "^0.182.0",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
@@ -41,10 +36,10 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.9",
     "@types/react-dom": "19.2.3",
-    "@types/three": "^0.182.0",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
     "@vitejs/plugin-react": "^5.1.2",
+    "@webgpu/types": "^0.1.69",
     "comlink": "^4.4.2",
     "eslint": "^9.15.0",
     "eslint-plugin-jsdoc": "^62.0.0",

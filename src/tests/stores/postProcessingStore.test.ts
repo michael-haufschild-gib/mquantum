@@ -143,78 +143,6 @@ describe('postProcessingStore', () => {
     })
   })
 
-  describe('SSR (screen-space reflections)', () => {
-    it('should toggle SSR enabled', () => {
-      const { setSSREnabled } = usePostProcessingStore.getState()
-
-      setSSREnabled(true)
-      expect(usePostProcessingStore.getState().ssrEnabled).toBe(true)
-    })
-
-    it('should set SSR intensity with clamping', () => {
-      const { setSSRIntensity } = usePostProcessingStore.getState()
-
-      setSSRIntensity(0.5)
-      expect(usePostProcessingStore.getState().ssrIntensity).toBe(0.5)
-
-      setSSRIntensity(2)
-      expect(usePostProcessingStore.getState().ssrIntensity).toBe(1)
-    })
-
-    it('should set SSR max distance with clamping', () => {
-      const { setSSRMaxDistance } = usePostProcessingStore.getState()
-
-      setSSRMaxDistance(20)
-      expect(usePostProcessingStore.getState().ssrMaxDistance).toBe(20)
-    })
-
-    it('should set SSR quality', () => {
-      const { setSSRQuality } = usePostProcessingStore.getState()
-
-      setSSRQuality('high')
-      expect(usePostProcessingStore.getState().ssrQuality).toBe('high')
-    })
-
-    it('should maintain fadeStart < fadeEnd constraint', () => {
-      const { setSSRFadeStart, setSSRFadeEnd } = usePostProcessingStore.getState()
-
-      setSSRFadeEnd(0.8)
-      setSSRFadeStart(0.9) // Trying to set higher than end
-
-      const state = usePostProcessingStore.getState()
-      expect(state.ssrFadeStart).toBeLessThan(state.ssrFadeEnd)
-    })
-  })
-
-  describe('refraction', () => {
-    it('should toggle refraction enabled', () => {
-      const { setRefractionEnabled } = usePostProcessingStore.getState()
-
-      setRefractionEnabled(true)
-      expect(usePostProcessingStore.getState().refractionEnabled).toBe(true)
-    })
-
-    it('should set refraction IOR with clamping', () => {
-      const { setRefractionIOR } = usePostProcessingStore.getState()
-
-      setRefractionIOR(1.5)
-      expect(usePostProcessingStore.getState().refractionIOR).toBe(1.5)
-
-      setRefractionIOR(0.5)
-      expect(usePostProcessingStore.getState().refractionIOR).toBe(1.0)
-
-      setRefractionIOR(5)
-      expect(usePostProcessingStore.getState().refractionIOR).toBe(2.5)
-    })
-
-    it('should set refraction strength with clamping', () => {
-      const { setRefractionStrength } = usePostProcessingStore.getState()
-
-      setRefractionStrength(0.5)
-      expect(usePostProcessingStore.getState().refractionStrength).toBe(0.5)
-    })
-  })
-
   describe('anti-aliasing', () => {
     it('should set anti-aliasing method', () => {
       const { setAntiAliasingMethod } = usePostProcessingStore.getState()
@@ -297,55 +225,6 @@ describe('postProcessingStore', () => {
 
       setObjectOnlyDepth(false)
       expect(usePostProcessingStore.getState().objectOnlyDepth).toBe(false)
-    })
-  })
-
-  describe('gravitational lensing', () => {
-    it('should toggle gravity enabled', () => {
-      const { setGravityEnabled } = usePostProcessingStore.getState()
-
-      setGravityEnabled(true)
-      expect(usePostProcessingStore.getState().gravityEnabled).toBe(true)
-    })
-
-    it('should set gravity strength with clamping', () => {
-      const { setGravityStrength } = usePostProcessingStore.getState()
-
-      setGravityStrength(5)
-      expect(usePostProcessingStore.getState().gravityStrength).toBe(5)
-
-      setGravityStrength(0)
-      expect(usePostProcessingStore.getState().gravityStrength).toBe(0.1)
-
-      setGravityStrength(20)
-      expect(usePostProcessingStore.getState().gravityStrength).toBe(10)
-    })
-
-    it('should set gravity distortion scale with clamping', () => {
-      const { setGravityDistortionScale } = usePostProcessingStore.getState()
-
-      setGravityDistortionScale(2)
-      expect(usePostProcessingStore.getState().gravityDistortionScale).toBe(2)
-    })
-
-    it('should set gravity falloff with clamping', () => {
-      const { setGravityFalloff } = usePostProcessingStore.getState()
-
-      setGravityFalloff(2)
-      expect(usePostProcessingStore.getState().gravityFalloff).toBe(2)
-
-      setGravityFalloff(0)
-      expect(usePostProcessingStore.getState().gravityFalloff).toBe(0.5)
-
-      setGravityFalloff(10)
-      expect(usePostProcessingStore.getState().gravityFalloff).toBe(4)
-    })
-
-    it('should set gravity chromatic aberration with clamping', () => {
-      const { setGravityChromaticAberration } = usePostProcessingStore.getState()
-
-      setGravityChromaticAberration(0.5)
-      expect(usePostProcessingStore.getState().gravityChromaticAberration).toBe(0.5)
     })
   })
 

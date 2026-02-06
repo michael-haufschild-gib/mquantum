@@ -2,13 +2,12 @@
  * SchroedingerControls Component
  *
  * Controls for configuring n-dimensional quantum wavefunction visualization.
- * Supports three physics modes:
+ * Supports two physics modes:
  * - Harmonic Oscillator: n-dimensional superposition states (default)
- * - Hydrogen Orbital: s, p, d, f electron orbitals (Coulomb potential, 3D)
  * - Hydrogen ND: n-dimensional hydrogen atom in 3D space
  *
  * Features:
- * - Mode selection (Harmonic Oscillator / Hydrogen Orbital / Hydrogen ND)
+ * - Mode selection (Harmonic Oscillator / Hydrogen ND)
  * - Preset selection for each mode
  * - Quantum parameter controls
  * - Volume rendering settings
@@ -23,9 +22,8 @@ import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/exten
 import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
-import { HydrogenOrbitalControls } from './HydrogenOrbitalControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
-import type { HarmonicOscillatorActions, HydrogenOrbitalActions, HydrogenNDActions } from './types'
+import type { HarmonicOscillatorActions, HydrogenNDActions } from './types'
 
 /**
  * Props for the SchroedingerControls component.
@@ -69,8 +67,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFieldScale: state.setSchroedingerFieldScale,
       setSchroedingerParameterValue: state.setSchroedingerParameterValue,
       resetSchroedingerParameters: state.resetSchroedingerParameters,
-      // Hydrogen orbital actions
-      setHydrogenPreset: state.setSchroedingerHydrogenPreset,
+      // Hydrogen actions
       setPrincipalQuantumNumber: state.setSchroedingerPrincipalQuantumNumber,
       setAzimuthalQuantumNumber: state.setSchroedingerAzimuthalQuantumNumber,
       setMagneticQuantumNumber: state.setSchroedingerMagneticQuantumNumber,
@@ -95,8 +92,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFieldScale,
       setSchroedingerParameterValue,
       resetSchroedingerParameters,
-      // Hydrogen orbital actions
-      setHydrogenPreset,
+      // Hydrogen actions
       setPrincipalQuantumNumber,
       setAzimuthalQuantumNumber,
       setMagneticQuantumNumber,
@@ -114,7 +110,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const dimension = useGeometryStore((state) => state.dimension)
 
     // Check current mode
-    const isHydrogenMode = config.quantumMode === 'hydrogenOrbital'
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
 
     // Build action objects for child components
@@ -130,17 +125,12 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       resetSchroedingerParameters,
     }
 
-    const hydrogenActions: HydrogenOrbitalActions = {
-      setHydrogenPreset,
+    const hydrogenNDActions: HydrogenNDActions = {
       setPrincipalQuantumNumber,
       setAzimuthalQuantumNumber,
       setMagneticQuantumNumber,
       setUseRealOrbitals,
       setBohrRadiusScale,
-    }
-
-    const hydrogenNDActions: HydrogenNDActions = {
-      ...hydrogenActions,
       setHydrogenNDPreset,
       setExtraDimQuantumNumber,
       setExtraDimFrequencySpread,
@@ -168,31 +158,24 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
             <ToggleGroup
               options={[
                 { value: 'harmonicOscillator', label: 'Harmonic' },
-                { value: 'hydrogenOrbital', label: 'Hydrogen 3D' },
                 { value: 'hydrogenND', label: 'Hydrogen ND' },
               ]}
               value={config.quantumMode}
-              onChange={(v) =>
-                setQuantumMode(v as 'harmonicOscillator' | 'hydrogenOrbital' | 'hydrogenND')
-              }
+              onChange={(v) => setQuantumMode(v as 'harmonicOscillator' | 'hydrogenND')}
               ariaLabel="Select physics mode"
               data-testid="mode-selector"
             />
             <p className="text-xs text-text-tertiary">
-              {isHydrogenMode
-                ? 'Electron orbitals from Coulomb potential (s, p, d, f shapes)'
-                : isHydrogenNDMode
-                  ? 'N-dimensional hydrogen atom in 3D space'
-                  : 'N-dimensional quantum superposition states'}
+              {isHydrogenNDMode
+                ? 'N-dimensional hydrogen atom in 3D space'
+                : 'N-dimensional quantum superposition states'}
             </p>
           </div>
         </Section>
 
         {/* Quantum State Section - content depends on mode */}
         <Section title="Quantum State" defaultOpen={true}>
-          {isHydrogenMode ? (
-            <HydrogenOrbitalControls config={config} actions={hydrogenActions} />
-          ) : isHydrogenNDMode ? (
+          {isHydrogenNDMode ? (
             <HydrogenNDControls config={config} dimension={dimension} actions={hydrogenNDActions} />
           ) : (
             <HarmonicOscillatorControls
@@ -206,9 +189,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         {/* Render Mode Info */}
         <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
           <p>Rendering: Volumetric (Beer-Lambert)</p>
-          {isHydrogenMode && (
-            <p className="text-text-tertiary mt-1">Hydrogen orbitals are always 3D</p>
-          )}
           {isHydrogenNDMode && (
             <p className="text-text-tertiary mt-1">{dimension}D hydrogen atom viewed in 3D space</p>
           )}
@@ -222,6 +202,5 @@ SchroedingerControls.displayName = 'SchroedingerControls'
 
 // Re-export sub-components for direct imports if needed
 export { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
-export { HydrogenOrbitalControls } from './HydrogenOrbitalControls'
 export { HydrogenNDControls } from './HydrogenNDControls'
 export type * from './types'

@@ -11,32 +11,14 @@
  */
 
 import type { ObjectType } from '@/lib/geometry/types'
-import {
-  DEFAULT_BLACK_HOLE_CONFIG,
-  DEFAULT_CLIFFORD_TORUS_CONFIG,
-  DEFAULT_MANDELBROT_CONFIG,
-  DEFAULT_NESTED_TORUS_CONFIG,
-  DEFAULT_POLYTOPE_CONFIG,
-  DEFAULT_QUATERNION_JULIA_CONFIG,
-  DEFAULT_ROOT_SYSTEM_CONFIG,
-  DEFAULT_SCHROEDINGER_CONFIG,
-  DEFAULT_WYTHOFF_POLYTOPE_CONFIG,
-} from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
  * Mapping from config key to its default config.
  */
 const CONFIG_KEY_TO_DEFAULT: Record<string, object> = {
-  polytope: DEFAULT_POLYTOPE_CONFIG,
-  wythoffPolytope: DEFAULT_WYTHOFF_POLYTOPE_CONFIG,
-  rootSystem: DEFAULT_ROOT_SYSTEM_CONFIG,
-  cliffordTorus: DEFAULT_CLIFFORD_TORUS_CONFIG,
-  nestedTorus: DEFAULT_NESTED_TORUS_CONFIG,
-  mandelbulb: DEFAULT_MANDELBROT_CONFIG,
-  quaternionJulia: DEFAULT_QUATERNION_JULIA_CONFIG,
   schroedinger: DEFAULT_SCHROEDINGER_CONFIG,
-  blackhole: DEFAULT_BLACK_HOLE_CONFIG,
 }
 
 /**
@@ -93,6 +75,17 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
 }
 
 /**
+ * Applies backwards-compatibility migrations for merged Schrödinger config.
+ * @param merged
+ */
+function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
+  if (merged.quantumMode === 'hydrogenOrbital') {
+    return { ...merged, quantumMode: 'hydrogenND' }
+  }
+  return merged
+}
+
+/**
  * Merges loaded extended object state with all config defaults.
  *
  * @deprecated Use mergeExtendedObjectStateForType instead to only merge the relevant config.
@@ -102,18 +95,11 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
  * @returns Merged state with all defaults filled in
  */
 export function mergeExtendedObjectState(loaded: Record<string, unknown>): Record<string, unknown> {
+  const mergedSchroedinger = deepMerge(DEFAULT_SCHROEDINGER_CONFIG, loaded.schroedinger)
   return {
     ...loaded,
-    // Merge each config object with its defaults
-    polytope: deepMerge(DEFAULT_POLYTOPE_CONFIG, loaded.polytope),
-    wythoffPolytope: deepMerge(DEFAULT_WYTHOFF_POLYTOPE_CONFIG, loaded.wythoffPolytope),
-    rootSystem: deepMerge(DEFAULT_ROOT_SYSTEM_CONFIG, loaded.rootSystem),
-    cliffordTorus: deepMerge(DEFAULT_CLIFFORD_TORUS_CONFIG, loaded.cliffordTorus),
-    nestedTorus: deepMerge(DEFAULT_NESTED_TORUS_CONFIG, loaded.nestedTorus),
-    mandelbulb: deepMerge(DEFAULT_MANDELBROT_CONFIG, loaded.mandelbulb),
-    quaternionJulia: deepMerge(DEFAULT_QUATERNION_JULIA_CONFIG, loaded.quaternionJulia),
-    schroedinger: deepMerge(DEFAULT_SCHROEDINGER_CONFIG, loaded.schroedinger),
-    blackhole: deepMerge(DEFAULT_BLACK_HOLE_CONFIG, loaded.blackhole),
+    // Merge schroedinger config with its defaults
+    schroedinger: normalizeSchroedingerConfig(mergedSchroedinger),
   }
 }
 
@@ -124,10 +110,6 @@ export function mergeExtendedObjectState(loaded: Record<string, unknown>): Recor
  * 1. Only updates the config for the loaded object type
  * 2. Merges with defaults to handle newly added parameters
  * 3. Does NOT touch configs for other object types
- *
- * This prevents issues like:
- * - Loading a hypercube scene overwriting blackhole settings
- * - Loading a blackhole scene overwriting schroedinger settings
  *
  * @param loaded - The loaded extended object state from a saved scene (typically only contains one config)
  * @param objectType - The object type being loaded
@@ -153,7 +135,13 @@ export function mergeExtendedObjectStateForType(
 
   // Return only the merged config for this object type
   // This ensures we don't overwrite other object type configs
+  const mergedConfig = deepMerge(defaultConfig, loadedConfig)
+  const normalizedConfig =
+    configKey === 'schroedinger'
+      ? normalizeSchroedingerConfig(mergedConfig as typeof DEFAULT_SCHROEDINGER_CONFIG)
+      : mergedConfig
+
   return {
-    [configKey]: deepMerge(defaultConfig, loadedConfig),
+    [configKey]: normalizedConfig,
   }
 }

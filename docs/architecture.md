@@ -1,16 +1,28 @@
 # Architecture Guide for LLM Coding Agents
 
-**Purpose**: This teaches you HOW to add code to this repo without breaking folder boundaries, performance constraints, or WebGL2 shader requirements.
+**Purpose**: Instructions for where to put code and what patterns to follow in this WebGPU quantum visualization project.
 
-**Read this first**: `docs/meta/styleguide.md` (mandatory engineering + shader rules).
+**Read this first**: `docs/meta/styleguide.md` (mandatory engineering rules).
+
+## Project Focus
+
+**mquantum** is a **WebGPU-only** visualization of **Schroedinger quantum wavefunctions** in **3 to 11 dimensions**. It renders volumetric quantum mechanics (hydrogen orbitals, harmonic oscillators) via raymarching in WGSL shaders, with a full post-processing pipeline (bloom, SSAO, SSR, bokeh, tonemapping, etc.).
+
+- **Single object type**: `ObjectType = 'schroedinger'` (no polytopes, fractals, or black holes)
+- **Single rendering backend**: WebGPU (no WebGL, no Three.js renderer)
+- **Shader language**: WGSL (not GLSL) for all GPU shaders
+- **Quantum modes**: hydrogen (3D), hydrogen N-D, harmonic oscillator 1D, harmonic oscillator N-D
 
 ## Tech Stack (Generate code for these tools only)
 
-- **App**: React 19 + TypeScript + Vite
-- **3D**: Three.js + @react-three/fiber (+ drei)
+- **App**: React 19 + TypeScript + Vite 7
+- **3D Canvas**: Custom WebGPU renderer (pure `GPUDevice` / `GPUCommandEncoder`)
 - **State**: Zustand 5 (selectors + `useShallow` for perf)
 - **Styling**: Tailwind CSS 4 tokens defined in `src/index.css` (`@theme` + `@utility`)
 - **Testing**: Vitest (happy-dom) + Playwright (`@playwright/test`)
+- **WASM**: Rust via `wasm-pack` for math operations (rotation, projection)
+
+**Not used in the rendering path**: Three.js, React Three Fiber. These are still dependencies but are only used for a small set of legacy hooks/components, not the core rendering.
 
 ## Where to Put New Code
 
@@ -20,37 +32,67 @@ src/
 │   ├── ui/            # ONLY reusable UI primitives (Button, Slider, Modal, etc.)
 │   ├── layout/        # Layout frames, panels, top bars, drawers
 │   ├── sections/      # Sidebar/editor sections (feature groupings)
-│   ├── canvas/        # Small R3F helpers (controllers, gizmos) not core pipeline
-│   └── ...            # Domain components (presets, share, etc.)
-├── hooks/             # React hooks that wire stores + rendering + UI
-├── lib/               # Pure logic (math, geometry, shaders-as-strings helpers)
-├── rendering/         # Rendering pipeline (Scene, render graph, shaders, passes)
+│   ├── canvas/        # Performance monitor, gizmos, debug overlays
+│   ├── controls/      # Domain controls (export, share buttons)
+│   ├── overlays/      # Modals and notifications
+│   └── presets/       # Scene/style preset managers
+├── hooks/             # React hooks wiring stores + rendering + UI
+├── lib/
+│   ├── geometry/      # Object type registry, Schroedinger config, presets
+│   ├── math/          # N-D vector, matrix, rotation, projection (pure logic)
+│   ├── cache/         # IndexedDB cache + Hermite polynomial constants
+│   ├── wasm/          # WASM bridge utilities
+│   ├── url/           # URL state serialization
+│   ├── colors/        # Color utilities
+│   ├── export/        # Image/video export
+│   └── animation/     # Animation bias calculations
+├── rendering/
+│   └── webgpu/
+│       ├── core/      # WebGPUDevice, Camera, BasePass, UniformBuffer, ResourcePool
+│       ├── graph/     # Declarative render graph (pass ordering, resource allocation)
+│       ├── renderers/ # WebGPUSchrodingerRenderer, Skybox, GroundPlane
+│       ├── passes/    # Post-processing passes (Bloom, SSAO, SSR, Bokeh, etc.)
+│       ├── shaders/   # All WGSL shaders
+│       │   ├── shared/        # Shared WGSL modules (lighting, color, math, depth)
+│       │   ├── schroedinger/  # Schroedinger SDF, quantum functions, volume integration
+│       │   ├── postprocessing/# Bloom, tonemapping, FXAA, SMAA, SSR shaders
+│       │   ├── skybox/        # 7 procedural skybox modes
+│       │   ├── groundplane/   # Ground plane + grid shaders
+│       │   └── temporal/      # Temporal reprojection/reconstruction
+│       └── utils/     # WebGPU-specific utilities (lighting, color)
 ├── stores/            # Zustand stores + slices (global state)
-├── workers/           # Web Workers (expensive geometry computations)
-└── theme/             # CSS helper utilities (currently `themeUtils.tsx`)
+│   ├── slices/
+│   │   ├── visual/    # Material, color, render, PBR slices
+│   │   └── geometry/  # Schroedinger slice
+│   ├── defaults/      # Default values
+│   └── utils/         # Preset serialization, merge helpers
+├── types/             # TypeScript type declarations
+├── wasm/              # Rust WASM source (mdimension_core)
+└── theme/             # CSS helper utilities (themeUtils.tsx)
 scripts/
 ├── playwright/        # Playwright E2E tests ONLY (must be `*.spec.ts`)
 └── tools/             # One-off utilities / verification scripts
-screenshots/           # Visual artifacts (png/jpg/json) — never in repo root
 docs/                  # Documentation
 ```
 
 ### Decision tree: where does this code go?
 
 - **Creating/adjusting UI controls**:
-  - **Reusable primitive** (Button/Select/Slider/Modal) → `src/components/ui/`
-  - **Feature control group / panel section** → `src/components/sections/<Feature>/`
-  - **Layout container** (top bar, drawers, split panes) → `src/components/layout/`
+  - **Reusable primitive** (Button/Select/Slider/Modal) -> `src/components/ui/`
+  - **Feature control group / panel section** -> `src/components/sections/<Feature>/`
+  - **Layout container** (top bar, drawers, split panes) -> `src/components/layout/`
 - **Creating/adjusting global state**:
-  - **Zustand store** (new domain) → `src/stores/<domain>Store.ts`
-  - **Store slice** (extend existing store) → `src/stores/slices/...`
-  - **Default constants** → `src/stores/defaults/...`
-- **Creating/adjusting rendering**:
-  - **Scene wiring** / top-level render graph → `src/rendering/`
-  - **A specific renderer** (polytope / mandelbulb / etc.) → `src/rendering/renderers/`
-  - **Shader code** or shader helpers → `src/rendering/shaders/` (or `src/lib/shaders/` if pure helpers)
-- **Pure math/geometry** (no React) → `src/lib/`
-- **Heavy computation** that blocks the main thread → `src/workers/` + a `src/hooks/use…Worker.ts` wrapper
+  - **Zustand store** (new domain) -> `src/stores/<domain>Store.ts`
+  - **Store slice** (extend existing store) -> `src/stores/slices/...`
+  - **Default constants** -> `src/stores/defaults/...`
+- **Creating/adjusting WebGPU rendering**:
+  - **New render pass** -> `src/rendering/webgpu/passes/<PassName>.ts`
+  - **New WGSL shader** -> `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
+  - **New renderer** -> `src/rendering/webgpu/renderers/<Name>Renderer.ts`
+  - **Render graph wiring** -> `src/rendering/webgpu/WebGPUScene.tsx`
+  - **Core GPU utilities** -> `src/rendering/webgpu/core/`
+- **Pure math/geometry** (no React, no GPU) -> `src/lib/`
+- **Quantum physics** (SDF functions, wavefunctions) -> `src/rendering/webgpu/shaders/schroedinger/`
 
 ## Naming & Import Rules
 
@@ -60,38 +102,121 @@ docs/                  # Documentation
   - Hooks: `useCamelCase.ts`
   - Stores: `camelCaseStore.ts`
   - Slices: `*Slice.ts`
+  - WGSL shaders: `name.wgsl.ts` (TypeScript exporting template literal strings)
   - Tests: `*.test.ts` or `*.test.tsx`
   - Playwright: `*.spec.ts`
 
-## UI Rules (Do NOT bypass the UI library)
+## WebGPU Rendering Architecture
 
-- **Always** build UI out of `src/components/ui/*` primitives.
-- **Never** introduce raw `<input>`, `<select>`, ad-hoc `<button>` styling, or bespoke modals unless there is no suitable primitive.
-- **Always** use the project’s Tailwind tokens + utilities:
-  - Theme tokens live in `src/index.css` (`@theme` variables).
-  - Premium utilities exist (e.g. `glass-panel`, `glass-button-primary`, `glass-input`).
-- **If you need inline styles**, prefer `src/theme/themeUtils.tsx` helpers for consistency.
+### Render Graph
 
-### Template: new UI primitive
+The rendering pipeline is a **declarative render graph** (`src/rendering/webgpu/graph/WebGPURenderGraph.ts`). Passes declare inputs, outputs, and an `enabled()` callback. The graph compiles execution order via topological sort.
 
-Create: `src/components/ui/<NAME>.tsx`, export it from `src/components/ui/index.ts`.
+```
+SchrodingerRenderer (MRT: color, normal, depth)
+  -> SkyboxRenderer / ScenePass (environment)
+    -> GroundPlaneRenderer (optional)
+      -> GTAOPass (ambient occlusion)
+        -> SSRPass (screen-space reflections)
+          -> EnvironmentCompositePass (combine object + environment)
+            -> BloomPass -> BokehPass -> RefractionPass -> FrameBlendingPass
+              -> TonemappingPass (HDR -> LDR)
+                -> CinematicPass -> PaperTexturePass
+                  -> FXAAPass / SMAAPass (anti-aliasing)
+                    -> ToScreenPass (final output to canvas)
+```
 
-```tsx
-import React from 'react'
+### Key abstractions
 
-export interface <NAME>Props {
-  className?: string
-  disabled?: boolean
-  'data-testid'?: string
+- **WebGPUDevice**: Singleton managing `GPUAdapter`, `GPUDevice`, canvas context
+- **WebGPUBasePass**: Base class for all passes. Provides uniform buffer management, pipeline caching, store access
+- **WebGPURenderGraph**: Manages pass ordering, resource allocation, ping-pong textures, lazy deallocation
+- **WebGPUResourcePool**: GPU resource allocation (textures, buffers, samplers) with VRAM tracking
+- **WebGPUCamera**: Pure TypeScript orbit camera with view/projection matrices
+- **WebGPUUniformBuffer**: Declarative uniform layout builder + writer
+
+### Store access in WebGPU passes
+
+Passes access stores via typed getters set on the render graph:
+
+```ts
+// In WebGPUScene.tsx setup:
+graph.setStoreGetter('appearance', () => useAppearanceStore.getState())
+
+// In a pass:
+const appearance = getStore(ctx, 'appearance')
+const color = appearance.edgeColor
+```
+
+### Template: new WebGPU render pass
+
+Create: `src/rendering/webgpu/passes/<Name>Pass.ts`
+
+```ts
+import { WebGPUBasePass } from '../core/WebGPUBasePass'
+import type { FrameContext } from '../core/types'
+import { getStore } from '../core/storeTypes'
+
+export class <Name>Pass extends WebGPUBasePass {
+  private pipeline: GPURenderPipeline | null = null
+
+  constructor(device: GPUDevice) {
+    super(device)
+  }
+
+  // Called by render graph to declare resource needs
+  static declare() {
+    return {
+      inputs: ['hdr-color'],
+      outputs: ['<name>-output'],
+      enabled: (ctx: FrameContext) => getStore(ctx, 'postProcessing').<name>Enabled,
+    }
+  }
+
+  render(ctx: FrameContext, encoder: GPUCommandEncoder): void {
+    // Get store values
+    const pp = getStore(ctx, 'postProcessing')
+    // Create render pass, bind resources, draw fullscreen quad
+  }
+
+  releaseInternalResources(): void {
+    this.pipeline = null
+  }
 }
+```
 
-export function <NAME>({ className = '', disabled = false, 'data-testid': testId }: <NAME>Props) {
-  return (
-    <div data-testid={testId} className={`glass-panel ${className}`} aria-disabled={disabled}>
-      {/* TODO: implement */}
-    </div>
-  )
-}
+### Template: WGSL shader module
+
+Create: `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
+
+```ts
+/**
+ * <Description of what this shader does>
+ */
+export const <name>Block = /* wgsl */ `
+  // Uniform bindings
+  @group(0) @binding(0) var<uniform> camera: CameraUniforms;
+
+  // Functions
+  fn <functionName>(uv: vec2f) -> vec4f {
+    // Implementation
+    return vec4f(1.0);
+  }
+`
+```
+
+Shader composition uses `composeWGSL()` from `src/rendering/webgpu/shaders/shared/compose-helpers.ts`:
+
+```ts
+import { composeWGSL, type ShaderBlock } from '../shared/compose-helpers'
+
+const blocks: ShaderBlock[] = [
+  { label: 'uniforms', code: uniformsBlock },
+  { label: 'sdf', code: sdfBlock, when: (flags) => flags.dimension === 4 },
+  { label: 'main', code: mainBlock },
+]
+
+const shaderCode = composeWGSL(blocks, featureFlags)
 ```
 
 ## Zustand Rules (Performance-critical)
@@ -105,33 +230,40 @@ export function <NAME>({ className = '', disabled = false, 'data-testid': testId
 
 `useShallow` is a hook. **Do not call it inside another hook call**.
 
-✅ Correct pattern:
-
 ```ts
+// CORRECT:
 import { useShallow } from 'zustand/react/shallow'
-import { useUIStore } from '@/stores'
-
 const uiSelector = useShallow((s: ReturnType<typeof useUIStore.getState>) => ({
   isOpen: s.isOpen,
   setOpen: s.setOpen,
 }))
-
 export function Component() {
   const { isOpen, setOpen } = useUIStore(uiSelector)
-  // ...
 }
-```
 
-❌ Incorrect pattern:
-
-```ts
-// DO NOT DO THIS
+// WRONG: Do NOT nest useShallow inside the store hook call
 const { isOpen } = useUIStore(useShallow((s) => ({ isOpen: s.isOpen })))
 ```
 
+### Version tracking pattern
+
+Stores use version counters for dirty-flag render optimization:
+
+```ts
+// In a store slice:
+setWithVersion: (updater) => {
+  set((state) => ({
+    ...updater(state),
+    schroedingerVersion: state.schroedingerVersion + 1,
+  }))
+}
+```
+
+WebGPU passes compare version numbers to skip redundant uniform uploads.
+
 ### Template: add a new store
 
-Create: `src/stores/<domain>Store.ts`, export from `src/stores/index.ts`, add tests in `src/tests/stores/`.
+Create: `src/stores/<domain>Store.ts`, export from `src/stores/index.ts`.
 
 ```ts
 import { create } from 'zustand'
@@ -151,82 +283,62 @@ export const use<Domain>Store = create<<Domain>State>((set) => ({
 }))
 ```
 
-## WebGL2 / Shader Rules (Non-negotiable)
+## Object Type Registry
 
-- **All shaders must be WebGL2 / GLSL ES 3.00**.
-- **Never** use WebGL1 syntax (`attribute`, `varying`, `gl_FragColor`, `texture2D`, `textureCube`).
-- When using `THREE.ShaderMaterial`, **always** set `glslVersion: THREE.GLSL3`.
+The single object type `'schroedinger'` is defined in `src/lib/geometry/registry/registry.ts` via `OBJECT_TYPE_REGISTRY`. The registry provides metadata:
 
-### Template: fragment shader output (GLSL3)
+- `dimensionConstraints`: min 3, max 11
+- `renderMethod`: `'raymarching'`
+- `renderingCapabilities`: faces, emission, fresnel (no edges/points)
+- `animationCapabilities`: rotation planes, parameter oscillation
+- `uiComponentMapping`: which controls/timeline components to show
 
-```glsl
-precision highp float;
-precision highp int;
+Query helpers: `isAvailableForDimension()`, `getRecommendedDimension()`, `canRenderFaces()`, `isRaymarchingType()`, `isRaymarchingFractal()`.
 
-layout(location = 0) out vec4 fragColor;
+## UI Rules (Do NOT bypass the UI library)
 
-void main() {
-  fragColor = vec4(1.0);
-}
-```
-
-### Critical Three.js DPR/viewport gotcha (RenderTargets)
-
-When rendering to a `WebGLRenderTarget` at non-standard resolution: **never call `gl.setViewport()`** (it multiplies by DPR).
-
-✅ Correct:
-
-```ts
-target.viewport.set(0, 0, target.width, target.height)
-gl.setRenderTarget(target)
-```
-
-❌ Incorrect:
-
-```ts
-gl.setRenderTarget(target)
-gl.setViewport(0, 0, target.width, target.height)
-```
-
-### Fullscreen quad vertex rule (manual quad rendering)
-
-If you render a fullscreen quad manually (not via ShaderPass), use direct NDC:
-
-```glsl
-in vec3 position;
-void main() {
-  gl_Position = vec4(position.xy, 0.0, 1.0);
-}
-```
+- **Always** build UI out of `src/components/ui/*` primitives.
+- **Never** introduce raw `<input>`, `<select>`, ad-hoc `<button>` styling.
+- **Always** use the project's Tailwind tokens + utilities:
+  - Theme tokens live in `src/index.css` (`@theme` variables).
+  - Glass morphism utilities: `glass-panel`, `glass-button-primary`, `glass-input`.
+- **If you need inline styles**, prefer `src/theme/themeUtils.tsx` helpers.
 
 ## How to Add a New Feature (Standard Procedure)
 
 1. **Decide ownership**: store vs hook vs rendering vs UI.
 2. **Add/extend store** in `src/stores/` (selectors + `useShallow`).
-3. **Add hook** in `src/hooks/` if any orchestration or derived state is needed.
-4. **Add UI** using `src/components/ui` primitives (no raw controls).
-5. **Add tests** in `src/tests/` mirroring the folder structure.
-6. **If it impacts visual output**, add Playwright coverage in `scripts/playwright/`.
+3. **Add hook** in `src/hooks/` if orchestration or derived state is needed.
+4. **Add UI** using `src/components/ui` primitives.
+5. **If it impacts rendering**, add/modify a WebGPU pass or shader module.
+6. **Add tests** in `src/tests/` mirroring the folder structure.
+7. **If it impacts visual output**, add Playwright coverage in `scripts/playwright/`.
 
 ## Common Mistakes
 
-❌ **Don't**: Add bespoke HTML controls with ad-hoc Tailwind classes when a UI primitive exists.
-✅ **Do**: Extend or compose `src/components/ui/*` primitives.
+- **Don't**: Write GLSL shaders or use `THREE.ShaderMaterial`.
+  **Do**: Write WGSL shaders as `.wgsl.ts` template strings, compose via `composeWGSL()`.
 
-❌ **Don't**: Hardcode colors (hex literals) or invent new “design tokens”.
-✅ **Do**: Use Tailwind theme variables and utilities from `src/index.css`.
+- **Don't**: Use Three.js `WebGLRenderer` or React Three Fiber `<Canvas>` for rendering.
+  **Do**: Use the WebGPU render graph (`WebGPURenderGraph`) and custom passes.
 
-❌ **Don't**: Subscribe to a whole Zustand store object (causes rerenders on unrelated changes).
-✅ **Do**: Use individual selectors or `useShallow` selectors.
+- **Don't**: Add new object types beyond `'schroedinger'`.
+  **Do**: Add new quantum modes or dimension-specific SDFs within the Schroedinger system.
 
-❌ **Don't**: Call `useShallow` inside another hook call.
-✅ **Do**: Create the selector via `useShallow(...)` first, then pass it to the store hook.
+- **Don't**: Subscribe to a whole Zustand store object.
+  **Do**: Use individual selectors or `useShallow` selectors.
 
-❌ **Don't**: Write WebGL1 shaders (`gl_FragColor`, `varying`, `texture2D`).
-✅ **Do**: Write GLSL ES 3.00 shaders with `layout(location=0) out vec4 ...;` and `texture()`.
+- **Don't**: Call `useShallow` inside another hook call.
+  **Do**: Create the selector via `useShallow(...)` first, then pass it to the store hook.
 
-❌ **Don't**: Use `gl.setViewport()` when rendering to `WebGLRenderTarget`.
-✅ **Do**: Use `target.viewport.set(...)` to avoid DPR multiplication bugs.
+- **Don't**: Hardcode colors or invent new design tokens.
+  **Do**: Use Tailwind theme variables from `src/index.css`.
 
-❌ **Don't**: Put scripts or screenshots in the repo root.
-✅ **Do**: Use `scripts/tools/`, `scripts/playwright/`, and `screenshots/`.
+- **Don't**: Put scripts or screenshots in the repo root.
+  **Do**: Use `scripts/tools/`, `scripts/playwright/`, and `screenshots/`.
+
+- **Don't**: Create GPU resources without going through `WebGPUResourcePool`.
+  **Do**: Use the resource pool for textures, buffers, and samplers.
+
+- **Don't**: Access stores directly in render passes.
+  **Do**: Use `getStore(ctx, 'storeName')` via the frame context.

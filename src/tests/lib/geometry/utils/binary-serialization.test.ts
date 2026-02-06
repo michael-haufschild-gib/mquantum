@@ -12,14 +12,14 @@ import {
   estimateStorageSizes,
   type BinaryPolytopeData,
 } from '@/lib/geometry/utils/binary-serialization'
-import type { PolytopeGeometry } from '@/lib/geometry/types'
+import type { NdGeometry } from '@/lib/geometry/types'
 
 // Helper to create test geometry
 function createTestGeometry(
   dimension: number,
   vertexCount: number,
   edgeCount: number
-): PolytopeGeometry {
+): NdGeometry {
   const vertices: number[][] = []
   for (let i = 0; i < vertexCount; i++) {
     const vertex = Array(dimension)
@@ -34,7 +34,7 @@ function createTestGeometry(
   }
 
   return {
-    type: 'wythoff-polytope',
+    type: 'schroedinger',
     dimension,
     vertices,
     edges,
@@ -60,8 +60,8 @@ describe('serializeToBinary', () => {
   })
 
   it('should serialize vertices to Float64Array buffer', () => {
-    const geometry: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const geometry: NdGeometry = {
+      type: 'schroedinger',
       dimension: 3,
       vertices: [
         [1.5, 2.5, 3.5],
@@ -84,8 +84,8 @@ describe('serializeToBinary', () => {
   })
 
   it('should serialize edges to Uint32Array buffer', () => {
-    const geometry: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const geometry: NdGeometry = {
+      type: 'schroedinger',
       dimension: 3,
       vertices: [
         [0, 0, 0],
@@ -113,8 +113,8 @@ describe('serializeToBinary', () => {
   })
 
   it('should serialize metadata as JSON', () => {
-    const geometry: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const geometry: NdGeometry = {
+      type: 'schroedinger',
       dimension: 3,
       vertices: [[0, 0, 0]],
       edges: [],
@@ -133,8 +133,8 @@ describe('serializeToBinary', () => {
   })
 
   it('should handle empty geometry', () => {
-    const geometry: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const geometry: NdGeometry = {
+      type: 'schroedinger',
       dimension: 3,
       vertices: [],
       edges: [],
@@ -162,8 +162,8 @@ describe('serializeToBinary', () => {
 
 describe('deserializeFromBinary', () => {
   it('should round-trip 3D geometry', () => {
-    const original: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const original: NdGeometry = {
+      type: 'schroedinger',
       dimension: 3,
       vertices: [
         [1, 2, 3],
@@ -180,7 +180,7 @@ describe('deserializeFromBinary', () => {
     const binary = serializeToBinary(original)
     const restored = deserializeFromBinary(binary)
 
-    expect(restored.type).toBe('wythoff-polytope')
+    expect(restored.type).toBe('schroedinger')
     expect(restored.dimension).toBe(3)
     expect(restored.vertices).toEqual([
       [1, 2, 3],
@@ -196,8 +196,8 @@ describe('deserializeFromBinary', () => {
   })
 
   it('should preserve vertex precision', () => {
-    const original: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const original: NdGeometry = {
+      type: 'schroedinger',
       dimension: 4,
       vertices: [[1.123456789012345, -2.987654321098765, 0, 3.141592653589793]],
       edges: [],
@@ -414,8 +414,8 @@ describe('estimateStorageSizes', () => {
   })
 
   it('should handle empty geometry', () => {
-    const geometry: PolytopeGeometry = {
-      type: 'wythoff-polytope',
+    const geometry: NdGeometry = {
+      type: 'schroedinger',
       dimension: 3,
       vertices: [],
       edges: [],

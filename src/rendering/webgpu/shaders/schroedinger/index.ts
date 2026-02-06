@@ -22,7 +22,6 @@ export {
   ho1dBlock,
   // Hydrogen atom
   hydrogenRadialBlock,
-  hydrogenPsiBlock,
   hydrogenNDCommonBlock,
   // HO ND variants and generators
   hoND3dBlock,

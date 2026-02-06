@@ -216,33 +216,21 @@ export function getFaceDetectionMethod(type: ObjectType): FaceDetectionMethod {
  *
  * @param type - The object type
  * @param dimension - The current dimension
- * @param facesVisible - Whether faces are visible
  * @returns The render mode to use
  */
 export function determineRenderMode(
   type: ObjectType,
-  dimension: number,
-  facesVisible: boolean
-):
-  | 'polytope'
-  | 'raymarch-mandelbulb'
-  | 'raymarch-quaternion-julia'
-  | 'raymarch-schroedinger'
-  | 'raymarch-blackhole'
-  | 'none' {
+  dimension: number
+): 'raymarch-schroedinger' | 'none' {
   const entry = getObjectTypeEntry(type)
   if (!entry) return 'none'
 
   if (entry.rendering.renderMethod === 'raymarch') {
-    if (!facesVisible || dimension < 3) return 'none'
-    // Specific raymarch modes based on type
-    if (type === 'quaternion-julia') return 'raymarch-quaternion-julia'
-    if (type === 'mandelbulb') return 'raymarch-mandelbulb'
+    if (dimension < 3) return 'none'
     if (type === 'schroedinger') return 'raymarch-schroedinger'
-    if (type === 'blackhole') return 'raymarch-blackhole'
   }
 
-  return 'polytope'
+  return 'none'
 }
 
 // ============================================================================

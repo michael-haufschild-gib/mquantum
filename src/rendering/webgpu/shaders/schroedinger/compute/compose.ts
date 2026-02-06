@@ -39,12 +39,11 @@ import {
 import { psiBlock, psiBlockDynamic } from '../quantum/psi.wgsl'
 import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from '../quantum/density.wgsl'
 
-// Hydrogen blocks (for hydrogen orbital modes)
+// Hydrogen blocks (shared by hydrogen ND mode)
 import { laguerreBlock } from '../quantum/laguerre.wgsl'
 import { legendreBlock } from '../quantum/legendre.wgsl'
 import { sphericalHarmonicsBlock } from '../quantum/sphericalHarmonics.wgsl'
 import { hydrogenRadialBlock } from '../quantum/hydrogenRadial.wgsl'
-import { hydrogenPsiBlock } from '../quantum/hydrogenPsi.wgsl'
 import { hydrogenNDCommonBlock } from '../quantum/hydrogenNDCommon.wgsl'
 import {
   hydrogenNDGen3dBlock,
@@ -68,7 +67,7 @@ import {
 } from './densityGrid.wgsl'
 
 /** Quantum mode for compute shader */
-export type ComputeQuantumMode = 'harmonicOscillator' | 'hydrogenOrbital' | 'hydrogenND'
+export type ComputeQuantumMode = 'harmonicOscillator' | 'hydrogenND'
 
 /**
  * Configuration for density grid compute shader
@@ -139,11 +138,8 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   }
 
   // Quantum mode constant for runtime dispatch
-  if (quantumMode === 'hydrogenOrbital') {
+  if (quantumMode === 'hydrogenND') {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 1;')
-    features.push('Hydrogen Orbital')
-  } else if (quantumMode === 'hydrogenND') {
-    defines.push('const QUANTUM_MODE_DEFAULT: i32 = 2;')
     features.push('Hydrogen ND')
   } else {
     defines.push('const QUANTUM_MODE_DEFAULT: i32 = 0;')
@@ -220,7 +216,6 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Legendre Polynomials', content: legendreBlock, condition: includeHydrogen },
     { name: 'Spherical Harmonics', content: sphericalHarmonicsBlock, condition: includeHydrogen },
     { name: 'Hydrogen Radial', content: hydrogenRadialBlock, condition: includeHydrogen },
-    { name: 'Hydrogen Psi', content: hydrogenPsiBlock, condition: includeHydrogen },
 
     // Hydrogen ND modules
     { name: 'Hydrogen ND Common', content: hydrogenNDCommonBlock, condition: includeHydrogenND },

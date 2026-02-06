@@ -44,7 +44,6 @@ export { useEnvironmentStore } from './environmentStore'
 export {
   getEffectiveSampleQuality,
   getEffectiveShadowQuality,
-  getEffectiveSSRQuality,
   INTERACTION_RESTORE_DELAY,
   REFINEMENT_STAGE_QUALITY,
   REFINEMENT_STAGE_TIMING,
@@ -57,7 +56,6 @@ export type {
   RefinementStage,
   SampleQualityLevel,
   ShadowQualityLevel,
-  SSRQualityLevel,
 } from './performanceStore'
 export { useCameraStore } from './cameraStore'
 export { useExportStore } from './exportStore'
@@ -71,7 +69,6 @@ export { usePresetManagerStore } from './presetManagerStore'
 export { useScreenshotStore } from './screenshotStore'
 export { useScreenshotCaptureStore, type CaptureStatus } from './screenshotCaptureStore'
 export { useThemeStore, type ThemeAccent, type ThemeMode } from './themeStore'
-export { useWebGLContextStore } from './webglContextStore'
 export { useDropdownStore, type DropdownStore } from './dropdownStore'
 export {
   useRendererStore,

@@ -1,9 +1,15 @@
 === CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-000)===
 ## KEEP THE BIG PICTURE IN MIND
-This is a scientific research project for my PHD thesis. Students will use this project to study multi-dimensional objects, fractals and physics. It is very important for my work and my career, we have to do it in steps, carefully , without mistakes and rush. Avoid hallucinations. Don't jump into coding without first researching. Don't patch bugs reactively. Use WebSearch extensively. Understand the purpose of code before changing it.
+This is a scientific research project for my PhD thesis. Students will use this project to study **quantum physics simulations in N dimensions** - specifically Schroedinger wavefunctions including harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions). It is very important for my work and my career, we have to do it in steps, carefully, without mistakes and rush. Avoid hallucinations. Don't jump into coding without first researching. Don't patch bugs reactively. Use WebSearch extensively. Understand the purpose of code before changing it.
 
-## CHECK WEBGL BEFORE WORKING ON WEBGPU
-WebGL is working perfectly. WebGPU is supposed to give the user the option to use WebGPU rendering instead of WebGL without losing any functionality, configuration options, visual quality. Always check first how WebGL is doing it before working on a WebGPU feature.
+## RENDERING: WEBGPU ONLY
+This project uses a **custom WebGPU renderer** - there is no WebGL, no Three.js rendering path. All GPU shaders are written in **WGSL** (not GLSL). The rendering pipeline is a declarative render graph built on raw `GPUDevice` / `GPUCommandEncoder` APIs.
+
+## QUANTUM PHYSICS SCOPE
+The project has a **single object type**: `ObjectType = 'schroedinger'`. There are no polytopes, fractals, black holes, or other geometric objects. All development should focus on expanding and improving the quantum physics simulation capabilities:
+- **Harmonic Oscillator**: Superposition of up to 8 terms, per-dimension frequencies, Hermite polynomial basis (1D-11D)
+- **Hydrogen Orbital**: Laguerre polynomials + spherical harmonics, real orbital variants (3D)
+- **Hydrogen N-Dimensional**: 3D hydrogen radial core + independent harmonic oscillators for extra dimensions (4D-11D)
 
 === END CIB-000 ===
 
@@ -21,39 +27,10 @@ Read at the start of a new session:
 ## MANDATORY CODE STYLE AND ARCHITECTURE RULES
 Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
 
-**All shaders MUST use WebGL2 and GLSL ES 3.00 syntax.** This is a mandatory requirement with no exceptions.
+**All GPU shaders MUST be written in WGSL.** This project does not use GLSL. Shaders are TypeScript files exporting template literal strings (`.wgsl.ts`) composed via `composeWGSL()`.
 
-*** Required GLSL ES 3.00 Syntax ***
+**WGSL shader files**: `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
 
-| WebGL1 (Forbidden) | WebGL2 (Required) |
-|-------------------|-------------------|
-| `attribute` | `in` (vertex shader) |
-| `varying` (vertex) | `out` |
-| `varying` (fragment) | `in` |
-| `gl_FragColor` | `layout(location = N) out vec4 varName;` |
-| `texture2D()` | `texture()` |
-| `textureCube()` | `texture()` |
-
-**CRITICAL THREE.JS DPR/VIEWPORT GOTCHA**: When rendering to WebGLRenderTarget at non-standard resolutions, NEVER use `gl.setViewport()`. It internally multiplies by device pixel ratio (DPR), causing incorrect rendering on high-DPI displays.
-
-```typescript
-// ✗ WRONG - DPR multiplication breaks non-standard resolution targets
-gl.setRenderTarget(target);
-gl.setViewport(0, 0, target.width, target.height);
-
-// ✓ CORRECT - exact pixel values, no DPR multiplication
-target.viewport.set(0, 0, target.width, target.height);
-gl.setRenderTarget(target);
-```
-
-For fullscreen quad shaders rendered manually (not via ShaderPass), use direct NDC coordinates:
-```glsl
-// ✗ WRONG - camera matrices affected by DPR
-gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-
-// ✓ CORRECT - direct NDC for PlaneGeometry(2, 2)
-gl_Position = vec4(position.xy, 0.0, 1.0);
-```
 **Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
 
 === END CIB-001 ===
@@ -66,11 +43,9 @@ gl_Position = vec4(position.xy, 0.0, 1.0);
 - **Vite** 7.2.7 - Build tool and dev server
 
 ### 3D Graphics & Rendering
-- **Three.js** 0.181.0 - WebGL 3D library
-- **@react-three/fiber** 9.4.2 - React renderer for Three.js
-- **@react-three/drei** 10.7.7 - Three.js utilities
-- **@react-three/postprocessing** 3.0.4 - Post-processing effects
-- **postprocessing** 6.38.0 - Post-processing library
+- **Custom WebGPU Renderer** - Pure `GPUDevice` / `GPUCommandEncoder` APIs
+- **WGSL** - All GPU shaders (vertex, fragment, compute)
+- **Declarative Render Graph** - Automatic pass ordering via topological sort
 
 ### UI & Styling
 - **Tailwind CSS** 4.1.18 - Utility-first CSS framework
@@ -79,9 +54,14 @@ gl_Position = vec4(position.xy, 0.0, 1.0);
 ### State Management & Utilities
 - **Zustand** 5.0.2 - State management
 
+### Performance-Critical Math (WASM)
+- **Rust/wasm-pack** - Animation-loop math (rotation composition, nD projection, matrix/vector ops)
+- JS fallback for all WASM functions (graceful degradation)
+
 ### Testing
 - **vitest** 4.0.15 - Unit testing framework
 - **happy-dom** 15.11.7 - DOM implementation for testing
+- **Playwright** - E2E testing with actual GPU rendering
 
 ### Development Tools
 - **ESLint** 9.15.0 - Code linting
@@ -92,4 +72,3 @@ gl_Position = vec4(position.xy, 0.0, 1.0);
 - **eslint-plugin-jsdoc** 61.5.0 - JSDoc linting
 - **Prettier** 3.4.1 - Code formatting
 - **@vitejs/plugin-react** 5.1.2 - Vite React plugin
-

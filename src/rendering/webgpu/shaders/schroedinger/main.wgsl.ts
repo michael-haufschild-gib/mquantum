@@ -116,9 +116,23 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   const { useDensityGrid = false } = config
 
   // When density grid is enabled, use the grid-based raymarcher
-  // The grid version doesn't need separate HQ path since it's already much faster
+  // with automatic fallback when features require direct wavefunction sampling.
   const raymarchCall = useDensityGrid
-    ? `volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);`
+    ? `let requiresDirectSampling =
+    schroedinger.dispersionEnabled != 0u ||
+    schroedinger.shimmerEnabled != 0u ||
+    schroedinger.colorAlgorithm == 8 ||
+    schroedinger.colorAlgorithm == 9;
+
+  if (requiresDirectSampling) {
+    if (fastMode && schroedinger.dispersionEnabled == 0u) {
+      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
+    } else {
+      volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
+    }
+  } else {
+    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
+  }`
     : `// Use HQ mode if quality requires it OR if dispersion is enabled
   // (dispersion requires per-channel RGB transmittance only available in HQ path)
   if (fastMode && schroedinger.dispersionEnabled == 0u) {
@@ -198,36 +212,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 }
 
 /**
- * Configuration for isosurface main block generation.
- */
-export interface IsosurfaceMainBlockConfig {
-  /** Enable IBL (Image-Based Lighting) */
-  ibl?: boolean
-}
-
-/**
  * Generator function for isosurface main block.
- * Conditionally includes IBL when enabled.
- * @param config
  */
-export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = {}): string {
-  const { ibl = false } = config
-
-  // IBL section - only included when feature is enabled
-  const iblSection = ibl
-    ? `
-  // Image-based lighting (IBL)
-  {
-    let F0_ibl = mix(vec3f(0.04), surfaceColor, material.metallic);
-    col += computeIBL(
-      n, viewDir, F0_ibl,
-      roughness, material.metallic, surfaceColor,
-      envMap, envMapSampler, iblUniforms
-    );
-  }
-`
-    : ''
-
+export function generateMainBlockIsosurface(): string {
   return /* wgsl */ `
 // ============================================
 // Main Fragment Shader - Isosurface Mode
@@ -426,7 +413,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     // Specular tint + intensity (matches WebGL uSpecularColor/uSpecularIntensity)
     col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;
   }
-${iblSection}
   // Fresnel rim from material uniforms
   if (material.fresnelEnabled != 0u && material.fresnelIntensity > 0.0) {
     let NdotV = max(dot(n, viewDir), 0.0);
@@ -509,29 +495,27 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
   // bayerOffset is in [0,1], convert to [-0.5, 0.5] for symmetric jitter
   let jitterOffset = camera.bayerOffset - vec2f(0.5);
 
-  // Compute view-aligned vectors for applying world-space jitter
+  // Compute per-pixel view direction and distance
   let viewDir = normalize(input.vPosition - camera.cameraPosition);
   let dist = length(input.vPosition - camera.cameraPosition);
 
-  // Compute pixel size at this distance (perspective projection)
-  // pixelSize = 2 * dist * tan(fov/2) / resolution
-  // Note: camera.fov is in radians
-  let pixelSize = 2.0 * dist * tan(camera.fov * 0.5) / camera.resolution.y;
+  // Compute world-space pixel sizes at this depth (perspective projection)
+  // Note: camera.fov is in radians.
+  let pixelSizeY = 2.0 * dist * tan(camera.fov * 0.5) / camera.resolution.y;
+  let pixelSizeX = 2.0 * dist * tan(camera.fov * 0.5) * camera.aspectRatio /
+                   camera.resolution.x;
 
-  // View-aligned right and up vectors
-  let worldUp = vec3f(0.0, 1.0, 0.0);
-  var viewRight = cross(worldUp, viewDir);
-  // Handle degenerate case when viewDir is parallel to worldUp
-  if (length(viewRight) < 0.001) {
-    viewRight = vec3f(1.0, 0.0, 0.0);
-  } else {
-    viewRight = normalize(viewRight);
-  }
-  let viewUp = normalize(cross(viewDir, viewRight));
+  // Use camera basis vectors (stable screen-space axes) for jitter.
+  // This avoids per-pixel basis flips that can cause visible seam artifacts.
+  let cameraRight = normalize(camera.inverseViewMatrix[0].xyz);
+  let cameraUp = normalize(camera.inverseViewMatrix[1].xyz);
 
-  // Apply sub-pixel offset in world space
-  // In quarter-res, each pixel is 2 full-res pixels, so jitter by 2× pixelSize
-  let worldOffset = (viewRight * jitterOffset.x + viewUp * jitterOffset.y) * pixelSize * 2.0;
+  // Apply sub-pixel offset in world space.
+  // jitterOffset is in full-pixel units [-0.5, 0.5].
+  // NOTE: Screen-space Y grows downward (texture coordinates), while cameraUp
+  // points upward in world space, so Y must be inverted to match reconstruction.
+  let worldOffset = cameraRight * (jitterOffset.x * pixelSizeX) -
+                    cameraUp * (jitterOffset.y * pixelSizeY);
   let jitteredVPosition = input.vPosition + worldOffset;
 `
     : ''

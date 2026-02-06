@@ -4,15 +4,15 @@
  * Animation controls for Schroedinger quantum visualization, displayed in the
  * TimelineControls bottom drawer.
  *
- * Supports both physics modes:
+ * Supports both active physics modes:
  * - Harmonic Oscillator: Full animation suite including superposition-specific effects
- * - Hydrogen Orbital: Time evolution and flow effects (orbitals are always 3D)
+ * - Hydrogen ND: Time evolution and flow effects in N-dimensional hydrogen space
  *
  * Animation Systems:
  * - Time Evolution: Controls the speed of quantum phase evolution (both modes)
  * - Animated Flow: Curl noise turbulence (both modes)
- * - Wavepacket Dispersion: Animates frequency spread (HO mode only)
- * - Slice Animation: 4D+ only, animates the 4D slice position (HO mode only)
+ * - Wavepacket Dispersion: Animates frequency spread
+ * - Slice Animation: 4D+ only, animates the 4D slice position
  *
  * @see docs/prd/ndimensional-visualizer.md
  */
@@ -73,10 +73,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setCurlStrength,
       setCurlScale,
       setCurlSpeed,
-      // Spread Animation (Dispersion) - HO mode only
+      // Spread Animation (Dispersion)
       setSpreadAnimationEnabled,
       setSpreadAnimationSpeed,
-      // Slice Animation - HO mode only, 4D+
+      // Slice Animation - 4D+
       setSliceAnimationEnabled,
       setSliceSpeed,
       setSliceAmplitude,
@@ -85,7 +85,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Check quantum mode for UI visibility
-    const isHydrogenMode = config.quantumMode === 'hydrogenOrbital'
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
 
     return (
@@ -110,37 +109,35 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         </div>
 
-        {/* Wavepacket Dispersion (Spread Animation) - HO mode only */}
-        {!isHydrogenMode && (
-          <div className="space-y-4" data-testid="animation-panel-dispersion">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-                Wavepacket Dispersion
-              </label>
-              <ToggleButton
-                pressed={config.spreadAnimationEnabled}
-                onToggle={() => setSpreadAnimationEnabled(!config.spreadAnimationEnabled)}
-                className="text-xs px-2 py-1 h-auto"
-                ariaLabel="Toggle spread animation"
-              >
-                {config.spreadAnimationEnabled ? 'ON' : 'OFF'}
-              </ToggleButton>
-            </div>
-            <div
-              className={`space-y-3 ${!config.spreadAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+        {/* Wavepacket Dispersion (Spread Animation) */}
+        <div className="space-y-4" data-testid="animation-panel-dispersion">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+              Wavepacket Dispersion
+            </label>
+            <ToggleButton
+              pressed={config.spreadAnimationEnabled}
+              onToggle={() => setSpreadAnimationEnabled(!config.spreadAnimationEnabled)}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle spread animation"
             >
-              <Slider
-                label="Breathing Speed"
-                min={0.1}
-                max={2.0}
-                step={0.1}
-                value={config.spreadAnimationSpeed ?? 0.5}
-                onChange={setSpreadAnimationSpeed}
-                showValue
-              />
-            </div>
+              {config.spreadAnimationEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
           </div>
-        )}
+          <div
+            className={`space-y-3 ${!config.spreadAnimationEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+          >
+            <Slider
+              label="Breathing Speed"
+              min={0.1}
+              max={2.0}
+              step={0.1}
+              value={config.spreadAnimationSpeed ?? 0.5}
+              onChange={setSpreadAnimationSpeed}
+              showValue
+            />
+          </div>
+        </div>
 
         {/* Animated Flow (Curl Noise) */}
         <div className="space-y-4" data-testid="animation-panel-flow">
@@ -190,8 +187,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         </div>
 
-        {/* Slice Animation - 4D+ and HO mode only */}
-        {!isHydrogenMode && dimension >= 4 && (
+        {/* Slice Animation - 4D+ only */}
+        {dimension >= 4 && (
           <div className="space-y-4" data-testid="animation-panel-sliceAnimation">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
@@ -255,15 +252,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         )}
 
-        {/* Mode info for hydrogen 3D orbitals */}
-        {isHydrogenMode && !isHydrogenNDMode && (
-          <div className="space-y-2 px-1">
-            <p className="text-xs text-text-tertiary italic">
-              Hydrogen 3D orbitals have static phase. Switch to Hydrogen ND mode for phase
-              animation.
-            </p>
-          </div>
-        )}
       </AnimationDrawerContainer>
     )
   }

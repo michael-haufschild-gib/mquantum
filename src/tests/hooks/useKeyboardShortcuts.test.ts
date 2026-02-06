@@ -83,34 +83,6 @@ describe('useKeyboardShortcuts', () => {
     expect(useGeometryStore.getState().dimension).toBe(3)
   })
 
-  it('should select hypercube on key 1', () => {
-    useGeometryStore.getState().setObjectType('simplex')
-    renderHook(() => useKeyboardShortcuts({ enabled: true }))
-
-    const event = new KeyboardEvent('keydown', { key: '1' })
-    window.dispatchEvent(event)
-
-    expect(useGeometryStore.getState().objectType).toBe('hypercube')
-  })
-
-  it('should select simplex on key 2', () => {
-    renderHook(() => useKeyboardShortcuts({ enabled: true }))
-
-    const event = new KeyboardEvent('keydown', { key: '2' })
-    window.dispatchEvent(event)
-
-    expect(useGeometryStore.getState().objectType).toBe('simplex')
-  })
-
-  it('should select cross-polytope on key 3', () => {
-    renderHook(() => useKeyboardShortcuts({ enabled: true }))
-
-    const event = new KeyboardEvent('keydown', { key: '3' })
-    window.dispatchEvent(event)
-
-    expect(useGeometryStore.getState().objectType).toBe('cross-polytope')
-  })
-
   it('should not reverse direction on d key (now used for camera movement)', () => {
     renderHook(() => useKeyboardShortcuts({ enabled: true }))
     const initialDirection = useAnimationStore.getState().direction

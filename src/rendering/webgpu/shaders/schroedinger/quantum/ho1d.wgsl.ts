@@ -14,8 +14,20 @@ export const ho1dBlock = /* wgsl */ `
 // 1D Harmonic Oscillator Eigenfunction
 // ============================================
 
+// 1/sqrt(2^n n!) for n = 0..6
+const HO_NORM: array<f32, 7> = array<f32, 7>(
+  1.0,
+  0.707106781187,
+  0.353553390593,
+  0.144337567297,
+  0.0510310363080,
+  0.0161374306092,
+  0.00465847495312
+);
+
 // Evaluate 1D HO eigenfunction φ_n(x, ω)
-// Uses visual normalization (not physically exact but stable)
+// Uses canonical normalization:
+//   (α/π)^(1/4) * 1/sqrt(2^n n!)
 //
 // Parameters:
 //   n     - quantum number (0-6)
@@ -24,6 +36,8 @@ export const ho1dBlock = /* wgsl */ `
 //
 // Returns: eigenfunction value (real)
 fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
+  if (n < 0 || n > 6) { return 0.0; }
+
   // α = √ω (in dimensionless units with ℏ=m=1)
   let alpha = sqrt(max(omega, 0.01));
   let u = alpha * x;
@@ -36,11 +50,11 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   // Hermite polynomial
   let H = hermite(n, u);
 
-  // Damping factor to prevent blowup at higher n
-  // This keeps visual amplitude reasonable across quantum numbers
-  let damp = 1.0 / (1.0 + 0.15 * f32(n * n));
+  // Canonical normalization factor.
+  let alphaNorm = sqrt(sqrt(alpha * INV_PI));
+  let norm = HO_NORM[n];
 
-  return damp * H * gauss;
+  return alphaNorm * norm * H * gauss;
 }
 
 // Evaluate product of 1D HO eigenfunctions for D dimensions
@@ -60,18 +74,6 @@ fn hoND(
   termIdx: i32,
   uniforms: SchroedingerUniforms
 ) -> f32 {
-  // OPTIMIZATION: Early exit for points outside 3σ Gaussian envelope
-  // Harmonic oscillator decays as exp(-0.5 * α² * x²), negligible beyond 3σ
-  var distSq = 0.0;
-  for (var j = 0; j < 11; j++) {
-    if (j >= dim) { break; }
-    let alpha = sqrt(max(getOmega(uniforms, j), 0.01));
-    let u = alpha * xND[j];
-    distSq += u * u;
-  }
-  // If sum of squared scaled coords > 18 (≈3σ per dim), contribution < 1e-8
-  if (distSq > 18.0) { return 0.0; }
-
   var product = 1.0;
 
   for (var j = 0; j < 11; j++) {

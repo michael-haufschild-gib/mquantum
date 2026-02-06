@@ -9,7 +9,6 @@ import { Tabs } from '@/components/ui/Tabs'
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 import { useShallow } from 'zustand/react/shallow'
 import { MiscControls } from './MiscControls'
-import { RefractionControls } from './RefractionControls'
 
 export const PostProcessingControls: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('bloom')
@@ -21,8 +20,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
     setCinematicEnabled: state.setCinematicEnabled,
     bokehEnabled: state.bokehEnabled,
     setBokehEnabled: state.setBokehEnabled,
-    refractionEnabled: state.refractionEnabled,
-    setRefractionEnabled: state.setRefractionEnabled,
     paperEnabled: state.paperEnabled,
     setPaperEnabled: state.setPaperEnabled,
   }))
@@ -33,8 +30,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
     setCinematicEnabled,
     bokehEnabled,
     setBokehEnabled,
-    refractionEnabled,
-    setRefractionEnabled,
     paperEnabled,
     setPaperEnabled,
   } = usePostProcessingStore(postProcessingSelector)
@@ -90,22 +85,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
         ),
       },
       {
-        id: 'refraction',
-        label: 'Refraction',
-        content: (
-          <div className="space-y-4">
-            <Switch
-              checked={refractionEnabled}
-              onCheckedChange={setRefractionEnabled}
-              label="Enable Refraction"
-            />
-            <div className={!refractionEnabled ? 'opacity-50 pointer-events-none' : ''}>
-              <RefractionControls />
-            </div>
-          </div>
-        ),
-      },
-      {
         id: 'paper',
         label: 'Paper',
         content: (
@@ -139,8 +118,6 @@ export const PostProcessingControls: React.FC = React.memo(() => {
       setCinematicEnabled,
       bokehEnabled,
       setBokehEnabled,
-      refractionEnabled,
-      setRefractionEnabled,
       paperEnabled,
       setPaperEnabled,
     ]

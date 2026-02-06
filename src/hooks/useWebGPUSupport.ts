@@ -25,7 +25,7 @@ export interface UseWebGPUSupportResult {
   /** Detailed capability info */
   capabilities: WebGPUCapabilityInfo | null
   /** Current renderer mode */
-  mode: 'webgl' | 'webgpu'
+  mode: 'webgpu'
 }
 
 // ============================================================================

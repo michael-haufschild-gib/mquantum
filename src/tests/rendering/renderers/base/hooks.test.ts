@@ -9,17 +9,9 @@
 import {
   calculateSafeProjectionDistance,
   DEFAULT_PROJECTION_DISTANCE,
-  getFramePriorityOrder,
-  getFramePriorityValue,
-  isFramePriorityKey,
-  useFramePriority,
-  useFramePriorityValue,
-  useLayerAssignment,
   useProjectionDistanceCache,
   useQualityTracking,
   useRotationUpdates,
-  useShadowPatching,
-  useVolumetricLayerAssignment,
 } from '@/rendering/renderers/base'
 import { describe, expect, it } from 'vitest'
 
@@ -33,54 +25,6 @@ describe('base/hooks exports', () => {
   describe('useRotationUpdates', () => {
     it('should be exported as a function', () => {
       expect(typeof useRotationUpdates).toBe('function')
-    })
-  })
-
-  describe('useLayerAssignment', () => {
-    it('should be exported as a function', () => {
-      expect(typeof useLayerAssignment).toBe('function')
-    })
-  })
-
-  describe('useVolumetricLayerAssignment', () => {
-    it('should be exported as a function', () => {
-      expect(typeof useVolumetricLayerAssignment).toBe('function')
-    })
-  })
-
-  describe('useFramePriority', () => {
-    it('should be exported as a function', () => {
-      expect(typeof useFramePriority).toBe('function')
-    })
-  })
-
-  describe('useFramePriorityValue', () => {
-    it('should be exported as a function', () => {
-      expect(typeof useFramePriorityValue).toBe('function')
-    })
-  })
-
-  describe('isFramePriorityKey', () => {
-    it('should be exported as a function', () => {
-      expect(typeof isFramePriorityKey).toBe('function')
-    })
-  })
-
-  describe('getFramePriorityValue', () => {
-    it('should be exported as a function', () => {
-      expect(typeof getFramePriorityValue).toBe('function')
-    })
-  })
-
-  describe('getFramePriorityOrder', () => {
-    it('should be exported as a function', () => {
-      expect(typeof getFramePriorityOrder).toBe('function')
-    })
-  })
-
-  describe('useShadowPatching', () => {
-    it('should be exported as a function', () => {
-      expect(typeof useShadowPatching).toBe('function')
     })
   })
 

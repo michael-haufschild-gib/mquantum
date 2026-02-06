@@ -55,6 +55,9 @@ export class SMAAPass extends WebGPUBasePass {
   private edgeUniformBuffer: GPUBuffer | null = null
   private blendUniformBuffer: GPUBuffer | null = null
   private neighborhoodUniformBuffer: GPUBuffer | null = null
+  private edgeUniformData = new Float32Array(4)
+  private blendUniformData = new Float32Array(4)
+  private neighborhoodUniformData = new Float32Array(4)
 
   // Samplers
   private linearSampler: GPUSampler | null = null
@@ -63,7 +66,15 @@ export class SMAAPass extends WebGPUBasePass {
   // Intermediate textures
   private edgesTexture: GPUTexture | null = null
   private blendWeightsTexture: GPUTexture | null = null
+  private edgesTextureView: GPUTextureView | null = null
+  private blendWeightsTextureView: GPUTextureView | null = null
   private textureSize = { width: 0, height: 0 }
+  private edgeBindGroup: GPUBindGroup | null = null
+  private edgeBindGroupInputView: GPUTextureView | null = null
+  private blendBindGroup: GPUBindGroup | null = null
+  private blendBindGroupInputView: GPUTextureView | null = null
+  private neighborhoodBindGroup: GPUBindGroup | null = null
+  private neighborhoodBindGroupInputView: GPUTextureView | null = null
 
   // Settings
   private threshold = 0.1
@@ -321,6 +332,7 @@ export class SMAAPass extends WebGPUBasePass {
       format: 'rg8unorm',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
+    this.edgesTextureView = this.edgesTexture.createView()
 
     // Create blend weights texture (RGBA8 for all blend channels)
     this.blendWeightsTexture = device.createTexture({
@@ -329,8 +341,19 @@ export class SMAAPass extends WebGPUBasePass {
       format: 'rgba8unorm',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
+    this.blendWeightsTextureView = this.blendWeightsTexture.createView()
 
     this.textureSize = { width, height }
+    this.invalidateBindGroups()
+  }
+
+  private invalidateBindGroups(): void {
+    this.edgeBindGroup = null
+    this.edgeBindGroupInputView = null
+    this.blendBindGroup = null
+    this.blendBindGroupInputView = null
+    this.neighborhoodBindGroup = null
+    this.neighborhoodBindGroupInputView = null
   }
 
   execute(ctx: WebGPURenderContext): void {
@@ -354,7 +377,12 @@ export class SMAAPass extends WebGPUBasePass {
     const { width, height } = ctx.size
     this.ensureTextures(this.device, width, height)
 
-    if (!this.edgesTexture || !this.blendWeightsTexture) {
+    if (
+      !this.edgesTexture ||
+      !this.blendWeightsTexture ||
+      !this.edgesTextureView ||
+      !this.blendWeightsTextureView
+    ) {
       return
     }
 
@@ -364,25 +392,26 @@ export class SMAAPass extends WebGPUBasePass {
     if (!inputView) return
 
     // === Pass 1: Edge Detection ===
-    const edgeUniformData = new Float32Array([
-      width,
-      height,
-      this.threshold,
-      0, // padding
-    ])
-    this.writeUniformBuffer(this.device, this.edgeUniformBuffer, edgeUniformData)
+    this.edgeUniformData[0] = width
+    this.edgeUniformData[1] = height
+    this.edgeUniformData[2] = this.threshold
+    this.edgeUniformData[3] = 0
+    this.writeUniformBuffer(this.device, this.edgeUniformBuffer, this.edgeUniformData)
 
-    const edgeBindGroup = this.createBindGroup(this.device, this.edgeDetectionBindGroupLayout, [
-      { binding: 0, resource: { buffer: this.edgeUniformBuffer } },
-      { binding: 1, resource: inputView },
-      { binding: 2, resource: this.linearSampler },
-    ])
+    if (!this.edgeBindGroup || this.edgeBindGroupInputView !== inputView) {
+      this.edgeBindGroup = this.createBindGroup(this.device, this.edgeDetectionBindGroupLayout, [
+        { binding: 0, resource: { buffer: this.edgeUniformBuffer } },
+        { binding: 1, resource: inputView },
+        { binding: 2, resource: this.linearSampler },
+      ])
+      this.edgeBindGroupInputView = inputView
+    }
 
     const edgePass = ctx.beginRenderPass({
       label: 'smaa-edge-detection',
       colorAttachments: [
         {
-          view: this.edgesTexture.createView(),
+          view: this.edgesTextureView,
           loadOp: 'clear',
           storeOp: 'store',
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
@@ -390,27 +419,33 @@ export class SMAAPass extends WebGPUBasePass {
       ],
     })
     edgePass.setPipeline(this.edgeDetectionPipeline)
-    edgePass.setBindGroup(0, edgeBindGroup)
+    edgePass.setBindGroup(0, this.edgeBindGroup)
     edgePass.draw(3, 1, 0, 0) // Fullscreen triangle via vertex_index
     edgePass.end()
 
     // === Pass 2: Blending Weight Calculation ===
-    const blendUniformData = new Float32Array([width, height, this.threshold, this.maxSearchSteps])
-    this.writeUniformBuffer(this.device, this.blendUniformBuffer, blendUniformData)
+    this.blendUniformData[0] = width
+    this.blendUniformData[1] = height
+    this.blendUniformData[2] = this.threshold
+    this.blendUniformData[3] = this.maxSearchSteps
+    this.writeUniformBuffer(this.device, this.blendUniformBuffer, this.blendUniformData)
 
-    const blendBindGroup = this.createBindGroup(this.device, this.blendWeightBindGroupLayout, [
-      { binding: 0, resource: { buffer: this.blendUniformBuffer } },
-      { binding: 1, resource: this.edgesTexture.createView() },
-      { binding: 2, resource: inputView },
-      { binding: 3, resource: this.linearSampler },
-      { binding: 4, resource: this.pointSampler },
-    ])
+    if (!this.blendBindGroup || this.blendBindGroupInputView !== inputView) {
+      this.blendBindGroup = this.createBindGroup(this.device, this.blendWeightBindGroupLayout, [
+        { binding: 0, resource: { buffer: this.blendUniformBuffer } },
+        { binding: 1, resource: this.edgesTextureView },
+        { binding: 2, resource: inputView },
+        { binding: 3, resource: this.linearSampler },
+        { binding: 4, resource: this.pointSampler },
+      ])
+      this.blendBindGroupInputView = inputView
+    }
 
     const blendPass = ctx.beginRenderPass({
       label: 'smaa-blend-weight',
       colorAttachments: [
         {
-          view: this.blendWeightsTexture.createView(),
+          view: this.blendWeightsTextureView,
           loadOp: 'clear',
           storeOp: 'store',
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
@@ -418,29 +453,30 @@ export class SMAAPass extends WebGPUBasePass {
       ],
     })
     blendPass.setPipeline(this.blendWeightPipeline)
-    blendPass.setBindGroup(0, blendBindGroup)
+    blendPass.setBindGroup(0, this.blendBindGroup)
     blendPass.draw(3, 1, 0, 0) // Fullscreen triangle via vertex_index
     blendPass.end()
 
     // === Pass 3: Neighborhood Blending ===
-    const neighborhoodUniformData = new Float32Array([
-      width,
-      height,
-      0, // padding
-      0, // padding
-    ])
-    this.writeUniformBuffer(this.device, this.neighborhoodUniformBuffer, neighborhoodUniformData)
+    this.neighborhoodUniformData[0] = width
+    this.neighborhoodUniformData[1] = height
+    this.neighborhoodUniformData[2] = 0
+    this.neighborhoodUniformData[3] = 0
+    this.writeUniformBuffer(this.device, this.neighborhoodUniformBuffer, this.neighborhoodUniformData)
 
-    const neighborhoodBindGroup = this.createBindGroup(
-      this.device,
-      this.neighborhoodBlendBindGroupLayout,
-      [
-        { binding: 0, resource: { buffer: this.neighborhoodUniformBuffer } },
-        { binding: 1, resource: inputView },
-        { binding: 2, resource: this.blendWeightsTexture.createView() },
-        { binding: 3, resource: this.linearSampler },
-      ]
-    )
+    if (!this.neighborhoodBindGroup || this.neighborhoodBindGroupInputView !== inputView) {
+      this.neighborhoodBindGroup = this.createBindGroup(
+        this.device,
+        this.neighborhoodBlendBindGroupLayout,
+        [
+          { binding: 0, resource: { buffer: this.neighborhoodUniformBuffer } },
+          { binding: 1, resource: inputView },
+          { binding: 2, resource: this.blendWeightsTextureView },
+          { binding: 3, resource: this.linearSampler },
+        ]
+      )
+      this.neighborhoodBindGroupInputView = inputView
+    }
 
     const neighborhoodPass = ctx.beginRenderPass({
       label: 'smaa-neighborhood-blend',
@@ -454,7 +490,7 @@ export class SMAAPass extends WebGPUBasePass {
       ],
     })
     neighborhoodPass.setPipeline(this.neighborhoodBlendPipeline)
-    neighborhoodPass.setBindGroup(0, neighborhoodBindGroup)
+    neighborhoodPass.setBindGroup(0, this.neighborhoodBindGroup)
     neighborhoodPass.draw(3, 1, 0, 0) // Fullscreen triangle via vertex_index
     neighborhoodPass.end()
   }
@@ -467,7 +503,10 @@ export class SMAAPass extends WebGPUBasePass {
     this.blendWeightsTexture?.destroy()
     this.edgesTexture = null
     this.blendWeightsTexture = null
+    this.edgesTextureView = null
+    this.blendWeightsTextureView = null
     this.textureSize = { width: 0, height: 0 }
+    this.invalidateBindGroups()
   }
 
   dispose(): void {
@@ -476,6 +515,8 @@ export class SMAAPass extends WebGPUBasePass {
     this.blendWeightsTexture?.destroy()
     this.edgesTexture = null
     this.blendWeightsTexture = null
+    this.edgesTextureView = null
+    this.blendWeightsTextureView = null
 
     // Destroy uniform buffers
     this.edgeUniformBuffer?.destroy()
@@ -496,6 +537,7 @@ export class SMAAPass extends WebGPUBasePass {
     this.edgeDetectionBindGroupLayout = null
     this.blendWeightBindGroupLayout = null
     this.neighborhoodBlendBindGroupLayout = null
+    this.invalidateBindGroups()
 
     super.dispose()
   }

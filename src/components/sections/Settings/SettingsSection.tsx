@@ -12,7 +12,6 @@ import { useToast } from '@/hooks/useToast'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
-import { clearMemoryCache } from '@/lib/geometry/wythoff/cache'
 import React, { useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -62,9 +61,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
 
     const handleClearGeometryCache = useCallback(async () => {
       try {
-        // Clear in-memory cache first
-        clearMemoryCache()
-
         // Delete only our app's geometry cache database
         await new Promise<void>((resolve, reject) => {
           const request = indexedDB.deleteDatabase(GEOMETRY_CACHE_DB_NAME)
