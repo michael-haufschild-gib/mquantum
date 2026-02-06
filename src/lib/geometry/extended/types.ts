@@ -237,8 +237,6 @@ export interface SchroedingerConfig {
   emissionColorShift: number
   /** Enable phase-based emission pulsing */
   emissionPulsing: boolean
-  /** Fresnel rim falloff exponent (1.0-10.0) */
-  rimExponent: number
   /** Scattering anisotropy (-0.9 to 0.9) */
   scatteringAnisotropy: number
   /** Surface roughness for specular highlights (0.0-1.0) */
@@ -335,10 +333,14 @@ export interface SchroedingerConfig {
   nodalColorNegative: string
   /** Enable energy level coloring */
   energyColorEnabled: boolean
-  /** Enable uncertainty shimmer */
-  shimmerEnabled: boolean
-  /** Shimmer strength (0.0-1.0) */
-  shimmerStrength: number
+  /** Enable physically-derived uncertainty boundary emphasis */
+  uncertaintyBoundaryEnabled: boolean
+  /** Visual strength of uncertainty boundary emphasis (0.0-1.0) */
+  uncertaintyBoundaryStrength: number
+  /** Target cumulative probability mass for confidence boundary (0.5-0.99) */
+  uncertaintyConfidenceMass: number
+  /** Half-width of boundary band in log-density space (0.05-1.0) */
+  uncertaintyBoundaryWidth: number
   /** Enable phase-dependent materiality (plasma vs smoke based on wavefunction phase) */
   phaseMaterialityEnabled: boolean
   /** Blend strength for phase materiality effect (0.0-1.0) */
@@ -460,7 +462,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   emissionThreshold: 0.3,
   emissionColorShift: 0.0,
   emissionPulsing: false,
-  rimExponent: 3.0,
   scatteringAnisotropy: 0.0,
   roughness: 0.3,
 
@@ -517,8 +518,10 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   nodalColorPositive: '#22c55e',
   nodalColorNegative: '#ef4444',
   energyColorEnabled: false,
-  shimmerEnabled: false,
-  shimmerStrength: 0.5,
+  uncertaintyBoundaryEnabled: false,
+  uncertaintyBoundaryStrength: 0.5,
+  uncertaintyConfidenceMass: 0.68,
+  uncertaintyBoundaryWidth: 0.3,
   phaseMaterialityEnabled: false,
   phaseMaterialityStrength: 1.0,
   interferenceEnabled: false,

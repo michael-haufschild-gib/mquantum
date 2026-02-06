@@ -131,6 +131,10 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
   private tempViewProjMatrix = new Float32Array(16)
   private tempInverseViewProjMatrix = new Float32Array(16)
 
+  // Cached bind group for position copy
+  private copyBindGroup: GPUBindGroup | null = null
+  private copyBindGroupPositionView: GPUTextureView | null = null
+
   constructor(config: TemporalDepthCapturePassConfig) {
     super({
       id: 'temporal-depth-capture',
@@ -324,7 +328,10 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
       label: 'temporal-depth-capture-history',
       size: { width, height },
       format: this.textureFormat,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.COPY_DST,
     })
 
     this.historyView = this.historyTexture.createView({
@@ -334,6 +341,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     this.lastWidth = width
     this.lastHeight = height
     this.hasValidHistory = false
+    this.copyBindGroup = null
+    this.copyBindGroupPositionView = null
   }
 
   /**
@@ -399,6 +408,7 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     // Get output target
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!outputView) return
+    const outputTexture = ctx.getTexture(this.passConfig.outputResource)
 
     const force = this.forceCapture ? this.forceCapture() : false
 
@@ -416,15 +426,17 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
 
     if (!this.historyView) return
 
-    // Create bind group for position copy
-    const copyBindGroup = this.device.createBindGroup({
-      label: 'temporal-depth-capture-copy-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: positionView },
-      ],
-    })
+    if (!this.copyBindGroup || this.copyBindGroupPositionView !== positionView) {
+      this.copyBindGroup = this.device.createBindGroup({
+        label: 'temporal-depth-capture-copy-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: this.sampler },
+          { binding: 1, resource: positionView },
+        ],
+      })
+      this.copyBindGroupPositionView = positionView
+    }
 
     // Copy position data to output
     const outputPassEncoder = ctx.beginRenderPass({
@@ -438,32 +450,32 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
         },
       ],
     })
-    this.renderFullscreen(outputPassEncoder, this.renderPipeline, [copyBindGroup])
+    this.renderFullscreen(outputPassEncoder, this.renderPipeline, [this.copyBindGroup!])
     outputPassEncoder.end()
 
-    // Also copy to history buffer for next frame
-    const historyBindGroup = this.device.createBindGroup({
-      label: 'temporal-depth-capture-history-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: positionView },
-      ],
-    })
-
-    const historyPassEncoder = ctx.beginRenderPass({
-      label: 'temporal-depth-capture-to-history',
-      colorAttachments: [
-        {
-          view: this.historyView,
-          loadOp: 'clear' as const,
-          storeOp: 'store' as const,
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        },
-      ],
-    })
-    this.renderFullscreen(historyPassEncoder, this.renderPipeline, [historyBindGroup])
-    historyPassEncoder.end()
+    // Copy output into history for next frame.
+    // Prefer GPU texture copy to avoid a second fullscreen draw pass.
+    if (outputTexture && this.historyTexture) {
+      ctx.encoder.copyTextureToTexture(
+        { texture: outputTexture },
+        { texture: this.historyTexture },
+        { width: ctx.size.width, height: ctx.size.height }
+      )
+    } else {
+      const historyPassEncoder = ctx.beginRenderPass({
+        label: 'temporal-depth-capture-to-history',
+        colorAttachments: [
+          {
+            view: this.historyView,
+            loadOp: 'clear' as const,
+            storeOp: 'store' as const,
+            clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          },
+        ],
+      })
+      this.renderFullscreen(historyPassEncoder, this.renderPipeline, [this.copyBindGroup!])
+      historyPassEncoder.end()
+    }
 
     // Update camera matrices for next frame
     // Get camera data from stores (consistent with other passes)
@@ -506,6 +518,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
    */
   resetHistory(): void {
     this.hasValidHistory = false
+    this.copyBindGroup = null
+    this.copyBindGroupPositionView = null
   }
 
   /**
@@ -514,6 +528,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
   onEnabled(): void {
     // Reset history when pass is re-enabled to avoid stale data
     this.hasValidHistory = false
+    this.copyBindGroup = null
+    this.copyBindGroupPositionView = null
   }
 
   /**
@@ -528,6 +544,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
     this.hasValidHistory = false
     this.lastWidth = 0
     this.lastHeight = 0
+    this.copyBindGroup = null
+    this.copyBindGroupPositionView = null
   }
 
   /**
@@ -543,6 +561,8 @@ export class TemporalDepthCapturePass extends WebGPUBasePass {
       this.historyTexture = null
       this.historyView = null
     }
+    this.copyBindGroup = null
+    this.copyBindGroupPositionView = null
 
     // Unregister from global invalidation
     instanceRegistry.delete(this)

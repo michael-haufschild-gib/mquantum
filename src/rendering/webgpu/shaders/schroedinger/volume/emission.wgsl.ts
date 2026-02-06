@@ -196,7 +196,7 @@ fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnifo
   var surfaceColor = computeBaseColor(rho, phase, pos, uniforms);
 
   // Phase materiality: matter (plasma) vs anti-matter (smoke)
-  if (uniforms.phaseMaterialityEnabled != 0u) {
+  if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
     let phaseMod = fract((phase + PI) / TAU); // 0..1, 0.5 = positive real
     let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
     let smokeWeight = 1.0 - plasmaWeight;
@@ -209,7 +209,7 @@ fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnifo
       str);
   }
 
-  var col = surfaceColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;
+  var col = surfaceColor * lighting.ambientColor * lighting.ambientIntensity;
 
   return col;
 }
@@ -267,7 +267,7 @@ fn computeEmissionLit(
   var surfaceColor = computeBaseColor(rho, phase, p, uniforms);
 
   // Phase materiality: matter (plasma) vs anti-matter (smoke)
-  if (uniforms.phaseMaterialityEnabled != 0u) {
+  if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
     let phaseMod = fract((phase + PI) / TAU); // 0..1, 0.5 = positive real
     let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
     let smokeWeight = 1.0 - plasmaWeight;
@@ -280,8 +280,8 @@ fn computeEmissionLit(
       str);
   }
 
-  // Start with ambient
-  var col = surfaceColor * max(1.0 - material.metallic, 0.0) * lighting.ambientColor * lighting.ambientIntensity;
+  // Start with ambient (Lambertian — no PBR metallic suppression for volumetric)
+  var col = surfaceColor * lighting.ambientColor * lighting.ambientIntensity;
 
   // Normalize gradient as pseudo-normal; fallback to view direction at wavefunction peak
   // where gradient of log(rho) is exactly zero (avoids division by zero)
@@ -292,9 +292,6 @@ fn computeEmissionLit(
   } else {
     n = gradient / gradLen;
   }
-
-  // Clamp roughness to prevent numerical issues
-  let roughness = max(material.roughness, 0.04);
 
   // Loop through lights using shared lighting system
   for (var i = 0; i < 8; i++) {
@@ -337,27 +334,18 @@ fn computeEmissionLit(
       phaseFactor *= 12.56;
     }
 
-    // GGX Specular (PBR) with energy conservation
+    // Lambertian diffuse (no PBR specular for volumetric — it has negligible effect on clouds)
     let NdotL = max(dot(n, l), 0.0);
-    let F0 = mix(vec3f(0.04), surfaceColor, material.metallic);
-    let H = normalize(l + viewDir);
-    let F = fresnelSchlick(max(dot(H, viewDir), 0.0), F0);
-
-    let kS = F;
-    let kD = (vec3f(1.0) - kS) * (1.0 - material.metallic);
 
     // Diffuse
-    col += kD * surfaceColor / PI * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
-
-    // Specular
-    let specular = computePBRSpecular(n, viewDir, l, roughness, F0);
+    col += surfaceColor / PI * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
 
     // Volumetric self-shadowing (simplified for WGSL)
     // PERFORMANCE: Skip shadow calculation in very low density regions
     // where the visual contribution is negligible (saves up to 8 sampleDensity calls)
     var shadowFactor = 1.0;
     let shadowDensityThreshold = 0.001;  // Skip shadows below this density
-    if (uniforms.shadowsEnabled != 0u && uniforms.shadowStrength > 0.0 && rho > shadowDensityThreshold) {
+    if (FEATURE_SHADOWS && uniforms.shadowsEnabled != 0u && uniforms.shadowStrength > 0.0 && rho > shadowDensityThreshold) {
       var shadowDens: f32 = 0.0;
       var shadowStep: f32 = 0.1;
       var tShadow: f32 = 0.05;
@@ -375,9 +363,6 @@ fn computeEmissionLit(
       shadowFactor = exp(-shadowDens * uniforms.densityGain * uniforms.shadowStrength);
     }
 
-    // Add specular with intensity/color (matching WebGL line 257)
-    col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation * shadowFactor;
-
     // Subsurface Scattering (SSS) - port from WebGL emission.glsl.ts lines 259-278
     if (material.sssEnabled != 0u && material.sssIntensity > 0.0) {
       // Screen-space noise for jitter (uses fragment position)
@@ -389,7 +374,7 @@ fn computeEmissionLit(
       let trans = pow(clamp(dot(viewDir, -halfVec), 0.0, 1.0), material.sssThickness * 4.0);
 
       var transmission = trans;
-      if (uniforms.shadowsEnabled != 0u) {
+      if (FEATURE_SHADOWS && uniforms.shadowsEnabled != 0u) {
         transmission *= shadowFactor;
       } else {
         transmission *= exp(-rho * material.sssThickness);
@@ -404,7 +389,7 @@ fn computeEmissionLit(
   // where the visual contribution is negligible (saves up to 8 sampleDensity calls)
   var aoFactor: f32 = 1.0;
   let aoDensityThreshold = 0.001;  // Skip AO below this density
-  if (quality.aoEnabled != 0 && uniforms.aoStrength > 0.0 && rho > aoDensityThreshold) {
+  if (FEATURE_AO && quality.aoEnabled != 0 && uniforms.aoStrength > 0.0 && rho > aoDensityThreshold) {
     var ao: f32 = 0.0;
     let radius = uniforms.aoRadius;
     // Halve AO steps in fast mode for better interactivity (min 2 for basic coverage)
@@ -441,17 +426,6 @@ fn computeEmissionLit(
     col *= aoModulator;
   }
 
-  // Volumetric Fresnel / Rim Lighting (port from WebGL emission.glsl.ts lines 317-325)
-  if (material.fresnelEnabled != 0u && material.fresnelIntensity > 0.0) {
-    let NdotV = max(dot(n, viewDir), 0.0);
-    var rim = pow(1.0 - NdotV, uniforms.rimExponent) * material.fresnelIntensity;
-    // Modulate rim by AO factor if AO is enabled
-    if (quality.aoEnabled != 0) {
-      rim *= aoFactor;
-    }
-    col += material.rimColor * rim;
-  }
-
   // Cache sFromRho for reuse in HDR Emission and Nodal sections (saves log() call)
   let cachedS = sFromRho(rho);
 
@@ -479,7 +453,7 @@ fn computeEmissionLit(
       }
 
       var pulse = 1.0;
-      if (uniforms.emissionPulsing != 0u) {
+      if (FEATURE_EMISSION_PULSING && uniforms.emissionPulsing != 0u) {
         let phaseNorm = (phase + PI) / TAU;
         pulse = 1.0 + 0.5 * sin(phaseNorm * 6.28 + uniforms.time * uniforms.timeScale * 2.0);
       }

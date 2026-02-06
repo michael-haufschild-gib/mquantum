@@ -29,6 +29,11 @@ const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
+const CONFIDENCE_MASS_MIN = 0.5
+const CONFIDENCE_MASS_MAX = 0.99
+const DEFAULT_CONFIDENCE_MASS = 0.68
+const DEFAULT_LOG_RHO_THRESHOLD = -2.0
+const RHO_EPSILON = 1e-12
 
 /**
  * Configuration for the density grid compute pass.
@@ -42,6 +47,8 @@ export interface DensityGridComputeConfig {
   quantumMode?: 'harmonicOscillator' | 'hydrogenND'
   /** Number of HO superposition terms for compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  /** Store phase/log payload in the grid (requires multi-channel format). */
+  includePhase?: boolean
 }
 
 /**
@@ -66,6 +73,12 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
   // Sampler for render pass
   private densitySampler: GPUSampler | null = null
+  private densityReadbackBuffer: GPUBuffer | null = null
+  private readbackBytesPerRow = 0
+  private readbackInFlight = false
+  private shouldRefreshDistribution = true
+  private densityTextureFormat: 'r16float' | 'rgba16float' = 'rgba16float'
+  private hasPhasePayload = false
 
   // Grid parameters
   private gridSize: number
@@ -86,6 +99,13 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   // Version tracking for uniform buffers - prevents unnecessary recomputation
   private lastSchroedingerVersion = -1
   private lastBasisVersion = -1
+  private confidenceMass = DEFAULT_CONFIDENCE_MASS
+  private logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
+  private sortedRhoValues: Float32Array | null = null
+  private prefixMass: Float64Array | null = null
+  private totalMass = 0
+  private readbackBytesPerTexel = 8
+  private readbackTexelStrideHalfs = 4
 
   constructor(config: DensityGridComputeConfig) {
     super({
@@ -105,21 +125,24 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
+    this.hasPhasePayload = this.passConfig.includePhase ?? false
+    this.densityTextureFormat = await this.selectGridTextureFormat(device, this.hasPhasePayload)
 
     // Compose compute shader
     const { wgsl } = composeDensityGridComputeShader({
       dimension: this.passConfig.dimension,
       quantumMode: this.passConfig.quantumMode,
       termCount: this.passConfig.termCount,
+      includePhase: this.hasPhasePayload,
+      storageFormat: this.densityTextureFormat,
     })
 
     // Create shader module
     const shaderModule = this.createShaderModule(device, wgsl, 'density-grid-compute')
 
-    // Create 3D texture for density storage
-    // Using rgba16float instead of r32float to enable hardware filtering
-    // (r32float requires 'float32-filterable' feature which may not be available)
-    // Store density in R channel; GBA available for future use (gradient, phase)
+    // Create 3D texture for density storage.
+    // - density-only mode: r16float (lower bandwidth)
+    // - phase-capable mode: rgba16float (rho/logRho/phase payload)
     this.densityTexture = device.createTexture({
       label: 'density-grid-texture',
       size: {
@@ -127,11 +150,12 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
         height: this.gridSize,
         depthOrArrayLayers: this.gridSize,
       },
-      format: 'rgba16float',
+      format: this.densityTextureFormat,
       dimension: '3d',
       usage:
         GPUTextureUsage.STORAGE_BINDING | // For compute shader write
         GPUTextureUsage.TEXTURE_BINDING | // For fragment shader read
+        GPUTextureUsage.COPY_SRC | // For GPU->CPU readback (uncertainty threshold extraction)
         GPUTextureUsage.COPY_DST, // For potential debugging
     })
 
@@ -150,9 +174,20 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       addressModeW: 'clamp-to-edge',
     })
 
+    // Readback buffer for confidence-boundary threshold extraction.
+    // Stride depends on grid format.
+    this.readbackBytesPerTexel = this.densityTextureFormat === 'r16float' ? 2 : 8
+    this.readbackTexelStrideHalfs = this.densityTextureFormat === 'r16float' ? 1 : 4
+    this.readbackBytesPerRow = Math.ceil((this.gridSize * this.readbackBytesPerTexel) / 256) * 256
+    this.densityReadbackBuffer = device.createBuffer({
+      label: 'density-grid-readback',
+      size: this.readbackBytesPerRow * this.gridSize * this.gridSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    })
+
     // Create uniform buffers
-    // SchroedingerUniforms: 1168 bytes (matches renderer, includes probability flow)
-    this.schroedingerBuffer = this.createUniformBuffer(device, 1168, 'density-schroedinger')
+    // SchroedingerUniforms: 1200 bytes (matches renderer, includes uncertainty controls)
+    this.schroedingerBuffer = this.createUniformBuffer(device, 1200, 'density-schroedinger')
     // BasisVectors: 192 bytes (4 × 3 × vec4f)
     this.basisBuffer = this.createUniformBuffer(device, 192, 'density-basis')
     // GridParams: 48 bytes
@@ -190,7 +225,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
           visibility: GPUShaderStage.COMPUTE,
           storageTexture: {
             access: 'write-only' as const,
-            format: 'rgba16float' as GPUTextureFormat,
+            format: this.densityTextureFormat,
             viewDimension: '3d' as GPUTextureViewDimension,
           },
         },
@@ -216,6 +251,45 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       [this.computeBindGroupLayout],
       'density-grid-compute'
     )
+  }
+
+  private async selectGridTextureFormat(
+    device: GPUDevice,
+    includePhase: boolean
+  ): Promise<'r16float' | 'rgba16float'> {
+    if (includePhase) {
+      return 'rgba16float'
+    }
+
+    const r16floatSupported = await this.supportsStorageTextureFormat(device, 'r16float')
+    return r16floatSupported ? 'r16float' : 'rgba16float'
+  }
+
+  private async supportsStorageTextureFormat(
+    device: GPUDevice,
+    format: 'r16float' | 'rgba16float'
+  ): Promise<boolean> {
+    if (format === 'rgba16float') {
+      return true
+    }
+
+    device.pushErrorScope('validation')
+    let probeTexture: GPUTexture | null = null
+    try {
+      probeTexture = device.createTexture({
+        label: 'density-grid-format-probe',
+        size: { width: 1, height: 1, depthOrArrayLayers: 1 },
+        format,
+        dimension: '3d',
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      })
+      probeTexture.destroy()
+    } catch {
+      // Some implementations may throw immediately for unsupported formats.
+    }
+
+    const validationError = await device.popErrorScope()
+    return validationError === null
   }
 
   /**
@@ -271,6 +345,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     device.queue.writeBuffer(this.schroedingerBuffer, 0, data)
     // Density |ψ|² is time-independent, so recompute only when tracked parameters change.
     this.needsRecompute = true
+    this.shouldRefreshDistribution = true
     this.lastSchroedingerVersion = version
   }
 
@@ -298,11 +373,176 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   }
 
   /**
+   * Set confidence mass used for uncertainty boundary extraction.
+   * Reuses cached density distribution to avoid recomputing the grid.
+   */
+  setConfidenceMass(confidenceMass: number): void {
+    const clampedMass = Math.max(CONFIDENCE_MASS_MIN, Math.min(CONFIDENCE_MASS_MAX, confidenceMass))
+    if (Math.abs(clampedMass - this.confidenceMass) < 1e-6) {
+      return
+    }
+    this.confidenceMass = clampedMass
+    this.recomputeUncertaintyThresholdFromDistribution()
+  }
+
+  /**
+   * Get current log-density threshold corresponding to configured confidence mass.
+   */
+  getLogRhoThreshold(): number {
+    return this.logRhoThreshold
+  }
+
+  /**
+   * Recompute uncertainty log-rho threshold from cached sorted density distribution.
+   */
+  private recomputeUncertaintyThresholdFromDistribution(): void {
+    const sortedRhoValues = this.sortedRhoValues
+    const prefixMass = this.prefixMass
+    if (!sortedRhoValues || !prefixMass || this.totalMass <= RHO_EPSILON) {
+      this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
+      return
+    }
+
+    const targetMass = this.totalMass * this.confidenceMass
+    let lo = 0
+    let hi = prefixMass.length - 1
+
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) * 0.5)
+      if ((prefixMass[mid] ?? Number.POSITIVE_INFINITY) >= targetMass) {
+        hi = mid
+      } else {
+        lo = mid + 1
+      }
+    }
+
+    const rhoAtTarget = Math.max(sortedRhoValues[lo] ?? RHO_EPSILON, RHO_EPSILON)
+    this.logRhoThreshold = Math.log(rhoAtTarget)
+  }
+
+  /**
+   * Queue GPU->CPU readback of the density volume and refresh CDF cache.
+   */
+  private refreshDensityDistribution(ctx: WebGPURenderContext): void {
+    if (
+      !this.densityTexture ||
+      !this.densityReadbackBuffer ||
+      this.readbackInFlight ||
+      !this.shouldRefreshDistribution
+    ) {
+      return
+    }
+
+    const readbackBuffer = this.densityReadbackBuffer
+
+    ctx.encoder.copyTextureToBuffer(
+      { texture: this.densityTexture },
+      {
+        buffer: readbackBuffer,
+        bytesPerRow: this.readbackBytesPerRow,
+        rowsPerImage: this.gridSize,
+      },
+      {
+        width: this.gridSize,
+        height: this.gridSize,
+        depthOrArrayLayers: this.gridSize,
+      }
+    )
+
+    this.readbackInFlight = true
+    this.shouldRefreshDistribution = false
+
+    readbackBuffer
+      .mapAsync(GPUMapMode.READ)
+      .then(() => {
+        const mapped = readbackBuffer.getMappedRange()
+        const halfView = new Uint16Array(mapped)
+        this.buildDensityDistribution(halfView)
+        readbackBuffer.unmap()
+      })
+      .catch(() => {
+        this.shouldRefreshDistribution = true
+      })
+      .finally(() => {
+        this.readbackInFlight = false
+      })
+  }
+
+  /**
+   * Decode a Float16 scalar to Float32.
+   */
+  private decodeFloat16(value: number): number {
+    const sign = (value & 0x8000) !== 0 ? -1 : 1
+    const exponent = (value & 0x7c00) >> 10
+    const fraction = value & 0x03ff
+
+    if (exponent === 0) {
+      if (fraction === 0) {
+        return sign * 0
+      }
+      return sign * Math.pow(2, -14) * (fraction / 1024)
+    }
+
+    if (exponent === 0x1f) {
+      if (fraction === 0) {
+        return sign * Number.POSITIVE_INFINITY
+      }
+      return Number.NaN
+    }
+
+    return sign * Math.pow(2, exponent - 15) * (1 + fraction / 1024)
+  }
+
+  /**
+   * Build sorted density values and cumulative mass arrays from readback texture data.
+   */
+  private buildDensityDistribution(halfView: Uint16Array): void {
+    const maxValues = this.gridSize * this.gridSize * this.gridSize
+    const values = new Float32Array(maxValues)
+    const texelsPerRow = this.readbackBytesPerRow / this.readbackBytesPerTexel
+    let count = 0
+
+    for (let z = 0; z < this.gridSize; z++) {
+      const zOffsetTexels = z * this.gridSize * texelsPerRow
+      for (let y = 0; y < this.gridSize; y++) {
+        const rowOffsetTexels = zOffsetTexels + y * texelsPerRow
+        for (let x = 0; x < this.gridSize; x++) {
+          const texelOffsetHalfs = (rowOffsetTexels + x) * this.readbackTexelStrideHalfs
+          const rho = this.decodeFloat16(halfView[texelOffsetHalfs] ?? 0)
+          if (rho > RHO_EPSILON && Number.isFinite(rho)) {
+            values[count++] = rho
+          }
+        }
+      }
+    }
+
+    if (count === 0) {
+      this.sortedRhoValues = null
+      this.prefixMass = null
+      this.totalMass = 0
+      this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
+      return
+    }
+
+    this.sortedRhoValues = values.slice(0, count).sort((a, b) => b - a)
+    this.prefixMass = new Float64Array(count)
+
+    let cumulativeMass = 0
+    for (let i = 0; i < count; i++) {
+      cumulativeMass += this.sortedRhoValues[i] ?? 0
+      this.prefixMass[i] = cumulativeMass
+    }
+    this.totalMass = cumulativeMass
+    this.recomputeUncertaintyThresholdFromDistribution()
+  }
+
+  /**
    * Mark the density grid as needing recomputation.
    * Call this when quantum parameters change.
    */
   markDirty(): void {
     this.needsRecompute = true
+    this.shouldRefreshDistribution = true
   }
 
   /**
@@ -358,6 +598,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     )
 
     computePass.end()
+    this.refreshDensityDistribution(ctx)
 
     // Update tracking state
     this.needsRecompute = false
@@ -377,6 +618,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   getDensitySampler(): GPUSampler | null {
     return this.densitySampler
+  }
+
+  hasPhaseData(): boolean {
+    return this.hasPhasePayload
+  }
+
+  getTextureFormat(): 'r16float' | 'rgba16float' {
+    return this.densityTextureFormat
   }
 
   /**
@@ -402,6 +651,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.worldBound = boundingRadius
     this.updateGridParams(device)
     this.needsRecompute = true
+    this.shouldRefreshDistribution = true
   }
 
   /**
@@ -420,6 +670,22 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.computeBindGroup = null
     this.computeBindGroupLayout = null
     this.densitySampler = null
+    if (this.densityReadbackBuffer) {
+      try {
+        this.densityReadbackBuffer.unmap()
+      } catch {
+        // ignore: buffer may already be unmapped/destroyed
+      }
+      this.densityReadbackBuffer.destroy()
+    }
+    this.densityReadbackBuffer = null
+    this.readbackBytesPerRow = 0
+    this.readbackInFlight = false
+    this.shouldRefreshDistribution = true
+    this.sortedRhoValues = null
+    this.prefixMass = null
+    this.totalMass = 0
+    this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
 
     super.dispose()
   }

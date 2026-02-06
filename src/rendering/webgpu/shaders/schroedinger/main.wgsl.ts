@@ -59,7 +59,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   // Use HQ mode if quality requires it OR if dispersion is enabled
   // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && schroedinger.dispersionEnabled == 0u) {
+  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -118,14 +118,19 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   // When density grid is enabled, use the grid-based raymarcher
   // with automatic fallback when features require direct wavefunction sampling.
   const raymarchCall = useDensityGrid
-    ? `let requiresDirectSampling =
-    schroedinger.dispersionEnabled != 0u ||
-    schroedinger.shimmerEnabled != 0u ||
+    ? `let phaseDependentMode =
     schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9;
+    schroedinger.colorAlgorithm == 9 ||
+    (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
+    (FEATURE_EMISSION_PULSING && schroedinger.emissionPulsing != 0u) ||
+    (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
+
+  let requiresDirectSampling =
+    (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
+    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE);
 
   if (requiresDirectSampling) {
-    if (fastMode && schroedinger.dispersionEnabled == 0u) {
+    if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
       volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
     } else {
       volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -135,7 +140,7 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   }`
     : `// Use HQ mode if quality requires it OR if dispersion is enabled
   // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && schroedinger.dispersionEnabled == 0u) {
+  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -413,13 +418,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     // Specular tint + intensity (matches WebGL uSpecularColor/uSpecularIntensity)
     col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;
   }
-  // Fresnel rim from material uniforms
-  if (material.fresnelEnabled != 0u && material.fresnelIntensity > 0.0) {
-    let NdotV = max(dot(n, viewDir), 0.0);
-    let t = 1.0 - NdotV;
-    let rim = t * t * t * material.fresnelIntensity * 2.0;
-    col += material.rimColor * rim;
-  }
 
   // Output color and normal for MRT
   output.color = vec4f(col, 1.0);
@@ -564,7 +562,7 @@ ${bayerJitterSection}
 
   // Use HQ mode if quality requires it OR if dispersion is enabled
   // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && schroedinger.dispersionEnabled == 0u) {
+  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);

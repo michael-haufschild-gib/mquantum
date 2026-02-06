@@ -40,7 +40,6 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
         renderMethod: 'raymarch',
         faceDetection: 'none',
         requiresRaymarching: true,
-        edgesAreFresnelRim: true,
         supportsEmission: true,
       },
 

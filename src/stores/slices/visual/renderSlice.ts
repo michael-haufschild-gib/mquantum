@@ -1,17 +1,10 @@
 import { StateCreator } from 'zustand'
 import { AppearanceSlice, RenderSlice, RenderSliceState } from './types'
-import {
-  DEFAULT_FRESNEL_ENABLED,
-  DEFAULT_FRESNEL_INTENSITY,
-  DEFAULT_SHADER_SETTINGS,
-  DEFAULT_SHADER_TYPE,
-} from '@/stores/defaults/visualDefaults'
+import { DEFAULT_SHADER_SETTINGS, DEFAULT_SHADER_TYPE } from '@/stores/defaults/visualDefaults'
 
 export const RENDER_INITIAL_STATE: RenderSliceState = {
   shaderType: DEFAULT_SHADER_TYPE,
   shaderSettings: { ...DEFAULT_SHADER_SETTINGS },
-  fresnelEnabled: DEFAULT_FRESNEL_ENABLED,
-  fresnelIntensity: DEFAULT_FRESNEL_INTENSITY,
 }
 
 export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlice> = (set) => ({
@@ -53,7 +46,4 @@ export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlic
       },
     })),
 
-  setFresnelEnabled: (enabled) => set({ fresnelEnabled: enabled }),
-  setFresnelIntensity: (intensity) =>
-    set({ fresnelIntensity: Math.max(0, Math.min(1, intensity)) }),
 })

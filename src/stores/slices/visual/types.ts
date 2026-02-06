@@ -59,29 +59,21 @@ export type ColorSlice = ColorSliceState & ColorSliceActions
  */
 export interface MaterialSliceState {
   // Display properties
-  edgeThickness: number
   faceOpacity: number
-
-  // Tube wireframe settings (only applies when edgeThickness > 1)
-  tubeCaps: boolean
 
   // Emission
   faceEmission: number
   faceEmissionThreshold: number
   faceEmissionColorShift: number
   faceEmissionPulsing: boolean
-  faceRimFalloff: number
 }
 
 export interface MaterialSliceActions {
-  setEdgeThickness: (thickness: number) => void
   setFaceOpacity: (opacity: number) => void
-  setTubeCaps: (caps: boolean) => void
   setFaceEmission: (emission: number) => void
   setFaceEmissionThreshold: (threshold: number) => void
   setFaceEmissionColorShift: (shift: number) => void
   setFaceEmissionPulsing: (pulsing: boolean) => void
-  setFaceRimFalloff: (falloff: number) => void
 }
 
 export type MaterialSlice = MaterialSliceState & MaterialSliceActions
@@ -94,18 +86,12 @@ export interface RenderSliceState {
   // Shader System
   shaderType: ShaderType
   shaderSettings: AllShaderSettings
-
-  // Surface Effects
-  fresnelEnabled: boolean
-  fresnelIntensity: number
 }
 
 export interface RenderSliceActions {
   setShaderType: (shaderType: ShaderType) => void
   setWireframeSettings: (settings: Partial<WireframeSettings>) => void
   setSurfaceSettings: (settings: Partial<SurfaceSettings>) => void
-  setFresnelEnabled: (enabled: boolean) => void
-  setFresnelIntensity: (intensity: number) => void
 }
 
 export type RenderSlice = RenderSliceState & RenderSliceActions

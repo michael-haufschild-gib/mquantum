@@ -273,6 +273,25 @@ fn sFromRho(rho: f32) -> f32 {
   return log(rho + DENSITY_EPS);
 }
 
+fn applyUncertaintyBoundaryEmphasis(
+  rho: f32,
+  logRho: f32,
+  uniforms: SchroedingerUniforms
+) -> f32 {
+  if (
+    uniforms.uncertaintyBoundaryEnabled == 0u ||
+    uniforms.uncertaintyBoundaryStrength <= 0.0
+  ) {
+    return rho;
+  }
+
+  let width = max(uniforms.uncertaintyBoundaryWidth, 1e-3);
+  let normalizedDistance = abs(logRho - uniforms.uncertaintyLogRhoThreshold) / width;
+  let band = exp(-0.5 * normalizedDistance * normalizedDistance);
+  let gain = 1.0 + uniforms.uncertaintyBoundaryStrength * band;
+  return rho * gain;
+}
+
 // Compute both ρ and s efficiently
 fn densityPair(psi: vec2f) -> vec2f {
   let rho = rhoFromPsi(psi);
@@ -292,7 +311,7 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
@@ -318,27 +337,19 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
   // Apply Edge Erosion
   rho = erodeDensity(rho, flowedPos, uniforms);
 
-  // Apply shimmer if enabled
-  if (uniforms.shimmerEnabled != 0u && uniforms.shimmerStrength > 0.0) {
-    if (rho > 0.001 && rho < 0.5) {
-      let time = uniforms.time * uniforms.timeScale;
-      let noisePos = flowedPos * 5.0 + vec3f(0.0, 0.0, time * 2.0);
-      var shimmer = gradientNoise(noisePos);
-      shimmer = shimmer * 0.5 + 0.5;
-      let uncertainty = 1.0 - clamp(rho * 2.0, 0.0, 1.0);
-      rho *= (1.0 + (shimmer - 0.5) * uniforms.shimmerStrength * uncertainty);
-    }
-  }
+  // Confidence-boundary emphasis around an iso-probability surface
+  let boundaryLogRho = sFromRho(rho);
+  rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
 
   // Apply interference fringing if enabled
-  if (uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
+  if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
     let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
     let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
     rho *= fringe;
@@ -377,27 +388,19 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
   // Apply Edge Erosion
   rho = erodeDensity(rho, flowedPos, uniforms);
 
-  // Apply shimmer if enabled
-  if (uniforms.shimmerEnabled != 0u && uniforms.shimmerStrength > 0.0) {
-    if (rho > 0.001 && rho < 0.5) {
-      let time = uniforms.time * uniforms.timeScale;
-      let noisePos = flowedPos * 5.0 + vec3f(0.0, 0.0, time * 2.0);
-      var shimmer = gradientNoise(noisePos);
-      shimmer = shimmer * 0.5 + 0.5;
-      let uncertainty = 1.0 - clamp(rho * 2.0, 0.0, 1.0);
-      rho *= (1.0 + (shimmer - 0.5) * uniforms.shimmerStrength * uncertainty);
-    }
-  }
+  // Confidence-boundary emphasis around an iso-probability surface
+  let boundaryLogRho = sFromRho(rho);
+  rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
 
   // Apply interference fringing if enabled
-  if (uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
+  if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
     let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
     let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
     rho *= fringe;
@@ -430,7 +433,7 @@ fn sampleDensityAtFlowedPos(flowedPos: vec3f, t: f32, uniforms: SchroedingerUnif
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
@@ -451,7 +454,7 @@ fn sampleDensityAtFlowedPosNoErosion(flowedPos: vec3f, t: f32, uniforms: Schroed
   var rho = rhoFromPsi(psi);
 
   // Hydrogen ND density boost (still needed for correct gradient magnitude)
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND) {
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 

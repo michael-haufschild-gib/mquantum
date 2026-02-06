@@ -51,6 +51,22 @@ export interface SchrodingerRendererConfig {
    * Default: false
    */
   useDensityGrid?: boolean
+  /** Require phase-capable density grid payload (rho/logRho/phase channels). */
+  densityGridPhaseRequired?: boolean
+  /** Compile-time specialization flag for nodal calculations. */
+  nodalEnabled?: boolean
+  /** Compile-time specialization flag for chromatic dispersion. */
+  dispersionEnabled?: boolean
+  /** Compile-time specialization flag for volumetric shadows. */
+  shadowsEnabled?: boolean
+  /** Compile-time specialization flag for volumetric AO. */
+  aoEnabled?: boolean
+  /** Compile-time specialization flag for phase materiality. */
+  phaseMaterialityEnabled?: boolean
+  /** Compile-time specialization flag for emission pulsing. */
+  emissionPulsing?: boolean
+  /** Compile-time specialization flag for interference. */
+  interferenceEnabled?: boolean
 }
 
 /**
@@ -148,6 +164,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private lastSchroedingerVersion = -1
   private lastLightingVersion = -1
   private lastAppearanceVersion = -1
+  private lastQualitySignature = ''
+  private lastBasisRotationVersion = -1
+  private lastBasisSchroedingerVersion = -1
+  private lastBasisDimension = -1
+  private lastBasisAnimationTime = Number.NaN
   // Separate appearance version tracker for the Schroedinger uniform buffer.
   // Emission/Rim parameters are sourced from the appearance store (matching WebGL),
   // so the Schroedinger buffer must also be updated when appearance changes.
@@ -156,6 +177,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Time field offset in SchroedingerUniforms buffer (bytes)
   // Used for partial buffer writes when only time changes
   private static readonly TIME_FIELD_OFFSET = 908
+  private static readonly BOUND_RADIUS_QUANT_STEP = 0.05
+  private static readonly BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
 
   // Diagnostic logging throttle
   private lastDiagnosticLog = 0
@@ -201,9 +224,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       temporal: false,
       // Density grid disabled by default: while it provides 3-6x FPS improvement via
       // pre-computed 64³ texture lookups, it loses phase data (returns phase=0.0),
-      // breaks chromatic dispersion, shimmer, and phase-based coloring.
+      // breaking some phase-dependent rendering features in density-only mode.
       // Enable explicitly when performance is prioritized over visual quality.
       useDensityGrid: false,
+      densityGridPhaseRequired: false,
+      nodalEnabled: true,
+      dispersionEnabled: true,
+      shadowsEnabled: true,
+      aoEnabled: true,
+      phaseMaterialityEnabled: true,
+      emissionPulsing: true,
+      interferenceEnabled: true,
       ...config,
     }
 
@@ -216,9 +247,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isosurface: this.rendererConfig.isosurface,
       quantumMode: this.rendererConfig.quantumMode,
       termCount: this.rendererConfig.termCount,
+      shadows: this.rendererConfig.shadowsEnabled ?? true,
+      ambientOcclusion: this.rendererConfig.aoEnabled ?? true,
+      nodal: this.rendererConfig.nodalEnabled ?? true,
+      dispersion: this.rendererConfig.dispersionEnabled ?? true,
       colorAlgorithm: this.rendererConfig.colorAlgorithm,
       temporalAccumulation: this.rendererConfig.temporal,
       useDensityGrid: effectiveUseDensityGrid,
+      densityGridHasPhase: false,
+      phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
+      emissionPulsing: this.rendererConfig.emissionPulsing ?? true,
+      interference: this.rendererConfig.interferenceEnabled ?? true,
     }
   }
 
@@ -238,6 +277,34 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const { device } = ctx
     // Force a lighting buffer write on first frame after (re)initialization.
     this.lastLightingVersion = -1
+    this.lastQualitySignature = ''
+    this.lastBasisRotationVersion = -1
+    this.lastBasisSchroedingerVersion = -1
+    this.lastBasisDimension = -1
+    this.lastBasisAnimationTime = Number.NaN
+
+    // Density grid only makes sense for volumetric mode.
+    const useDensityGrid = this.shaderConfig.useDensityGrid && !this.rendererConfig.isosurface
+
+    // Recreate density grid pass if needed so shader composition can use the actual payload mode.
+    this.densityGridPass?.dispose()
+    this.densityGridPass = null
+    this.densityGridInitialized = false
+
+    if (useDensityGrid) {
+      this.densityGridPass = new DensityGridComputePass({
+        dimension: this.rendererConfig.dimension ?? 3,
+        quantumMode: this.rendererConfig.quantumMode,
+        termCount: this.rendererConfig.termCount,
+        gridSize: 64, // 64³ grid - balance between quality and compute cost
+        includePhase: this.rendererConfig.densityGridPhaseRequired,
+      })
+      await this.densityGridPass.initialize(ctx)
+      this.densityGridInitialized = true
+      this.shaderConfig.densityGridHasPhase = this.densityGridPass.hasPhaseData()
+    } else {
+      this.shaderConfig.densityGridHasPhase = false
+    }
 
     // Compose shaders
     const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
@@ -272,15 +339,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Group 2: Object (Schroedinger + Basis + optional DensityGrid texture)
     // When useDensityGrid is enabled, we add texture and sampler bindings
-    const useDensityGrid = this.shaderConfig.useDensityGrid && !this.rendererConfig.isosurface
-
     const objectLayoutEntries: GPUBindGroupLayoutEntry[] = [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Schroedinger uniforms
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Basis vectors
     ]
 
     // Add density grid bindings if enabled
-    // Using rgba16float texture which supports hardware filtering
+    // Supports both r16float (density-only) and rgba16float (phase payload).
     if (useDensityGrid) {
       objectLayoutEntries.push(
         {
@@ -411,19 +476,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
     this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1200, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
-
-    // Create density grid compute pass if enabled
-    if (useDensityGrid) {
-      this.densityGridPass = new DensityGridComputePass({
-        dimension: this.rendererConfig.dimension ?? 3,
-        quantumMode: this.rendererConfig.quantumMode,
-        termCount: this.rendererConfig.termCount,
-        gridSize: 64, // 64³ grid - balance between quality and compute cost
-      })
-      // Initialize the compute pass (creates its own pipeline and resources)
-      await this.densityGridPass.initialize(ctx)
-      this.densityGridInitialized = true
-    }
 
     // Create bind groups - consolidated layout
     // Group 0: Camera
@@ -726,6 +778,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const animation = ctx.frame?.stores?.['animation'] as any
     const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
+    const uncertaintyConfidenceMass = schroedinger?.uncertaintyConfidenceMass ?? 0.68
+    const uncertaintyBoundaryWidth = schroedinger?.uncertaintyBoundaryWidth ?? 0.3
+    let uncertaintyLogRhoThreshold = -2.0
+    if (this.densityGridPass) {
+      this.densityGridPass.setConfidenceMass(uncertaintyConfidenceMass)
+      uncertaintyLogRhoThreshold = this.densityGridPass.getLogRhoThreshold()
+    }
+
     // === DIRTY-FLAG OPTIMIZATION ===
     // When schroedinger settings unchanged AND appearance unchanged,
     // only update the time field (4 bytes) instead of full buffer (~1KB)
@@ -735,7 +795,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const versionChanged = schroedingerVersion !== this.lastSchroedingerVersion
     const appearanceChanged = appearanceVersion !== this.lastSchrodingerAppearanceVersion
     if (!versionChanged && !appearanceChanged && this.lastSchroedingerVersion !== -1) {
-      // Partial buffer write: only update time field at offset 908
+      // Partial buffer write: update time and uncertainty threshold scalars
       // Uses pre-allocated buffer to avoid per-frame allocation
       this.timeUpdateBuffer[0] = animationTime
       this.device.queue.writeBuffer(
@@ -743,6 +803,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         WebGPUSchrodingerRenderer.TIME_FIELD_OFFSET,
         this.timeUpdateBuffer
       )
+      // Boundary threshold can refresh after density-grid recomputation even when
+      // store versions are unchanged, so keep this scalar updated too.
+      this.timeUpdateBuffer[0] = uncertaintyLogRhoThreshold
+      this.device.queue.writeBuffer(this.schroedingerUniformBuffer, 1180, this.timeUpdateBuffer)
       return
     }
 
@@ -863,9 +927,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         extraDimQuantumNumbers,
         extraDimOmega
       )
-      // Rebuild bounding geometry if radius changed significantly
-      if (Math.abs(newBoundR - this.boundingRadius) > 0.01 && this.device) {
-        this.boundingRadius = newBoundR
+      const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
+      const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
+      // Rebuild bounding geometry only when quantized bound shifts enough.
+      // This adds hysteresis and avoids geometry churn during small bound oscillations.
+      if (
+        Math.abs(quantizedBoundR - this.boundingRadius) >=
+          WebGPUSchrodingerRenderer.BOUND_RADIUS_REBUILD_THRESHOLD &&
+        this.device
+      ) {
+        this.boundingRadius = quantizedBoundR
         this.createBoundingGeometry(this.device)
       }
     }
@@ -978,7 +1049,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[696 / 4] = appearance?.faceEmissionThreshold ?? 0.0
     floatView[700 / 4] = appearance?.faceEmissionColorShift ?? 0.0
     intView[704 / 4] = appearance?.faceEmissionPulsing ? 1 : 0
-    floatView[708 / 4] = appearance?.faceRimFalloff ?? 3.0
+    floatView[708 / 4] = 0.0 // _reserved_rim (Fresnel rim removed)
     floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
     floatView[716 / 4] = pbr?.face?.roughness ?? 0.3 // WebGL uses 'pbr-face' source
 
@@ -1045,8 +1116,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // More fields
     intView[896 / 4] = schroedinger?.energyColorEnabled ? 1 : 0
-    intView[900 / 4] = schroedinger?.shimmerEnabled ? 1 : 0
-    floatView[904 / 4] = schroedinger?.shimmerStrength ?? 0.5 // WebGL default: 0.5
+    intView[900 / 4] = schroedinger?.uncertaintyBoundaryEnabled ? 1 : 0
+    floatView[904 / 4] = schroedinger?.uncertaintyBoundaryStrength ?? 0.5
     floatView[908 / 4] = animationTime // time (respects animation pause state)
     intView[912 / 4] = schroedinger?.isoEnabled ? 1 : 0
     floatView[916 / 4] = schroedinger?.isoThreshold ?? -3.0 // WebGL default: -3.0
@@ -1178,17 +1249,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1144 / 4] = nodalColorNegative[2]
     floatView[1148 / 4] = 0.0 // _padNodal3
 
-    // Probability Current Flow (offset 1152-1164)
+    // Probability Current Flow + uncertainty confidence mass (offset 1152-1164)
     intView[1152 / 4] = schroedinger?.probabilityFlowEnabled ? 1 : 0
     floatView[1156 / 4] = schroedinger?.probabilityFlowSpeed ?? 1.0
     floatView[1160 / 4] = schroedinger?.probabilityFlowStrength ?? 0.3
-    floatView[1164 / 4] = 0.0 // _padFlow0
+    floatView[1164 / 4] = uncertaintyConfidenceMass
 
-    // LCH perceptual color parameters (offset 1168-1180)
+    // LCH perceptual color parameters + uncertainty boundary controls (offset 1168-1180)
     floatView[1168 / 4] = appearance?.lchLightness ?? 0.7
     floatView[1172 / 4] = appearance?.lchChroma ?? 0.15
-    floatView[1176 / 4] = 0.0 // _padLch0
-    floatView[1180 / 4] = 0.0 // _padLch1
+    floatView[1176 / 4] = uncertaintyBoundaryWidth
+    floatView[1180 / 4] = uncertaintyLogRhoThreshold
 
     // Multi-source blend weights (offset 1184-1200, vec4f)
     const msWeights = appearance?.multiSourceWeights
@@ -1205,6 +1276,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const extended = ctx.frame?.stores?.['extended'] as any
     const schroedinger = extended?.schroedinger
+    const schroedingerVersion = extended?.schroedingerVersion ?? 0
+    const rotation = ctx.frame?.stores?.['rotation'] as any
+    const rotationVersion = rotation?.version ?? 0
     const geometry = ctx.frame?.stores?.['geometry'] as any
     const animation = ctx.frame?.stores?.['animation'] as any
     const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
@@ -1217,6 +1291,20 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const sliceSpeed = schroedinger?.sliceSpeed ?? 0.02
     const sliceAmplitude = schroedinger?.sliceAmplitude ?? 0.3
     const parameterValues = schroedinger?.parameterValues as number[] | undefined
+    const requiresTimeDrivenBasis = sliceAnimationEnabled && dimension > 3
+    const basisStaticInputsUnchanged =
+      rotationVersion === this.lastBasisRotationVersion &&
+      schroedingerVersion === this.lastBasisSchroedingerVersion &&
+      dimension === this.lastBasisDimension
+
+    if (basisStaticInputsUnchanged) {
+      if (!requiresTimeDrivenBasis) {
+        return
+      }
+      if (Math.abs(accumulatedTime - this.lastBasisAnimationTime) < 1e-6) {
+        return
+      }
+    }
 
     // BasisVectors struct uses array<vec4f, 3> for each member (48 floats total)
     // Stride is 12 (not 11) because array<vec4f, 3> = 3 * 4 = 12 floats
@@ -1289,6 +1377,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     this.writeUniformBuffer(this.device, this.basisUniformBuffer, basisData)
+    this.lastBasisRotationVersion = rotationVersion
+    this.lastBasisSchroedingerVersion = schroedingerVersion
+    this.lastBasisDimension = dimension
+    this.lastBasisAnimationTime = requiresTimeDrivenBasis ? accumulatedTime : Number.NaN
   }
 
   /**
@@ -1340,10 +1432,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     //   sssColor: vec3f,         // bytes 80-91  (idx 20-22)
     //   sssThickness: f32,       // bytes 92-95  (idx 23)
     //   sssJitter: f32,          // bytes 96-99  (idx 24)
-    //   fresnelEnabled: u32,     // bytes 100-103 (idx 25)
-    //   fresnelIntensity: f32,   // bytes 104-107 (idx 26)
+    //   _reserved_fresnel0: u32, // bytes 100-103 (idx 25) — Fresnel rim removed
+    //   _reserved_fresnel1: f32, // bytes 104-107 (idx 26)
     //   <padding>                // bytes 108-111 (idx 27) - alignment gap
-    //   rimColor: vec3f,         // bytes 112-123 (idx 28-30)
+    //   _reserved_fresnel2: vec3f, // bytes 112-123 (idx 28-30)
     //   _padding2: f32,          // bytes 124-127 (idx 31)
     //   specularIntensity: f32,  // bytes 128-131 (idx 32)
     //   <padding>                // bytes 132-143 (idx 33-35) - alignment gap
@@ -1398,23 +1490,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[23] = appearance?.sssThickness ?? 1.0
     data[24] = appearance?.sssJitter ?? 0.2
 
-    // fresnelEnabled: u32 (idx 25)
-    const fresnelEnabled = appearance?.fresnelEnabled ?? true
-    dataView.setUint32(25 * 4, fresnelEnabled ? 1 : 0, true)
-
-    // fresnelIntensity: f32 (idx 26)
-    const rimFalloff = appearance?.faceRimFalloff ?? 1.0
-    data[26] = (appearance?.fresnelIntensity ?? 0.5) * rimFalloff
-
+    // idx 25-31: reserved (Fresnel rim removed — zeroed for buffer compatibility)
+    data[25] = 0.0
+    data[26] = 0.0
     // idx 27: alignment gap
-
-    // rimColor: vec3f (idx 28-30) - aligned to byte 112
-    const rimColor = this.parseColor(appearance?.edgeColor ?? '#ffffff')
-    data[28] = rimColor[0]
-    data[29] = rimColor[1]
-    data[30] = rimColor[2]
-
-    // _padding2 (idx 31)
+    data[28] = 0.0
+    data[29] = 0.0
+    data[30] = 0.0
     data[31] = 0.0
 
     // specularIntensity: f32 (idx 32)
@@ -1458,23 +1540,40 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Quality multiplier affects ray march quality
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
+    const shadowQuality = lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0
+    const aoEnabled = schroedinger?.aoEnabled ? 1 : 0
+    const aoRadius = performance?.aoRadius ?? 0.5
+    const aoIntensity = performance?.aoIntensity ?? 1.0
+    const shadowSoftness = lighting?.shadowSoftness ?? 0.5
+    const debugMode = performance?.debugMode ?? 0
+
+    const qualitySignature = [
+      qualityMultiplier.toFixed(4),
+      shadowQuality,
+      shadowSoftness.toFixed(4),
+      aoEnabled,
+      aoRadius.toFixed(4),
+      aoIntensity.toFixed(4),
+      debugMode,
+    ].join('|')
+    if (qualitySignature === this.lastQualitySignature) {
+      return
+    }
+    this.lastQualitySignature = qualitySignature
+
     data[1] = 0.001 / qualityMultiplier // sdfSurfaceDistance (smaller = more precise)
-    data[3] = lighting?.shadowSoftness ?? 0.5 // shadowSoftness
-    data[6] = performance?.aoRadius ?? 0.5 // aoRadius
-    data[7] = performance?.aoIntensity ?? 1.0 // aoIntensity
+    data[3] = shadowSoftness // shadowSoftness
+    data[6] = aoRadius // aoRadius
+    data[7] = aoIntensity // aoIntensity
     data[8] = qualityMultiplier
 
     // Use pre-allocated DataView for integer writes
     this.qualityDataView.setInt32(0 * 4, Math.floor(128 * qualityMultiplier), true) // sdfMaxIterations
-    this.qualityDataView.setInt32(
-      2 * 4,
-      lighting?.shadowEnabled ? (lighting?.shadowQuality ?? 2) : 0,
-      true
-    ) // shadowQuality
+    this.qualityDataView.setInt32(2 * 4, shadowQuality, true) // shadowQuality
     // aoEnabled: Use schroedinger store's aoEnabled (WebGL uses per-object AO toggle, not global ssaoEnabled)
-    this.qualityDataView.setInt32(4 * 4, schroedinger?.aoEnabled ? 1 : 0, true) // aoEnabled
+    this.qualityDataView.setInt32(4 * 4, aoEnabled, true) // aoEnabled
     this.qualityDataView.setInt32(5 * 4, Math.floor(4 * qualityMultiplier), true) // aoSamples
-    this.qualityDataView.setInt32(9 * 4, performance?.debugMode ?? 0, true) // debugMode
+    this.qualityDataView.setInt32(9 * 4, debugMode, true) // debugMode
 
     this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)
   }

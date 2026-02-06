@@ -28,16 +28,6 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(useAppearanceStore.getState().shaderType).toBe('wireframe')
     })
 
-    it('setEdgeThickness clamps to [0, 5] without coupling to visibility toggles', () => {
-      useAppearanceStore.getState().setEdgeThickness(2)
-      expect(useAppearanceStore.getState().edgeThickness).toBe(2)
-
-      useAppearanceStore.getState().setEdgeThickness(-5)
-      expect(useAppearanceStore.getState().edgeThickness).toBe(0)
-
-      useAppearanceStore.getState().setEdgeThickness(99)
-      expect(useAppearanceStore.getState().edgeThickness).toBe(5)
-    })
   })
 
   describe('Clamping behavior (prevents invalid uniforms)', () => {

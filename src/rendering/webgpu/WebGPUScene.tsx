@@ -107,6 +107,13 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
   termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
   useDensityGrid: state.schroedinger?.useDensityGrid ?? false,
+  nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
+  dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
+  shadowsEnabled: state.schroedinger?.shadowsEnabled ?? false,
+  aoEnabled: state.schroedinger?.aoEnabled ?? false,
+  phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
+  emissionPulsing: state.schroedinger?.emissionPulsing ?? false,
+  interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
 })
 
 // Schrodinger selector for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
@@ -290,6 +297,19 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           quantumMode: schroedingerCompile.quantumMode,
           termCount: schroedingerCompile.termCount,
           useDensityGrid: schroedingerCompile.useDensityGrid,
+          nodalEnabled: schroedingerCompile.nodalEnabled,
+          dispersionEnabled: schroedingerCompile.dispersionEnabled,
+          shadowsEnabled: schroedingerCompile.shadowsEnabled,
+          aoEnabled: schroedingerCompile.aoEnabled,
+          phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
+          emissionPulsingEnabled: schroedingerCompile.emissionPulsing,
+          interferenceEnabled: schroedingerCompile.interferenceEnabled,
+          densityGridPhaseRequired:
+            schroedingerCompile.phaseMaterialityEnabled ||
+            schroedingerCompile.emissionPulsing ||
+            schroedingerCompile.interferenceEnabled ||
+            appearance.colorAlgorithm === 'phase' ||
+            appearance.colorAlgorithm === 'mixed',
           temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
           colorAlgorithm: appearance.colorAlgorithm,
           // Skybox settings
@@ -337,6 +357,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.quantumMode,
     schroedingerCompile.termCount,
     schroedingerCompile.useDensityGrid,
+    schroedingerCompile.nodalEnabled,
+    schroedingerCompile.dispersionEnabled,
+    schroedingerCompile.shadowsEnabled,
+    schroedingerCompile.aoEnabled,
+    schroedingerCompile.phaseMaterialityEnabled,
+    schroedingerCompile.emissionPulsing,
+    schroedingerCompile.interferenceEnabled,
     performance_.temporalReprojectionEnabled,
   ])
 
@@ -570,6 +597,14 @@ export interface PassConfig {
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   useDensityGrid: boolean
+  nodalEnabled: boolean
+  dispersionEnabled: boolean
+  shadowsEnabled: boolean
+  aoEnabled: boolean
+  phaseMaterialityEnabled: boolean
+  emissionPulsingEnabled: boolean
+  interferenceEnabled: boolean
+  densityGridPhaseRequired: boolean
   temporalReprojectionEnabled: boolean
   colorAlgorithm: PaletteColorAlgorithm
   // Skybox settings
@@ -991,7 +1026,21 @@ export async function setupRenderPasses(
  * @returns The Schroedinger renderer pass or null if not supported
  */
 export function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
-  const { dimension, isosurface, quantumMode, termCount, useDensityGrid } = config
+  const {
+    dimension,
+    isosurface,
+    quantumMode,
+    termCount,
+    useDensityGrid,
+    nodalEnabled,
+    dispersionEnabled,
+    shadowsEnabled,
+    aoEnabled,
+    phaseMaterialityEnabled,
+    emissionPulsingEnabled,
+    interferenceEnabled,
+    densityGridPhaseRequired,
+  } = config
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as WGSLColorAlgorithm | undefined
   const useTemporalCloudAccumulation =
     objectType === 'schroedinger' &&
@@ -1009,6 +1058,14 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         termCount,
         colorAlgorithm,
         useDensityGrid,
+        nodalEnabled,
+        dispersionEnabled,
+        shadowsEnabled,
+        aoEnabled,
+        phaseMaterialityEnabled,
+        emissionPulsing: emissionPulsingEnabled,
+        interferenceEnabled,
+        densityGridPhaseRequired,
         temporal: useTemporalCloudAccumulation,
       })
 

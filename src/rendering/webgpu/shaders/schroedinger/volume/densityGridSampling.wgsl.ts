@@ -37,11 +37,6 @@ export const densityGridBindingsBlock = /* wgsl */ `
 // Pre-computed density grid from compute pass (rgba16float, trilinear filtering)
 @group(2) @binding(2) var densityGridTex: texture_3d<f32>;
 @group(2) @binding(3) var densityGridSampler: sampler;
-
-// Grid parameters (must match compute shader)
-const DENSITY_GRID_MIN: vec3f = vec3f(-2.0, -2.0, -2.0);
-const DENSITY_GRID_MAX: vec3f = vec3f(2.0, 2.0, 2.0);
-const DENSITY_GRID_SIZE: vec3f = vec3f(64.0, 64.0, 64.0);
 `
 
 /**
@@ -55,41 +50,39 @@ export const densityGridSamplingBlock = /* wgsl */ `
 
 /**
  * Convert world position to density grid UV coordinates.
- * Maps world space [-2, 2] to texture UV [0, 1].
+ * Maps world space [-boundingRadius, +boundingRadius] to texture UV [0, 1].
+ * Must stay in sync with DensityGridComputePass worldMin/worldMax updates.
  */
-fn worldToGridUV(worldPos: vec3f) -> vec3f {
-  return (worldPos - DENSITY_GRID_MIN) / (DENSITY_GRID_MAX - DENSITY_GRID_MIN);
+fn worldToGridUV(worldPos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  let radius = max(uniforms.boundingRadius, 1e-6);
+  let minBound = vec3f(-radius);
+  let maxBound = vec3f(radius);
+  return (worldPos - minBound) / (maxBound - minBound);
 }
 
 /**
  * Sample density from the pre-computed 3D texture.
  * Returns the same format as sampleDensityWithPhase: vec3f(rho, logRho, phase)
  *
- * Note: Phase is currently not stored in the texture (r32float format).
- * Returns 0.0 for phase - if phase-based coloring is needed, either:
- * 1. Use rgba32float texture format
- * 2. Compute phase separately at lower cost
+ * In density-only mode (r16float), phase is not stored and defaults to 0.0.
+ * In phase-capable mode (rgba16float), log-density and phase are read directly.
  *
  * IMPORTANT: Uses textureSampleLevel instead of textureSample to allow
  * calling from non-uniform control flow (e.g., inside conditionals that
  * depend on per-pixel values like gradient calculations).
  */
 fn sampleDensityFromGrid(worldPos: vec3f) -> vec3f {
-  let uv = worldToGridUV(worldPos);
+  let uv = worldToGridUV(worldPos, schroedinger);
 
   // Clamp to valid range (edge clamping handled by sampler, but be safe)
   let uvClamped = clamp(uv, vec3f(0.0), vec3f(1.0));
 
-  // Sample density from texture (trilinear filtering at mip level 0)
-  // textureSampleLevel allows non-uniform control flow (no derivative calculation)
-  let rho = textureSampleLevel(densityGridTex, densityGridSampler, uvClamped, 0.0).r;
-
-  // Compute log-density for consistency with direct path
-  let s = log(rho + 1e-8);
-
-  // Phase not available in r32float texture - return 0
-  // For phase-based coloring, use rgba32float format and store it
-  let phase = 0.0;
+  // Sample density payload from texture (trilinear filtering at mip level 0).
+  // textureSampleLevel allows non-uniform control flow (no derivative calculation).
+  let densityPayload = textureSampleLevel(densityGridTex, densityGridSampler, uvClamped, 0.0);
+  let rho = densityPayload.r;
+  let s = select(log(rho + 1e-8), densityPayload.g, DENSITY_GRID_HAS_PHASE);
+  let phase = select(0.0, densityPayload.b, DENSITY_GRID_HAS_PHASE);
 
   return vec3f(rho, s, phase);
 }
@@ -103,7 +96,7 @@ fn sampleDensityFromGrid(worldPos: vec3f) -> vec3f {
  * shadow sampling, AO sampling inside conditionals).
  */
 fn sampleDensityOnlyFromGrid(worldPos: vec3f) -> f32 {
-  let uv = worldToGridUV(worldPos);
+  let uv = worldToGridUV(worldPos, schroedinger);
   let uvClamped = clamp(uv, vec3f(0.0), vec3f(1.0));
   // textureSampleLevel allows non-uniform control flow (no derivative calculation)
   return textureSampleLevel(densityGridTex, densityGridSampler, uvClamped, 0.0).r;
@@ -113,7 +106,7 @@ fn sampleDensityOnlyFromGrid(worldPos: vec3f) -> f32 {
  * Compute gradient from density grid using central differences.
  * This is much cheaper than tetrahedral sampling of the wavefunction.
  */
-fn computeGradientFromGrid(worldPos: vec3f, delta: f32) -> vec3f {
+fn computeGradientFromGrid(worldPos: vec3f, delta: f32, rhoCenter: f32) -> vec3f {
   // Central differences: gradient = (f(x+h) - f(x-h)) / (2h)
   let dx = sampleDensityOnlyFromGrid(worldPos + vec3f(delta, 0.0, 0.0)) -
            sampleDensityOnlyFromGrid(worldPos - vec3f(delta, 0.0, 0.0));
@@ -124,7 +117,6 @@ fn computeGradientFromGrid(worldPos: vec3f, delta: f32) -> vec3f {
 
   // Scale by 1/(2*delta) and convert to log-density gradient
   // For lighting, we want gradient of log(rho), not rho itself
-  let rhoCenter = sampleDensityOnlyFromGrid(worldPos);
   let scale = 1.0 / (2.0 * delta * max(rhoCenter, 0.001));
 
   return vec3f(dx, dy, dz) * scale;
@@ -138,7 +130,7 @@ fn computeGradientFromGrid(worldPos: vec3f, delta: f32) -> vec3f {
  */
 fn sampleWithGradientFromGrid(worldPos: vec3f, delta: f32) -> TetraSample {
   let density = sampleDensityFromGrid(worldPos);
-  let gradient = computeGradientFromGrid(worldPos, delta);
+  let gradient = computeGradientFromGrid(worldPos, delta, density.x);
 
   return TetraSample(
     density.x,  // rho
@@ -172,6 +164,11 @@ fn volumeRaymarchGrid(
   tFar: f32,
   uniforms: SchroedingerUniforms
 ) -> VolumeResult {
+  const EMPTY_SKIP_THRESHOLD: f32 = 1e-7;
+  const EMPTY_SKIP_FACTOR: f32 = 4.0;
+  const MIN_REMAINING_CONTRIBUTION: f32 = 0.001;
+  const MAX_REMAINING_DENSITY_BOUND: f32 = 8.0;
+
   var accColor = vec3f(0.0);
   var transmittance: f32 = 1.0;
   var iterCount: i32 = 0;
@@ -194,6 +191,10 @@ fn volumeRaymarchGrid(
     iterCount = i + 1;
 
     if (transmittance < MIN_TRANSMITTANCE) { break; }
+    let remainingDistance = max(tFar - t, 0.0);
+    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
+    let remainingContributionBound = transmittance * maxRemainingOpacity;
+    if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -212,13 +213,25 @@ fn volumeRaymarchGrid(
       lowDensityCount = 0;
     }
 
+    if (rho < EMPTY_SKIP_THRESHOLD) {
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      if (skipDistance > stepLen) {
+        let probeMid = sampleDensityOnlyFromGrid(pos + rayDir * (skipDistance * 0.5));
+        let probeFar = sampleDensityOnlyFromGrid(pos + rayDir * skipDistance);
+        if (probeMid < EMPTY_SKIP_THRESHOLD && probeFar < EMPTY_SKIP_THRESHOLD) {
+          t += skipDistance;
+          continue;
+        }
+      }
+    }
+
     // Physically neutral nodal visualization:
     // Smooth spatial fade matching the Gaussian envelope falloff.
     // Cannot use density gating because ρ=|ψ|²≈0 at nodes by definition.
     let nodalR2Grid = dot(pos, pos);
     let nodalBoundR2Grid = uniforms.boundingRadius * uniforms.boundingRadius;
     let nodalRadialFadeGrid = 1.0 - smoothstep(0.25, 0.65, nodalR2Grid / nodalBoundR2Grid);
-    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeGrid > 0.01) {
+    if (FEATURE_NODAL && uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeGrid > 0.01) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
       let fadedIntensityGrid = nodal.intensity * nodalRadialFadeGrid;
       if (fadedIntensityGrid > 1e-4) {
@@ -245,7 +258,7 @@ fn volumeRaymarchGrid(
       }
 
       // Compute gradient from grid (6 texture samples instead of 4 wavefunction evals)
-      let gradient = computeGradientFromGrid(pos, 0.05);
+      let gradient = computeGradientFromGrid(pos, 0.05, rho);
 
       // Compute emission with lighting
       let emission = computeEmissionLit(rho, phase, pos, gradient, viewDir, uniforms);

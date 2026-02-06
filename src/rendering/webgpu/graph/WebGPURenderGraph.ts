@@ -674,6 +674,17 @@ export class WebGPURenderGraph {
 
     // Track resources written by enabled passes to prevent passthrough overwriting them
     const writtenByEnabledPass = new Set<string>()
+    const passEnabledMemo = new Map<string, boolean>()
+
+    const getPassEnabled = (pass: WebGPURenderPass, passId: string): boolean => {
+      const cached = passEnabledMemo.get(passId)
+      if (cached !== undefined) {
+        return cached
+      }
+      const enabled = pass.config.enabled?.(this.frameContext) ?? true
+      passEnabledMemo.set(passId, enabled)
+      return enabled
+    }
 
     for (const passId of this.passOrder) {
       const pass = this.passes.get(passId)
@@ -683,7 +694,7 @@ export class WebGPURenderGraph {
       }
 
       // Check if pass is enabled
-      const enabled = pass.config.enabled?.(this.frameContext) ?? true
+      const enabled = getPassEnabled(pass, passId)
 
       // ========================================================================
       // Lazy Resource Deallocation: Track disabled frames and manage grace period
@@ -846,7 +857,7 @@ export class WebGPURenderGraph {
       if (!pass) continue
 
       // Check if pass was enabled this frame
-      const enabled = pass.config.enabled?.(this.frameContext) ?? true
+      const enabled = passEnabledMemo.get(passId) ?? true
       if (!enabled) continue
 
       // Get draw stats if available
@@ -866,7 +877,7 @@ export class WebGPURenderGraph {
       passTiming: this.passOrder.map((id) => ({
         passId: id,
         gpuTimeMs: this.lastPassTimings.get(id) ?? 0,
-        skipped: !(this.passes.get(id)?.config.enabled?.(this.frameContext) ?? true),
+        skipped: !(passEnabledMemo.get(id) ?? true),
       })),
       commandBufferCount: 1,
       vramUsage: this.pool.getVRAMUsage(),

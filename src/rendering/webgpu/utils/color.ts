@@ -9,6 +9,8 @@
  */
 
 export type Rgb = readonly [number, number, number]
+const LINEAR_COLOR_CACHE_MAX_ENTRIES = 512
+const linearColorCache = new Map<string, Rgb>()
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value))
@@ -54,12 +56,25 @@ export function parseHexColorToSrgbRgb(hex: string): Rgb | null {
  * Returns `fallback` when parsing fails.
  */
 export function parseHexColorToLinearRgb(hex: string, fallback: Rgb = [1, 1, 1]): Rgb {
+  if (hex && typeof hex === 'string') {
+    const cacheKey = hex.trim().toLowerCase()
+    const cached = linearColorCache.get(cacheKey)
+    if (cached) {
+      return cached
+    }
+  }
+
   const srgb = parseHexColorToSrgbRgb(hex)
   if (!srgb) return fallback
-  return [
+  const linear: Rgb = [
     srgbToLinearChannel(srgb[0]),
     srgbToLinearChannel(srgb[1]),
     srgbToLinearChannel(srgb[2]),
   ]
+  const cacheKey = hex.trim().toLowerCase()
+  if (linearColorCache.size >= LINEAR_COLOR_CACHE_MAX_ENTRIES) {
+    linearColorCache.clear()
+  }
+  linearColorCache.set(cacheKey, linear)
+  return linear
 }
-

@@ -21,7 +21,6 @@ import type { ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types
 // ============================================================================
 
 export const DEFAULT_EDGE_COLOR = '#19e697'
-export const DEFAULT_EDGE_THICKNESS = 1
 export const DEFAULT_FACE_OPACITY = 1
 export const DEFAULT_FACE_COLOR = '#33cc9e'
 export const DEFAULT_BACKGROUND_COLOR = '#232323'
@@ -34,12 +33,9 @@ export const DEFAULT_BACKGROUND_BLEND_MODE: BackgroundBlendMode = 'normal'
 export const DEFAULT_ROUGHNESS = 0.3
 export const DEFAULT_METALLIC = 0.0
 
-// Edge-specific specular (for TubeWireframe when thickness > 1)
+// Edge-specific specular
 export const DEFAULT_EDGE_SPECULAR_INTENSITY = 0.5
 export const DEFAULT_EDGE_SPECULAR_COLOR = '#ffffff'
-
-// Tube wireframe caps (false = hollow tubes for performance, true = capped ends)
-export const DEFAULT_TUBE_CAPS = false
 
 // ============================================================================
 // Bloom Defaults
@@ -206,8 +202,6 @@ export type { ShadowAnimationMode, ShadowQuality } from '@/rendering/shadows/typ
 // Surface Effect Defaults
 // ============================================================================
 
-export const DEFAULT_FRESNEL_ENABLED = false
-export const DEFAULT_FRESNEL_INTENSITY = 0.1
 export const DEFAULT_PER_DIMENSION_COLOR_ENABLED = false
 
 // ============================================================================
@@ -387,13 +381,12 @@ export const DEFAULT_SKYBOX_PROCEDURAL_SETTINGS: SkyboxProceduralSettings = {
 export const DEFAULT_SHADER_TYPE: ShaderType = 'surface'
 
 export const DEFAULT_WIREFRAME_SETTINGS = {
-  lineThickness: DEFAULT_EDGE_THICKNESS,
+  lineThickness: 1,
 }
 
 export const DEFAULT_SURFACE_SETTINGS = {
   faceOpacity: DEFAULT_FACE_OPACITY,
   specularIntensity: DEFAULT_SPECULAR_INTENSITY,
-  fresnelEnabled: DEFAULT_FRESNEL_ENABLED,
 }
 
 export const DEFAULT_SHADER_SETTINGS = {

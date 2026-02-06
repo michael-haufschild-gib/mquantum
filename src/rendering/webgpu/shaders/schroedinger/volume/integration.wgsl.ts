@@ -27,6 +27,10 @@ const MIN_TRANSMITTANCE: f32 = 0.01;
 
 // Minimum density to consider for accumulation
 const MIN_DENSITY: f32 = 1e-8;
+const EMPTY_SKIP_THRESHOLD: f32 = 1e-7;
+const EMPTY_SKIP_FACTOR: f32 = 4.0;
+const MIN_REMAINING_CONTRIBUTION: f32 = 0.001;
+const MAX_REMAINING_DENSITY_BOUND: f32 = 8.0;
 
 // Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
 
@@ -249,7 +253,7 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
   var colorMode = uniforms.nodalDefinition;
 
   // Optional hydrogen node-family filtering.
-  if (uniforms.quantumMode == QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND && uniforms.nodalFamilyFilter != NODAL_FAMILY_ALL) {
     let h0 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V0 * delta, t, uniforms);
     let h1 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V1 * delta, t, uniforms);
     let h2 = sampleHydrogenNodeFactorsWithFlow(pos + TETRA_V2 * delta, t, uniforms);
@@ -356,6 +360,10 @@ fn volumeRaymarch(
     iterCount = i + 1;  // Track iteration count
 
     if (transmittance < MIN_TRANSMITTANCE) { break; }
+    let remainingDistance = max(tFar - t, 0.0);
+    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
+    let remainingContributionBound = transmittance * maxRemainingOpacity;
+    if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -387,6 +395,18 @@ fn volumeRaymarch(
       lowDensityCount = 0;
     }
 
+    if (rho < EMPTY_SKIP_THRESHOLD) {
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      if (skipDistance > stepLen) {
+        let probeMid = sampleDensity(pos + rayDir * (skipDistance * 0.5), animTime, uniforms);
+        let probeFar = sampleDensity(pos + rayDir * skipDistance, animTime, uniforms);
+        if (probeMid < EMPTY_SKIP_THRESHOLD && probeFar < EMPTY_SKIP_THRESHOLD) {
+          t += skipDistance;
+          continue;
+        }
+      }
+    }
+
     // PERFORMANCE: Adaptive step size based on density
     // Take larger steps in empty regions to reduce wasted samples.
     // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
@@ -404,7 +424,7 @@ fn volumeRaymarch(
     // matching the Gaussian envelope falloff. No hard cutoff (which creates circle artifacts).
     // Cannot use density gating because ρ=|ψ|²≈0 at nodes by definition.
     let nodalRadialFade = 1.0 - smoothstep(0.25, 0.65, r2 / boundR2);
-    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFade > 0.01) {
+    if (FEATURE_NODAL && uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFade > 0.01) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
       let fadedIntensity = nodal.intensity * nodalRadialFade;
       if (fadedIntensity > 1e-4) {
@@ -424,7 +444,7 @@ fn volumeRaymarch(
 
     // Phase materiality: smoke regions are denser (more absorbing)
     var effectiveRho = rho;
-    if (uniforms.phaseMaterialityEnabled != 0u) {
+    if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
       effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
@@ -502,7 +522,7 @@ fn volumeRaymarchHQ(
   // Dispersion offsets
   var dispOffsetR = vec3f(0.0);
   var dispOffsetB = vec3f(0.0);
-  let dispersionActive = uniforms.dispersionEnabled != 0u && uniforms.dispersionStrength > 0.0;
+  let dispersionActive = FEATURE_DISPERSION && uniforms.dispersionEnabled != 0u && uniforms.dispersionStrength > 0.0;
 
   if (dispersionActive) {
     let dispAmount = uniforms.dispersionStrength * 0.15;
@@ -528,6 +548,11 @@ fn volumeRaymarchHQ(
     if (transmittance.r < MIN_TRANSMITTANCE &&
         transmittance.g < MIN_TRANSMITTANCE &&
         transmittance.b < MIN_TRANSMITTANCE) { break; }
+    let remainingDistance = max(tFar - t, 0.0);
+    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
+    let maxChannelTransmittance = max(transmittance.r, max(transmittance.g, transmittance.b));
+    let remainingContributionBound = maxChannelTransmittance * maxRemainingOpacity;
+    if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
 
@@ -554,6 +579,18 @@ fn volumeRaymarchHQ(
 
     // Skip expensive tetrahedral gradient when density is negligible
     var skipGradient = (quickS < -15.0);
+
+    if (quickRho < EMPTY_SKIP_THRESHOLD) {
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      if (skipDistance > stepLen) {
+        let probeMid = sampleDensity(pos + rayDir * (skipDistance * 0.5), animTime, uniforms);
+        let probeFar = sampleDensity(pos + rayDir * skipDistance, animTime, uniforms);
+        if (probeMid < EMPTY_SKIP_THRESHOLD && probeFar < EMPTY_SKIP_THRESHOLD) {
+          t += skipDistance;
+          continue;
+        }
+      }
+    }
 
     var rho: f32;
     var sCenter: f32;
@@ -607,7 +644,7 @@ fn volumeRaymarchHQ(
     // Physically neutral nodal visualization:
     // Smooth spatial fade matching the Gaussian envelope falloff.
     let nodalRadialFadeHQ = 1.0 - smoothstep(0.25, 0.65, r2 / boundR2);
-    if (uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeHQ > 0.01) {
+    if (FEATURE_NODAL && uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeHQ > 0.01) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
       let fadedIntensityHQ = nodal.intensity * nodalRadialFadeHQ;
       if (fadedIntensityHQ > 1e-4) {
@@ -627,7 +664,7 @@ fn volumeRaymarchHQ(
 
     // Phase materiality: smoke regions are denser (more absorbing)
     var pmDensityMod = 1.0;
-    if (uniforms.phaseMaterialityEnabled != 0u) {
+    if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
       pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);

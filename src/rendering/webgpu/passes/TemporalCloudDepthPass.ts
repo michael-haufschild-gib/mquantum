@@ -117,9 +117,12 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  private uniformData = new Float32Array(20) // 80 bytes
 
   // Sampler
   private sampler: GPUSampler | null = null
+  private bindGroup: GPUBindGroup | null = null
+  private bindGroupPositionView: GPUTextureView | null = null
 
   // Configuration
   private cameraNear: number
@@ -259,8 +262,8 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
 
     // Update uniforms
     // Layout: viewProjectionMatrix (mat4x4f, 64 bytes) + near (f32, 4 bytes) + far (f32, 4 bytes) + padding (8 bytes)
-    const data = new ArrayBuffer(80)
-    const floatView = new Float32Array(data)
+    const floatView = this.uniformData
+    floatView.fill(0)
 
     // Write view-projection matrix (first 16 floats = 64 bytes)
     if (camera?.viewProjectionMatrix?.elements) {
@@ -279,18 +282,20 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     floatView[16] = near
     floatView[17] = far
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
+    this.writeUniformBuffer(this.device, this.uniformBuffer, floatView)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'temporal-cloud-depth-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: positionView },
-      ],
-    })
+    if (!this.bindGroup || this.bindGroupPositionView !== positionView) {
+      this.bindGroup = this.device.createBindGroup({
+        label: 'temporal-cloud-depth-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: positionView },
+        ],
+      })
+      this.bindGroupPositionView = positionView
+    }
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -306,7 +311,7 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     })
 
     // Render fullscreen
-    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [this.bindGroup!])
 
     passEncoder.end()
   }
@@ -320,6 +325,8 @@ export class TemporalCloudDepthPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.bindGroup = null
+    this.bindGroupPositionView = null
 
     super.dispose()
   }

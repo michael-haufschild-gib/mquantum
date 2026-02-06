@@ -51,7 +51,6 @@ export {
   getRenderMethod,
   isRaymarchingType,
   isRaymarchingFractal,
-  hasFresnelEdges,
   supportsEmission,
   getRenderingCapabilities,
   getFaceDetectionMethod,

@@ -17,6 +17,7 @@ import { Tabs } from '@/components/ui/Tabs'
 import { isRaymarchingFractal } from '@/lib/geometry/registry'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore'
@@ -66,6 +67,11 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
 
   // Raymarching fractals (mandelbulb, julia, schroedinger, blackhole) are always fully opaque
   const isRaymarchingFractalType = isRaymarchingFractal(objectType, dimension)
+
+  // Check if isosurface mode is active (PBR material only applies to isosurface, not volumetric)
+  const isoEnabled = useExtendedObjectStore(
+    (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
+  )
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -137,6 +143,16 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     [setSurfaceSettings]
   )
 
+  // Material tab only available in isosurface mode (PBR has no effect on volumetric clouds)
+  const showMaterialTab = isoEnabled
+
+  // Reset to colors tab if material tab disappears while selected
+  React.useEffect(() => {
+    if (!showMaterialTab && activeTab === 'material') {
+      setActiveTab('colors')
+    }
+  }, [showMaterialTab, activeTab])
+
   const tabs = useMemo(
     () => [
       {
@@ -154,27 +170,30 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
           />
         ),
       },
-      {
-        id: 'material' as const,
-        label: 'Material',
-        content: (
-          <MaterialTabContent
-            faceOpacity={surfaceSettings.faceOpacity}
-            setFaceOpacity={handleFaceOpacityChange}
-            showLightingControls={showLightingControls}
-            specularColor={specularColor}
-            setSpecularColor={setSpecularColor}
-            specularIntensity={specularIntensity}
-            setSpecularIntensity={setSpecularIntensity}
-            roughness={roughness}
-            setRoughness={setRoughness}
-            metallic={metallic}
-            setMetallic={setMetallic}
-            // Hide opacity for raymarching fractals (always fully opaque)
-            hideOpacity={isRaymarchingFractalType}
-          />
-        ),
-      },
+      ...(showMaterialTab
+        ? [
+            {
+              id: 'material' as const,
+              label: 'Material',
+              content: (
+                <MaterialTabContent
+                  faceOpacity={surfaceSettings.faceOpacity}
+                  setFaceOpacity={handleFaceOpacityChange}
+                  showLightingControls={showLightingControls}
+                  specularColor={specularColor}
+                  setSpecularColor={setSpecularColor}
+                  specularIntensity={specularIntensity}
+                  setSpecularIntensity={setSpecularIntensity}
+                  roughness={roughness}
+                  setRoughness={setRoughness}
+                  metallic={metallic}
+                  setMetallic={setMetallic}
+                  hideOpacity={false}
+                />
+              ),
+            },
+          ]
+        : []),
     ],
     [
       colorAlgorithm,
@@ -184,6 +203,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
       setLchLightness,
       lchChroma,
       setLchChroma,
+      showMaterialTab,
       surfaceSettings.faceOpacity,
       handleFaceOpacityChange,
       showLightingControls,
@@ -195,7 +215,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
       setRoughness,
       metallic,
       setMetallic,
-      isRaymarchingFractalType,
     ]
   )
 

@@ -61,7 +61,7 @@ import {
 // Compute-specific blocks
 import {
   gridParamsBlock,
-  densityGridBindingsBlock,
+  generateDensityGridBindingsBlock,
   densityGridComputeBlock,
   densityGridWithPhaseComputeBlock,
 } from './densityGrid.wgsl'
@@ -79,8 +79,10 @@ export interface DensityGridComputeConfig {
   quantumMode?: ComputeQuantumMode
   /** Number of HO superposition terms (1-8) - enables compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Store phase information (requires rgba32float instead of r32float) */
+  /** Store phase information (requires multi-channel grid format) */
   includePhase?: boolean
+  /** Storage texture format for the grid payload */
+  storageFormat?: 'r16float' | 'rgba16float'
 }
 
 /**
@@ -102,6 +104,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     quantumMode = 'harmonicOscillator',
     termCount,
     includePhase = false,
+    storageFormat = 'rgba16float',
   } = config
 
   const defines: string[] = []
@@ -153,6 +156,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   if (includePhase) {
     features.push('Phase Storage')
   }
+  features.push(`Grid Format: ${storageFormat}`)
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
@@ -196,7 +200,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Grid Params', content: gridParamsBlock },
 
     // Compute shader bindings
-    { name: 'Compute Bindings', content: densityGridBindingsBlock },
+    { name: 'Compute Bindings', content: generateDensityGridBindingsBlock(storageFormat) },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
 

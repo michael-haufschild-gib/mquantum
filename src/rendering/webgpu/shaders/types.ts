@@ -40,16 +40,14 @@ export interface WGSLShaderConfig {
   overrides?: string[]
   /** Enable SSS module compilation (conditionally compiled) */
   sss?: boolean
-  /** Enable Fresnel rim lighting module compilation (conditionally compiled) */
-  fresnel?: boolean
   /** Enable Chromatic dispersion effect (conditionally compiled) */
   dispersion?: boolean
   /** Enable Nodal surface highlighting (conditionally compiled) */
   nodal?: boolean
   /** Enable Energy level coloring (conditionally compiled) */
   energyColor?: boolean
-  /** Enable Uncertainty shimmer effect (conditionally compiled) */
-  shimmer?: boolean
+  /** Enable uncertainty-boundary emphasis effect (conditionally compiled) */
+  uncertaintyBoundary?: boolean
   /** Enable Edge erosion effect (conditionally compiled) */
   erosion?: boolean
   /**

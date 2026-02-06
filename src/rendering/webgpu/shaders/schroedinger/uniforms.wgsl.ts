@@ -98,7 +98,7 @@ struct SchroedingerUniforms {
   emissionColorShift: f32,       // Emission color temperature shift (-1.0 to 1.0)
 
   emissionPulsing: u32,          // Enable phase-based emission pulsing
-  rimExponent: f32,              // Fresnel rim falloff (1.0-10.0)
+  _reserved_rim: f32,            // Reserved (previously rimExponent — removed)
   scatteringAnisotropy: f32,     // Henyey-Greenstein phase function g factor
 
   // Material properties
@@ -152,9 +152,9 @@ struct SchroedingerUniforms {
   // Energy coloring
   energyColorEnabled: u32,       // Enable energy level coloring
 
-  // Shimmer
-  shimmerEnabled: u32,           // Enable uncertainty shimmer
-  shimmerStrength: f32,          // Shimmer strength
+  // Uncertainty boundary
+  uncertaintyBoundaryEnabled: u32,   // Enable confidence-boundary emphasis
+  uncertaintyBoundaryStrength: f32,  // Boundary emphasis strength
 
   // Animation time
   time: f32,                     // Scaled animation time
@@ -218,13 +218,13 @@ struct SchroedingerUniforms {
   probabilityFlowEnabled: u32,    // Enable density-modulated flow noise
   probabilityFlowSpeed: f32,      // Flow animation speed (0.1-5.0)
   probabilityFlowStrength: f32,   // Flow modulation strength (0.0-1.0)
-  _padFlow0: f32,                 // Alignment padding
+  uncertaintyConfidenceMass: f32, // Confidence mass used for threshold extraction
 
   // LCH perceptual color parameters (algorithm 5)
   lchLightness: f32,              // Oklab perceptual lightness (0.1-1.0)
   lchChroma: f32,                 // Oklab perceptual chroma (0.0-0.4)
-  _padLch0: f32,                  // Alignment padding for vec4f
-  _padLch1: f32,                  // Alignment padding for vec4f
+  uncertaintyBoundaryWidth: f32,  // Boundary width in log-density space
+  uncertaintyLogRhoThreshold: f32,// log(rho) threshold at confidence mass
 
   // Multi-source blend weights (algorithm 6)
   multiSourceWeights: vec4f,      // xyz = depth/radial/normal weights, w = unused

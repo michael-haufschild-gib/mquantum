@@ -22,8 +22,6 @@ export interface SurfaceSettings {
   faceOpacity: number
   /** Specular intensity multiplier (0-2) */
   specularIntensity: number
-  /** Enable fresnel rim lighting effect */
-  fresnelEnabled: boolean
 }
 
 /** Union type for all shader settings */
@@ -127,5 +125,5 @@ export function isWireframeSettings(settings: ShaderSettings): settings is Wiref
  * @returns True if settings are SurfaceSettings
  */
 export function isSurfaceSettings(settings: ShaderSettings): settings is SurfaceSettings {
-  return 'faceOpacity' in settings && 'fresnelEnabled' in settings
+  return 'faceOpacity' in settings && 'specularIntensity' in settings
 }

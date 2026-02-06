@@ -144,8 +144,10 @@ export interface SchroedingerSliceActions {
   setSchroedingerNodalColorPositive: (color: string) => void
   setSchroedingerNodalColorNegative: (color: string) => void
   setSchroedingerEnergyColorEnabled: (enabled: boolean) => void
-  setSchroedingerShimmerEnabled: (enabled: boolean) => void
-  setSchroedingerShimmerStrength: (strength: number) => void
+  setSchroedingerUncertaintyBoundaryEnabled: (enabled: boolean) => void
+  setSchroedingerUncertaintyBoundaryStrength: (strength: number) => void
+  setSchroedingerUncertaintyConfidenceMass: (mass: number) => void
+  setSchroedingerUncertaintyBoundaryWidth: (width: number) => void
   setSchroedingerPhaseMaterialityEnabled: (enabled: boolean) => void
   setSchroedingerPhaseMaterialityStrength: (strength: number) => void
   setSchroedingerInterferenceEnabled: (enabled: boolean) => void

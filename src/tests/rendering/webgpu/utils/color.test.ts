@@ -57,6 +57,11 @@ describe('rendering/webgpu/utils/color', () => {
       expect(rgb[1]).toBeCloseTo(expected, 7)
       expect(rgb[2]).toBeCloseTo(expected, 7)
     })
+
+    it('reuses cached linear conversion for repeated hex strings', () => {
+      const first = parseHexColorToLinearRgb('#FFAA00', [0, 0, 0])
+      const second = parseHexColorToLinearRgb('  #ffaa00  ', [0, 0, 0])
+      expect(second).toBe(first)
+    })
   })
 })
-

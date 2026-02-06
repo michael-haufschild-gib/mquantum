@@ -52,6 +52,27 @@ describe('mergeExtendedObjectState', () => {
     })
   })
 
+  describe('legacy uncertainty shimmer migration', () => {
+    it('maps shimmer fields to uncertainty boundary fields', () => {
+      const savedState = {
+        schroedinger: {
+          shimmerEnabled: true,
+          shimmerStrength: 0.72,
+        },
+      }
+
+      const merged = mergeExtendedObjectState(savedState)
+      const schroedinger = merged.schroedinger as typeof DEFAULT_SCHROEDINGER_CONFIG
+
+      expect((schroedinger as unknown as Record<string, unknown>).uncertaintyBoundaryEnabled).toBe(
+        true
+      )
+      expect(
+        (schroedinger as unknown as Record<string, unknown>).uncertaintyBoundaryStrength
+      ).toBeCloseTo(0.72, 5)
+    })
+  })
+
   describe('handles nested objects', () => {
     it('merges nested cosineParams in schroedinger', () => {
       const savedState = {

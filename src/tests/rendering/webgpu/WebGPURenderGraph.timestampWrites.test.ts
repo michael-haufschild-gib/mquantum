@@ -156,6 +156,40 @@ async function createGraphHarness(pass: WebGPURenderPass) {
 }
 
 describe('WebGPURenderGraph timestampWrites wiring', () => {
+  it('memoizes pass enabled-state checks per frame', async () => {
+    const enabledSpy = vi.fn(() => true)
+    const pass: WebGPURenderPass = {
+      id: 'memo-enabled-pass',
+      config: {
+        ...createRenderPassConfig('memo-enabled-pass', [
+          { resourceId: 'out', access: 'write', binding: 0 },
+        ]),
+        enabled: enabledSpy,
+      },
+      initialize: vi.fn().mockResolvedValue(undefined),
+      execute: (ctx) => {
+        const passEncoder = ctx.beginRenderPass({
+          label: 'memo-enabled-pass',
+          colorAttachments: [
+            {
+              view: ctx.getWriteTarget('out')!,
+              loadOp: 'clear',
+              storeOp: 'store',
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        })
+        passEncoder.end()
+      },
+      dispose: vi.fn(),
+    }
+
+    const harness = await createGraphHarness(pass)
+    harness.graph.execute(1 / 60)
+
+    expect(enabledSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('injects timestampWrites into render pass descriptors and resolves query data', async () => {
     const pass: WebGPURenderPass = {
       id: 'render-pass',

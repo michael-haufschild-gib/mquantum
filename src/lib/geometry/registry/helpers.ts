@@ -170,16 +170,6 @@ export function isRaymarchingFractal(type: ObjectType, dimension: number): boole
 }
 
 /**
- * Checks if edges are rendered as fresnel rim lighting (for raymarched types).
- *
- * @param type - The object type
- * @returns true if edges use fresnel rim lighting
- */
-export function hasFresnelEdges(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.rendering.edgesAreFresnelRim ?? false
-}
-
-/**
  * Checks if an object type supports volumetric emission controls.
  * Only types with density-based rendering (e.g., Schroedinger) support this.
  *

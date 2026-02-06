@@ -173,9 +173,17 @@ export class BokehPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  private uniformData = new Float32Array(12)
 
   // Sampler
   private sampler: GPUSampler | null = null
+
+  // Cached bind groups to avoid per-frame allocations
+  private bokehBindGroup: GPUBindGroup | null = null
+  private bokehBindGroupColorView: GPUTextureView | null = null
+  private bokehBindGroupDepthView: GPUTextureView | null = null
+  private copyBindGroup: GPUBindGroup | null = null
+  private copyBindGroupSourceView: GPUTextureView | null = null
 
   // Configuration — matches WebGL BokehPass fields
   private focus: number = 15.0
@@ -378,33 +386,40 @@ export class BokehPass extends WebGPUBasePass {
     const { width, height } = ctx.size
 
     // Update uniforms (12 floats = 48 bytes, matches WGSL struct)
-    const data = new Float32Array(12)
-    data[0] = width                       // resolution.x
-    data[1] = height                      // resolution.y
-    data[2] = this.focus                  // focus (world units)
-    data[3] = this.focusRange             // focusRange (dead zone, world units)
-    data[4] = this.aperture               // aperture (bokehScale * 0.005)
-    data[5] = this.maxBlur                // maxblur (bokehScale * 0.02)
-    data[6] = camera?.near ?? 0.1         // near clip
-    data[7] = camera?.far ?? 100          // far clip
-    data[8] = height / width              // aspect (height/width, matches WebGL)
-    data[9] = 0                           // _pad1
-    data[10] = 0                          // _pad2
-    data[11] = 0                          // _pad3
+    const data = this.uniformData
+    data[0] = width // resolution.x
+    data[1] = height // resolution.y
+    data[2] = this.focus // focus (world units)
+    data[3] = this.focusRange // focusRange (dead zone, world units)
+    data[4] = this.aperture // aperture (bokehScale * 0.005)
+    data[5] = this.maxBlur // maxblur (bokehScale * 0.02)
+    data[6] = camera?.near ?? 0.1 // near clip
+    data[7] = camera?.far ?? 100 // far clip
+    data[8] = height / width // aspect (height/width, matches WebGL)
+    data[9] = 0 // _pad1
+    data[10] = 0 // _pad2
+    data[11] = 0 // _pad3
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'bokeh-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: colorView },
-        { binding: 3, resource: depthView },
-      ],
-    })
+    if (
+      !this.bokehBindGroup ||
+      this.bokehBindGroupColorView !== colorView ||
+      this.bokehBindGroupDepthView !== depthView
+    ) {
+      this.bokehBindGroup = this.device.createBindGroup({
+        label: 'bokeh-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: colorView },
+          { binding: 3, resource: depthView },
+        ],
+      })
+      this.bokehBindGroupColorView = colorView
+      this.bokehBindGroupDepthView = depthView
+    }
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -420,7 +435,7 @@ export class BokehPass extends WebGPUBasePass {
     })
 
     // Render fullscreen
-    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [this.bokehBindGroup!])
 
     passEncoder.end()
   }
@@ -435,14 +450,17 @@ export class BokehPass extends WebGPUBasePass {
   ): void {
     if (!this.copyPipeline || !this.copyBindGroupLayout || !this.sampler) return
 
-    const copyBindGroup = this.device!.createBindGroup({
-      label: 'bokeh-copy-bg',
-      layout: this.copyBindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: inputView },
-      ],
-    })
+    if (!this.copyBindGroup || this.copyBindGroupSourceView !== inputView) {
+      this.copyBindGroup = this.device!.createBindGroup({
+        label: 'bokeh-copy-bg',
+        layout: this.copyBindGroupLayout,
+        entries: [
+          { binding: 0, resource: this.sampler },
+          { binding: 1, resource: inputView },
+        ],
+      })
+      this.copyBindGroupSourceView = inputView
+    }
 
     const passEncoder = ctx.beginRenderPass({
       label: 'bokeh-copy',
@@ -456,7 +474,7 @@ export class BokehPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(passEncoder, this.copyPipeline, [copyBindGroup])
+    this.renderFullscreen(passEncoder, this.copyPipeline, [this.copyBindGroup!])
     passEncoder.end()
   }
 
@@ -465,6 +483,11 @@ export class BokehPass extends WebGPUBasePass {
     this.passBindGroupLayout = null
     this.copyPipeline = null
     this.copyBindGroupLayout = null
+    this.bokehBindGroup = null
+    this.bokehBindGroupColorView = null
+    this.bokehBindGroupDepthView = null
+    this.copyBindGroup = null
+    this.copyBindGroupSourceView = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null

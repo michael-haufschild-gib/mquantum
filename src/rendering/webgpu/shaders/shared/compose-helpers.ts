@@ -33,6 +33,22 @@ export interface WGSLShaderConfig {
   ambientOcclusion?: boolean
   /** Enable subsurface scattering */
   sss?: boolean
+  /** Enable fresnel/rim shading modules */
+  fresnel?: boolean
+  /** Enable chromatic dispersion modules */
+  dispersion?: boolean
+  /** Enable nodal visualization modules */
+  nodal?: boolean
+  /** Enable energy-color modules */
+  energyColor?: boolean
+  /** Enable uncertainty-boundary modules */
+  uncertaintyBoundary?: boolean
+  /** Enable erosion modules */
+  erosion?: boolean
+  /** Compile-time color algorithm hint */
+  colorAlgorithm?: number
+  /** Compile-time lighting mode hint */
+  lightingMode?: 'none' | 'simple' | 'pbr'
   /** Shadow quality (0-3) */
   shadowQuality?: number
   /** AO quality (0-2) */

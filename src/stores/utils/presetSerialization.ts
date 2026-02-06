@@ -87,6 +87,16 @@ export const TRANSIENT_FIELDS = new Set([
   // Legacy appearance fields removed from render mode controls
   'edgesVisible',
   'facesVisible',
+
+  // Legacy Fresnel rim fields (removed — has no visible effect on volumetric rendering)
+  'fresnelEnabled',
+  'fresnelIntensity',
+  'faceRimFalloff',
+  'rimExponent',
+
+  // Legacy edge thickness fields (removed — single object type has no geometric edges)
+  'edgeThickness',
+  'tubeCaps',
 ])
 
 /**

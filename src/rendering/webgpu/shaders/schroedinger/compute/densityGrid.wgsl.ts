@@ -7,7 +7,7 @@
  *
  * Architecture:
  * - Input: Quantum uniforms, basis vectors, grid parameters
- * - Output: 64×64×64 (or configurable) r32float 3D texture
+ * - Output: 64×64×64 (or configurable) r16float/rgba16float 3D texture
  * - Workgroup: 8×8×8 threads
  * - Dispatch: (gridSize/8)³ workgroups
  *
@@ -41,7 +41,10 @@ struct GridParams {
  * - Group 0, Binding 2: GridParams
  * - Group 0, Binding 3: Output texture (storage)
  */
-export const densityGridBindingsBlock = /* wgsl */ `
+export function generateDensityGridBindingsBlock(
+  storageFormat: 'r16float' | 'rgba16float' = 'rgba16float'
+): string {
+  return /* wgsl */ `
 // ============================================
 // Compute Shader Bind Groups
 // ============================================
@@ -52,9 +55,13 @@ export const densityGridBindingsBlock = /* wgsl */ `
 @group(0) @binding(2) var<uniform> gridParams: GridParams;
 
 // Output texture (write-only)
-// Using rgba16float for hardware filtering support in the render pass
-@group(0) @binding(3) var densityGrid: texture_storage_3d<rgba16float, write>;
+// r16float is used for density-only mode, rgba16float for phase-capable mode.
+@group(0) @binding(3) var densityGrid: texture_storage_3d<${storageFormat}, write>;
 `
+}
+
+// Backward-compatible default bindings block (rgba16float payload)
+export const densityGridBindingsBlock = generateDensityGridBindingsBlock()
 
 /**
  * Main compute shader entry point
@@ -103,7 +110,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let rho = densityResult.x;
 
   // Store density in the 3D texture
-  // Future enhancement: store (rho, logRho, phase, reserved) in rgba32float
   textureStore(densityGrid, gid, vec4f(rho, 0.0, 0.0, 0.0));
 }
 `
@@ -112,7 +118,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  * Extended compute shader that also stores phase information
  * for phase-based coloring during rendering.
  *
- * Output format (rgba32float):
+ * Output format (rgba16float):
  * - R: density (rho)
  * - G: log density (s)
  * - B: spatial phase
@@ -124,7 +130,7 @@ export const densityGridWithPhaseComputeBlock = /* wgsl */ `
 // ============================================
 
 @compute @workgroup_size(8, 8, 8)
-fn computeDensityGridWithPhase(@builtin(global_invocation_id) gid: vec3u) {
+fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Bounds check
   if (any(gid >= gridParams.gridSize)) {
     return;
@@ -154,7 +160,6 @@ fn computeDensityGridWithPhase(@builtin(global_invocation_id) gid: vec3u) {
   let spatialPhase = densityResult.z;
 
   // Store all values
-  // This requires rgba32float texture format instead of r32float
   textureStore(densityGrid, gid, vec4f(rho, logRho, spatialPhase, 0.0));
 }
 `

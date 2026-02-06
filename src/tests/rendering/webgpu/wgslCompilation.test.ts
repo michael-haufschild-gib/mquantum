@@ -185,6 +185,96 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('densityGridTex')
   })
 
+  it('specializes optional physics toggles via compile-time feature defines', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 5,
+      shadows: false,
+      temporal: false,
+      ambientOcclusion: false,
+      sss: false,
+      nodal: false,
+      dispersion: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const FEATURE_NODAL: bool = false;')
+    expect(wgsl).toContain('const FEATURE_DISPERSION: bool = false;')
+    expect(wgsl).toContain('const FEATURE_SHADOWS: bool = false;')
+    expect(wgsl).toContain('const FEATURE_AO: bool = false;')
+  })
+
+  it('uses dynamic bounding radius for density-grid sampling space', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 6,
+      shadows: false,
+      temporal: false,
+      ambientOcclusion: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useDensityGrid: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('schroedinger.boundingRadius')
+    expect(wgsl).not.toContain('const DENSITY_GRID_MIN')
+    expect(wgsl).not.toContain('const DENSITY_GRID_MAX')
+  })
+
+  it('adds conservative empty-space skipping and physically bounded early termination guards', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      shadows: false,
+      temporal: false,
+      ambientOcclusion: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useDensityGrid: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const EMPTY_SKIP_THRESHOLD')
+    expect(wgsl).toContain('const MAX_REMAINING_DENSITY_BOUND')
+    expect(wgsl).toContain('remainingContributionBound')
+  })
+
+  it('reuses center density when computing grid gradients', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      shadows: false,
+      temporal: false,
+      ambientOcclusion: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useDensityGrid: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('fn computeGradientFromGrid(worldPos: vec3f, delta: f32, rhoCenter: f32)')
+    expect(wgsl).toContain('computeGradientFromGrid(pos, 0.05, rho)')
+  })
+
+  it('uses uncertainty boundary uniforms instead of legacy shimmer uniforms', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      shadows: false,
+      temporal: false,
+      ambientOcclusion: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useDensityGrid: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('uncertaintyBoundaryEnabled')
+    expect(wgsl).toContain('uncertaintyBoundaryStrength')
+    expect(wgsl).toContain('uncertaintyConfidenceMass')
+    expect(wgsl).toContain('uncertaintyBoundaryWidth')
+    expect(wgsl).toContain('uncertaintyLogRhoThreshold')
+    expect(wgsl).not.toContain('shimmerEnabled')
+    expect(wgsl).not.toContain('shimmerStrength')
+  })
+
   it('keeps runtime color modules when compile-time colorAlgorithm is provided', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
@@ -306,6 +396,19 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
       verifyWgslCompute(wgsl)
       expect(features).toContain(`HO ${termCount}-term unrolled`)
     }
+  })
+
+  it('supports phase-capable density grid compute path with main entry point', () => {
+    const { wgsl, features } = composeDensityGridComputeShader({
+      dimension: 5,
+      quantumMode: 'hydrogenND',
+      includePhase: true,
+    })
+
+    verifyWgslCompute(wgsl)
+    expect(features).toContain('Phase Storage')
+    expect(wgsl).toContain('let densityResult = sampleDensityWithPhase')
+    expect(wgsl).toMatch(/@compute\s+@workgroup_size\(8,\s*8,\s*8\)\s*fn\s+main/)
   })
 })
 

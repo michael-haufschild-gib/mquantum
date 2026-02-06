@@ -428,7 +428,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerEmissionThreshold: clampedSetter('emissionThreshold', 0.0, 1.0),
     setSchroedingerEmissionColorShift: clampedSetter('emissionColorShift', -1.0, 1.0),
     setSchroedingerEmissionPulsing: valueSetter('emissionPulsing'),
-    setSchroedingerRimExponent: clampedSetter('rimExponent', 1.0, 10.0),
     setSchroedingerScatteringAnisotropy: clampedSetter('scatteringAnisotropy', -0.9, 0.9),
     setSchroedingerRoughness: clampedSetter('roughness', 0.0, 1.0),
     setSchroedingerFogIntegrationEnabled: valueSetter('fogIntegrationEnabled'),
@@ -492,8 +491,10 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Visual Effects ===
     setSchroedingerEnergyColorEnabled: valueSetter('energyColorEnabled'),
-    setSchroedingerShimmerEnabled: valueSetter('shimmerEnabled'),
-    setSchroedingerShimmerStrength: clampedSetter('shimmerStrength', 0.0, 1.0),
+    setSchroedingerUncertaintyBoundaryEnabled: valueSetter('uncertaintyBoundaryEnabled'),
+    setSchroedingerUncertaintyBoundaryStrength: clampedSetter('uncertaintyBoundaryStrength', 0.0, 1.0),
+    setSchroedingerUncertaintyConfidenceMass: clampedSetter('uncertaintyConfidenceMass', 0.5, 0.99),
+    setSchroedingerUncertaintyBoundaryWidth: clampedSetter('uncertaintyBoundaryWidth', 0.05, 1.0),
     setSchroedingerPhaseMaterialityEnabled: valueSetter('phaseMaterialityEnabled'),
     setSchroedingerPhaseMaterialityStrength: clampedSetter('phaseMaterialityStrength', 0.0, 1.0),
     setSchroedingerInterferenceEnabled: valueSetter('interferenceEnabled'),

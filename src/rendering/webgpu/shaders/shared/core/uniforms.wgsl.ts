@@ -86,11 +86,10 @@ struct MaterialUniforms {
   sssThickness: f32,
   sssJitter: f32,
 
-  // Fresnel / Rim Lighting
-  // (fresnelIntensity followed by vec3f can introduce padding before rimColor)
-  fresnelEnabled: u32,
-  fresnelIntensity: f32,
-  rimColor: vec3f,
+  // Reserved (previously Fresnel rim — removed, keeping layout for buffer compatibility)
+  _reserved_fresnel0: u32,
+  _reserved_fresnel1: f32,
+  _reserved_fresnel2: vec3f,
   _padding2: f32, // alignment
 
   // Specular (artist controls; matches WebGL PBRSource)

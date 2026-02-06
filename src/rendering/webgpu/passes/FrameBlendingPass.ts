@@ -104,6 +104,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  private uniformData = new Float32Array(4)
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -117,6 +118,14 @@ export class FrameBlendingPass extends WebGPUBasePass {
   private historyInitialized = false
   private lastWidth = 0
   private lastHeight = 0
+  private lastBlendFactor = Number.NaN
+
+  // Cached bind groups to avoid per-frame allocation churn
+  private blendBindGroup: GPUBindGroup | null = null
+  private blendBindGroupColorView: GPUTextureView | null = null
+  private blendBindGroupHistoryView: GPUTextureView | null = null
+  private copyToOutputBindGroup: GPUBindGroup | null = null
+  private copyToOutputColorView: GPUTextureView | null = null
 
   // Texture format for history buffer
   private textureFormat: GPUTextureFormat = 'rgba16float'
@@ -264,6 +273,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
     this.lastWidth = width
     this.lastHeight = height
     this.historyInitialized = false
+    this.lastBlendFactor = Number.NaN
+    this.blendBindGroup = null
+    this.blendBindGroupColorView = null
+    this.blendBindGroupHistoryView = null
   }
 
   /**
@@ -294,6 +307,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
    */
   resetHistory(): void {
     this.historyInitialized = false
+    this.lastBlendFactor = Number.NaN
   }
 
   /**
@@ -303,6 +317,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
   onEnabled(): void {
     // Reset history when pass is re-enabled to avoid stale frame blending
     this.historyInitialized = false
+    this.lastBlendFactor = Number.NaN
   }
 
   /**
@@ -344,15 +359,17 @@ export class FrameBlendingPass extends WebGPUBasePass {
 
     // If first frame, just copy current to output and initialize history
     if (!this.historyInitialized) {
-      // Create copy bind group for copying current to output
-      const copyBindGroup = this.device.createBindGroup({
-        label: 'frame-blending-copy-to-output-bg',
-        layout: this.copyBindGroupLayout,
-        entries: [
-          { binding: 0, resource: this.sampler },
-          { binding: 1, resource: colorView },
-        ],
-      })
+      if (!this.copyToOutputBindGroup || this.copyToOutputColorView !== colorView) {
+        this.copyToOutputBindGroup = this.device.createBindGroup({
+          label: 'frame-blending-copy-to-output-bg',
+          layout: this.copyBindGroupLayout,
+          entries: [
+            { binding: 0, resource: this.sampler },
+            { binding: 1, resource: colorView },
+          ],
+        })
+        this.copyToOutputColorView = colorView
+      }
 
       // Copy current frame to output
       const outputPassEncoder = ctx.beginRenderPass({
@@ -366,7 +383,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
           },
         ],
       })
-      this.renderFullscreen(outputPassEncoder, this.copyPipeline, [copyBindGroup])
+      this.renderFullscreen(outputPassEncoder, this.copyPipeline, [this.copyToOutputBindGroup!])
       outputPassEncoder.end()
 
       // Copy output to history for next frame using GPU texture copy
@@ -381,23 +398,30 @@ export class FrameBlendingPass extends WebGPUBasePass {
       return
     }
 
-    // Update uniforms
-    const data = new Float32Array(4)
-    data[0] = this.blendFactor
+    if (Math.abs(this.blendFactor - this.lastBlendFactor) > 1e-6) {
+      this.uniformData[0] = this.blendFactor
+      this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
+      this.lastBlendFactor = this.blendFactor
+    }
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
-
-    // Create blend bind group
-    const blendBindGroup = this.device.createBindGroup({
-      label: 'frame-blending-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: colorView },
-        { binding: 3, resource: this.historyView },
-      ],
-    })
+    if (
+      !this.blendBindGroup ||
+      this.blendBindGroupColorView !== colorView ||
+      this.blendBindGroupHistoryView !== this.historyView
+    ) {
+      this.blendBindGroup = this.device.createBindGroup({
+        label: 'frame-blending-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: colorView },
+          { binding: 3, resource: this.historyView },
+        ],
+      })
+      this.blendBindGroupColorView = colorView
+      this.blendBindGroupHistoryView = this.historyView
+    }
 
     // Render blended result to output
     const blendPassEncoder = ctx.beginRenderPass({
@@ -411,17 +435,18 @@ export class FrameBlendingPass extends WebGPUBasePass {
         },
       ],
     })
-    this.renderFullscreen(blendPassEncoder, this.blendPipeline, [blendBindGroup])
+    this.renderFullscreen(blendPassEncoder, this.blendPipeline, [this.blendBindGroup!])
     blendPassEncoder.end()
 
-    // Copy blended result to history for next frame using GPU texture copy
-    // This matches WebGL behavior where the blended output is stored for the next frame,
-    // creating proper temporal accumulation
-    ctx.encoder.copyTextureToTexture(
-      { texture: outputTexture },
-      { texture: this.historyTexture },
-      { width: ctx.size.width, height: ctx.size.height }
-    )
+    // If blendFactor is ~1.0 the output is already equivalent to history,
+    // so copying back is redundant.
+    if (this.blendFactor < 0.9999) {
+      ctx.encoder.copyTextureToTexture(
+        { texture: outputTexture },
+        { texture: this.historyTexture },
+        { width: ctx.size.width, height: ctx.size.height }
+      )
+    }
   }
 
   /**
@@ -436,6 +461,12 @@ export class FrameBlendingPass extends WebGPUBasePass {
     this.historyInitialized = false
     this.lastWidth = 0
     this.lastHeight = 0
+    this.lastBlendFactor = Number.NaN
+    this.blendBindGroup = null
+    this.blendBindGroupColorView = null
+    this.blendBindGroupHistoryView = null
+    this.copyToOutputBindGroup = null
+    this.copyToOutputColorView = null
   }
 
   /**
@@ -455,6 +486,12 @@ export class FrameBlendingPass extends WebGPUBasePass {
       this.historyTexture = null
       this.historyView = null
     }
+    this.lastBlendFactor = Number.NaN
+    this.blendBindGroup = null
+    this.blendBindGroupColorView = null
+    this.blendBindGroupHistoryView = null
+    this.copyToOutputBindGroup = null
+    this.copyToOutputColorView = null
 
     super.dispose()
   }

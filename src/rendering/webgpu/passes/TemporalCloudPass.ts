@@ -461,6 +461,23 @@ export class TemporalCloudPass extends WebGPUBasePass {
   // Sampler
   private sampler: GPUSampler | null = null
 
+  // Pre-allocated uniform staging buffers
+  private reprojectionUniformData = new Float32Array(40) // 160 bytes
+  private reconstructionUniformData = new Float32Array(12) // 48 bytes
+  private reconstructionUniformIntView = new Int32Array(this.reconstructionUniformData.buffer)
+  private currentViewProjectionMatrix = new Float32Array(16)
+
+  // Cached bind groups
+  private reprojectionBindGroup: GPUBindGroup | null = null
+  private reprojectionBindGroupAccumColorView: GPUTextureView | null = null
+  private reprojectionBindGroupAccumPositionView: GPUTextureView | null = null
+  private reconstructionBindGroup: GPUBindGroup | null = null
+  private reconstructionCloudColorView: GPUTextureView | null = null
+  private reconstructionCloudPositionView: GPUTextureView | null = null
+  private reconstructionHistoryColorView: GPUTextureView | null = null
+  private reconstructionHistoryPositionView: GPUTextureView | null = null
+  private reconstructionValidityView: GPUTextureView | null = null
+
   // State
   private frameIndex = 0
   private hasValidHistory = false
@@ -698,6 +715,15 @@ export class TemporalCloudPass extends WebGPUBasePass {
   resetHistory(): void {
     this.hasValidHistory = false
     this.frameIndex = 0
+    this.reprojectionBindGroup = null
+    this.reprojectionBindGroupAccumColorView = null
+    this.reprojectionBindGroupAccumPositionView = null
+    this.reconstructionBindGroup = null
+    this.reconstructionCloudColorView = null
+    this.reconstructionCloudPositionView = null
+    this.reconstructionHistoryColorView = null
+    this.reconstructionHistoryPositionView = null
+    this.reconstructionValidityView = null
   }
 
   /**
@@ -772,7 +798,8 @@ export class TemporalCloudPass extends WebGPUBasePass {
     }
 
     // Extract current viewProjectionMatrix from camera store
-    const currentViewProjectionMatrix = new Float32Array(16)
+    const currentViewProjectionMatrix = this.currentViewProjectionMatrix
+    currentViewProjectionMatrix.fill(0)
     if (camera?.viewProjectionMatrix?.elements) {
       for (let i = 0; i < 16; i++) {
         currentViewProjectionMatrix[i] = camera.viewProjectionMatrix.elements[i] ?? 0
@@ -803,44 +830,50 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
     // === REPROJECTION PASS ===
     if (this.hasValidHistory) {
-      // Update reprojection uniforms
-      const reprojData = new ArrayBuffer(160)
-      const reprojView = new DataView(reprojData)
+      const reprojData = this.reprojectionUniformData
 
       // prevViewProjectionMatrix (offset 0, 64 bytes)
       for (let i = 0; i < 16; i++) {
-        reprojView.setFloat32(i * 4, this.prevViewProjectionMatrix[i] ?? 0, true)
+        reprojData[i] = this.prevViewProjectionMatrix[i] ?? 0
       }
 
       // viewProjectionMatrix (offset 64, 64 bytes) - current frame's matrix
       for (let i = 0; i < 16; i++) {
-        reprojView.setFloat32(64 + i * 4, currentViewProjectionMatrix[i] ?? 0, true)
+        reprojData[16 + i] = currentViewProjectionMatrix[i] ?? 0
       }
 
       // cameraPosition (offset 128, 12 bytes) + pad
-      reprojView.setFloat32(128, cameraX, true)
-      reprojView.setFloat32(132, cameraY, true)
-      reprojView.setFloat32(136, cameraZ, true)
-      reprojView.setFloat32(140, 0, true) // pad
+      reprojData[32] = cameraX
+      reprojData[33] = cameraY
+      reprojData[34] = cameraZ
+      reprojData[35] = 0
 
       // accumulationResolution (offset 144, 8 bytes) + disocclusionThreshold + pad
-      reprojView.setFloat32(144, width, true)
-      reprojView.setFloat32(148, height, true)
-      reprojView.setFloat32(152, this.disocclusionThreshold, true)
-      reprojView.setFloat32(156, 0, true) // pad
+      reprojData[36] = width
+      reprojData[37] = height
+      reprojData[38] = this.disocclusionThreshold
+      reprojData[39] = 0
 
       this.writeUniformBuffer(this.device, this.reprojectionUniformBuffer, reprojData)
 
-      const reprojBindGroup = this.device.createBindGroup({
-        label: 'temporal-cloud-reprojection-bg',
-        layout: this.passBindGroupLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.reprojectionUniformBuffer } },
-          { binding: 1, resource: this.sampler },
-          { binding: 2, resource: accumColorReadView },
-          { binding: 3, resource: accumPositionReadView },
-        ],
-      })
+      if (
+        !this.reprojectionBindGroup ||
+        this.reprojectionBindGroupAccumColorView !== accumColorReadView ||
+        this.reprojectionBindGroupAccumPositionView !== accumPositionReadView
+      ) {
+        this.reprojectionBindGroup = this.device.createBindGroup({
+          label: 'temporal-cloud-reprojection-bg',
+          layout: this.passBindGroupLayout,
+          entries: [
+            { binding: 0, resource: { buffer: this.reprojectionUniformBuffer } },
+            { binding: 1, resource: this.sampler },
+            { binding: 2, resource: accumColorReadView },
+            { binding: 3, resource: accumPositionReadView },
+          ],
+        })
+        this.reprojectionBindGroupAccumColorView = accumColorReadView
+        this.reprojectionBindGroupAccumPositionView = accumPositionReadView
+      }
 
       const reprojPassEncoder = ctx.beginRenderPass({
         label: 'temporal-cloud-reprojection',
@@ -860,32 +893,31 @@ export class TemporalCloudPass extends WebGPUBasePass {
         ],
       })
 
-      this.renderFullscreen(reprojPassEncoder, this.reprojectionPipeline, [reprojBindGroup])
+      this.renderFullscreen(reprojPassEncoder, this.reprojectionPipeline, [this.reprojectionBindGroup!])
       reprojPassEncoder.end()
     }
 
     // === RECONSTRUCTION PASS ===
-    // Update reconstruction uniforms
-    const reconData = new ArrayBuffer(48)
-    const reconView = new DataView(reconData)
+    const reconData = this.reconstructionUniformData
+    const reconInts = this.reconstructionUniformIntView
 
     // bayerOffset (offset 0, 8 bytes) + frameIndex + hasValidHistory
-    reconView.setFloat32(0, bayerOffset[0], true)
-    reconView.setFloat32(4, bayerOffset[1], true)
-    reconView.setInt32(8, this.frameIndex, true)
-    reconView.setInt32(12, this.hasValidHistory ? 1 : 0, true)
+    reconData[0] = bayerOffset[0]
+    reconData[1] = bayerOffset[1]
+    reconInts[2] = this.frameIndex
+    reconInts[3] = this.hasValidHistory ? 1 : 0
 
     // cloudResolution (offset 16, 8 bytes) + accumulationResolution (8 bytes)
-    reconView.setFloat32(16, cloudWidth, true)
-    reconView.setFloat32(20, cloudHeight, true)
-    reconView.setFloat32(24, width, true)
-    reconView.setFloat32(28, height, true)
+    reconData[4] = cloudWidth
+    reconData[5] = cloudHeight
+    reconData[6] = width
+    reconData[7] = height
 
     // historyWeight (offset 32, 4 bytes) + padding (12 bytes)
-    reconView.setFloat32(32, this.historyWeight, true)
-    reconView.setFloat32(36, 0, true)
-    reconView.setFloat32(40, 0, true)
-    reconView.setFloat32(44, 0, true)
+    reconData[8] = this.historyWeight
+    reconData[9] = 0
+    reconData[10] = 0
+    reconData[11] = 0
 
     this.writeUniformBuffer(this.device, this.reconstructionUniformBuffer, reconData)
 
@@ -905,19 +937,33 @@ export class TemporalCloudPass extends WebGPUBasePass {
       return
     }
 
-    const reconBindGroup = this.device.createBindGroup({
-      label: 'temporal-cloud-reconstruction-bg',
-      layout: this.reconstructionBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.reconstructionUniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: cloudColorView },
-        { binding: 3, resource: cloudPositionView },
-        { binding: 4, resource: reprojHistoryReadView },
-        { binding: 5, resource: reprojPositionView },
-        { binding: 6, resource: validityReadView },
-      ],
-    })
+    if (
+      !this.reconstructionBindGroup ||
+      this.reconstructionCloudColorView !== cloudColorView ||
+      this.reconstructionCloudPositionView !== cloudPositionView ||
+      this.reconstructionHistoryColorView !== reprojHistoryReadView ||
+      this.reconstructionHistoryPositionView !== reprojPositionView ||
+      this.reconstructionValidityView !== validityReadView
+    ) {
+      this.reconstructionBindGroup = this.device.createBindGroup({
+        label: 'temporal-cloud-reconstruction-bg',
+        layout: this.reconstructionBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.reconstructionUniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: cloudColorView },
+          { binding: 3, resource: cloudPositionView },
+          { binding: 4, resource: reprojHistoryReadView },
+          { binding: 5, resource: reprojPositionView },
+          { binding: 6, resource: validityReadView },
+        ],
+      })
+      this.reconstructionCloudColorView = cloudColorView
+      this.reconstructionCloudPositionView = cloudPositionView
+      this.reconstructionHistoryColorView = reprojHistoryReadView
+      this.reconstructionHistoryPositionView = reprojPositionView
+      this.reconstructionValidityView = validityReadView
+    }
 
     const reconPassEncoder = ctx.beginRenderPass({
       label: 'temporal-cloud-reconstruction',
@@ -937,7 +983,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(reconPassEncoder, this.reconstructionPipeline, [reconBindGroup])
+    this.renderFullscreen(reconPassEncoder, this.reconstructionPipeline, [this.reconstructionBindGroup!])
     reconPassEncoder.end()
 
     // Update state for next frame
@@ -961,6 +1007,15 @@ export class TemporalCloudPass extends WebGPUBasePass {
   releaseInternalResources(): void {
     this.hasValidHistory = false
     this.frameIndex = 0
+    this.reprojectionBindGroup = null
+    this.reprojectionBindGroupAccumColorView = null
+    this.reprojectionBindGroupAccumPositionView = null
+    this.reconstructionBindGroup = null
+    this.reconstructionCloudColorView = null
+    this.reconstructionCloudPositionView = null
+    this.reconstructionHistoryColorView = null
+    this.reconstructionHistoryPositionView = null
+    this.reconstructionValidityView = null
   }
 
   /**
@@ -976,6 +1031,15 @@ export class TemporalCloudPass extends WebGPUBasePass {
     this.reconstructionUniformBuffer?.destroy()
     this.reconstructionUniformBuffer = null
     this.sampler = null
+    this.reprojectionBindGroup = null
+    this.reprojectionBindGroupAccumColorView = null
+    this.reprojectionBindGroupAccumPositionView = null
+    this.reconstructionBindGroup = null
+    this.reconstructionCloudColorView = null
+    this.reconstructionCloudPositionView = null
+    this.reconstructionHistoryColorView = null
+    this.reconstructionHistoryPositionView = null
+    this.reconstructionValidityView = null
 
     super.dispose()
   }

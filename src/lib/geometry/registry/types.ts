@@ -88,11 +88,6 @@ export interface RenderingCapabilities {
    */
   requiresRaymarching?: boolean
   /**
-   * Whether edges use fresnel rim lighting instead of physical lines.
-   * True for raymarched fractals where "edges" = rim highlights.
-   */
-  edgesAreFresnelRim?: boolean
-  /**
    * Whether this type supports volumetric emission controls.
    * Only applicable to types with density-based rendering (e.g., Schroedinger).
    */

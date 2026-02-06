@@ -55,8 +55,10 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setNodalColorPositive: state.setSchroedingerNodalColorPositive,
     setNodalColorNegative: state.setSchroedingerNodalColorNegative,
     setEnergyColorEnabled: state.setSchroedingerEnergyColorEnabled,
-    setShimmerEnabled: state.setSchroedingerShimmerEnabled,
-    setShimmerStrength: state.setSchroedingerShimmerStrength,
+    setUncertaintyBoundaryEnabled: state.setSchroedingerUncertaintyBoundaryEnabled,
+    setUncertaintyBoundaryStrength: state.setSchroedingerUncertaintyBoundaryStrength,
+    setUncertaintyConfidenceMass: state.setSchroedingerUncertaintyConfidenceMass,
+    setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
     setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
     setIsoEnabled: state.setSchroedingerIsoEnabled,
@@ -94,8 +96,10 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setNodalColorPositive,
     setNodalColorNegative,
     setEnergyColorEnabled,
-    setShimmerEnabled,
-    setShimmerStrength,
+    setUncertaintyBoundaryEnabled,
+    setUncertaintyBoundaryStrength,
+    setUncertaintyConfidenceMass,
+    setUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled,
     setPhaseMaterialityStrength,
     setIsoEnabled,
@@ -113,24 +117,20 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     faceEmissionThreshold: state.faceEmissionThreshold,
     faceEmissionColorShift: state.faceEmissionColorShift,
     faceEmissionPulsing: state.faceEmissionPulsing,
-    faceRimFalloff: state.faceRimFalloff,
     setFaceEmission: state.setFaceEmission,
     setFaceEmissionThreshold: state.setFaceEmissionThreshold,
     setFaceEmissionColorShift: state.setFaceEmissionColorShift,
     setFaceEmissionPulsing: state.setFaceEmissionPulsing,
-    setFaceRimFalloff: state.setFaceRimFalloff,
   }))
   const {
     faceEmission,
     faceEmissionThreshold,
     faceEmissionColorShift,
     faceEmissionPulsing,
-    faceRimFalloff,
     setFaceEmission,
     setFaceEmissionThreshold,
     setFaceEmissionColorShift,
     setFaceEmissionPulsing,
-    setFaceRimFalloff,
   } = useAppearanceStore(emissionSelector)
 
   return (
@@ -175,16 +175,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             data-testid="schroedinger-emission-pulsing"
           />
         </div>
-        <Slider
-          label="Rim Falloff"
-          min={0}
-          max={10}
-          step={0.5}
-          value={faceRimFalloff}
-          onChange={setFaceRimFalloff}
-          showValue
-          data-testid="schroedinger-rim-falloff"
-        />
       </ControlGroup>
 
       {/* Volume Rendering (includes Volume Effects) */}
@@ -481,31 +471,60 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           </ToggleButton>
         </div>
 
-        {/* Uncertainty Shimmer */}
+        {/* Uncertainty Boundary */}
         <div className="space-y-1 mt-2">
           <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Uncertainty Shimmer</label>
+            <label className="text-xs text-text-secondary">Uncertainty Boundary</label>
             <ToggleButton
-              pressed={config.shimmerEnabled ?? false}
-              onToggle={() => setShimmerEnabled(!(config.shimmerEnabled ?? false))}
+              pressed={config.uncertaintyBoundaryEnabled ?? false}
+              onToggle={() => {
+                const nextEnabled = !(config.uncertaintyBoundaryEnabled ?? false)
+                setUncertaintyBoundaryEnabled(nextEnabled)
+                // Confidence-boundary threshold extraction currently relies on the density grid.
+                if (nextEnabled && !(config.useDensityGrid ?? false)) {
+                  setUseDensityGrid(true)
+                }
+              }}
               className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle shimmer"
-              data-testid="schroedinger-shimmer-toggle"
+              ariaLabel="Toggle uncertainty boundary"
+              data-testid="schroedinger-uncertainty-boundary-toggle"
             >
-              {config.shimmerEnabled ? 'ON' : 'OFF'}
+              {config.uncertaintyBoundaryEnabled ? 'ON' : 'OFF'}
             </ToggleButton>
           </div>
-          {config.shimmerEnabled && (
-            <Slider
-              label="Strength"
-              min={0.0}
-              max={1.0}
-              step={0.1}
-              value={config.shimmerStrength ?? 0.5}
-              onChange={setShimmerStrength}
-              showValue
-              data-testid="schroedinger-shimmer-strength"
-            />
+          {config.uncertaintyBoundaryEnabled && (
+            <div className="ps-2 border-s border-border-default space-y-2">
+              <Slider
+                label="Strength"
+                min={0.0}
+                max={1.0}
+                step={0.05}
+                value={config.uncertaintyBoundaryStrength ?? 0.5}
+                onChange={setUncertaintyBoundaryStrength}
+                showValue
+                data-testid="schroedinger-uncertainty-boundary-strength"
+              />
+              <Slider
+                label="Confidence Mass"
+                min={0.5}
+                max={0.99}
+                step={0.01}
+                value={config.uncertaintyConfidenceMass ?? 0.68}
+                onChange={setUncertaintyConfidenceMass}
+                showValue
+                data-testid="schroedinger-uncertainty-confidence"
+              />
+              <Slider
+                label="Boundary Width"
+                min={0.05}
+                max={1.0}
+                step={0.05}
+                value={config.uncertaintyBoundaryWidth ?? 0.3}
+                onChange={setUncertaintyBoundaryWidth}
+                showValue
+                data-testid="schroedinger-uncertainty-boundary-width"
+              />
+            </div>
           )}
         </div>
 

@@ -141,6 +141,14 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
    * Provides 3-6x performance improvement for volumetric rendering.
    */
   useDensityGrid?: boolean
+  /** Whether the density grid payload stores phase/log channels (multi-channel mode). */
+  densityGridHasPhase?: boolean
+  /** Compile-time specialization for phase materiality branching. */
+  phaseMateriality?: boolean
+  /** Compile-time specialization for emission pulsing branching. */
+  emissionPulsing?: boolean
+  /** Compile-time specialization for interference branching. */
+  interference?: boolean
 }
 
 /**
@@ -159,6 +167,14 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     quantumMode = 'harmonicOscillator',
     termCount,
     useDensityGrid = false,
+    densityGridHasPhase = false,
+    shadows = true,
+    ambientOcclusion = true,
+    nodal = true,
+    dispersion = true,
+    phaseMateriality = true,
+    emissionPulsing = true,
+    interference = true,
     overrides = [],
   } = config
 
@@ -235,7 +251,21 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   if (useDensityGrid && !isosurface) {
     features.push('Density Grid Compute')
+    if (densityGridHasPhase) {
+      features.push('Density Grid Phase Payload')
+    }
   }
+
+  // Density grid compile-time flags
+  defines.push(`const DENSITY_GRID_ENABLED: bool = ${useDensityGrid && !isosurface};`)
+  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${useDensityGrid && !isosurface && densityGridHasPhase};`)
+  defines.push(`const FEATURE_SHADOWS: bool = ${shadows};`)
+  defines.push(`const FEATURE_AO: bool = ${ambientOcclusion};`)
+  defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
+  defines.push(`const FEATURE_DISPERSION: bool = ${dispersion};`)
+  defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
+  defines.push(`const FEATURE_EMISSION_PULSING: bool = ${emissionPulsing};`)
+  defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
 
   // Select main block based on mode
   // Temporal volumetric mode outputs MRT (color + world position)
@@ -410,8 +440,8 @@ struct VertexOutput {
     { name: 'Color (Oklab)', content: oklabBlock },
     { name: 'Color Selector', content: selectorBlock },
 
-    // ===== LIGHTING (GGX needed for both volumetric emission and isosurface) =====
-    { name: 'GGX PBR', content: ggxBlock },
+    // ===== LIGHTING (GGX PBR only needed for isosurface — volumetric uses Lambertian diffuse) =====
+    { name: 'GGX PBR', content: ggxBlock, condition: isosurface },
     { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface },
 
     // ===== VOLUME RENDERING =====

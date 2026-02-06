@@ -18,6 +18,16 @@ export const laguerreBlock = /* wgsl */ `
 // Maximum supported degree for Laguerre polynomials
 // For hydrogen orbitals: k = n - l - 1, so for n=7, l=0: k=6
 const MAX_LAGUERRE_K: i32 = 7;
+const LAGUERRE_INV_DEN: array<f32, 8> = array<f32, 8>(
+  1.0, // unused (index 0)
+  1.0, // 1/1
+  0.5, // 1/2
+  0.3333333333, // 1/3
+  0.25, // 1/4
+  0.2, // 1/5
+  0.1666666667, // 1/6
+  0.1428571429 // 1/7
+);
 
 /**
  * Evaluate associated Laguerre polynomial L^α_k(x)
@@ -49,8 +59,9 @@ fn laguerre(k: i32, alpha: f32, x: f32) -> f32 {
 
   for (var i = 1; i < kClamped; i++) {
     let fi = f32(i);
+    let invDen = LAGUERRE_INV_DEN[i + 1];
     // (k+1)L_{k+1} = (2k + 1 + α - x)L_k - (k + α)L_{k-1}
-    let Lkp1 = ((2.0 * fi + 1.0 + alpha - x) * Lk - (fi + alpha) * Lkm1) / (fi + 1.0);
+    let Lkp1 = ((2.0 * fi + 1.0 + alpha - x) * Lk - (fi + alpha) * Lkm1) * invDen;
     Lkm1 = Lk;
     Lk = Lkp1;
   }

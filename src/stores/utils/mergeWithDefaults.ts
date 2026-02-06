@@ -78,11 +78,39 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
  * Applies backwards-compatibility migrations for merged Schrödinger config.
  * @param merged
  */
-function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
-  if (merged.quantumMode === 'hydrogenOrbital') {
-    return { ...merged, quantumMode: 'hydrogenND' }
+function migrateLegacyShimmerFields<T>(loaded: T): T {
+  if (!loaded || typeof loaded !== 'object') {
+    return loaded
   }
-  return merged
+
+  const loadedRecord = loaded as unknown as Record<string, unknown>
+  let migrated = loadedRecord
+
+  const hasBoundaryEnabled = Object.prototype.hasOwnProperty.call(
+    loadedRecord,
+    'uncertaintyBoundaryEnabled'
+  )
+  const hasBoundaryStrength = Object.prototype.hasOwnProperty.call(
+    loadedRecord,
+    'uncertaintyBoundaryStrength'
+  )
+
+  if (!hasBoundaryEnabled && typeof loadedRecord.shimmerEnabled === 'boolean') {
+    migrated = { ...migrated, uncertaintyBoundaryEnabled: loadedRecord.shimmerEnabled }
+  }
+  if (!hasBoundaryStrength && typeof loadedRecord.shimmerStrength === 'number') {
+    migrated = { ...migrated, uncertaintyBoundaryStrength: loadedRecord.shimmerStrength }
+  }
+
+  return migrated as T
+}
+
+function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged: T): T {
+  let normalized = merged as unknown as Record<string, unknown>
+  if (normalized.quantumMode === 'hydrogenOrbital') {
+    normalized = { ...normalized, quantumMode: 'hydrogenND' }
+  }
+  return normalized as T
 }
 
 /**
@@ -95,7 +123,10 @@ function normalizeSchroedingerConfig<T extends { quantumMode?: unknown }>(merged
  * @returns Merged state with all defaults filled in
  */
 export function mergeExtendedObjectState(loaded: Record<string, unknown>): Record<string, unknown> {
-  const mergedSchroedinger = deepMerge(DEFAULT_SCHROEDINGER_CONFIG, loaded.schroedinger)
+  const mergedSchroedinger = deepMerge(
+    DEFAULT_SCHROEDINGER_CONFIG,
+    migrateLegacyShimmerFields(loaded.schroedinger)
+  )
   return {
     ...loaded,
     // Merge schroedinger config with its defaults
@@ -135,7 +166,9 @@ export function mergeExtendedObjectStateForType(
 
   // Return only the merged config for this object type
   // This ensures we don't overwrite other object type configs
-  const mergedConfig = deepMerge(defaultConfig, loadedConfig)
+  const migratedLoadedConfig =
+    configKey === 'schroedinger' ? migrateLegacyShimmerFields(loadedConfig) : loadedConfig
+  const mergedConfig = deepMerge(defaultConfig, migratedLoadedConfig)
   const normalizedConfig =
     configKey === 'schroedinger'
       ? normalizeSchroedingerConfig(mergedConfig as typeof DEFAULT_SCHROEDINGER_CONFIG)
