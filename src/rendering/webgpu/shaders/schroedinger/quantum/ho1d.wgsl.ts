@@ -2,7 +2,9 @@
  * WGSL 1D Harmonic Oscillator eigenfunction
  *
  * The quantum harmonic oscillator eigenfunctions are:
- *   φ_n(x) = (α/π)^{1/4} · (1/√(2^n n!)) · H_n(αx) · e^{-½(αx)²}
+ *   φ_n(x) = (ω/π)^{1/4} · (1/√(2^n n!)) · H_n(√ω·x) · e^{-½ω x²}
+ *
+ * With α = √ω (ℏ=m=1), the argument is αx and the prefactor is (α²/π)^{1/4}.
  *
  * Port of GLSL quantum/ho1d.glsl to WGSL.
  *
@@ -26,8 +28,8 @@ const HO_NORM: array<f32, 7> = array<f32, 7>(
 );
 
 // Evaluate 1D HO eigenfunction φ_n(x, ω)
-// Uses canonical normalization:
-//   (α/π)^(1/4) * 1/sqrt(2^n n!)
+// Uses canonical normalization (Griffiths eq. 2.85, natural units ℏ=m=1):
+//   (ω/π)^(1/4) * 1/sqrt(2^n n!)  =  (α²/π)^(1/4) * 1/sqrt(2^n n!)
 //
 // Parameters:
 //   n     - quantum number (0-6)
@@ -50,8 +52,8 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   // Hermite polynomial
   let H = hermite(n, u);
 
-  // Canonical normalization factor.
-  let alphaNorm = sqrt(sqrt(alpha * INV_PI));
+  // Canonical normalization factor: (α²/π)^{1/4} = (ω/π)^{1/4}
+  let alphaNorm = sqrt(sqrt(alpha * alpha * INV_PI));
   let norm = HO_NORM[n];
 
   return alphaNorm * norm * H * gauss;

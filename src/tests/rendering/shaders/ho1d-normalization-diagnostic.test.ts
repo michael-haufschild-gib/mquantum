@@ -33,14 +33,14 @@ function hermite(n: number, u: number): number {
 const INV_PI = 1 / Math.PI
 const HO_NORM = [1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.0510310363080, 0.0161374306092, 0.00465847495312]
 
-/** NEW canonical normalization (local code) */
+/** Canonical normalization: (α²/π)^{1/4} = (ω/π)^{1/4}, matches ho1d.wgsl.ts */
 function ho1D_canonical(n: number, x: number, omega: number): number {
   if (n < 0 || n > 6) return 0
   const alpha = Math.sqrt(Math.max(omega, 0.01))
   const u = alpha * x
   const gauss = Math.exp(-0.5 * u * u)
   const H = hermite(n, u)
-  const alphaNorm = Math.sqrt(Math.sqrt(alpha * INV_PI))
+  const alphaNorm = Math.sqrt(Math.sqrt(alpha * alpha * INV_PI))
   const norm = HO_NORM[n]
   return alphaNorm * norm * H * gauss
 }
@@ -327,7 +327,8 @@ describe('HO1D Normalization Diagnostic', () => {
     console.log('Visual (old):   ', rhoCenterV.toExponential(6))
     console.log('Ratio:          ', (rhoCenterC / rhoCenterV).toFixed(4))
 
-    // Theoretical canonical peak: (alpha/pi)^(3/2) = (1/pi)^(3/2) = 0.1795
+    // Theoretical canonical peak for ground state (0,0,0) with ω=1:
+    // |ψ_0(0)|^2 = [(ω/π)^{1/4}]^6 = (1/π)^{3/2} ≈ 0.1795 (3D product, each dim contributes (ω/π)^{1/4})
     console.log('Theoretical canonical:', Math.pow(1/Math.PI, 1.5).toExponential(6))
   })
 
@@ -356,7 +357,7 @@ describe('HO1D Normalization Diagnostic', () => {
         const n = qn[j]
         if (n < 0 || n > 6) continue
         const alpha = Math.sqrt(Math.max(p.omega[j] ?? 1.0, 0.01))
-        const alphaNorm = Math.sqrt(Math.sqrt(alpha * INV_PI))
+        const alphaNorm = Math.sqrt(Math.sqrt(alpha * alpha * INV_PI))
         const norm = HO_NORM[n]
         const damp = 1.0 / (1.0 + 0.15 * n * n)
         const ratio = damp / (alphaNorm * norm)

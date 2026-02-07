@@ -687,8 +687,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const omega = preset.omega[j] ?? 1.0
       const alpha = Math.sqrt(Math.max(omega, 0.01))
 
-      // Canonical normalization factor
-      const alphaNorm = Math.sqrt(Math.sqrt(alpha * INV_PI))
+      // Canonical normalization factor: (α²/π)^{1/4} = (ω/π)^{1/4}
+      const alphaNorm = Math.sqrt(Math.sqrt(alpha * alpha * INV_PI))
       const norm = HO_NORM[n]
 
       // Old visual damping factor
