@@ -10,6 +10,7 @@ import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
 import { MsgBox } from '@/components/overlays/MsgBox'
 import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
+import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { useCachePrewarming } from '@/hooks/useCachePrewarming'
@@ -111,6 +112,9 @@ function AppContent() {
 
         {/* Screenshot Preview Modal */}
         <ScreenshotModal />
+
+        {/* Shader Compilation Overlay */}
+        <ShaderCompilationOverlay />
       </div>
     </EditorLayout>
   )

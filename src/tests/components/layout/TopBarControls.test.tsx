@@ -36,13 +36,16 @@ describe('TopBarControls', () => {
 
     const toggle = screen.getByTestId('control-representation-toggle')
     expect(toggle).toHaveTextContent('Position')
+    const initialClassName = toggle.className
 
     await user.click(toggle)
     expect(toggle).toHaveTextContent('Momentum')
+    expect(toggle.className).toBe(initialClassName)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
 
     await user.click(toggle)
     expect(toggle).toHaveTextContent('Position')
+    expect(toggle.className).toBe(initialClassName)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
   })
 
@@ -51,10 +54,12 @@ describe('TopBarControls', () => {
     render(<TopBarControls compact={true} />)
 
     const toMomentum = screen.getByLabelText('Switch to Momentum Space')
+    const initialClassName = toMomentum.className
     await user.click(toMomentum)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
 
-    expect(screen.getByLabelText('Switch to Position Space')).toBeInTheDocument()
+    const toPosition = screen.getByLabelText('Switch to Position Space')
+    expect(toPosition).toBeInTheDocument()
+    expect(toPosition.className).toBe(initialClassName)
   })
 })
-

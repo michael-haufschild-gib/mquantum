@@ -44,6 +44,19 @@ import { BufferPreviewPass } from './passes/BufferPreviewPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 import { parseHexColorToLinearRgb } from './utils/color'
 
+/**
+ * Wait for the browser to complete at least one paint cycle.
+ * Double-rAF guarantees the DOM has been painted (first rAF fires
+ * before next paint, second fires after that paint completes).
+ */
+function waitForPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve())
+    })
+  })
+}
+
 // Object Renderers
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
 import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
@@ -277,6 +290,19 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
       console.log('[WebGPUScene] Setting up render passes for:', objectType)
 
+      // Signal the shader compilation overlay before any GPU work.
+      // waitForPaint() guarantees the overlay is rendered to screen
+      // before createShaderModule() blocks the main thread.
+      const perfStore = usePerformanceStore.getState()
+      perfStore.setShaderCompiling('pipeline', true)
+
+      await waitForPaint()
+      if (shouldAbortSetup()) {
+        usePerformanceStore.getState().setShaderCompiling('pipeline', false)
+        graph.clearPasses()
+        return
+      }
+
       try {
         await setupRenderPasses(graph, {
           objectType,
@@ -303,6 +329,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         }, shouldAbortSetup)
       } catch (err) {
         console.error('[WebGPUScene] CRITICAL: setupRenderPasses failed:', err)
+      } finally {
+        usePerformanceStore.getState().setShaderCompiling('pipeline', false)
       }
 
       if (shouldAbortSetup()) {

@@ -138,7 +138,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
         <div className="flex gap-1">
           <IconButton
             icon={representation === 'position' ? TargetIcon : WaveIcon}
-            active={representation === 'momentum'}
+            active={false}
             onClick={toggleRepresentation}
             label={
               representation === 'position'
@@ -172,17 +172,13 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             type="button"
             onClick={toggleRepresentation}
             onMouseEnter={() => soundManager.playHover()}
-            aria-label="Toggle Representation Space"
-            title="Toggle representation (Position ↔ Momentum)"
+            aria-label="Switch Representation Space"
+            title="Switch representation (Position ↔ Momentum)"
             data-testid="control-representation-toggle"
             className={`
               rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
               px-3 py-1.5
-              ${
-                representation === 'momentum'
-                  ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
-                  : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
-              }
+              bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]
             `}
           >
             {representation === 'position' ? 'Position' : 'Momentum'}
