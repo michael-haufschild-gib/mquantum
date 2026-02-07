@@ -442,6 +442,7 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerTimeScale: clampedSetter('timeScale', 0.1, 2.0),
     setSchroedingerFieldScale: clampedSetter('fieldScale', 0.5, 2.0),
     setSchroedingerDensityGain: clampedSetter('densityGain', 0.1, 5.0),
+    setSchroedingerDensityContrast: clampedSetter('densityContrast', 1.0, 4.0),
     setSchroedingerPowderScale: clampedSetter('powderScale', 0.0, 2.0),
     setSchroedingerSampleCount: clampedSetter('sampleCount', 16, 128),
     setSchroedingerEmissionIntensity: clampedSetter('emissionIntensity', 0.0, 5.0),

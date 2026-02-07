@@ -679,7 +679,6 @@ export class WebGPURenderGraph {
     const shouldLog = import.meta.env.DEV && (!this._lastPassLog || now - this._lastPassLog > 1000)
     if (shouldLog) {
       this._lastPassLog = now
-      console.log('[WebGPU RenderGraph] Executing passes:', this.passOrder)
     }
 
     // Track resources written by enabled passes to prevent passthrough overwriting them
@@ -809,7 +808,6 @@ export class WebGPURenderGraph {
       // Execute pass
       try {
         pass.execute(ctx)
-        if (shouldLog) console.log(`[WebGPU RenderGraph] Executed pass '${passId}'`)
       } catch (e) {
         console.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
       } finally {

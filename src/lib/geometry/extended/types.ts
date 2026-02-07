@@ -290,6 +290,8 @@ export interface SchroedingerConfig {
   fieldScale: number
   /** Absorption coefficient for Beer-Lambert (0.1-5.0) */
   densityGain: number
+  /** Power-curve exponent for lobe sharpening (1.0=linear, >1=sharper lobes, default 1.8) */
+  densityContrast: number
   /** Multiple scattering "powder" effect strength (0.0-2.0) */
   powderScale: number
   /** Samples per ray (32-128) */
@@ -560,6 +562,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   timeScale: 0.8,
   fieldScale: 1.0,
   densityGain: 2.0,
+  densityContrast: 1.8,
   powderScale: 1.0,
   sampleCount: 32, // Derived from raymarchQuality: 'balanced'
 

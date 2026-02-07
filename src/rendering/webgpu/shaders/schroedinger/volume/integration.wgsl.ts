@@ -129,6 +129,18 @@ fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
 }
 
 /**
+ * Apply density contrast sharpening via power-curve transfer function.
+ * Normalizes density by peak, applies power curve, denormalizes.
+ * Compresses low-density regions toward zero while preserving peaks,
+ * creating sharper visual lobe boundaries in volumetric rendering.
+ */
+fn applyDensityContrast(rho: f32, uniforms: SchroedingerUniforms) -> f32 {
+  if (uniforms.densityContrast <= 1.0 || uniforms.peakDensity <= 0.0) { return rho; }
+  let normalized = clamp(rho / uniforms.peakDensity, 0.0, 1.0);
+  return pow(normalized, uniforms.densityContrast) * uniforms.peakDensity;
+}
+
+/**
  * Compute per-step internal fog alpha for volumetric integration.
  */
 fn computeInternalFogAlpha(stepLen: f32, uniforms: SchroedingerUniforms) -> f32 {
@@ -798,8 +810,9 @@ fn volumeRaymarch(
       }
     }
 
+    // Density contrast sharpening: compress low-density tails for sharper lobes
+    var effectiveRho = applyDensityContrast(rho, uniforms);
     // Phase materiality: smoke regions are denser (more absorbing)
-    var effectiveRho = rho;
     if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
@@ -1083,8 +1096,14 @@ fn volumeRaymarchHQ(
     let cloudDepthHQ = 1.0 - (transmittance.r + transmittance.g + transmittance.b) / 3.0;
     let nodalFloorHQ = 5e-4 * cloudDepthHQ * cloudDepthHQ;
     let softRhoRGB = max(rhoRGB, vec3f(nodalFloorHQ));
+    // Density contrast sharpening: compress low-density tails for sharper lobes
+    let contrastedRhoRGB = vec3f(
+      applyDensityContrast(softRhoRGB.r, uniforms),
+      applyDensityContrast(softRhoRGB.g, uniforms),
+      applyDensityContrast(softRhoRGB.b, uniforms)
+    );
     // PERF: Vectorized alpha computation - single vec3 exp() instead of 3 scalar calls
-    let clampedRhoRGB = min(softRhoRGB * pmDensityMod, vec3f(10.0));
+    let clampedRhoRGB = min(contrastedRhoRGB * pmDensityMod, vec3f(10.0));
     let alphaExp = max(vec3f(-uniforms.densityGain) * clampedRhoRGB * adaptiveStep, vec3f(-20.0));
     let alpha = vec3f(1.0) - exp(alphaExp);
 
@@ -1282,8 +1301,9 @@ fn volumeRaymarchGrid(
       }
     }
 
+    // Density contrast sharpening: compress low-density tails for sharper lobes
+    var effectiveRho = applyDensityContrast(rho, uniforms);
     // Phase materiality
-    var effectiveRho = rho;
     if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);

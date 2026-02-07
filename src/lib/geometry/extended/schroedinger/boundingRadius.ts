@@ -13,9 +13,12 @@ import type { QuantumPreset } from './presets'
 /**
  * Number of Gaussian decay lengths beyond the classical turning point.
  * Controls how much of the evanescent tail is visible.
- * 4.0 captures density down to ~exp(-16) ≈ 1e-7 of peak.
+ * 2.5 captures density down to ~exp(-6.25) ≈ 2e-3 of peak — sufficient for
+ * volumetric rendering where the tail is invisible after Beer-Lambert absorption.
+ * A tighter bound concentrates ray samples on visible structure, improving
+ * spatial resolution for complex states with fine nodal features.
  */
-const GAUSSIAN_MARGIN = 4.0
+const GAUSSIAN_MARGIN = 2.5
 
 /** Minimum bounding radius (matches previous fixed BOUND_R) */
 const MIN_BOUND_R = 2.0

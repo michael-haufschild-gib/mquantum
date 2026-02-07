@@ -197,6 +197,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Multiplied into densityGain so canonical normalization produces
   // the same visual brightness as the old visual-damping normalization.
   private canonicalDensityCompensation = 1.0
+  private cachedPeakDensity = 0.1
 
   // Dynamic bounding radius: physics-based sphere that contains all
   // visually significant wavefunction density. Updated per state change.
@@ -252,9 +253,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private static readonly TIME_FIELD_OFFSET = 908
   private static readonly BOUND_RADIUS_QUANT_STEP = 0.05
   private static readonly BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
-
-  // Diagnostic logging throttle
-  private lastDiagnosticLog = 0
 
   constructor(config?: SchrodingerRendererConfig) {
     // Determine outputs based on mode
@@ -810,7 +808,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
    *
    * Analytically computes the peak |ψ|² for the dominant superposition term,
    * then returns a compensation factor that targets a specific per-step opacity
-   * (alpha ≈ 0.3) at peak density. This ensures the full density dynamic range
+   * (alpha ≈ 0.7) at peak density. This ensures the full density dynamic range
    * maps to a useful opacity range regardless of quantum numbers, preventing
    * opacity saturation that would hide internal structure in complex states.
    */
@@ -877,18 +875,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     if (peakDensity <= 0) return 1.0
+    this.cachedPeakDensity = peakDensity
 
-    // Target: at peak density with default densityGain=2.0, alpha per step ≈ 0.3
+    // Target: at peak density with default densityGain=2.0, alpha per step ≈ 0.7
+    // Higher target ensures narrow lobes (2-3 steps wide) build up near-opaque,
+    // preventing the "translucent colored clouds" look on complex states.
     // alpha = 1 - exp(-densityGain * rho * stepLen)
     // => densityGain = -ln(1 - target_alpha) / (peakRho * stepLen)
-    const TARGET_ALPHA = 0.3
+    const TARGET_ALPHA = 0.7
     const DEFAULT_DENSITY_GAIN = 2.0
-    const TYPICAL_SAMPLES = 64
+    const TYPICAL_SAMPLES = 32
     const estimatedStepLen = (2 * this.boundingRadius) / TYPICAL_SAMPLES
     const neededGain = -Math.log(1 - TARGET_ALPHA) / (peakDensity * estimatedStepLen)
 
     // Return compensation so that: effective = userGain * compensation
-    // At default userGain=2.0: effective = 2.0 * (neededGain/2.0) = neededGain → alpha≈0.3 at peak
+    // At default userGain=2.0: effective = 2.0 * (neededGain/2.0) = neededGain → alpha≈0.7 at peak
     return neededGain / DEFAULT_DENSITY_GAIN
   }
 
@@ -1043,8 +1044,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.cachedPresetConfig = { ...currentConfig }
       this.flattenedPreset = flattenPresetForUniforms(preset)
 
-      // Compute auto-compensation for canonical normalization
-      this.canonicalDensityCompensation = this.computeCanonicalCompensation(preset, dimension)
     }
 
     // Compute physics-based bounding radius for this state.
@@ -1075,6 +1074,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         this.boundingRadius = quantizedBoundR
         this.createBoundingGeometry(this.device)
       }
+    }
+
+    // Compute auto-compensation AFTER bounding radius update so stepLen estimate is correct
+    if (needsPresetRegen && this.cachedPreset) {
+      this.canonicalDensityCompensation = this.computeCanonicalCompensation(this.cachedPreset, dimension)
     }
 
     // Use cached flattened preset data
@@ -1184,8 +1188,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[692 / 4] = appearance?.faceEmission ?? 0.0
     floatView[696 / 4] = appearance?.faceEmissionThreshold ?? 0.0
     floatView[700 / 4] = appearance?.faceEmissionColorShift ?? 0.0
-    intView[704 / 4] = 0 // Reserved
-    floatView[708 / 4] = 0.0 // _reserved_rim (Fresnel rim removed)
+    floatView[704 / 4] = this.cachedPeakDensity
+    floatView[708 / 4] = schroedinger?.densityContrast ?? 1.8
     floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
     floatView[716 / 4] = pbr?.face?.roughness ?? 0.3 // WebGL uses 'pbr-face' source
 
@@ -1843,29 +1847,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
       // Execute compute pass - fills eigenfunction cache storage buffer
       cachePass.execute(ctx)
-    }
-
-    // DIAGNOSTIC: Log key parameters once per second to help debug performance issues
-    if (import.meta.env.DEV) {
-      const now = Date.now()
-      if (now - this.lastDiagnosticLog > 1000) {
-        this.lastDiagnosticLog = now
-        const extended = ctx.frame?.stores?.['extended'] as any
-        const schroedinger = extended?.schroedinger
-        const performance = ctx.frame?.stores?.['performance'] as any
-        const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-        const sampleCount = schroedinger?.sampleCount ?? (qualityMultiplier < 0.75 ? 32 : 64)
-        console.log('[WebGPU Schrödinger] Diagnostic:', {
-          sampleCount,
-          qualityMultiplier,
-          quantumMode: schroedinger?.quantumMode ?? 'unknown',
-          dimension: this.rendererConfig.dimension,
-          isosurface: this.rendererConfig.isosurface,
-          canvasSize: `${ctx.size.width}x${ctx.size.height}`,
-          storesAvailable: Object.keys(ctx.frame?.stores ?? {}),
-          schroedingerDefined: !!schroedinger,
-        })
-      }
     }
 
     // Get render targets based on mode:

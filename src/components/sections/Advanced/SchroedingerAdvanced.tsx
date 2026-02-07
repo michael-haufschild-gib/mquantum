@@ -35,6 +35,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
     setDensityGain: state.setSchroedingerDensityGain,
+    setDensityContrast: state.setSchroedingerDensityContrast,
     setPowderScale: state.setSchroedingerPowderScale,
     setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
     setDispersionEnabled: state.setSchroedingerDispersionEnabled,
@@ -73,6 +74,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const {
     config,
     setDensityGain,
+    setDensityContrast,
     setPowderScale,
     setScatteringAnisotropy,
     setDispersionEnabled,
@@ -541,6 +543,18 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             </div>
           )}
         </div>
+
+        {/* Density Contrast */}
+        <Slider
+          label="Density Contrast"
+          min={1.0}
+          max={4.0}
+          step={0.1}
+          value={config.densityContrast ?? 1.8}
+          onChange={setDensityContrast}
+          showValue
+          data-testid="schroedinger-density-contrast"
+        />
 
         {/* Edge Erosion */}
         <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">

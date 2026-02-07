@@ -132,8 +132,8 @@ struct SchroedingerUniforms {
   emissionThreshold: f32,        // Density threshold for emission (0.0-1.0)
   emissionColorShift: f32,       // Emission color temperature shift (-1.0 to 1.0)
 
-  _reservedEmissionPulse: u32,   // Reserved
-  _reserved_rim: f32,            // Reserved (previously rimExponent — removed)
+  peakDensity: f32,              // Peak |ψ|² for dominant term (auto-computed)
+  densityContrast: f32,          // Power-curve exponent for lobe sharpening (1.0=linear, >1=sharper)
   scatteringAnisotropy: f32,     // Henyey-Greenstein phase function g factor
 
   // Material properties
