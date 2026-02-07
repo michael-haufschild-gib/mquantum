@@ -65,7 +65,6 @@ uniform float uPowderScale;    // Multiple scattering "powder" effect (0.0-2.0)
 uniform float uEmissionIntensity; // HDR emission intensity (0.0-5.0)
 uniform float uEmissionThreshold; // Density threshold for emission (0.0-1.0)
 uniform float uEmissionColorShift;// Emission color temperature shift (-1.0 to 1.0)
-uniform bool uEmissionPulsing;    // Enable phase-based emission pulsing
 uniform float uRimExponent;       // Fresnel rim falloff (1.0-10.0)
 uniform float uScatteringAnisotropy; // Henyey-Greenstein phase function g factor (-0.9 to 0.9)
 uniform float uRoughness;         // GGX roughness (0.0-1.0)

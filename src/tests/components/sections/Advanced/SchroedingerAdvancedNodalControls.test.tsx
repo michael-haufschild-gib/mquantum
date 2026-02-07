@@ -1,6 +1,7 @@
 import { SchroedingerAdvanced } from '@/components/sections/Advanced/SchroedingerAdvanced'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { within } from '@testing-library/dom'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('SchroedingerAdvanced physical nodal controls', () => {
@@ -13,6 +14,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
 
     render(<SchroedingerAdvanced />)
 
+    expect(screen.getByTestId('schroedinger-nodal-render-mode')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-definition')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-tolerance')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-family-filter')).toBeInTheDocument()
@@ -30,11 +32,31 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
     })
     expect(useExtendedObjectStore.getState().schroedinger.nodalDefinition).toBe('imagPart')
 
+    fireEvent.change(screen.getByTestId('schroedinger-nodal-render-mode'), {
+      target: { value: 'surface' },
+    })
+    expect(useExtendedObjectStore.getState().schroedinger.nodalRenderMode).toBe('surface')
+
     const toleranceInput = screen.getByTestId('schroedinger-nodal-tolerance-input')
     fireEvent.change(toleranceInput, { target: { value: '0.05' } })
     fireEvent.blur(toleranceInput)
 
     expect(useExtendedObjectStore.getState().schroedinger.nodalTolerance).toBeCloseTo(0.05, 5)
+  })
+
+  it('offers only band/surface render modes and no slice-plane controls', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setSchroedingerNodalEnabled(true)
+
+    render(<SchroedingerAdvanced />)
+
+    const renderMode = screen.getByTestId('schroedinger-nodal-render-mode')
+    const options = within(renderMode).getAllByRole('option')
+    expect(options.map((o) => (o as HTMLOptionElement).value)).toEqual(['band', 'surface'])
+
+    expect(screen.queryByTestId('schroedinger-nodal-slice-axis')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-nodal-slice-offset')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-nodal-slice-thickness')).not.toBeInTheDocument()
   })
 
   it('enables family filter only for hydrogenND mode', () => {

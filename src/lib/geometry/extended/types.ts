@@ -112,6 +112,13 @@ export type SchroedingerNodalDefinition =
 export type SchroedingerNodalFamilyFilter = 'all' | 'radial' | 'angular'
 
 /**
+ * Nodal rendering mode:
+ * - band: volumetric near-zero band (default)
+ * - surface: true nodal ray-hit surfaces
+ */
+export type SchroedingerNodalRenderMode = 'band' | 'surface'
+
+/**
  * Named presets for Hydrogen ND mode (n-dimensional hydrogen orbitals)
  * Format: {orbital}_{dimension}d (e.g., '2pz_4d' = 2pz orbital in 4D)
  */
@@ -235,8 +242,6 @@ export interface SchroedingerConfig {
   emissionThreshold: number
   /** Emission color temperature shift (-1.0 to 1.0) */
   emissionColorShift: number
-  /** Enable phase-based emission pulsing */
-  emissionPulsing: boolean
   /** Scattering anisotropy (-0.9 to 0.9) */
   scatteringAnisotropy: number
   /** Surface roughness for specular highlights (0.0-1.0) */
@@ -301,6 +306,8 @@ export interface SchroedingerConfig {
   nodalTolerance: number
   /** Optional hydrogen node-family filter (all/radial/angular) */
   nodalFamilyFilter: SchroedingerNodalFamilyFilter
+  /** Nodal rendering style (band/surface) */
+  nodalRenderMode: SchroedingerNodalRenderMode
   /** Enable sign/lobe-aware nodal coloring */
   nodalLobeColoringEnabled: boolean
   /** Color for Re(psi)=0 nodal visualization */
@@ -441,7 +448,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   emissionIntensity: 0.5,
   emissionThreshold: 0.3,
   emissionColorShift: 0.0,
-  emissionPulsing: false,
   scatteringAnisotropy: 0.0,
   roughness: 0.3,
 
@@ -480,6 +486,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   nodalDefinition: 'psiAbs',
   nodalTolerance: 0.02,
   nodalFamilyFilter: 'all',
+  nodalRenderMode: 'band',
   nodalLobeColoringEnabled: false,
   nodalColorReal: '#00ffff',
   nodalColorImag: '#ff66ff',

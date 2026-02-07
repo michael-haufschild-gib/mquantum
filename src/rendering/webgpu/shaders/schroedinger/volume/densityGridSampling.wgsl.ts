@@ -225,15 +225,14 @@ fn volumeRaymarchGrid(
       }
     }
 
-    // Physically neutral nodal visualization:
-    // Smooth spatial fade matching the Gaussian envelope falloff.
-    // Cannot use density gating because ρ=|ψ|²≈0 at nodes by definition.
-    let nodalR2Grid = dot(pos, pos);
-    let nodalBoundR2Grid = uniforms.boundingRadius * uniforms.boundingRadius;
-    let nodalRadialFadeGrid = 1.0 - smoothstep(0.25, 0.65, nodalR2Grid / nodalBoundR2Grid);
-    if (FEATURE_NODAL && uniforms.nodalEnabled != 0u && uniforms.nodalStrength > 0.0 && nodalRadialFadeGrid > 0.01) {
+    if (
+      FEATURE_NODAL &&
+      uniforms.nodalEnabled != 0u &&
+      uniforms.nodalStrength > 0.0 &&
+      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
+    ) {
       let nodal = computePhysicalNodalField(pos, animTime, uniforms);
-      let fadedIntensityGrid = nodal.intensity * nodalRadialFadeGrid;
+      let fadedIntensityGrid = nodal.intensity * nodal.envelopeWeight;
       if (fadedIntensityGrid > 1e-4) {
         let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
         let nodalAlpha = clamp(
@@ -242,9 +241,9 @@ fn volumeRaymarchGrid(
           1.0
         );
         if (nodalAlpha > 1e-5) {
-          let nodalScattered = nodalColor * fogColor;
+          let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);
           accColor += transmittance * nodalAlpha * nodalScattered;
-          transmittance *= (1.0 - nodalAlpha);
+          transmittance *= (1.0 - nodalAlpha * 0.6);
         }
       }
     }

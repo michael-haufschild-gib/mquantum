@@ -389,6 +389,21 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('cameraUp * (jitterOffset.y * pixelSizeY);')
     expect(wgsl).not.toContain('* pixelSize * 2.0')
   })
+
+  it('uses density-grid raymarching in temporal mode when enabled', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 4,
+      temporalAccumulation: true,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useDensityGrid: true,
+      densityGridHasPhase: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(features).toContain('Density Grid Compute')
+    expect(wgsl).toContain('volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);')
+  })
 })
 
 describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {

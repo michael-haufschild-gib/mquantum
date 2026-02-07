@@ -382,17 +382,10 @@ fn computeEmissionLit(
         emissionColor = hsl2rgb(hsl.x, hsl.y, hsl.z);
       }
 
-      var pulse = 1.0;
-      if (FEATURE_EMISSION_PULSING && uniforms.emissionPulsing != 0u) {
-        let phaseNorm = (phase + PI) / TAU;
-        pulse = 1.0 + 0.5 * sin(phaseNorm * 6.28 + uniforms.time * uniforms.timeScale * 2.0);
-      }
-
-      col += emissionColor * uniforms.emissionIntensity * emissionFactor * pulse;
+      col += emissionColor * uniforms.emissionIntensity * emissionFactor;
     }
   }
 
   return col;
 }
 `
-

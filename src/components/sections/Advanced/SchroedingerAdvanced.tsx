@@ -2,11 +2,11 @@ import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
 import { ToggleButton } from '@/components/ui/ToggleButton'
 import type {
   SchroedingerNodalDefinition,
   SchroedingerNodalFamilyFilter,
+  SchroedingerNodalRenderMode,
 } from '@/lib/geometry/extended/types'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
@@ -24,6 +24,11 @@ const NODAL_FAMILY_OPTIONS: { value: SchroedingerNodalFamilyFilter; label: strin
   { value: 'all', label: 'All Nodes' },
   { value: 'radial', label: 'Radial Only' },
   { value: 'angular', label: 'Angular Only' },
+]
+
+const NODAL_RENDER_MODE_OPTIONS: { value: SchroedingerNodalRenderMode; label: string }[] = [
+  { value: 'band', label: 'Volumetric Band' },
+  { value: 'surface', label: 'Ray-Hit Surface' },
 ]
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
@@ -44,6 +49,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setNodalDefinition: state.setSchroedingerNodalDefinition,
     setNodalTolerance: state.setSchroedingerNodalTolerance,
     setNodalFamilyFilter: state.setSchroedingerNodalFamilyFilter,
+    setNodalRenderMode: state.setSchroedingerNodalRenderMode,
     setNodalLobeColoringEnabled: state.setSchroedingerNodalLobeColoringEnabled,
     setNodalColorReal: state.setSchroedingerNodalColorReal,
     setNodalColorImag: state.setSchroedingerNodalColorImag,
@@ -81,6 +87,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setNodalDefinition,
     setNodalTolerance,
     setNodalFamilyFilter,
+    setNodalRenderMode,
     setNodalLobeColoringEnabled,
     setNodalColorReal,
     setNodalColorImag,
@@ -107,21 +114,17 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     faceEmission: state.faceEmission,
     faceEmissionThreshold: state.faceEmissionThreshold,
     faceEmissionColorShift: state.faceEmissionColorShift,
-    faceEmissionPulsing: state.faceEmissionPulsing,
     setFaceEmission: state.setFaceEmission,
     setFaceEmissionThreshold: state.setFaceEmissionThreshold,
     setFaceEmissionColorShift: state.setFaceEmissionColorShift,
-    setFaceEmissionPulsing: state.setFaceEmissionPulsing,
   }))
   const {
     faceEmission,
     faceEmissionThreshold,
     faceEmissionColorShift,
-    faceEmissionPulsing,
     setFaceEmission,
     setFaceEmissionThreshold,
     setFaceEmissionColorShift,
-    setFaceEmissionPulsing,
   } = useAppearanceStore(emissionSelector)
 
   return (
@@ -158,14 +161,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-emission-color-shift"
         />
-        <div className="flex items-center justify-between py-2">
-          <label className="text-xs text-text-secondary">Pulsing</label>
-          <Switch
-            checked={faceEmissionPulsing}
-            onCheckedChange={setFaceEmissionPulsing}
-            data-testid="schroedinger-emission-pulsing"
-          />
-        </div>
       </ControlGroup>
 
       {/* Volume Rendering (includes Volume Effects) */}
@@ -278,6 +273,14 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
                 onChange={setNodalStrength}
                 showValue
                 data-testid="schroedinger-nodal-strength"
+              />
+
+              <Select
+                label="Rendering Mode"
+                options={NODAL_RENDER_MODE_OPTIONS}
+                value={config.nodalRenderMode ?? 'band'}
+                onChange={setNodalRenderMode}
+                data-testid="schroedinger-nodal-render-mode"
               />
 
               <Select

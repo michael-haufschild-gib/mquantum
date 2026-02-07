@@ -65,7 +65,6 @@ export interface MaterialSliceState {
   faceEmission: number
   faceEmissionThreshold: number
   faceEmissionColorShift: number
-  faceEmissionPulsing: boolean
 }
 
 export interface MaterialSliceActions {
@@ -73,7 +72,6 @@ export interface MaterialSliceActions {
   setFaceEmission: (emission: number) => void
   setFaceEmissionThreshold: (threshold: number) => void
   setFaceEmissionColorShift: (shift: number) => void
-  setFaceEmissionPulsing: (pulsing: boolean) => void
 }
 
 export type MaterialSlice = MaterialSliceState & MaterialSliceActions

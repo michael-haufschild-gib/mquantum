@@ -40,6 +40,10 @@ const NODAL_FAMILY_ALL: i32 = 0;
 const NODAL_FAMILY_RADIAL: i32 = 1;
 const NODAL_FAMILY_ANGULAR: i32 = 2;
 
+// Nodal rendering mode constants
+const NODAL_RENDER_MODE_BAND: i32 = 0;
+const NODAL_RENDER_MODE_SURFACE: i32 = 1;
+
 // WebGPU uniform buffers require 16-byte alignment for array elements.
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
@@ -97,7 +101,7 @@ struct SchroedingerUniforms {
   emissionThreshold: f32,        // Density threshold for emission (0.0-1.0)
   emissionColorShift: f32,       // Emission color temperature shift (-1.0 to 1.0)
 
-  emissionPulsing: u32,          // Enable phase-based emission pulsing
+  _reservedEmissionPulse: u32,   // Reserved
   _reserved_rim: f32,            // Reserved (previously rimExponent — removed)
   scatteringAnisotropy: f32,     // Henyey-Greenstein phase function g factor
 
@@ -226,6 +230,12 @@ struct SchroedingerUniforms {
 
   // Multi-source blend weights (algorithm 6)
   multiSourceWeights: vec4f,      // xyz = depth/radial/normal weights, w = unused
+
+  // Nodal rendering mode controls
+  nodalRenderMode: i32,           // 0=band, 1=surface
+  _nodalRenderPad0: i32,          // Reserved (kept for stable host buffer offsets)
+  _nodalRenderPad1: f32,          // Reserved
+  _nodalRenderPad2: f32,          // Reserved
 }
 
 // ============================================

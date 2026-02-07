@@ -83,18 +83,53 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     return vec4f(heatmap, 1.0);
   }
 
-  // Discard fully transparent pixels
-  if (volumeResult.alpha < 0.01) {
-    discard;
+  var finalColor = volumeResult.color;
+  var finalAlpha = volumeResult.alpha;
+
+  // True nodal-surface ray-hit mode: trace f=0 directly and composite as a crisp surface.
+  if (
+    FEATURE_NODAL &&
+    schroedinger.nodalEnabled != 0u &&
+    schroedinger.nodalStrength > 0.0 &&
+    schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE
+  ) {
+    let animTime = getVolumeTime(schroedinger);
+    let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
+    let localSpan = max(
+      (tFar - tNear) * mix(0.14, 0.26, surfaceStrengthT),
+      mix(0.16, 0.36, surfaceStrengthT)
+    );
+    let localNear = max(tNear, volumeResult.primaryHitT - localSpan);
+    let localFar = min(tFar, volumeResult.primaryHitT + localSpan);
+    let nodalHit = findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger);
+    if (nodalHit.hitMask > 0.0) {
+      let nodalColor = selectPhysicalNodalColor(
+        schroedinger,
+        nodalHit.colorMode,
+        nodalHit.signValue
+      );
+      let facing = max(dot(nodalHit.normal, -rd), 0.0);
+      let surfaceLight = 0.35 + 0.65 * facing;
+      let overlayColor = nodalColor * surfaceLight;
+      let overlayAlpha = clamp(
+        (0.45 + 0.55 * nodalHit.hitMask) * schroedinger.nodalStrength,
+        0.0,
+        0.95
+      );
+      finalColor = mix(finalColor, overlayColor, overlayAlpha);
+      finalAlpha = max(finalAlpha, overlayAlpha);
+    }
   }
 
-  // Alpha comes directly from Beer-Lambert integration
-  let alpha = volumeResult.alpha;
+  // Discard fully transparent pixels
+  if (finalAlpha < 0.01) {
+    discard;
+  }
 
   // Note: Powder effect is applied inside computeEmissionLit() in emission.wgsl.ts
   // matching WebGL behavior (inside light loop, not post-process)
 
-  return vec4f(volumeResult.color, alpha);
+  return vec4f(finalColor, finalAlpha);
 }
 `
 
@@ -122,7 +157,6 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
     schroedinger.colorAlgorithm == 8 ||
     schroedinger.colorAlgorithm == 9 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
-    (FEATURE_EMISSION_PULSING && schroedinger.emissionPulsing != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
   let requiresDirectSampling =
@@ -200,18 +234,53 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     return vec4f(heatmap, 1.0);
   }
 
-  // Discard fully transparent pixels
-  if (volumeResult.alpha < 0.01) {
-    discard;
+  var finalColor = volumeResult.color;
+  var finalAlpha = volumeResult.alpha;
+
+  // True nodal-surface ray-hit mode: trace f=0 directly and composite as a crisp surface.
+  if (
+    FEATURE_NODAL &&
+    schroedinger.nodalEnabled != 0u &&
+    schroedinger.nodalStrength > 0.0 &&
+    schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE
+  ) {
+    let animTime = getVolumeTime(schroedinger);
+    let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
+    let localSpan = max(
+      (tFar - tNear) * mix(0.14, 0.26, surfaceStrengthT),
+      mix(0.16, 0.36, surfaceStrengthT)
+    );
+    let localNear = max(tNear, volumeResult.primaryHitT - localSpan);
+    let localFar = min(tFar, volumeResult.primaryHitT + localSpan);
+    let nodalHit = findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger);
+    if (nodalHit.hitMask > 0.0) {
+      let nodalColor = selectPhysicalNodalColor(
+        schroedinger,
+        nodalHit.colorMode,
+        nodalHit.signValue
+      );
+      let facing = max(dot(nodalHit.normal, -rd), 0.0);
+      let surfaceLight = 0.35 + 0.65 * facing;
+      let overlayColor = nodalColor * surfaceLight;
+      let overlayAlpha = clamp(
+        (0.45 + 0.55 * nodalHit.hitMask) * schroedinger.nodalStrength,
+        0.0,
+        0.95
+      );
+      finalColor = mix(finalColor, overlayColor, overlayAlpha);
+      finalAlpha = max(finalAlpha, overlayAlpha);
+    }
   }
 
-  // Alpha comes directly from Beer-Lambert integration
-  let alpha = volumeResult.alpha;
+  // Discard fully transparent pixels
+  if (finalAlpha < 0.01) {
+    discard;
+  }
 
   // Note: Powder effect is applied inside computeEmissionLit() in emission.wgsl.ts
   // matching WebGL behavior (inside light loop, not post-process)
 
-  return vec4f(volumeResult.color, alpha);
+  return vec4f(finalColor, finalAlpha);
 }
 `
 }
@@ -273,6 +342,9 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   // Isosurface raymarching
   let animTime = schroedinger.time * schroedinger.timeScale;
   let threshold = schroedinger.isoThreshold;
+  // densityGain includes canonical normalization compensation, so the
+  // log-density threshold operates on the same scale as volumetric rendering.
+  let isoGain = max(schroedinger.densityGain, 0.01);
 
   // Use quality multiplier to determine step count
   let fastMode = quality.qualityMultiplier < 0.75;
@@ -290,7 +362,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     iterCount = i + 1;  // Track iteration count
 
     let pos = ro + rd * t;
-    let rho = sampleDensity(pos, animTime, schroedinger);
+    let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
     let s = sFromRho(rho);
 
     if (s > threshold) {
@@ -300,7 +372,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
       for (var j = 0; j < 5; j++) {
         let tMid = (tLo + tHi) * 0.5;
         let midPos = ro + rd * tMid;
-        let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger));
+        let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
         if (midS > threshold) {
           tHi = tMid;
         } else {
@@ -343,12 +415,12 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
   // Sample for color
   let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
-  let rho = densityInfo.x;
+  let rhoSurface = densityInfo.x * isoGain;
   let phase = densityInfo.z;
 
   // Surface coloring - use material base color with subtle phase modulation
   let baseHSL = rgb2hsl(material.baseColor.rgb);
-  let normS = clamp((sFromRho(rho) + 8.0) / 8.0, 0.0, 1.0);
+  let normS = clamp((sFromRho(rhoSurface) + 8.0) / 8.0, 0.0, 1.0);
   var surfaceColor: vec3f;
 
   // Phase influence on hue
@@ -419,6 +491,44 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;
   }
 
+  // Iso-mode nodal consistency: band overlay + local ray-hit surface overlay.
+  if (
+    FEATURE_NODAL &&
+    schroedinger.nodalEnabled != 0u &&
+    schroedinger.nodalStrength > 0.0
+  ) {
+    if (schroedinger.nodalRenderMode == NODAL_RENDER_MODE_BAND) {
+      let nodal = computePhysicalNodalField(p, animTime, schroedinger);
+      let nodalIntensity = nodal.intensity * nodal.envelopeWeight;
+      if (nodalIntensity > 1e-4) {
+        let nodalColor = selectPhysicalNodalColor(schroedinger, nodal.colorMode, nodal.signValue);
+        let nodalMix = clamp(nodalIntensity * schroedinger.nodalStrength, 0.0, 0.85);
+        col = mix(col, nodalColor, nodalMix);
+      }
+    } else if (schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE) {
+      let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
+      let localSpan = stepLen * mix(3.0, 8.0, surfaceStrengthT);
+      let localNear = max(tNear, hitT - localSpan);
+      let localFar = min(tFar, hitT + localSpan);
+      let nodalHit = findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger);
+      if (nodalHit.hitMask > 0.0) {
+        let nodalColor = selectPhysicalNodalColor(
+          schroedinger,
+          nodalHit.colorMode,
+          nodalHit.signValue
+        );
+        let nodalFacing = max(dot(nodalHit.normal, -rd), 0.0);
+        let nodalLight = 0.35 + 0.65 * nodalFacing;
+        let nodalMix = clamp(
+          (0.55 + 0.45 * nodalHit.hitMask) * schroedinger.nodalStrength,
+          0.0,
+          0.9
+        );
+        col = mix(col, nodalColor * nodalLight, nodalMix);
+      }
+    }
+  }
+
   // Output color and normal for MRT
   output.color = vec4f(col, 1.0);
   // Normal buffer: RGB = world-space normal (encoded 0-1), A = metallic
@@ -442,6 +552,8 @@ export const mainBlockIsosurface = generateMainBlockIsosurface()
 export interface TemporalMainBlockConfig {
   /** Enable Bayer jitter for quarter-res rendering */
   bayerJitter?: boolean
+  /** Use pre-computed density grid for faster raymarching */
+  useDensityGrid?: boolean
 }
 
 /**
@@ -471,7 +583,7 @@ struct TemporalFragmentOutput {
  * @param config
  */
 export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}): string {
-  const { bayerJitter = true } = config
+  const { bayerJitter = true, useDensityGrid = false } = config
 
   // Bayer jitter section - applies sub-pixel offset for quarter-res rendering
   // NOTE: Unlike the incorrect previous implementation that DISCARDED pixels,
@@ -521,6 +633,45 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
   // When jitter is applied, use jitteredVPosition for ray direction
   const rayDirSource = bayerJitter ? 'jitteredVPosition' : 'input.vPosition'
 
+  const raymarchCall = useDensityGrid
+    ? `let phaseDependentMode =
+    schroedinger.colorAlgorithm == 8 ||
+    schroedinger.colorAlgorithm == 9 ||
+    (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
+    (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
+
+  let requiresDirectSampling =
+    (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
+    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE);
+
+  if (requiresDirectSampling) {
+    if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
+    } else {
+      volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
+    }
+  } else {
+    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
+    // Safety fallback: if grid path yields a fully transparent sample,
+    // re-evaluate with direct sampling to avoid blank frames.
+    // This can happen when the density grid hasn't been populated yet
+    // or when coordinate mapping produces out-of-range lookups.
+    if (volumeResult.alpha < 0.01) {
+      if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+        volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
+      } else {
+        volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
+      }
+    }
+  }`
+    : `// Use HQ mode if quality requires it OR if dispersion is enabled
+  // (dispersion requires per-channel RGB transmittance only available in HQ path)
+  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+    volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
+  } else {
+    volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
+  }`
+
   return /* wgsl */ `
 // ============================================
 // Main Fragment Shader - Temporal Volumetric Mode
@@ -560,13 +711,7 @@ ${bayerJitterSection}
   // Use quality multiplier < 1.0 as "fast mode" indicator
   let fastMode = quality.qualityMultiplier < 0.75;
 
-  // Use HQ mode if quality requires it OR if dispersion is enabled
-  // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
-    volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-  } else {
-    volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-  }
+  ${raymarchCall}
 
   // Debug Mode 1: Iteration Heatmap
   if (quality.debugMode == 1) {

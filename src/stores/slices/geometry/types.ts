@@ -86,7 +86,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerEmissionIntensity: (intensity: number) => void
   setSchroedingerEmissionThreshold: (threshold: number) => void
   setSchroedingerEmissionColorShift: (shift: number) => void
-  setSchroedingerEmissionPulsing: (pulsing: boolean) => void
   setSchroedingerRimExponent: (exponent: number) => void
   setSchroedingerScatteringAnisotropy: (anisotropy: number) => void
   setSchroedingerRoughness: (roughness: number) => void
@@ -126,6 +125,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerNodalDefinition: (definition: SchroedingerConfig['nodalDefinition']) => void
   setSchroedingerNodalTolerance: (tolerance: number) => void
   setSchroedingerNodalFamilyFilter: (filter: SchroedingerConfig['nodalFamilyFilter']) => void
+  setSchroedingerNodalRenderMode: (mode: SchroedingerConfig['nodalRenderMode']) => void
   setSchroedingerNodalLobeColoringEnabled: (enabled: boolean) => void
   setSchroedingerNodalColorReal: (color: string) => void
   setSchroedingerNodalColorImag: (color: string) => void

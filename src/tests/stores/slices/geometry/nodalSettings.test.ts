@@ -10,6 +10,7 @@ describe('Schroedinger nodal settings', () => {
     const nodal = useExtendedObjectStore.getState().schroedinger
 
     expect(nodal.nodalDefinition).toBe('psiAbs')
+    expect(nodal.nodalRenderMode).toBe('band')
     expect(nodal.nodalTolerance).toBe(0.02)
     expect(nodal.nodalFamilyFilter).toBe('all')
     expect(nodal.nodalLobeColoringEnabled).toBe(false)
@@ -50,5 +51,17 @@ describe('Schroedinger nodal settings', () => {
     expect(nodal.nodalColorImag).toBe('#654321')
     expect(nodal.nodalColorPositive).toBe('#00ff00')
     expect(nodal.nodalColorNegative).toBe('#ff0000')
+  })
+
+  it('updates nodal render mode between band and ray-hit surface', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerNodalRenderMode('surface')
+    let nodal = useExtendedObjectStore.getState().schroedinger
+    expect(nodal.nodalRenderMode).toBe('surface')
+
+    store.setSchroedingerNodalRenderMode('band')
+    nodal = useExtendedObjectStore.getState().schroedinger
+    expect(nodal.nodalRenderMode).toBe('band')
   })
 })

@@ -59,8 +59,6 @@ export interface SchrodingerRendererConfig {
   dispersionEnabled?: boolean
   /** Compile-time specialization flag for phase materiality. */
   phaseMaterialityEnabled?: boolean
-  /** Compile-time specialization flag for emission pulsing. */
-  emissionPulsing?: boolean
   /** Compile-time specialization flag for interference. */
   interferenceEnabled?: boolean
 }
@@ -136,8 +134,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private boundingRadius = 2.0
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1200 bytes (300 floats) - includes physical nodal controls + probability flow + LCH/multiSource
-  private schroedingerUniformData = new ArrayBuffer(1200)
+  // Schroedinger: 1216 bytes (304 floats) - includes nodal render mode controls
+  private schroedingerUniformData = new ArrayBuffer(1216)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -165,10 +163,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private lastBasisSchroedingerVersion = -1
   private lastBasisDimension = -1
   private lastBasisAnimationTime = Number.NaN
+  private lastPbrVersion = -1
   // Separate appearance version tracker for the Schroedinger uniform buffer.
   // Emission/Rim parameters are sourced from the appearance store (matching WebGL),
   // so the Schroedinger buffer must also be updated when appearance changes.
   private lastSchrodingerAppearanceVersion = -1
+  // Schroedinger uniforms also read roughness from the PBR store; keep this
+  // version so buffer updates are not skipped when only PBR changes.
+  private lastSchrodingerPbrVersion = -1
 
   // Time field offset in SchroedingerUniforms buffer (bytes)
   // Used for partial buffer writes when only time changes
@@ -227,7 +229,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       nodalEnabled: true,
       dispersionEnabled: true,
       phaseMaterialityEnabled: true,
-      emissionPulsing: true,
       interferenceEnabled: true,
       ...config,
     }
@@ -248,7 +249,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       useDensityGrid: effectiveUseDensityGrid,
       densityGridHasPhase: false,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
-      emissionPulsing: this.rendererConfig.emissionPulsing ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
     }
   }
@@ -274,6 +274,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastBasisSchroedingerVersion = -1
     this.lastBasisDimension = -1
     this.lastBasisAnimationTime = Number.NaN
+    this.lastPbrVersion = -1
+    this.lastSchrodingerPbrVersion = -1
 
     // Density grid only makes sense for volumetric mode.
     const useDensityGrid = this.shaderConfig.useDensityGrid && !this.rendererConfig.isosurface
@@ -465,8 +467,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // 160 bytes due to WGSL vec3f 16-byte alignment requirements
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
-    // Schroedinger uniforms: ~1KB for all quantum parameters + fog/erosion HQ + bounding radius
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1200, 'schroedinger-uniforms')
+    // Schroedinger uniforms: 1216 bytes for all quantum parameters + nodal render mode controls
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1216, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create bind groups - consolidated layout
@@ -784,9 +786,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Note: Emission/Rim parameters come from the appearance store (matching WebGL),
     // so we must also check appearanceVersion to detect those changes.
     const appearanceVersion = appearance?.appearanceVersion ?? 0
+    const pbrVersion = pbr?.pbrVersion ?? 0
     const versionChanged = schroedingerVersion !== this.lastSchroedingerVersion
     const appearanceChanged = appearanceVersion !== this.lastSchrodingerAppearanceVersion
-    if (!versionChanged && !appearanceChanged && this.lastSchroedingerVersion !== -1) {
+    const pbrChanged = pbrVersion !== this.lastSchrodingerPbrVersion
+    if (!versionChanged && !appearanceChanged && !pbrChanged && this.lastSchroedingerVersion !== -1) {
       // Partial buffer write: update time and uncertainty threshold scalars
       // Uses pre-allocated buffer to avoid per-frame allocation
       this.timeUpdateBuffer[0] = animationTime
@@ -805,6 +809,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Full buffer update needed - version changed, appearance changed, or spread animation active
     this.lastSchroedingerVersion = schroedingerVersion
     this.lastSchrodingerAppearanceVersion = appearanceVersion
+    this.lastSchrodingerPbrVersion = pbrVersion
 
     // Reuse pre-allocated staging buffer to avoid per-frame GC pressure
     // See uniforms.wgsl.ts for the exact layout with packed arrays
@@ -1040,7 +1045,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[692 / 4] = appearance?.faceEmission ?? 0.0
     floatView[696 / 4] = appearance?.faceEmissionThreshold ?? 0.0
     floatView[700 / 4] = appearance?.faceEmissionColorShift ?? 0.0
-    intView[704 / 4] = appearance?.faceEmissionPulsing ? 1 : 0
+    intView[704 / 4] = 0 // Reserved
     floatView[708 / 4] = 0.0 // _reserved_rim (Fresnel rim removed)
     floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
     floatView[716 / 4] = pbr?.face?.roughness ?? 0.3 // WebGL uses 'pbr-face' source
@@ -1255,6 +1260,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1188 / 4] = msWeights?.orbitTrap ?? 0.3
     floatView[1192 / 4] = msWeights?.normal ?? 0.2
     floatView[1196 / 4] = 0.0 // w unused
+
+    // Nodal render mode + reserved padding (offset 1200-1216)
+    const nodalRenderModeMap: Record<string, number> = {
+      band: 0,
+      surface: 1,
+    }
+    intView[1200 / 4] = nodalRenderModeMap[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
+    intView[1204 / 4] = 0
+    floatView[1208 / 4] = 0.0
+    floatView[1212 / 4] = 0.0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1569,7 +1584,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // Get store versions for dirty checking
     const appearance = ctx.frame?.stores?.['appearance'] as any
+    const pbr = ctx.frame?.stores?.['pbr'] as any
     const appearanceVersion = appearance?.appearanceVersion ?? 0
+    const pbrVersion = pbr?.pbrVersion ?? 0
 
     // ALWAYS update: Camera (mouse movement) and Basis (rotation animation)
     this.updateCameraUniforms(ctx)
@@ -1583,10 +1600,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // CONDITIONAL: Lighting uniforms - update only when lighting.version changes
     this.updateLightingUniforms(ctx)
 
-    // CONDITIONAL: Material uniforms - depends on appearance version
-    if (appearanceVersion !== this.lastAppearanceVersion) {
+    // CONDITIONAL: Material uniforms - depends on appearance/PBR versions
+    if (
+      appearanceVersion !== this.lastAppearanceVersion ||
+      pbrVersion !== this.lastPbrVersion
+    ) {
       this.updateMaterialUniforms(ctx)
       this.lastAppearanceVersion = appearanceVersion
+      this.lastPbrVersion = pbrVersion
     }
 
     // ALWAYS update: Quality (cheap, needed for fast/slow toggle responsiveness)
@@ -1602,8 +1623,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       // Get versions for dirty tracking - prevents unnecessary grid recomputation
       const extended = ctx.frame?.stores?.['extended'] as any
       const rotation = ctx.frame?.stores?.['rotation'] as any
+      const geometry = ctx.frame?.stores?.['geometry'] as any
+      const animation = ctx.frame?.stores?.['animation'] as any
       const schroedingerVersion = extended?.schroedingerVersion ?? 0
       const rotationVersion = rotation?.version ?? 0
+      const dimension = geometry?.dimension ?? this.rendererConfig.dimension ?? 3
+      const sliceAnimationEnabled = extended?.schroedinger?.sliceAnimationEnabled ?? false
+      const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+      const basisTimeBucket = sliceAnimationEnabled && dimension > 3
+        ? Math.floor(accumulatedTime * 120.0)
+        : 0
+      const basisVersion = rotationVersion * 1000003 + basisTimeBucket
 
       // Sync uniform data from renderer to compute pass
       // The compute pass needs the same Schroedinger and Basis uniforms
@@ -1613,7 +1643,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         this.schroedingerUniformData,
         schroedingerVersion
       )
-      gridPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, rotationVersion)
+      gridPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, basisVersion)
       // Sync bounding radius so density grid covers the full wavefunction extent
       gridPass.updateWorldBound(ctx.device, this.boundingRadius)
 

@@ -105,7 +105,6 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
   dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
-  emissionPulsing: state.schroedinger?.emissionPulsing ?? false,
   interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
 })
 
@@ -291,11 +290,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           nodalEnabled: schroedingerCompile.nodalEnabled,
           dispersionEnabled: schroedingerCompile.dispersionEnabled,
           phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
-          emissionPulsingEnabled: schroedingerCompile.emissionPulsing,
           interferenceEnabled: schroedingerCompile.interferenceEnabled,
           densityGridPhaseRequired:
             schroedingerCompile.phaseMaterialityEnabled ||
-            schroedingerCompile.emissionPulsing ||
             schroedingerCompile.interferenceEnabled ||
             appearance.colorAlgorithm === 'phase' ||
             appearance.colorAlgorithm === 'mixed',
@@ -347,7 +344,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.nodalEnabled,
     schroedingerCompile.dispersionEnabled,
     schroedingerCompile.phaseMaterialityEnabled,
-    schroedingerCompile.emissionPulsing,
     schroedingerCompile.interferenceEnabled,
     performance_.temporalReprojectionEnabled,
   ])
@@ -437,11 +433,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     if (isPlaying && deltaTimeMs > 0 && deltaTimeMs < 100) {
       const animState = useAnimationStore.getState()
       const { animatingPlanes, getRotationDelta, updateAccumulatedTime } = animState
+      updateAccumulatedTime(deltaTime)
 
       if (animatingPlanes.size > 0) {
         const rotationState = useRotationStore.getState()
-        updateAccumulatedTime(deltaTime)
-
         const rotationDelta = getRotationDelta(deltaTimeMs)
         const updates = rotationUpdatesRef.current
         updates.clear()
@@ -582,7 +577,6 @@ export interface PassConfig {
   nodalEnabled: boolean
   dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
-  emissionPulsingEnabled: boolean
   interferenceEnabled: boolean
   densityGridPhaseRequired: boolean
   temporalReprojectionEnabled: boolean
@@ -971,7 +965,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     nodalEnabled,
     dispersionEnabled,
     phaseMaterialityEnabled,
-    emissionPulsingEnabled,
     interferenceEnabled,
     densityGridPhaseRequired,
   } = config
@@ -995,7 +988,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         nodalEnabled,
         dispersionEnabled,
         phaseMaterialityEnabled,
-        emissionPulsing: emissionPulsingEnabled,
         interferenceEnabled,
         densityGridPhaseRequired,
         temporal: useTemporalCloudAccumulation,

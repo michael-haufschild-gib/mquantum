@@ -20,7 +20,6 @@ export const MATERIAL_INITIAL_STATE: MaterialSliceState = {
   faceEmission: 0.3,
   faceEmissionThreshold: 0.0,
   faceEmissionColorShift: 0.0,
-  faceEmissionPulsing: false,
 }
 
 export const createMaterialSlice: StateCreator<AppearanceSlice, [], [], MaterialSlice> = (set) => ({
@@ -32,5 +31,4 @@ export const createMaterialSlice: StateCreator<AppearanceSlice, [], [], Material
     set({ faceEmissionThreshold: Math.max(0, Math.min(1, threshold)) }),
   setFaceEmissionColorShift: (shift) =>
     set({ faceEmissionColorShift: Math.max(-1, Math.min(1, shift)) }),
-  setFaceEmissionPulsing: (pulsing) => set({ faceEmissionPulsing: pulsing }),
 })

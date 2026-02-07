@@ -17,7 +17,6 @@ interface ScenePassConfig {
   nodalEnabled: boolean
   dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
-  emissionPulsingEnabled: boolean
   interferenceEnabled: boolean
   densityGridPhaseRequired: boolean
   temporalReprojectionEnabled: boolean
@@ -71,7 +70,6 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     nodalEnabled: false,
     dispersionEnabled: false,
     phaseMaterialityEnabled: false,
-    emissionPulsingEnabled: false,
     interferenceEnabled: false,
     densityGridPhaseRequired: false,
     temporalReprojectionEnabled: true,

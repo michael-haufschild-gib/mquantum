@@ -150,8 +150,6 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   densityGridHasPhase?: boolean
   /** Compile-time specialization for phase materiality branching. */
   phaseMateriality?: boolean
-  /** Compile-time specialization for emission pulsing branching. */
-  emissionPulsing?: boolean
   /** Compile-time specialization for interference branching. */
   interference?: boolean
 }
@@ -176,7 +174,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     nodal = true,
     dispersion = true,
     phaseMateriality = true,
-    emissionPulsing = true,
     interference = true,
     overrides = [],
   } = config
@@ -261,7 +258,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
   defines.push(`const FEATURE_DISPERSION: bool = ${dispersion};`)
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
-  defines.push(`const FEATURE_EMISSION_PULSING: bool = ${emissionPulsing};`)
   defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
 
   // Select main block based on mode
@@ -270,7 +266,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const selectedMainBlock = isosurface
     ? generateMainBlockIsosurface()
     : enableTemporal
-      ? generateMainBlockTemporal({ bayerJitter: true })
+      ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
       : useDensityGrid
         ? generateMainBlockVolumetric({ useDensityGrid: true })
         : mainBlock
@@ -459,7 +455,7 @@ struct VertexOutput {
       content: emissionBlock,
     },
     { name: 'Volume Gradient', content: volumeGradientBlock },
-    { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !isosurface },
+    { name: 'Volume Integration', content: volumeIntegrationBlock },
 
     // ===== DENSITY GRID (optional compute shader acceleration) =====
     {

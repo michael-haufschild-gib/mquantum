@@ -360,7 +360,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
 
   // Apply interference fringing if enabled
   if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
-    let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
+    let iTime = uniforms.time * uniforms.interferenceSpeed;
     let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
     rho *= fringe;
     rho = max(rho, 0.0);
@@ -370,7 +370,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   // Approximates |nabla rho|: edges flow fast, core stays still
   if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = uniforms.time * uniforms.timeScale * uniforms.probabilityFlowSpeed;
+    let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(pcfOffset, 0.0, pcfOffset * 0.7));
     rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
@@ -412,7 +412,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
 
   // Apply interference fringing if enabled
   if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
-    let iTime = uniforms.time * uniforms.timeScale * uniforms.interferenceSpeed;
+    let iTime = uniforms.time * uniforms.interferenceSpeed;
     let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
     rho *= fringe;
     rho = max(rho, 0.0);
@@ -422,7 +422,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   // Approximates |nabla rho|: edges flow fast, core stays still
   if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = uniforms.time * uniforms.timeScale * uniforms.probabilityFlowSpeed;
+    let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
     let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(pcfOffset, 0.0, pcfOffset * 0.7));
     rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
