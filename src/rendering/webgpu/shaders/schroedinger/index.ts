@@ -62,6 +62,17 @@ export {
   hoCombined8Block,
   getHOUnrolledBlocks,
   generateHODispatchBlock,
+  getHOCachedUnrolledBlocks,
+  generateHOCachedDispatchBlock,
+  // HO ND cached variants
+  generateHoNDCachedBlock,
+  generateHoNDCachedDispatchBlock,
+  // Eigenfunction cache
+  eigenfunctionCacheBindingsBlock,
+  eigenfunctionCacheLookupBlock,
+  EIGEN_CACHE_SAMPLES,
+  MAX_EIGEN_FUNCS,
+  generateAnalyticalGradientBlock,
   // Hydrogen ND variants and generators
   hydrogenNDGen3dBlock,
   hydrogenNDGen4dBlock,
@@ -99,3 +110,6 @@ export {
   type DensityGridComputeConfig,
   type ComputeQuantumMode,
 } from './compute'
+
+// Compute shader modules for eigenfunction cache (HO mode acceleration)
+export { composeEigenfunctionCacheComputeShader } from './compute'

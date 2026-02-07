@@ -18,6 +18,7 @@ import {
   composeSchroedingerVertexShader,
 } from '@/rendering/webgpu/shaders/schroedinger/compose'
 import { composeDensityGridComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/compose'
+import { composeEigenfunctionCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeEigenCache'
 import {
   composeSkyboxFragmentShader,
   composeSkyboxVertexShader,
@@ -165,6 +166,65 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       verifyWgsl(wgsl, true)
     }
+  })
+
+  it('includes momentum representation uniforms in composed shaders', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const REPRESENTATION_POSITION: i32 = 0;')
+    expect(wgsl).toContain('const REPRESENTATION_MOMENTUM: i32 = 1;')
+    expect(wgsl).toContain('representationMode: i32')
+    expect(wgsl).toContain('momentumDisplayMode: i32')
+    expect(wgsl).toContain('momentumScale: f32')
+    expect(wgsl).toContain('momentumHbar: f32')
+  })
+
+  it('routes harmonic oscillator psi through momentum evaluator when enabled', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 5,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('fn evalHarmonicOscillatorPsiMomentum(')
+    expect(wgsl).toContain('if (uniforms.representationMode == REPRESENTATION_MOMENTUM)')
+    expect(wgsl).toContain('return evalHarmonicOscillatorPsiMomentum(xND, t, uniforms);')
+  })
+
+  it('routes hydrogen-ND psi through momentum evaluator when enabled', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 6,
+      temporal: false,
+      sss: false,
+      quantumMode: 'hydrogenND',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('fn evalHydrogenNDMomentumSpatial(')
+    expect(wgsl).toContain('fn evalHydrogenNDMomentumPsi(')
+    expect(wgsl).toContain('return evalHydrogenNDMomentumPsi(xND, t, uniforms);')
+  })
+
+  it('adds momentum-mode probability-current safety throttling in volume integration', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 5,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('uniforms.representationMode == REPRESENTATION_MOMENTUM')
+    expect(wgsl).toContain('(i & 3) != 0')
+    expect(wgsl).toContain('delta = max(delta, 0.02);')
   })
 
   it('specializes harmonic-oscillator family by excluding hydrogen modules', () => {
@@ -399,6 +459,108 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
     }
   })
 
+})
+
+describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
+  it('composes eigenfunction cache compute shader', () => {
+    const { wgsl, features } = composeEigenfunctionCacheComputeShader()
+
+    expect(typeof wgsl).toBe('string')
+    expect(wgsl.length).toBeGreaterThan(100)
+    expect(wgsl).toMatch(/@compute/)
+    expect(wgsl).toMatch(/@workgroup_size\s*\(\s*256/)
+    expect(wgsl).toContain('fn main(')
+    expect(wgsl).toContain('eigenCacheOut')
+    expect(wgsl).toContain('computeHo1D')
+    expect(wgsl).toContain('computeHo1DDeriv')
+    expect(features).toContain('Eigenfunction Cache Compute')
+  })
+
+  it('composes HO shader with eigenfunction cache enabled', () => {
+    const { wgsl, modules, features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    verifyNoGlslLeakage(wgsl)
+    expect(features).toContain('Eigenfunction Cache')
+    expect(modules).toContain('Eigenfunction Cache Lookup')
+    expect(modules).toContain('Analytical Gradient')
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    expect(wgsl).toContain('fn lookupEigenfunction(')
+    expect(wgsl).toContain('fn ho1DCached(')
+    expect(wgsl).toContain('fn sampleDensityWithAnalyticalGradient(')
+    expect(wgsl).toContain('var<storage, read> eigenCache')
+    expect(wgsl).toContain('var<uniform> eigenMeta')
+  })
+
+  it('composes HO shader with cache and unrolled terms', () => {
+    const termCounts = [1, 2, 4, 8] as const
+    for (const termCount of termCounts) {
+      const { wgsl, modules } = composeSchroedingerShader({
+        dimension: 3,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        useEigenfunctionCache: true,
+        termCount,
+      })
+
+      verifyWgsl(wgsl, true)
+      expect(modules).toContain(`HO ND 3D`)
+      // Cached variant should use hoNDOptimized which routes through cache
+      expect(wgsl).toContain('hoND3DCached')
+    }
+  })
+
+  it('composes HO shader with cache across all dimensions', () => {
+    for (const dimension of [3, 5, 7, 11]) {
+      const { wgsl } = composeSchroedingerShader({
+        dimension,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        useEigenfunctionCache: true,
+      })
+
+      verifyWgsl(wgsl, true)
+      expect(wgsl).toContain(`hoND${dimension}DCached`)
+      expect(wgsl).toContain('fn computeAnalyticalGradient(')
+    }
+  })
+
+  it('does not include cache blocks for hydrogen mode', () => {
+    const { wgsl, modules } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'hydrogenND',
+      useEigenfunctionCache: true, // should be ignored for hydrogen
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(modules).not.toContain('Eigenfunction Cache Lookup')
+    expect(modules).not.toContain('Analytical Gradient')
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = false;')
+  })
+
+  it('composes isosurface mode with cache', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: true,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    // Isosurface mode should still have analytical gradient for normals
+    expect(wgsl).toContain('computeAnalyticalGradient')
+  })
 })
 
 describe('WGSL Shader Compilation - Skybox', () => {

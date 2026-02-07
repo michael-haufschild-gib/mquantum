@@ -480,7 +480,12 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
   // Compute surface point and normal (preserve gradient magnitude for uncertainty)
   let p = ro + rd * hitT;
-  let rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+  var rawGrad: vec3f;
+  if (USE_EIGENFUNCTION_CACHE) {
+    rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
+  } else {
+    rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+  }
   let gradMag = length(rawGrad);
   let n = rawGrad / max(gradMag, 1e-6);
 

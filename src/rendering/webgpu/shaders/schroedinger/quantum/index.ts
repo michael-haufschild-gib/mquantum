@@ -43,6 +43,8 @@ export {
   hoND10dBlock,
   hoND11dBlock,
   generateHoNDDispatchBlock,
+  generateHoNDCachedBlock,
+  generateHoNDCachedDispatchBlock,
   getHoNDBlockForDimension,
 } from './hoNDVariants.wgsl'
 
@@ -74,7 +76,20 @@ export {
   hoCombined8Block,
   getHOUnrolledBlocks,
   generateHODispatchBlock,
+  getHOCachedUnrolledBlocks,
+  generateHOCachedDispatchBlock,
 } from './hoSuperpositionVariants.wgsl'
+
+// Eigenfunction cache (HO mode acceleration)
+export {
+  eigenfunctionCacheBindingsBlock,
+  eigenfunctionCacheLookupBlock,
+  EIGEN_CACHE_SAMPLES,
+  MAX_EIGEN_FUNCS,
+} from './eigenfunctionCache.wgsl'
+
+// Analytical gradient from cached eigenfunctions
+export { generateAnalyticalGradientBlock } from './analyticalGradient.wgsl'
 
 // Dimension-specific hydrogen ND variants with generators
 export {

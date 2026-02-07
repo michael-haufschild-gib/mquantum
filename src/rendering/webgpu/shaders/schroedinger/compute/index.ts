@@ -17,3 +17,11 @@ export {
   type DensityGridComputeConfig,
   type ComputeQuantumMode,
 } from './compose'
+
+export {
+  eigenCacheComputeParamsBlock,
+  eigenCacheComputeBindingsBlock,
+  eigenCacheComputeMainBlock,
+} from './eigenfunctionCache.wgsl'
+
+export { composeEigenfunctionCacheComputeShader } from './composeEigenCache'

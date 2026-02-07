@@ -29,6 +29,13 @@ const MAX_EXTRA_DIM: i32 = 8;
 const QUANTUM_MODE_HARMONIC: i32 = 0;
 const QUANTUM_MODE_HYDROGEN_ND: i32 = 1;
 
+// Representation-space constants
+const REPRESENTATION_POSITION: i32 = 0;
+const REPRESENTATION_MOMENTUM: i32 = 1;
+const MOMENTUM_UNITS_NORMALIZED: i32 = 0;
+const MOMENTUM_UNITS_K: i32 = 1;
+const MOMENTUM_UNITS_P: i32 = 2;
+
 // Physical nodal-definition constants
 const NODAL_DEFINITION_PSI_ABS: i32 = 0;
 const NODAL_DEFINITION_REAL: i32 = 1;
@@ -283,6 +290,12 @@ struct SchroedingerUniforms {
   probabilityCurrentStepSize: f32,           // Integration/sample step size
   probabilityCurrentSteps: i32,              // Integration step count
   probabilityCurrentOpacity: f32,            // Overlay opacity
+
+  // Momentum-space representation controls (appended; keeps legacy offsets stable)
+  representationMode: i32,      // 0=position ψ(x), 1=momentum φ(k)
+  momentumDisplayMode: i32,     // 0=normalized, 1=k, 2=p
+  momentumScale: f32,           // Reciprocal-space zoom factor
+  momentumHbar: f32,            // Effective ħ for p=ħk display conversions
 }
 
 // ============================================

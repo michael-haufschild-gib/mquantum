@@ -163,6 +163,24 @@ Calculate struct sizes using WGSL alignment rules:
 
 ---
 
+### 6. WGSL Reserved Keywords as Variable Names
+
+**Problem**: WGSL has many reserved keywords that cannot be used as identifiers. `meta` is one of them (reserved for future use).
+
+**Error**: `'meta' is a reserved keyword`
+
+```wgsl
+// ❌ BAD
+let meta = eigenMeta.funcMeta[funcIdx];
+
+// ✅ GOOD
+let fMeta = eigenMeta.funcMeta[funcIdx];
+```
+
+**Common reserved words to avoid**: `meta`, `NULL`, `Self`, `abstract`, `active`, `alignas`, `become`, `co_await`, `co_return`, `co_yield`, `coherent`, `default`, `demote`, `demote_to_helper`, `do`, `dynamic_cast`, `enum`, `extern`, `external`, `fallthrough`, `filter`, `friend`, `goto`, `impl`, `instanceof`, `layout`, `module`, `noinline`, `null`, `nullptr`, `of`, `operator`, `package`, `priv`, `protected`, `pub`, `readonly`, `restrict`, `self`, `set`, `shared`, `sizeof`, `smooth`, `static`, `static_cast`, `std`, `subroutine`, `super`, `template`, `this`, `throw`, `trait`, `try`, `type`, `typedef`, `typeid`, `typename`, `union`, `unless`, `unsigned`, `using`, `varying`, `virtual`, `volatile`, `wgsl`, `with`, `yield`.
+
+---
+
 ## Shader Writing Checklist
 
 - [ ] All `textureSample` calls are in uniform control flow

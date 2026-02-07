@@ -104,4 +104,65 @@ fn hydrogenRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
   return norm * rhoL * L * expPart;
 }
 
+/**
+ * Evaluate Gegenbauer polynomial C_n^alpha(x) using recurrence.
+ */
+fn gegenbauer(n: i32, alpha: f32, x: f32) -> f32 {
+  if (n <= 0) { return 1.0; }
+  if (n == 1) { return 2.0 * alpha * x; }
+
+  var cNm2 = 1.0;
+  var cNm1 = 2.0 * alpha * x;
+  var cN = cNm1;
+
+  for (var i = 2; i <= n; i++) {
+    let fi = f32(i);
+    let a = 2.0 * (fi + alpha - 1.0) / fi;
+    let b = (fi + 2.0 * alpha - 2.0) / fi;
+    cN = a * x * cNm1 - b * cNm2;
+    cNm2 = cNm1;
+    cNm1 = cN;
+  }
+
+  return cN;
+}
+
+/**
+ * Momentum-space hydrogen radial amplitude R̃_nl(k).
+ *
+ * Visualization-oriented Fock-style form:
+ * R̃_nl(k) ∝ (na0·k)^l / (1 + (na0·k)^2)^(l+2) · C_{n-l-1}^{l+1}(x)
+ * with x = ((na0·k)^2 - 1) / ((na0·k)^2 + 1)
+ */
+fn hydrogenRadialMomentum(n: i32, l: i32, k: f32, a0: f32) -> f32 {
+  if (n < 1 || l < 0 || l >= n) { return 0.0; }
+
+  let a0Safe = max(a0, 0.001);
+  let nf = f32(n);
+  let na = nf * a0Safe;
+  let q = max(na * abs(k), 0.0);
+  let q2 = q * q;
+  let x = (q2 - 1.0) / max(q2 + 1.0, 1e-6);
+
+  let order = n - l - 1;
+  let alpha = f32(l + 1);
+  let gegen = gegenbauer(order, alpha, clamp(x, -1.0, 1.0));
+  let denom = pow(1.0 + q2, f32(l) + 2.0);
+
+  var qPow = 1.0;
+  for (var il = 0; il < l; il++) {
+    qPow *= q;
+  }
+
+  // Lightweight normalization using factorial ratio (n <= 7 in UI).
+  let factNum = FACTORIAL_LUT[max(order, 0)];
+  let factDen = max(FACTORIAL_LUT[min(n + l, 12)], 1e-6);
+  let norm = sqrt(max(factNum / factDen, 1e-8));
+
+  // Dimensional normalization for q = (n a0) k substitution:
+  // k-space radial amplitudes scale with (n a0)^(3/2) to preserve ∫|R̃|² k² dk.
+  let naNorm = na * sqrt(na);
+  return naNorm * pow(2.0, f32(l) + 2.0) * norm * qPow * gegen / max(denom, 1e-8);
+}
+
 `

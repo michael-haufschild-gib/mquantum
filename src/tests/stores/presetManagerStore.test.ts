@@ -6,6 +6,7 @@ import { useRotationStore } from '@/stores/rotationStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 // Mock msgBoxStore to prevent actual dialog displays
 vi.mock('@/stores/msgBoxStore', () => ({
@@ -192,6 +193,42 @@ describe('presetManagerStore', () => {
       expect(restoredRotations).toBeInstanceOf(Map)
       expect(restoredRotations.get('XY')).toBeCloseTo(1.5, 5)
       expect(restoredRotations.get('YZ')).toBeCloseTo(2.0, 5)
+    })
+
+    it('persists momentum representation settings in saved scenes', () => {
+      const extended = useExtendedObjectStore.getState()
+      extended.setSchroedingerRepresentation('momentum')
+      extended.setSchroedingerMomentumDisplayUnits('p')
+      extended.setSchroedingerMomentumScale(2.25)
+      extended.setSchroedingerMomentumHbar(1.75)
+
+      usePresetManagerStore.getState().saveScene('Momentum Scene')
+      const [savedScene] = usePresetManagerStore.getState().savedScenes
+      expect(savedScene).toBeDefined()
+
+      const savedConfig = savedScene!.data.extended.schroedinger as {
+        representation?: string
+        momentumDisplayUnits?: string
+        momentumScale?: number
+        momentumHbar?: number
+      }
+      expect(savedConfig.representation).toBe('momentum')
+      expect(savedConfig.momentumDisplayUnits).toBe('p')
+      expect(savedConfig.momentumScale).toBe(2.25)
+      expect(savedConfig.momentumHbar).toBe(1.75)
+
+      extended.setSchroedingerRepresentation('position')
+      extended.setSchroedingerMomentumDisplayUnits('normalized')
+      extended.setSchroedingerMomentumScale(1.0)
+      extended.setSchroedingerMomentumHbar(1.0)
+
+      usePresetManagerStore.getState().loadScene(savedScene!.id)
+
+      const restored = useExtendedObjectStore.getState().schroedinger
+      expect(restored.representation).toBe('momentum')
+      expect(restored.momentumDisplayUnits).toBe('p')
+      expect(restored.momentumScale).toBe(2.25)
+      expect(restored.momentumHbar).toBe(1.75)
     })
 
     it('should delete a scene', () => {

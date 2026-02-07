@@ -100,6 +100,19 @@ export type SchroedingerRenderStyle = 'rayMarching'
 export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND'
 
 /**
+ * Wavefunction representation space.
+ * - position: ψ(x), rendered in configuration space
+ * - momentum: φ(k), rendered in reciprocal space
+ */
+export type SchroedingerRepresentation = 'position' | 'momentum'
+
+/**
+ * UI display units for momentum-space interpretation.
+ * Internal evaluation remains in k-space.
+ */
+export type SchroedingerMomentumDisplayUnits = 'normalized' | 'k' | 'p'
+
+/**
  * Physically grounded nodal set definitions.
  */
 export type SchroedingerNodalDefinition = 'psiAbs' | 'realPart' | 'imagPart' | 'complexIntersection'
@@ -225,6 +238,16 @@ export interface SchroedingerConfig {
   // === Quantum Mode Selection ===
   /** Physics mode: harmonic oscillator vs hydrogen ND */
   quantumMode: SchroedingerQuantumMode
+
+  // === Representation Selection ===
+  /** Position-space ψ(x) or momentum-space φ(k) */
+  representation: SchroedingerRepresentation
+  /** How momentum-space axes/labels are interpreted in the UI */
+  momentumDisplayUnits: SchroedingerMomentumDisplayUnits
+  /** Reciprocal-space zoom factor applied before momentum evaluation */
+  momentumScale: number
+  /** Effective reduced Planck constant used for p = ħk display conversions */
+  momentumHbar: number
 
   // === Harmonic Oscillator Configuration (when quantumMode === 'harmonicOscillator') ===
   /** Named preset or 'custom' */
@@ -506,6 +529,12 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Quantum mode
   quantumMode: 'harmonicOscillator',
+
+  // Representation
+  representation: 'position',
+  momentumDisplayUnits: 'normalized',
+  momentumScale: 1.0,
+  momentumHbar: 1.0,
 
   // Harmonic oscillator state
   presetName: 'custom',

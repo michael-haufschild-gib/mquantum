@@ -25,6 +25,7 @@ import {
 } from '@/lib/geometry/extended/schroedinger/presets'
 import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
+import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
 
@@ -36,7 +37,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1328
+const SCHROEDINGER_UNIFORM_SIZE = 1344
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -95,6 +96,15 @@ const PROBABILITY_CURRENT_COLOR_MODE_MAP: Record<string, number> = {
   direction: 1,
   circulationSign: 2,
 }
+const REPRESENTATION_MODE_MAP: Record<string, number> = {
+  position: 0,
+  momentum: 1,
+}
+const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
+  normalized: 0,
+  k: 1,
+  p: 2,
+}
 
 export interface SchrodingerRendererConfig {
   dimension?: number
@@ -143,6 +153,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private densityGridPass: DensityGridComputePass | null = null
   private densityGridInitialized = false
 
+  // Eigenfunction Cache Compute Pass (HO mode acceleration)
+  private eigenCachePass: EigenfunctionCacheComputePass | null = null
+  private eigenCacheInitialized = false
+
   // Configuration
   private rendererConfig: SchrodingerRendererConfig
   private shaderConfig: SchroedingerWGSLShaderConfig
@@ -186,7 +200,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private boundingRadius = 2.0
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1328 bytes (332 floats) - includes cross-section + probability-current controls
+  // Schroedinger: 1344 bytes (336 floats) - includes representation + momentum controls
   private schroedingerUniformData = new ArrayBuffer(SCHROEDINGER_UNIFORM_SIZE)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
@@ -285,6 +299,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ...config,
     }
 
+    // Enable eigenfunction cache for HO mode (accelerates ho1D + gradient computation)
+    const isHO = (this.rendererConfig.quantumMode ?? 'harmonicOscillator') === 'harmonicOscillator'
+
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
       isosurface: this.rendererConfig.isosurface,
@@ -296,6 +313,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       temporalAccumulation: this.rendererConfig.temporal,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
+      useEigenfunctionCache: isHO,
     }
   }
 
@@ -338,6 +356,19 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     await this.densityGridPass.initialize(ctx)
     this.densityGridInitialized = true
 
+    // Eigenfunction cache compute pass (HO mode only)
+    this.eigenCachePass?.dispose()
+    this.eigenCachePass = null
+    this.eigenCacheInitialized = false
+
+    if (this.shaderConfig.useEigenfunctionCache) {
+      this.eigenCachePass = new EigenfunctionCacheComputePass({
+        dimension: this.rendererConfig.dimension ?? 3,
+      })
+      await this.eigenCachePass.initialize(ctx)
+      this.eigenCacheInitialized = true
+    }
+
     // Compose shaders
     const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
     const vertexShader = composeSchroedingerVertexShader()
@@ -369,13 +400,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Group 2: Object (Schroedinger + Basis)
+    // Group 2: Object (Schroedinger + Basis + optional Cache)
+    const objectBindGroupEntries: GPUBindGroupLayoutEntry[] = [
+      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Schroedinger uniforms
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Basis vectors
+    ]
+    // Eigenfunction cache: storage buffer + metadata uniform
+    if (this.eigenCachePass) {
+      objectBindGroupEntries.push(
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' as const } }, // eigenCache
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // eigenMeta
+      )
+    }
     const objectBindGroupLayout = device.createBindGroupLayout({
       label: 'schroedinger-object-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Schroedinger uniforms
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Basis vectors
-      ],
+      entries: objectBindGroupEntries,
     })
     // Create pipeline layout
     const bindGroupLayouts: GPUBindGroupLayout[] = [
@@ -486,7 +525,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // 160 bytes due to WGSL vec3f 16-byte alignment requirements
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
-    // Schroedinger uniforms: 1328 bytes for all quantum parameters + cross-section and probability-current controls
+    // Schroedinger uniforms: 1344 bytes for all quantum parameters + momentum representation controls
     this.schroedingerUniformBuffer = this.createUniformBuffer(
       device,
       SCHROEDINGER_UNIFORM_SIZE,
@@ -513,14 +552,25 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Group 2: Object (Schroedinger + Basis)
+    // Group 2: Object (Schroedinger + Basis + optional Cache)
+    const objectBindGroupEntries2: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
+      { binding: 1, resource: { buffer: this.basisUniformBuffer } },
+    ]
+    if (this.eigenCachePass) {
+      const cacheBuffer = this.eigenCachePass.getCacheBuffer()
+      const metaBuffer = this.eigenCachePass.getMetadataBuffer()
+      if (cacheBuffer && metaBuffer) {
+        objectBindGroupEntries2.push(
+          { binding: 2, resource: { buffer: cacheBuffer } },
+          { binding: 3, resource: { buffer: metaBuffer } },
+        )
+      }
+    }
     this.objectBindGroup = device.createBindGroup({
       label: 'schroedinger-object-bg',
       layout: objectBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
-        { binding: 1, resource: { buffer: this.basisUniformBuffer } },
-      ],
+      entries: objectBindGroupEntries2,
     })
 
     // Create bounding geometry (sphere for volume)
@@ -1132,8 +1182,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const fastMode = qualityMultiplier < 0.75
     const defaultSampleCount = fastMode ? 32 : 64
     const baseSampleCount = schroedinger?.sampleCount ?? defaultSampleCount
+    const isMomentumRepresentation = schroedinger?.representation === 'momentum'
+    // Momentum rendering is currently more expensive (especially with overlays).
+    // Apply a conservative workload budget to keep the app responsive.
+    const representationSampleScale = isMomentumRepresentation ? 0.65 : 1.0
+    const representationSampleCap = isMomentumRepresentation ? 64 : 96
     const radiusScale = this.boundingRadius / 2.0
-    const effectiveSampleCount = Math.ceil(baseSampleCount * radiusScale)
+    const effectiveSampleCount = Math.min(
+      Math.max(8, Math.ceil(baseSampleCount * radiusScale * representationSampleScale)),
+      representationSampleCap
+    )
     intView[920 / 4] = effectiveSampleCount
 
     // Phase shift fields
@@ -1284,7 +1342,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1276 / 4] = 0.0
 
     // Physical probability current controls (offset 1280-1328)
-    intView[1280 / 4] = schroedinger?.probabilityCurrentEnabled ? 1 : 0
+    const probabilityCurrentEnabled = schroedinger?.probabilityCurrentEnabled ?? false
+    intView[1280 / 4] = probabilityCurrentEnabled ? 1 : 0
     intView[1284 / 4] =
       PROBABILITY_CURRENT_STYLE_MAP[schroedinger?.probabilityCurrentStyle ?? 'magnitude'] ?? 0
     intView[1288 / 4] =
@@ -1296,10 +1355,19 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1300 / 4] = schroedinger?.probabilityCurrentSpeed ?? 1.0
     floatView[1304 / 4] = schroedinger?.probabilityCurrentDensityThreshold ?? 0.01
     floatView[1308 / 4] = schroedinger?.probabilityCurrentMagnitudeThreshold ?? 0.0
-    floatView[1312 / 4] = schroedinger?.probabilityCurrentLineDensity ?? 8.0
-    floatView[1316 / 4] = schroedinger?.probabilityCurrentStepSize ?? 0.04
-    intView[1320 / 4] = schroedinger?.probabilityCurrentSteps ?? 20
+    const lineDensity = schroedinger?.probabilityCurrentLineDensity ?? 8.0
+    const stepSize = schroedinger?.probabilityCurrentStepSize ?? 0.04
+    const integrationSteps = schroedinger?.probabilityCurrentSteps ?? 20
+    floatView[1312 / 4] = isMomentumRepresentation ? Math.min(lineDensity, 3.0) : lineDensity
+    floatView[1316 / 4] = isMomentumRepresentation ? Math.max(stepSize, 0.02) : stepSize
+    intView[1320 / 4] = isMomentumRepresentation ? Math.min(integrationSteps, 8) : integrationSteps
     floatView[1324 / 4] = schroedinger?.probabilityCurrentOpacity ?? 0.7
+
+    // Representation + momentum controls (offset 1328-1344)
+    intView[1328 / 4] = REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0
+    intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'normalized'] ?? 0
+    floatView[1336 / 4] = schroedinger?.momentumScale ?? 1.0
+    floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1677,6 +1745,29 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       gridPass.postFrame?.()
     }
 
+    // ============================================
+    // EIGENFUNCTION CACHE COMPUTE PASS (HO mode)
+    // ============================================
+    // Pre-compute 1D eigenfunctions for cache-accelerated rendering
+    const cachePass = this.eigenCachePass
+    if (cachePass && this.eigenCacheInitialized) {
+      const extended = ctx.frame?.stores?.['extended'] as any
+      const geometry = ctx.frame?.stores?.['geometry'] as any
+      const schroedingerVersion = extended?.schroedingerVersion ?? 0
+      const dimension = geometry?.dimension ?? this.rendererConfig.dimension ?? 3
+
+      // Sync uniform data and perform CPU-side deduplication
+      cachePass.updateFromUniforms(
+        ctx.device,
+        this.schroedingerUniformData,
+        schroedingerVersion,
+        dimension
+      )
+
+      // Execute compute pass - fills eigenfunction cache storage buffer
+      cachePass.execute(ctx)
+    }
+
     // DIAGNOSTIC: Log key parameters once per second to help debug performance issues
     if (import.meta.env.DEV) {
       const now = Date.now()
@@ -1823,10 +1914,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   dispose(): void {
-    // Dispose density grid compute pass
+    // Dispose compute passes
     this.densityGridPass?.dispose()
     this.densityGridPass = null
     this.densityGridInitialized = false
+
+    this.eigenCachePass?.dispose()
+    this.eigenCachePass = null
+    this.eigenCacheInitialized = false
 
     this.vertexBuffer?.destroy()
     this.indexBuffer?.destroy()

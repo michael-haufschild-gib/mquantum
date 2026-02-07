@@ -98,6 +98,21 @@ import {
   generateHydrogenNDDispatchBlock,
 } from './quantum/hydrogenNDVariants.wgsl'
 
+// Eigenfunction cache blocks (for HO mode acceleration)
+import {
+  eigenfunctionCacheBindingsBlock,
+  eigenfunctionCacheLookupBlock,
+} from './quantum/eigenfunctionCache.wgsl'
+import { generateAnalyticalGradientBlock } from './quantum/analyticalGradient.wgsl'
+import {
+  generateHoNDCachedBlock,
+  generateHoNDCachedDispatchBlock,
+} from './quantum/hoNDVariants.wgsl'
+import {
+  getHOCachedUnrolledBlocks,
+  generateHOCachedDispatchBlock,
+} from './quantum/hoSuperpositionVariants.wgsl'
+
 // Volume blocks
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
@@ -129,6 +144,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   phaseMateriality?: boolean
   /** Compile-time specialization for interference branching. */
   interference?: boolean
+  /** Use 1D eigenfunction cache for HO mode (replaces inline ho1D + tetrahedral gradient). */
+  useEigenfunctionCache?: boolean
 }
 
 /**
@@ -151,6 +168,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     dispersion = true,
     phaseMateriality = true,
     interference = true,
+    useEigenfunctionCache = false,
     overrides = [],
   } = config
 
@@ -169,6 +187,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   // Determine if we should use unrolled HO superposition
   const useUnrolledHO = includeHarmonic && termCount !== undefined
+
+  // Eigenfunction cache: only for HO mode
+  const useCache = useEigenfunctionCache && includeHarmonic
 
   // Add dimension define
   defines.push(`const DIMENSION: i32 = ${dimension};`)
@@ -202,6 +223,14 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     defines.push(`const HO_TERM_COUNT: i32 = ${termCount};`)
   } else {
     defines.push('const HO_UNROLLED: bool = false;')
+  }
+
+  // Add eigenfunction cache define
+  if (useCache) {
+    defines.push('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    features.push('Eigenfunction Cache')
+  } else {
+    defines.push('const USE_EIGENFUNCTION_CACHE: bool = false;')
   }
 
   // Add quantum mode constant for runtime dispatch
@@ -299,7 +328,8 @@ struct VertexOutput {
         '\n' +
         generateObjectBindGroup(2, 'SchroedingerUniforms', 'schroedinger', 0) +
         '\n' +
-        generateObjectBindGroup(2, 'BasisVectors', 'basis', 1),
+        generateObjectBindGroup(2, 'BasisVectors', 'basis', 1) +
+        (useCache ? '\n' + eigenfunctionCacheBindingsBlock : ''),
     },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
@@ -311,10 +341,13 @@ struct VertexOutput {
     { name: 'Hermite Polynomials', content: hermiteBlock },
     { name: 'HO 1D Eigenfunction', content: ho1dBlock },
 
+    // Eigenfunction cache lookup (must come before hoND variants that use it)
+    { name: 'Eigenfunction Cache Lookup', content: eigenfunctionCacheLookupBlock, condition: useCache },
+
     // HO ND dimension-specific variant (only ONE is included based on actualDim)
-    { name: `HO ND ${actualDim}D`, content: hoNDBlock, condition: includeHarmonic },
-    // Generated dispatch: directly calls hoND${actualDim}D
-    { name: 'HO ND Dispatch', content: generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
+    // When cache is enabled, use cached variants that call ho1DCached() instead of ho1D()
+    { name: `HO ND ${actualDim}D`, content: useCache ? generateHoNDCachedBlock(actualDim) : hoNDBlock, condition: includeHarmonic },
+    { name: 'HO ND Dispatch', content: useCache ? generateHoNDCachedDispatchBlock(actualDim) : generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
 
     // Hydrogen orbital basis functions (conditionally included)
     { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen },
@@ -341,25 +374,45 @@ struct VertexOutput {
     },
 
     // HO Superposition - unrolled variants when termCount is known
+    // When cache is enabled, use cached variants that call hoNDOptimized (which uses cache)
     ...(useUnrolledHO && termCount
-      ? [
-          {
-            name: `HO Superposition (${termCount} term${termCount > 1 ? 's' : ''})`,
-            content: getHOUnrolledBlocks(termCount).superposition,
-          },
-          {
-            name: `HO Spatial (${termCount} term${termCount > 1 ? 's' : ''})`,
-            content: getHOUnrolledBlocks(termCount).spatial,
-          },
-          {
-            name: `HO Combined (${termCount} term${termCount > 1 ? 's' : ''})`,
-            content: getHOUnrolledBlocks(termCount).combined,
-          },
-          {
-            name: 'HO Dispatch (Unrolled)',
-            content: generateHODispatchBlock(termCount),
-          },
-        ]
+      ? useCache
+        ? [
+            {
+              name: `HO Superposition Cached (${termCount} term${termCount > 1 ? 's' : ''})`,
+              content: getHOCachedUnrolledBlocks(termCount).superposition,
+            },
+            {
+              name: `HO Spatial Cached (${termCount} term${termCount > 1 ? 's' : ''})`,
+              content: getHOCachedUnrolledBlocks(termCount).spatial,
+            },
+            {
+              name: `HO Combined Cached (${termCount} term${termCount > 1 ? 's' : ''})`,
+              content: getHOCachedUnrolledBlocks(termCount).combined,
+            },
+            {
+              name: 'HO Dispatch Cached (Unrolled)',
+              content: generateHOCachedDispatchBlock(termCount),
+            },
+          ]
+        : [
+            {
+              name: `HO Superposition (${termCount} term${termCount > 1 ? 's' : ''})`,
+              content: getHOUnrolledBlocks(termCount).superposition,
+            },
+            {
+              name: `HO Spatial (${termCount} term${termCount > 1 ? 's' : ''})`,
+              content: getHOUnrolledBlocks(termCount).spatial,
+            },
+            {
+              name: `HO Combined (${termCount} term${termCount > 1 ? 's' : ''})`,
+              content: getHOUnrolledBlocks(termCount).combined,
+            },
+            {
+              name: 'HO Dispatch (Unrolled)',
+              content: generateHODispatchBlock(termCount),
+            },
+          ]
       : []),
 
     // Unified wavefunction evaluation (mode-switching)
@@ -390,6 +443,12 @@ struct VertexOutput {
     },
     { name: 'Cross-Section Slice', content: crossSectionBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },
+    // Analytical gradient from eigenfunction cache (replaces tetrahedral in integration loop)
+    {
+      name: 'Analytical Gradient',
+      content: generateAnalyticalGradientBlock(actualDim, termCount),
+      condition: useCache,
+    },
     { name: 'Volume Integration', content: volumeIntegrationBlock },
 
     // ===== GEOMETRY =====

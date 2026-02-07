@@ -1,6 +1,7 @@
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { useAnimationStore } from '@/stores/animationStore'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { useUIStore, type UISlice } from '@/stores/uiStore'
 import React, { useEffect, useState } from 'react'
@@ -12,6 +13,8 @@ import FullscreenIcon from '@/assets/icons/enlarge.svg?react'
 import PerfIcon from '@/assets/icons/perf.svg?react'
 import SoundOffIcon from '@/assets/icons/volume-mute2.svg?react'
 import SoundOnIcon from '@/assets/icons/volume-high.svg?react'
+import TargetIcon from '@/assets/icons/target.svg?react'
+import WaveIcon from '@/assets/icons/wave.svg?react'
 
 interface TopBarControlsProps {
   compact?: boolean
@@ -35,6 +38,7 @@ const IconButton: React.FC<IconButtonProps> = React.memo(
       onMouseEnter={() => soundManager.playHover()}
       aria-label={label}
       aria-pressed={active}
+      title={label}
       data-testid={`control-${label.toLowerCase().replace(/\s+/g, '-')}`}
       className={`
       rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
@@ -69,6 +73,12 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
     toggleCinematicMode: state.toggleCinematicMode,
   }))
   const { isCinematicMode, toggleCinematicMode } = useLayoutStore(layoutSelector)
+
+  const representationSelector = useShallow((state: ExtendedObjectState) => ({
+    representation: state.schroedinger.representation,
+    setRepresentation: state.setSchroedingerRepresentation,
+  }))
+  const { representation, setRepresentation } = useExtendedObjectStore(representationSelector)
 
   // Local State
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -115,11 +125,28 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
     }
   }
 
+  const toggleRepresentation = () => {
+    const nextRepresentation = representation === 'position' ? 'momentum' : 'position'
+    setRepresentation(nextRepresentation)
+    soundManager.playClick()
+  }
+
   return (
     <div className="flex items-center gap-1">
       {/* Mobile: utility icon buttons */}
       {compact ? (
         <div className="flex gap-1">
+          <IconButton
+            icon={representation === 'position' ? TargetIcon : WaveIcon}
+            active={representation === 'momentum'}
+            onClick={toggleRepresentation}
+            label={
+              representation === 'position'
+                ? 'Switch to Momentum Space'
+                : 'Switch to Position Space'
+            }
+            small
+          />
           <IconButton
             icon={PerfIcon}
             active={showPerfMonitor}
@@ -141,6 +168,28 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
       ) : (
         /* Desktop: utility icon buttons */
         <>
+          <button
+            type="button"
+            onClick={toggleRepresentation}
+            onMouseEnter={() => soundManager.playHover()}
+            aria-label="Toggle Representation Space"
+            title="Toggle representation (Position ↔ Momentum)"
+            data-testid="control-representation-toggle"
+            className={`
+              rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
+              px-3 py-1.5
+              ${
+                representation === 'momentum'
+                  ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'
+                  : 'bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]'
+              }
+            `}
+          >
+            {representation === 'position' ? 'Position' : 'Momentum'}
+          </button>
+
+          <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+
           <IconButton
             icon={PerfIcon}
             active={showPerfMonitor}

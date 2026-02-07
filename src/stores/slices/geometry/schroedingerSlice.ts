@@ -278,6 +278,10 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quantum Mode Selection ===
     setSchroedingerQuantumMode: valueSetter('quantumMode'),
+    setSchroedingerRepresentation: valueSetter('representation'),
+    setSchroedingerMomentumDisplayUnits: valueSetter('momentumDisplayUnits'),
+    setSchroedingerMomentumScale: clampedSetter('momentumScale', 0.1, 4.0),
+    setSchroedingerMomentumHbar: clampedSetter('momentumHbar', 0.01, 10.0),
 
     setSchroedingerPrincipalQuantumNumber: (n: number) => {
       const clamped = Math.max(1, Math.min(7, Math.floor(n)))

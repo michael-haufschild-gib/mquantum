@@ -80,6 +80,61 @@ fn hoNDOptimized(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUnifor
 }
 
 /**
+ * Generate a dimension-specific cached hoND function that uses the eigenfunction cache.
+ * Uses ho1DCached() instead of ho1D() for ~10x faster evaluation.
+ *
+ * @param dimension - The dimension (3-11)
+ * @returns WGSL function code for cached hoND{dimension}D
+ */
+export function generateHoNDCachedBlock(dimension: number): string {
+  const ho1DCachedChain = Array.from({ length: dimension }, (_, i) => {
+    if (i === 0) {
+      return `  var p = ho1DCached(getEigenFuncIdx(termIdx, 0), xND[0]);
+  if (abs(p) < 1e-10) { return 0.0; }`
+    } else if (i === dimension - 1) {
+      return `
+  p *= ho1DCached(getEigenFuncIdx(termIdx, ${i}), xND[${i}]);
+  return p;`
+    } else {
+      return `
+  p *= ho1DCached(getEigenFuncIdx(termIdx, ${i}), xND[${i}]);
+  if (abs(p) < 1e-10) { return 0.0; }`
+    }
+  }).join('')
+
+  return `
+// ============================================
+// Harmonic Oscillator ND - ${dimension}D (Cached, Unrolled)
+// ============================================
+
+fn hoND${dimension}DCached(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUniforms) -> f32 {
+${ho1DCachedChain}
+}
+`
+}
+
+/**
+ * Generate dispatch block for cached hoND.
+ * Provides hoNDOptimized() that calls the cached variant.
+ *
+ * @param dimension - The dimension (3-11)
+ * @returns WGSL dispatch block code
+ */
+export function generateHoNDCachedDispatchBlock(dimension: number): string {
+  const dim = Math.min(Math.max(dimension, 3), 11)
+  return `
+// ============================================
+// Harmonic Oscillator ND - Cached Compile-time Dispatch
+// Dimension: ${dim}
+// ============================================
+
+fn hoNDOptimized(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUniforms) -> f32 {
+  return hoND${dim}DCached(xND, termIdx, uniforms);
+}
+`
+}
+
+/**
  * Get the generated block for a specific dimension.
  *
  * @param dimension - The dimension (3-11)

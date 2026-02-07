@@ -89,20 +89,6 @@ export function multiply_matrix_vector_wasm(matrix: Float64Array, vector: Float6
 export function normalize_vector_wasm(v: Float64Array): Float64Array;
 
 /**
- * Projects edge pairs to 3D positions for LineSegments2 geometry.
- *
- * # Arguments
- * * `flat_vertices` - Flat array of vertex coordinates
- * * `dimension` - Dimensionality of each vertex
- * * `flat_edges` - Flat array of edge indices [start0, end0, start1, end1, ...]
- * * `projection_distance` - Distance from projection plane
- *
- * # Returns
- * Flat array of edge positions [e0_x1, e0_y1, e0_z1, e0_x2, e0_y2, e0_z2, ...]
- */
-export function project_edges_wasm(flat_vertices: Float64Array, dimension: number, flat_edges: Uint32Array, projection_distance: number): Float32Array;
-
-/**
  * Projects n-dimensional vertices to 3D positions using perspective projection.
  *
  * # Arguments
@@ -140,7 +126,6 @@ export interface InitOutput {
   readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly normalize_vector_wasm: (a: number, b: number, c: number) => void;
-  readonly project_edges_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly project_vertices_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly subtract_vectors_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly start: () => void;

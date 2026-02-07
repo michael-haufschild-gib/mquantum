@@ -76,26 +76,6 @@ pub fn project_vertices_wasm(
     animation::project_vertices_to_positions(flat_vertices, dimension, projection_distance)
 }
 
-/// Projects edge pairs to 3D positions for LineSegments2 geometry.
-///
-/// # Arguments
-/// * `flat_vertices` - Flat array of vertex coordinates
-/// * `dimension` - Dimensionality of each vertex
-/// * `flat_edges` - Flat array of edge indices [start0, end0, start1, end1, ...]
-/// * `projection_distance` - Distance from projection plane
-///
-/// # Returns
-/// Flat array of edge positions [e0_x1, e0_y1, e0_z1, e0_x2, e0_y2, e0_z2, ...]
-#[wasm_bindgen]
-pub fn project_edges_wasm(
-    flat_vertices: &[f64],
-    dimension: usize,
-    flat_edges: &[u32],
-    projection_distance: f64,
-) -> Vec<f32> {
-    animation::project_edges_to_positions(flat_vertices, dimension, flat_edges, projection_distance)
-}
-
 /// Multiplies a matrix by a vector.
 ///
 /// # Arguments

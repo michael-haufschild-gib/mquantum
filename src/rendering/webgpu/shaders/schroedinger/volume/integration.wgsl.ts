@@ -378,7 +378,11 @@ fn findNodalSurfaceHit(
 
       var normal = normalize(grad);
       if (length(grad) < 1e-5) {
-        normal = normalize(computeGradientTetrahedral(hitPos, animTime, 0.02, uniforms));
+        if (USE_EIGENFUNCTION_CACHE) {
+          normal = normalize(computeAnalyticalGradient(hitPos, animTime, uniforms));
+        } else {
+          normal = normalize(computeGradientTetrahedral(hitPos, animTime, 0.02, uniforms));
+        }
       }
 
       return NodalSurfaceHit(1.0, hitT, hitSample.signValue, hitSample.colorMode, normal, 0.0);
@@ -494,7 +498,11 @@ fn computePhysicalNodalField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms)
 
 // Returns vec4f(jx, jy, jz, |j|).
 fn sampleProbabilityCurrent(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  let delta = clamp(uniforms.probabilityCurrentStepSize, 0.005, 0.2);
+  var delta = clamp(uniforms.probabilityCurrentStepSize, 0.005, 0.2);
+  // Momentum-space fields vary faster; use a larger stencil for stability.
+  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
+    delta = max(delta, 0.02);
+  }
   let invTwoDelta = 0.5 / delta;
 
   let xND = mapPosToND(pos, uniforms);
@@ -774,7 +782,13 @@ fn volumeRaymarch(
       }
     }
 
-    if (uniforms.probabilityCurrentEnabled != 0u && uniforms.probabilityCurrentScale > 0.0) {
+    let momentumOverlaySubsample =
+      uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
+    if (
+      !momentumOverlaySubsample &&
+      uniforms.probabilityCurrentEnabled != 0u &&
+      uniforms.probabilityCurrentScale > 0.0
+    ) {
       let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(
@@ -811,8 +825,15 @@ fn volumeRaymarch(
         primaryHitT = t;
       }
 
-      // OPTIMIZED: Compute gradient WITHOUT erosion (skips 4 expensive erosion evaluations)
-      let gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
+      // Compute gradient for emission lighting
+      // When eigenfunction cache is available, use analytical gradient (no extra evaluations).
+      // Otherwise, fall back to tetrahedral finite differences (4 samples, no erosion).
+      var gradient: vec3f;
+      if (USE_EIGENFUNCTION_CACHE) {
+        gradient = computeAnalyticalGradient(pos, animTime, uniforms);
+      } else {
+        gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
+      }
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
       let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
@@ -959,6 +980,13 @@ fn volumeRaymarchHQ(
       sCenter = quickS;
       phase = quickCheck.z;
       gradient = vec3f(0.0);
+    } else if (USE_EIGENFUNCTION_CACHE) {
+      // Analytical gradient from cached eigenfunctions (1 eval vs 4 tetrahedral samples)
+      let cached = sampleDensityWithAnalyticalGradient(pos, animTime, uniforms);
+      rho = cached.rho;
+      sCenter = cached.s;
+      phase = cached.phase;
+      gradient = cached.gradient;
     } else {
       let tetra = sampleWithTetrahedralGradient(pos, animTime, 0.05, uniforms);
       rho = tetra.rho;
@@ -1022,7 +1050,13 @@ fn volumeRaymarchHQ(
       }
     }
 
-    if (uniforms.probabilityCurrentEnabled != 0u && uniforms.probabilityCurrentScale > 0.0) {
+    let momentumOverlaySubsample =
+      uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
+    if (
+      !momentumOverlaySubsample &&
+      uniforms.probabilityCurrentEnabled != 0u &&
+      uniforms.probabilityCurrentScale > 0.0
+    ) {
       let normalProxy = normalize(gradient + pos * 0.2 + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
       let currentOverlay = computeProbabilityCurrentOverlay(

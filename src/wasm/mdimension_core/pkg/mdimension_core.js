@@ -379,41 +379,6 @@ export function normalize_vector_wasm(v) {
 }
 
 /**
- * Projects edge pairs to 3D positions for LineSegments2 geometry.
- *
- * # Arguments
- * * `flat_vertices` - Flat array of vertex coordinates
- * * `dimension` - Dimensionality of each vertex
- * * `flat_edges` - Flat array of edge indices [start0, end0, start1, end1, ...]
- * * `projection_distance` - Distance from projection plane
- *
- * # Returns
- * Flat array of edge positions [e0_x1, e0_y1, e0_z1, e0_x2, e0_y2, e0_z2, ...]
- * @param {Float64Array} flat_vertices
- * @param {number} dimension
- * @param {Uint32Array} flat_edges
- * @param {number} projection_distance
- * @returns {Float32Array}
- */
-export function project_edges_wasm(flat_vertices, dimension, flat_edges, projection_distance) {
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        const ptr0 = passArrayF64ToWasm0(flat_vertices, wasm.__wbindgen_export);
-        const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArray32ToWasm0(flat_edges, wasm.__wbindgen_export);
-        const len1 = WASM_VECTOR_LEN;
-        wasm.project_edges_wasm(retptr, ptr0, len0, dimension, ptr1, len1, projection_distance);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        var v3 = getArrayF32FromWasm0(r0, r1).slice();
-        wasm.__wbindgen_export3(r0, r1 * 4, 4);
-        return v3;
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-    }
-}
-
-/**
  * Projects n-dimensional vertices to 3D positions using perspective projection.
  *
  * # Arguments

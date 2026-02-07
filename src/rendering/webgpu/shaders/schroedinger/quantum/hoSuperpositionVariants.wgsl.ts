@@ -227,3 +227,17 @@ fn evalHOCombinedPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms
 }
 `
 }
+
+/**
+ * Get cached HO unrolled blocks.
+ * Since the existing superposition variants already call hoNDOptimized(),
+ * and the cached dispatch block redefines hoNDOptimized to use the cache,
+ * the existing blocks work as-is for the cached path.
+ */
+export const getHOCachedUnrolledBlocks = getHOUnrolledBlocks
+
+/**
+ * Generate cached HO dispatch block.
+ * Identical to the standard dispatch since hoNDOptimized handles the routing.
+ */
+export const generateHOCachedDispatchBlock = generateHODispatchBlock

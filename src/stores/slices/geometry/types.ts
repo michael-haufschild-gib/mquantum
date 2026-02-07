@@ -50,6 +50,12 @@ export interface SchroedingerSliceActions {
 
   // Quantum Mode Selection
   setSchroedingerQuantumMode: (mode: SchroedingerQuantumMode) => void
+  setSchroedingerRepresentation: (mode: SchroedingerConfig['representation']) => void
+  setSchroedingerMomentumDisplayUnits: (
+    units: SchroedingerConfig['momentumDisplayUnits']
+  ) => void
+  setSchroedingerMomentumScale: (scale: number) => void
+  setSchroedingerMomentumHbar: (hbar: number) => void
 
   // Harmonic Oscillator Configuration
   setSchroedingerPresetName: (name: SchroedingerPresetName) => void

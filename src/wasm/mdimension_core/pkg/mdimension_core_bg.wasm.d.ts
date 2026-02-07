@@ -8,7 +8,6 @@ export const magnitude_wasm: (a: number, b: number) => number;
 export const multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const normalize_vector_wasm: (a: number, b: number, c: number) => void;
-export const project_edges_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const project_vertices_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
 export const subtract_vectors_wasm: (a: number, b: number, c: number, d: number, e: number) => void;
 export const start: () => void;

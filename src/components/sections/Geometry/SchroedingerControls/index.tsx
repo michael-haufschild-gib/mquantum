@@ -57,6 +57,10 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setScale: state.setSchroedingerScale,
       // Mode selection
       setQuantumMode: state.setSchroedingerQuantumMode,
+      setRepresentation: state.setSchroedingerRepresentation,
+      setMomentumDisplayUnits: state.setSchroedingerMomentumDisplayUnits,
+      setMomentumScale: state.setSchroedingerMomentumScale,
+      setMomentumHbar: state.setSchroedingerMomentumHbar,
       // Harmonic oscillator actions
       setPresetName: state.setSchroedingerPresetName,
       setSeed: state.setSchroedingerSeed,
@@ -82,6 +86,10 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       config,
       // Mode selection
       setQuantumMode,
+      setRepresentation,
+      setMomentumDisplayUnits,
+      setMomentumScale,
+      setMomentumHbar,
       // Harmonic oscillator actions
       setPresetName,
       setSeed,
@@ -169,6 +177,64 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               {isHydrogenNDMode
                 ? 'N-dimensional hydrogen atom in 3D space'
                 : 'N-dimensional quantum superposition states'}
+            </p>
+          </div>
+        </Section>
+
+        {/* Representation Selection */}
+        <Section title="Representation" defaultOpen={true}>
+          <div className="space-y-3">
+            <ToggleGroup
+              options={[
+                { value: 'position', label: 'Position' },
+                { value: 'momentum', label: 'Momentum' },
+              ]}
+              value={config.representation}
+              onChange={(v) => setRepresentation(v as 'position' | 'momentum')}
+              ariaLabel="Select representation space"
+              data-testid="representation-selector"
+            />
+
+            {config.representation === 'momentum' && (
+              <div className="space-y-3">
+                <ToggleGroup
+                  options={[
+                    { value: 'normalized', label: 'Normalized' },
+                    { value: 'k', label: 'k-Space' },
+                    { value: 'p', label: 'p-Space' },
+                  ]}
+                  value={config.momentumDisplayUnits}
+                  onChange={(v) => setMomentumDisplayUnits(v as 'normalized' | 'k' | 'p')}
+                  ariaLabel="Select momentum display units"
+                  data-testid="momentum-units-selector"
+                />
+                <Slider
+                  label="Momentum Scale"
+                  min={0.1}
+                  max={4.0}
+                  step={0.05}
+                  value={config.momentumScale}
+                  onChange={setMomentumScale}
+                  showValue
+                  data-testid="momentum-scale-slider"
+                />
+                {config.momentumDisplayUnits === 'p' && (
+                  <Slider
+                    label="Reduced Planck Constant (ħ)"
+                    min={0.01}
+                    max={10.0}
+                    step={0.01}
+                    value={config.momentumHbar}
+                    onChange={setMomentumHbar}
+                    showValue
+                    data-testid="momentum-hbar-slider"
+                  />
+                )}
+              </div>
+            )}
+
+            <p className="text-xs text-text-tertiary">
+              Internal momentum rendering uses k-space; display units affect interpretation only.
             </p>
           </div>
         </Section>

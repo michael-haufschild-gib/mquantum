@@ -22,6 +22,31 @@ describe('extendedObjectStore (invariants)', () => {
     expect(ultra.qualityPreset).toBe('ultra')
   })
 
+  it('updates representation and momentum display settings', () => {
+    useExtendedObjectStore.getState().setSchroedingerRepresentation('momentum')
+    useExtendedObjectStore.getState().setSchroedingerMomentumDisplayUnits('p')
+
+    const config = useExtendedObjectStore.getState().schroedinger
+    expect(config.representation).toBe('momentum')
+    expect(config.momentumDisplayUnits).toBe('p')
+  })
+
+  it('clamps momentum scale and hbar ranges', () => {
+    useExtendedObjectStore.getState().setSchroedingerMomentumScale(99)
+    useExtendedObjectStore.getState().setSchroedingerMomentumHbar(0)
+
+    let config = useExtendedObjectStore.getState().schroedinger
+    expect(config.momentumScale).toBe(4.0)
+    expect(config.momentumHbar).toBe(0.01)
+
+    useExtendedObjectStore.getState().setSchroedingerMomentumScale(-1)
+    useExtendedObjectStore.getState().setSchroedingerMomentumHbar(99)
+
+    config = useExtendedObjectStore.getState().schroedinger
+    expect(config.momentumScale).toBe(0.1)
+    expect(config.momentumHbar).toBe(10.0)
+  })
+
   it('reset restores defaults', () => {
     useExtendedObjectStore.getState().setSchroedingerScale(5)
     useExtendedObjectStore.getState().setSchroedingerQualityPreset('ultra')
