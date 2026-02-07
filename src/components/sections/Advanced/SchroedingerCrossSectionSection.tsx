@@ -90,7 +90,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
 
     return (
       <Section
-        title="Cross-Section Slice"
+        title="Analysis"
         defaultOpen={defaultOpen}
         data-testid="cross-section-slice-section"
       >

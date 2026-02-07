@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react'
 // Import existing sidebar sections
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { SchroedingerCrossSectionSection } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
+import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { DocumentationSection } from '@/components/sections/Documentation/DocumentationSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
@@ -32,6 +33,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
             {/* The "Subject" - Materials, Colors, Advanced */}
             <FacesSection defaultOpen={true} />
             <SchroedingerCrossSectionSection defaultOpen={true} />
+            <SchroedingerQuantumEffectsSection defaultOpen={true} />
             <AdvancedObjectControls />
           </div>
         ),

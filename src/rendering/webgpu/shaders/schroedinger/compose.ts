@@ -47,6 +47,7 @@ import { schroedingerUniformsBlock } from './uniforms.wgsl'
 import {
   generateMainBlockVolumetric,
   generateMainBlockIsosurface,
+  generateMainBlockIsosurfaceTemporal,
   generateMainBlockTemporal,
   temporalMRTOutputBlock,
 } from './main.wgsl'
@@ -212,8 +213,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   features.push(`${dimension}D Quantum`)
 
-  // Add temporal define (for volumetric mode only)
-  if (enableTemporal && !isosurface) {
+  // Add temporal define (for volumetric and isosurface modes)
+  if (enableTemporal) {
     defines.push('const TEMPORAL_ENABLED: bool = true;')
     features.push('Temporal Accumulation')
   } else {
@@ -288,9 +289,11 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   // Select main block based on mode
-  // Temporal volumetric mode outputs MRT (color + world position)
+  // Temporal modes output MRT (color + world position)
   const selectedMainBlock = isosurface
-    ? generateMainBlockIsosurface()
+    ? enableTemporal
+      ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
+      : generateMainBlockIsosurface({ useDensityGrid })
     : enableTemporal
       ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
       : generateMainBlockVolumetric({ useDensityGrid })
@@ -531,21 +534,21 @@ struct VertexOutput {
     {
       name: 'Temporal Accumulation',
       content: temporalBlock,
-      condition: enableTemporal && !isosurface,
+      condition: enableTemporal,
     },
 
     // MRT output struct for isosurface mode (outputs color + normal for post-processing)
     {
       name: 'Fragment Output (Isosurface)',
       content: mrtOutputBlock,
-      condition: isosurface,
+      condition: isosurface && !enableTemporal,
     },
 
-    // MRT output struct for temporal volumetric mode (outputs color + world position for reprojection)
+    // MRT output struct for temporal mode (outputs color + world position for reprojection)
     {
       name: 'Fragment Output (Temporal)',
       content: temporalMRTOutputBlock,
-      condition: enableTemporal && !isosurface,
+      condition: enableTemporal,
     },
 
     // ===== MAIN SHADER =====

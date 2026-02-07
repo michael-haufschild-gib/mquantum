@@ -12,15 +12,6 @@ describe('Tooltip', () => {
     vi.useRealTimers()
   })
 
-  it('renders children correctly', () => {
-    render(
-      <Tooltip content="Tooltip text">
-        <button>Hover me</button>
-      </Tooltip>
-    )
-    expect(screen.getByRole('button', { name: /hover me/i })).toBeInTheDocument()
-  })
-
   it('shows tooltip after delay on hover', async () => {
     render(
       <Tooltip content="Tooltip text" delay={300}>

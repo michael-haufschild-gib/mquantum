@@ -1,15 +1,15 @@
-import { SchroedingerAdvanced } from '@/components/sections/Advanced/SchroedingerAdvanced'
+import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-describe('SchroedingerAdvanced uncertainty boundary controls', () => {
+describe('SchroedingerQuantumEffectsSection uncertainty boundary controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
   })
 
   it('toggles uncertainty boundary and exposes physically meaningful controls', () => {
-    render(<SchroedingerAdvanced />)
+    render(<SchroedingerQuantumEffectsSection />)
 
     const toggle = screen.getByTestId('schroedinger-uncertainty-boundary-toggle')
     fireEvent.click(toggle)

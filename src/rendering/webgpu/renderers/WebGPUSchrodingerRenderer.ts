@@ -264,20 +264,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Isosurface mode uses MRT (color + normal + depth) like Mandelbulb
     // Volumetric mode uses color + depth (alpha blending handled by EnvironmentCompositePass)
     // Temporal mode uses quarter-res outputs that get accumulated by WebGPUTemporalCloudPass
+    // Temporal takes priority: isosurface+temporal uses quarter-res (no normal/depth buffer)
     const isIsosurface = config?.isosurface ?? false
     const isTemporal = config?.temporal ?? false
-    const outputs = isIsosurface
+    const outputs = isTemporal
       ? [
-          { resourceId: 'object-color', access: 'write' as const, binding: 0 },
-          { resourceId: 'normal-buffer', access: 'write' as const, binding: 1 },
-          { resourceId: 'depth-buffer', access: 'write' as const, binding: 2 },
+          // Temporal mode (volumetric or isosurface): quarter-res color + position for temporal accumulation
+          // No depth buffer needed - all targets are quarter-res, composited in environment pass
+          { resourceId: 'quarter-color', access: 'write' as const, binding: 0 },
+          { resourceId: 'quarter-position', access: 'write' as const, binding: 1 },
         ]
-      : isTemporal
+      : isIsosurface
         ? [
-            // Temporal volumetric: quarter-res color + position for temporal accumulation
-            // No depth buffer needed - all targets are quarter-res, composited in environment pass
-            { resourceId: 'quarter-color', access: 'write' as const, binding: 0 },
-            { resourceId: 'quarter-position', access: 'write' as const, binding: 1 },
+            { resourceId: 'object-color', access: 'write' as const, binding: 0 },
+            { resourceId: 'normal-buffer', access: 'write' as const, binding: 1 },
+            { resourceId: 'depth-buffer', access: 'write' as const, binding: 2 },
           ]
         : [
             { resourceId: 'object-color', access: 'write' as const, binding: 0 },
@@ -485,36 +486,40 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         module: fragmentModule,
         entryPoint: 'fragmentMain',
         // Target configuration depends on mode:
-        // - Isosurface: MRT (color + normal), no blend
-        // - Temporal volumetric: MRT (color + position), with alpha blend
+        // - Temporal (volumetric or isosurface): MRT (color + position), with alpha blend on color
+        // - Isosurface (non-temporal): MRT (color + normal), no blend
         // - Standard volumetric: single target with alpha blend
-        targets: this.rendererConfig.isosurface
+        targets: this.rendererConfig.temporal
           ? [
-              { format: 'rgba16float' as GPUTextureFormat }, // Color buffer (no blend for solid surface)
-              { format: 'rgba16float' as GPUTextureFormat }, // Normal buffer
+              {
+                // Temporal color output (volumetric: alpha blend, isosurface: no blend)
+                format: 'rgba16float' as GPUTextureFormat,
+                ...(this.rendererConfig.isosurface
+                  ? {}
+                  : {
+                      blend: {
+                        color: {
+                          srcFactor: 'src-alpha' as const,
+                          dstFactor: 'one-minus-src-alpha' as const,
+                          operation: 'add' as const,
+                        },
+                        alpha: {
+                          srcFactor: 'one' as const,
+                          dstFactor: 'one-minus-src-alpha' as const,
+                          operation: 'add' as const,
+                        },
+                      },
+                    }),
+              },
+              {
+                // Position buffer (rgba32float for world positions) - no blend
+                format: 'rgba32float' as GPUTextureFormat,
+              },
             ]
-          : this.rendererConfig.temporal
+          : this.rendererConfig.isosurface
             ? [
-                {
-                  // Temporal volumetric color output with alpha blending
-                  format: 'rgba16float' as GPUTextureFormat,
-                  blend: {
-                    color: {
-                      srcFactor: 'src-alpha' as const,
-                      dstFactor: 'one-minus-src-alpha' as const,
-                      operation: 'add' as const,
-                    },
-                    alpha: {
-                      srcFactor: 'one' as const,
-                      dstFactor: 'one-minus-src-alpha' as const,
-                      operation: 'add' as const,
-                    },
-                  },
-                },
-                {
-                  // Position buffer (rgba32float for world positions) - no blend
-                  format: 'rgba32float' as GPUTextureFormat,
-                },
+                { format: 'rgba16float' as GPUTextureFormat }, // Color buffer (no blend for solid surface)
+                { format: 'rgba16float' as GPUTextureFormat }, // Normal buffer
               ]
             : [
                 {
@@ -543,14 +548,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       },
       // Depth state: only for modes that use depth buffer (not temporal)
       // Temporal mode renders to quarter-res without depth testing
-      depthStencil:
-        this.rendererConfig.temporal && !this.rendererConfig.isosurface
-          ? undefined
-          : {
-              format: 'depth24plus' as GPUTextureFormat,
-              depthWriteEnabled: true,
-              depthCompare: 'less' as GPUCompareFunction,
-            },
+      depthStencil: this.rendererConfig.temporal
+        ? undefined
+        : {
+            format: 'depth24plus' as GPUTextureFormat,
+            depthWriteEnabled: true,
+            depthCompare: 'less' as GPUCompareFunction,
+          },
     })
 
     // Create uniform buffers
@@ -1909,10 +1913,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Get render targets based on mode:
-    // - Isosurface: object-color + normal-buffer + depth-buffer
-    // - Temporal volumetric: quarter-color + quarter-position (no depth - alpha blending only)
+    // - Temporal (volumetric or isosurface): quarter-color + quarter-position (no depth)
+    // - Isosurface (non-temporal): object-color + normal-buffer + depth-buffer
     // - Standard volumetric: object-color + depth-buffer
-    const isTemporal = this.rendererConfig.temporal && !this.rendererConfig.isosurface
+    const isTemporal = !!this.rendererConfig.temporal
 
     // Color output target
     const colorView = isTemporal
@@ -1934,21 +1938,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Secondary MRT output based on mode
-    // - Isosurface: normal buffer
-    // - Temporal volumetric: world position buffer
-    const secondaryView = this.rendererConfig.isosurface
-      ? ctx.getWriteTarget('normal-buffer')
-      : isTemporal
-        ? ctx.getWriteTarget('quarter-position')
+    // - Temporal (volumetric or isosurface): world position buffer
+    // - Isosurface (non-temporal): normal buffer
+    const secondaryView = isTemporal
+      ? ctx.getWriteTarget('quarter-position')
+      : this.rendererConfig.isosurface
+        ? ctx.getWriteTarget('normal-buffer')
         : null
-
-    if (this.rendererConfig.isosurface && !secondaryView) {
-      console.warn('[WebGPU Schrödinger] Isosurface mode requires normal-buffer target')
-      return
-    }
 
     if (isTemporal && !secondaryView) {
       console.warn('[WebGPU Schrödinger] Temporal mode requires quarter-position target')
+      return
+    }
+
+    if (!isTemporal && this.rendererConfig.isosurface && !secondaryView) {
+      console.warn('[WebGPU Schrödinger] Isosurface mode requires normal-buffer target')
       return
     }
 
@@ -1965,21 +1969,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     ]
 
     // Add secondary MRT attachment based on mode
-    if (this.rendererConfig.isosurface && secondaryView) {
-      // Isosurface mode: normal buffer
-      colorAttachments.push({
-        view: secondaryView,
-        loadOp: 'clear' as const,
-        storeOp: 'store' as const,
-        clearValue: this.clearValueNormal, // Default normal pointing up (+Z)
-      })
-    } else if (isTemporal && secondaryView) {
-      // Temporal volumetric mode: world position buffer
+    if (isTemporal && secondaryView) {
+      // Temporal mode (volumetric or isosurface): world position buffer
       colorAttachments.push({
         view: secondaryView,
         loadOp: 'clear' as const,
         storeOp: 'store' as const,
         clearValue: this.clearValueInvalidPos, // Invalid position (a < 0 means no hit)
+      })
+    } else if (this.rendererConfig.isosurface && secondaryView) {
+      // Isosurface mode (non-temporal): normal buffer
+      colorAttachments.push({
+        view: secondaryView,
+        loadOp: 'clear' as const,
+        storeOp: 'store' as const,
+        clearValue: this.clearValueNormal, // Default normal pointing up (+Z)
       })
     }
 

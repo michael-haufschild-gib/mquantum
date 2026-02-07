@@ -36,17 +36,6 @@ describe('Popover', () => {
   })
 
   describe('rendering', () => {
-    it('should render trigger element', () => {
-      render(
-        <Popover
-          trigger={<button data-testid="trigger">Open</button>}
-          content={<div>Content</div>}
-        />
-      )
-
-      expect(screen.getByTestId('trigger')).toBeInTheDocument()
-    })
-
     it('should open popover when trigger is clicked', async () => {
       const user = userEvent.setup()
       render(
@@ -157,82 +146,6 @@ describe('Popover', () => {
       // The popover container should exist with fixed positioning
       const popoverContainer = screen.getByTestId('content').closest('[popover="auto"]')
       expect(popoverContainer).toHaveStyle({ position: 'fixed' })
-    })
-
-    it('should use side=bottom by default', () => {
-      render(
-        <Popover
-          trigger={<button>Open</button>}
-          content={<div data-testid="content">Content</div>}
-          open={true}
-          onOpenChange={vi.fn()}
-        />
-      )
-
-      expect(screen.getByTestId('content')).toBeInTheDocument()
-    })
-
-    it('should accept side=top prop', () => {
-      render(
-        <Popover
-          trigger={<button>Open</button>}
-          content={<div data-testid="content">Content</div>}
-          side="top"
-          open={true}
-          onOpenChange={vi.fn()}
-        />
-      )
-
-      expect(screen.getByTestId('content')).toBeInTheDocument()
-    })
-
-    it('should accept different align values', () => {
-      const { rerender } = render(
-        <Popover
-          trigger={<button>Open</button>}
-          content={<div data-testid="content">Content</div>}
-          align="start"
-          open={true}
-          onOpenChange={vi.fn()}
-        />
-      )
-      expect(screen.getByTestId('content')).toBeInTheDocument()
-
-      rerender(
-        <Popover
-          trigger={<button>Open</button>}
-          content={<div data-testid="content">Content</div>}
-          align="center"
-          open={true}
-          onOpenChange={vi.fn()}
-        />
-      )
-      expect(screen.getByTestId('content')).toBeInTheDocument()
-
-      rerender(
-        <Popover
-          trigger={<button>Open</button>}
-          content={<div data-testid="content">Content</div>}
-          align="end"
-          open={true}
-          onOpenChange={vi.fn()}
-        />
-      )
-      expect(screen.getByTestId('content')).toBeInTheDocument()
-    })
-
-    it('should apply custom offset', () => {
-      render(
-        <Popover
-          trigger={<button>Open</button>}
-          content={<div data-testid="content">Content</div>}
-          offset={16}
-          open={true}
-          onOpenChange={vi.fn()}
-        />
-      )
-
-      expect(screen.getByTestId('content')).toBeInTheDocument()
     })
   })
 

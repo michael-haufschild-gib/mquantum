@@ -1,10 +1,10 @@
-import { SchroedingerAdvanced } from '@/components/sections/Advanced/SchroedingerAdvanced'
+import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { within } from '@testing-library/dom'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-describe('SchroedingerAdvanced physical nodal controls', () => {
+describe('SchroedingerQuantumEffectsSection physical nodal controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
   })
@@ -12,7 +12,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
   it('renders physical nodal control set when nodal surfaces are enabled', () => {
     useExtendedObjectStore.getState().setSchroedingerNodalEnabled(true)
 
-    render(<SchroedingerAdvanced />)
+    render(<SchroedingerQuantumEffectsSection />)
 
     expect(screen.getByTestId('schroedinger-nodal-render-mode')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-definition')).toBeInTheDocument()
@@ -25,7 +25,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerNodalEnabled(true)
 
-    render(<SchroedingerAdvanced />)
+    render(<SchroedingerQuantumEffectsSection />)
 
     fireEvent.change(screen.getByTestId('schroedinger-nodal-definition'), {
       target: { value: 'imagPart' },
@@ -48,7 +48,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerNodalEnabled(true)
 
-    render(<SchroedingerAdvanced />)
+    render(<SchroedingerQuantumEffectsSection />)
 
     const renderMode = screen.getByTestId('schroedinger-nodal-render-mode')
     const options = within(renderMode).getAllByRole('option')
@@ -64,7 +64,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
     store.setSchroedingerNodalEnabled(true)
     store.setSchroedingerQuantumMode('harmonicOscillator')
 
-    const { rerender } = render(<SchroedingerAdvanced />)
+    const { rerender } = render(<SchroedingerQuantumEffectsSection />)
 
     const harmonicFilter = screen.getByTestId('schroedinger-nodal-family-filter')
     expect(harmonicFilter).toBeDisabled()
@@ -72,7 +72,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
     act(() => {
       store.setSchroedingerQuantumMode('hydrogenND')
     })
-    rerender(<SchroedingerAdvanced />)
+    rerender(<SchroedingerQuantumEffectsSection />)
 
     const hydrogenFilter = screen.getByTestId('schroedinger-nodal-family-filter')
     expect(hydrogenFilter).not.toBeDisabled()
@@ -85,7 +85,7 @@ describe('SchroedingerAdvanced physical nodal controls', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerNodalEnabled(true)
 
-    render(<SchroedingerAdvanced />)
+    render(<SchroedingerQuantumEffectsSection />)
 
     expect(screen.getByTestId('schroedinger-nodal-color-real')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-nodal-color-imag')).toBeInTheDocument()

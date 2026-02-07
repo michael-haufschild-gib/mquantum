@@ -111,13 +111,33 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(outputResourceIds).toEqual(['quarter-color', 'quarter-position'])
   })
 
-  it('keeps isosurface rendering on full-resolution MRT outputs', async () => {
+  it('uses quarter-res temporal outputs for isosurface + temporal mode', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
         isosurface: true,
+      })
+    )
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    // Isosurface + temporal uses quarter-res temporal outputs (temporal takes priority)
+    const outputResourceIds = renderer.config.outputs.map((output) => output.resourceId)
+    expect(outputResourceIds).toEqual(['quarter-color', 'quarter-position'])
+  })
+
+  it('uses full-resolution MRT outputs for isosurface without temporal', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        isosurface: true,
+        temporalReprojectionEnabled: false,
       })
     )
 

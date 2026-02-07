@@ -212,7 +212,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   )
 
   return (
-    <Section title="Faces" defaultOpen={defaultOpen} data-testid="section-faces">
+    <Section title="Surface" defaultOpen={defaultOpen} data-testid="section-faces">
       <div className="transition-opacity duration-300">
         <div className="mb-4 space-y-2 border-b border-border-subtle pb-4">
           <div className="flex items-center justify-between">

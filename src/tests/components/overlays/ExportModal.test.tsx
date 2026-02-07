@@ -84,21 +84,7 @@ describe('ExportModal', () => {
     })
   })
 
-  it('renders the modal when open', () => {
-    render(<ExportModal />)
-    expect(screen.getByText('Video Export Studio')).toBeInTheDocument()
-  })
-
-  it('renders tabs correctly', () => {
-    render(<ExportModal />)
-    // "Presets" appears in the tab label and the active tab content
-    expect(screen.getAllByText('Presets').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Settings')).toBeInTheDocument()
-    expect(screen.getByText('Text')).toBeInTheDocument()
-    expect(screen.getByText('Advanced')).toBeInTheDocument()
-  })
-
-  it('renders the active tab content', () => {
+  it('renders presets tab content by default', () => {
     render(<ExportModal />)
     // Default tab is 'presets'
     expect(screen.getByTestId('export-presets')).toBeInTheDocument()

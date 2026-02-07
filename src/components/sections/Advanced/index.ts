@@ -1,4 +1,5 @@
 export { AdvancedObjectControls } from './AdvancedObjectControls'
 export { SchroedingerAdvanced } from './SchroedingerAdvanced'
 export { SchroedingerCrossSectionSection } from './SchroedingerCrossSectionSection'
+export { SchroedingerQuantumEffectsSection } from './SchroedingerQuantumEffectsSection'
 export { SharedAdvancedControls } from './SharedAdvancedControls'

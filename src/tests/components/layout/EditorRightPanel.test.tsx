@@ -11,13 +11,16 @@ describe('EditorRightPanel object tab layout', () => {
     })
   })
 
-  it('renders cross-section slice section above advanced rendering section', () => {
+  it('renders analysis section above quantum effects section above advanced rendering section', () => {
     render(<EditorRightPanel />)
 
-    const crossSection = screen.getByTestId('cross-section-slice-section')
+    const analysis = screen.getByTestId('cross-section-slice-section')
+    const quantumEffects = screen.getByTestId('quantum-effects-section')
     const advanced = screen.getByTestId('advanced-object-controls')
-    const relativePosition = crossSection.compareDocumentPosition(advanced)
+    const analysisToQuantum = analysis.compareDocumentPosition(quantumEffects)
+    const quantumToAdvanced = quantumEffects.compareDocumentPosition(advanced)
 
-    expect(relativePosition & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(analysisToQuantum & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(quantumToAdvanced & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

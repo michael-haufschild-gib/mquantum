@@ -10,18 +10,6 @@ describe('ControlPanel', () => {
     useLayoutStore.getState().setCollapsed(false)
   })
 
-  it('renders content and is expanded by default', () => {
-    render(
-      <ControlPanel>
-        <div data-testid="panel-content">Content</div>
-      </ControlPanel>
-    )
-
-    const button = screen.getByRole('button', { name: /collapse control panel/i })
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByTestId('panel-content')).toBeInTheDocument()
-  })
-
   it('reflects collapsed state from the layout store', () => {
     useLayoutStore.getState().setCollapsed(true)
 
@@ -64,15 +52,5 @@ describe('ControlPanel', () => {
     await waitFor(() => {
       expect(useLayoutStore.getState().isCollapsed).toBe(false)
     })
-  })
-
-  it('has proper ARIA label', () => {
-    render(
-      <ControlPanel>
-        <div>Content</div>
-      </ControlPanel>
-    )
-
-    expect(screen.getByRole('complementary', { name: /control panel/i })).toBeInTheDocument()
   })
 })

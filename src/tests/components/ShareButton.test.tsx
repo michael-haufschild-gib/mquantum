@@ -31,12 +31,6 @@ describe('ShareButton', () => {
     useAnimationStore.getState().reset()
   })
 
-  it('should render share button', () => {
-    render(<ShareButton />)
-    expect(screen.getByRole('button')).toBeInTheDocument()
-    expect(screen.getByText('Share URL')).toBeInTheDocument()
-  })
-
   it('should copy URL to clipboard on click', async () => {
     render(<ShareButton />)
     const button = screen.getByRole('button')

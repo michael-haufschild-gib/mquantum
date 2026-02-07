@@ -121,3 +121,42 @@ also: debugoverlaypass dead code? are the debug overlays working at all? light g
 
   Hydrogen momentum space has a genuinely different functional form (Fock transform, rational functions of k). This WOULD need a separate shader path.
   But it could be deferred — HO covers the entire 1D-11D range which is the primary use case.
+
+  Options to Improve Isosurface FPS
+
+  Roughly ordered by impact/effort ratio:
+  Option: Temporal reprojection for iso
+  Expected Gain: ~2-4x
+  Effort: Medium
+  Description: Depth-based reprojection is actually easier for opaque surfaces than volumetric. Render quarter-res, reproject using depth + motion
+    vectors.
+  ────────────────────────────────────────
+  Option: Density grid for iso march
+  Expected Gain: ~2-3x per step
+  Effort: Medium
+  Description: Use the cached 3D texture for marching steps; only evaluate inline wavefunction for the final 5 bisection refinements + gradient.
+  ────────────────────────────────────────
+  Option: Occupancy/empty-space grid
+  Expected Gain: ~1.5-3x
+  Effort: Medium
+  Description: Low-res 3D grid marking empty vs occupied cells. March can skip entire empty cells in one step, avoiding wasted evalPsi in inter-lobe
+  gaps.
+  ────────────────────────────────────────
+  Option: Analytical gradient
+  Expected Gain: ~1.3x post-hit
+  Effort: Low
+  Description: Already partially supported. Expanding coverage avoids 4 tetrahedral samples for the normal.
+  ────────────────────────────────────────
+  Option: Distance-adaptive max steps
+  Expected Gain: ~1.2-1.5x
+  Effort: Low
+  Description: Reduce max steps for distant pixels based on screen-space pixel footprint.
+  ────────────────────────────────────────
+  Option: Simpler lighting option
+  Expected Gain: ~1.1x
+  Effort: Low
+  Description: A Lambert-only fast path (skip GGX specular) when quality < 0.75.
+  The two highest-impact improvements are temporal reprojection (since it's a multiplier on total pixel count) and density grid support (since it's a
+  multiplier on per-step cost). Combined they could bring iso FPS much closer to volumetric.
+
+  Want me to investigate implementing any of these?

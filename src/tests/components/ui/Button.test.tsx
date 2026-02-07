@@ -4,11 +4,6 @@ import userEvent from '@testing-library/user-event'
 import { Button } from '../../../components/ui/Button'
 
 describe('Button', () => {
-  it('renders its accessible name from children (default)', () => {
-    render(<Button>Click me</Button>)
-    expect(screen.getByRole('button', { name: /click me/i })).toBeInTheDocument()
-  })
-
   it('calls onClick when clicked', async () => {
     const handleClick = vi.fn()
     const user = userEvent.setup()

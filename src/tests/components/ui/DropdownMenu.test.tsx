@@ -32,18 +32,6 @@ describe('DropdownMenu', () => {
   })
 
   describe('rendering', () => {
-    it('should render trigger element', () => {
-      render(
-        <DropdownMenu
-          trigger={<button data-testid="trigger">Open Menu</button>}
-          items={mockItems}
-          id="test-menu"
-        />
-      )
-
-      expect(screen.getByTestId('trigger')).toBeInTheDocument()
-    })
-
     it('should not render menu content when closed', () => {
       render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
 

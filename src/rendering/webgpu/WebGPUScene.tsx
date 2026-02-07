@@ -687,8 +687,7 @@ export async function setupRenderPasses(
 
   const useTemporalCloudAccumulation =
     config.objectType === 'schroedinger' &&
-    config.temporalReprojectionEnabled &&
-    !config.isosurface
+    config.temporalReprojectionEnabled
 
   const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
 
@@ -1012,8 +1011,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as WGSLColorAlgorithm | undefined
   const useTemporalCloudAccumulation =
     objectType === 'schroedinger' &&
-    config.temporalReprojectionEnabled &&
-    !isosurface
+    config.temporalReprojectionEnabled
 
   switch (objectType) {
     case 'schroedinger':
