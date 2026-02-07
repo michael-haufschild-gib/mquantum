@@ -142,6 +142,25 @@ export interface SchroedingerSliceActions {
   setSchroedingerInterferenceAmp: (amp: number) => void
   setSchroedingerInterferenceFreq: (freq: number) => void
   setSchroedingerInterferenceSpeed: (speed: number) => void
+  // Physical Probability Current (j-field)
+  setSchroedingerProbabilityCurrentEnabled: (enabled: boolean) => void
+  setSchroedingerProbabilityCurrentStyle: (
+    style: SchroedingerConfig['probabilityCurrentStyle']
+  ) => void
+  setSchroedingerProbabilityCurrentPlacement: (
+    placement: SchroedingerConfig['probabilityCurrentPlacement']
+  ) => void
+  setSchroedingerProbabilityCurrentColorMode: (
+    mode: SchroedingerConfig['probabilityCurrentColorMode']
+  ) => void
+  setSchroedingerProbabilityCurrentScale: (scale: number) => void
+  setSchroedingerProbabilityCurrentSpeed: (speed: number) => void
+  setSchroedingerProbabilityCurrentDensityThreshold: (threshold: number) => void
+  setSchroedingerProbabilityCurrentMagnitudeThreshold: (threshold: number) => void
+  setSchroedingerProbabilityCurrentLineDensity: (density: number) => void
+  setSchroedingerProbabilityCurrentStepSize: (stepSize: number) => void
+  setSchroedingerProbabilityCurrentSteps: (steps: number) => void
+  setSchroedingerProbabilityCurrentOpacity: (opacity: number) => void
   // Probability Current Flow
   setSchroedingerProbabilityFlowEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityFlowSpeed: (speed: number) => void

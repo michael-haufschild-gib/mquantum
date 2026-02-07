@@ -36,6 +36,8 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
+const SCHROEDINGER_UNIFORM_SIZE = 1264
+
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
@@ -134,8 +136,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private boundingRadius = 2.0
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1216 bytes (304 floats) - includes nodal render mode controls
-  private schroedingerUniformData = new ArrayBuffer(1216)
+  // Schroedinger: 1264 bytes (316 floats) - includes probability-current controls
+  private schroedingerUniformData = new ArrayBuffer(SCHROEDINGER_UNIFORM_SIZE)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -467,8 +469,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // 160 bytes due to WGSL vec3f 16-byte alignment requirements
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
-    // Schroedinger uniforms: 1216 bytes for all quantum parameters + nodal render mode controls
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1216, 'schroedinger-uniforms')
+    // Schroedinger uniforms: 1264 bytes for all quantum parameters + probability-current controls
+    this.schroedingerUniformBuffer = this.createUniformBuffer(
+      device,
+      SCHROEDINGER_UNIFORM_SIZE,
+      'schroedinger-uniforms'
+    )
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create bind groups - consolidated layout
@@ -790,7 +796,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const versionChanged = schroedingerVersion !== this.lastSchroedingerVersion
     const appearanceChanged = appearanceVersion !== this.lastSchrodingerAppearanceVersion
     const pbrChanged = pbrVersion !== this.lastSchrodingerPbrVersion
-    if (!versionChanged && !appearanceChanged && !pbrChanged && this.lastSchroedingerVersion !== -1) {
+    if (
+      !versionChanged &&
+      !appearanceChanged &&
+      !pbrChanged &&
+      this.lastSchroedingerVersion !== -1
+    ) {
       // Partial buffer write: update time and uncertainty threshold scalars
       // Uses pre-allocated buffer to avoid per-frame allocation
       this.timeUpdateBuffer[0] = animationTime
@@ -1085,11 +1096,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[808 / 4] = schroedinger?.dispersionQuality ?? 0
 
     // Reserved fields (formerly shadows + AO — removed, keeping layout for buffer compatibility)
-    intView[812 / 4] = 0   // _reservedShadow0
+    intView[812 / 4] = 0 // _reservedShadow0
     floatView[816 / 4] = 0 // _reservedShadow1
-    intView[820 / 4] = 0   // _reservedShadow2
+    intView[820 / 4] = 0 // _reservedShadow2
     floatView[824 / 4] = 0 // _reservedAo0
-    intView[828 / 4] = 0   // _reservedAo1
+    intView[828 / 4] = 0 // _reservedAo1
     floatView[832 / 4] = 0 // _reservedAo2
     // _reservedAoColor (vec3f at offset 848 + _pad2)
     floatView[848 / 4] = 0
@@ -1270,6 +1281,40 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[1204 / 4] = 0
     floatView[1208 / 4] = 0.0
     floatView[1212 / 4] = 0.0
+
+    // Physical probability current controls (offset 1216-1264)
+    const probabilityCurrentStyleMap: Record<string, number> = {
+      magnitude: 0,
+      arrows: 1,
+      surfaceLIC: 2,
+      streamlines: 3,
+    }
+    const probabilityCurrentPlacementMap: Record<string, number> = {
+      isosurface: 0,
+      volume: 1,
+    }
+    const probabilityCurrentColorModeMap: Record<string, number> = {
+      magnitude: 0,
+      direction: 1,
+      circulationSign: 2,
+    }
+
+    intView[1216 / 4] = schroedinger?.probabilityCurrentEnabled ? 1 : 0
+    intView[1220 / 4] =
+      probabilityCurrentStyleMap[schroedinger?.probabilityCurrentStyle ?? 'magnitude'] ?? 0
+    intView[1224 / 4] =
+      probabilityCurrentPlacementMap[schroedinger?.probabilityCurrentPlacement ?? 'isosurface'] ?? 0
+    intView[1228 / 4] =
+      probabilityCurrentColorModeMap[schroedinger?.probabilityCurrentColorMode ?? 'magnitude'] ?? 0
+
+    floatView[1232 / 4] = schroedinger?.probabilityCurrentScale ?? 1.0
+    floatView[1236 / 4] = schroedinger?.probabilityCurrentSpeed ?? 1.0
+    floatView[1240 / 4] = schroedinger?.probabilityCurrentDensityThreshold ?? 0.01
+    floatView[1244 / 4] = schroedinger?.probabilityCurrentMagnitudeThreshold ?? 0.0
+    floatView[1248 / 4] = schroedinger?.probabilityCurrentLineDensity ?? 8.0
+    floatView[1252 / 4] = schroedinger?.probabilityCurrentStepSize ?? 0.04
+    intView[1256 / 4] = schroedinger?.probabilityCurrentSteps ?? 20
+    floatView[1260 / 4] = schroedinger?.probabilityCurrentOpacity ?? 0.7
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1541,10 +1586,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
     const debugMode = performance?.debugMode ?? 0
 
-    const qualitySignature = [
-      qualityMultiplier.toFixed(4),
-      debugMode,
-    ].join('|')
+    const qualitySignature = [qualityMultiplier.toFixed(4), debugMode].join('|')
     if (qualitySignature === this.lastQualitySignature) {
       return
     }
@@ -1601,10 +1643,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.updateLightingUniforms(ctx)
 
     // CONDITIONAL: Material uniforms - depends on appearance/PBR versions
-    if (
-      appearanceVersion !== this.lastAppearanceVersion ||
-      pbrVersion !== this.lastPbrVersion
-    ) {
+    if (appearanceVersion !== this.lastAppearanceVersion || pbrVersion !== this.lastPbrVersion) {
       this.updateMaterialUniforms(ctx)
       this.lastAppearanceVersion = appearanceVersion
       this.lastPbrVersion = pbrVersion
@@ -1630,9 +1669,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const dimension = geometry?.dimension ?? this.rendererConfig.dimension ?? 3
       const sliceAnimationEnabled = extended?.schroedinger?.sliceAnimationEnabled ?? false
       const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
-      const basisTimeBucket = sliceAnimationEnabled && dimension > 3
-        ? Math.floor(accumulatedTime * 120.0)
-        : 0
+      const basisTimeBucket =
+        sliceAnimationEnabled && dimension > 3 ? Math.floor(accumulatedTime * 120.0) : 0
       const basisVersion = rotationVersion * 1000003 + basisTimeBucket
 
       // Sync uniform data from renderer to compute pass

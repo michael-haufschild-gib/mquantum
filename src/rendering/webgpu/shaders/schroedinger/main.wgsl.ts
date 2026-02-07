@@ -159,9 +159,20 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
+  let probabilityCurrentVolumeMode =
+    schroedinger.probabilityCurrentEnabled != 0u &&
+    (
+      schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_VOLUME ||
+      (
+        schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_ISOSURFACE &&
+        schroedinger.isoEnabled == 0u
+      )
+    );
+
   let requiresDirectSampling =
     (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
-    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE);
+    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE) ||
+    probabilityCurrentVolumeMode;
 
   if (requiresDirectSampling) {
     if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
@@ -529,6 +540,21 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     }
   }
 
+  if (schroedinger.probabilityCurrentEnabled != 0u && schroedinger.probabilityCurrentScale > 0.0) {
+    let currentSample = sampleProbabilityCurrent(p, animTime, schroedinger);
+    let currentOverlay = computeProbabilityCurrentOverlay(
+      p,
+      currentSample,
+      rhoSurface,
+      n,
+      viewDir,
+      schroedinger
+    );
+    if (currentOverlay.a > 1e-5) {
+      col = mix(col, currentOverlay.rgb, currentOverlay.a);
+    }
+  }
+
   // Output color and normal for MRT
   output.color = vec4f(col, 1.0);
   // Normal buffer: RGB = world-space normal (encoded 0-1), A = metallic
@@ -544,7 +570,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
  * @deprecated Use generateMainBlockIsosurface() instead
  */
 export const mainBlockIsosurface = generateMainBlockIsosurface()
-
 
 /**
  * Configuration for temporal volumetric main block generation.
@@ -640,9 +665,20 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
+  let probabilityCurrentVolumeMode =
+    schroedinger.probabilityCurrentEnabled != 0u &&
+    (
+      schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_VOLUME ||
+      (
+        schroedinger.probabilityCurrentPlacement == PROBABILITY_CURRENT_PLACEMENT_ISOSURFACE &&
+        schroedinger.isoEnabled == 0u
+      )
+    );
+
   let requiresDirectSampling =
     (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
-    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE);
+    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE) ||
+    probabilityCurrentVolumeMode;
 
   if (requiresDirectSampling) {
     if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {

@@ -44,6 +44,21 @@ const NODAL_FAMILY_ANGULAR: i32 = 2;
 const NODAL_RENDER_MODE_BAND: i32 = 0;
 const NODAL_RENDER_MODE_SURFACE: i32 = 1;
 
+// Physical probability-current style constants
+const PROBABILITY_CURRENT_STYLE_MAGNITUDE: i32 = 0;
+const PROBABILITY_CURRENT_STYLE_ARROWS: i32 = 1;
+const PROBABILITY_CURRENT_STYLE_SURFACE_LIC: i32 = 2;
+const PROBABILITY_CURRENT_STYLE_STREAMLINES: i32 = 3;
+
+// Probability-current placement constants
+const PROBABILITY_CURRENT_PLACEMENT_ISOSURFACE: i32 = 0;
+const PROBABILITY_CURRENT_PLACEMENT_VOLUME: i32 = 1;
+
+// Probability-current color mapping constants
+const PROBABILITY_CURRENT_COLOR_MODE_MAGNITUDE: i32 = 0;
+const PROBABILITY_CURRENT_COLOR_MODE_DIRECTION: i32 = 1;
+const PROBABILITY_CURRENT_COLOR_MODE_CIRCULATION_SIGN: i32 = 2;
+
 // WebGPU uniform buffers require 16-byte alignment for array elements.
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
@@ -236,6 +251,20 @@ struct SchroedingerUniforms {
   _nodalRenderPad0: i32,          // Reserved (kept for stable host buffer offsets)
   _nodalRenderPad1: f32,          // Reserved
   _nodalRenderPad2: f32,          // Reserved
+
+  // Physical probability current (j = Im(conj(psi) * nabla psi))
+  probabilityCurrentEnabled: u32,            // Enable j-field overlay
+  probabilityCurrentStyle: i32,              // 0=magnitude, 1=arrows, 2=surfaceLIC, 3=streamlines
+  probabilityCurrentPlacement: i32,          // 0=isosurface, 1=volume
+  probabilityCurrentColorMode: i32,          // 0=magnitude, 1=direction, 2=circulationSign
+  probabilityCurrentScale: f32,              // Visual magnitude scale
+  probabilityCurrentSpeed: f32,              // Animation speed for pattern advection
+  probabilityCurrentDensityThreshold: f32,   // Hide overlay below density threshold
+  probabilityCurrentMagnitudeThreshold: f32, // Hide overlay below |j| threshold
+  probabilityCurrentLineDensity: f32,        // Glyph/line density
+  probabilityCurrentStepSize: f32,           // Integration/sample step size
+  probabilityCurrentSteps: i32,              // Integration step count
+  probabilityCurrentOpacity: f32,            // Overlay opacity
 }
 
 // ============================================

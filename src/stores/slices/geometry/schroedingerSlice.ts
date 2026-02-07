@@ -480,7 +480,11 @@ export const createSchroedingerSlice: StateCreator<
     // === Visual Effects ===
     setSchroedingerEnergyColorEnabled: valueSetter('energyColorEnabled'),
     setSchroedingerUncertaintyBoundaryEnabled: valueSetter('uncertaintyBoundaryEnabled'),
-    setSchroedingerUncertaintyBoundaryStrength: clampedSetter('uncertaintyBoundaryStrength', 0.0, 1.0),
+    setSchroedingerUncertaintyBoundaryStrength: clampedSetter(
+      'uncertaintyBoundaryStrength',
+      0.0,
+      1.0
+    ),
     setSchroedingerUncertaintyConfidenceMass: clampedSetter('uncertaintyConfidenceMass', 0.5, 0.99),
     setSchroedingerUncertaintyBoundaryWidth: clampedSetter('uncertaintyBoundaryWidth', 0.05, 1.0),
     setSchroedingerPhaseMaterialityEnabled: valueSetter('phaseMaterialityEnabled'),
@@ -489,6 +493,40 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerInterferenceAmp: clampedSetter('interferenceAmp', 0.0, 1.0),
     setSchroedingerInterferenceFreq: clampedSetter('interferenceFreq', 1.0, 50.0),
     setSchroedingerInterferenceSpeed: clampedSetter('interferenceSpeed', 0.0, 10.0),
+    // Physical Probability Current (j-field)
+    setSchroedingerProbabilityCurrentEnabled: valueSetter('probabilityCurrentEnabled'),
+    setSchroedingerProbabilityCurrentStyle: valueSetter('probabilityCurrentStyle'),
+    setSchroedingerProbabilityCurrentPlacement: valueSetter('probabilityCurrentPlacement'),
+    setSchroedingerProbabilityCurrentColorMode: valueSetter('probabilityCurrentColorMode'),
+    setSchroedingerProbabilityCurrentScale: clampedSetter('probabilityCurrentScale', 0.0, 5.0),
+    setSchroedingerProbabilityCurrentSpeed: clampedSetter('probabilityCurrentSpeed', 0.0, 10.0),
+    setSchroedingerProbabilityCurrentDensityThreshold: clampedSetter(
+      'probabilityCurrentDensityThreshold',
+      0.0,
+      1.0
+    ),
+    setSchroedingerProbabilityCurrentMagnitudeThreshold: clampedSetter(
+      'probabilityCurrentMagnitudeThreshold',
+      0.0,
+      10.0
+    ),
+    setSchroedingerProbabilityCurrentLineDensity: clampedSetter(
+      'probabilityCurrentLineDensity',
+      1.0,
+      64.0
+    ),
+    setSchroedingerProbabilityCurrentStepSize: clampedSetter(
+      'probabilityCurrentStepSize',
+      0.005,
+      0.2
+    ),
+    setSchroedingerProbabilityCurrentSteps: (steps: number) => {
+      const clamped = Math.max(4, Math.min(64, Math.floor(steps)))
+      setWithVersion((state) => ({
+        schroedinger: { ...state.schroedinger, probabilityCurrentSteps: clamped },
+      }))
+    },
+    setSchroedingerProbabilityCurrentOpacity: clampedSetter('probabilityCurrentOpacity', 0.0, 1.0),
     // Probability Current Flow
     setSchroedingerProbabilityFlowEnabled: valueSetter('probabilityFlowEnabled'),
     setSchroedingerProbabilityFlowSpeed: clampedSetter('probabilityFlowSpeed', 0.1, 5.0),
