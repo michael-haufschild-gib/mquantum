@@ -100,11 +100,7 @@ export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND'
 /**
  * Physically grounded nodal set definitions.
  */
-export type SchroedingerNodalDefinition =
-  | 'psiAbs'
-  | 'realPart'
-  | 'imagPart'
-  | 'complexIntersection'
+export type SchroedingerNodalDefinition = 'psiAbs' | 'realPart' | 'imagPart' | 'complexIntersection'
 
 /**
  * Optional node-family filter for hydrogen/hydrogenND.
@@ -139,6 +135,25 @@ export type SchroedingerCrossSectionPlaneMode = 'axisAligned' | 'free'
  * Axis preset for axis-aligned cross-section planes.
  */
 export type SchroedingerCrossSectionAxis = 'x' | 'y' | 'z'
+
+/**
+ * Probability current visualization style.
+ */
+export type SchroedingerProbabilityCurrentStyle =
+  | 'magnitude'
+  | 'arrows'
+  | 'surfaceLIC'
+  | 'streamlines'
+
+/**
+ * Placement mode for probability current overlays.
+ */
+export type SchroedingerProbabilityCurrentPlacement = 'isosurface' | 'volume'
+
+/**
+ * Coloring mode for probability current overlays.
+ */
+export type SchroedingerProbabilityCurrentColorMode = 'magnitude' | 'direction' | 'circulationSign'
 
 /**
  * Named presets for Hydrogen ND mode (n-dimensional hydrogen orbitals)
@@ -361,8 +376,34 @@ export interface SchroedingerConfig {
   /** Interference fringe animation speed (0.0-10.0) */
   interferenceSpeed: number
 
+  // === Physical Probability Current (j-field) ===
+  /** Enable physical probability-current visualization (j = Im(conj(psi)∇psi)) */
+  probabilityCurrentEnabled: boolean
+  /** Current-field visualization style */
+  probabilityCurrentStyle: SchroedingerProbabilityCurrentStyle
+  /** Overlay placement for current visualization */
+  probabilityCurrentPlacement: SchroedingerProbabilityCurrentPlacement
+  /** Color mapping mode for current overlays */
+  probabilityCurrentColorMode: SchroedingerProbabilityCurrentColorMode
+  /** Visual scale multiplier for current magnitude */
+  probabilityCurrentScale: number
+  /** Animation/advection speed for current patterns */
+  probabilityCurrentSpeed: number
+  /** Minimum density required to show current overlays */
+  probabilityCurrentDensityThreshold: number
+  /** Minimum |j| required to show current overlays */
+  probabilityCurrentMagnitudeThreshold: number
+  /** Pattern/glyph density for arrows/LIC/streamlines */
+  probabilityCurrentLineDensity: number
+  /** Integration/sample step size for LIC/streamline styles */
+  probabilityCurrentStepSize: number
+  /** Integration/sample step count for LIC/streamline styles */
+  probabilityCurrentSteps: number
+  /** Overlay opacity for current visualization */
+  probabilityCurrentOpacity: number
+
   // === Probability Current Flow ===
-  /** Enable probability current flow animation */
+  /** Enable legacy density-modulated flow-noise animation */
   probabilityFlowEnabled: boolean
   /** Flow animation speed (0.1-5.0) */
   probabilityFlowSpeed: number
@@ -550,6 +591,20 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   interferenceAmp: 0.5,
   interferenceFreq: 10.0,
   interferenceSpeed: 1.0,
+
+  // Physical Probability Current (j-field)
+  probabilityCurrentEnabled: false,
+  probabilityCurrentStyle: 'magnitude',
+  probabilityCurrentPlacement: 'isosurface',
+  probabilityCurrentColorMode: 'magnitude',
+  probabilityCurrentScale: 1.0,
+  probabilityCurrentSpeed: 1.0,
+  probabilityCurrentDensityThreshold: 0.01,
+  probabilityCurrentMagnitudeThreshold: 0.0,
+  probabilityCurrentLineDensity: 8.0,
+  probabilityCurrentStepSize: 0.04,
+  probabilityCurrentSteps: 20,
+  probabilityCurrentOpacity: 0.7,
 
   // Probability Current Flow
   probabilityFlowEnabled: false,

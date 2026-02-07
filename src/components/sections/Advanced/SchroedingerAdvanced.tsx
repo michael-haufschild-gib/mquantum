@@ -11,6 +11,9 @@ import type {
   SchroedingerNodalDefinition,
   SchroedingerNodalFamilyFilter,
   SchroedingerNodalRenderMode,
+  SchroedingerProbabilityCurrentColorMode,
+  SchroedingerProbabilityCurrentPlacement,
+  SchroedingerProbabilityCurrentStyle,
 } from '@/lib/geometry/extended/types'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
@@ -63,6 +66,33 @@ const CROSS_SECTION_AXIS_OPTIONS: { value: SchroedingerCrossSectionAxis; label: 
   { value: 'z', label: 'XY (Z-Normal)' },
 ]
 
+const PROBABILITY_CURRENT_STYLE_OPTIONS: {
+  value: SchroedingerProbabilityCurrentStyle
+  label: string
+}[] = [
+  { value: 'magnitude', label: 'Magnitude' },
+  { value: 'arrows', label: 'Arrows' },
+  { value: 'surfaceLIC', label: 'Surface LIC' },
+  { value: 'streamlines', label: 'Streamlines' },
+]
+
+const PROBABILITY_CURRENT_PLACEMENT_OPTIONS: {
+  value: SchroedingerProbabilityCurrentPlacement
+  label: string
+}[] = [
+  { value: 'isosurface', label: 'Isosurface' },
+  { value: 'volume', label: 'Volume' },
+]
+
+const PROBABILITY_CURRENT_COLOR_MODE_OPTIONS: {
+  value: SchroedingerProbabilityCurrentColorMode
+  label: string
+}[] = [
+  { value: 'magnitude', label: 'Magnitude' },
+  { value: 'direction', label: 'Direction' },
+  { value: 'circulationSign', label: 'Circulation Sign' },
+]
+
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
@@ -93,6 +123,19 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
     setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
+    setProbabilityCurrentEnabled: state.setSchroedingerProbabilityCurrentEnabled,
+    setProbabilityCurrentStyle: state.setSchroedingerProbabilityCurrentStyle,
+    setProbabilityCurrentPlacement: state.setSchroedingerProbabilityCurrentPlacement,
+    setProbabilityCurrentColorMode: state.setSchroedingerProbabilityCurrentColorMode,
+    setProbabilityCurrentScale: state.setSchroedingerProbabilityCurrentScale,
+    setProbabilityCurrentSpeed: state.setSchroedingerProbabilityCurrentSpeed,
+    setProbabilityCurrentDensityThreshold: state.setSchroedingerProbabilityCurrentDensityThreshold,
+    setProbabilityCurrentMagnitudeThreshold:
+      state.setSchroedingerProbabilityCurrentMagnitudeThreshold,
+    setProbabilityCurrentLineDensity: state.setSchroedingerProbabilityCurrentLineDensity,
+    setProbabilityCurrentStepSize: state.setSchroedingerProbabilityCurrentStepSize,
+    setProbabilityCurrentSteps: state.setSchroedingerProbabilityCurrentSteps,
+    setProbabilityCurrentOpacity: state.setSchroedingerProbabilityCurrentOpacity,
     setIsoEnabled: state.setSchroedingerIsoEnabled,
     setIsoThreshold: state.setSchroedingerIsoThreshold,
     setCrossSectionEnabled: state.setSchroedingerCrossSectionEnabled,
@@ -143,6 +186,18 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled,
     setPhaseMaterialityStrength,
+    setProbabilityCurrentEnabled,
+    setProbabilityCurrentStyle,
+    setProbabilityCurrentPlacement,
+    setProbabilityCurrentColorMode,
+    setProbabilityCurrentScale,
+    setProbabilityCurrentSpeed,
+    setProbabilityCurrentDensityThreshold,
+    setProbabilityCurrentMagnitudeThreshold,
+    setProbabilityCurrentLineDensity,
+    setProbabilityCurrentStepSize,
+    setProbabilityCurrentSteps,
+    setProbabilityCurrentOpacity,
     setIsoEnabled,
     setIsoThreshold,
     setCrossSectionEnabled,
@@ -690,7 +745,9 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             <label className="text-xs text-text-secondary">Phase Materiality</label>
             <ToggleButton
               pressed={config.phaseMaterialityEnabled ?? false}
-              onToggle={() => setPhaseMaterialityEnabled(!(config.phaseMaterialityEnabled ?? false))}
+              onToggle={() =>
+                setPhaseMaterialityEnabled(!(config.phaseMaterialityEnabled ?? false))
+              }
               className="text-xs px-2 py-1 h-auto"
               ariaLabel="Toggle phase materiality"
               data-testid="schroedinger-phase-materiality-toggle"
@@ -712,6 +769,152 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           )}
         </div>
 
+        {/* Physical Probability Current (j-field) */}
+        <div className="space-y-1 mt-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-text-secondary">Probability Current (j)</label>
+            <ToggleButton
+              pressed={config.probabilityCurrentEnabled ?? false}
+              onToggle={() =>
+                setProbabilityCurrentEnabled(!(config.probabilityCurrentEnabled ?? false))
+              }
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle probability current field"
+              data-testid="schroedinger-probability-current-toggle"
+            >
+              {config.probabilityCurrentEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          {config.probabilityCurrentEnabled && (
+            <div className="ps-2 border-s border-border-default space-y-2">
+              <Select
+                label="Style"
+                options={PROBABILITY_CURRENT_STYLE_OPTIONS}
+                value={config.probabilityCurrentStyle ?? 'magnitude'}
+                onChange={setProbabilityCurrentStyle}
+                data-testid="schroedinger-probability-current-style"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  label="Placement"
+                  options={PROBABILITY_CURRENT_PLACEMENT_OPTIONS}
+                  value={config.probabilityCurrentPlacement ?? 'isosurface'}
+                  onChange={setProbabilityCurrentPlacement}
+                  data-testid="schroedinger-probability-current-placement"
+                />
+                <Select
+                  label="Color Mode"
+                  options={PROBABILITY_CURRENT_COLOR_MODE_OPTIONS}
+                  value={config.probabilityCurrentColorMode ?? 'magnitude'}
+                  onChange={setProbabilityCurrentColorMode}
+                  data-testid="schroedinger-probability-current-color-mode"
+                />
+              </div>
+
+              <Slider
+                label="Scale"
+                min={0.0}
+                max={5.0}
+                step={0.05}
+                value={config.probabilityCurrentScale ?? 1.0}
+                onChange={setProbabilityCurrentScale}
+                showValue
+                data-testid="schroedinger-probability-current-scale"
+              />
+              <Slider
+                label="Speed"
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                value={config.probabilityCurrentSpeed ?? 1.0}
+                onChange={setProbabilityCurrentSpeed}
+                showValue
+                data-testid="schroedinger-probability-current-speed"
+              />
+              <Slider
+                label="Density Threshold"
+                min={0.0}
+                max={1.0}
+                step={0.001}
+                value={config.probabilityCurrentDensityThreshold ?? 0.01}
+                onChange={setProbabilityCurrentDensityThreshold}
+                showValue
+                data-testid="schroedinger-probability-current-density-threshold"
+              />
+              <Slider
+                label="Current Threshold"
+                min={0.0}
+                max={10.0}
+                step={0.01}
+                value={config.probabilityCurrentMagnitudeThreshold ?? 0.0}
+                onChange={setProbabilityCurrentMagnitudeThreshold}
+                showValue
+                data-testid="schroedinger-probability-current-magnitude-threshold"
+              />
+
+              <p className="text-xs text-text-tertiary">
+                Flow is physically zero for many real stationary states. Use complex states (for
+                example, Hydrogen with real orbitals OFF and m ≠ 0, or oscillator superpositions) to
+                see circulation.
+              </p>
+
+              {config.probabilityCurrentStyle === 'magnitude' && (
+                <p className="text-xs text-text-tertiary">
+                  Colors the local |j| magnitude directly.
+                </p>
+              )}
+
+              {config.probabilityCurrentStyle === 'arrows' && (
+                <Slider
+                  label="Arrow Opacity"
+                  min={0.0}
+                  max={1.0}
+                  step={0.01}
+                  value={config.probabilityCurrentOpacity ?? 0.7}
+                  onChange={setProbabilityCurrentOpacity}
+                  showValue
+                  data-testid="schroedinger-probability-current-opacity"
+                />
+              )}
+
+              {(config.probabilityCurrentStyle === 'surfaceLIC' ||
+                config.probabilityCurrentStyle === 'streamlines') && (
+                <>
+                  <Slider
+                    label="Line Density"
+                    min={1.0}
+                    max={64.0}
+                    step={0.5}
+                    value={config.probabilityCurrentLineDensity ?? 8.0}
+                    onChange={setProbabilityCurrentLineDensity}
+                    showValue
+                    data-testid="schroedinger-probability-current-line-density"
+                  />
+                  <Slider
+                    label="Integration Step"
+                    min={0.005}
+                    max={0.2}
+                    step={0.005}
+                    value={config.probabilityCurrentStepSize ?? 0.04}
+                    onChange={setProbabilityCurrentStepSize}
+                    showValue
+                    data-testid="schroedinger-probability-current-step-size"
+                  />
+                  <Slider
+                    label="Integration Steps"
+                    min={4}
+                    max={64}
+                    step={1}
+                    value={config.probabilityCurrentSteps ?? 20}
+                    onChange={setProbabilityCurrentSteps}
+                    showValue
+                    data-testid="schroedinger-probability-current-steps"
+                  />
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </ControlGroup>
 
       {/* Artistic - Chromatic Dispersion & Erosion */}

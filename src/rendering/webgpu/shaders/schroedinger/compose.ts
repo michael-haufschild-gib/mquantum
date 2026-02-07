@@ -45,7 +45,7 @@ import { temporalBlock } from '../shared/features/temporal.wgsl'
 // Schroedinger-specific blocks
 import { schroedingerUniformsBlock } from './uniforms.wgsl'
 import {
-  mainBlock,
+  generateMainBlockVolumetric,
   generateMainBlockIsosurface,
   generateMainBlockTemporal,
   temporalMRTOutputBlock,
@@ -129,6 +129,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   isosurface?: boolean
   /** Use temporal accumulation */
   temporalAccumulation?: boolean
+  /** Use density-grid sampling for volumetric raymarching */
+  useDensityGrid?: boolean
   /** Quantum mode */
   quantumMode?: QuantumModeForShader
   /** Number of HO superposition terms (1-8) */
@@ -154,6 +156,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     dimension,
     isosurface = false,
     temporalAccumulation: enableTemporal = false,
+    useDensityGrid = false,
     quantumMode = 'harmonicOscillator',
     termCount,
     nodal = true,
@@ -240,8 +243,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const selectedMainBlock = isosurface
     ? generateMainBlockIsosurface()
     : enableTemporal
-      ? generateMainBlockTemporal({ bayerJitter: true })
-      : mainBlock
+      ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
+      : generateMainBlockVolumetric({ useDensityGrid })
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
