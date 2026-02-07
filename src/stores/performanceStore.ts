@@ -181,7 +181,7 @@ interface PerformanceState {
   qualityMultiplier: number
 
   // -------------------------------------------------------------------------
-  // Temporal Reprojection (Fractals only)
+  // Temporal Reprojection (Schroedinger raymarching)
   // -------------------------------------------------------------------------
 
   /** Whether temporal reprojection is enabled */
@@ -191,10 +191,10 @@ interface PerformanceState {
   cameraTeleported: boolean
 
   // -------------------------------------------------------------------------
-  // Fractal Animation Quality (Fractals only)
+  // Schroedinger Animation Quality
   // -------------------------------------------------------------------------
 
-  /** Whether to use lower quality during fractal animation for smoother interaction */
+  /** Whether to use lower quality during schroedinger animation for smoother interaction */
   fractalAnimationLowQuality: boolean
 
   // -------------------------------------------------------------------------
@@ -319,7 +319,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   temporalReprojectionEnabled: true,
   cameraTeleported: false,
 
-  // Fractal Animation Quality
+  // Schroedinger Animation Quality
   fractalAnimationLowQuality: true,
 
   // Render Resolution Scale (load from localStorage, default to desktop default)

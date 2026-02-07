@@ -177,7 +177,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
           onClose={handleCloseClearIndexDBModal}
           onConfirm={handleClearGeometryCache}
           title="Clear Geometry Cache"
-          message="This will delete all cached polytope geometry. Next loads will regenerate from scratch."
+          message="This will delete all cached wavefunction geometry. Next loads will regenerate from scratch."
           confirmText="Clear Cache"
           isDestructive
         />

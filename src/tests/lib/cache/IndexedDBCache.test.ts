@@ -75,83 +75,83 @@ describe('IndexedDBCache', () => {
 
   describe('get/set', () => {
     it('should store and retrieve data', async () => {
-      await cache.set('polytope-geometry', 'test-key', { foo: 'bar' })
-      const result = await cache.get('polytope-geometry', 'test-key')
+      await cache.set('wavefunction-luts', 'test-key', { foo: 'bar' })
+      const result = await cache.get('wavefunction-luts', 'test-key')
       expect(result).toEqual({ foo: 'bar' })
     })
 
     it('should return null for missing key', async () => {
-      const result = await cache.get('polytope-geometry', 'nonexistent')
+      const result = await cache.get('wavefunction-luts', 'nonexistent')
       expect(result).toBeNull()
     })
 
     it('should overwrite existing value', async () => {
-      await cache.set('polytope-geometry', 'key', { value: 1 })
-      await cache.set('polytope-geometry', 'key', { value: 2 })
-      const result = await cache.get('polytope-geometry', 'key')
+      await cache.set('wavefunction-luts', 'key', { value: 1 })
+      await cache.set('wavefunction-luts', 'key', { value: 2 })
+      const result = await cache.get('wavefunction-luts', 'key')
       expect(result).toEqual({ value: 2 })
     })
 
     it('should store typed arrays', async () => {
       const vertices = new Float64Array([1.5, 2.5, 3.5, 4.5])
-      await cache.set('polytope-geometry', 'typed-array', { vertices })
-      const result = await cache.get<{ vertices: Float64Array }>('polytope-geometry', 'typed-array')
+      await cache.set('wavefunction-luts', 'typed-array', { vertices })
+      const result = await cache.get<{ vertices: Float64Array }>('wavefunction-luts', 'typed-array')
       expect(result).not.toBeNull()
       // Note: IndexedDB may return regular arrays, not typed arrays
       expect(Array.from(result!.vertices)).toEqual([1.5, 2.5, 3.5, 4.5])
     })
 
     it('should store with optional checksum', async () => {
-      await cache.set('polytope-geometry', 'with-checksum', { data: 1 }, 'abc123')
-      const result = await cache.get('polytope-geometry', 'with-checksum')
+      await cache.set('wavefunction-luts', 'with-checksum', { data: 1 }, 'abc123')
+      const result = await cache.get('wavefunction-luts', 'with-checksum')
       expect(result).toEqual({ data: 1 })
     })
   })
 
   describe('delete', () => {
     it('should delete existing entry', async () => {
-      await cache.set('polytope-geometry', 'to-delete', { data: 1 })
-      await cache.delete('polytope-geometry', 'to-delete')
-      const result = await cache.get('polytope-geometry', 'to-delete')
+      await cache.set('wavefunction-luts', 'to-delete', { data: 1 })
+      await cache.delete('wavefunction-luts', 'to-delete')
+      const result = await cache.get('wavefunction-luts', 'to-delete')
       expect(result).toBeNull()
     })
 
     it('should not throw when deleting non-existent key', async () => {
-      await expect(cache.delete('polytope-geometry', 'nonexistent')).resolves.not.toThrow()
+      await expect(cache.delete('wavefunction-luts', 'nonexistent')).resolves.not.toThrow()
     })
   })
 
   describe('clear', () => {
     it('should clear all entries in store', async () => {
-      await cache.set('polytope-geometry', 'key1', { data: 1 })
-      await cache.set('polytope-geometry', 'key2', { data: 2 })
-      await cache.set('polytope-geometry', 'key3', { data: 3 })
+      await cache.set('wavefunction-luts', 'key1', { data: 1 })
+      await cache.set('wavefunction-luts', 'key2', { data: 2 })
+      await cache.set('wavefunction-luts', 'key3', { data: 3 })
 
-      await cache.clear('polytope-geometry')
+      await cache.clear('wavefunction-luts')
 
-      expect(await cache.get('polytope-geometry', 'key1')).toBeNull()
-      expect(await cache.get('polytope-geometry', 'key2')).toBeNull()
-      expect(await cache.get('polytope-geometry', 'key3')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'key1')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'key2')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'key3')).toBeNull()
     })
 
     it('should not affect other stores', async () => {
-      await cache.set('polytope-geometry', 'key1', { data: 1 })
+      await cache.set('wavefunction-luts', 'key1', { data: 1 })
       await cache.set('metadata', 'key1', { meta: true })
 
-      await cache.clear('polytope-geometry')
+      await cache.clear('wavefunction-luts')
 
-      expect(await cache.get('polytope-geometry', 'key1')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'key1')).toBeNull()
       expect(await cache.get('metadata', 'key1')).toEqual({ meta: true })
     })
   })
 
   describe('getAllKeys', () => {
     it('should return all keys', async () => {
-      await cache.set('polytope-geometry', 'a', { data: 1 })
-      await cache.set('polytope-geometry', 'b', { data: 2 })
-      await cache.set('polytope-geometry', 'c', { data: 3 })
+      await cache.set('wavefunction-luts', 'a', { data: 1 })
+      await cache.set('wavefunction-luts', 'b', { data: 2 })
+      await cache.set('wavefunction-luts', 'c', { data: 3 })
 
-      const keys = await cache.getAllKeys('polytope-geometry')
+      const keys = await cache.getAllKeys('wavefunction-luts')
       expect(keys).toContain('a')
       expect(keys).toContain('b')
       expect(keys).toContain('c')
@@ -159,29 +159,29 @@ describe('IndexedDBCache', () => {
     })
 
     it('should return empty array for empty store', async () => {
-      const keys = await cache.getAllKeys('polytope-geometry')
+      const keys = await cache.getAllKeys('wavefunction-luts')
       expect(keys).toEqual([])
     })
   })
 
   describe('getSize', () => {
     it('should calculate total size', async () => {
-      await cache.set('polytope-geometry', 'key', { data: 'test string value' })
-      const size = await cache.getSize('polytope-geometry')
+      await cache.set('wavefunction-luts', 'key', { data: 'test string value' })
+      const size = await cache.getSize('wavefunction-luts')
       expect(size).toBeGreaterThan(0)
     })
 
     it('should return 0 for empty store', async () => {
-      const size = await cache.getSize('polytope-geometry')
+      const size = await cache.getSize('wavefunction-luts')
       expect(size).toBe(0)
     })
 
     it('should increase with more entries', async () => {
-      await cache.set('polytope-geometry', 'key1', { data: 'value1' })
-      const size1 = await cache.getSize('polytope-geometry')
+      await cache.set('wavefunction-luts', 'key1', { data: 'value1' })
+      const size1 = await cache.getSize('wavefunction-luts')
 
-      await cache.set('polytope-geometry', 'key2', { data: 'value2' })
-      const size2 = await cache.getSize('polytope-geometry')
+      await cache.set('wavefunction-luts', 'key2', { data: 'value2' })
+      const size2 = await cache.getSize('wavefunction-luts')
 
       expect(size2).toBeGreaterThan(size1)
     })
@@ -190,52 +190,52 @@ describe('IndexedDBCache', () => {
   describe('evictLRU', () => {
     it('should evict oldest entries', async () => {
       // Add entries with delays to ensure different lastAccess times
-      await cache.set('polytope-geometry', 'old1', { data: 1 })
+      await cache.set('wavefunction-luts', 'old1', { data: 1 })
       await new Promise((r) => setTimeout(r, 10))
-      await cache.set('polytope-geometry', 'old2', { data: 2 })
+      await cache.set('wavefunction-luts', 'old2', { data: 2 })
       await new Promise((r) => setTimeout(r, 10))
-      await cache.set('polytope-geometry', 'new1', { data: 3 })
+      await cache.set('wavefunction-luts', 'new1', { data: 3 })
       await new Promise((r) => setTimeout(r, 10))
-      await cache.set('polytope-geometry', 'new2', { data: 4 })
+      await cache.set('wavefunction-luts', 'new2', { data: 4 })
 
       // Evict 50%
-      const evicted = await cache.evictLRU('polytope-geometry', 0.5)
+      const evicted = await cache.evictLRU('wavefunction-luts', 0.5)
       expect(evicted).toBe(2)
 
       // Old entries should be gone
-      expect(await cache.get('polytope-geometry', 'old1')).toBeNull()
-      expect(await cache.get('polytope-geometry', 'old2')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'old1')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'old2')).toBeNull()
 
       // New entries should remain
-      expect(await cache.get('polytope-geometry', 'new1')).not.toBeNull()
-      expect(await cache.get('polytope-geometry', 'new2')).not.toBeNull()
+      expect(await cache.get('wavefunction-luts', 'new1')).not.toBeNull()
+      expect(await cache.get('wavefunction-luts', 'new2')).not.toBeNull()
     })
 
     it('should return 0 when no entries to evict', async () => {
-      const evicted = await cache.evictLRU('polytope-geometry', 0.5)
+      const evicted = await cache.evictLRU('wavefunction-luts', 0.5)
       expect(evicted).toBe(0)
     })
 
     it('should update lastAccess on get', async () => {
       // Add old entry
-      await cache.set('polytope-geometry', 'old', { data: 1 })
+      await cache.set('wavefunction-luts', 'old', { data: 1 })
       await new Promise((r) => setTimeout(r, 10))
 
       // Add new entry
-      await cache.set('polytope-geometry', 'new', { data: 2 })
+      await cache.set('wavefunction-luts', 'new', { data: 2 })
       await new Promise((r) => setTimeout(r, 10))
 
       // Access old entry to update its lastAccess
-      await cache.get('polytope-geometry', 'old')
+      await cache.get('wavefunction-luts', 'old')
       await new Promise((r) => setTimeout(r, 10))
 
       // Evict 50% - should evict 'new' since 'old' was accessed more recently
-      await cache.evictLRU('polytope-geometry', 0.5)
+      await cache.evictLRU('wavefunction-luts', 0.5)
 
       // 'old' should still exist (accessed recently)
-      expect(await cache.get('polytope-geometry', 'old')).not.toBeNull()
+      expect(await cache.get('wavefunction-luts', 'old')).not.toBeNull()
       // 'new' should be evicted (older lastAccess despite being added later)
-      expect(await cache.get('polytope-geometry', 'new')).toBeNull()
+      expect(await cache.get('wavefunction-luts', 'new')).toBeNull()
     })
   })
 
@@ -252,13 +252,13 @@ describe('IndexedDBCache', () => {
 
   describe('multiple stores', () => {
     it('should isolate data between stores', async () => {
-      await cache.set('polytope-geometry', 'shared-key', { store: 'polytope' })
+      await cache.set('wavefunction-luts', 'shared-key', { store: 'wavefunction' })
       await cache.set('metadata', 'shared-key', { store: 'metadata' })
 
-      const polytopeData = await cache.get('polytope-geometry', 'shared-key')
+      const wavefunctionData = await cache.get('wavefunction-luts', 'shared-key')
       const metadataData = await cache.get('metadata', 'shared-key')
 
-      expect(polytopeData).toEqual({ store: 'polytope' })
+      expect(wavefunctionData).toEqual({ store: 'wavefunction' })
       expect(metadataData).toEqual({ store: 'metadata' })
     })
   })

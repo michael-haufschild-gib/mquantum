@@ -82,44 +82,6 @@ export const DIMENSION_INFO: Record<number, DimensionInfo> = {
   },
 }
 
-export const POLYTOPE_INFO: Record<string, EducationTopic> = {
-  hypercube: {
-    id: 'hypercube',
-    title: 'Hypercube',
-    description: 'The n-dimensional analog of a cube. Each vertex has n perpendicular edges.',
-    details: [
-      'In 3D: Cube (8 vertices, 12 edges, 6 faces)',
-      'In 4D: Tesseract (16 vertices, 32 edges, 24 faces, 8 cells)',
-      'In 5D: Penteract (32 vertices)',
-      'Formed by moving a (n-1)-cube perpendicular to itself',
-    ],
-  },
-  simplex: {
-    id: 'simplex',
-    title: 'Simplex',
-    description:
-      'The simplest polytope in n dimensions. Has n+1 vertices, all mutually equidistant.',
-    details: [
-      'In 3D: Tetrahedron (4 vertices)',
-      'In 4D: 5-cell/Pentachoron (5 vertices)',
-      'In 5D: 5-simplex (6 vertices)',
-      'Every vertex is connected to every other vertex',
-    ],
-  },
-  'cross-polytope': {
-    id: 'cross-polytope',
-    title: 'Cross-Polytope',
-    description:
-      'The n-dimensional analog of an octahedron. Has 2n vertices arranged along the axes.',
-    details: [
-      'In 3D: Octahedron (6 vertices)',
-      'In 4D: 16-cell (8 vertices)',
-      'In 5D: 5-orthoplex (10 vertices)',
-      'Vertices placed at +1 and -1 on each axis',
-    ],
-  },
-}
-
 export const PROJECTION_INFO: EducationTopic = {
   id: 'projection',
   title: 'Projection',
@@ -153,15 +115,6 @@ export function getDimensionInfo(dimension: number): DimensionInfo | undefined {
 }
 
 /**
- * Get educational information for a polytope type
- * @param type - The polytope type to get info for
- * @returns Education topic object or undefined if not found
- */
-export function getPolytopeInfo(type: string): EducationTopic | undefined {
-  return POLYTOPE_INFO[type]
-}
-
-/**
  * Get the number of rotation planes for a dimension
  * @param dimension - The dimension
  * @returns Number of rotation planes (n*(n-1)/2)
@@ -171,29 +124,3 @@ export function getRotationPlaneCount(dimension: number): number {
   return (dimension * (dimension - 1)) / 2
 }
 
-/**
- * Get the number of vertices for a hypercube of given dimension
- * @param dimension - The dimension
- * @returns Number of vertices (2^dimension)
- */
-export function getHypercubeVertexCount(dimension: number): number {
-  return Math.pow(2, dimension)
-}
-
-/**
- * Get the number of vertices for a simplex of given dimension
- * @param dimension - The dimension
- * @returns Number of vertices (dimension + 1)
- */
-export function getSimplexVertexCount(dimension: number): number {
-  return dimension + 1
-}
-
-/**
- * Get the number of vertices for a cross-polytope of given dimension
- * @param dimension - The dimension
- * @returns Number of vertices (2 * dimension)
- */
-export function getCrossPolytopeVertexCount(dimension: number): number {
-  return 2 * dimension
-}

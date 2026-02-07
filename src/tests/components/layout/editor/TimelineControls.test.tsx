@@ -16,46 +16,12 @@ vi.mock('@/stores/geometryStore', () => ({
 const mockRandomizePlanes = vi.fn()
 
 const mockExtendedState = {
-  mandelbulb: {
-    powerAnimationEnabled: false,
-    sliceAnimationEnabled: false,
-    phaseShiftEnabled: false,
-    alternatePowerEnabled: false,
-  },
-  quaternionJulia: {},
-  polytope: {
-    truncationEnabled: false,
-    facetOffsetEnabled: false,
-    dualMorphEnabled: false,
-    explodeEnabled: false,
-  },
   schroedinger: {
     sliceAnimationEnabled: false,
     interferenceEnabled: false,
     probabilityFlowEnabled: false,
     probabilityCurrentEnabled: false,
   },
-  blackhole: {
-    swirlAnimationEnabled: false,
-    pulseEnabled: false,
-  },
-  setMandelbulbPowerAnimationEnabled: vi.fn(),
-  setMandelbulbPowerMin: vi.fn(),
-  setMandelbulbPowerMax: vi.fn(),
-  setMandelbulbPowerSpeed: vi.fn(),
-  setMandelbulbSliceAnimationEnabled: vi.fn(),
-  setMandelbulbSliceSpeed: vi.fn(),
-  setMandelbulbSliceAmplitude: vi.fn(),
-  setMandelbulbJuliaModeEnabled: vi.fn(),
-  setMandelbulbJuliaOrbitSpeed: vi.fn(),
-  setMandelbulbJuliaOrbitRadius: vi.fn(),
-  setMandelbulbPhaseShiftEnabled: vi.fn(),
-  setMandelbulbPhaseSpeed: vi.fn(),
-  setMandelbulbPhaseAmplitude: vi.fn(),
-  setQuaternionJuliaConstantAnimationEnabled: vi.fn(),
-  setQuaternionJuliaPowerAnimationEnabled: vi.fn(),
-  setQuaternionJuliaOriginDriftEnabled: vi.fn(),
-  setQuaternionJuliaDimensionMixEnabled: vi.fn(),
 }
 
 vi.mock('@/stores/animationStore', () => ({

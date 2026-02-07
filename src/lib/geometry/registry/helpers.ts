@@ -60,36 +60,14 @@ export function getObjectTypeEntryOrThrow(type: ObjectType): ObjectTypeEntry {
  * Gets the category of an object type.
  *
  * @param type - The object type
- * @returns The category ('polytope' | 'extended' | 'fractal'), or undefined
+ * @returns The category ('fractal'), or undefined
  */
 export function getObjectCategory(type: ObjectType): ObjectCategory | undefined {
   return getObjectTypeEntry(type)?.category
 }
 
 /**
- * Checks if an object type is a polytope (hypercube, simplex, cross-polytope).
- *
- * @param type - The object type to check
- * @returns true if the type is a polytope
- */
-export function isPolytopeCategory(type: string): boolean {
-  const entry = OBJECT_TYPE_REGISTRY.get(type as ObjectType)
-  return entry?.category === 'polytope'
-}
-
-/**
- * Checks if an object type is an extended object (root-system, tori).
- *
- * @param type - The object type to check
- * @returns true if the type is an extended object
- */
-export function isExtendedCategory(type: string): boolean {
-  const entry = OBJECT_TYPE_REGISTRY.get(type as ObjectType)
-  return entry?.category === 'extended'
-}
-
-/**
- * Checks if an object type is a fractal (mandelbulb, quaternion-julia).
+ * Checks if an object type uses raymarching (schroedinger).
  *
  * @param type - The object type to check
  * @returns true if the type is a fractal
@@ -138,7 +116,7 @@ export function canRenderPoints(type: ObjectType): boolean {
  * Gets the render method for an object type.
  *
  * @param type - The object type
- * @returns The render method ('polytope' | 'raymarch' | 'point-cloud')
+ * @returns The render method ('raymarch')
  */
 export function getRenderMethod(type: ObjectType): RenderMethod | undefined {
   return getObjectTypeEntry(type)?.rendering.renderMethod
@@ -476,7 +454,7 @@ export function getTypeDescription(type: ObjectType): string {
  * Gets the config store key for an object type.
  *
  * @param type - The object type
- * @returns The key used in extendedObjectStore (e.g., 'mandelbulb', 'polytope')
+ * @returns The key used in extendedObjectStore (e.g., 'schroedinger')
  */
 export function getConfigStoreKey(type: ObjectType): string | undefined {
   return getObjectTypeEntry(type)?.configStoreKey

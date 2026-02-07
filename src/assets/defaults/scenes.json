@@ -381,66 +381,6 @@
           "sssColor": "#ff8844",
           "sssThickness": 1
         },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
         "schroedinger": {
           "scale": 0.6,
           "qualityPreset": "standard",
@@ -1096,66 +1036,6 @@
           "sssIntensity": 1,
           "sssColor": "#ff8844",
           "sssThickness": 1
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
         },
         "schroedinger": {
           "scale": 0.6,
@@ -1842,64 +1722,6 @@
           "sssColor": "#ff8844",
           "sssThickness": 1
         },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "qualityMultiplier": 1,
-          "parameterValues": [],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
         "schroedinger": {
           "scale": 0.6,
           "qualityPreset": "standard",
@@ -2526,63 +2348,6 @@
           "sssColor": "#ff8844",
           "sssThickness": 1
         },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "sdfMaxIterations": 30,
-          "sdfSurfaceDistance": 0.002,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0
-        },
         "schroedinger": {
           "scale": 0.6,
           "qualityPreset": "standard",
@@ -3190,68 +2955,6 @@
           "driftAmplitude": 0.03,
           "driftBaseFrequency": 0.04,
           "driftFrequencySpread": 0.2
-        },
-        "quaternionJulia": {
-          "juliaConstant": [
-            -0.2,
-            0.8,
-            0,
-            0
-          ],
-          "power": 2,
-          "maxIterations": 64,
-          "bailoutRadius": 4,
-          "scale": 1,
-          "surfaceThreshold": 0.002,
-          "maxRaymarchSteps": 128,
-          "sdfMaxIterations": 30,
-          "sdfSurfaceDistance": 0.002,
-          "qualityMultiplier": 1,
-          "parameterValues": [
-            0
-          ],
-          "colorMode": 2,
-          "baseColor": "#4488ff",
-          "cosineCoefficients": {
-            "a": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "b": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "c": [
-              1,
-              1,
-              1
-            ],
-            "d": [
-              0,
-              0.33,
-              0.67
-            ]
-          },
-          "colorPower": 1,
-          "colorCycles": 1,
-          "colorOffset": 0,
-          "lchLightness": 0.7,
-          "lchChroma": 0.15,
-          "roughness": 0.3,
-          "sssEnabled": false,
-          "sssIntensity": 1,
-          "sssColor": "#ff8844",
-          "sssThickness": 1,
-          "fogEnabled": false,
-          "fogContribution": 1,
-          "internalFogDensity": 0,
-          "opacityMode": 0,
-          "opacity": 1,
-          "layerCount": 2,
-          "layerOpacity": 0.5,
-          "volumetricDensity": 1
         },
         "schroedinger": {
           "scale": 0.6,

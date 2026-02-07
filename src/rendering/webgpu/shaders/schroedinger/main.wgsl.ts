@@ -487,20 +487,42 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let rhoSurface = densityInfo.x * isoGain;
   let phase = densityInfo.z;
 
-  // Surface coloring - use material base color with subtle phase modulation
-  let baseHSL = rgb2hsl(material.baseColor.rgb);
-  let normS = clamp((sFromRho(rhoSurface) + 8.0) / 8.0, 0.0, 1.0);
-  var surfaceColor: vec3f;
+  // Surface coloring via full color algorithm system
+  let sSurface = sFromRho(rhoSurface);
+  var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
 
-  // Phase influence on hue
-  let phaseNorm = (phase + PI) / TAU;
-  let hueShift = (phaseNorm - 0.5) * 0.4; // +/- 20% hue shift
+  // Uncertainty boundary emphasis: brighten surface near confidence threshold
+  if (schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
+    let ubWidth = max(schroedinger.uncertaintyBoundaryWidth, 1e-3);
+    let ubDist = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold) / ubWidth;
+    let ubBand = exp(-0.5 * ubDist * ubDist);
+    let ubGlow = ubBand * schroedinger.uncertaintyBoundaryStrength;
+    surfaceColor = mix(surfaceColor, surfaceColor * 1.8 + vec3f(0.05), ubGlow);
+  }
 
-  // Use color algorithm 8 (Phase) as default for quantum visualization
-  let hue = fract(baseHSL.x + hueShift);
-  let lightness = 0.15 + 0.35 * normS;
-  let saturation = 0.7 + 0.25 * normS;
-  surfaceColor = hsl2rgb(hue, saturation, lightness);
+  // Chromatic dispersion: per-channel color separation at surface
+  if (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u && schroedinger.dispersionStrength > 0.0) {
+    let dispAmount = schroedinger.dispersionStrength * 0.15;
+    var dispDir: vec3f;
+    if (schroedinger.dispersionDirection == 1) {
+      // View-aligned
+      var up = vec3f(0.0, 1.0, 0.0);
+      if (abs(rd.y) > 0.999) { up = vec3f(1.0, 0.0, 0.0); }
+      dispDir = normalize(cross(rd, up));
+    } else {
+      // Radial
+      dispDir = normalize(p);
+    }
+    let pR = p + dispDir * dispAmount;
+    let pB = p - dispDir * dispAmount;
+    let infoR = sampleDensityWithPhase(pR, animTime, schroedinger);
+    let infoB = sampleDensityWithPhase(pB, animTime, schroedinger);
+    let rhoR = infoR.x * isoGain;
+    let rhoB = infoB.x * isoGain;
+    let colorR = computeBaseColor(rhoR, sFromRho(rhoR), infoR.z, pR, schroedinger);
+    let colorB = computeBaseColor(rhoB, sFromRho(rhoB), infoB.z, pB, schroedinger);
+    surfaceColor = vec3f(colorR.r, surfaceColor.g, colorB.b);
+  }
 
   // Lighting - use shared lighting uniforms
   var col = surfaceColor * max(1.0 - material.metallic, 0.0) *

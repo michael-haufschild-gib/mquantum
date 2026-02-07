@@ -13,11 +13,9 @@ import { describe, it, expect } from 'vitest'
 import {
   isColorAlgorithmAvailable,
   isQuantumOnlyAlgorithm,
-  isBlackHoleOnlyAlgorithm,
   isGeometricPhaseAlgorithm,
   isPolytopeOnlyAlgorithm,
   QUANTUM_ONLY_ALGORITHMS,
-  BLACKHOLE_ONLY_ALGORITHMS,
   GEOMETRIC_PHASE_ALGORITHMS,
   POLYTOPE_ONLY_ALGORITHMS,
   type ColorAlgorithm,
@@ -36,10 +34,6 @@ describe('Color Algorithm Availability', () => {
       expect(GEOMETRIC_PHASE_ALGORITHMS).toContain('mixed')
       expect(isGeometricPhaseAlgorithm('phase')).toBe(true)
       expect(isGeometricPhaseAlgorithm('mixed')).toBe(true)
-    })
-
-    it('should have no blackhole-only algorithms', () => {
-      expect(BLACKHOLE_ONLY_ALGORITHMS).toHaveLength(0)
     })
 
     it('should have no polytope-only algorithms', () => {
@@ -102,13 +96,6 @@ describe('Color Algorithm Availability', () => {
     it('should return false for general algorithms', () => {
       expect(isQuantumOnlyAlgorithm('monochromatic')).toBe(false)
       expect(isQuantumOnlyAlgorithm('cosine')).toBe(false)
-    })
-  })
-
-  describe('isBlackHoleOnlyAlgorithm', () => {
-    it('should return false for all algorithms (no blackhole types remain)', () => {
-      expect(isBlackHoleOnlyAlgorithm('monochromatic')).toBe(false)
-      expect(isBlackHoleOnlyAlgorithm('cosine')).toBe(false)
     })
   })
 

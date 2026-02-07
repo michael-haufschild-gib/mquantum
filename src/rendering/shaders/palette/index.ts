@@ -47,7 +47,6 @@ ${GLSL_PALETTE_FUNCTIONS}
 
 // Types
 export {
-  BLACKHOLE_ONLY_ALGORITHMS,
   COLOR_ALGORITHM_OPTIONS,
   COLOR_ALGORITHM_TO_INT,
   DEFAULT_COLOR_ALGORITHM,
@@ -55,7 +54,6 @@ export {
   DEFAULT_DISTRIBUTION,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
   GEOMETRIC_PHASE_ALGORITHMS,
-  isBlackHoleOnlyAlgorithm,
   isColorAlgorithmAvailable,
   isGeometricPhaseAlgorithm,
   isQuantumOnlyAlgorithm,

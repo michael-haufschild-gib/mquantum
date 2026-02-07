@@ -1,7 +1,7 @@
 /**
  * Appearance slice for visual store
  *
- * Manages visual appearance of the polytope:
+ * Manages visual appearance of the schroedinger object:
  * - Basic colors (edge, face, background)
  * - Advanced color system (algorithms, cosine coefficients, LCH)
  * - Shader system (wireframe, surface settings)

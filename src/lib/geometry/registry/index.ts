@@ -41,8 +41,6 @@ export {
   getObjectTypeEntryOrThrow,
   // Category helpers
   getObjectCategory,
-  isPolytopeCategory,
-  isExtendedCategory,
   isFractalCategory,
   // Rendering capability helpers
   canRenderFaces,

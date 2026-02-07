@@ -186,7 +186,7 @@ export interface PBRConfig {
   specularColor: string // hex color string
 }
 
-/** PBR for main objects (polytope faces, mandelbulb, julia, schroedinger, blackhole) */
+/** PBR for main objects (schroedinger wavefunctions) */
 export const DEFAULT_FACE_PBR: PBRConfig = {
   roughness: 0.3,
   metallic: 0.0,

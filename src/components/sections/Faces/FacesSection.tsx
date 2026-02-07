@@ -64,7 +64,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     }))
   )
 
-  // Raymarching fractals (mandelbulb, julia, schroedinger, blackhole) are always fully opaque
+  // Raymarching objects (schroedinger) are always fully opaque
   const isRaymarchingFractalType = isRaymarchingFractal(objectType, dimension)
 
   // Check if isosurface mode is active (PBR material only applies to isosurface, not volumetric)

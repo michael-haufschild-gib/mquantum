@@ -1,22 +1,13 @@
 /**
  * ObjectSettingsSection Component
  *
- * Displays type-specific settings for all object types (both polytopes and extended objects).
+ * Displays type-specific settings for the schroedinger object type.
  * Uses the registry to dynamically load the appropriate controls component.
  *
  * Features:
  * - Dynamic lazy loading of controls via registry
  * - Code-split controls components for smaller initial bundle
  * - Unified control rendering across all object types
- *
- * Polytopes:
- * - Hypercube, Simplex, Cross-polytope: scale (0.5-3.0)
- *
- * Extended Objects:
- * - Root System: type (A/D/E8), scale (0.5-2.0), always has edges
- * - Clifford Torus: radius, resolution, edge mode
- * - Mandelbulb: max iterations, escape radius, etc.
- * - Quaternion Julia: constant, power, iterations, etc.
  */
 
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'

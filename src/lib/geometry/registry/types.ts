@@ -17,34 +17,19 @@ import type { ObjectType } from '../types'
 /**
  * Category classification for object types
  */
-export type ObjectCategory = 'polytope' | 'extended' | 'fractal'
+export type ObjectCategory = 'fractal'
 
 /**
  * Render method determines which renderer handles the object
- * - polytope: Traditional vertex/edge/face rendering via PolytopeScene
- * - raymarch: GPU raymarching for fractals (Mandelbulb, Quaternion Julia)
- * - point-cloud: Point-based rendering (future use)
+ * - raymarch: GPU raymarching for volumetric rendering (Schroedinger wavefunction)
  */
-export type RenderMethod = 'polytope' | 'raymarch' | 'point-cloud'
+export type RenderMethod = 'raymarch'
 
 /**
  * Face detection algorithm used for this object type
- * - analytical-quad: Hypercube - quad faces generated from dimension formula
- * - triangles: Simplex/Cross-polytope - 3-cycles in adjacency graph
- * - convex-hull: Root system - 3D convex hull projection
- * - grid: Clifford/Nested torus - UV grid structure from metadata
- * - metadata: Pre-computed faces stored in geometry metadata (Wythoff polytopes)
- * - metadata-or-triangles: Try metadata first, fall back to triangles (Wythoff presets)
- * - none: Point clouds, raymarched fractals (faces rendered by shader)
+ * - none: Raymarched volumes (faces rendered by shader, not geometry)
  */
-export type FaceDetectionMethod =
-  | 'analytical-quad'
-  | 'triangles'
-  | 'convex-hull'
-  | 'grid'
-  | 'metadata'
-  | 'metadata-or-triangles'
-  | 'none'
+export type FaceDetectionMethod = 'none'
 
 // ============================================================================
 // Dimension Constraints
@@ -246,8 +231,7 @@ export interface ObjectTypeEntry {
 
   /**
    * Key for the config object in extendedObjectStore.
-   * e.g., "mandelbulb" → store.mandelbulb
-   * e.g., "polytope" → store.polytope
+   * e.g., "schroedinger" → store.schroedinger
    */
   configStoreKey: string
 }

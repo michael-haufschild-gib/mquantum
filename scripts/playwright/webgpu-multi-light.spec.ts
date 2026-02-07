@@ -150,8 +150,8 @@ test('spot light rotation changes WebGPU lighting output', async ({ page }) => {
     localStorage.setItem('mdim_preferred_renderer', 'webgpu')
   })
 
-  // Use mandelbulb: stable, centered, and strongly lit when a spotlight hits it
-  await page.goto('/?t=mandelbulb')
+  // Use schroedinger: stable, centered, and strongly lit when a spotlight hits it
+  await page.goto('/?t=schroedinger')
   await waitForCanvasVisible(page)
 
   const webgpuAvailable = await page.evaluate(() => !!navigator.gpu)

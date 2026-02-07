@@ -269,7 +269,6 @@ describe('presetManagerStore', () => {
       expect(saved!.data.extended.blackholeVersion).toBeUndefined()
       expect(saved!.data.extended.schroedingerVersion).toBeUndefined()
       expect(saved!.data.extended.mandelbulbVersion).toBeUndefined()
-      expect(saved!.data.extended.quaternionJuliaVersion).toBeUndefined()
     })
 
     it('should not include device-specific UI settings in saved scenes', () => {

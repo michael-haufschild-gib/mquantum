@@ -11,13 +11,11 @@
 /**
  * Available object stores in the cache database.
  *
- * - polytope-geometry: Active. Stores Wythoff polytope binary data for
- *   cross-session caching. Uses binary serialization (~2.5x size reduction).
  * - wavefunction-luts: Reserved. For future Schroedinger wavefunction lookup tables.
  * - blobs: Reserved. For future texture/asset blob storage.
  * - metadata: Reserved. For future cache metadata/statistics.
  */
-export type IndexedDBCacheStore = 'polytope-geometry' | 'wavefunction-luts' | 'blobs' | 'metadata'
+export type IndexedDBCacheStore = 'wavefunction-luts' | 'blobs' | 'metadata'
 
 /** Metadata stored with each cached entry */
 interface CacheEntry<T> {
@@ -37,7 +35,6 @@ const DB_NAME = 'mdimension-cache'
 
 /** Store names to create */
 const STORES: IndexedDBCacheStore[] = [
-  'polytope-geometry',
   'wavefunction-luts',
   'blobs',
   'metadata',

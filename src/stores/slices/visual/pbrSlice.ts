@@ -2,7 +2,7 @@
  * PBR (Physically Based Rendering) Material Slice
  *
  * Provides independent PBR settings for three object types:
- * - Face: Main objects (polytope faces, mandelbulb, julia, schroedinger, blackhole)
+ * - Face: Main objects (schroedinger wavefunctions)
  * - Edge: TubeWireframe (when edgeThickness > 1)
  *
  * Each object type has its own complete set of PBR properties:

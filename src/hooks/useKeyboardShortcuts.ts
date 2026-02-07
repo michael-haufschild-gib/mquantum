@@ -50,9 +50,6 @@ export const SHORTCUTS: Omit<ShortcutConfig, 'action'>[] = [
   // Geometry
   { key: 'ArrowUp', description: 'Increase dimension' },
   { key: 'ArrowDown', description: 'Decrease dimension' },
-  { key: '1', description: 'Select hypercube' },
-  { key: '2', description: 'Select simplex' },
-  { key: '3', description: 'Select cross-polytope' },
   // View
   { key: 'c', description: 'Toggle cinematic mode' },
   // Export
@@ -74,11 +71,10 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
   const { enabled = true } = options
 
   // Grouped geometry store subscription
-  const { dimension, setDimension, setObjectType } = useGeometryStore(
+  const { dimension, setDimension } = useGeometryStore(
     useShallow((state) => ({
       dimension: state.dimension,
       setDimension: state.setDimension,
-      setObjectType: state.setObjectType,
     }))
   )
 
@@ -225,7 +221,6 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
     [
       dimension,
       setDimension,
-      setObjectType,
       selectedLightId,
       setTransformMode,
       selectLight,

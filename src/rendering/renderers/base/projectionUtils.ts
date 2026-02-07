@@ -2,8 +2,8 @@
  * Projection Distance Utilities for N-D Renderers
  *
  * Provides utilities for calculating safe projection distances that ensure
- * all vertices remain visible without singularities. Used by PolytopeScene
- * and TubeWireframe to avoid vertices crossing the projection plane.
+ * all vertices remain visible without singularities. Used by N-D renderers
+ * to avoid vertices crossing the projection plane.
  *
  * @module rendering/renderers/base/projectionUtils
  */

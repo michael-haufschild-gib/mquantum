@@ -108,20 +108,6 @@ export function isGeometricPhaseAlgorithm(algorithm: ColorAlgorithm): boolean {
 }
 
 /**
- * Black hole algorithms - empty since blackhole type is removed.
- */
-export const BLACKHOLE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
-
-/**
- * Check if a color algorithm is black-hole-specific.
- * @param algorithm - The color algorithm to check
- * @returns Always false since blackhole type is removed
- */
-export function isBlackHoleOnlyAlgorithm(_algorithm: ColorAlgorithm): boolean {
-  return false
-}
-
-/**
  * Polytope algorithms - empty since polytope types are removed.
  */
 export const POLYTOPE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
@@ -160,11 +146,6 @@ export function isColorAlgorithmAvailable(
   // Geometric phase algorithms available for all
   if (isGeometricPhaseAlgorithm(algorithm)) {
     return true
-  }
-
-  // Black hole algorithms - none exist now
-  if (isBlackHoleOnlyAlgorithm(algorithm)) {
-    return false
   }
 
   // Polytope algorithms - none exist now
