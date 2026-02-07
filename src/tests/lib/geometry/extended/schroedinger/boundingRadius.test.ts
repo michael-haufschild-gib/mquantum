@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   computeHOBoundingRadius,
   computeHydrogenBoundingRadius,
+  computeHOMomentumBoundingRadius,
+  computeHydrogenMomentumBoundingRadius,
   computeBoundingRadius,
 } from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/presets'
@@ -38,19 +40,19 @@ describe('computeHOBoundingRadius', () => {
     expect(R_multi).toBeCloseTo(R_single, 5)
   })
 
-  it('produces R~5 for ground state n=[0,0,0] omega~1.0', () => {
+  it('produces R~3.5 for ground state n=[0,0,0] omega~1.0', () => {
     // classical turning point for n=0, omega=1: sqrt(1)/1 = 1
-    // + margin: 1 + 4/1 = 5
+    // + margin: 1 + 2.5/1 = 3.5
     const R = computeHOBoundingRadius(3, [[0, 0, 0]], [1.0, 1.0, 1.0])
-    expect(R).toBeCloseTo(5.0, 0)
+    expect(R).toBeCloseTo(3.5, 0)
   })
 
-  it('produces R~7 for typical n=2 omega~0.81 state', () => {
+  it('produces R~5.3 for typical n=2 omega~0.81 state', () => {
     // classical turning point for n=2, omega=0.81: sqrt(5)/sqrt(0.81) = 2.236/0.9 ≈ 2.48
-    // + margin: 2.48 + 4/0.9 ≈ 6.93
+    // + margin: 2.48 + 2.5/0.9 ≈ 5.26
     const R = computeHOBoundingRadius(3, [[2, 0, 0]], [0.81, 0.81, 0.81])
-    expect(R).toBeGreaterThan(6.0)
-    expect(R).toBeLessThan(8.0)
+    expect(R).toBeGreaterThan(5.0)
+    expect(R).toBeLessThan(6.0)
   })
 })
 
@@ -83,6 +85,56 @@ describe('computeHydrogenBoundingRadius', () => {
   })
 })
 
+describe('computeHOMomentumBoundingRadius', () => {
+  it('returns at least 2.0 for any state', () => {
+    const R = computeHOMomentumBoundingRadius(3, [[0, 0, 0]], [1.0, 1.0, 1.0])
+    expect(R).toBeGreaterThanOrEqual(2.0)
+  })
+
+  it('is reciprocal to position-space for omega', () => {
+    // For omega=1, position and momentum bounds should be equal
+    const R_pos = computeHOBoundingRadius(3, [[2, 0, 0]], [1.0, 1.0, 1.0])
+    const R_mom = computeHOMomentumBoundingRadius(3, [[2, 0, 0]], [1.0, 1.0, 1.0])
+    expect(R_mom).toBeCloseTo(R_pos, 4)
+  })
+
+  it('grows with higher frequencies (narrower in x, wider in k)', () => {
+    const R_lowOmega = computeHOMomentumBoundingRadius(3, [[2, 2, 2]], [0.5, 0.5, 0.5])
+    const R_highOmega = computeHOMomentumBoundingRadius(3, [[2, 2, 2]], [2.0, 2.0, 2.0])
+    // Higher omega → wider in momentum space
+    expect(R_highOmega).toBeGreaterThan(R_lowOmega)
+  })
+
+  it('shrinks when momentumScale increases', () => {
+    const R_scale1 = computeHOMomentumBoundingRadius(3, [[2, 0, 0]], [1.0, 1.0, 1.0], 1.0)
+    const R_scale2 = computeHOMomentumBoundingRadius(3, [[2, 0, 0]], [1.0, 1.0, 1.0], 2.0)
+    expect(R_scale2).toBeLessThan(R_scale1)
+  })
+})
+
+describe('computeHydrogenMomentumBoundingRadius', () => {
+  it('returns at least 2.0', () => {
+    const R = computeHydrogenMomentumBoundingRadius(1, 1.0)
+    expect(R).toBeGreaterThanOrEqual(2.0)
+  })
+
+  it('is much smaller than position-space radius for large n', () => {
+    // Position: n=4, a0=1 → R = 48
+    // Momentum: R ≈ 6/(4*1) = 1.5 → clamped to 2.0
+    const R_pos = computeHydrogenBoundingRadius(4, 1.0)
+    const R_mom = computeHydrogenMomentumBoundingRadius(4, 1.0)
+    expect(R_pos).toBeGreaterThan(40)
+    expect(R_mom).toBeLessThan(10)
+  })
+
+  it('shrinks (inversely) with principal quantum number', () => {
+    const R1 = computeHydrogenMomentumBoundingRadius(1, 1.0)
+    const R3 = computeHydrogenMomentumBoundingRadius(3, 1.0)
+    // Larger n → smaller momentum extent → smaller bounding radius
+    expect(R3).toBeLessThan(R1)
+  })
+})
+
 describe('computeBoundingRadius (dispatch)', () => {
   it('dispatches to HO for harmonicOscillator mode', () => {
     const preset = generateQuantumPreset(42, 3, 1, 3, 0.01)
@@ -99,5 +151,24 @@ describe('computeBoundingRadius (dispatch)', () => {
   it('returns MIN_BOUND_R when no preset available', () => {
     const R = computeBoundingRadius('harmonicOscillator', null, 3)
     expect(R).toBe(2.0)
+  })
+
+  it('dispatches to momentum HO when representation is momentum', () => {
+    const preset = generateQuantumPreset(42, 3, 1, 3, 0.01)
+    const R_mom = computeBoundingRadius(
+      'harmonicOscillator', preset, 3, 2, 1.0, undefined, undefined, 'momentum'
+    )
+    // For omega≈1 these should be similar to position-space; test that momentum path runs
+    expect(R_mom).toBeGreaterThanOrEqual(2.0)
+  })
+
+  it('dispatches to momentum hydrogen when representation is momentum', () => {
+    const R_pos = computeBoundingRadius('hydrogenND', null, 3, 4, 1.0)
+    const R_mom = computeBoundingRadius(
+      'hydrogenND', null, 3, 4, 1.0, undefined, undefined, 'momentum'
+    )
+    // Momentum should be much smaller for n=4
+    expect(R_pos).toBeGreaterThan(40)
+    expect(R_mom).toBeLessThan(10)
   })
 })

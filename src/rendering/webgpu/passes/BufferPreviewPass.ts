@@ -7,6 +7,10 @@
  * - Temporal depth buffer
  * - Generic texture copy
  *
+ * Renders directly to canvas, overwriting the final output when a preview
+ * is active. Uses textureLoad with unfilterable-float to support all
+ * texture types including depth24plus.
+ *
  * @module rendering/webgpu/passes/BufferPreviewPass
  */
 
@@ -27,12 +31,10 @@ export type DepthMode = 'raw' | 'linear' | 'focusZones'
  * Configuration for BufferPreviewPass.
  */
 export interface BufferPreviewPassConfig {
-  /** Input resource to preview */
+  /** Default input resource to preview */
   bufferInput: string
   /** Additional input resources (for dynamic switching without recompiling) */
   additionalInputs?: string[]
-  /** Output resource */
-  outputResource: string
   /** Type of buffer being previewed */
   bufferType?: BufferType
   /** Depth visualization mode (for depth buffers) */
@@ -48,7 +50,19 @@ export interface BufferPreviewPassConfig {
 }
 
 /**
+ * Store config shape for dynamic buffer preview control.
+ */
+export interface BufferPreviewStoreConfig {
+  bufferType: BufferType
+  bufferInput: string
+  depthMode?: DepthMode
+}
+
+/**
  * WGSL Buffer Preview Fragment Shader
+ *
+ * Uses textureLoad (not textureSample) to support all texture types
+ * including depth24plus bound as unfilterable-float.
  */
 const BUFFER_PREVIEW_SHADER = /* wgsl */ `
 struct Uniforms {
@@ -63,12 +77,18 @@ struct Uniforms {
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var texSampler: sampler;
-@group(0) @binding(2) var tInput: texture_2d<f32>;
+@group(0) @binding(1) var tInput: texture_2d<f32>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
+}
+
+// Load texel using integer coordinates (required for unfilterable-float)
+fn loadTexel(uv: vec2f) -> vec4f {
+  let dims = textureDimensions(tInput);
+  let coord = vec2i(uv * vec2f(dims));
+  return textureLoad(tInput, coord, 0);
 }
 
 // Convert perspective depth to view Z
@@ -79,7 +99,7 @@ fn perspectiveDepthToViewZ(depth: f32, near: f32, far: f32) -> f32 {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let uv = input.uv;
-  let texel = textureSample(tInput, texSampler, uv);
+  let texel = loadTexel(uv);
 
   // Type 1: Depth Buffer
   if (uniforms.bufferType == 1) {
@@ -157,23 +177,20 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
  * WebGPU Buffer Preview Pass.
  *
  * Provides debug visualization of various G-buffer contents.
- * Useful for debugging depth, normals, and other intermediate buffers.
+ * Renders directly to canvas when a preview is active (overwrites final output).
+ * Skips execution when no preview is active (no-op).
  *
  * @example
  * ```typescript
- * const depthPreview = new BufferPreviewPass({
- *   bufferInput: 'sceneDepth',
- *   outputResource: 'previewOutput',
+ * const bufferPreview = new BufferPreviewPass({
+ *   bufferInput: 'depth-buffer',
+ *   additionalInputs: ['normal-buffer'],
  *   bufferType: 'depth',
  *   depthMode: 'linear',
- *   nearClip: 0.1,
- *   farClip: 1000.0,
  * });
  * ```
  */
 export class BufferPreviewPass extends WebGPUBasePass {
-  private passConfig: BufferPreviewPassConfig
-
   // Pipeline
   private renderPipeline: GPURenderPipeline | null = null
 
@@ -189,9 +206,6 @@ export class BufferPreviewPass extends WebGPUBasePass {
   // PERF: Cached bind group to avoid per-frame GPU driver calls
   private cachedBindGroup: GPUBindGroup | null = null
   private cachedInputView: GPUTextureView | null = null
-
-  // Sampler
-  private sampler: GPUSampler | null = null
 
   // Configuration
   private bufferType: number
@@ -210,16 +224,16 @@ export class BufferPreviewPass extends WebGPUBasePass {
 
     super({
       id: 'bufferPreview',
-      priority: 200,
+      // Run after ToScreenPass (1000) to overwrite canvas when preview is active
+      priority: 1100,
       inputs: uniqueInputs.map((resourceId, index) => ({
         resourceId,
         access: 'read' as const,
         binding: index,
       })),
-      outputs: [{ resourceId: config.outputResource, access: 'write' as const, binding: 0 }],
+      outputs: [], // Renders directly to canvas
     })
 
-    this.passConfig = config
     this.bufferInputId = config.bufferInput
 
     // Map buffer type to int
@@ -250,9 +264,10 @@ export class BufferPreviewPass extends WebGPUBasePass {
    * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device } = ctx
+    const { device, format } = ctx
 
     // Create bind group layout
+    // Use unfilterable-float to support all texture types including depth24plus
     this.passBindGroupLayout = device.createBindGroupLayout({
       label: 'buffer-preview-bgl',
       entries: [
@@ -260,12 +275,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
         {
           binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
-          sampler: { type: 'filtering' as const },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' as const },
+          texture: { sampleType: 'unfilterable-float' as const },
         },
       ],
     })
@@ -273,27 +283,17 @@ export class BufferPreviewPass extends WebGPUBasePass {
     // Create fragment shader module
     const fragmentModule = this.createShaderModule(device, BUFFER_PREVIEW_SHADER, 'buffer-preview-fragment')
 
-    // Create pipeline with rgba8unorm format to match the output resource
-    // (not canvas format which may be bgra8unorm)
+    // Create pipeline targeting canvas format (direct-to-screen)
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      'rgba8unorm',
+      format,
       { label: 'buffer-preview' }
     )
 
-    // Create uniform buffer (8 floats = 32 bytes, aligned to 16 = 32 bytes)
+    // Create uniform buffer (8 i32/f32 values = 32 bytes)
     this.uniformBuffer = this.createUniformBuffer(device, 32, 'buffer-preview-uniforms')
-
-    // Create sampler
-    this.sampler = device.createSampler({
-      label: 'buffer-preview-sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-    })
   }
 
   /**
@@ -353,6 +353,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
 
   /**
    * Execute the buffer preview pass.
+   * Skips when no preview is active (checks bufferPreview store).
    * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
@@ -360,40 +361,41 @@ export class BufferPreviewPass extends WebGPUBasePass {
       !this.device ||
       !this.renderPipeline ||
       !this.uniformBuffer ||
-      !this.passBindGroupLayout ||
-      !this.sampler
+      !this.passBindGroupLayout
     ) {
       return
     }
 
-    // Dynamic configuration from stores (if available)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const previewConfig = ctx.frame?.stores?.['bufferPreview'] as any
-    if (previewConfig) {
-      // Update buffer type and input based on which debug flag is active
-      if (previewConfig.bufferType !== undefined) {
-        this.setBufferType(previewConfig.bufferType)
-      }
-      if (previewConfig.bufferInput !== undefined) {
-        this.setBufferInput(previewConfig.bufferInput)
-      }
-      if (previewConfig.depthMode !== undefined) {
-        this.setDepthMode(previewConfig.depthMode)
-      }
+    // Dynamic configuration from stores — skip if no preview active
+    const previewConfig = ctx.frame?.stores?.['bufferPreview'] as BufferPreviewStoreConfig | null
+    if (!previewConfig) return
+
+    // Update buffer type and input based on which debug flag is active
+    if (previewConfig.bufferType !== undefined) {
+      this.setBufferType(previewConfig.bufferType)
+    }
+    if (previewConfig.bufferInput !== undefined) {
+      this.setBufferInput(previewConfig.bufferInput)
+    }
+    if (previewConfig.depthMode !== undefined) {
+      this.setDepthMode(previewConfig.depthMode)
+    }
+
+    // Update camera clip planes from camera store
+    const camera = ctx.frame?.stores?.['camera'] as { near?: number; far?: number } | null
+    if (camera) {
+      this.nearClip = camera.near ?? 0.1
+      this.farClip = camera.far ?? 100
     }
 
     // Get input texture
     const inputView = ctx.getTextureView(this.bufferInputId)
     if (!inputView) return
 
-    // Get output target
-    const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
-    if (!outputView) return
+    // Get canvas for output (renders directly to screen)
+    const canvasView = ctx.getCanvasTextureView()
 
     // Update uniforms
-    // Layout: type (i32), depthMode (i32), nearClip (f32), farClip (f32),
-    //         focus (f32), focusRange (f32), _pad0 (f32), _pad1 (f32)
-    // PERF: Reuse pre-allocated uniform views
     const intView = this.uniformIntView
     const floatView = this.uniformFloatView
 
@@ -413,20 +415,19 @@ export class BufferPreviewPass extends WebGPUBasePass {
         layout: this.passBindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: this.uniformBuffer } },
-          { binding: 1, resource: this.sampler },
-          { binding: 2, resource: inputView },
+          { binding: 1, resource: inputView },
         ],
       })
       this.cachedInputView = inputView
     }
     const bindGroup = this.cachedBindGroup
 
-    // Begin render pass
+    // Begin render pass — clear canvas and overwrite with buffer visualization
     const passEncoder = ctx.beginRenderPass({
       label: 'buffer-preview-render',
       colorAttachments: [
         {
-          view: outputView,
+          view: canvasView,
           loadOp: 'clear' as const,
           storeOp: 'store' as const,
           clearValue: { r: 0, g: 0, b: 0, a: 1 },
@@ -448,7 +449,6 @@ export class BufferPreviewPass extends WebGPUBasePass {
     this.passBindGroupLayout = null
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
-    this.sampler = null
     this.cachedBindGroup = null
     this.cachedInputView = null
 

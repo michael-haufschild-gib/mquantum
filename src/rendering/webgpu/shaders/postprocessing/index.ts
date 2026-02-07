@@ -9,9 +9,6 @@
 // Bloom
 export { bloomThresholdShader, createBloomBlurShader, bloomCompositeShader } from './bloom.wgsl'
 
-// Tonemapping
-export { tonemappingShader } from './tonemapping.wgsl'
-
 // Anti-aliasing
 export { fxaaShader } from './fxaa.wgsl'
 export {

@@ -4,8 +4,16 @@
  * Computes the minimum sphere radius that contains all visually significant
  * probability density. Called once per quantum state change (not per frame).
  *
- * For harmonic oscillators: R = classical turning point + Gaussian margin
- * For hydrogen orbitals: R = n^2 * a0 * safety factor
+ * Position space:
+ *   HO: R = classical turning point + Gaussian margin = (sqrt(2n+1) + margin) / sqrt(ω)
+ *   Hydrogen: R = n² · a₀ · safety factor
+ *
+ * Momentum space (Fourier dual):
+ *   HO: R_k = (sqrt(2n+1) + margin) · sqrt(ω)   (reciprocal of position)
+ *   Hydrogen: R_k ∝ 1/(n · a₀)   (concentrated near origin for large n)
+ *
+ * The momentumScale parameter zooms k-space coordinates (k → k·scale),
+ * so the required bounding radius in coordinate space is R_k / momentumScale.
  */
 
 import type { QuantumPreset } from './presets'
@@ -91,8 +99,88 @@ export function computeHydrogenBoundingRadius(
 }
 
 /**
+ * Compute bounding radius for an HO state in momentum (k-) space.
+ *
+ * The HO eigenfunctions are self-dual under Fourier transform: the momentum-
+ * space eigenfunction has the same Hermite × Gaussian form but with the
+ * reciprocal frequency.  Position-space turning point is sqrt(2n+1)/sqrt(ω);
+ * momentum-space turning point is sqrt(2n+1)·sqrt(ω).
+ *
+ * @param dimension - Number of spatial dimensions (3-11)
+ * @param quantumNumbers - n[k][j] for each term k and dimension j
+ * @param omegas - Per-dimension angular frequencies
+ * @param momentumScale - Reciprocal-space zoom factor (k → k·scale); default 1.0
+ * @returns Bounding radius in coordinate-space units (pre-scale)
+ */
+export function computeHOMomentumBoundingRadius(
+  dimension: number,
+  quantumNumbers: number[][],
+  omegas: number[],
+  momentumScale: number = 1.0
+): number {
+  const kScale = Math.max(momentumScale, 0.01)
+  let maxR = MIN_BOUND_R
+  for (let j = 0; j < dimension; j++) {
+    const maxN = Math.max(...quantumNumbers.map((term) => term[j] ?? 0))
+    const alpha = Math.sqrt(Math.max(omegas[j] ?? 1.0, 0.01))
+    // Momentum-space turning point: sqrt(2n+1) · sqrt(ω)
+    // Momentum-space margin: GAUSSIAN_MARGIN · sqrt(ω)
+    // Divide by kScale because shader samples at kCoord = xND * kScale
+    const k_extent = (Math.sqrt(2 * maxN + 1) + GAUSSIAN_MARGIN) * alpha
+    const R_j = k_extent / kScale
+    maxR = Math.max(maxR, R_j)
+  }
+  return maxR
+}
+
+/**
+ * Compute bounding radius for a hydrogen orbital in momentum (k-) space.
+ *
+ * The Fock momentum-space radial wavefunction decays as
+ *   R̃_nl(k) ∝ (na₀k)^l / (1+(na₀k)²)^{l+2}
+ * which has effective support up to k ≈ few / (n·a₀).
+ *
+ * Safety factor 6.0 keeps the sharp peak and first few oscillations visible
+ * (the algebraic tail falls off fast as 1/k^{2l+4}).
+ *
+ * Extra dimensions (4D+) use HO momentum-space bounds.
+ *
+ * @param principalN - Principal quantum number n (1-7)
+ * @param bohrRadius - Bohr radius scale factor
+ * @param momentumScale - Reciprocal-space zoom factor; default 1.0
+ * @param extraDimN - Quantum numbers for extra dimensions (4D-11D)
+ * @param extraDimOmega - Frequencies for extra dimensions
+ * @returns Bounding radius in coordinate-space units (pre-scale)
+ */
+export function computeHydrogenMomentumBoundingRadius(
+  principalN: number,
+  bohrRadius: number,
+  momentumScale: number = 1.0,
+  extraDimN?: number[],
+  extraDimOmega?: number[]
+): number {
+  const kScale = Math.max(momentumScale, 0.01)
+  const na0 = Math.max(principalN * bohrRadius, 0.01)
+  // Momentum-space extent: peak at k~1/(n·a₀), significant out to ~6/(n·a₀)
+  const hydrogenK = 6.0 / na0
+  let maxR = Math.max(MIN_BOUND_R, hydrogenK / kScale)
+
+  // Extra dimensions use HO momentum formula
+  if (extraDimN && extraDimOmega) {
+    for (let j = 0; j < extraDimN.length; j++) {
+      const n = extraDimN[j] ?? 0
+      const alpha = Math.sqrt(Math.max(extraDimOmega[j] ?? 1.0, 0.01))
+      const k_extent = (Math.sqrt(2 * n + 1) + GAUSSIAN_MARGIN) * alpha
+      const R_j = k_extent / kScale
+      maxR = Math.max(maxR, R_j)
+    }
+  }
+  return maxR
+}
+
+/**
  * Compute bounding radius for the current quantum state.
- * Dispatches to the appropriate function based on quantum mode.
+ * Dispatches to the appropriate function based on quantum mode and representation.
  *
  * @param quantumMode - 'harmonicOscillator' or 'hydrogenND'
  * @param preset - Current quantum preset (for HO mode)
@@ -101,6 +189,8 @@ export function computeHydrogenBoundingRadius(
  * @param bohrRadius - Bohr radius scale (hydrogen mode)
  * @param extraDimN - Extra dimension quantum numbers (hydrogen ND mode)
  * @param extraDimOmega - Extra dimension frequencies (hydrogen ND mode)
+ * @param representation - 'position' (default) or 'momentum'
+ * @param momentumScale - Reciprocal-space zoom factor (only for momentum); default 1.0
  * @returns Bounding radius in object-space units
  */
 export function computeBoundingRadius(
@@ -110,13 +200,37 @@ export function computeBoundingRadius(
   principalN: number = 2,
   bohrRadius: number = 1.0,
   extraDimN?: number[],
-  extraDimOmega?: number[]
+  extraDimOmega?: number[],
+  representation: 'position' | 'momentum' = 'position',
+  momentumScale: number = 1.0
 ): number {
+  if (representation === 'momentum') {
+    if (quantumMode === 'hydrogenND') {
+      return computeHydrogenMomentumBoundingRadius(
+        principalN,
+        bohrRadius,
+        momentumScale,
+        extraDimN,
+        extraDimOmega
+      )
+    }
+    // Harmonic oscillator momentum space
+    if (preset) {
+      return computeHOMomentumBoundingRadius(
+        dimension,
+        preset.quantumNumbers,
+        preset.omega,
+        momentumScale
+      )
+    }
+    return MIN_BOUND_R
+  }
+
+  // Position space (default)
   if (quantumMode === 'hydrogenND') {
     return computeHydrogenBoundingRadius(principalN, bohrRadius, extraDimN, extraDimOmega)
   }
 
-  // Default: harmonic oscillator
   if (preset) {
     return computeHOBoundingRadius(dimension, preset.quantumNumbers, preset.omega)
   }

@@ -224,7 +224,8 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
       // HO mode: cache all dimensions for all terms
       const termCount = Math.min(Math.max(intView[OFFSET_TERM_COUNT / 4]!, 1), MAX_TERMS)
 
-      // Extract omega values
+      // Extract omega values (for HO momentum, the uniform buffer already
+      // contains 1/ω from the CPU transform in updateSchroedingerUniforms)
       const omegaBase = OFFSET_OMEGA / 4
       const omegas: number[] = []
       for (let j = 0; j < dimension; j++) {
@@ -271,8 +272,9 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
       const sqrtOmega = Math.sqrt(Math.max(omega, 0.01))
 
       // Domain: classical turning point + Gaussian tail margin
-      // x_tp = sqrt(2n+1) / sqrt(omega)
-      // margin = 4 / sqrt(omega) for adequate Gaussian tail coverage
+      // For position: x_tp = sqrt(2n+1) / sqrt(omega), margin = 4 / sqrt(omega)
+      // For momentum: same formula with effectiveOmega=1/ω produces
+      //   k_tp = sqrt(2n+1) * sqrt(ω), margin = 4 * sqrt(ω)
       const turningPoint = Math.sqrt(2 * n + 1) / sqrtOmega
       const margin = 4.0 / sqrtOmega
       const xMax = turningPoint + margin

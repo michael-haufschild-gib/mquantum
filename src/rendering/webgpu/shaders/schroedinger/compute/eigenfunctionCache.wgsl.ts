@@ -123,8 +123,9 @@ fn main(
   let n = i32(params.z);
   let omega = params.w;
 
-  // Compute x coordinate at sample center
-  let x = mix(xMin, xMax, (f32(sampleIdx) + 0.5) / f32(EIGEN_CACHE_SAMPLES));
+  // Compute x at endpoint-aligned grid position: index 0 → xMin, index SAMPLES-1 → xMax.
+  // Matches fragment shader's invRange = (SAMPLES-1) / (xMax-xMin) for Catmull-Rom lookup.
+  let x = mix(xMin, xMax, f32(sampleIdx) / f32(EIGEN_CACHE_SAMPLES - 1u));
 
   // Compute eigenfunction value and derivative
   let phi = computeHo1D(n, x, omega);

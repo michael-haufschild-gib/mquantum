@@ -233,19 +233,13 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
 /**
  * Harmonic-oscillator-only psi block with dynamic HO superposition loop.
  * Does not reference hydrogen symbols, enabling family-specific shader composition.
+ * HO momentum is handled by CPU uniform transformation (1/ω, coefficient phase rotation),
+ * so the shader always runs the position-mode path.
  */
 export const psiBlockHarmonic = /* wgsl */ `
 // ============================================
 // Wavefunction Evaluation (Harmonic Oscillator)
 // ============================================
-
-fn phaseNegI(power: i32) -> vec2f {
-  let m = ((power % 4) + 4) % 4;
-  if (m == 0) { return vec2f(1.0, 0.0); }
-  if (m == 1) { return vec2f(0.0, -1.0); }
-  if (m == 2) { return vec2f(-1.0, 0.0); }
-  return vec2f(0.0, 1.0);
-}
 
 // Evaluate harmonic oscillator wavefunction with runtime term count
 fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
@@ -274,50 +268,8 @@ fn evalHarmonicOscillatorPsi(xND: array<f32, 11>, t: f32, uniforms: Schroedinger
   return psi;
 }
 
-// Evaluate harmonic oscillator wavefunction in momentum space.
-fn evalHarmonicOscillatorPsiMomentum(
-  xND: array<f32, 11>,
-  t: f32,
-  uniforms: SchroedingerUniforms
-) -> vec2f {
-  var psi = vec2f(0.0, 0.0);
-  let kScale = max(uniforms.momentumScale, 1e-4);
-  // Preserve normalization under explicit k-axis zoom (k -> kScale * k).
-  let representationNorm = pow(kScale, 0.5 * f32(max(ACTUAL_DIM, 1)));
-
-  for (var termIdx = 0; termIdx < 8; termIdx++) {
-    if (termIdx >= uniforms.termCount) { break; }
-
-    var spatialProduct = 1.0;
-    var quantumSum = 0;
-    for (var j = 0; j < 11; j++) {
-      if (j >= ACTUAL_DIM) { break; }
-      let n = getQuantumNumber(uniforms, termIdx, j);
-      let omega = max(getOmega(uniforms, j), 0.01);
-      let reciprocalOmega = 1.0 / omega;
-      let kCoord = xND[j] * kScale;
-      spatialProduct *= ho1D(n, kCoord, reciprocalOmega);
-      quantumSum += n;
-      if (abs(spatialProduct) < 1e-10) { break; }
-    }
-
-    if (abs(spatialProduct) < 1e-10) { continue; }
-
-    let momentumPhase = phaseNegI(quantumSum);
-    let coeff = getCoeff(uniforms, termIdx);
-    let timeFactor = cexp_i(-getEnergy(uniforms, termIdx) * t);
-    let termFactor = cmul(cmul(coeff, timeFactor), momentumPhase);
-    psi += cscale(spatialProduct * representationNorm, termFactor);
-  }
-
-  return psi;
-}
-
 // Evaluate wavefunction ψ(x,t) at D-dimensional point xND and time t.
 fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
-  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
-    return evalHarmonicOscillatorPsiMomentum(xND, t, uniforms);
-  }
   return evalHarmonicOscillatorPsi(xND, t, uniforms);
 }
 
@@ -330,11 +282,6 @@ fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms)
 
 // Evaluate spatial-only phase (t=0) for stable coloring.
 fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
-  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
-    let psi = evalHarmonicOscillatorPsiMomentum(xND, 0.0, uniforms);
-    return atan2(psi.y, psi.x);
-  }
-
   var psi = vec2f(0.0, 0.0);
 
   for (var k = 0; k < 8; k++) {
@@ -351,13 +298,6 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
 // Evaluate time-dependent ψ and spatial-only phase in one pass.
 // Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, unused)
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
-    let psiTime = evalHarmonicOscillatorPsiMomentum(xND, t, uniforms);
-    let psiSpatial = evalHarmonicOscillatorPsiMomentum(xND, 0.0, uniforms);
-    let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
-    return vec4f(psiTime.x, psiTime.y, spatialPhase, 0.0);
-  }
-
   var psiTime = vec2f(0.0, 0.0);
   var psiSpatial = vec2f(0.0, 0.0);
 
@@ -383,62 +323,15 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
 /**
  * Harmonic-oscillator-only psi block for unrolled HO superposition variants.
  * Requires evalHarmonicOscillatorPsi/evalHOSpatialOnly/evalHOCombinedPsi from HO dispatch.
+ * HO momentum is handled by CPU uniform transformation, so no momentum branching.
  */
 export const psiBlockDynamicHarmonic = /* wgsl */ `
 // ============================================
 // Wavefunction Evaluation (Harmonic Oscillator, Unrolled)
 // ============================================
-
-fn phaseNegI(power: i32) -> vec2f {
-  let m = ((power % 4) + 4) % 4;
-  if (m == 0) { return vec2f(1.0, 0.0); }
-  if (m == 1) { return vec2f(0.0, -1.0); }
-  if (m == 2) { return vec2f(-1.0, 0.0); }
-  return vec2f(0.0, 1.0);
-}
-
-fn evalHarmonicOscillatorPsiMomentum(
-  xND: array<f32, 11>,
-  t: f32,
-  uniforms: SchroedingerUniforms
-) -> vec2f {
-  var psi = vec2f(0.0, 0.0);
-  let kScale = max(uniforms.momentumScale, 1e-4);
-  // Preserve normalization under explicit k-axis zoom (k -> kScale * k).
-  let representationNorm = pow(kScale, 0.5 * f32(max(ACTUAL_DIM, 1)));
-
-  for (var termIdx = 0; termIdx < 8; termIdx++) {
-    if (termIdx >= uniforms.termCount) { break; }
-
-    var spatialProduct = 1.0;
-    var quantumSum = 0;
-    for (var j = 0; j < 11; j++) {
-      if (j >= ACTUAL_DIM) { break; }
-      let n = getQuantumNumber(uniforms, termIdx, j);
-      let omega = max(getOmega(uniforms, j), 0.01);
-      let reciprocalOmega = 1.0 / omega;
-      let kCoord = xND[j] * kScale;
-      spatialProduct *= ho1D(n, kCoord, reciprocalOmega);
-      quantumSum += n;
-      if (abs(spatialProduct) < 1e-10) { break; }
-    }
-
-    if (abs(spatialProduct) < 1e-10) { continue; }
-
-    let momentumPhase = phaseNegI(quantumSum);
-    let coeff = getCoeff(uniforms, termIdx);
-    let timeFactor = cexp_i(-getEnergy(uniforms, termIdx) * t);
-    let termFactor = cmul(cmul(coeff, timeFactor), momentumPhase);
-    psi += cscale(spatialProduct * representationNorm, termFactor);
-  }
-
-  return psi;
-}
+// Note: evalHarmonicOscillatorPsi is provided by HO Dispatch (Unrolled) block
 
 fn evalPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
-  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
-    return evalHarmonicOscillatorPsiMomentum(xND, t, uniforms);
-  }
   return evalHarmonicOscillatorPsi(xND, t, uniforms);
 }
 
@@ -449,21 +342,11 @@ fn evalPsiWithPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms)
 }
 
 fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 {
-  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
-    let psi = evalHarmonicOscillatorPsiMomentum(xND, 0.0, uniforms);
-    return atan2(psi.y, psi.x);
-  }
   let psi = evalHOSpatialOnly(xND, uniforms);
   return atan2(psi.y, psi.x);
 }
 
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
-  if (uniforms.representationMode == REPRESENTATION_MOMENTUM) {
-    let psiTime = evalHarmonicOscillatorPsiMomentum(xND, t, uniforms);
-    let psiSpatial = evalHarmonicOscillatorPsiMomentum(xND, 0.0, uniforms);
-    let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
-    return vec4f(psiTime.x, psiTime.y, spatialPhase, 0.0);
-  }
   return evalHOCombinedPsi(xND, t, uniforms);
 }
 `

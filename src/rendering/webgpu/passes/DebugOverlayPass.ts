@@ -2,23 +2,15 @@
  * WebGPU Debug Overlay Pass
  *
  * Composites debug/gizmo elements onto the screen AFTER all post-processing.
- * This is the WebGPU equivalent of the WebGL DebugOverlayPass.
  *
  * WHY THIS EXISTS:
  * ----------------
  * Debug elements (light gizmos, transform controls, axis helpers) need to be
- * rendered on top of all post-processing effects. In WebGL, this is done by
- * rendering the DEBUG layer directly with Three.js. In WebGPU, we composite
- * a pre-rendered debug texture onto the canvas.
+ * rendered on top of all post-processing effects. This pass composites
+ * a pre-rendered debug texture onto the canvas using alpha blending.
  *
- * USAGE:
- * ------
- * The pass accepts an optional debug texture input. If no texture is provided
- * or it's empty (all transparent), the pass becomes a no-op. When a debug
- * texture is available, it's composited onto the screen using alpha blending.
- *
- * The debug texture should be rendered separately (e.g., by a Three.js WebGPU
- * renderer targeting the DEBUG layer) and passed as a resource.
+ * The debug texture should be rendered separately (e.g., by a light gizmo
+ * renderer) and passed as a resource.
  *
  * @module rendering/webgpu/passes/DebugOverlayPass
  */
@@ -39,6 +31,7 @@ export interface DebugOverlayPassConfig {
 
   /**
    * Whether to use premultiplied alpha for blending.
+   * Controls the pipeline blend state (not the shader).
    * @default false
    */
   premultipliedAlpha?: boolean
@@ -47,20 +40,13 @@ export interface DebugOverlayPassConfig {
 /**
  * WGSL fragment shader for debug overlay compositing.
  *
- * Uses standard alpha blending: output = src * srcAlpha + dst * (1 - srcAlpha)
- * Also supports premultiplied alpha when configured.
+ * Alpha blending mode (premultiplied vs standard) is controlled by the
+ * pipeline blend state, not the shader — so the shader simply outputs
+ * the sampled color.
  */
 const DEBUG_OVERLAY_SHADER = /* wgsl */ `
-struct Uniforms {
-  premultipliedAlpha: u32,
-  _pad0: u32,
-  _pad1: u32,
-  _pad2: u32,
-}
-
-@group(0) @binding(0) var<uniform> uniforms: Uniforms;
-@group(0) @binding(1) var texSampler: sampler;
-@group(0) @binding(2) var tDebug: texture_2d<f32>;
+@group(0) @binding(0) var texSampler: sampler;
+@group(0) @binding(1) var tDebug: texture_2d<f32>;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -76,15 +62,8 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     discard;
   }
 
-  // For premultiplied alpha, the color channels already include alpha multiplication
-  // For non-premultiplied, we need to output as-is for the blend state to handle
-  if (uniforms.premultipliedAlpha != 0u) {
-    // Premultiplied: output directly, blend state handles the rest
-    return debugColor;
-  } else {
-    // Non-premultiplied: standard alpha output
-    return debugColor;
-  }
+  // Output as-is — the pipeline blend state handles premultiplied vs non-premultiplied
+  return debugColor;
 }
 `
 
@@ -114,11 +93,12 @@ export class DebugOverlayPass extends WebGPUBasePass {
   // Bind group layout
   private passBindGroupLayout: GPUBindGroupLayout | null = null
 
-  // Uniform buffer
-  private uniformBuffer: GPUBuffer | null = null
-
   // Sampler
   private sampler: GPUSampler | null = null
+
+  // PERF: Cached bind group
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedDebugView: GPUTextureView | null = null
 
   // Configuration
   private premultipliedAlpha: boolean
@@ -126,8 +106,8 @@ export class DebugOverlayPass extends WebGPUBasePass {
   constructor(config: DebugOverlayPassConfig = {}) {
     super({
       id: 'debugOverlay',
-      // CRITICAL: Very high priority ensures this pass runs LAST in the render graph.
-      // Must be higher than ToScreenPass (1000) to render after it.
+      // Very high priority ensures this pass runs LAST in the render graph.
+      // Must be higher than ToScreenPass (1000) and BufferPreviewPass (1100).
       priority: 10000,
       inputs: config.debugInput
         ? [{ resourceId: config.debugInput, access: 'read' as const, binding: 0 }]
@@ -146,18 +126,17 @@ export class DebugOverlayPass extends WebGPUBasePass {
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device, format } = ctx
 
-    // Create bind group layout
+    // Create bind group layout (no uniform buffer needed)
     this.passBindGroupLayout = device.createBindGroupLayout({
       label: 'debug-overlay-bgl',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
         {
-          binding: 1,
+          binding: 0,
           visibility: GPUShaderStage.FRAGMENT,
           sampler: { type: 'filtering' as const },
         },
         {
-          binding: 2,
+          binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
           texture: { sampleType: 'float' as const },
         },
@@ -172,33 +151,16 @@ export class DebugOverlayPass extends WebGPUBasePass {
     )
 
     // Create pipeline with alpha blending to composite over existing content
-    // Using standard alpha blending: result = src * srcAlpha + dst * (1 - srcAlpha)
     const blendState: GPUBlendState = this.premultipliedAlpha
       ? {
           // Premultiplied alpha blending
-          color: {
-            srcFactor: 'one',
-            dstFactor: 'one-minus-src-alpha',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'one-minus-src-alpha',
-            operation: 'add',
-          },
+          color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+          alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
         }
       : {
           // Standard alpha blending (non-premultiplied)
-          color: {
-            srcFactor: 'src-alpha',
-            dstFactor: 'one-minus-src-alpha',
-            operation: 'add',
-          },
-          alpha: {
-            srcFactor: 'one',
-            dstFactor: 'one-minus-src-alpha',
-            operation: 'add',
-          },
+          color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
+          alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
         }
 
     this.renderPipeline = this.createFullscreenPipeline(
@@ -209,10 +171,6 @@ export class DebugOverlayPass extends WebGPUBasePass {
       { label: 'debug-overlay', blendState }
     )
 
-    // Create uniform buffer (16-byte aligned)
-    this.uniformBuffer = this.createUniformBuffer(device, 16, 'debug-overlay-uniforms')
-    this.updateUniformBuffer()
-
     // Create sampler with nearest filtering to preserve sharp debug elements
     this.sampler = device.createSampler({
       label: 'debug-overlay-sampler',
@@ -221,34 +179,6 @@ export class DebugOverlayPass extends WebGPUBasePass {
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     })
-  }
-
-  /**
-   * Update the uniform buffer with current settings.
-   */
-  private updateUniformBuffer(): void {
-    if (!this.device || !this.uniformBuffer) return
-
-    const data = new Uint32Array(4)
-    data[0] = this.premultipliedAlpha ? 1 : 0
-
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
-  }
-
-  /**
-   * Set whether to use premultiplied alpha blending.
-   * @param enabled - Whether to use premultiplied alpha
-   */
-  setPremultipliedAlpha(enabled: boolean): void {
-    this.premultipliedAlpha = enabled
-    this.updateUniformBuffer()
-  }
-
-  /**
-   * Get current premultiplied alpha setting.
-   */
-  getPremultipliedAlpha(): boolean {
-    return this.premultipliedAlpha
   }
 
   /**
@@ -264,7 +194,6 @@ export class DebugOverlayPass extends WebGPUBasePass {
     if (
       !this.device ||
       !this.renderPipeline ||
-      !this.uniformBuffer ||
       !this.passBindGroupLayout ||
       !this.sampler
     ) {
@@ -273,24 +202,23 @@ export class DebugOverlayPass extends WebGPUBasePass {
 
     // Get debug texture
     const debugView = ctx.getTextureView(this.passConfig.debugInput)
-    if (!debugView) {
-      // No debug texture available, skip
-      return
-    }
+    if (!debugView) return
 
     // Get canvas for output (we composite directly onto it)
     const canvasView = ctx.getCanvasTextureView()
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'debug-overlay-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: debugView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when debug texture view changes
+    if (!this.cachedBindGroup || this.cachedDebugView !== debugView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'debug-overlay-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: this.sampler },
+          { binding: 1, resource: debugView },
+        ],
+      })
+      this.cachedDebugView = debugView
+    }
 
     // Begin render pass with 'load' to preserve existing canvas content
     const passEncoder = ctx.beginRenderPass({
@@ -298,8 +226,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
       colorAttachments: [
         {
           view: canvasView,
-          // CRITICAL: Use 'load' to preserve existing content (from ToScreenPass)
-          // This allows us to composite debug elements on top
+          // Use 'load' to preserve existing content (from ToScreenPass/BufferPreviewPass)
           loadOp: 'load' as const,
           storeOp: 'store' as const,
         },
@@ -307,7 +234,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
     })
 
     // Render fullscreen with alpha blending
-    this.renderFullscreen(passEncoder, this.renderPipeline, [bindGroup])
+    this.renderFullscreen(passEncoder, this.renderPipeline, [this.cachedBindGroup])
 
     passEncoder.end()
   }
@@ -318,9 +245,9 @@ export class DebugOverlayPass extends WebGPUBasePass {
   dispose(): void {
     this.renderPipeline = null
     this.passBindGroupLayout = null
-    this.uniformBuffer?.destroy()
-    this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedDebugView = null
 
     super.dispose()
   }

@@ -38,7 +38,6 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
 
   // Fullscreen quad resources (shared across fullscreen passes)
   protected static fullscreenVertexBuffer: GPUBuffer | null = null
-  protected static fullscreenIndexBuffer: GPUBuffer | null = null
 
   constructor(config: WebGPURenderPassConfig) {
     this.id = config.id

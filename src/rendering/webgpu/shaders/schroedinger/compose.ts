@@ -203,7 +203,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Eigenfunction cache: always enabled when requested.
   // HO mode: caches all dimensions. Hydrogen ND: caches extra dims (4+). Hydrogen 3D: 0 entries (harmless).
   const useCache = useEigenfunctionCache
-  // Analytical gradient: only for pure HO mode (all dimensions are HO eigenfunctions)
+  // Analytical gradient: for pure HO mode (all dimensions are HO eigenfunctions).
+  // HO momentum uses CPU uniform transform (1/ω), so gradient d/dx becomes d/dk automatically.
   const useAnalyticalGradient = useCache && includeHarmonic
 
   // Add dimension define

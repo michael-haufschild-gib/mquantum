@@ -185,7 +185,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('momentumHbar: f32')
   })
 
-  it('routes harmonic oscillator psi through momentum evaluator when enabled', () => {
+  it('HO psi block uses position-only path (momentum handled by CPU uniform transform)', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 5,
       temporal: false,
@@ -194,9 +194,11 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     })
 
     verifyWgsl(wgsl, true)
-    expect(wgsl).toContain('fn evalHarmonicOscillatorPsiMomentum(')
-    expect(wgsl).toContain('if (uniforms.representationMode == REPRESENTATION_MOMENTUM)')
-    expect(wgsl).toContain('return evalHarmonicOscillatorPsiMomentum(xND, t, uniforms);')
+    // HO momentum is handled by CPU uniform transformation (1/ω + coefficient phase rotation),
+    // so the shader only has the position-mode evaluator — no momentum branching.
+    expect(wgsl).toContain('fn evalHarmonicOscillatorPsi(')
+    expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsiMomentum(')
+    expect(wgsl).toContain('return evalHarmonicOscillatorPsi(xND, t, uniforms);')
   })
 
   it('routes hydrogen-ND psi through momentum evaluator when enabled', () => {

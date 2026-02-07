@@ -17,7 +17,6 @@ import type {
   WebGPUFrameStats,
   WebGPURenderContext,
   WebGPURenderPass,
-  WebGPURenderPassConfig,
   WebGPURenderResourceConfig,
   WebGPUResource,
   WebGPUSetupContext,
@@ -500,11 +499,9 @@ export class WebGPURenderGraph {
     if (this.compiled) return
 
     // Build dependency graph
-    const passConfigs = new Map<string, WebGPURenderPassConfig>()
     const outputToPass = new Map<string, string>()
 
     for (const [id, pass] of this.passes) {
-      passConfigs.set(id, pass.config)
       // Defensive: check if outputs exists and is iterable
       if (!pass.config.outputs || !Array.isArray(pass.config.outputs)) {
         console.error(`WebGPURenderGraph: Pass '${id}' has invalid outputs:`, pass.config.outputs)
@@ -515,48 +512,78 @@ export class WebGPURenderGraph {
       }
     }
 
-    // Topological sort based on resource dependencies
-    const sorted: string[] = []
-    const visited = new Set<string>()
-    const visiting = new Set<string>()
-
-    const visit = (id: string): void => {
-      if (visited.has(id)) return
-      if (visiting.has(id)) {
-        console.error(`WebGPURenderGraph: Cycle detected involving pass '${id}'`)
-        return
-      }
-
-      visiting.add(id)
-
-      const pass = this.passes.get(id)
-      if (pass) {
-        // Visit dependencies (passes that produce our inputs)
-        for (const input of pass.config.inputs) {
-          const producer = outputToPass.get(input.resourceId)
-          if (producer && producer !== id) {
-            visit(producer)
-          }
-        }
-      }
-
-      visiting.delete(id)
-      visited.add(id)
-      sorted.push(id)
-    }
-
-    for (const id of this.passes.keys()) {
-      visit(id)
-    }
-
-    // Sort by priority within dependency-satisfying order
-    this.passOrder = sorted.sort((a, b) => {
+    const sortByPriority = (a: string, b: string): number => {
       const passA = this.passes.get(a)
       const passB = this.passes.get(b)
       const prioA = passA?.config.priority ?? 0
       const prioB = passB?.config.priority ?? 0
-      return prioA - prioB
-    })
+      if (prioA !== prioB) return prioA - prioB
+      return a.localeCompare(b)
+    }
+
+    // Kahn topological sort with priority tie-breakers.
+    // This preserves producer->consumer dependencies while keeping deterministic
+    // ordering for independent passes.
+    const dependents = new Map<string, Set<string>>()
+    const indegree = new Map<string, number>()
+
+    for (const passId of this.passes.keys()) {
+      dependents.set(passId, new Set())
+      indegree.set(passId, 0)
+    }
+
+    for (const [id, pass] of this.passes) {
+      if (!pass.config.inputs || !Array.isArray(pass.config.inputs)) {
+        console.error(`WebGPURenderGraph: Pass '${id}' has invalid inputs:`, pass.config.inputs)
+        continue
+      }
+      for (const input of pass.config.inputs) {
+        const producer = outputToPass.get(input.resourceId)
+        if (!producer || producer === id) continue
+
+        const producerDependents = dependents.get(producer)
+        if (!producerDependents) continue
+
+        // Only count each dependency once.
+        if (producerDependents.has(id)) continue
+        producerDependents.add(id)
+        indegree.set(id, (indegree.get(id) ?? 0) + 1)
+      }
+    }
+
+    const readyQueue: string[] = []
+    for (const [passId, degree] of indegree.entries()) {
+      if (degree === 0) readyQueue.push(passId)
+    }
+    readyQueue.sort(sortByPriority)
+
+    const sorted: string[] = []
+    while (readyQueue.length > 0) {
+      const nextPassId = readyQueue.shift()!
+      sorted.push(nextPassId)
+
+      const nextDependents = dependents.get(nextPassId)
+      if (!nextDependents) continue
+      for (const dependentId of nextDependents) {
+        const nextDegree = (indegree.get(dependentId) ?? 0) - 1
+        indegree.set(dependentId, nextDegree)
+        if (nextDegree === 0) {
+          readyQueue.push(dependentId)
+          readyQueue.sort(sortByPriority)
+        }
+      }
+    }
+
+    if (sorted.length !== this.passes.size) {
+      const remaining = [...this.passes.keys()].filter((id) => !sorted.includes(id))
+      remaining.sort(sortByPriority)
+      console.error(
+        `WebGPURenderGraph: Cycle detected among passes (${remaining.join(', ')}); appending remaining passes by priority`
+      )
+      sorted.push(...remaining)
+    }
+
+    this.passOrder = sorted
 
     // Identify ping-pong resources
     for (const pass of this.passes.values()) {

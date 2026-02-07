@@ -73,15 +73,21 @@ describe('useSyncedDimension', () => {
       expect(useTransformStore.getState().dimension).toBe(4)
 
       // Simulate scene loading starting BEFORE changing dimension
-      usePerformanceStore.getState().setIsLoadingScene(true)
+      act(() => {
+        usePerformanceStore.getState().setIsLoadingScene(true)
+      })
 
       // Manually set rotation/transform to 4 (to test the hook skip)
-      useRotationStore.setState({ dimension: 4 })
-      useTransformStore.setState({ dimension: 4 })
+      act(() => {
+        useRotationStore.setState({ dimension: 4 })
+        useTransformStore.setState({ dimension: 4 })
+      })
 
       // Change dimension during scene load via direct setState (not through store action)
       // This simulates what happens during scene loading where stores are restored directly
-      useGeometryStore.setState({ dimension: 6 })
+      act(() => {
+        useGeometryStore.setState({ dimension: 6 })
+      })
 
       // The hook should have skipped the sync (isLoadingScene=true)
       // So rotation/transform dimensions should still be 4
@@ -101,16 +107,20 @@ describe('useSyncedDimension', () => {
       expect(useRotationStore.getState().dimension).toBe(4)
 
       // Simulate scene loading - set stores to different values
-      usePerformanceStore.getState().setIsLoadingScene(true)
-      useRotationStore.setState({ dimension: 4 })
-      useTransformStore.setState({ dimension: 4 })
-      useGeometryStore.setState({ dimension: 5 })
+      act(() => {
+        usePerformanceStore.getState().setIsLoadingScene(true)
+        useRotationStore.setState({ dimension: 4 })
+        useTransformStore.setState({ dimension: 4 })
+        useGeometryStore.setState({ dimension: 5 })
+      })
 
       // Verify sync was skipped
       expect(useRotationStore.getState().dimension).toBe(4)
 
       // End scene loading
-      usePerformanceStore.getState().setIsLoadingScene(false)
+      act(() => {
+        usePerformanceStore.getState().setIsLoadingScene(false)
+      })
 
       // Change dimension again (normal operation - uses store action which syncs directly)
       act(() => {

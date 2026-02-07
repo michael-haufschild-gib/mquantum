@@ -27,9 +27,21 @@ export enum ToneMappingMode {
   Reinhard = 2,
   Cineon = 3,
   ACESFilmic = 4,
-  // Mode 5 is skipped (was Custom in Three.js)
+  Filmic = 5,
   AgX = 6,
   Neutral = 7,
+}
+
+/** Maps store's ToneMappingAlgorithm string to shader mode integer. */
+const ALGORITHM_TO_MODE: Record<string, ToneMappingMode> = {
+  none: ToneMappingMode.Linear,
+  linear: ToneMappingMode.Linear,
+  reinhard: ToneMappingMode.Reinhard,
+  cineon: ToneMappingMode.Cineon,
+  aces: ToneMappingMode.ACESFilmic,
+  filmic: ToneMappingMode.Filmic,
+  agx: ToneMappingMode.AgX,
+  neutral: ToneMappingMode.Neutral,
 }
 
 /**
@@ -184,6 +196,24 @@ fn AgXToneMapping(color: vec3f, exposure: f32) -> vec3f {
   return clamp(c, vec3f(0.0), vec3f(1.0));
 }
 
+// Filmic (Uncharted 2) - http://filmicworlds.com/blog/filmic-tonemapping-operators/
+fn Uncharted2Curve(x: vec3f) -> vec3f {
+  let A = 0.15;  // Shoulder Strength
+  let B = 0.50;  // Linear Strength
+  let C = 0.10;  // Linear Angle
+  let D = 0.20;  // Toe Strength
+  let E = 0.02;  // Toe Numerator
+  let F = 0.30;  // Toe Denominator
+  return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+}
+
+fn FilmicToneMapping(color: vec3f, exposure: f32) -> vec3f {
+  let W = 11.2;  // Linear White Point
+  let curr = Uncharted2Curve(color * exposure * 2.0);
+  let whiteScale = vec3f(1.0) / Uncharted2Curve(vec3f(W));
+  return saturate3(curr * whiteScale);
+}
+
 // Neutral - https://modelviewer.dev/examples/tone-mapping
 fn NeutralToneMapping(color: vec3f, exposure: f32) -> vec3f {
   let StartCompression = 0.8 - 0.04;
@@ -218,6 +248,7 @@ fn applyToneMapping(color: vec3f, mode: i32, exposure: f32) -> vec3f {
   if (mode == 2) { return ReinhardToneMapping(color, exposure); }
   if (mode == 3) { return CineonToneMapping(color, exposure); }
   if (mode == 4) { return ACESFilmicToneMapping(color, exposure); }
+  if (mode == 5) { return FilmicToneMapping(color, exposure); }
   if (mode == 6) { return AgXToneMapping(color, exposure); }
   if (mode == 7) { return NeutralToneMapping(color, exposure); }
   return color;
@@ -333,7 +364,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
   constructor(config: ToneMappingCinematicPassConfig) {
     super({
       id: 'tonemapping-cinematic',
-      priority: 195, // Between tonemap (900) and cinematic (190)
+      priority: 900, // After HDR effects (bloom, frame-blending), before paper/AA
       inputs: [{ resourceId: config.colorInput, access: 'read' as const, binding: 0 }],
       outputs: [{ resourceId: config.outputResource, access: 'write' as const, binding: 0 }],
     })
@@ -356,7 +387,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
    * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create bind group layout
     this.passBindGroupLayout = device.createBindGroupLayout({
@@ -387,12 +418,12 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
       'tonemapping-cinematic-fragment'
     )
 
-    // Create pipeline
+    // Create pipeline - use rgba8unorm for LDR output buffer
     this.renderPipeline = this.createFullscreenPipeline(
       device,
       fragmentModule,
       [this.passBindGroupLayout],
-      format,
+      'rgba8unorm',
       { label: 'tonemapping-cinematic' }
     )
 
@@ -467,10 +498,11 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
   private updateFromStores(ctx: WebGPURenderContext): void {
     const lighting = ctx.frame?.stores?.['lighting'] as {
       exposure?: number
+      toneMappingEnabled?: boolean
       toneMappingAlgorithm?: string
     }
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as {
-      tonemappingMode?: number
+      cinematicEnabled?: boolean
       cinematicVignette?: number
       cinematicAberration?: number
       cinematicGrain?: number
@@ -481,35 +513,33 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
       this.exposure = lighting.exposure
     }
 
-    // Tonemapping mode - can come from postProcessing store (as number)
-    // or from lighting store (as string algorithm name)
-    if (postProcessing?.tonemappingMode !== undefined) {
-      this.toneMapping = postProcessing.tonemappingMode
+    // Tonemapping algorithm from lighting store
+    // When toneMappingEnabled is false, use Linear mode (no curve, just clamp)
+    if (lighting?.toneMappingEnabled === false) {
+      this.toneMapping = ToneMappingMode.Linear
     } else if (lighting?.toneMappingAlgorithm !== undefined) {
-      // Map string algorithm name to ToneMappingMode enum
-      const algorithmMap: Record<string, ToneMappingMode> = {
-        linear: ToneMappingMode.Linear,
-        reinhard: ToneMappingMode.Reinhard,
-        cineon: ToneMappingMode.Cineon,
-        aces: ToneMappingMode.ACESFilmic,
-        agx: ToneMappingMode.AgX,
-        neutral: ToneMappingMode.Neutral,
-      }
-      const mode = algorithmMap[lighting.toneMappingAlgorithm]
+      const mode = ALGORITHM_TO_MODE[lighting.toneMappingAlgorithm]
       if (mode !== undefined) {
         this.toneMapping = mode
       }
     }
 
     // Cinematic effects from postProcessing store
-    if (postProcessing?.cinematicVignette !== undefined) {
-      this.vignette = postProcessing.cinematicVignette
-    }
-    if (postProcessing?.cinematicAberration !== undefined) {
-      this.aberration = postProcessing.cinematicAberration
-    }
-    if (postProcessing?.cinematicGrain !== undefined) {
-      this.grain = postProcessing.cinematicGrain
+    // When cinematicEnabled is false, zero out all effects
+    if (postProcessing?.cinematicEnabled === false) {
+      this.aberration = 0
+      this.vignette = 0
+      this.grain = 0
+    } else {
+      if (postProcessing?.cinematicVignette !== undefined) {
+        this.vignette = postProcessing.cinematicVignette
+      }
+      if (postProcessing?.cinematicAberration !== undefined) {
+        this.aberration = postProcessing.cinematicAberration
+      }
+      if (postProcessing?.cinematicGrain !== undefined) {
+        this.grain = postProcessing.cinematicGrain
+      }
     }
   }
 

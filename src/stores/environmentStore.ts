@@ -34,8 +34,7 @@ export const useEnvironmentStore = create<EnvironmentStore>()(
           if (
             key.startsWith('skybox') ||
             key === 'proceduralSettings' ||
-            key === 'backgroundColor' ||
-            key === 'backgroundBlendMode'
+            key === 'backgroundColor'
           ) {
             skyboxBump = 1
           }

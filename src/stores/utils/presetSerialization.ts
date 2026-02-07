@@ -100,6 +100,9 @@ export const TRANSIENT_FIELDS = new Set([
 
   // Legacy density grid rendering acceleration (removed — compute pass kept for uncertainty boundary only)
   'useDensityGrid',
+
+  // Legacy skybox blend mode (removed — never connected to rendering pipeline)
+  'backgroundBlendMode',
 ])
 
 /**

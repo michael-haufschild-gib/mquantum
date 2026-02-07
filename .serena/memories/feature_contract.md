@@ -1,23 +1,21 @@
 # Session Handoff
 
-_Generated: 2026-02-07 18:58 UTC (precompact)_
+_Generated: 2026-02-07 20:39 UTC (precompact)_
 
 ## Current Task
-i told you in the beginning that we tried to disable nodal floor and it did not do anything. update your memory so we do not again try fixes that we already tried
+No explicit task identified
 
 ## Status: unknown items complete
 
-## Blockers
-- ⚠️ need to know to continue working on this. what have we tried already. what does not work.
-- ⚠️ question: what should we even see? attached what i see now.
-- ⚠️ question is really: **what visual quality are you targeting for your thesis?** Do you want:
-
 ## Files Modified This Session
-- `src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts`
-- `Documents/code/mquantum/src/rendering/webgpu/renderers/WebGPUSchrodingerRenderer.ts`
-- `Documents/code/mquantum/src/lib/geometry/extended/schroedinger/boundingRadius.ts`
-- `Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/volume/integration.wgsl.ts`
-- `Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/uniforms.wgsl.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/passes/ToneMappingCinematicPass.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/passes/DebugOverlayPass.ts`
+- `Documents/code/mquantum/src/tests/rendering/webgpu/WebGPUScene.temporal.test.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/passes/index.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/passes/BufferPreviewPass.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/WebGPUScene.tsx`
+- `Documents/code/mquantum/src/rendering/webgpu/shaders/postprocessing/index.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/passes/EnvironmentCompositePass.ts`
 
 ---
 _Auto-generated. Edit if inaccurate. Will be injected on session start if fresh._

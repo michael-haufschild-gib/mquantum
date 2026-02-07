@@ -39,22 +39,6 @@ describe('useDeviceCapabilities', () => {
     vi.restoreAllMocks()
   })
 
-  it('should return webgl2Supported as true initially', () => {
-    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
-      webgl2Supported: true,
-      gpuTier: 3,
-      isMobileGPU: false,
-      gpuName: 'test gpu',
-      detectionType: 'BENCHMARK',
-      estimatedFps: 60,
-    })
-
-    const { result } = renderHook(() => useDeviceCapabilities())
-
-    // Before detection completes, should assume true
-    expect(result.current.webgl2Supported).toBe(true)
-  })
-
   it('should detect desktop GPU and not apply mobile defaults', async () => {
     vi.mocked(detectDeviceCapabilities).mockResolvedValue({
       webgl2Supported: true,

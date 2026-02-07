@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
 import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
+import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
 
 interface ScenePassConfig {
   objectType: 'schroedinger'
@@ -9,7 +10,6 @@ interface ScenePassConfig {
   antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
   paperEnabled: boolean
   frameBlendingEnabled: boolean
-  cinematicEnabled: boolean
   isosurface: boolean
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
@@ -18,6 +18,8 @@ interface ScenePassConfig {
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
   temporalReprojectionEnabled: boolean
+  eigenfunctionCacheEnabled: boolean
+  representation: 'position' | 'momentum'
   colorAlgorithm:
     | 'monochromatic'
     | 'analogous'
@@ -39,6 +41,7 @@ interface ScenePassConfig {
     | 'procedural_horizon'
     | 'procedural_ocean'
     | 'procedural_twilight'
+  backgroundColor: string
 }
 
 function ensureGpuTextureUsageConstants(): void {
@@ -60,7 +63,6 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     antiAliasingMethod: 'none',
     paperEnabled: false,
     frameBlendingEnabled: false,
-    cinematicEnabled: false,
     isosurface: false,
     quantumMode: 'harmonicOscillator',
     termCount: 1,
@@ -69,9 +71,12 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     phaseMaterialityEnabled: false,
     interferenceEnabled: false,
     temporalReprojectionEnabled: true,
+    eigenfunctionCacheEnabled: true,
+    representation: 'position',
     colorAlgorithm: 'monochromatic',
     skyboxEnabled: false,
     skyboxMode: 'classic',
+    backgroundColor: '#232323',
     ...overrides,
   }
 }
@@ -166,5 +171,36 @@ describe('WebGPUScene temporal reprojection wiring', () => {
 
     const objectColorUsage = resources.get('object-color')?.usage as number
     expect((objectColorUsage & GPUTextureUsage.COPY_SRC) !== 0).toBe(false)
+  })
+
+  it('uses configured background color for no-skybox scene clear pass', async () => {
+    ensureGpuTextureUsageConstants()
+    const { setupRenderPasses } = await import('@/rendering/webgpu/WebGPUScene')
+    const { graph, passes } = createGraphHarness()
+    const backgroundColor = '#4080ff'
+
+    await setupRenderPasses(
+      graph as unknown as WebGPURenderGraph,
+      createPassConfig({
+        skyboxEnabled: false,
+        backgroundColor,
+      })
+    )
+
+    const scenePass = passes.find((pass) => pass.id === 'scene') as
+      | ({ getClearColor?: () => { r: number; g: number; b: number; a: number } } & WebGPURenderPass)
+      | undefined
+    expect(scenePass).toBeDefined()
+    expect(typeof scenePass?.getClearColor).toBe('function')
+
+    const clearColor = scenePass?.getClearColor?.()
+    const expected = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
+
+    expect(clearColor).toMatchObject({
+      r: expected[0],
+      g: expected[1],
+      b: expected[2],
+      a: 1,
+    })
   })
 })

@@ -144,27 +144,6 @@ describe('environmentStore', () => {
       })
     })
 
-    describe('background blend mode', () => {
-      it('should set background blend mode', () => {
-        const { setBackgroundBlendMode } = useEnvironmentStore.getState()
-
-        setBackgroundBlendMode('screen')
-        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('screen')
-
-        setBackgroundBlendMode('multiply')
-        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('multiply')
-
-        setBackgroundBlendMode('overlay')
-        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('overlay')
-
-        setBackgroundBlendMode('add')
-        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('add')
-
-        setBackgroundBlendMode('normal')
-        expect(useEnvironmentStore.getState().backgroundBlendMode).toBe('normal')
-      })
-    })
-
     describe('version tracking', () => {
       it('should bump skybox version when skybox settings change', () => {
         const { setSkyboxIntensity } = useEnvironmentStore.getState()
@@ -198,18 +177,15 @@ describe('environmentStore', () => {
         expect(state.skyboxIntensity).toBe(SKYBOX_INITIAL_STATE.skyboxIntensity)
       })
 
-      it('should reset background color and blend mode to defaults', () => {
-        const { setBackgroundColor, setBackgroundBlendMode, resetSkyboxSettings } =
-          useEnvironmentStore.getState()
+      it('should reset background color to default', () => {
+        const { setBackgroundColor, resetSkyboxSettings } = useEnvironmentStore.getState()
 
         setBackgroundColor('#ff0000')
-        setBackgroundBlendMode('screen')
 
         resetSkyboxSettings()
 
         const state = useEnvironmentStore.getState()
         expect(state.backgroundColor).toBe(SKYBOX_INITIAL_STATE.backgroundColor)
-        expect(state.backgroundBlendMode).toBe(SKYBOX_INITIAL_STATE.backgroundBlendMode)
       })
     })
   })

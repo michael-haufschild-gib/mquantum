@@ -7,8 +7,8 @@
  */
 
 // Post-processing passes
-export { TonemappingPass, TonemapMode } from './TonemappingPass'
-export type { TonemappingPassOptions } from './TonemappingPass'
+export { ToneMappingCinematicPass, ToneMappingMode } from './ToneMappingCinematicPass'
+export type { ToneMappingCinematicPassConfig } from './ToneMappingCinematicPass'
 
 export { BloomPass } from './BloomPass'
 export type { BloomPassOptions } from './BloomPass'
@@ -20,16 +20,13 @@ export { SMAAPass } from './SMAAPass'
 export type { SMAAPassOptions } from './SMAAPass'
 
 export { EnvironmentCompositePass } from './EnvironmentCompositePass'
-export type { EnvironmentCompositePassConfig, ShellGlowConfig } from './EnvironmentCompositePass'
+export type { EnvironmentCompositePassConfig } from './EnvironmentCompositePass'
 
 export { NormalPass } from './NormalPass'
 export type { NormalPassConfig } from './NormalPass'
 
 export { DepthPass } from './DepthPass'
 export type { DepthPassConfig, DepthFormat } from './DepthPass'
-
-export { CinematicPass } from './CinematicPass'
-export type { CinematicPassConfig } from './CinematicPass'
 
 export { CopyPass } from './CopyPass'
 export type { CopyPassConfig } from './CopyPass'
@@ -47,10 +44,7 @@ export { ToScreenPass } from './ToScreenPass'
 export type { ToScreenPassConfig } from './ToScreenPass'
 
 export { BufferPreviewPass } from './BufferPreviewPass'
-export type { BufferPreviewPassConfig, BufferType, DepthMode } from './BufferPreviewPass'
-
-export { ToneMappingCinematicPass, ToneMappingMode } from './ToneMappingCinematicPass'
-export type { ToneMappingCinematicPassConfig } from './ToneMappingCinematicPass'
+export type { BufferPreviewPassConfig, BufferPreviewStoreConfig, BufferType, DepthMode } from './BufferPreviewPass'
 
 export { DebugOverlayPass } from './DebugOverlayPass'
 export type { DebugOverlayPassConfig } from './DebugOverlayPass'

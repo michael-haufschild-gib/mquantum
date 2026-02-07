@@ -125,6 +125,9 @@ export interface SchrodingerRendererConfig {
   interferenceEnabled?: boolean
   /** Whether eigenfunction caching is enabled (compile-time shader specialization). */
   eigenfunctionCacheEnabled?: boolean
+  /** Wavefunction representation — triggers pipeline rebuild when changed.
+   *  HO momentum uses CPU uniform transform; hydrogen momentum uses shader path. */
+  representation?: 'position' | 'momentum'
 }
 
 /**
@@ -302,10 +305,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? true
 
-    // Density grid raymarching: enabled when eigencache toggle is on AND quantum mode is hydrogen.
-    // HO mode uses 1D eigencache (faster). Hydrogen uses 3D density grid (replaces expensive inline eval).
+    // Density grid raymarching: only for hydrogen mode.
+    // HO mode uses eigencache + analytical gradient in both position and momentum representations.
+    // HO momentum works via CPU uniform transform (1/ω, coefficient phase rotation).
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
-    const useGridForHydrogen = enableCache && isHydrogen
+    const useDensityGrid = enableCache && isHydrogen
+
+    // Eigenfunction cache: always enabled when cache is on.
+    // For HO momentum, the uniform buffer contains 1/ω → cache produces k-space functions automatically.
+    const useEigenfunctionCache = enableCache
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
@@ -318,8 +326,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       temporalAccumulation: this.rendererConfig.temporal,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
-      useEigenfunctionCache: enableCache,
-      useDensityGrid: useGridForHydrogen,
+      useEigenfunctionCache,
+      useDensityGrid,
       densityGridSize: 64,
     }
   }
@@ -1060,7 +1068,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         schroedinger?.principalQuantumNumber ?? 2,
         schroedinger?.bohrRadiusScale ?? 1.0,
         extraDimQuantumNumbers,
-        extraDimOmega
+        extraDimOmega,
+        schroedinger?.representation ?? 'position',
+        schroedinger?.momentumScale ?? 1.0
       )
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
@@ -1264,15 +1274,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const fastMode = qualityMultiplier < 0.75
     const defaultSampleCount = fastMode ? 32 : 64
     const baseSampleCount = schroedinger?.sampleCount ?? defaultSampleCount
-    const isMomentumRepresentation = schroedinger?.representation === 'momentum'
-    // Momentum rendering is currently more expensive (especially with overlays).
-    // Apply a conservative workload budget to keep the app responsive.
-    const representationSampleScale = isMomentumRepresentation ? 0.65 : 1.0
-    const representationSampleCap = isMomentumRepresentation ? 64 : 96
     const radiusScale = this.boundingRadius / 2.0
     const effectiveSampleCount = Math.min(
-      Math.max(8, Math.ceil(baseSampleCount * radiusScale * representationSampleScale)),
-      representationSampleCap
+      Math.max(8, Math.ceil(baseSampleCount * radiusScale)),
+      96
     )
     intView[920 / 4] = effectiveSampleCount
 
@@ -1440,9 +1445,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const lineDensity = schroedinger?.probabilityCurrentLineDensity ?? 8.0
     const stepSize = schroedinger?.probabilityCurrentStepSize ?? 0.04
     const integrationSteps = schroedinger?.probabilityCurrentSteps ?? 20
-    floatView[1312 / 4] = isMomentumRepresentation ? Math.min(lineDensity, 3.0) : lineDensity
-    floatView[1316 / 4] = isMomentumRepresentation ? Math.max(stepSize, 0.02) : stepSize
-    intView[1320 / 4] = isMomentumRepresentation ? Math.min(integrationSteps, 8) : integrationSteps
+    // Probability current in momentum space uses broader stencil deltas and heavier evaluation;
+    // cap line density and integration steps to keep the overlay responsive.
+    const isMomentum = schroedinger?.representation === 'momentum'
+    floatView[1312 / 4] = isMomentum ? Math.min(lineDensity, 3.0) : lineDensity
+    floatView[1316 / 4] = isMomentum ? Math.max(stepSize, 0.02) : stepSize
+    intView[1320 / 4] = isMomentum ? Math.min(integrationSteps, 8) : integrationSteps
     floatView[1324 / 4] = schroedinger?.probabilityCurrentOpacity ?? 0.7
 
     // Representation + momentum controls (offset 1328-1344)
@@ -1450,6 +1458,55 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'normalized'] ?? 0
     floatView[1336 / 4] = schroedinger?.momentumScale ?? 1.0
     floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
+
+    // ============================================
+    // HO MOMENTUM: CPU UNIFORM TRANSFORMATION
+    // ============================================
+    // Physics: HO eigenfunctions are eigenfunctions of the Fourier transform.
+    // φ̃_n(k, ω) = (-i)^n · φ_n(k, 1/ω) — same function, reciprocal ω, phase rotation.
+    // Transform the uniform buffer so the GPU shader runs the normal position-mode path
+    // and produces correct momentum-space wavefunctions automatically.
+    // All optimizations (eigencache, analytical gradient, temporal reprojection) work at 60 FPS.
+    // Exception: Hydrogen momentum has genuinely different functional form (Gegenbauer polynomials),
+    // so it keeps representationMode=1 and its own shader path in psiBlockHydrogenND.
+    const isHOMomentum = (schroedinger?.representation === 'momentum') &&
+      quantumModeStr !== 'hydrogenND'
+
+    if (isHOMomentum) {
+      // 1. Invert omegas: ω_j → 1/ω_j
+      const omegaOff = 16 / 4
+      for (let j = 0; j < MAX_DIM; j++) {
+        const omega = floatView[omegaOff + j]!
+        floatView[omegaOff + j] = 1.0 / Math.max(omega, 0.01)
+      }
+
+      // 2. Rotate coefficients by (-i)^{Σ n_j} per term
+      const quantumOff = 64 / 4
+      const coeffOff = 416 / 4
+      const termCount = Math.min(Math.max(intView[1]!, 1), MAX_TERMS)
+
+      for (let k = 0; k < termCount; k++) {
+        // Sum quantum numbers for this term
+        let totalN = 0
+        for (let j = 0; j < dimension; j++) {
+          totalN += intView[quantumOff + k * MAX_DIM + j]!
+        }
+
+        // (-i)^totalN phase rotation of complex coefficient
+        const re = floatView[coeffOff + k * 4]!
+        const im = floatView[coeffOff + k * 4 + 1]!
+        const mod = ((totalN % 4) + 4) % 4
+        switch (mod) {
+          case 0: break                                                                            // ×1
+          case 1: floatView[coeffOff + k * 4] = im; floatView[coeffOff + k * 4 + 1] = -re; break  // ×(-i)
+          case 2: floatView[coeffOff + k * 4] = -re; floatView[coeffOff + k * 4 + 1] = -im; break // ×(-1)
+          case 3: floatView[coeffOff + k * 4] = -im; floatView[coeffOff + k * 4 + 1] = re; break  // ×(i)
+        }
+      }
+
+      // 3. Force representationMode = 0 (position) — shader runs normal path
+      intView[1328 / 4] = 0
+    }
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -1845,7 +1902,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         dimension
       )
 
-      // Execute compute pass - fills eigenfunction cache storage buffer
+      // Execute compute pass - fills eigenfunction cache storage buffer.
+      // For HO momentum, the uniform buffer already contains 1/ω from the
+      // CPU transform, so the cache naturally produces k-space eigenfunctions.
       cachePass.execute(ctx)
     }
 

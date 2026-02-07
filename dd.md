@@ -107,3 +107,17 @@
 
   Fix: remove the HO-specific early termination entirely (it saves negligible
   GPU time since the Gaussian envelope skip already handles the tail)
+
+
+interrupting here: the tonemapping was initially part of the cinematic pass as you can also see that its ui controls are in the cinematic tab in
+  the right editor. somehow this got messed up. originally also this was supposed to be a 1:1 port of the threejs tonemapping algos/shaders as this
+  project originally used threejs. continue and plan accordingly. we may have now correct implementations but in the tonemapping implementation
+  outside of the cinematic pass. needs some thoughts and cleanup
+
+also: debugoverlaypass dead code? are the debug overlays working at all? light gizmos are not working right now. are the debug previews for depth/normal/temporal depth buffer from the performance monitor working?
+
+
+  Hydrogen momentum — the one exception
+
+  Hydrogen momentum space has a genuinely different functional form (Fock transform, rational functions of k). This WOULD need a separate shader path.
+  But it could be deferred — HO covers the entire 1D-11D range which is the primary use case.

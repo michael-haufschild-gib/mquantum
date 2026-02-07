@@ -27,19 +27,22 @@ import { useRotationStore } from '@/stores/rotationStore'
 import { useTransformStore } from '@/stores/transformStore'
 import { usePBRStore } from '@/stores/pbrStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { useUIStore } from '@/stores/uiStore'
 
 // Passes (import as needed for the pipeline)
 import { ScenePass } from './passes/ScenePass'
 import { BloomPass } from './passes/BloomPass'
-import { TonemappingPass } from './passes/TonemappingPass'
+import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
 import { FXAAPass } from './passes/FXAAPass'
 import { SMAAPass } from './passes/SMAAPass'
 import { ToScreenPass } from './passes/ToScreenPass'
 import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
 import { PaperTexturePass } from './passes/PaperTexturePass'
 import { FrameBlendingPass } from './passes/FrameBlendingPass'
-import { CinematicPass } from './passes/CinematicPass'
+// CinematicPass merged into ToneMappingCinematicPass
+import { BufferPreviewPass } from './passes/BufferPreviewPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
+import { parseHexColorToLinearRgb } from './utils/color'
 
 // Object Renderers
 import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
@@ -76,6 +79,7 @@ const appearanceSelector = (state: ReturnType<typeof useAppearanceStore.getState
 const environmentSelector = (state: ReturnType<typeof useEnvironmentStore.getState>) => ({
   skyboxEnabled: state.skyboxEnabled,
   skyboxMode: state.skyboxMode,
+  backgroundColor: state.backgroundColor,
 })
 
 const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getState>) => ({
@@ -91,8 +95,6 @@ const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.
   paperEnabled: state.paperEnabled,
   // Frame blending
   frameBlendingEnabled: state.frameBlendingEnabled,
-  // Cinematic
-  cinematicEnabled: state.cinematicEnabled,
 })
 
 // Schrodinger isosurface selector (compile-time shader flag, triggers renderer recreation)
@@ -106,6 +108,7 @@ const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectS
   dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
   interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
+  representation: (state.schroedinger?.representation ?? 'position') as 'position' | 'momentum',
 })
 
 // Schrodinger selector for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
@@ -282,7 +285,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           antiAliasingMethod: postProcessing.antiAliasingMethod,
           paperEnabled: postProcessing.paperEnabled,
           frameBlendingEnabled: postProcessing.frameBlendingEnabled,
-          cinematicEnabled: postProcessing.cinematicEnabled,
           isosurface: schroedingerIsoEnabled,
           quantumMode: schroedingerCompile.quantumMode,
           termCount: schroedingerCompile.termCount,
@@ -293,9 +295,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
           eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
           colorAlgorithm: appearance.colorAlgorithm,
+          representation: schroedingerCompile.representation,
           // Skybox settings
           skyboxEnabled: environment.skyboxEnabled,
           skyboxMode: environment.skyboxMode as SkyboxMode,
+          backgroundColor: environment.backgroundColor,
         }, shouldAbortSetup)
       } catch (err) {
         console.error('[WebGPUScene] CRITICAL: setupRenderPasses failed:', err)
@@ -329,8 +333,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     postProcessing.antiAliasingMethod,
     postProcessing.paperEnabled,
     postProcessing.frameBlendingEnabled,
-    postProcessing.cinematicEnabled,
     environment.skyboxEnabled,
+    environment.backgroundColor,
     appearance.colorAlgorithm,
     schroedingerIsoEnabled,
     schroedingerCompile.quantumMode,
@@ -339,6 +343,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.dispersionEnabled,
     schroedingerCompile.phaseMaterialityEnabled,
     schroedingerCompile.interferenceEnabled,
+    schroedingerCompile.representation,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
   ])
@@ -404,6 +409,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     graph.setStoreGetter('transform', () => useTransformStore.getState())
     graph.setStoreGetter('pbr', () => usePBRStore.getState())
     graph.setStoreGetter('geometry', () => useGeometryStore.getState())
+    // Buffer preview: maps UI toggle flags to pass configuration
+    graph.setStoreGetter('bufferPreview', () => {
+      const ui = useUIStore.getState()
+      if (ui.showDepthBuffer) return { bufferType: 'depth' as const, bufferInput: 'depth-buffer', depthMode: 'linear' as const }
+      if (ui.showNormalBuffer) return { bufferType: 'normal' as const, bufferInput: 'normal-buffer' }
+      if (ui.showTemporalDepthBuffer) return { bufferType: 'temporalDepth' as const, bufferInput: 'quarter-position' }
+      return null
+    })
   }, [graph, objectType])
 
   // Reusable Map for rotation updates (avoid allocating per frame)
@@ -562,8 +575,6 @@ export interface PassConfig {
   paperEnabled: boolean
   // Frame blending for smoother motion
   frameBlendingEnabled: boolean
-  // Cinematic effects (vignette, chromatic aberration, film grain)
-  cinematicEnabled: boolean
   // Schrodinger isosurface mode (compile-time shader selection)
   isosurface: boolean
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
@@ -575,9 +586,12 @@ export interface PassConfig {
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
   colorAlgorithm: PaletteColorAlgorithm
+  // Wavefunction representation (compile-time: momentum mode uses density grid)
+  representation: 'position' | 'momentum'
   // Skybox settings
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
+  backgroundColor: string
 }
 
 /**
@@ -590,11 +604,10 @@ export interface PassConfig {
  * 4. EnvironmentCompositePass - Composite environment with main object
  * 5. BloomPass (optional) - Bloom effect
  * 6. FrameBlendingPass (optional) - Temporal smoothing
- * 7. TonemappingPass - HDR to LDR conversion
- * 8. CinematicPass (optional) - Vignette, chromatic aberration, film grain
- * 9. PaperTexturePass (optional) - Paper texture overlay
- * 10. FXAA/SMAAPass (optional) - Anti-aliasing
- * 11. ToScreenPass - Copy to canvas
+ * 7. ToneMappingCinematicPass - HDR→LDR + cinematic effects (vignette, aberration, grain)
+ * 8. PaperTexturePass (optional) - Paper texture overlay
+ * 9. FXAA/SMAAPass (optional) - Anti-aliasing
+ * 10. ToScreenPass - Copy to canvas
  */
 /** Safely add a pass -- logs and continues on failure instead of aborting the pipeline. */
 async function safeAddPass(
@@ -648,6 +661,8 @@ export async function setupRenderPasses(
     config.objectType === 'schroedinger' &&
     config.temporalReprojectionEnabled &&
     !config.isosurface
+
+  const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
 
   // ============================================================================
   // Define Resources
@@ -766,13 +781,19 @@ export async function setupRenderPasses(
       shouldAbort
     )
   } else {
-    // No skybox: just clear the scene-render buffer to black
+    // No skybox: clear the scene-render buffer to the configured background color
     await safeAddPass(
       graph,
       new ScenePass({
         outputResource: 'scene-render',
         depthResource: 'depth-buffer',
         mode: 'clear',
+        clearColor: {
+          r: backgroundLinear[0],
+          g: backgroundLinear[1],
+          b: backgroundLinear[2],
+          a: 1,
+        },
       }),
       'scene-pass',
       shouldAbort
@@ -839,40 +860,21 @@ export async function setupRenderPasses(
     if (ok) currentHDRBuffer = 'frame-blend-output'
   }
 
-  // 9. Tonemapping - HDR to LDR conversion (CRITICAL -- always required)
+  // 9. Tone mapping + cinematic (CRITICAL -- always required)
+  // Combined pass: HDR→LDR conversion + chromatic aberration, vignette, film grain.
+  // Cinematic effects are controlled via store values (0 = disabled).
   await safeAddPass(
     graph,
-    new TonemappingPass({
-      inputResource: currentHDRBuffer,
-      exposure: 1.0,
+    new ToneMappingCinematicPass({
+      colorInput: currentHDRBuffer,
+      outputResource: 'ldr-color',
     }),
-    'tonemapping',
+    'tonemapping-cinematic',
     shouldAbort
   )
 
   // Track current LDR buffer for post-tonemapping effects
   let currentLDRBuffer = 'ldr-color'
-
-  // 10. Cinematic effects (optional) - vignette, chromatic aberration, film grain
-  if (config.cinematicEnabled) {
-    graph.addResource('cinematic-output', {
-      type: 'texture',
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new CinematicPass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'cinematic-output',
-      }),
-      'cinematic',
-      shouldAbort
-    )
-
-    if (ok) currentLDRBuffer = 'cinematic-output'
-  }
 
   // 11. Paper Texture (optional) - paper/parchment overlay effect
   if (config.paperEnabled) {
@@ -937,6 +939,25 @@ export async function setupRenderPasses(
     'to-screen',
     shouldAbort
   )
+
+  // 14. Buffer preview (debug visualization, renders directly to canvas)
+  // Always added — acts as no-op when no preview toggle is active.
+  // Reads from depth-buffer, normal-buffer, or quarter-position depending on store flags.
+  const bufferPreviewInputs = ['depth-buffer', 'normal-buffer']
+  if (useTemporalCloudAccumulation) {
+    bufferPreviewInputs.push('quarter-position')
+  }
+  await safeAddPass(
+    graph,
+    new BufferPreviewPass({
+      bufferInput: 'depth-buffer',
+      additionalInputs: bufferPreviewInputs.slice(1),
+      bufferType: 'depth',
+      depthMode: 'linear',
+    }),
+    'buffer-preview',
+    shouldAbort
+  )
 }
 
 /**
@@ -982,6 +1003,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         interferenceEnabled,
         temporal: useTemporalCloudAccumulation,
         eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
+        representation: config.representation,
       })
 
     default:

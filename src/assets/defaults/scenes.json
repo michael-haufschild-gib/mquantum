@@ -254,8 +254,7 @@
           "parallaxEnabled": false,
           "parallaxStrength": 0.5
         },
-        "backgroundColor": "#000000",
-        "backgroundBlendMode": "normal"
+        "backgroundColor": "#000000"
       },
       "pbr": {
         "face": {
@@ -910,8 +909,7 @@
           "parallaxEnabled": false,
           "parallaxStrength": 0.5
         },
-        "backgroundColor": "#000000",
-        "backgroundBlendMode": "normal"
+        "backgroundColor": "#000000"
       },
       "pbr": {
         "face": {
@@ -1602,8 +1600,7 @@
           "parallaxEnabled": false,
           "parallaxStrength": 0.5
         },
-        "backgroundColor": "#070707",
-        "backgroundBlendMode": "normal"
+        "backgroundColor": "#070707"
       },
       "pbr": {
         "face": {
@@ -2238,8 +2235,7 @@
           "parallaxEnabled": false,
           "parallaxStrength": 0.5
         },
-        "backgroundColor": "#0F0F1A",
-        "backgroundBlendMode": "normal"
+        "backgroundColor": "#0F0F1A"
       },
       "pbr": {
         "face": {
@@ -2827,8 +2823,7 @@
           "parallaxEnabled": false,
           "parallaxStrength": 0.5
         },
-        "backgroundColor": "#f8f5f5",
-        "backgroundBlendMode": "normal"
+        "backgroundColor": "#f8f5f5"
       },
       "pbr": {
         "face": {

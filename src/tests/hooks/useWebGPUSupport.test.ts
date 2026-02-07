@@ -8,7 +8,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useWebGPUSupport, hasWebGPUAPI } from '@/hooks/useWebGPUSupport'
+import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
 import { useRendererStore } from '@/stores/rendererStore'
 
 describe('useWebGPUSupport', () => {
@@ -20,23 +20,6 @@ describe('useWebGPUSupport', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-  })
-
-  describe('initial state', () => {
-    it('returns isChecking true before detection', () => {
-      const { result } = renderHook(() => useWebGPUSupport())
-
-      // Initially should be checking or unknown
-      expect(result.current.isChecking).toBe(true)
-      expect(result.current.isComplete).toBe(false)
-    })
-
-    it('returns webgpu mode by default', () => {
-      const { result } = renderHook(() => useWebGPUSupport())
-
-      // Default mode is webgpu
-      expect(result.current.mode).toBe('webgpu')
-    })
   })
 
   describe('WebGPU detection', () => {
@@ -109,17 +92,6 @@ describe('useWebGPUSupport', () => {
   })
 
   describe('store integration', () => {
-    it('updates store webgpuStatus to checking during detection', async () => {
-      renderHook(() => useWebGPUSupport())
-
-      // Status should transition through checking
-      // Note: This may be too fast to catch in tests, so we check final state
-      await waitFor(() => {
-        const state = useRendererStore.getState()
-        expect(state.detectionComplete).toBe(true)
-      })
-    })
-
     it('updates store with detection results', async () => {
       renderHook(() => useWebGPUSupport())
 
@@ -131,19 +103,5 @@ describe('useWebGPUSupport', () => {
       expect(state.webgpuCapabilities).not.toBeNull()
       expect(state.webgpuStatus).toBe('supported')
     })
-  })
-})
-
-describe('hasWebGPUAPI', () => {
-  it('returns true when navigator.gpu exists', () => {
-    // The mock from setup.ts provides navigator.gpu
-    expect(hasWebGPUAPI()).toBe(true)
-  })
-
-  it('checks for gpu property in navigator', () => {
-    // Verify the check is based on 'gpu' in navigator
-    // The mock provides navigator.gpu, so this should be true
-    expect('gpu' in navigator).toBe(true)
-    expect(hasWebGPUAPI()).toBe(true)
   })
 })

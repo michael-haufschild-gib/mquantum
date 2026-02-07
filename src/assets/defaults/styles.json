@@ -254,7 +254,6 @@
           "parallaxStrength": 0.5
         },
         "backgroundColor": "#070707",
-        "backgroundBlendMode": "normal",
         "skyboxBlur": 0
       },
       "pbr": {
@@ -483,7 +482,6 @@
           "parallaxStrength": 0.5
         },
         "backgroundColor": "#f8f5f5",
-        "backgroundBlendMode": "normal",
         "skyboxBlur": 0
       },
       "pbr": {
@@ -723,8 +721,7 @@
             "surfaceShimmer": 0.4
           }
         },
-        "backgroundColor": "#afafaf",
-        "backgroundBlendMode": "normal"
+        "backgroundColor": "#afafaf"
       },
       "pbr": {
         "face": {

@@ -58,9 +58,14 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
     if (isFirst) {
       lines.push(`    psiRe = ct_k.x * spatial_k;`)
       lines.push(`    psiIm = ct_k.y * spatial_k;`)
+      // Spatial-only accumulation (no time factor) for correct phase coloring
+      lines.push(`    spatRe = coeff_k.x * spatial_k;`)
+      lines.push(`    spatIm = coeff_k.y * spatial_k;`)
     } else {
       lines.push(`    psiRe += ct_k.x * spatial_k;`)
       lines.push(`    psiIm += ct_k.y * spatial_k;`)
+      lines.push(`    spatRe += coeff_k.x * spatial_k;`)
+      lines.push(`    spatIm += coeff_k.y * spatial_k;`)
     }
 
     // Gradient components for each ND dimension
@@ -84,6 +89,8 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
   if (useUnrolledTerms) {
     const initBlock = `  var psiRe = 0.0;
   var psiIm = 0.0;
+  var spatRe = 0.0;
+  var spatIm = 0.0;
   var dPsiRe: array<f32, ${dim}>;
   var dPsiIm: array<f32, ${dim}>;`
 
@@ -93,6 +100,8 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
     // Runtime loop version
     termsBlock = `  var psiRe = 0.0;
   var psiIm = 0.0;
+  var spatRe = 0.0;
+  var spatIm = 0.0;
   var dPsiRe: array<f32, ${dim}>;
   var dPsiIm: array<f32, ${dim}>;
   for (var k = 0; k < uniforms.termCount; k++) {
@@ -104,6 +113,8 @@ ${genLoadPhis('k')}
     let ct_k = cmul(coeff_k, tf_k);
     psiRe += ct_k.x * spatial_k;
     psiIm += ct_k.y * spatial_k;
+    spatRe += coeff_k.x * spatial_k;
+    spatIm += coeff_k.y * spatial_k;
 ${Array.from({ length: dim }, (_, j) => {
   const pp = genPartialProduct(j).replace(/\bk\b/g, 'k')
   return `    dPsiRe[${j}] += ct_k.x * ${pp};\n    dPsiIm[${j}] += ct_k.y * ${pp};`
@@ -145,8 +156,8 @@ ${termsBlock}
   let rho = psiRe * psiRe + psiIm * psiIm;
   let s = log(rho + 1e-8);
 
-  // Spatial phase for coloring
-  let spatialPhase = atan2(psiIm, psiRe);
+  // Spatial phase for coloring (time-independent: coefficient × spatial product, no e^{-iEt})
+  let spatialPhase = atan2(spatIm, spatRe);
 
   // ∂ρ/∂xND[j] = 2 · Re(ψ* · ∂ψ/∂xND[j]) = 2 · (ψ_re · ∂ψ_re/∂xND[j] + ψ_im · ∂ψ_im/∂xND[j])
   let invRhoEps = 1.0 / (rho + 1e-8);
