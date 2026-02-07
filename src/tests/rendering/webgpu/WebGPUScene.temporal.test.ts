@@ -13,12 +13,10 @@ interface ScenePassConfig {
   isosurface: boolean
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  useDensityGrid: boolean
   nodalEnabled: boolean
   dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
-  densityGridPhaseRequired: boolean
   temporalReprojectionEnabled: boolean
   colorAlgorithm:
     | 'monochromatic'
@@ -66,12 +64,10 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     isosurface: false,
     quantumMode: 'harmonicOscillator',
     termCount: 1,
-    useDensityGrid: false,
     nodalEnabled: false,
     dispersionEnabled: false,
     phaseMaterialityEnabled: false,
     interferenceEnabled: false,
-    densityGridPhaseRequired: false,
     temporalReprojectionEnabled: true,
     colorAlgorithm: 'monochromatic',
     skyboxEnabled: false,

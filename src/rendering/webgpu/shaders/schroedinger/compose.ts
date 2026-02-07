@@ -48,7 +48,6 @@ import {
   mainBlock,
   generateMainBlockIsosurface,
   generateMainBlockTemporal,
-  generateMainBlockVolumetric,
   temporalMRTOutputBlock,
 } from './main.wgsl'
 
@@ -115,11 +114,6 @@ import { sdfHighDBlock } from './sdf/sdf-high-d.wgsl'
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { emissionBlock } from './volume/emission.wgsl'
 import { volumeGradientBlock, volumeIntegrationBlock } from './volume/integration.wgsl'
-import {
-  densityGridBindingsBlock,
-  densityGridSamplingBlock,
-  volumeRaymarchGridBlock,
-} from './volume/densityGridSampling.wgsl'
 
 import type { ColorAlgorithm } from '../types'
 
@@ -140,14 +134,6 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Preferred color algorithm hint (Schrödinger currently evaluates color branches at runtime) */
   colorAlgorithm?: ColorAlgorithm
-  /**
-   * Use pre-computed density grid texture instead of direct wavefunction evaluation.
-   * Requires the DensityGridComputePass to run before the render pass.
-   * Provides 3-6x performance improvement for volumetric rendering.
-   */
-  useDensityGrid?: boolean
-  /** Whether the density grid payload stores phase/log channels (multi-channel mode). */
-  densityGridHasPhase?: boolean
   /** Compile-time specialization for phase materiality branching. */
   phaseMateriality?: boolean
   /** Compile-time specialization for interference branching. */
@@ -169,8 +155,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     temporalAccumulation: enableTemporal = false,
     quantumMode = 'harmonicOscillator',
     termCount,
-    useDensityGrid = false,
-    densityGridHasPhase = false,
     nodal = true,
     dispersion = true,
     phaseMateriality = true,
@@ -245,16 +229,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   features.push('Beer-Lambert')
 
-  if (useDensityGrid && !isosurface) {
-    features.push('Density Grid Compute')
-    if (densityGridHasPhase) {
-      features.push('Density Grid Phase Payload')
-    }
-  }
-
-  // Density grid compile-time flags
-  defines.push(`const DENSITY_GRID_ENABLED: bool = ${useDensityGrid && !isosurface};`)
-  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${useDensityGrid && !isosurface && densityGridHasPhase};`)
   defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
   defines.push(`const FEATURE_DISPERSION: bool = ${dispersion};`)
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
@@ -262,14 +236,11 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   // Select main block based on mode
   // Temporal volumetric mode outputs MRT (color + world position)
-  // Volumetric mode with density grid uses optimized raymarcher
   const selectedMainBlock = isosurface
     ? generateMainBlockIsosurface()
     : enableTemporal
-      ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
-      : useDensityGrid
-        ? generateMainBlockVolumetric({ useDensityGrid: true })
-        : mainBlock
+      ? generateMainBlockTemporal({ bayerJitter: true })
+      : mainBlock
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
@@ -456,23 +427,6 @@ struct VertexOutput {
     },
     { name: 'Volume Gradient', content: volumeGradientBlock },
     { name: 'Volume Integration', content: volumeIntegrationBlock },
-
-    // ===== DENSITY GRID (optional compute shader acceleration) =====
-    {
-      name: 'Density Grid Bindings',
-      content: densityGridBindingsBlock,
-      condition: useDensityGrid && !isosurface,
-    },
-    {
-      name: 'Density Grid Sampling',
-      content: densityGridSamplingBlock,
-      condition: useDensityGrid && !isosurface,
-    },
-    {
-      name: 'Volume Raymarch Grid',
-      content: volumeRaymarchGridBlock,
-      condition: useDensityGrid && !isosurface,
-    },
 
     // ===== GEOMETRY =====
     { name: 'Sphere Intersection', content: sphereIntersectBlock },

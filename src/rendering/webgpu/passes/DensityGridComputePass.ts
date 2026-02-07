@@ -47,8 +47,6 @@ export interface DensityGridComputeConfig {
   quantumMode?: 'harmonicOscillator' | 'hydrogenND'
   /** Number of HO superposition terms for compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Store phase/log payload in the grid (requires multi-channel format). */
-  includePhase?: boolean
 }
 
 /**
@@ -71,15 +69,13 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private computeBindGroup: GPUBindGroup | null = null
   private computeBindGroupLayout: GPUBindGroupLayout | null = null
 
-  // Sampler for render pass
-  private densitySampler: GPUSampler | null = null
+  // GPU->CPU readback for uncertainty threshold extraction
   private densityReadbackBuffer: GPUBuffer | null = null
   private readbackBytesPerRow = 0
   private readbackInFlight = false
   private readbackPendingSubmit = false
   private shouldRefreshDistribution = true
-  private densityTextureFormat: 'r16float' | 'rgba16float' = 'rgba16float'
-  private hasPhasePayload = false
+  private densityTextureFormat: 'r16float' | 'rgba16float' = 'r16float'
 
   // Grid parameters
   private gridSize: number
@@ -126,24 +122,20 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
-    this.hasPhasePayload = this.passConfig.includePhase ?? false
-    this.densityTextureFormat = await this.selectGridTextureFormat(device, this.hasPhasePayload)
+    this.densityTextureFormat = await this.selectGridTextureFormat(device)
 
-    // Compose compute shader
+    // Compose compute shader (density-only mode for uncertainty threshold extraction)
     const { wgsl } = composeDensityGridComputeShader({
       dimension: this.passConfig.dimension,
       quantumMode: this.passConfig.quantumMode,
       termCount: this.passConfig.termCount,
-      includePhase: this.hasPhasePayload,
       storageFormat: this.densityTextureFormat,
     })
 
     // Create shader module
     const shaderModule = this.createShaderModule(device, wgsl, 'density-grid-compute')
 
-    // Create 3D texture for density storage.
-    // - density-only mode: r16float (lower bandwidth)
-    // - phase-capable mode: rgba16float (rho/logRho/phase payload)
+    // Create 3D texture for density storage (density-only, for uncertainty threshold extraction).
     this.densityTexture = device.createTexture({
       label: 'density-grid-texture',
       size: {
@@ -155,7 +147,6 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       dimension: '3d',
       usage:
         GPUTextureUsage.STORAGE_BINDING | // For compute shader write
-        GPUTextureUsage.TEXTURE_BINDING | // For fragment shader read
         GPUTextureUsage.COPY_SRC | // For GPU->CPU readback (uncertainty threshold extraction)
         GPUTextureUsage.COPY_DST, // For potential debugging
     })
@@ -163,16 +154,6 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.densityTextureView = this.densityTexture.createView({
       label: 'density-grid-view',
       dimension: '3d',
-    })
-
-    // Create sampler for render pass (trilinear filtering)
-    this.densitySampler = device.createSampler({
-      label: 'density-grid-sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
-      addressModeU: 'clamp-to-edge',
-      addressModeV: 'clamp-to-edge',
-      addressModeW: 'clamp-to-edge',
     })
 
     // Readback buffer for confidence-boundary threshold extraction.
@@ -255,13 +236,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   }
 
   private async selectGridTextureFormat(
-    device: GPUDevice,
-    includePhase: boolean
+    device: GPUDevice
   ): Promise<'r16float' | 'rgba16float'> {
-    if (includePhase) {
-      return 'rgba16float'
-    }
-
     const r16floatSupported = await this.supportsStorageTextureFormat(device, 'r16float')
     return r16floatSupported ? 'r16float' : 'rgba16float'
   }
@@ -634,24 +610,6 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.startPendingReadback()
   }
 
-  /**
-   * Get the density texture for use in render pass.
-   */
-  getDensityTextureView(): GPUTextureView | null {
-    return this.densityTextureView
-  }
-
-  /**
-   * Get the sampler for the density texture.
-   */
-  getDensitySampler(): GPUSampler | null {
-    return this.densitySampler
-  }
-
-  hasPhaseData(): boolean {
-    return this.hasPhasePayload
-  }
-
   getTextureFormat(): 'r16float' | 'rgba16float' {
     return this.densityTextureFormat
   }
@@ -697,7 +655,6 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.basisBuffer = null
     this.computeBindGroup = null
     this.computeBindGroupLayout = null
-    this.densitySampler = null
     if (this.densityReadbackBuffer) {
       try {
         this.densityReadbackBuffer.unmap()

@@ -137,42 +137,18 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
  * Configuration for volumetric main block generation.
  */
 export interface VolumetricMainBlockConfig {
-  /** Use pre-computed density grid for faster raymarching */
-  useDensityGrid?: boolean
+  // Reserved for future per-mode config options
 }
 
 /**
  * Generator function for volumetric main block.
- * When useDensityGrid is enabled, uses volumeRaymarchGrid() instead of
- * volumeRaymarch()/volumeRaymarchHQ() for 3-6x performance improvement.
+ * Selects between volumeRaymarch() (fast) and volumeRaymarchHQ() (dispersion-capable).
  * @param config
  */
 export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = {}): string {
-  const { useDensityGrid = false } = config
+  const _config = config // reserved for future use
 
-  // When density grid is enabled, use the grid-based raymarcher
-  // with automatic fallback when features require direct wavefunction sampling.
-  const raymarchCall = useDensityGrid
-    ? `let phaseDependentMode =
-    schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9 ||
-    (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
-    (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
-
-  let requiresDirectSampling =
-    (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
-    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE);
-
-  if (requiresDirectSampling) {
-    if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
-      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-    } else {
-      volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-    }
-  } else {
-    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
-  }`
-    : `// Use HQ mode if quality requires it OR if dispersion is enabled
+  const raymarchCall = `// Use HQ mode if quality requires it OR if dispersion is enabled
   // (dispersion requires per-channel RGB transmittance only available in HQ path)
   if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
@@ -552,8 +528,6 @@ export const mainBlockIsosurface = generateMainBlockIsosurface()
 export interface TemporalMainBlockConfig {
   /** Enable Bayer jitter for quarter-res rendering */
   bayerJitter?: boolean
-  /** Use pre-computed density grid for faster raymarching */
-  useDensityGrid?: boolean
 }
 
 /**
@@ -583,7 +557,7 @@ struct TemporalFragmentOutput {
  * @param config
  */
 export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}): string {
-  const { bayerJitter = true, useDensityGrid = false } = config
+  const { bayerJitter = true } = config
 
   // Bayer jitter section - applies sub-pixel offset for quarter-res rendering
   // NOTE: Unlike the incorrect previous implementation that DISCARDED pixels,
@@ -633,38 +607,7 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
   // When jitter is applied, use jitteredVPosition for ray direction
   const rayDirSource = bayerJitter ? 'jitteredVPosition' : 'input.vPosition'
 
-  const raymarchCall = useDensityGrid
-    ? `let phaseDependentMode =
-    schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9 ||
-    (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
-    (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
-
-  let requiresDirectSampling =
-    (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
-    (phaseDependentMode && !DENSITY_GRID_HAS_PHASE);
-
-  if (requiresDirectSampling) {
-    if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
-      volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-    } else {
-      volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-    }
-  } else {
-    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
-    // Safety fallback: if grid path yields a fully transparent sample,
-    // re-evaluate with direct sampling to avoid blank frames.
-    // This can happen when the density grid hasn't been populated yet
-    // or when coordinate mapping produces out-of-range lookups.
-    if (volumeResult.alpha < 0.01) {
-      if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
-        volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-      } else {
-        volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-      }
-    }
-  }`
-    : `// Use HQ mode if quality requires it OR if dispersion is enabled
+  const raymarchCall = `// Use HQ mode if quality requires it OR if dispersion is enabled
   // (dispersion requires per-channel RGB transmittance only available in HQ path)
   if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);

@@ -80,7 +80,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerDensityGain: (gain: number) => void
   setSchroedingerPowderScale: (scale: number) => void
   setSchroedingerSampleCount: (count: number) => void
-  setSchroedingerUseDensityGrid: (enabled: boolean) => void
 
   // Emission Settings
   setSchroedingerEmissionIntensity: (intensity: number) => void

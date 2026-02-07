@@ -45,14 +45,6 @@ export interface SchrodingerRendererConfig {
   colorAlgorithm?: WGSLColorAlgorithm
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean
-  /**
-   * Use pre-computed density grid for 3-6x faster volumetric rendering.
-   * Requires compute shader support. Only applies to volumetric mode (not isosurface).
-   * Default: false
-   */
-  useDensityGrid?: boolean
-  /** Require phase-capable density grid payload (rho/logRho/phase channels). */
-  densityGridPhaseRequired?: boolean
   /** Compile-time specialization flag for nodal calculations. */
   nodalEnabled?: boolean
   /** Compile-time specialization flag for chromatic dispersion. */
@@ -82,12 +74,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Bind groups
   // Group 0: Camera
   // Group 1: Combined (Lighting + Material + Quality)
-  // Group 2: Object (Schrödinger + Basis + optional DensityGrid)
+  // Group 2: Object (Schrödinger + Basis)
   private cameraBindGroup: GPUBindGroup | null = null
   private lightingBindGroup: GPUBindGroup | null = null
   private objectBindGroup: GPUBindGroup | null = null
 
-  // Density Grid Compute Pass (for accelerated volumetric rendering)
+  // Density Grid Compute Pass (for uncertainty boundary threshold extraction)
   private densityGridPass: DensityGridComputePass | null = null
   private densityGridInitialized = false
 
@@ -220,22 +212,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isosurface: false,
       quantumMode: 'harmonicOscillator',
       temporal: false,
-      // Density grid disabled by default: while it provides 3-6x FPS improvement via
-      // pre-computed 64³ texture lookups, it loses phase data (returns phase=0.0),
-      // breaking some phase-dependent rendering features in density-only mode.
-      // Enable explicitly when performance is prioritized over visual quality.
-      useDensityGrid: false,
-      densityGridPhaseRequired: false,
       nodalEnabled: true,
       dispersionEnabled: true,
       phaseMaterialityEnabled: true,
       interferenceEnabled: true,
       ...config,
     }
-
-    // Density grid only makes sense for volumetric mode, not isosurface
-    const effectiveUseDensityGrid =
-      this.rendererConfig.useDensityGrid && !this.rendererConfig.isosurface
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
@@ -246,8 +228,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       dispersion: this.rendererConfig.dispersionEnabled ?? true,
       colorAlgorithm: this.rendererConfig.colorAlgorithm,
       temporalAccumulation: this.rendererConfig.temporal,
-      useDensityGrid: effectiveUseDensityGrid,
-      densityGridHasPhase: false,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
     }
@@ -277,28 +257,20 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastPbrVersion = -1
     this.lastSchrodingerPbrVersion = -1
 
-    // Density grid only makes sense for volumetric mode.
-    const useDensityGrid = this.shaderConfig.useDensityGrid && !this.rendererConfig.isosurface
-
-    // Recreate density grid pass if needed so shader composition can use the actual payload mode.
+    // Density grid compute pass provides uncertainty boundary threshold extraction.
+    // Always create it (cheap when idle — only runs when uncertainty boundary is enabled).
     this.densityGridPass?.dispose()
     this.densityGridPass = null
     this.densityGridInitialized = false
 
-    if (useDensityGrid) {
-      this.densityGridPass = new DensityGridComputePass({
-        dimension: this.rendererConfig.dimension ?? 3,
-        quantumMode: this.rendererConfig.quantumMode,
-        termCount: this.rendererConfig.termCount,
-        gridSize: 64, // 64³ grid - balance between quality and compute cost
-        includePhase: this.rendererConfig.densityGridPhaseRequired,
-      })
-      await this.densityGridPass.initialize(ctx)
-      this.densityGridInitialized = true
-      this.shaderConfig.densityGridHasPhase = this.densityGridPass.hasPhaseData()
-    } else {
-      this.shaderConfig.densityGridHasPhase = false
-    }
+    this.densityGridPass = new DensityGridComputePass({
+      dimension: this.rendererConfig.dimension ?? 3,
+      quantumMode: this.rendererConfig.quantumMode,
+      termCount: this.rendererConfig.termCount,
+      gridSize: 64,
+    })
+    await this.densityGridPass.initialize(ctx)
+    this.densityGridInitialized = true
 
     // Compose shaders
     const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
@@ -331,32 +303,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Group 2: Object (Schroedinger + Basis + optional DensityGrid texture)
-    // When useDensityGrid is enabled, we add texture and sampler bindings
-    const objectLayoutEntries: GPUBindGroupLayoutEntry[] = [
-      { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Schroedinger uniforms
-      { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Basis vectors
-    ]
-
-    // Add density grid bindings if enabled
-    // Supports both r16float (density-only) and rgba16float (phase payload).
-    if (useDensityGrid) {
-      objectLayoutEntries.push(
-        {
-          binding: 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: {
-            sampleType: 'float' as GPUTextureSampleType,
-            viewDimension: '3d' as GPUTextureViewDimension,
-          },
-        }, // Density grid texture (rgba16float)
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' as const } } // Trilinear sampler
-      )
-    }
-
+    // Group 2: Object (Schroedinger + Basis)
     const objectBindGroupLayout = device.createBindGroupLayout({
       label: 'schroedinger-object-bgl',
-      entries: objectLayoutEntries,
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Schroedinger uniforms
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // Basis vectors
+      ],
     })
     // Create pipeline layout
     const bindGroupLayouts: GPUBindGroupLayout[] = [
@@ -490,28 +443,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ],
     })
 
-    // Group 2: Object (Schroedinger + Basis + optional DensityGrid)
-    const objectBindGroupEntries: GPUBindGroupEntry[] = [
-      { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
-      { binding: 1, resource: { buffer: this.basisUniformBuffer } },
-    ]
-
-    // Add density grid texture and sampler if enabled
-    if (useDensityGrid && this.densityGridPass) {
-      const densityTextureView = this.densityGridPass.getDensityTextureView()
-      const densitySampler = this.densityGridPass.getDensitySampler()
-      if (densityTextureView && densitySampler) {
-        objectBindGroupEntries.push(
-          { binding: 2, resource: densityTextureView },
-          { binding: 3, resource: densitySampler }
-        )
-      }
-    }
-
+    // Group 2: Object (Schroedinger + Basis)
     this.objectBindGroup = device.createBindGroup({
       label: 'schroedinger-object-bg',
       layout: objectBindGroupLayout,
-      entries: objectBindGroupEntries,
+      entries: [
+        { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
+        { binding: 1, resource: { buffer: this.basisUniformBuffer } },
+      ],
     })
 
     // Create bounding geometry (sphere for volume)

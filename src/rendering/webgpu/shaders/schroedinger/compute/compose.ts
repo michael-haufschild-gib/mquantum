@@ -67,7 +67,6 @@ import {
   gridParamsBlock,
   generateDensityGridBindingsBlock,
   densityGridComputeBlock,
-  densityGridWithPhaseComputeBlock,
 } from './densityGrid.wgsl'
 
 /** Quantum mode for compute shader */
@@ -83,8 +82,6 @@ export interface DensityGridComputeConfig {
   quantumMode?: ComputeQuantumMode
   /** Number of HO superposition terms (1-8) - enables compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Store phase information (requires multi-channel grid format) */
-  includePhase?: boolean
   /** Storage texture format for the grid payload */
   storageFormat?: 'r16float' | 'rgba16float'
 }
@@ -107,8 +104,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     dimension,
     quantumMode = 'harmonicOscillator',
     termCount,
-    includePhase = false,
-    storageFormat = 'rgba16float',
+    storageFormat = 'r16float',
   } = config
 
   const defines: string[] = []
@@ -161,9 +157,6 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   defines.push('const FEATURE_INTERFERENCE: bool = true;')
 
   features.push('Density Grid Compute')
-  if (includePhase) {
-    features.push('Phase Storage')
-  }
   features.push(`Grid Format: ${storageFormat}`)
 
   // Get dimension-specific blocks
@@ -279,8 +272,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
     // ===== COMPUTE SHADER ENTRY POINT =====
-    // Use phase-inclusive version when storing phase for color mapping
-    { name: 'Compute Main', content: includePhase ? densityGridWithPhaseComputeBlock : densityGridComputeBlock },
+    { name: 'Compute Main', content: densityGridComputeBlock },
   ]
 
   // Assemble shader

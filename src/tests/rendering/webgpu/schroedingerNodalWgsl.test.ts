@@ -7,7 +7,6 @@ describe('Schroedinger nodal WGSL composition', () => {
       dimension: 4,
       quantumMode: 'harmonicOscillator',
       isosurface: false,
-      useDensityGrid: false,
     })
 
     expect(wgsl).toContain('nodalDefinition: i32')
@@ -54,25 +53,11 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).not.toContain('fn nodalSliceMask(')
   })
 
-  it('keeps non-emissive nodal compositing in density-grid path', () => {
-    const { wgsl } = composeSchroedingerShader({
-      dimension: 4,
-      quantumMode: 'harmonicOscillator',
-      isosurface: false,
-      useDensityGrid: true,
-    })
-
-    expect(wgsl).toContain('uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND')
-    expect(wgsl).toContain('transmittance *= (1.0 - nodalAlpha * 0.6);')
-    expect(wgsl).not.toContain('nodal.intensity * uniforms.nodalStrength * stepLen * 2.5')
-  })
-
   it('uses 3D hydrogen radial core in hydrogen-ND wavefunction evaluation', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 7,
       quantumMode: 'hydrogenND',
       isosurface: false,
-      useDensityGrid: false,
     })
 
     expect(wgsl).toContain('if (hydrogenRadialEarlyExit(r3D, uniforms))')
@@ -88,7 +73,6 @@ describe('Schroedinger nodal WGSL composition', () => {
       dimension: 5,
       quantumMode: 'hydrogenND',
       isosurface: true,
-      useDensityGrid: false,
     })
 
     expect(wgsl).toContain('let localSpan = stepLen * mix(3.0, 8.0, surfaceStrengthT);')

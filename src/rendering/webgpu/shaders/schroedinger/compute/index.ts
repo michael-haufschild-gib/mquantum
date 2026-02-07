@@ -9,9 +9,7 @@
 
 export {
   gridParamsBlock,
-  densityGridBindingsBlock,
   densityGridComputeBlock,
-  densityGridWithPhaseComputeBlock,
 } from './densityGrid.wgsl'
 
 export {

@@ -101,7 +101,6 @@ const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore
 const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) => ({
   quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
   termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
-  useDensityGrid: state.schroedinger?.useDensityGrid ?? false,
   nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
   dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
@@ -286,16 +285,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           isosurface: schroedingerIsoEnabled,
           quantumMode: schroedingerCompile.quantumMode,
           termCount: schroedingerCompile.termCount,
-          useDensityGrid: schroedingerCompile.useDensityGrid,
           nodalEnabled: schroedingerCompile.nodalEnabled,
           dispersionEnabled: schroedingerCompile.dispersionEnabled,
           phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
           interferenceEnabled: schroedingerCompile.interferenceEnabled,
-          densityGridPhaseRequired:
-            schroedingerCompile.phaseMaterialityEnabled ||
-            schroedingerCompile.interferenceEnabled ||
-            appearance.colorAlgorithm === 'phase' ||
-            appearance.colorAlgorithm === 'mixed',
           temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
           colorAlgorithm: appearance.colorAlgorithm,
           // Skybox settings
@@ -340,7 +333,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerIsoEnabled,
     schroedingerCompile.quantumMode,
     schroedingerCompile.termCount,
-    schroedingerCompile.useDensityGrid,
     schroedingerCompile.nodalEnabled,
     schroedingerCompile.dispersionEnabled,
     schroedingerCompile.phaseMaterialityEnabled,
@@ -573,12 +565,10 @@ export interface PassConfig {
   isosurface: boolean
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  useDensityGrid: boolean
   nodalEnabled: boolean
   dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
-  densityGridPhaseRequired: boolean
   temporalReprojectionEnabled: boolean
   colorAlgorithm: PaletteColorAlgorithm
   // Skybox settings
@@ -961,12 +951,10 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     isosurface,
     quantumMode,
     termCount,
-    useDensityGrid,
     nodalEnabled,
     dispersionEnabled,
     phaseMaterialityEnabled,
     interferenceEnabled,
-    densityGridPhaseRequired,
   } = config
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as WGSLColorAlgorithm | undefined
   const useTemporalCloudAccumulation =
@@ -984,12 +972,10 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         quantumMode,
         termCount,
         colorAlgorithm,
-        useDensityGrid,
         nodalEnabled,
         dispersionEnabled,
         phaseMaterialityEnabled,
         interferenceEnabled,
-        densityGridPhaseRequired,
         temporal: useTemporalCloudAccumulation,
       })
 

@@ -94,12 +94,10 @@ export { sdf3dBlock, sdfHighDBlock } from './sdf'
 // Volume rendering modules
 export { emissionBlock } from './volume'
 
-// Compute shader modules for density grid pre-computation
+// Compute shader modules for density grid pre-computation (uncertainty boundary)
 export {
   gridParamsBlock,
-  densityGridBindingsBlock,
   densityGridComputeBlock,
-  densityGridWithPhaseComputeBlock,
   composeDensityGridComputeShader,
   type DensityGridComputeConfig,
   type ComputeQuantumMode,

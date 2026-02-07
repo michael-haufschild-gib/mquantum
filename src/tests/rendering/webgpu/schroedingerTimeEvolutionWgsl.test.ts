@@ -7,7 +7,6 @@ describe('Schroedinger time evolution WGSL composition', () => {
       dimension: 5,
       quantumMode: 'harmonicOscillator',
       isosurface: false,
-      useDensityGrid: false,
       interference: true,
     })
 

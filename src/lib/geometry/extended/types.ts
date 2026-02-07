@@ -232,8 +232,6 @@ export interface SchroedingerConfig {
   powderScale: number
   /** Samples per ray (32-128) */
   sampleCount: number
-  /** Use precomputed density grid acceleration (volumetric mode only) */
-  useDensityGrid: boolean
 
   // === Emission Settings ===
   /** HDR emission intensity (0.0-5.0) */
@@ -442,7 +440,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   densityGain: 2.0,
   powderScale: 1.0,
   sampleCount: 32, // Derived from raymarchQuality: 'balanced'
-  useDensityGrid: false,
 
   // Emission
   emissionIntensity: 0.5,

@@ -97,6 +97,9 @@ export const TRANSIENT_FIELDS = new Set([
   // Legacy edge thickness fields (removed — single object type has no geometric edges)
   'edgeThickness',
   'tubeCaps',
+
+  // Legacy density grid rendering acceleration (removed — compute pass kept for uncertainty boundary only)
+  'useDensityGrid',
 ])
 
 /**

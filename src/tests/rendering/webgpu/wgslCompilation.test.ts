@@ -207,24 +207,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('fn evalHarmonicOscillatorPsi(')
   })
 
-  it('supports density grid acceleration mode', () => {
-    const { wgsl, features } = composeSchroedingerShader({
-      dimension: 4,
-
-      temporal: false,
-
-      sss: false,
-      quantumMode: 'harmonicOscillator',
-      useDensityGrid: true,
-    })
-
-    verifyWgsl(wgsl, true)
-    expect(features).toContain('Density Grid Compute')
-    // Should include the grid sampling functions
-    expect(wgsl).toContain('sampleDensityFromGrid')
-    expect(wgsl).toContain('densityGridTex')
-  })
-
   it('specializes optional physics toggles via compile-time feature defines', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 5,
@@ -242,56 +224,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('const FEATURE_DISPERSION: bool = false;')
   })
 
-  it('uses dynamic bounding radius for density-grid sampling space', () => {
-    const { wgsl } = composeSchroedingerShader({
-      dimension: 6,
-
-      temporal: false,
-
-      sss: false,
-      quantumMode: 'harmonicOscillator',
-      useDensityGrid: true,
-    })
-
-    verifyWgsl(wgsl, true)
-    expect(wgsl).toContain('schroedinger.boundingRadius')
-    expect(wgsl).not.toContain('const DENSITY_GRID_MIN')
-    expect(wgsl).not.toContain('const DENSITY_GRID_MAX')
-  })
-
-  it('adds conservative empty-space skipping and physically bounded early termination guards', () => {
-    const { wgsl } = composeSchroedingerShader({
-      dimension: 4,
-
-      temporal: false,
-
-      sss: false,
-      quantumMode: 'harmonicOscillator',
-      useDensityGrid: true,
-    })
-
-    verifyWgsl(wgsl, true)
-    expect(wgsl).toContain('const EMPTY_SKIP_THRESHOLD')
-    expect(wgsl).toContain('const MAX_REMAINING_DENSITY_BOUND')
-    expect(wgsl).toContain('remainingContributionBound')
-  })
-
-  it('reuses center density when computing grid gradients', () => {
-    const { wgsl } = composeSchroedingerShader({
-      dimension: 4,
-
-      temporal: false,
-
-      sss: false,
-      quantumMode: 'harmonicOscillator',
-      useDensityGrid: true,
-    })
-
-    verifyWgsl(wgsl, true)
-    expect(wgsl).toContain('fn computeGradientFromGrid(worldPos: vec3f, delta: f32, rhoCenter: f32)')
-    expect(wgsl).toContain('computeGradientFromGrid(pos, 0.05, rho)')
-  })
-
   it('uses uncertainty boundary uniforms instead of legacy shimmer uniforms', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 4,
@@ -300,7 +232,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       sss: false,
       quantumMode: 'harmonicOscillator',
-      useDensityGrid: true,
     })
 
     verifyWgsl(wgsl, true)
@@ -390,20 +321,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('* pixelSize * 2.0')
   })
 
-  it('uses density-grid raymarching in temporal mode when enabled', () => {
-    const { wgsl, features } = composeSchroedingerShader({
-      dimension: 4,
-      temporalAccumulation: true,
-      sss: false,
-      quantumMode: 'harmonicOscillator',
-      useDensityGrid: true,
-      densityGridHasPhase: true,
-    })
-
-    verifyWgsl(wgsl, true)
-    expect(features).toContain('Density Grid Compute')
-    expect(wgsl).toContain('volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);')
-  })
 })
 
 describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
@@ -482,18 +399,6 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
     }
   })
 
-  it('supports phase-capable density grid compute path with main entry point', () => {
-    const { wgsl, features } = composeDensityGridComputeShader({
-      dimension: 5,
-      quantumMode: 'hydrogenND',
-      includePhase: true,
-    })
-
-    verifyWgslCompute(wgsl)
-    expect(features).toContain('Phase Storage')
-    expect(wgsl).toContain('let densityResult = sampleDensityWithPhase')
-    expect(wgsl).toMatch(/@compute\s+@workgroup_size\(8,\s*8,\s*8\)\s*fn\s+main/)
-  })
 })
 
 describe('WGSL Shader Compilation - Skybox', () => {
