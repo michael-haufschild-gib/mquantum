@@ -306,8 +306,8 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('shimmerStrength')
   })
 
-  it('keeps runtime color modules when compile-time colorAlgorithm is provided', () => {
-    const { wgsl } = composeSchroedingerShader({
+  it('excludes unused color modules when compile-time colorAlgorithm is provided', () => {
+    const { wgsl, modules } = composeSchroedingerShader({
       dimension: 4,
 
       temporal: false,
@@ -318,10 +318,16 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     })
 
     verifyWgsl(wgsl, true)
-    expect(wgsl).not.toContain('fn getColorByAlgorithm')
-    expect(wgsl).toContain('struct ColorUniforms')
-    expect(wgsl).toContain('fn cosinePalette(')
-    expect(wgsl).toContain('fn oklab2rgb(')
+    // Algorithm 0 (Monochromatic) uses HSL only — cosine and oklab excluded
+    expect(modules).toContain('Color (HSL)')
+    expect(modules).not.toContain('Color (Cosine)')
+    expect(modules).not.toContain('Color (Oklab)')
+    expect(modules).not.toContain('Color Selector')
+    expect(wgsl).not.toContain('fn cosinePalette(')
+    expect(wgsl).not.toContain('fn oklab2rgb(')
+    // computeBaseColor is specialized to single branch
+    expect(wgsl).toContain('fn computeBaseColor(')
+    expect(wgsl).not.toContain('uniforms.colorAlgorithm')
   })
 
   it('uses normalized harmonic oscillator basis (no visual damping)', () => {
@@ -383,6 +389,192 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('* pixelSize * 2.0')
   })
 
+})
+
+describe('WGSL Color Algorithm Specialization', () => {
+  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+
+  for (const alg of allAlgorithms) {
+    it(`produces valid WGSL for colorAlgorithm=${alg}`, () => {
+      const { wgsl } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
+
+      verifyWgsl(wgsl, true)
+      verifyNoGlslLeakage(wgsl)
+      // Specialized: no runtime dispatch
+      expect(wgsl).toContain('fn computeBaseColor(')
+      expect(wgsl).not.toContain('let algorithm = uniforms.colorAlgorithm;')
+    })
+  }
+
+  it('Color Selector block never appears in modules', () => {
+    for (const alg of allAlgorithms) {
+      const { modules } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
+
+      expect(modules).not.toContain('Color Selector')
+    }
+    // Also check undefined (runtime dispatch)
+    const { modules } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+    expect(modules).not.toContain('Color Selector')
+  })
+
+  it('excludes Cosine module for HSL-only algorithms (0, 1, 8, 9, 10)', () => {
+    const hslOnlyAlgorithms = [0, 1, 8, 9, 10] as const
+    for (const alg of hslOnlyAlgorithms) {
+      const { modules, wgsl } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
+
+      expect(modules).not.toContain('Color (Cosine)')
+      expect(wgsl).not.toContain('fn cosinePalette(')
+    }
+  })
+
+  it('excludes Oklab module for non-Oklab algorithms', () => {
+    const nonOklabAlgorithms = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] as const
+    for (const alg of nonOklabAlgorithms) {
+      const { modules, wgsl } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
+
+      expect(modules).not.toContain('Color (Oklab)')
+      expect(wgsl).not.toContain('fn oklab2rgb(')
+    }
+  })
+
+  it('includes Cosine module for cosine algorithms (2, 3, 4, 6, 7)', () => {
+    const cosineAlgorithms = [2, 3, 4, 6, 7] as const
+    for (const alg of cosineAlgorithms) {
+      const { modules, wgsl } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
+
+      expect(modules).toContain('Color (Cosine)')
+      expect(wgsl).toContain('fn cosinePalette(')
+    }
+  })
+
+  it('includes Oklab module only for algorithm 5', () => {
+    const { modules, wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 5,
+    })
+
+    expect(modules).toContain('Color (Oklab)')
+    expect(wgsl).toContain('fn oklab2rgb(')
+  })
+
+  it('includes all color modules when colorAlgorithm is undefined', () => {
+    const { modules, wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    expect(modules).toContain('Color (HSL)')
+    expect(modules).toContain('Color (Cosine)')
+    expect(modules).toContain('Color (Oklab)')
+    expect(wgsl).toContain('let algorithm = uniforms.colorAlgorithm;')
+  })
+
+  it('always includes HSL module', () => {
+    for (const alg of allAlgorithms) {
+      const { modules } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
+
+      expect(modules).toContain('Color (HSL)')
+    }
+  })
+
+  it('works with hydrogenND + colorAlgorithm', () => {
+    for (const alg of [2, 5, 9] as const) {
+      const { wgsl } = composeSchroedingerShader({
+        dimension: 5,
+        temporal: false,
+        sss: false,
+        quantumMode: 'hydrogenND',
+        colorAlgorithm: alg,
+      })
+
+      verifyWgsl(wgsl, true)
+      expect(wgsl).toContain('fn computeBaseColor(')
+    }
+  })
+
+  it('adds color feature tag when colorAlgorithm is specified', () => {
+    const { features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 9,
+    })
+
+    expect(features).toContain('Color: Mixed')
+  })
+
+  it('does not add color feature tag when colorAlgorithm is undefined', () => {
+    const { features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    expect(features.some(f => f.startsWith('Color:'))).toBe(false)
+  })
+
+  it('splits emission into 3 blocks in modules list', () => {
+    const { modules } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 9,
+    })
+
+    expect(modules).toContain('Volume Emission (Pre)')
+    expect(modules).toContain('Volume Emission (Color)')
+    expect(modules).toContain('Volume Emission (Post)')
+    expect(modules).not.toContain('Volume Emission')
+  })
 })
 
 describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {

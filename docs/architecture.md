@@ -6,7 +6,7 @@
 
 ## Project Focus
 
-**mquantum** is a **WebGPU-only** visualization of **Schroedinger quantum wavefunctions** in **3 to 11 dimensions**. It renders volumetric quantum mechanics (hydrogen orbitals, harmonic oscillators) via raymarching in WGSL shaders, with a full post-processing pipeline (bloom, SSAO, SSR, bokeh, tonemapping, etc.).
+**mquantum** is a **WebGPU-only** visualization of **Schroedinger quantum wavefunctions** in **3 to 11 dimensions**. It renders volumetric quantum mechanics (hydrogen orbitals, harmonic oscillators) via raymarching in WGSL shaders, with a post-processing pipeline (bloom, tonemapping, frame blending, paper texture, and anti-aliasing).
 
 - **Single object type**: `ObjectType = 'schroedinger'` (no polytopes, fractals, or black holes)
 - **Single rendering backend**: WebGPU (no WebGL, no Three.js renderer)
@@ -49,11 +49,11 @@ src/
 │       ├── core/      # WebGPUDevice, Camera, BasePass, UniformBuffer, ResourcePool
 │       ├── graph/     # Declarative render graph (pass ordering, resource allocation)
 │       ├── renderers/ # WebGPUSchrodingerRenderer, Skybox, GroundPlane
-│       ├── passes/    # Post-processing passes (Bloom, SSAO, SSR, Bokeh, etc.)
+│       ├── passes/    # Post-processing passes (Bloom, tonemapping, FXAA/SMAA, paper, etc.)
 │       ├── shaders/   # All WGSL shaders
 │       │   ├── shared/        # Shared WGSL modules (lighting, color, math, depth)
 │       │   ├── schroedinger/  # Schroedinger SDF, quantum functions, volume integration
-│       │   ├── postprocessing/# Bloom, tonemapping, FXAA, SMAA, SSR shaders
+│       │   ├── postprocessing/# Bloom, tonemapping, FXAA, SMAA shaders
 │       │   ├── skybox/        # 7 procedural skybox modes
 │       │   ├── groundplane/   # Ground plane + grid shaders
 │       │   └── temporal/      # Temporal reprojection/reconstruction
@@ -112,16 +112,15 @@ The rendering pipeline is a **declarative render graph** (`src/rendering/webgpu/
 
 ```
 SchrodingerRenderer (MRT: color, normal, depth)
-  -> SkyboxRenderer / ScenePass (environment)
-    -> GroundPlaneRenderer (optional)
-      -> GTAOPass (ambient occlusion)
-        -> SSRPass (screen-space reflections)
-          -> EnvironmentCompositePass (combine object + environment)
-            -> BloomPass -> BokehPass -> RefractionPass -> FrameBlendingPass
-              -> TonemappingPass (HDR -> LDR)
-                -> CinematicPass -> PaperTexturePass
-                  -> FXAAPass / SMAAPass (anti-aliasing)
-                    -> ToScreenPass (final output to canvas)
+  -> TemporalCloudPass (optional reconstruction)
+    -> SkyboxRenderer / ScenePass (environment)
+      -> EnvironmentCompositePass (combine object + environment)
+        -> BloomPass (optional)
+          -> FrameBlendingPass (optional)
+            -> ToneMappingCinematicPass (HDR -> LDR + cinematic)
+              -> PaperTexturePass (optional)
+                -> FXAAPass / SMAAPass (optional anti-aliasing)
+                  -> ToScreenPass (final output to canvas)
 ```
 
 ### Key abstractions

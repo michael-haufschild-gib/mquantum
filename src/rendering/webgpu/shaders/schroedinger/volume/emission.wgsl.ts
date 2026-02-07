@@ -13,7 +13,15 @@
  * @module rendering/webgpu/shaders/schroedinger/volume/emission.wgsl
  */
 
-export const emissionBlock = /* wgsl */ `
+import type { ColorAlgorithm } from '../../types'
+
+/**
+ * Static utilities that computeBaseColor depends on:
+ * - COLOR_ALG_* constants
+ * - PHASE_HUE_INFLUENCE
+ * - blackbody(), henyeyGreenstein(), applyDistributionS()
+ */
+export const emissionPreBlock = /* wgsl */ `
 // ============================================
 // Volume Emission Color
 // ============================================
@@ -61,9 +69,135 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   // Clamp before fract to avoid fract(1.0)=0 discontinuity at peak density
   return fract(clamp(curved * cycles + offset, 0.0, 0.999));
 }
+`
 
+// ---- Algorithm branch generators ----
+// Each returns the WGSL body lines for col assignment (no fn signature, no return)
+
+const ALGO_BRANCH: Record<number, string> = {
+  0: /* wgsl */ `
+    // 0: Monochromatic - same hue, varying lightness
+    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let newL = 0.3 + distributedT * 0.4;
+    col = hsl2rgb(baseHSL.x, baseHSL.y, newL);`,
+
+  1: /* wgsl */ `
+    // 1: Analogous - hue varies +/-30deg from base, preserves material lightness
+    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let hueOffset = (distributedT - 0.5) * 0.167;
+    let newH = fract(baseHSL.x + hueOffset);
+    col = hsl2rgb(newH, baseHSL.y, baseHSL.z);`,
+
+  2: /* wgsl */ `
+    // 2: Cosine gradient (Inigo Quilez palette)
+    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let a = uniforms.cosineA.xyz;
+    let b = uniforms.cosineB.xyz;
+    let c = uniforms.cosineC.xyz;
+    let d = uniforms.cosineD.xyz;
+    col = cosinePalette(distributedT, a, b, c, d);`,
+
+  3: /* wgsl */ `
+    // 3: Normal-based - color by vertical position as normal proxy
+    let normalT = pos.y * 0.5 + 0.5;
+    let distNormalT = applyDistributionS(normalT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let a = uniforms.cosineA.xyz;
+    let b = uniforms.cosineB.xyz;
+    let c = uniforms.cosineC.xyz;
+    let d = uniforms.cosineD.xyz;
+    col = cosinePalette(distNormalT, a, b, c, d);`,
+
+  4: /* wgsl */ `
+    // 4: Distance field - cosine palette on density (primary signal for volume)
+    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let a = uniforms.cosineA.xyz;
+    let b = uniforms.cosineB.xyz;
+    let c = uniforms.cosineC.xyz;
+    let d = uniforms.cosineD.xyz;
+    col = cosinePalette(distributedT, a, b, c, d);`,
+
+  5: /* wgsl */ `
+    // 5: LCH/Oklab perceptual hue rotation
+    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    // Maps distributedT to hue angle in Oklab color space
+    let hue = distributedT * TAU;
+    let oklab = vec3f(uniforms.lchLightness, uniforms.lchChroma * cos(hue), uniforms.lchChroma * sin(hue));
+    col = clamp(oklab2rgb(oklab), vec3f(0.0), vec3f(1.0));`,
+
+  6: /* wgsl */ `
+    // 6: Multi-source - blend density + radial + vertical through cosine palette
+    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
+    let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
+    let radialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+    let verticalT = pos.y * 0.5 + 0.5;
+    let blendedT = w.x * distributedT + w.y * radialT + w.z * verticalT;
+    let a = uniforms.cosineA.xyz;
+    let b = uniforms.cosineB.xyz;
+    let c = uniforms.cosineC.xyz;
+    let d = uniforms.cosineD.xyz;
+    col = cosinePalette(blendedT, a, b, c, d);`,
+
+  7: /* wgsl */ `
+    // 7: Radial - color by distance from center through cosine palette
+    let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
+    let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
+    let a = uniforms.cosineA.xyz;
+    let b = uniforms.cosineB.xyz;
+    let c = uniforms.cosineC.xyz;
+    let d = uniforms.cosineD.xyz;
+    col = cosinePalette(radialT, a, b, c, d);`,
+
+  8: /* wgsl */ `
+    // 8: Quantum Phase coloring
+    let phaseNorm = (phase + PI) / TAU;
+    let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
+    let hue = fract(baseHSL.x + hueShift);
+    col = hsl2rgb(hue, 0.75, 0.35);`,
+
+  9: /* wgsl */ `
+    // 9: Mixed (Quantum Phase + Density) - DEFAULT
+    let phaseNorm = (phase + PI) / TAU;
+    let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
+    let hue = fract(baseHSL.x + hueShift);
+    let lightness = 0.15 + 0.35 * normalized;
+    let saturation = 0.7 + 0.25 * normalized;
+    col = hsl2rgb(hue, saturation, lightness);`,
+
+  10: /* wgsl */ `
+    // 10: Blackbody (Heat)
+    let temp = normalized * 12000.0;
+    if (temp < 500.0) { return vec3f(0.0); } // Cold is black
+    col = blackbody(temp);`,
+}
+
+/** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
+const COLOR_ALG_NAMES: Record<number, string> = {
+  0: 'Monochromatic',
+  1: 'Analogous',
+  2: 'Cosine',
+  3: 'Normal-based',
+  4: 'Distance Field',
+  5: 'LCH/Oklab',
+  6: 'Multi-source',
+  7: 'Radial',
+  8: 'Phase',
+  9: 'Mixed',
+  10: 'Blackbody',
+}
+
+export { COLOR_ALG_NAMES }
+
+/**
+ * Generate the computeBaseColor() WGSL function.
+ *
+ * @param colorAlgorithm When defined, emit only that algorithm's branch (no if/else chain).
+ *                       When undefined, emit the full 11-branch runtime dispatch (backward compatible).
+ */
+export function generateComputeBaseColor(colorAlgorithm?: ColorAlgorithm): string {
+  // Common function header
+  const header = /* wgsl */ `
 // Compute base surface color (no lighting applied)
-// Uses uniforms.colorAlgorithm to select the coloring method
 // PERF: accepts pre-computed log-density s to avoid redundant log() call
 fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   // Normalize log-density to [0, 1] range for color mapping
@@ -73,7 +207,7 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   var baseHSL = rgb2hsl(material.baseColor.rgb);
 
   // Energy level coloring: map radial distance to spectral hue
-  // Center (low energy) → Red, Edge (high energy) → Violet
+  // Center (low energy) -> Red, Edge (high energy) -> Violet
   if (uniforms.energyColorEnabled != 0u) {
     let r = length(pos);
     let energyProxy = clamp(r * 0.5, 0.0, 1.0);
@@ -81,33 +215,29 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
     baseHSL = vec3f(hue, 1.0, 0.5);
   }
 
-  let algorithm = uniforms.colorAlgorithm;
-
   var col = vec3f(0.0);
+`
+
+  // Specialized single-branch (compile-time)
+  if (colorAlgorithm !== undefined) {
+    const branch = ALGO_BRANCH[colorAlgorithm]
+    if (!branch) {
+      throw new Error(`Unknown colorAlgorithm: ${colorAlgorithm}`)
+    }
+    return header + branch + '\n\n  return col;\n}\n'
+  }
+
+  // Full runtime dispatch (backward compatible)
+  return header + /* wgsl */ `
+  let algorithm = uniforms.colorAlgorithm;
 
   // Quantum-specific color algorithms (8-10) use actual wavefunction phase
   // Algorithms 0-7 delegate to standard color system
-  if (algorithm == COLOR_ALG_PHASE) {
-    // Algorithm 8: Quantum Phase coloring
-    let phaseNorm = (phase + PI) / TAU;
-    let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
-    let hue = fract(baseHSL.x + hueShift);
-    col = hsl2rgb(hue, 0.75, 0.35);
+  if (algorithm == COLOR_ALG_PHASE) {${ALGO_BRANCH[8]}
   }
-  else if (algorithm == COLOR_ALG_MIXED) {
-    // Algorithm 9: Mixed (Quantum Phase + Density) - DEFAULT
-    let phaseNorm = (phase + PI) / TAU;
-    let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
-    let hue = fract(baseHSL.x + hueShift);
-    let lightness = 0.15 + 0.35 * normalized;
-    let saturation = 0.7 + 0.25 * normalized;
-    col = hsl2rgb(hue, saturation, lightness);
+  else if (algorithm == COLOR_ALG_MIXED) {${ALGO_BRANCH[9]}
   }
-  else if (algorithm == COLOR_ALG_BLACKBODY) {
-    // Algorithm 10: Blackbody (Heat)
-    let temp = normalized * 12000.0;
-    if (temp < 500.0) { return vec3f(0.0); } // Cold is black
-    col = blackbody(temp);
+  else if (algorithm == COLOR_ALG_BLACKBODY) {${ALGO_BRANCH[10]}
   }
   else {
     // Algorithms 0-7: Use shared color algorithm system
@@ -119,7 +249,7 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
       col = hsl2rgb(baseHSL.x, baseHSL.y, newL);
     }
     else if (algorithm == 1) {
-      // 1: Analogous - hue varies ±30° from base, preserves material lightness
+      // 1: Analogous - hue varies +/-30deg from base, preserves material lightness
       let hueOffset = (distributedT - 0.5) * 0.167;
       let newH = fract(baseHSL.x + hueOffset);
       col = hsl2rgb(newH, baseHSL.y, baseHSL.z);
@@ -193,7 +323,15 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
 
   return col;
 }
+`
+}
 
+/**
+ * Everything after computeBaseColor:
+ * computeEmission(), getEmissionLightDir(), getEmissionLightAttenuation(),
+ * getEmissionSpotAttenuation(), computeEmissionLit()
+ */
+export const emissionPostBlock = /* wgsl */ `
 // Compute emission with ambient lighting only (for fast mode)
 // PERF: accepts pre-computed log-density s to avoid redundant log() call
 fn computeEmission(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
@@ -395,3 +533,6 @@ fn computeEmissionLit(
   return col;
 }
 `
+
+/** Backward-compatible combined block (full runtime dispatch) */
+export const emissionBlock = emissionPreBlock + '\n' + generateComputeBaseColor() + '\n' + emissionPostBlock

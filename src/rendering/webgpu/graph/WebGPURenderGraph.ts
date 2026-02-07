@@ -37,13 +37,11 @@ class RenderContextImpl implements WebGPURenderContext {
   private pool: WebGPUResourcePool
   private canvasTextureView: GPUTextureView
   private resourceAliases: Map<string, string>
-  private activeTimestampWrites:
-    | {
-        querySet: GPUQuerySet
-        beginningOfPassWriteIndex: number
-        endOfPassWriteIndex: number
-      }
-    | null = null
+  private activeTimestampWrites: {
+    querySet: GPUQuerySet
+    beginningOfPassWriteIndex: number
+    endOfPassWriteIndex: number
+  } | null = null
   private passUsedTimestampWrites = false
 
   constructor(
@@ -215,6 +213,14 @@ class SetupContextImpl implements WebGPUSetupContext {
 // Render Graph
 // =============================================================================
 
+export interface WebGPUBeforeSubmitHookContext {
+  device: GPUDevice
+  encoder: GPUCommandEncoder
+  canvasTexture: GPUTexture
+  frame: WebGPUFrameContext | null
+  size: { width: number; height: number }
+}
+
 /**
  * WebGPU Render Graph.
  *
@@ -273,7 +279,10 @@ export class WebGPURenderGraph {
   private _frameWrittenByEnabledPass: Set<string> = new Set()
   private _framePassEnabledMemo: Map<string, boolean> = new Map()
   private _frameTimedPassIds: string[] = []
-  private _framePassTimingResult: Array<{ passId: string; gpuTimeMs: number; skipped: boolean }> = []
+  private _framePassTimingResult: Array<{ passId: string; gpuTimeMs: number; skipped: boolean }> =
+    []
+  private beforeSubmitHooks: Map<string, (context: WebGPUBeforeSubmitHookContext) => void> =
+    new Map()
 
   /** Default grace period in frames before resource deallocation (~1s at 60fps) */
   private static readonly DEFAULT_DISABLE_GRACE_PERIOD = 60
@@ -337,11 +346,7 @@ export class WebGPURenderGraph {
     measuredPassCount: number,
     timedPassIds: string[]
   ): void {
-    if (
-      measuredPassCount <= 0 ||
-      this.timestampReadbackInFlight ||
-      !this.timestampReadBuffer
-    ) {
+    if (measuredPassCount <= 0 || this.timestampReadbackInFlight || !this.timestampReadBuffer) {
       return
     }
 
@@ -353,6 +358,10 @@ export class WebGPURenderGraph {
     device.queue
       .onSubmittedWorkDone()
       .then(async () => {
+        // Buffer may have been destroyed by dispose() during the async wait
+        if (!this.initialized || this.timestampReadBuffer !== readBuffer) {
+          return
+        }
         await readBuffer.mapAsync(GPUMapMode.READ, 0, byteLength)
         try {
           const range = readBuffer.getMappedRange(0, byteLength)
@@ -454,7 +463,6 @@ export class WebGPURenderGraph {
     }
   }
 
-
   /**
    * Clear all passes and resources.
    * Call this before rebuilding the render graph with new passes.
@@ -489,6 +497,26 @@ export class WebGPURenderGraph {
    */
   getPass(id: string): WebGPURenderPass | undefined {
     return this.passes.get(id)
+  }
+
+  /**
+   * Register a callback executed after all passes are encoded and before submit().
+   *
+   * Useful for one-off command encoding that must happen on the same frame
+   * command encoder (for example, screenshot readback copies from the canvas).
+   */
+  registerBeforeSubmitHook(
+    id: string,
+    hook: (context: WebGPUBeforeSubmitHookContext) => void
+  ): void {
+    this.beforeSubmitHooks.set(id, hook)
+  }
+
+  /**
+   * Remove a previously-registered before-submit hook.
+   */
+  unregisterBeforeSubmitHook(id: string): void {
+    this.beforeSubmitHooks.delete(id)
   }
 
   /**
@@ -772,7 +800,8 @@ export class WebGPURenderGraph {
           // This prevents mutually exclusive passes from overwriting each other's output
           if (writtenByEnabledPass.has(outputId)) {
             passTimings.set(passId, 0)
-            if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
+            if (shouldLog)
+              console.log(`[WebGPU RenderGraph] Pass '${passId}' skipped (output already written)`)
             continue
           }
 
@@ -782,7 +811,8 @@ export class WebGPURenderGraph {
           if (skipPassthrough) {
             // Aliasing: output resolves to input (zero GPU cost)
             this.resourceAliases.set(outputId, inputId)
-            if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
+            if (shouldLog)
+              console.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing ${outputId} → ${inputId}`)
           } else {
             // Passthrough: copy input texture to output target using GPU copy
             const inputTexture = this.pool.getTexture(inputId)
@@ -807,12 +837,20 @@ export class WebGPURenderGraph {
                   { texture: outputTexture },
                   { width: inputWidth, height: inputHeight }
                 )
-                if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' passthrough copy ${inputId} → ${outputId}`)
+                if (shouldLog)
+                  console.log(
+                    `[WebGPU RenderGraph] Pass '${passId}' passthrough copy ${inputId} → ${outputId}`
+                  )
               } else {
                 // Dimensions or format mismatch - fall back to aliasing
                 this.resourceAliases.set(outputId, inputId)
-                const reason = !dimensionsMatch ? 'size mismatch' : `format mismatch (${inputFormat} → ${outputFormat})`
-                if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' aliasing (${reason}) ${outputId} → ${inputId}`)
+                const reason = !dimensionsMatch
+                  ? 'size mismatch'
+                  : `format mismatch (${inputFormat} → ${outputFormat})`
+                if (shouldLog)
+                  console.log(
+                    `[WebGPU RenderGraph] Pass '${passId}' aliasing (${reason}) ${outputId} → ${inputId}`
+                  )
               }
             }
           }
@@ -866,6 +904,24 @@ export class WebGPURenderGraph {
         0,
         resolvedTimestampCount * 8
       )
+    }
+
+    if (this.beforeSubmitHooks.size > 0) {
+      const hookContext: WebGPUBeforeSubmitHookContext = {
+        device,
+        encoder,
+        canvasTexture,
+        frame: this.frameContext,
+        size: { width: this.width, height: this.height },
+      }
+
+      for (const [hookId, hook] of this.beforeSubmitHooks) {
+        try {
+          hook(hookContext)
+        } catch (error) {
+          console.error(`[WebGPU RenderGraph] beforeSubmit hook '${hookId}' failed:`, error)
+        }
+      }
     }
 
     // Submit command buffer
@@ -1052,6 +1108,7 @@ export class WebGPURenderGraph {
     this.passes.clear()
     this.passOrder = []
     this.resources.clear()
+    this.beforeSubmitHooks.clear()
 
     this.pool.dispose()
 

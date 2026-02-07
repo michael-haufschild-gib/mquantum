@@ -146,6 +146,8 @@ export class WebGPUDevice {
       device,
       format,
       alphaMode: 'premultiplied',
+      // Required for screenshot capture via copyTextureToBuffer from the swapchain texture.
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
     })
 
     // Store capabilities

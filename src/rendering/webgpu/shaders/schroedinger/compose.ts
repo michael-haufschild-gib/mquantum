@@ -30,7 +30,6 @@ import { uniformsBlock } from '../shared/core/uniforms.wgsl'
 import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
 import { hslBlock } from '../shared/color/hsl.wgsl'
 import { oklabBlock } from '../shared/color/oklab.wgsl'
-import { selectorBlock } from '../shared/color/selector.wgsl'
 
 // Lighting blocks (for isosurface mode)
 import { ggxBlock } from '../shared/lighting/ggx.wgsl'
@@ -123,7 +122,7 @@ import {
   generateDensityGridFragmentBindings,
   densityGridSamplingBlock,
 } from './volume/densityGridSampling.wgsl'
-import { emissionBlock } from './volume/emission.wgsl'
+import { emissionPreBlock, generateComputeBaseColor, emissionPostBlock, COLOR_ALG_NAMES } from './volume/emission.wgsl'
 import { volumeGradientBlock, volumeIntegrationBlock, volumeRaymarchGridBlock } from './volume/integration.wgsl'
 import { radialProbabilityBlock, radialProbabilityStubBlock } from './volume/radialProbability.wgsl'
 
@@ -182,6 +181,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     dispersion = true,
     phaseMateriality = true,
     interference = true,
+    colorAlgorithm,
     useEigenfunctionCache = false,
     overrides = [],
   } = config
@@ -290,6 +290,14 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const DENSITY_GRID_SIZE: f32 = ${densityGridSize}.0;`)
   if (useDensityGrid) {
     features.push('Density Grid Raymarching')
+  }
+
+  // Color module dependency flags (compile-time specialization)
+  const needsCosine = colorAlgorithm === undefined || [2, 3, 4, 6, 7].includes(colorAlgorithm)
+  const needsOklab = colorAlgorithm === undefined || colorAlgorithm === 5
+
+  if (colorAlgorithm !== undefined) {
+    features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
   }
 
   // Select main block based on mode
@@ -473,12 +481,11 @@ struct VertexOutput {
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
     // ===== COLOR SYSTEM =====
-    // Always include the full color stack for Schrödinger emission.
-    // computeBaseColor() in emission.wgsl dispatches at runtime and references HSL, cosine, and Oklab paths.
+    // HSL always included (energy coloring + emission color shift use rgb2hsl/hsl2rgb)
+    // Cosine and Oklab conditionally included based on compile-time colorAlgorithm
     { name: 'Color (HSL)', content: hslBlock },
-    { name: 'Color (Cosine)', content: cosinePaletteBlock },
-    { name: 'Color (Oklab)', content: oklabBlock },
-    { name: 'Color Selector', content: selectorBlock },
+    { name: 'Color (Cosine)', content: cosinePaletteBlock, condition: needsCosine },
+    { name: 'Color (Oklab)', content: oklabBlock, condition: needsOklab },
 
     // ===== LIGHTING (GGX PBR only needed for isosurface — volumetric uses Lambertian diffuse) =====
     { name: 'GGX PBR', content: ggxBlock, condition: isosurface },
@@ -486,10 +493,9 @@ struct VertexOutput {
 
     // ===== VOLUME RENDERING =====
     { name: 'Beer-Lambert Absorption', content: absorptionBlock },
-    {
-      name: 'Volume Emission',
-      content: emissionBlock,
-    },
+    { name: 'Volume Emission (Pre)', content: emissionPreBlock },
+    { name: 'Volume Emission (Color)', content: generateComputeBaseColor(colorAlgorithm) },
+    { name: 'Volume Emission (Post)', content: emissionPostBlock },
     { name: 'Cross-Section Slice', content: crossSectionBlock },
     { name: 'Radial Probability Overlay', content: includeHydrogen ? radialProbabilityBlock : radialProbabilityStubBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },

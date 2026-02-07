@@ -2,7 +2,7 @@
  * useScreenshotCapture Hook
  *
  * Provides a promise-based interface for capturing screenshots.
- * Works with ScreenshotCaptureController to capture frames on demand.
+ * Works with the WebGPU canvas capture bridge to capture frames on demand.
  *
  * Can be used from outside R3F context (e.g., in menu handlers).
  *
@@ -37,14 +37,11 @@ export interface UseScreenshotCaptureResult {
  */
 async function captureWithSubscription(): Promise<string> {
   const store = useScreenshotCaptureStore.getState()
+  const requestId = store.status === 'capturing' ? store.requestId : store.requestCapture()
 
   // If already capturing, wait for current capture to complete
   if (store.status === 'capturing') {
     // Fall through to subscription below
-  } else {
-    // Reset and request capture
-    store.reset()
-    store.requestCapture()
   }
 
   return new Promise((resolve, reject) => {
@@ -55,6 +52,7 @@ async function captureWithSubscription(): Promise<string> {
     const timeoutId = setTimeout(() => {
       if (!resolved) {
         resolved = true
+        useScreenshotCaptureStore.getState().setError('Screenshot capture timeout', requestId)
         unsubscribe?.()
         reject(new Error('Screenshot capture timeout'))
       }

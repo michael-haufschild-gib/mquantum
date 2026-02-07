@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CropBox, CropValues } from './CropBox'
 
 export const ScreenshotModal = () => {
-  const { isOpen, imageSrc, closeModal, reset } = useScreenshotStore()
+  const { isOpen, imageSrc, closeModal } = useScreenshotStore()
   const { addToast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
 
@@ -61,11 +61,14 @@ export const ScreenshotModal = () => {
       const blob = await generateOutput()
       if (!blob) throw new Error('Failed to process image')
 
+      if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+        throw new Error('Clipboard image copy is not supported in this browser.')
+      }
+
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
       addToast('Copied screenshot to clipboard!', 'success')
       soundManager.playSuccess()
       closeModal()
-      setTimeout(reset, 300)
     } catch (err) {
       console.error(err)
       addToast('Failed to copy. ' + (err instanceof Error ? err.message : ''), 'error')
@@ -95,7 +98,6 @@ export const ScreenshotModal = () => {
       addToast('Screenshot downloaded!', 'success')
       soundManager.playSuccess()
       closeModal()
-      setTimeout(reset, 300)
     } catch (err) {
       console.error(err)
       addToast('Failed to save image.', 'error')
@@ -167,7 +169,7 @@ export const ScreenshotModal = () => {
               data-testid="screenshot-copy-button"
             >
               <Icon name="copy" className="sm:mr-2" />
-              <span className="hidden sm:inline">Copy</span>
+              <span>Copy</span>
             </Button>
             <Button
               variant="primary"
@@ -179,7 +181,7 @@ export const ScreenshotModal = () => {
               data-testid="screenshot-save-button"
             >
               <Icon name="download" className="sm:mr-2" />
-              <span className="hidden sm:inline">Save</span>
+              <span>Save</span>
             </Button>
           </div>
         </div>

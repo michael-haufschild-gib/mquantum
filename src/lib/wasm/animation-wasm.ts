@@ -78,8 +78,8 @@ export async function initAnimationWasm(): Promise<void> {
   }
 
   wasmInitPromise = (async () => {
-    // Skip WASM loading in test environment
-    if (import.meta.env.MODE === 'test' || import.meta.env.SSR) {
+    // Skip WASM loading in test or non-browser environments
+    if (import.meta.env.MODE === 'test' || typeof window === 'undefined') {
       return
     }
 

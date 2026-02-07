@@ -307,11 +307,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? true
 
-    // Density grid raymarching: only for hydrogen mode.
+    // Density grid raymarching: only for 3D hydrogen mode.
+    // For hydrogen ND (dim > 3), the 64^3 grid is too coarse to capture the oscillatory
+    // structure from extra-dimensional HO eigenfunctions, causing visible lattice artifacts.
+    // Those dimensions use inline evaluation with eigencache instead (ho1DCached for extra dims).
     // HO mode uses eigencache + analytical gradient in both position and momentum representations.
-    // HO momentum works via CPU uniform transform (1/ω, coefficient phase rotation).
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
-    const useDensityGrid = enableCache && isHydrogen
+    const dim = this.rendererConfig.dimension ?? 3
+    const useDensityGrid = enableCache && isHydrogen && dim <= 3
 
     // Eigenfunction cache: always enabled when cache is on.
     // For HO momentum, the uniform buffer contains 1/ω → cache produces k-space functions automatically.

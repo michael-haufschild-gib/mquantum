@@ -3,7 +3,7 @@
  * Button for exporting the visualization as PNG
  */
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/hooks/useToast'
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
@@ -14,18 +14,7 @@ export interface ExportButtonProps {
 
 export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) => {
   const [isExporting, setIsExporting] = useState(false)
-  const [lastExport, setLastExport] = useState<string | null>(null)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { addToast } = useToast()
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [])
 
   const handleExport = async () => {
     setIsExporting(true)
@@ -37,13 +26,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) =>
     const success = exportSceneToPNG({ filename })
 
     if (success) {
-      setLastExport(filename)
-      addToast(`Exported ${filename}.png`, 'success')
-      // Clear the success message after 3 seconds
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-      timeoutRef.current = setTimeout(() => setLastExport(null), 3000)
+      addToast('Opening screenshot preview...', 'info')
     } else {
       addToast('Export failed. Please try again.', 'error')
     }
@@ -62,8 +45,6 @@ export const ExportButton: React.FC<ExportButtonProps> = ({ className = '' }) =>
       >
         {isExporting ? 'Exporting...' : 'Export PNG'}
       </Button>
-
-      {lastExport && <p className="text-xs text-accent">Saved: {lastExport}.png</p>}
     </div>
   )
 }

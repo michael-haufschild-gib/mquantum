@@ -1,6 +1,7 @@
 import { useExportStore } from '@/stores/exportStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
+import { useToast } from '@/hooks/useToast'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { useEffect, useRef, useState } from 'react'
@@ -31,6 +32,7 @@ export const CropEditor = () => {
     }))
   )
   const setCinematicMode = useLayoutStore((state) => state.setCinematicMode)
+  const { addToast } = useToast()
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [crop, setCrop] = useState<CropValues>({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 })
@@ -49,12 +51,15 @@ export const CropEditor = () => {
 
   // Recapture screenshot before reopening modal
   // (The modal's reset() clears previewImage when it closes for crop editor)
-  const recapturePreview = async () => {
+  const recapturePreview = async (): Promise<boolean> => {
     try {
       const dataUrl = await captureScreenshotAsync()
       setPreviewImage(dataUrl)
+      return true
     } catch (e) {
       console.error('Failed to recapture preview:', e)
+      addToast('Failed to refresh preview image. Try again.', 'error')
+      return false
     }
   }
 

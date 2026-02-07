@@ -69,13 +69,6 @@ export const TRANSIENT_FIELDS = new Set([
   'iblIntensity',
 
   // Legacy post-processing fields removed from the quantum-only fork
-  'ssrEnabled',
-  'ssrIntensity',
-  'ssrMaxDistance',
-  'ssrThickness',
-  'ssrFadeStart',
-  'ssrFadeEnd',
-  'ssrQuality',
   'refractionEnabled',
   'refractionIOR',
   'refractionStrength',

@@ -16,7 +16,10 @@ export const useScreenshotStore = create<ScreenshotStore>((set) => ({
   imageSrc: null,
 
   openModal: (imageSrc) => set({ isOpen: true, imageSrc }),
-  closeModal: () => set({ isOpen: false }),
+  closeModal: () => {
+    set({ isOpen: false, imageSrc: null })
+    useScreenshotCaptureStore.getState().reset()
+  },
   reset: () => {
     set({ isOpen: false, imageSrc: null })
     // Clean up the screenshot capture store to free memory from data URL

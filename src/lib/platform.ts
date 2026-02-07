@@ -5,7 +5,7 @@
 
 /**
  * Detect if the current platform is macOS/iOS
- * Uses navigator.platform for SSR safety
+ * Uses navigator.platform with non-browser guard
  */
 export const isMac =
   typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)

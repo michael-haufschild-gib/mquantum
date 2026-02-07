@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { WebGPURenderPass, WebGPURenderPassConfig, WebGPUResourceAccess } from '@/rendering/webgpu/core/types'
+import type {
+  WebGPURenderPass,
+  WebGPURenderPassConfig,
+  WebGPUResourceAccess,
+} from '@/rendering/webgpu/core/types'
 
-function createRenderPassConfig(id: string, outputs: WebGPUResourceAccess[]): WebGPURenderPassConfig {
+function createRenderPassConfig(
+  id: string,
+  outputs: WebGPUResourceAccess[]
+): WebGPURenderPassConfig {
   return {
     id,
     inputs: [],
@@ -214,7 +221,8 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
       dispose: vi.fn(),
     }
 
-    const { graph, beginRenderPass, resolveQuerySet, copyBufferToBuffer } = await createGraphHarness(pass)
+    const { graph, beginRenderPass, resolveQuerySet, copyBufferToBuffer } =
+      await createGraphHarness(pass)
     graph.execute(1 / 60)
 
     expect(beginRenderPass).toHaveBeenCalledTimes(1)
@@ -241,7 +249,8 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
       dispose: vi.fn(),
     }
 
-    const { graph, beginComputePass, resolveQuerySet, copyBufferToBuffer } = await createGraphHarness(pass)
+    const { graph, beginComputePass, resolveQuerySet, copyBufferToBuffer } =
+      await createGraphHarness(pass)
     graph.execute(1 / 60)
 
     expect(beginComputePass).toHaveBeenCalledTimes(1)
@@ -292,5 +301,47 @@ describe('WebGPURenderGraph timestampWrites wiring', () => {
     expect(descriptor.timestampWrites).toBeUndefined()
     expect(harness.resolveQuerySet).not.toHaveBeenCalled()
     expect(harness.copyBufferToBuffer).not.toHaveBeenCalled()
+  })
+
+  it('runs registered before-submit hooks exactly while registered', async () => {
+    const pass: WebGPURenderPass = {
+      id: 'before-submit-pass',
+      config: createRenderPassConfig('before-submit-pass', [
+        { resourceId: 'out', access: 'write', binding: 0 },
+      ]),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      execute: (ctx) => {
+        const passEncoder = ctx.beginRenderPass({
+          label: 'before-submit',
+          colorAttachments: [
+            {
+              view: ctx.getWriteTarget('out')!,
+              loadOp: 'clear',
+              storeOp: 'store',
+              clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            },
+          ],
+        })
+        passEncoder.end()
+      },
+      dispose: vi.fn(),
+    }
+
+    const { graph } = await createGraphHarness(pass)
+    const hook = vi.fn()
+
+    graph.registerBeforeSubmitHook('test-before-submit', hook)
+    graph.execute(1 / 60)
+
+    expect(hook).toHaveBeenCalledTimes(1)
+    const hookContext = hook.mock.calls[0]?.[0]
+    expect(hookContext).toBeDefined()
+    expect(hookContext.encoder).toBeDefined()
+    expect(hookContext.canvasTexture).toBeDefined()
+    expect(hookContext.size).toEqual({ width: 64, height: 64 })
+
+    graph.unregisterBeforeSubmitHook('test-before-submit')
+    graph.execute(1 / 60)
+    expect(hook).toHaveBeenCalledTimes(1)
   })
 })

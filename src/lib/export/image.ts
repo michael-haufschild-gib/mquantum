@@ -1,6 +1,6 @@
 /**
  * Image Export Utilities
- * Exports Three.js canvas to PNG images using on-demand screenshot capture
+ * Exports WebGPU canvas content to PNG images using on-demand screenshot capture
  */
 
 import { useMsgBoxStore } from '@/stores/msgBoxStore'
@@ -27,7 +27,7 @@ const DEFAULT_OPTIONS: Required<ExportOptions> = {
  *
  * @param canvas - The canvas element to export
  * @param options - Export options
- * @throws {Error} If document.body is not available (SSR/non-browser context)
+ * @throws {Error} If document.body is not available (non-browser context)
  */
 export function exportCanvasToPNG(canvas: HTMLCanvasElement, options: ExportOptions = {}): void {
   const opts = { ...DEFAULT_OPTIONS, ...options }
@@ -58,7 +58,8 @@ export function exportCanvasToPNG(canvas: HTMLCanvasElement, options: ExportOpti
 }
 
 /**
- * Finds the Three.js canvas in the document
+ * Finds a canvas in the legacy export wrapper.
+ * @deprecated The WebGPU screenshot pipeline no longer depends on direct DOM canvas lookup.
  *
  * @returns The canvas element or null if not found
  */

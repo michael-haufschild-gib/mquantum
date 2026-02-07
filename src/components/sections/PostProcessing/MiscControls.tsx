@@ -5,8 +5,6 @@
  * - Anti-aliasing method selector: None, FXAA, SMAA
  * - Object depth settings
  *
- * Note: Ambient Occlusion controls moved to LightingControls (Lights section)
- *
  * @see {@link PostProcessing} for the effect implementation
  * @see {@link usePostProcessingStore} for state management
  */

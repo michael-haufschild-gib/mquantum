@@ -28,6 +28,7 @@ import { useTransformStore } from '@/stores/transformStore'
 import { usePBRStore } from '@/stores/pbrStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 
 // Passes (import as needed for the pipeline)
 import { ScenePass } from './passes/ScenePass'
@@ -43,6 +44,7 @@ import { FrameBlendingPass } from './passes/FrameBlendingPass'
 import { BufferPreviewPass } from './passes/BufferPreviewPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 import { parseHexColorToLinearRgb } from './utils/color'
+import { WebGPUCanvasCapture } from './utils/WebGPUCanvasCapture'
 
 /**
  * Wait for the browser to complete at least one paint cycle.
@@ -62,7 +64,10 @@ import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer
 import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
-import { COLOR_ALGORITHM_TO_INT, type ColorAlgorithm as PaletteColorAlgorithm } from '@/rendering/shaders/palette/types'
+import {
+  COLOR_ALGORITHM_TO_INT,
+  type ColorAlgorithm as PaletteColorAlgorithm,
+} from '@/rendering/shaders/palette/types'
 import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
 
 // Rotation hooks for Schroedinger basis vectors
@@ -114,7 +119,9 @@ const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.
 const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
   state.schroedinger?.isoEnabled ?? false
 
-const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) => ({
+const schroedingerCompileSelector = (
+  state: ReturnType<typeof useExtendedObjectStore.getState>
+) => ({
   quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
   termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
   nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
@@ -221,6 +228,35 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     }
   }, [device])
 
+  useEffect(() => {
+    const capture = new WebGPUCanvasCapture(device.getDevice())
+
+    graph.registerBeforeSubmitHook('screenshot-capture', ({ encoder, canvasTexture, size }) => {
+      const state = useScreenshotCaptureStore.getState()
+      if (state.status !== 'capturing') return
+
+      capture.queueCapture({
+        encoder,
+        texture: canvasTexture,
+        width: size.width,
+        height: size.height,
+        format: device.getFormat(),
+        requestId: state.requestId,
+        onSuccess: (dataUrl, requestId) => {
+          useScreenshotCaptureStore.getState().setCapturedImage(dataUrl, requestId)
+        },
+        onError: (error, requestId) => {
+          useScreenshotCaptureStore.getState().setError(error, requestId)
+        },
+      })
+    })
+
+    return () => {
+      graph.unregisterBeforeSubmitHook('screenshot-capture')
+      capture.dispose()
+    }
+  }, [device, graph])
+
   // Store subscriptions with shallow comparison
   const appearance = useAppearanceStore(useShallow(appearanceSelector))
   const environment = useEnvironmentStore(useShallow(environmentSelector))
@@ -272,8 +308,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   useEffect(() => {
     let cancelled = false
     const setupGeneration = ++setupGenerationRef.current
-    const shouldAbortSetup = () =>
-      cancelled || setupGeneration !== setupGenerationRef.current
+    const shouldAbortSetup = () => cancelled || setupGeneration !== setupGenerationRef.current
     const previousSetupTask = setupTaskRef.current
 
     const setupPasses = async () => {
@@ -304,29 +339,33 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       }
 
       try {
-        await setupRenderPasses(graph, {
-          objectType,
-          dimension,
-          bloomEnabled: postProcessing.bloomEnabled,
-          antiAliasingMethod: postProcessing.antiAliasingMethod,
-          paperEnabled: postProcessing.paperEnabled,
-          frameBlendingEnabled: postProcessing.frameBlendingEnabled,
-          isosurface: schroedingerIsoEnabled,
-          quantumMode: schroedingerCompile.quantumMode,
-          termCount: schroedingerCompile.termCount,
-          nodalEnabled: schroedingerCompile.nodalEnabled,
-          dispersionEnabled: schroedingerCompile.dispersionEnabled,
-          phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
-          interferenceEnabled: schroedingerCompile.interferenceEnabled,
-          temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
-          eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
-          colorAlgorithm: appearance.colorAlgorithm,
-          representation: schroedingerCompile.representation,
-          // Skybox settings
-          skyboxEnabled: environment.skyboxEnabled,
-          skyboxMode: environment.skyboxMode as SkyboxMode,
-          backgroundColor: environment.backgroundColor,
-        }, shouldAbortSetup)
+        await setupRenderPasses(
+          graph,
+          {
+            objectType,
+            dimension,
+            bloomEnabled: postProcessing.bloomEnabled,
+            antiAliasingMethod: postProcessing.antiAliasingMethod,
+            paperEnabled: postProcessing.paperEnabled,
+            frameBlendingEnabled: postProcessing.frameBlendingEnabled,
+            isosurface: schroedingerIsoEnabled,
+            quantumMode: schroedingerCompile.quantumMode,
+            termCount: schroedingerCompile.termCount,
+            nodalEnabled: schroedingerCompile.nodalEnabled,
+            dispersionEnabled: schroedingerCompile.dispersionEnabled,
+            phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
+            interferenceEnabled: schroedingerCompile.interferenceEnabled,
+            temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
+            eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
+            colorAlgorithm: appearance.colorAlgorithm,
+            representation: schroedingerCompile.representation,
+            // Skybox settings
+            skyboxEnabled: environment.skyboxEnabled,
+            skyboxMode: environment.skyboxMode as SkyboxMode,
+            backgroundColor: environment.backgroundColor,
+          },
+          shouldAbortSetup
+        )
       } catch (err) {
         console.error('[WebGPUScene] CRITICAL: setupRenderPasses failed:', err)
       } finally {
@@ -440,9 +479,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     // Buffer preview: maps UI toggle flags to pass configuration
     graph.setStoreGetter('bufferPreview', () => {
       const ui = useUIStore.getState()
-      if (ui.showDepthBuffer) return { bufferType: 'depth' as const, bufferInput: 'depth-buffer', depthMode: 'linear' as const }
-      if (ui.showNormalBuffer) return { bufferType: 'normal' as const, bufferInput: 'normal-buffer' }
-      if (ui.showTemporalDepthBuffer) return { bufferType: 'temporalDepth' as const, bufferInput: 'quarter-position' }
+      if (ui.showDepthBuffer)
+        return {
+          bufferType: 'depth' as const,
+          bufferInput: 'depth-buffer',
+          depthMode: 'linear' as const,
+        }
+      if (ui.showNormalBuffer)
+        return { bufferType: 'normal' as const, bufferInput: 'normal-buffer' }
+      if (ui.showTemporalDepthBuffer)
+        return { bufferType: 'temporalDepth' as const, bufferInput: 'quarter-position' }
       return null
     })
   }, [graph, objectType])
@@ -686,8 +732,7 @@ export async function setupRenderPasses(
   if (shouldAbort?.()) return
 
   const useTemporalCloudAccumulation =
-    config.objectType === 'schroedinger' &&
-    config.temporalReprojectionEnabled
+    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
 
   const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
 
@@ -1008,10 +1053,11 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     phaseMaterialityEnabled,
     interferenceEnabled,
   } = config
-  const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as WGSLColorAlgorithm | undefined
+  const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as
+    | WGSLColorAlgorithm
+    | undefined
   const useTemporalCloudAccumulation =
-    objectType === 'schroedinger' &&
-    config.temporalReprojectionEnabled
+    objectType === 'schroedinger' && config.temporalReprojectionEnabled
 
   switch (objectType) {
     case 'schroedinger':
@@ -1033,7 +1079,9 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
       })
 
     default:
-      console.warn(`WebGPU: No renderer for object type '${objectType}', only 'schroedinger' is supported`)
+      console.warn(
+        `WebGPU: No renderer for object type '${objectType}', only 'schroedinger' is supported`
+      )
       return null
   }
 }

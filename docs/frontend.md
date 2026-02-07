@@ -248,7 +248,7 @@ const { dimension, setDimension } = useGeometryStore()
 | `appearanceStore` | Visual style | `colorAlgorithm`, `facesVisible`, `edgeColor` (Fresnel rim) |
 | `environmentStore` | Environment | `skyboxEnabled`, `skyboxMode`, ground plane config |
 | `lightingStore` | Lights | Light list, shadow settings |
-| `postProcessingStore` | Effects | Bloom, SSAO, SSR, bokeh, tonemapping, AA |
+| `postProcessingStore` | Effects | Bloom, cinematic tonemapping, paper texture, frame blending, AA |
 | `performanceStore` | Performance | Resolution scale, temporal reprojection, progressive refinement |
 | `animationStore` | Animation | `isPlaying`, `animatingPlanes`, rotation speeds |
 | `rotationStore` | N-D rotation | `rotations` Map, dimension |
