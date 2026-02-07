@@ -134,8 +134,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private boundingRadius = 2.0
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1216 bytes (304 floats) - includes nodal render mode controls
-  private schroedingerUniformData = new ArrayBuffer(1216)
+  // Schroedinger: 1280 bytes (320 floats) - includes cross-section slice controls
+  private schroedingerUniformData = new ArrayBuffer(1280)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
   // Camera: 512 bytes (128 floats)
@@ -467,8 +467,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // 160 bytes due to WGSL vec3f 16-byte alignment requirements
     this.materialUniformBuffer = this.createUniformBuffer(device, 160, 'schroedinger-material')
     this.qualityUniformBuffer = this.createUniformBuffer(device, 64, 'schroedinger-quality')
-    // Schroedinger uniforms: 1216 bytes for all quantum parameters + nodal render mode controls
-    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1216, 'schroedinger-uniforms')
+    // Schroedinger uniforms: 1280 bytes for all quantum parameters + cross-section slice controls
+    this.schroedingerUniformBuffer = this.createUniformBuffer(device, 1280, 'schroedinger-uniforms')
     this.basisUniformBuffer = this.createUniformBuffer(device, 192, 'schroedinger-basis')
 
     // Create bind groups - consolidated layout
@@ -1270,6 +1270,46 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[1204 / 4] = 0
     floatView[1208 / 4] = 0.0
     floatView[1212 / 4] = 0.0
+
+    // Cross-section slice controls (offset 1216-1280)
+    const crossSectionCompositeModeMap: Record<string, number> = {
+      overlay: 0,
+      sliceOnly: 1,
+    }
+    const crossSectionScalarMap: Record<string, number> = {
+      density: 0,
+      real: 1,
+      imag: 2,
+    }
+
+    const crossSectionNormal = schroedinger?.crossSectionPlaneNormal ?? [0, 0, 1]
+    const nx = Number(crossSectionNormal[0] ?? 0)
+    const ny = Number(crossSectionNormal[1] ?? 0)
+    const nz = Number(crossSectionNormal[2] ?? 1)
+    const nLen = Math.hypot(nx, ny, nz)
+    const invNLen = nLen > 1e-6 ? 1.0 / nLen : 1.0
+
+    intView[1216 / 4] = schroedinger?.crossSectionEnabled ? 1 : 0
+    intView[1220 / 4] =
+      crossSectionCompositeModeMap[schroedinger?.crossSectionCompositeMode ?? 'overlay'] ?? 0
+    intView[1224 / 4] = crossSectionScalarMap[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
+    intView[1228 / 4] = schroedinger?.crossSectionAutoWindow ? 1 : 0
+
+    floatView[1232 / 4] = nx * invNLen
+    floatView[1236 / 4] = ny * invNLen
+    floatView[1240 / 4] = nz * invNLen
+    floatView[1244 / 4] = schroedinger?.crossSectionPlaneOffset ?? 0.0
+
+    floatView[1248 / 4] = schroedinger?.crossSectionWindowMin ?? 0.0
+    floatView[1252 / 4] = schroedinger?.crossSectionWindowMax ?? 1.0
+    floatView[1256 / 4] = schroedinger?.crossSectionOpacity ?? 0.75
+    floatView[1260 / 4] = schroedinger?.crossSectionThickness ?? 0.02
+
+    const crossSectionPlaneColor = this.parseColor(schroedinger?.crossSectionPlaneColor ?? '#66ccff')
+    floatView[1264 / 4] = crossSectionPlaneColor[0]
+    floatView[1268 / 4] = crossSectionPlaneColor[1]
+    floatView[1272 / 4] = crossSectionPlaneColor[2]
+    floatView[1276 / 4] = 0.0
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }

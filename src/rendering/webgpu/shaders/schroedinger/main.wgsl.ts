@@ -121,6 +121,30 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     }
   }
 
+  let crossSection = evaluateCrossSectionSample(
+    ro,
+    rd,
+    tNear,
+    tFar,
+    getVolumeTime(schroedinger),
+    schroedinger
+  );
+  if (crossSection.alpha > 0.0) {
+    if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
+      finalColor = crossSection.color;
+      finalAlpha = crossSection.alpha;
+    } else {
+      let crossSectionAlpha = clamp(crossSection.alpha, 0.0, 1.0);
+      finalColor = mix(finalColor, crossSection.color, crossSectionAlpha);
+      finalAlpha = max(finalAlpha, crossSectionAlpha);
+    }
+  } else if (
+    schroedinger.crossSectionEnabled != 0u &&
+    schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY
+  ) {
+    discard;
+  }
+
   // Discard fully transparent pixels
   if (finalAlpha < 0.01) {
     discard;
@@ -272,6 +296,30 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     }
   }
 
+  let crossSection = evaluateCrossSectionSample(
+    ro,
+    rd,
+    tNear,
+    tFar,
+    getVolumeTime(schroedinger),
+    schroedinger
+  );
+  if (crossSection.alpha > 0.0) {
+    if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
+      finalColor = crossSection.color;
+      finalAlpha = crossSection.alpha;
+    } else {
+      let crossSectionAlpha = clamp(crossSection.alpha, 0.0, 1.0);
+      finalColor = mix(finalColor, crossSection.color, crossSectionAlpha);
+      finalAlpha = max(finalAlpha, crossSectionAlpha);
+    }
+  } else if (
+    schroedinger.crossSectionEnabled != 0u &&
+    schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY
+  ) {
+    discard;
+  }
+
   // Discard fully transparent pixels
   if (finalAlpha < 0.01) {
     discard;
@@ -405,7 +453,18 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     return output;
   }
 
+  let crossSection = evaluateCrossSectionSample(ro, rd, tNear, tFar, animTime, schroedinger);
+  let sliceOnlyCrossSection =
+    schroedinger.crossSectionEnabled != 0u &&
+    schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY;
+
   if (hitT < 0.0) {
+    if (sliceOnlyCrossSection && crossSection.alpha > 0.0) {
+      let planeNormal = normalize(schroedinger.crossSectionPlane.xyz);
+      output.color = vec4f(crossSection.color, crossSection.alpha);
+      output.normal = vec4f(planeNormal * 0.5 + 0.5, material.metallic);
+      return output;
+    }
     discard;
   }
 
@@ -529,10 +588,28 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     }
   }
 
+  var finalColor = col;
+  var finalAlpha = 1.0;
+  var finalNormal = n;
+
+  if (crossSection.alpha > 0.0) {
+    if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
+      finalColor = crossSection.color;
+      finalAlpha = crossSection.alpha;
+      finalNormal = normalize(schroedinger.crossSectionPlane.xyz);
+    } else {
+      let crossSectionAlpha = clamp(crossSection.alpha, 0.0, 1.0);
+      finalColor = mix(finalColor, crossSection.color, crossSectionAlpha);
+      finalAlpha = max(finalAlpha, crossSectionAlpha);
+    }
+  } else if (sliceOnlyCrossSection) {
+    discard;
+  }
+
   // Output color and normal for MRT
-  output.color = vec4f(col, 1.0);
+  output.color = vec4f(finalColor, finalAlpha);
   // Normal buffer: RGB = world-space normal (encoded 0-1), A = metallic
-  output.normal = vec4f(n * 0.5 + 0.5, material.metallic);
+  output.normal = vec4f(finalNormal * 0.5 + 0.5, material.metallic);
 
   return output;
 }
@@ -729,27 +806,58 @@ ${bayerJitterSection}
     return output;
   }
 
-  // Discard fully transparent pixels
-  if (volumeResult.alpha < 0.01) {
+  let crossSection = evaluateCrossSectionSample(
+    ro,
+    rd,
+    tNear,
+    tFar,
+    getVolumeTime(schroedinger),
+    schroedinger
+  );
+
+  var finalColor = volumeResult.color;
+  var finalAlpha = volumeResult.alpha;
+  var hitT = volumeResult.primaryHitT;
+
+  if (crossSection.alpha > 0.0) {
+    if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
+      finalColor = crossSection.color;
+      finalAlpha = crossSection.alpha;
+      hitT = crossSection.hitT;
+    } else {
+      let crossSectionAlpha = clamp(crossSection.alpha, 0.0, 1.0);
+      finalColor = mix(finalColor, crossSection.color, crossSectionAlpha);
+      finalAlpha = max(finalAlpha, crossSectionAlpha);
+      if (hitT < 0.0) {
+        hitT = crossSection.hitT;
+      }
+    }
+  } else if (
+    schroedinger.crossSectionEnabled != 0u &&
+    schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY
+  ) {
     discard;
   }
 
-  // Alpha comes directly from Beer-Lambert integration
-  let alpha = volumeResult.alpha;
+  // Discard fully transparent pixels
+  if (finalAlpha < 0.01) {
+    discard;
+  }
 
   // Note: Powder effect is applied inside computeEmissionLit() in emission.wgsl.ts
   // matching WebGL behavior (inside light loop, not post-process)
 
   // Compute hit position for temporal reprojection
-  // Use the primary hit distance from volume result
-  let hitT = volumeResult.primaryHitT;
+  if (hitT < 0.0) {
+    hitT = (tNear + tFar) * 0.5;
+  }
   let hitPosModel = ro + rd * hitT;
 
   // Transform hit position to world space for reprojection
   let hitPosWorld = (camera.modelMatrix * vec4f(hitPosModel, 1.0)).xyz;
 
   // Output color
-  output.color = vec4f(volumeResult.color, alpha);
+  output.color = vec4f(finalColor, finalAlpha);
   
   // Output world position (xyz) and model-space ray distance (w) for reprojection
   // The ray distance in W is used for temporal depth optimization

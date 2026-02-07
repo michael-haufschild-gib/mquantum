@@ -65,6 +65,23 @@ export const createSchroedingerSlice: StateCreator<
       }))
     }
 
+  const normalizePlaneNormal = (
+    normal: [number, number, number]
+  ): [number, number, number] => {
+    const [x, y, z] = normal
+    const length = Math.hypot(x, y, z)
+    if (!Number.isFinite(length) || length < 1e-6) {
+      return [0, 0, 1]
+    }
+    return [x / length, y / length, z / length]
+  }
+
+  const axisToNormal = (axis: 'x' | 'y' | 'z'): [number, number, number] => {
+    if (axis === 'x') return [1, 0, 0]
+    if (axis === 'y') return [0, 1, 0]
+    return [0, 0, 1]
+  }
+
   return {
     schroedinger: { ...DEFAULT_SCHROEDINGER_CONFIG },
 
@@ -495,6 +512,62 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerProbabilityFlowStrength: clampedSetter('probabilityFlowStrength', 0.0, 1.0),
     setSchroedingerIsoEnabled: valueSetter('isoEnabled'),
     setSchroedingerIsoThreshold: clampedSetter('isoThreshold', -6, 0),
+
+    // === 2D Cross-Section Slice ===
+    setSchroedingerCrossSectionEnabled: valueSetter('crossSectionEnabled'),
+    setSchroedingerCrossSectionCompositeMode: valueSetter('crossSectionCompositeMode'),
+    setSchroedingerCrossSectionScalar: valueSetter('crossSectionScalar'),
+    setSchroedingerCrossSectionPlaneMode: valueSetter('crossSectionPlaneMode'),
+    setSchroedingerCrossSectionAxis: (axis) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          crossSectionAxis: axis,
+          crossSectionPlaneMode: 'axisAligned',
+          crossSectionPlaneNormal: axisToNormal(axis),
+        },
+      }))
+    },
+    setSchroedingerCrossSectionPlaneNormal: (normal) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          crossSectionPlaneNormal: normalizePlaneNormal(normal),
+          crossSectionPlaneMode: 'free',
+        },
+      }))
+    },
+    setSchroedingerCrossSectionPlaneOffset: clampedSetter('crossSectionPlaneOffset', -1.0, 1.0),
+    setSchroedingerCrossSectionOpacity: clampedSetter('crossSectionOpacity', 0.0, 1.0),
+    setSchroedingerCrossSectionThickness: clampedSetter('crossSectionThickness', 0.0, 0.2),
+    setSchroedingerCrossSectionPlaneColor: valueSetter('crossSectionPlaneColor'),
+    setSchroedingerCrossSectionAutoWindow: valueSetter('crossSectionAutoWindow'),
+    setSchroedingerCrossSectionWindowMin: (minValue) => {
+      setWithVersion((state) => {
+        const clampedMin = Math.max(-10.0, Math.min(10.0, minValue))
+        const clampedMax = Math.max(state.schroedinger.crossSectionWindowMax, clampedMin + 1e-4)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            crossSectionWindowMin: clampedMin,
+            crossSectionWindowMax: clampedMax,
+          },
+        }
+      })
+    },
+    setSchroedingerCrossSectionWindowMax: (maxValue) => {
+      setWithVersion((state) => {
+        const clampedMax = Math.max(-10.0, Math.min(10.0, maxValue))
+        const clampedMin = Math.min(state.schroedinger.crossSectionWindowMin, clampedMax - 1e-4)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            crossSectionWindowMin: clampedMin,
+            crossSectionWindowMax: Math.max(clampedMax, clampedMin + 1e-4),
+          },
+        }
+      })
+    },
 
     // === Slice Animation (4D+ only) ===
     setSchroedingerSliceAnimationEnabled: valueSetter('sliceAnimationEnabled'),
