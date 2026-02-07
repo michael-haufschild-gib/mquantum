@@ -21,7 +21,7 @@
 All GPU shaders use WGSL. There is no GLSL/WebGL in this project.
 
 - Shaders are `.wgsl.ts` files exporting template literal strings
-- Composition via `composeWGSL()` from `src/rendering/webgpu/shaders/shared/compose-helpers.ts`
+- Composition via `assembleShaderBlocks()` from `src/rendering/webgpu/shaders/shared/compose-helpers.ts`
 - Entry points must be named `main` (matches `WebGPUBasePass.createFullscreenPipeline()`)
 - Maximum 4 bind groups (0-3)
 - All `textureSample` calls must be in uniform control flow

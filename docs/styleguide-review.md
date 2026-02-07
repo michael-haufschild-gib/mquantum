@@ -1,7 +1,8 @@
 # Styleguide Compliance Review
 
-**Date:** 2025-12-29
+**Date:** 2026-02-07
 **Reviewed Against:** `docs/meta/styleguide.md`
+**Renderer Status:** Custom WebGPU-only (no WebGL, no Three.js, no GLSL)
 
 ---
 
@@ -9,12 +10,15 @@
 
 | Category | Status | Violations | Priority |
 |----------|--------|------------|----------|
-| WebGL2/GLSL ES 3.00 | PASS | 0 | - |
+| WebGPU / WGSL Shaders | PASS | 0 | - |
 | Modern CSS (Logical Properties) | FAIL | 40+ | High |
 | State Management (useShallow) | FAIL | 15+ | High |
 | Import Patterns | FAIL | 10 | Medium |
 | JSDoc Documentation | FAIL | 15 | Medium |
-| Three.js DPR/Viewport | FAIL | 2 | Low |
+
+> **Note (Feb 2026):** The project has fully migrated to a custom WebGPU renderer. All WebGL code, Three.js dependencies, and GLSL shaders have been removed. GPU shaders are now written in **WGSL** via `.wgsl.ts` files composed with `assembleShaderBlocks()`. The "WebGL2/GLSL ES 3.00" and "Three.js DPR/Viewport" categories from the previous review (Dec 2025) are no longer applicable and have been removed.
+>
+> **Action required:** The styleguide itself (`docs/meta/styleguide.md`) still contains an outdated "WebGL2 / GLSL ES 3.00 Standard" section with GLSL syntax tables, Three.js `ShaderMaterial` examples, and `.frag`/`.vert` file conventions. This section should be replaced with WebGPU/WGSL guidance matching the current architecture.
 
 ---
 
@@ -302,37 +306,6 @@ const { prop1, prop2, action1 } = useStore(
 
 ---
 
-## 5. Three.js DPR/Viewport Violations
-
-**Requirement:** Fullscreen quad shaders rendered manually (not via ShaderPass) with PlaneGeometry(2, 2) must use direct NDC coordinates, not camera matrices.
-
-**Reference:** `docs/meta/styleguide.md` → CIB-002 → "CRITICAL THREE.JS DPR/VIEWPORT GOTCHA"
-
-### 5.1 src/rendering/graph/passes/BloomPass.ts
-
-| Line | Violation | Fix |
-|------|-----------|-----|
-| 46 | `gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);` | Change to `gl_Position = vec4(position.xy, 0.0, 1.0);` for fullscreen quad |
-
-**Context:** The `luminosityHighPassShader` is used for fullscreen bloom threshold detection. If it renders to a PlaneGeometry(2,2), it should use direct NDC.
-
-### 5.2 src/rendering/graph/passes/NormalPass.ts
-
-| Line | Violation | Fix |
-|------|-----------|-----|
-| 97 | `gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);` | If this is a fullscreen quad pass, change to `gl_Position = vec4(position.xy, 0.0, 1.0);` |
-
-**Context:** Verify if this is rendering a fullscreen quad or actual geometry. If fullscreen quad, use direct NDC.
-
-### Reference Implementation
-
-See `src/rendering/graph/passes/ToScreenPass.ts:137` for correct pattern:
-```glsl
-gl_Position = vec4(position.xy, 0.0, 1.0);
-```
-
----
-
 ## Appendix: Files with Good Patterns to Reference
 
 ### Correct useShallow Usage
@@ -350,5 +323,6 @@ gl_Position = vec4(position.xy, 0.0, 1.0);
 - `src/lib/math/vector.ts`
 - `src/lib/math/matrix.ts`
 
-### Correct Fullscreen Quad Shader
-- `src/rendering/graph/passes/ToScreenPass.ts:137`
+### Correct WGSL Shader Patterns
+- All `.wgsl.ts` files in `src/rendering/webgpu/shaders/` use `assembleShaderBlocks()` composition
+- Shader uniforms follow bind group layout: G0=per-frame, G1=per-material, G2=per-object, G3=dynamic

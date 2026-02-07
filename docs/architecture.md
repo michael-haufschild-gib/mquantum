@@ -22,8 +22,6 @@
 - **Testing**: Vitest (happy-dom) + Playwright (`@playwright/test`)
 - **WASM**: Rust via `wasm-pack` for math operations (rotation, projection)
 
-**Not used in the rendering path**: Three.js, React Three Fiber. These are still dependencies but are only used for a small set of legacy hooks/components, not the core rendering.
-
 ## Where to Put New Code
 
 ```
@@ -205,18 +203,18 @@ export const <name>Block = /* wgsl */ `
 `
 ```
 
-Shader composition uses `composeWGSL()` from `src/rendering/webgpu/shaders/shared/compose-helpers.ts`:
+Shader composition uses `assembleShaderBlocks()` from `src/rendering/webgpu/shaders/shared/compose-helpers.ts`:
 
 ```ts
-import { composeWGSL, type ShaderBlock } from '../shared/compose-helpers'
+import { assembleShaderBlocks, type ShaderBlock } from '../shared/compose-helpers'
 
 const blocks: ShaderBlock[] = [
-  { label: 'uniforms', code: uniformsBlock },
-  { label: 'sdf', code: sdfBlock, when: (flags) => flags.dimension === 4 },
-  { label: 'main', code: mainBlock },
+  { name: 'Uniforms', content: uniformsBlock },
+  { name: 'SDF', content: sdfBlock, condition: dimension === 4 },
+  { name: 'Main', content: mainBlock },
 ]
 
-const shaderCode = composeWGSL(blocks, featureFlags)
+const { wgsl, modules } = assembleShaderBlocks(blocks)
 ```
 
 ## Zustand Rules (Performance-critical)
@@ -315,12 +313,6 @@ Query helpers: `isAvailableForDimension()`, `getRecommendedDimension()`, `canRen
 7. **If it impacts visual output**, add Playwright coverage in `scripts/playwright/`.
 
 ## Common Mistakes
-
-- **Don't**: Write GLSL shaders or use `THREE.ShaderMaterial`.
-  **Do**: Write WGSL shaders as `.wgsl.ts` template strings, compose via `composeWGSL()`.
-
-- **Don't**: Use Three.js `WebGLRenderer` or React Three Fiber `<Canvas>` for rendering.
-  **Do**: Use the WebGPU render graph (`WebGPURenderGraph`) and custom passes.
 
 - **Don't**: Add new object types beyond `'schroedinger'`.
   **Do**: Add new quantum modes or dimension-specific SDFs within the Schroedinger system.

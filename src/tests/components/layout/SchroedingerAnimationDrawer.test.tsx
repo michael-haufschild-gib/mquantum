@@ -104,4 +104,25 @@ describe('SchroedingerAnimationDrawer', () => {
     const paramContainer = flowPanel.querySelector('.opacity-50')
     expect(paramContainer).toBeInTheDocument()
   })
+
+  it('should render Probability Current animation type controls and update settings', () => {
+    render(<SchroedingerAnimationDrawer />)
+
+    expect(screen.getByTestId('animation-panel-probabilityCurrent')).toBeInTheDocument()
+
+    const toggle = screen.getByTestId('schroedinger-probability-current-toggle')
+    fireEvent.click(toggle)
+    expect(useExtendedObjectStore.getState().schroedinger.probabilityCurrentEnabled).toBe(true)
+
+    fireEvent.change(screen.getByTestId('schroedinger-probability-current-style'), {
+      target: { value: 'arrows' },
+    })
+    expect(useExtendedObjectStore.getState().schroedinger.probabilityCurrentStyle).toBe('arrows')
+    expect(screen.getByTestId('schroedinger-probability-current-opacity')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('schroedinger-probability-current-style'), {
+      target: { value: 'streamlines' },
+    })
+    expect(screen.getByTestId('schroedinger-probability-current-steps')).toBeInTheDocument()
+  })
 })

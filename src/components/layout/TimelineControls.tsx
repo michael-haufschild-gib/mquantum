@@ -79,6 +79,7 @@ export const TimelineControls: FC = () => {
         schroedingerConfig.sliceAnimationEnabled,
         schroedingerConfig.interferenceEnabled,
         schroedingerConfig.probabilityFlowEnabled,
+        schroedingerConfig.probabilityCurrentEnabled,
       ].filter(Boolean).length
     }
 
@@ -88,6 +89,7 @@ export const TimelineControls: FC = () => {
     schroedingerConfig.sliceAnimationEnabled,
     schroedingerConfig.interferenceEnabled,
     schroedingerConfig.probabilityFlowEnabled,
+    schroedingerConfig.probabilityCurrentEnabled,
   ])
 
   // Check if any animation is active

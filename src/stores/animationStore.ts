@@ -163,6 +163,7 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
     const hasOtherAnimations =
       schroedinger.interferenceEnabled ||
       schroedinger.probabilityFlowEnabled ||
+      schroedinger.probabilityCurrentEnabled ||
       schroedinger.sliceAnimationEnabled ||
       schroedinger.phaseAnimationEnabled
     set({

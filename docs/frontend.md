@@ -183,7 +183,7 @@ export function {Name}Controls() {
 
 ### Architecture overview
 
-This project uses a **custom WebGPU renderer** (not Three.js). The rendering pipeline:
+This project uses a **custom WebGPU renderer**. The rendering pipeline:
 1. **WebGPUCanvas** (`src/rendering/webgpu/WebGPUCanvas.tsx`) - React component providing the canvas
 2. **WebGPUScene** (`src/rendering/webgpu/WebGPUScene.tsx`) - Sets up render graph, creates passes, runs frame loop
 3. **WebGPURenderGraph** - Declarative pass orchestration with automatic resource management
@@ -205,8 +205,8 @@ See `docs/architecture.md` for the pass template.
 
 1. Create `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
 2. Export a `const <name>Block = /* wgsl */ \`...\`` template string
-3. Import and compose via `composeWGSL()` in the relevant `compose.ts`
-4. Use `ShaderBlock.when` predicate for conditional inclusion based on `FeatureFlags`
+3. Import and compose via `assembleShaderBlocks()` in the relevant `compose.ts`
+4. Use `ShaderBlock.condition` for conditional inclusion (set to `false` to skip)
 
 ### Schroedinger shader system
 
@@ -352,12 +352,6 @@ const position = useMemo(() => ({ x: 0, y: 0 }), [])
 
 - **Don't**: Use arbitrary color values (hex literals).
   **Do**: Use Tailwind color tokens (`accent-cyan`, `text-primary`, etc.).
-
-- **Don't**: Import Three.js `WebGLRenderer` or use `<Canvas>` from R3F for rendering.
-  **Do**: Use the WebGPU rendering pipeline (`WebGPUCanvas`, `WebGPURenderGraph`, passes).
-
-- **Don't**: Write GLSL shaders.
-  **Do**: Write WGSL shaders as `.wgsl.ts` template strings.
 
 - **Don't**: Create new arrays/objects in JSX props.
   **Do**: Create stable references with `useMemo` or outside component.

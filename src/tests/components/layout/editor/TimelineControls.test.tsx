@@ -1,18 +1,62 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { TimelineControls } from '@/components/layout/TimelineControls'
 
+const mockGeometryState = {
+  dimension: 4,
+  objectType: 'hypercube',
+}
+
 vi.mock('@/stores/geometryStore', () => ({
   useGeometryStore: vi.fn((selector) => {
-    const state = {
-      dimension: 4,
-      objectType: 'hypercube',
-    }
-    return selector ? selector(state) : state
+    return selector ? selector(mockGeometryState) : mockGeometryState
   }),
 }))
 
 const mockRandomizePlanes = vi.fn()
+
+const mockExtendedState = {
+  mandelbulb: {
+    powerAnimationEnabled: false,
+    sliceAnimationEnabled: false,
+    phaseShiftEnabled: false,
+    alternatePowerEnabled: false,
+  },
+  quaternionJulia: {},
+  polytope: {
+    truncationEnabled: false,
+    facetOffsetEnabled: false,
+    dualMorphEnabled: false,
+    explodeEnabled: false,
+  },
+  schroedinger: {
+    sliceAnimationEnabled: false,
+    interferenceEnabled: false,
+    probabilityFlowEnabled: false,
+    probabilityCurrentEnabled: false,
+  },
+  blackhole: {
+    swirlAnimationEnabled: false,
+    pulseEnabled: false,
+  },
+  setMandelbulbPowerAnimationEnabled: vi.fn(),
+  setMandelbulbPowerMin: vi.fn(),
+  setMandelbulbPowerMax: vi.fn(),
+  setMandelbulbPowerSpeed: vi.fn(),
+  setMandelbulbSliceAnimationEnabled: vi.fn(),
+  setMandelbulbSliceSpeed: vi.fn(),
+  setMandelbulbSliceAmplitude: vi.fn(),
+  setMandelbulbJuliaModeEnabled: vi.fn(),
+  setMandelbulbJuliaOrbitSpeed: vi.fn(),
+  setMandelbulbJuliaOrbitRadius: vi.fn(),
+  setMandelbulbPhaseShiftEnabled: vi.fn(),
+  setMandelbulbPhaseSpeed: vi.fn(),
+  setMandelbulbPhaseAmplitude: vi.fn(),
+  setQuaternionJuliaConstantAnimationEnabled: vi.fn(),
+  setQuaternionJuliaPowerAnimationEnabled: vi.fn(),
+  setQuaternionJuliaOriginDriftEnabled: vi.fn(),
+  setQuaternionJuliaDimensionMixEnabled: vi.fn(),
+}
 
 vi.mock('@/stores/animationStore', () => ({
   useAnimationStore: vi.fn((selector) => {
@@ -54,50 +98,7 @@ vi.mock('@/stores/defaults/visualDefaults', () => ({
 
 vi.mock('@/stores/extendedObjectStore', () => ({
   useExtendedObjectStore: vi.fn((selector) => {
-    const state = {
-      mandelbulb: {
-        powerAnimationEnabled: false,
-        sliceAnimationEnabled: false,
-        phaseShiftEnabled: false,
-        alternatePowerEnabled: false,
-      },
-      // NOTE: quaternionJulia has no animations - shape morphing via 4D+ rotation
-      quaternionJulia: {},
-      polytope: {
-        truncationEnabled: false,
-        facetOffsetEnabled: false,
-        dualMorphEnabled: false,
-        explodeEnabled: false,
-      },
-      schroedinger: {
-        sliceAnimationEnabled: false,
-        interferenceEnabled: false,
-        probabilityFlowEnabled: false,
-      },
-      blackhole: {
-        swirlAnimationEnabled: false,
-        pulseEnabled: false,
-      },
-      setMandelbulbPowerAnimationEnabled: vi.fn(),
-      setMandelbulbPowerMin: vi.fn(),
-      setMandelbulbPowerMax: vi.fn(),
-      setMandelbulbPowerSpeed: vi.fn(),
-      setMandelbulbSliceAnimationEnabled: vi.fn(),
-      setMandelbulbSliceSpeed: vi.fn(),
-      setMandelbulbSliceAmplitude: vi.fn(),
-      setMandelbulbJuliaModeEnabled: vi.fn(),
-      setMandelbulbJuliaOrbitSpeed: vi.fn(),
-      setMandelbulbJuliaOrbitRadius: vi.fn(),
-      setMandelbulbPhaseShiftEnabled: vi.fn(),
-      setMandelbulbPhaseSpeed: vi.fn(),
-      setMandelbulbPhaseAmplitude: vi.fn(),
-      // Quaternion Julia setters
-      setQuaternionJuliaConstantAnimationEnabled: vi.fn(),
-      setQuaternionJuliaPowerAnimationEnabled: vi.fn(),
-      setQuaternionJuliaOriginDriftEnabled: vi.fn(),
-      setQuaternionJuliaDimensionMixEnabled: vi.fn(),
-    }
-    return selector ? selector(state) : state
+    return selector ? selector(mockExtendedState) : mockExtendedState
   }),
 }))
 
@@ -115,6 +116,16 @@ vi.mock('@/lib/audio/SoundManager', () => ({
 }))
 
 describe('TimelineControls', () => {
+  beforeEach(() => {
+    mockGeometryState.dimension = 4
+    mockGeometryState.objectType = 'hypercube'
+    mockExtendedState.schroedinger.sliceAnimationEnabled = false
+    mockExtendedState.schroedinger.interferenceEnabled = false
+    mockExtendedState.schroedinger.probabilityFlowEnabled = false
+    mockExtendedState.schroedinger.probabilityCurrentEnabled = false
+    mockRandomizePlanes.mockClear()
+  })
+
   it('toggles Rotate drawer when button is clicked', async () => {
     render(<TimelineControls />)
 
@@ -197,5 +208,15 @@ describe('TimelineControls', () => {
     await waitFor(() => {
       expect(screen.queryByText('XY', { selector: 'button' })).not.toBeInTheDocument()
     })
+  })
+
+  it('counts probability current as an animation type for schroedinger', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.probabilityCurrentEnabled = true
+
+    render(<TimelineControls />)
+
+    const animButton = screen.getByRole('button', { name: /toggle animations drawer/i })
+    expect((animButton.textContent ?? '').replace(/\s+/g, '')).toContain('Anim1')
   })
 })

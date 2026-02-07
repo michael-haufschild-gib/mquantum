@@ -1,47 +1,237 @@
 # Front-End Engineering Style Guide
 
-## WebGL2 / GLSL ES 3.00 Standard
+## WebGPU / WGSL Shader Standard
 
-**All shaders MUST use WebGL2 and GLSL ES 3.00 syntax.** This is a mandatory requirement with no exceptions.
-
-### Required GLSL ES 3.00 Syntax
-
-| WebGL1 (Forbidden) | WebGL2 (Required) |
-|-------------------|-------------------|
-| `attribute` | `in` (vertex shader) |
-| `varying` (vertex) | `out` |
-| `varying` (fragment) | `in` |
-| `gl_FragColor` | `layout(location = N) out vec4 varName;` |
-| `texture2D()` | `texture()` |
-| `textureCube()` | `texture()` |
-
-### MRT (Multiple Render Target) Declaration Pattern
-
-```glsl
-// Fragment shader output declarations (WebGL2 MRT)
-layout(location = 0) out vec4 gColor;   // Color buffer
-layout(location = 1) out vec4 gNormal;  // Normal buffer (packed: RGB = normal, A = metallic)
-```
+**All GPU shaders MUST be written in WGSL.** This project uses a custom WebGPU renderer built on raw `GPUDevice` / `GPUCommandEncoder` APIs. There is no WebGL, no Three.js, and no GLSL.
 
 ### Shader File Conventions
 
-- `.frag` / `.vert` files: Raw GLSL for raymarching shaders
-- `.glsl.ts` files: TypeScript template strings for dynamic shader generation
-- Always include `precision highp float;` at the top of fragment shaders
-- Use `in`/`out` keywords, never `attribute`/`varying`
+- `.wgsl.ts` files: TypeScript files exporting WGSL source as template literal strings
+- Location: `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
+- Use the `/* wgsl */` comment prefix for syntax highlighting in editors
 
-### Three.js Integration
+```
+src/rendering/webgpu/shaders/
+├── shared/           # Reusable blocks (core, color, lighting, math, raymarch, depth, features)
+│   ├── core/         # uniforms.wgsl.ts, constants.wgsl.ts
+│   ├── color/        # hsl, oklab, cosine-palette, selector
+│   ├── lighting/     # ggx, multi-light
+│   ├── math/         # Complex math utilities
+│   ├── raymarch/     # Sphere intersection, SDF sampling
+│   ├── depth/        # Custom depth handling
+│   ├── features/     # Temporal, cross-section, etc.
+│   └── compose-helpers.ts  # assembleShaderBlocks(), bind group generators
+├── schroedinger/     # Quantum wavefunction shaders + compose.ts
+├── postprocessing/   # Bloom, tonemapping, FXAA, SMAA, etc.
+├── skybox/           # Procedural skybox shaders
+└── temporal/         # Temporal reprojection
+```
 
-When using ShaderMaterial, set `glslVersion: THREE.GLSL3` to enable WebGL2 mode:
+### WGSL Block Pattern
+
+Export shader code as named constants or generator functions:
 
 ```typescript
-const material = new THREE.ShaderMaterial({
-  glslVersion: THREE.GLSL3,
-  vertexShader: myVertexShader,
-  fragmentShader: myFragmentShader,
-  uniforms: { ... }
-});
+/**
+ * WGSL Color Conversion Block
+ *
+ * Linear sRGB ↔ Oklab conversion utilities.
+ *
+ * @module rendering/webgpu/shaders/shared/color/oklab.wgsl
+ */
+
+// Static block — exported as a constant
+export const oklabBlock = /* wgsl */ `
+fn rgb2oklab(c: vec3f) -> vec3f {
+  let l = 0.4122214708 * c.r + 0.5363325363 * c.g + 0.0514459929 * c.b;
+  // ...
+}
+`
+
+// Dynamic block — exported as a generator function
+export function generateObjectBindGroup(
+  group: number,
+  structName: string,
+  varName: string,
+  binding: number
+): string {
+  return /* wgsl */ `@group(${group}) @binding(${binding}) var<uniform> ${varName}: ${structName};`
+}
 ```
+
+### Shader Composition with `assembleShaderBlocks()`
+
+Shaders are composed from ordered blocks using `assembleShaderBlocks()` from `compose-helpers.ts`:
+
+```typescript
+import { assembleShaderBlocks, ShaderBlock } from '../shared/compose-helpers'
+import { constantsBlock } from '../shared/core/constants.wgsl'
+import { uniformsBlock } from '../shared/core/uniforms.wgsl'
+import { complexMathBlock } from '../shared/math/complex.wgsl'
+
+const blocks: ShaderBlock[] = [
+  { name: 'Constants', content: constantsBlock },
+  { name: 'Uniforms', content: uniformsBlock },
+  { name: 'Complex Math', content: complexMathBlock },
+  { name: 'GGX PBR', content: ggxBlock, condition: isosurface },  // conditional inclusion
+  { name: 'Main', content: mainShaderBlock },
+]
+
+const { wgsl, modules } = assembleShaderBlocks(blocks)
+```
+
+**`ShaderBlock` interface:**
+```typescript
+interface ShaderBlock {
+  name: string           // Debug label
+  content: string        // WGSL source code
+  condition?: boolean    // Set to false to skip this block
+}
+```
+
+**Block dependency order** (must follow this sequence):
+1. Vertex input structs
+2. Defines / constants
+3. Core (uniforms)
+4. Bind group declarations
+5. Math utilities (complex, hermite, etc.)
+6. Color system (HSL, oklab, cosine palette)
+7. Lighting (GGX PBR — isosurface only)
+8. Volume rendering (absorption, emission, integration)
+9. Geometry (sphere intersection, SDF)
+10. Features (temporal, cross-section)
+11. Fragment output structs (MRT)
+12. Main shader
+
+### Bind Group Layout (4 groups max)
+
+WebGPU limits pipelines to 4 bind groups. The project follows this standard layout:
+
+| Group | Purpose | Update Frequency | Bindings |
+|-------|---------|-----------------|----------|
+| 0 | Camera | Every frame | `@binding(0) camera: CameraUniforms` |
+| 1 | Combined rendering | Per material change | `@binding(0) lighting`, `@binding(1) material`, `@binding(2) quality` |
+| 2 | Object-specific | Per object | `@binding(0) [object uniforms]`, `@binding(1) basis: BasisVectors` |
+| 3 | IBL / Environment | Optional | `@binding(0) iblUniforms`, `@binding(1) envMap`, `@binding(2) sampler` |
+
+Use `generateConsolidatedBindGroups()` for Groups 0-1 and `generateObjectBindGroup()` for Group 2:
+
+```typescript
+{ name: 'Standard Bind Groups', content: generateConsolidatedBindGroups() },
+{
+  name: 'Object Uniforms',
+  content:
+    schroedingerUniformsBlock + '\n' +
+    generateObjectBindGroup(2, 'SchroedingerUniforms', 'schroedinger', 0) + '\n' +
+    generateObjectBindGroup(2, 'BasisVectors', 'basis', 1),
+},
+```
+
+### WGSL Struct Alignment (Critical)
+
+WGSL alignment rules differ from C. `vec3f` aligns to **16 bytes**, not 12. Always account for padding:
+
+| Type | Size (bytes) | Alignment (bytes) |
+|------|-------------|-------------------|
+| `f32`, `i32`, `u32` | 4 | 4 |
+| `vec2f` | 8 | 8 |
+| `vec3f` | 12 | **16** |
+| `vec4f` | 16 | 16 |
+| `mat4x4f` | 64 | 16 |
+
+```wgsl
+struct CameraUniforms {
+  // ...
+  cameraPosition: vec3f,   // 16-byte aligned (12 bytes used + 4 padding)
+  cameraNear: f32,         // Fills the 4-byte gap after vec3f
+  cameraFar: f32,
+  fov: f32,
+  resolution: vec2f,
+  aspectRatio: f32,
+  time: f32,
+  deltaTime: f32,
+  frameNumber: u32,
+  bayerOffset: vec2f,
+  _padding: vec2f,         // Explicit padding — always document!
+}
+```
+
+### MRT (Multiple Render Target) Pattern
+
+```wgsl
+struct FragmentOutput {
+  @location(0) color: vec4f,    // Color buffer
+  @location(1) normal: vec4f,   // Normal buffer (RGB = normal, A = metallic)
+}
+
+@fragment
+fn main(input: VertexOutput) -> FragmentOutput {
+  var output: FragmentOutput;
+  output.color = vec4f(finalColor, finalAlpha);
+  output.normal = vec4f(encodedNormal * 0.5 + 0.5, material.metallic);
+  return output;
+}
+```
+
+### Entry Point Naming
+
+Use `main` for both vertex and fragment entry points (required by `createFullscreenPipeline()`):
+
+```wgsl
+@vertex
+fn main(input: VertexInput) -> VertexOutput { ... }
+
+@fragment
+fn main(input: VertexOutput) -> @location(0) vec4f { ... }
+```
+
+### Texture Sampling Rules
+
+`textureSample` must be called from **uniform control flow** only. Use `textureLoad` for depth textures and inside conditionals:
+
+```wgsl
+// ✅ CORRECT — all samples before any conditionals
+let colorC = textureSample(tex, samp, input.uv);
+let colorN = textureSample(tex, samp, input.uv + offset);
+let skipProcessing = shouldSkip(colorC);
+return vec4f(select(processedColor, colorC.rgb, skipProcessing), 1.0);
+
+// ✅ CORRECT — textureLoad for depth (unfilterable-float)
+let coord = vec2i(uv * vec2f(textureDimensions(depthTex)));
+let depth = textureLoad(depthTex, coord, 0).r;
+
+// ❌ WRONG — textureSample after early return (non-uniform control flow)
+if (earlyExit) { return vec4f(0.0); }
+let color = textureSample(tex, samp, uv);  // Error!
+```
+
+### Pipeline Format Must Match Render Target
+
+```typescript
+// ❌ WRONG — canvas format for HDR target
+this.createFullscreenPipeline(device, shader, layouts, ctx.format)
+
+// ✅ CORRECT — explicit format matching target texture
+this.createFullscreenPipeline(device, shader, layouts, 'rgba16float')
+```
+
+| Render Target | Pipeline Format |
+|---------------|-----------------|
+| Canvas | `ctx.format` (`bgra8unorm`) |
+| HDR textures (scene, bloom) | `'rgba16float'` |
+| LDR textures (final-color) | `'rgba8unorm'` |
+| AO buffer | `'r8unorm'` |
+
+### Shader Writing Checklist
+
+- [ ] All `textureSample` calls are in uniform control flow
+- [ ] Depth/unfilterable textures use `textureLoad`, not `textureSample`
+- [ ] Using at most 4 bind groups (0–3)
+- [ ] Entry point names match pipeline configuration (`main`)
+- [ ] All referenced struct types are defined in the shader
+- [ ] Struct sizes account for `vec3f` 16-byte alignment
+- [ ] All GPU objects have descriptive `label` properties
+- [ ] Pipeline `colorFormat` matches the actual render target format
 
 ---
 

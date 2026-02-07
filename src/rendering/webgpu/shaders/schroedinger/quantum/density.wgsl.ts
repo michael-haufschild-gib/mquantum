@@ -366,13 +366,24 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
     rho = max(rho, 0.0);
   }
 
-  // Apply probability current flow if enabled
-  // Approximates |nabla rho|: edges flow fast, core stays still
+  // Phase-coherent quantum texture: uses wavefunction phase to create noise
+  // patterns aligned with the quantum state's structure. The phase φ encodes
+  // local momentum direction (p ∝ ∇φ in the semiclassical limit), so the
+  // texture flows coherently with wavefronts rather than randomly.
+  // For real eigenstates: highlights nodal surfaces (phase jumps 0 → π).
+  // For complex/superposition states: patterns evolve with the phase field.
   if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
     let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
-    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(pcfOffset, 0.0, pcfOffset * 0.7));
+    let psiLen = max(length(psi), 1e-8);
+    let pcfCosP = psi.x / psiLen;
+    let pcfSinP = psi.y / psiLen;
+    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(
+        pcfOffset + pcfCosP * 0.5,
+        pcfSinP * 0.5,
+        pcfOffset * 0.7 + pcfCosP * 0.3
+    ));
     rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }
@@ -418,13 +429,19 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     rho = max(rho, 0.0);
   }
 
-  // Apply probability current flow if enabled
-  // Approximates |nabla rho|: edges flow fast, core stays still
+  // Phase-coherent quantum texture (see sampleDensityWithPhase for details)
   if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
     let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
     let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
     let pcfOffset = pcfTime * pcfSpeedMod;
-    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(pcfOffset, 0.0, pcfOffset * 0.7));
+    let psiLen = max(length(psi), 1e-8);
+    let pcfCosP = psi.x / psiLen;
+    let pcfSinP = psi.y / psiLen;
+    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(
+        pcfOffset + pcfCosP * 0.5,
+        pcfSinP * 0.5,
+        pcfOffset * 0.7 + pcfCosP * 0.3
+    ));
     rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
     rho = max(rho, 0.0);
   }

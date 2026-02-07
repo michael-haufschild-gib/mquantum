@@ -4,16 +4,9 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleButton } from '@/components/ui/ToggleButton'
 import type {
-  SchroedingerCrossSectionAxis,
-  SchroedingerCrossSectionCompositeMode,
-  SchroedingerCrossSectionPlaneMode,
-  SchroedingerCrossSectionScalar,
   SchroedingerNodalDefinition,
   SchroedingerNodalFamilyFilter,
   SchroedingerNodalRenderMode,
-  SchroedingerProbabilityCurrentColorMode,
-  SchroedingerProbabilityCurrentPlacement,
-  SchroedingerProbabilityCurrentStyle,
 } from '@/lib/geometry/extended/types'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
@@ -36,61 +29,6 @@ const NODAL_FAMILY_OPTIONS: { value: SchroedingerNodalFamilyFilter; label: strin
 const NODAL_RENDER_MODE_OPTIONS: { value: SchroedingerNodalRenderMode; label: string }[] = [
   { value: 'band', label: 'Volumetric Band' },
   { value: 'surface', label: 'Ray-Hit Surface' },
-]
-
-const CROSS_SECTION_COMPOSITE_OPTIONS: {
-  value: SchroedingerCrossSectionCompositeMode
-  label: string
-}[] = [
-  { value: 'overlay', label: 'Overlay' },
-  { value: 'sliceOnly', label: 'Slice Only' },
-]
-
-const CROSS_SECTION_SCALAR_OPTIONS: { value: SchroedingerCrossSectionScalar; label: string }[] = [
-  { value: 'density', label: '|ψ|² Density' },
-  { value: 'real', label: 'Re(ψ)' },
-  { value: 'imag', label: 'Im(ψ)' },
-]
-
-const CROSS_SECTION_PLANE_MODE_OPTIONS: {
-  value: SchroedingerCrossSectionPlaneMode
-  label: string
-}[] = [
-  { value: 'axisAligned', label: 'Axis-Aligned' },
-  { value: 'free', label: 'Free Plane' },
-]
-
-const CROSS_SECTION_AXIS_OPTIONS: { value: SchroedingerCrossSectionAxis; label: string }[] = [
-  { value: 'x', label: 'YZ (X-Normal)' },
-  { value: 'y', label: 'XZ (Y-Normal)' },
-  { value: 'z', label: 'XY (Z-Normal)' },
-]
-
-const PROBABILITY_CURRENT_STYLE_OPTIONS: {
-  value: SchroedingerProbabilityCurrentStyle
-  label: string
-}[] = [
-  { value: 'magnitude', label: 'Magnitude' },
-  { value: 'arrows', label: 'Arrows' },
-  { value: 'surfaceLIC', label: 'Surface LIC' },
-  { value: 'streamlines', label: 'Streamlines' },
-]
-
-const PROBABILITY_CURRENT_PLACEMENT_OPTIONS: {
-  value: SchroedingerProbabilityCurrentPlacement
-  label: string
-}[] = [
-  { value: 'isosurface', label: 'Isosurface' },
-  { value: 'volume', label: 'Volume' },
-]
-
-const PROBABILITY_CURRENT_COLOR_MODE_OPTIONS: {
-  value: SchroedingerProbabilityCurrentColorMode
-  label: string
-}[] = [
-  { value: 'magnitude', label: 'Magnitude' },
-  { value: 'direction', label: 'Direction' },
-  { value: 'circulationSign', label: 'Circulation Sign' },
 ]
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
@@ -123,34 +61,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
     setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
-    setProbabilityCurrentEnabled: state.setSchroedingerProbabilityCurrentEnabled,
-    setProbabilityCurrentStyle: state.setSchroedingerProbabilityCurrentStyle,
-    setProbabilityCurrentPlacement: state.setSchroedingerProbabilityCurrentPlacement,
-    setProbabilityCurrentColorMode: state.setSchroedingerProbabilityCurrentColorMode,
-    setProbabilityCurrentScale: state.setSchroedingerProbabilityCurrentScale,
-    setProbabilityCurrentSpeed: state.setSchroedingerProbabilityCurrentSpeed,
-    setProbabilityCurrentDensityThreshold: state.setSchroedingerProbabilityCurrentDensityThreshold,
-    setProbabilityCurrentMagnitudeThreshold:
-      state.setSchroedingerProbabilityCurrentMagnitudeThreshold,
-    setProbabilityCurrentLineDensity: state.setSchroedingerProbabilityCurrentLineDensity,
-    setProbabilityCurrentStepSize: state.setSchroedingerProbabilityCurrentStepSize,
-    setProbabilityCurrentSteps: state.setSchroedingerProbabilityCurrentSteps,
-    setProbabilityCurrentOpacity: state.setSchroedingerProbabilityCurrentOpacity,
     setIsoEnabled: state.setSchroedingerIsoEnabled,
     setIsoThreshold: state.setSchroedingerIsoThreshold,
-    setCrossSectionEnabled: state.setSchroedingerCrossSectionEnabled,
-    setCrossSectionCompositeMode: state.setSchroedingerCrossSectionCompositeMode,
-    setCrossSectionScalar: state.setSchroedingerCrossSectionScalar,
-    setCrossSectionPlaneMode: state.setSchroedingerCrossSectionPlaneMode,
-    setCrossSectionAxis: state.setSchroedingerCrossSectionAxis,
-    setCrossSectionPlaneNormal: state.setSchroedingerCrossSectionPlaneNormal,
-    setCrossSectionPlaneOffset: state.setSchroedingerCrossSectionPlaneOffset,
-    setCrossSectionOpacity: state.setSchroedingerCrossSectionOpacity,
-    setCrossSectionThickness: state.setSchroedingerCrossSectionThickness,
-    setCrossSectionPlaneColor: state.setSchroedingerCrossSectionPlaneColor,
-    setCrossSectionAutoWindow: state.setSchroedingerCrossSectionAutoWindow,
-    setCrossSectionWindowMin: state.setSchroedingerCrossSectionWindowMin,
-    setCrossSectionWindowMax: state.setSchroedingerCrossSectionWindowMax,
     // Erosion
     setErosionStrength: state.setSchroedingerErosionStrength,
     setErosionScale: state.setSchroedingerErosionScale,
@@ -186,33 +98,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled,
     setPhaseMaterialityStrength,
-    setProbabilityCurrentEnabled,
-    setProbabilityCurrentStyle,
-    setProbabilityCurrentPlacement,
-    setProbabilityCurrentColorMode,
-    setProbabilityCurrentScale,
-    setProbabilityCurrentSpeed,
-    setProbabilityCurrentDensityThreshold,
-    setProbabilityCurrentMagnitudeThreshold,
-    setProbabilityCurrentLineDensity,
-    setProbabilityCurrentStepSize,
-    setProbabilityCurrentSteps,
-    setProbabilityCurrentOpacity,
     setIsoEnabled,
     setIsoThreshold,
-    setCrossSectionEnabled,
-    setCrossSectionCompositeMode,
-    setCrossSectionScalar,
-    setCrossSectionPlaneMode,
-    setCrossSectionAxis,
-    setCrossSectionPlaneNormal,
-    setCrossSectionPlaneOffset,
-    setCrossSectionOpacity,
-    setCrossSectionThickness,
-    setCrossSectionPlaneColor,
-    setCrossSectionAutoWindow,
-    setCrossSectionWindowMin,
-    setCrossSectionWindowMax,
     setErosionStrength,
     setErosionScale,
     setErosionTurbulence,
@@ -237,8 +124,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setFaceEmissionThreshold,
     setFaceEmissionColorShift,
   } = useAppearanceStore(emissionSelector)
-
-  const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 
   return (
     <div className="space-y-4">
@@ -338,182 +223,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             ? 'Sharp surface at constant probability density'
             : 'Volumetric cloud visualization'}
         </p>
-      </ControlGroup>
-
-      {/* 2D Cross-Section Slice */}
-      <ControlGroup title="Cross-Section Slice" collapsible defaultOpen>
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-text-secondary">Enable Slice Plane</label>
-          <ToggleButton
-            pressed={config.crossSectionEnabled ?? false}
-            onToggle={() => setCrossSectionEnabled(!(config.crossSectionEnabled ?? false))}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle cross-section slice"
-            data-testid="schroedinger-cross-section-toggle"
-          >
-            {config.crossSectionEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
-        </div>
-
-        {config.crossSectionEnabled && (
-          <div className="ps-2 mt-2 border-s border-border-default space-y-2">
-            <Select
-              label="Compositing"
-              options={CROSS_SECTION_COMPOSITE_OPTIONS}
-              value={config.crossSectionCompositeMode ?? 'overlay'}
-              onChange={(value) =>
-                setCrossSectionCompositeMode(value as SchroedingerCrossSectionCompositeMode)
-              }
-              data-testid="schroedinger-cross-section-composite-mode"
-            />
-            <Select
-              label="Scalar"
-              options={CROSS_SECTION_SCALAR_OPTIONS}
-              value={config.crossSectionScalar ?? 'density'}
-              onChange={(value) => setCrossSectionScalar(value as SchroedingerCrossSectionScalar)}
-              data-testid="schroedinger-cross-section-scalar"
-            />
-            <Select
-              label="Plane Mode"
-              options={CROSS_SECTION_PLANE_MODE_OPTIONS}
-              value={config.crossSectionPlaneMode ?? 'axisAligned'}
-              onChange={(value) =>
-                setCrossSectionPlaneMode(value as SchroedingerCrossSectionPlaneMode)
-              }
-              data-testid="schroedinger-cross-section-plane-mode"
-            />
-
-            {(config.crossSectionPlaneMode ?? 'axisAligned') === 'axisAligned' ? (
-              <Select
-                label="Orientation"
-                options={CROSS_SECTION_AXIS_OPTIONS}
-                value={config.crossSectionAxis ?? 'z'}
-                onChange={(value) => setCrossSectionAxis(value as SchroedingerCrossSectionAxis)}
-                data-testid="schroedinger-cross-section-axis"
-              />
-            ) : (
-              <>
-                <Slider
-                  label="Normal X"
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={crossSectionNormal[0]}
-                  onChange={(value) =>
-                    setCrossSectionPlaneNormal([value, crossSectionNormal[1], crossSectionNormal[2]])
-                  }
-                  showValue
-                  data-testid="schroedinger-cross-section-normal-x"
-                />
-                <Slider
-                  label="Normal Y"
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={crossSectionNormal[1]}
-                  onChange={(value) =>
-                    setCrossSectionPlaneNormal([crossSectionNormal[0], value, crossSectionNormal[2]])
-                  }
-                  showValue
-                  data-testid="schroedinger-cross-section-normal-y"
-                />
-                <Slider
-                  label="Normal Z"
-                  min={-1}
-                  max={1}
-                  step={0.01}
-                  value={crossSectionNormal[2]}
-                  onChange={(value) =>
-                    setCrossSectionPlaneNormal([crossSectionNormal[0], crossSectionNormal[1], value])
-                  }
-                  showValue
-                  data-testid="schroedinger-cross-section-normal-z"
-                />
-              </>
-            )}
-
-            <Slider
-              label="Plane Offset"
-              min={-1}
-              max={1}
-              step={0.01}
-              value={config.crossSectionPlaneOffset ?? 0.0}
-              onChange={setCrossSectionPlaneOffset}
-              showValue
-              data-testid="schroedinger-cross-section-offset"
-            />
-            <Slider
-              label="Opacity"
-              min={0}
-              max={1}
-              step={0.01}
-              value={config.crossSectionOpacity ?? 0.75}
-              onChange={setCrossSectionOpacity}
-              showValue
-              data-testid="schroedinger-cross-section-opacity"
-            />
-            <Slider
-              label="Thickness"
-              min={0}
-              max={0.2}
-              step={0.005}
-              value={config.crossSectionThickness ?? 0.02}
-              onChange={setCrossSectionThickness}
-              showValue
-              data-testid="schroedinger-cross-section-thickness"
-            />
-            <div data-testid="schroedinger-cross-section-plane-color">
-              <ColorPicker
-                label="Plane Color"
-                value={config.crossSectionPlaneColor ?? '#66ccff'}
-                onChange={setCrossSectionPlaneColor}
-                disableAlpha={true}
-                className="w-full"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-text-secondary">Auto Window</label>
-              <ToggleButton
-                pressed={config.crossSectionAutoWindow ?? true}
-                onToggle={() => setCrossSectionAutoWindow(!(config.crossSectionAutoWindow ?? true))}
-                className="text-xs px-2 py-1 h-auto"
-                ariaLabel="Toggle cross-section auto window"
-                data-testid="schroedinger-cross-section-auto-window-toggle"
-              >
-                {config.crossSectionAutoWindow ? 'ON' : 'OFF'}
-              </ToggleButton>
-            </div>
-
-            {!config.crossSectionAutoWindow && (
-              <>
-                <Slider
-                  label="Window Min"
-                  min={-5}
-                  max={5}
-                  step={0.01}
-                  value={config.crossSectionWindowMin ?? 0}
-                  onChange={setCrossSectionWindowMin}
-                  showValue
-                  data-testid="schroedinger-cross-section-window-min"
-                />
-                <Slider
-                  label="Window Max"
-                  min={-5}
-                  max={5}
-                  step={0.01}
-                  value={config.crossSectionWindowMax ?? 1}
-                  onChange={setCrossSectionWindowMax}
-                  showValue
-                  data-testid="schroedinger-cross-section-window-max"
-                />
-              </>
-            )}
-            <p className="text-xs text-text-tertiary">
-              Slice scalar colors use the active Faces color algorithm and palette settings.
-            </p>
-          </div>
-        )}
       </ControlGroup>
 
       {/* Quantum Effects */}
@@ -769,152 +478,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           )}
         </div>
 
-        {/* Physical Probability Current (j-field) */}
-        <div className="space-y-1 mt-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Probability Current (j)</label>
-            <ToggleButton
-              pressed={config.probabilityCurrentEnabled ?? false}
-              onToggle={() =>
-                setProbabilityCurrentEnabled(!(config.probabilityCurrentEnabled ?? false))
-              }
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle probability current field"
-              data-testid="schroedinger-probability-current-toggle"
-            >
-              {config.probabilityCurrentEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          {config.probabilityCurrentEnabled && (
-            <div className="ps-2 border-s border-border-default space-y-2">
-              <Select
-                label="Style"
-                options={PROBABILITY_CURRENT_STYLE_OPTIONS}
-                value={config.probabilityCurrentStyle ?? 'magnitude'}
-                onChange={setProbabilityCurrentStyle}
-                data-testid="schroedinger-probability-current-style"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Select
-                  label="Placement"
-                  options={PROBABILITY_CURRENT_PLACEMENT_OPTIONS}
-                  value={config.probabilityCurrentPlacement ?? 'isosurface'}
-                  onChange={setProbabilityCurrentPlacement}
-                  data-testid="schroedinger-probability-current-placement"
-                />
-                <Select
-                  label="Color Mode"
-                  options={PROBABILITY_CURRENT_COLOR_MODE_OPTIONS}
-                  value={config.probabilityCurrentColorMode ?? 'magnitude'}
-                  onChange={setProbabilityCurrentColorMode}
-                  data-testid="schroedinger-probability-current-color-mode"
-                />
-              </div>
-
-              <Slider
-                label="Scale"
-                min={0.0}
-                max={5.0}
-                step={0.05}
-                value={config.probabilityCurrentScale ?? 1.0}
-                onChange={setProbabilityCurrentScale}
-                showValue
-                data-testid="schroedinger-probability-current-scale"
-              />
-              <Slider
-                label="Speed"
-                min={0.0}
-                max={10.0}
-                step={0.1}
-                value={config.probabilityCurrentSpeed ?? 1.0}
-                onChange={setProbabilityCurrentSpeed}
-                showValue
-                data-testid="schroedinger-probability-current-speed"
-              />
-              <Slider
-                label="Density Threshold"
-                min={0.0}
-                max={1.0}
-                step={0.001}
-                value={config.probabilityCurrentDensityThreshold ?? 0.01}
-                onChange={setProbabilityCurrentDensityThreshold}
-                showValue
-                data-testid="schroedinger-probability-current-density-threshold"
-              />
-              <Slider
-                label="Current Threshold"
-                min={0.0}
-                max={10.0}
-                step={0.01}
-                value={config.probabilityCurrentMagnitudeThreshold ?? 0.0}
-                onChange={setProbabilityCurrentMagnitudeThreshold}
-                showValue
-                data-testid="schroedinger-probability-current-magnitude-threshold"
-              />
-
-              <p className="text-xs text-text-tertiary">
-                Flow is physically zero for many real stationary states. Use complex states (for
-                example, Hydrogen with real orbitals OFF and m ≠ 0, or oscillator superpositions) to
-                see circulation.
-              </p>
-
-              {config.probabilityCurrentStyle === 'magnitude' && (
-                <p className="text-xs text-text-tertiary">
-                  Colors the local |j| magnitude directly.
-                </p>
-              )}
-
-              {config.probabilityCurrentStyle === 'arrows' && (
-                <Slider
-                  label="Arrow Opacity"
-                  min={0.0}
-                  max={1.0}
-                  step={0.01}
-                  value={config.probabilityCurrentOpacity ?? 0.7}
-                  onChange={setProbabilityCurrentOpacity}
-                  showValue
-                  data-testid="schroedinger-probability-current-opacity"
-                />
-              )}
-
-              {(config.probabilityCurrentStyle === 'surfaceLIC' ||
-                config.probabilityCurrentStyle === 'streamlines') && (
-                <>
-                  <Slider
-                    label="Line Density"
-                    min={1.0}
-                    max={64.0}
-                    step={0.5}
-                    value={config.probabilityCurrentLineDensity ?? 8.0}
-                    onChange={setProbabilityCurrentLineDensity}
-                    showValue
-                    data-testid="schroedinger-probability-current-line-density"
-                  />
-                  <Slider
-                    label="Integration Step"
-                    min={0.005}
-                    max={0.2}
-                    step={0.005}
-                    value={config.probabilityCurrentStepSize ?? 0.04}
-                    onChange={setProbabilityCurrentStepSize}
-                    showValue
-                    data-testid="schroedinger-probability-current-step-size"
-                  />
-                  <Slider
-                    label="Integration Steps"
-                    min={4}
-                    max={64}
-                    step={1}
-                    value={config.probabilityCurrentSteps ?? 20}
-                    onChange={setProbabilityCurrentSteps}
-                    showValue
-                    data-testid="schroedinger-probability-current-steps"
-                  />
-                </>
-              )}
-            </div>
-          )}
-        </div>
       </ControlGroup>
 
       {/* Artistic - Chromatic Dispersion & Erosion */}

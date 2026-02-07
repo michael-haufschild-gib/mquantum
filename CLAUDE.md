@@ -3,7 +3,7 @@
 This is a scientific research project for my PhD thesis. Students will use this project to study **quantum physics simulations in N dimensions** - specifically Schroedinger wavefunctions including harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions). It is very important for my work and my career, we have to do it in steps, carefully, without mistakes and rush. Avoid hallucinations. Don't jump into coding without first researching. Don't patch bugs reactively. Use WebSearch extensively. Understand the purpose of code before changing it.
 
 ## RENDERING: WEBGPU ONLY
-This project uses a **custom WebGPU renderer** - there is no WebGL, no Three.js rendering path. All GPU shaders are written in **WGSL** (not GLSL). The rendering pipeline is a declarative render graph built on raw `GPUDevice` / `GPUCommandEncoder` APIs.
+This project uses a **custom WebGPU renderer** built on raw `GPUDevice` / `GPUCommandEncoder` APIs. All GPU shaders are written in **WGSL**. The rendering pipeline is a declarative render graph with automatic pass ordering via topological sort.
 
 ## QUANTUM PHYSICS SCOPE
 The project has a **single object type**: `ObjectType = 'schroedinger'`. There are no polytopes, fractals, black holes, or other geometric objects. All development should focus on expanding and improving the quantum physics simulation capabilities:
@@ -27,7 +27,7 @@ Read at the start of a new session:
 ## MANDATORY CODE STYLE AND ARCHITECTURE RULES
 Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
 
-**All GPU shaders MUST be written in WGSL.** This project does not use GLSL. Shaders are TypeScript files exporting template literal strings (`.wgsl.ts`) composed via `composeWGSL()`.
+**All GPU shaders MUST be written in WGSL.** Shaders are TypeScript files exporting template literal strings (`.wgsl.ts`) composed via `assembleShaderBlocks()`.
 
 **WGSL shader files**: `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
 
