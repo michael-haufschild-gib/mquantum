@@ -142,6 +142,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useDensityGrid?: boolean
   /** Whether the density grid texture has phase data (rgba16float vs r16float) */
   densityGridHasPhase?: boolean
+  /** Density grid resolution (e.g. 64 or 128) for gradient step size calculation */
+  densityGridSize?: number
   /** Quantum mode */
   quantumMode?: QuantumModeForShader
   /** Number of HO superposition terms (1-8) */
@@ -171,6 +173,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     temporalAccumulation: enableTemporal = false,
     useDensityGrid = false,
     densityGridHasPhase = false,
+    densityGridSize = 64,
     quantumMode = 'harmonicOscillator',
     termCount,
     nodal = true,
@@ -215,6 +218,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   } else {
     defines.push('const TEMPORAL_ENABLED: bool = false;')
   }
+
+  // Fragment shader always applies uncertainty emphasis per-pixel (not baked into grid)
+  defines.push('const SKIP_DENSITY_EMPHASIS: bool = false;')
 
   // Add quantum mode defines
   if (includeHydrogen) {
@@ -274,6 +280,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Phase data (logRho, spatialPhase) available only when rgba16float format is used.
   // r16float stores only rho in the R channel; G/B/A are 0.
   defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${densityGridHasPhase};`)
+  // Grid resolution for gradient central-difference step size
+  defines.push(`const DENSITY_GRID_SIZE: f32 = ${densityGridSize}.0;`)
   if (useDensityGrid) {
     features.push('Density Grid Raymarching')
   }

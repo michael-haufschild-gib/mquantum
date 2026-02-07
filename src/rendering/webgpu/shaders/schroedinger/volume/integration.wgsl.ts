@@ -1196,7 +1196,7 @@ fn volumeRaymarchGrid(
     // Returns (rho, logRho, spatialPhase, 0) for rgba16float
     // Returns (rho, 0, 0, 0) for r16float
     let gridSample = sampleDensityFromGrid(pos, uniforms);
-    let rho = gridSample.r;
+    var rho = gridSample.r;
 
     // Compute logRho: use grid value if available (rgba16float), else compute from rho
     var sCenter: f32;
@@ -1213,6 +1213,12 @@ fn volumeRaymarchGrid(
     } else {
       phase = 0.0;
     }
+
+    // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
+    rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
+    // Update logRho to reflect emphasis so emission color/brightness matches inline path
+    // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
+    sCenter = select(-20.0, log(rho), rho > 1e-9);
 
     // Skip near-zero density regions
     if (rho < EMPTY_SKIP_THRESHOLD) {

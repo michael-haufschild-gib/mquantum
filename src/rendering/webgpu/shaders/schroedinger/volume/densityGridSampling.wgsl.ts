@@ -88,11 +88,10 @@ fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
  * @return Gradient vector (drho/dx, drho/dy, drho/dz)
  */
 fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  // Step size: 1 texel in world space
-  // Grid covers [-bound, +bound] with gridSize texels, so texel size = 2*bound/gridSize.
-  // Use 2 texels for smoother gradient at the cost of slightly reduced sharpness.
+  // Step size: 2 texels in world space for smoother gradient
+  // Grid covers [-bound, +bound] with DENSITY_GRID_SIZE texels
   let bound = uniforms.boundingRadius;
-  let eps = bound * (2.0 / 64.0); // 2 texels in a 64^3 grid
+  let eps = bound * (2.0 / DENSITY_GRID_SIZE);
 
   let dx = vec3f(eps, 0.0, 0.0);
   let dy = vec3f(0.0, eps, 0.0);

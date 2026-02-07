@@ -67,6 +67,7 @@ import {
   gridParamsBlock,
   generateDensityGridBindingsBlock,
   densityGridComputeBlock,
+  densityGridWithPhaseComputeBlock,
 } from './densityGrid.wgsl'
 
 /** Quantum mode for compute shader */
@@ -155,6 +156,9 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   // Density modules reference FEATURE_INTERFERENCE; keep it defined in compute shaders.
   // Set to true so runtime uniform toggles still control the effect in compute mode.
   defines.push('const FEATURE_INTERFERENCE: bool = true;')
+  // Skip uncertainty boundary emphasis in compute: store raw density in the grid so
+  // the fragment shader can apply emphasis per-pixel (preserves sharp band at 64³).
+  defines.push('const SKIP_DENSITY_EMPHASIS: bool = true;')
 
   features.push('Density Grid Compute')
   features.push(`Grid Format: ${storageFormat}`)
@@ -272,7 +276,9 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
     // ===== COMPUTE SHADER ENTRY POINT =====
-    { name: 'Compute Main', content: densityGridComputeBlock },
+    // Use phase-aware compute block when rgba16float format is available
+    // (stores rho + logRho + spatialPhase vs rho-only for r16float)
+    { name: 'Compute Main', content: storageFormat === 'rgba16float' ? densityGridWithPhaseComputeBlock : densityGridComputeBlock },
   ]
 
   // Assemble shader

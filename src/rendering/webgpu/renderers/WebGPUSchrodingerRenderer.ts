@@ -304,11 +304,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? true
 
-    // Density grid raymarching: DISABLED pending visual quality investigation.
-    // The 64^3 grid produces enlarged/blurry results for high-n hydrogen states
-    // due to trilinear interpolation smoothing and r16float precision limits.
-    // TODO: Re-enable after grid path validation at higher resolution.
-    const useGridForHydrogen = false
+    // Density grid raymarching: enabled when eigencache toggle is on AND quantum mode is hydrogen.
+    // HO mode uses 1D eigencache (faster). Hydrogen uses 3D density grid (replaces expensive inline eval).
+    const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
+    const useGridForHydrogen = enableCache && isHydrogen
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
@@ -323,6 +322,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       interference: this.rendererConfig.interferenceEnabled ?? true,
       useEigenfunctionCache: enableCache,
       useDensityGrid: useGridForHydrogen,
+      densityGridSize: 64,
     }
   }
 
@@ -1018,14 +1018,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
       // Compute auto-compensation for canonical normalization
       this.canonicalDensityCompensation = this.computeCanonicalCompensation(preset, dimension)
+    }
 
-      // Compute physics-based bounding radius for this state
+    // Compute physics-based bounding radius for this state.
+    // Must run on EVERY full update (not just preset regen) because hydrogen n/l/m
+    // changes affect bounding radius but don't trigger HO preset regeneration.
+    if (this.cachedPreset) {
       const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
       const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
       const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
       const newBoundR = computeBoundingRadius(
         quantumModeStr,
-        preset,
+        this.cachedPreset,
         dimension,
         schroedinger?.principalQuantumNumber ?? 2,
         schroedinger?.bohrRadiusScale ?? 1.0,

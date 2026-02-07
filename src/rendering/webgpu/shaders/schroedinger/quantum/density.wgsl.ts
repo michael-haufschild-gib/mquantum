@@ -354,9 +354,13 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   let qPos = vec3f(xND[0], xND[1], xND[2]);
   rho = erodeDensity(rho, qPos, uniforms);
 
-  // Confidence-boundary emphasis around an iso-probability surface
-  let boundaryLogRho = sFromRho(rho);
-  rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
+  // Confidence-boundary emphasis around an iso-probability surface.
+  // Skipped in compute shaders (SKIP_DENSITY_EMPHASIS=true) so the density grid
+  // stores raw density; emphasis is applied per-pixel in the fragment raymarcher.
+  if (!SKIP_DENSITY_EMPHASIS) {
+    let boundaryLogRho = sFromRho(rho);
+    rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
+  }
 
   // Apply interference fringing if enabled
   if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
@@ -417,9 +421,11 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   let qPos = vec3f(xND[0], xND[1], xND[2]);
   rho = erodeDensity(rho, qPos, uniforms);
 
-  // Confidence-boundary emphasis around an iso-probability surface
-  let boundaryLogRho = sFromRho(rho);
-  rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
+  // Confidence-boundary emphasis (see sampleDensityWithPhase for details)
+  if (!SKIP_DENSITY_EMPHASIS) {
+    let boundaryLogRho = sFromRho(rho);
+    rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
+  }
 
   // Apply interference fringing if enabled
   if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
