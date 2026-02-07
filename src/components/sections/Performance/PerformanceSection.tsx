@@ -5,6 +5,7 @@
 
 import { Section } from '@/components/sections/Section'
 import React from 'react'
+import { EigenfunctionCacheControls } from './EigenfunctionCacheControls'
 import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'
 import { TemporalReprojectionControls } from './TemporalReprojectionControls'
 
@@ -32,6 +33,9 @@ export const PerformanceSection: React.FC<PerformanceSectionProps> = React.memo(
 
         {/* Temporal Reprojection */}
         <TemporalReprojectionControls />
+
+        {/* Eigenfunction Cache */}
+        <EigenfunctionCacheControls />
       </Section>
     )
   }

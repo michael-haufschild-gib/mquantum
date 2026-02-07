@@ -123,6 +123,8 @@ export interface SchrodingerRendererConfig {
   phaseMaterialityEnabled?: boolean
   /** Compile-time specialization flag for interference. */
   interferenceEnabled?: boolean
+  /** Whether eigenfunction caching is enabled (compile-time shader specialization). */
+  eigenfunctionCacheEnabled?: boolean
 }
 
 /**
@@ -149,9 +151,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private lightingBindGroup: GPUBindGroup | null = null
   private objectBindGroup: GPUBindGroup | null = null
 
-  // Density Grid Compute Pass (for uncertainty boundary threshold extraction)
+  // Density Grid Compute Pass (for uncertainty boundary threshold extraction + grid raymarching)
   private densityGridPass: DensityGridComputePass | null = null
   private densityGridInitialized = false
+  private densityGridSampler: GPUSampler | null = null
 
   // Eigenfunction Cache Compute Pass (HO mode acceleration)
   private eigenCachePass: EigenfunctionCacheComputePass | null = null
@@ -299,9 +302,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ...config,
     }
 
-    // Eigenfunction cache: always enabled. HO caches all dims, hydrogen ND caches extra dims,
-    // hydrogen 3D has 0 entries (harmless — compute pass short-circuits).
-    const enableCache = true
+    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? true
+
+    // Density grid raymarching: DISABLED pending visual quality investigation.
+    // The 64^3 grid produces enlarged/blurry results for high-n hydrogen states
+    // due to trilinear interpolation smoothing and r16float precision limits.
+    // TODO: Re-enable after grid path validation at higher resolution.
+    const useGridForHydrogen = false
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
@@ -315,6 +322,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
       useEigenfunctionCache: enableCache,
+      useDensityGrid: useGridForHydrogen,
     }
   }
 
@@ -371,6 +379,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.eigenCacheInitialized = true
     }
 
+    // Update density grid phase availability based on actual texture format
+    // r16float only stores rho (R channel); rgba16float stores rho, logRho, phase (R, G, B)
+    if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
+      this.shaderConfig.densityGridHasPhase = this.densityGridPass.getTextureFormat() === 'rgba16float'
+    }
+
     // Compose shaders
     const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
     const vertexShader = composeSchroedingerVertexShader()
@@ -412,6 +426,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       objectBindGroupEntries.push(
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' as const } }, // eigenCache
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // eigenMeta
+      )
+    }
+    // Density grid texture + sampler for grid-based hydrogen raymarching
+    if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
+      objectBindGroupEntries.push(
+        {
+          binding: 4,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
+        }, // densityGridTexture
+        {
+          binding: 5,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' as const },
+        }, // densityGridSampler
       )
     }
     const objectBindGroupLayout = device.createBindGroupLayout({
@@ -566,6 +595,22 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         objectBindGroupEntries2.push(
           { binding: 2, resource: { buffer: cacheBuffer } },
           { binding: 3, resource: { buffer: metaBuffer } },
+        )
+      }
+    }
+    // Density grid texture + sampler for grid-based hydrogen raymarching
+    if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
+      const densityView = this.densityGridPass.getDensityTextureView()
+      if (densityView) {
+        // Create trilinear-filtering sampler for smooth grid interpolation
+        this.densityGridSampler = device.createSampler({
+          label: 'density-grid-sampler',
+          magFilter: 'linear',
+          minFilter: 'linear',
+        })
+        objectBindGroupEntries2.push(
+          { binding: 4, resource: densityView },
+          { binding: 5, resource: this.densityGridSampler },
         )
       }
     }
@@ -1633,15 +1678,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // _reservedAoRadius: f32 (6)
     // _reservedAoIntensity: f32 (7)
     // qualityMultiplier: f32 (8)
-    // debugMode: i32 (9)
+    // _reservedDebug: i32 (9)
     // Use pre-allocated buffer to avoid per-frame GC pressure
     const data = this.qualityUniformData
 
     // Quality multiplier affects ray march quality
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
-    const debugMode = performance?.debugMode ?? 0
 
-    const qualitySignature = [qualityMultiplier.toFixed(4), debugMode].join('|')
+    const qualitySignature = qualityMultiplier.toFixed(4)
     if (qualitySignature === this.lastQualitySignature) {
       return
     }
@@ -1658,7 +1702,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.qualityDataView.setInt32(2 * 4, 0, true) // _reservedShadowQuality
     this.qualityDataView.setInt32(4 * 4, 0, true) // _reservedAoEnabled
     this.qualityDataView.setInt32(5 * 4, 0, true) // _reservedAoSamples
-    this.qualityDataView.setInt32(9 * 4, debugMode, true) // debugMode
+    this.qualityDataView.setInt32(9 * 4, 0, true) // _reservedDebug
 
     this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)
   }
@@ -1920,6 +1964,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.densityGridPass?.dispose()
     this.densityGridPass = null
     this.densityGridInitialized = false
+    this.densityGridSampler = null
 
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null

@@ -120,7 +120,13 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
       label: 'eigenfunction-cache-storage',
       size: cacheBufferSize,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
     })
+    // Zero-initialize: for hydrogen 3D (0 extra HO dims), the compute shader
+    // never dispatches, leaving the buffer with garbage VRAM. The buffer is still
+    // bound to the fragment shader at group 2, so ensure it contains zeros.
+    new Float32Array(this.cacheBuffer.getMappedRange()).fill(0)
+    this.cacheBuffer.unmap()
 
     // Compute params uniform buffer
     this.computeParamsBuffer = this.createUniformBuffer(

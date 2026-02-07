@@ -673,8 +673,10 @@ fn volumeRaymarch(
   var primaryHitT: f32 = -1.0;
   let primaryHitThreshold: f32 = 0.01; // Alpha threshold to consider a "hit"
 
-  // Sample count from uniforms (clamped to avoid division by zero)
-  let sampleCount = max(uniforms.sampleCount, 1);
+  // Sample count scaled by per-pixel path length to keep step SIZE constant.
+  // Glancing rays traverse less volume → fewer steps, same sampling density.
+  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
 
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
@@ -890,8 +892,9 @@ fn volumeRaymarchHQ(
   var primaryHitT: f32 = -1.0;
   let primaryHitThreshold: f32 = 0.01; // Alpha threshold to consider a "hit"
 
-  // Sample count from uniforms (clamped to avoid division by zero)
-  let sampleCount = max(uniforms.sampleCount, 1);
+  // Sample count scaled by per-pixel path length to keep step SIZE constant.
+  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
   let stepLen = (tFar - tNear) / f32(sampleCount);
   var t = tNear;
 
@@ -1133,6 +1136,199 @@ fn volumeRaymarchHQ(
   let finalAlpha = 1.0 - (transmittance.r + transmittance.g + transmittance.b) / 3.0;
 
   // If no primary hit found, use midpoint of ray segment
+  if (primaryHitT < 0.0) {
+    primaryHitT = (tNear + tFar) * 0.5;
+  }
+
+  return VolumeResult(accColor, finalAlpha, iterCount, primaryHitT);
+}
+`
+
+/**
+ * Grid-based volume raymarching function.
+ * Uses pre-computed 3D density grid texture instead of inline wavefunction evaluation.
+ * Same compositing logic as volumeRaymarch() but ~3-6x cheaper per step
+ * (texture lookup vs Laguerre + Legendre + spherical harmonics).
+ *
+ * Only used for hydrogen modes when eigenfunctionCacheEnabled.
+ */
+export const volumeRaymarchGridBlock = /* wgsl */ `
+// ============================================
+// Grid-Based Volume Raymarching
+// ============================================
+
+fn volumeRaymarchGrid(
+  rayOrigin: vec3f,
+  rayDir: vec3f,
+  tNear: f32,
+  tFar: f32,
+  uniforms: SchroedingerUniforms
+) -> VolumeResult {
+  var accColor = vec3f(0.0);
+  var iterCount: i32 = 0;
+  var primaryHitT: f32 = -1.0;
+  let primaryHitThreshold: f32 = 0.01;
+
+  // Sample count scaled by per-pixel path length to keep step SIZE constant
+  let maxPathLen = 2.0 * uniforms.boundingRadius;
+  let sampleCount = max(i32(f32(max(uniforms.sampleCount, 1)) * (tFar - tNear) / maxPathLen), 4);
+  let stepLen = (tFar - tNear) / f32(sampleCount);
+  var t = tNear;
+
+  let animTime = getVolumeTime(uniforms);
+  let viewDir = -rayDir;
+  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
+  var transmittance: f32 = 1.0;
+
+  for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
+    if (i >= sampleCount) { break; }
+    iterCount = i + 1;
+
+    if (transmittance < MIN_TRANSMITTANCE) { break; }
+    let remainingDistance = max(tFar - t, 0.0);
+    let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
+    let remainingContributionBound = transmittance * maxRemainingOpacity;
+    if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
+
+    let pos = rayOrigin + rayDir * t;
+
+    // Sample density from pre-computed 3D grid texture
+    // Returns (rho, logRho, spatialPhase, 0) for rgba16float
+    // Returns (rho, 0, 0, 0) for r16float
+    let gridSample = sampleDensityFromGrid(pos, uniforms);
+    let rho = gridSample.r;
+
+    // Compute logRho: use grid value if available (rgba16float), else compute from rho
+    var sCenter: f32;
+    if (DENSITY_GRID_HAS_PHASE) {
+      sCenter = gridSample.g; // logRho from grid
+    } else {
+      sCenter = select(-20.0, log(rho), rho > 1e-9);
+    }
+
+    // Phase: use grid value if available, else 0
+    var phase: f32;
+    if (DENSITY_GRID_HAS_PHASE) {
+      phase = gridSample.b; // spatialPhase from grid
+    } else {
+      phase = 0.0;
+    }
+
+    // Skip near-zero density regions
+    if (rho < EMPTY_SKIP_THRESHOLD) {
+      let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
+      if (skipDistance > stepLen) {
+        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms).r;
+        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms).r;
+        if (probeMid < EMPTY_SKIP_THRESHOLD && probeFar < EMPTY_SKIP_THRESHOLD) {
+          t += skipDistance;
+          continue;
+        }
+      }
+    }
+
+    // Adaptive step size based on density
+    var stepMultiplier = 1.0;
+    if (sCenter < -12.0) {
+      stepMultiplier = 4.0;
+    } else if (sCenter < -8.0) {
+      stepMultiplier = 2.0;
+    }
+    let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
+    // Nodal surface overlay (uses inline evaluation, not grid)
+    if (
+      FEATURE_NODAL &&
+      uniforms.nodalEnabled != 0u &&
+      uniforms.nodalStrength > 0.0 &&
+      uniforms.nodalRenderMode == NODAL_RENDER_MODE_BAND
+    ) {
+      let nodal = computePhysicalNodalField(pos, animTime, uniforms);
+      let fadedIntensity = nodal.intensity * nodal.envelopeWeight;
+      if (fadedIntensity > 1e-4) {
+        let nodalColor = selectPhysicalNodalColor(uniforms, nodal.colorMode, nodal.signValue);
+        let nodalOpticalStep = min(adaptiveStep, stepLen * 1.5);
+        let nodalAlpha = clamp(
+          1.0 - exp(-max(fadedIntensity * uniforms.nodalStrength, 0.0) * nodalOpticalStep),
+          0.0,
+          1.0
+        );
+        if (nodalAlpha > 1e-5) {
+          let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);
+          accColor += transmittance * nodalAlpha * nodalScattered;
+          transmittance *= (1.0 - nodalAlpha * 0.6);
+        }
+      }
+    }
+
+    // Probability current overlay
+    let momentumOverlaySubsample =
+      uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
+    if (
+      !momentumOverlaySubsample &&
+      uniforms.probabilityCurrentEnabled != 0u &&
+      uniforms.probabilityCurrentScale > 0.0
+    ) {
+      let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
+      let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
+      let currentOverlay = computeProbabilityCurrentOverlay(
+        pos,
+        currentSample,
+        rho,
+        normalProxy,
+        viewDir,
+        uniforms
+      );
+      if (currentOverlay.a > 1e-5) {
+        let overlayAlpha = clamp(
+          currentOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0),
+          0.0,
+          1.0
+        );
+        accColor += transmittance * overlayAlpha * currentOverlay.rgb;
+        transmittance *= (1.0 - overlayAlpha * 0.45);
+      }
+    }
+
+    // Phase materiality
+    var effectiveRho = rho;
+    if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
+      let pmPhase = fract((phase + PI) / TAU);
+      let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
+      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+    }
+    // Nodal plane softening
+    let cloudDepth = 1.0 - transmittance;
+    effectiveRho = max(effectiveRho, 5e-4 * cloudDepth * cloudDepth);
+    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
+
+    if (alpha > 0.001) {
+      if (primaryHitT < 0.0 && alpha > primaryHitThreshold) {
+        primaryHitT = t;
+      }
+
+      // Compute gradient from grid (central differences on texture)
+      let gradient = computeGradientFromGrid(pos, uniforms);
+
+      // Compute emission with lighting
+      let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+
+      // Front-to-back compositing
+      accColor += transmittance * alpha * emission;
+      transmittance *= (1.0 - alpha);
+    }
+
+    // Internal fog integration
+    let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
+    if (fogAlpha > 0.0001) {
+      accColor += transmittance * fogAlpha * fogColor;
+      transmittance *= (1.0 - fogAlpha);
+    }
+
+    t += adaptiveStep;
+  }
+
+  let finalAlpha = 1.0 - transmittance;
   if (primaryHitT < 0.0) {
     primaryHitT = (tNear + tFar) * 0.5;
   }

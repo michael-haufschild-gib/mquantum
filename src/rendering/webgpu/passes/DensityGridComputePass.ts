@@ -157,6 +157,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       dimension: '3d',
       usage:
         GPUTextureUsage.STORAGE_BINDING | // For compute shader write
+        GPUTextureUsage.TEXTURE_BINDING | // For fragment shader sampling (density grid raymarching)
         GPUTextureUsage.COPY_SRC | // For GPU->CPU readback (uncertainty threshold extraction)
         GPUTextureUsage.COPY_DST, // For potential debugging
     })
@@ -625,6 +626,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
   getTextureFormat(): 'r16float' | 'rgba16float' {
     return this.densityTextureFormat
+  }
+
+  getDensityTextureView(): GPUTextureView | null {
+    return this.densityTextureView
   }
 
   /**

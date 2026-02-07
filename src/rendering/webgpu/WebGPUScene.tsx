@@ -81,6 +81,7 @@ const environmentSelector = (state: ReturnType<typeof useEnvironmentStore.getSta
 const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getState>) => ({
   maxFps: state.maxFps,
   temporalReprojectionEnabled: state.temporalReprojectionEnabled,
+  eigenfunctionCacheEnabled: state.eigenfunctionCacheEnabled,
 })
 
 const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.getState>) => ({
@@ -290,6 +291,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
           interferenceEnabled: schroedingerCompile.interferenceEnabled,
           temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
+          eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
           colorAlgorithm: appearance.colorAlgorithm,
           // Skybox settings
           skyboxEnabled: environment.skyboxEnabled,
@@ -338,6 +340,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.phaseMaterialityEnabled,
     schroedingerCompile.interferenceEnabled,
     performance_.temporalReprojectionEnabled,
+    performance_.eigenfunctionCacheEnabled,
   ])
 
   // Update camera aspect ratio when canvas size changes
@@ -570,6 +573,7 @@ export interface PassConfig {
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
   temporalReprojectionEnabled: boolean
+  eigenfunctionCacheEnabled: boolean
   colorAlgorithm: PaletteColorAlgorithm
   // Skybox settings
   skyboxEnabled: boolean
@@ -977,6 +981,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         phaseMaterialityEnabled,
         interferenceEnabled,
         temporal: useTemporalCloudAccumulation,
+        eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
       })
 
     default:

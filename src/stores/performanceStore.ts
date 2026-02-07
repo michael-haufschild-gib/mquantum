@@ -190,6 +190,9 @@ interface PerformanceState {
   /** Whether camera has teleported (disables reprojection for 1 frame) */
   cameraTeleported: boolean
 
+  /** Whether eigenfunction caching is enabled (compile-time shader specialization) */
+  eigenfunctionCacheEnabled: boolean
+
   // -------------------------------------------------------------------------
   // Schroedinger Animation Quality
   // -------------------------------------------------------------------------
@@ -214,13 +217,6 @@ interface PerformanceState {
   // Shader Debugging
   shaderDebugInfos: Record<string, ShaderDebugInfo>
   shaderOverrides: string[]
-
-  // -------------------------------------------------------------------------
-  // GPU Profiler Debug Mode
-  // -------------------------------------------------------------------------
-
-  /** Debug visualization mode for GPU profiler (0=off, 1=iteration heatmap, 2=depth, 3=normals) */
-  debugMode: number
 
   // -------------------------------------------------------------------------
   // Shader Compilation State
@@ -258,6 +254,9 @@ interface PerformanceState {
   setTemporalReprojectionEnabled: (enabled: boolean) => void
   setCameraTeleported: (teleported: boolean) => void
 
+  // Eigenfunction Cache
+  setEigenfunctionCacheEnabled: (enabled: boolean) => void
+
   // Fractal Animation Quality
   setFractalAnimationLowQuality: (enabled: boolean) => void
 
@@ -271,9 +270,6 @@ interface PerformanceState {
   setShaderDebugInfo: (key: string, info: ShaderDebugInfo | null) => void
   toggleShaderModule: (moduleName: string) => void
   resetShaderOverrides: () => void
-
-  // GPU Profiler Debug Mode
-  setDebugMode: (mode: number) => void
 
   // Shader Compilation
   setShaderCompiling: (shaderName: string, compiling: boolean) => void
@@ -319,6 +315,9 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   temporalReprojectionEnabled: true,
   cameraTeleported: false,
 
+  // Eigenfunction Cache
+  eigenfunctionCacheEnabled: true,
+
   // Schroedinger Animation Quality
   fractalAnimationLowQuality: true,
 
@@ -331,9 +330,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Shader Debugging
   shaderDebugInfos: {},
   shaderOverrides: [],
-
-  // GPU Profiler Debug Mode (0=off, 1=iteration heatmap, 2=depth, 3=normals)
-  debugMode: 0,
 
   // Shader Compilation State
   compilingShaders: new Set<string>(),
@@ -416,6 +412,11 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ cameraTeleported: teleported })
   },
 
+  // Eigenfunction Cache
+  setEigenfunctionCacheEnabled: (enabled: boolean) => {
+    set({ eigenfunctionCacheEnabled: enabled })
+  },
+
   // Fractal Animation Quality
   setFractalAnimationLowQuality: (enabled: boolean) => {
     set({ fractalAnimationLowQuality: enabled })
@@ -464,11 +465,6 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ shaderOverrides: [] })
   },
 
-  // GPU Profiler Debug Mode
-  setDebugMode: (mode: number) => {
-    set({ debugMode: Math.max(0, Math.min(3, mode)) })
-  },
-
   // Shader Compilation
   setShaderCompiling: (shaderName: string, compiling: boolean) => {
     set((state) => {
@@ -509,12 +505,12 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       qualityMultiplier: 1.0,
       temporalReprojectionEnabled: true,
       cameraTeleported: false,
+      eigenfunctionCacheEnabled: true,
       fractalAnimationLowQuality: true,
       renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
       maxFps: DEFAULT_MAX_FPS,
       shaderDebugInfos: {},
       shaderOverrides: [],
-      debugMode: 0,
       compilingShaders: new Set<string>(),
       isShaderCompiling: false,
       shaderCompilationMessage: '',

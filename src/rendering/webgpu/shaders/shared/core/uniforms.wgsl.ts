@@ -172,8 +172,7 @@ struct QualityUniforms {
   // Global quality multiplier (for fast mode)
   qualityMultiplier: f32,
 
-  // Debug visualization mode (0=off, 1=iteration heatmap, 2=depth, 3=normals)
-  debugMode: i32,
+  _reservedDebug: i32,
 }
 
 // ============================================

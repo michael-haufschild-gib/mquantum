@@ -19,7 +19,7 @@ function createMockCtx() {
         stores: {
           appearance: { appearanceVersion: 0 },
           pbr: { pbrVersion: 0 },
-          performance: { qualityMultiplier: 1, debugMode: 0 },
+          performance: { qualityMultiplier: 1 },
           extended: { schroedinger: {} },
           animation: { accumulatedTime: 0 },
           geometry: { dimension: 3 },

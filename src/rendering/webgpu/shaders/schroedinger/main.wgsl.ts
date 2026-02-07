@@ -65,24 +65,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
   }
 
-  // Debug Mode 1: Iteration Heatmap
-  // Shows green→yellow→red gradient based on iteration count
-  // Green = few iterations (efficient), Red = many iterations (expensive)
-  if (quality.debugMode == 1) {
-    let maxIter = f32(schroedinger.sampleCount);
-    let iterT = f32(volumeResult.iterationCount) / max(maxIter, 1.0);
-    // Heatmap: green (low) → yellow (mid) → red (high)
-    var heatmap: vec3f;
-    heatmap.r = smoothstep(0.0, 0.5, iterT);           // R: ramps up in first half
-    heatmap.g = 1.0 - smoothstep(0.5, 1.0, iterT);     // G: stays high, drops in second half
-    heatmap.b = 0.0;                                    // B: always 0
-    // For low alpha (nearly transparent), show slightly darker
-    if (volumeResult.alpha < 0.5) {
-      heatmap *= 0.5 + 0.5 * volumeResult.alpha;
-    }
-    return vec4f(heatmap, 1.0);
-  }
-
   var finalColor = volumeResult.color;
   var finalAlpha = volumeResult.alpha;
 
@@ -250,24 +232,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 
   ${raymarchCall}
 
-  // Debug Mode 1: Iteration Heatmap
-  // Shows green→yellow→red gradient based on iteration count
-  // Green = few iterations (efficient), Red = many iterations (expensive)
-  if (quality.debugMode == 1) {
-    let maxIter = f32(schroedinger.sampleCount);
-    let iterT = f32(volumeResult.iterationCount) / max(maxIter, 1.0);
-    // Heatmap: green (low) → yellow (mid) → red (high)
-    var heatmap: vec3f;
-    heatmap.r = smoothstep(0.0, 0.5, iterT);           // R: ramps up in first half
-    heatmap.g = 1.0 - smoothstep(0.5, 1.0, iterT);     // G: stays high, drops in second half
-    heatmap.b = 0.0;                                    // B: always 0
-    // For low alpha (nearly transparent), show slightly darker
-    if (volumeResult.alpha < 0.5) {
-      heatmap *= 0.5 + 0.5 * volumeResult.alpha;
-    }
-    return vec4f(heatmap, 1.0);
-  }
-
   var finalColor = volumeResult.color;
   var finalAlpha = volumeResult.alpha;
 
@@ -414,53 +378,95 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   // Iteration counter for debug visualization
   var iterCount: i32 = 0;
 
-  for (var i = 0; i < 128; i++) {
-    if (i >= maxSteps) { break; }
-    if (t > tFar) { break; }
-    iterCount = i + 1;  // Track iteration count
+  if (USE_ANALYTICAL_GRADIENT) {
+    // Adaptive ray march: step size = |gap| / |ds/dt| along ray direction.
+    // Uses cheap sampleDensity per step (same cost as fixed-step march),
+    // with directional derivative estimated from consecutive samples.
+    // Converges faster near surfaces by taking smaller, precise steps;
+    // takes full stepLen steps in empty space (same as fixed-step).
+    let stMinStep = stepLen * 0.1;    // Floor: prevent stalling
+    let stDsDtFloor: f32 = 0.5;      // ds/dt floor: prevent huge steps when derivative ≈ 0
+    let stConvergeEps: f32 = 0.05;   // Convergence: accept hit when gap < this
 
-    let pos = ro + rd * t;
-    let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
-    let s = sFromRho(rho);
+    // Seed directional derivative with sample at ray entry
+    var prevS = sFromRho(sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain);
+    var prevT = tNear;
+    t = tNear + stMinStep;
 
-    if (s > threshold) {
-      // Binary search refinement
-      var tLo = t - stepLen;
-      var tHi = t;
-      for (var j = 0; j < 5; j++) {
-        let tMid = (tLo + tHi) * 0.5;
-        let midPos = ro + rd * tMid;
-        let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
-        if (midS > threshold) {
-          tHi = tMid;
-        } else {
-          tLo = tMid;
+    for (var i = 0; i < 128; i++) {
+      if (i >= maxSteps) { break; }
+      if (t > tFar) { break; }
+      iterCount = i + 1;
+
+      let pos = ro + rd * t;
+      let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
+      let s = sFromRho(rho);
+      let gap = s - threshold;
+
+      // Crossed threshold → binary search refinement
+      if (gap > 0.0) {
+        var tLo = prevT;
+        var tHi = t;
+        for (var j = 0; j < 5; j++) {
+          let tMid = (tLo + tHi) * 0.5;
+          let midPos = ro + rd * tMid;
+          let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
+          if (midS > threshold) {
+            tHi = tMid;
+          } else {
+            tLo = tMid;
+          }
         }
+        hitT = (tLo + tHi) * 0.5;
+        break;
       }
-      hitT = (tLo + tHi) * 0.5;
-      break;
-    }
 
-    t += stepLen;
-  }
+      // Converged close enough to surface → accept hit
+      if (gap > -stConvergeEps) {
+        hitT = t;
+        break;
+      }
 
-  // Debug Mode 1: Iteration Heatmap (isosurface mode)
-  // Shows green→yellow→red gradient based on iteration count
-  if (quality.debugMode == 1) {
-    let maxIter = f32(maxSteps);
-    let iterT = f32(iterCount) / max(maxIter, 1.0);
-    // Heatmap: green (low) → yellow (mid) → red (high)
-    var heatmap: vec3f;
-    heatmap.r = smoothstep(0.0, 0.5, iterT);           // R: ramps up in first half
-    heatmap.g = 1.0 - smoothstep(0.5, 1.0, iterT);     // G: stays high, drops in second half
-    heatmap.b = 0.0;                                    // B: always 0
-    // For misses, show slightly darker
-    if (hitT < 0.0) {
-      heatmap *= 0.7;
+      // Directional derivative along ray: ds/dt from consecutive samples
+      let dt = t - prevT;
+      let dsDt = (s - prevS) / max(dt, 1e-6);
+      let stStep = clamp(abs(gap) / max(abs(dsDt), stDsDtFloor), stMinStep, stepLen);
+
+      prevS = s;
+      prevT = t;
+      t += stStep;
     }
-    output.color = vec4f(heatmap, 1.0);
-    output.normal = vec4f(0.5, 0.5, 1.0, 0.0);  // Default up normal for debug
-    return output;
+  } else {
+    // Fixed-step march (Hydrogen modes — no analytical gradient available)
+    for (var i = 0; i < 128; i++) {
+      if (i >= maxSteps) { break; }
+      if (t > tFar) { break; }
+      iterCount = i + 1;
+
+      let pos = ro + rd * t;
+      let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
+      let s = sFromRho(rho);
+
+      if (s > threshold) {
+        // Binary search refinement
+        var tLo = t - stepLen;
+        var tHi = t;
+        for (var j = 0; j < 5; j++) {
+          let tMid = (tLo + tHi) * 0.5;
+          let midPos = ro + rd * tMid;
+          let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
+          if (midS > threshold) {
+            tHi = tMid;
+          } else {
+            tLo = tMid;
+          }
+        }
+        hitT = (tLo + tHi) * 0.5;
+        break;
+      }
+
+      t += stepLen;
+    }
   }
 
   let crossSection = evaluateCrossSectionSample(ro, rd, tNear, tFar, animTime, schroedinger);
@@ -904,22 +910,6 @@ ${bayerJitterSection}
   let fastMode = quality.qualityMultiplier < 0.75;
 
   ${raymarchCall}
-
-  // Debug Mode 1: Iteration Heatmap
-  if (quality.debugMode == 1) {
-    let maxIter = f32(schroedinger.sampleCount);
-    let iterT = f32(volumeResult.iterationCount) / max(maxIter, 1.0);
-    var heatmap: vec3f;
-    heatmap.r = smoothstep(0.0, 0.5, iterT);
-    heatmap.g = 1.0 - smoothstep(0.5, 1.0, iterT);
-    heatmap.b = 0.0;
-    if (volumeResult.alpha < 0.5) {
-      heatmap *= 0.5 + 0.5 * volumeResult.alpha;
-    }
-    output.color = vec4f(heatmap, 1.0);
-    output.worldPosition = vec4f(0.0, 0.0, 0.0, -1.0); // Invalid position for debug
-    return output;
-  }
 
   let crossSection = evaluateCrossSectionSample(
     ro,

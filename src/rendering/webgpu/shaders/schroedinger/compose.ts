@@ -118,8 +118,12 @@ import {
 // Volume blocks
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
+import {
+  generateDensityGridFragmentBindings,
+  densityGridSamplingBlock,
+} from './volume/densityGridSampling.wgsl'
 import { emissionBlock } from './volume/emission.wgsl'
-import { volumeGradientBlock, volumeIntegrationBlock } from './volume/integration.wgsl'
+import { volumeGradientBlock, volumeIntegrationBlock, volumeRaymarchGridBlock } from './volume/integration.wgsl'
 
 import type { ColorAlgorithm } from '../types'
 
@@ -136,6 +140,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   temporalAccumulation?: boolean
   /** Use density-grid sampling for volumetric raymarching */
   useDensityGrid?: boolean
+  /** Whether the density grid texture has phase data (rgba16float vs r16float) */
+  densityGridHasPhase?: boolean
   /** Quantum mode */
   quantumMode?: QuantumModeForShader
   /** Number of HO superposition terms (1-8) */
@@ -164,6 +170,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isosurface = false,
     temporalAccumulation: enableTemporal = false,
     useDensityGrid = false,
+    densityGridHasPhase = false,
     quantumMode = 'harmonicOscillator',
     termCount,
     nodal = true,
@@ -262,6 +269,15 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
   defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
 
+  // Density grid defines: use 3D texture for hydrogen raymarching
+  defines.push(`const USE_DENSITY_GRID: bool = ${useDensityGrid};`)
+  // Phase data (logRho, spatialPhase) available only when rgba16float format is used.
+  // r16float stores only rho in the R channel; G/B/A are 0.
+  defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${densityGridHasPhase};`)
+  if (useDensityGrid) {
+    features.push('Density Grid Raymarching')
+  }
+
   // Select main block based on mode
   // Temporal volumetric mode outputs MRT (color + world position)
   const selectedMainBlock = isosurface
@@ -336,7 +352,8 @@ struct VertexOutput {
         generateObjectBindGroup(2, 'SchroedingerUniforms', 'schroedinger', 0) +
         '\n' +
         generateObjectBindGroup(2, 'BasisVectors', 'basis', 1) +
-        (useCache ? '\n' + eigenfunctionCacheBindingsBlock : ''),
+        (useCache ? '\n' + eigenfunctionCacheBindingsBlock : '') +
+        (useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : ''),
     },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
@@ -464,10 +481,39 @@ struct VertexOutput {
     // Only *called* when USE_ANALYTICAL_GRADIENT is true (pure HO mode).
     {
       name: 'Analytical Gradient',
-      content: generateAnalyticalGradientBlock(actualDim, termCount),
-      condition: useCache,
+      content: useCache
+        ? generateAnalyticalGradientBlock(actualDim, termCount)
+        : [
+            '// Stubs: analytical gradient unavailable without eigenfunction cache',
+            '// These functions are referenced behind if (USE_ANALYTICAL_GRADIENT) guards',
+            '// but WGSL still requires symbol resolution in dead branches.',
+            'fn sampleDensityWithAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> TetraSample { return TetraSample(0.0, 0.0, 0.0, vec3f(0.0)); }',
+            'fn computeAnalyticalGradient(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+          ].join('\n'),
+    },
+    // Density grid sampling (texture lookup for grid-based raymarching)
+    {
+      name: 'Density Grid Sampling',
+      content: useDensityGrid
+        ? densityGridSamplingBlock
+        : [
+            '// Stubs: density grid sampling unavailable (inline wavefunction evaluation used)',
+            '// WGSL requires symbol resolution in dead branches even behind if (USE_DENSITY_GRID) guards.',
+            'fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
+            'fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
+          ].join('\n'),
     },
     { name: 'Volume Integration', content: volumeIntegrationBlock },
+    // Grid-based raymarching (uses density grid texture instead of inline evaluation)
+    {
+      name: 'Volume Raymarch Grid',
+      content: useDensityGrid
+        ? volumeRaymarchGridBlock
+        : [
+            '// Stub: grid raymarching unavailable',
+            'fn volumeRaymarchGrid(ro: vec3f, rd: vec3f, tNear: f32, tFar: f32, uniforms: SchroedingerUniforms) -> VolumeResult { return VolumeResult(vec3f(0.0), 0.0, 0, 0.0); }',
+          ].join('\n'),
+    },
 
     // ===== GEOMETRY =====
     { name: 'Sphere Intersection', content: sphereIntersectBlock },
