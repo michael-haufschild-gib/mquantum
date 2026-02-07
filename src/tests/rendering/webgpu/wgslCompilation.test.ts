@@ -491,6 +491,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     expect(modules).toContain('Eigenfunction Cache Lookup')
     expect(modules).toContain('Analytical Gradient')
     expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = true;')
     expect(wgsl).toContain('fn lookupEigenfunction(')
     expect(wgsl).toContain('fn ho1DCached(')
     expect(wgsl).toContain('fn sampleDensityWithAnalyticalGradient(')
@@ -533,19 +534,61 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     }
   })
 
-  it('does not include cache blocks for hydrogen mode', () => {
+  it('includes cache but not analytical gradient for hydrogen ND (4D+)', () => {
     const { wgsl, modules } = composeSchroedingerShader({
-      dimension: 4,
+      dimension: 5,
       temporal: false,
       sss: false,
       quantumMode: 'hydrogenND',
-      useEigenfunctionCache: true, // should be ignored for hydrogen
+      useEigenfunctionCache: true,
     })
 
     verifyWgsl(wgsl, true)
-    expect(modules).not.toContain('Eigenfunction Cache Lookup')
-    expect(modules).not.toContain('Analytical Gradient')
-    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = false;')
+    // Hydrogen ND 5D has extra dimensions → cache IS enabled for HO extra dims
+    expect(modules).toContain('Eigenfunction Cache Lookup')
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    // Analytical gradient function is included (WGSL needs symbol resolution) but NOT enabled
+    expect(modules).toContain('Analytical Gradient')
+    expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+    // Cached hydrogen ND variant should be present
+    expect(wgsl).toContain('evalHydrogenNDPsi5DCached')
+    expect(wgsl).toContain('ho1DCached')
+  })
+
+  it('includes cache bindings for hydrogen ND 3D (0 entries, harmless)', () => {
+    const { wgsl, modules } = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+      sss: false,
+      quantumMode: 'hydrogenND',
+      useEigenfunctionCache: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    // Cache is always enabled — 3D hydrogen has 0 entries but bindings are present
+    expect(modules).toContain('Eigenfunction Cache Lookup')
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    // No analytical gradient for hydrogen (3D core isn't HO)
+    expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+    // No cached variant — no extra dims to cache
+    expect(wgsl).not.toContain('evalHydrogenNDPsi3DCached')
+  })
+
+  it('composes hydrogen ND with cache across all higher dimensions', () => {
+    for (const dimension of [4, 6, 8, 11]) {
+      const { wgsl } = composeSchroedingerShader({
+        dimension,
+        temporal: false,
+        sss: false,
+        quantumMode: 'hydrogenND',
+        useEigenfunctionCache: true,
+      })
+
+      verifyWgsl(wgsl, true)
+      expect(wgsl).toContain(`evalHydrogenNDPsi${dimension}DCached`)
+      expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
+      expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+    }
   })
 
   it('composes isosurface mode with cache', () => {

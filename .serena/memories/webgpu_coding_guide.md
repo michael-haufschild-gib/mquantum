@@ -181,6 +181,40 @@ let fMeta = eigenMeta.funcMeta[funcIdx];
 
 ---
 
+### 7. WGSL Has No Preprocessor — Dead Branches Still Resolve Symbols
+
+**Problem**: WGSL validates ALL function calls, even inside `if (false)` branches with compile-time constant conditions. Unlike C/C++ `#if 0`, WGSL has no preprocessor to strip code. Every referenced function must be defined.
+
+**Error**: `unresolved call target 'computeAnalyticalGradient'`
+
+```wgsl
+// ❌ BAD - function not defined but referenced in dead branch
+const USE_FEATURE: bool = false;
+
+@fragment fn main() -> @location(0) vec4f {
+  if (USE_FEATURE) {
+    return myUndefinedFunction();  // ← WGSL ERROR even though branch is dead!
+  }
+  return vec4f(1.0);
+}
+
+// ✅ GOOD - always include function definition, even if never called
+fn myFeatureFunction() -> vec4f { return vec4f(0.0); }  // Stub or real impl
+
+const USE_FEATURE: bool = false;
+
+@fragment fn main() -> @location(0) vec4f {
+  if (USE_FEATURE) {
+    return myFeatureFunction();  // ← OK, symbol resolves
+  }
+  return vec4f(1.0);
+}
+```
+
+**Rule**: When using compile-time `const bool` flags to gate features, always include the function definitions in the shader. Control whether they're *called* via the constant, not whether they *exist*.
+
+---
+
 ## Shader Writing Checklist
 
 - [ ] All `textureSample` calls are in uniform control flow
@@ -188,8 +222,10 @@ let fMeta = eigenMeta.funcMeta[funcIdx];
 - [ ] Using at most 4 bind groups (0-3)
 - [ ] Entry point names match pipeline configuration
 - [ ] All referenced struct types are defined in the shader
+- [ ] All referenced functions are defined, even in dead `if (false)` branches
 - [ ] Fragment shaders don't declare bind groups they don't use
 - [ ] All GPU objects have descriptive `label` properties
+- [ ] No WGSL reserved keywords used as variable names (see §6)
 
 ---
 

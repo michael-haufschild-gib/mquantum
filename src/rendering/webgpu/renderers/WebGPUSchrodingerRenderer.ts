@@ -299,8 +299,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ...config,
     }
 
-    // Enable eigenfunction cache for HO mode (accelerates ho1D + gradient computation)
-    const isHO = (this.rendererConfig.quantumMode ?? 'harmonicOscillator') === 'harmonicOscillator'
+    // Eigenfunction cache: always enabled. HO caches all dims, hydrogen ND caches extra dims,
+    // hydrogen 3D has 0 entries (harmless — compute pass short-circuits).
+    const enableCache = true
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
@@ -313,7 +314,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       temporalAccumulation: this.rendererConfig.temporal,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
-      useEigenfunctionCache: isHO,
+      useEigenfunctionCache: enableCache,
     }
   }
 
@@ -356,7 +357,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     await this.densityGridPass.initialize(ctx)
     this.densityGridInitialized = true
 
-    // Eigenfunction cache compute pass (HO mode only)
+    // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null
     this.eigenCacheInitialized = false
@@ -364,6 +365,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (this.shaderConfig.useEigenfunctionCache) {
       this.eigenCachePass = new EigenfunctionCacheComputePass({
         dimension: this.rendererConfig.dimension ?? 3,
+        isHydrogenND: this.rendererConfig.quantumMode === 'hydrogenND',
       })
       await this.eigenCachePass.initialize(ctx)
       this.eigenCacheInitialized = true

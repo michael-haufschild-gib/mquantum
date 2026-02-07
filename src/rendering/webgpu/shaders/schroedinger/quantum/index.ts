@@ -104,6 +104,8 @@ export {
   hydrogenNDGen11dBlock,
   generateHydrogenNDDispatchBlock,
   getHydrogenNDBlockForDimension,
+  generateHydrogenNDCachedBlock,
+  generateHydrogenNDCachedDispatchBlock,
 } from './hydrogenNDVariants.wgsl'
 
 // Mode-switching wavefunction evaluation

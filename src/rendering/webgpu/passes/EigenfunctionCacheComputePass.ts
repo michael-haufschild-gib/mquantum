@@ -23,6 +23,10 @@ const OFFSET_TERM_COUNT = 4 // i32 at byte 4
 const OFFSET_OMEGA = 16 // array<vec4f, 3> at byte 16 (11 f32 values)
 const OFFSET_QUANTUM = 64 // array<vec4<i32>, 22> at byte 64 (88 i32 values)
 
+// Hydrogen ND extra dimension offsets
+const OFFSET_EXTRA_DIM_N = 608 // array<vec4<i32>, 2> at byte 608 (8 i32 values)
+const OFFSET_EXTRA_DIM_OMEGA = 640 // array<vec4f, 2> at byte 640 (8 f32 values)
+
 const MAX_TERMS = 8
 const MAX_DIM = 11
 
@@ -48,6 +52,8 @@ const FRAGMENT_META_SIZE = 16 + MAX_EIGEN_FUNCS * 16 + 22 * 16
 export interface EigenfunctionCacheConfig {
   /** Number of dimensions (3-11) */
   dimension: number
+  /** Whether this is hydrogen ND mode (only extra dims 3+ are HO) */
+  isHydrogenND?: boolean
 }
 
 /**
@@ -81,6 +87,9 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
   private fragmentMetaF32 = new Float32Array(this.fragmentMetaData)
   private fragmentMetaI32 = new Int32Array(this.fragmentMetaData)
 
+  // Mode config
+  private isHydrogenND: boolean
+
   // Dirty tracking
   private needsRecompute = true
   private lastSchroedingerVersion = -1
@@ -94,6 +103,7 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
       isCompute: true,
       workgroupSize: [WORKGROUP_SIZE, 1, 1],
     })
+    this.isHydrogenND = config.isHydrogenND ?? false
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
@@ -164,6 +174,10 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
 
   /**
    * Extract unique (n, ω) pairs from SchroedingerUniforms and build index map.
+   *
+   * For HO mode: caches all dimensions (0 to dimension-1) for all terms.
+   * For hydrogen ND: caches only extra dimensions (3 to dimension-1) for termIdx=0,
+   * reading from extraDimN/extraDimOmega uniform arrays.
    */
   private deduplicateFromUniforms(
     schroedingerData: ArrayBuffer,
@@ -172,35 +186,21 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
     const floatView = new Float32Array(schroedingerData)
     const intView = new Int32Array(schroedingerData)
 
-    const termCount = Math.min(Math.max(intView[OFFSET_TERM_COUNT / 4]!, 1), MAX_TERMS)
-
-    // Extract omega values
-    const omegaBase = OFFSET_OMEGA / 4
-    const omegas: number[] = []
-    for (let j = 0; j < dimension; j++) {
-      omegas.push(floatView[omegaBase + j]!)
-    }
-
-    // Extract quantum numbers
-    const quantumBase = OFFSET_QUANTUM / 4
-    const quantumNumbers: number[][] = [] // quantumNumbers[term][dim]
-    for (let k = 0; k < termCount; k++) {
-      const row: number[] = []
-      for (let j = 0; j < dimension; j++) {
-        row.push(intView[quantumBase + k * MAX_DIM + j]!)
-      }
-      quantumNumbers.push(row)
-    }
-
     // Deduplicate: find unique (n, ω) pairs
     const uniqueMap = new Map<string, number>() // key → unique index
     const uniqueParams: Array<{ n: number; omega: number }> = []
     const indexMap = new Int32Array(MAX_TERMS * MAX_DIM).fill(-1) // -1 = unused
 
-    for (let k = 0; k < termCount; k++) {
-      for (let j = 0; j < dimension; j++) {
-        const n = quantumNumbers[k]![j]!
-        const omega = omegas[j]!
+    if (this.isHydrogenND) {
+      // Hydrogen ND: only cache extra dimensions (3+) for single "term" at index 0
+      const extraDimCount = Math.max(dimension - 3, 0)
+      const extraDimNBase = OFFSET_EXTRA_DIM_N / 4
+      const extraDimOmegaBase = OFFSET_EXTRA_DIM_OMEGA / 4
+
+      for (let i = 0; i < extraDimCount; i++) {
+        const dimIdx = i + 3 // actual dimension index
+        const n = intView[extraDimNBase + i]!
+        const omega = floatView[extraDimOmegaBase + i]!
         const key = `${n}:${omega.toFixed(6)}`
 
         let uniqueIdx = uniqueMap.get(key)
@@ -210,7 +210,47 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
           uniqueParams.push({ n, omega })
         }
 
-        indexMap[k * MAX_DIM + j] = uniqueIdx
+        // Map (termIdx=0, dimIdx) to unique function index
+        indexMap[0 * MAX_DIM + dimIdx] = uniqueIdx
+      }
+      // Dims 0-2 remain -1 (hydrogen core, not cached)
+    } else {
+      // HO mode: cache all dimensions for all terms
+      const termCount = Math.min(Math.max(intView[OFFSET_TERM_COUNT / 4]!, 1), MAX_TERMS)
+
+      // Extract omega values
+      const omegaBase = OFFSET_OMEGA / 4
+      const omegas: number[] = []
+      for (let j = 0; j < dimension; j++) {
+        omegas.push(floatView[omegaBase + j]!)
+      }
+
+      // Extract quantum numbers
+      const quantumBase = OFFSET_QUANTUM / 4
+      const quantumNumbers: number[][] = []
+      for (let k = 0; k < termCount; k++) {
+        const row: number[] = []
+        for (let j = 0; j < dimension; j++) {
+          row.push(intView[quantumBase + k * MAX_DIM + j]!)
+        }
+        quantumNumbers.push(row)
+      }
+
+      for (let k = 0; k < termCount; k++) {
+        for (let j = 0; j < dimension; j++) {
+          const n = quantumNumbers[k]![j]!
+          const omega = omegas[j]!
+          const key = `${n}:${omega.toFixed(6)}`
+
+          let uniqueIdx = uniqueMap.get(key)
+          if (uniqueIdx === undefined) {
+            uniqueIdx = uniqueParams.length
+            uniqueMap.set(key, uniqueIdx)
+            uniqueParams.push({ n, omega })
+          }
+
+          indexMap[k * MAX_DIM + j] = uniqueIdx
+        }
       }
     }
 

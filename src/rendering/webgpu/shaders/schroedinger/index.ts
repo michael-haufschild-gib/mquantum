@@ -85,6 +85,9 @@ export {
   hydrogenNDGen11dBlock,
   generateHydrogenNDDispatchBlock,
   getHydrogenNDBlockForDimension,
+  // Hydrogen ND cached variants
+  generateHydrogenNDCachedBlock,
+  generateHydrogenNDCachedDispatchBlock,
   // Mode-switching wavefunction evaluation
   psiBlock,
   psiBlockDynamic,

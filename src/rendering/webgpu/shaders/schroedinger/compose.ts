@@ -96,6 +96,8 @@ import {
   hydrogenNDGen10dBlock,
   hydrogenNDGen11dBlock,
   generateHydrogenNDDispatchBlock,
+  generateHydrogenNDCachedBlock,
+  generateHydrogenNDCachedDispatchBlock,
 } from './quantum/hydrogenNDVariants.wgsl'
 
 // Eigenfunction cache blocks (for HO mode acceleration)
@@ -188,8 +190,11 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Determine if we should use unrolled HO superposition
   const useUnrolledHO = includeHarmonic && termCount !== undefined
 
-  // Eigenfunction cache: only for HO mode
-  const useCache = useEigenfunctionCache && includeHarmonic
+  // Eigenfunction cache: always enabled when requested.
+  // HO mode: caches all dimensions. Hydrogen ND: caches extra dims (4+). Hydrogen 3D: 0 entries (harmless).
+  const useCache = useEigenfunctionCache
+  // Analytical gradient: only for pure HO mode (all dimensions are HO eigenfunctions)
+  const useAnalyticalGradient = useCache && includeHarmonic
 
   // Add dimension define
   defines.push(`const DIMENSION: i32 = ${dimension};`)
@@ -225,13 +230,15 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     defines.push('const HO_UNROLLED: bool = false;')
   }
 
-  // Add eigenfunction cache define
+  // Add eigenfunction cache defines
   if (useCache) {
     defines.push('const USE_EIGENFUNCTION_CACHE: bool = true;')
     features.push('Eigenfunction Cache')
   } else {
     defines.push('const USE_EIGENFUNCTION_CACHE: bool = false;')
   }
+  // Analytical gradient: only for pure HO mode (hydrogen ND keeps tetrahedral for 3D core)
+  defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${useAnalyticalGradient};`)
 
   // Add quantum mode constant for runtime dispatch
   if (quantumMode === 'hydrogenND') {
@@ -361,6 +368,8 @@ struct VertexOutput {
     },
 
     // Hydrogen ND modules
+    // When cache is enabled, include BOTH non-cached block (for the base function)
+    // AND cached block (for the optimized dispatch that uses ho1DCached for extra dims)
     { name: 'Hydrogen ND Common', content: hydrogenNDCommonBlock, condition: includeHydrogenND },
     {
       name: `Hydrogen ND ${hydrogenNDDimension}D`,
@@ -368,8 +377,15 @@ struct VertexOutput {
       condition: includeHydrogenND && hydrogenNDBlock.length > 0,
     },
     {
+      name: `Hydrogen ND ${hydrogenNDDimension}D Cached`,
+      content: useCache ? generateHydrogenNDCachedBlock(hydrogenNDDimension) : '',
+      condition: includeHydrogenND && useCache && hydrogenNDDimension > 3,
+    },
+    {
       name: 'Hydrogen ND Dispatch',
-      content: generateHydrogenNDDispatchBlock(hydrogenNDDimension),
+      content: useCache && hydrogenNDDimension > 3
+        ? generateHydrogenNDCachedDispatchBlock(hydrogenNDDimension)
+        : generateHydrogenNDDispatchBlock(hydrogenNDDimension),
       condition: includeHydrogenND,
     },
 
@@ -444,6 +460,8 @@ struct VertexOutput {
     { name: 'Cross-Section Slice', content: crossSectionBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },
     // Analytical gradient from eigenfunction cache (replaces tetrahedral in integration loop)
+    // Always included when cache is present (WGSL requires symbol resolution even in dead branches).
+    // Only *called* when USE_ANALYTICAL_GRADIENT is true (pure HO mode).
     {
       name: 'Analytical Gradient',
       content: generateAnalyticalGradientBlock(actualDim, termCount),

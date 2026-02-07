@@ -205,6 +205,131 @@ fn hydrogenNDOptimized(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUnifor
 `
 }
 
+// ============================================
+// Cached Hydrogen ND Variants
+// Uses ho1DCached() for extra dimensions instead of ho1D()
+// ============================================
+
+/**
+ * Generate cached extra-dimension HO product (uses eigenfunction cache).
+ * Extra dims use (termIdx=0, dimIdx=i+3) for cache lookup.
+ * @param dimension
+ */
+function generateExtraDimProductCached(dimension: number): string {
+  const extraDimCount = dimension - 3
+  if (extraDimCount <= 0) {
+    return `
+  // No extra dimensions
+  let extraProduct = 1.0;
+`
+  }
+
+  // Generate cached ho1D lookups for each extra dimension
+  // Cache index map: (termIdx=0, dimIdx=3+i) for hydrogen ND extra dims
+  const hoCallsWithEarlyExit = Array.from({ length: extraDimCount }, (_, i) => {
+    const efVar = `ef${i}`
+    const coordVar = `x${i + 3}`
+    const dimIdx = i + 3
+    if (i === 0) {
+      return `  let ${efVar} = ho1DCached(getEigenFuncIdx(0, ${dimIdx}), ${coordVar});
+  if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
+    } else if (i === extraDimCount - 1) {
+      return `  let ${efVar} = ho1DCached(getEigenFuncIdx(0, ${dimIdx}), ${coordVar});`
+    } else {
+      return `  let ${efVar} = ho1DCached(getEigenFuncIdx(0, ${dimIdx}), ${coordVar});
+  if (abs(${efVar}) < 1e-10) { return vec2f(0.0, 0.0); }`
+    }
+  }).join('\n')
+
+  const productTerms = Array.from({ length: extraDimCount }, (_, i) => `ef${i}`).join(' * ')
+
+  return `
+  // Extra dimension factors (cached eigenfunction lookups)
+${hoCallsWithEarlyExit}
+  let extraProduct = ${productTerms};
+`
+}
+
+/**
+ * Generate a cached hydrogen ND function block.
+ * Identical to non-cached except extra dimensions use ho1DCached().
+ *
+ * @param dimension - The dimension (4-11; 3D has no extra dims so cache doesn't help)
+ * @returns WGSL function code
+ */
+export function generateHydrogenNDCachedBlock(dimension: number): string {
+  const extraDimCount = dimension - 3
+
+  const coordExtraction = generateCoordExtraction(dimension)
+  const extraDimEarlyExit = generateExtraDimEarlyExit(dimension)
+  const radiusCalc = generateRadiusCalculation(dimension)
+  const extraDimProduct = extraDimCount > 0
+    ? generateExtraDimProductCached(dimension)
+    : generateExtraDimProduct(dimension)
+
+  return `
+// ============================================
+// Hydrogen ND - ${dimension}D (Cached Extra Dimensions)
+// Extra dimensions: ${extraDimCount} (using eigenfunction cache)
+// Generated at JavaScript level for maximum optimization
+// ============================================
+
+fn evalHydrogenNDPsi${dimension}DCached(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  // Extract coordinates (unrolled)
+${coordExtraction}
+${extraDimEarlyExit}${radiusCalc}
+  // EARLY EXIT 2: Check hydrogen radial threshold
+  if (hydrogenRadialEarlyExit(r3D, uniforms)) {
+    return vec2f(0.0, 0.0);
+  }
+
+  // Spherical angles from first 3 dimensions
+  let angles = sphericalAngles3D(x0, x1, x2, r3D);
+  let theta = angles.x;
+  let phi = angles.y;
+
+  // Radial part: R_nl(r_3D) from the 3D hydrogen core
+  let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
+
+  // Angular part: Y_lm(theta, phi) from first 3 dims
+  let Y = evalHydrogenNDAngular(uniforms.azimuthalL, uniforms.magneticM, theta, phi, uniforms.useRealOrbitals != 0u);
+${extraDimProduct}
+  // Combine: psi = R * Y * extraProduct
+  let psiReal = R * Y * extraProduct;
+
+  // Time evolution
+  return hydrogenNDTimeEvolution(psiReal, uniforms.principalN, t);
+}
+`
+}
+
+/**
+ * Generate cached hydrogen ND dispatch block.
+ * When cache is active, routes to the cached variant.
+ *
+ * @param dimension - The dimension (3-11)
+ * @returns WGSL dispatch block code
+ */
+export function generateHydrogenNDCachedDispatchBlock(dimension: number): string {
+  const dim = Math.min(Math.max(dimension, 3), 11)
+  if (dim <= 3) {
+    // 3D hydrogen has no extra dimensions to cache, fall back to non-cached
+    return generateHydrogenNDDispatchBlock(dim)
+  }
+  return `
+// ============================================
+// Hydrogen ND - Cached Compile-time Dispatch
+// Dimension: ${dim} (extra dims use eigenfunction cache)
+// Generated at JavaScript level
+// ============================================
+
+// hydrogenNDOptimized: Direct call to cached dimension-specific variant
+fn hydrogenNDOptimized(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
+  return evalHydrogenNDPsi${dim}DCached(xND, t, uniforms);
+}
+`
+}
+
 // Pre-generate all dimension-specific blocks
 export const hydrogenNDGen3dBlock = generateHydrogenNDBlock(3)
 export const hydrogenNDGen4dBlock = generateHydrogenNDBlock(4)

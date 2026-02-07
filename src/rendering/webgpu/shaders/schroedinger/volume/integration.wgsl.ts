@@ -378,7 +378,7 @@ fn findNodalSurfaceHit(
 
       var normal = normalize(grad);
       if (length(grad) < 1e-5) {
-        if (USE_EIGENFUNCTION_CACHE) {
+        if (USE_ANALYTICAL_GRADIENT) {
           normal = normalize(computeAnalyticalGradient(hitPos, animTime, uniforms));
         } else {
           normal = normalize(computeGradientTetrahedral(hitPos, animTime, 0.02, uniforms));
@@ -829,7 +829,7 @@ fn volumeRaymarch(
       // When eigenfunction cache is available, use analytical gradient (no extra evaluations).
       // Otherwise, fall back to tetrahedral finite differences (4 samples, no erosion).
       var gradient: vec3f;
-      if (USE_EIGENFUNCTION_CACHE) {
+      if (USE_ANALYTICAL_GRADIENT) {
         gradient = computeAnalyticalGradient(pos, animTime, uniforms);
       } else {
         gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
@@ -980,7 +980,7 @@ fn volumeRaymarchHQ(
       sCenter = quickS;
       phase = quickCheck.z;
       gradient = vec3f(0.0);
-    } else if (USE_EIGENFUNCTION_CACHE) {
+    } else if (USE_ANALYTICAL_GRADIENT) {
       // Analytical gradient from cached eigenfunctions (1 eval vs 4 tetrahedral samples)
       let cached = sampleDensityWithAnalyticalGradient(pos, animTime, uniforms);
       rho = cached.rho;
