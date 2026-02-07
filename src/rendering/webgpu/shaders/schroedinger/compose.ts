@@ -157,6 +157,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   interference?: boolean
   /** Use 1D eigenfunction cache for HO mode (replaces inline ho1D + tetrahedral gradient). */
   useEigenfunctionCache?: boolean
+  /** Compile-time specialization for uncertainty boundary emphasis. */
+  uncertaintyBoundary?: boolean
 }
 
 /**
@@ -181,6 +183,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     dispersion = true,
     phaseMateriality = true,
     interference = true,
+    uncertaintyBoundary = true,
     colorAlgorithm,
     useEigenfunctionCache = false,
     overrides = [],
@@ -280,6 +283,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const FEATURE_DISPERSION: bool = ${dispersion};`)
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
   defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
+  defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${uncertaintyBoundary};`)
 
   // Density grid defines: use 3D texture for hydrogen raymarching
   defines.push(`const USE_DENSITY_GRID: bool = ${useDensityGrid};`)

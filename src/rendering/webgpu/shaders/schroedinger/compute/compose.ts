@@ -156,6 +156,9 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   // Density modules reference FEATURE_INTERFERENCE; keep it defined in compute shaders.
   // Set to true so runtime uniform toggles still control the effect in compute mode.
   defines.push('const FEATURE_INTERFERENCE: bool = true;')
+  // Density modules reference FEATURE_UNCERTAINTY_BOUNDARY; keep it defined in compute shaders.
+  // Set to false — compute stores raw density; fragment shader applies emphasis per-pixel.
+  defines.push('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
   // Skip uncertainty boundary emphasis in compute: store raw density in the grid so
   // the fragment shader can apply emphasis per-pixel (preserves sharp band at 64³).
   defines.push('const SKIP_DENSITY_EMPHASIS: bool = true;')
