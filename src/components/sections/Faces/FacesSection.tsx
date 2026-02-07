@@ -13,11 +13,10 @@ import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { Tabs } from '@/components/ui/Tabs'
-import { isRaymarchingFractal } from '@/lib/geometry/registry'
+import { ToggleButton } from '@/components/ui/ToggleButton'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore'
 import React, { useCallback, useMemo } from 'react'
@@ -56,20 +55,15 @@ type FacesTabId = 'colors' | 'material'
 export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOpen = false }) => {
   const [activeTab, setActiveTab] = React.useState<FacesTabId>('colors')
 
-  // Get object type and dimension to check rendering mode
-  const { objectType, dimension } = useGeometryStore(
-    useShallow((state) => ({
-      objectType: state.objectType,
-      dimension: state.dimension,
-    }))
-  )
-
-  // Raymarching objects (schroedinger) are always fully opaque
-  const isRaymarchingFractalType = isRaymarchingFractal(objectType, dimension)
-
-  // Check if isosurface mode is active (PBR material only applies to isosurface, not volumetric)
-  const isoEnabled = useExtendedObjectStore(
-    (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
+  // Isosurface mode controls (drives material tab availability and rendering mode)
+  const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
+    isoEnabled: state.schroedinger?.isoEnabled ?? false,
+    isoThreshold: state.schroedinger?.isoThreshold ?? -3,
+    setIsoEnabled: state.setSchroedingerIsoEnabled,
+    setIsoThreshold: state.setSchroedingerIsoThreshold,
+  }))
+  const { isoEnabled, isoThreshold, setIsoEnabled, setIsoThreshold } = useExtendedObjectStore(
+    schroedingerIsoSelector
   )
 
   // Appearance settings
@@ -220,6 +214,38 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   return (
     <Section title="Faces" defaultOpen={defaultOpen} data-testid="section-faces">
       <div className="transition-opacity duration-300">
+        <div className="mb-4 space-y-2 border-b border-border-subtle pb-4">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-text-secondary">Isosurface Mode</label>
+            <ToggleButton
+              pressed={isoEnabled}
+              onToggle={() => setIsoEnabled(!isoEnabled)}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle isosurface mode"
+              data-testid="schroedinger-iso-toggle"
+            >
+              {isoEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          {isoEnabled && (
+            <Slider
+              label="Iso Threshold (log)"
+              min={-6}
+              max={0}
+              step={0.1}
+              value={isoThreshold}
+              onChange={setIsoThreshold}
+              showValue
+              data-testid="schroedinger-iso-threshold"
+            />
+          )}
+          <p className="text-xs text-text-tertiary">
+            {isoEnabled
+              ? 'Sharp surface at constant probability density'
+              : 'Volumetric cloud visualization'}
+          </p>
+        </div>
+
         <Tabs
           tabs={tabs}
           value={activeTab}

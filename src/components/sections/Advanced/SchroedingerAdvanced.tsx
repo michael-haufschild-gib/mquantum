@@ -62,8 +62,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
     setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
-    setIsoEnabled: state.setSchroedingerIsoEnabled,
-    setIsoThreshold: state.setSchroedingerIsoThreshold,
     // Erosion
     setErosionStrength: state.setSchroedingerErosionStrength,
     setErosionScale: state.setSchroedingerErosionScale,
@@ -100,8 +98,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setUncertaintyBoundaryWidth,
     setPhaseMaterialityEnabled,
     setPhaseMaterialityStrength,
-    setIsoEnabled,
-    setIsoThreshold,
     setErosionStrength,
     setErosionScale,
     setErosionTurbulence,
@@ -199,36 +195,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             data-testid="schroedinger-anisotropy"
           />
         )}
-        {/* Isosurface Mode */}
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
-          <label className="text-xs text-text-secondary">Isosurface Mode</label>
-          <ToggleButton
-            pressed={config.isoEnabled}
-            onToggle={() => setIsoEnabled(!config.isoEnabled)}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle isosurface mode"
-            data-testid="schroedinger-iso-toggle"
-          >
-            {config.isoEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
-        </div>
-        {config.isoEnabled && (
-          <Slider
-            label="Iso Threshold (log)"
-            min={-6}
-            max={0}
-            step={0.1}
-            value={config.isoThreshold}
-            onChange={setIsoThreshold}
-            showValue
-            data-testid="schroedinger-iso-threshold"
-          />
-        )}
-        <p className="text-xs text-text-tertiary">
-          {config.isoEnabled
-            ? 'Sharp surface at constant probability density'
-            : 'Volumetric cloud visualization'}
-        </p>
       </ControlGroup>
 
       {/* Quantum Effects */}

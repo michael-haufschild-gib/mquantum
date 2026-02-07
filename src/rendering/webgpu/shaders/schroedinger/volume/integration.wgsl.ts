@@ -129,15 +129,24 @@ fn getVolumeTime(uniforms: SchroedingerUniforms) -> f32 {
 }
 
 /**
- * Apply density contrast sharpening via power-curve transfer function.
- * Normalizes density by peak, applies power curve, denormalizes.
- * Compresses low-density regions toward zero while preserving peaks,
- * creating sharper visual lobe boundaries in volumetric rendering.
+ * Apply density contrast sharpening via smoothstep sigmoid transfer function.
+ * Uses smoothstep(0, width, normalized) where width = 1/contrast.
+ *
+ * Effect: mid-range densities are BOOSTED toward peak (lobes stay same size),
+ * while very low tail densities are suppressed to zero (kills blur/noise).
+ * This creates a sharper opaque→transparent transition at lobe boundaries
+ * without shrinking the visible lobe extent.
+ *
+ * contrast=1.0: bypass (linear)
+ * contrast=1.5: gentle sharpening (width=0.67, saturates above 67% of peak)
+ * contrast=2.0: moderate (width=0.50, saturates above 50% of peak)
+ * contrast=3.0: aggressive (width=0.33, saturates above 33% of peak)
  */
 fn applyDensityContrast(rho: f32, uniforms: SchroedingerUniforms) -> f32 {
   if (uniforms.densityContrast <= 1.0 || uniforms.peakDensity <= 0.0) { return rho; }
   let normalized = clamp(rho / uniforms.peakDensity, 0.0, 1.0);
-  return pow(normalized, uniforms.densityContrast) * uniforms.peakDensity;
+  let width = 1.0 / uniforms.densityContrast;
+  return smoothstep(0.0, width, normalized) * uniforms.peakDensity;
 }
 
 /**
