@@ -378,95 +378,62 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   // Iteration counter for debug visualization
   var iterCount: i32 = 0;
 
-  if (USE_ANALYTICAL_GRADIENT) {
-    // Adaptive ray march: step size = |gap| / |ds/dt| along ray direction.
-    // Uses cheap sampleDensity per step (same cost as fixed-step march),
-    // with directional derivative estimated from consecutive samples.
-    // Converges faster near surfaces by taking smaller, precise steps;
-    // takes full stepLen steps in empty space (same as fixed-step).
-    let stMinStep = stepLen * 0.1;    // Floor: prevent stalling
-    let stDsDtFloor: f32 = 0.5;      // ds/dt floor: prevent huge steps when derivative ≈ 0
-    let stConvergeEps: f32 = 0.05;   // Convergence: accept hit when gap < this
+  // Adaptive ray march: step size = |gap| / |ds/dt| along ray direction.
+  // Uses cheap sampleDensity per step (same cost as fixed-step march),
+  // with directional derivative estimated from consecutive samples.
+  // Converges faster near surfaces by taking smaller, precise steps;
+  // takes full stepLen steps in empty space (same as fixed-step).
+  let stMinStep = stepLen * 0.1;    // Floor: prevent stalling
+  let stDsDtFloor: f32 = 0.5;      // ds/dt floor: prevent huge steps when derivative ≈ 0
+  let stConvergeEps: f32 = 0.05;   // Convergence: accept hit when gap < this
 
-    // Seed directional derivative with sample at ray entry
-    var prevS = sFromRho(sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain);
-    var prevT = tNear;
-    t = tNear + stMinStep;
+  // Seed directional derivative with sample at ray entry
+  var prevS = sFromRho(sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain);
+  var prevT = tNear;
+  t = tNear + stMinStep;
 
-    for (var i = 0; i < 128; i++) {
-      if (i >= maxSteps) { break; }
-      if (t > tFar) { break; }
-      iterCount = i + 1;
+  for (var i = 0; i < 128; i++) {
+    if (i >= maxSteps) { break; }
+    if (t > tFar) { break; }
+    iterCount = i + 1;
 
-      let pos = ro + rd * t;
-      let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
-      let s = sFromRho(rho);
-      let gap = s - threshold;
+    let pos = ro + rd * t;
+    let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
+    let s = sFromRho(rho);
+    let gap = s - threshold;
 
-      // Crossed threshold → binary search refinement
-      if (gap > 0.0) {
-        var tLo = prevT;
-        var tHi = t;
-        for (var j = 0; j < 5; j++) {
-          let tMid = (tLo + tHi) * 0.5;
-          let midPos = ro + rd * tMid;
-          let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
-          if (midS > threshold) {
-            tHi = tMid;
-          } else {
-            tLo = tMid;
-          }
+    // Crossed threshold → binary search refinement
+    if (gap > 0.0) {
+      var tLo = prevT;
+      var tHi = t;
+      for (var j = 0; j < 5; j++) {
+        let tMid = (tLo + tHi) * 0.5;
+        let midPos = ro + rd * tMid;
+        let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
+        if (midS > threshold) {
+          tHi = tMid;
+        } else {
+          tLo = tMid;
         }
-        hitT = (tLo + tHi) * 0.5;
-        break;
       }
-
-      // Converged close enough to surface → accept hit
-      if (gap > -stConvergeEps) {
-        hitT = t;
-        break;
-      }
-
-      // Directional derivative along ray: ds/dt from consecutive samples
-      let dt = t - prevT;
-      let dsDt = (s - prevS) / max(dt, 1e-6);
-      let stStep = clamp(abs(gap) / max(abs(dsDt), stDsDtFloor), stMinStep, stepLen);
-
-      prevS = s;
-      prevT = t;
-      t += stStep;
+      hitT = (tLo + tHi) * 0.5;
+      break;
     }
-  } else {
-    // Fixed-step march (Hydrogen modes — no analytical gradient available)
-    for (var i = 0; i < 128; i++) {
-      if (i >= maxSteps) { break; }
-      if (t > tFar) { break; }
-      iterCount = i + 1;
 
-      let pos = ro + rd * t;
-      let rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
-      let s = sFromRho(rho);
-
-      if (s > threshold) {
-        // Binary search refinement
-        var tLo = t - stepLen;
-        var tHi = t;
-        for (var j = 0; j < 5; j++) {
-          let tMid = (tLo + tHi) * 0.5;
-          let midPos = ro + rd * tMid;
-          let midS = sFromRho(sampleDensity(midPos, animTime, schroedinger) * isoGain);
-          if (midS > threshold) {
-            tHi = tMid;
-          } else {
-            tLo = tMid;
-          }
-        }
-        hitT = (tLo + tHi) * 0.5;
-        break;
-      }
-
-      t += stepLen;
+    // Converged close enough to surface → accept hit
+    if (gap > -stConvergeEps) {
+      hitT = t;
+      break;
     }
+
+    // Directional derivative along ray: ds/dt from consecutive samples
+    let dt = t - prevT;
+    let dsDt = (s - prevS) / max(dt, 1e-6);
+    let stStep = clamp(abs(gap) / max(abs(dsDt), stDsDtFloor), stMinStep, stepLen);
+
+    prevS = s;
+    prevT = t;
+    t += stStep;
   }
 
   let crossSection = evaluateCrossSectionSample(ro, rd, tNear, tFar, animTime, schroedinger);
