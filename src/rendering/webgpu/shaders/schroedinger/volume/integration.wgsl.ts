@@ -689,10 +689,6 @@ fn volumeRaymarch(
   // Transmittance (scalar for non-dispersion path)
   var transmittance: f32 = 1.0;
 
-  // Consecutive low-density samples (for early exit)
-  var lowDensityCount: i32 = 0;
-  let allowEarlyExit = (uniforms.quantumMode == QUANTUM_MODE_HARMONIC);
-
   // PERF: Hoist loop-invariant bounding radius computation
   let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
   let boundR2Skip = boundR2 * 0.85;
@@ -725,16 +721,6 @@ fn volumeRaymarch(
     let rho = densityInfo.x;
     let sCenter = densityInfo.y;
     let phase = densityInfo.z;
-
-    // Early exit if density is consistently low (harmonic oscillator only)
-    if (allowEarlyExit && rho < MIN_DENSITY) {
-      lowDensityCount++;
-      if (lowDensityCount > 5) { break; }
-      t += stepLen;
-      continue;
-    } else {
-      lowDensityCount = 0;
-    }
 
     if (rho < EMPTY_SKIP_THRESHOLD) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));

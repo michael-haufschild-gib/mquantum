@@ -806,31 +806,36 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   /**
-   * Compute auto-compensation factor for canonical HO normalization.
+   * Compute peak-density-based auto-normalization for densityGain.
    *
-   * The canonical normalization (probability-normalized) produces peak densities
-   * ~30x lower than the old visual-damping normalization. This method computes
-   * the exact ratio between old and new for the dominant superposition term,
-   * so we can fold it into densityGain for equivalent visual brightness.
-   *
-   * ratio_per_dim = damp(n) / (alphaNorm * HO_NORM[n])
-   * compensation = product(ratio_per_dim^2) across dimensions
+   * Analytically computes the peak |ψ|² for the dominant superposition term,
+   * then returns a compensation factor that targets a specific per-step opacity
+   * (alpha ≈ 0.3) at peak density. This ensures the full density dynamic range
+   * maps to a useful opacity range regardless of quantum numbers, preventing
+   * opacity saturation that would hide internal structure in complex states.
    */
   private computeCanonicalCompensation(preset: QuantumPreset, dimension: number): number {
-    // HO_NORM[n] = 1/sqrt(2^n * n!) - must match ho1d.wgsl.ts
-    const HO_NORM = [
-      1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.051031036308, 0.0161374306092,
-      0.00465847495312,
+    // Physicists' Hermite polynomial coefficients H_n(u), stored as [u^0, u^1, ..., u^6]
+    const HERMITE_COEFFS: number[][] = [
+      [1],                                      // H_0
+      [0, 2],                                    // H_1
+      [-2, 0, 4],                                // H_2
+      [0, -12, 0, 8],                            // H_3
+      [12, 0, -48, 0, 16],                       // H_4
+      [0, 120, 0, -160, 0, 32],                  // H_5
+      [-120, 0, 720, 0, -480, 0, 64],            // H_6
     ]
-    const INV_PI = 1 / Math.PI
+    const FACTORIALS = [1, 1, 2, 6, 24, 120, 720]
 
     if (preset.termCount === 0) return 1.0
 
-    // Find the dominant term (largest |c_k|)
+    // Find the dominant term (largest |c_k|²)
     let dominantIdx = 0
     let maxCoeffMag = 0
     for (let k = 0; k < preset.termCount; k++) {
-      const [cRe, cIm] = preset.coefficients[k]
+      const coeff = preset.coefficients[k]
+      if (!coeff) continue
+      const [cRe, cIm] = coeff
       const mag = cRe * cRe + cIm * cIm
       if (mag > maxCoeffMag) {
         maxCoeffMag = mag
@@ -839,30 +844,52 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     const qn = preset.quantumNumbers[dominantIdx]
+    if (!qn) return 1.0
     const dim = Math.min(dimension, qn.length)
 
-    let ratioProduct = 1.0
+    // Compute peak |ψ|² = |c_dominant|² × ∏ᵢ peak_1D(nᵢ, ωᵢ)
+    // where peak_1D(n,ω) = √(ω/π) / (2ⁿ n!) × max_u[Hₙ²(u)·e^{-u²}]
+    let peakDensity = maxCoeffMag
     for (let j = 0; j < dim; j++) {
-      const n = qn[j]
-      if (n < 0 || n > 6) continue
+      const nRaw = qn[j]
+      if (nRaw == null) continue
+      const n = Math.max(0, Math.min(6, Math.round(nRaw)))
+      const omega = Math.max(preset.omega[j] ?? 1.0, 0.01)
+      const coeffs = HERMITE_COEFFS[n]
+      if (!coeffs) continue
 
-      const omega = preset.omega[j] ?? 1.0
-      const alpha = Math.sqrt(Math.max(omega, 0.01))
+      // Find max of Hₙ²(u)·e^{-u²} numerically over u ∈ [0, 5]
+      let maxHermiteSq = 0
+      for (let i = 0; i <= 500; i++) {
+        const u = (i / 500) * 5.0
+        let hn = 0
+        for (let k = coeffs.length - 1; k >= 0; k--) {
+          hn = hn * u + (coeffs[k] ?? 0)
+        }
+        const val = hn * hn * Math.exp(-u * u)
+        if (val > maxHermiteSq) maxHermiteSq = val
+      }
 
-      // Canonical normalization factor: (α²/π)^{1/4} = (ω/π)^{1/4}
-      const alphaNorm = Math.sqrt(Math.sqrt(alpha * alpha * INV_PI))
-      const norm = HO_NORM[n]
-
-      // Old visual damping factor
-      const damp = 1.0 / (1.0 + 0.15 * n * n)
-
-      // Ratio: old / new (per dimension, for the wavefunction not density)
-      const ratio = damp / (alphaNorm * norm)
-      // Density is |psi|^2, so square the ratio
-      ratioProduct *= ratio * ratio
+      const factorial = FACTORIALS[n] ?? 1
+      const twoN_nFact = Math.pow(2, n) * factorial
+      const peak1D = Math.sqrt(omega / Math.PI) / twoN_nFact * maxHermiteSq
+      peakDensity *= peak1D
     }
 
-    return ratioProduct
+    if (peakDensity <= 0) return 1.0
+
+    // Target: at peak density with default densityGain=2.0, alpha per step ≈ 0.3
+    // alpha = 1 - exp(-densityGain * rho * stepLen)
+    // => densityGain = -ln(1 - target_alpha) / (peakRho * stepLen)
+    const TARGET_ALPHA = 0.3
+    const DEFAULT_DENSITY_GAIN = 2.0
+    const TYPICAL_SAMPLES = 64
+    const estimatedStepLen = (2 * this.boundingRadius) / TYPICAL_SAMPLES
+    const neededGain = -Math.log(1 - TARGET_ALPHA) / (peakDensity * estimatedStepLen)
+
+    // Return compensation so that: effective = userGain * compensation
+    // At default userGain=2.0: effective = 2.0 * (neededGain/2.0) = neededGain → alpha≈0.3 at peak
+    return neededGain / DEFAULT_DENSITY_GAIN
   }
 
   updateSchroedingerUniforms(ctx: WebGPURenderContext): void {
