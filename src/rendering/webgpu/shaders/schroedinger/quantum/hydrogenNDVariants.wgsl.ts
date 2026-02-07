@@ -161,16 +161,17 @@ ${extraDimEarlyExit}${radiusCalc}
     return vec2f(0.0, 0.0);
   }
 
-  // Spherical angles from first 3 dimensions
-  let angles = sphericalAngles3D(x0, x1, x2, r3D);
-  let theta = angles.x;
-  let phi = angles.y;
+  // PERF: Compute cos/sin(theta) directly from Cartesian coords — avoids acos + cos round-trip
+  let invR = 1.0 / max(r3D, 1e-10);
+  let cosTheta = x2 * invR;
+  let sinTheta = sqrt(max(x0 * x0 + x1 * x1, 0.0)) * invR;
+  let phi = atan2(x1, x0);
 
   // Radial part: R_nl(r_3D) from the 3D hydrogen core
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm(theta, phi) from first 3 dims
-  let Y = evalHydrogenNDAngular(uniforms.azimuthalL, uniforms.magneticM, theta, phi, uniforms.useRealOrbitals != 0u);
+  // Angular part: Y_lm from first 3 dims (using precomputed cos/sin theta)
+  let Y = evalHydrogenNDAngularDirect(uniforms.azimuthalL, uniforms.magneticM, cosTheta, sinTheta, phi, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
   // Combine: psi = R * Y * extraProduct
   let psiReal = R * Y * extraProduct;
@@ -283,16 +284,17 @@ ${extraDimEarlyExit}${radiusCalc}
     return vec2f(0.0, 0.0);
   }
 
-  // Spherical angles from first 3 dimensions
-  let angles = sphericalAngles3D(x0, x1, x2, r3D);
-  let theta = angles.x;
-  let phi = angles.y;
+  // PERF: Compute cos/sin(theta) directly — avoids acos + cos round-trip
+  let invR = 1.0 / max(r3D, 1e-10);
+  let cosTheta = x2 * invR;
+  let sinTheta = sqrt(max(x0 * x0 + x1 * x1, 0.0)) * invR;
+  let phi = atan2(x1, x0);
 
   // Radial part: R_nl(r_3D) from the 3D hydrogen core
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm(theta, phi) from first 3 dims
-  let Y = evalHydrogenNDAngular(uniforms.azimuthalL, uniforms.magneticM, theta, phi, uniforms.useRealOrbitals != 0u);
+  // Angular part: Y_lm from first 3 dims (using precomputed cos/sin theta)
+  let Y = evalHydrogenNDAngularDirect(uniforms.azimuthalL, uniforms.magneticM, cosTheta, sinTheta, phi, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
   // Combine: psi = R * Y * extraProduct
   let psiReal = R * Y * extraProduct;

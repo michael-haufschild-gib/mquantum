@@ -60,7 +60,12 @@ fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
     if (l <= 2) {
       return fastRealSphericalHarmonic(l, m, theta, phi);
     } else {
-      return realSphericalHarmonic(l, m, theta, phi, true);
+      // realSphericalHarmonic includes Condon-Shortley (-1)^|m| via legendre().
+      // The fast path (l <= 2) uses the chemistry convention WITHOUT CS phase.
+      // Undo CS phase for odd |m| so both paths use the same sign convention.
+      var Y = realSphericalHarmonic(l, m, theta, phi, true);
+      if ((abs(m) & 1) == 1) { Y = -Y; }
+      return Y;
     }
   } else {
     // Complex: |Y_lm| = K * |P|
@@ -68,6 +73,30 @@ fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
     // |K·P·e^{imφ}| = |K·P|·|e^{imφ}| = |K·P|·1
     let K = sphericalHarmonicNorm(l, m);
     let P = legendre(l, m, cos(theta));
+    return K * abs(P);
+  }
+}
+
+/**
+ * PERF: Evaluate angular part from pre-computed cos/sin theta.
+ * Eliminates acos + cos round-trip (~50 GPU cycles per sample).
+ * Used by the hot-path generated hydrogen ND variants.
+ */
+fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi: f32, useReal: bool) -> f32 {
+  if (useReal) {
+    if (l <= 2) {
+      return fastRealSphericalHarmonicDirect(l, m, cosTheta, sinTheta, phi);
+    } else {
+      // General path needs theta for Legendre recurrence
+      let theta = acos(clamp(cosTheta, -1.0, 1.0));
+      var Y = realSphericalHarmonic(l, m, theta, phi, true);
+      if ((abs(m) & 1) == 1) { Y = -Y; }
+      return Y;
+    }
+  } else {
+    // Complex: |Y_lm| = K * |P|
+    let K = sphericalHarmonicNorm(l, m);
+    let P = legendre(l, m, cosTheta);
     return K * abs(P);
   }
 }

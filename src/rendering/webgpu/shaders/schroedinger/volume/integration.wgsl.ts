@@ -817,6 +817,11 @@ fn volumeRaymarch(
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
       effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
+    // Nodal plane softening: when inside the cloud, apply a tiny density floor
+    // to fill the thin dark line artifact where |psi|^2 = 0 at nodal surfaces.
+    // Scales with cloud depth so edges and empty space are unaffected.
+    let cloudDepth = 1.0 - transmittance;
+    effectiveRho = max(effectiveRho, 5e-4 * cloudDepth * cloudDepth);
     let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
@@ -1085,8 +1090,12 @@ fn volumeRaymarchHQ(
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
       pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
+    // Nodal plane softening: same as fast path but using average transmittance.
+    let cloudDepthHQ = 1.0 - (transmittance.r + transmittance.g + transmittance.b) / 3.0;
+    let nodalFloorHQ = 5e-4 * cloudDepthHQ * cloudDepthHQ;
+    let softRhoRGB = max(rhoRGB, vec3f(nodalFloorHQ));
     // PERF: Vectorized alpha computation - single vec3 exp() instead of 3 scalar calls
-    let clampedRhoRGB = min(rhoRGB * pmDensityMod, vec3f(10.0));
+    let clampedRhoRGB = min(softRhoRGB * pmDensityMod, vec3f(10.0));
     let alphaExp = max(vec3f(-uniforms.densityGain) * clampedRhoRGB * adaptiveStep, vec3f(-20.0));
     let alpha = vec3f(1.0) - exp(alphaExp);
 

@@ -126,7 +126,15 @@ fn realSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
 fn fastRealSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> f32 {
   let ct = cos(theta);
   let st = sin(theta);
+  return fastRealSphericalHarmonicDirect(l, m, ct, st, phi);
+}
 
+/**
+ * PERF: Fast real spherical harmonic from pre-computed cos/sin theta.
+ * Eliminates redundant acos → cos round-trip in the hot path.
+ * cosTheta = z/r, sinTheta = sqrt(x²+y²)/r (precomputed by caller).
+ */
+fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -> f32 {
   // s orbital (l=0)
   if (l == 0) {
     // Y_00 = 1/(2√π)
@@ -176,7 +184,8 @@ fn fastRealSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> f32 {
     }
   }
 
-  // Fall back to general computation for l > 2
+  // Fall back to general computation for l > 2 (needs theta for Legendre)
+  let theta = acos(clamp(ct, -1.0, 1.0));
   return realSphericalHarmonic(l, m, theta, phi, true);
 }
 `
