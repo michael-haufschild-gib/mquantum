@@ -87,6 +87,7 @@ export const TRANSIENT_FIELDS = new Set([
   // Legacy appearance fields removed from render mode controls
   'edgesVisible',
   'facesVisible',
+  'faceOpacity',
 
   // Legacy Fresnel rim fields (removed — has no visible effect on volumetric rendering)
   'fresnelEnabled',
@@ -198,6 +199,14 @@ export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T)
   for (const field of TRANSIENT_FIELDS) {
     delete clean[field]
   }
+
+  // Legacy nested field removed from surface material settings.
+  const shaderSettings = clean.shaderSettings as Record<string, unknown> | undefined
+  const surfaceSettings = shaderSettings?.surface as Record<string, unknown> | undefined
+  if (surfaceSettings && typeof surfaceSettings === 'object' && 'faceOpacity' in surfaceSettings) {
+    delete surfaceSettings.faceOpacity
+  }
+
   return clean
 }
 

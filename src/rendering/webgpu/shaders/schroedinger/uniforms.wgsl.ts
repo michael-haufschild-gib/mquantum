@@ -296,6 +296,14 @@ struct SchroedingerUniforms {
   momentumDisplayMode: i32,     // 0=normalized, 1=k, 2=p
   momentumScale: f32,           // Reciprocal-space zoom factor
   momentumHbar: f32,            // Effective ħ for p=ħk display conversions
+
+  // Radial probability overlay (hydrogen P(r) shells)
+  radialProbabilityEnabled: u32,    // offset 1344
+  radialProbabilityOpacity: f32,    // offset 1348
+  radialProbabilityNorm: f32,       // offset 1352 (CPU-precomputed 1/max(P(r)))
+  _padRadialProb0: f32,             // offset 1356
+  radialProbabilityColor: vec3f,    // offset 1360 (16-byte aligned: 1360 % 16 = 0)
+  _padRadialProb1: f32,             // offset 1372
 }
 
 // ============================================

@@ -45,7 +45,6 @@
         "lchLightness": 0.7,
         "lchChroma": 0.15,
         "edgeThickness": 1.7,
-        "faceOpacity": 1,
         "tubeCaps": false,
         "faceEmission": 0,
         "faceEmissionThreshold": 0,
@@ -58,7 +57,6 @@
             "lineThickness": 1
           },
           "surface": {
-            "faceOpacity": 1,
             "specularIntensity": 0.8,
             "fresnelEnabled": true
           }
@@ -318,7 +316,6 @@
         "lchLightness": 0.7,
         "lchChroma": 0.15,
         "edgeThickness": 1,
-        "faceOpacity": 1,
         "tubeCaps": false,
         "faceEmission": 0.9,
         "faceEmissionThreshold": 0.15,
@@ -331,7 +328,6 @@
             "lineThickness": 1
           },
           "surface": {
-            "faceOpacity": 0.6,
             "specularIntensity": 0.8,
             "fresnelEnabled": false
           }
@@ -546,7 +542,6 @@
         "lchLightness": 0.7,
         "lchChroma": 0.15,
         "edgeThickness": 1.8,
-        "faceOpacity": 1,
         "tubeCaps": false,
         "faceEmission": 0,
         "faceEmissionThreshold": 0,
@@ -559,7 +554,6 @@
             "lineThickness": 1
           },
           "surface": {
-            "faceOpacity": 1,
             "specularIntensity": 0.8,
             "fresnelEnabled": false
           }

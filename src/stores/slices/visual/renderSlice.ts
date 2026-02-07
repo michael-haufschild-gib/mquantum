@@ -34,10 +34,6 @@ export const createRenderSlice: StateCreator<AppearanceSlice, [], [], RenderSlic
         surface: {
           ...state.shaderSettings.surface,
           ...settings,
-          faceOpacity:
-            settings.faceOpacity !== undefined
-              ? Math.max(0, Math.min(1, settings.faceOpacity))
-              : state.shaderSettings.surface.faceOpacity,
           specularIntensity:
             settings.specularIntensity !== undefined
               ? Math.max(0, Math.min(2, settings.specularIntensity))

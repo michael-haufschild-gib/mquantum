@@ -3,7 +3,7 @@
  *
  * Sidebar section for all face/surface settings organized in tabs:
  * - Colors: Color algorithm selection and configuration
- * - Material: Opacity, diffuse, and specular settings
+ * - Material: Diffuse and specular settings
  * - FX: Fresnel rim effects
  *
  */
@@ -71,8 +71,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     colorAlgorithm: state.colorAlgorithm,
     faceColor: state.faceColor,
     setFaceColor: state.setFaceColor,
-    shaderSettings: state.shaderSettings,
-    setSurfaceSettings: state.setSurfaceSettings,
     lchLightness: state.lchLightness,
     setLchLightness: state.setLchLightness,
     lchChroma: state.lchChroma,
@@ -83,8 +81,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     colorAlgorithm,
     faceColor,
     setFaceColor,
-    shaderSettings,
-    setSurfaceSettings,
     lchLightness,
     setLchLightness,
     lchChroma,
@@ -120,21 +116,12 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     setSpecularColor,
   } = usePBRStore(pbrSelector)
 
-  const surfaceSettings = shaderSettings.surface
-
   // Check if lighting controls should be shown
   const showLightingControls = shaderType === 'surface' && lightEnabled
 
   const handleTabChange = useCallback((id: string) => {
     setActiveTab(id as FacesTabId)
   }, [])
-
-  const handleFaceOpacityChange = useCallback(
-    (value: number) => {
-      setSurfaceSettings({ faceOpacity: value })
-    },
-    [setSurfaceSettings]
-  )
 
   // Material tab only available in isosurface mode (PBR has no effect on volumetric clouds)
   const showMaterialTab = isoEnabled
@@ -170,8 +157,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
               label: 'Material',
               content: (
                 <MaterialTabContent
-                  faceOpacity={surfaceSettings.faceOpacity}
-                  setFaceOpacity={handleFaceOpacityChange}
                   showLightingControls={showLightingControls}
                   specularColor={specularColor}
                   setSpecularColor={setSpecularColor}
@@ -181,7 +166,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
                   setRoughness={setRoughness}
                   metallic={metallic}
                   setMetallic={setMetallic}
-                  hideOpacity={false}
                 />
               ),
             },
@@ -197,8 +181,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
       lchChroma,
       setLchChroma,
       showMaterialTab,
-      surfaceSettings.faceOpacity,
-      handleFaceOpacityChange,
       showLightingControls,
       specularColor,
       setSpecularColor,
@@ -352,8 +334,6 @@ ColorsTabContent.displayName = 'ColorsTabContent'
 // =============================================================================
 
 interface MaterialTabContentProps {
-  faceOpacity: number
-  setFaceOpacity: (value: number) => void
   showLightingControls: boolean
   specularColor: string
   setSpecularColor: (color: string) => void
@@ -363,14 +343,10 @@ interface MaterialTabContentProps {
   setRoughness: (value: number) => void
   metallic: number
   setMetallic: (value: number) => void
-  // Hide opacity controls for raymarching fractals (always fully opaque)
-  hideOpacity?: boolean
 }
 
 const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
   ({
-    faceOpacity,
-    setFaceOpacity,
     showLightingControls,
     specularColor,
     setSpecularColor,
@@ -380,7 +356,6 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
     setRoughness,
     metallic,
     setMetallic,
-    hideOpacity = false,
   }) => {
     const handleResetSpecularColor = useCallback(() => {
       setSpecularColor(DEFAULT_FACE_PBR.specularColor)
@@ -388,20 +363,6 @@ const MaterialTabContent: React.FC<MaterialTabContentProps> = React.memo(
 
     return (
       <div className="space-y-4">
-        {/* Face Opacity - Hidden for raymarching fractals (always fully opaque) */}
-        {!hideOpacity && (
-          <Slider
-            label="Opacity"
-            min={0}
-            max={1}
-            step={0.1}
-            value={faceOpacity}
-            onChange={setFaceOpacity}
-            showValue
-            data-testid="slider-face-opacity"
-          />
-        )}
-
         {/* PBR Material - Only when lighting is enabled */}
         {showLightingControls && (
           <div>

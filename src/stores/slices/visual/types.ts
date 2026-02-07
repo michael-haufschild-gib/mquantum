@@ -53,14 +53,11 @@ export type ColorSlice = ColorSliceState & ColorSliceActions
 // ============================================================================
 
 /**
- * Material slice state - display and emission properties.
+ * Material slice state - emission properties.
  * NOTE: PBR properties (roughness, metallic, specularIntensity, specularColor)
  * have been moved to the dedicated pbrStore (usePBRStore).
  */
 export interface MaterialSliceState {
-  // Display properties
-  faceOpacity: number
-
   // Emission
   faceEmission: number
   faceEmissionThreshold: number
@@ -68,7 +65,6 @@ export interface MaterialSliceState {
 }
 
 export interface MaterialSliceActions {
-  setFaceOpacity: (opacity: number) => void
   setFaceEmission: (emission: number) => void
   setFaceEmissionThreshold: (threshold: number) => void
   setFaceEmissionColorShift: (shift: number) => void

@@ -125,6 +125,7 @@ import {
 } from './volume/densityGridSampling.wgsl'
 import { emissionBlock } from './volume/emission.wgsl'
 import { volumeGradientBlock, volumeIntegrationBlock, volumeRaymarchGridBlock } from './volume/integration.wgsl'
+import { radialProbabilityBlock, radialProbabilityStubBlock } from './volume/radialProbability.wgsl'
 
 import type { ColorAlgorithm } from '../types'
 
@@ -254,6 +255,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
   // Analytical gradient: only for pure HO mode (hydrogen ND keeps tetrahedral for 3D core)
   defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${useAnalyticalGradient};`)
+
+  // Radial probability overlay: compile-time guard (hydrogen only)
+  defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${includeHydrogen};`)
 
   // Add quantum mode constant for runtime dispatch
   if (quantumMode === 'hydrogenND') {
@@ -487,6 +491,7 @@ struct VertexOutput {
       content: emissionBlock,
     },
     { name: 'Cross-Section Slice', content: crossSectionBlock },
+    { name: 'Radial Probability Overlay', content: includeHydrogen ? radialProbabilityBlock : radialProbabilityStubBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },
     // Analytical gradient from eigenfunction cache (replaces tetrahedral in integration loop)
     // Always included when cache is present (WGSL requires symbol resolution even in dead branches).

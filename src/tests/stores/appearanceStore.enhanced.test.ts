@@ -49,19 +49,15 @@ describe('Enhanced Features Stores (invariants)', () => {
       }
     })
 
-    it('clamps surface faceOpacity to [0, 1] and specularIntensity to [0, 2]', () => {
+    it('clamps surface specularIntensity to [0, 2]', () => {
       useAppearanceStore.getState().setSurfaceSettings({
-        faceOpacity: 2,
         specularIntensity: 10,
       })
-      expect(useAppearanceStore.getState().shaderSettings.surface.faceOpacity).toBe(1)
       expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(2)
 
       useAppearanceStore.getState().setSurfaceSettings({
-        faceOpacity: -1,
         specularIntensity: -5,
       })
-      expect(useAppearanceStore.getState().shaderSettings.surface.faceOpacity).toBe(0)
       expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(0)
     })
 

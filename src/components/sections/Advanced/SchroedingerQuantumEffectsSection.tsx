@@ -334,6 +334,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
             />
           )}
         </div>
+
       </div>
     </Section>
   )

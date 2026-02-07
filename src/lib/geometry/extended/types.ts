@@ -482,6 +482,14 @@ export interface SchroedingerConfig {
   // === Phase Animation (Hydrogen ND only) ===
   /** Enable quantum phase evolution animation for Hydrogen ND mode */
   phaseAnimationEnabled: boolean
+
+  // === Radial Probability Overlay (hydrogen only) ===
+  /** Show P(r) = 4πr²|R_nl(r)|² as semi-transparent spherical shell overlay */
+  radialProbabilityEnabled: boolean
+  /** Overlay opacity [0,1] */
+  radialProbabilityOpacity: number
+  /** Shell color (CSS hex) */
+  radialProbabilityColor: string
 }
 
 /**
@@ -671,6 +679,11 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Phase Animation (Hydrogen ND only)
   phaseAnimationEnabled: false,
+
+  // Radial Probability Overlay (hydrogen only)
+  radialProbabilityEnabled: false,
+  radialProbabilityOpacity: 0.6,
+  radialProbabilityColor: '#44aaff',
 }
 
 // ============================================================================

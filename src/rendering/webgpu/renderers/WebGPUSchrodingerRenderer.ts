@@ -24,6 +24,7 @@ import {
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
 import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
+import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
@@ -37,7 +38,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1344
+const SCHROEDINGER_UNIFORM_SIZE = 1376
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -1463,6 +1464,20 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1336 / 4] = schroedinger?.momentumScale ?? 1.0
     floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
 
+    // Radial probability overlay (offset 1344-1376)
+    const radialProbEnabled = schroedinger?.radialProbabilityEnabled ?? false
+    intView[1344 / 4] = radialProbEnabled ? 1 : 0
+    floatView[1348 / 4] = schroedinger?.radialProbabilityOpacity ?? 0.6
+    floatView[1352 / 4] = (radialProbEnabled && quantumModeStr !== 'harmonicOscillator')
+      ? computeRadialProbabilityNorm(validN, validL, bohrRadius)
+      : 1.0
+    floatView[1356 / 4] = 0.0  // padding
+    const rpColor = this.parseColor(schroedinger?.radialProbabilityColor ?? '#44aaff')
+    floatView[1360 / 4] = rpColor[0]
+    floatView[1364 / 4] = rpColor[1]
+    floatView[1368 / 4] = rpColor[2]
+    floatView[1372 / 4] = 0.0  // padding
+
     // ============================================
     // HO MOMENTUM: CPU UNIFORM TRANSFORMATION
     // ============================================
@@ -1690,12 +1705,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const data = this.materialUniformData
     const dataView = this.materialDataView
 
-    // baseColor: vec4f (idx 0-3) - includes faceOpacity for alpha
+    // baseColor: vec4f (idx 0-3) - alpha is fixed to 1.0 (surface opacity control removed)
     const faceColor = this.parseColor(appearance?.faceColor ?? '#ffffff')
     data[0] = faceColor[0]
     data[1] = faceColor[1]
     data[2] = faceColor[2]
-    data[3] = appearance?.faceOpacity ?? 1.0
+    data[3] = 1.0
 
     // metallic, roughness, reflectance, ao (idx 4-7)
     data[4] = pbr?.face?.metallic ?? 0.0

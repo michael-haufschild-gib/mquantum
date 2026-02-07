@@ -64,6 +64,9 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
       setCrossSectionAutoWindow: state.setSchroedingerCrossSectionAutoWindow,
       setCrossSectionWindowMin: state.setSchroedingerCrossSectionWindowMin,
       setCrossSectionWindowMax: state.setSchroedingerCrossSectionWindowMax,
+      setRadialProbabilityEnabled: state.setSchroedingerRadialProbabilityEnabled,
+      setRadialProbabilityOpacity: state.setSchroedingerRadialProbabilityOpacity,
+      setRadialProbabilityColor: state.setSchroedingerRadialProbabilityColor,
     }))
     const {
       config,
@@ -80,6 +83,9 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
       setCrossSectionAutoWindow,
       setCrossSectionWindowMin,
       setCrossSectionWindowMax,
+      setRadialProbabilityEnabled,
+      setRadialProbabilityOpacity,
+      setRadialProbabilityColor,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     if (objectType !== 'schroedinger') {
@@ -266,6 +272,49 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
             </div>
           )}
         </div>
+
+        {config.quantumMode === 'hydrogenND' && (
+          <div className="space-y-1 mt-3 pt-3 border-t border-border-subtle">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-text-secondary">Radial Probability P(r)</label>
+              <ToggleButton
+                pressed={config.radialProbabilityEnabled ?? false}
+                onToggle={() => setRadialProbabilityEnabled(!(config.radialProbabilityEnabled ?? false))}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle radial probability overlay"
+                data-testid="schroedinger-radial-probability-toggle"
+              >
+                {config.radialProbabilityEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+            {config.radialProbabilityEnabled && (
+              <div className="ps-2 border-s border-border-default space-y-2">
+                <Slider
+                  label="Opacity"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={config.radialProbabilityOpacity ?? 0.6}
+                  onChange={setRadialProbabilityOpacity}
+                  showValue
+                  data-testid="schroedinger-radial-probability-opacity"
+                />
+                <div
+                  className="flex items-center justify-between"
+                  data-testid="schroedinger-radial-probability-color"
+                >
+                  <label className="text-xs text-text-secondary">Shell Color</label>
+                  <ColorPicker
+                    value={config.radialProbabilityColor ?? '#44aaff'}
+                    onChange={setRadialProbabilityColor}
+                    disableAlpha={true}
+                    className="w-24"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </Section>
     )
   })

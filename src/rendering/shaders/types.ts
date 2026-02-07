@@ -18,8 +18,6 @@ export interface WireframeSettings {
 
 /** Surface shader settings - filled faces with lighting */
 export interface SurfaceSettings {
-  /** Face opacity (0-1, 0 = wireframe, 1 = solid) */
-  faceOpacity: number
   /** Specular intensity multiplier (0-2) */
   specularIntensity: number
 }
@@ -125,5 +123,5 @@ export function isWireframeSettings(settings: ShaderSettings): settings is Wiref
  * @returns True if settings are SurfaceSettings
  */
 export function isSurfaceSettings(settings: ShaderSettings): settings is SurfaceSettings {
-  return 'faceOpacity' in settings && 'specularIntensity' in settings
+  return 'specularIntensity' in settings
 }

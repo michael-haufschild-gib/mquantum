@@ -552,6 +552,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerProbabilityFlowEnabled: valueSetter('probabilityFlowEnabled'),
     setSchroedingerProbabilityFlowSpeed: clampedSetter('probabilityFlowSpeed', 0.1, 5.0),
     setSchroedingerProbabilityFlowStrength: clampedSetter('probabilityFlowStrength', 0.0, 1.0),
+    // Radial Probability Overlay (hydrogen)
+    setSchroedingerRadialProbabilityEnabled: valueSetter('radialProbabilityEnabled'),
+    setSchroedingerRadialProbabilityOpacity: clampedSetter('radialProbabilityOpacity', 0.0, 1.0),
+    setSchroedingerRadialProbabilityColor: valueSetter('radialProbabilityColor'),
     setSchroedingerIsoEnabled: valueSetter('isoEnabled'),
     setSchroedingerIsoThreshold: clampedSetter('isoThreshold', -6, 0),
 

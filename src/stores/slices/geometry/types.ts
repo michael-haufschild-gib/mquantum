@@ -171,6 +171,11 @@ export interface SchroedingerSliceActions {
   setSchroedingerProbabilityFlowSpeed: (speed: number) => void
   setSchroedingerProbabilityFlowStrength: (strength: number) => void
 
+  // Radial Probability Overlay (hydrogen)
+  setSchroedingerRadialProbabilityEnabled: (enabled: boolean) => void
+  setSchroedingerRadialProbabilityOpacity: (opacity: number) => void
+  setSchroedingerRadialProbabilityColor: (color: string) => void
+
   // Isosurface Mode
   setSchroedingerIsoEnabled: (enabled: boolean) => void
   setSchroedingerIsoThreshold: (threshold: number) => void

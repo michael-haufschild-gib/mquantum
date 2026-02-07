@@ -819,6 +819,18 @@ fn volumeRaymarch(
       }
     }
 
+    // Radial probability overlay (hydrogen P(r) shells)
+    if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
+      let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
+      if (rProbOverlay.a > 1e-5) {
+        let rProbAlpha = clamp(
+          rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
+        );
+        accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
+        transmittance *= (1.0 - rProbAlpha * 0.5);
+      }
+    }
+
     // Density contrast sharpening: compress low-density tails for sharper lobes
     var effectiveRho = applyDensityContrast(rho, uniforms);
     // Phase materiality: smoke regions are denser (more absorbing)
@@ -1094,6 +1106,18 @@ fn volumeRaymarchHQ(
       }
     }
 
+    // Radial probability overlay (hydrogen P(r) shells)
+    if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
+      let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
+      if (rProbOverlay.a > 1e-5) {
+        let rProbAlpha = clamp(
+          rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
+        );
+        accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
+        transmittance *= vec3f(1.0 - rProbAlpha * 0.5);
+      }
+    }
+
     // Phase materiality: smoke regions are denser (more absorbing)
     var pmDensityMod = 1.0;
     if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
@@ -1307,6 +1331,18 @@ fn volumeRaymarchGrid(
         );
         accColor += transmittance * overlayAlpha * currentOverlay.rgb;
         transmittance *= (1.0 - overlayAlpha * 0.45);
+      }
+    }
+
+    // Radial probability overlay (hydrogen P(r) shells)
+    if (FEATURE_RADIAL_PROBABILITY && uniforms.radialProbabilityEnabled != 0u) {
+      let rProbOverlay = computeRadialProbabilityOverlay(pos, uniforms);
+      if (rProbOverlay.a > 1e-5) {
+        let rProbAlpha = clamp(
+          rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
+        );
+        accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
+        transmittance *= (1.0 - rProbAlpha * 0.5);
       }
     }
 
