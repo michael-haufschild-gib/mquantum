@@ -18,7 +18,7 @@ describe('Schroedinger cross-section slice settings', () => {
     expect(config.crossSectionPlaneOffset).toBe(0)
     expect(config.crossSectionOpacity).toBe(0.75)
     expect(config.crossSectionThickness).toBe(0.02)
-    expect(config.crossSectionColorMap).toBe('viridis')
+    expect(config.crossSectionPlaneColor).toBe('#66ccff')
     expect(config.crossSectionAutoWindow).toBe(true)
   })
 

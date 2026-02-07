@@ -112,6 +112,7 @@ import { sdfHighDBlock } from './sdf/sdf-high-d.wgsl'
 
 // Volume blocks
 import { absorptionBlock } from './volume/absorption.wgsl'
+import { crossSectionBlock } from './volume/crossSection.wgsl'
 import { emissionBlock } from './volume/emission.wgsl'
 import { volumeGradientBlock, volumeIntegrationBlock } from './volume/integration.wgsl'
 
@@ -425,6 +426,7 @@ struct VertexOutput {
       name: 'Volume Emission',
       content: emissionBlock,
     },
+    { name: 'Cross-Section Slice', content: crossSectionBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },
     { name: 'Volume Integration', content: volumeIntegrationBlock },
 

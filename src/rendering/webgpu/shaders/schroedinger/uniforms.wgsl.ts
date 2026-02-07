@@ -44,6 +44,15 @@ const NODAL_FAMILY_ANGULAR: i32 = 2;
 const NODAL_RENDER_MODE_BAND: i32 = 0;
 const NODAL_RENDER_MODE_SURFACE: i32 = 1;
 
+// Cross-section compositing constants
+const CROSS_SECTION_COMPOSITE_OVERLAY: i32 = 0;
+const CROSS_SECTION_COMPOSITE_SLICE_ONLY: i32 = 1;
+
+// Cross-section scalar constants
+const CROSS_SECTION_SCALAR_DENSITY: i32 = 0;
+const CROSS_SECTION_SCALAR_REAL: i32 = 1;
+const CROSS_SECTION_SCALAR_IMAG: i32 = 2;
+
 // WebGPU uniform buffers require 16-byte alignment for array elements.
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
@@ -236,6 +245,15 @@ struct SchroedingerUniforms {
   _nodalRenderPad0: i32,          // Reserved (kept for stable host buffer offsets)
   _nodalRenderPad1: f32,          // Reserved
   _nodalRenderPad2: f32,          // Reserved
+
+  // Cross-section slice controls
+  crossSectionEnabled: u32,       // Enable 2D cross-section plane
+  crossSectionCompositeMode: i32, // 0=overlay, 1=slice-only
+  crossSectionScalar: i32,        // 0=density, 1=Re(psi), 2=Im(psi)
+  crossSectionAutoWindow: u32,    // Auto-map scalar range
+  crossSectionPlane: vec4f,       // xyz=normal (unit), w=offset in normalized radius units
+  crossSectionWindow: vec4f,      // x=min, y=max, z=opacity, w=thickness
+  crossSectionPlaneColor: vec4f,  // rgb=tint, w=reserved
 }
 
 // ============================================

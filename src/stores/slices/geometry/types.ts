@@ -85,7 +85,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerEmissionIntensity: (intensity: number) => void
   setSchroedingerEmissionThreshold: (threshold: number) => void
   setSchroedingerEmissionColorShift: (shift: number) => void
-  setSchroedingerRimExponent: (exponent: number) => void
   setSchroedingerScatteringAnisotropy: (anisotropy: number) => void
   setSchroedingerRoughness: (roughness: number) => void
 
@@ -149,6 +148,25 @@ export interface SchroedingerSliceActions {
   // Isosurface Mode
   setSchroedingerIsoEnabled: (enabled: boolean) => void
   setSchroedingerIsoThreshold: (threshold: number) => void
+
+  // Cross-Section Slice
+  setSchroedingerCrossSectionEnabled: (enabled: boolean) => void
+  setSchroedingerCrossSectionCompositeMode: (
+    mode: SchroedingerConfig['crossSectionCompositeMode']
+  ) => void
+  setSchroedingerCrossSectionScalar: (scalar: SchroedingerConfig['crossSectionScalar']) => void
+  setSchroedingerCrossSectionPlaneMode: (
+    mode: SchroedingerConfig['crossSectionPlaneMode']
+  ) => void
+  setSchroedingerCrossSectionAxis: (axis: SchroedingerConfig['crossSectionAxis']) => void
+  setSchroedingerCrossSectionPlaneNormal: (normal: [number, number, number]) => void
+  setSchroedingerCrossSectionPlaneOffset: (offset: number) => void
+  setSchroedingerCrossSectionOpacity: (opacity: number) => void
+  setSchroedingerCrossSectionThickness: (thickness: number) => void
+  setSchroedingerCrossSectionPlaneColor: (color: string) => void
+  setSchroedingerCrossSectionAutoWindow: (enabled: boolean) => void
+  setSchroedingerCrossSectionWindowMin: (min: number) => void
+  setSchroedingerCrossSectionWindowMax: (max: number) => void
 
   // Slice Animation (4D+ only)
   setSchroedingerSliceAnimationEnabled: (enabled: boolean) => void

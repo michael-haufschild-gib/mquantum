@@ -119,6 +119,28 @@ export type SchroedingerNodalFamilyFilter = 'all' | 'radial' | 'angular'
 export type SchroedingerNodalRenderMode = 'band' | 'surface'
 
 /**
+ * Cross-section compositing mode.
+ * - overlay: blend slice over the current rendering mode
+ * - sliceOnly: render only the slice plane
+ */
+export type SchroedingerCrossSectionCompositeMode = 'overlay' | 'sliceOnly'
+
+/**
+ * Scalar source sampled on the cross-section plane.
+ */
+export type SchroedingerCrossSectionScalar = 'density' | 'real' | 'imag'
+
+/**
+ * Plane orientation mode for cross-section slicing.
+ */
+export type SchroedingerCrossSectionPlaneMode = 'axisAligned' | 'free'
+
+/**
+ * Axis preset for axis-aligned cross-section planes.
+ */
+export type SchroedingerCrossSectionAxis = 'x' | 'y' | 'z'
+
+/**
  * Named presets for Hydrogen ND mode (n-dimensional hydrogen orbitals)
  * Format: {orbital}_{dimension}d (e.g., '2pz_4d' = 2pz orbital in 4D)
  */
@@ -353,6 +375,34 @@ export interface SchroedingerConfig {
   /** Log-density threshold for isosurface (-6 to 0) */
   isoThreshold: number
 
+  // === 2D Cross-Section Slice ===
+  /** Enable 2D plane slice visualization of the current 3D projection */
+  crossSectionEnabled: boolean
+  /** Whether to overlay on volume/surface or render slice only */
+  crossSectionCompositeMode: SchroedingerCrossSectionCompositeMode
+  /** Scalar sampled on the plane: |psi|^2, Re(psi), or Im(psi) */
+  crossSectionScalar: SchroedingerCrossSectionScalar
+  /** Plane orientation mode (axis preset vs free normal vector) */
+  crossSectionPlaneMode: SchroedingerCrossSectionPlaneMode
+  /** Axis preset when crossSectionPlaneMode='axisAligned' */
+  crossSectionAxis: SchroedingerCrossSectionAxis
+  /** Unit normal vector for free-plane mode */
+  crossSectionPlaneNormal: [number, number, number]
+  /** Offset along plane normal in normalized object radius units (-1 to 1) */
+  crossSectionPlaneOffset: number
+  /** Slice alpha contribution (0.0-1.0) */
+  crossSectionOpacity: number
+  /** Slab half-thickness in normalized radius units (0.0-0.2) */
+  crossSectionThickness: number
+  /** Visual tint color for the slice plane surface */
+  crossSectionPlaneColor: string
+  /** Auto-scale scalar window based on scalar type */
+  crossSectionAutoWindow: boolean
+  /** Manual window minimum when auto-window is disabled */
+  crossSectionWindowMin: number
+  /** Manual window maximum when auto-window is disabled */
+  crossSectionWindowMax: number
+
   // === Slice Animation (4D+ only) ===
   /** Enable slice animation through extra dimensions */
   sliceAnimationEnabled: boolean
@@ -509,6 +559,21 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   // Isosurface (disabled by default)
   isoEnabled: false,
   isoThreshold: -0.76,
+
+  // 2D Cross-Section Slice
+  crossSectionEnabled: false,
+  crossSectionCompositeMode: 'overlay',
+  crossSectionScalar: 'density',
+  crossSectionPlaneMode: 'axisAligned',
+  crossSectionAxis: 'z',
+  crossSectionPlaneNormal: [0, 0, 1],
+  crossSectionPlaneOffset: 0.0,
+  crossSectionOpacity: 0.75,
+  crossSectionThickness: 0.02,
+  crossSectionPlaneColor: '#66ccff',
+  crossSectionAutoWindow: true,
+  crossSectionWindowMin: 0.0,
+  crossSectionWindowMax: 1.0,
 
   // Slice Animation
   sliceAnimationEnabled: false,

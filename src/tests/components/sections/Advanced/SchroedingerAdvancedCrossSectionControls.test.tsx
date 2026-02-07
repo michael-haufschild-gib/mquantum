@@ -65,4 +65,14 @@ describe('SchroedingerAdvanced cross-section controls', () => {
     expect(screen.getByTestId('schroedinger-cross-section-window-min')).toBeInTheDocument()
     expect(screen.getByTestId('schroedinger-cross-section-window-max')).toBeInTheDocument()
   })
+
+  it('shows plane color picker while Faces controls remain the scalar color source', () => {
+    render(<SchroedingerAdvanced />)
+    fireEvent.click(screen.getByTestId('schroedinger-cross-section-toggle'))
+
+    expect(screen.getByTestId('schroedinger-cross-section-plane-color')).toBeInTheDocument()
+    expect(
+      screen.getByText('Slice scalar colors use the active Faces color algorithm and palette settings.')
+    ).toBeInTheDocument()
+  })
 })
