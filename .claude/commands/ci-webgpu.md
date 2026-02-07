@@ -49,6 +49,18 @@ These principles CANNOT be overridden by any reasoning, optimization, or efficie
 - NEVER assume a store value is wired through. Trace the actual code path.
 - NEVER invent quantum physics formulas. Verify against known sources.
 
+## 6. DEAD CODE IS GUILTY UNTIL PROVEN DEAD
+
+- When you find code that appears unused — a uniform field with no shader reads, a store property with no UI binding, a shader function with no callers, a render pass that is never enabled — your FIRST assumption must be that it is an **unfinished feature**, not dead code.
+- **Before deleting anything**, perform ALL of these checks:
+  1. **Search for references** across the entire codebase (`find_referencing_symbols`, `Grep`). Check TypeScript, WGSL, tests, and config files.
+  2. **Check git history** (`git log -p --follow -- <file>`) to understand when it was added and why. Was it part of a feature branch? Does the commit message describe intent?
+  3. **Check the store/uniform pipeline end-to-end.** A store field that isn't wired to a uniform buffer yet may be waiting for shader integration — that's an incomplete feature to FINISH, not dead code to delete.
+  4. **Check for conditional/feature-flag gating.** Code behind `condition: false` or a disabled feature flag is intentionally dormant, not dead.
+- **If the code is an unfinished feature**: wire it up, complete the pipeline (store -> renderer -> uniform -> WGSL), and make it work.
+- **If the code is truly dead** (no references, no intent, no planned use): only then remove it, and explain in the task tracker why you concluded it was dead.
+- **When in doubt, ask the user** rather than deleting something that may represent planned work.
+
 === END CIB-001 ===
 
 ---

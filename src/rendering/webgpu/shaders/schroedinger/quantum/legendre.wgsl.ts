@@ -64,7 +64,8 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
   if (l == absM) { return pmm; }
 
   // Compute P^m_{m+1} = x(2m+1) P^m_m
-  var pmmp1 = xClamped * (2.0 * f32(absM) + 1.0) * pmm;
+  let fm = f32(absM);
+  var pmmp1 = xClamped * (2.0 * fm + 1.0) * pmm;
 
   // If l == |m| + 1, we're done
   if (l == absM + 1) { return pmmp1; }
@@ -75,7 +76,6 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
 
   for (var ll = absM + 2; ll <= min(l, MAX_LEGENDRE_L); ll++) {
     let fll = f32(ll);
-    let fm = f32(absM);
     pll = (xClamped * (2.0 * fll - 1.0) * pmmp1 - (fll + fm - 1.0) * pmm) / (fll - fm);
     pmm = pmmp1;
     pmmp1 = pll;
@@ -84,34 +84,4 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
   return pll;
 }
 
-/**
- * Compute P_l(x) - the regular Legendre polynomial (m=0 case)
- *
- * This is a simpler recurrence:
- *   P_0(x) = 1
- *   P_1(x) = x
- *   (l+1)P_{l+1}(x) = (2l+1)x P_l(x) - l P_{l-1}(x)
- *
- * @param l - Degree
- * @param x - Evaluation point
- * @return P_l(x)
- */
-fn legendreP(l: i32, x: f32) -> f32 {
-  if (l < 0) { return 0.0; }
-  if (l == 0) { return 1.0; }
-  if (l == 1) { return x; }
-
-  var P0 = 1.0;
-  var P1 = x;
-  var Pl = P1;
-
-  for (var i = 1; i < min(l, MAX_LEGENDRE_L); i++) {
-    let fi = f32(i);
-    Pl = ((2.0 * fi + 1.0) * x * P1 - fi * P0) / (fi + 1.0);
-    P0 = P1;
-    P1 = Pl;
-  }
-
-  return Pl;
-}
 `

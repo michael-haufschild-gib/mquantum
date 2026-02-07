@@ -33,8 +33,9 @@ fn hydrogenRadialEarlyExit(r: f32, uniforms: SchroedingerUniforms) -> bool {
 fn hydrogenRadialNorm(n: i32, l: i32, a0: f32) -> f32 {
   let nf = f32(n);
 
-  // (2/na₀)^{3/2}
-  let front = pow(2.0 / (nf * a0), 1.5);
+  // (2/na₀)^{3/2} — use x*sqrt(x) instead of pow(x,1.5) to avoid exp+log
+  let twoOverNa = 2.0 / (nf * a0);
+  let front = twoOverNa * sqrt(twoOverNa);
 
   // sqrt((n-l-1)! / (2n·(n+l)!))
   let nMinusLMinus1 = n - l - 1;
@@ -86,12 +87,10 @@ fn hydrogenRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
   let norm = hydrogenRadialNorm(n, l, a0Safe);
 
   // ρ^l factor (behavior near origin)
-  let fl = f32(l);
-  var rhoL: f32;
-  if (l == 0) {
-    rhoL = 1.0;
-  } else {
-    rhoL = pow(max(rho, 1e-10), fl);
+  // Use iterative multiplication instead of pow() to avoid exp+log transcendentals
+  var rhoL: f32 = 1.0;
+  for (var il = 0; il < l; il++) {
+    rhoL *= rho;
   }
 
   // Associated Laguerre polynomial L^{2l+1}_{n-l-1}(ρ)
@@ -102,39 +101,7 @@ fn hydrogenRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
   // Exponential decay: e^{-ρ/2} = e^{-r/(na₀)}
   let expPart = exp(-rho * 0.5);
 
-  // Damping for high n to prevent numerical blowup
-  let damp = 1.0 / (1.0 + 0.02 * f32(n * n));
-
-  return damp * norm * rhoL * L * expPart;
+  return norm * rhoL * L * expPart;
 }
 
-/**
- * Compute radial probability density r²|R_nl|²
- *
- * This is what's often plotted to show where electrons are likely
- * to be found. The r² factor accounts for the spherical volume element.
- */
-fn hydrogenRadialProbability(n: i32, l: i32, r: f32, a0: f32) -> f32 {
-  let R = hydrogenRadial(n, l, r, a0);
-  return r * r * R * R;
-}
-
-/**
- * Find approximate maximum of radial wavefunction
- *
- * Used for adaptive scaling in visualization.
- */
-fn hydrogenRadialMaxRadius(n: i32, l: i32, a0: f32) -> f32 {
-  let nf = f32(n);
-  let fl = f32(l);
-
-  if (l == 0) {
-    // s orbitals: max at r ≈ n·a₀
-    return nf * a0;
-  } else {
-    // General case: max near r = n·a₀·(1 + sqrt(1 - (l/n)²))
-    let ratio = fl / nf;
-    return nf * a0 * (1.0 + sqrt(max(0.0, 1.0 - ratio * ratio)));
-  }
-}
 `

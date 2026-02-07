@@ -69,21 +69,4 @@ fn laguerre(k: i32, alpha: f32, x: f32) -> f32 {
   return Lk;
 }
 
-/**
- * Evaluate associated Laguerre polynomial with damping for visualization
- *
- * High-degree polynomials can have large oscillations. This version
- * applies mild damping to keep values reasonable for volume rendering.
- *
- * @param k - Polynomial degree
- * @param alpha - Associated parameter
- * @param x - Evaluation point
- * @return Damped L^α_k(x)
- */
-fn laguerreDamped(k: i32, alpha: f32, x: f32) -> f32 {
-  let L = laguerre(k, alpha, x);
-  // Damping factor to reduce oscillation amplitude at high k
-  let damp = 1.0 / (1.0 + 0.05 * f32(k * k));
-  return damp * L;
-}
 `

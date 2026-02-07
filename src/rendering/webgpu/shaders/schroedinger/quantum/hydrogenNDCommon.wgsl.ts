@@ -35,11 +35,9 @@ fn sphericalAngles3D(x: f32, y: f32, z: f32, r3d: f32) -> vec2f {
   // theta = arccos(z/r)
   let theta = acos(clamp(z / r3d, -1.0, 1.0));
 
-  // phi = atan2(y, x)
-  var phi = atan2(y, x);
-  if (phi < 0.0) {
-    phi += 2.0 * PI;
-  }
+  // phi = atan2(y, x) — returns [-π, π], which is fine since
+  // downstream cos(m*phi) and sin(m*phi) are 2π-periodic
+  let phi = atan2(y, x);
 
   return vec2f(theta, phi);
 }
@@ -65,9 +63,12 @@ fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
       return realSphericalHarmonic(l, m, theta, phi, true);
     }
   } else {
-    // Complex: return magnitude
-    let Yc = sphericalHarmonic(l, m, theta, phi);
-    return length(Yc);
+    // Complex: |Y_lm| = K * |P|
+    // Skip trig (cos/sin of mφ) and sqrt — they cancel out since
+    // |K·P·e^{imφ}| = |K·P|·|e^{imφ}| = |K·P|·1
+    let K = sphericalHarmonicNorm(l, m);
+    let P = legendre(l, m, cos(theta));
+    return K * abs(P);
   }
 }
 

@@ -35,21 +35,6 @@ const FACTORIAL_LUT: array<f32, 13> = array<f32, 13>(
 );
 
 /**
- * Factorial function using lookup table (OPT-SH-1)
- * Falls back to loop for n > 12 (rare in practice for quantum viz)
- */
-fn factorial(n: i32) -> f32 {
-  if (n <= 1) { return 1.0; }
-  if (n <= 12) { return FACTORIAL_LUT[n]; }
-  // Fallback for large n (rarely needed)
-  var result = FACTORIAL_LUT[12];
-  for (var i = 13; i <= n; i++) {
-    result *= f32(i);
-  }
-  return result;
-}
-
-/**
  * Compute normalization constant K_l^m for spherical harmonics
  *
  * K_l^m = sqrt((2l+1)/(4π) · (l-|m|)!/(l+|m|)!)
@@ -174,20 +159,20 @@ fn fastRealSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> f32 {
       return norm * (3.0 * ct2 - 1.0);
     } else if (m == 1) {
       // dxz: ∝ sin(θ)cos(θ)cos(φ)
-      let norm = 0.77254840; // sqrt(15/(4*PI))
+      let norm = 1.09254843; // sqrt(15/(4*PI)) — includes √2 factor for real harmonics
       return norm * st * ct * cos(phi);
     } else if (m == -1) {
       // dyz: ∝ sin(θ)cos(θ)sin(φ)
-      let norm = 0.77254840;
+      let norm = 1.09254843;
       return norm * st * ct * sin(phi);
     } else if (m == 2) {
-      // dxy: ∝ sin²(θ)sin(2φ)
-      let norm = 0.54627422; // sqrt(15/(16*PI))
-      return norm * st2 * sin(2.0 * phi);
-    } else { // m == -2
       // dx2-y2: ∝ sin²(θ)cos(2φ)
-      let norm = 0.54627422;
+      let norm = 0.54627422; // sqrt(15/(16*PI))
       return norm * st2 * cos(2.0 * phi);
+    } else { // m == -2
+      // dxy: ∝ sin²(θ)sin(2φ)
+      let norm = 0.54627422;
+      return norm * st2 * sin(2.0 * phi);
     }
   }
 
