@@ -10,7 +10,6 @@ import {
   vectorToFloat64,
   float64ToVector,
   flattenVertices,
-  flattenEdges,
 } from '@/lib/wasm/animation-wasm'
 
 describe('animation-wasm helpers', () => {
@@ -149,37 +148,6 @@ describe('animation-wasm helpers', () => {
       const result = flattenVertices([[42]])
 
       expect(Array.from(result)).toEqual([42])
-    })
-  })
-
-  describe('flattenEdges', () => {
-    it('returns empty Uint32Array for empty input', () => {
-      const result = flattenEdges([])
-
-      expect(result).toBeInstanceOf(Uint32Array)
-      expect(result.length).toBe(0)
-    })
-
-    it('flattens single edge correctly', () => {
-      const result = flattenEdges([[0, 1]])
-
-      expect(Array.from(result)).toEqual([0, 1])
-    })
-
-    it('flattens multiple edges correctly', () => {
-      const result = flattenEdges([
-        [0, 1],
-        [1, 2],
-        [2, 0],
-      ])
-
-      expect(Array.from(result)).toEqual([0, 1, 1, 2, 2, 0])
-    })
-
-    it('handles large vertex indices', () => {
-      const result = flattenEdges([[1000, 2000]])
-
-      expect(Array.from(result)).toEqual([1000, 2000])
     })
   })
 })

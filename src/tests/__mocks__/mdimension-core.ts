@@ -71,23 +71,6 @@ export function project_vertices_wasm(
 }
 
 /**
- * Project edges mock
- * @param _flat_vertices - Flat vertex array
- * @param _dimension - Dimension
- * @param _flat_edges - Flat edge array
- * @param _projection_distance - Projection distance
- * @returns Empty array
- */
-export function project_edges_wasm(
-  _flat_vertices: Float64Array,
-  _dimension: number,
-  _flat_edges: Uint32Array,
-  _projection_distance: number
-): Float32Array {
-  return new Float32Array(0)
-}
-
-/**
  * Multiply matrix by vector mock
  * @param _matrix - Input matrix
  * @param _vector - Input vector

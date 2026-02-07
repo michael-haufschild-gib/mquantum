@@ -72,7 +72,6 @@ export {
   clipLine,
   DEFAULT_PROJECTION_DISTANCE,
   MIN_SAFE_DISTANCE,
-  projectEdgesToPositions,
   projectPerspective,
   projectVertices,
   projectVerticesToPositions,

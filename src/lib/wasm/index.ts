@@ -13,7 +13,6 @@ export {
   composeRotationsIndexedWasm,
   composeRotationsWasm,
   projectVerticesWasm,
-  projectEdgesWasm,
   multiplyMatrixVectorWasm,
   // Phase 2: Matrix and vector functions
   multiplyMatricesWasm,
@@ -24,5 +23,4 @@ export {
   // Data conversion helpers
   float64ToVector,
   flattenVertices,
-  flattenEdges,
 } from './animation-wasm'

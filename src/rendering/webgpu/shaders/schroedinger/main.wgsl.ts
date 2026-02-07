@@ -478,9 +478,11 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     discard;
   }
 
-  // Compute surface point and normal
+  // Compute surface point and normal (preserve gradient magnitude for uncertainty)
   let p = ro + rd * hitT;
-  let n = normalize(computeGradientTetrahedral(p, animTime, 0.01, schroedinger));
+  let rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+  let gradMag = length(rawGrad);
+  let n = rawGrad / max(gradMag, 1e-6);
 
   // Sample for color
   let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
@@ -491,18 +493,47 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let sSurface = sFromRho(rhoSurface);
   var surfaceColor = computeBaseColor(rhoSurface, sSurface, phase, p, schroedinger);
 
-  // Uncertainty boundary emphasis: brighten surface near confidence threshold
+  // Phase materiality: matter (plasma) vs anti-matter (smoke)
+  if (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) {
+    let phaseMod = fract((phase + PI) / TAU);
+    let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
+    let smokeWeight = 1.0 - plasmaWeight;
+    let pmStr = schroedinger.phaseMaterialityStrength;
+    let normalizedRho = clamp((sSurface + 8.0) / 8.0, 0.0, 1.0);
+    let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
+    let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
+    surfaceColor = mix(surfaceColor,
+      plasmaColor * plasmaWeight + smokeColor * smokeWeight,
+      pmStr);
+  }
+
+  // Interference fringing: modulate surface brightness by phase-band pattern
+  if (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u && schroedinger.interferenceAmp > 0.0) {
+    let iTime = schroedinger.time * schroedinger.interferenceSpeed;
+    let fringe = 1.0 + schroedinger.interferenceAmp * sin(phase * schroedinger.interferenceFreq + iTime);
+    surfaceColor *= max(fringe, 0.0);
+  }
+
+  // Uncertainty boundary: highlight proximity to the confidence iso-probability surface
+  // Estimates spatial distance from this surface point to the confidence contour:
+  //   spatialDist ≈ |log(ρ_surface) - log(ρ_confidence)| / |∇log(ρ)|
+  // Small distance → this part of the isosurface is near the confidence boundary → glow
   if (schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
     let ubWidth = max(schroedinger.uncertaintyBoundaryWidth, 1e-3);
-    let ubDist = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold) / ubWidth;
-    let ubBand = exp(-0.5 * ubDist * ubDist);
+    let logRhoDelta = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold);
+    let spatialDist = logRhoDelta / max(gradMag, 1e-6);
+    let ubBand = exp(-0.5 * (spatialDist / ubWidth) * (spatialDist / ubWidth));
     let ubGlow = ubBand * schroedinger.uncertaintyBoundaryStrength;
-    surfaceColor = mix(surfaceColor, surfaceColor * 1.8 + vec3f(0.05), ubGlow);
+    surfaceColor = mix(surfaceColor, surfaceColor * 2.0 + vec3f(0.1, 0.08, 0.15), ubGlow);
   }
 
   // Chromatic dispersion: per-channel color separation at surface
+  // Stronger at glancing angles (Fresnel-like chromatic aberration)
   if (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u && schroedinger.dispersionStrength > 0.0) {
-    let dispAmount = schroedinger.dispersionStrength * 0.15;
+    let NdotV = max(dot(n, -rd), 0.0);
+    let fresnelEdge = pow(1.0 - NdotV, 3.0);
+    let dispScale = schroedinger.dispersionStrength * schroedinger.boundingRadius * 0.08;
+    let dispAmount = dispScale * (0.3 + 0.7 * fresnelEdge);
     var dispDir: vec3f;
     if (schroedinger.dispersionDirection == 1) {
       // View-aligned
@@ -580,6 +611,28 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     let specular = computePBRSpecular(n, viewDir, l, roughness, F0);
     // Specular tint + intensity (matches WebGL uSpecularColor/uSpecularIntensity)
     col += specular * material.specularColor * light.color.rgb * NdotL * material.specularIntensity * attenuation;
+  }
+
+  // HDR Emission Glow
+  if (schroedinger.emissionIntensity > 0.0) {
+    let emNorm = clamp((sSurface + 8.0) / 8.0, 0.0, 1.0);
+    if (emNorm > schroedinger.emissionThreshold) {
+      var emFactor = (emNorm - schroedinger.emissionThreshold) / (1.0 - schroedinger.emissionThreshold);
+      emFactor = emFactor * emFactor;
+      var emColor = surfaceColor;
+      if (abs(schroedinger.emissionColorShift) > 0.01) {
+        var emHSL = rgb2hsl(emColor);
+        if (schroedinger.emissionColorShift > 0.0) {
+          emHSL.x = mix(emHSL.x, 0.08, schroedinger.emissionColorShift * 0.5);
+          emHSL.y = mix(emHSL.y, 1.0, schroedinger.emissionColorShift * 0.3);
+        } else {
+          emHSL.x = mix(emHSL.x, 0.6, -schroedinger.emissionColorShift * 0.5);
+          emHSL.z = mix(emHSL.z, 0.9, -schroedinger.emissionColorShift * 0.3);
+        }
+        emColor = hsl2rgb(emHSL.x, emHSL.y, emHSL.z);
+      }
+      col += emColor * schroedinger.emissionIntensity * emFactor;
+    }
   }
 
   // Iso-mode nodal consistency: band overlay + local ray-hit surface overlay.

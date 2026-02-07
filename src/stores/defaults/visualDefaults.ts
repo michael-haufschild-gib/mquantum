@@ -29,13 +29,9 @@ export const DEFAULT_BACKGROUND_COLOR = '#232323'
 export type BackgroundBlendMode = 'normal' | 'screen' | 'multiply' | 'overlay' | 'add'
 export const DEFAULT_BACKGROUND_BLEND_MODE: BackgroundBlendMode = 'normal'
 
-// Unified PBR properties (single value for all objects: faces, edges, fractals)
+// Unified PBR properties
 export const DEFAULT_ROUGHNESS = 0.3
 export const DEFAULT_METALLIC = 0.0
-
-// Edge-specific specular
-export const DEFAULT_EDGE_SPECULAR_INTENSITY = 0.5
-export const DEFAULT_EDGE_SPECULAR_COLOR = '#ffffff'
 
 // ============================================================================
 // Bloom Defaults
@@ -191,14 +187,6 @@ export const DEFAULT_FACE_PBR: PBRConfig = {
   roughness: 0.3,
   metallic: 0.0,
   specularIntensity: 0.8,
-  specularColor: '#ffffff',
-}
-
-/** PBR for TubeWireframe (edges with thickness > 1) */
-export const DEFAULT_EDGE_PBR: PBRConfig = {
-  roughness: 0.3,
-  metallic: 0.0,
-  specularIntensity: 0.5,
   specularColor: '#ffffff',
 }
 

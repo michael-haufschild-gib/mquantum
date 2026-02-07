@@ -46,7 +46,7 @@ import {
 /**
  * Lighting slice state.
  * NOTE: specularIntensity and specularColor have been moved to the dedicated
- * pbrStore for better organization. Use usePBRStore for face/edge PBR.
+ * pbrStore for better organization. Use usePBRStore for face PBR.
  */
 export interface LightingSliceState {
   // --- Basic Lighting ---

@@ -9,7 +9,6 @@
  * - composeRotationsIndexedWasm: Compose rotation matrices from precomputed axis index pairs
  * - composeRotationsWasm: Compose rotation matrices from plane names and angles
  * - projectVerticesWasm: Project nD vertices to 3D positions
- * - projectEdgesWasm: Project nD edges to 3D positions
  * - multiplyMatrixVectorWasm: Matrix-vector multiplication
  * - multiplyMatricesWasm: Matrix-matrix multiplication
  * - dotProductWasm: Vector dot product
@@ -37,12 +36,6 @@ interface WasmModule {
   project_vertices_wasm: (
     flat_vertices: Float64Array,
     dimension: number,
-    projection_distance: number
-  ) => Float32Array
-  project_edges_wasm: (
-    flat_vertices: Float64Array,
-    dimension: number,
-    flat_edges: Uint32Array,
     projection_distance: number
   ) => Float32Array
   multiply_matrix_vector_wasm: (
@@ -250,49 +243,6 @@ export function projectVerticesWasm(
 }
 
 /**
- * Project edge pairs to 3D positions using WASM if available.
- *
- * @param flatVertices - Flat array of vertex coordinates
- * @param dimension - Dimensionality of each vertex (must be >= 3)
- * @param flatEdges - Flat array of edge indices [start0, end0, start1, end1, ...]
- * @param projectionDistance - Distance from projection plane (must be positive)
- * @returns Float32Array of edge positions, or null if WASM not ready or invalid input
- */
-export function projectEdgesWasm(
-  flatVertices: Float64Array,
-  dimension: number,
-  flatEdges: Uint32Array,
-  projectionDistance: number
-): Float32Array | null {
-  if (!wasmReady || !wasmModule) {
-    return null
-  }
-
-  // Input validation
-  if (!Number.isInteger(dimension) || dimension < 3) {
-    return null
-  }
-  if (flatVertices.length === 0 || flatVertices.length % dimension !== 0) {
-    return null
-  }
-  if (flatEdges.length === 0 || flatEdges.length % 2 !== 0) {
-    return null
-  }
-  if (!Number.isFinite(projectionDistance) || projectionDistance <= 0) {
-    return null
-  }
-
-  try {
-    return wasmModule.project_edges_wasm(flatVertices, dimension, flatEdges, projectionDistance)
-  } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] project_edges_wasm failed:', err)
-    }
-    return null
-  }
-}
-
-/**
  * Multiply matrix by vector using WASM if available.
  *
  * @param matrix - Flat n×n matrix (row-major) as Float64Array
@@ -463,7 +413,6 @@ export function subtractVectorsWasm(a: Float64Array, b: Float64Array): Float64Ar
 // OPT-WASM-1: Pool Float64Array instances to avoid per-call allocations
 // Key: size, Value: pooled array (simple single-item pool per size)
 const float64Pool = new Map<number, Float64Array>()
-const uint32Pool = new Map<number, Uint32Array>()
 
 /** Maximum pooled buffer size (64KB of float64s = 8KB) */
 const MAX_POOL_SIZE = 8192
@@ -484,24 +433,6 @@ function getPooledFloat64(size: number): Float64Array {
   }
   const fresh = new Float64Array(size)
   float64Pool.set(size, fresh)
-  return fresh
-}
-
-/**
- * Get or create a pooled Uint32Array of the requested size.
- * @param size - Requested array size
- * @returns Uint32Array of the requested size
- */
-function getPooledUint32(size: number): Uint32Array {
-  if (size > MAX_POOL_SIZE) {
-    return new Uint32Array(size)
-  }
-  const pooled = uint32Pool.get(size)
-  if (pooled) {
-    return pooled
-  }
-  const fresh = new Uint32Array(size)
-  uint32Pool.set(size, fresh)
   return fresh
 }
 
@@ -549,22 +480,6 @@ export function flattenVertices(vertices: VectorND[]): Float64Array {
     for (let j = 0; j < dimension; j++) {
       flat[offset + j] = v[j]!
     }
-  }
-  return flat
-}
-
-/**
- * Flatten edge pairs to Uint32Array.
- * OPT-WASM-1: Uses pooled arrays to avoid per-call allocations.
- * @param edges - Array of edge pairs
- * @returns Flat Uint32Array (may be pooled - do not store reference long-term)
- */
-export function flattenEdges(edges: [number, number][]): Uint32Array {
-  const size = edges.length * 2
-  const flat = getPooledUint32(size)
-  for (let i = 0; i < edges.length; i++) {
-    flat[i * 2] = edges[i]![0]
-    flat[i * 2 + 1] = edges[i]![1]
   }
   return flat
 }

@@ -1,11 +1,9 @@
 /**
  * PBR (Physically Based Rendering) Material Slice
  *
- * Provides independent PBR settings for three object types:
- * - Face: Main objects (schroedinger wavefunctions)
- * - Edge: TubeWireframe (when edgeThickness > 1)
+ * Provides PBR settings for face rendering (schroedinger wavefunctions).
  *
- * Each object type has its own complete set of PBR properties:
+ * Properties:
  * - roughness (0.04-1.0)
  * - metallic (0.0-1.0)
  * - specularIntensity (0.0-2.0)
@@ -18,7 +16,6 @@
 
 import { StateCreator } from 'zustand'
 import {
-  DEFAULT_EDGE_PBR,
   DEFAULT_FACE_PBR,
   type PBRConfig,
 } from '@/stores/defaults/visualDefaults'
@@ -27,14 +24,9 @@ import {
 // Types
 // ============================================================================
 
-/** PBR target object type */
-export type PBRTarget = 'face' | 'edge'
-
 export interface PBRSliceState {
   /** PBR settings for main objects (faces) */
   face: PBRConfig
-  /** PBR settings for TubeWireframe (edges) */
-  edge: PBRConfig
   /** Version counter - incremented on ANY PBR change for efficient uniform updates */
   pbrVersion: number
 }
@@ -46,13 +38,6 @@ export interface PBRSliceActions {
   setFaceSpecularIntensity: (intensity: number) => void
   setFaceSpecularColor: (color: string) => void
   setFacePBR: (config: Partial<PBRConfig>) => void
-
-  // Edge setters
-  setEdgeRoughness: (roughness: number) => void
-  setEdgeMetallic: (metallic: number) => void
-  setEdgeSpecularIntensity: (intensity: number) => void
-  setEdgeSpecularColor: (color: string) => void
-  setEdgePBR: (config: Partial<PBRConfig>) => void
 
   // Version bump (for preset loading)
   /** Manually bump version counter (used after direct setState calls) */
@@ -95,7 +80,6 @@ const clampSpecularIntensity = (value: number): number => Math.max(0.0, Math.min
 
 export const PBR_INITIAL_STATE: PBRSliceState = {
   face: { ...DEFAULT_FACE_PBR },
-  edge: { ...DEFAULT_EDGE_PBR },
   pbrVersion: 0,
 }
 
@@ -135,45 +119,6 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
     set((state) => ({
       face: {
         ...state.face,
-        ...(config.roughness !== undefined && { roughness: clampRoughness(config.roughness) }),
-        ...(config.metallic !== undefined && { metallic: clampMetallic(config.metallic) }),
-        ...(config.specularIntensity !== undefined && {
-          specularIntensity: clampSpecularIntensity(config.specularIntensity),
-        }),
-        ...(config.specularColor !== undefined && { specularColor: config.specularColor }),
-      },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  // --- Edge Setters ---
-  setEdgeRoughness: (roughness) =>
-    set((state) => ({
-      edge: { ...state.edge, roughness: clampRoughness(roughness) },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setEdgeMetallic: (metallic) =>
-    set((state) => ({
-      edge: { ...state.edge, metallic: clampMetallic(metallic) },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setEdgeSpecularIntensity: (intensity) =>
-    set((state) => ({
-      edge: { ...state.edge, specularIntensity: clampSpecularIntensity(intensity) },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setEdgeSpecularColor: (color) =>
-    set((state) => ({
-      edge: { ...state.edge, specularColor: color },
-      pbrVersion: state.pbrVersion + 1,
-    })),
-
-  setEdgePBR: (config) =>
-    set((state) => ({
-      edge: {
-        ...state.edge,
         ...(config.roughness !== undefined && { roughness: clampRoughness(config.roughness) }),
         ...(config.metallic !== undefined && { metallic: clampMetallic(config.metallic) }),
         ...(config.specularIntensity !== undefined && {

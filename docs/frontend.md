@@ -245,7 +245,7 @@ const { dimension, setDimension } = useGeometryStore()
 |-------|--------|----------------|
 | `geometryStore` | Object config | `dimension` (3-11), `objectType` ('schroedinger') |
 | `extendedObjectStore` | Quantum config | `schroedinger` (quantum mode, n/l/m, quality, etc.) |
-| `appearanceStore` | Visual style | `colorAlgorithm`, `facesVisible`, `fresnelEnabled`, `edgeThickness` |
+| `appearanceStore` | Visual style | `colorAlgorithm`, `facesVisible`, `edgeColor` (Fresnel rim) |
 | `environmentStore` | Environment | `skyboxEnabled`, `skyboxMode`, ground plane config |
 | `lightingStore` | Lights | Light list, shadow settings |
 | `postProcessingStore` | Effects | Bloom, SSAO, SSR, bokeh, tonemapping, AA |

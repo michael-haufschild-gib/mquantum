@@ -3,11 +3,15 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 
 export const SharedAdvancedControls: React.FC = React.memo(() => {
+  const isoEnabled = useExtendedObjectStore(
+    (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
+  )
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
     sssEnabled: state.sssEnabled,
     setSssEnabled: state.setSssEnabled,
@@ -42,7 +46,8 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-4 mb-4 pb-4">
-      {/* Subsurface Scattering */}
+      {/* Subsurface Scattering (volumetric only) */}
+      {!isoEnabled && (
       <ControlGroup
         title="Subsurface Scattering"
         collapsible
@@ -95,6 +100,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
           data-testid="global-sss-jitter"
         />
       </ControlGroup>
+      )}
 
     </div>
   )

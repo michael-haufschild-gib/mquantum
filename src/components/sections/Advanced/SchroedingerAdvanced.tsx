@@ -173,26 +173,30 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-gain"
         />
-        <Slider
-          label="Powder Effect"
-          min={0.0}
-          max={2.0}
-          step={0.1}
-          value={config.powderScale}
-          onChange={setPowderScale}
-          showValue
-          data-testid="schroedinger-powder-scale"
-        />
-        <Slider
-          label="Anisotropy (Phase)"
-          min={-0.9}
-          max={0.9}
-          step={0.05}
-          value={config.scatteringAnisotropy ?? 0.0}
-          onChange={setScatteringAnisotropy}
-          showValue
-          data-testid="schroedinger-anisotropy"
-        />
+        {!config.isoEnabled && (
+          <Slider
+            label="Powder Effect"
+            min={0.0}
+            max={2.0}
+            step={0.1}
+            value={config.powderScale}
+            onChange={setPowderScale}
+            showValue
+            data-testid="schroedinger-powder-scale"
+          />
+        )}
+        {!config.isoEnabled && (
+          <Slider
+            label="Anisotropy (Phase)"
+            min={-0.9}
+            max={0.9}
+            step={0.05}
+            value={config.scatteringAnisotropy ?? 0.0}
+            onChange={setScatteringAnisotropy}
+            showValue
+            data-testid="schroedinger-anisotropy"
+          />
+        )}
         {/* Isosurface Mode */}
         <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-subtle">
           <label className="text-xs text-text-secondary">Isosurface Mode</label>
