@@ -1,39 +1,52 @@
 import { soundManager } from '@/lib/audio/SoundManager'
-import { getAvailableTypesForDimension } from '@/lib/geometry'
-import type { ObjectType } from '@/lib/geometry/types'
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
-import { useRotationStore } from '@/stores/rotationStore'
 import { m } from 'motion/react'
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
-  // Consolidate geometry store selectors with useShallow
-  const { objectType, setObjectType, dimension } = useGeometryStore(
+  const { objectType, dimension } = useGeometryStore(
     useShallow((state: GeometryState) => ({
       objectType: state.objectType,
-      setObjectType: state.setObjectType,
       dimension: state.dimension,
     }))
   )
-  const resetAllRotations = useRotationStore((state) => state.resetAllRotations)
+
+  const { quantumMode, setQuantumMode } = useExtendedObjectStore(
+    useShallow((state: ExtendedObjectState) => ({
+      quantumMode: state.schroedinger.quantumMode,
+      setQuantumMode: state.setSchroedingerQuantumMode,
+    }))
+  )
 
   // Handle object type initialization (fractals, polytopes, raymarching visibility)
   useObjectTypeInitialization(objectType, dimension)
 
-  // Get available types based on current dimension
-  const availableTypes = useMemo(() => getAvailableTypesForDimension(dimension), [dimension])
+  const modeOptions = useMemo(
+    () => [
+      {
+        value: 'harmonicOscillator' as SchroedingerQuantumMode,
+        label: 'Harmonic Oscillator',
+        description: 'N-dimensional quantum superposition states.',
+      },
+      {
+        value: 'hydrogenND' as SchroedingerQuantumMode,
+        label: 'Hydrogen Orbitals',
+        description: 'N-dimensional hydrogen atom in 3D space.',
+      },
+    ],
+    []
+  )
 
   const handleSelect = useCallback(
-    (value: ObjectType) => {
+    (value: SchroedingerQuantumMode) => {
       soundManager.playClick()
-      // Reset rotation angles to prevent accumulated rotations from previous
-      // object type causing visual artifacts (e.g., spikes/distortion)
-      resetAllRotations()
-      setObjectType(value)
+      setQuantumMode(value)
     },
-    [resetAllRotations, setObjectType]
+    [setQuantumMode]
   )
 
   const containerVariants = {
@@ -58,17 +71,15 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       initial="hidden"
       animate="show"
     >
-      {availableTypes.map((type) => {
-        const isSelected = objectType === type.type
-        const isDisabled = !type.available
+      {modeOptions.map((mode) => {
+        const isSelected = quantumMode === mode.value
 
         return (
           <m.button
-            key={type.type}
+            key={mode.value}
             variants={itemVariants}
-            onClick={() => !isDisabled && handleSelect(type.type)}
-            onMouseEnter={() => !isDisabled && soundManager.playHover()}
-            disabled={isDisabled}
+            onClick={() => handleSelect(mode.value)}
+            onMouseEnter={() => soundManager.playHover()}
             className={`
                         relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
                         ${
@@ -76,14 +87,14 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
                             ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
                             : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
                         }
-                        ${isDisabled ? 'opacity-50 cursor-not-allowed hover:border-panel-border' : 'cursor-pointer'}
+                        cursor-pointer
                       `}
-            whileHover={!isDisabled ? { scale: 1.01, x: 2 } : undefined}
-            whileTap={!isDisabled ? { scale: 0.98 } : undefined}
-            data-testid={`object-type-${type.type}`}
+            whileHover={{ scale: 1.01, x: 2 }}
+            whileTap={{ scale: 0.98 }}
+            data-testid={`object-type-${mode.value}`}
           >
             <div className="flex items-center justify-between w-full mb-1">
-              <span className="font-medium text-sm">{type.name}</span>
+              <span className="font-medium text-sm">{mode.label}</span>
               {isSelected && (
                 <div className="relative w-2 h-2">
                   {/* Glow layer - static blur, no animation = 0 style recalcs */}
@@ -94,16 +105,8 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
               )}
             </div>
             <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
-              {type.description}
+              {mode.description}
             </span>
-
-            {isDisabled && (
-              <div className="absolute inset-0 bg-background/50 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
-                <span className="text-xs font-bold bg-background px-2 py-1 rounded shadow-sm border border-panel-border">
-                  {type.disabledReason}
-                </span>
-              </div>
-            )}
           </m.button>
         )
       })}

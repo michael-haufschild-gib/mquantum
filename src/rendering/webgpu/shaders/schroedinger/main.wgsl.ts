@@ -325,7 +325,7 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
   const densitySample = useDensityGrid
     ? `if (USE_DENSITY_GRID) {
       rho = sampleDensityFromGrid(pos, schroedinger).r;
-      rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger);
+      if (FEATURE_UNCERTAINTY_BOUNDARY) { rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger); }
       rho *= isoGain;
     } else {
       rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
@@ -336,7 +336,7 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
     ? `var seedRho: f32;
   if (USE_DENSITY_GRID) {
     seedRho = sampleDensityFromGrid(ro + rd * tNear, schroedinger).r;
-    seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger);
+    if (FEATURE_UNCERTAINTY_BOUNDARY) { seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger); }
     seedRho *= isoGain;
   } else {
     seedRho = sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain;
@@ -348,7 +348,7 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
     ? `var midRho: f32;
         if (USE_DENSITY_GRID) {
           midRho = sampleDensityFromGrid(midPos, schroedinger).r;
-          midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger);
+          if (FEATURE_UNCERTAINTY_BOUNDARY) { midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger); }
           midRho *= isoGain;
         } else {
           midRho = sampleDensity(midPos, animTime, schroedinger) * isoGain;
@@ -566,7 +566,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   // Estimates spatial distance from this surface point to the confidence contour:
   //   spatialDist ≈ |log(ρ_surface) - log(ρ_confidence)| / |∇log(ρ)|
   // Small distance → this part of the isosurface is near the confidence boundary → glow
-  if (schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
+  if (FEATURE_UNCERTAINTY_BOUNDARY && schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
     let ubWidth = max(schroedinger.uncertaintyBoundaryWidth, 1e-3);
     let logRhoDelta = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold);
     let spatialDist = logRhoDelta / max(gradMag, 1e-6);
@@ -818,7 +818,7 @@ export function generateMainBlockIsosurfaceTemporal(
   const densitySample = useDensityGrid
     ? `if (USE_DENSITY_GRID) {
       rho = sampleDensityFromGrid(pos, schroedinger).r;
-      rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger);
+      if (FEATURE_UNCERTAINTY_BOUNDARY) { rho = applyUncertaintyBoundaryEmphasis(rho, sFromRho(rho), schroedinger); }
       rho *= isoGain;
     } else {
       rho = sampleDensity(pos, animTime, schroedinger) * isoGain;
@@ -829,7 +829,7 @@ export function generateMainBlockIsosurfaceTemporal(
     ? `var seedRho: f32;
   if (USE_DENSITY_GRID) {
     seedRho = sampleDensityFromGrid(ro + rd * tNear, schroedinger).r;
-    seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger);
+    if (FEATURE_UNCERTAINTY_BOUNDARY) { seedRho = applyUncertaintyBoundaryEmphasis(seedRho, sFromRho(seedRho), schroedinger); }
     seedRho *= isoGain;
   } else {
     seedRho = sampleDensity(ro + rd * tNear, animTime, schroedinger) * isoGain;
@@ -841,7 +841,7 @@ export function generateMainBlockIsosurfaceTemporal(
     ? `var midRho: f32;
         if (USE_DENSITY_GRID) {
           midRho = sampleDensityFromGrid(midPos, schroedinger).r;
-          midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger);
+          if (FEATURE_UNCERTAINTY_BOUNDARY) { midRho = applyUncertaintyBoundaryEmphasis(midRho, sFromRho(midRho), schroedinger); }
           midRho *= isoGain;
         } else {
           midRho = sampleDensity(midPos, animTime, schroedinger) * isoGain;
@@ -1045,7 +1045,7 @@ ${bayerJitterSection}
   }
 
   // Uncertainty boundary
-  if (schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
+  if (FEATURE_UNCERTAINTY_BOUNDARY && schroedinger.uncertaintyBoundaryEnabled != 0u && schroedinger.uncertaintyBoundaryStrength > 0.0) {
     let ubWidth = max(schroedinger.uncertaintyBoundaryWidth, 1e-3);
     let logRhoDelta = abs(sSurface - schroedinger.uncertaintyLogRhoThreshold);
     let spatialDist = logRhoDelta / max(gradMag, 1e-6);

@@ -357,7 +357,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   // Confidence-boundary emphasis around an iso-probability surface.
   // Skipped in compute shaders (SKIP_DENSITY_EMPHASIS=true) so the density grid
   // stores raw density; emphasis is applied per-pixel in the fragment raymarcher.
-  if (!SKIP_DENSITY_EMPHASIS) {
+  if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
     let boundaryLogRho = sFromRho(rho);
     rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
   }
@@ -422,7 +422,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   rho = erodeDensity(rho, qPos, uniforms);
 
   // Confidence-boundary emphasis (see sampleDensityWithPhase for details)
-  if (!SKIP_DENSITY_EMPHASIS) {
+  if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
     let boundaryLogRho = sFromRho(rho);
     rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
   }

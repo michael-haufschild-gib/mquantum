@@ -124,6 +124,8 @@ export interface SchrodingerRendererConfig {
   phaseMaterialityEnabled?: boolean
   /** Compile-time specialization flag for interference. */
   interferenceEnabled?: boolean
+  /** Compile-time specialization flag for uncertainty boundary emphasis. */
+  uncertaintyBoundaryEnabled?: boolean
   /** Whether eigenfunction caching is enabled (compile-time shader specialization). */
   eigenfunctionCacheEnabled?: boolean
   /** Wavefunction representation — triggers pipeline rebuild when changed.
@@ -302,6 +304,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       dispersionEnabled: true,
       phaseMaterialityEnabled: true,
       interferenceEnabled: true,
+      uncertaintyBoundaryEnabled: true,
       ...config,
     }
 
@@ -331,6 +334,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       temporalAccumulation: this.rendererConfig.temporal,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
       interference: this.rendererConfig.interferenceEnabled ?? true,
+      uncertaintyBoundary: this.rendererConfig.uncertaintyBoundaryEnabled ?? true,
       useEigenfunctionCache,
       useDensityGrid,
       densityGridSize: 64,

@@ -86,10 +86,14 @@ Acceptance criteria:
 
 ## Functional Requirements
 
-### FR-1 Feature toggle and mode
+### FR-1 Feature toggle
 Add arc controls to Schroedinger config:
 - `arcEnabled: boolean`
-- `arcMode: 'volumetric' | 'isosurface' | 'both'`
+
+> **Correction**: The original `arcMode: 'volumetric' | 'isosurface' | 'both'` is removed.
+> Arcs are an emissive term injected into the active rendering path.
+> Volumetric mode accumulates arcs during raymarching; isosurface mode applies them as surface overlay.
+> The toggle `arcEnabled` is sufficient — each rendering path implements arcs independently.
 
 ### FR-2 Core arc parameters
 Add parameters:
@@ -115,7 +119,12 @@ In volumetric path, arcs are accumulated as additional emissive term during raym
 In isosurface path, arcs are applied as emissive surface overlay at/near the isosurface hit point (no fake deep interior integration in pure surface mode).
 
 ### FR-6 Mathematical model (initial)
-Use procedural ridged noise from existing WGSL noise helpers (no mandatory arc texture):
+Use procedural ridged noise (no mandatory arc texture):
+
+> **Correction**: No WGSL noise helpers exist in the Schroedinger shader tree.
+> A new noise module must be created at `src/rendering/webgpu/shaders/schroedinger/volume/noise.wgsl.ts`.
+> The skybox shader has `skyboxHash()`/`skyboxNoise()`/`skyboxFbm3()` which can inform the implementation,
+> but Schroedinger needs its own standalone module to avoid cross-domain coupling.
 
 1. `n = baseNoise(pos * arcScale + time * arcSpeed)`
 2. `ridged = pow(clamp(1.0 - abs(n), 0.0, 1.0), arcSharpness)`
@@ -231,8 +240,7 @@ Add a new `Electric Arcs` subgroup in `Advanced > Artistic`.
 
 ### Core controls (always)
 1. Enable toggle
-2. Mode (`volumetric`, `isosurface`, `both`)
-3. Intensity
+2. Intensity
 4. Scale
 5. Sharpness
 6. Sparsity
@@ -314,3 +322,29 @@ Advanced couplings (phase/node), performance guard automation, presets.
 2. Feature works for both quantum families and dimensions 3-11 (with documented 4D+ semantics).
 3. Default mode keeps interactive performance on baseline hardware.
 4. Users can tune from subtle educational styling to cinematic presentation without breaking render stability.
+
+---
+
+## Validation Notes (2026-02-07)
+
+### File reference audit
+All 10 referenced files verified to exist in the current codebase.
+
+### Uniform capacity
+`SchroedingerUniforms` struct has ~64 bytes of reserved space from removed features
+(`_reservedCurl0-4`, `_reservedShadow0-2`, `_reservedAo0-2`, `_reservedAoColor`)
+that can be repurposed for arc uniform fields without growing the buffer.
+
+### Noise infrastructure
+No WGSL noise functions exist in the Schroedinger shader domain.
+The skybox domain has `noise.wgsl.ts` with hash/noise/fbm — these inform design but must not be imported.
+A new noise module is required.
+
+### Feature flag pattern
+Compile-time `FEATURE_*` pattern is well-established:
+`FEATURE_NODAL`, `FEATURE_DISPERSION`, `FEATURE_PHASE_MATERIALITY`, `FEATURE_INTERFERENCE`, etc.
+`FEATURE_ARCS` fits this pattern exactly.
+
+### Density grid constraint
+Hydrogen ND >3D does not use density-grid acceleration (confirmed and enforced as of 2026-02-07 fix).
+Arc gating must use inline density evaluation in these cases, matching the constraint in Known Limitations.

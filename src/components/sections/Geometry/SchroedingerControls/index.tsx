@@ -7,7 +7,6 @@
  * - Hydrogen ND: n-dimensional hydrogen atom in 3D space
  *
  * Features:
- * - Mode selection (Harmonic Oscillator / Hydrogen ND)
  * - Preset selection for each mode
  * - Quantum parameter controls
  * - Volume rendering settings
@@ -53,10 +52,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     // Consolidate extended object store selectors with useShallow
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
       config: state.schroedinger,
-      // Geometry actions
-      setScale: state.setSchroedingerScale,
-      // Mode selection
-      setQuantumMode: state.setSchroedingerQuantumMode,
       setRepresentation: state.setSchroedingerRepresentation,
       setMomentumDisplayUnits: state.setSchroedingerMomentumDisplayUnits,
       setMomentumScale: state.setSchroedingerMomentumScale,
@@ -84,8 +79,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     }))
     const {
       config,
-      // Mode selection
-      setQuantumMode,
       setRepresentation,
       setMomentumDisplayUnits,
       setMomentumScale,
@@ -110,8 +103,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setHydrogenNDPreset,
       setExtraDimQuantumNumber,
       setExtraDimFrequencySpread,
-      // Geometry actions
-      setScale,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Get current dimension to show/hide dimension-specific controls
@@ -146,41 +137,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
     return (
       <div className={className} data-testid="schroedinger-controls">
-        {/* Geometry Settings */}
-        <Section title="Geometry" defaultOpen={true}>
-          <Slider
-            label="Scale"
-            min={0.1}
-            max={2.0}
-            step={0.05}
-            value={config.scale}
-            onChange={setScale}
-            showValue
-            data-testid="schroedinger-scale"
-          />
-        </Section>
-
-        {/* Physics Mode Selection */}
-        <Section title="Physics Mode" defaultOpen={true}>
-          <div className="space-y-3">
-            <ToggleGroup
-              options={[
-                { value: 'harmonicOscillator', label: 'Harmonic' },
-                { value: 'hydrogenND', label: 'Hydrogen ND' },
-              ]}
-              value={config.quantumMode}
-              onChange={(v) => setQuantumMode(v as 'harmonicOscillator' | 'hydrogenND')}
-              ariaLabel="Select physics mode"
-              data-testid="mode-selector"
-            />
-            <p className="text-xs text-text-tertiary">
-              {isHydrogenNDMode
-                ? 'N-dimensional hydrogen atom in 3D space'
-                : 'N-dimensional quantum superposition states'}
-            </p>
-          </div>
-        </Section>
-
         {/* Representation Selection */}
         <Section title="Representation" defaultOpen={true}>
           <div className="space-y-3">

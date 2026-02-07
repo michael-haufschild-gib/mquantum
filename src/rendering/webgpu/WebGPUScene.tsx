@@ -128,6 +128,7 @@ const schroedingerCompileSelector = (
   dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
   interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
+  uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
   representation: (state.schroedinger?.representation ?? 'position') as 'position' | 'momentum',
 })
 
@@ -355,6 +356,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
             dispersionEnabled: schroedingerCompile.dispersionEnabled,
             phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
             interferenceEnabled: schroedingerCompile.interferenceEnabled,
+            uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
             temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
             eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
             colorAlgorithm: appearance.colorAlgorithm,
@@ -410,6 +412,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.dispersionEnabled,
     schroedingerCompile.phaseMaterialityEnabled,
     schroedingerCompile.interferenceEnabled,
+    schroedingerCompile.uncertaintyBoundaryEnabled,
     schroedingerCompile.representation,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
@@ -657,6 +660,7 @@ export interface PassConfig {
   dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
+  uncertaintyBoundaryEnabled: boolean
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
   colorAlgorithm: PaletteColorAlgorithm
@@ -1052,6 +1056,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     dispersionEnabled,
     phaseMaterialityEnabled,
     interferenceEnabled,
+    uncertaintyBoundaryEnabled,
   } = config
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as
     | WGSLColorAlgorithm
@@ -1073,6 +1078,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         dispersionEnabled,
         phaseMaterialityEnabled,
         interferenceEnabled,
+        uncertaintyBoundaryEnabled,
         temporal: useTemporalCloudAccumulation,
         eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
         representation: config.representation,

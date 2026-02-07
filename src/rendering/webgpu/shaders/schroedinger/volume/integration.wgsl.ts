@@ -1253,7 +1253,7 @@ fn volumeRaymarchGrid(
     }
 
     // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
-    rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
+    if (FEATURE_UNCERTAINTY_BOUNDARY) { rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms); }
     // Update logRho to reflect emphasis so emission color/brightness matches inline path
     // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
     sCenter = select(-20.0, log(rho), rho > 1e-9);

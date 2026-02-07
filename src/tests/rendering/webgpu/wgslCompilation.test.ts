@@ -278,12 +278,36 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
       sss: false,
       nodal: false,
       dispersion: false,
+      uncertaintyBoundary: false,
       quantumMode: 'harmonicOscillator',
     })
 
     verifyWgsl(wgsl, true)
     expect(wgsl).toContain('const FEATURE_NODAL: bool = false;')
     expect(wgsl).toContain('const FEATURE_DISPERSION: bool = false;')
+    expect(wgsl).toContain('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
+  })
+
+  it('emits FEATURE_UNCERTAINTY_BOUNDARY true by default and false when disabled', () => {
+    // Default: enabled
+    const { wgsl: enabledWgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      quantumMode: 'harmonicOscillator',
+    })
+    verifyWgsl(enabledWgsl, true)
+    expect(enabledWgsl).toContain('const FEATURE_UNCERTAINTY_BOUNDARY: bool = true;')
+
+    // Explicit: disabled
+    const { wgsl: disabledWgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      uncertaintyBoundary: false,
+      quantumMode: 'harmonicOscillator',
+    })
+    verifyWgsl(disabledWgsl, true)
+    expect(disabledWgsl).toContain('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
+    // Boundary emphasis calls are guarded by const bool — shader must still be valid
   })
 
   it('uses uncertainty boundary uniforms instead of legacy shimmer uniforms', () => {
