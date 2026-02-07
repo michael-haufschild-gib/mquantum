@@ -124,18 +124,12 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let depthCoord = vec2i(uv * vec2f(texDims));
   let objDepth = textureLoad(tMainObjectDepth, depthCoord, 0);
 
-  var finalColor: vec3f;
-  var finalAlpha: f32;
-
-  if (isAtFarPlane(objDepth) && objColor.a < 0.01) {
-    // No object at this pixel - show environment
-    finalColor = envColor.rgb;
-    finalAlpha = envColor.a;
-  } else {
-    // Object exists - blend based on alpha
-    finalColor = objColor.rgb + envColor.rgb * (1.0 - objColor.a);
-    finalAlpha = max(envColor.a, objColor.a);
-  }
+  // PERF: Branchless object/environment compositing
+  let noObject = isAtFarPlane(objDepth) && objColor.a < 0.01;
+  let blendedColor = objColor.rgb + envColor.rgb * (1.0 - objColor.a);
+  let blendedAlpha = max(envColor.a, objColor.a);
+  var finalColor = select(blendedColor, envColor.rgb, noObject);
+  var finalAlpha = select(blendedAlpha, envColor.a, noObject);
 
   // === PHOTON SHELL (Screen-space edge glow) ===
   if (uniforms.shellEnabled != 0u && uniforms.shellGlowStrength > 0.0) {

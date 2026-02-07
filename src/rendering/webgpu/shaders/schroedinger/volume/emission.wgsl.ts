@@ -29,10 +29,11 @@ const PHASE_HUE_INFLUENCE: f32 = 0.4;
 
 // Analytic approximation of blackbody color (rgb)
 fn blackbody(Temp: f32) -> vec3f {
-  // Safety: pow(x, -1.5) is undefined for x <= 0
   if (Temp <= 0.0) { return vec3f(0.0); }
   var col = vec3f(255.0);
-  let invTemp = pow(Temp, -1.5);
+  // PERF: pow(x, -1.5) = 1/(x*sqrt(x)), avoids exp(-1.5*log(x)) ~8 cycle savings
+  let sqrtTemp = sqrt(Temp);
+  let invTemp = 1.0 / (Temp * sqrtTemp);
   col.x = 56100000.0 * invTemp + 148.0;
   col.y = 100040000.0 * invTemp + 66.0;
   col.z = 194180000.0 * invTemp + 30.0;
@@ -43,8 +44,10 @@ fn blackbody(Temp: f32) -> vec3f {
 // Henyey-Greenstein Phase Function for anisotropic scattering
 fn henyeyGreenstein(dotLH: f32, g: f32) -> f32 {
   let g2 = g * g;
-  let denom = 1.0 + g2 - 2.0 * g * dotLH;
-  return (1.0 - g2) / (4.0 * PI * pow(max(denom, 0.001), 1.5));
+  let denom = max(1.0 + g2 - 2.0 * g * dotLH, 0.001);
+  // PERF: pow(x, 1.5) = x * sqrt(x), avoids exp(1.5*log(x)) ~12 cycle savings
+  let denomSqrt = sqrt(denom);
+  return (1.0 - g2) / (4.0 * PI * denom * denomSqrt);
 }
 
 // Apply distribution function for color algorithms
@@ -61,9 +64,9 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
 
 // Compute base surface color (no lighting applied)
 // Uses uniforms.colorAlgorithm to select the coloring method
-fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+// PERF: accepts pre-computed log-density s to avoid redundant log() call
+fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   // Normalize log-density to [0, 1] range for color mapping
-  let s = sFromRho(rho);
   let normalized = clamp((s + 8.0) / 8.0, 0.0, 1.0);
 
   // Get base color from material's base color
@@ -192,8 +195,9 @@ fn computeBaseColor(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnif
 }
 
 // Compute emission with ambient lighting only (for fast mode)
-fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
-  var surfaceColor = computeBaseColor(rho, phase, pos, uniforms);
+// PERF: accepts pre-computed log-density s to avoid redundant log() call
+fn computeEmission(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
+  var surfaceColor = computeBaseColor(rho, s, phase, pos, uniforms);
 
   // Phase materiality: matter (plasma) vs anti-matter (smoke)
   if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
@@ -201,7 +205,7 @@ fn computeEmission(rho: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUnifo
     let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
     let smokeWeight = 1.0 - plasmaWeight;
     let str = uniforms.phaseMaterialityStrength;
-    let normalizedRho = clamp((sFromRho(rho) + 8.0) / 8.0, 0.0, 1.0);
+    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
     let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
     let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
     surfaceColor = mix(surfaceColor,
@@ -251,8 +255,10 @@ fn getEmissionSpotAttenuation(lightIdx: i32, lightToFrag: vec3f) -> f32 {
 }
 
 // Compute emission with full scene lighting (for HQ mode)
+// PERF: accepts pre-computed log-density s to avoid redundant log() call
 fn computeEmissionLit(
   rho: f32,
+  s: f32,
   phase: f32,
   p: vec3f,
   gradient: vec3f,
@@ -261,10 +267,10 @@ fn computeEmissionLit(
 ) -> vec3f {
   // Early return if no lights
   if (lighting.lightCount == 0) {
-    return computeEmission(rho, phase, p, uniforms);
+    return computeEmission(rho, s, phase, p, uniforms);
   }
 
-  var surfaceColor = computeBaseColor(rho, phase, p, uniforms);
+  var surfaceColor = computeBaseColor(rho, s, phase, p, uniforms);
 
   // Phase materiality: matter (plasma) vs anti-matter (smoke)
   if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
@@ -272,7 +278,7 @@ fn computeEmissionLit(
     let plasmaWeight = smoothstep(0.35, 0.65, phaseMod);
     let smokeWeight = 1.0 - plasmaWeight;
     let str = uniforms.phaseMaterialityStrength;
-    let normalizedRho = clamp((sFromRho(rho) + 8.0) / 8.0, 0.0, 1.0);
+    let normalizedRho = clamp((s + 8.0) / 8.0, 0.0, 1.0);
     let plasmaColor = blackbody(normalizedRho * 8000.0 + 2000.0);
     let smokeColor = vec3f(0.08, 0.08, 0.25) * max(length(surfaceColor), 0.1);
     surfaceColor = mix(surfaceColor,
@@ -356,8 +362,8 @@ fn computeEmissionLit(
     }
   }
 
-  // Cache sFromRho for reuse in HDR Emission and Nodal sections (saves log() call)
-  let cachedS = sFromRho(rho);
+  // Use pre-computed log-density (passed in as parameter, saves log() call)
+  let cachedS = s;
 
   // HDR Emission Glow (port from WebGL emission.glsl.ts lines 332-361)
   if (uniforms.emissionIntensity > 0.0) {

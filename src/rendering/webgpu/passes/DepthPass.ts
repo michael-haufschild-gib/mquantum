@@ -165,6 +165,13 @@ export class DepthPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffers to avoid per-frame GC pressure
+  private uniformArrayBuffer = new ArrayBuffer(16)
+  private uniformFloatView = new Float32Array(this.uniformArrayBuffer, 0, 2)
+  private uniformIntView = new Int32Array(this.uniformArrayBuffer, 8, 1)
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedDepthView: GPUTextureView | null = null
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -320,28 +327,28 @@ export class DepthPass extends WebGPUBasePass {
     const near = camera?.near ?? this.cameraNear
     const far = camera?.far ?? this.cameraFar
 
-    // Update uniforms
+    // Update uniforms (reuse pre-allocated views)
     // Layout: near (f32), far (f32), format (i32), _pad (f32)
-    const data = new ArrayBuffer(16)
-    const floatView = new Float32Array(data, 0, 2)
-    const intView = new Int32Array(data, 8, 1)
+    this.uniformFloatView[0] = near
+    this.uniformFloatView[1] = far
+    this.uniformIntView[0] = this.format
 
-    floatView[0] = near
-    floatView[1] = far
-    intView[0] = this.format
+    this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
-
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'depth-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: depthView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedDepthView !== depthView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'depth-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: depthView },
+        ],
+      })
+      this.cachedDepthView = depthView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -371,6 +378,8 @@ export class DepthPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedDepthView = null
 
     super.dispose()
   }

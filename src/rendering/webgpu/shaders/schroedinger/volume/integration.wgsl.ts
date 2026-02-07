@@ -683,6 +683,10 @@ fn volumeRaymarch(
   var lowDensityCount: i32 = 0;
   let allowEarlyExit = (uniforms.quantumMode == QUANTUM_MODE_HARMONIC);
 
+  // PERF: Hoist loop-invariant bounding radius computation
+  let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+  let boundR2Skip = boundR2 * 0.85;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
@@ -699,8 +703,7 @@ fn volumeRaymarch(
     // The outer ~15% shell of the bounding sphere is exponentially low density.
     // Skip expensive wavefunction evaluation and take 8x steps through it.
     let r2 = dot(pos, pos);
-    let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
-    if (r2 > boundR2 * 0.85) {
+    if (r2 > boundR2Skip) {
       t += stepLen * 8.0;
       continue;
     }
@@ -811,8 +814,8 @@ fn volumeRaymarch(
       // OPTIMIZED: Compute gradient WITHOUT erosion (skips 4 expensive erosion evaluations)
       let gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
 
-      // Compute emission with lighting
-      let emission = computeEmissionLit(rho, phase, pos, gradient, viewDir, uniforms);
+      // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
+      let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
 
       // Front-to-back compositing (scalar path)
       accColor += transmittance * alpha * emission;
@@ -891,6 +894,10 @@ fn volumeRaymarchHQ(
     // Radial mode: offset updated inside loop
   }
 
+  // PERF: Hoist loop-invariant bounding radius computation
+  let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+  let boundR2Skip = boundR2 * 0.85;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
@@ -909,8 +916,7 @@ fn volumeRaymarchHQ(
 
     // PERFORMANCE: Gaussian envelope early-skip for deep tail region.
     let r2 = dot(pos, pos);
-    let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
-    if (r2 > boundR2 * 0.85) {
+    if (r2 > boundR2Skip) {
       t += stepLen * 8.0;
       continue;
     }
@@ -1045,11 +1051,10 @@ fn volumeRaymarchHQ(
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
       pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
-    // Alpha per channel
-    var alpha: vec3f;
-    alpha.r = computeAlpha(rhoRGB.r * pmDensityMod, adaptiveStep, uniforms.densityGain);
-    alpha.g = computeAlpha(rhoRGB.g * pmDensityMod, adaptiveStep, uniforms.densityGain);
-    alpha.b = computeAlpha(rhoRGB.b * pmDensityMod, adaptiveStep, uniforms.densityGain);
+    // PERF: Vectorized alpha computation - single vec3 exp() instead of 3 scalar calls
+    let clampedRhoRGB = min(rhoRGB * pmDensityMod, vec3f(10.0));
+    let alphaExp = max(vec3f(-uniforms.densityGain) * clampedRhoRGB * adaptiveStep, vec3f(-20.0));
+    let alpha = vec3f(1.0) - exp(alphaExp);
 
     if (alpha.g > 0.001 || alpha.r > 0.001 || alpha.b > 0.001) {
       // Track primary hit for temporal reprojection
@@ -1058,7 +1063,8 @@ fn volumeRaymarchHQ(
       }
 
       // Compute emission using ORIGINAL density (rhoRGB) so coloring logic works
-      let emissionCenter = computeEmissionLit(rhoRGB.g, phase, pos, gradient, viewDir, uniforms);
+      // Pass pre-computed log-density to avoid redundant log()
+      let emissionCenter = computeEmissionLit(rhoRGB.g, sCenter, phase, pos, gradient, viewDir, uniforms);
 
       // Modulate emission for R/B channels based on their density relative to G
       var emission: vec3f;

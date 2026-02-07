@@ -52,13 +52,15 @@ export type SchroedingerColorMode = 'density' | 'phase' | 'mixed' | 'palette' | 
  */
 export type SchroedingerPresetName =
   | 'groundState'
+  | 'firstExcited'
+  | 'quantumBeat'
+  | 'groundExcitedBeat'
   | 'highEnergy'
-  | 'simpleCoherence'
-  | 'symmetry'
-  | 'complexOrbital'
-  | 'diffuseCloud'
-  | 'stationary'
-  | 'denseState'
+  | 'excitedTriad'
+  | 'nearDegenerate'
+  | 'isotropic'
+  | 'nodalStructure'
+  | 'richSuperposition'
   | 'custom'
 
 /**
@@ -507,7 +509,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Harmonic oscillator state
   presetName: 'custom',
-  seed: 42,
+  seed: 13,
   termCount: 1,
   maxQuantumNumber: 6,
   frequencySpread: 0.01,

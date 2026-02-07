@@ -29,6 +29,14 @@ const DEFAULT_WORLD_BOUND = 2.0
 
 // Workgroup size (must match shader @workgroup_size)
 const WORKGROUP_SIZE = 8
+// PERF: Precomputed 2^(exponent-15) lookup table for Float16 decoding.
+// Exponents 0..30 (31 is Inf/NaN handled separately). Avoids Math.pow per voxel.
+const F16_EXP_TABLE = new Float32Array(31)
+for (let e = 0; e < 31; e++) {
+  F16_EXP_TABLE[e] = 2 ** (e - 15)
+}
+const F16_SUBNORM_SCALE = 2 ** -14 / 1024 // for subnormals: 2^-14 * fraction/1024
+
 const CONFIDENCE_MASS_MIN = 0.5
 const CONFIDENCE_MASS_MAX = 0.99
 const DEFAULT_CONFIDENCE_MASS = 0.68
@@ -103,6 +111,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private totalMass = 0
   private readbackBytesPerTexel = 8
   private readbackTexelStrideHalfs = 4
+  // PERF: Reusable scratch buffer for density distribution (avoids 1MB allocation per readback)
+  private distributionScratch: Float32Array | null = null
 
   constructor(config: DensityGridComputeConfig) {
     super({
@@ -474,6 +484,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
 
   /**
    * Decode a Float16 scalar to Float32.
+   * PERF: Uses precomputed exponent lookup table instead of Math.pow per call.
    */
   private decodeFloat16(value: number): number {
     const sign = (value & 0x8000) !== 0 ? -1 : 1
@@ -481,20 +492,14 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     const fraction = value & 0x03ff
 
     if (exponent === 0) {
-      if (fraction === 0) {
-        return sign * 0
-      }
-      return sign * Math.pow(2, -14) * (fraction / 1024)
+      return fraction === 0 ? 0 : sign * F16_SUBNORM_SCALE * fraction
     }
 
     if (exponent === 0x1f) {
-      if (fraction === 0) {
-        return sign * Number.POSITIVE_INFINITY
-      }
-      return Number.NaN
+      return fraction === 0 ? sign * Number.POSITIVE_INFINITY : Number.NaN
     }
 
-    return sign * Math.pow(2, exponent - 15) * (1 + fraction / 1024)
+    return sign * F16_EXP_TABLE[exponent]! * (1 + fraction / 1024)
   }
 
   /**
@@ -502,7 +507,11 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   private buildDensityDistribution(halfView: Uint16Array): void {
     const maxValues = this.gridSize * this.gridSize * this.gridSize
-    const values = new Float32Array(maxValues)
+    // PERF: Reuse scratch buffer to avoid 1MB allocation + GC per readback cycle
+    if (!this.distributionScratch || this.distributionScratch.length < maxValues) {
+      this.distributionScratch = new Float32Array(maxValues)
+    }
+    const values = this.distributionScratch
     const texelsPerRow = this.readbackBytesPerRow / this.readbackBytesPerTexel
     let count = 0
 
@@ -676,6 +685,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.prefixMass = null
     this.totalMass = 0
     this.logRhoThreshold = DEFAULT_LOG_RHO_THRESHOLD
+    this.distributionScratch = null
 
     super.dispose()
   }

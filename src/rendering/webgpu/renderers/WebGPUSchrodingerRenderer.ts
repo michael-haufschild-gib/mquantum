@@ -38,6 +38,64 @@ const BAYER_OFFSETS: [number, number][] = [
 
 const SCHROEDINGER_UNIFORM_SIZE = 1328
 
+// PERF: Module-level string→int lookup maps (avoids recreating per-update)
+const QUANTUM_MODE_MAP: Record<string, number> = {
+  harmonicOscillator: 0,
+  hydrogenND: 1,
+}
+const COLOR_ALGORITHM_MAP: Record<string, number> = {
+  monochromatic: 0,
+  analogous: 1,
+  cosine: 2,
+  normal: 3,
+  distance: 4,
+  lch: 5,
+  multiSource: 6,
+  radial: 7,
+  phase: 8,
+  mixed: 9,
+  blackbody: 10,
+}
+const NODAL_DEFINITION_MAP: Record<string, number> = {
+  psiAbs: 0,
+  realPart: 1,
+  imagPart: 2,
+  complexIntersection: 3,
+}
+const NODAL_FAMILY_MAP: Record<string, number> = {
+  all: 0,
+  radial: 1,
+  angular: 2,
+}
+const NODAL_RENDER_MODE_MAP: Record<string, number> = {
+  band: 0,
+  surface: 1,
+}
+const CROSS_SECTION_COMPOSITE_MODE_MAP: Record<string, number> = {
+  overlay: 0,
+  sliceOnly: 1,
+}
+const CROSS_SECTION_SCALAR_MAP: Record<string, number> = {
+  density: 0,
+  real: 1,
+  imag: 2,
+}
+const PROBABILITY_CURRENT_STYLE_MAP: Record<string, number> = {
+  magnitude: 0,
+  arrows: 1,
+  surfaceLIC: 2,
+  streamlines: 3,
+}
+const PROBABILITY_CURRENT_PLACEMENT_MAP: Record<string, number> = {
+  isosurface: 0,
+  volume: 1,
+}
+const PROBABILITY_CURRENT_COLOR_MODE_MAP: Record<string, number> = {
+  magnitude: 0,
+  direction: 1,
+  circulationSign: 2,
+}
+
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
@@ -146,6 +204,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private qualityDataView = new DataView(this.qualityUniformData.buffer)
   // Time update: 4 bytes (1 float) - for dirty-flag optimization partial writes
   private timeUpdateBuffer = new Float32Array(1)
+  // PERF: Pre-allocated clearValue objects to avoid per-frame object literal allocation
+  private readonly clearValueTransparent = { r: 0, g: 0, b: 0, a: 0 }
+  private readonly clearValueNormal = { r: 0.5, g: 0.5, b: 1, a: 0 }
+  private readonly clearValueInvalidPos = { r: 0, g: 0, b: 0, a: -1 }
+  // PERF: Pre-allocated DataView for camera uniform uint32 writes (avoids per-frame allocation)
+  private cameraDataView = new DataView(this.cameraUniformData.buffer)
 
   // Dirty-flag version tracking - skip uniform updates when unchanged
   // Schroedinger uses partial buffer writes: only time field (4 bytes) when settings unchanged
@@ -626,8 +690,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[120] = ctx.size.width / ctx.size.height // aspectRatio
     data[121] = animationTime // time (respects animation pause state)
     data[122] = ctx.frame?.delta || 0.016 // deltaTime
-    // frameNumber is u32 in WGSL - write as uint32 via DataView
-    new DataView(data.buffer).setUint32(123 * 4, ctx.frame?.frameNumber || 0, true)
+    // frameNumber is u32 in WGSL - write as uint32 via pre-allocated DataView
+    // PERF: Reuse cached DataView instead of allocating new one per frame
+    this.cameraDataView.setUint32(123 * 4, ctx.frame?.frameNumber || 0, true)
 
     // Temporal accumulation: Bayer offset for quarter-res rendering.
     // Align with WebGPUTemporalCloudPass frameIndex cycle, which starts at 0
@@ -803,11 +868,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // --- Quantum mode mapping (string to int, like WebGL) ---
     const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
-    const modeMap: Record<string, number> = {
-      harmonicOscillator: 0,
-      hydrogenND: 1,
-    }
-    const quantumModeInt = modeMap[quantumModeStr] ?? 0
+    const quantumModeInt = QUANTUM_MODE_MAP[quantumModeStr] ?? 0
 
     // --- Quantum preset generation (like WebGL SchroedingerMesh.tsx lines 598-638) ---
     // Read config values from store
@@ -1083,20 +1144,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Color algorithm system (offset 940+)
     // Use canonical mapping shared with WebGL (palette/types.ts COLOR_ALGORITHM_TO_INT)
-    const colorAlgorithmMap: Record<string, number> = {
-      monochromatic: 0,
-      analogous: 1,
-      cosine: 2,
-      normal: 3,
-      distance: 4,
-      lch: 5,
-      multiSource: 6,
-      radial: 7,
-      phase: 8,
-      mixed: 9,
-      blackbody: 10,
-    }
-    const colorAlgorithm = colorAlgorithmMap[appearance?.colorAlgorithm ?? 'mixed'] ?? 9
+    const colorAlgorithm = COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'mixed'] ?? 9
     intView[940 / 4] = colorAlgorithm
     floatView[944 / 4] = appearance?.distribution?.power ?? 1.0
     floatView[948 / 4] = appearance?.distribution?.cycles ?? 1.0
@@ -1151,21 +1199,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1068 / 4] = schroedinger?.interferenceSpeed ?? 1.0
 
     // Physical nodal controls (offset 1072+)
-    const nodalDefinitionMap: Record<string, number> = {
-      psiAbs: 0,
-      realPart: 1,
-      imagPart: 2,
-      complexIntersection: 3,
-    }
-    const nodalFamilyMap: Record<string, number> = {
-      all: 0,
-      radial: 1,
-      angular: 2,
-    }
-
-    intView[1072 / 4] = nodalDefinitionMap[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
+    intView[1072 / 4] = NODAL_DEFINITION_MAP[schroedinger?.nodalDefinition ?? 'psiAbs'] ?? 0
     floatView[1076 / 4] = schroedinger?.nodalTolerance ?? 0.02
-    intView[1080 / 4] = nodalFamilyMap[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
+    intView[1080 / 4] = NODAL_FAMILY_MAP[schroedinger?.nodalFamilyFilter ?? 'all'] ?? 0
     intView[1084 / 4] = schroedinger?.nodalLobeColoringEnabled ? 1 : 0
 
     const nodalColorReal = this.parseColor(schroedinger?.nodalColorReal ?? '#00ffff')
@@ -1212,26 +1248,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1196 / 4] = 0.0 // w unused
 
     // Nodal render mode + reserved padding (offset 1200-1216)
-    const nodalRenderModeMap: Record<string, number> = {
-      band: 0,
-      surface: 1,
-    }
-    intView[1200 / 4] = nodalRenderModeMap[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
+    intView[1200 / 4] = NODAL_RENDER_MODE_MAP[schroedinger?.nodalRenderMode ?? 'band'] ?? 0
     intView[1204 / 4] = 0
     floatView[1208 / 4] = 0.0
     floatView[1212 / 4] = 0.0
 
     // Cross-section slice controls (offset 1216-1280)
-    const crossSectionCompositeModeMap: Record<string, number> = {
-      overlay: 0,
-      sliceOnly: 1,
-    }
-    const crossSectionScalarMap: Record<string, number> = {
-      density: 0,
-      real: 1,
-      imag: 2,
-    }
-
     const crossSectionNormal = schroedinger?.crossSectionPlaneNormal ?? [0, 0, 1]
     const nx = Number(crossSectionNormal[0] ?? 0)
     const ny = Number(crossSectionNormal[1] ?? 0)
@@ -1241,8 +1263,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     intView[1216 / 4] = schroedinger?.crossSectionEnabled ? 1 : 0
     intView[1220 / 4] =
-      crossSectionCompositeModeMap[schroedinger?.crossSectionCompositeMode ?? 'overlay'] ?? 0
-    intView[1224 / 4] = crossSectionScalarMap[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
+      CROSS_SECTION_COMPOSITE_MODE_MAP[schroedinger?.crossSectionCompositeMode ?? 'overlay'] ?? 0
+    intView[1224 / 4] = CROSS_SECTION_SCALAR_MAP[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
     intView[1228 / 4] = schroedinger?.crossSectionAutoWindow ? 1 : 0
 
     floatView[1232 / 4] = nx * invNLen
@@ -1262,29 +1284,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1276 / 4] = 0.0
 
     // Physical probability current controls (offset 1280-1328)
-    const probabilityCurrentStyleMap: Record<string, number> = {
-      magnitude: 0,
-      arrows: 1,
-      surfaceLIC: 2,
-      streamlines: 3,
-    }
-    const probabilityCurrentPlacementMap: Record<string, number> = {
-      isosurface: 0,
-      volume: 1,
-    }
-    const probabilityCurrentColorModeMap: Record<string, number> = {
-      magnitude: 0,
-      direction: 1,
-      circulationSign: 2,
-    }
-
     intView[1280 / 4] = schroedinger?.probabilityCurrentEnabled ? 1 : 0
     intView[1284 / 4] =
-      probabilityCurrentStyleMap[schroedinger?.probabilityCurrentStyle ?? 'magnitude'] ?? 0
+      PROBABILITY_CURRENT_STYLE_MAP[schroedinger?.probabilityCurrentStyle ?? 'magnitude'] ?? 0
     intView[1288 / 4] =
-      probabilityCurrentPlacementMap[schroedinger?.probabilityCurrentPlacement ?? 'isosurface'] ?? 0
+      PROBABILITY_CURRENT_PLACEMENT_MAP[schroedinger?.probabilityCurrentPlacement ?? 'isosurface'] ?? 0
     intView[1292 / 4] =
-      probabilityCurrentColorModeMap[schroedinger?.probabilityCurrentColorMode ?? 'magnitude'] ?? 0
+      PROBABILITY_CURRENT_COLOR_MODE_MAP[schroedinger?.probabilityCurrentColorMode ?? 'magnitude'] ?? 0
 
     floatView[1296 / 4] = schroedinger?.probabilityCurrentScale ?? 1.0
     floatView[1300 / 4] = schroedinger?.probabilityCurrentSpeed ?? 1.0
@@ -1740,12 +1746,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Build color attachments - MRT for isosurface/temporal, single for standard volumetric
     // Use alpha=0 clear value for proper compositing (transparent where nothing rendered)
+    // PERF: Use pre-allocated clearValue objects to avoid per-frame literal allocation
     const colorAttachments: GPURenderPassColorAttachment[] = [
       {
         view: colorView,
         loadOp: 'clear' as const,
         storeOp: 'store' as const,
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        clearValue: this.clearValueTransparent,
       },
     ]
 
@@ -1756,7 +1763,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         view: secondaryView,
         loadOp: 'clear' as const,
         storeOp: 'store' as const,
-        clearValue: { r: 0.5, g: 0.5, b: 1, a: 0 }, // Default normal pointing up (+Z)
+        clearValue: this.clearValueNormal, // Default normal pointing up (+Z)
       })
     } else if (isTemporal && secondaryView) {
       // Temporal volumetric mode: world position buffer
@@ -1764,7 +1771,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         view: secondaryView,
         loadOp: 'clear' as const,
         storeOp: 'store' as const,
-        clearValue: { r: 0, g: 0, b: 0, a: -1 }, // Invalid position (a < 0 means no hit)
+        clearValue: this.clearValueInvalidPos, // Invalid position (a < 0 means no hit)
       })
     }
 

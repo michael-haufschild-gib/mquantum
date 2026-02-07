@@ -269,6 +269,13 @@ export class WebGPURenderGraph {
   // Map: passId → disabledFrameCount
   private passStateTracking = new Map<string, number>()
 
+  // PERF: Reusable per-frame collections to avoid GC pressure from allocating every frame
+  private _framePassTimings: Map<string, number> = new Map()
+  private _frameWrittenByEnabledPass: Set<string> = new Set()
+  private _framePassEnabledMemo: Map<string, boolean> = new Map()
+  private _frameTimedPassIds: string[] = []
+  private _framePassTimingResult: Array<{ passId: string; gpuTimeMs: number; skipped: boolean }> = []
+
   /** Default grace period in frames before resource deallocation (~1s at 60fps) */
   private static readonly DEFAULT_DISABLE_GRACE_PERIOD = 60
 
@@ -654,9 +661,12 @@ export class WebGPURenderGraph {
     )
 
     // Execute passes
-    const passTimings: Map<string, number> = new Map()
+    // PERF: Reuse per-frame collections instead of allocating new ones each frame
+    const passTimings = this._framePassTimings
+    passTimings.clear()
     let timestampIndex = 0
-    const timedPassIds: string[] = []
+    const timedPassIds = this._frameTimedPassIds
+    timedPassIds.length = 0
     const canCollectGpuTimings =
       this.gpuTimingEnabled &&
       !!this.timestampQuerySet &&
@@ -673,8 +683,11 @@ export class WebGPURenderGraph {
     }
 
     // Track resources written by enabled passes to prevent passthrough overwriting them
-    const writtenByEnabledPass = new Set<string>()
-    const passEnabledMemo = new Map<string, boolean>()
+    // PERF: Reuse instance-level collections instead of allocating per frame
+    const writtenByEnabledPass = this._frameWrittenByEnabledPass
+    writtenByEnabledPass.clear()
+    const passEnabledMemo = this._framePassEnabledMemo
+    passEnabledMemo.clear()
 
     const getPassEnabled = (pass: WebGPURenderPass, passId: string): boolean => {
       const cached = passEnabledMemo.get(passId)
@@ -874,11 +887,8 @@ export class WebGPURenderGraph {
     // Build frame stats
     return {
       totalTimeMs: delta * 1000,
-      passTiming: this.passOrder.map((id) => ({
-        passId: id,
-        gpuTimeMs: this.lastPassTimings.get(id) ?? 0,
-        skipped: !(passEnabledMemo.get(id) ?? true),
-      })),
+      // PERF: Reuse pre-allocated passTiming array, resize only when pass count changes
+      passTiming: this.buildPassTimingResult(passEnabledMemo),
       commandBufferCount: 1,
       vramUsage: this.pool.getVRAMUsage(),
       drawStats: {
@@ -889,6 +899,35 @@ export class WebGPURenderGraph {
         points: totalPoints,
       },
     }
+  }
+
+  /**
+   * PERF: Build pass timing results, reusing pre-allocated array when possible.
+   */
+  private buildPassTimingResult(
+    passEnabledMemo: Map<string, boolean>
+  ): Array<{ passId: string; gpuTimeMs: number; skipped: boolean }> {
+    const result = this._framePassTimingResult
+    const passCount = this.passOrder.length
+
+    // Resize array if pass count changed
+    while (result.length < passCount) {
+      result.push({ passId: '', gpuTimeMs: 0, skipped: false })
+    }
+    if (result.length > passCount) {
+      result.length = passCount
+    }
+
+    // Update in-place
+    for (let i = 0; i < passCount; i++) {
+      const id = this.passOrder[i]!
+      const entry = result[i]!
+      entry.passId = id
+      entry.gpuTimeMs = this.lastPassTimings.get(id) ?? 0
+      entry.skipped = !(passEnabledMemo.get(id) ?? true)
+    }
+
+    return result
   }
 
   /**

@@ -182,6 +182,13 @@ export class BufferPreviewPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffers to avoid per-frame GC pressure
+  private uniformArrayBuffer = new ArrayBuffer(32)
+  private uniformIntView = new Int32Array(this.uniformArrayBuffer, 0, 2)
+  private uniformFloatView = new Float32Array(this.uniformArrayBuffer, 8, 6)
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedInputView: GPUTextureView | null = null
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -386,9 +393,9 @@ export class BufferPreviewPass extends WebGPUBasePass {
     // Update uniforms
     // Layout: type (i32), depthMode (i32), nearClip (f32), farClip (f32),
     //         focus (f32), focusRange (f32), _pad0 (f32), _pad1 (f32)
-    const data = new ArrayBuffer(32)
-    const intView = new Int32Array(data, 0, 2)
-    const floatView = new Float32Array(data, 8, 6)
+    // PERF: Reuse pre-allocated uniform views
+    const intView = this.uniformIntView
+    const floatView = this.uniformFloatView
 
     intView[0] = this.bufferType
     intView[1] = this.depthMode
@@ -397,18 +404,22 @@ export class BufferPreviewPass extends WebGPUBasePass {
     floatView[2] = this.focus
     floatView[3] = this.focusRange
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
+    this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'buffer-preview-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: inputView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedInputView !== inputView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'buffer-preview-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: inputView },
+        ],
+      })
+      this.cachedInputView = inputView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -438,6 +449,8 @@ export class BufferPreviewPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedInputView = null
 
     super.dispose()
   }

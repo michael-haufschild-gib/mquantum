@@ -147,6 +147,11 @@ export class NormalPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffer to avoid per-frame GC pressure
+  private uniformData = new Float32Array(20)
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedDepthView: GPUTextureView | null = null
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -252,8 +257,8 @@ export class NormalPass extends WebGPUBasePass {
       far?: number
     }
 
-    // Update uniforms
-    const data = new Float32Array(20) // 80 bytes / 4 bytes per float = 20 floats
+    // Update uniforms (reuse pre-allocated buffer)
+    const data = this.uniformData
 
     // Inverse projection matrix (16 floats at offset 0)
     if (camera?.inverseProjectionMatrix?.elements) {
@@ -263,6 +268,7 @@ export class NormalPass extends WebGPUBasePass {
       }
     } else {
       // Identity matrix fallback
+      data.fill(0, 0, 16)
       data[0] = 1
       data[5] = 1
       data[10] = 1
@@ -279,16 +285,20 @@ export class NormalPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'normal-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: depthView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedDepthView !== depthView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'normal-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: depthView },
+        ],
+      })
+      this.cachedDepthView = depthView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -318,6 +328,8 @@ export class NormalPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedDepthView = null
 
     super.dispose()
   }

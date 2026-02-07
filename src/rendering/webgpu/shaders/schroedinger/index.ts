@@ -88,9 +88,6 @@ export {
   densityBlock,
 } from './quantum'
 
-// SDF modules for isosurface rendering
-export { sdf3dBlock, sdfHighDBlock } from './sdf'
-
 // Volume rendering modules
 export { emissionBlock } from './volume'
 

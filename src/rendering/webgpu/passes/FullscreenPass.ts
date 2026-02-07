@@ -148,6 +148,10 @@ export class FullscreenPass extends WebGPUBasePass {
   private uniformOffsets: Map<string, { offset: number; type: FullscreenUniformType }> = new Map()
   private totalUniformSize = 0
 
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedInputViews: GPUTextureView[] = []
+
   // Normalized input/output configurations
   private normalizedInputs: WebGPUResourceAccess[] = []
   private normalizedOutputs: WebGPUResourceAccess[] = []
@@ -370,31 +374,36 @@ export class FullscreenPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
 
-    // Build bind group entries
-    const bindGroupEntries: GPUBindGroupEntry[] = []
-    let bindingIndex = 0
-
-    // Sampler
-    bindGroupEntries.push({ binding: bindingIndex++, resource: this.sampler })
-
-    // Uniform buffer
-    bindGroupEntries.push({ binding: bindingIndex++, resource: { buffer: this.uniformBuffer } })
-
-    // Input textures
+    // Collect input texture views
+    const inputViews: GPUTextureView[] = []
     for (const input of this.normalizedInputs) {
       const textureView = ctx.getTextureView(input.resourceId)
       if (!textureView) {
         console.warn(`FullscreenPass ${this.id}: Missing input texture '${input.resourceId}'`)
         return
       }
-      bindGroupEntries.push({ binding: bindingIndex++, resource: textureView })
+      inputViews.push(textureView)
     }
 
-    const bindGroup = this.device.createBindGroup({
-      label: `${this.id}-bg`,
-      layout: this.passBindGroupLayout,
-      entries: bindGroupEntries,
-    })
+    // PERF: Cache bind group, invalidate only when input texture views change
+    const viewsChanged = inputViews.length !== this.cachedInputViews.length ||
+      inputViews.some((v, i) => v !== this.cachedInputViews[i])
+    if (!this.cachedBindGroup || viewsChanged) {
+      const bindGroupEntries: GPUBindGroupEntry[] = []
+      let bindingIndex = 0
+      bindGroupEntries.push({ binding: bindingIndex++, resource: this.sampler })
+      bindGroupEntries.push({ binding: bindingIndex++, resource: { buffer: this.uniformBuffer } })
+      for (const view of inputViews) {
+        bindGroupEntries.push({ binding: bindingIndex++, resource: view })
+      }
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: `${this.id}-bg`,
+        layout: this.passBindGroupLayout,
+        entries: bindGroupEntries,
+      })
+      this.cachedInputViews = [...inputViews]
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Get output target
     const outputConfig = this.normalizedOutputs[0]
@@ -453,6 +462,8 @@ export class FullscreenPass extends WebGPUBasePass {
     this.renderPipeline = null
     this.passBindGroupLayout = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedInputViews = []
     super.dispose()
   }
 

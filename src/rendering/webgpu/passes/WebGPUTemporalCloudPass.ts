@@ -86,6 +86,10 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private frameIndex = 0
   private prevViewProjectionMatrix = new Float32Array(16)
   private prevCameraPosition = { x: 0, y: 0, z: 0 }
+  // PERF: Pre-allocated matrix buffers to avoid per-frame GC pressure
+  private _viewProjectionMatrix = new Float32Array(16)
+  private _inverseViewProjectionMatrix = new Float32Array(16)
+  private _fallbackIdentityMatrix = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])
   private hasValidHistory = false
   private lastWidth = 0
   private lastHeight = 0
@@ -512,10 +516,12 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     }
 
     const vpElements = cameraStore.viewProjectionMatrix.elements
-    const viewProjectionMatrix = new Float32Array(vpElements)
+    // PERF: Reuse pre-allocated matrix buffers
+    const viewProjectionMatrix = this._viewProjectionMatrix
+    viewProjectionMatrix.set(vpElements)
 
     // Compute inverse view-projection matrix
-    const inverseViewProjectionMatrix = new Float32Array(16)
+    const inverseViewProjectionMatrix = this._inverseViewProjectionMatrix
     if (!this.invertMatrix4(viewProjectionMatrix, inverseViewProjectionMatrix)) {
       // If inversion fails, use identity
       inverseViewProjectionMatrix.fill(0)
@@ -650,12 +656,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       }
     } else {
       // Fallback to identity if camera data unavailable
-      viewProjectionMatrix = new Float32Array(16)
-      viewProjectionMatrix[0] = viewProjectionMatrix[5] = 1
-      viewProjectionMatrix[10] = viewProjectionMatrix[15] = 1
-      inverseViewProjectionMatrix = new Float32Array(16)
-      inverseViewProjectionMatrix[0] = inverseViewProjectionMatrix[5] = 1
-      inverseViewProjectionMatrix[10] = inverseViewProjectionMatrix[15] = 1
+      // PERF: Reuse pre-allocated identity matrix
+      viewProjectionMatrix = this._fallbackIdentityMatrix
+      inverseViewProjectionMatrix = this._fallbackIdentityMatrix
       cameraPosition = { x: 0, y: 0, z: 0 }
     }
 

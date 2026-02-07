@@ -47,6 +47,9 @@ export class CopyPass extends WebGPUBasePass {
   private passConfig: CopyPassConfig
 
   private renderPipeline: GPURenderPipeline | null = null
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedSourceView: GPUTextureView | null = null
   private passBindGroupLayout: GPUBindGroupLayout | null = null
   private sampler: GPUSampler | null = null
 
@@ -104,14 +107,19 @@ export class CopyPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!sourceView || !outputView) return
 
-    const bindGroup = this.device.createBindGroup({
-      label: 'copy-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: sourceView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedSourceView !== sourceView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'copy-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: this.sampler },
+          { binding: 1, resource: sourceView },
+        ],
+      })
+      this.cachedSourceView = sourceView
+    }
+    const bindGroup = this.cachedBindGroup
 
     const passEncoder = ctx.beginRenderPass({
       label: 'copy-render',
@@ -133,6 +141,8 @@ export class CopyPass extends WebGPUBasePass {
     this.renderPipeline = null
     this.passBindGroupLayout = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedSourceView = null
     super.dispose()
   }
 }

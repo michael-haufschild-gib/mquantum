@@ -89,24 +89,11 @@ fn blendAlphaColor(base: vec3f, blend: vec3f, alpha: f32, weight: f32) -> vec3f 
   return mix(base, blend, alpha * weight);
 }
 
+// PERF: Vectorized overlay blend — 3 per-component branches → 1 branchless select()
 fn blendOverlay(base: vec3f, blend: vec3f, weight: f32) -> vec3f {
-  var result: vec3f;
-  // Component-wise overlay calculation
-  if (base.r < 0.5) {
-    result.r = 2.0 * base.r * blend.r;
-  } else {
-    result.r = 1.0 - 2.0 * (1.0 - base.r) * (1.0 - blend.r);
-  }
-  if (base.g < 0.5) {
-    result.g = 2.0 * base.g * blend.g;
-  } else {
-    result.g = 1.0 - 2.0 * (1.0 - base.g) * (1.0 - blend.g);
-  }
-  if (base.b < 0.5) {
-    result.b = 2.0 * base.b * blend.b;
-  } else {
-    result.b = 1.0 - 2.0 * (1.0 - base.b) * (1.0 - blend.b);
-  }
+  let multiply = 2.0 * base * blend;
+  let screen = 1.0 - 2.0 * (1.0 - base) * (1.0 - blend);
+  let result = select(screen, multiply, base < vec3f(0.5));
   return mix(base, result, weight);
 }
 
@@ -216,6 +203,15 @@ export class CompositePass extends WebGPUBasePass {
   private renderPipeline: GPURenderPipeline | null = null
   private passBindGroupLayout: GPUBindGroupLayout | null = null
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffers to avoid per-frame GC pressure
+  private uniformArrayBuffer = new ArrayBuffer(48)
+  private uniformFloatView = new Float32Array(this.uniformArrayBuffer)
+  private uniformIntView = new Int32Array(this.uniformArrayBuffer)
+  private weightsBuffer = new Float32Array(4)
+  private blendModesBuffer = new Int32Array(4)
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedTextureViews: GPUTextureView[] = []
   private sampler: GPUSampler | null = null
 
   // Dummy texture for unused slots
@@ -388,9 +384,9 @@ export class CompositePass extends WebGPUBasePass {
     const inputCount = Math.min(this.compositeInputs.length, 4)
     const textureViews: GPUTextureView[] = []
 
-    // Collect weights and blend modes
-    const weights = new Float32Array(4)
-    const blendModes = new Int32Array(4)
+    // Collect weights and blend modes (reuse pre-allocated buffers)
+    const weights = this.weightsBuffer
+    const blendModes = this.blendModesBuffer
 
     for (let i = 0; i < 4; i++) {
       if (i < inputCount) {
@@ -406,11 +402,10 @@ export class CompositePass extends WebGPUBasePass {
       }
     }
 
-    // Update uniforms
+    // Update uniforms (reuse pre-allocated views)
     // Layout: vec4f weights (16) + vec4<i32> blendModes (16) + vec3f backgroundColor (12) + i32 inputCount (4)
-    const uniformData = new ArrayBuffer(48)
-    const floatView = new Float32Array(uniformData)
-    const intView = new Int32Array(uniformData)
+    const floatView = this.uniformFloatView
+    const intView = this.uniformIntView
 
     // weights (offset 0)
     floatView[0] = weights[0]!
@@ -432,21 +427,27 @@ export class CompositePass extends WebGPUBasePass {
     // inputCount (offset 44 bytes = 11 floats)
     intView[11] = inputCount
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, uniformData)
+    this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'composite-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: textureViews[0]! },
-        { binding: 3, resource: textureViews[1]! },
-        { binding: 4, resource: textureViews[2]! },
-        { binding: 5, resource: textureViews[3]! },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture views change
+    const viewsChanged = textureViews.length !== this.cachedTextureViews.length ||
+      textureViews.some((v, i) => v !== this.cachedTextureViews[i])
+    if (!this.cachedBindGroup || viewsChanged) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'composite-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: textureViews[0]! },
+          { binding: 3, resource: textureViews[1]! },
+          { binding: 4, resource: textureViews[2]! },
+          { binding: 5, resource: textureViews[3]! },
+        ],
+      })
+      this.cachedTextureViews = [...textureViews]
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -479,6 +480,8 @@ export class CompositePass extends WebGPUBasePass {
     this.dummyTexture?.destroy()
     this.dummyTexture = null
     this.dummyTextureView = null
+    this.cachedBindGroup = null
+    this.cachedTextureViews = []
 
     super.dispose()
   }

@@ -36,10 +36,11 @@ fn mapCrossSectionColor(
   // Reuse the existing object color algorithm pipeline, but drive it from the
   // slice scalar alone (1D ramp). This avoids spatial/phase artifacts in slices.
   let t = clamp(value01, 0.0, 1.0);
-  let proxyRho = exp(t * 8.0 - 8.0);
+  let proxyS = t * 8.0 - 8.0;
+  let proxyRho = exp(proxyS);
   let proxyPhase = t * TAU - PI;
   let proxyPos = vec3f(t * 2.0 - 1.0, t * 2.0 - 1.0, t * 2.0 - 1.0);
-  let scalarColor = computeBaseColor(proxyRho, proxyPhase, proxyPos, uniforms);
+  let scalarColor = computeBaseColor(proxyRho, proxyS, proxyPhase, proxyPos, uniforms);
   let planeColor = uniforms.crossSectionPlaneColor.xyz;
   return mix(planeColor, scalarColor, clamp(envelope, 0.0, 1.0));
 }

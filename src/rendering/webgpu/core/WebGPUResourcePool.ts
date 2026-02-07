@@ -46,6 +46,10 @@ export class WebGPUResourcePool {
   // Default samplers (cached for reuse)
   private linearSampler: GPUSampler | null = null
 
+  // PERF: Cached VRAM usage to avoid per-frame traversal of all resources
+  private cachedVRAMUsage = 0
+  private vramUsageDirty = true
+
   /**
    * Initialize the pool with a GPU device.
    * @param device
@@ -243,6 +247,11 @@ export class WebGPUResourcePool {
    * Estimate VRAM usage in bytes.
    */
   getVRAMUsage(): number {
+    // PERF: Return cached value when resources haven't changed
+    if (!this.vramUsageDirty) {
+      return this.cachedVRAMUsage
+    }
+
     let total = 0
 
     const countResource = (r: WebGPUResource): number => {
@@ -263,6 +272,8 @@ export class WebGPUResourcePool {
       total += countResource(pingPong.write)
     }
 
+    this.cachedVRAMUsage = total
+    this.vramUsageDirty = false
     return total
   }
 
@@ -354,6 +365,7 @@ export class WebGPUResourcePool {
     // Use appropriate sampler
     const sampler = this.linearSampler!
 
+    this.vramUsageDirty = true
     return {
       config,
       texture,
@@ -388,6 +400,7 @@ export class WebGPUResourcePool {
   private disposeResource(resource: WebGPUResource): void {
     resource.texture.destroy()
     resource.depthTexture?.destroy()
+    this.vramUsageDirty = true
   }
 
   private resolveSize(size: ResourceSize): { width: number; height: number } {

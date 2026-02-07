@@ -135,11 +135,18 @@ fn ACESFilmicToneMapping(color: vec3f, exposure: f32) -> vec3f {
   return saturate3(c);
 }
 
-// AgX color space matrices (transposed for WGSL column-major)
-const LINEAR_SRGB_TO_LINEAR_REC2020 = mat3x3f(
-  vec3f(0.6274, 0.3293, 0.0433),
-  vec3f(0.0691, 0.9195, 0.0113),
-  vec3f(0.0164, 0.0880, 0.8956)
+// PERF: Precomputed AGX_INPUT_MATRIX = AgXInsetMatrix * LINEAR_SRGB_TO_LINEAR_REC2020
+// (transposed for WGSL column-major) — eliminates one matrix multiply per pixel
+const AGX_INPUT_MATRIX = mat3x3f(
+  vec3f(0.587512206399144, 0.313681468644592, 0.0988063249562637),
+  vec3f(0.186722181710028, 0.707402721510485, 0.105775096779487),
+  vec3f(0.126348794494964, 0.137330842818871, 0.736320362686164)
+);
+// Output matrices cannot be combined (pow(2.2) separates them)
+const AGX_OUTSET_MATRIX = mat3x3f(
+  vec3f( 1.1271005818144368, -0.11060664309660323, -0.016493938717834573),
+  vec3f(-0.1413297634984383,  1.157823702216272, -0.016493938717834257),
+  vec3f(-0.14132976349843826, -0.11060664309660294, 1.2519364065950405)
 );
 const LINEAR_REC2020_TO_LINEAR_SRGB = mat3x3f(
   vec3f( 1.6605, -0.5876, -0.0728),
@@ -148,38 +155,19 @@ const LINEAR_REC2020_TO_LINEAR_SRGB = mat3x3f(
 );
 
 // AgX contrast approximation
+// PERF: Horner form reduces multiplies from ~12 to 6 per component
 fn agxDefaultContrastApprox(x: vec3f) -> vec3f {
-  let x2 = x * x;
-  let x4 = x2 * x2;
-  return + 15.5 * x4 * x2
-    - 40.14 * x4 * x
-    + 31.96 * x4
-    - 6.868 * x2 * x
-    + 0.4298 * x2
-    + 0.1191 * x
-    - 0.00232;
+  return (((((15.5 * x - 40.14) * x + 31.96) * x - 6.868) * x + 0.4298) * x + 0.1191) * x - 0.00232;
 }
 
 // AgX
 fn AgXToneMapping(color: vec3f, exposure: f32) -> vec3f {
-  // AgX Inset Matrix (transposed for WGSL column-major)
-  let AgXInsetMatrix = mat3x3f(
-    vec3f(0.856627153315983, 0.0951212405381588, 0.0482516061458583),
-    vec3f(0.137318972929847, 0.761241990602591, 0.101439036467562),
-    vec3f(0.11189821299995, 0.0767994186031903, 0.811302368396859)
-  );
-  // AgX Outset Matrix (transposed for WGSL column-major)
-  let AgXOutsetMatrix = mat3x3f(
-    vec3f( 1.1271005818144368, -0.11060664309660323, -0.016493938717834573),
-    vec3f(-0.1413297634984383,  1.157823702216272, -0.016493938717834257),
-    vec3f(-0.14132976349843826, -0.11060664309660294, 1.2519364065950405)
-  );
   let AgxMinEv = -12.47393;
   let AgxMaxEv = 4.026069;
 
-  var c = color * exposure;
-  c = LINEAR_SRGB_TO_LINEAR_REC2020 * c;
-  c = AgXInsetMatrix * c;
+  // PERF: Use precomputed AGX_INPUT_MATRIX = AgXInsetMatrix * LINEAR_SRGB_TO_LINEAR_REC2020
+  // Eliminates one matrix multiply per pixel
+  var c = AGX_INPUT_MATRIX * (color * exposure);
 
   c = max(c, vec3f(1e-10));
   c = log2(c);
@@ -188,7 +176,8 @@ fn AgXToneMapping(color: vec3f, exposure: f32) -> vec3f {
 
   c = agxDefaultContrastApprox(c);
 
-  c = AgXOutsetMatrix * c;
+  c = AGX_OUTSET_MATRIX * c;
+  // pow(2.2) is integral to AgX algorithm (converts from AgX internal space to linear)
   c = pow(max(vec3f(0.0), c), vec3f(2.2));
   c = LINEAR_REC2020_TO_LINEAR_SRGB * c;
 
@@ -203,12 +192,8 @@ fn NeutralToneMapping(color: vec3f, exposure: f32) -> vec3f {
   var c = color * exposure;
 
   let x = min(c.r, min(c.g, c.b));
-  var offset: f32;
-  if (x < 0.08) {
-    offset = x - 6.25 * x * x;
-  } else {
-    offset = 0.04;
-  }
+  // PERF: Branchless offset selection
+  let offset = select(0.04, x - 6.25 * x * x, x < 0.08);
   c = c - offset;
 
   let peak = max(c.r, max(c.g, c.b));
@@ -324,6 +309,13 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffers to avoid per-frame GC pressure
+  private uniformArrayBuffer = new ArrayBuffer(48)
+  private uniformFloatView = new Float32Array(this.uniformArrayBuffer)
+  private uniformIntView = new Int32Array(this.uniformArrayBuffer)
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedColorView: GPUTextureView | null = null
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -558,9 +550,9 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     //   vignetteOffset: f32 (offset 28, 4 bytes)
     //   noiseIntensity: f32 (offset 32, 4 bytes)
     //   _pad0-2: f32 (offset 36-44, 12 bytes padding to 48)
-    const data = new ArrayBuffer(48)
-    const floatView = new Float32Array(data)
-    const intView = new Int32Array(data)
+    // PERF: Reuse pre-allocated uniform views
+    const floatView = this.uniformFloatView
+    const intView = this.uniformIntView
 
     floatView[0] = ctx.size.width
     floatView[1] = ctx.size.height
@@ -571,20 +563,24 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     floatView[6] = this.vignette
     floatView[7] = this.vignetteOffset
     floatView[8] = this.grain
-    // Padding floatView[9-11] already zeroed
+    // Padding floatView[9-11] already zeroed from ArrayBuffer init
 
-    this.writeUniformBuffer(this.device, this.uniformBuffer, data)
+    this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'tonemapping-cinematic-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: colorView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedColorView !== colorView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'tonemapping-cinematic-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: colorView },
+        ],
+      })
+      this.cachedColorView = colorView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -614,6 +610,8 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedColorView = null
 
     super.dispose()
   }

@@ -92,8 +92,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Check if position is within the bounding sphere (dynamic radius)
   // Grid is a cube, but quantum volume is spherical - skip corners
-  let distFromCenter = length(worldPos);
-  if (distFromCenter > schroedinger.boundingRadius) {
+  // PERF: Compare squared distances to avoid sqrt per thread
+  let dist2 = dot(worldPos, worldPos);
+  let boundR = schroedinger.boundingRadius;
+  if (dist2 > boundR * boundR) {
     // Outside bounding sphere - store zero density
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
@@ -142,8 +144,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
   // Skip positions outside bounding sphere (dynamic radius)
-  let distFromCenter = length(worldPos);
-  if (distFromCenter > schroedinger.boundingRadius) {
+  // PERF: Compare squared distances to avoid sqrt per thread
+  let dist2 = dot(worldPos, worldPos);
+  let boundR = schroedinger.boundingRadius;
+  if (dist2 > boundR * boundR) {
     textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
     return;
   }

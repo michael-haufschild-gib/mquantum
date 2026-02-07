@@ -109,9 +109,14 @@ export class CinematicPass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffer to avoid per-frame GC pressure
+  private uniformData = new Float32Array(8)
 
   // Sampler
   private sampler: GPUSampler | null = null
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedColorView: GPUTextureView | null = null
 
   // Configuration
   private aberration: number
@@ -258,8 +263,8 @@ export class CinematicPass extends WebGPUBasePass {
     const outputView = ctx.getWriteTarget(this.passConfig.outputResource)
     if (!outputView) return
 
-    // Update uniforms
-    const data = new Float32Array(8)
+    // Update uniforms (reuse pre-allocated buffer)
+    const data = this.uniformData
     data[0] = ctx.size.width
     data[1] = ctx.size.height
     data[2] = ctx.frame?.time ?? 0
@@ -270,16 +275,20 @@ export class CinematicPass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'cinematic-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: colorView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedColorView !== colorView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'cinematic-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: colorView },
+        ],
+      })
+      this.cachedColorView = colorView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -309,6 +318,8 @@ export class CinematicPass extends WebGPUBasePass {
     this.uniformBuffer?.destroy()
     this.uniformBuffer = null
     this.sampler = null
+    this.cachedBindGroup = null
+    this.cachedColorView = null
 
     super.dispose()
   }

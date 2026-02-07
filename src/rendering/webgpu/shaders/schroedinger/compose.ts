@@ -98,18 +98,6 @@ import {
   generateHydrogenNDDispatchBlock,
 } from './quantum/hydrogenNDVariants.wgsl'
 
-// SDF blocks for isosurface mode
-import { sdf3dBlock } from './sdf/sdf3d.wgsl'
-import { sdf4dBlock } from './sdf/sdf4d.wgsl'
-import { sdf5dBlock } from './sdf/sdf5d.wgsl'
-import { sdf6dBlock } from './sdf/sdf6d.wgsl'
-import { sdf7dBlock } from './sdf/sdf7d.wgsl'
-import { sdf8dBlock } from './sdf/sdf8d.wgsl'
-import { sdf9dBlock } from './sdf/sdf9d.wgsl'
-import { sdf10dBlock } from './sdf/sdf10d.wgsl'
-import { sdf11dBlock } from './sdf/sdf11d.wgsl'
-import { sdfHighDBlock } from './sdf/sdf-high-d.wgsl'
-
 // Volume blocks
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
@@ -273,40 +261,11 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
   const hydrogenNDBlock = hydrogenNDBlockMap[hydrogenNDDimension] || ''
 
-  // Get dimension-specific SDF block for isosurface mode
-  const sdfBlockMap: Record<number, string> = {
-    3: sdf3dBlock,
-    4: sdf4dBlock,
-    5: sdf5dBlock,
-    6: sdf6dBlock,
-    7: sdf7dBlock,
-    8: sdf8dBlock,
-    9: sdf9dBlock,
-    10: sdf10dBlock,
-    11: sdf11dBlock,
-  }
-  const sdfBlock = sdfBlockMap[actualDim] || sdfHighDBlock
-
   const selectedPsiBlock = isHydrogenFamily
     ? psiBlockHydrogenND
     : useUnrolledHO
       ? psiBlockDynamicHarmonic
       : psiBlockHarmonic
-
-  // Generate SDF dispatch that calls the dimension-specific function
-  const sdfDispatchBlock = /* wgsl */ `
-// SDF Dispatch - calls dimension-specific SDF function
-fn sdfDispatch(
-  pos: vec3f,
-  pwr: f32,
-  bail: f32,
-  maxIt: i32,
-  basis: BasisVectors,
-  uniforms: SchroedingerUniforms
-) -> vec2f {
-  return sdf${actualDim}D(pos, pwr, bail, maxIt, basis, uniforms);
-}
-`
 
   // Build blocks array in dependency order
   const blocks = [
@@ -435,10 +394,6 @@ struct VertexOutput {
 
     // ===== GEOMETRY =====
     { name: 'Sphere Intersection', content: sphereIntersectBlock },
-
-    // ===== SDF (for isosurface mode) =====
-    { name: `SDF ${actualDim}D`, content: sdfBlock, condition: isosurface },
-    { name: 'SDF Dispatch', content: sdfDispatchBlock, condition: isosurface },
 
     // ===== FEATURES =====
     {

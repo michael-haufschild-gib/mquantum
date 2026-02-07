@@ -612,6 +612,11 @@ export class PaperTexturePass extends WebGPUBasePass {
 
   // Uniform buffer
   private uniformBuffer: GPUBuffer | null = null
+  // PERF: Pre-allocated uniform buffer to avoid per-frame GC pressure
+  private uniformData = new Float32Array(32) // 128 bytes
+  // PERF: Cached bind group to avoid per-frame GPU driver calls
+  private cachedBindGroup: GPUBindGroup | null = null
+  private cachedColorView: GPUTextureView | null = null
 
   // Sampler
   private sampler: GPUSampler | null = null
@@ -931,7 +936,8 @@ export class PaperTexturePass extends WebGPUBasePass {
     // f32 crumples, crumpleSize, folds, foldCount = 80
     // f32 drops, fade, seed, quality = 96
     // f32 intensity, pad0, pad1, pad2 = 112 -> aligned to 128
-    const data = new Float32Array(32) // 128 bytes
+    // PERF: Reuse pre-allocated uniform buffer
+    const data = this.uniformData
     data[0] = ctx.size.width
     data[1] = ctx.size.height
     data[2] = ctx.frame?.time ?? 0
@@ -967,17 +973,21 @@ export class PaperTexturePass extends WebGPUBasePass {
 
     this.writeUniformBuffer(this.device, this.uniformBuffer, data)
 
-    // Create bind group
-    const bindGroup = this.device.createBindGroup({
-      label: 'paper-texture-bg',
-      layout: this.passBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.uniformBuffer } },
-        { binding: 1, resource: this.sampler },
-        { binding: 2, resource: colorView },
-        { binding: 3, resource: this.noiseTextureView },
-      ],
-    })
+    // PERF: Cache bind group, invalidate only when input texture view changes
+    if (!this.cachedBindGroup || this.cachedColorView !== colorView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'paper-texture-bg',
+        layout: this.passBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: colorView },
+          { binding: 3, resource: this.noiseTextureView },
+        ],
+      })
+      this.cachedColorView = colorView
+    }
+    const bindGroup = this.cachedBindGroup
 
     // Begin render pass
     const passEncoder = ctx.beginRenderPass({
@@ -1010,6 +1020,8 @@ export class PaperTexturePass extends WebGPUBasePass {
     this.noiseTexture?.destroy()
     this.noiseTexture = null
     this.noiseTextureView = null
+    this.cachedBindGroup = null
+    this.cachedColorView = null
 
     super.dispose()
   }
