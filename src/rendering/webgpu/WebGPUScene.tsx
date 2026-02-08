@@ -305,15 +305,39 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const lastMouseRef = useRef({ x: 0, y: 0 })
   const overlayRef = useRef<HTMLDivElement>(null)
 
+  // Interaction state for progressive refinement
+  const interactionTimerRef = useRef<number | null>(null)
+  const INTERACTION_RESTORE_DELAY = 150
+
+  const startInteraction = useCallback(() => {
+    if (interactionTimerRef.current !== null) {
+      window.clearTimeout(interactionTimerRef.current)
+      interactionTimerRef.current = null
+    }
+    usePerformanceStore.getState().setIsInteracting(true)
+  }, [])
+
+  const scheduleEndInteraction = useCallback(() => {
+    if (interactionTimerRef.current !== null) {
+      window.clearTimeout(interactionTimerRef.current)
+    }
+    interactionTimerRef.current = window.setTimeout(() => {
+      interactionTimerRef.current = null
+      usePerformanceStore.getState().setIsInteracting(false)
+    }, INTERACTION_RESTORE_DELAY)
+  }, [INTERACTION_RESTORE_DELAY])
+
   // Camera control handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDraggingRef.current = true
     lastMouseRef.current = { x: e.clientX, y: e.clientY }
-  }, [])
+    startInteraction()
+  }, [startInteraction])
 
   const handleMouseUp = useCallback(() => {
     isDraggingRef.current = false
-  }, [])
+    scheduleEndInteraction()
+  }, [scheduleEndInteraction])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isDraggingRef.current || !cameraRef.current) return
@@ -340,6 +364,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // Zoom sensitivity
       const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9
       cameraRef.current.zoom(zoomFactor)
+
+      startInteraction()
+      scheduleEndInteraction()
     }
 
     overlay.addEventListener('wheel', handleWheel, { passive: false })
@@ -347,7 +374,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     return () => {
       overlay.removeEventListener('wheel', handleWheel)
     }
-  }, [])
+  }, [startInteraction, scheduleEndInteraction])
 
   // Initialize collector with adapter metadata for GPU name.
   useEffect(() => {
@@ -458,6 +485,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // before createShaderModule() blocks the main thread.
       const perfStore = usePerformanceStore.getState()
       perfStore.setShaderCompiling('pipeline', true)
+      perfStore.resetRefinement()
 
       await waitForPaint()
       if (shouldAbortSetup()) {
@@ -1387,6 +1415,12 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
+      }
+
+      // Clear interaction debounce timer
+      if (interactionTimerRef.current !== null) {
+        window.clearTimeout(interactionTimerRef.current)
+        interactionTimerRef.current = null
       }
 
       runtime.abortRequested = true

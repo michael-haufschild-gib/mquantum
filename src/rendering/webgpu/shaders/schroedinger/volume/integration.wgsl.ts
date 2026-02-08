@@ -1065,19 +1065,18 @@ fn volumeRaymarchHQ(
     }
 
     // Phase materiality: smoke regions are denser (more absorbing)
-    var pmDensityMod = 1.0;
+    // Density contrast sharpening: compress low-density tails for sharper lobes
+    var effectiveRho = applyDensityContrast(rho, uniforms);
+    // Phase materiality: smoke regions are denser (more absorbing)
     if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
-      pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
-    // Nodal plane softening: density floor scaled by cloud depth
+    // Nodal plane softening: density floor AFTER contrast so sigmoid doesn't kill it
     let cloudDepthHQ = 1.0 - transmittance;
-    let nodalFloorHQ = 5e-4 * cloudDepthHQ * cloudDepthHQ;
-    let effectiveRho = max(rho, nodalFloorHQ);
-    // Density contrast sharpening: compress low-density tails for sharper lobes
-    let contrastedRho = applyDensityContrast(effectiveRho, uniforms);
-    let alpha = computeAlpha(contrastedRho * pmDensityMod, adaptiveStep, uniforms.densityGain);
+    effectiveRho = max(effectiveRho, 5e-4 * cloudDepthHQ * cloudDepthHQ);
+    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
       // Track primary hit for temporal reprojection
@@ -1296,20 +1295,18 @@ fn volumeRaymarchGrid(
       }
     }
 
-    // Phase materiality modifier
-    var pmDensityMod = 1.0;
+    // Density contrast sharpening: compress low-density tails for sharper lobes
+    var effectiveRho = applyDensityContrast(rho, uniforms);
+    // Phase materiality: smoke regions are denser (more absorbing)
     if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
-      pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
-    // Nodal plane softening: density floor scaled by cloud depth
+    // Nodal plane softening: density floor AFTER contrast so sigmoid doesn't kill it
     let cloudDepth = 1.0 - transmittance;
-    let nodalFloor = 5e-4 * cloudDepth * cloudDepth;
-    let effectiveRho = max(rho, nodalFloor);
-    // Density contrast sharpening
-    let contrastedRho = applyDensityContrast(effectiveRho, uniforms);
-    let alpha = computeAlpha(contrastedRho * pmDensityMod, adaptiveStep, uniforms.densityGain);
+    effectiveRho = max(effectiveRho, 5e-4 * cloudDepth * cloudDepth);
+    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
       if (primaryHitT < 0.0 && alpha > primaryHitThreshold) {

@@ -3,6 +3,7 @@
  * Displays progressive refinement progress
  */
 
+import { useProgressiveRefinement } from '@/hooks/useProgressiveRefinement'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -27,6 +28,9 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
   position = 'bottom-right',
   autoHideDelay = 1000,
 }) => {
+  // Drive the progressive refinement state machine
+  useProgressiveRefinement()
+
   const { enabled, stage, progress, isInteracting } = usePerformanceStore(
     useShallow((s) => ({
       enabled: s.progressiveRefinementEnabled,

@@ -1363,6 +1363,41 @@ ${bayerJitterSection}
   var finalAlpha = volumeResult.alpha;
   var hitT = volumeResult.primaryHitT;
 
+  // True nodal-surface ray-hit mode: trace f=0 directly and composite as a crisp surface.
+  if (
+    FEATURE_NODAL &&
+    schroedinger.nodalEnabled != 0u &&
+    schroedinger.nodalStrength > 0.0 &&
+    schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE
+  ) {
+    let animTime = getVolumeTime(schroedinger);
+    let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
+    let localSpan = max(
+      (tFar - tNear) * mix(0.14, 0.26, surfaceStrengthT),
+      mix(0.16, 0.36, surfaceStrengthT)
+    );
+    let localNear = max(tNear, volumeResult.primaryHitT - localSpan);
+    let localFar = min(tFar, volumeResult.primaryHitT + localSpan);
+    let nodalHit = findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger);
+    if (nodalHit.hitMask > 0.0) {
+      let nodalColor = selectPhysicalNodalColor(
+        schroedinger,
+        nodalHit.colorMode,
+        nodalHit.signValue
+      );
+      let facing = max(dot(nodalHit.normal, -rd), 0.0);
+      let surfaceLight = 0.35 + 0.65 * facing;
+      let overlayColor = nodalColor * surfaceLight;
+      let overlayAlpha = clamp(
+        (0.45 + 0.55 * nodalHit.hitMask) * schroedinger.nodalStrength,
+        0.0,
+        0.95
+      );
+      finalColor = mix(finalColor, overlayColor, overlayAlpha);
+      finalAlpha = max(finalAlpha, overlayAlpha);
+    }
+  }
+
   if (crossSection.alpha > 0.0) {
     if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
       finalColor = crossSection.color;
