@@ -381,6 +381,7 @@ export class WebGPURenderGraph {
         }
       })
       .catch((err) => {
+        if (!this.initialized) return // Buffer destroyed by dispose() — expected
         console.warn('[WebGPU RenderGraph] Timestamp readback failed:', err)
       })
       .finally(() => {

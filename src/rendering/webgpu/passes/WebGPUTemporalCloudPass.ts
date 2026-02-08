@@ -91,6 +91,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private _inverseViewProjectionMatrix = new Float32Array(16)
   private _fallbackIdentityMatrix = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])
   private hasValidHistory = false
+  // Static scene detection: freeze Bayer cycling when nothing changes
+  private prevAnimationTime = Number.NaN
+  private completedFullCycle = false
   private lastWidth = 0
   private lastHeight = 0
 
@@ -752,13 +755,48 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       )
     }
 
+    // Detect whether the scene has changed since the last frame.
+    // When static, freeze the Bayer offset cycle to prevent per-frame jitter.
+    const animation = ctx.frame?.stores?.['animation'] as
+      | { accumulatedTime?: number }
+      | undefined
+    const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+    const animTimeChanged = currentAnimTime !== this.prevAnimationTime
+    const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)
+    const sceneChanged = animTimeChanged || cameraChanged || !this.hasValidHistory
+
     // Update state for next frame
-    // BUG-T6 FIX: Cycle frame index 0-3
-    this.frameIndex = (this.frameIndex + 1) % 4
+    // Only advance frame index when scene content has changed.
+    // When static, we allow one full 4-frame cycle to accumulate all Bayer
+    // sub-pixel samples, then freeze to produce a stable output.
+    if (sceneChanged) {
+      this.frameIndex = (this.frameIndex + 1) % 4
+      this.completedFullCycle = false
+    } else if (!this.completedFullCycle) {
+      // Allow the remaining frames in the current 4-frame cycle to complete
+      const nextIndex = (this.frameIndex + 1) % 4
+      this.frameIndex = nextIndex
+      if (nextIndex === 0) {
+        this.completedFullCycle = true
+      }
+    }
+    // else: scene is static and full cycle completed → freeze frameIndex
+    this.prevAnimationTime = currentAnimTime
     this.hasValidHistory = true
 
     // Store camera position for cut detection (BUG-T5)
     this.prevCameraPosition = { ...cameraPosition }
+  }
+
+  /**
+   * Compare two Float32Array matrices for equality (exact bitwise).
+   */
+  private matricesEqual(a: Float32Array, b: Float32Array): boolean {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false
+    }
+    return true
   }
 
   /**
@@ -780,6 +818,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
    */
   resetHistory(): void {
     this.hasValidHistory = false
+    this.completedFullCycle = false
   }
 
   /**

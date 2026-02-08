@@ -106,8 +106,20 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Get quarter-res texture dimensions
   let quarterDims = vec2i(textureDimensions(quarterColor));
 
-  // Sample current frame quarter-res color
+  // Current frame: spatially interpolate from quarter-res for ALL pixels.
+  // This ensures every pixel reflects the current frame's data, eliminating
+  // the visible Bayer shimmer caused by treating pixels differently based
+  // on the cycling Bayer offset.
+  let interpolated = spatialInterpolate(fullCoord, quarterDims);
+
+  // For the Bayer-aligned pixel, we have an exact sample (no interpolation needed)
+  let blockPos = vec2f(f32(fullCoord.x % 2), f32(fullCoord.y % 2));
+  let isRenderedPixel = (blockPos.x == temporal.bayerOffset.x && blockPos.y == temporal.bayerOffset.y);
   let current = sampleQuarterRes(quarterCoord, quarterDims);
+
+  // Use exact sample for rendered pixel, interpolated for others
+  let currentColor = select(interpolated.rgb, current.rgb, isRenderedPixel);
+  let currentAlpha = select(interpolated.a, current.a, isRenderedPixel);
 
   // Sample reprojected history (RGB color, A = validity)
   let historyData = textureLoad(reprojectedHistory, fullCoord, 0);
@@ -122,42 +134,32 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Clamp history to neighborhood bounds (prevents ghosting)
   let clampedHistory = clamp(historyColor, neighborMin, neighborMax);
 
-  // Determine if this pixel was rendered this frame using Bayer pattern
-  let blockPos = vec2f(f32(fullCoord.x % 2), f32(fullCoord.y % 2));
-  let isRenderedPixel = (blockPos.x == temporal.bayerOffset.x && blockPos.y == temporal.bayerOffset.y);
-
+  // Blend current frame with clamped history uniformly for all pixels.
+  // All pixels get the same treatment regardless of Bayer position,
+  // preventing the 4-frame pattern that causes visible jitter.
   var result: vec3f;
   var alpha: f32;
 
-  if (isRenderedPixel) {
-    // This pixel was rendered this frame
-    if (validity > 0.5) {
-      // Valid history - use configured history weight to suppress Bayer shimmer.
-      let blendWeight = temporal.historyWeight * validity;
-      result = mix(current.rgb, clampedHistory, blendWeight);
-    } else {
-      // No valid history - use current frame directly
-      result = current.rgb;
-    }
-    alpha = current.a;
+  if (validity > 0.5 && currentAlpha > 0.001) {
+    let blendWeight = temporal.historyWeight * validity;
+    result = mix(currentColor, clampedHistory, blendWeight);
+    alpha = currentAlpha;
+  } else if (currentAlpha > 0.001) {
+    // No valid history - use current frame directly
+    result = currentColor;
+    alpha = currentAlpha;
+  } else if (validity > 0.5) {
+    // No current data but valid history
+    result = clampedHistory;
+    alpha = 1.0;
   } else {
-    // This pixel was NOT rendered this frame
-    if (validity > 0.5) {
-      // Have valid history - use it
-      result = clampedHistory;
-      // History alpha is not stored in reprojectedHistory (A holds validity),
-      // so keep reconstructed pixels opaque to avoid dark/translucent "shadow" artifacts.
-      alpha = 1.0;
-    } else {
-      // No valid history - spatial interpolation from current quarter-res
-      let interpolated = spatialInterpolate(fullCoord, quarterDims);
-      result = interpolated.rgb;
-      alpha = interpolated.a;
-    }
+    // Nothing available
+    result = vec3f(0.0);
+    alpha = 0.0;
   }
 
   // Ensure solid objects remain solid (preserve alpha = 1.0)
-  if (current.a > 0.99) {
+  if (currentAlpha > 0.99) {
     alpha = 1.0;
   }
 

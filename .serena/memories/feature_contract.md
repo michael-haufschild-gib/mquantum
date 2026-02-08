@@ -1,15 +1,14 @@
 # Session Handoff
 
-_Generated: 2026-02-08 11:07 UTC (precompact)_
+_Generated: 2026-02-08 13:36 UTC (precompact)_
 
 ## Current Task
-This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+fix this. but this cannot be the true reason: film grain is not active. also the jitter is there when animations are on or off. fix the film grain bug yo ufound, then continue your investigation
 
 ## Status: unknown items complete
 
 ## Files Modified This Session
-- `Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/volume/integration.wgsl.ts`
-- `Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/main.wgsl.ts`
+- `Documents/code/mquantum/src/rendering/webgpu/passes/ToneMappingCinematicPass.ts`
 
 ---
 _Auto-generated. Edit if inaccurate. Will be injected on session start if fresh._

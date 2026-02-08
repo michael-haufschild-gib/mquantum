@@ -586,7 +586,10 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
     floatView[0] = ctx.size.width
     floatView[1] = ctx.size.height
-    floatView[2] = ctx.frame?.time ?? 0
+    // Use animation time (pauses with animation) instead of wall-clock time
+    // to prevent film grain noise pattern from jittering when paused
+    const animation = ctx.frame?.stores?.['animation'] as any
+    floatView[2] = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     intView[3] = this.toneMapping // i32
     floatView[4] = this.exposure
     floatView[5] = this.aberration

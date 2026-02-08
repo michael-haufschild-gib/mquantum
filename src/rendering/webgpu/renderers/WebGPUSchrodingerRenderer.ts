@@ -233,6 +233,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // PERF: Pre-allocated DataView for camera uniform uint32 writes (avoids per-frame allocation)
   private cameraDataView = new DataView(this.cameraUniformData.buffer)
 
+  // Temporal Bayer offset freeze: only advance when scene changes to prevent jitter
+  private temporalBayerIndex = 0
+  private prevTemporalAnimTime = Number.NaN
+  private prevTemporalVPMatrix = new Float32Array(16)
+  private completedTemporalCycle = false
+
   // Dirty-flag version tracking - skip uniform updates when unchanged
   // Schroedinger uses partial buffer writes: only time field (4 bytes) when settings unchanged
   private lastSchroedingerVersion = -1
@@ -806,11 +812,35 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.cameraDataView.setUint32(123 * 4, ctx.frame?.frameNumber || 0, true)
 
     // Temporal accumulation: Bayer offset for quarter-res rendering.
-    // Align with WebGPUTemporalCloudPass frameIndex cycle, which starts at 0
-    // on the first rendered frame.
-    const frameNumber = ctx.frame?.frameNumber ?? 1
-    const frameIndex = (((frameNumber - 1) % 4) + 4) % 4
-    const bayerOffset = BAYER_OFFSETS[frameIndex % 4]!
+    // Only advance the Bayer cycle when scene content changes (camera move/rotate
+    // or animation time change) to prevent sub-pixel jitter on static scenes.
+    const animTimeChanged = animationTime !== this.prevTemporalAnimTime
+    let cameraChanged = false
+    if (camera.viewProjectionMatrix?.elements) {
+      const vpElems = camera.viewProjectionMatrix.elements
+      for (let i = 0; i < 16; i++) {
+        if (vpElems[i] !== this.prevTemporalVPMatrix[i]) {
+          cameraChanged = true
+          break
+        }
+      }
+      this.prevTemporalVPMatrix.set(vpElems)
+    }
+    const sceneChanged = animTimeChanged || cameraChanged
+
+    if (sceneChanged) {
+      this.temporalBayerIndex = (this.temporalBayerIndex + 1) % 4
+      this.completedTemporalCycle = false
+    } else if (!this.completedTemporalCycle) {
+      const nextIndex = (this.temporalBayerIndex + 1) % 4
+      this.temporalBayerIndex = nextIndex
+      if (nextIndex === 0) {
+        this.completedTemporalCycle = true
+      }
+    }
+    this.prevTemporalAnimTime = animationTime
+
+    const bayerOffset = BAYER_OFFSETS[this.temporalBayerIndex]!
     data[124] = bayerOffset[0] // bayerOffset.x
     data[125] = bayerOffset[1] // bayerOffset.y
     data[126] = 0 // padding

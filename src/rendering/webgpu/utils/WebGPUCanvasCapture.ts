@@ -186,6 +186,7 @@ export class WebGPUCanvasCapture {
         }
       })
       .catch((error) => {
+        if (this.disposed) return // Buffer destroyed by dispose() — expected
         const message = error instanceof Error ? error.message : 'Screenshot readback failed'
         onError(message, requestId)
       })
