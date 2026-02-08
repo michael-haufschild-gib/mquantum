@@ -51,9 +51,7 @@ export interface SchroedingerSliceActions {
   // Quantum Mode Selection
   setSchroedingerQuantumMode: (mode: SchroedingerQuantumMode) => void
   setSchroedingerRepresentation: (mode: SchroedingerConfig['representation']) => void
-  setSchroedingerMomentumDisplayUnits: (
-    units: SchroedingerConfig['momentumDisplayUnits']
-  ) => void
+  setSchroedingerMomentumDisplayUnits: (units: SchroedingerConfig['momentumDisplayUnits']) => void
   setSchroedingerMomentumScale: (scale: number) => void
   setSchroedingerMomentumHbar: (hbar: number) => void
 
@@ -171,6 +169,18 @@ export interface SchroedingerSliceActions {
   setSchroedingerProbabilityFlowSpeed: (speed: number) => void
   setSchroedingerProbabilityFlowStrength: (strength: number) => void
 
+  // Electric Arcs (artistic)
+  setSchroedingerArcEnabled: (enabled: boolean) => void
+  setSchroedingerArcIntensity: (intensity: number) => void
+  setSchroedingerArcScale: (scale: number) => void
+  setSchroedingerArcSharpness: (sharpness: number) => void
+  setSchroedingerArcSparsity: (sparsity: number) => void
+  setSchroedingerArcSpeed: (speed: number) => void
+  setSchroedingerArcThickness: (thickness: number) => void
+  setSchroedingerArcColor: (color: string) => void
+  setSchroedingerArcColorMix: (mix: number) => void
+  setSchroedingerArcDensityGate: (gate: number) => void
+
   // Radial Probability Overlay (hydrogen)
   setSchroedingerRadialProbabilityEnabled: (enabled: boolean) => void
   setSchroedingerRadialProbabilityOpacity: (opacity: number) => void
@@ -186,9 +196,7 @@ export interface SchroedingerSliceActions {
     mode: SchroedingerConfig['crossSectionCompositeMode']
   ) => void
   setSchroedingerCrossSectionScalar: (scalar: SchroedingerConfig['crossSectionScalar']) => void
-  setSchroedingerCrossSectionPlaneMode: (
-    mode: SchroedingerConfig['crossSectionPlaneMode']
-  ) => void
+  setSchroedingerCrossSectionPlaneMode: (mode: SchroedingerConfig['crossSectionPlaneMode']) => void
   setSchroedingerCrossSectionAxis: (axis: SchroedingerConfig['crossSectionAxis']) => void
   setSchroedingerCrossSectionPlaneNormal: (normal: [number, number, number]) => void
   setSchroedingerCrossSectionPlaneOffset: (offset: number) => void

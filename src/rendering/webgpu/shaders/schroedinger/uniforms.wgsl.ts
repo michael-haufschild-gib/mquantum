@@ -304,6 +304,18 @@ struct SchroedingerUniforms {
   _padRadialProb0: f32,             // offset 1356
   radialProbabilityColor: vec3f,    // offset 1360 (16-byte aligned: 1360 % 16 = 0)
   _padRadialProb1: f32,             // offset 1372
+
+  // Electric arc parameters (artistic)
+  arcEnabled: u32,                   // offset 1376
+  arcIntensity: f32,                 // offset 1380
+  arcScale: f32,                     // offset 1384
+  arcSharpness: f32,                 // offset 1388
+  arcSparsity: f32,                  // offset 1392
+  arcSpeed: f32,                     // offset 1396
+  arcThickness: f32,                 // offset 1400
+  arcColorMix: f32,                  // offset 1404
+  arcColor: vec3f,                   // offset 1408 (16-byte aligned: 1408 % 16 = 0)
+  arcDensityGate: f32,               // offset 1420
 }
 
 // ============================================

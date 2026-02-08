@@ -1,3 +1,4 @@
+import { ColorPicker } from '@/components/ui/ColorPicker'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
@@ -24,6 +25,17 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setErosionTurbulence: state.setSchroedingerErosionTurbulence,
     setErosionNoiseType: state.setSchroedingerErosionNoiseType,
     setErosionHQ: state.setSchroedingerErosionHQ,
+    // Electric Arcs
+    setArcEnabled: state.setSchroedingerArcEnabled,
+    setArcIntensity: state.setSchroedingerArcIntensity,
+    setArcScale: state.setSchroedingerArcScale,
+    setArcSharpness: state.setSchroedingerArcSharpness,
+    setArcSparsity: state.setSchroedingerArcSparsity,
+    setArcSpeed: state.setSchroedingerArcSpeed,
+    setArcThickness: state.setSchroedingerArcThickness,
+    setArcColor: state.setSchroedingerArcColor,
+    setArcColorMix: state.setSchroedingerArcColorMix,
+    setArcDensityGate: state.setSchroedingerArcDensityGate,
   }))
   const {
     config,
@@ -40,6 +52,16 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setErosionTurbulence,
     setErosionNoiseType,
     setErosionHQ,
+    setArcEnabled,
+    setArcIntensity,
+    setArcScale,
+    setArcSharpness,
+    setArcSparsity,
+    setArcSpeed,
+    setArcThickness,
+    setArcColor,
+    setArcColorMix,
+    setArcDensityGate,
   } = useExtendedObjectStore(extendedObjectSelector)
 
   // Emission settings from appearance store
@@ -262,6 +284,112 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
                   {config.erosionHQ ? 'ON' : 'OFF'}
                 </ToggleButton>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Electric Arcs */}
+        <div className="space-y-2 mt-3 pt-3 border-t border-border-subtle">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-text-secondary font-medium">Electric Arcs</label>
+            <ToggleButton
+              pressed={config.arcEnabled ?? false}
+              onToggle={() => setArcEnabled(!(config.arcEnabled ?? false))}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle electric arcs"
+              data-testid="schroedinger-arc-toggle"
+            >
+              {config.arcEnabled ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          {config.arcEnabled && (
+            <div className="ps-2 border-s border-border-default space-y-2">
+              <Slider
+                label="Intensity"
+                min={0}
+                max={2}
+                step={0.05}
+                value={config.arcIntensity ?? 0.8}
+                onChange={setArcIntensity}
+                showValue
+                data-testid="schroedinger-arc-intensity"
+              />
+              <Slider
+                label="Scale"
+                min={0.5}
+                max={8}
+                step={0.1}
+                value={config.arcScale ?? 3.0}
+                onChange={setArcScale}
+                showValue
+                data-testid="schroedinger-arc-scale"
+              />
+              <Slider
+                label="Sharpness"
+                min={1}
+                max={12}
+                step={0.1}
+                value={config.arcSharpness ?? 5.0}
+                onChange={setArcSharpness}
+                showValue
+                data-testid="schroedinger-arc-sharpness"
+              />
+              <Slider
+                label="Sparsity"
+                min={0}
+                max={1}
+                step={0.01}
+                value={config.arcSparsity ?? 0.4}
+                onChange={setArcSparsity}
+                showValue
+                data-testid="schroedinger-arc-sparsity"
+              />
+              <Slider
+                label="Speed"
+                min={0}
+                max={3}
+                step={0.05}
+                value={config.arcSpeed ?? 0.5}
+                onChange={setArcSpeed}
+                showValue
+                data-testid="schroedinger-arc-speed"
+              />
+              <Slider
+                label="Thickness"
+                min={1}
+                max={8}
+                step={0.1}
+                value={config.arcThickness ?? 4.0}
+                onChange={setArcThickness}
+                showValue
+                data-testid="schroedinger-arc-thickness"
+              />
+              <Slider
+                label="Color Mix"
+                min={0}
+                max={1}
+                step={0.01}
+                value={config.arcColorMix ?? 0.5}
+                onChange={setArcColorMix}
+                showValue
+                data-testid="schroedinger-arc-color-mix"
+              />
+              <Slider
+                label="Density Gate"
+                min={0}
+                max={1}
+                step={0.01}
+                value={config.arcDensityGate ?? 0.05}
+                onChange={setArcDensityGate}
+                showValue
+                data-testid="schroedinger-arc-density-gate"
+              />
+              <ColorPicker
+                label="Arc Color"
+                value={config.arcColor ?? '#88ccff'}
+                onChange={setArcColor}
+                disableAlpha
+              />
             </div>
           )}
         </div>

@@ -38,7 +38,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1376
+const SCHROEDINGER_UNIFORM_SIZE = 1424
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -1215,20 +1215,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
     floatView[716 / 4] = pbr?.face?.roughness ?? 0.3 // WebGL uses 'pbr-face' source
 
-    // SSS fields (read from global appearance store, not per-object store)
-    intView[720 / 4] = appearance?.sssEnabled ? 1 : 0
-    floatView[724 / 4] = appearance?.sssIntensity ?? 1.0 // WebGL default: 1.0
-
-    // sssColor (vec3f needs 16-byte alignment, so it's at 736 after implicit padding)
-    // Parse hex color from appearance store
-    const sssColor = this.parseColor(appearance?.sssColor ?? '#ff8844')
-    floatView[736 / 4] = sssColor[0]
-    floatView[740 / 4] = sssColor[1]
-    floatView[744 / 4] = sssColor[2]
+    // SSS fields in SchroedingerUniforms are DEAD — shader reads from MaterialUniforms
+    // (material.sss* in bind group 1). Keep struct layout stable by zero-filling.
+    intView[720 / 4] = 0     // sssEnabled (dead)
+    floatView[724 / 4] = 0.0 // sssIntensity (dead)
+    // bytes 728-735: implicit padding before vec3f
+    floatView[736 / 4] = 0.0 // sssColor.r (dead)
+    floatView[740 / 4] = 0.0 // sssColor.g (dead)
+    floatView[744 / 4] = 0.0 // sssColor.b (dead)
     floatView[748 / 4] = 0.0 // _pad1
-
-    floatView[752 / 4] = appearance?.sssThickness ?? 1.0
-    floatView[756 / 4] = appearance?.sssJitter ?? 0.2 // WebGL default: 0.2
+    floatView[752 / 4] = 0.0 // sssThickness (dead)
+    floatView[756 / 4] = 0.0 // sssJitter (dead)
 
     // Erosion fields
     floatView[760 / 4] = schroedinger?.erosionStrength ?? 0.0
@@ -1484,6 +1481,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1364 / 4] = rpColor[1]
     floatView[1368 / 4] = rpColor[2]
     floatView[1372 / 4] = 0.0  // padding
+
+    // Electric arc parameters (offset 1376-1424)
+    intView[1376 / 4] = schroedinger?.arcEnabled ? 1 : 0
+    floatView[1380 / 4] = schroedinger?.arcIntensity ?? 1.0
+    floatView[1384 / 4] = schroedinger?.arcScale ?? 3.0
+    floatView[1388 / 4] = schroedinger?.arcSharpness ?? 5.0
+    floatView[1392 / 4] = schroedinger?.arcSparsity ?? 0.3
+    floatView[1396 / 4] = schroedinger?.arcSpeed ?? 0.5
+    floatView[1400 / 4] = schroedinger?.arcThickness ?? 4.0
+    floatView[1404 / 4] = schroedinger?.arcColorMix ?? 0.5
+    const arcCol = this.parseColor(schroedinger?.arcColor ?? '#88ccff')
+    floatView[1408 / 4] = arcCol[0]
+    floatView[1412 / 4] = arcCol[1]
+    floatView[1416 / 4] = arcCol[2]
+    floatView[1420 / 4] = schroedinger?.arcDensityGate ?? 0.0
 
     // ============================================
     // HO MOMENTUM: CPU UNIFORM TRANSFORMATION

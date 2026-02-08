@@ -1218,6 +1218,10 @@ fn volumeRaymarchGrid(
   let fogColor = lighting.ambientColor * lighting.ambientIntensity;
   var transmittance: f32 = 1.0;
 
+  // PERF: Hoist loop-invariant bounding radius computation
+  let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+  let boundR2Skip = boundR2 * 0.85;
+
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
     iterCount = i + 1;
@@ -1229,6 +1233,15 @@ fn volumeRaymarchGrid(
     if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
+
+    // PERF: Gaussian envelope early-skip for deep tail region.
+    // The outer ~15% shell of the bounding sphere is exponentially low density.
+    // Skip expensive texture lookups and take 8x steps through it.
+    let r2 = dot(pos, pos);
+    if (r2 > boundR2Skip) {
+      t += stepLen * 8.0;
+      continue;
+    }
 
     // Sample density from pre-computed 3D grid texture
     // Returns (rho, logRho, spatialPhase, 0) for rgba16float
@@ -1253,10 +1266,13 @@ fn volumeRaymarchGrid(
     }
 
     // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
-    if (FEATURE_UNCERTAINTY_BOUNDARY) { rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms); }
-    // Update logRho to reflect emphasis so emission color/brightness matches inline path
-    // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
-    sCenter = select(-20.0, log(rho), rho > 1e-9);
+    // PERF: Only recompute log(rho) when emphasis actually modifies rho
+    if (FEATURE_UNCERTAINTY_BOUNDARY) {
+      rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
+      // Update logRho to reflect emphasis so emission color/brightness matches inline path
+      // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
+      sCenter = select(-20.0, log(rho), rho > 1e-9);
+    }
 
     // Skip near-zero density regions
     if (rho < EMPTY_SKIP_THRESHOLD) {

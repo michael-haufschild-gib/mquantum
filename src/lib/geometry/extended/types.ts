@@ -485,6 +485,29 @@ export interface SchroedingerConfig {
 
   // === Radial Probability Overlay (hydrogen only) ===
   /** Show P(r) = 4πr²|R_nl(r)|² as semi-transparent spherical shell overlay */
+
+  // === Electric Arcs (artistic) ===
+  /** Enable electric arc visual effect */
+  arcEnabled: boolean
+  /** Arc emission intensity (0.0-2.0) */
+  arcIntensity: number
+  /** Arc noise scale (0.5-8.0) */
+  arcScale: number
+  /** Ridge sharpness exponent (1.0-8.0) */
+  arcSharpness: number
+  /** Filament sparsity threshold (0.0-1.0) */
+  arcSparsity: number
+  /** Animation speed (0.0-3.0) */
+  arcSpeed: number
+  /** Filament thickness (0.5-4.0) */
+  arcThickness: number
+  /** Arc tint color (hex string) */
+  arcColor: string
+  /** Additive blend strength (0.0-1.0) */
+  arcColorMix: number
+  /** Minimum density to show arcs (0.0-1.0) */
+  arcDensityGate: number
+
   radialProbabilityEnabled: boolean
   /** Overlay opacity [0,1] */
   radialProbabilityOpacity: number
@@ -679,6 +702,18 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Phase Animation (Hydrogen ND only)
   phaseAnimationEnabled: false,
+
+  // Electric Arcs (artistic)
+  arcEnabled: false,
+  arcIntensity: 1.0,
+  arcScale: 3.0,
+  arcSharpness: 5.0,
+  arcSparsity: 0.3,
+  arcSpeed: 0.5,
+  arcThickness: 4.0,
+  arcColor: '#88ccff',
+  arcColorMix: 0.5,
+  arcDensityGate: 0.0,
 
   // Radial Probability Overlay (hydrogen only)
   radialProbabilityEnabled: false,

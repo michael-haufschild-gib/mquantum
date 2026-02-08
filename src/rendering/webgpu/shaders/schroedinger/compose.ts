@@ -116,6 +116,7 @@ import {
 } from './quantum/hoSuperpositionVariants.wgsl'
 
 // Volume blocks
+import { arcEmissionBlock } from './volume/arcs.wgsl'
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
 import {
@@ -500,6 +501,7 @@ struct VertexOutput {
     { name: 'Volume Emission (Pre)', content: emissionPreBlock },
     { name: 'Volume Emission (Color)', content: generateComputeBaseColor(colorAlgorithm) },
     { name: 'Volume Emission (Post)', content: emissionPostBlock },
+    { name: 'Arc Emission', content: arcEmissionBlock },
     { name: 'Cross-Section Slice', content: crossSectionBlock },
     { name: 'Radial Probability Overlay', content: includeHydrogen ? radialProbabilityBlock : radialProbabilityStubBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },
