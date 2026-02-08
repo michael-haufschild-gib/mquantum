@@ -65,6 +65,7 @@ export const ExportModal = () => {
   const isDesktop = useIsDesktop()
   const [activeTab, setActiveTab] = useState<ExportTabId>('presets')
   const [showStopConfirm, setShowStopConfirm] = useState(false)
+  const effectiveMode = exportModeOverride || exportMode
 
   // Build tabs list - include Preview tab only on mobile
   const tabs = useMemo(() => {
@@ -183,8 +184,6 @@ export const ExportModal = () => {
 
   // Get contextual guidance based on selected mode
   const getModeGuidance = () => {
-    const effectiveMode = exportModeOverride || exportMode
-
     if (effectiveMode === 'in-memory') {
       return 'Video stays in memory until download. Best for short exports.'
     }
@@ -250,7 +249,7 @@ export const ExportModal = () => {
                   <h3 className="text-xl font-bold text-accent animate-pulse">
                     {status === 'previewing'
                       ? 'Generating Preview...'
-                      : exportMode === 'stream'
+                      : effectiveMode === 'stream'
                         ? 'Streaming to Disk...'
                         : 'Rendering Sequence...'}
                   </h3>
@@ -482,7 +481,7 @@ export const ExportModal = () => {
                   <div className="flex flex-col items-center">
                     <span className="text-sm font-bold flex items-center gap-2">
                       <Icon name="image" className="w-4 h-4" />
-                      {exportMode === 'stream' ? 'Select File & Start' : 'Start Rendering'}
+                      {effectiveMode === 'stream' ? 'Select File & Start' : 'Start Rendering'}
                     </span>
                   </div>
                 </Button>

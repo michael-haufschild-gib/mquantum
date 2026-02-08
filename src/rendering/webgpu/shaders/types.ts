@@ -38,16 +38,12 @@ export interface WGSLShaderConfig {
   overrides?: string[]
   /** Enable SSS module compilation (conditionally compiled) */
   sss?: boolean
-  /** Enable Chromatic dispersion effect (conditionally compiled) */
-  dispersion?: boolean
   /** Enable Nodal surface highlighting (conditionally compiled) */
   nodal?: boolean
   /** Enable Energy level coloring (conditionally compiled) */
   energyColor?: boolean
   /** Enable uncertainty-boundary emphasis effect (conditionally compiled) */
   uncertaintyBoundary?: boolean
-  /** Enable Edge erosion effect (conditionally compiled) */
-  erosion?: boolean
   /**
    * Color algorithm for compile-time optimization
    * When specified, only the required color module(s) are included:

@@ -333,28 +333,6 @@ export interface SchroedingerConfig {
   /** Jitter/Noise amount for SSS (0.0-1.0) */
   sssJitter: number
 
-  // === Edge Detail Erosion ===
-  /** Strength of edge noise erosion (0.0-1.0) */
-  erosionStrength: number
-  /** Scale of erosion noise (0.25-4.0) */
-  erosionScale: number
-  /** Turbulence/swirl amount for erosion (0.0-1.0) */
-  erosionTurbulence: number
-  /** Noise type for erosion (0=Worley, 1=Perlin, 2=Hybrid) */
-  erosionNoiseType: number
-  /** High quality erosion mode (3×3×3 Worley + 4-sample curl vs 2×2×2 + 2-sample) */
-  erosionHQ: boolean
-
-  // === Chromatic Dispersion ===
-  /** Enable chromatic dispersion */
-  dispersionEnabled: boolean
-  /** Dispersion strength (0.0-1.0) */
-  dispersionStrength: number
-  /** Dispersion direction (0=Radial, 1=View-Aligned, 2=Custom) */
-  dispersionDirection: number
-  /** Dispersion quality/accuracy (0=Gradient Hack, 1=Full Sampling) */
-  dispersionQuality: number
-
   // === Quantum Effects ===
   /** Enable nodal surface highlighting */
   nodalEnabled: boolean
@@ -485,29 +463,6 @@ export interface SchroedingerConfig {
 
   // === Radial Probability Overlay (hydrogen only) ===
   /** Show P(r) = 4πr²|R_nl(r)|² as semi-transparent spherical shell overlay */
-
-  // === Electric Arcs (artistic) ===
-  /** Enable electric arc visual effect */
-  arcEnabled: boolean
-  /** Arc emission intensity (0.0-2.0) */
-  arcIntensity: number
-  /** Arc noise scale (0.5-8.0) */
-  arcScale: number
-  /** Ridge sharpness exponent (1.0-8.0) */
-  arcSharpness: number
-  /** Filament sparsity threshold (0.0-1.0) */
-  arcSparsity: number
-  /** Animation speed (0.0-3.0) */
-  arcSpeed: number
-  /** Filament thickness (0.5-4.0) */
-  arcThickness: number
-  /** Arc tint color (hex string) */
-  arcColor: string
-  /** Additive blend strength (0.0-1.0) */
-  arcColorMix: number
-  /** Minimum density to show arcs (0.0-1.0) */
-  arcDensityGate: number
-
   radialProbabilityEnabled: boolean
   /** Overlay opacity [0,1] */
   radialProbabilityOpacity: number
@@ -619,19 +574,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   sssThickness: 1.0,
   sssJitter: 0.2,
 
-  // Erosion
-  erosionStrength: 0.0,
-  erosionScale: 1.0,
-  erosionTurbulence: 0.5,
-  erosionNoiseType: 0,
-  erosionHQ: false,
-
-  // Dispersion
-  dispersionEnabled: false,
-  dispersionStrength: 0.2,
-  dispersionDirection: 0,
-  dispersionQuality: 0,
-
   // Quantum Effects
   nodalEnabled: false,
   nodalColor: '#00ffff', // Cyan
@@ -702,18 +644,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Phase Animation (Hydrogen ND only)
   phaseAnimationEnabled: false,
-
-  // Electric Arcs (artistic)
-  arcEnabled: false,
-  arcIntensity: 1.0,
-  arcScale: 3.0,
-  arcSharpness: 5.0,
-  arcSparsity: 0.3,
-  arcSpeed: 0.5,
-  arcThickness: 4.0,
-  arcColor: '#88ccff',
-  arcColorMix: 0.5,
-  arcDensityGate: 0.0,
 
   // Radial Probability Overlay (hydrogen only)
   radialProbabilityEnabled: false,

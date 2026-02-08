@@ -38,7 +38,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1424
+const SCHROEDINGER_UNIFORM_SIZE = 1376
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -118,8 +118,6 @@ export interface SchrodingerRendererConfig {
   temporal?: boolean
   /** Compile-time specialization flag for nodal calculations. */
   nodalEnabled?: boolean
-  /** Compile-time specialization flag for chromatic dispersion. */
-  dispersionEnabled?: boolean
   /** Compile-time specialization flag for phase materiality. */
   phaseMaterialityEnabled?: boolean
   /** Compile-time specialization flag for interference. */
@@ -301,7 +299,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       quantumMode: 'harmonicOscillator',
       temporal: false,
       nodalEnabled: true,
-      dispersionEnabled: true,
       phaseMaterialityEnabled: true,
       interferenceEnabled: true,
       uncertaintyBoundaryEnabled: true,
@@ -329,7 +326,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       quantumMode: this.rendererConfig.quantumMode,
       termCount: this.rendererConfig.termCount,
       nodal: this.rendererConfig.nodalEnabled ?? true,
-      dispersion: this.rendererConfig.dispersionEnabled ?? true,
       colorAlgorithm: this.rendererConfig.colorAlgorithm,
       temporalAccumulation: this.rendererConfig.temporal,
       phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
@@ -1227,11 +1223,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[752 / 4] = 0.0 // sssThickness (dead)
     floatView[756 / 4] = 0.0 // sssJitter (dead)
 
-    // Erosion fields
-    floatView[760 / 4] = schroedinger?.erosionStrength ?? 0.0
-    floatView[764 / 4] = schroedinger?.erosionScale ?? 1.0
-    floatView[768 / 4] = schroedinger?.erosionTurbulence ?? 0.5 // WebGL default: 0.5
-    intView[772 / 4] = schroedinger?.erosionNoiseType ?? 0
+    // Reserved (formerly erosion, removed)
+    floatView[760 / 4] = 0.0
+    floatView[764 / 4] = 0.0
+    floatView[768 / 4] = 0.0
+    intView[772 / 4] = 0
 
     // Reserved (formerly curl noise flow, removed)
     intView[776 / 4] = 0
@@ -1240,11 +1236,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[788 / 4] = 0.0
     intView[792 / 4] = 0
 
-    // Dispersion fields
-    intView[796 / 4] = schroedinger?.dispersionEnabled ? 1 : 0
-    floatView[800 / 4] = schroedinger?.dispersionStrength ?? 0.2 // WebGL default: 0.2
-    intView[804 / 4] = schroedinger?.dispersionDirection ?? 0
-    intView[808 / 4] = schroedinger?.dispersionQuality ?? 0
+    // Reserved (formerly dispersion, removed)
+    intView[796 / 4] = 0
+    floatView[800 / 4] = 0.0
+    intView[804 / 4] = 0
+    intView[808 / 4] = 0
 
     // Reserved fields (formerly shadows + AO — removed, keeping layout for buffer compatibility)
     intView[812 / 4] = 0 // _reservedShadow0
@@ -1334,11 +1330,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1016 / 4] = cosineCoeffs.d?.[2] ?? 0.67
     floatView[1020 / 4] = 0.0 // w unused
 
-    // Fog and erosion quality controls (offset 1024+)
+    // Fog controls (offset 1024+)
     intView[1024 / 4] = schroedinger?.fogIntegrationEnabled ? 1 : 0
     floatView[1028 / 4] = schroedinger?.fogContribution ?? 1.0
     floatView[1032 / 4] = schroedinger?.internalFogDensity ?? 0.0
-    intView[1036 / 4] = schroedinger?.erosionHQ ? 1 : 0
+    intView[1036 / 4] = 0  // Reserved (formerly erosionHQ)
 
     // Dynamic bounding radius (offset 1040+)
     floatView[1040 / 4] = this.boundingRadius
@@ -1481,21 +1477,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1364 / 4] = rpColor[1]
     floatView[1368 / 4] = rpColor[2]
     floatView[1372 / 4] = 0.0  // padding
-
-    // Electric arc parameters (offset 1376-1424)
-    intView[1376 / 4] = schroedinger?.arcEnabled ? 1 : 0
-    floatView[1380 / 4] = schroedinger?.arcIntensity ?? 1.0
-    floatView[1384 / 4] = schroedinger?.arcScale ?? 3.0
-    floatView[1388 / 4] = schroedinger?.arcSharpness ?? 5.0
-    floatView[1392 / 4] = schroedinger?.arcSparsity ?? 0.3
-    floatView[1396 / 4] = schroedinger?.arcSpeed ?? 0.5
-    floatView[1400 / 4] = schroedinger?.arcThickness ?? 4.0
-    floatView[1404 / 4] = schroedinger?.arcColorMix ?? 0.5
-    const arcCol = this.parseColor(schroedinger?.arcColor ?? '#88ccff')
-    floatView[1408 / 4] = arcCol[0]
-    floatView[1412 / 4] = arcCol[1]
-    floatView[1416 / 4] = arcCol[2]
-    floatView[1420 / 4] = schroedinger?.arcDensityGate ?? 0.0
 
     // ============================================
     // HO MOMENTUM: CPU UNIFORM TRANSFORMATION

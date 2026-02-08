@@ -353,9 +353,6 @@ fn computeEmission(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedin
 
   var col = surfaceColor * lighting.ambientColor * lighting.ambientIntensity;
 
-  // Electric arc emission overlay (runtime-gated, no recompilation on toggle)
-  col += computeArcEmission(pos, rho, uniforms.time * uniforms.timeScale, uniforms) * uniforms.arcColorMix;
-
   return col;
 }
 
@@ -532,9 +529,6 @@ fn computeEmissionLit(
       col += emissionColor * uniforms.emissionIntensity * emissionFactor;
     }
   }
-
-  // Electric arc emission overlay (runtime-gated, no recompilation on toggle)
-  col += computeArcEmission(p, rho, uniforms.time * uniforms.timeScale, uniforms) * uniforms.arcColorMix;
 
   return col;
 }

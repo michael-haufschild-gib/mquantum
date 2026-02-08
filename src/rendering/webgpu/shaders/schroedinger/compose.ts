@@ -116,7 +116,6 @@ import {
 } from './quantum/hoSuperpositionVariants.wgsl'
 
 // Volume blocks
-import { arcEmissionBlock } from './volume/arcs.wgsl'
 import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
 import {
@@ -181,7 +180,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     quantumMode = 'harmonicOscillator',
     termCount,
     nodal = true,
-    dispersion = true,
     phaseMateriality = true,
     interference = true,
     uncertaintyBoundary = true,
@@ -281,7 +279,6 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   features.push('Beer-Lambert')
 
   defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
-  defines.push(`const FEATURE_DISPERSION: bool = ${dispersion};`)
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
   defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
   defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${uncertaintyBoundary};`)
@@ -501,7 +498,6 @@ struct VertexOutput {
     { name: 'Volume Emission (Pre)', content: emissionPreBlock },
     { name: 'Volume Emission (Color)', content: generateComputeBaseColor(colorAlgorithm) },
     { name: 'Volume Emission (Post)', content: emissionPostBlock },
-    { name: 'Arc Emission', content: arcEmissionBlock },
     { name: 'Cross-Section Slice', content: crossSectionBlock },
     { name: 'Radial Probability Overlay', content: includeHydrogen ? radialProbabilityBlock : radialProbabilityStubBlock },
     { name: 'Volume Gradient', content: volumeGradientBlock },

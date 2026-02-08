@@ -89,4 +89,29 @@ describe('ExportModal', () => {
     // Default tab is 'presets'
     expect(screen.getByTestId('export-presets')).toBeInTheDocument()
   })
+
+  it('uses effective mode override for start button label', () => {
+    useExportStore.setState({
+      exportMode: 'in-memory',
+      exportModeOverride: 'stream',
+      status: 'idle',
+      isExporting: false,
+    })
+
+    render(<ExportModal />)
+    expect(screen.getByText('Select File & Start')).toBeInTheDocument()
+  })
+
+  it('uses effective mode override for rendering status text', () => {
+    useExportStore.setState({
+      exportMode: 'in-memory',
+      exportModeOverride: 'stream',
+      status: 'rendering',
+      isExporting: true,
+      progress: 0.4,
+    })
+
+    render(<ExportModal />)
+    expect(screen.getByText('Streaming to Disk...')).toBeInTheDocument()
+  })
 })

@@ -18,7 +18,7 @@
  */
 export const densityPreMapBlock = /* wgsl */ `
 // ============================================
-// Noise & Erosion Functions
+// Noise Functions
 // ============================================
 
 // OPTIMIZED: Integer bit-manipulation hash
@@ -43,170 +43,6 @@ fn gradientNoise(p: vec3f) -> f32 {
                      dot(hash33(i + vec3f(1.0,0.0,1.0)), f - vec3f(1.0,0.0,1.0)), u.x),
                  mix(dot(hash33(i + vec3f(0.0,1.0,1.0)), f - vec3f(0.0,1.0,1.0)),
                      dot(hash33(i + vec3f(1.0,1.0,1.0)), f - vec3f(1.0,1.0,1.0)), u.x), u.y), u.z);
-}
-
-// ============================================
-// Worley Noise - Fast 2×2×2 octant search
-// ============================================
-
-// Returns squared distance, sqrt deferred to caller
-fn worleyNoiseSquared(p: vec3f) -> f32 {
-  let id = floor(p);
-  let f = fract(p);
-
-  // Determine which octant of the cell we're in
-  let o = step(vec3f(0.5), f) - 1.0;
-
-  // Unrolled 8 neighbor checks (2×2×2)
-  let d0 = o + hash33(id + o) * 0.5 + 0.5 - f;
-  let d1 = o + vec3f(1.0,0.0,0.0) + hash33(id + o + vec3f(1.0,0.0,0.0)) * 0.5 + 0.5 - f;
-  let d2 = o + vec3f(0.0,1.0,0.0) + hash33(id + o + vec3f(0.0,1.0,0.0)) * 0.5 + 0.5 - f;
-  let d3 = o + vec3f(1.0,1.0,0.0) + hash33(id + o + vec3f(1.0,1.0,0.0)) * 0.5 + 0.5 - f;
-  let d4 = o + vec3f(0.0,0.0,1.0) + hash33(id + o + vec3f(0.0,0.0,1.0)) * 0.5 + 0.5 - f;
-  let d5 = o + vec3f(1.0,0.0,1.0) + hash33(id + o + vec3f(1.0,0.0,1.0)) * 0.5 + 0.5 - f;
-  let d6 = o + vec3f(0.0,1.0,1.0) + hash33(id + o + vec3f(0.0,1.0,1.0)) * 0.5 + 0.5 - f;
-  let d7 = o + vec3f(1.0,1.0,1.0) + hash33(id + o + vec3f(1.0,1.0,1.0)) * 0.5 + 0.5 - f;
-
-  // Find minimum squared distance
-  var m = dot(d0, d0);
-  m = min(m, dot(d1, d1));
-  m = min(m, dot(d2, d2));
-  m = min(m, dot(d3, d3));
-  m = min(m, dot(d4, d4));
-  m = min(m, dot(d5, d5));
-  m = min(m, dot(d6, d6));
-  m = min(m, dot(d7, d7));
-
-  return m;
-}
-
-// Higher quality Worley noise - 3×3×3 neighborhood search
-fn worleyNoiseSquaredHQ(p: vec3f) -> f32 {
-  let id = floor(p);
-  let f = fract(p);
-  var minDist = 1e9;
-
-  for (var z: i32 = -1; z <= 1; z++) {
-    for (var y: i32 = -1; y <= 1; y++) {
-      for (var x: i32 = -1; x <= 1; x++) {
-        let cell = vec3f(f32(x), f32(y), f32(z));
-        let jitter = hash33(id + cell) * 0.5 + 0.5;
-        let d = cell + jitter - f;
-        minDist = min(minDist, dot(d, d));
-      }
-    }
-  }
-
-  return minDist;
-}
-
-// Unified Noise Function based on type
-// 0=Worley (Billowy), 1=Perlin (Smooth), 2=Hybrid
-fn getErosionNoise(p: vec3f, uniforms: SchroedingerUniforms) -> f32 {
-  let noiseType = uniforms.erosionNoiseType;
-  let hqMode = uniforms.erosionHQ != 0u;
-
-  if (noiseType == 0) {
-    // Worley: sqrt of squared distance, inverted for billowy clouds
-    let worleySq = select(worleyNoiseSquared(p), worleyNoiseSquaredHQ(p), hqMode);
-    return 1.0 - sqrt(worleySq);
-  } else if (noiseType == 1) {
-    // Perlin: -1 to 1. Map to 0..1
-    return gradientNoise(p) * 0.5 + 0.5;
-  } else {
-    // Hybrid: Perlin-Worley
-    let pN = gradientNoise(p) * 0.5 + 0.5;
-    let worleySq = select(worleyNoiseSquared(p * 2.0), worleyNoiseSquaredHQ(p * 2.0), hqMode);
-    let wN = 1.0 - sqrt(worleySq);
-    return mix(pN, wN, 0.5);
-  }
-}
-
-// ============================================
-// Curl Distortion - Fast pseudo-curl
-// ============================================
-
-// Fast: Pseudo-curl with 2 samples
-fn distortPosition(p: vec3f, strength: f32) -> vec3f {
-  if (strength < 0.1) { return p; }
-
-  // Pseudo-curl with only 2 noise samples
-  let n1 = gradientNoise(p + vec3f(0.1, 0.0, 0.0));
-  let n2 = gradientNoise(p + vec3f(0.0, 0.1, 0.0));
-
-  // Create pseudo-curl displacement
-  let displacement = vec3f(
-    n2,           // X displacement from Y-offset sample
-    -n1,          // Y displacement from X-offset sample (negated for rotation)
-    n1 - n2       // Z displacement from difference (adds turbulence)
-  );
-
-  return p + displacement * strength;
-}
-
-// HQ pseudo-curl distortion with central differences (4 samples)
-fn distortPositionHQ(p: vec3f, strength: f32) -> vec3f {
-  if (strength < 0.1) { return p; }
-
-  let eps = 0.1;
-  let nx1 = gradientNoise(p + vec3f(eps, 0.0, 0.0));
-  let nx2 = gradientNoise(p - vec3f(eps, 0.0, 0.0));
-  let ny1 = gradientNoise(p + vec3f(0.0, eps, 0.0));
-  let ny2 = gradientNoise(p - vec3f(0.0, eps, 0.0));
-
-  let dx = nx1 - nx2;
-  let dy = ny1 - ny2;
-  let displacement = vec3f(
-    dy,
-    -dx,
-    dx - dy
-  );
-
-  return p + displacement * (strength * 0.5);
-}
-
-// Erode density based on noise — surface-aware edge erosion.
-// IMPORTANT: quantumPos must be the basis-rotated quantum-space position
-// (first 3 components of xND), NOT the raw model-space ray position.
-// Using model-space would make the noise static while lobes rotate via basis vectors.
-fn erodeDensity(rho: f32, quantumPos: vec3f, uniforms: SchroedingerUniforms) -> f32 {
-  // Early exit: erosion disabled
-  if (uniforms.erosionStrength <= 0.001) { return rho; }
-
-  // Skip erosion for very low density (invisible samples)
-  if (rho < 0.001) { return rho; }
-
-  // Scale position for noise (quantumPos already includes fieldScale from mapPosToND)
-  var noisePos = quantumPos * uniforms.erosionScale;
-
-  // Add turbulence/distortion
-  if (uniforms.erosionTurbulence > 0.0) {
-    // Animate swirl
-    let t = uniforms.time * uniforms.timeScale * 0.2;
-    noisePos += vec3f(0.0, -t, 0.0);
-    if (uniforms.erosionHQ != 0u) {
-      noisePos = distortPositionHQ(noisePos, uniforms.erosionTurbulence);
-    } else {
-      noisePos = distortPosition(noisePos, uniforms.erosionTurbulence);
-    }
-  }
-
-  // Sample noise
-  let noise = getErosionNoise(noisePos, uniforms);
-
-  // Surface-proximity weighting:
-  // normalizedRho ≈ per-step opacity contribution (rho * densityGain).
-  //   Edge  (normalizedRho small, ~0-0.3)  → full erosion  → carves lobe boundary
-  //   Core  (normalizedRho large, >2)       → zero erosion  → preserves interior
-  // This prevents volumetric noise from acting as a view-dependent overlay.
-  let normalizedRho = rho * max(uniforms.densityGain, 0.01);
-  let surfaceWeight = 1.0 - smoothstep(0.3, 2.0, normalizedRho);
-
-  // Subtract noise scaled by surface weight
-  let erodedRho = max(0.0, rho - noise * uniforms.erosionStrength * surfaceWeight * 2.0);
-
-  // Smooth blending to avoid hard cuts
-  return mix(rho, erodedRho, uniforms.erosionStrength);
 }
 
 `
@@ -309,10 +145,8 @@ fn densityPair(psi: vec2f) -> vec2f {
 
 // Sample density at a 3D position, mapping through ND basis
 fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
-  let flowedPos = pos;
-
   // Map 3D position to ND coordinates
-  let xND = mapPosToND(flowedPos, uniforms);
+  let xND = mapPosToND(pos, uniforms);
 
   // Evaluate wavefunction and density
   let psi = evalPsi(xND, t, uniforms);
@@ -323,20 +157,14 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
     rho *= uniforms.hydrogenNDBoost;
   }
 
-  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
-  let qPos = vec3f(xND[0], xND[1], xND[2]);
-  rho = erodeDensity(rho, qPos, uniforms);
-
   return rho;
 }
 
 // Sample density with phase information for coloring
 // Returns: vec3f(rho, logRho, spatialPhase)
 fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
-  let flowedPos = pos;
-
   // Map 3D position to ND coordinates
-  let xND = mapPosToND(flowedPos, uniforms);
+  let xND = mapPosToND(pos, uniforms);
 
   // OPTIMIZED: Single-pass evaluation for both time-dependent density and spatial phase
   let psiResult = evalPsiWithSpatialPhase(xND, t, uniforms);
@@ -349,10 +177,6 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
-
-  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
-  let qPos = vec3f(xND[0], xND[1], xND[2]);
-  rho = erodeDensity(rho, qPos, uniforms);
 
   // Confidence-boundary emphasis around an iso-probability surface.
   // Skipped in compute shaders (SKIP_DENSITY_EMPHASIS=true) so the density grid
@@ -383,7 +207,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
     let psiLen = max(length(psi), 1e-8);
     let pcfCosP = psi.x / psiLen;
     let pcfSinP = psi.y / psiLen;
-    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(
+    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
         pcfOffset + pcfCosP * 0.5,
         pcfSinP * 0.5,
         pcfOffset * 0.7 + pcfCosP * 0.3
@@ -397,13 +221,11 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   return vec3f(rho, s, spatialPhase);
 }
 
-// Sample density with phase, also returning the flowed position for gradient reuse
-// Returns tuple: (vec3f density info, vec3f flowed position)
+// Sample density with phase, also returning the position for gradient reuse
+// Returns tuple: (vec3f density info, vec3f position)
 fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> array<vec3f, 2> {
-  let flowedPos = pos;
-
   // Map 3D position to ND coordinates
-  let xND = mapPosToND(flowedPos, uniforms);
+  let xND = mapPosToND(pos, uniforms);
 
   // OPTIMIZED: Single-pass evaluation
   let psiResult = evalPsiWithSpatialPhase(xND, t, uniforms);
@@ -416,10 +238,6 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
   if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
-
-  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
-  let qPos = vec3f(xND[0], xND[1], xND[2]);
-  rho = erodeDensity(rho, qPos, uniforms);
 
   // Confidence-boundary emphasis (see sampleDensityWithPhase for details)
   if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
@@ -443,7 +261,7 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
     let psiLen = max(length(psi), 1e-8);
     let pcfCosP = psi.x / psiLen;
     let pcfSinP = psi.y / psiLen;
-    let pcfNoise = gradientNoise(flowedPos * 2.0 + vec3f(
+    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
         pcfOffset + pcfCosP * 0.5,
         pcfSinP * 0.5,
         pcfOffset * 0.7 + pcfCosP * 0.3
@@ -454,46 +272,19 @@ fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUnifo
 
   let s = sFromRho(rho);
 
-  return array<vec3f, 2>(vec3f(rho, s, spatialPhase), flowedPos);
+  return array<vec3f, 2>(vec3f(rho, s, spatialPhase), pos);
 }
 
-// Sample density at a pre-flowed position (skips applyFlow)
-fn sampleDensityAtFlowedPos(flowedPos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
-  // Map pre-flowed 3D position to ND coordinates
-  let xND = mapPosToND(flowedPos, uniforms);
-
-  // Evaluate wavefunction and density
+// Sample density at a given position (lightweight path for tetrahedral gradient).
+fn sampleDensityAtPos(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
+  let xND = mapPosToND(pos, uniforms);
   let psi = evalPsi(xND, t, uniforms);
   var rho = rhoFromPsi(psi);
 
-  // Hydrogen ND density boost
   if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     rho *= uniforms.hydrogenNDBoost;
   }
 
-  // Apply Edge Erosion (using quantum-space coords so noise rotates with lobes)
-  let qPos = vec3f(xND[0], xND[1], xND[2]);
-  rho = erodeDensity(rho, qPos, uniforms);
-
-  return rho;
-}
-
-// Sample density WITHOUT erosion for gradient computation
-// Gradient samples only affect lighting direction, not density values.
-fn sampleDensityAtFlowedPosNoErosion(flowedPos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
-  // Map pre-flowed 3D position to ND coordinates
-  let xND = mapPosToND(flowedPos, uniforms);
-
-  // Evaluate wavefunction and density
-  let psi = evalPsi(xND, t, uniforms);
-  var rho = rhoFromPsi(psi);
-
-  // Hydrogen ND density boost (still needed for correct gradient magnitude)
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
-    rho *= uniforms.hydrogenNDBoost;
-  }
-
-  // NO erosion applied - gradient shape from base wavefunction is sufficient
   return rho;
 }
 `

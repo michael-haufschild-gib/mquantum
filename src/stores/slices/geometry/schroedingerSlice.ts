@@ -469,19 +469,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerSssThickness: clampedSetter('sssThickness', 0.1, 5.0),
     setSchroedingerSssJitter: clampedSetter('sssJitter', 0.0, 1.0),
 
-    // === Erosion ===
-    setSchroedingerErosionStrength: clampedSetter('erosionStrength', 0.0, 1.0),
-    setSchroedingerErosionScale: clampedSetter('erosionScale', 0.25, 4.0),
-    setSchroedingerErosionTurbulence: clampedSetter('erosionTurbulence', 0.0, 1.0),
-    setSchroedingerErosionNoiseType: valueSetter('erosionNoiseType'),
-    setSchroedingerErosionHQ: valueSetter('erosionHQ'),
-
-    // === Dispersion ===
-    setSchroedingerDispersionEnabled: valueSetter('dispersionEnabled'),
-    setSchroedingerDispersionStrength: clampedSetter('dispersionStrength', 0.0, 1.0),
-    setSchroedingerDispersionDirection: valueSetter('dispersionDirection'),
-    setSchroedingerDispersionQuality: valueSetter('dispersionQuality'),
-
     // === Nodal Surfaces ===
     setSchroedingerNodalEnabled: valueSetter('nodalEnabled'),
     setSchroedingerNodalColor: valueSetter('nodalColor'),
@@ -550,17 +537,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerProbabilityFlowEnabled: valueSetter('probabilityFlowEnabled'),
     setSchroedingerProbabilityFlowSpeed: clampedSetter('probabilityFlowSpeed', 0.1, 5.0),
     setSchroedingerProbabilityFlowStrength: clampedSetter('probabilityFlowStrength', 0.0, 1.0),
-    // Electric Arcs (artistic)
-    setSchroedingerArcEnabled: valueSetter('arcEnabled'),
-    setSchroedingerArcIntensity: clampedSetter('arcIntensity', 0.0, 2.0),
-    setSchroedingerArcScale: clampedSetter('arcScale', 0.5, 8.0),
-    setSchroedingerArcSharpness: clampedSetter('arcSharpness', 1.0, 12.0),
-    setSchroedingerArcSparsity: clampedSetter('arcSparsity', 0.0, 1.0),
-    setSchroedingerArcSpeed: clampedSetter('arcSpeed', 0.0, 3.0),
-    setSchroedingerArcThickness: clampedSetter('arcThickness', 1.0, 8.0),
-    setSchroedingerArcColor: valueSetter('arcColor'),
-    setSchroedingerArcColorMix: clampedSetter('arcColorMix', 0.0, 1.0),
-    setSchroedingerArcDensityGate: clampedSetter('arcDensityGate', 0.0, 1.0),
     // Radial Probability Overlay (hydrogen)
     setSchroedingerRadialProbabilityEnabled: valueSetter('radialProbabilityEnabled'),
     setSchroedingerRadialProbabilityOpacity: clampedSetter('radialProbabilityOpacity', 0.0, 1.0),

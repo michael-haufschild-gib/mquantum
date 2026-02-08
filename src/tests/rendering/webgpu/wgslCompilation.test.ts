@@ -277,14 +277,12 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       sss: false,
       nodal: false,
-      dispersion: false,
       uncertaintyBoundary: false,
       quantumMode: 'harmonicOscillator',
     })
 
     verifyWgsl(wgsl, true)
     expect(wgsl).toContain('const FEATURE_NODAL: bool = false;')
-    expect(wgsl).toContain('const FEATURE_DISPERSION: bool = false;')
     expect(wgsl).toContain('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
   })
 

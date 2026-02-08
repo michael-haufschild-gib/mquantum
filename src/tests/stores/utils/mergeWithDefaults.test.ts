@@ -30,7 +30,7 @@ describe('mergeExtendedObjectState', () => {
       // Missing values should get defaults
       expect(schroedinger.densityGain).toBe(DEFAULT_SCHROEDINGER_CONFIG.densityGain)
       expect(schroedinger.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
-      expect(schroedinger.erosionStrength).toBe(DEFAULT_SCHROEDINGER_CONFIG.erosionStrength)
+      expect(schroedinger.powderScale).toBe(DEFAULT_SCHROEDINGER_CONFIG.powderScale)
     })
   })
 

@@ -78,15 +78,13 @@ fn computeGradientTetrahedral(pos: vec3f, t: f32, delta: f32, uniforms: Schroedi
 }
 
 /**
- * OPTIMIZED (E1): Gradient WITHOUT erosion.
- * - Skips 4 expensive erosion noise evaluations (gradient shape unchanged)
- * This reduces erosion calls by ~80% with zero visual impact on lighting.
+ * Tetrahedral gradient sampling of log-density at a position.
  */
-fn computeGradientTetrahedralAtFlowedPos(flowedPos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f {
-  let s0 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V0 * delta, t, uniforms));
-  let s1 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V1 * delta, t, uniforms));
-  let s2 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V2 * delta, t, uniforms));
-  let s3 = sFromRho(sampleDensityAtFlowedPosNoErosion(flowedPos + TETRA_V3 * delta, t, uniforms));
+fn computeGradientTetrahedralAtPos(pos: vec3f, t: f32, delta: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let s0 = sFromRho(sampleDensityAtPos(pos + TETRA_V0 * delta, t, uniforms));
+  let s1 = sFromRho(sampleDensityAtPos(pos + TETRA_V1 * delta, t, uniforms));
+  let s2 = sFromRho(sampleDensityAtPos(pos + TETRA_V2 * delta, t, uniforms));
+  let s3 = sFromRho(sampleDensityAtPos(pos + TETRA_V3 * delta, t, uniforms));
 
   return (TETRA_V0 * s0 + TETRA_V1 * s1 + TETRA_V2 * s2 + TETRA_V3 * s3) * (0.75 / delta);
 }
@@ -707,7 +705,7 @@ fn volumeRaymarch(
   let viewDir = -rayDir;
   let fogColor = lighting.ambientColor * lighting.ambientIntensity;
 
-  // Transmittance (scalar for non-dispersion path)
+  // Transmittance
   var transmittance: f32 = 1.0;
 
   // PERF: Hoist loop-invariant bounding radius computation
@@ -854,12 +852,12 @@ fn volumeRaymarch(
 
       // Compute gradient for emission lighting
       // When eigenfunction cache is available, use analytical gradient (no extra evaluations).
-      // Otherwise, fall back to tetrahedral finite differences (4 samples, no erosion).
+      // Otherwise, fall back to tetrahedral finite differences (4 samples).
       var gradient: vec3f;
       if (USE_ANALYTICAL_GRADIENT) {
         gradient = computeAnalyticalGradient(pos, animTime, uniforms);
       } else {
-        gradient = computeGradientTetrahedralAtFlowedPos(flowedPos, animTime, 0.05, uniforms);
+        gradient = computeGradientTetrahedralAtPos(flowedPos, animTime, 0.05, uniforms);
       }
 
       // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
@@ -892,7 +890,7 @@ fn volumeRaymarch(
 }
 
 /**
- * High-quality volume integration with lighting and dispersion support.
+ * High-quality volume integration with lighting.
  * Uses tetrahedral gradient sampling (4 samples) for O(h^2) accuracy.
  */
 fn volumeRaymarchHQ(
@@ -903,7 +901,7 @@ fn volumeRaymarchHQ(
   uniforms: SchroedingerUniforms
 ) -> VolumeResult {
   var accColor = vec3f(0.0);
-  var transmittance = vec3f(1.0); // vec3 for chromatic dispersion support
+  var transmittance: f32 = 1.0;
 
   // Iteration counter for debug visualization
   var iterCount: i32 = 0;
@@ -922,27 +920,6 @@ fn volumeRaymarchHQ(
   let viewDir = -rayDir;
   let fogColor = lighting.ambientColor * lighting.ambientIntensity;
 
-  // Dispersion offsets
-  var dispOffsetR = vec3f(0.0);
-  var dispOffsetB = vec3f(0.0);
-  let dispersionActive = FEATURE_DISPERSION && uniforms.dispersionEnabled != 0u && uniforms.dispersionStrength > 0.0;
-
-  if (dispersionActive) {
-    let dispAmount = uniforms.dispersionStrength * 0.15;
-
-    if (uniforms.dispersionDirection == 1) { // View-aligned
-      // Use alternative up vector when rayDir is nearly vertical to avoid NaN from zero cross product
-      var up = vec3f(0.0, 1.0, 0.0);
-      if (abs(rayDir.y) > 0.999) {
-        up = vec3f(1.0, 0.0, 0.0);
-      }
-      let right = normalize(cross(rayDir, up));
-      dispOffsetR = right * dispAmount;
-      dispOffsetB = -right * dispAmount;
-    }
-    // Radial mode: offset updated inside loop
-  }
-
   // PERF: Hoist loop-invariant bounding radius computation
   let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
   let boundR2Skip = boundR2 * 0.85;
@@ -951,14 +928,10 @@ fn volumeRaymarchHQ(
     if (i >= sampleCount) { break; }
     iterCount = i + 1;  // Track iteration count
 
-    // Exit if ALL channels are blocked
-    if (transmittance.r < MIN_TRANSMITTANCE &&
-        transmittance.g < MIN_TRANSMITTANCE &&
-        transmittance.b < MIN_TRANSMITTANCE) { break; }
+    if (transmittance < MIN_TRANSMITTANCE) { break; }
     let remainingDistance = max(tFar - t, 0.0);
     let maxRemainingOpacity = 1.0 - exp(-min(uniforms.densityGain * MAX_REMAINING_DENSITY_BOUND * remainingDistance, 20.0));
-    let maxChannelTransmittance = max(transmittance.r, max(transmittance.g, transmittance.b));
-    let remainingContributionBound = maxChannelTransmittance * maxRemainingOpacity;
+    let remainingContributionBound = transmittance * maxRemainingOpacity;
     if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
@@ -968,14 +941,6 @@ fn volumeRaymarchHQ(
     if (r2 > boundR2Skip) {
       t += stepLen * 8.0;
       continue;
-    }
-
-    // Update radial dispersion offset per sample
-    if (dispersionActive && uniforms.dispersionDirection == 0) {
-      let normalProxy = normalize(pos);
-      let dispAmount = uniforms.dispersionStrength * 0.15;
-      dispOffsetR = normalProxy * dispAmount;
-      dispOffsetB = -normalProxy * dispAmount;
     }
 
     // First do cheap center-only density check
@@ -1023,25 +988,6 @@ fn volumeRaymarchHQ(
       gradient = tetra.gradient;
     }
 
-    // Chromatic Dispersion Logic
-    var rhoRGB = vec3f(rho);
-
-    if (dispersionActive) {
-      if (uniforms.dispersionQuality > 0) {
-        // High quality mode: explicit R/B re-sampling
-        let rhoR = sampleDensityWithPhase(pos + dispOffsetR, animTime, uniforms).x;
-        let rhoB = sampleDensityWithPhase(pos + dispOffsetB, animTime, uniforms).x;
-        rhoRGB.r = rhoR;
-        rhoRGB.b = rhoB;
-      } else {
-        // Fast mode: gradient extrapolation for R/B channels
-        let s_r = sCenter + dot(gradient, dispOffsetR);
-        let s_b = sCenter + dot(gradient, dispOffsetB);
-        rhoRGB.r = exp(s_r);
-        rhoRGB.b = exp(s_b);
-      }
-    }
-
     // PERFORMANCE: Adaptive step size based on density
     // Take larger steps in empty regions to reduce wasted samples.
     // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
@@ -1073,7 +1019,7 @@ fn volumeRaymarchHQ(
         if (nodalAlpha > 1e-5) {
           let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);
           accColor += transmittance * nodalAlpha * nodalScattered;
-          transmittance *= vec3f(1.0 - nodalAlpha * 0.6);
+          transmittance *= (1.0 - nodalAlpha * 0.6);
         }
       }
     }
@@ -1090,7 +1036,7 @@ fn volumeRaymarchHQ(
       let currentOverlay = computeProbabilityCurrentOverlay(
         pos,
         currentSample,
-        rhoRGB.g,
+        rho,
         normalProxy,
         viewDir,
         uniforms
@@ -1102,7 +1048,7 @@ fn volumeRaymarchHQ(
           1.0
         );
         accColor += transmittance * overlayAlpha * currentOverlay.rgb;
-        transmittance *= vec3f(1.0 - overlayAlpha * 0.45);
+        transmittance *= (1.0 - overlayAlpha * 0.45);
       }
     }
 
@@ -1114,7 +1060,7 @@ fn volumeRaymarchHQ(
           rProbOverlay.a * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 1.0
         );
         accColor += transmittance * rProbAlpha * rProbOverlay.rgb;
-        transmittance *= vec3f(1.0 - rProbAlpha * 0.5);
+        transmittance *= (1.0 - rProbAlpha * 0.5);
       }
     }
 
@@ -1125,53 +1071,40 @@ fn volumeRaymarchHQ(
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
       pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
-    // Nodal plane softening: same as fast path but using average transmittance.
-    let cloudDepthHQ = 1.0 - (transmittance.r + transmittance.g + transmittance.b) / 3.0;
+    // Nodal plane softening: density floor scaled by cloud depth
+    let cloudDepthHQ = 1.0 - transmittance;
     let nodalFloorHQ = 5e-4 * cloudDepthHQ * cloudDepthHQ;
-    let softRhoRGB = max(rhoRGB, vec3f(nodalFloorHQ));
+    let effectiveRho = max(rho, nodalFloorHQ);
     // Density contrast sharpening: compress low-density tails for sharper lobes
-    let contrastedRhoRGB = vec3f(
-      applyDensityContrast(softRhoRGB.r, uniforms),
-      applyDensityContrast(softRhoRGB.g, uniforms),
-      applyDensityContrast(softRhoRGB.b, uniforms)
-    );
-    // PERF: Vectorized alpha computation - single vec3 exp() instead of 3 scalar calls
-    let clampedRhoRGB = min(contrastedRhoRGB * pmDensityMod, vec3f(10.0));
-    let alphaExp = max(vec3f(-uniforms.densityGain) * clampedRhoRGB * adaptiveStep, vec3f(-20.0));
-    let alpha = vec3f(1.0) - exp(alphaExp);
+    let contrastedRho = applyDensityContrast(effectiveRho, uniforms);
+    let alpha = computeAlpha(contrastedRho * pmDensityMod, adaptiveStep, uniforms.densityGain);
 
-    if (alpha.g > 0.001 || alpha.r > 0.001 || alpha.b > 0.001) {
+    if (alpha > 0.001) {
       // Track primary hit for temporal reprojection
-      if (primaryHitT < 0.0 && alpha.g > primaryHitThreshold) {
+      if (primaryHitT < 0.0 && alpha > primaryHitThreshold) {
         primaryHitT = t;
       }
 
-      // Compute emission using ORIGINAL density (rhoRGB) so coloring logic works
-      // Pass pre-computed log-density to avoid redundant log()
-      let emissionCenter = computeEmissionLit(rhoRGB.g, sCenter, phase, pos, gradient, viewDir, uniforms);
+      // Compute emission with lighting (pass pre-computed log-density to avoid redundant log())
+      let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
 
-      // Modulate emission for R/B channels based on their density relative to G
-      var emission: vec3f;
-      emission.g = emissionCenter.g;
-      emission.r = emissionCenter.r * (rhoRGB.r / max(rhoRGB.g, 0.0001));
-      emission.b = emissionCenter.b * (rhoRGB.b / max(rhoRGB.g, 0.0001));
-
+      // Front-to-back compositing
       accColor += transmittance * alpha * emission;
-      transmittance *= (vec3f(1.0) - alpha);
+      transmittance *= (1.0 - alpha);
     }
 
     // Internal fog integration (scene atmosphere inside volume)
     let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
     if (fogAlpha > 0.0001) {
       accColor += transmittance * fogAlpha * fogColor;
-      transmittance *= vec3f(1.0 - fogAlpha);
+      transmittance *= (1.0 - fogAlpha);
     }
 
     t += adaptiveStep;
   }
 
-  // Final alpha (average remaining transmittance)
-  let finalAlpha = 1.0 - (transmittance.r + transmittance.g + transmittance.b) / 3.0;
+  // Final alpha
+  let finalAlpha = 1.0 - transmittance;
 
   // If no primary hit found, use midpoint of ray segment
   if (primaryHitT < 0.0) {
@@ -1216,6 +1149,7 @@ fn volumeRaymarchGrid(
   let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
   let fogColor = lighting.ambientColor * lighting.ambientIntensity;
+
   var transmittance: f32 = 1.0;
 
   // PERF: Hoist loop-invariant bounding radius computation
@@ -1362,18 +1296,20 @@ fn volumeRaymarchGrid(
       }
     }
 
-    // Density contrast sharpening: compress low-density tails for sharper lobes
-    var effectiveRho = applyDensityContrast(rho, uniforms);
-    // Phase materiality
+    // Phase materiality modifier
+    var pmDensityMod = 1.0;
     if (FEATURE_PHASE_MATERIALITY && uniforms.phaseMaterialityEnabled != 0u) {
       let pmPhase = fract((phase + PI) / TAU);
       let pmSmoke = 1.0 - smoothstep(0.35, 0.65, pmPhase);
-      effectiveRho *= mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
+      pmDensityMod = mix(1.0, 3.0, pmSmoke * uniforms.phaseMaterialityStrength);
     }
-    // Nodal plane softening
+    // Nodal plane softening: density floor scaled by cloud depth
     let cloudDepth = 1.0 - transmittance;
-    effectiveRho = max(effectiveRho, 5e-4 * cloudDepth * cloudDepth);
-    let alpha = computeAlpha(effectiveRho, adaptiveStep, uniforms.densityGain);
+    let nodalFloor = 5e-4 * cloudDepth * cloudDepth;
+    let effectiveRho = max(rho, nodalFloor);
+    // Density contrast sharpening
+    let contrastedRho = applyDensityContrast(effectiveRho, uniforms);
+    let alpha = computeAlpha(contrastedRho * pmDensityMod, adaptiveStep, uniforms.densityGain);
 
     if (alpha > 0.001) {
       if (primaryHitT < 0.0 && alpha > primaryHitThreshold) {
@@ -1401,6 +1337,7 @@ fn volumeRaymarchGrid(
     t += adaptiveStep;
   }
 
+  // Final alpha
   let finalAlpha = 1.0 - transmittance;
   if (primaryHitT < 0.0) {
     primaryHitT = (tNear + tFar) * 0.5;

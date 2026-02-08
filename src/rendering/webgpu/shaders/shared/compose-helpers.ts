@@ -31,16 +31,12 @@ export interface WGSLShaderConfig {
   sss?: boolean
   /** Enable fresnel/rim shading modules */
   fresnel?: boolean
-  /** Enable chromatic dispersion modules */
-  dispersion?: boolean
   /** Enable nodal visualization modules */
   nodal?: boolean
   /** Enable energy-color modules */
   energyColor?: boolean
   /** Enable uncertainty-boundary modules */
   uncertaintyBoundary?: boolean
-  /** Enable erosion modules */
-  erosion?: boolean
   /** Compile-time color algorithm hint */
   colorAlgorithm?: number
   /** Compile-time lighting mode hint */

@@ -147,11 +147,11 @@ struct SchroedingerUniforms {
   sssThickness: f32,             // SSS thickness factor (0.1-5.0)
   sssJitter: f32,                // SSS jitter amount (0.0-1.0)
 
-  // Erosion
-  erosionStrength: f32,          // Edge erosion strength (0.0-1.0)
-  erosionScale: f32,             // Edge erosion scale (0.25-4.0)
-  erosionTurbulence: f32,        // Edge erosion turbulence (0.0-1.0)
-  erosionNoiseType: i32,         // 0=Worley, 1=Perlin, 2=Hybrid
+  // Reserved (formerly erosion, removed)
+  _reservedErosion0: f32,
+  _reservedErosion1: f32,
+  _reservedErosion2: f32,
+  _reservedErosion3: i32,
 
   // Reserved (formerly curl noise flow, removed)
   _reservedCurl0: u32,
@@ -160,12 +160,12 @@ struct SchroedingerUniforms {
   _reservedCurl3: f32,
   _reservedCurl4: i32,
 
-  // Dispersion
-  dispersionEnabled: u32,        // Enable chromatic dispersion
-  dispersionStrength: f32,       // Dispersion strength (0.0-1.0)
-  dispersionDirection: i32,      // 0=Radial, 1=View
+  // Reserved (formerly dispersion, removed)
+  _reservedDispersion0: u32,
+  _reservedDispersion1: f32,
+  _reservedDispersion2: i32,
 
-  dispersionQuality: i32,        // 0=Fast, 1=High
+  _reservedDispersion3: i32,
 
   // Reserved (formerly shadows + AO — removed, keeping layout for buffer compatibility)
   _reservedShadow0: u32,
@@ -217,11 +217,11 @@ struct SchroedingerUniforms {
   cosineC: vec4f,                // Cosine palette C coefficient
   cosineD: vec4f,                // Cosine palette D coefficient
 
-  // Volumetric fog and erosion quality controls
+  // Volumetric fog controls
   fogIntegrationEnabled: u32,    // Enable internal fog integration
   fogContribution: f32,          // Fog contribution strength
   internalFogDensity: f32,       // Internal object-space fog density
-  erosionHQ: u32,                // High-quality erosion mode toggle
+  _reservedErosionHQ: u32,       // Reserved (formerly erosionHQ, removed)
 
   // Dynamic bounding radius (replaces fixed BOUND_R constant)
   boundingRadius: f32,           // Bounding sphere radius (physics-based, ≥ 2.0)
@@ -304,18 +304,6 @@ struct SchroedingerUniforms {
   _padRadialProb0: f32,             // offset 1356
   radialProbabilityColor: vec3f,    // offset 1360 (16-byte aligned: 1360 % 16 = 0)
   _padRadialProb1: f32,             // offset 1372
-
-  // Electric arc parameters (artistic)
-  arcEnabled: u32,                   // offset 1376
-  arcIntensity: f32,                 // offset 1380
-  arcScale: f32,                     // offset 1384
-  arcSharpness: f32,                 // offset 1388
-  arcSparsity: f32,                  // offset 1392
-  arcSpeed: f32,                     // offset 1396
-  arcThickness: f32,                 // offset 1400
-  arcColorMix: f32,                  // offset 1404
-  arcColor: vec3f,                   // offset 1408 (16-byte aligned: 1408 % 16 = 0)
-  arcDensityGate: f32,               // offset 1420
 }
 
 // ============================================

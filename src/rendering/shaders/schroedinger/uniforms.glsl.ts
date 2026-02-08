@@ -73,19 +73,11 @@ uniform float uSssIntensity;      // SSS intensity (0.0-2.0)
 uniform vec3 uSssColor;           // SSS tint color
 uniform float uSssThickness;      // SSS thickness factor (0.1-5.0)
 uniform float uSssJitter;         // SSS jitter amount (0.0-1.0)
-uniform float uErosionStrength;   // Edge erosion strength (0.0-1.0)
-uniform float uErosionScale;      // Edge erosion scale (0.25-4.0)
-uniform float uErosionTurbulence; // Edge erosion turbulence (0.0-1.0)
-uniform int uErosionNoiseType;    // Edge erosion noise type (0=Worley, 1=Perlin, 2=Hybrid)
 uniform bool uCurlEnabled;        // Enable curl noise flow
 uniform float uCurlStrength;      // Flow strength (0.0-1.0)
 uniform float uCurlScale;         // Flow scale (0.25-4.0)
 uniform float uCurlSpeed;         // Flow speed (0.1-5.0)
 uniform int uCurlBias;            // Flow bias (0=None, 1=Up, 2=Out, 3=In)
-uniform bool uDispersionEnabled;  // Enable chromatic dispersion
-uniform float uDispersionStrength;// Dispersion strength (0.0-1.0)
-uniform int uDispersionDirection; // Dispersion direction (0=Radial, 1=View)
-uniform int uDispersionQuality;   // Dispersion quality (0=Fast, 1=High)
 uniform bool uShadowsEnabled;     // Enable volumetric self-shadowing
 uniform float uShadowStrength;    // Shadow strength (0.0-2.0)
 uniform int uShadowSteps;         // Shadow march steps (1-8)

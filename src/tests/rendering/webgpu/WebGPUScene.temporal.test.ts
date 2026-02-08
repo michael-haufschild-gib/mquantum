@@ -14,7 +14,6 @@ interface ScenePassConfig {
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
-  dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
   temporalReprojectionEnabled: boolean
@@ -67,7 +66,6 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     quantumMode: 'harmonicOscillator',
     termCount: 1,
     nodalEnabled: false,
-    dispersionEnabled: false,
     phaseMaterialityEnabled: false,
     interferenceEnabled: false,
     temporalReprojectionEnabled: true,

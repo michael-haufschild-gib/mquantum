@@ -57,9 +57,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Use quality multiplier < 1.0 as "fast mode" indicator
   let fastMode = quality.qualityMultiplier < 0.75;
 
-  // Use HQ mode if quality requires it OR if dispersion is enabled
-  // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+  if (fastMode) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -149,7 +147,7 @@ export interface VolumetricMainBlockConfig {
 
 /**
  * Generator function for volumetric main block.
- * Selects between volumeRaymarch() (fast) and volumeRaymarchHQ() (dispersion-capable).
+ * Selects between volumeRaymarch() (fast) and volumeRaymarchHQ() (high quality).
  * @param config
  */
 export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = {}): string {
@@ -175,12 +173,11 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
     );
 
   let requiresDirectSampling =
-    (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
     (phaseDependentMode && !DENSITY_GRID_HAS_PHASE) ||
     probabilityCurrentVolumeMode;
 
   if (requiresDirectSampling) {
-    if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+    if (fastMode) {
       volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
     } else {
       volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -188,9 +185,7 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   } else {
     volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
   }`
-    : `// Use HQ mode if quality requires it OR if dispersion is enabled
-  // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+    : `if (fastMode) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -321,7 +316,7 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
   // Density grid sampling helpers for march loop / binary search / gradient.
   // When USE_DENSITY_GRID is true at compile time, grid sampling replaces inline evaluation
   // for the main march, binary search, gradient, and color (if grid has phase).
-  // Post-hit features (nodal, probability current, dispersion) still use inline evaluation.
+  // Post-hit features (nodal, probability current) still use inline evaluation.
   const densitySample = useDensityGrid
     ? `if (USE_DENSITY_GRID) {
       rho = sampleDensityFromGrid(pos, schroedinger).r;
@@ -573,34 +568,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     let ubBand = exp(-0.5 * (spatialDist / ubWidth) * (spatialDist / ubWidth));
     let ubGlow = ubBand * schroedinger.uncertaintyBoundaryStrength;
     surfaceColor = mix(surfaceColor, surfaceColor * 2.0 + vec3f(0.1, 0.08, 0.15), ubGlow);
-  }
-
-  // Chromatic dispersion: per-channel color separation at surface
-  // Stronger at glancing angles (Fresnel-like chromatic aberration)
-  if (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u && schroedinger.dispersionStrength > 0.0) {
-    let NdotV = max(dot(n, -rd), 0.0);
-    let fresnelEdge = pow(1.0 - NdotV, 3.0);
-    let dispScale = schroedinger.dispersionStrength * schroedinger.boundingRadius * 0.08;
-    let dispAmount = dispScale * (0.3 + 0.7 * fresnelEdge);
-    var dispDir: vec3f;
-    if (schroedinger.dispersionDirection == 1) {
-      // View-aligned
-      var up = vec3f(0.0, 1.0, 0.0);
-      if (abs(rd.y) > 0.999) { up = vec3f(1.0, 0.0, 0.0); }
-      dispDir = normalize(cross(rd, up));
-    } else {
-      // Radial
-      dispDir = normalize(p);
-    }
-    let pR = p + dispDir * dispAmount;
-    let pB = p - dispDir * dispAmount;
-    let infoR = sampleDensityWithPhase(pR, animTime, schroedinger);
-    let infoB = sampleDensityWithPhase(pB, animTime, schroedinger);
-    let rhoR = infoR.x * isoGain;
-    let rhoB = infoB.x * isoGain;
-    let colorR = computeBaseColor(rhoR, sFromRho(rhoR), infoR.z, pR, schroedinger);
-    let colorB = computeBaseColor(rhoB, sFromRho(rhoB), infoB.z, pB, schroedinger);
-    surfaceColor = vec3f(colorR.r, surfaceColor.g, colorB.b);
   }
 
   // Lighting - use shared lighting uniforms
@@ -1054,31 +1021,6 @@ ${bayerJitterSection}
     surfaceColor = mix(surfaceColor, surfaceColor * 2.0 + vec3f(0.1, 0.08, 0.15), ubGlow);
   }
 
-  // Chromatic dispersion
-  if (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u && schroedinger.dispersionStrength > 0.0) {
-    let NdotV = max(dot(n, -rd), 0.0);
-    let fresnelEdge = pow(1.0 - NdotV, 3.0);
-    let dispScale = schroedinger.dispersionStrength * schroedinger.boundingRadius * 0.08;
-    let dispAmount = dispScale * (0.3 + 0.7 * fresnelEdge);
-    var dispDir: vec3f;
-    if (schroedinger.dispersionDirection == 1) {
-      var up = vec3f(0.0, 1.0, 0.0);
-      if (abs(rd.y) > 0.999) { up = vec3f(1.0, 0.0, 0.0); }
-      dispDir = normalize(cross(rd, up));
-    } else {
-      dispDir = normalize(p);
-    }
-    let pR = p + dispDir * dispAmount;
-    let pB = p - dispDir * dispAmount;
-    let infoR = sampleDensityWithPhase(pR, animTime, schroedinger);
-    let infoB = sampleDensityWithPhase(pB, animTime, schroedinger);
-    let rhoR = infoR.x * isoGain;
-    let rhoB = infoB.x * isoGain;
-    let colorR = computeBaseColor(rhoR, sFromRho(rhoR), infoR.z, pR, schroedinger);
-    let colorB = computeBaseColor(rhoB, sFromRho(rhoB), infoB.z, pB, schroedinger);
-    surfaceColor = vec3f(colorR.r, surfaceColor.g, colorB.b);
-  }
-
   // Lighting
   var col = surfaceColor * max(1.0 - material.metallic, 0.0) *
             lighting.ambientColor * lighting.ambientIntensity;
@@ -1338,12 +1280,11 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     );
 
   let requiresDirectSampling =
-    (FEATURE_DISPERSION && schroedinger.dispersionEnabled != 0u) ||
     (phaseDependentMode && !DENSITY_GRID_HAS_PHASE) ||
     probabilityCurrentVolumeMode;
 
   if (requiresDirectSampling) {
-    if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+    if (fastMode) {
       volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
     } else {
       volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
@@ -1355,16 +1296,14 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     // This can happen when the density grid hasn't been populated yet
     // or when coordinate mapping produces out-of-range lookups.
     if (volumeResult.alpha < 0.01) {
-      if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+      if (fastMode) {
         volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
       } else {
         volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
       }
     }
   }`
-    : `// Use HQ mode if quality requires it OR if dispersion is enabled
-  // (dispersion requires per-channel RGB transmittance only available in HQ path)
-  if (fastMode && (!FEATURE_DISPERSION || schroedinger.dispersionEnabled == 0u)) {
+    : `if (fastMode) {
     volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
   } else {
     volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);

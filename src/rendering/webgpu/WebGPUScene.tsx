@@ -45,6 +45,14 @@ import { BufferPreviewPass } from './passes/BufferPreviewPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 import { parseHexColorToLinearRgb } from './utils/color'
 import { WebGPUCanvasCapture } from './utils/WebGPUCanvasCapture'
+import { VideoRecorder } from '@/lib/export/video'
+import {
+  computeRenderDimensions,
+  computeSegmentDurationFrames,
+  ensureEvenDimensions,
+  resolveExportDimensions,
+} from '@/lib/export/videoExportPlanning'
+import { useExportStore, type ExportMode, type ExportSettings } from '@/stores/exportStore'
 
 /**
  * Wait for the browser to complete at least one paint cycle.
@@ -125,7 +133,6 @@ const schroedingerCompileSelector = (
   quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
   termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
   nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
-  dispersionEnabled: state.schroedinger?.dispersionEnabled ?? false,
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
   interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
   uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
@@ -137,6 +144,128 @@ const schroedingerCompileSelector = (
 const EMPTY_PARAM_VALUES: number[] = []
 const schroedingerSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
   state.schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
+
+type ExportPhase = 'warmup' | 'preview' | 'recording'
+type RuntimeExportMode = Exclude<ExportMode, 'auto'>
+
+interface ExportLoopState {
+  phase: ExportPhase
+  frameId: number
+  warmupFrame: number
+  startTime: number
+  totalFrames: number
+  frameDuration: number
+  exportStartTime: number
+  lastEtaUpdate: number
+  mainStreamHandle?: FileSystemFileHandle
+  segmentDurationFrames: number
+  currentSegment: number
+  framesInCurrentSegment: number
+  segmentStartTimeVideo: number
+}
+
+interface ExportPerformanceSnapshot {
+  progressiveRefinementEnabled: boolean
+  fractalAnimationLowQuality: boolean
+  renderResolutionScale: number
+}
+
+interface ExportRuntimeState {
+  starting: boolean
+  started: boolean
+  processing: boolean
+  finishing: boolean
+  canceling: boolean
+  abortRequested: boolean
+  mode: RuntimeExportMode | null
+  settings: ExportSettings | null
+  recorder: VideoRecorder | null
+  rotationSnapshot: Map<string, number> | null
+  originalCanvasWidth: number
+  originalCanvasHeight: number
+  originalCameraAspect: number
+  exportWidth: number
+  exportHeight: number
+  renderWidth: number
+  renderHeight: number
+  originalPerf: ExportPerformanceSnapshot
+  loop: ExportLoopState
+}
+
+function createInitialExportLoopState(): ExportLoopState {
+  return {
+    phase: 'warmup',
+    frameId: 0,
+    warmupFrame: 0,
+    startTime: 0,
+    totalFrames: 0,
+    frameDuration: 0,
+    exportStartTime: 0,
+    lastEtaUpdate: 0,
+    mainStreamHandle: undefined,
+    segmentDurationFrames: 0,
+    currentSegment: 0,
+    framesInCurrentSegment: 0,
+    segmentStartTimeVideo: 0,
+  }
+}
+
+function createInitialExportRuntimeState(): ExportRuntimeState {
+  return {
+    starting: false,
+    started: false,
+    processing: false,
+    finishing: false,
+    canceling: false,
+    abortRequested: false,
+    mode: null,
+    settings: null,
+    recorder: null,
+    rotationSnapshot: null,
+    originalCanvasWidth: 0,
+    originalCanvasHeight: 0,
+    originalCameraAspect: 1,
+    exportWidth: 0,
+    exportHeight: 0,
+    renderWidth: 0,
+    renderHeight: 0,
+    originalPerf: {
+      progressiveRefinementEnabled: true,
+      fractalAnimationLowQuality: true,
+      renderResolutionScale: 1,
+    },
+    loop: createInitialExportLoopState(),
+  }
+}
+
+function cloneExportSettings(settings: ExportSettings): ExportSettings {
+  return {
+    ...settings,
+    textOverlay: { ...settings.textOverlay },
+    crop: { ...settings.crop },
+  }
+}
+
+function estimateExportSizeMb(settings: ExportSettings): number {
+  return (settings.duration * settings.bitrate) / 8
+}
+
+function resolveRuntimeExportMode(
+  mode: ExportMode,
+  browserType: ReturnType<typeof useExportStore.getState>['browserType'],
+  settings: ExportSettings
+): RuntimeExportMode {
+  if (mode !== 'auto') {
+    return mode
+  }
+
+  const estimatedSizeMb = estimateExportSizeMb(settings)
+  if (estimatedSizeMb < 100) {
+    return 'in-memory'
+  }
+
+  return browserType === 'chromium-capable' ? 'stream' : 'segmented'
+}
 
 // ============================================================================
 // Component
@@ -156,6 +285,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const setupGenerationRef = useRef(0)
   const setupTaskRef = useRef<Promise<void>>(Promise.resolve())
   const statsCollectorRef = useRef<WebGPUStatsCollector>(new WebGPUStatsCollector())
+  const exportRuntimeRef = useRef<ExportRuntimeState>(createInitialExportRuntimeState())
 
   // WebGPU camera for view/projection matrices (since we don't have THREE.js camera)
   const cameraRef = useRef<WebGPUCamera | null>(null)
@@ -269,9 +399,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   // Schroedinger parameterValues for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
   const schroedingerParamValues = useExtendedObjectStore(schroedingerSelector)
 
-  // Animation state
-  const isPlaying = useAnimationStore((state) => state.isPlaying)
-
   // Rotation basis vectors for Schrodinger renderer (matches WebGL SchroedingerMesh.tsx lines 111, 912)
   // Computes rotated basis vectors from rotation store for N-D slicing
   const schroedingerRotation = useRotationUpdates({
@@ -353,7 +480,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
             quantumMode: schroedingerCompile.quantumMode,
             termCount: schroedingerCompile.termCount,
             nodalEnabled: schroedingerCompile.nodalEnabled,
-            dispersionEnabled: schroedingerCompile.dispersionEnabled,
             phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
             interferenceEnabled: schroedingerCompile.interferenceEnabled,
             uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
@@ -403,13 +529,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     postProcessing.paperEnabled,
     postProcessing.frameBlendingEnabled,
     environment.skyboxEnabled,
+    environment.skyboxMode,
     environment.backgroundColor,
     appearance.colorAlgorithm,
     schroedingerIsoEnabled,
     schroedingerCompile.quantumMode,
     schroedingerCompile.termCount,
     schroedingerCompile.nodalEnabled,
-    schroedingerCompile.dispersionEnabled,
     schroedingerCompile.phaseMaterialityEnabled,
     schroedingerCompile.interferenceEnabled,
     schroedingerCompile.uncertaintyBoundaryEnabled,
@@ -499,8 +625,735 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   // Reusable Map for rotation updates (avoid allocating per frame)
   const rotationUpdatesRef = useRef<Map<string, number>>(new Map())
 
+  const resetExportRuntime = useCallback((preserveAbortFlag = false) => {
+    const runtime = exportRuntimeRef.current
+    const abortRequested = preserveAbortFlag && runtime.abortRequested
+
+    runtime.starting = false
+    runtime.started = false
+    runtime.processing = false
+    runtime.finishing = false
+    runtime.canceling = false
+    runtime.abortRequested = abortRequested
+    runtime.mode = null
+    runtime.settings = null
+    runtime.recorder = null
+    runtime.rotationSnapshot = null
+    runtime.originalCanvasWidth = 0
+    runtime.originalCanvasHeight = 0
+    runtime.originalCameraAspect = 1
+    runtime.exportWidth = 0
+    runtime.exportHeight = 0
+    runtime.renderWidth = 0
+    runtime.renderHeight = 0
+    runtime.originalPerf = {
+      progressiveRefinementEnabled: true,
+      fractalAnimationLowQuality: true,
+      renderResolutionScale: 1,
+    }
+    runtime.loop = createInitialExportLoopState()
+  }, [])
+
+  const restoreRuntimeState = useCallback(() => {
+    const runtime = exportRuntimeRef.current
+
+    const restoreWidth =
+      runtime.originalCanvasWidth > 0 ? runtime.originalCanvasWidth : size.width
+    const restoreHeight =
+      runtime.originalCanvasHeight > 0 ? runtime.originalCanvasHeight : size.height
+
+    if (restoreWidth > 0 && restoreHeight > 0) {
+      canvas.width = restoreWidth
+      canvas.height = restoreHeight
+      graph.setSize(restoreWidth, restoreHeight)
+    }
+
+    if (cameraRef.current && runtime.originalCameraAspect > 0) {
+      cameraRef.current.setAspect(runtime.originalCameraAspect)
+    }
+
+    const perfStore = usePerformanceStore.getState()
+    perfStore.setProgressiveRefinementEnabled(runtime.originalPerf.progressiveRefinementEnabled)
+    perfStore.setFractalAnimationLowQuality(runtime.originalPerf.fractalAnimationLowQuality)
+    perfStore.setRenderResolutionScale(runtime.originalPerf.renderResolutionScale)
+    perfStore.setRefinementStage('final')
+
+    runtime.rotationSnapshot = null
+  }, [canvas, graph, size.height, size.width])
+
+  const triggerSegmentDownload = useCallback(
+    (blob: Blob, segmentIndex: number, format: ExportSettings['format']) => {
+      const ext = format === 'webm' ? 'webm' : 'mp4'
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `mdimension-${Date.now()}-part${segmentIndex}.${ext}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    },
+    []
+  )
+
+  const advanceSceneStateByDelta = useCallback(
+    (deltaTime: number) => {
+      const deltaTimeMs = deltaTime * 1000
+      const animationState = useAnimationStore.getState()
+      const { isPlaying, animatingPlanes, getRotationDelta, updateAccumulatedTime } = animationState
+
+      if (isPlaying && deltaTimeMs > 0 && deltaTimeMs < 100) {
+        updateAccumulatedTime(deltaTime)
+
+        if (animatingPlanes.size > 0) {
+          const rotationState = useRotationStore.getState()
+          const rotationDelta = getRotationDelta(deltaTimeMs)
+          const updates = rotationUpdatesRef.current
+          updates.clear()
+
+          for (const plane of animatingPlanes) {
+            const currentAngle = rotationState.rotations.get(plane) ?? 0
+            updates.set(plane, currentAngle + rotationDelta)
+          }
+
+          if (updates.size > 0) {
+            rotationState.updateRotations(updates)
+          }
+        }
+      }
+
+      if (objectType === 'schroedinger') {
+        const { basisX, basisY, basisZ, changed } = schroedingerRotation.getBasisVectors(false)
+        if (changed) {
+          schroedingerBasisCacheRef.current.basisX.set(basisX)
+          schroedingerBasisCacheRef.current.basisY.set(basisY)
+          schroedingerBasisCacheRef.current.basisZ.set(basisZ)
+        }
+      }
+    },
+    [objectType, schroedingerRotation]
+  )
+
+  const executeSceneFrame = useCallback(
+    (deltaTime: number) => {
+      const frameSize = {
+        width: canvas.width > 0 ? canvas.width : size.width,
+        height: canvas.height > 0 ? canvas.height : size.height,
+      }
+
+      const effectiveDpr =
+        canvas.clientWidth > 0
+          ? frameSize.width / canvas.clientWidth
+          : typeof window !== 'undefined'
+            ? window.devicePixelRatio
+            : 1
+
+      executeFrameAndCollectMetrics({
+        graph,
+        collector: statsCollectorRef.current,
+        deltaTime,
+        size: frameSize,
+        dpr: effectiveDpr,
+      })
+
+      onFrame?.(deltaTime)
+    },
+    [canvas, graph, onFrame, size.height, size.width]
+  )
+
+  const handleExportError = useCallback(
+    async (error: unknown) => {
+      const runtime = exportRuntimeRef.current
+      const exportStore = useExportStore.getState()
+
+      if (runtime.recorder) {
+        try {
+          await runtime.recorder.cancel()
+        } catch {
+          runtime.recorder.dispose()
+        } finally {
+          runtime.recorder = null
+        }
+      }
+
+      restoreRuntimeState()
+      resetExportRuntime()
+
+      exportStore.setEta(null)
+      exportStore.setError(error instanceof Error ? error.message : 'Video export failed')
+      exportStore.setStatus('error')
+      exportStore.setIsExporting(false)
+    },
+    [resetExportRuntime, restoreRuntimeState]
+  )
+
+  const finishExport = useCallback(async () => {
+    const runtime = exportRuntimeRef.current
+    if (runtime.finishing || runtime.canceling || !runtime.mode || !runtime.settings) {
+      return
+    }
+
+    runtime.finishing = true
+    const exportStore = useExportStore.getState()
+    let handledError = false
+    let cleanedEarly = false
+
+    try {
+      if (runtime.abortRequested) {
+        if (runtime.recorder) {
+          try {
+            await runtime.recorder.cancel()
+          } catch {
+            runtime.recorder.dispose()
+          } finally {
+            runtime.recorder = null
+          }
+        }
+
+        restoreRuntimeState()
+        resetExportRuntime()
+        cleanedEarly = true
+
+        if (!exportStore.isExporting) {
+          exportStore.setStatus('idle')
+        }
+        return
+      }
+
+      exportStore.setStatus('encoding')
+      const blob = runtime.recorder ? await runtime.recorder.finalize() : null
+
+      if (runtime.mode === 'in-memory') {
+        if (!blob) {
+          throw new Error('No video output was produced for in-memory export')
+        }
+        const url = URL.createObjectURL(blob)
+        exportStore.setPreviewUrl(url)
+        exportStore.setProgress(1)
+        exportStore.setCompletionDetails({ type: 'in-memory' })
+        exportStore.setStatus('completed')
+      } else if (runtime.mode === 'stream') {
+        exportStore.setProgress(1)
+        exportStore.setCompletionDetails({ type: 'stream' })
+        exportStore.setStatus('completed')
+      } else {
+        if (blob) {
+          triggerSegmentDownload(blob, runtime.loop.currentSegment, runtime.settings.format)
+        }
+        exportStore.setProgress(1)
+        exportStore.setCompletionDetails({
+          type: 'segmented',
+          segmentCount: runtime.loop.currentSegment,
+        })
+        exportStore.setStatus('completed')
+      }
+
+    } catch (error) {
+      handledError = true
+      await handleExportError(error)
+    } finally {
+      if (runtime.recorder) {
+        runtime.recorder.dispose()
+      }
+      runtime.recorder = null
+
+      if (!handledError && !cleanedEarly && !runtime.canceling) {
+        restoreRuntimeState()
+        resetExportRuntime()
+        exportStore.setIsExporting(false)
+      }
+    }
+  }, [handleExportError, resetExportRuntime, restoreRuntimeState, triggerSegmentDownload])
+
+  const cancelExport = useCallback(async () => {
+    const runtime = exportRuntimeRef.current
+    if (runtime.canceling) {
+      return
+    }
+
+    runtime.abortRequested = true
+    runtime.canceling = true
+
+    const exportStore = useExportStore.getState()
+    exportStore.setProgress(0)
+    exportStore.setEta(null)
+
+    try {
+      if (runtime.recorder) {
+        try {
+          await runtime.recorder.cancel()
+        } catch {
+          runtime.recorder.dispose()
+        } finally {
+          runtime.recorder = null
+        }
+      }
+    } finally {
+      restoreRuntimeState()
+      resetExportRuntime()
+      exportStore.setStatus('idle')
+    }
+  }, [resetExportRuntime, restoreRuntimeState])
+
+  const startExport = useCallback(async () => {
+    const runtime = exportRuntimeRef.current
+    if (runtime.starting || runtime.started || runtime.canceling || runtime.finishing) {
+      return
+    }
+
+    const exportStore = useExportStore.getState()
+    if (exportStore.status !== 'idle') {
+      return
+    }
+
+    runtime.starting = true
+    runtime.abortRequested = false
+
+    exportStore.setProgress(0)
+    exportStore.setEta(null)
+    exportStore.setError(null)
+    exportStore.setCompletionDetails(null)
+
+    const settings = cloneExportSettings(exportStore.settings)
+    const mode = resolveRuntimeExportMode(
+      exportStore.exportModeOverride ?? exportStore.exportMode,
+      exportStore.browserType,
+      settings
+    )
+    runtime.mode = mode
+    runtime.settings = settings
+
+    let streamHandle: FileSystemFileHandle | undefined
+
+    try {
+      if (mode === 'stream') {
+        if (!('showSaveFilePicker' in window)) {
+          throw new Error(
+            'File System Access API is not supported in this browser. Use Chrome/Edge or select another export mode.'
+          )
+        }
+
+        exportStore.setStatus('rendering')
+
+        try {
+          const extension = settings.format === 'webm' ? '.webm' : '.mp4'
+          const description = settings.format === 'webm' ? 'WebM Video' : 'MP4 Video'
+          const mimeType = settings.format === 'webm' ? 'video/webm' : 'video/mp4'
+
+          streamHandle = await window.showSaveFilePicker({
+            suggestedName: `mdimension-${Date.now()}${extension}`,
+            types: [
+              {
+                description,
+                accept: { [mimeType]: [extension] },
+              },
+            ],
+          })
+        } catch (pickerError) {
+          const err = pickerError as { name?: string }
+          if (err?.name === 'AbortError') {
+            exportStore.setIsExporting(false)
+            exportStore.setStatus('idle')
+            resetExportRuntime()
+            return
+          }
+          throw pickerError
+        }
+      } else {
+        exportStore.setStatus('rendering')
+      }
+
+      const perfStore = usePerformanceStore.getState()
+      runtime.originalCanvasWidth = canvas.width
+      runtime.originalCanvasHeight = canvas.height
+      runtime.originalCameraAspect =
+        cameraRef.current?.getState().aspect ||
+        (size.width > 0 && size.height > 0 ? size.width / size.height : 1)
+      runtime.originalPerf = {
+        progressiveRefinementEnabled: perfStore.progressiveRefinementEnabled,
+        fractalAnimationLowQuality: perfStore.fractalAnimationLowQuality,
+        renderResolutionScale: perfStore.renderResolutionScale,
+      }
+
+      perfStore.setProgressiveRefinementEnabled(false)
+      perfStore.setFractalAnimationLowQuality(false)
+      perfStore.setRefinementStage('final')
+      perfStore.setRenderResolutionScale(1)
+
+      await waitForPaint()
+      if (runtime.abortRequested) {
+        restoreRuntimeState()
+        resetExportRuntime()
+        return
+      }
+
+      if (!Number.isFinite(settings.fps) || settings.fps <= 0) {
+        throw new Error(`Invalid FPS: ${settings.fps}`)
+      }
+      if (!Number.isFinite(settings.duration) || settings.duration <= 0) {
+        throw new Error(`Invalid duration: ${settings.duration}`)
+      }
+      if (!Number.isFinite(settings.bitrate) || settings.bitrate <= 0) {
+        throw new Error(`Invalid bitrate: ${settings.bitrate}`)
+      }
+
+      const resolved = resolveExportDimensions(
+        settings.resolution,
+        settings.customWidth,
+        settings.customHeight
+      )
+      const exportDimensions = ensureEvenDimensions(resolved.width, resolved.height)
+      const maxTextureDimension2D = device.getCapabilities()?.maxTextureDimension2D ?? 4096
+      const renderDimensions = computeRenderDimensions({
+        exportWidth: exportDimensions.width,
+        exportHeight: exportDimensions.height,
+        originalAspect: runtime.originalCameraAspect,
+        maxTextureDimension2D,
+        crop: settings.crop,
+      })
+
+      runtime.exportWidth = exportDimensions.width
+      runtime.exportHeight = exportDimensions.height
+      runtime.renderWidth = renderDimensions.width
+      runtime.renderHeight = renderDimensions.height
+
+      canvas.width = renderDimensions.width
+      canvas.height = renderDimensions.height
+      graph.setSize(renderDimensions.width, renderDimensions.height)
+
+      if (cameraRef.current) {
+        if (settings.crop.enabled) {
+          cameraRef.current.setAspect(runtime.originalCameraAspect)
+        } else {
+          cameraRef.current.setAspect(renderDimensions.width / renderDimensions.height)
+        }
+      }
+
+      await waitForPaint()
+      if (runtime.abortRequested) {
+        restoreRuntimeState()
+        resetExportRuntime()
+        return
+      }
+
+      const totalFrames = Math.max(1, Math.ceil(settings.duration * settings.fps))
+      const segmentDurationFrames =
+        mode === 'segmented'
+          ? computeSegmentDurationFrames({
+              durationSeconds: settings.duration,
+              fps: settings.fps,
+              bitrateMbps: settings.bitrate,
+            })
+          : totalFrames
+
+      runtime.loop = {
+        phase: 'warmup',
+        frameId: 0,
+        warmupFrame: 0,
+        startTime: performance.now(),
+        totalFrames,
+        frameDuration: 1 / settings.fps,
+        exportStartTime: Date.now(),
+        lastEtaUpdate: 0,
+        mainStreamHandle: streamHandle,
+        segmentDurationFrames,
+        currentSegment: 1,
+        framesInCurrentSegment: 0,
+        segmentStartTimeVideo: 0,
+      }
+
+      if (mode !== 'stream') {
+        const firstRecorderDuration =
+          mode === 'segmented' ? segmentDurationFrames / settings.fps : settings.duration
+        const recorder = new VideoRecorder(canvas, {
+          width: runtime.exportWidth,
+          height: runtime.exportHeight,
+          fps: settings.fps,
+          duration: firstRecorderDuration,
+          totalDuration: settings.duration,
+          bitrate: settings.bitrate,
+          format: settings.format,
+          codec: settings.codec,
+          onProgress: (progress) => {
+            if (mode !== 'segmented') {
+              useExportStore.getState().setProgress(progress)
+            }
+          },
+          hardwareAcceleration: settings.hardwareAcceleration,
+          bitrateMode: settings.bitrateMode,
+          textOverlay: settings.textOverlay,
+          crop: settings.crop,
+          rotation: settings.rotation,
+        })
+        await recorder.initialize()
+        runtime.recorder = recorder
+      }
+
+      runtime.started = true
+    } catch (error) {
+      await handleExportError(error)
+    } finally {
+      runtime.starting = false
+    }
+  }, [canvas, device, graph, handleExportError, resetExportRuntime, restoreRuntimeState, size.height, size.width])
+
+  const processExportBatch = useCallback(async () => {
+    const runtime = exportRuntimeRef.current
+    if (
+      !runtime.started ||
+      runtime.processing ||
+      runtime.finishing ||
+      runtime.canceling ||
+      !runtime.mode ||
+      !runtime.settings
+    ) {
+      return
+    }
+
+    runtime.processing = true
+
+    try {
+      const maxBlockingTimeMs = 30
+      const batchStartMs = performance.now()
+      const shouldYield = () => performance.now() - batchStartMs > maxBlockingTimeMs
+
+      const loop = runtime.loop
+      const settings = runtime.settings
+      const mode = runtime.mode
+      const exportStore = useExportStore.getState()
+
+      while (loop.phase === 'warmup') {
+        if (runtime.abortRequested) {
+          await finishExport()
+          return
+        }
+
+        if (loop.warmupFrame >= settings.warmupFrames) {
+          if (mode === 'stream') {
+            runtime.rotationSnapshot = new Map(useRotationStore.getState().rotations)
+
+            const previewDuration = Math.min(3, settings.duration)
+            loop.phase = 'preview'
+            loop.frameId = 0
+            loop.totalFrames = Math.max(1, Math.ceil(previewDuration * settings.fps))
+
+            const previewRecorder = new VideoRecorder(canvas, {
+              width: runtime.exportWidth,
+              height: runtime.exportHeight,
+              fps: settings.fps,
+              duration: previewDuration,
+              bitrate: settings.bitrate,
+              format: settings.format,
+              codec: settings.codec,
+              hardwareAcceleration: settings.hardwareAcceleration,
+              bitrateMode: settings.bitrateMode,
+              textOverlay: settings.textOverlay,
+              crop: settings.crop,
+              rotation: settings.rotation,
+            })
+            await previewRecorder.initialize()
+            runtime.recorder = previewRecorder
+            exportStore.setStatus('previewing')
+          } else {
+            loop.phase = 'recording'
+            loop.frameId = 0
+          }
+          continue
+        }
+
+        advanceSceneStateByDelta(loop.frameDuration)
+        executeSceneFrame(loop.frameDuration)
+        loop.warmupFrame++
+
+        if (shouldYield()) {
+          return
+        }
+      }
+
+      while (loop.phase === 'preview') {
+        if (runtime.abortRequested) {
+          await finishExport()
+          return
+        }
+
+        if (loop.frameId >= loop.totalFrames) {
+          if (runtime.recorder) {
+            const previewBlob = await runtime.recorder.finalize()
+            if (previewBlob) {
+              exportStore.setPreviewUrl(URL.createObjectURL(previewBlob))
+            }
+            runtime.recorder.dispose()
+            runtime.recorder = null
+          }
+
+          loop.phase = 'recording'
+          loop.frameId = 0
+          loop.totalFrames = Math.max(1, Math.ceil(settings.duration * settings.fps))
+          loop.startTime = performance.now()
+          loop.exportStartTime = Date.now()
+          loop.lastEtaUpdate = 0
+
+          if (runtime.rotationSnapshot) {
+            useRotationStore.getState().updateRotations(runtime.rotationSnapshot)
+          }
+
+          const mainRecorder = new VideoRecorder(canvas, {
+            width: runtime.exportWidth,
+            height: runtime.exportHeight,
+            fps: settings.fps,
+            duration: settings.duration,
+            totalDuration: settings.duration,
+            bitrate: settings.bitrate,
+            format: settings.format,
+            codec: settings.codec,
+            streamHandle: loop.mainStreamHandle,
+            onProgress: (progress) => exportStore.setProgress(progress),
+            hardwareAcceleration: settings.hardwareAcceleration,
+            bitrateMode: settings.bitrateMode,
+            textOverlay: settings.textOverlay,
+            crop: settings.crop,
+            rotation: settings.rotation,
+          })
+          await mainRecorder.initialize()
+          runtime.recorder = mainRecorder
+          exportStore.setStatus('rendering')
+          continue
+        }
+
+        advanceSceneStateByDelta(loop.frameDuration)
+        executeSceneFrame(loop.frameDuration)
+
+        if (runtime.recorder) {
+          await runtime.recorder.captureFrame(loop.frameId * loop.frameDuration, loop.frameDuration)
+        }
+        loop.frameId++
+
+        if (shouldYield()) {
+          return
+        }
+      }
+
+      while (loop.phase === 'recording' && loop.frameId < loop.totalFrames) {
+        if (runtime.abortRequested) {
+          await finishExport()
+          return
+        }
+
+        if (mode === 'segmented' && loop.framesInCurrentSegment >= loop.segmentDurationFrames) {
+          if (runtime.recorder) {
+            const segmentBlob = await runtime.recorder.finalize()
+            if (segmentBlob) {
+              triggerSegmentDownload(segmentBlob, loop.currentSegment, settings.format)
+            }
+            runtime.recorder.dispose()
+            runtime.recorder = null
+          }
+
+          loop.currentSegment += 1
+          loop.framesInCurrentSegment = 0
+          loop.segmentStartTimeVideo = loop.frameId * loop.frameDuration
+
+          const remainingFrames = loop.totalFrames - loop.frameId
+          const nextSegmentFrames = Math.min(loop.segmentDurationFrames, remainingFrames)
+
+          const nextRecorder = new VideoRecorder(canvas, {
+            width: runtime.exportWidth,
+            height: runtime.exportHeight,
+            fps: settings.fps,
+            duration: nextSegmentFrames / settings.fps,
+            totalDuration: settings.duration,
+            bitrate: settings.bitrate,
+            format: settings.format,
+            codec: settings.codec,
+            hardwareAcceleration: settings.hardwareAcceleration,
+            bitrateMode: settings.bitrateMode,
+            textOverlay: settings.textOverlay,
+            crop: settings.crop,
+            rotation: settings.rotation,
+          })
+          await nextRecorder.initialize()
+          runtime.recorder = nextRecorder
+        }
+
+        advanceSceneStateByDelta(loop.frameDuration)
+        executeSceneFrame(loop.frameDuration)
+
+        const globalVideoTime = loop.frameId * loop.frameDuration
+        const relativeVideoTime = globalVideoTime - loop.segmentStartTimeVideo
+
+        if (runtime.recorder) {
+          await runtime.recorder.captureFrame(
+            relativeVideoTime,
+            loop.frameDuration,
+            globalVideoTime
+          )
+        }
+
+        loop.frameId++
+        loop.framesInCurrentSegment++
+
+        if (shouldYield()) {
+          break
+        }
+      }
+
+      if (loop.phase === 'recording') {
+        const nowMs = Date.now()
+        if (nowMs - loop.lastEtaUpdate > 500) {
+          const framesDone = loop.frameId
+          const framesTotal = loop.totalFrames
+          const progress = framesTotal > 0 ? framesDone / framesTotal : 0
+          exportStore.setProgress(progress)
+
+          if (framesDone > 0) {
+            const elapsedMs = nowMs - loop.exportStartTime
+            const msPerFrame = elapsedMs / framesDone
+            const remainingMs = (framesTotal - framesDone) * msPerFrame
+            const remainingSec = Math.ceil(remainingMs / 1000)
+            exportStore.setEta(`${remainingSec}s`)
+          }
+          loop.lastEtaUpdate = nowMs
+        }
+
+        if (loop.frameId >= loop.totalFrames) {
+          await finishExport()
+        }
+      }
+    } catch (error) {
+      await handleExportError(error)
+    } finally {
+      runtime.processing = false
+    }
+  }, [advanceSceneStateByDelta, canvas, executeSceneFrame, finishExport, handleExportError, triggerSegmentDownload])
+
   // Animation loop
   const renderFrame = useCallback(() => {
+    const runtime = exportRuntimeRef.current
+    const exportStore = useExportStore.getState()
+
+    if (
+      exportStore.isExporting &&
+      exportStore.status === 'idle' &&
+      !runtime.starting &&
+      !runtime.started
+    ) {
+      void startExport()
+    } else if (
+      !exportStore.isExporting &&
+      (runtime.starting || runtime.started || runtime.processing || runtime.finishing) &&
+      !runtime.canceling
+    ) {
+      void cancelExport()
+    }
+
+    if (runtime.started || runtime.starting || runtime.processing || runtime.finishing || runtime.canceling) {
+      if (runtime.started && !runtime.processing && !runtime.finishing && !runtime.canceling) {
+        void processExportBatch()
+      }
+      animationFrameRef.current = requestAnimationFrame(renderFrame)
+      return
+    }
+
     const now = performance.now()
     const targetFrameIntervalMs = performance_.maxFps > 0 ? 1000 / performance_.maxFps : 0
     const elapsedMs = now - lastTimeRef.current
@@ -510,88 +1363,41 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       return
     }
 
-    const deltaTime = elapsedMs / 1000 // Convert to seconds
+    const deltaTime = elapsedMs / 1000
     lastTimeRef.current = now
-    const deltaTimeMs = deltaTime * 1000
 
-    // Update rotation animation (matches WebGL useAnimationLoop)
-    if (isPlaying && deltaTimeMs > 0 && deltaTimeMs < 100) {
-      const animState = useAnimationStore.getState()
-      const { animatingPlanes, getRotationDelta, updateAccumulatedTime } = animState
-      updateAccumulatedTime(deltaTime)
+    advanceSceneStateByDelta(deltaTime)
+    executeSceneFrame(deltaTime)
 
-      if (animatingPlanes.size > 0) {
-        const rotationState = useRotationStore.getState()
-        const rotationDelta = getRotationDelta(deltaTimeMs)
-        const updates = rotationUpdatesRef.current
-        updates.clear()
-
-        for (const plane of animatingPlanes) {
-          const currentAngle = rotationState.rotations.get(plane) ?? 0
-          updates.set(plane, currentAngle + rotationDelta)
-        }
-
-        if (updates.size > 0) {
-          rotationState.updateRotations(updates)
-        }
-      }
-    }
-
-    // Update Schrodinger basis vectors from rotation store (matches WebGL SchroedingerMesh.tsx line 912)
-    // Only do this for schroedinger object type to avoid unnecessary computation
-    if (objectType === 'schroedinger') {
-      // getBasisVectors uses internal version tracking - passing false is fine,
-      // it will still detect actual rotation changes via version numbers
-      const { basisX, basisY, basisZ, changed } = schroedingerRotation.getBasisVectors(false)
-      if (changed) {
-        // Copy to cached arrays (basisX/Y/Z are pre-allocated working arrays from the hook)
-        schroedingerBasisCacheRef.current.basisX.set(basisX)
-        schroedingerBasisCacheRef.current.basisY.set(basisY)
-        schroedingerBasisCacheRef.current.basisZ.set(basisZ)
-      }
-    }
-
-    // Execute render graph and publish performance metrics to the monitor store.
-    const effectiveDpr =
-      canvas.clientWidth > 0
-        ? size.width / canvas.clientWidth
-        : typeof window !== 'undefined'
-          ? window.devicePixelRatio
-          : 1
-
-    executeFrameAndCollectMetrics({
-      graph,
-      collector: statsCollectorRef.current,
-      deltaTime,
-      size,
-      dpr: effectiveDpr,
-    })
-
-    onFrame?.(deltaTime)
-
-    // Continue animation loop
     animationFrameRef.current = requestAnimationFrame(renderFrame)
   }, [
-    canvas,
-    graph,
-    isPlaying,
-    objectType,
-    onFrame,
+    advanceSceneStateByDelta,
+    cancelExport,
+    executeSceneFrame,
     performance_.maxFps,
-    schroedingerRotation,
-    size,
+    processExportBatch,
+    startExport,
   ])
 
   // Start/stop animation loop
   useEffect(() => {
     animationFrameRef.current = requestAnimationFrame(renderFrame)
+    const runtime = exportRuntimeRef.current
 
     return () => {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
+
+      runtime.abortRequested = true
+      if (runtime.recorder) {
+        runtime.recorder.dispose()
+        runtime.recorder = null
+      }
+      restoreRuntimeState()
+      resetExportRuntime()
     }
-  }, [renderFrame])
+  }, [renderFrame, resetExportRuntime, restoreRuntimeState])
 
   // Render event capture overlay for camera controls
   return (
@@ -657,7 +1463,6 @@ export interface PassConfig {
   quantumMode: 'harmonicOscillator' | 'hydrogenND'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
-  dispersionEnabled: boolean
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
   uncertaintyBoundaryEnabled: boolean
@@ -1053,7 +1858,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     quantumMode,
     termCount,
     nodalEnabled,
-    dispersionEnabled,
     phaseMaterialityEnabled,
     interferenceEnabled,
     uncertaintyBoundaryEnabled,
@@ -1075,7 +1879,6 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         termCount,
         colorAlgorithm,
         nodalEnabled,
-        dispersionEnabled,
         phaseMaterialityEnabled,
         interferenceEnabled,
         uncertaintyBoundaryEnabled,

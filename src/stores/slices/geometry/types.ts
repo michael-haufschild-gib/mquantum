@@ -108,19 +108,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerSssThickness: (thickness: number) => void
   setSchroedingerSssJitter: (jitter: number) => void
 
-  // Erosion Settings
-  setSchroedingerErosionStrength: (strength: number) => void
-  setSchroedingerErosionScale: (scale: number) => void
-  setSchroedingerErosionTurbulence: (turbulence: number) => void
-  setSchroedingerErosionNoiseType: (type: number) => void
-  setSchroedingerErosionHQ: (hq: boolean) => void
-
-  // Dispersion Settings
-  setSchroedingerDispersionEnabled: (enabled: boolean) => void
-  setSchroedingerDispersionStrength: (strength: number) => void
-  setSchroedingerDispersionDirection: (direction: number) => void
-  setSchroedingerDispersionQuality: (quality: number) => void
-
   // Quantum Effects
   setSchroedingerNodalEnabled: (enabled: boolean) => void
   setSchroedingerNodalColor: (color: string) => void
@@ -168,18 +155,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerProbabilityFlowEnabled: (enabled: boolean) => void
   setSchroedingerProbabilityFlowSpeed: (speed: number) => void
   setSchroedingerProbabilityFlowStrength: (strength: number) => void
-
-  // Electric Arcs (artistic)
-  setSchroedingerArcEnabled: (enabled: boolean) => void
-  setSchroedingerArcIntensity: (intensity: number) => void
-  setSchroedingerArcScale: (scale: number) => void
-  setSchroedingerArcSharpness: (sharpness: number) => void
-  setSchroedingerArcSparsity: (sparsity: number) => void
-  setSchroedingerArcSpeed: (speed: number) => void
-  setSchroedingerArcThickness: (thickness: number) => void
-  setSchroedingerArcColor: (color: string) => void
-  setSchroedingerArcColorMix: (mix: number) => void
-  setSchroedingerArcDensityGate: (gate: number) => void
 
   // Radial Probability Overlay (hydrogen)
   setSchroedingerRadialProbabilityEnabled: (enabled: boolean) => void
