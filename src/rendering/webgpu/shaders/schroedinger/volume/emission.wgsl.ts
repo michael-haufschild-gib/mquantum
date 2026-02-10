@@ -31,6 +31,8 @@ export const emissionPreBlock = /* wgsl */ `
 const COLOR_ALG_PHASE: i32 = 8;
 const COLOR_ALG_MIXED: i32 = 9;
 const COLOR_ALG_BLACKBODY: i32 = 10;
+const COLOR_ALG_PHASE_WHEEL: i32 = 11;
+const COLOR_ALG_PHASE_DIVERGING: i32 = 12;
 
 // Phase influence on hue (0.0 = no phase color, 1.0 = full rainbow)
 const PHASE_HUE_INFLUENCE: f32 = 0.4;
@@ -169,6 +171,21 @@ const ALGO_BRANCH: Record<number, string> = {
     let temp = normalized * 12000.0;
     if (temp < 500.0) { return vec3f(0.0); } // Cold is black
     col = blackbody(temp);`,
+
+  11: /* wgsl */ `
+    // 11: Full complex phase wheel
+    let phaseNorm = fract((phase + PI) / TAU);
+    col = hsl2rgb(phaseNorm, 0.9, 0.2 + 0.45 * normalized);`,
+
+  12: /* wgsl */ `
+    // 12: Signed diverging phase map (Wigner-style sign encoding proxy)
+    let phaseSignCarrier = cos(phase);
+    let signStrength = abs(phaseSignCarrier);
+    let positiveWing = vec3f(0.92, 0.24, 0.22);
+    let negativeWing = vec3f(0.22, 0.40, 0.95);
+    let wing = select(negativeWing, positiveWing, phaseSignCarrier >= 0.0);
+    let neutral = vec3f(0.92);
+    col = mix(neutral, wing, signStrength) * (0.2 + 0.8 * normalized);`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -184,6 +201,8 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   8: 'Phase',
   9: 'Mixed',
   10: 'Blackbody',
+  11: 'Phase Wheel',
+  12: 'Phase Diverging',
 }
 
 export { COLOR_ALG_NAMES }
@@ -192,7 +211,7 @@ export { COLOR_ALG_NAMES }
  * Generate the computeBaseColor() WGSL function.
  *
  * @param colorAlgorithm When defined, emit only that algorithm's branch (no if/else chain).
- *                       When undefined, emit the full 11-branch runtime dispatch (backward compatible).
+ *                       When undefined, emit the full runtime dispatch (backward compatible).
  */
 export function generateComputeBaseColor(colorAlgorithm?: ColorAlgorithm): string {
   // Common function header
@@ -231,11 +250,15 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   return header + /* wgsl */ `
   let algorithm = uniforms.colorAlgorithm;
 
-  // Quantum-specific color algorithms (8-10) use actual wavefunction phase
+  // Phase-aware color algorithms (8-12) use actual wavefunction phase
   // Algorithms 0-7 delegate to standard color system
   if (algorithm == COLOR_ALG_PHASE) {${ALGO_BRANCH[8]}
   }
   else if (algorithm == COLOR_ALG_MIXED) {${ALGO_BRANCH[9]}
+  }
+  else if (algorithm == COLOR_ALG_PHASE_WHEEL) {${ALGO_BRANCH[11]}
+  }
+  else if (algorithm == COLOR_ALG_PHASE_DIVERGING) {${ALGO_BRANCH[12]}
   }
   else if (algorithm == COLOR_ALG_BLACKBODY) {${ALGO_BRANCH[10]}
   }

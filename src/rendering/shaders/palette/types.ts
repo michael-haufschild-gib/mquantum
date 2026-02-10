@@ -25,6 +25,8 @@ import { isPolytopeType, type ObjectType } from '@/lib/geometry/types'
  * - lch: Perceptually uniform LCH/Oklab color space
  * - multiSource: Blend multiple value sources for complex coloring
  * - radial: Color based on 3D distance from origin (spherical gradient)
+ * - phaseWheel: Full 2π complex phase hue wheel
+ * - phaseDiverging: Signed diverging palette (Re(ψ) sign proxy)
  */
 
 export type ColorAlgorithm =
@@ -38,6 +40,8 @@ export type ColorAlgorithm =
   | 'radial'
   | 'phase'
   | 'mixed'
+  | 'phaseWheel'
+  | 'phaseDiverging'
   | 'blackbody'
 
 /**
@@ -54,6 +58,8 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'radial' as const, label: 'Radial (from center)' },
   { value: 'phase' as const, label: 'Angular (XZ Rotation)' },
   { value: 'mixed' as const, label: 'Angular + Depth' },
+  { value: 'phaseWheel' as const, label: 'Complex Phase Wheel' },
+  { value: 'phaseDiverging' as const, label: 'Signed Phase Diverging' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
 ] as const
 
@@ -72,6 +78,8 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   phase: 8,
   mixed: 9,
   blackbody: 10,
+  phaseWheel: 11,
+  phaseDiverging: 12,
 }
 
 /**
@@ -87,7 +95,12 @@ export const QUANTUM_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
  * These work for all object types.
  * Uses azimuth angle in XZ plane for coloring.
  */
-export const GEOMETRIC_PHASE_ALGORITHMS: readonly ColorAlgorithm[] = ['phase', 'mixed'] as const
+export const GEOMETRIC_PHASE_ALGORITHMS: readonly ColorAlgorithm[] = [
+  'phase',
+  'mixed',
+  'phaseWheel',
+  'phaseDiverging',
+] as const
 
 /**
  * Check if a color algorithm is quantum-specific (Schroedinger only).

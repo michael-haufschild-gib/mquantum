@@ -542,10 +542,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // (e.g., if a resize occurred mid-rebuild when pool had no configs).
       // This mirrors what the resize handler does and prevents the vertical
       // squish that would otherwise require a manual window resize to fix.
+      // IMPORTANT: Use the actual DPR (window.devicePixelRatio × renderResolutionScale)
+      // instead of deriving it from canvas.width/clientWidth, which can be stale.
       if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
-        const effectiveDpr = canvas.width > 0 && canvas.clientWidth > 0
-          ? canvas.width / canvas.clientWidth
-          : window.devicePixelRatio
+        const renderScale = usePerformanceStore.getState().renderResolutionScale
+        const effectiveDpr = window.devicePixelRatio * renderScale
         const w = Math.floor(canvas.clientWidth * effectiveDpr)
         const h = Math.floor(canvas.clientHeight * effectiveDpr)
         canvas.width = w
@@ -578,7 +579,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     postProcessing.frameBlendingEnabled,
     environment.skyboxEnabled,
     environment.skyboxMode,
-    environment.backgroundColor,
     appearance.colorAlgorithm,
     schroedingerIsoEnabled,
     schroedingerCompile.quantumMode,
@@ -591,6 +591,21 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
   ])
+
+  // Runtime scene clear-color update (avoids full pass rebuild for background color changes).
+  useEffect(() => {
+    console.warn(
+      `[WebGPUScene] BG COLOR UPDATE: ${environment.backgroundColor}`,
+      `\n  canvas: ${canvas?.width}×${canvas?.height}, client: ${canvas?.clientWidth}×${canvas?.clientHeight}`,
+      `\n  context size: ${size.width}×${size.height}`,
+      `\n  DPR: ${window.devicePixelRatio}`,
+    )
+    updateScenePassBackgroundColor({
+      graph,
+      skyboxEnabled: environment.skyboxEnabled,
+      backgroundColor: environment.backgroundColor,
+    })
+  }, [graph, environment.skyboxEnabled, environment.backgroundColor])
 
   // Update camera aspect ratio when canvas size changes
   useEffect(() => {
@@ -607,8 +622,17 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     graph.setStoreGetter('performance', () => usePerformanceStore.getState())
     graph.setStoreGetter('postProcessing', () => usePostProcessingStore.getState())
     // Camera: provide actual matrices from WebGPUCamera (not OrbitControls state)
+    // IMPORTANT: Sync camera aspect with graph render dimensions every frame.
+    // The React context `size` and graph dimensions can desync (post-rebuild, resize race).
+    // The graph width/height are the authoritative render dimensions.
     graph.setStoreGetter('camera', () => {
       if (!cameraRef.current) return null
+      // Sync aspect ratio with graph render dimensions (authoritative source of truth)
+      const graphW = graph.getWidth()
+      const graphH = graph.getHeight()
+      if (graphW > 0 && graphH > 0) {
+        cameraRef.current.setAspect(graphW / graphH)
+      }
       const matrices = cameraRef.current.getMatrices()
       const cameraStoreCache = cameraStoreCacheRef.current
       cameraStoreCache.viewMatrix.elements.set(matrices.viewMatrix)
@@ -784,6 +808,24 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
   const executeSceneFrame = useCallback(
     (deltaTime: number) => {
+      // Per-frame size sync: ensure drawing buffer matches CSS layout before painting.
+      // ResizeObserver can lag by one frame on sudden layout changes (e.g. dev-tools toggle),
+      // causing the old buffer to be stretched into the new CSS rect. Catching it here
+      // guarantees the buffer is correct before every paint.
+      const cw = canvas.clientWidth
+      const ch = canvas.clientHeight
+      if (cw > 0 && ch > 0) {
+        const renderScale = usePerformanceStore.getState().renderResolutionScale
+        const dpr = window.devicePixelRatio * renderScale
+        const targetW = Math.floor(cw * dpr)
+        const targetH = Math.floor(ch * dpr)
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+          canvas.width = targetW
+          canvas.height = targetH
+          graph.setSize(targetW, targetH)
+        }
+      }
+
       const frameSize = {
         width: canvas.width > 0 ? canvas.width : size.width,
         height: canvas.height > 0 ? canvas.height : size.height,
@@ -1529,6 +1571,34 @@ export interface PassConfig {
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
   backgroundColor: string
+}
+
+interface ScenePassBackgroundColorUpdateArgs {
+  graph: Pick<WebGPURenderGraph, 'getPass'>
+  skyboxEnabled: boolean
+  backgroundColor: string
+}
+
+/**
+ * Update ScenePass clear color at runtime without rebuilding passes/pipelines.
+ */
+export function updateScenePassBackgroundColor({
+  graph,
+  skyboxEnabled,
+  backgroundColor,
+}: ScenePassBackgroundColorUpdateArgs): void {
+  if (skyboxEnabled) return
+
+  const scenePass = graph.getPass('scene')
+  if (!(scenePass instanceof ScenePass)) return
+
+  const backgroundLinear = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
+  scenePass.setClearColor({
+    r: backgroundLinear[0],
+    g: backgroundLinear[1],
+    b: backgroundLinear[2],
+    a: 1,
+  })
 }
 
 /**

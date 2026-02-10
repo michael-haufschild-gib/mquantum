@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { WebGPURenderPass } from '@/rendering/webgpu/core/types'
 import type { WebGPURenderGraph } from '@/rendering/webgpu/graph/WebGPURenderGraph'
 import { parseHexColorToLinearRgb } from '@/rendering/webgpu/utils/color'
+import { ScenePass } from '@/rendering/webgpu/passes/ScenePass'
 
 interface ScenePassConfig {
   objectType: 'schroedinger'
@@ -222,5 +223,82 @@ describe('WebGPUScene temporal reprojection wiring', () => {
       b: expected[2],
       a: 1,
     })
+  })
+})
+
+describe('WebGPUScene background color runtime updates', () => {
+  it('updates scene pass clear color without requiring pass rebuild', async () => {
+    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+      string,
+      unknown
+    >
+
+    expect(typeof sceneModule['updateScenePassBackgroundColor']).toBe('function')
+
+    const updateScenePassBackgroundColor = sceneModule['updateScenePassBackgroundColor'] as (args: {
+      graph: Pick<WebGPURenderGraph, 'getPass'>
+      skyboxEnabled: boolean
+      backgroundColor: string
+    }) => void
+
+    const scenePass = new ScenePass({
+      outputResource: 'scene-render',
+      mode: 'clear',
+      clearColor: { r: 0, g: 0, b: 0, a: 1 },
+    })
+
+    const graph = {
+      getPass: vi.fn((id: string) => (id === 'scene' ? scenePass : undefined)),
+    } as unknown as Pick<WebGPURenderGraph, 'getPass'>
+
+    const backgroundColor = '#4080ff'
+    updateScenePassBackgroundColor({
+      graph,
+      skyboxEnabled: false,
+      backgroundColor,
+    })
+
+    const expected = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
+    expect(scenePass.getClearColor()).toEqual({
+      r: expected[0],
+      g: expected[1],
+      b: expected[2],
+      a: 1,
+    })
+    expect(graph.getPass).toHaveBeenCalledWith('scene')
+  })
+
+  it('does not update scene pass clear color when skybox is enabled', async () => {
+    const sceneModule = (await import('@/rendering/webgpu/WebGPUScene')) as unknown as Record<
+      string,
+      unknown
+    >
+
+    expect(typeof sceneModule['updateScenePassBackgroundColor']).toBe('function')
+
+    const updateScenePassBackgroundColor = sceneModule['updateScenePassBackgroundColor'] as (args: {
+      graph: Pick<WebGPURenderGraph, 'getPass'>
+      skyboxEnabled: boolean
+      backgroundColor: string
+    }) => void
+
+    const scenePass = new ScenePass({
+      outputResource: 'scene-render',
+      mode: 'clear',
+      clearColor: { r: 0.25, g: 0.25, b: 0.25, a: 1 },
+    })
+    const initial = scenePass.getClearColor()
+    const graph = {
+      getPass: vi.fn(() => scenePass),
+    } as unknown as Pick<WebGPURenderGraph, 'getPass'>
+
+    updateScenePassBackgroundColor({
+      graph,
+      skyboxEnabled: true,
+      backgroundColor: '#ff0000',
+    })
+
+    expect(scenePass.getClearColor()).toEqual(initial)
+    expect(graph.getPass).not.toHaveBeenCalled()
   })
 })

@@ -57,6 +57,8 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   phase: 8,
   mixed: 9,
   blackbody: 10,
+  phaseWheel: 11,
+  phaseDiverging: 12,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -809,6 +811,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[118] = ctx.size.width // resolution.x
     data[119] = ctx.size.height // resolution.y
     data[120] = ctx.size.width / ctx.size.height // aspectRatio
+
+    // DIAGNOSTIC: Detect aspect ratio mismatch between projection matrix and ctx.size
+    if (camera.projectionMatrix?.elements) {
+      // Projection matrix element [0] = 1/(aspect*tan(fov/2)), element [5] = 1/tan(fov/2)
+      // So projAspect = element[5] / element[0]
+      const projAspect = camera.projectionMatrix.elements[5] / camera.projectionMatrix.elements[0]
+      const ctxAspect = ctx.size.width / ctx.size.height
+      if (Math.abs(projAspect - ctxAspect) > 0.01) {
+        console.warn(`[Schrodinger] ASPECT MISMATCH! projection: ${projAspect.toFixed(4)}, ctx.size: ${ctxAspect.toFixed(4)} (${ctx.size.width}×${ctx.size.height})`)
+      }
+    }
     data[121] = animationTime // time (respects animation pause state)
     data[122] = ctx.frame?.delta || 0.016 // deltaTime
     // frameNumber is u32 in WGSL - write as uint32 via pre-allocated DataView

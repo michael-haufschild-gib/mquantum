@@ -159,6 +159,8 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
     ? `let phaseDependentMode =
     schroedinger.colorAlgorithm == 8 ||
     schroedinger.colorAlgorithm == 9 ||
+    schroedinger.colorAlgorithm == 11 ||
+    schroedinger.colorAlgorithm == 12 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
@@ -1266,6 +1268,8 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     ? `let phaseDependentMode =
     schroedinger.colorAlgorithm == 8 ||
     schroedinger.colorAlgorithm == 9 ||
+    schroedinger.colorAlgorithm == 11 ||
+    schroedinger.colorAlgorithm == 12 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 

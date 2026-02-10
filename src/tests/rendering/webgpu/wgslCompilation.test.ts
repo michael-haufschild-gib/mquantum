@@ -414,7 +414,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
-  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const
 
   for (const alg of allAlgorithms) {
     it(`produces valid WGSL for colorAlgorithm=${alg}`, () => {
@@ -456,8 +456,8 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(modules).not.toContain('Color Selector')
   })
 
-  it('excludes Cosine module for HSL-only algorithms (0, 1, 8, 9, 10)', () => {
-    const hslOnlyAlgorithms = [0, 1, 8, 9, 10] as const
+  it('excludes Cosine module for HSL-only algorithms (0, 1, 8, 9, 10, 11, 12)', () => {
+    const hslOnlyAlgorithms = [0, 1, 8, 9, 10, 11, 12] as const
     for (const alg of hslOnlyAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -473,7 +473,7 @@ describe('WGSL Color Algorithm Specialization', () => {
   })
 
   it('excludes Oklab module for non-Oklab algorithms', () => {
-    const nonOklabAlgorithms = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10] as const
+    const nonOklabAlgorithms = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12] as const
     for (const alg of nonOklabAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,

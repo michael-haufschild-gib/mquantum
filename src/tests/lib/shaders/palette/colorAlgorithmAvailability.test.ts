@@ -29,11 +29,15 @@ describe('Color Algorithm Availability', () => {
       expect(QUANTUM_ONLY_ALGORITHMS).toHaveLength(0)
     })
 
-    it('should classify phase and mixed as geometric phase algorithms', () => {
+    it('should classify phase-family algorithms as geometric phase algorithms', () => {
       expect(GEOMETRIC_PHASE_ALGORITHMS).toContain('phase')
       expect(GEOMETRIC_PHASE_ALGORITHMS).toContain('mixed')
+      expect(GEOMETRIC_PHASE_ALGORITHMS).toContain('phaseWheel')
+      expect(GEOMETRIC_PHASE_ALGORITHMS).toContain('phaseDiverging')
       expect(isGeometricPhaseAlgorithm('phase')).toBe(true)
       expect(isGeometricPhaseAlgorithm('mixed')).toBe(true)
+      expect(isGeometricPhaseAlgorithm('phaseWheel')).toBe(true)
+      expect(isGeometricPhaseAlgorithm('phaseDiverging')).toBe(true)
     })
 
     it('should have no polytope-only algorithms', () => {
@@ -43,7 +47,12 @@ describe('Color Algorithm Availability', () => {
 
   describe('isColorAlgorithmAvailable', () => {
     describe('geometric phase algorithms (phase, mixed)', () => {
-      const geometricAlgorithms: ColorAlgorithm[] = ['phase', 'mixed']
+      const geometricAlgorithms: ColorAlgorithm[] = [
+        'phase',
+        'mixed',
+        'phaseWheel',
+        'phaseDiverging',
+      ]
 
       it('should be available for schroedinger', () => {
         for (const algo of geometricAlgorithms) {

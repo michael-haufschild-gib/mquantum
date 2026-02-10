@@ -104,6 +104,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
   // Initialize WebGPU
   useEffect(() => {
+    console.warn('[WebGPUCanvas] INIT EFFECT RUNNING — deps changed')
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -196,6 +197,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     const height = Math.floor(container.clientHeight * devicePixelRatio)
 
     if (canvas.width !== width || canvas.height !== height) {
+      console.warn(`[WebGPUCanvas] RESIZE: canvas ${canvas.width}×${canvas.height} → ${width}×${height}, container ${container.clientWidth}×${container.clientHeight}, dpr=${devicePixelRatio}`)
       canvas.width = width
       canvas.height = height
       graph.setSize(width, height)

@@ -322,6 +322,7 @@ export class WebGPUCamera {
    * @param aspect
    */
   setAspect(aspect: number): void {
+    if (this.state.aspect === aspect) return
     this.state.aspect = aspect
     this.dirty = true
   }

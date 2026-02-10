@@ -25,6 +25,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
 import { domMax, LazyMotion } from 'motion/react'
+import { useCallback, useMemo } from 'react'
 
 /**
  * Inner app content that requires ToastProvider context.
@@ -63,6 +64,13 @@ function AppContent() {
   const baseDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio
   const scaledDpr = baseDpr * renderResolutionScale
 
+  // Stable callback to prevent WebGPUCanvas init effect from re-running on every render
+  const handleWebGPUError = useCallback((error: Error) => {
+    console.error('[App] WebGPU error:', error)
+  }, [])
+
+  const canvasStyle = useMemo(() => ({ background: backgroundColor }), [backgroundColor])
+
   return (
     <EditorLayout>
       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
@@ -85,11 +93,9 @@ function AppContent() {
           >
             <WebGPUCanvas
               className="absolute inset-0"
-              style={{ background: backgroundColor }}
+              style={canvasStyle}
               dpr={scaledDpr}
-              onError={(error) => {
-                console.error('[App] WebGPU error:', error)
-              }}
+              onError={handleWebGPUError}
             >
               <WebGPUScene objectType={objectType} dimension={dimension} />
             </WebGPUCanvas>

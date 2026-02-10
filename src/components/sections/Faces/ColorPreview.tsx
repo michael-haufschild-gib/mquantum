@@ -168,6 +168,22 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const lightness = 0.15 + 0.35 * t
           const saturation = 0.7 + 0.25 * t
           ;[r, g, b] = hslToRgb(hue, saturation, lightness)
+        } else if (colorAlgorithm === 'phaseWheel') {
+          // Complex phase wheel: full 2π phase mapped directly to hue.
+          const hue = t
+          const lightness = 0.2 + 0.45 * t
+          ;[r, g, b] = hslToRgb(hue, 0.9, lightness)
+        } else if (colorAlgorithm === 'phaseDiverging') {
+          // Signed diverging map: negative phase sign -> blue, positive -> red, nodal lines -> neutral.
+          const signCarrier = Math.cos(t * Math.PI * 2)
+          const signStrength = Math.abs(signCarrier)
+          const wing: [number, number, number] =
+            signCarrier >= 0 ? [0.92, 0.24, 0.22] : [0.22, 0.4, 0.95]
+          const neutral: [number, number, number] = [0.92, 0.92, 0.92]
+          const magnitude = 0.2 + 0.8 * t
+          r = (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * magnitude
+          g = (neutral[1] * (1 - signStrength) + wing[1] * signStrength) * magnitude
+          b = (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * magnitude
         } else if (colorAlgorithm === 'blackbody') {
           // Blackbody: analytic temperature ramp (t = normalized density)
           // Matches shader: temp = normalized * 12000, blackbody(temp)
