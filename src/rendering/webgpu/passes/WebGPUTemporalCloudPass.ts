@@ -707,6 +707,23 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
       ])
 
       reprojectionPass.end()
+    } else {
+      // No valid history — clear the reprojected history texture to transparent.
+      // Previously, quarterColorView (half-res) was used as a fallback, but the
+      // reconstruction shader reads it at full-res coordinates via textureLoad(),
+      // causing a resolution mismatch: the top-left quadrant got wrong data that
+      // persisted as a ghost in the accumulation buffer.
+      const clearPass = ctx.beginRenderPass({
+        colorAttachments: [
+          {
+            view: this.reprojectedHistoryView!,
+            loadOp: 'clear',
+            storeOp: 'store',
+            clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          },
+        ],
+      })
+      clearPass.end()
     }
 
     // ========================================
@@ -714,9 +731,8 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     // ========================================
     const reconstructionBindGroup0 = this.getOrCreateReconstructionUniformBindGroup()
 
-    const reprojectedInput = this.hasValidHistory
-      ? this.reprojectedHistoryView!
-      : quarterColorView // Use quarter color directly if no history
+    // Always use the full-res reprojected history texture (cleared when no history).
+    const reprojectedInput = this.reprojectedHistoryView!
 
     const reconstructionBindGroup1 = this.getOrCreateReconstructionTextureBindGroup(
       quarterColorView,
