@@ -44,6 +44,7 @@ import { FrameBlendingPass } from './passes/FrameBlendingPass'
 import { BufferPreviewPass } from './passes/BufferPreviewPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 import { parseHexColorToLinearRgb } from './utils/color'
+import { evaluateFpsLimit } from './utils/fpsLimiter'
 import { WebGPUCanvasCapture } from './utils/WebGPUCanvasCapture'
 import { VideoRecorder } from '@/lib/export/video'
 import {
@@ -192,6 +193,21 @@ interface ExportRuntimeState {
   loop: ExportLoopState
 }
 
+export function isExportRuntimeActive(
+  runtime: Pick<
+    ExportRuntimeState,
+    'starting' | 'started' | 'processing' | 'finishing' | 'canceling'
+  >
+): boolean {
+  return (
+    runtime.starting ||
+    runtime.started ||
+    runtime.processing ||
+    runtime.finishing ||
+    runtime.canceling
+  )
+}
+
 function createInitialExportLoopState(): ExportLoopState {
   return {
     phase: 'warmup',
@@ -279,8 +295,10 @@ function resolveRuntimeExportMode(
  */
 export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension, onFrame }) => {
   const { graph, size, canvas, device } = useWebGPU()
+  const initialFrameTimeRef = useRef<number>(performance.now())
   const animationFrameRef = useRef<number>(0)
-  const lastTimeRef = useRef<number>(performance.now())
+  const lastTimeRef = useRef<number>(initialFrameTimeRef.current)
+  const fpsThrottleAnchorRef = useRef<number>(initialFrameTimeRef.current)
   const currentObjectTypeRef = useRef<ObjectType | null>(null)
   const setupGenerationRef = useRef(0)
   const setupTaskRef = useRef<Promise<void>>(Promise.resolve())
@@ -419,6 +437,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const appearance = useAppearanceStore(useShallow(appearanceSelector))
   const environment = useEnvironmentStore(useShallow(environmentSelector))
   const performance_ = usePerformanceStore(useShallow(performanceSelector))
+  const renderResolutionScale = usePerformanceStore((state) => state.renderResolutionScale)
   const postProcessing = usePostProcessingStore(useShallow(postProcessingSelector))
   // Schroedinger isosurface flag (compile-time shader selection, triggers renderer recreation)
   const schroedingerIsoEnabled = useExtendedObjectStore(schroedingerIsoSelector)
@@ -513,6 +532,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
             uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
             temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
             eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
+            // Read directly from store to avoid coupling pass setup dependencies to runtime scale changes.
+            renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
             colorAlgorithm: appearance.colorAlgorithm,
             representation: schroedingerCompile.representation,
             // Skybox settings
@@ -606,6 +627,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       backgroundColor: environment.backgroundColor,
     })
   }, [graph, environment.skyboxEnabled, environment.backgroundColor])
+
+  // Runtime CAS sharpening update (avoids full pass rebuild for render resolution changes).
+  useEffect(() => {
+    updateToScreenPassSharpness({
+      graph,
+      renderResolutionScale,
+    })
+  }, [graph, renderResolutionScale])
 
   // Update camera aspect ratio when canvas size changes
   useEffect(() => {
@@ -1420,6 +1449,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const renderFrame = useCallback(() => {
     const runtime = exportRuntimeRef.current
     const exportStore = useExportStore.getState()
+    const runtimeActive = isExportRuntimeActive(runtime)
 
     if (
       exportStore.isExporting &&
@@ -1430,13 +1460,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       void startExport()
     } else if (
       !exportStore.isExporting &&
-      (runtime.starting || runtime.started || runtime.processing || runtime.finishing) &&
+      runtimeActive &&
       !runtime.canceling
     ) {
       void cancelExport()
     }
 
-    if (runtime.started || runtime.starting || runtime.processing || runtime.finishing || runtime.canceling) {
+    if (runtimeActive) {
       if (runtime.started && !runtime.processing && !runtime.finishing && !runtime.canceling) {
         void processExportBatch()
       }
@@ -1445,15 +1475,19 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     }
 
     const now = performance.now()
-    const targetFrameIntervalMs = performance_.maxFps > 0 ? 1000 / performance_.maxFps : 0
-    const elapsedMs = now - lastTimeRef.current
+    const fpsDecision = evaluateFpsLimit({
+      nowMs: now,
+      throttleAnchorMs: fpsThrottleAnchorRef.current,
+      maxFps: performance_.maxFps,
+    })
+    fpsThrottleAnchorRef.current = fpsDecision.nextThrottleAnchorMs
 
-    if (targetFrameIntervalMs > 0 && elapsedMs < targetFrameIntervalMs) {
+    if (!fpsDecision.shouldRender) {
       animationFrameRef.current = requestAnimationFrame(renderFrame)
       return
     }
 
-    const deltaTime = elapsedMs / 1000
+    const deltaTime = (now - lastTimeRef.current) / 1000
     lastTimeRef.current = now
 
     advanceSceneStateByDelta(deltaTime)
@@ -1485,13 +1519,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         interactionTimerRef.current = null
       }
 
+      const shouldRestoreRuntime = isExportRuntimeActive(runtime) || runtime.recorder !== null
       runtime.abortRequested = true
       if (runtime.recorder) {
         runtime.recorder.dispose()
         runtime.recorder = null
       }
-      restoreRuntimeState()
-      resetExportRuntime()
+      if (shouldRestoreRuntime) {
+        restoreRuntimeState()
+        resetExportRuntime()
+      }
     }
   }, [renderFrame, resetExportRuntime, restoreRuntimeState])
 
@@ -1564,6 +1601,7 @@ export interface PassConfig {
   uncertaintyBoundaryEnabled: boolean
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
+  renderResolutionScale?: number
   colorAlgorithm: PaletteColorAlgorithm
   // Wavefunction representation (compile-time: momentum mode uses density grid)
   representation: 'position' | 'momentum'
@@ -1577,6 +1615,27 @@ interface ScenePassBackgroundColorUpdateArgs {
   graph: Pick<WebGPURenderGraph, 'getPass'>
   skyboxEnabled: boolean
   backgroundColor: string
+}
+
+interface ToScreenPassSharpnessUpdateArgs {
+  graph: Pick<WebGPURenderGraph, 'getPass'>
+  renderResolutionScale: number
+}
+
+/**
+ * Compute CAS sharpening intensity from render resolution scale.
+ *
+ * Below 95% render scale, sharpening increases as scale decreases:
+ * `min(0.7, (1 - scale) * 1.5)`.
+ */
+export function computeCasSharpnessFromRenderScale(renderResolutionScale: number): number {
+  const normalizedScale = Number.isFinite(renderResolutionScale)
+    ? Math.max(0, Math.min(1, renderResolutionScale))
+    : 1
+
+  if (normalizedScale >= 0.95) return 0
+
+  return Math.min(0.7, (1 - normalizedScale) * 1.5)
 }
 
 /**
@@ -1599,6 +1658,19 @@ export function updateScenePassBackgroundColor({
     b: backgroundLinear[2],
     a: 1,
   })
+}
+
+/**
+ * Update ToScreen CAS sharpness at runtime without rebuilding passes/pipelines.
+ */
+export function updateToScreenPassSharpness({
+  graph,
+  renderResolutionScale,
+}: ToScreenPassSharpnessUpdateArgs): void {
+  const toScreenPass = graph.getPass('toScreen')
+  if (!(toScreenPass instanceof ToScreenPass)) return
+
+  toScreenPass.setSharpness(computeCasSharpnessFromRenderScale(renderResolutionScale))
 }
 
 /**
@@ -1940,6 +2012,7 @@ export async function setupRenderPasses(
     new ToScreenPass({
       inputResource: finalInput,
       gammaCorrection: true,
+      sharpness: computeCasSharpnessFromRenderScale(config.renderResolutionScale ?? 1),
     }),
     'to-screen',
     shouldAbort

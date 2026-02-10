@@ -34,6 +34,13 @@ const TIER_FULL_STATS = 2
 /** Update interval for publishing to store (500ms = 2Hz) */
 const PUBLISH_INTERVAL_MS = 500
 
+/**
+ * Exponential smoothing factor for published FPS.
+ *
+ * At 2 Hz publishing this provides readable FPS without masking sustained shifts.
+ */
+const FPS_SMOOTHING_ALPHA = 0.35
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -83,6 +90,7 @@ export class WebGPUStatsCollector {
   private measurementTier = TIER_HIDDEN
   private lastPublishTime = 0
   private lastFrameTime = 0
+  private smoothedFps: number | null = null
 
   private accumulated: AccumulatedStats = {
     frameCount: 0,
@@ -220,14 +228,19 @@ export class WebGPUStatsCollector {
 
     const frameCount = this.accumulated.frameCount || 1
 
-    // Calculate averages
-    const avgFps = this.accumulated.lastFps
+    // Calculate window averages (frame-time based, not last-sample instantaneous FPS).
     const avgFrameTime = this.accumulated.totalFrameTimeMs / frameCount
     const avgCpuTime = this.accumulated.totalCpuTimeMs / frameCount
+    const windowAvgFps = avgFrameTime > 0 ? 1000 / avgFrameTime : this.accumulated.lastFps
+    const smoothedFps =
+      this.smoothedFps === null
+        ? windowAvgFps
+        : this.smoothedFps + FPS_SMOOTHING_ALPHA * (windowAvgFps - this.smoothedFps)
+    this.smoothedFps = smoothedFps
 
     // Update FPS history (shift left, add new value)
     this.accumulated.fpsHistory.shift()
-    this.accumulated.fpsHistory.push(avgFps)
+    this.accumulated.fpsHistory.push(smoothedFps)
     this.accumulated.cpuHistory.shift()
     this.accumulated.cpuHistory.push(avgCpuTime)
 
@@ -252,7 +265,7 @@ export class WebGPUStatsCollector {
 
     // Update metrics
     updateMetrics({
-      fps: Math.round(avgFps),
+      fps: Math.round(smoothedFps),
       minFps: Math.round(this.accumulated.minFps),
       maxFps: Math.round(this.accumulated.maxFps),
       frameTime: avgFrameTime,
@@ -315,6 +328,7 @@ export class WebGPUStatsCollector {
   reset(): void {
     this.lastPublishTime = 0
     this.lastFrameTime = 0
+    this.smoothedFps = null
     this.accumulated = {
       frameCount: 0,
       totalCpuTimeMs: 0,

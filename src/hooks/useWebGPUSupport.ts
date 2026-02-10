@@ -9,7 +9,7 @@
 
 import { useEffect, useRef } from 'react'
 import { useRendererStore } from '@/stores/rendererStore'
-import type { WebGPUCapabilityInfo } from '@/stores/rendererStore'
+import type { WebGPUCapabilityInfo, WebGPUAdapterMode } from '@/stores/rendererStore'
 
 // ============================================================================
 // Types
@@ -39,6 +39,66 @@ function isWebGPUInBrowser(): boolean {
   return typeof navigator !== 'undefined' && 'gpu' in navigator
 }
 
+interface AdapterInfoWithFallback extends Partial<GPUAdapterInfo> {
+  isFallbackAdapter?: boolean
+}
+
+interface AdapterWithFallbackHints extends GPUAdapter {
+  isFallbackAdapter?: boolean
+  info?: AdapterInfoWithFallback
+}
+
+interface AdapterModeDetectionResult {
+  isFallbackAdapter?: boolean
+  adapterMode: WebGPUAdapterMode
+  adapterModeEstimated: boolean
+}
+
+/**
+ * Derive hardware/software adapter mode.
+ *
+ * Priority:
+ * 1) Explicit fallback flag (adapter or adapter.info)
+ * 2) Heuristic estimate from adapter metadata tokens
+ */
+function detectAdapterMode(adapter: AdapterWithFallbackHints): AdapterModeDetectionResult {
+  const adapterInfo = adapter.info
+
+  const explicitFallbackFlag =
+    typeof adapter.isFallbackAdapter === 'boolean'
+      ? adapter.isFallbackAdapter
+      : typeof adapterInfo?.isFallbackAdapter === 'boolean'
+        ? adapterInfo.isFallbackAdapter
+        : undefined
+
+  if (typeof explicitFallbackFlag === 'boolean') {
+    return {
+      isFallbackAdapter: explicitFallbackFlag,
+      adapterMode: explicitFallbackFlag ? 'software' : 'hardware',
+      adapterModeEstimated: false,
+    }
+  }
+
+  const adapterFingerprint = [
+    adapterInfo?.vendor,
+    adapterInfo?.architecture,
+    adapterInfo?.device,
+    adapterInfo?.description,
+  ]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
+    .toLowerCase()
+
+  const looksLikeSoftwareAdapter =
+    /(swiftshader|warp|llvmpipe|software adapter|software rasterizer)/i.test(adapterFingerprint)
+
+  return {
+    isFallbackAdapter: undefined,
+    adapterMode: looksLikeSoftwareAdapter ? 'software' : 'hardware',
+    adapterModeEstimated: true,
+  }
+}
+
 /**
  * Perform full WebGPU capability detection.
  */
@@ -66,7 +126,9 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
 
     // Get adapter info - use synchronous info property (modern WebGPU)
     // Cast to access info property which may not be in all type definitions
-    const adapterInfo = (adapter as GPUAdapter & { info?: GPUAdapterInfo }).info
+    const adapterWithHints = adapter as AdapterWithFallbackHints
+    const adapterInfo = adapterWithHints.info
+    const adapterModeResult = detectAdapterMode(adapterWithHints)
 
     // Try to create a device to verify full support
     try {
@@ -81,6 +143,9 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
         vendor: adapterInfo?.vendor || undefined,
         architecture: adapterInfo?.architecture || undefined,
         device: adapterInfo?.device || undefined,
+        isFallbackAdapter: adapterModeResult.isFallbackAdapter,
+        adapterMode: adapterModeResult.adapterMode,
+        adapterModeEstimated: adapterModeResult.adapterModeEstimated,
       }
     } catch (deviceError) {
       console.warn('[useWebGPUSupport] Failed to create device:', deviceError)
@@ -89,6 +154,9 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
         vendor: adapterInfo?.vendor || undefined,
         architecture: adapterInfo?.architecture || undefined,
         device: adapterInfo?.device || undefined,
+        isFallbackAdapter: adapterModeResult.isFallbackAdapter,
+        adapterMode: adapterModeResult.adapterMode,
+        adapterModeEstimated: adapterModeResult.adapterModeEstimated,
         unavailableReason: 'initialization_error',
       }
     }
@@ -123,7 +191,7 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
  *     return <LoadingSpinner />
  *   }
  *
- *   return mode === 'webgpu' ? <WebGPUScene /> : <WebGLScene />
+ *   return mode === 'webgpu' ? <WebGPUScene /> : <WebGPUUnavailableNotice />
  * }
  * ```
  */

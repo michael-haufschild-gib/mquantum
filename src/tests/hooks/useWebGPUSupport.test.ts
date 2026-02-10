@@ -11,6 +11,50 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { useWebGPUSupport } from '@/hooks/useWebGPUSupport'
 import { useRendererStore } from '@/stores/rendererStore'
 
+interface MockAdapterOptions {
+  vendor?: string
+  architecture?: string
+  device?: string
+  description?: string
+  adapterFallbackFlag?: boolean
+  infoFallbackFlag?: boolean
+}
+
+function createMockAdapter({
+  vendor = 'Mock Vendor',
+  architecture = 'Mock Architecture',
+  device = 'Mock Device',
+  description = 'Mock WebGPU Adapter',
+  adapterFallbackFlag,
+  infoFallbackFlag,
+}: MockAdapterOptions = {}): GPUAdapter {
+  const info: GPUAdapterInfo & { isFallbackAdapter?: boolean } = {
+    vendor,
+    architecture,
+    device,
+    description,
+  } as GPUAdapterInfo & { isFallbackAdapter?: boolean }
+
+  if (typeof infoFallbackFlag === 'boolean') {
+    info.isFallbackAdapter = infoFallbackFlag
+  }
+
+  const adapter = {
+    features: new Set() as GPUSupportedFeatures,
+    limits: {} as GPUSupportedLimits,
+    info,
+    requestDevice: vi.fn().mockResolvedValue({
+      destroy: vi.fn(),
+    } as unknown as GPUDevice),
+  } as GPUAdapter & { isFallbackAdapter?: boolean }
+
+  if (typeof adapterFallbackFlag === 'boolean') {
+    adapter.isFallbackAdapter = adapterFallbackFlag
+  }
+
+  return adapter as GPUAdapter
+}
+
 describe('useWebGPUSupport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -55,6 +99,55 @@ describe('useWebGPUSupport', () => {
 
       expect(result.current.capabilities).not.toBeNull()
       expect(result.current.capabilities?.supported).toBe(true)
+    })
+
+    it('uses explicit adapter fallback flag when available', async () => {
+      vi.mocked(navigator.gpu.requestAdapter).mockResolvedValueOnce(
+        createMockAdapter({ adapterFallbackFlag: false })
+      )
+      const { result } = renderHook(() => useWebGPUSupport())
+
+      await waitFor(() => {
+        expect(result.current.isComplete).toBe(true)
+      })
+
+      expect(result.current.capabilities?.adapterMode).toBe('hardware')
+      expect(result.current.capabilities?.isFallbackAdapter).toBe(false)
+      expect(result.current.capabilities?.adapterModeEstimated).toBe(false)
+    })
+
+    it('uses explicit adapter.info.isFallbackAdapter when adapter-level flag is missing', async () => {
+      vi.mocked(navigator.gpu.requestAdapter).mockResolvedValueOnce(
+        createMockAdapter({ infoFallbackFlag: true })
+      )
+      const { result } = renderHook(() => useWebGPUSupport())
+
+      await waitFor(() => {
+        expect(result.current.isComplete).toBe(true)
+      })
+
+      expect(result.current.capabilities?.adapterMode).toBe('software')
+      expect(result.current.capabilities?.isFallbackAdapter).toBe(true)
+      expect(result.current.capabilities?.adapterModeEstimated).toBe(false)
+    })
+
+    it('falls back to heuristic estimation when no explicit fallback flag is exposed', async () => {
+      vi.mocked(navigator.gpu.requestAdapter).mockResolvedValueOnce(
+        createMockAdapter({
+          vendor: 'Google Inc.',
+          architecture: 'SwiftShader Device (Subzero)',
+          description: 'SwiftShader Device',
+        })
+      )
+      const { result } = renderHook(() => useWebGPUSupport())
+
+      await waitFor(() => {
+        expect(result.current.isComplete).toBe(true)
+      })
+
+      expect(result.current.capabilities?.adapterMode).toBe('software')
+      expect(result.current.capabilities?.isFallbackAdapter).toBeUndefined()
+      expect(result.current.capabilities?.adapterModeEstimated).toBe(true)
     })
   })
 

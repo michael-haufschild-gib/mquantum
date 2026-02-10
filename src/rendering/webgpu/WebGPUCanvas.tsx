@@ -95,6 +95,8 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<WebGPURenderGraph | null>(null)
   const frameIdRef = useRef<number>(0)
+  const dprRef = useRef<number | undefined>(dpr)
+  dprRef.current = dpr
 
   const [context, setContext] = useState<WebGPUCanvasContext | null>(null)
   const [isInitialized, setIsInitialized] = useState(false)
@@ -131,7 +133,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         // Set initial size
         const container = containerRef.current
         if (container) {
-          const devicePixelRatio = dpr ?? window.devicePixelRatio
+          const devicePixelRatio = dprRef.current ?? window.devicePixelRatio
           const width = Math.floor(container.clientWidth * devicePixelRatio)
           const height = Math.floor(container.clientHeight * devicePixelRatio)
 
@@ -182,7 +184,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         cancelAnimationFrame(frameIdRef.current)
       }
     }
-  }, [dpr, onReady, onError, handleDeviceLost])
+  }, [onReady, onError, handleDeviceLost])
 
   // Handle resize
   const handleResize = useCallback(() => {
@@ -213,6 +215,10 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
+
+    // Apply current size immediately (including DPR changes) without
+    // tearing down and reinitializing WebGPU resources.
+    handleResize()
 
     const resizeObserver = new ResizeObserver(() => {
       handleResize()

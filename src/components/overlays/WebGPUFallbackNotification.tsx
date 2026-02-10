@@ -1,7 +1,7 @@
 /**
  * WebGPU Fallback Notification
  *
- * Displayed when the user's browser doesn't support WebGPU and falls back to WebGL.
+ * Displayed when WebGPU is unavailable.
  * Provides information about why WebGPU isn't available and can be dismissed.
  *
  * @module components/overlays/WebGPUFallbackNotification
@@ -17,7 +17,7 @@ import { Z_INDEX } from '@/constants/zIndex'
 // ============================================================================
 
 /**
- * Notification banner shown when WebGPU is unavailable and falls back to WebGL.
+ * Notification banner shown when WebGPU is unavailable.
  * Auto-dismisses after a timeout or can be manually dismissed.
  */
 export const WebGPUFallbackNotification: React.FC = () => {
@@ -113,7 +113,7 @@ export const WebGPUFallbackNotification: React.FC = () => {
 
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text, #fff)' }}>
-          Using WebGL fallback
+          WebGPU unavailable
         </div>
         <div style={{ fontSize: '12px', color: 'var(--color-text-muted, #888)', marginTop: '2px' }}>
           {reasonMessage}

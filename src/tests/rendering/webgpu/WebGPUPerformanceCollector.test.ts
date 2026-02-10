@@ -64,6 +64,33 @@ function createGraphMock() {
   }
 }
 
+function runFramesWithTimestamps(args: {
+  collector: WebGPUStatsCollector
+  graph: ReturnType<typeof createGraphMock>
+  timestampsMs: number[]
+  cpuTimeMs?: number
+}): void {
+  const { collector, graph, timestampsMs, cpuTimeMs = 4 } = args
+  let cursor = 0
+  const nowSpy = vi.spyOn(performance, 'now').mockImplementation(() => {
+    const value = timestampsMs[Math.min(cursor, timestampsMs.length - 1)] ?? 0
+    cursor++
+    return value
+  })
+
+  for (let i = 0; i < timestampsMs.length; i++) {
+    collector.recordFrame(
+      cpuTimeMs,
+      createFrameStats(),
+      graph as unknown as WebGPURenderGraph,
+      { width: 1200, height: 800 },
+      1.25
+    )
+  }
+
+  nowSpy.mockRestore()
+}
+
 describe('WebGPUStatsCollector', () => {
   beforeEach(() => {
     resetMetricsStore()
@@ -168,5 +195,63 @@ describe('WebGPUStatsCollector', () => {
     expect(metrics.viewport).toEqual({ width: 0, height: 0, dpr: 1 })
 
     nowSpy.mockRestore()
+  })
+
+  it('publishes FPS from window-average frame time (not the last frame sample)', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const sixtyHz = 1000 / 60
+    const thirtyHz = 1000 / 30
+    const timestampsMs: number[] = []
+    let nowMs = 0
+
+    // 29 fast frames, then one slow frame at publish boundary.
+    for (let i = 0; i < 29; i++) {
+      nowMs += sixtyHz
+      timestampsMs.push(nowMs)
+    }
+    nowMs += thirtyHz
+    timestampsMs.push(nowMs)
+
+    runFramesWithTimestamps({ collector, graph, timestampsMs })
+
+    const metrics = usePerformanceMetricsStore.getState()
+    // Window average should stay near high-50s FPS; last-sample behavior would report ~30.
+    expect(metrics.fps).toBeGreaterThan(55)
+    expect(metrics.fps).toBeLessThan(60)
+  })
+
+  it('applies smoothing so FPS transitions are less jumpy between windows', () => {
+    useUIStore.setState({ showPerfMonitor: true, perfMonitorExpanded: false })
+
+    const collector = new WebGPUStatsCollector()
+    const graph = createGraphMock()
+    const sixtyHz = 1000 / 60
+    const thirtyHz = 1000 / 30
+    const timestampsMs: number[] = []
+    let nowMs = 0
+
+    // Window 1 (~60 FPS): triggers first publish around 500ms.
+    for (let i = 0; i < 30; i++) {
+      nowMs += sixtyHz
+      timestampsMs.push(nowMs)
+    }
+
+    // Window 2 (~30 FPS): triggers second publish about 500ms later.
+    for (let i = 0; i < 16; i++) {
+      nowMs += thirtyHz
+      timestampsMs.push(nowMs)
+    }
+
+    runFramesWithTimestamps({ collector, graph, timestampsMs })
+
+    const metrics = usePerformanceMetricsStore.getState()
+    // With smoothing we should transition toward 30 rather than jump instantly from 60 to 30.
+    expect(metrics.fps).toBeGreaterThan(30)
+    expect(metrics.fps).toBeLessThan(60)
+    expect(metrics.fps).toBeGreaterThanOrEqual(49)
+    expect(metrics.fps).toBeLessThanOrEqual(51)
   })
 })

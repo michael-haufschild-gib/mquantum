@@ -1,4 +1,5 @@
 import { usePerformanceMetricsStore } from '@/stores/performanceMetricsStore'
+import { useRendererStore } from '@/stores/rendererStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Icons } from '../icons'
@@ -16,9 +17,29 @@ export const SystemTabContent = React.memo(function SystemTabContent() {
       vram: s.vram,
     }))
   )
+  const { adapterMode, adapterModeEstimated } = useRendererStore(
+    useShallow((s) => ({
+      adapterMode: s.webgpuCapabilities?.adapterMode,
+      adapterModeEstimated: s.webgpuCapabilities?.adapterModeEstimated ?? false,
+    }))
+  )
+
+  const normalizedAdapterMode = adapterMode === 'software' ? 'software' : 'hardware'
+  const rendererLabel = normalizedAdapterMode === 'software' ? 'Software' : 'Hardware'
+  const rendererValue = adapterModeEstimated ? `${rendererLabel} (estimated)` : rendererLabel
 
   return (
     <div className="space-y-5 p-5">
+      <div className="space-y-3">
+        <SectionHeader icon={<Icons.Activity />} label="Renderer" />
+        <div className="grid grid-cols-1 gap-2">
+          <InfoCard
+            label="Mode"
+            value={rendererValue}
+            highlight={normalizedAdapterMode === 'software'}
+          />
+        </div>
+      </div>
       <div className="space-y-3">
         <SectionHeader icon={<Icons.Chip />} label="GPU Info" />
         <div className="p-3 bg-[var(--bg-hover)] rounded-lg border border-border-subtle text-xs text-text-secondary font-mono leading-relaxed">

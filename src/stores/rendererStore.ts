@@ -20,6 +20,9 @@ export type RendererMode = 'webgpu'
 /** WebGPU support status */
 export type WebGPUSupportStatus = 'unknown' | 'checking' | 'supported' | 'unsupported'
 
+/** WebGPU adapter execution mode */
+export type WebGPUAdapterMode = 'hardware' | 'software' | 'unknown'
+
 /** Reason why WebGPU is not available */
 export type WebGPUUnavailableReason =
   | 'not_in_browser' // navigator.gpu doesn't exist
@@ -37,6 +40,24 @@ export interface WebGPUCapabilityInfo {
   architecture?: string
   /** Adapter device description */
   device?: string
+  /**
+   * Indicates a browser-provided fallback adapter (typically software) when exposed.
+   *
+   * Not all browsers expose this field.
+   */
+  isFallbackAdapter?: boolean
+  /**
+   * Derived adapter mode.
+   *
+   * When explicit fallback signals are unavailable, this can be inferred from
+   * adapter metadata heuristics.
+   */
+  adapterMode?: WebGPUAdapterMode
+  /**
+   * True when adapterMode is inferred heuristically rather than reported
+   * explicitly by the browser/runtime.
+   */
+  adapterModeEstimated?: boolean
   /** Reason if not supported */
   unavailableReason?: WebGPUUnavailableReason
 }
