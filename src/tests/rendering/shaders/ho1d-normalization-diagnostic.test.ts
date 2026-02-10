@@ -41,7 +41,7 @@ function ho1D_canonical(n: number, x: number, omega: number): number {
   const gauss = Math.exp(-0.5 * u * u)
   const H = hermite(n, u)
   const alphaNorm = Math.sqrt(Math.sqrt(alpha * alpha * INV_PI))
-  const norm = HO_NORM[n]
+  const norm = HO_NORM[n]!
   return alphaNorm * norm * H * gauss
 }
 
@@ -66,14 +66,14 @@ function computeDensity3D(
   let psiIm = 0
 
   for (let k = 0; k < preset.termCount; k++) {
-    const qn = preset.quantumNumbers[k]
-    const [cRe, cIm] = preset.coefficients[k]
-    const E = preset.energies[k]
+    const qn = preset.quantumNumbers[k]!
+    const [cRe, cIm] = preset.coefficients[k]!
+    const E = preset.energies[k]!
 
     // Product of 1D eigenfunctions
-    const phi = ho1DFunc(qn[0], x, omega[0])
-               * ho1DFunc(qn[1], y, omega[1])
-               * ho1DFunc(qn[2], z, omega[2])
+    const phi = ho1DFunc(qn[0]!, x, omega[0]!)
+               * ho1DFunc(qn[1]!, y, omega[1]!)
+               * ho1DFunc(qn[2]!, z, omega[2]!)
 
     // Time factor: e^{-iEt}
     const cosEt = Math.cos(E * t)
@@ -122,7 +122,7 @@ describe('HO1D Normalization Diagnostic', () => {
 
     expect(preset.termCount).toBe(1)
     expect(preset.quantumNumbers.length).toBe(1)
-    expect(preset.quantumNumbers[0].length).toBe(3)
+    expect(preset.quantumNumbers[0]!.length).toBe(3)
   })
 
   it('should compare peak density: canonical vs visual normalization', () => {
@@ -346,19 +346,19 @@ describe('HO1D Normalization Diagnostic', () => {
       let dominantIdx = 0
       let maxMag = 0
       for (let k = 0; k < p.termCount; k++) {
-        const [cRe, cIm] = p.coefficients[k]
+        const [cRe, cIm] = p.coefficients[k]!
         const mag = cRe * cRe + cIm * cIm
         if (mag > maxMag) { maxMag = mag; dominantIdx = k }
       }
 
-      const qn = p.quantumNumbers[dominantIdx]
+      const qn = p.quantumNumbers[dominantIdx]!
       let ratioProduct = 1.0
       for (let j = 0; j < Math.min(dim, qn.length); j++) {
-        const n = qn[j]
+        const n = qn[j]!
         if (n < 0 || n > 6) continue
         const alpha = Math.sqrt(Math.max(p.omega[j] ?? 1.0, 0.01))
         const alphaNorm = Math.sqrt(Math.sqrt(alpha * alpha * INV_PI))
-        const norm = HO_NORM[n]
+        const norm = HO_NORM[n]!
         const damp = 1.0 / (1.0 + 0.15 * n * n)
         const ratio = damp / (alphaNorm * norm)
         ratioProduct *= ratio * ratio

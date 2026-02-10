@@ -255,7 +255,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private getOrCreateReprojectionUniformBindGroup(): GPUBindGroup {
     if (!this.reprojectionBindGroup0) {
       this.reprojectionBindGroup0 = this.createBindGroup(
-        this.device,
+        this.device!,
         this.reprojectionBindGroupLayout0!,
         [{ binding: 0, resource: { buffer: this.temporalUniformBuffer! } }],
         'temporal-reprojection-bg0'
@@ -277,7 +277,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     }
 
     const bindGroup = this.createBindGroup(
-      this.device,
+      this.device!,
       this.reprojectionBindGroupLayout1!,
       [
         { binding: 0, resource: accumulationView },
@@ -293,7 +293,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   private getOrCreateReconstructionUniformBindGroup(): GPUBindGroup {
     if (!this.reconstructionBindGroup0) {
       this.reconstructionBindGroup0 = this.createBindGroup(
-        this.device,
+        this.device!,
         this.reconstructionBindGroupLayout0!,
         [{ binding: 0, resource: { buffer: this.temporalUniformBuffer! } }],
         'temporal-reconstruction-bg0'
@@ -315,7 +315,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     }
 
     const bindGroup = this.createBindGroup(
-      this.device,
+      this.device!,
       this.reconstructionBindGroupLayout1!,
       [
         { binding: 0, resource: quarterColorView },

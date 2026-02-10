@@ -16,6 +16,7 @@ interface ScenePassConfig {
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
   interferenceEnabled: boolean
+  uncertaintyBoundaryEnabled: boolean
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
   representation: 'position' | 'momentum'
@@ -68,6 +69,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     nodalEnabled: false,
     phaseMaterialityEnabled: false,
     interferenceEnabled: false,
+    uncertaintyBoundaryEnabled: false,
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     representation: 'position',

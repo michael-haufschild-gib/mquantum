@@ -67,7 +67,7 @@ function createGraphMock() {
 describe('WebGPUStatsCollector', () => {
   beforeEach(() => {
     resetMetricsStore()
-    useUIStore.setState(UI_INITIAL_STATE, true)
+    useUIStore.setState(UI_INITIAL_STATE)
     vi.restoreAllMocks()
   })
 
