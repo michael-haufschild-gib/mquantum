@@ -102,6 +102,39 @@ fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi
 }
 
 /**
+ * Evaluate angular part Y_lm from Cartesian unit direction (nx, ny, nz) = (x/r, y/r, z/r).
+ * Eliminates the atan2 singularity on the z-axis by using polynomial Cartesian form
+ * for l <= 2 and a guarded fallback for l > 2.
+ */
+fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, useReal: bool) -> f32 {
+  if (useReal) {
+    if (l <= 2) {
+      // Cartesian form: no atan2, no singularity
+      return fastRealSphericalHarmonicCartesian(l, m, nx, ny, nz);
+    } else {
+      // General path: recover spherical coords with z-axis guard.
+      // For m != 0, Y_lm vanishes on the z-axis (P_l^|m|(±1) = 0 for m != 0),
+      // so returning 0 when sin²θ is tiny is mathematically exact.
+      let rxy2 = nx * nx + ny * ny;
+      if (m != 0 && rxy2 < 1e-8) {
+        return 0.0;
+      }
+      let theta = acos(clamp(nz, -1.0, 1.0));
+      let phi = atan2(ny, nx);
+      var Y = realSphericalHarmonic(l, m, theta, phi, true);
+      // Undo Condon-Shortley phase for odd |m| (same as evalHydrogenNDAngularDirect)
+      if ((abs(m) & 1) == 1) { Y = -Y; }
+      return Y;
+    }
+  } else {
+    // Complex: |Y_lm| = K * |P| — no phi dependency, no singularity
+    let K = sphericalHarmonicNorm(l, m);
+    let P = legendre(l, m, nz);
+    return K * abs(P);
+  }
+}
+
+/**
  * Apply time evolution to hydrogen ND wavefunction
  *
  * ψ(t) = ψ(0) * exp(-i * E * t)

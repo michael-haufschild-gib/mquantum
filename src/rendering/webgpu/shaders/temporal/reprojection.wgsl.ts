@@ -59,7 +59,9 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Compute this BEFORE any early returns so we can sample history uniformly
   let prevClip = temporal.prevViewProjection * vec4f(worldPos, 1.0);
   let prevNDC = prevClip.xyz / max(prevClip.w, 0.0001);
-  let prevUV = prevNDC.xy * 0.5 + 0.5;
+  // NDC → UV: X is direct, Y must be flipped because NDC.y=+1 is screen top
+  // but UV.y=0 is texture top (WebGPU framebuffer convention)
+  let prevUV = vec2f(prevNDC.x, -prevNDC.y) * 0.5 + 0.5;
 
   // CRITICAL: textureSample must be called from UNIFORM control flow
   // Sample history BEFORE any per-pixel conditional branches

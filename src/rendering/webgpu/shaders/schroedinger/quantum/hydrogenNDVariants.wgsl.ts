@@ -161,17 +161,17 @@ ${extraDimEarlyExit}${radiusCalc}
     return vec2f(0.0, 0.0);
   }
 
-  // PERF: Compute cos/sin(theta) directly from Cartesian coords — avoids acos + cos round-trip
+  // Cartesian unit direction — singularity-free angular evaluation (no atan2)
   let invR = 1.0 / max(r3D, 1e-10);
-  let cosTheta = x2 * invR;
-  let sinTheta = sqrt(max(x0 * x0 + x1 * x1, 0.0)) * invR;
-  let phi = atan2(x1, x0);
+  let nx = x0 * invR;
+  let ny = x1 * invR;
+  let nz = x2 * invR;
 
   // Radial part: R_nl(r_3D) from the 3D hydrogen core
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm from first 3 dims (using precomputed cos/sin theta)
-  let Y = evalHydrogenNDAngularDirect(uniforms.azimuthalL, uniforms.magneticM, cosTheta, sinTheta, phi, uniforms.useRealOrbitals != 0u);
+  // Angular part: Y_lm from Cartesian direction (avoids atan2 z-axis singularity)
+  let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
   // Combine: psi = R * Y * extraProduct
   let psiReal = R * Y * extraProduct;
@@ -284,17 +284,17 @@ ${extraDimEarlyExit}${radiusCalc}
     return vec2f(0.0, 0.0);
   }
 
-  // PERF: Compute cos/sin(theta) directly — avoids acos + cos round-trip
+  // Cartesian unit direction — singularity-free angular evaluation (no atan2)
   let invR = 1.0 / max(r3D, 1e-10);
-  let cosTheta = x2 * invR;
-  let sinTheta = sqrt(max(x0 * x0 + x1 * x1, 0.0)) * invR;
-  let phi = atan2(x1, x0);
+  let nx = x0 * invR;
+  let ny = x1 * invR;
+  let nz = x2 * invR;
 
   // Radial part: R_nl(r_3D) from the 3D hydrogen core
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm from first 3 dims (using precomputed cos/sin theta)
-  let Y = evalHydrogenNDAngularDirect(uniforms.azimuthalL, uniforms.magneticM, cosTheta, sinTheta, phi, uniforms.useRealOrbitals != 0u);
+  // Angular part: Y_lm from Cartesian direction (avoids atan2 z-axis singularity)
+  let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
   // Combine: psi = R * Y * extraProduct
   let psiReal = R * Y * extraProduct;

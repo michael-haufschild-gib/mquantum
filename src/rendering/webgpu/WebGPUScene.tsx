@@ -537,6 +537,26 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // Compile the graph
       graph.compile()
 
+      // Force-sync canvas pixel dimensions and graph/pool size after rebuild.
+      // During the async rebuild, the canvas or pool may have stale dimensions
+      // (e.g., if a resize occurred mid-rebuild when pool had no configs).
+      // This mirrors what the resize handler does and prevents the vertical
+      // squish that would otherwise require a manual window resize to fix.
+      if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+        const effectiveDpr = canvas.width > 0 && canvas.clientWidth > 0
+          ? canvas.width / canvas.clientWidth
+          : window.devicePixelRatio
+        const w = Math.floor(canvas.clientWidth * effectiveDpr)
+        const h = Math.floor(canvas.clientHeight * effectiveDpr)
+        canvas.width = w
+        canvas.height = h
+        graph.setSize(w, h)
+        // Also re-sync camera aspect ratio to match the freshly-set dimensions
+        if (cameraRef.current) {
+          cameraRef.current.setAspect(w / h)
+        }
+      }
+
       console.log('[WebGPUScene] Passes initialized, graph compiled')
     }
 

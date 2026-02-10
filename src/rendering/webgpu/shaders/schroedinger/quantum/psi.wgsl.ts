@@ -379,10 +379,10 @@ fn evalHydrogenNDMomentumSpatial(
   let ky = xND[1] * kScale;
   let kz = xND[2] * kScale;
   let r3D = length(vec3f(kx, ky, kz));
-
-  let angles = sphericalAngles3D(kx, ky, kz, r3D);
-  let theta = angles.x;
-  let phi = angles.y;
+  let invR = 1.0 / max(r3D, 1e-10);
+  let nx = kx * invR;
+  let ny = ky * invR;
+  let nz = kz * invR;
 
   let radial = hydrogenRadialMomentum(
     uniforms.principalN,
@@ -390,11 +390,10 @@ fn evalHydrogenNDMomentumSpatial(
     r3D,
     uniforms.bohrRadius
   );
-  let angular = evalHydrogenNDAngular(
+  let angular = evalHydrogenNDAngularCartesian(
     uniforms.azimuthalL,
     uniforms.magneticM,
-    theta,
-    phi,
+    nx, ny, nz,
     uniforms.useRealOrbitals != 0u
   );
 

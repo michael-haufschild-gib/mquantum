@@ -199,14 +199,16 @@ fn evalHydrogenNodeFactorsAtXND(xND: array<f32, 11>, uniforms: SchroedingerUnifo
 
   let sum3D = x0 * x0 + x1 * x1 + x2 * x2;
   let r3D = sqrt(max(sum3D, 0.0));
-  let angles = sphericalAngles3D(x0, x1, x2, r3D);
+  let invR = 1.0 / max(r3D, 1e-10);
+  let nx = x0 * invR;
+  let ny = x1 * invR;
+  let nz = x2 * invR;
   // For node-family decomposition, radial nodes are defined by the 3D hydrogen core.
   let radial = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
-  let angular = evalHydrogenNDAngular(
+  let angular = evalHydrogenNDAngularCartesian(
     uniforms.azimuthalL,
     uniforms.magneticM,
-    angles.x,
-    angles.y,
+    nx, ny, nz,
     uniforms.useRealOrbitals != 0u
   );
   return vec2f(radial, angular);

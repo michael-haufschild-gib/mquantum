@@ -188,4 +188,54 @@ fn fastRealSphericalHarmonicDirect(l: i32, m: i32, ct: f32, st: f32, phi: f32) -
   let theta = acos(clamp(ct, -1.0, 1.0));
   return realSphericalHarmonic(l, m, theta, phi, true);
 }
+
+/**
+ * Cartesian form of real spherical harmonics for l <= 2.
+ * Takes normalized direction (nx, ny, nz) = (x/r, y/r, z/r) instead of angles.
+ * Completely avoids atan2 — eliminates the z-axis singularity where phi is undefined.
+ *
+ * Equivalences:
+ *   sin(θ)cos(φ) = x/r = nx
+ *   sin(θ)sin(φ) = y/r = ny
+ *   cos(θ)        = z/r = nz
+ */
+fn fastRealSphericalHarmonicCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32) -> f32 {
+  // s orbital (l=0)
+  if (l == 0) {
+    return 0.28209479; // 1/(2*sqrt(PI))
+  }
+
+  // p orbitals (l=1)
+  if (l == 1) {
+    let norm = 0.48860251; // sqrt(3/(4*PI))
+    if (m == 0) { return norm * nz; }       // pz: cos(θ) = z/r
+    if (m == 1) { return norm * nx; }        // px: sin(θ)cos(φ) = x/r
+    return norm * ny;                         // py: sin(θ)sin(φ) = y/r
+  }
+
+  // d orbitals (l=2)
+  if (l == 2) {
+    if (m == 0) {
+      // dz²: (3cos²θ - 1) = (3z²/r² - 1)
+      return 0.31539157 * (3.0 * nz * nz - 1.0);
+    }
+    if (m == 1) {
+      // dxz: sin(θ)cos(θ)cos(φ) = xz/r²
+      return 1.09254843 * nx * nz;
+    }
+    if (m == -1) {
+      // dyz: sin(θ)cos(θ)sin(φ) = yz/r²
+      return 1.09254843 * ny * nz;
+    }
+    if (m == 2) {
+      // dx²-y²: sin²(θ)cos(2φ) = (x²-y²)/r²
+      return 0.54627422 * (nx * nx - ny * ny);
+    }
+    // dxy: sin²(θ)sin(2φ) = 2xy/r²
+    return 0.54627422 * 2.0 * nx * ny;
+  }
+
+  // Should not reach here for l <= 2
+  return 0.0;
+}
 `
