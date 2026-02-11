@@ -25,8 +25,10 @@ import { ColorAlgorithmSelector } from './ColorAlgorithmSelector'
 import { ColorPreview } from './ColorPreview'
 import { CosineGradientEditor } from './CosineGradientEditor'
 import { DistributionControls } from './DistributionControls'
+import { DomainColoringControls } from './DomainColoringControls'
 import { LchPresetSelector } from './LchPresetSelector'
 import { PresetSelector } from './PresetSelector'
+import { RealImagDivergingControls } from './RealImagDivergingControls'
 
 /** Algorithms that use the cosine palette (preset selector + advanced editor) */
 const USES_COSINE_PALETTE = new Set(['radial', 'multiSource'])
@@ -275,6 +277,14 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
 
         {/* Multi-source weight editor */}
         {colorAlgorithm === 'multiSource' && <MultiSourceWeightsEditor />}
+
+        {/* Domain coloring controls */}
+        {colorAlgorithm === 'domainColoringPsi' && <DomainColoringControls />}
+
+        {/* Real/Imag diverging controls */}
+        {(colorAlgorithm === 'realDiverging' || colorAlgorithm === 'imagDiverging') && (
+          <RealImagDivergingControls />
+        )}
 
         {/* Distribution controls (power, cycles, offset) */}
         {USES_DISTRIBUTION.has(colorAlgorithm) && <DistributionControls />}

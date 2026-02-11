@@ -310,7 +310,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   // Color module dependency flags (compile-time specialization)
-  // 1=MultiSource, 2=Radial use cosine palette; 0=LCH and 6=PhaseCyclicUniform use Oklab
+  // 1=MultiSource, 2=Radial use cosine palette; 0=LCH and 6=PhaseCyclicUniform use Oklab.
+  // 3,4,7,8,9,10 are HSL-based and do not need cosine/oklab helper blocks.
   const needsCosine = colorAlgorithm === undefined || [1, 2].includes(colorAlgorithm)
   const needsOklab = colorAlgorithm === undefined || [0, 6].includes(colorAlgorithm)
 

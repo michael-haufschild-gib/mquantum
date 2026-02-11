@@ -1,6 +1,8 @@
 import type {
   ColorAlgorithm,
   CosineCoefficients,
+  DivergingPsiSettings,
+  DomainColoringSettings,
   DistributionSettings,
   MultiSourceWeights,
 } from '@/rendering/shaders/palette'
@@ -8,6 +10,8 @@ import {
   DEFAULT_BACKGROUND_COLOR,
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
+  DEFAULT_DIVERGING_PSI_SETTINGS,
+  DEFAULT_DOMAIN_COLORING_SETTINGS,
   DEFAULT_DISTRIBUTION,
   DEFAULT_EDGE_COLOR,
   DEFAULT_FACE_COLOR,
@@ -28,8 +32,9 @@ import type { AppearanceSlice, ColorSlice, ColorSliceState } from './types'
  * Used to determine what to reset when switching algorithms.
  */
 type AlgorithmParamSet = 'distribution' | 'cosine' | 'lch' | 'multiSource'
+type ExtendedAlgorithmParamSet = AlgorithmParamSet | 'domainColoring' | 'divergingPsi'
 
-const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
+const ALGORITHM_PARAMS: Record<ColorAlgorithm, ExtendedAlgorithmParamSet[]> = {
   // Cosine palette-based (+ distribution)
   radial: ['distribution', 'cosine'],
   multiSource: ['distribution', 'cosine', 'multiSource'],
@@ -40,6 +45,9 @@ const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
   mixed: [],
   phaseCyclicUniform: [],
   phaseDiverging: [],
+  realDiverging: ['divergingPsi'],
+  imagDiverging: ['divergingPsi'],
+  domainColoringPsi: ['domainColoring'],
   // Analytic (no user-controllable color parameters)
   blackbody: [],
 }
@@ -53,7 +61,7 @@ const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
 function getNewParamsForAlgorithm(
   prevAlgorithm: ColorAlgorithm,
   newAlgorithm: ColorAlgorithm
-): AlgorithmParamSet[] {
+) {
   const prevParams = ALGORITHM_PARAMS[prevAlgorithm] || ['distribution']
   const newParams = ALGORITHM_PARAMS[newAlgorithm] || ['distribution']
   return newParams.filter((p) => !prevParams.includes(p))
@@ -70,6 +78,8 @@ export const COLOR_INITIAL_STATE: ColorSliceState = {
   multiSourceWeights: { ...DEFAULT_MULTI_SOURCE_WEIGHTS },
   lchLightness: DEFAULT_LCH_LIGHTNESS,
   lchChroma: DEFAULT_LCH_CHROMA,
+  domainColoring: { ...DEFAULT_DOMAIN_COLORING_SETTINGS },
+  divergingPsi: { ...DEFAULT_DIVERGING_PSI_SETTINGS },
 }
 
 export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice> = (set) =>
@@ -106,6 +116,16 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
         if (newParams.includes('multiSource')) {
           // Switching to multiSource algorithm - reset blend weights
           resets.multiSourceWeights = { ...DEFAULT_MULTI_SOURCE_WEIGHTS }
+        }
+
+        if (newParams.includes('domainColoring')) {
+          // Switching to domain-coloring algorithm - reset contour styling
+          resets.domainColoring = { ...DEFAULT_DOMAIN_COLORING_SETTINGS }
+        }
+
+        if (newParams.includes('divergingPsi')) {
+          // Switching to real/imag diverging algorithm - reset diverging palette
+          resets.divergingPsi = { ...DEFAULT_DIVERGING_PSI_SETTINGS }
         }
 
         // Also reset distribution when switching FROM cosine/lch/multiSource TO simple HSL-based
@@ -180,6 +200,56 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
     setLchLightness: (lightness: number) =>
       set({ lchLightness: Math.max(0.1, Math.min(1, lightness)) }),
     setLchChroma: (chroma: number) => set({ lchChroma: Math.max(0, Math.min(0.4, chroma)) }),
+
+    setDomainColoringSettings: (settings: Partial<DomainColoringSettings>) =>
+      set((state) => ({
+        domainColoring: {
+          ...state.domainColoring,
+          modulusMode:
+            settings.modulusMode !== undefined
+              ? settings.modulusMode
+              : state.domainColoring.modulusMode,
+          contoursEnabled:
+            settings.contoursEnabled !== undefined
+              ? settings.contoursEnabled
+              : state.domainColoring.contoursEnabled,
+          contourDensity:
+            settings.contourDensity !== undefined
+              ? Math.max(1, Math.min(32, settings.contourDensity))
+              : state.domainColoring.contourDensity,
+          contourWidth:
+            settings.contourWidth !== undefined
+              ? Math.max(0.005, Math.min(0.25, settings.contourWidth))
+              : state.domainColoring.contourWidth,
+          contourStrength:
+            settings.contourStrength !== undefined
+              ? Math.max(0, Math.min(1, settings.contourStrength))
+              : state.domainColoring.contourStrength,
+        },
+      })),
+
+    setDivergingPsiSettings: (settings: Partial<DivergingPsiSettings>) =>
+      set((state) => ({
+        divergingPsi: {
+          ...state.divergingPsi,
+          neutralColor:
+            settings.neutralColor !== undefined
+              ? settings.neutralColor
+              : state.divergingPsi.neutralColor,
+          positiveColor:
+            settings.positiveColor !== undefined
+              ? settings.positiveColor
+              : state.divergingPsi.positiveColor,
+          negativeColor:
+            settings.negativeColor !== undefined
+              ? settings.negativeColor
+              : state.divergingPsi.negativeColor,
+          intensityFloor:
+            settings.intensityFloor !== undefined
+              ? Math.max(0, Math.min(1, settings.intensityFloor))
+              : state.divergingPsi.intensityFloor,
+        },
+      })),
   }) as unknown as AppearanceSlice
 // Casting because we are only implementing part of the interface here,
 // but in the final merge it will be complete.

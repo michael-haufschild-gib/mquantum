@@ -100,6 +100,31 @@ export interface AppearanceStoreState {
     c: [number, number, number]
     d: [number, number, number]
   }
+  distribution: {
+    power: number
+    cycles: number
+    offset: number
+  }
+  multiSourceWeights: {
+    depth: number
+    orbitTrap: number
+    normal: number
+  }
+  lchLightness: number
+  lchChroma: number
+  domainColoring: {
+    modulusMode: 'logPsiAbsSquared' | 'logPsiAbs'
+    contoursEnabled: boolean
+    contourDensity: number
+    contourWidth: number
+    contourStrength: number
+  }
+  divergingPsi: {
+    neutralColor: string
+    positiveColor: string
+    negativeColor: string
+    intensityFloor: number
+  }
   faceColor: string
   edgeColor: string
   opacity: number

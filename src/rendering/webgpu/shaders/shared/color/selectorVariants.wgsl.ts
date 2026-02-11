@@ -10,7 +10,7 @@
  * Color algorithms and their dependencies:
  * - 0: Oklab only (lchColor)
  * - 1,2: Cosine palette only (getCosinePaletteColor)
- * - 3,4,7: HSL only (hsl2rgb)
+ * - 3,4,7,8,9,10: HSL only (hsl2rgb)
  * - 6: Oklab cyclic phase map (oklab2rgb)
  * - 5: Blackbody (no dependencies, inline math)
  *
@@ -156,6 +156,59 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
+    case 8:
+      // Domain Coloring Psi (HSL)
+      return /* wgsl */ `
+// ============================================
+// Color Selector - Algorithm 8: Domain Coloring Psi (Compile-time)
+// ============================================
+
+fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
+  let phaseNorm = fract(t);
+  let modulusValue = clamp(t, 0.0, 1.0);
+  let lightness = clamp(0.08 + 0.82 * modulusValue, 0.0, 1.0);
+  return hsl2rgb(phaseNorm, 0.85, lightness);
+}
+`
+
+    case 9:
+      // Real Diverging (HSL)
+      return /* wgsl */ `
+// ============================================
+// Color Selector - Algorithm 9: Real Diverging (Compile-time)
+// ============================================
+
+fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
+  let signedReal = clamp(cos(t * 6.28318), -1.0, 1.0);
+  let signStrength = abs(signedReal);
+  let positiveWing = vec3f(0.91, 0.23, 0.23);
+  let negativeWing = vec3f(0.19, 0.40, 0.96);
+  let neutral = vec3f(0.85);
+  let wing = select(negativeWing, positiveWing, signedReal >= 0.0);
+  let intensity = 0.2 + 0.8 * signStrength;
+  return mix(neutral, wing, signStrength) * intensity;
+}
+`
+
+    case 10:
+      // Imag Diverging (HSL)
+      return /* wgsl */ `
+// ============================================
+// Color Selector - Algorithm 10: Imag Diverging (Compile-time)
+// ============================================
+
+fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
+  let signedImag = clamp(sin(t * 6.28318), -1.0, 1.0);
+  let signStrength = abs(signedImag);
+  let positiveWing = vec3f(0.91, 0.23, 0.23);
+  let negativeWing = vec3f(0.19, 0.40, 0.96);
+  let neutral = vec3f(0.85);
+  let wing = select(negativeWing, positiveWing, signedImag >= 0.0);
+  let intensity = 0.2 + 0.8 * signStrength;
+  return mix(neutral, wing, signStrength) * intensity;
+}
+`
+
     default:
       // Fallback to full selector (should not happen)
       return ''
@@ -165,7 +218,7 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 /**
  * Get required color modules for a specific algorithm.
  *
- * @param algorithm - Color algorithm (0-7)
+ * @param algorithm - Color algorithm (0-10)
  * @returns Object indicating which modules are needed
  */
 export function getColorModuleDependencies(algorithm: ColorAlgorithm): {
@@ -186,6 +239,11 @@ export function getColorModuleDependencies(algorithm: ColorAlgorithm): {
     case 6:
       return { hsl: false, cosine: false, oklab: true }
     case 7:
+      return { hsl: true, cosine: false, oklab: false }
+    case 8:
+      return { hsl: true, cosine: false, oklab: false }
+    case 9:
+    case 10:
       return { hsl: true, cosine: false, oklab: false }
     default:
       return { hsl: true, cosine: true, oklab: true }

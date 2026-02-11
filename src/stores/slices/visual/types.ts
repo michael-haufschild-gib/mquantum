@@ -1,6 +1,8 @@
 import type {
   ColorAlgorithm,
   CosineCoefficients,
+  DivergingPsiSettings,
+  DomainColoringSettings,
   DistributionSettings,
   MultiSourceWeights,
 } from '@/rendering/shaders/palette'
@@ -29,6 +31,8 @@ export interface ColorSliceState {
   multiSourceWeights: MultiSourceWeights
   lchLightness: number
   lchChroma: number
+  domainColoring: DomainColoringSettings
+  divergingPsi: DivergingPsiSettings
 }
 
 export interface ColorSliceActions {
@@ -44,6 +48,8 @@ export interface ColorSliceActions {
   setMultiSourceWeights: (weights: Partial<MultiSourceWeights>) => void
   setLchLightness: (lightness: number) => void
   setLchChroma: (chroma: number) => void
+  setDomainColoringSettings: (settings: Partial<DomainColoringSettings>) => void
+  setDivergingPsiSettings: (settings: Partial<DivergingPsiSettings>) => void
 }
 
 export type ColorSlice = ColorSliceState & ColorSliceActions

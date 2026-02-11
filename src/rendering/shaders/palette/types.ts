@@ -20,6 +20,9 @@
  * - radial: Color based on 3D distance from origin (spherical gradient)
  * - phaseCyclicUniform: Perceptually uniform cyclic phase map for arg(ψ)
  * - phaseDiverging: Signed diverging palette (Re(ψ) sign proxy)
+ * - realDiverging: Zero-centered diverging map for Re(ψ)
+ * - imagDiverging: Zero-centered diverging map for Im(ψ)
+ * - domainColoringPsi: Domain coloring for wavefunction phase + modulus
  */
 
 export type ColorAlgorithm =
@@ -30,6 +33,9 @@ export type ColorAlgorithm =
   | 'mixed'
   | 'phaseCyclicUniform'
   | 'phaseDiverging'
+  | 'realDiverging'
+  | 'imagDiverging'
+  | 'domainColoringPsi'
   | 'blackbody'
 
 /**
@@ -43,6 +49,9 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'mixed' as const, label: 'Angular + Depth' },
   { value: 'phaseCyclicUniform' as const, label: 'Phase Cyclic Uniform' },
   { value: 'phaseDiverging' as const, label: 'Signed Phase Diverging' },
+  { value: 'realDiverging' as const, label: 'Real Diverging (Re)' },
+  { value: 'imagDiverging' as const, label: 'Imag Diverging (Im)' },
+  { value: 'domainColoringPsi' as const, label: 'Domain Coloring Psi' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
 ] as const
 
@@ -58,6 +67,9 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   blackbody: 5,
   phaseCyclicUniform: 6,
   phaseDiverging: 7,
+  domainColoringPsi: 8,
+  realDiverging: 9,
+  imagDiverging: 10,
 }
 
 /**
@@ -90,6 +102,32 @@ export interface DistributionSettings {
   offset: number
 }
 
+export type DomainColoringModulusMode = 'logPsiAbsSquared' | 'logPsiAbs'
+
+export interface DomainColoringSettings {
+  /** Log modulus source: log(|psi|^2) or log(|psi|) */
+  modulusMode: DomainColoringModulusMode
+  /** Toggle anti-aliased contour lines in log-modulus space */
+  contoursEnabled: boolean
+  /** Number of contour periods in the normalized log-modulus range */
+  contourDensity: number
+  /** Contour half-width in normalized line-distance space */
+  contourWidth: number
+  /** Blend strength for contour darkening */
+  contourStrength: number
+}
+
+export interface DivergingPsiSettings {
+  /** Center color pinned at zero crossing. */
+  neutralColor: string
+  /** Positive wing color for signed values > 0. */
+  positiveColor: string
+  /** Negative wing color for signed values < 0. */
+  negativeColor: string
+  /** Intensity floor applied before sign-strength modulation. */
+  intensityFloor: number
+}
+
 /**
  * Default cosine coefficients (Crimson Fade - smooth red to pink gradient).
  * Uses half-cycle frequency for smooth, non-rainbow gradients.
@@ -108,6 +146,24 @@ export const DEFAULT_DISTRIBUTION: DistributionSettings = {
   power: 1.0,
   cycles: 1.0,
   offset: 0.0,
+}
+
+/**
+ * Default domain-coloring controls.
+ */
+export const DEFAULT_DOMAIN_COLORING_SETTINGS: DomainColoringSettings = {
+  modulusMode: 'logPsiAbsSquared',
+  contoursEnabled: true,
+  contourDensity: 8.0,
+  contourWidth: 0.08,
+  contourStrength: 0.45,
+}
+
+export const DEFAULT_DIVERGING_PSI_SETTINGS: DivergingPsiSettings = {
+  neutralColor: '#d9d9d9',
+  positiveColor: '#e83b3b',
+  negativeColor: '#3166f5',
+  intensityFloor: 0.2,
 }
 
 /**

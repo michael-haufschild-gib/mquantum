@@ -31,9 +31,19 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
       lchLightness: state.lchLightness,
       lchChroma: state.lchChroma,
       faceColor: state.faceColor,
+      domainColoring: state.domainColoring,
+      divergingPsi: state.divergingPsi,
     }))
-    const { colorAlgorithm, cosineCoefficients, distribution, lchLightness, lchChroma, faceColor } =
-      useAppearanceStore(appearanceSelector)
+    const {
+      colorAlgorithm,
+      cosineCoefficients,
+      distribution,
+      lchLightness,
+      lchChroma,
+      faceColor,
+      domainColoring,
+      divergingPsi,
+    } = useAppearanceStore(appearanceSelector)
 
     useEffect(() => {
       const canvas = canvasRef.current
@@ -63,6 +73,17 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
         else if (max === g) h = ((b - r) / d + 2) / 6
         else h = ((r - g) / d + 4) / 6
         return [h, s, l]
+      }
+
+      // Helper: Convert hex color to RGB
+      const hexToRgb = (hex: string): [number, number, number] => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+        if (!result) return [0.85, 0.85, 0.85]
+        return [
+          parseInt(result[1]!, 16) / 255,
+          parseInt(result[2]!, 16) / 255,
+          parseInt(result[3]!, 16) / 255,
+        ]
       }
 
       // Helper: Convert HSL to RGB
@@ -165,6 +186,44 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           r = (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * magnitude
           g = (neutral[1] * (1 - signStrength) + wing[1] * signStrength) * magnitude
           b = (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * magnitude
+        } else if (colorAlgorithm === 'realDiverging' || colorAlgorithm === 'imagDiverging') {
+          // Zero-centered diverging maps for signed Re(psi)/Im(psi) components.
+          const signCarrier =
+            colorAlgorithm === 'realDiverging' ? Math.cos(t * Math.PI * 2) : Math.sin(t * Math.PI * 2)
+          const signStrength = Math.abs(signCarrier)
+          const neutral = hexToRgb(divergingPsi.neutralColor)
+          const positiveWing = hexToRgb(divergingPsi.positiveColor)
+          const negativeWing = hexToRgb(divergingPsi.negativeColor)
+          const wing = signCarrier >= 0 ? positiveWing : negativeWing
+          const intensityFloor = Math.max(0, Math.min(1, divergingPsi.intensityFloor))
+          const intensity = intensityFloor + (1 - intensityFloor) * signStrength
+          r = (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * intensity
+          g = (neutral[1] * (1 - signStrength) + wing[1] * signStrength) * intensity
+          b = (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * intensity
+        } else if (colorAlgorithm === 'domainColoringPsi') {
+          // Domain coloring: hue = arg(psi), lightness = log-modulus.
+          const phaseNorm = t
+          const lightness = Math.max(0, Math.min(1, 0.08 + 0.82 * t))
+          ;[r, g, b] = hslToRgb(phaseNorm, 0.85, lightness)
+
+          if (domainColoring.contoursEnabled) {
+            const contourDensity = Math.max(1, domainColoring.contourDensity)
+            const contourWidth = Math.max(0.005, Math.min(0.25, domainColoring.contourWidth))
+            const contourStrength = Math.max(0, Math.min(1, domainColoring.contourStrength))
+            const logModulus =
+              domainColoring.modulusMode === 'logPsiAbs'
+                ? -4 + 4 * t
+                : -8 + 8 * t
+            const contourPhase = ((logModulus * contourDensity) % 1 + 1) % 1
+            const lineDistance = Math.min(contourPhase, 1 - contourPhase)
+            const edgeWidth = Math.max(0.001, contourWidth * 0.5)
+            const lineMask =
+              lineDistance <= edgeWidth ? 1 : Math.max(0, 1 - (lineDistance - edgeWidth) / edgeWidth)
+            const darken = 1 - contourStrength * lineMask * 0.85
+            r *= darken
+            g *= darken
+            b *= darken
+          }
         } else if (colorAlgorithm === 'blackbody') {
           // Blackbody: analytic temperature ramp (t = normalized density)
           // Matches shader: temp = normalized * 12000, blackbody(temp)
@@ -205,7 +264,16 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
         ctx.fillStyle = `rgb(${r8}, ${g8}, ${b8})`
         ctx.fillRect(x, 0, 1, canvas.height)
       }
-    }, [colorAlgorithm, cosineCoefficients, distribution, lchLightness, lchChroma, faceColor])
+    }, [
+      colorAlgorithm,
+      cosineCoefficients,
+      distribution,
+      lchLightness,
+      lchChroma,
+      faceColor,
+      domainColoring,
+      divergingPsi,
+    ])
 
     return (
       <div className={`${className}`}>

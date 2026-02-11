@@ -206,7 +206,7 @@ struct SchroedingerUniforms {
   _pad3: f32,                    // Alignment padding
 
   // Color algorithm system (matches WebGL uniform system)
-  colorAlgorithm: i32,           // Color algorithm selector (0-7)
+  colorAlgorithm: i32,           // Color algorithm selector (0-10)
   distPower: f32,                // Distribution power for distance-based coloring
   distCycles: f32,               // Distribution cycles
   distOffset: f32,               // Distribution offset
@@ -304,6 +304,15 @@ struct SchroedingerUniforms {
   _padRadialProb0: f32,             // offset 1356
   radialProbabilityColor: vec3f,    // offset 1360 (16-byte aligned: 1360 % 16 = 0)
   _padRadialProb1: f32,             // offset 1372
+
+  // Domain coloring controls (algorithm 8)
+  domainColoringParams0: vec4f,     // x=modulusMode(0=log|psi|^2,1=log|psi|), y=contoursEnabled, z=contourDensity, w=contourWidth
+  domainColoringParams1: vec4f,     // x=contourStrength, yzw=reserved
+
+  // Zero-centered diverging Re/Im controls (algorithms 9/10)
+  divergingNeutralParams: vec4f,    // xyz=neutralColor, w=intensityFloor
+  divergingPositiveParams: vec4f,   // xyz=positive wing color, w=reserved
+  divergingNegativeParams: vec4f,   // xyz=negative wing color, w=reserved
 }
 
 // ============================================

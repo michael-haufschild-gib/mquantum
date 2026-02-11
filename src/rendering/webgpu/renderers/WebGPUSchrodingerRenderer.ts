@@ -39,7 +39,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1376
+const SCHROEDINGER_UNIFORM_SIZE = 1456
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -55,6 +55,9 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   blackbody: 5,
   phaseCyclicUniform: 6,
   phaseDiverging: 7,
+  domainColoringPsi: 8,
+  realDiverging: 9,
+  imagDiverging: 10,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -110,7 +113,7 @@ export interface SchrodingerRendererConfig {
   isosurface?: boolean
   quantumMode?: QuantumModeForShader
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Compile-time color module selection (0-7) */
+  /** Compile-time color module selection (0-10) */
   colorAlgorithm?: WGSLColorAlgorithm
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean
@@ -206,7 +209,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private boundingRadius = 2.0
 
   // Pre-allocated staging buffers to avoid per-frame GC pressure
-  // Schroedinger: 1344 bytes (336 floats) - includes representation + momentum controls
+  // Schroedinger: 1456 bytes (364 floats) - includes domain + diverging color controls
   private schroedingerUniformData = new ArrayBuffer(SCHROEDINGER_UNIFORM_SIZE)
   private schroedingerFloatView = new Float32Array(this.schroedingerUniformData)
   private schroedingerIntView = new Int32Array(this.schroedingerUniformData)
@@ -1592,6 +1595,37 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1364 / 4] = rpColor[1]
     floatView[1368 / 4] = rpColor[2]
     floatView[1372 / 4] = 0.0  // padding
+
+    // Domain coloring controls (offset 1376-1408)
+    const domainColoring = appearance?.domainColoring
+    floatView[1376 / 4] = domainColoring?.modulusMode === 'logPsiAbs' ? 1.0 : 0.0
+    floatView[1380 / 4] = domainColoring?.contoursEnabled ? 1.0 : 0.0
+    floatView[1384 / 4] = domainColoring?.contourDensity ?? 8.0
+    floatView[1388 / 4] = domainColoring?.contourWidth ?? 0.08
+    floatView[1392 / 4] = domainColoring?.contourStrength ?? 0.45
+    floatView[1396 / 4] = 0.0
+    floatView[1400 / 4] = 0.0
+    floatView[1404 / 4] = 0.0
+
+    // Zero-centered diverging Re/Im controls (offset 1408-1456)
+    const divergingPsi = appearance?.divergingPsi
+    const divergingNeutral = this.parseColor(divergingPsi?.neutralColor ?? '#d9d9d9')
+    const divergingPositive = this.parseColor(divergingPsi?.positiveColor ?? '#e83b3b')
+    const divergingNegative = this.parseColor(divergingPsi?.negativeColor ?? '#3166f5')
+    floatView[1408 / 4] = divergingNeutral[0]
+    floatView[1412 / 4] = divergingNeutral[1]
+    floatView[1416 / 4] = divergingNeutral[2]
+    floatView[1420 / 4] = Math.max(0, Math.min(1, divergingPsi?.intensityFloor ?? 0.2))
+
+    floatView[1424 / 4] = divergingPositive[0]
+    floatView[1428 / 4] = divergingPositive[1]
+    floatView[1432 / 4] = divergingPositive[2]
+    floatView[1436 / 4] = 0.0
+
+    floatView[1440 / 4] = divergingNegative[0]
+    floatView[1444 / 4] = divergingNegative[1]
+    floatView[1448 / 4] = divergingNegative[2]
+    floatView[1452 / 4] = 0.0
 
     // ============================================
     // HO MOMENTUM: CPU UNIFORM TRANSFORMATION

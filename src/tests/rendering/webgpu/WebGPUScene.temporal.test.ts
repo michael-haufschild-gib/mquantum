@@ -30,6 +30,9 @@ interface ScenePassConfig {
     | 'blackbody'
     | 'phaseCyclicUniform'
     | 'phaseDiverging'
+    | 'realDiverging'
+    | 'imagDiverging'
+    | 'domainColoringPsi'
   skyboxEnabled: boolean
   skyboxMode:
     | 'classic'
@@ -96,6 +99,57 @@ function createGraphHarness() {
 }
 
 describe('WebGPUScene temporal reprojection wiring', () => {
+  it('maps domainColoringPsi to compile-time colorAlgorithm=8', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        colorAlgorithm: 'domainColoringPsi',
+      })
+    ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(8)
+  })
+
+  it('maps realDiverging to compile-time colorAlgorithm=9', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        colorAlgorithm: 'realDiverging',
+      })
+    ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(9)
+  })
+
+  it('maps imagDiverging to compile-time colorAlgorithm=10', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        colorAlgorithm: 'imagDiverging',
+      })
+    ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(10)
+  })
+
   it('creates Schrödinger renderer in quarter-res temporal mode when enabled', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')

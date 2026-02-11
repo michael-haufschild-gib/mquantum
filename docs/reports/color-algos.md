@@ -193,6 +193,7 @@ The following additions are based on external visualization and scientific-color
 - Encode:
   color wing = sign of `Re(psi)` or `Im(psi)`,
   intensity = magnitude.
+- Options in the ui: provide separate real and imaginary views with zero pinned to a neutral color (color picker).
 - Why: diverging maps are the standard for signed quantities with a critical midpoint at zero.
 - Educational value: high for nodal surfaces (zero crossings), symmetry, and sign structure of eigenstates/superpositions.
 - Expected fluff level: **low**.

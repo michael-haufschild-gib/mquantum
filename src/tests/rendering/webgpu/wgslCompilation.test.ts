@@ -414,8 +414,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
-  // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody, 6=PhaseCyclicUniform, 7=PhaseDiverging
-  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7] as const
+  // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody,
+  // 6=PhaseCyclicUniform, 7=PhaseDiverging, 8=DomainColoringPsi, 9=RealDiverging, 10=ImagDiverging
+  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
 
   for (const alg of allAlgorithms) {
     it(`produces valid WGSL for colorAlgorithm=${alg}`, () => {
@@ -457,9 +458,10 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(modules).not.toContain('Color Selector')
   })
 
-  it('excludes Cosine module for non-cosine algorithms (3, 4, 5, 6, 7)', () => {
-    // 3=Phase(HSL), 4=Mixed(HSL), 5=Blackbody(none), 6=PhaseCyclicUniform(Oklab), 7=PhaseDiverging(HSL)
-    const nonCosineAlgorithms = [3, 4, 5, 6, 7] as const
+  it('excludes Cosine module for non-cosine algorithms (3, 4, 5, 6, 7, 8, 9, 10)', () => {
+    // 3=Phase(HSL), 4=Mixed(HSL), 5=Blackbody(none), 6=PhaseCyclicUniform(Oklab),
+    // 7=PhaseDiverging(HSL), 8=DomainColoringPsi(HSL), 9=RealDiverging(HSL), 10=ImagDiverging(HSL)
+    const nonCosineAlgorithms = [3, 4, 5, 6, 7, 8, 9, 10] as const
     for (const alg of nonCosineAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -476,7 +478,7 @@ describe('WGSL Color Algorithm Specialization', () => {
 
   it('excludes Oklab module for non-Oklab algorithms', () => {
     // All except 0 (LCH) and 6 (PhaseCyclicUniform)
-    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 7] as const
+    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 7, 8, 9, 10] as const
     for (const alg of nonOklabAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -577,6 +579,54 @@ describe('WGSL Color Algorithm Specialization', () => {
     })
 
     expect(features).toContain('Color: Mixed')
+  })
+
+  it('adds domain-coloring feature tag when colorAlgorithm=8', () => {
+    const { features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 8,
+    })
+
+    expect(features).toContain('Color: Domain Coloring Psi')
+  })
+
+  it('adds real-diverging feature tag when colorAlgorithm=9', () => {
+    const { features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 9,
+    })
+
+    expect(features).toContain('Color: Real Diverging')
+  })
+
+  it('adds imag-diverging feature tag when colorAlgorithm=10', () => {
+    const { features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 10,
+    })
+
+    expect(features).toContain('Color: Imag Diverging')
+  })
+
+  it('does not emit derivative ops in domainColoringPsi emission path', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 8,
+    })
+
+    expect(wgsl).not.toContain('fwidth(')
   })
 
   it('does not add color feature tag when colorAlgorithm is undefined', () => {

@@ -51,6 +51,8 @@ export {
   COLOR_ALGORITHM_TO_INT,
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
+  DEFAULT_DOMAIN_COLORING_SETTINGS,
+  DEFAULT_DIVERGING_PSI_SETTINGS,
   DEFAULT_DISTRIBUTION,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
   LCH_PRESET_OPTIONS,
@@ -58,6 +60,9 @@ export {
   type ColorAlgorithm,
   // Cosine palette types
   type CosineCoefficients,
+  type DivergingPsiSettings,
+  type DomainColoringModulusMode,
+  type DomainColoringSettings,
   // Distribution types
   type DistributionSettings,
   // LCH preset types

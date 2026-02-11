@@ -161,6 +161,9 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
     schroedinger.colorAlgorithm == 4 ||
     schroedinger.colorAlgorithm == 6 ||
     schroedinger.colorAlgorithm == 7 ||
+    schroedinger.colorAlgorithm == 8 ||
+    schroedinger.colorAlgorithm == 9 ||
+    schroedinger.colorAlgorithm == 10 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
@@ -1270,6 +1273,9 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     schroedinger.colorAlgorithm == 4 ||
     schroedinger.colorAlgorithm == 6 ||
     schroedinger.colorAlgorithm == 7 ||
+    schroedinger.colorAlgorithm == 8 ||
+    schroedinger.colorAlgorithm == 9 ||
+    schroedinger.colorAlgorithm == 10 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 

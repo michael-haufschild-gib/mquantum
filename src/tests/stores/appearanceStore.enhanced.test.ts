@@ -28,6 +28,60 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(useAppearanceStore.getState().shaderType).toBe('wireframe')
     })
 
+    it('clamps domain-coloring contour settings to safe ranges', () => {
+      useAppearanceStore.getState().setDomainColoringSettings({
+        contourDensity: 999,
+        contourWidth: 0,
+        contourStrength: 2,
+      })
+
+      expect(useAppearanceStore.getState().domainColoring.contourDensity).toBe(32)
+      expect(useAppearanceStore.getState().domainColoring.contourWidth).toBe(0.005)
+      expect(useAppearanceStore.getState().domainColoring.contourStrength).toBe(1)
+
+      useAppearanceStore.getState().setDomainColoringSettings({
+        contourDensity: 0,
+        contourWidth: 1,
+        contourStrength: -1,
+      })
+
+      expect(useAppearanceStore.getState().domainColoring.contourDensity).toBe(1)
+      expect(useAppearanceStore.getState().domainColoring.contourWidth).toBe(0.25)
+      expect(useAppearanceStore.getState().domainColoring.contourStrength).toBe(0)
+    })
+
+    it('updates diverging real/imag midpoint settings and clamps intensity floor', () => {
+      const appearance = useAppearanceStore.getState() as unknown as {
+        divergingPsi: {
+          neutralColor: string
+          positiveColor: string
+          negativeColor: string
+          intensityFloor: number
+        }
+        setDivergingPsiSettings: (settings: {
+          neutralColor?: string
+          positiveColor?: string
+          negativeColor?: string
+          intensityFloor?: number
+        }) => void
+      }
+
+      appearance.setDivergingPsiSettings({
+        neutralColor: '#d9d9d9',
+        positiveColor: '#e83b3b',
+        negativeColor: '#3166f5',
+        intensityFloor: -1,
+      })
+
+      const next = useAppearanceStore.getState() as unknown as typeof appearance
+      expect(next.divergingPsi.neutralColor).toBe('#d9d9d9')
+      expect(next.divergingPsi.positiveColor).toBe('#e83b3b')
+      expect(next.divergingPsi.negativeColor).toBe('#3166f5')
+      expect(next.divergingPsi.intensityFloor).toBe(0)
+
+      next.setDivergingPsiSettings({ intensityFloor: 2 })
+      expect((useAppearanceStore.getState() as unknown as typeof appearance).divergingPsi.intensityFloor).toBe(1)
+    })
   })
 
   describe('Clamping behavior (prevents invalid uniforms)', () => {

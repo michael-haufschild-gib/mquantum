@@ -33,6 +33,9 @@ const COLOR_ALG_MIXED: i32 = 4;
 const COLOR_ALG_BLACKBODY: i32 = 5;
 const COLOR_ALG_PHASE_CYCLIC_UNIFORM: i32 = 6;
 const COLOR_ALG_PHASE_DIVERGING: i32 = 7;
+const COLOR_ALG_DOMAIN_COLORING_PSI: i32 = 8;
+const COLOR_ALG_REAL_DIVERGING: i32 = 9;
+const COLOR_ALG_IMAG_DIVERGING: i32 = 10;
 
 // Phase influence on hue (0.0 = no phase color, 1.0 = full rainbow)
 const PHASE_HUE_INFLUENCE: f32 = 0.4;
@@ -147,6 +150,54 @@ const ALGO_BRANCH: Record<number, string> = {
     let wing = select(negativeWing, positiveWing, phaseSignCarrier >= 0.0);
     let neutral = vec3f(0.92);
     col = mix(neutral, wing, signStrength) * (0.2 + 0.8 * normalized);`,
+
+  8: /* wgsl */ `
+    // 8: Domain coloring for wavefunction psi (phase hue + log-modulus lightness)
+    let phaseNorm = fract((phase + PI) / TAU);
+    let modulusMode = uniforms.domainColoringParams0.x >= 0.5;
+    let logModulus = select(s, s * 0.5, modulusMode);
+    let modulusDenom = select(8.0, 4.0, modulusMode);
+    let modulusValue = clamp((logModulus + modulusDenom) / modulusDenom, 0.0, 1.0);
+    let baseLightness = clamp(0.08 + 0.82 * modulusValue, 0.0, 1.0);
+    col = hsl2rgb(phaseNorm, 0.85, baseLightness);
+
+    let contoursEnabled = uniforms.domainColoringParams0.y >= 0.5;
+    if (contoursEnabled) {
+      let contourDensity = max(uniforms.domainColoringParams0.z, 1.0);
+      let contourWidth = clamp(uniforms.domainColoringParams0.w, 0.005, 0.25);
+      let contourStrength = clamp(uniforms.domainColoringParams1.x, 0.0, 1.0);
+      let contourPhase = fract(logModulus * contourDensity);
+      let lineDistance = min(contourPhase, 1.0 - contourPhase);
+      // Derivative-free feathering width to keep WGSL valid in non-uniform control paths.
+      let antiAlias = max(0.0005, contourWidth * 0.35);
+      let lineMask = 1.0 - smoothstep(contourWidth, contourWidth + antiAlias, lineDistance);
+      let darken = 1.0 - contourStrength * lineMask * 0.85;
+      col *= darken;
+    }`,
+
+  9: /* wgsl */ `
+    // 9: Zero-centered diverging map for Re(psi)
+    let signedReal = normalized * cos(phase);
+    let signStrength = clamp(abs(signedReal), 0.0, 1.0);
+    let neutral = uniforms.divergingNeutralParams.xyz;
+    let positiveWing = uniforms.divergingPositiveParams.xyz;
+    let negativeWing = uniforms.divergingNegativeParams.xyz;
+    let wing = select(negativeWing, positiveWing, signedReal >= 0.0);
+    let intensityFloor = clamp(uniforms.divergingNeutralParams.w, 0.0, 1.0);
+    let intensity = intensityFloor + (1.0 - intensityFloor) * signStrength;
+    col = mix(neutral, wing, signStrength) * intensity;`,
+
+  10: /* wgsl */ `
+    // 10: Zero-centered diverging map for Im(psi)
+    let signedImag = normalized * sin(phase);
+    let signStrength = clamp(abs(signedImag), 0.0, 1.0);
+    let neutral = uniforms.divergingNeutralParams.xyz;
+    let positiveWing = uniforms.divergingPositiveParams.xyz;
+    let negativeWing = uniforms.divergingNegativeParams.xyz;
+    let wing = select(negativeWing, positiveWing, signedImag >= 0.0);
+    let intensityFloor = clamp(uniforms.divergingNeutralParams.w, 0.0, 1.0);
+    let intensity = intensityFloor + (1.0 - intensityFloor) * signStrength;
+    col = mix(neutral, wing, signStrength) * intensity;`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -159,6 +210,9 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   5: 'Blackbody',
   6: 'Phase Cyclic Uniform',
   7: 'Phase Diverging',
+  8: 'Domain Coloring Psi',
+  9: 'Real Diverging',
+  10: 'Imag Diverging',
 }
 
 export { COLOR_ALG_NAMES }
@@ -206,7 +260,7 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   return header + /* wgsl */ `
   let algorithm = uniforms.colorAlgorithm;
 
-  // Phase-aware color algorithms (3-7) use actual wavefunction phase
+  // Phase-aware color algorithms (3-8) use actual wavefunction phase
   // Algorithms 0-2 delegate to standard color system
   if (algorithm == COLOR_ALG_PHASE) {${ALGO_BRANCH[3]}
   }
@@ -215,6 +269,12 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   else if (algorithm == COLOR_ALG_PHASE_CYCLIC_UNIFORM) {${ALGO_BRANCH[6]}
   }
   else if (algorithm == COLOR_ALG_PHASE_DIVERGING) {${ALGO_BRANCH[7]}
+  }
+  else if (algorithm == COLOR_ALG_DOMAIN_COLORING_PSI) {${ALGO_BRANCH[8]}
+  }
+  else if (algorithm == COLOR_ALG_REAL_DIVERGING) {${ALGO_BRANCH[9]}
+  }
+  else if (algorithm == COLOR_ALG_IMAG_DIVERGING) {${ALGO_BRANCH[10]}
   }
   else if (algorithm == COLOR_ALG_BLACKBODY) {${ALGO_BRANCH[5]}
   }
