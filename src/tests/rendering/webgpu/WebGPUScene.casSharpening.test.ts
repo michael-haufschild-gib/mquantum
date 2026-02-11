@@ -21,17 +21,14 @@ interface ScenePassConfig {
   eigenfunctionCacheEnabled: boolean
   representation: 'position' | 'momentum'
   colorAlgorithm:
-    | 'monochromatic'
-    | 'analogous'
-    | 'cosine'
-    | 'normal'
-    | 'distance'
     | 'lch'
     | 'multiSource'
     | 'radial'
     | 'phase'
     | 'mixed'
     | 'blackbody'
+    | 'phaseWheel'
+    | 'phaseDiverging'
   skyboxEnabled: boolean
   skyboxMode:
     | 'classic'
@@ -87,7 +84,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     representation: 'position',
-    colorAlgorithm: 'monochromatic',
+    colorAlgorithm: 'mixed',
     skyboxEnabled: false,
     skyboxMode: 'classic',
     backgroundColor: '#232323',

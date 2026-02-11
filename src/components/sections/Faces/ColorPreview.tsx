@@ -117,30 +117,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
         const t = x / canvas.width
         let r: number, g: number, b: number
 
-        if (colorAlgorithm === 'monochromatic') {
-          // Monochromatic: Same hue, varying lightness (matches shader exactly)
-          const [hue, sat] = hexToHsl(faceColor)
-          const distributedT = applyDistributionTS(
-            t,
-            distribution.power,
-            distribution.cycles,
-            distribution.offset
-          )
-          const litVar = 0.3 + distributedT * 0.4 // Vary lightness from 0.3 to 0.7
-          ;[r, g, b] = hslToRgb(hue, sat, litVar)
-        } else if (colorAlgorithm === 'analogous') {
-          // Analogous: Hue varies ±30° from base (matches shader exactly)
-          const [baseHue, sat, lit] = hexToHsl(faceColor)
-          const distributedT = applyDistributionTS(
-            t,
-            distribution.power,
-            distribution.cycles,
-            distribution.offset
-          )
-          const hueOffset = (distributedT - 0.5) * 0.167 // ±30° = ±0.0833, doubled for full range
-          const hue = (baseHue + hueOffset + 1) % 1
-          ;[r, g, b] = hslToRgb(hue, sat, lit)
-        } else if (colorAlgorithm === 'lch') {
+        if (colorAlgorithm === 'lch') {
           // LCH preview using proper Oklab conversion (matches shader exactly)
           const distributedT = applyDistributionTS(
             t,
@@ -199,7 +176,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             b = Math.min(1, Math.max(0, (194180000 * invTemp + 30) / 255))
           }
         } else {
-          // Cosine palette (cosine, normal, distance, multiSource, radial)
+          // Cosine palette (multiSource, radial)
           // Shows the underlying palette that will be sampled by position/density.
           const color = getCosinePaletteColorTS(
             t,

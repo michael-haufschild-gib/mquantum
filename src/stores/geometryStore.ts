@@ -15,13 +15,8 @@ import {
 } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import { invalidateAllTemporalDepthWebGPU } from '@/rendering/webgpu/passes'
-import {
-  DEFAULT_COLOR_ALGORITHM,
-  isColorAlgorithmAvailable,
-} from '@/rendering/shaders/palette/types'
 import { create } from 'zustand'
 import { useAnimationStore } from './animationStore'
-import { useAppearanceStore } from './appearanceStore'
 import { usePerformanceStore } from './performanceStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
@@ -217,14 +212,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
         ? recommendedDimension
         : currentDimension
 
-    // All store updates execute synchronously and are batched by React 18's automatic batching
-    // When switching object types, validate that the current color algorithm is still supported.
-    // If not, revert to the default (monochromatic) to avoid rendering artifacts or mismatch with UI.
-    const appearanceStore = useAppearanceStore.getState()
-    if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, type)) {
-      appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
-    }
-
     // Trigger progressive refinement: start at low quality during content type switch
     usePerformanceStore.getState().setSceneTransitioning(true)
     usePerformanceStore.getState().setCameraTeleported(true)
@@ -281,12 +268,6 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
       useAnimationStore.getState().setDimension(clampedDimension)
       useRotationStore.getState().setDimension(clampedDimension)
       useTransformStore.getState().setDimension(clampedDimension)
-    }
-
-    // Validate color algorithm for new object type
-    const appearanceStore = useAppearanceStore.getState()
-    if (!isColorAlgorithmAvailable(appearanceStore.colorAlgorithm, objectType)) {
-      appearanceStore.setColorAlgorithm(DEFAULT_COLOR_ALGORITHM)
     }
 
     // Set both atomically - no auto-adjustments

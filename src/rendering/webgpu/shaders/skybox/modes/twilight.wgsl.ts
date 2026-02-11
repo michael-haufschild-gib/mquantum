@@ -28,45 +28,23 @@ fn getTwilight(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   // Color layers
   var col: vec3<f32>;
-  if (uniforms.usePalette > 0.5) {
-    // Use palette with temperature variation
-    var palettePos = gradientY + tempShift * 0.2 - 0.1;
-    palettePos = clamp(palettePos, 0.0, 1.0);
+  // Palette with temperature variation
+  var palettePos = gradientY + tempShift * 0.2 - 0.1;
+  palettePos = clamp(palettePos, 0.0, 1.0);
 
-    let skyColor = cosinePalette(palettePos, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    let horizonColor = cosinePalette(0.5 + tempShift * 0.3, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  let skyColor = cosinePalette(palettePos, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  let horizonColor = cosinePalette(0.5 + tempShift * 0.3, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
 
-    // PERF: Use sqrt() instead of pow(x, 0.5)
-    col = mix(horizonColor, skyColor, sqrt(abs(y)));
+  // PERF: Use sqrt() instead of pow(x, 0.5)
+  col = mix(horizonColor, skyColor, sqrt(abs(y)));
 
-    // Sun glow
-    // PERF: Use multiplications instead of pow(x, 4.0)
-    let sunDotVal = max(0.0, dot(dir, sunDir));
-    let sunDot2 = sunDotVal * sunDotVal;
-    let sunGlow = sunDot2 * sunDot2;
-    let sunColor = cosinePalette(tempShift, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
-    col = mix(col, sunColor, sunGlow * 0.5);
-  } else {
-    // Manual gradient using user colors
-    let topColor = mix(uniforms.color1, uniforms.color2, tempShift);
-    let horizonColor = mix(uniforms.color2, uniforms.color1, tempShift) * 1.2;
-    let bottomColor = uniforms.color1 * 0.3;
-
-    if (y > 0.0) {
-      col = mix(horizonColor, topColor, pow(y, 0.7));
-    } else {
-      // PERF: Use sqrt() instead of pow(x, 0.5)
-      col = mix(horizonColor, bottomColor, sqrt(-y));
-    }
-
-    // Sun glow using brighter blend of user colors
-    // PERF: Use multiplications instead of pow(x, 4.0)
-    let sunDotVal = max(0.0, dot(dir, sunDir));
-    let sunDot2 = sunDotVal * sunDotVal;
-    let sunGlow = sunDot2 * sunDot2;
-    let sunColor = mix(uniforms.color2, uniforms.color1, tempShift) * 1.5;
-    col = mix(col, sunColor, sunGlow * 0.5);
-  }
+  // Sun glow
+  // PERF: Use multiplications instead of pow(x, 4.0)
+  let sunDotVal = max(0.0, dot(dir, sunDir));
+  let sunDot2 = sunDotVal * sunDotVal;
+  let sunGlow = sunDot2 * sunDot2;
+  let sunColor = cosinePalette(tempShift, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
+  col = mix(col, sunColor, sunGlow * 0.5);
 
   // Subtle atmospheric layers and haze (reuse single noise sample)
   let atmNoise = skyboxNoise(dir * 4.0 + time * 0.01);

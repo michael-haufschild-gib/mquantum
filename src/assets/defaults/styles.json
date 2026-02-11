@@ -184,7 +184,6 @@
           "scale": 0.4,
           "complexity": 0.17,
           "timeScale": 0.2,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.85,
@@ -410,7 +409,6 @@
           "scale": 1,
           "complexity": 0.5,
           "timeScale": 0.2,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.6,
@@ -661,7 +659,6 @@
           "scale": 1,
           "complexity": 0.5,
           "timeScale": 0.2,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.6,

@@ -185,7 +185,6 @@
           "scale": 1,
           "complexity": 0.5,
           "timeScale": 0.2,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.6,
@@ -351,7 +350,7 @@
             0.9
           ],
           "mandelbulbPower": 8,
-          "epsilon": 1E-12,
+          "epsilon": 1e-12,
           "powerAnimationEnabled": false,
           "powerMin": 5,
           "powerMax": 12,
@@ -830,7 +829,6 @@
           "scale": 1,
           "complexity": 0.5,
           "timeScale": 0.2,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.6,
@@ -996,7 +994,7 @@
             0.9
           ],
           "mandelbulbPower": 8,
-          "epsilon": 1E-12,
+          "epsilon": 1e-12,
           "powerAnimationEnabled": false,
           "powerMin": 5,
           "powerMax": 12,
@@ -1511,7 +1509,6 @@
           "scale": 2.3,
           "complexity": 0.07,
           "timeScale": 0.1,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.6,
@@ -1670,7 +1667,7 @@
             0.9
           ],
           "mandelbulbPower": 8,
-          "epsilon": 1E-12,
+          "epsilon": 1e-12,
           "powerAnimationEnabled": false,
           "powerMin": 5,
           "powerMax": 12,
@@ -2144,7 +2141,6 @@
           "scale": 0.5,
           "complexity": 0.5,
           "timeScale": 0.19,
-          "syncWithObject": false,
           "cosineCoefficients": {
             "a": [
               0.15,
@@ -2290,7 +2286,7 @@
             0.9
           ],
           "mandelbulbPower": 8,
-          "epsilon": 1E-12,
+          "epsilon": 1e-12,
           "powerAnimationEnabled": false,
           "powerMin": 5,
           "powerMax": 12,
@@ -2713,7 +2709,6 @@
           "scale": 1,
           "complexity": 0.5,
           "timeScale": 0.2,
-          "syncWithObject": true,
           "cosineCoefficients": {
             "a": [
               0.6,
@@ -2879,7 +2874,7 @@
             0.9
           ],
           "mandelbulbPower": 8,
-          "epsilon": 1E-12,
+          "epsilon": 1e-12,
           "powerAnimationEnabled": false,
           "powerMin": 5,
           "powerMax": 12,

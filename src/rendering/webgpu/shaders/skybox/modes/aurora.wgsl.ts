@@ -50,18 +50,13 @@ fn getAurora(dir: vec3<f32>, time: f32) -> vec3<f32> {
   var auroraColor: vec3<f32>;
   let colorShift = sin(time * 0.08) * 0.1; // Subtle color drift
 
-  if (uniforms.usePalette > 0.5) {
-    let paletteT = v * 0.7 + 0.15 + colorShift;
-    auroraColor = cosinePalette(paletteT, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  let paletteT = v * 0.7 + 0.15 + colorShift;
+  auroraColor = cosinePalette(paletteT, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
 
-    // Vertical color variation
-    let heightColor = smoothstep(0.0, 0.6, dir.y);
-    let topColor = cosinePalette(0.8, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    auroraColor = mix(auroraColor, topColor, heightColor * 0.4);
-  } else {
-    let gradientT = clamp(smoothstep(0.0, 0.5, dir.y) + colorShift, 0.0, 1.0);
-    auroraColor = mix(uniforms.color1, uniforms.color2, gradientT);
-  }
+  // Vertical color variation
+  let heightColor = smoothstep(0.0, 0.6, dir.y);
+  let topColor = cosinePalette(0.8, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  auroraColor = mix(auroraColor, topColor, heightColor * 0.4);
 
   // Final composite
   let col = mix(nightSky, auroraColor, intensity * auroraHeight * 1.5);

@@ -3,10 +3,8 @@
  * Includes: Structure, Appearance, and Delight Features
  */
 import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
 import { SkyboxProceduralSettings } from '@/stores/defaults/visualDefaults'
 import React, { useCallback } from 'react'
-import { SkyboxPaletteEditor } from '../SkyboxPaletteEditor'
 
 interface SkyboxSharedProceduralControlsProps {
   proceduralSettings: SkyboxProceduralSettings
@@ -36,10 +34,6 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
       )
       const handleEvolutionChange = useCallback(
         (v: number) => setProceduralSettings({ evolution: v }),
-        [setProceduralSettings]
-      )
-      const handleSyncChange = useCallback(
-        (v: boolean) => setProceduralSettings({ syncWithObject: v }),
         [setProceduralSettings]
       )
       const handleTimeScaleChange = useCallback(
@@ -95,15 +89,6 @@ export const SkyboxSharedProceduralControls: React.FC<SkyboxSharedProceduralCont
             <span className="text-xs font-bold text-text-secondary uppercase tracking-wider block mb-2">
               Appearance
             </span>
-            <Switch
-              data-testid="skybox-sync-toggle"
-              checked={proceduralSettings.syncWithObject}
-              onCheckedChange={handleSyncChange}
-              label="Sync Color with Object"
-            />
-
-            {!proceduralSettings.syncWithObject && <SkyboxPaletteEditor />}
-
             <Slider
               label="Brightness"
               value={skyboxIntensity}

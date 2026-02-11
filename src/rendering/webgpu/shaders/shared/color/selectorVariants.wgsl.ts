@@ -8,10 +8,10 @@
  * - Unused color module dependencies
  *
  * Color algorithms and their dependencies:
- * - 0,1: HSL only (hsl2rgb)
- * - 2,3,4,6,7,8,9: Cosine palette only (getCosinePaletteColor)
- * - 5: Oklab only (lchColor)
- * - 10: Blackbody (no dependencies, inline math)
+ * - 0: Oklab only (lchColor)
+ * - 1,2: Cosine palette only (getCosinePaletteColor)
+ * - 3,4,6,7: HSL only (hsl2rgb)
+ * - 5: Blackbody (no dependencies, inline math)
  *
  * Port of GLSL shared/color/selectorVariants.glsl to WGSL.
  *
@@ -29,79 +29,10 @@ import type { ColorAlgorithm } from '../../types'
 export function generateColorSelectorBlock(algorithm: ColorAlgorithm): string {
   switch (algorithm) {
     case 0:
-      // Monochromatic (HSL)
-      return /* wgsl */ `
-// ============================================
-// Color Selector - Algorithm 0: Monochromatic (Compile-time)
-// ============================================
-
-fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
-  let distributedT = applyDistribution(t, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-  let newL = 0.3 + distributedT * 0.4;
-  return hsl2rgb(baseHSL.x, baseHSL.y, newL);
-}
-`
-
-    case 1:
-      // Analogous (HSL)
-      return /* wgsl */ `
-// ============================================
-// Color Selector - Algorithm 1: Analogous (Compile-time)
-// ============================================
-
-fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
-  let distributedT = applyDistribution(t, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-  let hueOffset = (distributedT - 0.5) * 0.167;
-  let newH = fract(baseHSL.x + hueOffset);
-  return hsl2rgb(newH, baseHSL.y, baseHSL.z);
-}
-`
-
-    case 2:
-      // Cosine gradient
-      return /* wgsl */ `
-// ============================================
-// Color Selector - Algorithm 2: Cosine Gradient (Compile-time)
-// ============================================
-
-fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
-  return getCosinePaletteColor(t, uniforms.cosineA, uniforms.cosineB, uniforms.cosineC, uniforms.cosineD,
-                                uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-}
-`
-
-    case 3:
-      // Normal-based (Cosine)
-      return /* wgsl */ `
-// ============================================
-// Color Selector - Algorithm 3: Normal-based (Compile-time)
-// ============================================
-
-fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
-  let normalT = normal.y * 0.5 + 0.5;
-  return getCosinePaletteColor(normalT, uniforms.cosineA, uniforms.cosineB, uniforms.cosineC, uniforms.cosineD,
-                                uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-}
-`
-
-    case 4:
-      // Distance-field (Cosine)
-      return /* wgsl */ `
-// ============================================
-// Color Selector - Algorithm 4: Distance-field (Compile-time)
-// ============================================
-
-fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
-  return getCosinePaletteColor(t, uniforms.cosineA, uniforms.cosineB, uniforms.cosineC, uniforms.cosineD,
-                                uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-}
-`
-
-    case 5:
       // LCH/Oklab
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 5: LCH/Oklab (Compile-time)
+// Color Selector - Algorithm 0: LCH/Oklab (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
@@ -110,11 +41,11 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
-    case 6:
+    case 1:
       // Multi-source (Cosine)
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 6: Multi-source (Compile-time)
+// Color Selector - Algorithm 1: Multi-source (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
@@ -128,11 +59,11 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
-    case 7:
+    case 2:
       // Radial (Cosine)
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 7: Radial (Compile-time)
+// Color Selector - Algorithm 2: Radial (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
@@ -142,11 +73,11 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
-    case 8:
+    case 3:
       // Phase/Angular (Cosine)
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 8: Phase/Angular (Compile-time)
+// Color Selector - Algorithm 3: Phase/Angular (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
@@ -157,11 +88,11 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
-    case 9:
+    case 4:
       // Mixed (Cosine)
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 9: Mixed Phase+Distance (Compile-time)
+// Color Selector - Algorithm 4: Mixed Phase+Distance (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
@@ -174,11 +105,11 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
-    case 10:
+    case 5:
       // Blackbody (no dependencies)
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 10: Blackbody (Compile-time)
+// Color Selector - Algorithm 5: Blackbody (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
@@ -191,6 +122,37 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 }
 `
 
+    case 6:
+      // Phase Wheel (HSL)
+      return /* wgsl */ `
+// ============================================
+// Color Selector - Algorithm 6: Phase Wheel (Compile-time)
+// ============================================
+
+fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
+  let phaseNorm = fract(t);
+  return hsl2rgb(phaseNorm, 0.9, 0.2 + 0.45 * t);
+}
+`
+
+    case 7:
+      // Phase Diverging (HSL)
+      return /* wgsl */ `
+// ============================================
+// Color Selector - Algorithm 7: Phase Diverging (Compile-time)
+// ============================================
+
+fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
+  let phaseSignCarrier = cos(t * 6.28318);
+  let signStrength = abs(phaseSignCarrier);
+  let positiveWing = vec3f(0.92, 0.24, 0.22);
+  let negativeWing = vec3f(0.22, 0.40, 0.95);
+  let wing = select(negativeWing, positiveWing, phaseSignCarrier >= 0.0);
+  let neutral = vec3f(0.92);
+  return mix(neutral, wing, signStrength) * (0.2 + 0.8 * t);
+}
+`
+
     default:
       // Fallback to full selector (should not happen)
       return ''
@@ -200,7 +162,7 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 /**
  * Get required color modules for a specific algorithm.
  *
- * @param algorithm - Color algorithm (0-10)
+ * @param algorithm - Color algorithm (0-7)
  * @returns Object indicating which modules are needed
  */
 export function getColorModuleDependencies(algorithm: ColorAlgorithm): {
@@ -210,20 +172,17 @@ export function getColorModuleDependencies(algorithm: ColorAlgorithm): {
 } {
   switch (algorithm) {
     case 0:
+      return { hsl: false, cosine: false, oklab: true }
     case 1:
-      return { hsl: true, cosine: false, oklab: false }
     case 2:
     case 3:
     case 4:
-    case 6:
-    case 7:
-    case 8:
-    case 9:
       return { hsl: false, cosine: true, oklab: false }
     case 5:
-      return { hsl: false, cosine: false, oklab: true }
-    case 10:
       return { hsl: false, cosine: false, oklab: false }
+    case 6:
+    case 7:
+      return { hsl: true, cosine: false, oklab: false }
     default:
       return { hsl: true, cosine: true, oklab: true }
   }

@@ -23,7 +23,7 @@ struct SkyboxUniforms {
   timeScale: f32,
 
   evolution: f32,
-  usePalette: f32,
+  _padSync: f32,           // was usePalette (removed)
   distortion: f32,
   vignette: f32,
 
@@ -93,14 +93,11 @@ fn getScale() -> f32 { return uniforms.scale; }
 fn getComplexity() -> f32 { return uniforms.complexity; }
 fn getTimeScale() -> f32 { return uniforms.timeScale; }
 fn getEvolution() -> f32 { return uniforms.evolution; }
-fn getUsePalette() -> f32 { return uniforms.usePalette; }
 fn getDistortion() -> f32 { return uniforms.distortion; }
 fn getVignette() -> f32 { return uniforms.vignette; }
 fn getTurbulence() -> f32 { return uniforms.turbulence; }
 fn getDualTone() -> f32 { return uniforms.dualTone; }
 fn getSunIntensity() -> f32 { return uniforms.sunIntensity; }
-fn getColor1() -> vec3<f32> { return uniforms.color1; }
-fn getColor2() -> vec3<f32> { return uniforms.color2; }
 fn getPalA() -> vec3<f32> { return uniforms.palA; }
 fn getPalB() -> vec3<f32> { return uniforms.palB; }
 fn getPalC() -> vec3<f32> { return uniforms.palC; }

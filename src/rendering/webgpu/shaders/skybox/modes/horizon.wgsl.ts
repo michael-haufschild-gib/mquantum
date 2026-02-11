@@ -47,40 +47,24 @@ fn getHorizonGradient(dir: vec3<f32>, time: f32) -> vec3<f32> {
   let ambientPulse = sin(time * 0.1 + dir.x * 0.5) * 0.03 + 1.0;
 
   var col: vec3<f32>;
-  if (uniforms.usePalette > 0.5) {
-    // 4-point gradient for smooth studio look
-    // Apply temperature pulse to palette sampling
-    let floorColor = cosinePalette(0.1 + tempPulse * 0.1, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 0.6;
-    let horizonColor = cosinePalette(0.4 + tempPulse * 0.05, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    let midColor = cosinePalette(0.6, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    let topColor = cosinePalette(0.85 - tempPulse * 0.05, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  // 4-point gradient for smooth studio look
+  // Apply temperature pulse to palette sampling
+  let floorColor = cosinePalette(0.1 + tempPulse * 0.1, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 0.6;
+  let horizonColor = cosinePalette(0.4 + tempPulse * 0.05, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  let midColor = cosinePalette(0.6, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  let topColor = cosinePalette(0.85 - tempPulse * 0.05, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
 
-    // Smooth 4-zone blend
-    col = mix(floorColor, horizonColor, floorZone);
-    col = mix(col, midColor, smoothstep(-0.1, 0.3, y));
-    col = mix(col, topColor, upperZone);
+  // Smooth 4-zone blend
+  col = mix(floorColor, horizonColor, floorZone);
+  col = mix(col, midColor, smoothstep(-0.1, 0.3, y));
+  col = mix(col, topColor, upperZone);
 
-    // Add subtle horizon glow (the "infinity" effect)
-    col += horizonColor * horizonZone * 0.2 * uniforms.scale;
+  // Add subtle horizon glow (the "infinity" effect)
+  col += horizonColor * horizonZone * 0.2 * uniforms.scale;
 
-    // Add light sweep highlight
-    let sweepColor = cosinePalette(0.95, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    col += sweepColor * lightSweep;
-  } else {
-    // Two-color mode: color1 = floor/dark, color2 = top/light
-    // Apply temperature modulation via interpolation shift
-    let tempShift = tempPulse * 0.1;
-    let floorColor = uniforms.color1 * (0.5 + tempShift);
-    let horizonColor = mix(uniforms.color1, uniforms.color2, 0.5 + tempShift);
-    let topColor = uniforms.color2 * (1.0 - tempShift * 0.5);
-
-    col = mix(floorColor, horizonColor, floorZone);
-    col = mix(col, topColor, upperZone);
-    col += horizonColor * horizonZone * 0.15 * uniforms.scale;
-
-    // Add light sweep highlight
-    col += mix(uniforms.color1, uniforms.color2, 0.8) * lightSweep;
-  }
+  // Add light sweep highlight
+  let sweepColor = cosinePalette(0.95, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  col += sweepColor * lightSweep;
 
   // Apply ambient pulse
   col *= ambientPulse;

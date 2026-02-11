@@ -23,4 +23,11 @@ describe('EditorRightPanel object tab layout', () => {
     expect(analysisToQuantum & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(quantumToAdvanced & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+
+  it('does not render isosurface mode toggle in the right panel surface section', () => {
+    render(<EditorRightPanel />)
+
+    expect(screen.queryByTestId('schroedinger-iso-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('schroedinger-iso-threshold')).not.toBeInTheDocument()
+  })
 })

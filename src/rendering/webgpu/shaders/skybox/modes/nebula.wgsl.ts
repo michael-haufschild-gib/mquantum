@@ -42,27 +42,15 @@ fn getNebula(dir: vec3<f32>, time: f32) -> vec3<f32> {
 
   // Coloring
   var col: vec3<f32>;
-  if (uniforms.usePalette > 0.5) {
-    let deepColor = cosinePalette(0.1, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 0.1;
-    let emissionColor = cosinePalette(mainDensity * 0.6 + 0.2, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    let knotColor = cosinePalette(0.85, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
+  let deepColor = cosinePalette(0.1, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 0.1;
+  let emissionColor = cosinePalette(mainDensity * 0.6 + 0.2, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  let knotColor = cosinePalette(0.85, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD) * 1.5;
 
-    col = deepColor;
-    col = mix(col, emissionColor, mainDensity * 0.8);
-    col = mix(col, deepColor, absorption);
-    col += knotColor * knots;
-    col *= smoothstep(0.0, 0.4, totalDensity) * 0.7 + 0.3;
-  } else {
-    let deepColor = uniforms.color1 * 0.1;
-    let emissionColor = mix(uniforms.color1, uniforms.color2, mainDensity);
-    let knotColor = uniforms.color2 * 1.5;
-
-    col = deepColor;
-    col = mix(col, emissionColor, mainDensity * 0.8);
-    col = mix(col, deepColor, absorption);
-    col += knotColor * knots;
-    col *= smoothstep(0.0, 0.4, totalDensity) * 0.7 + 0.3;
-  }
+  col = deepColor;
+  col = mix(col, emissionColor, mainDensity * 0.8);
+  col = mix(col, deepColor, absorption);
+  col += knotColor * knots;
+  col *= smoothstep(0.0, 0.4, totalDensity) * 0.7 + 0.3;
 
   return col;
 }

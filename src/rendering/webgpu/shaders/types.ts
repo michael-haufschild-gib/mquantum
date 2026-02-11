@@ -11,19 +11,14 @@
  * When specified, only the required color module(s) are included
  */
 export type ColorAlgorithm =
-  | 0 // Monochromatic (HSL)
-  | 1 // Analogous (HSL)
-  | 2 // Cosine gradient
-  | 3 // Normal-based (Cosine)
-  | 4 // Distance-field (Cosine)
-  | 5 // LCH/Oklab perceptual
-  | 6 // Multi-source (Cosine)
-  | 7 // Radial (Cosine)
-  | 8 // Phase/Angular (HSL, wavefunction phase)
-  | 9 // Mixed Phase+Distance (HSL, default)
-  | 10 // Blackbody (analytic, no user color params)
-  | 11 // Full complex phase wheel (HSL)
-  | 12 // Signed diverging phase map (HSL)
+  | 0 // LCH/Oklab perceptual
+  | 1 // Multi-source (Cosine)
+  | 2 // Radial (Cosine)
+  | 3 // Phase/Angular (HSL, wavefunction phase)
+  | 4 // Mixed Phase+Distance (HSL, default)
+  | 5 // Blackbody (analytic, no user color params)
+  | 6 // Full complex phase wheel (HSL)
+  | 7 // Signed diverging phase map (HSL)
 
 /**
  * Lighting mode for compile-time optimization
@@ -49,11 +44,10 @@ export interface WGSLShaderConfig {
   /**
    * Color algorithm for compile-time optimization
    * When specified, only the required color module(s) are included:
-   * - 0,1: HSL only
-   * - 2,3,4,6,7: Cosine palette only
-   * - 8,9,11,12: HSL + phase-aware logic
-   * - 5: Oklab only
-   * - 10: No color modules (blackbody)
+   * - 0: Oklab only (LCH)
+   * - 1,2: Cosine palette only
+   * - 3,4,6,7: HSL + phase-aware logic
+   * - 5: No color modules (blackbody)
    * If undefined, all color modules included for runtime switching
    */
   colorAlgorithm?: ColorAlgorithm

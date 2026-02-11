@@ -28,11 +28,11 @@ export const emissionPreBlock = /* wgsl */ `
 // Note: LIGHT_TYPE_* constants are defined in shared/core/constants.wgsl.ts
 
 // Color algorithm constants (must match COLOR_ALGORITHM_TO_INT in types.ts)
-const COLOR_ALG_PHASE: i32 = 8;
-const COLOR_ALG_MIXED: i32 = 9;
-const COLOR_ALG_BLACKBODY: i32 = 10;
-const COLOR_ALG_PHASE_WHEEL: i32 = 11;
-const COLOR_ALG_PHASE_DIVERGING: i32 = 12;
+const COLOR_ALG_PHASE: i32 = 3;
+const COLOR_ALG_MIXED: i32 = 4;
+const COLOR_ALG_BLACKBODY: i32 = 5;
+const COLOR_ALG_PHASE_WHEEL: i32 = 6;
+const COLOR_ALG_PHASE_DIVERGING: i32 = 7;
 
 // Phase influence on hue (0.0 = no phase color, 1.0 = full rainbow)
 const PHASE_HUE_INFLUENCE: f32 = 0.4;
@@ -78,56 +78,15 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
 
 const ALGO_BRANCH: Record<number, string> = {
   0: /* wgsl */ `
-    // 0: Monochromatic - same hue, varying lightness
-    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-    let newL = 0.3 + distributedT * 0.4;
-    col = hsl2rgb(baseHSL.x, baseHSL.y, newL);`,
-
-  1: /* wgsl */ `
-    // 1: Analogous - hue varies +/-30deg from base, preserves material lightness
-    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-    let hueOffset = (distributedT - 0.5) * 0.167;
-    let newH = fract(baseHSL.x + hueOffset);
-    col = hsl2rgb(newH, baseHSL.y, baseHSL.z);`,
-
-  2: /* wgsl */ `
-    // 2: Cosine gradient (Inigo Quilez palette)
-    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-    let a = uniforms.cosineA.xyz;
-    let b = uniforms.cosineB.xyz;
-    let c = uniforms.cosineC.xyz;
-    let d = uniforms.cosineD.xyz;
-    col = cosinePalette(distributedT, a, b, c, d);`,
-
-  3: /* wgsl */ `
-    // 3: Normal-based - color by vertical position as normal proxy
-    let normalT = pos.y * 0.5 + 0.5;
-    let distNormalT = applyDistributionS(normalT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-    let a = uniforms.cosineA.xyz;
-    let b = uniforms.cosineB.xyz;
-    let c = uniforms.cosineC.xyz;
-    let d = uniforms.cosineD.xyz;
-    col = cosinePalette(distNormalT, a, b, c, d);`,
-
-  4: /* wgsl */ `
-    // 4: Distance field - cosine palette on density (primary signal for volume)
-    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-    let a = uniforms.cosineA.xyz;
-    let b = uniforms.cosineB.xyz;
-    let c = uniforms.cosineC.xyz;
-    let d = uniforms.cosineD.xyz;
-    col = cosinePalette(distributedT, a, b, c, d);`,
-
-  5: /* wgsl */ `
-    // 5: LCH/Oklab perceptual hue rotation
+    // 0: LCH/Oklab perceptual hue rotation
     let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     // Maps distributedT to hue angle in Oklab color space
     let hue = distributedT * TAU;
     let oklab = vec3f(uniforms.lchLightness, uniforms.lchChroma * cos(hue), uniforms.lchChroma * sin(hue));
     col = clamp(oklab2rgb(oklab), vec3f(0.0), vec3f(1.0));`,
 
-  6: /* wgsl */ `
-    // 6: Multi-source - blend density + radial + vertical through cosine palette
+  1: /* wgsl */ `
+    // 1: Multi-source - blend density + radial + vertical through cosine palette
     let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
     let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
@@ -140,8 +99,8 @@ const ALGO_BRANCH: Record<number, string> = {
     let d = uniforms.cosineD.xyz;
     col = cosinePalette(blendedT, a, b, c, d);`,
 
-  7: /* wgsl */ `
-    // 7: Radial - color by distance from center through cosine palette
+  2: /* wgsl */ `
+    // 2: Radial - color by distance from center through cosine palette
     let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
     let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
     let a = uniforms.cosineA.xyz;
@@ -150,15 +109,15 @@ const ALGO_BRANCH: Record<number, string> = {
     let d = uniforms.cosineD.xyz;
     col = cosinePalette(radialT, a, b, c, d);`,
 
-  8: /* wgsl */ `
-    // 8: Quantum Phase coloring
+  3: /* wgsl */ `
+    // 3: Quantum Phase coloring
     let phaseNorm = (phase + PI) / TAU;
     let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
     let hue = fract(baseHSL.x + hueShift);
     col = hsl2rgb(hue, 0.75, 0.35);`,
 
-  9: /* wgsl */ `
-    // 9: Mixed (Quantum Phase + Density) - DEFAULT
+  4: /* wgsl */ `
+    // 4: Mixed (Quantum Phase + Density) - DEFAULT
     let phaseNorm = (phase + PI) / TAU;
     let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
     let hue = fract(baseHSL.x + hueShift);
@@ -166,19 +125,19 @@ const ALGO_BRANCH: Record<number, string> = {
     let saturation = 0.7 + 0.25 * normalized;
     col = hsl2rgb(hue, saturation, lightness);`,
 
-  10: /* wgsl */ `
-    // 10: Blackbody (Heat)
+  5: /* wgsl */ `
+    // 5: Blackbody (Heat)
     let temp = normalized * 12000.0;
     if (temp < 500.0) { return vec3f(0.0); } // Cold is black
     col = blackbody(temp);`,
 
-  11: /* wgsl */ `
-    // 11: Full complex phase wheel
+  6: /* wgsl */ `
+    // 6: Full complex phase wheel
     let phaseNorm = fract((phase + PI) / TAU);
     col = hsl2rgb(phaseNorm, 0.9, 0.2 + 0.45 * normalized);`,
 
-  12: /* wgsl */ `
-    // 12: Signed diverging phase map (Wigner-style sign encoding proxy)
+  7: /* wgsl */ `
+    // 7: Signed diverging phase map (Wigner-style sign encoding proxy)
     let phaseSignCarrier = cos(phase);
     let signStrength = abs(phaseSignCarrier);
     let positiveWing = vec3f(0.92, 0.24, 0.22);
@@ -190,19 +149,14 @@ const ALGO_BRANCH: Record<number, string> = {
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
 const COLOR_ALG_NAMES: Record<number, string> = {
-  0: 'Monochromatic',
-  1: 'Analogous',
-  2: 'Cosine',
-  3: 'Normal-based',
-  4: 'Distance Field',
-  5: 'LCH/Oklab',
-  6: 'Multi-source',
-  7: 'Radial',
-  8: 'Phase',
-  9: 'Mixed',
-  10: 'Blackbody',
-  11: 'Phase Wheel',
-  12: 'Phase Diverging',
+  0: 'LCH/Oklab',
+  1: 'Multi-source',
+  2: 'Radial',
+  3: 'Phase',
+  4: 'Mixed',
+  5: 'Blackbody',
+  6: 'Phase Wheel',
+  7: 'Phase Diverging',
 }
 
 export { COLOR_ALG_NAMES }
@@ -250,68 +204,30 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   return header + /* wgsl */ `
   let algorithm = uniforms.colorAlgorithm;
 
-  // Phase-aware color algorithms (8-12) use actual wavefunction phase
-  // Algorithms 0-7 delegate to standard color system
-  if (algorithm == COLOR_ALG_PHASE) {${ALGO_BRANCH[8]}
+  // Phase-aware color algorithms (3-7) use actual wavefunction phase
+  // Algorithms 0-2 delegate to standard color system
+  if (algorithm == COLOR_ALG_PHASE) {${ALGO_BRANCH[3]}
   }
-  else if (algorithm == COLOR_ALG_MIXED) {${ALGO_BRANCH[9]}
+  else if (algorithm == COLOR_ALG_MIXED) {${ALGO_BRANCH[4]}
   }
-  else if (algorithm == COLOR_ALG_PHASE_WHEEL) {${ALGO_BRANCH[11]}
+  else if (algorithm == COLOR_ALG_PHASE_WHEEL) {${ALGO_BRANCH[6]}
   }
-  else if (algorithm == COLOR_ALG_PHASE_DIVERGING) {${ALGO_BRANCH[12]}
+  else if (algorithm == COLOR_ALG_PHASE_DIVERGING) {${ALGO_BRANCH[7]}
   }
-  else if (algorithm == COLOR_ALG_BLACKBODY) {${ALGO_BRANCH[10]}
+  else if (algorithm == COLOR_ALG_BLACKBODY) {${ALGO_BRANCH[5]}
   }
   else {
-    // Algorithms 0-7: Use shared color algorithm system
+    // Algorithms 0-2: Use shared color algorithm system
     let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
 
     if (algorithm == 0) {
-      // 0: Monochromatic - same hue, varying lightness
-      let newL = 0.3 + distributedT * 0.4;
-      col = hsl2rgb(baseHSL.x, baseHSL.y, newL);
-    }
-    else if (algorithm == 1) {
-      // 1: Analogous - hue varies +/-30deg from base, preserves material lightness
-      let hueOffset = (distributedT - 0.5) * 0.167;
-      let newH = fract(baseHSL.x + hueOffset);
-      col = hsl2rgb(newH, baseHSL.y, baseHSL.z);
-    }
-    else if (algorithm == 2) {
-      // 2: Cosine gradient (Inigo Quilez palette)
-      let a = uniforms.cosineA.xyz;
-      let b = uniforms.cosineB.xyz;
-      let c = uniforms.cosineC.xyz;
-      let d = uniforms.cosineD.xyz;
-      col = cosinePalette(distributedT, a, b, c, d);
-    }
-    else if (algorithm == 3) {
-      // 3: Normal-based - color by vertical position as normal proxy
-      let normalT = pos.y * 0.5 + 0.5;
-      let distNormalT = applyDistributionS(normalT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-      let a = uniforms.cosineA.xyz;
-      let b = uniforms.cosineB.xyz;
-      let c = uniforms.cosineC.xyz;
-      let d = uniforms.cosineD.xyz;
-      col = cosinePalette(distNormalT, a, b, c, d);
-    }
-    else if (algorithm == 4) {
-      // 4: Distance field - cosine palette on density (primary signal for volume)
-      let a = uniforms.cosineA.xyz;
-      let b = uniforms.cosineB.xyz;
-      let c = uniforms.cosineC.xyz;
-      let d = uniforms.cosineD.xyz;
-      col = cosinePalette(distributedT, a, b, c, d);
-    }
-    else if (algorithm == 5) {
-      // 5: LCH/Oklab perceptual hue rotation
-      // Maps distributedT to hue angle in Oklab color space
+      // 0: LCH/Oklab perceptual hue rotation
       let hue = distributedT * TAU;
       let oklab = vec3f(uniforms.lchLightness, uniforms.lchChroma * cos(hue), uniforms.lchChroma * sin(hue));
       col = clamp(oklab2rgb(oklab), vec3f(0.0), vec3f(1.0));
     }
-    else if (algorithm == 6) {
-      // 6: Multi-source - blend density + radial + vertical through cosine palette
+    else if (algorithm == 1) {
+      // 1: Multi-source - blend density + radial + vertical through cosine palette
       let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
       let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
       let radialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
@@ -323,8 +239,8 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
       let d = uniforms.cosineD.xyz;
       col = cosinePalette(blendedT, a, b, c, d);
     }
-    else if (algorithm == 7) {
-      // 7: Radial - color by distance from center through cosine palette
+    else if (algorithm == 2) {
+      // 2: Radial - color by distance from center through cosine palette
       let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
       let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
       let a = uniforms.cosineA.xyz;

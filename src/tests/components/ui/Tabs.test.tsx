@@ -87,6 +87,26 @@ describe('Tabs', () => {
 
       expect(handleChange).not.toHaveBeenCalled()
     })
+
+    it('does not call onChange when a disabled tab is clicked', async () => {
+      const user = userEvent.setup()
+      const handleChange = vi.fn()
+      const tabsWithDisabled: Tab[] = [
+        { id: 'tab1', label: 'Tab 1', content: <div>Content 1</div> },
+        { id: 'tab2', label: 'Tab 2', content: <div>Content 2</div>, disabled: true },
+        { id: 'tab3', label: 'Tab 3', content: <div>Content 3</div> },
+      ]
+
+      render(<Tabs tabs={tabsWithDisabled} value="tab1" onChange={handleChange} />)
+
+      const disabledTab = screen.getByRole('tab', { name: 'Tab 2' })
+      expect(disabledTab).toBeDisabled()
+      expect(disabledTab).toHaveAttribute('aria-disabled', 'true')
+
+      await user.click(disabledTab)
+
+      expect(handleChange).not.toHaveBeenCalled()
+    })
   })
 
   describe('keyboard navigation', () => {
@@ -156,6 +176,25 @@ describe('Tabs', () => {
       tab1.focus()
 
       await user.keyboard('{End}')
+
+      expect(handleChange).toHaveBeenCalledWith('tab3')
+    })
+
+    it('skips disabled tabs when navigating with ArrowRight', async () => {
+      const user = userEvent.setup()
+      const handleChange = vi.fn()
+      const tabsWithDisabled: Tab[] = [
+        { id: 'tab1', label: 'Tab 1', content: <div>Content 1</div> },
+        { id: 'tab2', label: 'Tab 2', content: <div>Content 2</div>, disabled: true },
+        { id: 'tab3', label: 'Tab 3', content: <div>Content 3</div> },
+      ]
+
+      render(<Tabs tabs={tabsWithDisabled} value="tab1" onChange={handleChange} />)
+
+      const tab1 = screen.getByRole('tab', { name: 'Tab 1' })
+      tab1.focus()
+
+      await user.keyboard('{ArrowRight}')
 
       expect(handleChange).toHaveBeenCalledWith('tab3')
     })

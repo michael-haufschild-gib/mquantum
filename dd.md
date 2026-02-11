@@ -160,3 +160,17 @@ also: debugoverlaypass dead code? are the debug overlays working at all? light g
   multiplier on per-step cost). Combined they could bring iso FPS much closer to volumetric.
 
   Want me to investigate implementing any of these?
+
+
+ Out of Scope
+ Item: Type system alignment (3 parallel type systems)
+ Why deferred: Structural change, needs production team input
+ ────────────────────────────────────────
+ Item: Visual feedback for non-technical users
+ Why deferred: UX redesign, not an enforcement gap
+ ────────────────────────────────────────
+ Item: Context rot mitigation
+ Why deferred: Already partially addressed by per-game CLAUDE.md; further work needs research
+ ────────────────────────────────────────
+ Item: Additional docs consolidation/deprecation
+ Why deferred: Can be done incrementally as docs are touched

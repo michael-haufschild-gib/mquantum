@@ -487,7 +487,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'powderBlue',
     name: 'Powder Blue',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.powderBlue,
     distribution: { power: 0.8, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -495,7 +495,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'dustyRose',
     name: 'Dusty Rose',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.dustyRose,
     distribution: { power: 0.9, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -503,7 +503,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'softLavender',
     name: 'Soft Lavender',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.softLavender,
     distribution: { power: 0.8, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -511,7 +511,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'palePeach',
     name: 'Pale Peach',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.palePeach,
     distribution: { power: 0.9, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -522,7 +522,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'steelBlue',
     name: 'Steel Blue',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.steelBlue,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -530,7 +530,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'stormCloud',
     name: 'Storm Cloud',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.stormCloud,
     distribution: { power: 1.2, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -538,7 +538,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'deepSea',
     name: 'Deep Sea',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.deepSea,
     distribution: { power: 1.3, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -546,7 +546,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'slate',
     name: 'Slate',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.slate,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -554,7 +554,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'fog',
     name: 'Fog',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.fog,
     distribution: { power: 0.7, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -565,7 +565,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'crimsonFade',
     name: 'Crimson Fade',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.crimsonFade,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -573,7 +573,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'driedRose',
     name: 'Dried Rose',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.driedRose,
     distribution: { power: 0.9, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -581,7 +581,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'terracotta',
     name: 'Terracotta',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.terracotta,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -589,7 +589,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'clay',
     name: 'Clay',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.clay,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -597,7 +597,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'burgundyMist',
     name: 'Burgundy Mist',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.burgundyMist,
     distribution: { power: 1.1, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -605,7 +605,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'mauve',
     name: 'Mauve',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.mauve,
     distribution: { power: 0.9, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -616,7 +616,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'stone',
     name: 'Stone',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.stone,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -624,7 +624,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'driftwood',
     name: 'Driftwood',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.driftwood,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -632,7 +632,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'charcoal',
     name: 'Charcoal',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.charcoal,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -640,7 +640,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'espresso',
     name: 'Espresso',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.espresso,
     distribution: { power: 1.2, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -651,7 +651,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'roseSteel',
     name: 'Rose Steel',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.roseSteel,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -659,7 +659,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'dustyTwilight',
     name: 'Dusty Twilight',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.dustyTwilight,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -667,7 +667,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'warmFog',
     name: 'Warm Fog',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.warmFog,
     distribution: { power: 0.9, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -675,7 +675,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'coolEmber',
     name: 'Cool Ember',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.coolEmber,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -686,7 +686,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'electric',
     name: 'Electric',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.electric,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -694,7 +694,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'plasma',
     name: 'Plasma',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.plasma,
     distribution: { power: 0.8, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -702,7 +702,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'nebula',
     name: 'Nebula',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.nebula,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -710,7 +710,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'prism',
     name: 'Prism',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.prism,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -721,7 +721,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'glitch',
     name: 'Glitch',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.glitch,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -729,7 +729,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'infrared',
     name: 'Infrared',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.infrared,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -737,7 +737,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'acidWash',
     name: 'Acid Wash',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.acidWash,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -745,7 +745,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'voidPulse',
     name: 'Void Pulse',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.voidPulse,
     distribution: { power: 1.5, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -753,7 +753,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'solarFlare',
     name: 'Solar Flare',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.solarFlare,
     distribution: { power: 0.8, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -761,7 +761,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'deepFry',
     name: 'Deep Fry',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.deepFry,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -769,7 +769,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'ghostwave',
     name: 'Ghostwave',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.ghostwave,
     distribution: { power: 0.7, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -777,7 +777,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'toxicSpill',
     name: 'Toxic Spill',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.toxicSpill,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -785,7 +785,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'binaryFade',
     name: 'Binary Fade',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.binaryFade,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -793,7 +793,7 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
   {
     id: 'chromaticShift',
     name: 'Chromatic Shift',
-    algorithm: 'cosine',
+    algorithm: 'radial',
     coefficients: COSINE_PRESETS.chromaticShift,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,
@@ -805,30 +805,6 @@ export const BUILT_IN_PRESETS: ColorPreset[] = [
     id: 'lch-smooth',
     name: 'LCH Smooth',
     algorithm: 'lch',
-    coefficients: COSINE_PRESETS.crimsonFade,
-    distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
-    isBuiltIn: true,
-  },
-  {
-    id: 'normal-based',
-    name: 'Normal Based',
-    algorithm: 'normal',
-    coefficients: COSINE_PRESETS.steelBlue,
-    distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
-    isBuiltIn: true,
-  },
-  {
-    id: 'monochromatic',
-    name: 'Monochromatic',
-    algorithm: 'monochromatic',
-    coefficients: COSINE_PRESETS.charcoal,
-    distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
-    isBuiltIn: true,
-  },
-  {
-    id: 'analogous',
-    name: 'Analogous',
-    algorithm: 'analogous',
     coefficients: COSINE_PRESETS.crimsonFade,
     distribution: { power: 1.0, cycles: 1.0, offset: 0.0 },
     isBuiltIn: true,

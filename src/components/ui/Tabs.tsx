@@ -28,6 +28,8 @@ export interface Tab {
   label: React.ReactNode
   /** Content rendered when tab is active */
   content: React.ReactNode
+  /** Disabled tabs remain visible but cannot be selected */
+  disabled?: boolean
 }
 
 export interface TabsProps {
@@ -58,6 +60,7 @@ const TabButton = React.memo(
     index,
     isActive,
     isPending,
+    isDisabled,
     instanceId,
     variant,
     fullWidth,
@@ -70,6 +73,7 @@ const TabButton = React.memo(
     index: number
     isActive: boolean
     isPending: boolean
+    isDisabled: boolean
     instanceId: string
     variant: 'default' | 'minimal' | 'pills'
     fullWidth: boolean
@@ -79,14 +83,15 @@ const TabButton = React.memo(
     tabRef: (el: HTMLButtonElement | null) => void
   }) => {
     const handleClick = useCallback(() => {
+      if (isDisabled) return
       onTabChange(tab.id)
-    }, [onTabChange, tab.id])
+    }, [isDisabled, onTabChange, tab.id])
 
     const handleMouseEnter = useCallback(() => {
-      if (!isActive) {
+      if (!isActive && !isDisabled) {
         soundManager.playHover()
       }
-    }, [isActive])
+    }, [isActive, isDisabled])
 
     const handleKeyDownWrapper = useCallback(
       (e: React.KeyboardEvent) => {
@@ -102,19 +107,27 @@ const TabButton = React.memo(
         role="tab"
         id={`tab-${tab.id}`}
         aria-selected={isActive}
+        aria-disabled={isDisabled || undefined}
         aria-controls={`panel-${tab.id}`}
-        tabIndex={isActive ? 0 : -1}
+        tabIndex={isDisabled ? -1 : isActive ? 0 : -1}
+        disabled={isDisabled}
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         onKeyDown={handleKeyDownWrapper}
         className={`
-        relative px-4 py-2 text-[10px] uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200 cursor-pointer
+        relative px-4 py-2 text-[10px] uppercase tracking-widest font-bold whitespace-nowrap select-none transition-colors duration-200
         outline-none focus:outline-none focus-visible:outline-none border-none focus:ring-0
         ${fullWidth ? 'flex-1' : ''}
-        ${isActive ? 'text-accent text-glow-subtle' : 'text-text-secondary hover:text-text-primary'}
+        ${
+          isDisabled
+            ? 'text-text-tertiary opacity-60 cursor-not-allowed'
+            : isActive
+              ? 'text-accent text-glow-subtle cursor-pointer'
+              : 'text-text-secondary hover:text-text-primary cursor-pointer'
+        }
         ${variant === 'pills' && isActive ? 'bg-[var(--bg-active)] rounded shadow-sm' : ''}
-        ${variant === 'pills' && !isActive ? 'hover:bg-[var(--bg-hover)] rounded' : ''}
-        ${isPending && !isActive ? 'opacity-50' : ''}
+        ${variant === 'pills' && !isActive && !isDisabled ? 'hover:bg-[var(--bg-hover)] rounded' : ''}
+        ${isPending && !isActive && !isDisabled ? 'opacity-50' : ''}
       `}
         data-testid={testId ? `${testId}-tab-${tab.id}` : undefined}
       >
@@ -156,23 +169,14 @@ export const Tabs: React.FC<TabsProps> = React.memo(
     const [isPending, startTransition] = useTransition()
     const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set([value]))
 
-    // Track direction for slide animation
-    const prevValue = useRef(value)
-    const activeIndex = tabs.findIndex((tab) => tab.id === value)
-    const prevIndex = tabs.findIndex((tab) => tab.id === prevValue.current)
-
-    useEffect(() => {
-      if (activeIndex !== prevIndex) {
-        prevValue.current = value
+    const mountedTabIds = useMemo(() => {
+      if (mountedTabs.has(value)) {
+        return mountedTabs
       }
-      // Mark tab as mounted when it becomes active
-      setMountedTabs((prev) => {
-        if (prev.has(value)) return prev
-        const next = new Set(prev)
-        next.add(value)
-        return next
-      })
-    }, [value, activeIndex, prevIndex])
+      const next = new Set(mountedTabs)
+      next.add(value)
+      return next
+    }, [mountedTabs, value])
 
     // Optimized Scroll Checking using ResizeObserver
     // Wait for layout to stabilize before showing scroll indicators
@@ -233,36 +237,67 @@ export const Tabs: React.FC<TabsProps> = React.memo(
 
     const handleTabChange = useCallback(
       (id: string) => {
+        const targetTab = tabs.find((tab) => tab.id === id)
+        if (!targetTab || targetTab.disabled) return
         if (id !== value) {
+          setMountedTabs((prev) => {
+            if (prev.has(id)) return prev
+            const next = new Set(prev)
+            next.add(id)
+            return next
+          })
           soundManager.playClick()
           startTransition(() => {
             onChange(id)
           })
         }
       },
-      [value, onChange]
+      [tabs, value, onChange]
     )
 
     const handleKeyDown = useCallback(
       (event: React.KeyboardEvent, index: number) => {
-        let newIndex = index
+        const findNextEnabledIndex = (startIndex: number, direction: 1 | -1): number => {
+          for (let offset = 1; offset <= tabs.length; offset += 1) {
+            const candidateIndex = (startIndex + direction * offset + tabs.length) % tabs.length
+            if (!tabs[candidateIndex]?.disabled) {
+              return candidateIndex
+            }
+          }
+          return -1
+        }
+
+        const findBoundaryEnabledIndex = (fromStart: boolean): number => {
+          if (fromStart) {
+            return tabs.findIndex((tab) => !tab.disabled)
+          }
+          for (let i = tabs.length - 1; i >= 0; i -= 1) {
+            if (!tabs[i]?.disabled) {
+              return i
+            }
+          }
+          return -1
+        }
+
+        let newIndex = -1
         switch (event.key) {
           case 'ArrowLeft':
-            newIndex = index === 0 ? tabs.length - 1 : index - 1
+            newIndex = findNextEnabledIndex(index, -1)
             break
           case 'ArrowRight':
-            newIndex = index === tabs.length - 1 ? 0 : index + 1
+            newIndex = findNextEnabledIndex(index, 1)
             break
           case 'Home':
-            newIndex = 0
+            newIndex = findBoundaryEnabledIndex(true)
             break
           case 'End':
-            newIndex = tabs.length - 1
+            newIndex = findBoundaryEnabledIndex(false)
             break
           default:
             return
         }
         event.preventDefault()
+        if (newIndex === -1) return
         const targetTab = tabs[newIndex]
         if (targetTab) {
           handleTabChange(targetTab.id)
@@ -292,7 +327,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
     const tabPanels = useMemo(
       () =>
         tabs.map((tab) => {
-          if (!mountedTabs.has(tab.id)) return null
+          if (!mountedTabIds.has(tab.id)) return null
 
           return (
             <div
@@ -306,7 +341,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
             </div>
           )
         }),
-      [tabs, mountedTabs, value, testId]
+      [tabs, mountedTabIds, value, testId]
     )
 
     return (
@@ -344,6 +379,7 @@ export const Tabs: React.FC<TabsProps> = React.memo(
                       index={index}
                       isActive={isActive}
                       isPending={isPending}
+                      isDisabled={Boolean(tab.disabled)}
                       instanceId={instanceId}
                       variant={variant}
                       fullWidth={fullWidth}

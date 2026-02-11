@@ -310,8 +310,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   // Color module dependency flags (compile-time specialization)
-  const needsCosine = colorAlgorithm === undefined || [2, 3, 4, 6, 7].includes(colorAlgorithm)
-  const needsOklab = colorAlgorithm === undefined || colorAlgorithm === 5
+  // 1=MultiSource, 2=Radial use cosine palette; 0=LCH uses Oklab
+  const needsCosine = colorAlgorithm === undefined || [1, 2].includes(colorAlgorithm)
+  const needsOklab = colorAlgorithm === undefined || colorAlgorithm === 0
 
   if (colorAlgorithm !== undefined) {
     features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)

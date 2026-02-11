@@ -277,7 +277,6 @@ export interface SkyboxProceduralSettings {
   timeScale: number
 
   // Appearance
-  syncWithObject: boolean // "Harmonic Link"
   cosineCoefficients: CosineCoefficients // Independent skybox palette
   distribution: DistributionSettings // Distribution curve settings
   hue: number // -0.5 to 0.5 (color rotation)
@@ -302,7 +301,6 @@ export const DEFAULT_SKYBOX_PROCEDURAL_SETTINGS: SkyboxProceduralSettings = {
   scale: 1.0,
   complexity: 0.5,
   timeScale: 0.2,
-  syncWithObject: true,
   cosineCoefficients: { ...DEFAULT_COSINE_COEFFICIENTS },
   distribution: { ...DEFAULT_DISTRIBUTION },
   hue: 0,

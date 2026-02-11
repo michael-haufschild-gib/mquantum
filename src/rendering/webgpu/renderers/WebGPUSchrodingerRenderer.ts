@@ -47,19 +47,14 @@ const QUANTUM_MODE_MAP: Record<string, number> = {
   hydrogenND: 1,
 }
 const COLOR_ALGORITHM_MAP: Record<string, number> = {
-  monochromatic: 0,
-  analogous: 1,
-  cosine: 2,
-  normal: 3,
-  distance: 4,
-  lch: 5,
-  multiSource: 6,
-  radial: 7,
-  phase: 8,
-  mixed: 9,
-  blackbody: 10,
-  phaseWheel: 11,
-  phaseDiverging: 12,
+  lch: 0,
+  multiSource: 1,
+  radial: 2,
+  phase: 3,
+  mixed: 4,
+  blackbody: 5,
+  phaseWheel: 6,
+  phaseDiverging: 7,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,

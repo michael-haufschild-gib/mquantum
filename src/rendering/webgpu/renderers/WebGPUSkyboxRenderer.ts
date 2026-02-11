@@ -608,7 +608,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     data[7] = settings?.timeScale ?? 0.2 // timeScale
 
     data[8] = settings?.evolution ?? 0.0 // evolution
-    data[9] = settings?.syncWithObject ? 1.0 : 0.0 // usePalette (sync = use object palette)
+    data[9] = 0.0 // _padSync (was usePalette, removed)
     data[10] = animDistortion // distortion (animation-driven for heatwave)
     data[11] = 0.0 // vignette
 

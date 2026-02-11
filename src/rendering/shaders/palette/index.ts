@@ -53,12 +53,7 @@ export {
   DEFAULT_COSINE_COEFFICIENTS,
   DEFAULT_DISTRIBUTION,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
-  GEOMETRIC_PHASE_ALGORITHMS,
-  isColorAlgorithmAvailable,
-  isGeometricPhaseAlgorithm,
-  isQuantumOnlyAlgorithm,
   LCH_PRESET_OPTIONS,
-  QUANTUM_ONLY_ALGORITHMS,
   // Color algorithm types
   type ColorAlgorithm,
   // Cosine palette types

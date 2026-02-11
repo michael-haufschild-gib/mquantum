@@ -97,6 +97,9 @@ export const TRANSIENT_FIELDS = new Set([
 
   // Legacy skybox blend mode (removed — never connected to rendering pipeline)
   'backgroundBlendMode',
+
+  // Legacy skybox sync-with-object toggle (removed — skybox always uses palette)
+  'syncWithObject',
 ])
 
 /**

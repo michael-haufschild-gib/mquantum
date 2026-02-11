@@ -11,17 +11,10 @@
 // Color Algorithm System
 // ============================================================================
 
-import { isPolytopeType, type ObjectType } from '@/lib/geometry/types'
-
 /**
  * Color algorithm selection.
  * Determines how the color palette is generated.
  *
- * - monochromatic: Same hue, varying lightness only (based on base color)
- * - analogous: Hue varies ±30° from base color
- * - cosine: Smooth cosine gradient palette (Inigo Quilez technique)
- * - normal: Color based on surface normal direction
- * - distance: Color based on distance field value (orbit trap)
  * - lch: Perceptually uniform LCH/Oklab color space
  * - multiSource: Blend multiple value sources for complex coloring
  * - radial: Color based on 3D distance from origin (spherical gradient)
@@ -30,11 +23,6 @@ import { isPolytopeType, type ObjectType } from '@/lib/geometry/types'
  */
 
 export type ColorAlgorithm =
-  | 'monochromatic'
-  | 'analogous'
-  | 'cosine'
-  | 'normal'
-  | 'distance'
   | 'lch'
   | 'multiSource'
   | 'radial'
@@ -48,11 +36,6 @@ export type ColorAlgorithm =
  * Options for the Color Algorithm dropdown in the UI.
  */
 export const COLOR_ALGORITHM_OPTIONS = [
-  { value: 'monochromatic' as const, label: 'Monochromatic' },
-  { value: 'analogous' as const, label: 'Analogous' },
-  { value: 'cosine' as const, label: 'Cosine Gradient' },
-  { value: 'normal' as const, label: 'Normal-Based' },
-  { value: 'distance' as const, label: 'Distance Field' },
   { value: 'lch' as const, label: 'LCH Perceptual' },
   { value: 'multiSource' as const, label: 'Multi-Source' },
   { value: 'radial' as const, label: 'Radial (from center)' },
@@ -67,107 +50,14 @@ export const COLOR_ALGORITHM_OPTIONS = [
  * Map from ColorAlgorithm string to integer for shader uniform.
  */
 export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
-  monochromatic: 0,
-  analogous: 1,
-  cosine: 2,
-  normal: 3,
-  distance: 4,
-  lch: 5,
-  multiSource: 6,
-  radial: 7,
-  phase: 8,
-  mixed: 9,
-  blackbody: 10,
-  phaseWheel: 11,
-  phaseDiverging: 12,
-}
-
-/**
- * Color algorithms that are only meaningful for Schroedinger (quantum wavefunction).
- * These use quantum-specific data that only exists for Schroedinger objects.
- * Note: 'phase' and 'mixed' use geometric position, not quantum data, so they're
- * available for all object types except blackhole.
- */
-export const QUANTUM_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
-
-/**
- * Color algorithms that use geometric angular/position data.
- * These work for all object types.
- * Uses azimuth angle in XZ plane for coloring.
- */
-export const GEOMETRIC_PHASE_ALGORITHMS: readonly ColorAlgorithm[] = [
-  'phase',
-  'mixed',
-  'phaseWheel',
-  'phaseDiverging',
-] as const
-
-/**
- * Check if a color algorithm is quantum-specific (Schroedinger only).
- * @param algorithm - The color algorithm to check
- * @returns True if the algorithm is quantum-only
- */
-export function isQuantumOnlyAlgorithm(algorithm: ColorAlgorithm): boolean {
-  return QUANTUM_ONLY_ALGORITHMS.includes(algorithm)
-}
-
-/**
- * Check if a color algorithm is geometric-phase-based.
- * @param algorithm - The color algorithm to check
- * @returns True if the algorithm uses geometric phase
- */
-export function isGeometricPhaseAlgorithm(algorithm: ColorAlgorithm): boolean {
-  return GEOMETRIC_PHASE_ALGORITHMS.includes(algorithm)
-}
-
-/**
- * Polytope algorithms - empty since polytope types are removed.
- */
-export const POLYTOPE_ONLY_ALGORITHMS: readonly ColorAlgorithm[] = [] as const
-
-/**
- * Check if a color algorithm is polytope-specific.
- * @param algorithm - The color algorithm to check
- * @returns Always false since polytope types are removed
- */
-export function isPolytopeOnlyAlgorithm(_algorithm: ColorAlgorithm): boolean {
-  return false
-}
-
-/**
- * Check if a color algorithm is available for a specific object type.
- * Encapsulates the logic for showing/hiding algorithms based on object capability.
- *
- * @param algorithm - The color algorithm to check
- * @param objectType - The object type to check availability for
- * @returns True if the algorithm can be used with the object type
- */
-export function isColorAlgorithmAvailable(
-  algorithm: ColorAlgorithm,
-  _objectType: ObjectType
-): boolean {
-  // Special case: Blackbody is available for Schroedinger
-  if (algorithm === 'blackbody') {
-    return true
-  }
-
-  // Quantum algorithms only for Schroedinger
-  if (isQuantumOnlyAlgorithm(algorithm)) {
-    return true
-  }
-
-  // Geometric phase algorithms available for all
-  if (isGeometricPhaseAlgorithm(algorithm)) {
-    return true
-  }
-
-  // Polytope algorithms - none exist now
-  if (isPolytopeOnlyAlgorithm(algorithm)) {
-    return isPolytopeType(_objectType)
-  }
-
-  // All other algorithms are available for all objects
-  return true
+  lch: 0,
+  multiSource: 1,
+  radial: 2,
+  phase: 3,
+  mixed: 4,
+  blackbody: 5,
+  phaseWheel: 6,
+  phaseDiverging: 7,
 }
 
 /**

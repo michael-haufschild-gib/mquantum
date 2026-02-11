@@ -157,7 +157,7 @@ describe('BUILT_IN_PRESETS', () => {
   })
 
   it('should have valid algorithm values', () => {
-    const validAlgorithms = ['cosine', 'lch', 'normal', 'monochromatic', 'analogous']
+    const validAlgorithms = ['radial', 'lch']
 
     for (const preset of BUILT_IN_PRESETS) {
       expect(validAlgorithms).toContain(preset.algorithm)
@@ -220,34 +220,16 @@ describe('getPresetById', () => {
 })
 
 describe('getDefaultPresetForAlgorithm', () => {
-  it('should return a preset for cosine algorithm', () => {
-    const preset = getDefaultPresetForAlgorithm('cosine')
+  it('should return a preset for radial algorithm', () => {
+    const preset = getDefaultPresetForAlgorithm('radial')
     expect(preset).toBeDefined()
-    expect(preset.algorithm).toBe('cosine')
+    expect(preset.algorithm).toBe('radial')
   })
 
   it('should return a preset for lch algorithm', () => {
     const preset = getDefaultPresetForAlgorithm('lch')
     expect(preset).toBeDefined()
     expect(preset.algorithm).toBe('lch')
-  })
-
-  it('should return a preset for normal algorithm', () => {
-    const preset = getDefaultPresetForAlgorithm('normal')
-    expect(preset).toBeDefined()
-    expect(preset.algorithm).toBe('normal')
-  })
-
-  it('should return a preset for monochromatic algorithm', () => {
-    const preset = getDefaultPresetForAlgorithm('monochromatic')
-    expect(preset).toBeDefined()
-    expect(preset.algorithm).toBe('monochromatic')
-  })
-
-  it('should return a preset for analogous algorithm', () => {
-    const preset = getDefaultPresetForAlgorithm('analogous')
-    expect(preset).toBeDefined()
-    expect(preset.algorithm).toBe('analogous')
   })
 
   it('should return fallback preset for unknown algorithm', () => {

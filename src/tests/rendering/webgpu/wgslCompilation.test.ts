@@ -329,6 +329,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
   })
 
   it('excludes unused color modules when compile-time colorAlgorithm is provided', () => {
+    // Algorithm 5 (Blackbody) uses no color modules — cosine and oklab excluded
     const { wgsl, modules } = composeSchroedingerShader({
       dimension: 4,
 
@@ -336,11 +337,10 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
       sss: false,
       quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 0,
+      colorAlgorithm: 5,
     })
 
     verifyWgsl(wgsl, true)
-    // Algorithm 0 (Monochromatic) uses HSL only — cosine and oklab excluded
     expect(modules).toContain('Color (HSL)')
     expect(modules).not.toContain('Color (Cosine)')
     expect(modules).not.toContain('Color (Oklab)')
@@ -414,7 +414,8 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
-  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const
+  // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody, 6=PhaseWheel, 7=PhaseDiverging
+  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7] as const
 
   for (const alg of allAlgorithms) {
     it(`produces valid WGSL for colorAlgorithm=${alg}`, () => {
@@ -456,9 +457,10 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(modules).not.toContain('Color Selector')
   })
 
-  it('excludes Cosine module for HSL-only algorithms (0, 1, 8, 9, 10, 11, 12)', () => {
-    const hslOnlyAlgorithms = [0, 1, 8, 9, 10, 11, 12] as const
-    for (const alg of hslOnlyAlgorithms) {
+  it('excludes Cosine module for non-cosine algorithms (3, 4, 5, 6, 7)', () => {
+    // 3=Phase(HSL), 4=Mixed(HSL), 5=Blackbody(none), 6=PhaseWheel(HSL), 7=PhaseDiverging(HSL)
+    const nonCosineAlgorithms = [3, 4, 5, 6, 7] as const
+    for (const alg of nonCosineAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
         temporal: false,
@@ -473,7 +475,8 @@ describe('WGSL Color Algorithm Specialization', () => {
   })
 
   it('excludes Oklab module for non-Oklab algorithms', () => {
-    const nonOklabAlgorithms = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12] as const
+    // All except 0(LCH)
+    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 6, 7] as const
     for (const alg of nonOklabAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -488,8 +491,9 @@ describe('WGSL Color Algorithm Specialization', () => {
     }
   })
 
-  it('includes Cosine module for cosine algorithms (2, 3, 4, 6, 7)', () => {
-    const cosineAlgorithms = [2, 3, 4, 6, 7] as const
+  it('includes Cosine module for cosine algorithms (1, 2)', () => {
+    // 1=MultiSource, 2=Radial
+    const cosineAlgorithms = [1, 2] as const
     for (const alg of cosineAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -504,13 +508,13 @@ describe('WGSL Color Algorithm Specialization', () => {
     }
   })
 
-  it('includes Oklab module only for algorithm 5', () => {
+  it('includes Oklab module only for algorithm 0 (LCH)', () => {
     const { modules, wgsl } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
       sss: false,
       quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 5,
+      colorAlgorithm: 0,
     })
 
     expect(modules).toContain('Color (Oklab)')
@@ -546,7 +550,8 @@ describe('WGSL Color Algorithm Specialization', () => {
   })
 
   it('works with hydrogenND + colorAlgorithm', () => {
-    for (const alg of [2, 5, 9] as const) {
+    // 0=LCH, 2=Radial, 4=Mixed
+    for (const alg of [0, 2, 4] as const) {
       const { wgsl } = composeSchroedingerShader({
         dimension: 5,
         temporal: false,
@@ -566,7 +571,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       temporal: false,
       sss: false,
       quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 9,
+      colorAlgorithm: 4,
     })
 
     expect(features).toContain('Color: Mixed')
@@ -589,7 +594,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       temporal: false,
       sss: false,
       quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 9,
+      colorAlgorithm: 4,
     })
 
     expect(modules).toContain('Volume Emission (Pre)')

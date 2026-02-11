@@ -2,11 +2,37 @@ import { DimensionSelector } from '@/components/sections/Geometry/DimensionSelec
 import { ObjectSettingsSection } from '@/components/sections/Geometry/ObjectSettingsSection'
 import { ObjectTypeExplorer } from '@/components/sections/ObjectTypes/ObjectTypeExplorer'
 import { Icon } from '@/components/ui/Icon'
+import { Slider } from '@/components/ui/Slider'
 import { Tab, Tabs } from '@/components/ui/Tabs'
+import { ToggleGroup } from '@/components/ui/ToggleGroup'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import React, { useMemo, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+
+type SurfaceMode = 'volumetric' | 'isosurface'
+
+const SURFACE_MODE_OPTIONS = [
+  { value: 'volumetric' as const, label: 'Volumetric Cloud' },
+  { value: 'isosurface' as const, label: 'Iso Surface' },
+]
 
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
+  const dimension = useGeometryStore((state) => state.dimension)
+  const isoSelector = useShallow((state: ExtendedObjectState) => ({
+    isoEnabled: state.schroedinger?.isoEnabled ?? false,
+    isoThreshold: state.schroedinger?.isoThreshold ?? -3,
+    setIsoEnabled: state.setSchroedingerIsoEnabled,
+    setIsoThreshold: state.setSchroedingerIsoThreshold,
+  }))
+  const { isoEnabled, isoThreshold, setIsoEnabled, setIsoThreshold } = useExtendedObjectStore(
+    isoSelector
+  )
+
+  const handleSurfaceModeChange = (mode: SurfaceMode) => {
+    setIsoEnabled(mode === 'isosurface')
+  }
 
   const tabs: Tab[] = useMemo(
     () => [
@@ -56,14 +82,37 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
         {/* Fixed Header Section with Dimension Selector */}
         <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-hover)] shrink-0">
-          <div className="flex justify-between items-baseline px-4 py-2 border-b border-[var(--border-subtle)]">
-            <label className="text-[10px] text-accent font-bold uppercase tracking-wider text-glow-subtle flex items-center gap-2">
-              Dimensions
-            </label>
-          </div>
-          <div className="p-4">
+
+          <div className="px-4 py-2">
             <DimensionSelector />
           </div>
+          {dimension > 2 && (
+            <div className="px-4 pb-2">
+              <div className="space-y-1">
+
+                <ToggleGroup
+                  options={SURFACE_MODE_OPTIONS}
+                  value={isoEnabled ? 'isosurface' : 'volumetric'}
+                  onChange={handleSurfaceModeChange}
+                  ariaLabel="Select surface rendering mode"
+                  data-testid="surface-mode-selector"
+                />
+                {isoEnabled && (
+                  <Slider
+                    label="Iso Threshold (log)"
+                    min={-6}
+                    max={0}
+                    step={0.1}
+                    value={isoThreshold}
+                    onChange={setIsoThreshold}
+                    showValue
+                    data-testid="schroedinger-iso-threshold"
+                  />
+                )}
+
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tabs Section */}

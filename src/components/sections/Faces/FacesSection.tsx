@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/Button'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { Tabs } from '@/components/ui/Tabs'
-import { ToggleButton } from '@/components/ui/ToggleButton'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
@@ -30,22 +29,17 @@ import { LchPresetSelector } from './LchPresetSelector'
 import { PresetSelector } from './PresetSelector'
 
 /** Algorithms that use the cosine palette (preset selector + advanced editor) */
-const USES_COSINE_PALETTE = new Set(['cosine', 'normal', 'distance', 'radial', 'multiSource'])
+const USES_COSINE_PALETTE = new Set(['radial', 'multiSource'])
 
 /** Algorithms that use distribution controls (power, cycles, offset) */
 const USES_DISTRIBUTION = new Set([
-  'monochromatic',
-  'analogous',
-  'cosine',
-  'normal',
-  'distance',
   'lch',
   'multiSource',
   'radial',
 ])
 
 /** Algorithms that use the base/face color (HSL-based) */
-const USES_BASE_COLOR = new Set(['monochromatic', 'analogous', 'phase', 'mixed'])
+const USES_BASE_COLOR = new Set(['phase', 'mixed'])
 
 export interface FacesSectionProps {
   defaultOpen?: boolean
@@ -60,13 +54,8 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   // Isosurface mode controls (drives material tab availability and rendering mode)
   const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
-    isoThreshold: state.schroedinger?.isoThreshold ?? -3,
-    setIsoEnabled: state.setSchroedingerIsoEnabled,
-    setIsoThreshold: state.setSchroedingerIsoThreshold,
   }))
-  const { isoEnabled, isoThreshold, setIsoEnabled, setIsoThreshold } = useExtendedObjectStore(
-    schroedingerIsoSelector
-  )
+  const { isoEnabled } = useExtendedObjectStore(schroedingerIsoSelector)
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -125,15 +114,15 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     setActiveTab(id as FacesTabId)
   }, [])
 
-  // Material tab only available in isosurface mode and 3D+ (PBR has no effect on volumetric clouds or 2D)
-  const showMaterialTab = isoEnabled && dimension > 2
+  // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds or 2D)
+  const materialTabEnabled = isoEnabled && dimension > 2
 
-  // Reset to colors tab if material tab disappears while selected
+  // Reset to colors tab if material tab becomes disabled while selected
   React.useEffect(() => {
-    if (!showMaterialTab && activeTab === 'material') {
+    if (!materialTabEnabled && activeTab === 'material') {
       setActiveTab('colors')
     }
-  }, [showMaterialTab, activeTab])
+  }, [materialTabEnabled, activeTab])
 
   const tabs = useMemo(
     () => [
@@ -152,27 +141,24 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
           />
         ),
       },
-      ...(showMaterialTab
-        ? [
-            {
-              id: 'material' as const,
-              label: 'Material',
-              content: (
-                <MaterialTabContent
-                  showLightingControls={showLightingControls}
-                  specularColor={specularColor}
-                  setSpecularColor={setSpecularColor}
-                  specularIntensity={specularIntensity}
-                  setSpecularIntensity={setSpecularIntensity}
-                  roughness={roughness}
-                  setRoughness={setRoughness}
-                  metallic={metallic}
-                  setMetallic={setMetallic}
-                />
-              ),
-            },
-          ]
-        : []),
+      {
+        id: 'material' as const,
+        label: 'Material',
+        disabled: !materialTabEnabled,
+        content: (
+          <MaterialTabContent
+            showLightingControls={showLightingControls}
+            specularColor={specularColor}
+            setSpecularColor={setSpecularColor}
+            specularIntensity={specularIntensity}
+            setSpecularIntensity={setSpecularIntensity}
+            roughness={roughness}
+            setRoughness={setRoughness}
+            metallic={metallic}
+            setMetallic={setMetallic}
+          />
+        ),
+      },
     ],
     [
       colorAlgorithm,
@@ -182,7 +168,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
       setLchLightness,
       lchChroma,
       setLchChroma,
-      showMaterialTab,
+      materialTabEnabled,
       showLightingControls,
       specularColor,
       setSpecularColor,
@@ -198,40 +184,6 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   return (
     <Section title="Surface" defaultOpen={defaultOpen} data-testid="section-faces">
       <div className="transition-opacity duration-300">
-        {dimension > 2 && (
-        <div className="mb-4 space-y-2 border-b border-border-subtle pb-4">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Isosurface Mode</label>
-            <ToggleButton
-              pressed={isoEnabled}
-              onToggle={() => setIsoEnabled(!isoEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle isosurface mode"
-              data-testid="schroedinger-iso-toggle"
-            >
-              {isoEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          {isoEnabled && (
-            <Slider
-              label="Iso Threshold (log)"
-              min={-6}
-              max={0}
-              step={0.1}
-              value={isoThreshold}
-              onChange={setIsoThreshold}
-              showValue
-              data-testid="schroedinger-iso-threshold"
-            />
-          )}
-          <p className="text-xs text-text-tertiary">
-            {isoEnabled
-              ? 'Sharp surface at constant probability density'
-              : 'Volumetric cloud visualization'}
-          </p>
-        </div>
-        )}
-
         <Tabs
           tabs={tabs}
           value={activeTab}

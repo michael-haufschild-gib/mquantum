@@ -50,15 +50,9 @@ fn getDeepOcean(dir: vec3<f32>, time: f32) -> vec3<f32> {
   var userMid: vec3<f32>;
   var userSurface: vec3<f32>;
 
-  if (uniforms.usePalette > 0.5) {
-    userDeep = cosinePalette(0.0, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    userMid = cosinePalette(0.5, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-    userSurface = cosinePalette(1.0, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
-  } else {
-    userDeep = uniforms.color1;
-    userMid = mix(uniforms.color1, uniforms.color2, 0.5);
-    userSurface = uniforms.color2;
-  }
+  userDeep = cosinePalette(0.0, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  userMid = cosinePalette(0.5, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
+  userSurface = cosinePalette(1.0, uniforms.palA, uniforms.palB, uniforms.palC, uniforms.palD);
 
   // Calculate luminance contrast of user's palette
   let deepLum = dot(userDeep, vec3<f32>(0.299, 0.587, 0.114));
