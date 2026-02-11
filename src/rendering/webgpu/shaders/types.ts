@@ -17,7 +17,7 @@ export type ColorAlgorithm =
   | 3 // Phase/Angular (HSL, wavefunction phase)
   | 4 // Mixed Phase+Distance (HSL, default)
   | 5 // Blackbody (analytic, no user color params)
-  | 6 // Full complex phase wheel (HSL)
+  | 6 // Perceptually uniform cyclic phase map (Oklab)
   | 7 // Signed diverging phase map (HSL)
 
 /**
@@ -46,7 +46,8 @@ export interface WGSLShaderConfig {
    * When specified, only the required color module(s) are included:
    * - 0: Oklab only (LCH)
    * - 1,2: Cosine palette only
-   * - 3,4,6,7: HSL + phase-aware logic
+   * - 3,4,7: HSL + phase-aware logic
+   * - 6: Oklab phase-aware cyclic map
    * - 5: No color modules (blackbody)
    * If undefined, all color modules included for runtime switching
    */

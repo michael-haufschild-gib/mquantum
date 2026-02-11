@@ -38,7 +38,7 @@ const ALGORITHM_PARAMS: Record<ColorAlgorithm, AlgorithmParamSet[]> = {
   // Phase-based (uses base color only, no distribution or cosine)
   phase: [],
   mixed: [],
-  phaseWheel: [],
+  phaseCyclicUniform: [],
   phaseDiverging: [],
   // Analytic (no user-controllable color parameters)
   blackbody: [],

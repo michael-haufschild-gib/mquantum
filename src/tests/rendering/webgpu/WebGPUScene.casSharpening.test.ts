@@ -27,7 +27,7 @@ interface ScenePassConfig {
     | 'phase'
     | 'mixed'
     | 'blackbody'
-    | 'phaseWheel'
+    | 'phaseCyclicUniform'
     | 'phaseDiverging'
   skyboxEnabled: boolean
   skyboxMode:

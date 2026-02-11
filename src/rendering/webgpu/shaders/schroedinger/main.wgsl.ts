@@ -157,10 +157,10 @@ export function generateMainBlockVolumetric(config: VolumetricMainBlockConfig = 
   // with automatic fallback when features require direct wavefunction sampling.
   const raymarchCall = useDensityGrid
     ? `let phaseDependentMode =
-    schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9 ||
-    schroedinger.colorAlgorithm == 11 ||
-    schroedinger.colorAlgorithm == 12 ||
+    schroedinger.colorAlgorithm == 3 ||
+    schroedinger.colorAlgorithm == 4 ||
+    schroedinger.colorAlgorithm == 6 ||
+    schroedinger.colorAlgorithm == 7 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 
@@ -1266,10 +1266,10 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
 
   const raymarchCall = useDensityGrid
     ? `let phaseDependentMode =
-    schroedinger.colorAlgorithm == 8 ||
-    schroedinger.colorAlgorithm == 9 ||
-    schroedinger.colorAlgorithm == 11 ||
-    schroedinger.colorAlgorithm == 12 ||
+    schroedinger.colorAlgorithm == 3 ||
+    schroedinger.colorAlgorithm == 4 ||
+    schroedinger.colorAlgorithm == 6 ||
+    schroedinger.colorAlgorithm == 7 ||
     (FEATURE_PHASE_MATERIALITY && schroedinger.phaseMaterialityEnabled != 0u) ||
     (FEATURE_INTERFERENCE && schroedinger.interferenceEnabled != 0u);
 

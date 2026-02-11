@@ -53,7 +53,7 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   phase: 3,
   mixed: 4,
   blackbody: 5,
-  phaseWheel: 6,
+  phaseCyclicUniform: 6,
   phaseDiverging: 7,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
@@ -110,7 +110,7 @@ export interface SchrodingerRendererConfig {
   isosurface?: boolean
   quantumMode?: QuantumModeForShader
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Compile-time color module selection (0-10) */
+  /** Compile-time color module selection (0-7) */
   colorAlgorithm?: WGSLColorAlgorithm
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean
@@ -1409,7 +1409,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Color algorithm system (offset 940+)
     // Use canonical mapping shared with WebGL (palette/types.ts COLOR_ALGORITHM_TO_INT)
-    const colorAlgorithm = COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'mixed'] ?? 9
+    const colorAlgorithm = COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'mixed'] ?? 4
     intView[940 / 4] = colorAlgorithm
     floatView[944 / 4] = appearance?.distribution?.power ?? 1.0
     floatView[948 / 4] = appearance?.distribution?.cycles ?? 1.0

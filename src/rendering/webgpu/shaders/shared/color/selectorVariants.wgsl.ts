@@ -10,7 +10,8 @@
  * Color algorithms and their dependencies:
  * - 0: Oklab only (lchColor)
  * - 1,2: Cosine palette only (getCosinePaletteColor)
- * - 3,4,6,7: HSL only (hsl2rgb)
+ * - 3,4,7: HSL only (hsl2rgb)
+ * - 6: Oklab cyclic phase map (oklab2rgb)
  * - 5: Blackbody (no dependencies, inline math)
  *
  * Port of GLSL shared/color/selectorVariants.glsl to WGSL.
@@ -123,15 +124,17 @@ fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, u
 `
 
     case 6:
-      // Phase Wheel (HSL)
+      // Phase Cyclic Uniform (Oklab)
       return /* wgsl */ `
 // ============================================
-// Color Selector - Algorithm 6: Phase Wheel (Compile-time)
+// Color Selector - Algorithm 6: Phase Cyclic Uniform (Compile-time)
 // ============================================
 
 fn getColorByAlgorithm(t: f32, normal: vec3f, baseHSL: vec3f, position: vec3f, uniforms: ColorUniforms) -> vec3f {
   let phaseNorm = fract(t);
-  return hsl2rgb(phaseNorm, 0.9, 0.2 + 0.45 * t);
+  let hueAngle = phaseNorm * 6.28318;
+  let cyclicOklab = vec3f(0.72, 0.11 * cos(hueAngle), 0.11 * sin(hueAngle));
+  return clamp(oklab2rgb(cyclicOklab), vec3f(0.0), vec3f(1.0));
 }
 `
 
@@ -181,6 +184,7 @@ export function getColorModuleDependencies(algorithm: ColorAlgorithm): {
     case 5:
       return { hsl: false, cosine: false, oklab: false }
     case 6:
+      return { hsl: false, cosine: false, oklab: true }
     case 7:
       return { hsl: true, cosine: false, oklab: false }
     default:

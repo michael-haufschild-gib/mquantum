@@ -1,11 +1,11 @@
 # Color Algorithms: Physical Encoding vs Visual Styling
 
-**Date:** 2026-02-11  
-**Scope:** `schroedinger` color algorithms implemented in WebGPU WGSL  
-**Primary sources:**  
-`/Users/Spare/Documents/code/mquantum/src/rendering/shaders/palette/types.ts`  
-`/Users/Spare/Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl.ts`  
-`/Users/Spare/Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts`  
+**Date:** 2026-02-11
+**Scope:** `schroedinger` color algorithms implemented in WebGPU WGSL
+**Primary sources:**
+`/Users/Spare/Documents/code/mquantum/src/rendering/shaders/palette/types.ts`
+`/Users/Spare/Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl.ts`
+`/Users/Spare/Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/quantum/density.wgsl.ts`
 `/Users/Spare/Documents/code/mquantum/src/rendering/webgpu/shaders/schroedinger/quantum/psi.wgsl.ts`
 
 ## Common Quantities Used by the Algorithms
@@ -13,7 +13,7 @@
 - Complex wavefunction: `psi = Re(psi) + i Im(psi)`
 - Probability density: `rho = |psi|^2 = Re(psi)^2 + Im(psi)^2`
 - Log-density: `s = log(rho + 1e-8)`
-- Density color driver (used by many algorithms):  
+- Density color driver (used by many algorithms):
   `normalized = clamp((s + 8.0) / 8.0, 0.0, 1.0)`
 - Spatial phase used for coloring: `phase = atan2(Im(psi), Re(psi))`
 
@@ -79,9 +79,9 @@ Scales below are practical interpretation scores:
 
 ### 6) `multiSource`
 
-- What it does: blends three drivers then applies cosine palette:  
+- What it does: blends three drivers then applies cosine palette:
   `blendedT = w0*density + w1*radial + w2*vertical`
-- Encodes: mixed scalar of  
+- Encodes: mixed scalar of
   `log(|psi|^2)` (density term), radius `|x|/R`, and vertical position `y`.
 - Information value: **50%**
 - Visual fluff: **50%**
@@ -119,13 +119,13 @@ Scales below are practical interpretation scores:
 - Visual fluff: **35%**
 - Assessment: density structure is readable and intuitive, but "temperature" is metaphorical here (not actual thermodynamic temperature of the state).
 
-### 11) `phaseWheel`
+### 11) `phaseCyclicUniform`
 
-- What it does: full `0..2pi` phase -> hue wheel; lightness scales with `normalized`.
-- Encodes: `arg(psi)` directly (hue) + compressed `log(|psi|^2)` (lightness).
+- What it does: full `0..2pi` phase -> cyclic perceptual color loop with constant lightness/chroma.
+- Encodes: `arg(psi)` only.
 - Information value: **90%**
 - Visual fluff: **10%**
-- Assessment: one of the most scientifically informative modes for complex wavefunction analysis.
+- Assessment: one of the most scientifically informative modes for complex wavefunction analysis, with lower perceptual bias than HSV-like wheels.
 
 ### 12) `phaseDiverging`
 
@@ -134,7 +134,7 @@ Scales below are practical interpretation scores:
   `sign(cos(phase))` as positive/negative wing,
   `|cos(phase)|` as sign confidence,
   compressed `log(|psi|^2)` as brightness.
-- Physical interpretation of `cos(phase)`: for `|psi| > 0`,  
+- Physical interpretation of `cos(phase)`: for `|psi| > 0`,
   `cos(phase) = Re(psi) / |psi|`, so sign acts as a **Re(psi) sign proxy**.
 - Information value: **92%**
 - Visual fluff: **8%**
@@ -144,7 +144,7 @@ Scales below are practical interpretation scores:
 
 Highest insight (recommended for analysis):
 - `phaseDiverging`
-- `phaseWheel`
+- `phaseCyclicUniform`
 - `mixed`
 - `phase`
 
@@ -163,7 +163,7 @@ Mostly stylistic / presentation-first:
 
 ## Bottom Line
 
-If the goal is physical/mathematical insight (not just visual appeal), prioritize phase-aware algorithms (`phaseWheel`, `phaseDiverging`, `mixed`) because they encode the complex structure of `psi` directly, not only a styled remapping of density.
+If the goal is physical/mathematical insight (not just visual appeal), prioritize phase-aware algorithms (`phaseCyclicUniform`, `phaseDiverging`, `mixed`) because they encode the complex structure of `psi` directly, not only a styled remapping of density.
 
 ## Web-Researched Recommendations for an Educational Quantum Toolkit
 
@@ -175,14 +175,14 @@ The following additions are based on external visualization and scientific-color
 - Why: phase is periodic, so endpoints must match seamlessly; cyclic maps are recommended specifically for periodic data.
 - Educational value: clearer phase wraps, branch cuts, and phase vortices in superpositions.
 - Expected fluff level: **low**.
-- Recommendation: offer this as a replacement/upgrade path for HSV-like phase wheels.
+- Recommendation: use this as the direct replacement for HSV-like phase wheels.
 
 ### B) Domain Coloring for Wavefunctions (`domainColoringPsi`)
 
 - Encode:
   hue = `arg(psi)`,
   value/lightness = `log(|psi|)` or `log(|psi|^2)`,
-  optional modulus contour lines.
+- As option toggleable with configuration options for styling:  modulus contour lines
 - Why: domain coloring is explicitly designed to show complex phase and magnitude simultaneously.
 - Educational value: very high for superposition analysis, interference structure, and nodal interpretation.
 - Expected fluff level: **low-medium** (depends on contour styling).

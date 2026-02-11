@@ -31,7 +31,7 @@ export const emissionPreBlock = /* wgsl */ `
 const COLOR_ALG_PHASE: i32 = 3;
 const COLOR_ALG_MIXED: i32 = 4;
 const COLOR_ALG_BLACKBODY: i32 = 5;
-const COLOR_ALG_PHASE_WHEEL: i32 = 6;
+const COLOR_ALG_PHASE_CYCLIC_UNIFORM: i32 = 6;
 const COLOR_ALG_PHASE_DIVERGING: i32 = 7;
 
 // Phase influence on hue (0.0 = no phase color, 1.0 = full rainbow)
@@ -132,9 +132,11 @@ const ALGO_BRANCH: Record<number, string> = {
     col = blackbody(temp);`,
 
   6: /* wgsl */ `
-    // 6: Full complex phase wheel
+    // 6: Perceptually uniform cyclic phase map (phase-only)
     let phaseNorm = fract((phase + PI) / TAU);
-    col = hsl2rgb(phaseNorm, 0.9, 0.2 + 0.45 * normalized);`,
+    let hueAngle = phaseNorm * TAU;
+    let cyclicOklab = vec3f(0.72, 0.11 * cos(hueAngle), 0.11 * sin(hueAngle));
+    col = clamp(oklab2rgb(cyclicOklab), vec3f(0.0), vec3f(1.0));`,
 
   7: /* wgsl */ `
     // 7: Signed diverging phase map (Wigner-style sign encoding proxy)
@@ -155,7 +157,7 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   3: 'Phase',
   4: 'Mixed',
   5: 'Blackbody',
-  6: 'Phase Wheel',
+  6: 'Phase Cyclic Uniform',
   7: 'Phase Diverging',
 }
 
@@ -210,7 +212,7 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   }
   else if (algorithm == COLOR_ALG_MIXED) {${ALGO_BRANCH[4]}
   }
-  else if (algorithm == COLOR_ALG_PHASE_WHEEL) {${ALGO_BRANCH[6]}
+  else if (algorithm == COLOR_ALG_PHASE_CYCLIC_UNIFORM) {${ALGO_BRANCH[6]}
   }
   else if (algorithm == COLOR_ALG_PHASE_DIVERGING) {${ALGO_BRANCH[7]}
   }

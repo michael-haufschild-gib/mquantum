@@ -18,7 +18,7 @@
  * - lch: Perceptually uniform LCH/Oklab color space
  * - multiSource: Blend multiple value sources for complex coloring
  * - radial: Color based on 3D distance from origin (spherical gradient)
- * - phaseWheel: Full 2π complex phase hue wheel
+ * - phaseCyclicUniform: Perceptually uniform cyclic phase map for arg(ψ)
  * - phaseDiverging: Signed diverging palette (Re(ψ) sign proxy)
  */
 
@@ -28,7 +28,7 @@ export type ColorAlgorithm =
   | 'radial'
   | 'phase'
   | 'mixed'
-  | 'phaseWheel'
+  | 'phaseCyclicUniform'
   | 'phaseDiverging'
   | 'blackbody'
 
@@ -41,7 +41,7 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'radial' as const, label: 'Radial (from center)' },
   { value: 'phase' as const, label: 'Angular (XZ Rotation)' },
   { value: 'mixed' as const, label: 'Angular + Depth' },
-  { value: 'phaseWheel' as const, label: 'Complex Phase Wheel' },
+  { value: 'phaseCyclicUniform' as const, label: 'Phase Cyclic Uniform' },
   { value: 'phaseDiverging' as const, label: 'Signed Phase Diverging' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
 ] as const
@@ -56,7 +56,7 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   phase: 3,
   mixed: 4,
   blackbody: 5,
-  phaseWheel: 6,
+  phaseCyclicUniform: 6,
   phaseDiverging: 7,
 }
 

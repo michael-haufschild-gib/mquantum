@@ -414,7 +414,7 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
-  // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody, 6=PhaseWheel, 7=PhaseDiverging
+  // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody, 6=PhaseCyclicUniform, 7=PhaseDiverging
   const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7] as const
 
   for (const alg of allAlgorithms) {
@@ -458,7 +458,7 @@ describe('WGSL Color Algorithm Specialization', () => {
   })
 
   it('excludes Cosine module for non-cosine algorithms (3, 4, 5, 6, 7)', () => {
-    // 3=Phase(HSL), 4=Mixed(HSL), 5=Blackbody(none), 6=PhaseWheel(HSL), 7=PhaseDiverging(HSL)
+    // 3=Phase(HSL), 4=Mixed(HSL), 5=Blackbody(none), 6=PhaseCyclicUniform(Oklab), 7=PhaseDiverging(HSL)
     const nonCosineAlgorithms = [3, 4, 5, 6, 7] as const
     for (const alg of nonCosineAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
@@ -475,8 +475,8 @@ describe('WGSL Color Algorithm Specialization', () => {
   })
 
   it('excludes Oklab module for non-Oklab algorithms', () => {
-    // All except 0(LCH)
-    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 6, 7] as const
+    // All except 0 (LCH) and 6 (PhaseCyclicUniform)
+    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 7] as const
     for (const alg of nonOklabAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -508,17 +508,19 @@ describe('WGSL Color Algorithm Specialization', () => {
     }
   })
 
-  it('includes Oklab module only for algorithm 0 (LCH)', () => {
-    const { modules, wgsl } = composeSchroedingerShader({
-      dimension: 4,
-      temporal: false,
-      sss: false,
-      quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 0,
-    })
+  it('includes Oklab module for Oklab-based algorithms (0, 6)', () => {
+    for (const alg of [0, 6] as const) {
+      const { modules, wgsl } = composeSchroedingerShader({
+        dimension: 4,
+        temporal: false,
+        sss: false,
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: alg,
+      })
 
-    expect(modules).toContain('Color (Oklab)')
-    expect(wgsl).toContain('fn oklab2rgb(')
+      expect(modules).toContain('Color (Oklab)')
+      expect(wgsl).toContain('fn oklab2rgb(')
+    }
   })
 
   it('includes all color modules when colorAlgorithm is undefined', () => {

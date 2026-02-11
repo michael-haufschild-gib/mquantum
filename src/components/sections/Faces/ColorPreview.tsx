@@ -145,11 +145,15 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const lightness = 0.15 + 0.35 * t
           const saturation = 0.7 + 0.25 * t
           ;[r, g, b] = hslToRgb(hue, saturation, lightness)
-        } else if (colorAlgorithm === 'phaseWheel') {
-          // Complex phase wheel: full 2π phase mapped directly to hue.
-          const hue = t
-          const lightness = 0.2 + 0.45 * t
-          ;[r, g, b] = hslToRgb(hue, 0.9, lightness)
+        } else if (colorAlgorithm === 'phaseCyclicUniform') {
+          // Perceptually uniform cyclic phase map (phase-only, no density coupling).
+          const phaseNorm = ((t % 1) + 1) % 1
+          const angle = phaseNorm * Math.PI * 2
+          const L = 0.72
+          const C = 0.11
+          const a_oklab = C * Math.cos(angle)
+          const b_oklab = C * Math.sin(angle)
+          ;[r, g, b] = oklabToLinearSrgb(L, a_oklab, b_oklab)
         } else if (colorAlgorithm === 'phaseDiverging') {
           // Signed diverging map: negative phase sign -> blue, positive -> red, nodal lines -> neutral.
           const signCarrier = Math.cos(t * Math.PI * 2)
