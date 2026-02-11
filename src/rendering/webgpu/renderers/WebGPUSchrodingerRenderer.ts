@@ -12,6 +12,7 @@ import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import {
   composeSchroedingerShader,
   composeSchroedingerVertexShader,
+  composeSchroedingerVertexShader2D,
   type SchroedingerWGSLShaderConfig,
   type QuantumModeForShader,
 } from '../shaders/schroedinger/compose'
@@ -276,23 +277,29 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Temporal takes priority: isosurface+temporal uses quarter-res (no normal/depth buffer)
     const isIsosurface = config?.isosurface ?? false
     const isTemporal = config?.temporal ?? false
-    const outputs = isTemporal
+    const is2D = (config?.dimension ?? 3) === 2
+    const outputs = is2D
       ? [
-          // Temporal mode (volumetric or isosurface): quarter-res color + position for temporal accumulation
-          // No depth buffer needed - all targets are quarter-res, composited in environment pass
-          { resourceId: 'quarter-color', access: 'write' as const, binding: 0 },
-          { resourceId: 'quarter-position', access: 'write' as const, binding: 1 },
+          // 2D mode: only color output (no depth, no normal, no temporal)
+          { resourceId: 'object-color', access: 'write' as const, binding: 0 },
         ]
-      : isIsosurface
+      : isTemporal
         ? [
-            { resourceId: 'object-color', access: 'write' as const, binding: 0 },
-            { resourceId: 'normal-buffer', access: 'write' as const, binding: 1 },
-            { resourceId: 'depth-buffer', access: 'write' as const, binding: 2 },
+            // Temporal mode (volumetric or isosurface): quarter-res color + position for temporal accumulation
+            // No depth buffer needed - all targets are quarter-res, composited in environment pass
+            { resourceId: 'quarter-color', access: 'write' as const, binding: 0 },
+            { resourceId: 'quarter-position', access: 'write' as const, binding: 1 },
           ]
-        : [
-            { resourceId: 'object-color', access: 'write' as const, binding: 0 },
-            { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
-          ]
+        : isIsosurface
+          ? [
+              { resourceId: 'object-color', access: 'write' as const, binding: 0 },
+              { resourceId: 'normal-buffer', access: 'write' as const, binding: 1 },
+              { resourceId: 'depth-buffer', access: 'write' as const, binding: 2 },
+            ]
+          : [
+              { resourceId: 'object-color', access: 'write' as const, binding: 0 },
+              { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
+            ]
 
     super({
       id: 'schroedinger',
@@ -313,7 +320,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ...config,
     }
 
-    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? true
+    // Force-disable 3D-only features for 2D mode
+    if (is2D) {
+      this.rendererConfig.temporal = false
+      this.rendererConfig.eigenfunctionCacheEnabled = false
+    }
+
+    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? (!is2D)
 
     // Density grid raymarching: only for 3D hydrogen VOLUMETRIC mode.
     // For hydrogen ND (dim > 3), the 64^3 grid is too coarse to capture the oscillatory
@@ -373,27 +386,32 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastPbrVersion = -1
     this.lastSchrodingerPbrVersion = -1
 
+    const pipelineIs2D = (this.rendererConfig.dimension ?? 3) === 2
+
     // Density grid compute pass provides uncertainty boundary threshold extraction.
-    // Always create it (cheap when idle — only runs when uncertainty boundary is enabled).
+    // Skip for 2D mode (no volumetric raymarching).
     this.densityGridPass?.dispose()
     this.densityGridPass = null
     this.densityGridInitialized = false
 
-    this.densityGridPass = new DensityGridComputePass({
-      dimension: this.rendererConfig.dimension ?? 3,
-      quantumMode: this.rendererConfig.quantumMode,
-      termCount: this.rendererConfig.termCount,
-      gridSize: 64,
-    })
-    await this.densityGridPass.initialize(ctx)
-    this.densityGridInitialized = true
+    if (!pipelineIs2D) {
+      this.densityGridPass = new DensityGridComputePass({
+        dimension: this.rendererConfig.dimension ?? 3,
+        quantumMode: this.rendererConfig.quantumMode,
+        termCount: this.rendererConfig.termCount,
+        gridSize: 64,
+      })
+      await this.densityGridPass.initialize(ctx)
+      this.densityGridInitialized = true
+    }
 
     // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
+    // Skip for 2D mode (direct evaluation is fast enough).
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null
     this.eigenCacheInitialized = false
 
-    if (this.shaderConfig.useEigenfunctionCache) {
+    if (!pipelineIs2D && this.shaderConfig.useEigenfunctionCache) {
       this.eigenCachePass = new EigenfunctionCacheComputePass({
         dimension: this.rendererConfig.dimension ?? 3,
         isHydrogenND: this.rendererConfig.quantumMode === 'hydrogenND',
@@ -410,7 +428,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Compose shaders
     const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
-    const vertexShader = composeSchroedingerVertexShader()
+    const vertexShader = pipelineIs2D
+      ? composeSchroedingerVertexShader2D()
+      : composeSchroedingerVertexShader()
 
     // Create shader modules
     const vertexModule = this.createShaderModule(device, vertexShader, 'schroedinger-vertex')
@@ -491,86 +511,109 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       vertex: {
         module: vertexModule,
         entryPoint: 'main',
-        buffers: [
-          {
-            arrayStride: 12, // 3 floats position
-            attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' as const }],
-          },
-        ],
+        buffers: pipelineIs2D
+          ? [] // 2D fullscreen triangle uses vertex_index, no vertex buffer
+          : [
+              {
+                arrayStride: 12, // 3 floats position
+                attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' as const }],
+              },
+            ],
       },
       fragment: {
         module: fragmentModule,
         entryPoint: 'fragmentMain',
         // Target configuration depends on mode:
+        // - 2D: single target with alpha blend (direct pixel evaluation)
         // - Temporal (volumetric or isosurface): MRT (color + position), with alpha blend on color
         // - Isosurface (non-temporal): MRT (color + normal), no blend
         // - Standard volumetric: single target with alpha blend
-        targets: this.rendererConfig.temporal
+        targets: pipelineIs2D
           ? [
               {
-                // Temporal color output (volumetric: alpha blend, isosurface: no blend)
+                // 2D mode: single color output with alpha blend
                 format: 'rgba16float' as GPUTextureFormat,
-                ...(this.rendererConfig.isosurface
-                  ? {}
-                  : {
-                      blend: {
-                        color: {
-                          srcFactor: 'src-alpha' as const,
-                          dstFactor: 'one-minus-src-alpha' as const,
-                          operation: 'add' as const,
-                        },
-                        alpha: {
-                          srcFactor: 'one' as const,
-                          dstFactor: 'one-minus-src-alpha' as const,
-                          operation: 'add' as const,
-                        },
-                      },
-                    }),
-              },
-              {
-                // Position buffer (rgba32float for world positions) - no blend
-                format: 'rgba32float' as GPUTextureFormat,
-              },
-            ]
-          : this.rendererConfig.isosurface
-            ? [
-                { format: 'rgba16float' as GPUTextureFormat }, // Color buffer (no blend for solid surface)
-                { format: 'rgba16float' as GPUTextureFormat }, // Normal buffer
-              ]
-            : [
-                {
-                  // Standard volumetric mode needs alpha blending
-                  format: 'rgba16float' as GPUTextureFormat,
-                  blend: {
-                    color: {
-                      srcFactor: 'src-alpha' as const,
-                      dstFactor: 'one-minus-src-alpha' as const,
-                      operation: 'add' as const,
-                    },
-                    alpha: {
-                      srcFactor: 'one' as const,
-                      dstFactor: 'one-minus-src-alpha' as const,
-                      operation: 'add' as const,
-                    },
+                blend: {
+                  color: {
+                    srcFactor: 'src-alpha' as const,
+                    dstFactor: 'one-minus-src-alpha' as const,
+                    operation: 'add' as const,
+                  },
+                  alpha: {
+                    srcFactor: 'one' as const,
+                    dstFactor: 'one-minus-src-alpha' as const,
+                    operation: 'add' as const,
                   },
                 },
-              ],
+              },
+            ]
+          : this.rendererConfig.temporal
+            ? [
+                {
+                  // Temporal color output (volumetric: alpha blend, isosurface: no blend)
+                  format: 'rgba16float' as GPUTextureFormat,
+                  ...(this.rendererConfig.isosurface
+                    ? {}
+                    : {
+                        blend: {
+                          color: {
+                            srcFactor: 'src-alpha' as const,
+                            dstFactor: 'one-minus-src-alpha' as const,
+                            operation: 'add' as const,
+                          },
+                          alpha: {
+                            srcFactor: 'one' as const,
+                            dstFactor: 'one-minus-src-alpha' as const,
+                            operation: 'add' as const,
+                          },
+                        },
+                      }),
+                },
+                {
+                  // Position buffer (rgba32float for world positions) - no blend
+                  format: 'rgba32float' as GPUTextureFormat,
+                },
+              ]
+            : this.rendererConfig.isosurface
+              ? [
+                  { format: 'rgba16float' as GPUTextureFormat }, // Color buffer (no blend for solid surface)
+                  { format: 'rgba16float' as GPUTextureFormat }, // Normal buffer
+                ]
+              : [
+                  {
+                    // Standard volumetric mode needs alpha blending
+                    format: 'rgba16float' as GPUTextureFormat,
+                    blend: {
+                      color: {
+                        srcFactor: 'src-alpha' as const,
+                        dstFactor: 'one-minus-src-alpha' as const,
+                        operation: 'add' as const,
+                      },
+                      alpha: {
+                        srcFactor: 'one' as const,
+                        dstFactor: 'one-minus-src-alpha' as const,
+                        operation: 'add' as const,
+                      },
+                    },
+                  },
+                ],
       },
       primitive: {
         topology: 'triangle-list' as const,
-        // CRITICAL: Use 'front' to match THREE.BackSide in WebGL
-        // BackSide = render back faces = cull front faces
-        cullMode: 'front' as const,
+        // 2D: no culling (fullscreen triangle)
+        // 3D: 'front' to match THREE.BackSide (render back faces = cull front faces)
+        cullMode: pipelineIs2D ? ('none' as const) : ('front' as const),
       },
-      // Depth state: only for modes that use depth buffer (not temporal)
-      // Temporal mode renders to quarter-res without depth testing
-      depthStencil: this.rendererConfig.temporal
+      // Depth state: 2D has no depth buffer, temporal also has none
+      depthStencil: pipelineIs2D
         ? undefined
-        : {
-            format: 'depth24plus' as GPUTextureFormat,
-            depthWriteEnabled: true,
-            depthCompare: 'less' as GPUCompareFunction,
-          },
+        : this.rendererConfig.temporal
+          ? undefined
+          : {
+              format: 'depth24plus' as GPUTextureFormat,
+              depthWriteEnabled: true,
+              depthCompare: 'less' as GPUCompareFunction,
+            },
     })
 
     // Create uniform buffers
@@ -646,8 +689,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       entries: objectBindGroupEntries2,
     })
 
-    // Create bounding geometry (sphere for volume)
-    this.createBoundingGeometry(device)
+    // Create bounding geometry (sphere for volume) — not needed for 2D fullscreen triangle
+    if (!pipelineIs2D) {
+      this.createBoundingGeometry(device)
+    }
   }
 
   private createBoundingGeometry(device: GPUDevice): void {
@@ -753,10 +798,38 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Model matrices for raymarching coordinate space conversion
-    // Read transform from store for position/scale
-    const transform = ctx.frame?.stores?.['transform'] as any
-    const scale = transform?.uniformScale ?? 1.0
-    const position = transform?.position ?? [0, 0, 0]
+    const is2D = (this.rendererConfig.dimension ?? 3) === 2
+    let scale: number
+    let posX: number
+    let posY: number
+    let posZ: number
+
+    if (is2D) {
+      // 2D mode: derive model matrix from camera state (pan + zoom)
+      // Camera target XY = pan offset, camera distance = zoom level
+      const camPos = camera.position ?? { x: 0, y: 0, z: 8 }
+      const camTarget = camera.target ?? { x: 0, y: 0, z: 0 }
+      // Distance from camera to target (default = 8)
+      const dx = camPos.x - (camTarget.x ?? 0)
+      const dy = camPos.y - (camTarget.y ?? 0)
+      const dz = camPos.z - (camTarget.z ?? 0)
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      const defaultDistance = 8.0
+      // Zoom: farther = see more (scale up), closer = see less (scale down)
+      scale = distance > 0 ? distance / defaultDistance : 1.0
+      // Pan: camera target XY determines view center
+      posX = camTarget.x ?? 0
+      posY = camTarget.y ?? 0
+      posZ = 0
+    } else {
+      // 3D mode: read transform from store for position/scale
+      const transform = ctx.frame?.stores?.['transform'] as any
+      scale = transform?.uniformScale ?? 1.0
+      const position = transform?.position ?? [0, 0, 0]
+      posX = position[0]
+      posY = position[1]
+      posZ = position[2]
+    }
 
     // Build model matrix: translation * scale
     // Column-major order for WebGPU (same as Three.js)
@@ -773,9 +846,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[89] = 0
     data[90] = scale
     data[91] = 0
-    data[92] = position[0]
-    data[93] = position[1]
-    data[94] = position[2]
+    data[92] = posX
+    data[93] = posY
+    data[94] = posZ
     data[95] = 1.0
 
     // inverseModelMatrix (offset 96): inverse of translation * scale
@@ -793,9 +866,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[105] = 0
     data[106] = invScale
     data[107] = 0
-    data[108] = -position[0] * invScale
-    data[109] = -position[1] * invScale
-    data[110] = -position[2] * invScale
+    data[108] = -posX * invScale
+    data[109] = -posY * invScale
+    data[110] = -posZ * invScale
     data[111] = 1.0
 
     // Camera position at offset 112 (after 7 matrices)
@@ -1866,15 +1939,20 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   execute(ctx: WebGPURenderContext): void {
+    const is2D = (this.rendererConfig.dimension ?? 3) === 2
+
+    // Guard: 2D mode doesn't use vertex/index buffers
     if (
       !this.device ||
       !this.renderPipeline ||
-      !this.vertexBuffer ||
-      !this.indexBuffer ||
       !this.cameraBindGroup ||
       !this.lightingBindGroup ||
       !this.objectBindGroup
     ) {
+      return
+    }
+    // 3D mode additionally requires vertex/index buffers
+    if (!is2D && (!this.vertexBuffer || !this.indexBuffer)) {
       return
     }
 
@@ -1974,6 +2052,51 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       cachePass.execute(ctx)
     }
 
+    // ============================================
+    // RENDER TARGET SETUP
+    // ============================================
+    if (is2D) {
+      // 2D mode: only color output, no depth, no MRT
+      const colorView = ctx.getWriteTarget('object-color')
+      if (!colorView) {
+        console.warn('[WebGPU Schrödinger] Missing color render target for 2D')
+        return
+      }
+
+      const passEncoder = ctx.beginRenderPass({
+        label: 'schroedinger-render-2d',
+        colorAttachments: [
+          {
+            view: colorView,
+            loadOp: 'clear' as const,
+            storeOp: 'store' as const,
+            clearValue: this.clearValueTransparent,
+          },
+        ],
+      })
+
+      passEncoder.setPipeline(this.renderPipeline)
+      passEncoder.setBindGroup(0, this.cameraBindGroup)
+      passEncoder.setBindGroup(1, this.lightingBindGroup)
+      passEncoder.setBindGroup(2, this.objectBindGroup)
+
+      // Fullscreen triangle — 3 vertices from vertex_index, no vertex/index buffers
+      passEncoder.draw(3)
+      passEncoder.end()
+
+      this.lastDrawStats = {
+        calls: 1,
+        triangles: 1,
+        vertices: 3,
+        lines: 0,
+        points: 0,
+      }
+      return
+    }
+
+    // ============================================
+    // 3D RENDER PATH (existing logic)
+    // ============================================
     // Get render targets based on mode:
     // - Temporal (volumetric or isosurface): quarter-color + quarter-position (no depth)
     // - Isosurface (non-temporal): object-color + normal-buffer + depth-buffer
@@ -2073,8 +2196,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     passEncoder.setBindGroup(1, this.lightingBindGroup) // Combined
     passEncoder.setBindGroup(2, this.objectBindGroup)
 
-    passEncoder.setVertexBuffer(0, this.vertexBuffer)
-    passEncoder.setIndexBuffer(this.indexBuffer, 'uint16' as const)
+    passEncoder.setVertexBuffer(0, this.vertexBuffer!)
+    passEncoder.setIndexBuffer(this.indexBuffer!, 'uint16' as const)
     passEncoder.drawIndexed(this.indexCount)
 
     passEncoder.end()

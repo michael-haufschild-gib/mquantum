@@ -57,7 +57,7 @@ fn gradientNoise(p: vec3f) -> f32 {
  * @returns WGSL mapPosToND function for the specified dimension
  */
 export function generateMapPosToND(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
 
   // Generate unrolled coordinate assignments using getBasisComponent helper
   // The basis uniform is globally available from the bind group

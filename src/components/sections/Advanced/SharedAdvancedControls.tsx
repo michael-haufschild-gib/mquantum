@@ -4,11 +4,13 @@ import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 
 export const SharedAdvancedControls: React.FC = React.memo(() => {
+  const dimension = useGeometryStore((state) => state.dimension)
   const isoEnabled = useExtendedObjectStore(
     (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
   )
@@ -46,8 +48,8 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-4 mb-4 pb-4">
-      {/* Subsurface Scattering (volumetric only) */}
-      {!isoEnabled && (
+      {/* Subsurface Scattering (volumetric only, 3D+) */}
+      {!isoEnabled && dimension > 2 && (
       <ControlGroup
         title="Subsurface Scattering"
         collapsible

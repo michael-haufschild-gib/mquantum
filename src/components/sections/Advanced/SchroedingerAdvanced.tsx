@@ -2,10 +2,12 @@ import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
+  const dimension = useGeometryStore((state) => state.dimension)
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
     setDensityGain: state.setSchroedingerDensityGain,
@@ -87,7 +89,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-gain"
         />
-        {!config.isoEnabled && (
+        {!config.isoEnabled && dimension > 2 && (
           <Slider
             label="Powder Effect"
             min={0.0}
@@ -99,7 +101,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             data-testid="schroedinger-powder-scale"
           />
         )}
-        {!config.isoEnabled && (
+        {!config.isoEnabled && dimension > 2 && (
           <Slider
             label="Anisotropy (Phase)"
             min={-0.9}

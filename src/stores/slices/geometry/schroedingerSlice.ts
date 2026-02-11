@@ -631,9 +631,30 @@ export const createSchroedingerSlice: StateCreator<
       // product of Hermite polynomials at slice positions.
       // Higher dimensions need more gain to remain visible.
       // Base gain of 2.0 works well for 3D-4D, scale up for higher.
-      const baseDensityGain = 2.0
+      // 2D needs less gain since there's no volumetric integration loss.
+      const baseDensityGain = dimension === 2 ? 1.0 : 2.0
       const dimensionBoost = dimension > 4 ? 1.0 + (dimension - 4) * 0.4 : 1.0
       const densityGain = Math.min(baseDensityGain * dimensionBoost, 5.0) // Clamp to max
+
+      // For 2D hydrogen mode: auto-adjust quantum numbers to ensure visibility.
+      // The 2D view is a z=0 cross-section, so orbitals with cos(θ) dependence
+      // (e.g. pz: l=1,m=0) are exactly zero at z=0. Default to l=0 (s orbital)
+      // which is spherically symmetric and always visible.
+      const hydrogenUpdate: Record<string, number> = {}
+      if (dimension === 2) {
+        const current = get().schroedinger
+        if (current.quantumMode === 'hydrogenND') {
+          const currentL = current.azimuthalQuantumNumber
+          const currentM = current.magneticQuantumNumber
+          // If current orbital would be invisible at z=0 (m=0 with l>0 → cos(θ)^l factor)
+          // Specifically: Y_l^0 ∝ P_l(cosθ), and P_l(0) = 0 for odd l.
+          // For even l>0 with m=0, there IS some density at θ=π/2 but it can be weak.
+          // Safest fix: if m=0 and l>0, switch to m=1 (real orbital → px/dxy etc.)
+          if (currentM === 0 && currentL > 0) {
+            hydrogenUpdate.magneticQuantumNumber = 1
+          }
+        }
+      }
 
       setWithVersion((state) => ({
         schroedinger: {
@@ -644,6 +665,7 @@ export const createSchroedingerSlice: StateCreator<
           colorMode,
           extent,
           densityGain,
+          ...hydrogenUpdate,
         },
       }))
     },

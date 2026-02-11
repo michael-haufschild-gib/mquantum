@@ -51,11 +51,17 @@ import {
   temporalMRTOutputBlock,
 } from './main.wgsl'
 
+// 2D-specific blocks
+import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
+import { nodalLines2DBlock, nodalLines2DStubBlock } from './volume/nodalLines2D.wgsl'
+import { isolines2DBlock, isolines2DStubBlock } from './volume/isolines2D.wgsl'
+
 // Quantum math blocks
 import { complexMathBlock } from './quantum/complex.wgsl'
 import { hermiteBlock } from './quantum/hermite.wgsl'
 import { ho1dBlock } from './quantum/ho1d.wgsl'
 import {
+  hoND2dBlock,
   hoND3dBlock,
   hoND4dBlock,
   hoND5dBlock,
@@ -192,8 +198,12 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const features: string[] = []
 
   // Compile-time dimension
-  const actualDim = Math.min(Math.max(dimension, 3), 11)
+  // For HO: actualDim matches dimension (2-11). For hydrogen: always at least 3.
+  const is2D = dimension === 2
   const isHydrogenFamily = quantumMode === 'hydrogenND'
+  const actualDim = isHydrogenFamily
+    ? Math.min(Math.max(dimension, 3), 11)
+    : Math.min(Math.max(dimension, 2), 11)
   const includeHydrogen = isHydrogenFamily
   const includeHydrogenND = isHydrogenFamily
   const includeHarmonic = !isHydrogenFamily
@@ -214,6 +224,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Add dimension define
   defines.push(`const DIMENSION: i32 = ${dimension};`)
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
+  defines.push(`const IS_2D: bool = ${is2D};`)
   features.push(`${dimension}D Quantum`)
 
   // Add temporal define (for volumetric and isosurface modes)
@@ -270,13 +281,17 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     features.push('Harmonic Oscillator')
   }
 
-  if (isosurface) {
+  if (is2D) {
+    features.push(isosurface ? '2D Isolines Mode' : '2D Heatmap Mode')
+  } else if (isosurface) {
     features.push('Isosurface Mode')
   } else {
     features.push('Volumetric Mode')
   }
 
-  features.push('Beer-Lambert')
+  if (!is2D) {
+    features.push('Beer-Lambert')
+  }
 
   defines.push(`const FEATURE_NODAL: bool = ${nodal};`)
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
@@ -303,17 +318,23 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
 
   // Select main block based on mode
-  // Temporal modes output MRT (color + world position)
-  const selectedMainBlock = isosurface
-    ? enableTemporal
-      ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
-      : generateMainBlockIsosurface({ useDensityGrid })
-    : enableTemporal
-      ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
-      : generateMainBlockVolumetric({ useDensityGrid })
+  // 2D mode: direct evaluation (no raymarching). Isolines = 2D isosurface equivalent.
+  // 3D+ modes: temporal modes output MRT (color + world position)
+  const selectedMainBlock = is2D
+    ? isosurface
+      ? generateMainBlock2DIsolines()
+      : generateMainBlock2D()
+    : isosurface
+      ? enableTemporal
+        ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
+        : generateMainBlockIsosurface({ useDensityGrid })
+      : enableTemporal
+        ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
+        : generateMainBlockVolumetric({ useDensityGrid })
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
+    2: hoND2dBlock,
     3: hoND3dBlock,
     4: hoND4dBlock,
     5: hoND5dBlock,
@@ -347,10 +368,17 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   // Build blocks array in dependency order
   const blocks = [
-    // Vertex inputs
+    // Vertex inputs (different struct for 2D vs 3D)
     {
       name: 'Vertex Inputs',
-      content: /* wgsl */ `
+      content: is2D
+        ? /* wgsl */ `
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4f,
+  @location(0) uv: vec2f,
+}
+`
+        : /* wgsl */ `
 struct VertexOutput {
   @builtin(position) clipPosition: vec4f,
   @location(0) vPosition: vec3f,
@@ -490,22 +518,26 @@ struct VertexOutput {
     { name: 'Color (Oklab)', content: oklabBlock, condition: needsOklab },
 
     // ===== LIGHTING (GGX PBR only needed for isosurface — volumetric uses Lambertian diffuse) =====
-    { name: 'GGX PBR', content: ggxBlock, condition: isosurface },
-    { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface },
+    // Skipped in 2D mode (no volumetric lighting, ambient-only)
+    { name: 'GGX PBR', content: ggxBlock, condition: isosurface && !is2D },
+    { name: 'Multi-Light System', content: multiLightBlock, condition: isosurface && !is2D },
 
     // ===== VOLUME RENDERING =====
-    { name: 'Beer-Lambert Absorption', content: absorptionBlock },
+    // In 2D mode, only emission color blocks are needed (for computeBaseColor).
+    // Volume integration, absorption, raymarching, cross-section are skipped.
+    { name: 'Beer-Lambert Absorption', content: absorptionBlock, condition: !is2D },
     { name: 'Volume Emission (Pre)', content: emissionPreBlock },
     { name: 'Volume Emission (Color)', content: generateComputeBaseColor(colorAlgorithm) },
-    { name: 'Volume Emission (Post)', content: emissionPostBlock },
-    { name: 'Cross-Section Slice', content: crossSectionBlock },
-    { name: 'Radial Probability Overlay', content: includeHydrogen ? radialProbabilityBlock : radialProbabilityStubBlock },
-    { name: 'Volume Gradient', content: volumeGradientBlock },
+    { name: 'Volume Emission (Post)', content: emissionPostBlock, condition: !is2D },
+    { name: 'Cross-Section Slice', content: crossSectionBlock, condition: !is2D },
+    { name: 'Radial Probability Overlay', content: includeHydrogen && !is2D ? radialProbabilityBlock : radialProbabilityStubBlock, condition: !is2D },
+    { name: 'Volume Gradient', content: volumeGradientBlock, condition: !is2D },
     // Analytical gradient from eigenfunction cache (replaces tetrahedral in integration loop)
     // Always included when cache is present (WGSL requires symbol resolution even in dead branches).
     // Only *called* when USE_ANALYTICAL_GRADIENT is true (pure HO mode).
     {
       name: 'Analytical Gradient',
+      condition: !is2D,
       content: useCache
         ? generateAnalyticalGradientBlock(actualDim, termCount)
         : [
@@ -519,6 +551,7 @@ struct VertexOutput {
     // Density grid sampling (texture lookup for grid-based raymarching)
     {
       name: 'Density Grid Sampling',
+      condition: !is2D,
       content: useDensityGrid
         ? densityGridSamplingBlock
         : [
@@ -528,10 +561,11 @@ struct VertexOutput {
             'fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
           ].join('\n'),
     },
-    { name: 'Volume Integration', content: volumeIntegrationBlock },
+    { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !is2D },
     // Grid-based raymarching (uses density grid texture instead of inline evaluation)
     {
       name: 'Volume Raymarch Grid',
+      condition: !is2D,
       content: useDensityGrid
         ? volumeRaymarchGridBlock
         : [
@@ -540,28 +574,32 @@ struct VertexOutput {
           ].join('\n'),
     },
 
+    // ===== 2D-SPECIFIC BLOCKS =====
+    { name: '2D Nodal Lines', content: is2D ? nodalLines2DBlock : nodalLines2DStubBlock, condition: is2D || nodal },
+    { name: '2D Isolines', content: is2D ? isolines2DBlock : isolines2DStubBlock, condition: is2D },
+
     // ===== GEOMETRY =====
-    { name: 'Sphere Intersection', content: sphereIntersectBlock },
+    { name: 'Sphere Intersection', content: sphereIntersectBlock, condition: !is2D },
 
     // ===== FEATURES =====
     {
       name: 'Temporal Accumulation',
       content: temporalBlock,
-      condition: enableTemporal,
+      condition: enableTemporal && !is2D,
     },
 
     // MRT output struct for isosurface mode (outputs color + normal for post-processing)
     {
       name: 'Fragment Output (Isosurface)',
       content: mrtOutputBlock,
-      condition: isosurface && !enableTemporal,
+      condition: isosurface && !enableTemporal && !is2D,
     },
 
     // MRT output struct for temporal mode (outputs color + world position for reprojection)
     {
       name: 'Fragment Output (Temporal)',
       content: temporalMRTOutputBlock,
-      condition: enableTemporal,
+      condition: enableTemporal && !is2D,
     },
 
     // ===== MAIN SHADER =====
@@ -628,6 +666,66 @@ fn main(input: VertexInput) -> VertexOutput {
 
   // Clip position
   output.clipPosition = camera.viewProjectionMatrix * vec4f(worldPos, 1.0);
+
+  return output;
+}
+`
+}
+
+/**
+ * Create 2D vertex shader for Schrödinger rendering.
+ * Fullscreen triangle using vertex_index — no vertex buffer needed.
+ *
+ * @returns WGSL vertex shader code for 2D fullscreen triangle
+ */
+export function composeSchroedingerVertexShader2D(): string {
+  return /* wgsl */ `
+// Schrödinger 2D Vertex Shader
+// Fullscreen triangle — no vertex buffer input
+
+struct CameraUniforms {
+  viewMatrix: mat4x4f,
+  projectionMatrix: mat4x4f,
+  viewProjectionMatrix: mat4x4f,
+  inverseViewMatrix: mat4x4f,
+  inverseProjectionMatrix: mat4x4f,
+  modelMatrix: mat4x4f,
+  inverseModelMatrix: mat4x4f,
+  cameraPosition: vec3f,
+  cameraNear: f32,
+  cameraFar: f32,
+  fov: f32,
+  resolution: vec2f,
+  aspectRatio: f32,
+  time: f32,
+  deltaTime: f32,
+  frameNumber: u32,
+  bayerOffset: vec2f,
+  _padding: vec2f,
+}
+
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+
+struct VertexOutput {
+  @builtin(position) clipPosition: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@vertex
+fn main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+  var output: VertexOutput;
+
+  // Fullscreen triangle: 3 vertices covering clip space [-1,1]
+  // Vertex 0: (-1, -1) → uv (0, 1)
+  // Vertex 1: ( 3, -1) → uv (2, 1)
+  // Vertex 2: (-1,  3) → uv (0, -1)
+  // The triangle extends beyond clip space; hardware clips to viewport.
+  let x = f32(i32(vertexIndex & 1u)) * 4.0 - 1.0;
+  let y = f32(i32(vertexIndex >> 1u)) * 4.0 - 1.0;
+
+  output.clipPosition = vec4f(x, y, 0.0, 1.0);
+  // UV: map clip [-1,1] to [0,1], Y-flipped for screen-space top-down
+  output.uv = vec2f(x * 0.5 + 0.5, 1.0 - (y * 0.5 + 0.5));
 
   return output;
 }

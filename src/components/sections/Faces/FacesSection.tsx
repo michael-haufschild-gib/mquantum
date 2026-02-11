@@ -17,6 +17,7 @@ import { ToggleButton } from '@/components/ui/ToggleButton'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import { useLightingStore, type LightingSlice } from '@/stores/lightingStore'
 import { usePBRStore, type PBRSlice } from '@/stores/pbrStore'
 import React, { useCallback, useMemo } from 'react'
@@ -54,6 +55,7 @@ type FacesTabId = 'colors' | 'material'
 
 export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOpen = false }) => {
   const [activeTab, setActiveTab] = React.useState<FacesTabId>('colors')
+  const dimension = useGeometryStore((state) => state.dimension)
 
   // Isosurface mode controls (drives material tab availability and rendering mode)
   const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
@@ -123,8 +125,8 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     setActiveTab(id as FacesTabId)
   }, [])
 
-  // Material tab only available in isosurface mode (PBR has no effect on volumetric clouds)
-  const showMaterialTab = isoEnabled
+  // Material tab only available in isosurface mode and 3D+ (PBR has no effect on volumetric clouds or 2D)
+  const showMaterialTab = isoEnabled && dimension > 2
 
   // Reset to colors tab if material tab disappears while selected
   React.useEffect(() => {
@@ -196,6 +198,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   return (
     <Section title="Surface" defaultOpen={defaultOpen} data-testid="section-faces">
       <div className="transition-opacity duration-300">
+        {dimension > 2 && (
         <div className="mb-4 space-y-2 border-b border-border-subtle pb-4">
           <div className="flex items-center justify-between">
             <label className="text-xs text-text-secondary">Isosurface Mode</label>
@@ -227,6 +230,7 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
               : 'Volumetric cloud visualization'}
           </p>
         </div>
+        )}
 
         <Tabs
           tabs={tabs}

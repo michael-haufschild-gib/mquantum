@@ -49,6 +49,7 @@ export interface SchroedingerCrossSectionSectionProps {
 export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionSectionProps> =
   React.memo(({ defaultOpen = true }) => {
     const objectType = useGeometryStore((state) => state.objectType)
+    const dimension = useGeometryStore((state) => state.dimension)
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
       config: state.schroedinger,
       setCrossSectionEnabled: state.setSchroedingerCrossSectionEnabled,
@@ -91,6 +92,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
     if (objectType !== 'schroedinger') {
       return null
     }
+    if (dimension <= 2) return null
 
     const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 

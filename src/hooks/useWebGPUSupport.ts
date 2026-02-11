@@ -39,15 +39,6 @@ function isWebGPUInBrowser(): boolean {
   return typeof navigator !== 'undefined' && 'gpu' in navigator
 }
 
-interface AdapterInfoWithFallback extends Partial<GPUAdapterInfo> {
-  isFallbackAdapter?: boolean
-}
-
-interface AdapterWithFallbackHints extends GPUAdapter {
-  isFallbackAdapter?: boolean
-  info?: AdapterInfoWithFallback
-}
-
 interface AdapterModeDetectionResult {
   isFallbackAdapter?: boolean
   adapterMode: WebGPUAdapterMode
@@ -61,12 +52,14 @@ interface AdapterModeDetectionResult {
  * 1) Explicit fallback flag (adapter or adapter.info)
  * 2) Heuristic estimate from adapter metadata tokens
  */
-function detectAdapterMode(adapter: AdapterWithFallbackHints): AdapterModeDetectionResult {
+function detectAdapterMode(adapter: GPUAdapter): AdapterModeDetectionResult {
   const adapterInfo = adapter.info
 
+  // Check both adapter-level (legacy) and info-level (current spec) flags
+  const legacyFlag = (adapter as unknown as Record<string, unknown>).isFallbackAdapter
   const explicitFallbackFlag =
-    typeof adapter.isFallbackAdapter === 'boolean'
-      ? adapter.isFallbackAdapter
+    typeof legacyFlag === 'boolean'
+      ? legacyFlag
       : typeof adapterInfo?.isFallbackAdapter === 'boolean'
         ? adapterInfo.isFallbackAdapter
         : undefined
@@ -126,9 +119,8 @@ async function detectWebGPUCapabilities(): Promise<WebGPUCapabilityInfo> {
 
     // Get adapter info - use synchronous info property (modern WebGPU)
     // Cast to access info property which may not be in all type definitions
-    const adapterWithHints = adapter as AdapterWithFallbackHints
-    const adapterInfo = adapterWithHints.info
-    const adapterModeResult = detectAdapterMode(adapterWithHints)
+    const adapterInfo = adapter.info
+    const adapterModeResult = detectAdapterMode(adapter)
 
     // Try to create a device to verify full support
     try {

@@ -50,7 +50,7 @@ function scheduleTransitionComplete(): void {
 }
 
 /** Minimum supported dimension */
-export const MIN_DIMENSION = 3
+export const MIN_DIMENSION = 2
 
 /** Maximum supported dimension */
 export const MAX_DIMENSION = 11

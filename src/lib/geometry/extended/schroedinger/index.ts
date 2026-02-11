@@ -15,13 +15,13 @@ import type { SchroedingerConfig } from '../types'
  * Returns empty geometry that signals to UnifiedRenderer to use SchroedingerMesh.
  * All fractal computation happens on the GPU via raymarching shaders.
  *
- * @param dimension - Dimensionality (3-11)
+ * @param dimension - Dimensionality (2-11)
  * @param _config - Configuration (used by shader, not CPU)
  * @returns Minimal NdGeometry for raymarching
  */
 export function generateSchroedinger(dimension: number, _config: SchroedingerConfig): NdGeometry {
-  if (dimension < 3) {
-    throw new Error(`Schroedinger requires dimension >= 3, got ${dimension}`)
+  if (dimension < 2) {
+    throw new Error(`Schroedinger requires dimension >= 2, got ${dimension}`)
   }
 
   const name = dimension === 3 ? 'Schroedinger' : `${dimension}D Schroedinger`

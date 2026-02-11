@@ -70,8 +70,10 @@ describe('Object Type Registry', () => {
     })
 
     it('isRaymarchingFractal checks dimension', () => {
+      expect(isRaymarchingFractal('schroedinger', 2)).toBe(true)
       expect(isRaymarchingFractal('schroedinger', 3)).toBe(true)
       expect(isRaymarchingFractal('schroedinger', 4)).toBe(true)
+      expect(isRaymarchingFractal('schroedinger', 1)).toBe(false)
     })
 
     it('returns correct face detection method', () => {
@@ -79,15 +81,16 @@ describe('Object Type Registry', () => {
     })
 
     it('determineRenderMode returns correct mode', () => {
+      expect(determineRenderMode('schroedinger', 2)).toBe('raymarch-schroedinger')
       expect(determineRenderMode('schroedinger', 4)).toBe('raymarch-schroedinger')
-      expect(determineRenderMode('schroedinger', 2)).toBe('none')
+      expect(determineRenderMode('schroedinger', 1)).toBe('none')
     })
   })
 
   describe('Dimension Constraints', () => {
     it('returns dimension constraints for schroedinger', () => {
       const constraints = getDimensionConstraints('schroedinger')
-      expect(constraints?.min).toBe(3)
+      expect(constraints?.min).toBe(2)
       expect(constraints?.max).toBe(11)
       expect(constraints?.recommended).toBe(4)
     })

@@ -27,7 +27,7 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
       category: 'fractal',
 
       dimensions: {
-        min: 3,
+        min: 2,
         max: 11,
         recommended: 4,
         recommendedReason: '4D provides rich quantum interference patterns with good performance',

@@ -4,6 +4,7 @@
  */
 
 import { Switch } from '@/components/ui/Switch'
+import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -20,6 +21,9 @@ export const TemporalReprojectionControls: React.FC = () => {
       setEnabled: s.setTemporalReprojectionEnabled,
     }))
   )
+  const dimension = useGeometryStore((s) => s.dimension)
+
+  if (dimension <= 2) return null
 
   return (
     <div className="space-y-2">

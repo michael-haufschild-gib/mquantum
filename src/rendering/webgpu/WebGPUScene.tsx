@@ -322,6 +322,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const isDraggingRef = useRef(false)
   const lastMouseRef = useRef({ x: 0, y: 0 })
   const overlayRef = useRef<HTMLDivElement>(null)
+  // Dimension ref for mouse handlers (avoids stale closure over prop)
+  const dimensionRef = useRef(dimension)
+  dimensionRef.current = dimension
 
   // Interaction state for progressive refinement
   const interactionTimerRef = useRef<number | null>(null)
@@ -364,9 +367,15 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     const dy = e.clientY - lastMouseRef.current.y
     lastMouseRef.current = { x: e.clientX, y: e.clientY }
 
-    // Orbit sensitivity
-    const sensitivity = 0.005
-    cameraRef.current.orbit(-dx * sensitivity, -dy * sensitivity)
+    if (dimensionRef.current === 2) {
+      // 2D mode: pan instead of orbit (top-down orthographic view)
+      const panSensitivity = 0.01
+      cameraRef.current.pan(-dx * panSensitivity, dy * panSensitivity)
+    } else {
+      // 3D mode: orbit
+      const sensitivity = 0.005
+      cameraRef.current.orbit(-dx * sensitivity, -dy * sensitivity)
+    }
   }, [])
 
   // Attach wheel listener with { passive: false } to allow preventDefault()
@@ -466,6 +475,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     inverseViewMatrix: { elements: new Float32Array(16) },
     inverseProjectionMatrix: { elements: new Float32Array(16) },
     position: { x: 0, y: 0, z: 0 },
+    target: { x: 0, y: 0, z: 0 },
     near: 0.1,
     far: 1000,
     fov: 60,
@@ -643,6 +653,15 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     }
   }, [size.width, size.height])
 
+  // Reset camera to top-down view when switching to 2D mode
+  useEffect(() => {
+    if (dimension === 2 && cameraRef.current) {
+      // Top-down orthographic-like view: camera looking straight down Z axis
+      cameraRef.current.setPosition(0, 0, 8)
+      cameraRef.current.setTarget(0, 0, 0)
+    }
+  }, [dimension])
+
   // Set up store getters for uniform updates
   useEffect(() => {
     graph.setStoreGetter('appearance', () => useAppearanceStore.getState())
@@ -672,6 +691,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       cameraStoreCache.position.x = matrices.cameraPosition.x
       cameraStoreCache.position.y = matrices.cameraPosition.y
       cameraStoreCache.position.z = matrices.cameraPosition.z
+      // Camera target for 2D pan/zoom model matrix derivation
+      const cameraState = cameraRef.current.getState()
+      cameraStoreCache.target.x = cameraState.target[0]
+      cameraStoreCache.target.y = cameraState.target[1]
+      cameraStoreCache.target.z = cameraState.target[2]
       cameraStoreCache.near = matrices.cameraNear
       cameraStoreCache.far = matrices.cameraFar
       cameraStoreCache.fov = matrices.fov

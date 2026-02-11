@@ -323,11 +323,11 @@ describe('isBinaryFormat', () => {
   })
 
   it('should return false for invalid dimension range', () => {
-    // Dimension < 3
+    // Dimension < 2
     expect(
       isBinaryFormat({
         version: 1,
-        dimension: 2,
+        dimension: 1,
         vertexCount: 0,
         edgeCount: 0,
         vertices: new ArrayBuffer(0),

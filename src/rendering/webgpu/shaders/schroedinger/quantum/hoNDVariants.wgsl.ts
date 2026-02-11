@@ -46,6 +46,7 @@ ${ho1DChain}
 }
 
 // Pre-generate all dimension-specific blocks
+export const hoND2dBlock = generateHoNDBlock(2)
 export const hoND3dBlock = generateHoNDBlock(3)
 export const hoND4dBlock = generateHoNDBlock(4)
 export const hoND5dBlock = generateHoNDBlock(5)
@@ -64,7 +65,7 @@ export const hoND11dBlock = generateHoNDBlock(11)
  * @returns WGSL dispatch block code
  */
 export function generateHoNDDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
   return `
 // ============================================
 // Harmonic Oscillator ND - Compile-time Dispatch
@@ -121,7 +122,7 @@ ${ho1DCachedChain}
  * @returns WGSL dispatch block code
  */
 export function generateHoNDCachedDispatchBlock(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
   return `
 // ============================================
 // Harmonic Oscillator ND - Cached Compile-time Dispatch
@@ -141,8 +142,10 @@ fn hoNDOptimized(xND: array<f32, 11>, termIdx: i32, uniforms: SchroedingerUnifor
  * @returns WGSL code for the hoND function
  */
 export function getHoNDBlockForDimension(dimension: number): string {
-  const dim = Math.min(Math.max(dimension, 3), 11)
+  const dim = Math.min(Math.max(dimension, 2), 11)
   switch (dim) {
+    case 2:
+      return hoND2dBlock
     case 3:
       return hoND3dBlock
     case 4:

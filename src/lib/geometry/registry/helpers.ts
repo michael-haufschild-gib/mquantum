@@ -144,7 +144,7 @@ export function isRaymarchingType(type: ObjectType): boolean {
 export function isRaymarchingFractal(type: ObjectType, dimension: number): boolean {
   const entry = getObjectTypeEntry(type)
   if (!entry) return false
-  return entry.rendering.requiresRaymarching === true && dimension >= 3
+  return entry.rendering.requiresRaymarching === true && dimension >= 2
 }
 
 /**
@@ -194,7 +194,7 @@ export function determineRenderMode(
   if (!entry) return 'none'
 
   if (entry.rendering.renderMethod === 'raymarch') {
-    if (dimension < 3) return 'none'
+    if (dimension < 2) return 'none'
     if (type === 'schroedinger') return 'raymarch-schroedinger'
   }
 

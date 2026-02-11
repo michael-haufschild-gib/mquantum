@@ -46,7 +46,7 @@ function createMockAdapter({
     requestDevice: vi.fn().mockResolvedValue({
       destroy: vi.fn(),
     } as unknown as GPUDevice),
-  } as GPUAdapter & { isFallbackAdapter?: boolean }
+  } as unknown as GPUAdapter & { isFallbackAdapter?: boolean }
 
   if (typeof adapterFallbackFlag === 'boolean') {
     adapter.isFallbackAdapter = adapterFallbackFlag

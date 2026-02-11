@@ -160,7 +160,7 @@ export function isBinaryFormat(data: unknown): data is BinaryPolytopeData {
   }
 
   // Validate ranges
-  if (obj.dimension < 3 || obj.dimension > 11) {
+  if (obj.dimension < 2 || obj.dimension > 11) {
     return false
   }
   if (obj.vertexCount < 0 || obj.edgeCount < 0) {
