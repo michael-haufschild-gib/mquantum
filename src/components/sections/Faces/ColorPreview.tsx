@@ -32,6 +32,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
       lchChroma: state.lchChroma,
       faceColor: state.faceColor,
       domainColoring: state.domainColoring,
+      phaseDiverging: state.phaseDiverging,
       divergingPsi: state.divergingPsi,
     }))
     const {
@@ -42,6 +43,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
       lchChroma,
       faceColor,
       domainColoring,
+      phaseDiverging,
       divergingPsi,
     } = useAppearanceStore(appearanceSelector)
 
@@ -179,17 +181,18 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           // Signed diverging map: negative phase sign -> blue, positive -> red, nodal lines -> neutral.
           const signCarrier = Math.cos(t * Math.PI * 2)
           const signStrength = Math.abs(signCarrier)
-          const wing: [number, number, number] =
-            signCarrier >= 0 ? [0.92, 0.24, 0.22] : [0.22, 0.4, 0.95]
-          const neutral: [number, number, number] = [0.92, 0.92, 0.92]
+          const neutral = hexToRgb(phaseDiverging.neutralColor)
+          const positiveWing = hexToRgb(phaseDiverging.positiveColor)
+          const negativeWing = hexToRgb(phaseDiverging.negativeColor)
+          const wing = signCarrier >= 0 ? positiveWing : negativeWing
           const magnitude = 0.2 + 0.8 * t
           r = (neutral[0] * (1 - signStrength) + wing[0] * signStrength) * magnitude
           g = (neutral[1] * (1 - signStrength) + wing[1] * signStrength) * magnitude
           b = (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * magnitude
-        } else if (colorAlgorithm === 'realDiverging' || colorAlgorithm === 'imagDiverging') {
-          // Zero-centered diverging maps for signed Re(psi)/Im(psi) components.
+        } else if (colorAlgorithm === 'diverging') {
+          // Zero-centered diverging map for signed Re/Im(psi) component.
           const signCarrier =
-            colorAlgorithm === 'realDiverging' ? Math.cos(t * Math.PI * 2) : Math.sin(t * Math.PI * 2)
+            divergingPsi.component === 'imag' ? Math.sin(t * Math.PI * 2) : Math.cos(t * Math.PI * 2)
           const signStrength = Math.abs(signCarrier)
           const neutral = hexToRgb(divergingPsi.neutralColor)
           const positiveWing = hexToRgb(divergingPsi.positiveColor)
@@ -228,6 +231,12 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             g *= darken
             b *= darken
           }
+        } else if (colorAlgorithm === 'relativePhase') {
+          // Relative phase map: hue = arg(conj(psi_ref) * psi), lightness = |psi|^2.
+          // Preview uses t as both normalized relative phase and normalized density.
+          const phaseNorm = t
+          const rhoNorm = t
+          ;[r, g, b] = hslToRgb(phaseNorm, 0.85, rhoNorm)
         } else if (colorAlgorithm === 'blackbody') {
           // Blackbody: analytic temperature ramp (t = normalized density)
           // Matches shader: temp = normalized * 12000, blackbody(temp)
@@ -276,6 +285,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
       lchChroma,
       faceColor,
       domainColoring,
+      phaseDiverging,
       divergingPsi,
     ])
 

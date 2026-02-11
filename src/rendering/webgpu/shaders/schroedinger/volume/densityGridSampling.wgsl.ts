@@ -6,7 +6,7 @@
  * spherical harmonics, ~85-90 cycles per step) with cheap texture lookups during raymarching.
  *
  * The grid texture format depends on device capability:
- * - rgba16float: R=rho, G=logRho, B=spatialPhase, A=reserved
+ * - rgba16float: R=rho, G=logRho, B=spatialPhase, A=relativePhase
  * - r16float: R=rho only (fallback)
  *
  * Coordinate mapping: world pos in [-boundingRadius, +boundingRadius] → UVW [0, 1]
@@ -56,7 +56,7 @@ fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
 /**
  * Sample density data from pre-computed 3D grid texture.
  *
- * Returns (rho, logRho, spatialPhase, 0) when rgba16float format is available.
+ * Returns (rho, logRho, spatialPhase, relativePhase) when rgba16float format is available.
  * Returns (rho, 0, 0, 0) for r16float fallback.
  *
  * When position is outside grid bounds, returns zero density.

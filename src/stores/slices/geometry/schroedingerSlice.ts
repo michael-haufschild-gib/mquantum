@@ -484,7 +484,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerNodalColorNegative: valueSetter('nodalColorNegative'),
 
     // === Visual Effects ===
-    setSchroedingerEnergyColorEnabled: valueSetter('energyColorEnabled'),
     setSchroedingerUncertaintyBoundaryEnabled: valueSetter('uncertaintyBoundaryEnabled'),
     setSchroedingerUncertaintyBoundaryStrength: clampedSetter(
       'uncertaintyBoundaryStrength',

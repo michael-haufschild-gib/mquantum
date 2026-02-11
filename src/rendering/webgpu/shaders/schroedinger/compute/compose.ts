@@ -153,6 +153,9 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
   // Temporal disabled for compute (not needed)
   defines.push('const TEMPORAL_ENABLED: bool = false;')
+  // Compute shaders include shared density helpers that reference COLOR_ALGORITHM.
+  // Grid baking is algorithm-agnostic, so keep the default mixed mode value.
+  defines.push('const COLOR_ALGORITHM: i32 = 4;')
   // Density modules reference FEATURE_INTERFERENCE; keep it defined in compute shaders.
   // Set to true so runtime uniform toggles still control the effect in compute mode.
   defines.push('const FEATURE_INTERFERENCE: bool = true;')

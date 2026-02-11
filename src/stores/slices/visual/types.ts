@@ -3,6 +3,7 @@ import type {
   CosineCoefficients,
   DivergingPsiSettings,
   DomainColoringSettings,
+  PhaseDivergingSettings,
   DistributionSettings,
   MultiSourceWeights,
 } from '@/rendering/shaders/palette'
@@ -32,6 +33,7 @@ export interface ColorSliceState {
   lchLightness: number
   lchChroma: number
   domainColoring: DomainColoringSettings
+  phaseDiverging: PhaseDivergingSettings
   divergingPsi: DivergingPsiSettings
 }
 
@@ -49,6 +51,7 @@ export interface ColorSliceActions {
   setLchLightness: (lightness: number) => void
   setLchChroma: (chroma: number) => void
   setDomainColoringSettings: (settings: Partial<DomainColoringSettings>) => void
+  setPhaseDivergingSettings: (settings: Partial<PhaseDivergingSettings>) => void
   setDivergingPsiSettings: (settings: Partial<DivergingPsiSettings>) => void
 }
 

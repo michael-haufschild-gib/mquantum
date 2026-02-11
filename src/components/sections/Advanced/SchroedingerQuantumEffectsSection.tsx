@@ -54,7 +54,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
     setNodalColorImag: state.setSchroedingerNodalColorImag,
     setNodalColorPositive: state.setSchroedingerNodalColorPositive,
     setNodalColorNegative: state.setSchroedingerNodalColorNegative,
-    setEnergyColorEnabled: state.setSchroedingerEnergyColorEnabled,
+
     setUncertaintyBoundaryEnabled: state.setSchroedingerUncertaintyBoundaryEnabled,
     setUncertaintyBoundaryStrength: state.setSchroedingerUncertaintyBoundaryStrength,
     setUncertaintyConfidenceMass: state.setSchroedingerUncertaintyConfidenceMass,
@@ -76,7 +76,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
     setNodalColorImag,
     setNodalColorPositive,
     setNodalColorNegative,
-    setEnergyColorEnabled,
+
     setUncertaintyBoundaryEnabled,
     setUncertaintyBoundaryStrength,
     setUncertaintyConfidenceMass,
@@ -242,19 +242,6 @@ export const SchroedingerQuantumEffectsSection: React.FC<
               )}
             </div>
           )}
-        </div>
-
-        <div className="flex items-center justify-between mt-2">
-          <label className="text-xs text-text-secondary">Energy Coloring</label>
-          <ToggleButton
-            pressed={config.energyColorEnabled ?? false}
-            onToggle={() => setEnergyColorEnabled(!(config.energyColorEnabled ?? false))}
-            className="text-xs px-2 py-1 h-auto"
-            ariaLabel="Toggle energy coloring"
-            data-testid="schroedinger-energy-toggle"
-          >
-            {config.energyColorEnabled ? 'ON' : 'OFF'}
-          </ToggleButton>
         </div>
 
         <div className="space-y-1 mt-2">

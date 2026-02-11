@@ -121,7 +121,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerNodalColorImag: (color: string) => void
   setSchroedingerNodalColorPositive: (color: string) => void
   setSchroedingerNodalColorNegative: (color: string) => void
-  setSchroedingerEnergyColorEnabled: (enabled: boolean) => void
   setSchroedingerUncertaintyBoundaryEnabled: (enabled: boolean) => void
   setSchroedingerUncertaintyBoundaryStrength: (strength: number) => void
   setSchroedingerUncertaintyConfidenceMass: (mass: number) => void

@@ -30,8 +30,9 @@ interface ScenePassConfig {
     | 'blackbody'
     | 'phaseCyclicUniform'
     | 'phaseDiverging'
-    | 'realDiverging'
-    | 'imagDiverging'
+    | 'diverging'
+    | 'relativePhase'
+    | 'energy'
     | 'domainColoringPsi'
   skyboxEnabled: boolean
   skyboxMode:
@@ -116,13 +117,13 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(renderer.rendererConfig?.colorAlgorithm).toBe(8)
   })
 
-  it('maps realDiverging to compile-time colorAlgorithm=9', async () => {
+  it('maps diverging to compile-time colorAlgorithm=9', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
-        colorAlgorithm: 'realDiverging',
+        colorAlgorithm: 'diverging',
       })
     ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
 
@@ -133,13 +134,13 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(renderer.rendererConfig?.colorAlgorithm).toBe(9)
   })
 
-  it('maps imagDiverging to compile-time colorAlgorithm=10', async () => {
+  it('maps relativePhase to compile-time colorAlgorithm=10', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
       'schroedinger',
       createPassConfig({
-        colorAlgorithm: 'imagDiverging',
+        colorAlgorithm: 'relativePhase',
       })
     ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
 

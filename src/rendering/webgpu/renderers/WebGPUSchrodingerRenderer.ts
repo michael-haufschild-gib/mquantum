@@ -56,8 +56,9 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   phaseCyclicUniform: 6,
   phaseDiverging: 7,
   domainColoringPsi: 8,
-  realDiverging: 9,
-  imagDiverging: 10,
+  diverging: 9,
+  relativePhase: 10,
+  energy: 11,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -113,7 +114,7 @@ export interface SchrodingerRendererConfig {
   isosurface?: boolean
   quantumMode?: QuantumModeForShader
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Compile-time color module selection (0-10) */
+  /** Compile-time color module selection (0-11) */
   colorAlgorithm?: WGSLColorAlgorithm
   /** Enable temporal accumulation for volumetric mode */
   temporal?: boolean
@@ -1384,7 +1385,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[892 / 4] = schroedinger?.nodalStrength ?? 1.0 // WebGL default: 1.0
 
     // More fields
-    intView[896 / 4] = schroedinger?.energyColorEnabled ? 1 : 0
+    intView[896 / 4] = 0 // _padEnergy (unused)
     intView[900 / 4] = schroedinger?.uncertaintyBoundaryEnabled ? 1 : 0
     floatView[904 / 4] = schroedinger?.uncertaintyBoundaryStrength ?? 0.5
     floatView[908 / 4] = animationTime // time (respects animation pause state)
@@ -1607,20 +1608,40 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1400 / 4] = 0.0
     floatView[1404 / 4] = 0.0
 
-    // Zero-centered diverging Re/Im controls (offset 1408-1456)
+    // Diverging color controls (offset 1408-1456).
+    // Algorithm 7 (phaseDiverging) uses the palette colors only.
+    // Algorithm 9 (diverging Re/Im) uses palette + intensity floor + component toggle.
+    const usePhaseDivergingPalette = appearance?.colorAlgorithm === 'phaseDiverging'
+    const phaseDiverging = appearance?.phaseDiverging
     const divergingPsi = appearance?.divergingPsi
-    const divergingNeutral = this.parseColor(divergingPsi?.neutralColor ?? '#d9d9d9')
-    const divergingPositive = this.parseColor(divergingPsi?.positiveColor ?? '#e83b3b')
-    const divergingNegative = this.parseColor(divergingPsi?.negativeColor ?? '#3166f5')
+    const divergingNeutral = this.parseColor(
+      usePhaseDivergingPalette
+        ? (phaseDiverging?.neutralColor ?? '#ebebeb')
+        : (divergingPsi?.neutralColor ?? '#d9d9d9')
+    )
+    const divergingPositive = this.parseColor(
+      usePhaseDivergingPalette
+        ? (phaseDiverging?.positiveColor ?? '#eb3d38')
+        : (divergingPsi?.positiveColor ?? '#e83b3b')
+    )
+    const divergingNegative = this.parseColor(
+      usePhaseDivergingPalette
+        ? (phaseDiverging?.negativeColor ?? '#3866f2')
+        : (divergingPsi?.negativeColor ?? '#3166f5')
+    )
     floatView[1408 / 4] = divergingNeutral[0]
     floatView[1412 / 4] = divergingNeutral[1]
     floatView[1416 / 4] = divergingNeutral[2]
-    floatView[1420 / 4] = Math.max(0, Math.min(1, divergingPsi?.intensityFloor ?? 0.2))
+    floatView[1420 / 4] = usePhaseDivergingPalette
+      ? 0.2
+      : Math.max(0, Math.min(1, divergingPsi?.intensityFloor ?? 0.2))
 
     floatView[1424 / 4] = divergingPositive[0]
     floatView[1428 / 4] = divergingPositive[1]
     floatView[1432 / 4] = divergingPositive[2]
-    floatView[1436 / 4] = 0.0
+    floatView[1436 / 4] = usePhaseDivergingPalette
+      ? 0.0
+      : (divergingPsi?.component === 'imag' ? 1.0 : 0.0)
 
     floatView[1440 / 4] = divergingNegative[0]
     floatView[1444 / 4] = divergingNegative[1]

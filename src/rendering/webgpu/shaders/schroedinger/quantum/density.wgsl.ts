@@ -160,9 +160,9 @@ fn sampleDensity(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> f32 {
   return rho;
 }
 
-// Sample density with phase information for coloring
-// Returns: vec3f(rho, logRho, spatialPhase)
-fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
+// Sample density with both phase channels.
+// Returns: vec4f(rho, logRho, spatialPhase, relativePhase)
+fn sampleDensityWithPhaseComponents(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
   // Map 3D position to ND coordinates
   let xND = mapPosToND(pos, uniforms);
 
@@ -170,6 +170,7 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
   let psiResult = evalPsiWithSpatialPhase(xND, t, uniforms);
   let psi = psiResult.xy;
   let spatialPhase = psiResult.z;
+  let relativePhase = psiResult.w;
 
   var rho = rhoFromPsi(psi);
 
@@ -218,61 +219,23 @@ fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) ->
 
   let s = sFromRho(rho);
 
-  return vec3f(rho, s, spatialPhase);
+  return vec4f(rho, s, spatialPhase, relativePhase);
+}
+
+// Sample density with phase information for coloring.
+// Returns: vec3f(rho, logRho, selectedPhaseForColorAlgorithm)
+fn sampleDensityWithPhase(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> vec3f {
+  let densityInfo = sampleDensityWithPhaseComponents(pos, t, uniforms);
+  let phaseForColor = select(densityInfo.z, densityInfo.w, COLOR_ALGORITHM == 10);
+  return vec3f(densityInfo.x, densityInfo.y, phaseForColor);
 }
 
 // Sample density with phase, also returning the position for gradient reuse
 // Returns tuple: (vec3f density info, vec3f position)
 fn sampleDensityWithPhaseAndFlow(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) -> array<vec3f, 2> {
-  // Map 3D position to ND coordinates
-  let xND = mapPosToND(pos, uniforms);
-
-  // OPTIMIZED: Single-pass evaluation
-  let psiResult = evalPsiWithSpatialPhase(xND, t, uniforms);
-  let psi = psiResult.xy;
-  let spatialPhase = psiResult.z;
-
-  var rho = rhoFromPsi(psi);
-
-  // Hydrogen ND density boost
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
-    rho *= uniforms.hydrogenNDBoost;
-  }
-
-  // Confidence-boundary emphasis (see sampleDensityWithPhase for details)
-  if (FEATURE_UNCERTAINTY_BOUNDARY && !SKIP_DENSITY_EMPHASIS) {
-    let boundaryLogRho = sFromRho(rho);
-    rho = applyUncertaintyBoundaryEmphasis(rho, boundaryLogRho, uniforms);
-  }
-
-  // Apply interference fringing if enabled
-  if (FEATURE_INTERFERENCE && uniforms.interferenceEnabled != 0u && uniforms.interferenceAmp > 0.0) {
-    let iTime = uniforms.time * uniforms.interferenceSpeed;
-    let fringe = 1.0 + uniforms.interferenceAmp * sin(spatialPhase * uniforms.interferenceFreq + iTime);
-    rho *= fringe;
-    rho = max(rho, 0.0);
-  }
-
-  // Phase-coherent quantum texture (see sampleDensityWithPhase for details)
-  if (uniforms.probabilityFlowEnabled != 0u && uniforms.probabilityFlowStrength > 0.0) {
-    let pcfSpeedMod = 1.0 - clamp(rho * 5.0, 0.0, 1.0);
-    let pcfTime = uniforms.time * uniforms.probabilityFlowSpeed;
-    let pcfOffset = pcfTime * pcfSpeedMod;
-    let psiLen = max(length(psi), 1e-8);
-    let pcfCosP = psi.x / psiLen;
-    let pcfSinP = psi.y / psiLen;
-    let pcfNoise = gradientNoise(pos * 2.0 + vec3f(
-        pcfOffset + pcfCosP * 0.5,
-        pcfSinP * 0.5,
-        pcfOffset * 0.7 + pcfCosP * 0.3
-    ));
-    rho *= (1.0 + pcfNoise * uniforms.probabilityFlowStrength * pcfSpeedMod);
-    rho = max(rho, 0.0);
-  }
-
-  let s = sFromRho(rho);
-
-  return array<vec3f, 2>(vec3f(rho, s, spatialPhase), pos);
+  let densityInfo = sampleDensityWithPhaseComponents(pos, t, uniforms);
+  let phaseForColor = select(densityInfo.z, densityInfo.w, COLOR_ALGORITHM == 10);
+  return array<vec3f, 2>(vec3f(densityInfo.x, densityInfo.y, phaseForColor), pos);
 }
 
 // Sample density at a given position (lightweight path for tetrahedral gradient).

@@ -163,10 +163,10 @@ const ALGO_BRANCH: Record<number, string> = {
     // 7: Signed diverging phase map (Wigner-style sign encoding proxy)
     let phaseSignCarrier = cos(phase);
     let signStrength = abs(phaseSignCarrier);
-    let positiveWing = vec3f(0.92, 0.24, 0.22);
-    let negativeWing = vec3f(0.22, 0.40, 0.95);
+    let positiveWing = uniforms.divergingPositiveParams.xyz;
+    let negativeWing = uniforms.divergingNegativeParams.xyz;
     let wing = select(negativeWing, positiveWing, phaseSignCarrier >= 0.0);
-    let neutral = vec3f(0.92);
+    let neutral = uniforms.divergingNeutralParams.xyz;
     col = mix(neutral, wing, signStrength) * (0.2 + 0.8 * normalized);`,
 
   8: /* wgsl */ `
@@ -198,28 +198,33 @@ const ALGO_BRANCH: Record<number, string> = {
     }`,
 
   9: /* wgsl */ `
-    // 9: Zero-centered diverging map for Re(psi)
-    let signedReal = normalized * cos(phase);
-    let signStrength = clamp(abs(signedReal), 0.0, 1.0);
+    // 9: Zero-centered diverging map for Re/Im(psi)
+    // divergingPositiveParams.w: 0.0 = Re(psi) via cos, 1.0 = Im(psi) via sin
+    let useImag = uniforms.divergingPositiveParams.w >= 0.5;
+    let signedVal = normalized * select(cos(phase), sin(phase), useImag);
+    let signStrength = clamp(abs(signedVal), 0.0, 1.0);
     let neutral = uniforms.divergingNeutralParams.xyz;
     let positiveWing = uniforms.divergingPositiveParams.xyz;
     let negativeWing = uniforms.divergingNegativeParams.xyz;
-    let wing = select(negativeWing, positiveWing, signedReal >= 0.0);
+    let wing = select(negativeWing, positiveWing, signedVal >= 0.0);
     let intensityFloor = clamp(uniforms.divergingNeutralParams.w, 0.0, 1.0);
     let intensity = intensityFloor + (1.0 - intensityFloor) * signStrength;
     col = mix(neutral, wing, signStrength) * intensity;`,
 
   10: /* wgsl */ `
-    // 10: Zero-centered diverging map for Im(psi)
-    let signedImag = normalized * sin(phase);
-    let signStrength = clamp(abs(signedImag), 0.0, 1.0);
-    let neutral = uniforms.divergingNeutralParams.xyz;
-    let positiveWing = uniforms.divergingPositiveParams.xyz;
-    let negativeWing = uniforms.divergingNegativeParams.xyz;
-    let wing = select(negativeWing, positiveWing, signedImag >= 0.0);
-    let intensityFloor = clamp(uniforms.divergingNeutralParams.w, 0.0, 1.0);
-    let intensity = intensityFloor + (1.0 - intensityFloor) * signStrength;
-    col = mix(neutral, wing, signStrength) * intensity;`,
+    // 10: Relative phase to spatial reference.
+    // phase is expected to be arg(conj(psi_ref) * psi), precomputed in density sampling.
+    // Lightness uses normalized |psi|^2 so students can read probability amplitude directly.
+    let relativePhaseNorm = fract((phase + PI) / TAU);
+    let rhoNorm = clamp(rho / max(uniforms.peakDensity, 1e-8), 0.0, 1.0);
+    col = hsl2rgb(relativePhaseNorm, 0.85, rhoNorm);`,
+
+  11: /* wgsl */ `
+    // 11: Energy (spectral distance-based)
+    let r = length(pos);
+    let energyProxy = clamp(r * 0.5, 0.0, 1.0);
+    let hue = 0.8 * energyProxy;
+    col = hsl2rgb(hue, 1.0, 0.5);`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -233,8 +238,9 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   6: 'Phase Cyclic Uniform',
   7: 'Phase Diverging',
   8: 'Domain Coloring Psi',
-  9: 'Real Diverging',
-  10: 'Imag Diverging',
+  9: 'Diverging',
+  10: 'Relative Phase',
+  11: 'Energy',
 }
 
 export { COLOR_ALG_NAMES }
@@ -253,15 +259,6 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
 
   // Get base color from material's base color
   var baseHSL = rgb2hsl(material.baseColor.rgb);
-
-  // Energy level coloring: map radial distance to spectral hue
-  // Center (low energy) -> Red, Edge (high energy) -> Violet
-  if (uniforms.energyColorEnabled != 0u) {
-    let r = length(pos);
-    let energyProxy = clamp(r * 0.5, 0.0, 1.0);
-    let hue = 0.8 * energyProxy;
-    baseHSL = vec3f(hue, 1.0, 0.5);
-  }
 
   var col = vec3f(0.0);
 `
@@ -480,4 +477,3 @@ fn computeEmissionLit(
   return col;
 }
 `
-

@@ -182,8 +182,7 @@ struct SchroedingerUniforms {
   nodalColor: vec3f,             // Nodal surface color
   nodalStrength: f32,            // Nodal highlight strength
 
-  // Energy coloring
-  energyColorEnabled: u32,       // Enable energy level coloring
+  _padEnergy: u32,               // Unused (keeps byte offsets stable)
 
   // Uncertainty boundary
   uncertaintyBoundaryEnabled: u32,   // Enable confidence-boundary emphasis
@@ -206,7 +205,7 @@ struct SchroedingerUniforms {
   _pad3: f32,                    // Alignment padding
 
   // Color algorithm system (matches WebGL uniform system)
-  colorAlgorithm: i32,           // Color algorithm selector (0-10)
+  colorAlgorithm: i32,           // Color algorithm selector (0-11)
   distPower: f32,                // Distribution power for distance-based coloring
   distCycles: f32,               // Distribution cycles
   distOffset: f32,               // Distribution offset
@@ -309,9 +308,11 @@ struct SchroedingerUniforms {
   domainColoringParams0: vec4f,     // x=modulusMode(0=log|psi|^2,1=log|psi|), y=contoursEnabled, z=contourDensity, w=contourWidth
   domainColoringParams1: vec4f,     // x=contourStrength, yzw=reserved
 
-  // Zero-centered diverging Re/Im controls (algorithms 9/10)
+  // Diverging palettes:
+  // - algorithm 7 (phaseDiverging): uses xyz colors from these vectors
+  // - algorithm 9 (diverging Re/Im): also uses w channels below
   divergingNeutralParams: vec4f,    // xyz=neutralColor, w=intensityFloor
-  divergingPositiveParams: vec4f,   // xyz=positive wing color, w=reserved
+  divergingPositiveParams: vec4f,   // xyz=positive wing color, w=component (0=Re, 1=Im)
   divergingNegativeParams: vec4f,   // xyz=negative wing color, w=reserved
 }
 

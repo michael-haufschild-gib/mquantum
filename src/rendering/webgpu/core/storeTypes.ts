@@ -119,11 +119,17 @@ export interface AppearanceStoreState {
     contourWidth: number
     contourStrength: number
   }
+  phaseDiverging: {
+    neutralColor: string
+    positiveColor: string
+    negativeColor: string
+  }
   divergingPsi: {
     neutralColor: string
     positiveColor: string
     negativeColor: string
     intensityFloor: number
+    component: 'real' | 'imag'
   }
   faceColor: string
   edgeColor: string

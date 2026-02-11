@@ -20,9 +20,9 @@
  * - radial: Color based on 3D distance from origin (spherical gradient)
  * - phaseCyclicUniform: Perceptually uniform cyclic phase map for arg(ψ)
  * - phaseDiverging: Signed diverging palette (Re(ψ) sign proxy)
- * - realDiverging: Zero-centered diverging map for Re(ψ)
- * - imagDiverging: Zero-centered diverging map for Im(ψ)
+ * - diverging: Zero-centered diverging map for Re(ψ) or Im(ψ)
  * - domainColoringPsi: Domain coloring for wavefunction phase + modulus
+ * - relativePhase: Relative phase map hue=arg(conj(ψ_ref)*ψ), lightness≈|ψ|²
  */
 
 export type ColorAlgorithm =
@@ -33,10 +33,11 @@ export type ColorAlgorithm =
   | 'mixed'
   | 'phaseCyclicUniform'
   | 'phaseDiverging'
-  | 'realDiverging'
-  | 'imagDiverging'
+  | 'diverging'
   | 'domainColoringPsi'
+  | 'relativePhase'
   | 'blackbody'
+  | 'energy'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -49,10 +50,11 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'mixed' as const, label: 'Angular + Depth' },
   { value: 'phaseCyclicUniform' as const, label: 'Phase Cyclic Uniform' },
   { value: 'phaseDiverging' as const, label: 'Signed Phase Diverging' },
-  { value: 'realDiverging' as const, label: 'Real Diverging (Re)' },
-  { value: 'imagDiverging' as const, label: 'Imag Diverging (Im)' },
+  { value: 'diverging' as const, label: 'Diverging (Re/Im)' },
   { value: 'domainColoringPsi' as const, label: 'Domain Coloring Psi' },
+  { value: 'relativePhase' as const, label: 'Relative Phase (ref)' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
+  { value: 'energy' as const, label: 'Energy (Spectral)' },
 ] as const
 
 /**
@@ -68,8 +70,9 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   phaseCyclicUniform: 6,
   phaseDiverging: 7,
   domainColoringPsi: 8,
-  realDiverging: 9,
-  imagDiverging: 10,
+  diverging: 9,
+  relativePhase: 10,
+  energy: 11,
 }
 
 /**
@@ -117,6 +120,15 @@ export interface DomainColoringSettings {
   contourStrength: number
 }
 
+export interface PhaseDivergingSettings {
+  /** Center color pinned at cos(phase) = 0 crossings. */
+  neutralColor: string
+  /** Positive wing color for cos(phase) > 0. */
+  positiveColor: string
+  /** Negative wing color for cos(phase) < 0. */
+  negativeColor: string
+}
+
 export interface DivergingPsiSettings {
   /** Center color pinned at zero crossing. */
   neutralColor: string
@@ -126,6 +138,8 @@ export interface DivergingPsiSettings {
   negativeColor: string
   /** Intensity floor applied before sign-strength modulation. */
   intensityFloor: number
+  /** Which wavefunction component to extract: 'real' = Re(psi), 'imag' = Im(psi). */
+  component: 'real' | 'imag'
 }
 
 /**
@@ -159,11 +173,18 @@ export const DEFAULT_DOMAIN_COLORING_SETTINGS: DomainColoringSettings = {
   contourStrength: 0.45,
 }
 
+export const DEFAULT_PHASE_DIVERGING_SETTINGS: PhaseDivergingSettings = {
+  neutralColor: '#ebebeb',
+  positiveColor: '#eb3d38',
+  negativeColor: '#3866f2',
+}
+
 export const DEFAULT_DIVERGING_PSI_SETTINGS: DivergingPsiSettings = {
   neutralColor: '#d9d9d9',
   positiveColor: '#e83b3b',
   negativeColor: '#3166f5',
   intensityFloor: 0.2,
+  component: 'real',
 }
 
 /**

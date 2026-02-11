@@ -1,33 +1,28 @@
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import type { ColorAlgorithm } from '@/rendering/shaders/palette'
+import type { DivergingPsiSettings } from '@/rendering/shaders/palette'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-const DIVERGING_MODE_OPTIONS: { value: ColorAlgorithm; label: string }[] = [
-  { value: 'realDiverging', label: 'Re(ψ)' },
-  { value: 'imagDiverging', label: 'Im(ψ)' },
+const COMPONENT_OPTIONS: { value: DivergingPsiSettings['component']; label: string }[] = [
+  { value: 'real', label: 'Re(ψ)' },
+  { value: 'imag', label: 'Im(ψ)' },
 ]
 
 export const RealImagDivergingControls: React.FC = React.memo(() => {
   const selector = useShallow((state: AppearanceSlice) => ({
-    colorAlgorithm: state.colorAlgorithm,
-    setColorAlgorithm: state.setColorAlgorithm,
     divergingPsi: state.divergingPsi,
     setDivergingPsiSettings: state.setDivergingPsiSettings,
   }))
-  const { colorAlgorithm, setColorAlgorithm, divergingPsi, setDivergingPsiSettings } =
-    useAppearanceStore(selector)
+  const { divergingPsi, setDivergingPsiSettings } = useAppearanceStore(selector)
 
-  const handleModeChange = useCallback(
-    (value: ColorAlgorithm) => {
-      if (value === 'realDiverging' || value === 'imagDiverging') {
-        setColorAlgorithm(value)
-      }
+  const handleComponentChange = useCallback(
+    (value: DivergingPsiSettings['component']) => {
+      setDivergingPsiSettings({ component: value })
     },
-    [setColorAlgorithm]
+    [setDivergingPsiSettings]
   )
 
   const handleNeutralColor = useCallback(
@@ -58,15 +53,12 @@ export const RealImagDivergingControls: React.FC = React.memo(() => {
     [setDivergingPsiSettings]
   )
 
-  const selectedMode: ColorAlgorithm =
-    colorAlgorithm === 'imagDiverging' ? 'imagDiverging' : 'realDiverging'
-
   return (
     <div className="space-y-4">
       <ToggleGroup
-        options={DIVERGING_MODE_OPTIONS}
-        value={selectedMode}
-        onChange={handleModeChange}
+        options={COMPONENT_OPTIONS}
+        value={divergingPsi.component}
+        onChange={handleComponentChange}
         ariaLabel="Signed component mode"
         data-testid="diverging-component-mode"
       />

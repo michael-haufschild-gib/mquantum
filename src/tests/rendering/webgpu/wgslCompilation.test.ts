@@ -416,8 +416,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
 
 describe('WGSL Color Algorithm Specialization', () => {
   // 0=LCH, 1=MultiSource, 2=Radial, 3=Phase, 4=Mixed, 5=Blackbody,
-  // 6=PhaseCyclicUniform, 7=PhaseDiverging, 8=DomainColoringPsi, 9=RealDiverging, 10=ImagDiverging
-  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const
+  // 6=PhaseCyclicUniform, 7=PhaseDiverging, 8=DomainColoringPsi,
+  // 9=Diverging, 10=RelativePhase, 11=Energy
+  const allAlgorithms = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const
 
   for (const alg of allAlgorithms) {
     it(`produces valid WGSL for colorAlgorithm=${alg}`, () => {
@@ -459,10 +460,11 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(modules).not.toContain('Color Selector')
   })
 
-  it('excludes Cosine module for non-cosine algorithms (3, 4, 5, 6, 7, 8, 9, 10)', () => {
+  it('excludes Cosine module for non-cosine algorithms (3, 4, 5, 6, 7, 8, 9, 10, 11)', () => {
     // 3=Phase(HSL), 4=Mixed(HSL), 5=Blackbody(none), 6=PhaseCyclicUniform(Oklab),
-    // 7=PhaseDiverging(HSL), 8=DomainColoringPsi(HSL), 9=RealDiverging(HSL), 10=ImagDiverging(HSL)
-    const nonCosineAlgorithms = [3, 4, 5, 6, 7, 8, 9, 10] as const
+    // 7=PhaseDiverging(HSL), 8=DomainColoringPsi(HSL), 9=Diverging(HSL),
+    // 10=RelativePhase(HSL), 11=Energy(HSL)
+    const nonCosineAlgorithms = [3, 4, 5, 6, 7, 8, 9, 10, 11] as const
     for (const alg of nonCosineAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -479,7 +481,7 @@ describe('WGSL Color Algorithm Specialization', () => {
 
   it('excludes Oklab module for non-Oklab algorithms', () => {
     // All except 0 (LCH) and 6 (PhaseCyclicUniform)
-    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 7, 8, 9, 10] as const
+    const nonOklabAlgorithms = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11] as const
     for (const alg of nonOklabAlgorithms) {
       const { modules, wgsl } = composeSchroedingerShader({
         dimension: 4,
@@ -594,7 +596,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(features).toContain('Color: Domain Coloring Psi')
   })
 
-  it('adds real-diverging feature tag when colorAlgorithm=9', () => {
+  it('adds diverging feature tag when colorAlgorithm=9', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
@@ -603,10 +605,24 @@ describe('WGSL Color Algorithm Specialization', () => {
       colorAlgorithm: 9,
     })
 
-    expect(features).toContain('Color: Real Diverging')
+    expect(features).toContain('Color: Diverging')
   })
 
-  it('adds imag-diverging feature tag when colorAlgorithm=10', () => {
+  it('sources signed phase diverging wing colors from uniforms (algorithm 7)', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 7,
+    })
+
+    expect(wgsl).toContain('uniforms.divergingNeutralParams.xyz')
+    expect(wgsl).toContain('uniforms.divergingPositiveParams.xyz')
+    expect(wgsl).toContain('uniforms.divergingNegativeParams.xyz')
+  })
+
+  it('adds relative-phase feature tag when colorAlgorithm=10', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
@@ -615,7 +631,35 @@ describe('WGSL Color Algorithm Specialization', () => {
       colorAlgorithm: 10,
     })
 
-    expect(features).toContain('Color: Imag Diverging')
+    expect(features).toContain('Color: Relative Phase')
+  })
+
+  it('adds energy feature tag when colorAlgorithm=11', () => {
+    const { features } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      colorAlgorithm: 11,
+    })
+
+    expect(features).toContain('Color: Energy')
+  })
+
+  it('uses density-grid relative-phase channel for colorAlgorithm=10', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      isosurface: true,
+      useDensityGrid: true,
+      densityGridHasPhase: true,
+      colorAlgorithm: 10,
+    })
+
+    expect(wgsl).toContain('const COLOR_ALGORITHM: i32 = 10;')
+    expect(wgsl).toContain('select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10)')
   })
 
   it('does not emit derivative ops in domainColoringPsi emission path', () => {
@@ -668,7 +712,7 @@ describe('WGSL Emission Pre-Block Conditional Inclusion', () => {
   it('blackbody() is always included (WGSL requires symbol resolution in dead branches)', () => {
     // blackbody is referenced in main.wgsl.ts and main2D.wgsl.ts behind
     // FEATURE_PHASE_MATERIALITY guards, so it must always be defined
-    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
       const block = generateEmissionPreBlock(alg, false)
       expect(block).toContain('fn blackbody(')
     }
@@ -715,7 +759,7 @@ describe('WGSL Emission Pre-Block Conditional Inclusion', () => {
 
   it('dead COLOR_ALG_* constants are removed', () => {
     // Test all algorithm values — none should emit COLOR_ALG_ constants
-    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
       const block = generateEmissionPreBlock(alg, false)
       expect(block).not.toContain('COLOR_ALG_')
     }

@@ -112,7 +112,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
 // OPTIMIZED: Evaluate time-dependent ψ AND spatial-only phase in ONE pass
 // This computes both the density (from time-dependent |ψ|²) and the
 // stable spatial phase (for coloring) without redundant calculations.
-// Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, unused)
+// Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, relativePhaseToSpatialRef)
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
   if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
     // OPTIMIZED: Evaluate spatial wavefunction ONCE (at t=0)
@@ -132,8 +132,10 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
       outputPhase = spatialPhase - E * t;
     }
 
-    // Return spatial wavefunction (density unchanged) with animated phase
-    return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, 0.0);
+    // Hydrogen ND keeps spatial-only density for stability; relative phase is
+    // interpreted as animated offset from the spatial reference phase.
+    let relativePhase = outputPhase - spatialPhase;
+    return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, relativePhase);
   }
 
   // Harmonic oscillator mode
@@ -160,7 +162,15 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   }
 
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
-  return vec4f(psiTime.x, psiTime.y, spatialPhase, 0.0);
+  let refNorm2 = dot(psiSpatial, psiSpatial);
+  let psiNorm2 = dot(psiTime, psiTime);
+  var relativePhase = spatialPhase;
+  if (refNorm2 > 1e-12 && psiNorm2 > 1e-12) {
+    let imagPart = psiSpatial.x * psiTime.y - psiSpatial.y * psiTime.x;
+    let realPart = dot(psiSpatial, psiTime);
+    relativePhase = atan2(imagPart, realPart);
+  }
+  return vec4f(psiTime.x, psiTime.y, spatialPhase, relativePhase);
 }
 `
 
@@ -222,7 +232,8 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
       let E = -0.5 / (nf * nf);
       outputPhase = spatialPhase - E * t;
     }
-    return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, 0.0);
+    let relativePhase = outputPhase - spatialPhase;
+    return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, relativePhase);
   }
 
   // Harmonic oscillator mode - use unrolled combined function
@@ -296,7 +307,7 @@ fn evalSpatialPhase(xND: array<f32, 11>, uniforms: SchroedingerUniforms) -> f32 
 }
 
 // Evaluate time-dependent ψ and spatial-only phase in one pass.
-// Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, unused)
+// Returns: vec4f(psi_time.re, psi_time.im, spatialPhase, relativePhaseToSpatialRef)
 fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {
   var psiTime = vec2f(0.0, 0.0);
   var psiSpatial = vec2f(0.0, 0.0);
@@ -316,7 +327,15 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   }
 
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
-  return vec4f(psiTime.x, psiTime.y, spatialPhase, 0.0);
+  let refNorm2 = dot(psiSpatial, psiSpatial);
+  let psiNorm2 = dot(psiTime, psiTime);
+  var relativePhase = spatialPhase;
+  if (refNorm2 > 1e-12 && psiNorm2 > 1e-12) {
+    let imagPart = psiSpatial.x * psiTime.y - psiSpatial.y * psiTime.x;
+    let realPart = dot(psiSpatial, psiTime);
+    relativePhase = atan2(imagPart, realPart);
+  }
+  return vec4f(psiTime.x, psiTime.y, spatialPhase, relativePhase);
 }
 `
 
@@ -461,6 +480,7 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     outputPhase = spatialPhase - E * t;
   }
 
-  return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, 0.0);
+  let relativePhase = outputPhase - spatialPhase;
+  return vec4f(psiSpatial.x, psiSpatial.y, outputPhase, relativePhase);
 }
 `

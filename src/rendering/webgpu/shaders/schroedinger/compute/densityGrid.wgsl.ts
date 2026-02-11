@@ -104,11 +104,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute animation time (matching fragment shader convention)
   let t = schroedinger.time * schroedinger.timeScale;
 
-  // Sample density at this grid point using existing quantum functions
-  // sampleDensityWithPhase returns vec3f(rho, logRho, spatialPhase)
-  let densityResult = sampleDensityWithPhase(worldPos, t, schroedinger);
+  // Sample density at this grid point using existing quantum functions.
+  // sampleDensityWithPhaseComponents returns vec4f(rho, logRho, spatialPhase, relativePhase).
+  let densityResult = sampleDensityWithPhaseComponents(worldPos, t, schroedinger);
 
-  // Extract density value
+  // Extract density value only in r16 mode.
   let rho = densityResult.x;
 
   // Store density in the 3D texture
@@ -124,7 +124,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
  * - R: density (rho)
  * - G: log density (s)
  * - B: spatial phase
- * - A: reserved (flow magnitude or gradient magnitude)
+ * - A: relative phase to spatial reference arg(conj(psi_ref)*psi)
  */
 export const densityGridWithPhaseComputeBlock = /* wgsl */ `
 // ============================================
@@ -155,15 +155,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Compute animation time
   let t = schroedinger.time * schroedinger.timeScale;
 
-  // Sample density with full phase information
-  let densityResult = sampleDensityWithPhase(worldPos, t, schroedinger);
+  // Sample density with both spatial and relative phase channels.
+  let densityResult = sampleDensityWithPhaseComponents(worldPos, t, schroedinger);
 
-  // densityResult = vec3f(rho, logRho, spatialPhase)
+  // densityResult = vec4f(rho, logRho, spatialPhase, relativePhase)
   let rho = densityResult.x;
   let logRho = densityResult.y;
   let spatialPhase = densityResult.z;
+  let relativePhase = densityResult.w;
 
   // Store all values
-  textureStore(densityGrid, gid, vec4f(rho, logRho, spatialPhase, 0.0));
+  textureStore(densityGrid, gid, vec4f(rho, logRho, spatialPhase, relativePhase));
 }
 `

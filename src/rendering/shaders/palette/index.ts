@@ -53,6 +53,7 @@ export {
   DEFAULT_COSINE_COEFFICIENTS,
   DEFAULT_DOMAIN_COLORING_SETTINGS,
   DEFAULT_DIVERGING_PSI_SETTINGS,
+  DEFAULT_PHASE_DIVERGING_SETTINGS,
   DEFAULT_DISTRIBUTION,
   DEFAULT_MULTI_SOURCE_WEIGHTS,
   LCH_PRESET_OPTIONS,
@@ -63,6 +64,7 @@ export {
   type DivergingPsiSettings,
   type DomainColoringModulusMode,
   type DomainColoringSettings,
+  type PhaseDivergingSettings,
   // Distribution types
   type DistributionSettings,
   // LCH preset types

@@ -118,7 +118,15 @@ function generateHOCombinedBlock(termCount: number): string {
 fn evalHOCombined${termCount}(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec4f {${terms}
 
   let spatialPhase = atan2(psiSpatial.y, psiSpatial.x);
-  return vec4f(psiTime.x, psiTime.y, spatialPhase, 0.0);
+  let refNorm2 = dot(psiSpatial, psiSpatial);
+  let psiNorm2 = dot(psiTime, psiTime);
+  var relativePhase = spatialPhase;
+  if (refNorm2 > 1e-12 && psiNorm2 > 1e-12) {
+    let imagPart = psiSpatial.x * psiTime.y - psiSpatial.y * psiTime.x;
+    let realPart = dot(psiSpatial, psiTime);
+    relativePhase = atan2(imagPart, realPart);
+  }
+  return vec4f(psiTime.x, psiTime.y, spatialPhase, relativePhase);
 }
 `
 }

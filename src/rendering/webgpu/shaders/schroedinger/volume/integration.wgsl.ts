@@ -1179,7 +1179,7 @@ fn volumeRaymarchGrid(
     }
 
     // Sample density from pre-computed 3D grid texture
-    // Returns (rho, logRho, spatialPhase, 0) for rgba16float
+    // Returns (rho, logRho, spatialPhase, relativePhase) for rgba16float
     // Returns (rho, 0, 0, 0) for r16float
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     var rho = gridSample.r;
@@ -1192,10 +1192,10 @@ fn volumeRaymarchGrid(
       sCenter = select(-20.0, log(rho), rho > 1e-9);
     }
 
-    // Phase: use grid value if available, else 0
+    // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
     var phase: f32;
     if (DENSITY_GRID_HAS_PHASE) {
-      phase = gridSample.b; // spatialPhase from grid
+      phase = select(gridSample.b, gridSample.a, COLOR_ALGORITHM == 10);
     } else {
       phase = 0.0;
     }

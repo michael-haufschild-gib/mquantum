@@ -376,7 +376,7 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
   if (USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
     let gridColor = sampleDensityFromGrid(p, schroedinger);
     rhoSurface = gridColor.r * isoGain;
-    phase = gridColor.b;
+    phase = select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10);
   } else {
     let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
     rhoSurface = densityInfo.x * isoGain;
@@ -841,7 +841,7 @@ export function generateMainBlockIsosurfaceTemporal(
   if (USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
     let gridColor = sampleDensityFromGrid(p, schroedinger);
     rhoSurface = gridColor.r * isoGain;
-    phase = gridColor.b;
+    phase = select(gridColor.b, gridColor.a, COLOR_ALGORITHM == 10);
   } else {
     let densityInfo = sampleDensityWithPhase(p, animTime, schroedinger);
     rhoSurface = densityInfo.x * isoGain;

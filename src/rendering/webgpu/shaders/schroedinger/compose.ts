@@ -297,6 +297,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const FEATURE_PHASE_MATERIALITY: bool = ${phaseMateriality};`)
   defines.push(`const FEATURE_INTERFERENCE: bool = ${interference};`)
   defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${uncertaintyBoundary};`)
+  // Compile-time color algorithm selection used by phase channel routing.
+  defines.push(`const COLOR_ALGORITHM: i32 = ${colorAlgorithm};`)
 
   // Density grid defines: use 3D texture for hydrogen raymarching
   defines.push(`const USE_DENSITY_GRID: bool = ${useDensityGrid};`)
@@ -311,7 +313,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   // Color module dependency flags (compile-time specialization)
   // 1=MultiSource, 2=Radial use cosine palette; 0=LCH and 6=PhaseCyclicUniform use Oklab.
-  // 3,4,7,8,9,10 are HSL-based and do not need cosine/oklab helper blocks.
+  // 3,4,7,8,9,10,11 are HSL-based and do not need cosine/oklab helper blocks.
   const needsCosine = [1, 2].includes(colorAlgorithm)
   const needsOklab = [0, 6].includes(colorAlgorithm)
   features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)

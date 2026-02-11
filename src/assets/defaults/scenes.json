@@ -9,7 +9,7 @@
         "faceColor": "#dd2727",
         "backgroundColor": "#0F0F1A",
         "perDimensionColorEnabled": false,
-        "colorAlgorithm": "phase",
+        "colorAlgorithm": "energy",
         "cosineCoefficients": {
           "a": [
             0.6,
@@ -483,7 +483,7 @@
           "nodalEnabled": true,
           "nodalColor": "#ff00c5",
           "nodalStrength": 0.4,
-          "energyColorEnabled": true,
+
           "shimmerEnabled": true,
           "shimmerStrength": 0.5,
           "isoEnabled": false,
@@ -653,7 +653,7 @@
         "faceColor": "#dd2727",
         "backgroundColor": "#0F0F1A",
         "perDimensionColorEnabled": false,
-        "colorAlgorithm": "phase",
+        "colorAlgorithm": "energy",
         "cosineCoefficients": {
           "a": [
             0.5,
@@ -1133,7 +1133,7 @@
           "nodalEnabled": false,
           "nodalColor": "#ff00c5",
           "nodalStrength": 0.1,
-          "energyColorEnabled": true,
+
           "shimmerEnabled": false,
           "shimmerStrength": 0.1,
           "isoEnabled": false,
@@ -1333,7 +1333,7 @@
         "faceColor": "#33cc9e",
         "backgroundColor": "#0F0F1A",
         "perDimensionColorEnabled": false,
-        "colorAlgorithm": "radial",
+        "colorAlgorithm": "energy",
         "cosineCoefficients": {
           "a": [
             0.5,
@@ -1797,7 +1797,7 @@
           "nodalEnabled": false,
           "nodalColor": "#00ffff",
           "nodalStrength": 2,
-          "energyColorEnabled": true,
+
           "shimmerEnabled": false,
           "shimmerStrength": 1,
           "isoEnabled": true,
@@ -1965,7 +1965,7 @@
         "faceColor": "#33cc9e",
         "backgroundColor": "#0F0F1A",
         "perDimensionColorEnabled": false,
-        "colorAlgorithm": "phase",
+        "colorAlgorithm": "energy",
         "cosineCoefficients": {
           "a": [
             0.65,
@@ -2416,7 +2416,7 @@
           "nodalEnabled": false,
           "nodalColor": "#00ffff",
           "nodalStrength": 1.5,
-          "energyColorEnabled": true,
+
           "shimmerEnabled": true,
           "shimmerStrength": 1,
           "isoEnabled": false,
@@ -3006,7 +3006,7 @@
           "nodalEnabled": false,
           "nodalColor": "#ff00c5",
           "nodalStrength": 1.4,
-          "energyColorEnabled": false,
+
           "shimmerEnabled": false,
           "shimmerStrength": 0.5,
           "isoEnabled": true,

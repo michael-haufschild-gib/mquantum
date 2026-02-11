@@ -29,8 +29,9 @@ interface ScenePassConfig {
     | 'blackbody'
     | 'phaseCyclicUniform'
     | 'phaseDiverging'
-    | 'realDiverging'
-    | 'imagDiverging'
+    | 'diverging'
+    | 'relativePhase'
+    | 'energy'
     | 'domainColoringPsi'
   skyboxEnabled: boolean
   skyboxMode:

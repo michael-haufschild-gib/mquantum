@@ -358,8 +358,6 @@ export interface SchroedingerConfig {
   nodalColorPositive: string
   /** Color for negative lobe/phase sign */
   nodalColorNegative: string
-  /** Enable energy level coloring */
-  energyColorEnabled: boolean
   /** Enable physically-derived uncertainty boundary emphasis */
   uncertaintyBoundaryEnabled: boolean
   /** Visual strength of uncertainty boundary emphasis (0.0-1.0) */
@@ -587,7 +585,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   nodalColorImag: '#ff66ff',
   nodalColorPositive: '#22c55e',
   nodalColorNegative: '#ef4444',
-  energyColorEnabled: false,
   uncertaintyBoundaryEnabled: false,
   uncertaintyBoundaryStrength: 0.5,
   uncertaintyConfidenceMass: 0.68,
