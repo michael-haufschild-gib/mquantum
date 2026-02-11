@@ -8,38 +8,46 @@
  *
  * Uses shared lighting system (lighting uniform buffer) for lit emission.
  *
- * Port of GLSL schroedinger/volume/emission.glsl to WGSL.
- *
  * @module rendering/webgpu/shaders/schroedinger/volume/emission.wgsl
  */
 
 import type { ColorAlgorithm } from '../../types'
 
 /**
- * Static utilities that computeBaseColor depends on:
- * - COLOR_ALG_* constants
- * - PHASE_HUE_INFLUENCE
- * - blackbody(), henyeyGreenstein(), applyDistributionS()
+ * Generate emission pre-block WGSL with only the helpers needed by the active algorithm.
+ *
+ * Conditional:
+ * - PHASE_HUE_INFLUENCE: algorithms 3, 4
+ * - applyDistributionS(): algorithms 0, 1, 2
+ * - henyeyGreenstein(): 3D volumetric only (computeEmissionLit)
+ *
+ * Always included:
+ * - blackbody(): referenced in main.wgsl.ts / main2D.wgsl.ts behind
+ *   FEATURE_PHASE_MATERIALITY guards (WGSL requires symbol resolution in dead branches)
  */
-export const emissionPreBlock = /* wgsl */ `
+export function generateEmissionPreBlock(
+  colorAlgorithm: ColorAlgorithm,
+  is2D: boolean,
+): string {
+  const parts: string[] = [
+    /* wgsl */ `
 // ============================================
 // Volume Emission Color
 // ============================================
-// Note: LIGHT_TYPE_* constants are defined in shared/core/constants.wgsl.ts
+// Note: LIGHT_TYPE_* constants are defined in shared/core/constants.wgsl.ts`,
+  ]
 
-// Color algorithm constants (must match COLOR_ALGORITHM_TO_INT in types.ts)
-const COLOR_ALG_PHASE: i32 = 3;
-const COLOR_ALG_MIXED: i32 = 4;
-const COLOR_ALG_BLACKBODY: i32 = 5;
-const COLOR_ALG_PHASE_CYCLIC_UNIFORM: i32 = 6;
-const COLOR_ALG_PHASE_DIVERGING: i32 = 7;
-const COLOR_ALG_DOMAIN_COLORING_PSI: i32 = 8;
-const COLOR_ALG_REAL_DIVERGING: i32 = 9;
-const COLOR_ALG_IMAG_DIVERGING: i32 = 10;
-
+  // PHASE_HUE_INFLUENCE: only algorithms 3 (Phase) and 4 (Mixed)
+  if (colorAlgorithm === 3 || colorAlgorithm === 4) {
+    parts.push(/* wgsl */ `
 // Phase influence on hue (0.0 = no phase color, 1.0 = full rainbow)
-const PHASE_HUE_INFLUENCE: f32 = 0.4;
+const PHASE_HUE_INFLUENCE: f32 = 0.4;`)
+  }
 
+  // blackbody(): always included — called by algorithm 5 directly, and referenced by
+  // phase materiality blocks in emissionPostBlock, main.wgsl.ts, and main2D.wgsl.ts
+  // (WGSL requires symbol resolution even in dead branches behind compile-time const guards)
+  parts.push(/* wgsl */ `
 // Analytic approximation of blackbody color (rgb)
 fn blackbody(Temp: f32) -> vec3f {
   if (Temp <= 0.0) { return vec3f(0.0); }
@@ -52,8 +60,11 @@ fn blackbody(Temp: f32) -> vec3f {
   col.z = 194180000.0 * invTemp + 30.0;
   col = col / 255.0;
   return clamp(col, vec3f(0.0), vec3f(1.0));
-}
+}`)
 
+  // henyeyGreenstein(): only 3D volumetric (used by computeEmissionLit in post-block)
+  if (!is2D) {
+    parts.push(/* wgsl */ `
 // Henyey-Greenstein Phase Function for anisotropic scattering
 fn henyeyGreenstein(dotLH: f32, g: f32) -> f32 {
   let g2 = g * g;
@@ -61,10 +72,13 @@ fn henyeyGreenstein(dotLH: f32, g: f32) -> f32 {
   // PERF: pow(x, 1.5) = x * sqrt(x), avoids exp(1.5*log(x)) ~12 cycle savings
   let denomSqrt = sqrt(denom);
   return (1.0 - g2) / (4.0 * PI * denom * denomSqrt);
-}
+}`)
+  }
 
+  // applyDistributionS(): algorithms 0, 1, 2
+  if (colorAlgorithm === 0 || colorAlgorithm === 1 || colorAlgorithm === 2) {
+    parts.push(/* wgsl */ `
 // Apply distribution function for color algorithms
-// Matches WebGL order: pow() first, then fract(curved * cycles + offset)
 fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   let clamped = clamp(t, 0.0, 1.0);
   // Guard pow() - ensure base > 0 and power >= small value
@@ -73,8 +87,11 @@ fn applyDistributionS(t: f32, power: f32, cycles: f32, offset: f32) -> f32 {
   let curved = pow(safeBase, safePower);
   // Clamp before fract to avoid fract(1.0)=0 discontinuity at peak density
   return fract(clamp(curved * cycles + offset, 0.0, 0.999));
+}`)
+  }
+
+  return parts.join('\n')
 }
-`
 
 // ---- Algorithm branch generators ----
 // Each returns the WGSL body lines for col assignment (no fn signature, no return)
@@ -136,8 +153,9 @@ const ALGO_BRANCH: Record<number, string> = {
 
   6: /* wgsl */ `
     // 6: Perceptually uniform cyclic phase map (phase-only)
-    let phaseNorm = fract((phase + PI) / TAU);
-    let hueAngle = phaseNorm * TAU;
+    // PERF: cos/sin are 2π-periodic, so (phase + PI) directly gives the hue angle
+    // without the fract((phase + PI) / TAU) * TAU roundtrip (saves fract + div + mul)
+    let hueAngle = phase + PI;
     let cyclicOklab = vec3f(0.72, 0.11 * cos(hueAngle), 0.11 * sin(hueAngle));
     col = clamp(oklab2rgb(cyclicOklab), vec3f(0.0), vec3f(1.0));`,
 
@@ -155,9 +173,13 @@ const ALGO_BRANCH: Record<number, string> = {
     // 8: Domain coloring for wavefunction psi (phase hue + log-modulus lightness)
     let phaseNorm = fract((phase + PI) / TAU);
     let modulusMode = uniforms.domainColoringParams0.x >= 0.5;
+    // s = log(|psi|^2).  Mode 0 uses s directly; mode 1 uses s*0.5 = log(|psi|).
+    // Both normalize against the same 8.0 window so the different log scaling
+    // produces visibly different tonal distributions:
+    //   log|psi|^2: full range [-8,0] -> lightness [0.08, 0.90]  (high contrast)
+    //   log|psi|:   half range [-4,0] -> lightness [0.49, 0.90]  (brighter, more tail detail)
     let logModulus = select(s, s * 0.5, modulusMode);
-    let modulusDenom = select(8.0, 4.0, modulusMode);
-    let modulusValue = clamp((logModulus + modulusDenom) / modulusDenom, 0.0, 1.0);
+    let modulusValue = clamp((logModulus + 8.0) / 8.0, 0.0, 1.0);
     let baseLightness = clamp(0.08 + 0.82 * modulusValue, 0.0, 1.0);
     col = hsl2rgb(phaseNorm, 0.85, baseLightness);
 
@@ -218,13 +240,10 @@ const COLOR_ALG_NAMES: Record<number, string> = {
 export { COLOR_ALG_NAMES }
 
 /**
- * Generate the computeBaseColor() WGSL function.
- *
- * @param colorAlgorithm When defined, emit only that algorithm's branch (no if/else chain).
- *                       When undefined, emit the full runtime dispatch (backward compatible).
+ * Generate the computeBaseColor() WGSL function for a specific color algorithm.
+ * Emits only that algorithm's branch (no if/else chain) for compile-time specialization.
  */
-export function generateComputeBaseColor(colorAlgorithm?: ColorAlgorithm): string {
-  // Common function header
+export function generateComputeBaseColor(colorAlgorithm: ColorAlgorithm): string {
   const header = /* wgsl */ `
 // Compute base surface color (no lighting applied)
 // PERF: accepts pre-computed log-density s to avoid redundant log() call
@@ -247,84 +266,11 @@ fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: Schroedi
   var col = vec3f(0.0);
 `
 
-  // Specialized single-branch (compile-time)
-  if (colorAlgorithm !== undefined) {
-    const branch = ALGO_BRANCH[colorAlgorithm]
-    if (!branch) {
-      throw new Error(`Unknown colorAlgorithm: ${colorAlgorithm}`)
-    }
-    return header + branch + '\n\n  return col;\n}\n'
+  const branch = ALGO_BRANCH[colorAlgorithm]
+  if (!branch) {
+    throw new Error(`Unknown colorAlgorithm: ${colorAlgorithm}`)
   }
-
-  // Full runtime dispatch (backward compatible)
-  return header + /* wgsl */ `
-  let algorithm = uniforms.colorAlgorithm;
-
-  // Phase-aware color algorithms (3-8) use actual wavefunction phase
-  // Algorithms 0-2 delegate to standard color system
-  if (algorithm == COLOR_ALG_PHASE) {${ALGO_BRANCH[3]}
-  }
-  else if (algorithm == COLOR_ALG_MIXED) {${ALGO_BRANCH[4]}
-  }
-  else if (algorithm == COLOR_ALG_PHASE_CYCLIC_UNIFORM) {${ALGO_BRANCH[6]}
-  }
-  else if (algorithm == COLOR_ALG_PHASE_DIVERGING) {${ALGO_BRANCH[7]}
-  }
-  else if (algorithm == COLOR_ALG_DOMAIN_COLORING_PSI) {${ALGO_BRANCH[8]}
-  }
-  else if (algorithm == COLOR_ALG_REAL_DIVERGING) {${ALGO_BRANCH[9]}
-  }
-  else if (algorithm == COLOR_ALG_IMAG_DIVERGING) {${ALGO_BRANCH[10]}
-  }
-  else if (algorithm == COLOR_ALG_BLACKBODY) {${ALGO_BRANCH[5]}
-  }
-  else {
-    // Algorithms 0-2: Use shared color algorithm system
-    let distributedT = applyDistributionS(normalized, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-
-    if (algorithm == 0) {
-      // 0: LCH/Oklab perceptual hue rotation
-      let hue = distributedT * TAU;
-      let oklab = vec3f(uniforms.lchLightness, uniforms.lchChroma * cos(hue), uniforms.lchChroma * sin(hue));
-      col = clamp(oklab2rgb(oklab), vec3f(0.0), vec3f(1.0));
-    }
-    else if (algorithm == 1) {
-      // 1: Multi-source - blend density + radial + vertical through cosine palette
-      let totalW = uniforms.multiSourceWeights.x + uniforms.multiSourceWeights.y + uniforms.multiSourceWeights.z;
-      let w = uniforms.multiSourceWeights.xyz / max(totalW, 0.001);
-      let radialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
-      let verticalT = pos.y * 0.5 + 0.5;
-      let blendedT = w.x * distributedT + w.y * radialT + w.z * verticalT;
-      let a = uniforms.cosineA.xyz;
-      let b = uniforms.cosineB.xyz;
-      let c = uniforms.cosineC.xyz;
-      let d = uniforms.cosineD.xyz;
-      col = cosinePalette(blendedT, a, b, c, d);
-    }
-    else if (algorithm == 2) {
-      // 2: Radial - color by distance from center through cosine palette
-      let rawRadialT = clamp(length(pos) / uniforms.boundingRadius, 0.0, 1.0);
-      let radialT = applyDistributionS(rawRadialT, uniforms.distPower, uniforms.distCycles, uniforms.distOffset);
-      let a = uniforms.cosineA.xyz;
-      let b = uniforms.cosineB.xyz;
-      let c = uniforms.cosineC.xyz;
-      let d = uniforms.cosineD.xyz;
-      col = cosinePalette(radialT, a, b, c, d);
-    }
-    else {
-      // Default fallback to mixed
-      let phaseNorm = (phase + PI) / TAU;
-      let hueShift = (phaseNorm - 0.5) * PHASE_HUE_INFLUENCE;
-      let hue = fract(baseHSL.x + hueShift);
-      let lightness = 0.15 + 0.35 * normalized;
-      let saturation = 0.7 + 0.25 * normalized;
-      col = hsl2rgb(hue, saturation, lightness);
-    }
-  }
-
-  return col;
-}
-`
+  return header + branch + '\n\n  return col;\n}\n'
 }
 
 /**
@@ -485,7 +431,7 @@ fn computeEmissionLit(
     // Diffuse
     col += surfaceColor / PI * light.color.rgb * NdotL * attenuation * powder * phaseFactor;
 
-    // Subsurface Scattering (SSS) - port from WebGL emission.glsl.ts lines 259-278
+    // Subsurface Scattering (SSS)
     if (material.sssEnabled != 0u && material.sssIntensity > 0.0) {
       // Screen-space noise for jitter (uses fragment position)
       let fragCoord = vec2f(p.x * 100.0, p.y * 100.0); // Approximate fragment coord from world pos
@@ -504,7 +450,7 @@ fn computeEmissionLit(
   // Use pre-computed log-density (passed in as parameter, saves log() call)
   let cachedS = s;
 
-  // HDR Emission Glow (port from WebGL emission.glsl.ts lines 332-361)
+  // HDR Emission Glow
   if (uniforms.emissionIntensity > 0.0) {
     let normalizedRho = clamp((cachedS + 8.0) / 8.0, 0.0, 1.0);
 
@@ -535,5 +481,3 @@ fn computeEmissionLit(
 }
 `
 
-/** Backward-compatible combined block (full runtime dispatch) */
-export const emissionBlock = emissionPreBlock + '\n' + generateComputeBaseColor() + '\n' + emissionPostBlock

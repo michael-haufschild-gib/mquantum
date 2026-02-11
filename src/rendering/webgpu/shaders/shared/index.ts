@@ -14,8 +14,6 @@ export { uniformsBlock } from './core/uniforms.wgsl'
 export { cosinePaletteBlock } from './color/cosine-palette.wgsl'
 export { hslBlock } from './color/hsl.wgsl'
 export { oklabBlock } from './color/oklab.wgsl'
-export { selectorBlock } from './color/selector.wgsl'
-export { generateColorSelectorBlock, getColorModuleDependencies } from './color/selectorVariants.wgsl'
 
 // Lighting
 export { ggxBlock } from './lighting/ggx.wgsl'

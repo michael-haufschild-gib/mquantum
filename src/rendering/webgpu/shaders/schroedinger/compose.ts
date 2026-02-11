@@ -128,7 +128,7 @@ import {
   generateDensityGridFragmentBindings,
   densityGridSamplingBlock,
 } from './volume/densityGridSampling.wgsl'
-import { emissionPreBlock, generateComputeBaseColor, emissionPostBlock, COLOR_ALG_NAMES } from './volume/emission.wgsl'
+import { generateEmissionPreBlock, generateComputeBaseColor, emissionPostBlock, COLOR_ALG_NAMES } from './volume/emission.wgsl'
 import { volumeGradientBlock, volumeIntegrationBlock, volumeRaymarchGridBlock } from './volume/integration.wgsl'
 import { radialProbabilityBlock, radialProbabilityStubBlock } from './volume/radialProbability.wgsl'
 
@@ -155,7 +155,7 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   quantumMode?: QuantumModeForShader
   /** Number of HO superposition terms (1-8) */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  /** Preferred color algorithm hint (Schrödinger currently evaluates color branches at runtime) */
+  /** Compile-time color algorithm specialization (defaults to Mixed) */
   colorAlgorithm?: ColorAlgorithm
   /** Compile-time specialization for phase materiality branching. */
   phaseMateriality?: boolean
@@ -189,7 +189,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     phaseMateriality = true,
     interference = true,
     uncertaintyBoundary = true,
-    colorAlgorithm,
+    colorAlgorithm = 4,
     useEigenfunctionCache = false,
     overrides = [],
   } = config
@@ -312,12 +312,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Color module dependency flags (compile-time specialization)
   // 1=MultiSource, 2=Radial use cosine palette; 0=LCH and 6=PhaseCyclicUniform use Oklab.
   // 3,4,7,8,9,10 are HSL-based and do not need cosine/oklab helper blocks.
-  const needsCosine = colorAlgorithm === undefined || [1, 2].includes(colorAlgorithm)
-  const needsOklab = colorAlgorithm === undefined || [0, 6].includes(colorAlgorithm)
-
-  if (colorAlgorithm !== undefined) {
-    features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
-  }
+  const needsCosine = [1, 2].includes(colorAlgorithm)
+  const needsOklab = [0, 6].includes(colorAlgorithm)
+  features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
 
   // Select main block based on mode
   // 2D mode: direct evaluation (no raymarching). Isolines = 2D isosurface equivalent.
@@ -528,7 +525,7 @@ struct VertexOutput {
     // In 2D mode, only emission color blocks are needed (for computeBaseColor).
     // Volume integration, absorption, raymarching, cross-section are skipped.
     { name: 'Beer-Lambert Absorption', content: absorptionBlock, condition: !is2D },
-    { name: 'Volume Emission (Pre)', content: emissionPreBlock },
+    { name: 'Volume Emission (Pre)', content: generateEmissionPreBlock(colorAlgorithm, is2D) },
     { name: 'Volume Emission (Color)', content: generateComputeBaseColor(colorAlgorithm) },
     { name: 'Volume Emission (Post)', content: emissionPostBlock, condition: !is2D },
     { name: 'Cross-Section Slice', content: crossSectionBlock, condition: !is2D },

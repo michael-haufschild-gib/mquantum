@@ -102,8 +102,6 @@ export {
   densityBlock,
 } from './quantum'
 
-// Volume rendering modules
-export { emissionBlock } from './volume'
 
 // Compute shader modules for density grid pre-computation (uncertainty boundary)
 export {

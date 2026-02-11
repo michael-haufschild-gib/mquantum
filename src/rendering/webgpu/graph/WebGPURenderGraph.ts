@@ -689,7 +689,15 @@ export class WebGPURenderGraph {
    */
   execute(delta: number): WebGPUFrameStats {
     if (!this.initialized) {
-      throw new Error('WebGPURenderGraph: Not initialized')
+      // Graceful skip: during HMR or graph recreation the animation loop may
+      // fire on a stale/disposed graph reference before the new one initializes.
+      return {
+        totalTimeMs: 0,
+        passTiming: [],
+        commandBufferCount: 0,
+        vramUsage: 0,
+        drawStats: { calls: 0, triangles: 0, vertices: 0, lines: 0, points: 0 },
+      }
     }
 
     // Ensure compiled

@@ -202,8 +202,12 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           b = (neutral[2] * (1 - signStrength) + wing[2] * signStrength) * intensity
         } else if (colorAlgorithm === 'domainColoringPsi') {
           // Domain coloring: hue = arg(psi), lightness = log-modulus.
+          // Mode 0 (log|psi|^2): modulusValue = t  -> full [0,1] range
+          // Mode 1 (log|psi|):   modulusValue = 0.5 + 0.5*t -> brighter [0.5,1] range
+          const modulusValue =
+            domainColoring.modulusMode === 'logPsiAbs' ? 0.5 + 0.5 * t : t
           const phaseNorm = t
-          const lightness = Math.max(0, Math.min(1, 0.08 + 0.82 * t))
+          const lightness = Math.max(0, Math.min(1, 0.08 + 0.82 * modulusValue))
           ;[r, g, b] = hslToRgb(phaseNorm, 0.85, lightness)
 
           if (domainColoring.contoursEnabled) {

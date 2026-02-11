@@ -23,6 +23,7 @@ import {
   composeSkyboxFragmentShader,
   composeSkyboxVertexShader,
 } from '@/rendering/webgpu/shaders/skybox/compose'
+import { generateEmissionPreBlock } from '@/rendering/webgpu/shaders/schroedinger/volume/emission.wgsl'
 
 /**
  * Removes comments from WGSL code for syntax checking.
@@ -448,7 +449,7 @@ describe('WGSL Color Algorithm Specialization', () => {
 
       expect(modules).not.toContain('Color Selector')
     }
-    // Also check undefined (runtime dispatch)
+    // Also check default (Mixed)
     const { modules } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
@@ -525,8 +526,8 @@ describe('WGSL Color Algorithm Specialization', () => {
     }
   })
 
-  it('includes all color modules when colorAlgorithm is undefined', () => {
-    const { modules, wgsl } = composeSchroedingerShader({
+  it('defaults to Mixed (4) algorithm when colorAlgorithm is omitted', () => {
+    const { modules, features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
       sss: false,
@@ -534,9 +535,9 @@ describe('WGSL Color Algorithm Specialization', () => {
     })
 
     expect(modules).toContain('Color (HSL)')
-    expect(modules).toContain('Color (Cosine)')
-    expect(modules).toContain('Color (Oklab)')
-    expect(wgsl).toContain('let algorithm = uniforms.colorAlgorithm;')
+    expect(modules).not.toContain('Color (Cosine)')
+    expect(modules).not.toContain('Color (Oklab)')
+    expect(features).toContain('Color: Mixed')
   })
 
   it('always includes HSL module', () => {
@@ -629,7 +630,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(wgsl).not.toContain('fwidth(')
   })
 
-  it('does not add color feature tag when colorAlgorithm is undefined', () => {
+  it('always adds color feature tag (compile-time specialization)', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
@@ -637,7 +638,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       quantumMode: 'harmonicOscillator',
     })
 
-    expect(features.some(f => f.startsWith('Color:'))).toBe(false)
+    expect(features.some(f => f.startsWith('Color:'))).toBe(true)
   })
 
   it('splits emission into 3 blocks in modules list', () => {
@@ -653,6 +654,71 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(modules).toContain('Volume Emission (Color)')
     expect(modules).toContain('Volume Emission (Post)')
     expect(modules).not.toContain('Volume Emission')
+  })
+})
+
+describe('WGSL Emission Pre-Block Conditional Inclusion', () => {
+  it('algorithm 5 (Blackbody) includes blackbody(), excludes PHASE_HUE_INFLUENCE and applyDistributionS', () => {
+    const block = generateEmissionPreBlock(5, false)
+    expect(block).toContain('fn blackbody(')
+    expect(block).not.toContain('PHASE_HUE_INFLUENCE')
+    expect(block).not.toContain('fn applyDistributionS(')
+  })
+
+  it('blackbody() is always included (WGSL requires symbol resolution in dead branches)', () => {
+    // blackbody is referenced in main.wgsl.ts and main2D.wgsl.ts behind
+    // FEATURE_PHASE_MATERIALITY guards, so it must always be defined
+    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+      const block = generateEmissionPreBlock(alg, false)
+      expect(block).toContain('fn blackbody(')
+    }
+  })
+
+  it('algorithm 3 (Phase) includes PHASE_HUE_INFLUENCE, excludes applyDistributionS', () => {
+    const block = generateEmissionPreBlock(3, false)
+    expect(block).toContain('PHASE_HUE_INFLUENCE')
+    expect(block).toContain('fn blackbody(') // always included
+    expect(block).not.toContain('fn applyDistributionS(')
+  })
+
+  it('algorithm 5 does NOT include PHASE_HUE_INFLUENCE', () => {
+    const block = generateEmissionPreBlock(5, false)
+    expect(block).not.toContain('PHASE_HUE_INFLUENCE')
+  })
+
+  it('algorithm 0 (LCH) includes applyDistributionS, excludes PHASE_HUE_INFLUENCE', () => {
+    const block = generateEmissionPreBlock(0, false)
+    expect(block).toContain('fn applyDistributionS(')
+    expect(block).not.toContain('PHASE_HUE_INFLUENCE')
+  })
+
+  it('algorithm 4 (Mixed) does NOT include applyDistributionS', () => {
+    const block = generateEmissionPreBlock(4, false)
+    expect(block).not.toContain('fn applyDistributionS(')
+  })
+
+  it('henyeyGreenstein included in 3D, excluded in 2D', () => {
+    const block3D = generateEmissionPreBlock(4, false)
+    expect(block3D).toContain('fn henyeyGreenstein(')
+
+    const block2D = generateEmissionPreBlock(4, true)
+    expect(block2D).not.toContain('fn henyeyGreenstein(')
+  })
+
+  it('2D + algorithm 4 + no phaseMateriality emits minimal block (header + blackbody + PHASE_HUE_INFLUENCE)', () => {
+    const block = generateEmissionPreBlock(4, true)
+    expect(block).toContain('fn blackbody(')
+    expect(block).not.toContain('fn henyeyGreenstein(')
+    expect(block).not.toContain('fn applyDistributionS(')
+    expect(block).toContain('PHASE_HUE_INFLUENCE')
+  })
+
+  it('dead COLOR_ALG_* constants are removed', () => {
+    // Test all algorithm values — none should emit COLOR_ALG_ constants
+    for (const alg of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] as const) {
+      const block = generateEmissionPreBlock(alg, false)
+      expect(block).not.toContain('COLOR_ALG_')
+    }
   })
 })
 
