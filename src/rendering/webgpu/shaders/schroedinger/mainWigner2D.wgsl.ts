@@ -5,11 +5,9 @@
  * in phase space. Maps UV → (x, p) coordinates and evaluates the Wigner
  * function for the selected dimension.
  *
- * Supports:
- * - HO analytical Wigner (Fock states and superpositions via Laguerre polynomials)
- * - Hydrogen numerical Wigner (radial Fourier-cosine quadrature)
- * - Hydrogen ND extra dims: HO analytical Wigner for extra-dimensional modes
- * - Time-dependent cross terms for superposition interference fringes
+ * Supports two evaluation paths:
+ * - Inline evaluation (useCache=false): per-pixel Laguerre/quadrature computation
+ * - Cache texture sampling (useCache=true): bilinear sample from pre-computed grid
  *
  * @module rendering/webgpu/shaders/schroedinger/mainWigner2D
  */
@@ -20,9 +18,61 @@
  * Maps UV → phase-space (x, p), evaluates Wigner function, applies color.
  * Uses existing computeBaseColor() for user-selectable color algorithms.
  *
+ * @param useCache - When true, sample W from pre-computed cache texture
+ *                   instead of inline evaluation
  * @returns WGSL fragment shader code for Wigner phase-space visualization
  */
-export function generateMainBlockWigner2D(): string {
+export function generateMainBlockWigner2D(useCache = false): string {
+  // Wigner evaluation block: either cache texture sample or inline computation
+  const wignerEvalBlock = useCache
+    ? /* wgsl */ `
+  // === CACHE PATH: Sample W from pre-computed 2D texture ===
+  // Cache covers [-wignerXRange, +wignerXRange] × [-wignerPRange, +wignerPRange]
+  // Map physical coords to cache UV [0,1]
+  let cacheU = (xPhys + schroedinger.wignerXRange) / (2.0 * schroedinger.wignerXRange);
+  let cacheV = (pPhys + schroedinger.wignerPRange) / (2.0 * schroedinger.wignerPRange);
+
+  // Out-of-bounds: position is outside the cached region
+  if (cacheU < 0.0 || cacheU > 1.0 || cacheV < 0.0 || cacheV > 1.0) {
+    discard;
+  }
+
+  // Sample cache: R = signed W, G = |W|
+  let cacheSample = textureSampleLevel(wignerCacheTexture, wignerCacheSampler, vec2f(cacheU, cacheV), 0.0);
+  var W = cacheSample.x;
+`
+    : /* wgsl */ `
+  // === INLINE PATH: Per-pixel Wigner evaluation ===
+  let dimIdx = schroedinger.wignerDimensionIndex;
+  let t = schroedinger.time * schroedinger.timeScale;
+  var W = 0.0;
+
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+    // Hydrogen family
+    if (dimIdx < 3) {
+      // Core radial dimension: numerical Fourier-cosine quadrature
+      let r = max(xPhys, 0.0);
+      let pr = pPhys;
+      W = wignerHydrogenRadial(
+        r, pr,
+        schroedinger.principalN,
+        schroedinger.azimuthalL,
+        schroedinger.bohrRadius,
+        schroedinger.wignerQuadPoints
+      );
+    } else {
+      // Extra HO dimension (dimIdx >= 3): analytical single Fock state Wigner
+      let extraIdx = dimIdx - 3;
+      let n = getExtraDimN(schroedinger, extraIdx);
+      let omega = getExtraDimOmega(schroedinger, extraIdx);
+      W = wignerDiagonal(n, xPhys, pPhys, omega);
+    }
+  } else {
+    // Harmonic oscillator: full marginal Wigner with cross terms and time evolution
+    W = evaluateWignerMarginalHO(xPhys, pPhys, dimIdx, t, schroedinger);
+  }
+`
+
   return /* wgsl */ `
 // ============================================
 // Main Fragment Shader - Wigner Phase-Space Mode
@@ -61,37 +111,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let xPhys = panResult.x;
   let pPhys = panResult.y;
 
-  // Evaluate Wigner function — dispatch based on quantum mode and dimension
-  let dimIdx = schroedinger.wignerDimensionIndex;
-  let t = schroedinger.time * schroedinger.timeScale;
-  var W = 0.0;
-
-  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
-    // Hydrogen family
-    if (dimIdx < 3) {
-      // Core radial dimension: numerical Fourier-cosine quadrature
-      // Axes: x = radial position r, p = radial momentum p_r
-      // Clamp r >= 0 (radial coordinate is non-negative)
-      let r = max(xPhys, 0.0);
-      let pr = pPhys;
-      W = wignerHydrogenRadial(
-        r, pr,
-        schroedinger.principalN,
-        schroedinger.azimuthalL,
-        schroedinger.bohrRadius,
-        schroedinger.wignerQuadPoints
-      );
-    } else {
-      // Extra HO dimension (dimIdx >= 3): analytical single Fock state Wigner
-      let extraIdx = dimIdx - 3;
-      let n = getExtraDimN(schroedinger, extraIdx);
-      let omega = getExtraDimOmega(schroedinger, extraIdx);
-      W = wignerDiagonal(n, xPhys, pPhys, omega);
-    }
-  } else {
-    // Harmonic oscillator: full marginal Wigner with cross terms and time evolution
-    W = evaluateWignerMarginalHO(xPhys, pPhys, dimIdx, t, schroedinger);
-  }
+  // Evaluate Wigner function
+${wignerEvalBlock}
 
   // Map Wigner value to color
   let absW = abs(W);
@@ -129,20 +150,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     var overlayAlpha = 0.0;
 
     if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+      let dimIdx = schroedinger.wignerDimensionIndex;
       if (dimIdx < 3) {
         // Hydrogen radial: classical turning points
-        // For a Coulomb potential: E = -1/(2*n^2) in atomic units
-        // Classical turning points: r_min and r_max where E = V_eff(r)
-        // V_eff = -1/r + l(l+1)/(2*r^2)
-        // Draw vertical lines at turning points and energy contour
         let nf = f32(schroedinger.principalN);
         let lf = f32(schroedinger.azimuthalL);
         let a0 = schroedinger.bohrRadius;
-        // Classical turning points in scaled units
         let E = -1.0 / (2.0 * nf * nf);
-        // r_min, r_max from: E = -1/(a0*r) + l(l+1)/(2*a0^2*r^2)
-        // Quadratic in 1/r: l(l+1)/(2*a0^2) * (1/r)^2 - (1/a0)*(1/r) - E = 0
-        // => (1/r) = [1/a0 ± sqrt(1/a0^2 + 2*E*l(l+1)/a0^2)] / [l(l+1)/a0^2]
         let ll1 = lf * (lf + 1.0);
         if (ll1 > 0.0) {
           let disc = 1.0 + 2.0 * E * ll1;
@@ -152,7 +166,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
             let invR2 = (1.0 - sqrtDisc) / (ll1 * a0);
             let rMin = select(0.0, 1.0 / invR1, invR1 > 0.0);
             let rMax = select(100.0 * a0, 1.0 / invR2, invR2 > 0.0);
-            // Draw vertical lines at turning points
             let distMin = abs(xPhys - rMin);
             let distMax = abs(xPhys - rMax);
             let lineMin = 1.0 - smoothstep(0.0, lineWidth, distMin);
@@ -160,7 +173,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
             overlayAlpha = max(lineMin, lineMax);
           }
         } else {
-          // l=0: only outer turning point, r_max = -1/(a0*E) = 2*n^2*a0
           let rMax = 2.0 * nf * nf * a0;
           let distMax = abs(xPhys - rMax);
           overlayAlpha = 1.0 - smoothstep(0.0, lineWidth, distMax);
@@ -175,6 +187,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
       }
     } else {
       // HO: draw energy ellipse for each term (weighted by |c_k|^2)
+      let dimIdx = schroedinger.wignerDimensionIndex;
       let omega = getOmega(schroedinger, dimIdx);
       let tc = schroedinger.termCount;
       for (var k = 0; k < tc; k++) {

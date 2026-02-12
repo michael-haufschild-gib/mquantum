@@ -129,6 +129,20 @@ export const WignerControls: React.FC<WignerControlsProps> = React.memo(
           onCheckedChange={actions.setClassicalOverlay}
           data-testid="wigner-classical-overlay"
         />
+
+        {/* Cache resolution */}
+        <Select
+          label="Cache Resolution"
+          options={[
+            { value: '128', label: '128' },
+            { value: '256', label: '256' },
+            { value: '512', label: '512' },
+            { value: '1024', label: '1024' },
+          ]}
+          value={String(config.wignerCacheResolution)}
+          onChange={(v) => actions.setCacheResolution(Number(v))}
+          data-testid="wigner-cache-resolution"
+        />
       </div>
     )
   }

@@ -52,6 +52,7 @@ export interface WignerActions {
   setCrossTermsEnabled: ExtendedObjectState['setSchroedingerWignerCrossTermsEnabled']
   setQuadPoints: ExtendedObjectState['setSchroedingerWignerQuadPoints']
   setClassicalOverlay: ExtendedObjectState['setSchroedingerWignerClassicalOverlay']
+  setCacheResolution: ExtendedObjectState['setSchroedingerWignerCacheResolution']
 }
 
 /**

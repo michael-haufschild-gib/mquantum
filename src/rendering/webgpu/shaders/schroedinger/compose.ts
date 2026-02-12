@@ -172,6 +172,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   uncertaintyBoundary?: boolean
   /** Wigner phase-space mode — forces 2D pipeline with phase-space evaluation. */
   isWigner?: boolean
+  /** Use pre-computed Wigner cache texture instead of inline evaluation. */
+  useWignerCache?: boolean
 }
 
 /**
@@ -199,6 +201,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     colorAlgorithm = 4,
     useEigenfunctionCache = false,
     isWigner = false,
+    useWignerCache = false,
     overrides = [],
   } = config
 
@@ -325,6 +328,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   if (useDensityGrid) {
     features.push('Density Grid Raymarching')
   }
+  if (isWigner && useWignerCache) {
+    features.push('Wigner Cache')
+  }
 
   // Color module dependency flags (compile-time specialization)
   // 1=MultiSource, 2=Radial use cosine palette; 0=LCH and 6=PhaseCyclicUniform use Oklab.
@@ -338,7 +344,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // 2D mode: direct evaluation (no raymarching). Isolines = 2D isosurface equivalent.
   // 3D+ modes: temporal modes output MRT (color + world position)
   const selectedMainBlock = isWigner
-    ? generateMainBlockWigner2D()
+    ? generateMainBlockWigner2D(useWignerCache)
     : is2D
     ? isosurface
       ? generateMainBlock2DIsolines()
@@ -426,6 +432,12 @@ struct VertexOutput {
         '\n' +
         generateObjectBindGroup(2, 'BasisVectors', 'basis', 1) +
         (useCache ? '\n' + eigenfunctionCacheBindingsBlock : '') +
+        (isWigner && useWignerCache
+          ? '\n' + /* wgsl */ `
+// Wigner cache texture + sampler (pre-computed W(x,p) grid)
+@group(2) @binding(2) var wignerCacheTexture: texture_2d<f32>;
+@group(2) @binding(3) var wignerCacheSampler: sampler;`
+          : '') +
         (useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : ''),
     },
 

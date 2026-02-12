@@ -482,6 +482,8 @@ export interface SchroedingerConfig {
   wignerQuadPoints: number
   /** Show classical trajectory ellipse overlay */
   wignerClassicalOverlay: boolean
+  /** Resolution of the pre-computed Wigner cache texture (128-1024) */
+  wignerCacheResolution: number
 }
 
 /**
@@ -671,6 +673,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   wignerCrossTermsEnabled: true,
   wignerQuadPoints: 32,
   wignerClassicalOverlay: false,
+  wignerCacheResolution: 512,
 }
 
 // ============================================================================

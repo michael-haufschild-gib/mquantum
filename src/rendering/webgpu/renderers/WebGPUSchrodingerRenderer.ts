@@ -28,6 +28,7 @@ import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boun
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
+import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
 
@@ -167,6 +168,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Eigenfunction Cache Compute Pass (HO mode acceleration)
   private eigenCachePass: EigenfunctionCacheComputePass | null = null
   private eigenCacheInitialized = false
+  private wignerCachePass: WignerCacheComputePass | null = null
+  private wignerCacheInitialized = false
 
   // Configuration
   private rendererConfig: SchrodingerRendererConfig
@@ -363,6 +366,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       useDensityGrid,
       densityGridSize: 64,
       isWigner,
+      useWignerCache: isWigner,
     }
   }
 
@@ -424,6 +428,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.eigenCacheInitialized = true
     }
 
+    // Wigner cache compute pass (pre-computes W(x,p) on a 2D grid)
+    this.wignerCachePass?.dispose()
+    this.wignerCachePass = null
+    this.wignerCacheInitialized = false
+
+    if (this.shaderConfig.isWigner) {
+      this.wignerCachePass = new WignerCacheComputePass({
+        dimension: this.rendererConfig.dimension ?? 3,
+        quantumMode: this.rendererConfig.quantumMode,
+        termCount: this.rendererConfig.termCount,
+      })
+      await this.wignerCachePass.initialize(ctx)
+      this.wignerCacheInitialized = true
+    }
+
     // Update density grid phase availability based on actual texture format
     // r16float only stores rho (R channel); rgba16float stores rho, logRho, phase (R, G, B)
     if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
@@ -473,6 +492,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       objectBindGroupEntries.push(
         { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' as const } }, // eigenCache
         { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // eigenMeta
+      )
+    }
+    // Wigner cache: pre-computed 2D texture + bilinear sampler (same slots as eigencache, mutually exclusive)
+    if (this.wignerCachePass) {
+      objectBindGroupEntries.push(
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' as const, viewDimension: '2d' as const },
+        }, // wignerCacheTexture
+        {
+          binding: 3,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' as const },
+        }, // wignerCacheSampler
       )
     }
     // Density grid texture + sampler for grid-based hydrogen raymarching
@@ -668,6 +702,17 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         objectBindGroupEntries2.push(
           { binding: 2, resource: { buffer: cacheBuffer } },
           { binding: 3, resource: { buffer: metaBuffer } },
+        )
+      }
+    }
+    // Wigner cache: pre-computed 2D texture + bilinear sampler
+    if (this.wignerCachePass) {
+      const cacheView = this.wignerCachePass.getCacheTextureView()
+      const cacheSampler = this.wignerCachePass.getCacheSampler()
+      if (cacheView && cacheSampler) {
+        objectBindGroupEntries2.push(
+          { binding: 2, resource: cacheView },
+          { binding: 3, resource: cacheSampler },
         )
       }
     }
@@ -2149,6 +2194,56 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // ============================================
+    // WIGNER CACHE COMPUTE PASS (Wigner mode)
+    // ============================================
+    // Pre-compute 2D Wigner quasi-probability texture W(x,p) before fragment shader
+    const wignerPass = this.wignerCachePass
+    if (wignerPass && this.wignerCacheInitialized) {
+      const extended = ctx.frame?.stores?.['extended'] as any
+      const rotation = ctx.frame?.stores?.['rotation'] as any
+      const animation = ctx.frame?.stores?.['animation'] as any
+      const schroedingerVersion = extended?.schroedingerVersion ?? 0
+      const rotationVersion = rotation?.version ?? 0
+      const isAnimating = animation?.isPlaying ?? false
+
+      // Sync Schroedinger uniforms (version-tracked)
+      wignerPass.updateSchroedingerUniforms(
+        ctx.device,
+        this.schroedingerUniformData,
+        schroedingerVersion
+      )
+
+      // Sync basis uniforms (version-tracked)
+      wignerPass.updateBasisUniforms(
+        ctx.device,
+        this.basisUniformData.buffer,
+        rotationVersion
+      )
+
+      // Update grid x/p ranges from the already-computed Schroedinger uniform buffer
+      const xRange = this.schroedingerFloatView[1464 / 4]
+      const pRange = this.schroedingerFloatView[1468 / 4]
+      wignerPass.updateGridParams(ctx.device, -xRange, xRange, -pRange, pRange)
+
+      // Determine if cache needs recomputation
+      const schroedinger = extended?.schroedinger
+      const crossTermsEnabled = schroedinger?.wignerCrossTermsEnabled ?? false
+      const termCount = this.rendererConfig.termCount ?? 1
+      const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
+
+      // Update time in compute pass buffer for animated HO superpositions.
+      // Must happen every frame during animation since version tracking doesn't cover time changes.
+      if (isAnimating) {
+        const time = ctx.frame?.time ?? 0
+        wignerPass.updateTimeOnly(ctx.device, time)
+      }
+
+      if (wignerPass.needsUpdate(isAnimating, crossTermsEnabled, termCount, isHydrogen)) {
+        wignerPass.execute(ctx)
+      }
+    }
+
+    // ============================================
     // RENDER TARGET SETUP
     // ============================================
     if (is2D) {
@@ -2325,6 +2420,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null
     this.eigenCacheInitialized = false
+
+    this.wignerCachePass?.dispose()
+    this.wignerCachePass = null
+    this.wignerCacheInitialized = false
 
     this.vertexBuffer?.destroy()
     this.indexBuffer?.destroy()

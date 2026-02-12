@@ -19,6 +19,7 @@ import {
 } from '@/rendering/webgpu/shaders/schroedinger/compose'
 import { composeDensityGridComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/compose'
 import { composeEigenfunctionCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeEigenCache'
+import { composeWignerCacheComputeShader } from '@/rendering/webgpu/shaders/schroedinger/compute/composeWignerCache'
 import {
   composeSkyboxFragmentShader,
   composeSkyboxVertexShader,
@@ -1037,5 +1038,68 @@ describe('WGSL Cross-Object Verification', () => {
       verifyWgsl(wgsl, false)
       verifyNoGlslLeakage(wgsl)
     }
+  })
+})
+
+describe('WGSL Shader Compilation - Wigner Cache', () => {
+  it('composes Wigner cache compute shader for HO mode', () => {
+    const { wgsl, features } = composeWignerCacheComputeShader({
+      dimension: 3,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    expect(typeof wgsl).toBe('string')
+    expect(wgsl.length).toBeGreaterThan(100)
+    expect(wgsl).toMatch(/@compute/)
+    expect(wgsl).toMatch(/@workgroup_size\s*\(\s*16\s*,\s*16/)
+    expect(wgsl).toContain('fn main(')
+    expect(wgsl).toContain('wignerCacheOut')
+    expect(wgsl).toContain('evaluateWignerMarginalHO')
+    expect(wgsl).toContain('WignerGridParams')
+    expect(features).toContain('Wigner Cache Compute')
+    expect(features).toContain('Harmonic Oscillator')
+  })
+
+  it('composes Wigner cache compute shader for hydrogen ND mode', () => {
+    const { wgsl, features } = composeWignerCacheComputeShader({
+      dimension: 4,
+      quantumMode: 'hydrogenND',
+    })
+
+    expect(wgsl).toMatch(/@compute/)
+    expect(wgsl).toContain('wignerHydrogenRadial')
+    expect(wgsl).toContain('fn hydrogenRadial(')
+    expect(features).toContain('Hydrogen ND')
+  })
+
+  it('composes fragment shader with Wigner cache enabled', () => {
+    const { wgsl, modules, features } = composeSchroedingerShader({
+      dimension: 3,
+      isWigner: true,
+      useWignerCache: true,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    verifyNoGlslLeakage(wgsl)
+    expect(features).toContain('Wigner Cache')
+    expect(wgsl).toContain('wignerCacheTexture')
+    expect(wgsl).toContain('wignerCacheSampler')
+    expect(wgsl).toContain('textureSampleLevel')
+  })
+
+  it('composes fragment shader with Wigner inline evaluation', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isWigner: true,
+      useWignerCache: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    verifyNoGlslLeakage(wgsl)
+    expect(features).not.toContain('Wigner Cache')
+    expect(wgsl).not.toContain('wignerCacheTexture')
+    expect(wgsl).toContain('evaluateWignerMarginalHO')
   })
 })

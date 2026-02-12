@@ -197,6 +197,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerWignerCrossTermsEnabled: (enabled: boolean) => void
   setSchroedingerWignerQuadPoints: (points: number) => void
   setSchroedingerWignerClassicalOverlay: (enabled: boolean) => void
+  setSchroedingerWignerCacheResolution: (resolution: number) => void
 
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void

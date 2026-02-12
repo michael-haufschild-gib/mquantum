@@ -85,6 +85,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setWignerCrossTermsEnabled: state.setSchroedingerWignerCrossTermsEnabled,
       setWignerQuadPoints: state.setSchroedingerWignerQuadPoints,
       setWignerClassicalOverlay: state.setSchroedingerWignerClassicalOverlay,
+      setWignerCacheResolution: state.setSchroedingerWignerCacheResolution,
     }))
     const {
       config,
@@ -120,6 +121,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setWignerCrossTermsEnabled,
       setWignerQuadPoints,
       setWignerClassicalOverlay,
+      setWignerCacheResolution,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Get current dimension to show/hide dimension-specific controls
@@ -160,6 +162,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setCrossTermsEnabled: setWignerCrossTermsEnabled,
       setQuadPoints: setWignerQuadPoints,
       setClassicalOverlay: setWignerClassicalOverlay,
+      setCacheResolution: setWignerCacheResolution,
     }
 
     return (

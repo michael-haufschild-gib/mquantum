@@ -630,6 +630,13 @@ export const createSchroedingerSlice: StateCreator<
     },
     setSchroedingerWignerClassicalOverlay: valueSetter('wignerClassicalOverlay'),
 
+    setSchroedingerWignerCacheResolution: (resolution: number) => {
+      const clamped = Math.max(128, Math.min(1024, Math.round(resolution)))
+      setWithVersion((state) => ({
+        schroedinger: { ...state.schroedinger, wignerCacheResolution: clamped },
+      }))
+    },
+
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => ({

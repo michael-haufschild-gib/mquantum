@@ -25,3 +25,14 @@ export {
 } from './eigenfunctionCache.wgsl'
 
 export { composeEigenfunctionCacheComputeShader } from './composeEigenCache'
+
+export {
+  wignerGridParamsBlock,
+  wignerCacheComputeBlock,
+  WIGNER_GRID_PARAMS_SIZE,
+} from './wignerCache.wgsl'
+
+export {
+  composeWignerCacheComputeShader,
+  type WignerCacheComputeConfig,
+} from './composeWignerCache'
