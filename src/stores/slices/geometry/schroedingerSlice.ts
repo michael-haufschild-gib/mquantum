@@ -607,6 +607,29 @@ export const createSchroedingerSlice: StateCreator<
     // === Phase Animation (Hydrogen ND only) ===
     setSchroedingerPhaseAnimationEnabled: valueSetter('phaseAnimationEnabled'),
 
+    // === Wigner Phase-Space Visualization ===
+    setSchroedingerWignerDimensionIndex: (index: number) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          wignerDimensionIndex: Math.max(0, Math.min(index, 10)),
+        },
+      }))
+    },
+    setSchroedingerWignerAutoRange: valueSetter('wignerAutoRange'),
+    setSchroedingerWignerXRange: clampedSetter('wignerXRange', 1.0, 30.0),
+    setSchroedingerWignerPRange: clampedSetter('wignerPRange', 1.0, 30.0),
+    setSchroedingerWignerCrossTermsEnabled: valueSetter('wignerCrossTermsEnabled'),
+    setSchroedingerWignerQuadPoints: (points: number) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          wignerQuadPoints: Math.max(8, Math.min(Math.round(points), 64)),
+        },
+      }))
+    },
+    setSchroedingerWignerClassicalOverlay: valueSetter('wignerClassicalOverlay'),
+
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => ({

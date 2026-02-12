@@ -22,7 +22,8 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
-import type { HarmonicOscillatorActions, HydrogenNDActions } from './types'
+import { WignerControls } from './WignerControls'
+import type { HarmonicOscillatorActions, HydrogenNDActions, WignerActions } from './types'
 
 /**
  * Props for the SchroedingerControls component.
@@ -76,6 +77,14 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setHydrogenNDPreset: state.setSchroedingerHydrogenNDPreset,
       setExtraDimQuantumNumber: state.setSchroedingerExtraDimQuantumNumber,
       setExtraDimFrequencySpread: state.setSchroedingerExtraDimFrequencySpread,
+      // Wigner actions
+      setWignerDimensionIndex: state.setSchroedingerWignerDimensionIndex,
+      setWignerAutoRange: state.setSchroedingerWignerAutoRange,
+      setWignerXRange: state.setSchroedingerWignerXRange,
+      setWignerPRange: state.setSchroedingerWignerPRange,
+      setWignerCrossTermsEnabled: state.setSchroedingerWignerCrossTermsEnabled,
+      setWignerQuadPoints: state.setSchroedingerWignerQuadPoints,
+      setWignerClassicalOverlay: state.setSchroedingerWignerClassicalOverlay,
     }))
     const {
       config,
@@ -103,6 +112,14 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setHydrogenNDPreset,
       setExtraDimQuantumNumber,
       setExtraDimFrequencySpread,
+      // Wigner actions
+      setWignerDimensionIndex,
+      setWignerAutoRange,
+      setWignerXRange,
+      setWignerPRange,
+      setWignerCrossTermsEnabled,
+      setWignerQuadPoints,
+      setWignerClassicalOverlay,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Get current dimension to show/hide dimension-specific controls
@@ -135,6 +152,16 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setExtraDimFrequencySpread,
     }
 
+    const wignerActions: WignerActions = {
+      setDimensionIndex: setWignerDimensionIndex,
+      setAutoRange: setWignerAutoRange,
+      setXRange: setWignerXRange,
+      setPRange: setWignerPRange,
+      setCrossTermsEnabled: setWignerCrossTermsEnabled,
+      setQuadPoints: setWignerQuadPoints,
+      setClassicalOverlay: setWignerClassicalOverlay,
+    }
+
     return (
       <div className={className} data-testid="schroedinger-controls">
         {/* Representation Selection */}
@@ -144,9 +171,10 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               options={[
                 { value: 'position', label: 'Position' },
                 { value: 'momentum', label: 'Momentum' },
+                { value: 'wigner', label: 'Wigner' },
               ]}
               value={config.representation}
-              onChange={(v) => setRepresentation(v as 'position' | 'momentum')}
+              onChange={(v) => setRepresentation(v as 'position' | 'momentum' | 'wigner')}
               ariaLabel="Select representation space"
               data-testid="representation-selector"
             />
@@ -189,9 +217,15 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               </div>
             )}
 
-            <p className="text-xs text-text-tertiary">
-              Internal momentum rendering uses k-space; display units affect interpretation only.
-            </p>
+            {config.representation === 'wigner' && (
+              <WignerControls config={config} dimension={dimension} actions={wignerActions} />
+            )}
+
+            {config.representation === 'momentum' && (
+              <p className="text-xs text-text-tertiary">
+                Internal momentum rendering uses k-space; display units affect interpretation only.
+              </p>
+            )}
           </div>
         </Section>
 
@@ -225,4 +259,5 @@ SchroedingerControls.displayName = 'SchroedingerControls'
 // Re-export sub-components for direct imports if needed
 export { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 export { HydrogenNDControls } from './HydrogenNDControls'
+export { WignerControls } from './WignerControls'
 export type * from './types'

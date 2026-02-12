@@ -57,8 +57,9 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
   // Isosurface mode controls (drives material tab availability and rendering mode)
   const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
+    representation: state.schroedinger?.representation ?? 'position',
   }))
-  const { isoEnabled } = useExtendedObjectStore(schroedingerIsoSelector)
+  const { isoEnabled, representation } = useExtendedObjectStore(schroedingerIsoSelector)
 
   // Appearance settings
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
@@ -117,8 +118,8 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     setActiveTab(id as FacesTabId)
   }, [])
 
-  // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds or 2D)
-  const materialTabEnabled = isoEnabled && dimension > 2
+  // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds, 2D, or Wigner)
+  const materialTabEnabled = isoEnabled && dimension > 2 && representation !== 'wigner'
 
   // Reset to colors tab if material tab becomes disabled while selected
   React.useEffect(() => {

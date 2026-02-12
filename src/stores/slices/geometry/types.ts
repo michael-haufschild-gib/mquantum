@@ -189,6 +189,15 @@ export interface SchroedingerSliceActions {
   // Phase Animation (Hydrogen ND only)
   setSchroedingerPhaseAnimationEnabled: (enabled: boolean) => void
 
+  // Wigner Phase-Space Visualization
+  setSchroedingerWignerDimensionIndex: (index: number) => void
+  setSchroedingerWignerAutoRange: (enabled: boolean) => void
+  setSchroedingerWignerXRange: (range: number) => void
+  setSchroedingerWignerPRange: (range: number) => void
+  setSchroedingerWignerCrossTermsEnabled: (enabled: boolean) => void
+  setSchroedingerWignerQuadPoints: (points: number) => void
+  setSchroedingerWignerClassicalOverlay: (enabled: boolean) => void
+
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void
   initializeSchroedingerForDimension: (dimension: number) => void

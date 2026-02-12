@@ -42,6 +42,19 @@ export interface HydrogenNDActions {
 }
 
 /**
+ * Actions for Wigner phase-space controls
+ */
+export interface WignerActions {
+  setDimensionIndex: ExtendedObjectState['setSchroedingerWignerDimensionIndex']
+  setAutoRange: ExtendedObjectState['setSchroedingerWignerAutoRange']
+  setXRange: ExtendedObjectState['setSchroedingerWignerXRange']
+  setPRange: ExtendedObjectState['setSchroedingerWignerPRange']
+  setCrossTermsEnabled: ExtendedObjectState['setSchroedingerWignerCrossTermsEnabled']
+  setQuadPoints: ExtendedObjectState['setSchroedingerWignerQuadPoints']
+  setClassicalOverlay: ExtendedObjectState['setSchroedingerWignerClassicalOverlay']
+}
+
+/**
  * Props for Harmonic Oscillator Controls
  */
 export interface HarmonicOscillatorControlsProps {
@@ -57,4 +70,13 @@ export interface HydrogenNDControlsProps {
   config: SchroedingerConfig
   dimension: number
   actions: HydrogenNDActions
+}
+
+/**
+ * Props for Wigner Phase-Space Controls
+ */
+export interface WignerControlsProps {
+  config: SchroedingerConfig
+  dimension: number
+  actions: WignerActions
 }

@@ -137,7 +137,7 @@ const schroedingerCompileSelector = (
   phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
   interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
   uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
-  representation: (state.schroedinger?.representation ?? 'position') as 'position' | 'momentum',
+  representation: (state.schroedinger?.representation ?? 'position') as 'position' | 'momentum' | 'wigner',
 })
 
 // Schrodinger selector for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
@@ -1627,8 +1627,8 @@ export interface PassConfig {
   eigenfunctionCacheEnabled: boolean
   renderResolutionScale?: number
   colorAlgorithm: PaletteColorAlgorithm
-  // Wavefunction representation (compile-time: momentum mode uses density grid)
-  representation: 'position' | 'momentum'
+  // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
+  representation: 'position' | 'momentum' | 'wigner'
   // Skybox settings
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode

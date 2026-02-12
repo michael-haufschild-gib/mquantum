@@ -89,7 +89,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-gain"
         />
-        {!config.isoEnabled && dimension > 2 && (
+        {!config.isoEnabled && dimension > 2 && config.representation !== 'wigner' && (
           <Slider
             label="Powder Effect"
             min={0.0}
@@ -101,7 +101,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             data-testid="schroedinger-powder-scale"
           />
         )}
-        {!config.isoEnabled && dimension > 2 && (
+        {!config.isoEnabled && dimension > 2 && config.representation !== 'wigner' && (
           <Slider
             label="Anisotropy (Phase)"
             min={-0.9}

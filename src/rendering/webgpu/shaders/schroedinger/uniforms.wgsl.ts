@@ -314,6 +314,16 @@ struct SchroedingerUniforms {
   divergingNeutralParams: vec4f,    // xyz=neutralColor, w=intensityFloor
   divergingPositiveParams: vec4f,   // xyz=positive wing color, w=component (0=Re, 1=Im)
   divergingNegativeParams: vec4f,   // xyz=negative wing color, w=reserved
+
+  // Wigner phase-space visualization (offset 1456)
+  wignerDimensionIndex: i32,        // offset 1456: which dimension to display
+  wignerCrossTermsEnabled: u32,     // offset 1460: include cross-Wigner terms
+  wignerXRange: f32,                // offset 1464: x-axis half-range (position)
+  wignerPRange: f32,                // offset 1468: p-axis half-range (momentum)
+  wignerQuadPoints: i32,            // offset 1472: quadrature points for hydrogen
+  wignerClassicalOverlay: u32,      // offset 1476: show classical trajectory
+  _padWigner0: f32,                 // offset 1480: padding
+  _padWigner1: f32,                 // offset 1484: padding
 }
 
 // ============================================

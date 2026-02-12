@@ -39,6 +39,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
   SchroedingerQuantumEffectsSectionProps
 > = React.memo(({ defaultOpen = true }) => {
   const objectType = useGeometryStore((state) => state.objectType)
+  const dimension = useGeometryStore((state) => state.dimension)
 
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
@@ -88,6 +89,8 @@ export const SchroedingerQuantumEffectsSection: React.FC<
   if (objectType !== 'schroedinger') {
     return null
   }
+  // Quantum effects are 3D volumetric shader features — hide for 2D and Wigner modes
+  if (dimension <= 2 || config.representation === 'wigner') return null
 
   return (
     <Section title="Quantum Effects" defaultOpen={defaultOpen} data-testid="quantum-effects-section">

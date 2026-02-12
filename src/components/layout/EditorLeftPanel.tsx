@@ -23,10 +23,11 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
   const isoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
     isoThreshold: state.schroedinger?.isoThreshold ?? -3,
+    representation: state.schroedinger?.representation ?? 'position',
     setIsoEnabled: state.setSchroedingerIsoEnabled,
     setIsoThreshold: state.setSchroedingerIsoThreshold,
   }))
-  const { isoEnabled, isoThreshold, setIsoEnabled, setIsoThreshold } = useExtendedObjectStore(
+  const { isoEnabled, isoThreshold, representation, setIsoEnabled, setIsoThreshold } = useExtendedObjectStore(
     isoSelector
   )
 
@@ -86,7 +87,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           <div className="px-4 py-2">
             <DimensionSelector />
           </div>
-          {dimension > 2 && (
+          {dimension > 2 && representation !== 'wigner' && (
             <div className="px-4 pb-2">
               <div className="space-y-1">
 

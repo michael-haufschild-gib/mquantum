@@ -30,7 +30,7 @@ describe('TopBarControls', () => {
     }
   })
 
-  it('uses a single desktop representation toggle button with text flip', async () => {
+  it('uses a single desktop representation toggle button with three-state cycle', async () => {
     const user = userEvent.setup()
     render(<TopBarControls compact={false} />)
 
@@ -44,22 +44,33 @@ describe('TopBarControls', () => {
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
 
     await user.click(toggle)
+    expect(toggle).toHaveTextContent('Wigner')
+    expect(toggle.className).toBe(initialClassName)
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
+
+    await user.click(toggle)
     expect(toggle).toHaveTextContent('Position')
     expect(toggle.className).toBe(initialClassName)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
   })
 
-  it('uses a single mobile icon toggle that flips action labels', async () => {
+  it('uses a single mobile icon toggle that cycles through representations', async () => {
     const user = userEvent.setup()
     render(<TopBarControls compact={true} />)
 
-    const toMomentum = screen.getByLabelText('Switch to Momentum Space')
-    const initialClassName = toMomentum.className
-    await user.click(toMomentum)
+    const repButton = screen.getByLabelText('Representation: Position')
+    const initialClassName = repButton.className
+    await user.click(repButton)
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('momentum')
 
-    const toPosition = screen.getByLabelText('Switch to Position Space')
-    expect(toPosition).toBeInTheDocument()
-    expect(toPosition.className).toBe(initialClassName)
+    const momentumButton = screen.getByLabelText('Representation: Momentum')
+    expect(momentumButton).toBeInTheDocument()
+    expect(momentumButton.className).toBe(initialClassName)
+
+    await user.click(momentumButton)
+    expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('wigner')
+
+    const wignerButton = screen.getByLabelText('Representation: Wigner')
+    expect(wignerButton).toBeInTheDocument()
   })
 })

@@ -126,7 +126,8 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
   }
 
   const toggleRepresentation = () => {
-    const nextRepresentation = representation === 'position' ? 'momentum' : 'position'
+    const cycle = { position: 'momentum', momentum: 'wigner', wigner: 'position' } as const
+    const nextRepresentation = cycle[representation as keyof typeof cycle] ?? 'position'
     setRepresentation(nextRepresentation)
     soundManager.playClick()
   }
@@ -138,13 +139,9 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
         <div className="flex gap-1">
           <IconButton
             icon={representation === 'position' ? TargetIcon : WaveIcon}
-            active={false}
+            active={representation === 'wigner'}
             onClick={toggleRepresentation}
-            label={
-              representation === 'position'
-                ? 'Switch to Momentum Space'
-                : 'Switch to Position Space'
-            }
+            label={`Representation: ${representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}`}
             small
           />
           <IconButton
@@ -173,7 +170,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             onClick={toggleRepresentation}
             onMouseEnter={() => soundManager.playHover()}
             aria-label="Switch Representation Space"
-            title="Switch representation (Position ↔ Momentum)"
+            title="Switch representation (Position → Momentum → Wigner)"
             data-testid="control-representation-toggle"
             className={`
               rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
@@ -181,7 +178,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
               bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]
             `}
           >
-            {representation === 'position' ? 'Position' : 'Momentum'}
+            {representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}
           </button>
 
           <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />

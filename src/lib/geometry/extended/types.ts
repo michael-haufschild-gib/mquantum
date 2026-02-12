@@ -104,7 +104,7 @@ export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND'
  * - position: ψ(x), rendered in configuration space
  * - momentum: φ(k), rendered in reciprocal space
  */
-export type SchroedingerRepresentation = 'position' | 'momentum'
+export type SchroedingerRepresentation = 'position' | 'momentum' | 'wigner'
 
 /**
  * UI display units for momentum-space interpretation.
@@ -466,6 +466,22 @@ export interface SchroedingerConfig {
   radialProbabilityOpacity: number
   /** Shell color (CSS hex) */
   radialProbabilityColor: string
+
+  // === Wigner Phase-Space Visualization ===
+  /** Which dimension index to display in Wigner phase space (0-based) */
+  wignerDimensionIndex: number
+  /** Auto-compute axis ranges from physics (bounding radius, omega) */
+  wignerAutoRange: boolean
+  /** Manual x-axis range (position units) when autoRange is off */
+  wignerXRange: number
+  /** Manual p-axis range (momentum units) when autoRange is off */
+  wignerPRange: number
+  /** Include cross terms in HO superposition Wigner function */
+  wignerCrossTermsEnabled: boolean
+  /** Number of quadrature points for hydrogen numerical Wigner transform */
+  wignerQuadPoints: number
+  /** Show classical trajectory ellipse overlay */
+  wignerClassicalOverlay: boolean
 }
 
 /**
@@ -646,6 +662,15 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   radialProbabilityEnabled: false,
   radialProbabilityOpacity: 0.6,
   radialProbabilityColor: '#44aaff',
+
+  // Wigner Phase-Space Visualization
+  wignerDimensionIndex: 0,
+  wignerAutoRange: true,
+  wignerXRange: 6.0,
+  wignerPRange: 6.0,
+  wignerCrossTermsEnabled: true,
+  wignerQuadPoints: 32,
+  wignerClassicalOverlay: false,
 }
 
 // ============================================================================

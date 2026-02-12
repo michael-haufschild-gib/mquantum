@@ -39,7 +39,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1456
+const SCHROEDINGER_UNIFORM_SIZE = 1488
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -102,6 +102,7 @@ const PROBABILITY_CURRENT_COLOR_MODE_MAP: Record<string, number> = {
 const REPRESENTATION_MODE_MAP: Record<string, number> = {
   position: 0,
   momentum: 1,
+  wigner: 2,
 }
 const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
   normalized: 0,
@@ -129,8 +130,9 @@ export interface SchrodingerRendererConfig {
   /** Whether eigenfunction caching is enabled (compile-time shader specialization). */
   eigenfunctionCacheEnabled?: boolean
   /** Wavefunction representation — triggers pipeline rebuild when changed.
-   *  HO momentum uses CPU uniform transform; hydrogen momentum uses shader path. */
-  representation?: 'position' | 'momentum'
+   *  HO momentum uses CPU uniform transform; hydrogen momentum uses shader path.
+   *  Wigner uses 2D pipeline for phase-space visualization. */
+  representation?: 'position' | 'momentum' | 'wigner'
 }
 
 /**
@@ -276,8 +278,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Temporal takes priority: isosurface+temporal uses quarter-res (no normal/depth buffer)
     const isIsosurface = config?.isosurface ?? false
     const isTemporal = config?.temporal ?? false
+    const isWigner = config?.representation === 'wigner'
     const is2D = (config?.dimension ?? 3) === 2
-    const outputs = is2D
+    const pipelineIs2D = is2D || isWigner
+    const outputs = pipelineIs2D
       ? [
           // 2D mode: only color output (no depth, no normal, no temporal)
           { resourceId: 'object-color', access: 'write' as const, binding: 0 },
@@ -319,13 +323,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ...config,
     }
 
-    // Force-disable 3D-only features for 2D mode
-    if (is2D) {
+    // Force-disable 3D-only features for 2D and Wigner modes
+    if (pipelineIs2D) {
       this.rendererConfig.temporal = false
       this.rendererConfig.eigenfunctionCacheEnabled = false
     }
 
-    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? (!is2D)
+    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? (!pipelineIs2D)
 
     // Density grid raymarching: only for 3D hydrogen VOLUMETRIC mode.
     // For hydrogen ND (dim > 3), the 64^3 grid is too coarse to capture the oscillatory
@@ -358,6 +362,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       useEigenfunctionCache,
       useDensityGrid,
       densityGridSize: 64,
+      isWigner,
     }
   }
 
@@ -385,7 +390,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastPbrVersion = -1
     this.lastSchrodingerPbrVersion = -1
 
-    const pipelineIs2D = (this.rendererConfig.dimension ?? 3) === 2
+    const pipelineIs2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
 
     // Density grid compute pass provides uncertainty boundary threshold extraction.
     // Skip for 2D mode (no volumetric raymarching).
@@ -797,7 +802,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Model matrices for raymarching coordinate space conversion
-    const is2D = (this.rendererConfig.dimension ?? 3) === 2
+    const is2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
     let scale: number
     let posX: number
     let posY: number
@@ -1697,6 +1702,47 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       intView[1328 / 4] = 0
     }
 
+    // Wigner phase-space controls (offset 1456-1488)
+    const wignerDimIdx = schroedinger?.wignerDimensionIndex ?? 0
+    intView[1456 / 4] = Math.max(0, Math.min(wignerDimIdx, dimension - 1))
+    intView[1460 / 4] = schroedinger?.wignerCrossTermsEnabled ? 1 : 0
+
+    // Wigner axis ranges: auto-compute from physics or use manual values
+    const wignerAutoRange = schroedinger?.wignerAutoRange ?? true
+    if (wignerAutoRange) {
+      const isHydrogenMode = this.rendererConfig.quantumMode === 'hydrogenND'
+      if (isHydrogenMode && wignerDimIdx < 3) {
+        // Hydrogen radial Wigner: r-axis from 0, p_r-axis symmetric
+        const n = schroedinger?.principalN ?? 1
+        const a0 = schroedinger?.bohrRadiusScale ?? 1.0
+        const rMax = n * n * a0 * 2.5
+        const prMax = 3.0 / (n * a0)
+        floatView[1464 / 4] = rMax
+        floatView[1468 / 4] = prMax
+      } else {
+        // HO mode or hydrogen ND extra dim: scale from omega
+        // For hydrogen ND extra dims (dimIdx >= 3), read from extraDimOmega at offset 640
+        // For HO mode, read from main omega array at offset 16
+        let selectedOmega: number
+        if (isHydrogenMode && wignerDimIdx >= 3) {
+          selectedOmega = floatView[640 / 4 + (wignerDimIdx - 3)] ?? 1.0
+        } else {
+          selectedOmega = floatView[16 / 4 + Math.min(wignerDimIdx, 10)] ?? 1.0
+        }
+        const xRange = this.boundingRadius * 1.5
+        const pRange = xRange * selectedOmega
+        floatView[1464 / 4] = xRange
+        floatView[1468 / 4] = pRange
+      }
+    } else {
+      floatView[1464 / 4] = schroedinger?.wignerXRange ?? 6.0
+      floatView[1468 / 4] = schroedinger?.wignerPRange ?? 6.0
+    }
+    intView[1472 / 4] = schroedinger?.wignerQuadPoints ?? 32
+    intView[1476 / 4] = schroedinger?.wignerClassicalOverlay ? 1 : 0
+    floatView[1480 / 4] = 0.0  // padding
+    floatView[1484 / 4] = 0.0  // padding
+
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
 
@@ -1989,7 +2035,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   execute(ctx: WebGPURenderContext): void {
-    const is2D = (this.rendererConfig.dimension ?? 3) === 2
+    const is2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
 
     // Guard: 2D mode doesn't use vertex/index buffers
     if (

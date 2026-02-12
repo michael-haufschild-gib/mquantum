@@ -14,6 +14,9 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
   const isoEnabled = useExtendedObjectStore(
     (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
   )
+  const representation = useExtendedObjectStore(
+    (state: ExtendedObjectState) => state.schroedinger?.representation ?? 'position'
+  )
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
     sssEnabled: state.sssEnabled,
     setSssEnabled: state.setSssEnabled,
@@ -49,7 +52,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
   return (
     <div className="space-y-4 mb-4 pb-4">
       {/* Subsurface Scattering (volumetric only, 3D+) */}
-      {!isoEnabled && dimension > 2 && (
+      {!isoEnabled && dimension > 2 && representation !== 'wigner' && (
       <ControlGroup
         title="Subsurface Scattering"
         collapsible

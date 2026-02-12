@@ -53,6 +53,7 @@ import {
 
 // 2D-specific blocks
 import { generateMainBlock2D, generateMainBlock2DIsolines } from './main2D.wgsl'
+import { generateMainBlockWigner2D } from './mainWigner2D.wgsl'
 import { nodalLines2DBlock, nodalLines2DStubBlock } from './volume/nodalLines2D.wgsl'
 import { isolines2DBlock, isolines2DStubBlock } from './volume/isolines2D.wgsl'
 
@@ -83,6 +84,10 @@ import {
   psiBlockHydrogenND,
 } from './quantum/psi.wgsl'
 import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from './quantum/density.wgsl'
+
+// Wigner phase-space blocks
+import { wignerHOBlock } from './quantum/wignerHO.wgsl'
+import { wignerHydrogenBlock } from './quantum/wignerHydrogen.wgsl'
 
 // Hydrogen blocks (conditional)
 import { laguerreBlock } from './quantum/laguerre.wgsl'
@@ -165,6 +170,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useEigenfunctionCache?: boolean
   /** Compile-time specialization for uncertainty boundary emphasis. */
   uncertaintyBoundary?: boolean
+  /** Wigner phase-space mode — forces 2D pipeline with phase-space evaluation. */
+  isWigner?: boolean
 }
 
 /**
@@ -191,6 +198,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     uncertaintyBoundary = true,
     colorAlgorithm = 4,
     useEigenfunctionCache = false,
+    isWigner = false,
     overrides = [],
   } = config
 
@@ -199,11 +207,15 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
 
   // Compile-time dimension
   // For HO: actualDim matches dimension (2-11). For hydrogen: always at least 3.
-  const is2D = dimension === 2
+  // Wigner mode uses the 2D pipeline but with the full ND quantum system
+  const is2D = dimension === 2 || isWigner
   const isHydrogenFamily = quantumMode === 'hydrogenND'
+  // Wigner: keep full ND dimension for quantum evaluation even though pipeline is 2D
   const actualDim = isHydrogenFamily
     ? Math.min(Math.max(dimension, 3), 11)
-    : Math.min(Math.max(dimension, 2), 11)
+    : isWigner
+      ? Math.min(Math.max(dimension, 3), 11)
+      : Math.min(Math.max(dimension, 2), 11)
   const includeHydrogen = isHydrogenFamily
   const includeHydrogenND = isHydrogenFamily
   const includeHarmonic = !isHydrogenFamily
@@ -225,6 +237,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const DIMENSION: i32 = ${dimension};`)
   defines.push(`const ACTUAL_DIM: i32 = ${actualDim};`)
   defines.push(`const IS_2D: bool = ${is2D};`)
+  defines.push(`const IS_WIGNER: bool = ${isWigner};`)
   features.push(`${dimension}D Quantum`)
 
   // Add temporal define (for volumetric and isosurface modes)
@@ -281,7 +294,9 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     features.push('Harmonic Oscillator')
   }
 
-  if (is2D) {
+  if (isWigner) {
+    features.push('Wigner Phase-Space Mode')
+  } else if (is2D) {
     features.push(isosurface ? '2D Isolines Mode' : '2D Heatmap Mode')
   } else if (isosurface) {
     features.push('Isosurface Mode')
@@ -319,9 +334,12 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   features.push(`Color: ${COLOR_ALG_NAMES[colorAlgorithm] ?? colorAlgorithm}`)
 
   // Select main block based on mode
+  // Wigner: dedicated phase-space evaluation (2D pipeline, ND quantum system)
   // 2D mode: direct evaluation (no raymarching). Isolines = 2D isosurface equivalent.
   // 3D+ modes: temporal modes output MRT (color + world position)
-  const selectedMainBlock = is2D
+  const selectedMainBlock = isWigner
+    ? generateMainBlockWigner2D()
+    : is2D
     ? isosurface
       ? generateMainBlock2DIsolines()
       : generateMainBlock2D()
@@ -429,7 +447,7 @@ struct VertexOutput {
     { name: 'HO ND Dispatch', content: useCache ? generateHoNDCachedDispatchBlock(actualDim) : generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
 
     // Hydrogen orbital basis functions (conditionally included)
-    { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen },
+    { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen || isWigner },
     { name: 'Legendre Polynomials', content: legendreBlock, condition: includeHydrogen },
     { name: 'Spherical Harmonics', content: sphericalHarmonicsBlock, condition: includeHydrogen },
     { name: 'Hydrogen Radial', content: hydrogenRadialBlock, condition: includeHydrogen },
@@ -437,6 +455,18 @@ struct VertexOutput {
       name: 'Hydrogen Family Fallbacks',
       content: hydrogenFamilyFallbackBlock,
       condition: !includeHydrogen,
+    },
+
+    // Wigner phase-space evaluation (HO analytical — needs Laguerre)
+    // Included for HO mode (full marginal) and hydrogen ND (extra dim single Fock)
+    { name: 'Wigner HO', content: wignerHOBlock, condition: isWigner },
+    // Wigner phase-space evaluation (hydrogen numerical quadrature — needs hydrogenRadial)
+    { name: 'Wigner Hydrogen', content: wignerHydrogenBlock, condition: isWigner && includeHydrogen },
+    // Stub for wignerHydrogenRadial when hydrogen isn't included (WGSL requires all symbols)
+    {
+      name: 'Wigner Hydrogen Stub',
+      content: '// Stub: hydrogen Wigner unavailable in HO mode\nfn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> f32 { return 0.0; }',
+      condition: isWigner && !includeHydrogen,
     },
 
     // Hydrogen ND modules

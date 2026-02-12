@@ -92,7 +92,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
     if (objectType !== 'schroedinger') {
       return null
     }
-    if (dimension <= 2) return null
+    if (dimension <= 2 || config.representation === 'wigner') return null
 
     const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 

@@ -4,6 +4,7 @@
  */
 
 import { Switch } from '@/components/ui/Switch'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import React from 'react'
@@ -22,8 +23,11 @@ export const TemporalReprojectionControls: React.FC = () => {
     }))
   )
   const dimension = useGeometryStore((s) => s.dimension)
+  const representation = useExtendedObjectStore(
+    (s: ExtendedObjectState) => s.schroedinger?.representation ?? 'position'
+  )
 
-  if (dimension <= 2) return null
+  if (dimension <= 2 || representation === 'wigner') return null
 
   return (
     <div className="space-y-2">
