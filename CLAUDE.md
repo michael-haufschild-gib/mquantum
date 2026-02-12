@@ -1,74 +1,39 @@
-=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-000)===
-## KEEP THE BIG PICTURE IN MIND
-This is a scientific research project for my PhD thesis. Students will use this project to study **quantum physics simulations in N dimensions** - specifically Schroedinger wavefunctions including harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions). It is very important for my work and my career, we have to do it in steps, carefully, without mistakes and rush. Avoid hallucinations. Don't jump into coding without first researching. Don't patch bugs reactively. Use WebSearch extensively. Understand the purpose of code before changing it.
+# mquantum — N-Dimensional Quantum Physics Simulator
 
-## RENDERING: WEBGPU ONLY
-This project uses a **custom WebGPU renderer** built on raw `GPUDevice` / `GPUCommandEncoder` APIs. All GPU shaders are written in **WGSL**. The rendering pipeline is a declarative render graph with automatic pass ordering via topological sort.
+## Identity
 
-## QUANTUM PHYSICS SCOPE
-The project has a **single object type**: `ObjectType = 'schroedinger'`. There are no polytopes, fractals, black holes, or other geometric objects. All development should focus on expanding and improving the quantum physics simulation capabilities:
-- **Harmonic Oscillator**: Superposition of up to 8 terms, per-dimension frequencies, Hermite polynomial basis (1D-11D)
-- **Hydrogen Orbital**: Laguerre polynomials + spherical harmonics, real orbital variants (3D)
-- **Hydrogen N-Dimensional**: 3D hydrogen radial core + independent harmonic oscillators for extra dimensions (4D-11D)
+Scientific research project (PhD thesis). Students study quantum physics simulations in N dimensions: Schroedinger wavefunctions including harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions).
 
-=== END CIB-000 ===
+## Constraints (Immutable)
 
+| Constraint | Rule |
+|-----------|------|
+| Single object type | `ObjectType = 'schroedinger'` only. No polytopes, fractals, black holes. |
+| Renderer | Custom WebGPU on raw `GPUDevice` / `GPUCommandEncoder`. No WebGL, no Three.js. |
+| Shaders | WGSL only. Files: `.wgsl.ts` composed via `assembleShaderBlocks()`. |
+| Approach | Research before coding. Understand code purpose before changing it. No reactive patches. |
 
-=== CRITICAL CODE STYLE INSTRUCTION BLOCK (CIB-001)===
+## Required Reading
 
-## MANDATORY DOCUMENT READS
-Read at the start of a new session:
-- Project architecture and folder structure: `docs/architecture.md`
-- Development environment: `docs/testing.md`
-- Testing setup: `docs/testing.md`
-- Frontend setup: `docs/frontend.md`
+These docs are auto-loaded via `@import` — refer to them for details:
+- @docs/architecture.md
+- @docs/meta/styleguide.md
+- @docs/testing.md
+- @docs/frontend.md
+- @package.json
 
+## Commands
 
-## MANDATORY CODE STYLE AND ARCHITECTURE RULES
-Coding agents must follow `docs/meta/styleguide.md` - No exceptions!
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Dev server (already running — do NOT start) |
+| `npm run build` | Full build: wasm:build -> tsc -b -> vite build |
+| `npx vitest run` | Unit tests |
+| `npx vite build` | Vite-only build (skips tsc) |
 
-**All GPU shaders MUST be written in WGSL.** Shaders are TypeScript files exporting template literal strings (`.wgsl.ts`) composed via `assembleShaderBlocks()`.
+## Code Style (Quick Reference)
 
-**WGSL shader files**: `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
-
-**Leverage useShallow**: Leverage useShallow and Zustand 5 to improve performance.
-
-=== END CIB-001 ===
-
-## TECH STACK
-
-### Core Framework
-- **React** 19.2.3 - UI library
-- **TypeScript** 5.6.3 - Type-safe JavaScript
-- **Vite** 7.2.7 - Build tool and dev server
-
-### 3D Graphics & Rendering
-- **Custom WebGPU Renderer** - Pure `GPUDevice` / `GPUCommandEncoder` APIs
-- **WGSL** - All GPU shaders (vertex, fragment, compute)
-- **Declarative Render Graph** - Automatic pass ordering via topological sort
-
-### UI & Styling
-- **Tailwind CSS** 4.1.18 - Utility-first CSS framework
-- **@tailwindcss/vite** 4.1.18 - Vite plugin for Tailwind
-
-### State Management & Utilities
-- **Zustand** 5.0.2 - State management
-
-### Performance-Critical Math (WASM)
-- **Rust/wasm-pack** - Animation-loop math (rotation composition, nD projection, matrix/vector ops)
-- JS fallback for all WASM functions (graceful degradation)
-
-### Testing
-- **vitest** 4.0.15 - Unit testing framework
-- **happy-dom** 15.11.7 - DOM implementation for testing
-- **Playwright** - E2E testing with actual GPU rendering
-
-### Development Tools
-- **ESLint** 9.15.0 - Code linting
-- **@typescript-eslint/parser** 8.15.0 - TypeScript ESLint parser
-- **@typescript-eslint/eslint-plugin** 8.15.0 - TypeScript linting rules
-- **eslint-plugin-react-hooks** 5.0.0 - React Hooks linting
-- **eslint-plugin-react-refresh** 0.4.14 - React Refresh linting
-- **eslint-plugin-jsdoc** 61.5.0 - JSDoc linting
-- **Prettier** 3.4.1 - Code formatting
-- **@vitejs/plugin-react** 5.1.2 - Vite React plugin
+- Follow `docs/meta/styleguide.md` — no exceptions
+- Zustand selectors: use `useShallow` from `zustand/react/shallow` for multi-value selectors
+- Tailwind CSS 4: config in CSS via `@theme` directive, not `tailwind.config.js`
+- Path-specific rules: `.claude/rules/` (shaders, stores, rendering, physics, testing)

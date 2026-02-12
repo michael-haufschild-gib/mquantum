@@ -59,19 +59,25 @@ export function generateMyShape(dimension: number): GeometryData {
 }
 ```
 
-### 2. Shader Interfaces (`src/lib/shaders/`)
-**Contract**: Uniforms passed to GLSL shaders.
+### 2. Shader Interfaces (`src/rendering/webgpu/shaders/`)
+**Contract**: WGSL shader blocks composed via `assembleShaderBlocks()`.
 **Pattern**:
 ```typescript
-const uniforms = useMemo(() => ({
-  uTime: { value: 0 },
-  uColor: { value: new THREE.Color('#ff0000') }
-}), []);
+// Shader blocks are template literal strings
+export const myBlock = /* wgsl */ `
+  fn myFunction(pos: vec3f) -> f32 {
+    return length(pos);
+  }
+`
 
-useFrame((state) => {
-  materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-});
+// Composed in a compose.ts file
+const blocks: ShaderBlock[] = [
+  { name: 'My Block', content: myBlock, condition: featureEnabled },
+]
+const { wgsl } = assembleShaderBlocks(blocks)
 ```
+
+Uniforms are passed via GPU uniform buffers, not per-frame JS updates. See `docs/architecture.md` for bind group layout.
 
 ---
 

@@ -11,11 +11,11 @@ This review identifies **critical performance issues** in the Schroedinger rende
 
 ### 2.1 Redundant Wavefunction Evaluations
 
-**Location**: `psi.glsl.ts` lines 190-227
+**Location**: `psi.wgsl.ts` lines 190-227
 
 For Hydrogen ND mode, the `evalPsiWithSpatialPhase` function evaluates the wavefunction TWICE:
 
-```glsl
+```wgsl
 if (uQuantumMode == QUANTUM_MODE_HYDROGEN_ND) {
     // We call twice: once with t for density, once with 0 for spatial phase
     vec2 psiTime;
@@ -34,16 +34,16 @@ Each `evalHydrogenNDPsi*D` function is expensive (~20-50 ALU operations). The sp
 
 ### 2.2 Density Sampling is Called Multiple Times Per Ray Step
 
-**Location**: `integration.glsl.ts`, `emission.glsl.ts`
+**Location**: `integration.wgsl.ts`, `emission.wgsl.ts`
 
 In `volumeRaymarchHQ`, each step samples density:
-```glsl
+```wgsl
 vec3 densityInfo = sampleDensityWithPhase(pos, animTime);
 ```
 
 Then `computeEmissionLit` is called, which internally may call `sampleDensity` again for:
-1. Self-shadowing (up to 8 additional samples per light) - lines 240-248 in emission.glsl.ts
-2. AO (up to 8 additional samples) - lines 286-302 in emission.glsl.ts
+1. Self-shadowing (up to 8 additional samples per light) - lines 240-248 in emission.wgsl.ts
+2. AO (up to 8 additional samples) - lines 286-302 in emission.wgsl.ts
 
 **Per-step worst case**:
 - 1 density sample for color
@@ -56,9 +56,9 @@ With 64 steps: **2,112 density samples per ray**.
 
 ### 2.3 Gradient Computation Uses Forward Differences but Still Expensive
 
-**Location**: `integration.glsl.ts` lines 67-73
+**Location**: `integration.wgsl.ts` lines 67-73
 
-```glsl
+```wgsl
 // OPTIMIZED: Use forward differences with pre-computed center value
 vec3 computeDensityGradientFast(vec3 pos, float t, float delta, float sCenter) {
     float sxp = sFromRho(sampleDensity(pos + vec3(delta, 0.0, 0.0), t));
@@ -72,10 +72,10 @@ This is **3 additional density samples per step** for gradient. This is called i
 
 ### 2.4 Dispersion Mode Multiplies Sampling Cost
 
-**Location**: `integration.glsl.ts` lines 261-275
+**Location**: `integration.wgsl.ts` lines 261-275
 
 When dispersion is enabled in HQ mode:
-```glsl
+```wgsl
 if (useFullSampling) { // High Quality: Full Sampling
     vec3 dInfoR = sampleDensityWithPhase(pos + dispOffsetR, animTime);
     vec3 dInfoB = sampleDensityWithPhase(pos + dispOffsetB, animTime);
@@ -88,9 +88,9 @@ This adds **2 more density samples per step**.
 
 ### 2.5 Flow Distortion Applied on Every Sample
 
-**Location**: `density.glsl.ts` lines 261-265
+**Location**: `density.wgsl.ts` lines 261-265
 
-```glsl
+```wgsl
 float sampleDensity(vec3 pos, float t) {
     // Apply Animated Flow (Curl Noise)
     vec3 flowedPos = applyFlow(pos, t);
@@ -100,8 +100,8 @@ float sampleDensity(vec3 pos, float t) {
 
 When `curlEnabled`, `applyFlow` calls `curlNoise` which internally calls `distortPosition` which calls `gradientNoise` multiple times.
 
-In `density.glsl.ts` lines 153-199, `curlNoise` does:
-```glsl
+In `density.wgsl.ts` lines 153-199, `curlNoise` does:
+```wgsl
 vec3 curlNoise(vec3 p) {
     const float e = 0.1;
     // ...multiple gradientNoise calls...
@@ -194,9 +194,9 @@ The `useMemo` has **14 dependencies**. Any change to these triggers a full shade
 
 ### 4.1 MAX_VOLUME_SAMPLES Loop Bound vs Actual Sample Count
 
-**Location**: `integration.glsl.ts` lines 108-109, 231-232
+**Location**: `integration.wgsl.ts` lines 108-109, 231-232
 
-```glsl
+```wgsl
 for (int i = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) break;
     // ...
@@ -207,9 +207,9 @@ On most GPUs, the loop is unrolled to `MAX_VOLUME_SAMPLES` (128) iterations, wit
 
 ### 4.2 Transmittance Check Per Channel in HQ Mode
 
-**Location**: `integration.glsl.ts` lines 233-234
+**Location**: `integration.wgsl.ts` lines 233-234
 
-```glsl
+```wgsl
 // Exit if ALL channels are blocked
 if (transmittance.r < MIN_TRANSMITTANCE && transmittance.g < MIN_TRANSMITTANCE && transmittance.b < MIN_TRANSMITTANCE) break;
 ```
@@ -228,9 +228,9 @@ High-density regions could use shorter steps for accuracy, while low-density reg
 
 ### 5.1 Hermite Polynomial Unrolling is Sub-Optimal
 
-**Location**: `hermite.glsl.ts` lines 72-98
+**Location**: `hermite.wgsl.ts` lines 72-98
 
-```glsl
+```wgsl
 if (n == 2) {
     result = result * u + HERMITE_COEFFS[offset + 1];
     result = result * u + HERMITE_COEFFS[offset];
@@ -245,9 +245,9 @@ This creates a **6-way branch** for n=0 through n=6. On GPUs, branches cause div
 
 ### 5.2 HO1D Early Exit May Cause Divergence
 
-**Location**: `ho1d.glsl.ts` lines 62-73
+**Location**: `ho1d.wgsl.ts` lines 62-73
 
-```glsl
+```wgsl
 // OPTIMIZATION: Early exit for points outside 3σ Gaussian envelope
 float distSq = 0.0;
 for (int j = 0; j < MAX_DIM; j++) {
@@ -263,9 +263,9 @@ This early exit causes **thread divergence** within a warp. Half the threads may
 
 ### 5.3 N-Dimensional Coordinate Transform Per Sample
 
-**Location**: `density.glsl.ts` lines 266-284
+**Location**: `density.wgsl.ts` lines 266-284
 
-```glsl
+```wgsl
 // Map 3D position to ND coordinates
 float xND[MAX_DIM];
 for (int j = 0; j < MAX_DIM; j++) {
@@ -321,7 +321,7 @@ u.uResolution.value.set(size.width, size.height);
 
 ```typescript
 if (material.uniforms.uSssColor) {
-    updateLinearColorUniform(cache.faceColor, material.uniforms.uSssColor.value as THREE.Color, sssColor || '#ff8844');
+    updateLinearColorUniform(cache.faceColor, material.uniforms.uSssColor.value assssColor || '#ff8844');
 }
 ```
 
