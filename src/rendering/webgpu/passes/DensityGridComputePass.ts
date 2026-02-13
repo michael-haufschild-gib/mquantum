@@ -55,6 +55,8 @@ export interface DensityGridComputeConfig {
   quantumMode?: 'harmonicOscillator' | 'hydrogenND'
   /** Number of HO superposition terms for compile-time optimization */
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  /** Force rgba16float format (ensures phase data for dim > 3 momentum mode) */
+  forceRgba?: boolean
 }
 
 /**
@@ -253,6 +255,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private async selectGridTextureFormat(
     device: GPUDevice
   ): Promise<'r16float' | 'rgba16float'> {
+    if (this.passConfig.forceRgba) return 'rgba16float'
     const r16floatSupported = await this.supportsStorageTextureFormat(device, 'r16float')
     return r16floatSupported ? 'r16float' : 'rgba16float'
   }

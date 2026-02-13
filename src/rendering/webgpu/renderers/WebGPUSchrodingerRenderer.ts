@@ -159,6 +159,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private cameraBindGroup: GPUBindGroup | null = null
   private lightingBindGroup: GPUBindGroup | null = null
   private objectBindGroup: GPUBindGroup | null = null
+  private objectBindGroupLayout: GPUBindGroupLayout | null = null
 
   // Density Grid Compute Pass (for uncertainty boundary threshold extraction + grid raymarching)
   private densityGridPass: DensityGridComputePass | null = null
@@ -271,6 +272,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private static readonly BOUND_RADIUS_QUANT_STEP = 0.05
   private static readonly BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
 
+  // Wigner cache resolution tracking
+  private lastWignerCacheResolution = 256
+
   constructor(config?: SchrodingerRendererConfig) {
     // Determine outputs based on mode
     // Write to 'object-color' like other renderers (Mandelbulb, Julia, Polytope)
@@ -334,10 +338,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? (!pipelineIs2D)
 
-    // Density grid raymarching: only for 3D hydrogen VOLUMETRIC mode.
-    // For hydrogen ND (dim > 3), the 64^3 grid is too coarse to capture the oscillatory
-    // structure from extra-dimensional HO eigenfunctions, causing visible lattice artifacts.
-    // Those dimensions use inline evaluation with eigencache instead (ho1DCached for extra dims).
+    // Density grid raymarching: for hydrogen VOLUMETRIC mode at all dimensions (3-11D).
+    // Adaptive grid resolution: 64^3 for 3D, 96^3 for 4-5D, 128^3 for 6-11D.
+    // Extra-dim HO quantum numbers are clamped to max 6 → at 96^3 we get ~16 samples/period.
     // HO mode uses eigencache + analytical gradient in both position and momentum representations.
     // Isosurface mode must NOT use the density grid: the 64^3 resolution causes visible
     // voxel-aligned rectangle artifacts at threshold crossings between lobes/nodal surfaces.
@@ -345,7 +348,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
     const dim = this.rendererConfig.dimension ?? 3
     const isosurface = this.rendererConfig.isosurface ?? false
-    const useDensityGrid = enableCache && isHydrogen && dim <= 3 && !isosurface
+    const useDensityGrid = enableCache && isHydrogen && !isosurface
+    const densityGridSize = !useDensityGrid ? 64 : dim <= 3 ? 64 : dim <= 5 ? 96 : 128
 
     // Eigenfunction cache: always enabled when cache is on.
     // For HO momentum, the uniform buffer contains 1/ω → cache produces k-space functions automatically.
@@ -364,7 +368,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       uncertaintyBoundary: this.rendererConfig.uncertaintyBoundaryEnabled ?? true,
       useEigenfunctionCache,
       useDensityGrid,
-      densityGridSize: 64,
+      densityGridSize,
       isWigner,
       useWignerCache: isWigner,
     }
@@ -407,7 +411,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         dimension: this.rendererConfig.dimension ?? 3,
         quantumMode: this.rendererConfig.quantumMode,
         termCount: this.rendererConfig.termCount,
-        gridSize: 64,
+        gridSize: this.shaderConfig.densityGridSize,
+        forceRgba: (this.rendererConfig.dimension ?? 3) > 3,
       })
       await this.densityGridPass.initialize(ctx)
       this.densityGridInitialized = true
@@ -528,6 +533,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       label: 'schroedinger-object-bgl',
       entries: objectBindGroupEntries,
     })
+    this.objectBindGroupLayout = objectBindGroupLayout
     // Create pipeline layout
     const bindGroupLayouts: GPUBindGroupLayout[] = [
       cameraBindGroupLayout,
@@ -1757,27 +1763,42 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (wignerAutoRange) {
       const isHydrogenMode = this.rendererConfig.quantumMode === 'hydrogenND'
       if (isHydrogenMode && wignerDimIdx < 3) {
-        // Hydrogen radial Wigner: r-axis from 0, p_r-axis symmetric
-        const n = schroedinger?.principalN ?? 1
+        // Hydrogen radial Wigner: centered on rCenter = n²a₀ (most probable radius)
+        // wignerXRange = half-extent around rCenter; visible range is
+        // [max(0, rCenter - halfExtent*aspect), rCenter + halfExtent*aspect]
+        const n = schroedinger?.principalQuantumNumber ?? 2
         const a0 = schroedinger?.bohrRadiusScale ?? 1.0
-        const rMax = n * n * a0 * 2.5
+        const rCenter = n * n * a0
+        const rMax = rCenter * 2.5
+        const halfExtent = Math.max(rCenter, rMax - rCenter)
         const prMax = 3.0 / (n * a0)
-        floatView[1464 / 4] = rMax
+        floatView[1464 / 4] = halfExtent
         floatView[1468 / 4] = prMax
       } else {
-        // HO mode or hydrogen ND extra dim: scale from omega
-        // For hydrogen ND extra dims (dimIdx >= 3), read from extraDimOmega at offset 640
-        // For HO mode, read from main omega array at offset 16
+        // HO mode or hydrogen ND extra dim: physics-based range from quantum number and omega
+        // Characteristic HO scale: x_rms = sqrt((2n+1) / omega), p_rms = sqrt((2n+1) * omega)
+        // Show ~3.5 standard deviations for comfortable viewing
         let selectedOmega: number
+        let maxN: number
         if (isHydrogenMode && wignerDimIdx >= 3) {
-          selectedOmega = floatView[640 / 4 + (wignerDimIdx - 3)] ?? 1.0
+          // Hydrogen ND extra dimension
+          const extraIdx = wignerDimIdx - 3
+          selectedOmega = floatView[640 / 4 + extraIdx] ?? 1.0
+          maxN = intView[608 / 4 + extraIdx] ?? 0
         } else {
+          // Pure HO mode: find max quantum number for this dimension across all terms
           selectedOmega = floatView[16 / 4 + Math.min(wignerDimIdx, 10)] ?? 1.0
+          maxN = 0
+          const tc = this.rendererConfig.termCount ?? 1
+          for (let k = 0; k < tc; k++) {
+            const qn = intView[64 / 4 + k * 11 + Math.min(wignerDimIdx, 10)] ?? 0
+            if (qn > maxN) maxN = qn
+          }
         }
-        const xRange = this.boundingRadius * 1.5
-        const pRange = xRange * selectedOmega
-        floatView[1464 / 4] = xRange
-        floatView[1468 / 4] = pRange
+        const xScale = Math.sqrt(Math.max(2 * maxN + 1, 1) / Math.max(selectedOmega, 0.01))
+        const pScale = Math.sqrt(Math.max(2 * maxN + 1, 1) * Math.max(selectedOmega, 0.01))
+        floatView[1464 / 4] = xScale * 3.5
+        floatView[1468 / 4] = pScale * 3.5
       }
     } else {
       floatView[1464 / 4] = schroedinger?.wignerXRange ?? 6.0
@@ -2196,7 +2217,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // WIGNER CACHE COMPUTE PASS (Wigner mode)
     // ============================================
-    // Pre-compute 2D Wigner quasi-probability texture W(x,p) before fragment shader
+    // Two-phase pipeline: spatial precompute (expensive, once per param change)
+    // + reconstruction (cheap, every animated frame with cross terms)
     const wignerPass = this.wignerCachePass
     if (wignerPass && this.wignerCacheInitialized) {
       const extended = ctx.frame?.stores?.['extended'] as any
@@ -2205,6 +2227,30 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const schroedingerVersion = extended?.schroedingerVersion ?? 0
       const rotationVersion = rotation?.version ?? 0
       const isAnimating = animation?.isPlaying ?? false
+
+      // Check for cache resolution change (requires texture resize + bind group rebuild)
+      const wignerCacheResolution = extended?.schroedinger?.wignerCacheResolution ?? 256
+      if (wignerCacheResolution !== this.lastWignerCacheResolution) {
+        const didResize = wignerPass.resize(ctx.device, wignerCacheResolution)
+        this.lastWignerCacheResolution = wignerCacheResolution
+        // Rebuild fragment shader bind group to reference the new cache texture view
+        if (didResize && this.objectBindGroupLayout && this.schroedingerUniformBuffer && this.basisUniformBuffer) {
+          const newCacheView = wignerPass.getCacheTextureView()
+          const newCacheSampler = wignerPass.getCacheSampler()
+          if (newCacheView && newCacheSampler) {
+            this.objectBindGroup = ctx.device.createBindGroup({
+              label: 'schroedinger-object-bg',
+              layout: this.objectBindGroupLayout,
+              entries: [
+                { binding: 0, resource: { buffer: this.schroedingerUniformBuffer } },
+                { binding: 1, resource: { buffer: this.basisUniformBuffer } },
+                { binding: 2, resource: newCacheView },
+                { binding: 3, resource: newCacheSampler },
+              ],
+            })
+          }
+        }
+      }
 
       // Sync Schroedinger uniforms (version-tracked)
       wignerPass.updateSchroedingerUniforms(
@@ -2220,16 +2266,35 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         rotationVersion
       )
 
-      // Update grid x/p ranges from the already-computed Schroedinger uniform buffer
-      const xRange = this.schroedingerFloatView[1464 / 4]
-      const pRange = this.schroedingerFloatView[1468 / 4]
-      wignerPass.updateGridParams(ctx.device, -xRange, xRange, -pRange, pRange)
-
-      // Determine if cache needs recomputation
+      // Determine mode for grid range and update logic
       const schroedinger = extended?.schroedinger
       const crossTermsEnabled = schroedinger?.wignerCrossTermsEnabled ?? false
       const termCount = this.rendererConfig.termCount ?? 1
       const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
+      const wignerDimIdx = this.schroedingerIntView[1456 / 4] ?? 0
+      const isHydrogenRadial = isHydrogen && wignerDimIdx < 3
+
+      // Update grid x/p ranges from the already-computed Schroedinger uniform buffer.
+      // The fragment shader maps x with aspect correction (x * aspect) for square pixels
+      // in phase space, so the cache must cover the same aspect-scaled x range.
+      // Hydrogen radial: centered on rCenter = n²a₀, range [max(0, rCenter-halfExt), rCenter+halfExt]
+      // HO / extra dims: x-axis is [-xRange * aspect, +xRange * aspect] (symmetric)
+      const xRange = this.schroedingerFloatView[1464 / 4]
+      const pRange = this.schroedingerFloatView[1468 / 4]
+      const aspect = ctx.size.width / ctx.size.height
+      let xMin: number
+      let xMax: number
+      if (isHydrogenRadial) {
+        const n = schroedinger?.principalQuantumNumber ?? 2
+        const a0 = schroedinger?.bohrRadiusScale ?? 1.0
+        const rCenter = n * n * a0
+        xMin = Math.max(0, rCenter - xRange * aspect)
+        xMax = rCenter + xRange * aspect
+      } else {
+        xMax = xRange * aspect
+        xMin = -xMax
+      }
+      wignerPass.updateGridParams(ctx.device, xMin, xMax, -pRange, pRange)
 
       // Update time in compute pass buffer for animated HO superpositions.
       // Must happen every frame during animation since version tracking doesn't cover time changes.
@@ -2238,8 +2303,24 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         wignerPass.updateTimeOnly(ctx.device, time)
       }
 
-      if (wignerPass.needsUpdate(isAnimating, crossTermsEnabled, termCount, isHydrogen)) {
-        wignerPass.execute(ctx)
+      const updateFlags = wignerPass.needsUpdate(isAnimating, crossTermsEnabled, termCount, isHydrogen)
+
+      if (wignerPass.isTwoPhaseActive()) {
+        // Two-phase pipeline: spatial + reconstruct dispatched independently
+        if (updateFlags.spatial) {
+          wignerPass.executeSpatial(ctx)
+        }
+        if (updateFlags.reconstruct) {
+          const time = ctx.frame?.time ?? 0
+          const timeScale = this.schroedingerFloatView[676 / 4] ?? 0.8
+          wignerPass.updateReconstructParams(ctx.device, this.schroedingerUniformData, time, timeScale)
+          wignerPass.executeReconstruct(ctx)
+        }
+      } else {
+        // Legacy single-pass pipeline
+        if (updateFlags.spatial) {
+          wignerPass.execute(ctx)
+        }
       }
     }
 

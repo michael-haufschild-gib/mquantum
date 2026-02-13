@@ -9,6 +9,10 @@
  * - Inline evaluation (useCache=false): per-pixel Laguerre/quadrature computation
  * - Cache texture sampling (useCache=true): bilinear sample from pre-computed grid
  *
+ * Coordinate mapping:
+ * - HO / extra dims: symmetric x-axis [-wignerXRange, +wignerXRange]
+ * - Hydrogen radial (dimIdx < 3): one-sided x-axis [0, wignerXRange] since r >= 0
+ *
  * @module rendering/webgpu/shaders/schroedinger/mainWigner2D
  */
 
@@ -27,9 +31,20 @@ export function generateMainBlockWigner2D(useCache = false): string {
   const wignerEvalBlock = useCache
     ? /* wgsl */ `
   // === CACHE PATH: Sample W from pre-computed 2D texture ===
-  // Cache covers [-wignerXRange, +wignerXRange] × [-wignerPRange, +wignerPRange]
   // Map physical coords to cache UV [0,1]
-  let cacheU = (xPhys + schroedinger.wignerXRange) / (2.0 * schroedinger.wignerXRange);
+  // Cache grid range matches the renderer's updateGridParams() computation:
+  // Hydrogen radial: [max(0, rCenter - halfExt*aspect), rCenter + halfExt*aspect]
+  // HO / extra dim: [-xRange*aspect, +xRange*aspect]
+  let xRangeScaled = schroedinger.wignerXRange * aspect;
+  var cacheU: f32;
+  if (isHydrogenRadial) {
+    let rCenter = f32(schroedinger.principalN * schroedinger.principalN) * schroedinger.bohrRadius;
+    let cacheXMin = max(0.0, rCenter - xRangeScaled);
+    let cacheXMax = rCenter + xRangeScaled;
+    cacheU = (xPhys - cacheXMin) / (cacheXMax - cacheXMin);
+  } else {
+    cacheU = (xPhys + xRangeScaled) / (2.0 * xRangeScaled);
+  }
   let cacheV = (pPhys + schroedinger.wignerPRange) / (2.0 * schroedinger.wignerPRange);
 
   // Out-of-bounds: position is outside the cached region
@@ -51,7 +66,8 @@ export function generateMainBlockWigner2D(useCache = false): string {
     // Hydrogen family
     if (dimIdx < 3) {
       // Core radial dimension: numerical Fourier-cosine quadrature
-      let r = max(xPhys, 0.0);
+      // xPhys >= 0 guaranteed by discard check above for hydrogen radial.
+      let r = xPhys;
       let pr = pPhys;
       W = wignerHydrogenRadial(
         r, pr,
@@ -98,18 +114,36 @@ fn classicalEllipseSDF(x: f32, p: f32, omega: f32, energy: f32, lineWidth: f32) 
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // Map UV [0,1] to centered coordinates [-1,1]
-  let centeredUV = input.uv * 2.0 - 1.0;
+  // Detect hydrogen radial mode: one-sided x-axis [0, rMax] since r >= 0
+  let isHydrogenRadial = (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND)
+    && (schroedinger.wignerDimensionIndex < 3);
 
-  // Scale by axis ranges and aspect ratio
+  // Map UV to physical (x, p) coordinates with aspect correction
+  // for square pixels in phase space (1 unit x = 1 unit p on screen).
+  // Both modes use symmetric UV mapping centered at origin.
+  // Hydrogen radial: offset by rCenter = n²a₀ so the orbital peak is at screen center.
+  // HO / extra dim: centered at origin (symmetric wavefunction).
+  // p is always symmetric: [-wignerPRange, +wignerPRange]
   let aspect = camera.resolution.x / camera.resolution.y;
-  let x = centeredUV.x * schroedinger.wignerXRange * aspect;
-  let p = centeredUV.y * schroedinger.wignerPRange;
+  let centeredUV = input.uv * 2.0 - 1.0;
+  var x = centeredUV.x * schroedinger.wignerXRange * aspect;
+  var p = centeredUV.y * schroedinger.wignerPRange;
 
-  // Apply camera pan (model matrix translation) for interactive navigation
+  // Hydrogen radial: shift origin to rCenter so orbital peak is at screen center
+  if (isHydrogenRadial) {
+    let rCenter = f32(schroedinger.principalN * schroedinger.principalN) * schroedinger.bohrRadius;
+    x += rCenter;
+  }
+
+  // Apply camera pan/zoom (model matrix) for interactive navigation
   let panResult = (camera.modelMatrix * vec4f(x, p, 0.0, 1.0)).xyz;
   let xPhys = panResult.x;
   let pPhys = panResult.y;
+
+  // Hydrogen radial: discard negative r (unphysical region)
+  if (isHydrogenRadial && xPhys < 0.0) {
+    discard;
+  }
 
   // Evaluate Wigner function
 ${wignerEvalBlock}
@@ -143,7 +177,9 @@ ${wignerEvalBlock}
   // Classical trajectory overlay
   if (schroedinger.wignerClassicalOverlay != 0u) {
     // Compute pixel size in phase-space units for line width scaling
-    let pixelX = schroedinger.wignerXRange * aspect * 2.0 / camera.resolution.x;
+    // Both modes use symmetric mapping: x covers [-xRange*aspect, +xRange*aspect]
+    let xExtent = schroedinger.wignerXRange * aspect * 2.0;
+    let pixelX = xExtent / camera.resolution.x;
     let pixelP = schroedinger.wignerPRange * 2.0 / camera.resolution.y;
     let lineWidth = max(pixelX, pixelP) * 1.5;
     let lineColor = vec3f(1.0, 1.0, 1.0);
@@ -209,6 +245,23 @@ ${wignerEvalBlock}
 
   if (alpha < 0.005) {
     discard;
+  }
+
+  // === DIAGNOSTIC OVERLAY (bottom-left corner) ===
+  // Shows quantum numbers as colored blocks to verify GPU-side values.
+  // Color: R=principalN/7, G=azimuthalL/6, B=magneticM indicator
+  // Position: bottom-left 60x40 pixel region
+  let pixelX = input.uv.x * camera.resolution.x;
+  let pixelY = (1.0 - input.uv.y) * camera.resolution.y; // flip Y: 0=top
+  if (pixelX < 60.0 && pixelY > camera.resolution.y - 40.0) {
+    let n = f32(schroedinger.principalN);
+    let l = f32(schroedinger.azimuthalL);
+    let m = f32(schroedinger.magneticM);
+    // Encode: R = n/7 (bright=high n), G = l/6 (bright=high l), B = (m+l)/(2l+1)
+    let diagR = clamp(n / 7.0, 0.0, 1.0);
+    let diagG = clamp(l / 6.0, 0.0, 1.0);
+    let diagB = select(0.5, clamp((m + l) / max(2.0 * l, 1.0), 0.0, 1.0), l > 0.0);
+    return vec4f(diagR, diagG, diagB, 1.0);
   }
 
   return vec4f(col, alpha);

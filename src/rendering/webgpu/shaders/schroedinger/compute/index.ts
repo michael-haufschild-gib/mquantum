@@ -36,3 +36,22 @@ export {
   composeWignerCacheComputeShader,
   type WignerCacheComputeConfig,
 } from './composeWignerCache'
+
+export {
+  wignerSpatialParamsBlock,
+  wignerSpatialComputeBlock,
+  WIGNER_SPATIAL_PARAMS_SIZE,
+} from './wignerSpatial.wgsl'
+
+export {
+  composeWignerSpatialComputeShader,
+  type WignerSpatialComputeConfig,
+} from './composeWignerSpatial'
+
+export {
+  wignerReconstructParamsBlock,
+  wignerReconstructComputeBlock,
+  WIGNER_RECONSTRUCT_PARAMS_SIZE,
+} from './wignerReconstruct.wgsl'
+
+export { composeWignerReconstructComputeShader } from './composeWignerReconstruct'

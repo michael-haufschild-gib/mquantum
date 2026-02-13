@@ -673,7 +673,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   wignerCrossTermsEnabled: true,
   wignerQuadPoints: 32,
   wignerClassicalOverlay: false,
-  wignerCacheResolution: 512,
+  wignerCacheResolution: 256,
 }
 
 // ============================================================================

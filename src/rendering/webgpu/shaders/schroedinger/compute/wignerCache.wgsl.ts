@@ -111,7 +111,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Hydrogen family
     if (dimIdx < 3) {
       // Core radial dimension: numerical Fourier-cosine quadrature
-      let r = max(xPhys, 0.0);
+      // xPhys >= 0 guaranteed by grid range [0, xRange] for hydrogen radial;
+      // hydrogenReducedRadial() handles r <= 0 as a safety net.
+      let r = xPhys;
       let pr = pPhys;
       W = wignerHydrogenRadial(
         r, pr,
