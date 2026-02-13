@@ -63,7 +63,7 @@ export interface PaperTexturePassConfig {
 /**
  * WGSL Paper Texture Fragment Shader
  */
-const PAPER_TEXTURE_SHADER = /* wgsl */ `
+export const PAPER_TEXTURE_SHADER = /* wgsl */ `
 struct Uniforms {
   resolution: vec2f,
   time: f32,
@@ -113,6 +113,18 @@ fn rotate2d(uv: vec2f, th: f32) -> vec2f {
   let c = cos(th);
   let s = sin(th);
   return vec2f(c * uv.x + s * uv.y, -s * uv.x + c * uv.y);
+}
+
+fn getUvFrame(uv: vec2f) -> f32 {
+  let aax = 2.0 * fwidth(uv.x);
+  let aay = 2.0 * fwidth(uv.y);
+
+  let left = smoothstep(0.0, aax, uv.x);
+  let right = 1.0 - smoothstep(1.0 - aax, 1.0, uv.x);
+  let bottom = smoothstep(0.0, aay, uv.y);
+  let top = 1.0 - smoothstep(1.0 - aay, 1.0, uv.y);
+
+  return left * right * bottom * top;
 }
 
 // Texture-based random using R channel
@@ -225,13 +237,13 @@ fn fiberNoiseFbm(n: vec2f, seedOffset: vec2f, octaves: i32) -> f32 {
   return total;
 }
 
-// Forward difference (3 FBM calls) instead of central difference (4 FBM calls)
 fn fiberNoise(uv: vec2f, seedOffset: vec2f, octaves: i32) -> f32 {
   let epsilon = 0.001;
-  let n0 = fiberNoiseFbm(uv, seedOffset, octaves);
   let n1 = fiberNoiseFbm(uv + vec2f(epsilon, 0.0), seedOffset, octaves);
-  let n2 = fiberNoiseFbm(uv + vec2f(0.0, epsilon), seedOffset, octaves);
-  return length(vec2f(n1 - n0, n2 - n0)) / epsilon;
+  let n2 = fiberNoiseFbm(uv - vec2f(epsilon, 0.0), seedOffset, octaves);
+  let n3 = fiberNoiseFbm(uv + vec2f(0.0, epsilon), seedOffset, octaves);
+  let n4 = fiberNoiseFbm(uv - vec2f(0.0, epsilon), seedOffset, octaves);
+  return length(vec2f(n1 - n2, n3 - n4)) / (2.0 * epsilon);
 }
 
 // ============================================================================
@@ -428,29 +440,35 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   let bgColor = uniforms.colorBack.rgb * uniforms.colorBack.a;
   let bgOpacity = uniforms.colorBack.a;
 
+  // Image displacement + frame mask preserve edge behavior from the source implementation.
+  let imageUV = uv + 0.02 * normalImage;
+  var frame = getUvFrame(imageUV);
+  let imageSampleUV = clamp(imageUV, vec2f(0.0), vec2f(1.0));
+  var imageColor = textureSample(tDiffuse, texSampler, imageSampleUV);
+  let relief = 0.6 * pow(uniforms.contrast, 0.4) * (res - 0.7);
+  imageColor = vec4f(imageColor.rgb + relief, imageColor.a);
+
+  frame *= imageColor.a;
+
   // Paper texture color
   var paperColor = fgColor * res;
   var paperOpacity = fgOpacity * res;
 
   paperColor += bgColor * (1.0 - paperOpacity);
   paperOpacity += bgOpacity * (1.0 - paperOpacity);
+  paperOpacity = mix(paperOpacity, 1.0, frame);
 
   // Apply drops darkening
   paperColor -= 0.007 * dropsVal;
 
-  // Blend with input based on intensity
-  // Use multiply blend for paper texture effect
-  let blendedColor = mix(inputColor.rgb, inputColor.rgb * paperColor, uniforms.intensity);
+  // Blend paper with displaced image using frame mask
+  paperColor = mix(paperColor, imageColor.rgb, frame);
 
-  // Add subtle normal displacement to image
-  var displacedUV = uv + 0.01 * normalImage * uniforms.intensity;
-  displacedUV = clamp(displacedUV, vec2f(0.0), vec2f(1.0));
-  let displacedColor = textureSample(tDiffuse, texSampler, displacedUV).rgb;
+  // Global intensity control for runtime tuning
+  let finalColor = mix(inputColor.rgb, paperColor, uniforms.intensity);
+  let finalAlpha = mix(inputColor.a, paperOpacity, uniforms.intensity);
 
-  // Final blend
-  let finalColor = mix(blendedColor, displacedColor * paperColor, 0.3 * uniforms.intensity);
-
-  return vec4f(finalColor, inputColor.a);
+  return vec4f(finalColor, finalAlpha);
 }
 `
 
