@@ -100,6 +100,17 @@ export const TRANSIENT_FIELDS = new Set([
 
   // Legacy skybox sync-with-object toggle (removed — skybox always uses palette)
   'syncWithObject',
+
+  // Second quantization educational layer — session-specific interpretive UI, not scene state
+  'sqLayerEnabled',
+  'sqLayerMode',
+  'sqLayerSelectedModeIndex',
+  'sqLayerShowOccupation',
+  'sqLayerShowUncertainty',
+  'sqLayerCoherentAlphaRe',
+  'sqLayerCoherentAlphaIm',
+  'sqLayerSqueezeR',
+  'sqLayerSqueezeTheta',
 ])
 
 /**
@@ -177,10 +188,19 @@ export const serializeExtendedState = <T extends object>(
     return {}
   }
 
+  // Filter transient fields from the nested config before cloning
+  const configRecord = config as Record<string, unknown>
+  const filtered: Record<string, unknown> = {}
+  for (const key in configRecord) {
+    if (typeof configRecord[key] === 'function') continue
+    if (TRANSIENT_FIELDS.has(key)) continue
+    filtered[key] = configRecord[key]
+  }
+
   // Return only the relevant config, keyed by its config key
   // This allows mergeExtendedObjectState to properly merge on load
   return {
-    [configKey]: JSON.parse(JSON.stringify(config)),
+    [configKey]: JSON.parse(JSON.stringify(filtered)),
   }
 }
 
@@ -203,6 +223,25 @@ export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T)
     delete surfaceSettings.faceOpacity
   }
 
+  return clean
+}
+
+/**
+ * Sanitizes extended object config, stripping transient fields from nested config objects.
+ * The extended store has structure `{ schroedinger: { ...fields } }`, so we need to
+ * sanitize both the top level and each nested config object.
+ * @param state - The extended state object loaded from a preset.
+ * @returns A sanitized copy with transient fields removed at all levels.
+ */
+export const sanitizeExtendedLoadedState = <T extends Record<string, unknown>>(state: T): T => {
+  const clean = sanitizeLoadedState(state)
+  // Also sanitize nested config objects (e.g., clean.schroedinger)
+  for (const key of Object.keys(clean)) {
+    const value = clean[key]
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      clean[key] = sanitizeLoadedState(value as Record<string, unknown>)
+    }
+  }
   return clean
 }
 
@@ -233,7 +272,7 @@ export const sanitizeSceneData = (data: SavedScene['data']): SavedScene['data'] 
   environment: sanitizeLoadedState(data.environment),
   pbr: sanitizeLoadedState(data.pbr),
   geometry: sanitizeLoadedState(data.geometry),
-  extended: sanitizeLoadedState(data.extended),
+  extended: sanitizeExtendedLoadedState(data.extended),
   transform: sanitizeLoadedState(data.transform),
   rotation: sanitizeLoadedState(data.rotation),
   animation: sanitizeLoadedState(data.animation),

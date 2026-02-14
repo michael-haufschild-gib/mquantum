@@ -2,7 +2,7 @@
  * Shared types for SchroedingerControls components
  */
 
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import type { SchroedingerConfig, SecondQuantizationMode } from '@/lib/geometry/extended/types'
 import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
 /**
@@ -53,6 +53,30 @@ export interface WignerActions {
   setQuadPoints: ExtendedObjectState['setSchroedingerWignerQuadPoints']
   setClassicalOverlay: ExtendedObjectState['setSchroedingerWignerClassicalOverlay']
   setCacheResolution: ExtendedObjectState['setSchroedingerWignerCacheResolution']
+}
+
+/**
+ * Actions for Second Quantization Educational Layer
+ */
+export interface SecondQuantizationActions {
+  setEnabled: ExtendedObjectState['setSchroedingerSqLayerEnabled']
+  setMode: ExtendedObjectState['setSchroedingerSqLayerMode']
+  setSelectedModeIndex: ExtendedObjectState['setSchroedingerSqLayerSelectedModeIndex']
+  setShowOccupation: ExtendedObjectState['setSchroedingerSqLayerShowOccupation']
+  setShowUncertainty: ExtendedObjectState['setSchroedingerSqLayerShowUncertainty']
+  setCoherentAlphaRe: ExtendedObjectState['setSchroedingerSqLayerCoherentAlphaRe']
+  setCoherentAlphaIm: ExtendedObjectState['setSchroedingerSqLayerCoherentAlphaIm']
+  setSqueezeR: ExtendedObjectState['setSchroedingerSqLayerSqueezeR']
+  setSqueezeTheta: ExtendedObjectState['setSchroedingerSqLayerSqueezeTheta']
+}
+
+/**
+ * Props for Second Quantization Section
+ */
+export interface SecondQuantizationSectionProps {
+  config: SchroedingerConfig
+  dimension: number
+  actions: SecondQuantizationActions
 }
 
 /**

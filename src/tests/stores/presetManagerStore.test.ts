@@ -633,6 +633,54 @@ describe('presetManagerStore', () => {
       expect(useEnvironmentStore.getState().skyboxEnabled).toBe(false)
     })
 
+    it('should strip nested sqLayer transient fields when loading a scene', () => {
+      // Simulate a legacy scene saved before sqLayer fields were marked transient
+      const legacyScene = {
+        id: 'sq-legacy-id',
+        name: 'Legacy SQ Scene',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: {
+            schroedinger: {
+              quantumMode: 'harmonicOscillator',
+              termCount: 3,
+              sqLayerEnabled: true,
+              sqLayerMode: 'coherent',
+              sqLayerCoherentAlphaRe: 2.5,
+              sqLayerSelectedModeIndex: 1,
+            },
+          },
+          transform: {},
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: [] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      usePresetManagerStore.getState().importScenes(JSON.stringify([legacyScene]))
+      const [imported] = usePresetManagerStore.getState().savedScenes
+      expect(imported).toBeDefined()
+
+      // Load the scene — sqLayer transient fields should be stripped during load
+      usePresetManagerStore.getState().loadScene(imported!.id)
+
+      const config = useExtendedObjectStore.getState().schroedinger
+      // Non-transient fields should be restored
+      expect(config.quantumMode).toBe('harmonicOscillator')
+      expect(config.termCount).toBe(3)
+      // sqLayer fields should NOT have been applied from the legacy scene —
+      // they should retain their defaults (false, 'fock', 0, etc.)
+      expect(config.sqLayerEnabled).toBe(false)
+      expect(config.sqLayerMode).toBe('fock')
+      expect(config.sqLayerSelectedModeIndex).toBe(0)
+    })
+
     it('should strip version fields when importing styles', () => {
       // Import a style that contains version fields (e.g., from an older export)
       const styleWithVersions = {

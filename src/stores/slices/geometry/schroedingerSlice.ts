@@ -637,6 +637,17 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
 
+    // === Second Quantization Educational Layer ===
+    setSchroedingerSqLayerEnabled: valueSetter('sqLayerEnabled'),
+    setSchroedingerSqLayerMode: valueSetter('sqLayerMode'),
+    setSchroedingerSqLayerSelectedModeIndex: clampedSetter('sqLayerSelectedModeIndex', 0, 10),
+    setSchroedingerSqLayerShowOccupation: valueSetter('sqLayerShowOccupation'),
+    setSchroedingerSqLayerShowUncertainty: valueSetter('sqLayerShowUncertainty'),
+    setSchroedingerSqLayerCoherentAlphaRe: clampedSetter('sqLayerCoherentAlphaRe', -5, 5),
+    setSchroedingerSqLayerCoherentAlphaIm: clampedSetter('sqLayerCoherentAlphaIm', -5, 5),
+    setSchroedingerSqLayerSqueezeR: clampedSetter('sqLayerSqueezeR', 0, 3),
+    setSchroedingerSqLayerSqueezeTheta: clampedSetter('sqLayerSqueezeTheta', 0, 2 * Math.PI),
+
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
       setWithVersion((state) => ({
@@ -694,6 +705,11 @@ export const createSchroedingerSlice: StateCreator<
           colorMode,
           extent,
           densityGain,
+          // Clamp SQ layer mode index to valid dimension range
+          sqLayerSelectedModeIndex: Math.min(
+            state.schroedinger.sqLayerSelectedModeIndex,
+            Math.max(0, dimension - 1)
+          ),
           ...hydrogenUpdate,
         },
       }))

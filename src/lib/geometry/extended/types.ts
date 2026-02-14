@@ -100,6 +100,14 @@ export type SchroedingerRenderStyle = 'rayMarching'
 export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND'
 
 /**
+ * Second-quantization educational layer interpretation mode.
+ * - fock: Number state |n> (default)
+ * - coherent: Coherent state |alpha> = displacement operator on vacuum
+ * - squeezed: Squeezed vacuum state S(r,theta)|0>
+ */
+export type SecondQuantizationMode = 'fock' | 'coherent' | 'squeezed'
+
+/**
  * Wavefunction representation space.
  * - position: ψ(x), rendered in configuration space
  * - momentum: φ(k), rendered in reciprocal space
@@ -484,6 +492,26 @@ export interface SchroedingerConfig {
   wignerClassicalOverlay: boolean
   /** Resolution of the pre-computed Wigner cache texture (128-1024) */
   wignerCacheResolution: number
+
+  // === Second Quantization Educational Layer ===
+  /** Master toggle for second-quantization interpretation overlay */
+  sqLayerEnabled: boolean
+  /** Interpretation mode: Fock, coherent, or squeezed */
+  sqLayerMode: SecondQuantizationMode
+  /** Which HO dimension mode index to inspect (0-based) */
+  sqLayerSelectedModeIndex: number
+  /** Show occupation number table */
+  sqLayerShowOccupation: boolean
+  /** Show uncertainty metrics card */
+  sqLayerShowUncertainty: boolean
+  /** Re(alpha) for coherent state preset */
+  sqLayerCoherentAlphaRe: number
+  /** Im(alpha) for coherent state preset */
+  sqLayerCoherentAlphaIm: number
+  /** Squeeze parameter r */
+  sqLayerSqueezeR: number
+  /** Squeeze angle theta */
+  sqLayerSqueezeTheta: number
 }
 
 /**
@@ -674,6 +702,17 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   wignerQuadPoints: 32,
   wignerClassicalOverlay: false,
   wignerCacheResolution: 256,
+
+  // Second Quantization Educational Layer
+  sqLayerEnabled: false,
+  sqLayerMode: 'fock' as SecondQuantizationMode,
+  sqLayerSelectedModeIndex: 0,
+  sqLayerShowOccupation: true,
+  sqLayerShowUncertainty: true,
+  sqLayerCoherentAlphaRe: 1.0,
+  sqLayerCoherentAlphaIm: 0.0,
+  sqLayerSqueezeR: 0.5,
+  sqLayerSqueezeTheta: 0.0,
 }
 
 // ============================================================================

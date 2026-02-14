@@ -8,6 +8,7 @@ import {
   SchroedingerQualityPreset,
   SchroedingerQuantumMode,
   SchroedingerRenderStyle,
+  SecondQuantizationMode,
 } from '@/lib/geometry/extended/types'
 
 // ============================================================================
@@ -198,6 +199,17 @@ export interface SchroedingerSliceActions {
   setSchroedingerWignerQuadPoints: (points: number) => void
   setSchroedingerWignerClassicalOverlay: (enabled: boolean) => void
   setSchroedingerWignerCacheResolution: (resolution: number) => void
+
+  // Second Quantization Educational Layer
+  setSchroedingerSqLayerEnabled: (enabled: boolean) => void
+  setSchroedingerSqLayerMode: (mode: SecondQuantizationMode) => void
+  setSchroedingerSqLayerSelectedModeIndex: (index: number) => void
+  setSchroedingerSqLayerShowOccupation: (show: boolean) => void
+  setSchroedingerSqLayerShowUncertainty: (show: boolean) => void
+  setSchroedingerSqLayerCoherentAlphaRe: (re: number) => void
+  setSchroedingerSqLayerCoherentAlphaIm: (im: number) => void
+  setSchroedingerSqLayerSqueezeR: (r: number) => void
+  setSchroedingerSqLayerSqueezeTheta: (theta: number) => void
 
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void

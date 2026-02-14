@@ -23,7 +23,11 @@ import React from 'react'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { WignerControls } from './WignerControls'
-import type { HarmonicOscillatorActions, HydrogenNDActions, WignerActions } from './types'
+import type {
+  HarmonicOscillatorActions,
+  HydrogenNDActions,
+  WignerActions,
+} from './types'
 
 /**
  * Props for the SchroedingerControls component.

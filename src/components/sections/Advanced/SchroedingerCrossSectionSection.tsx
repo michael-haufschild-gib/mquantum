@@ -1,7 +1,9 @@
+import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Section } from '@/components/sections/Section'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
 import { ToggleButton } from '@/components/ui/ToggleButton'
 import type {
   SchroedingerCrossSectionAxis,
@@ -9,6 +11,8 @@ import type {
   SchroedingerCrossSectionPlaneMode,
   SchroedingerCrossSectionScalar,
 } from '@/lib/geometry/extended/types'
+import { SecondQuantizationSection } from '@/components/sections/Geometry/SchroedingerControls/SecondQuantizationSection'
+import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
@@ -52,6 +56,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
     const dimension = useGeometryStore((state) => state.dimension)
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
       config: state.schroedinger,
+      // Cross-section actions
       setCrossSectionEnabled: state.setSchroedingerCrossSectionEnabled,
       setCrossSectionCompositeMode: state.setSchroedingerCrossSectionCompositeMode,
       setCrossSectionScalar: state.setSchroedingerCrossSectionScalar,
@@ -68,6 +73,16 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
       setRadialProbabilityEnabled: state.setSchroedingerRadialProbabilityEnabled,
       setRadialProbabilityOpacity: state.setSchroedingerRadialProbabilityOpacity,
       setRadialProbabilityColor: state.setSchroedingerRadialProbabilityColor,
+      // Second quantization actions
+      setSqLayerEnabled: state.setSchroedingerSqLayerEnabled,
+      setSqLayerMode: state.setSchroedingerSqLayerMode,
+      setSqLayerSelectedModeIndex: state.setSchroedingerSqLayerSelectedModeIndex,
+      setSqLayerShowOccupation: state.setSchroedingerSqLayerShowOccupation,
+      setSqLayerShowUncertainty: state.setSchroedingerSqLayerShowUncertainty,
+      setSqLayerCoherentAlphaRe: state.setSchroedingerSqLayerCoherentAlphaRe,
+      setSqLayerCoherentAlphaIm: state.setSchroedingerSqLayerCoherentAlphaIm,
+      setSqLayerSqueezeR: state.setSchroedingerSqLayerSqueezeR,
+      setSqLayerSqueezeTheta: state.setSchroedingerSqLayerSqueezeTheta,
     }))
     const {
       config,
@@ -87,6 +102,16 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
       setRadialProbabilityEnabled,
       setRadialProbabilityOpacity,
       setRadialProbabilityColor,
+      // SQ actions
+      setSqLayerEnabled,
+      setSqLayerMode,
+      setSqLayerSelectedModeIndex,
+      setSqLayerShowOccupation,
+      setSqLayerShowUncertainty,
+      setSqLayerCoherentAlphaRe,
+      setSqLayerCoherentAlphaIm,
+      setSqLayerSqueezeR,
+      setSqLayerSqueezeTheta,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     if (objectType !== 'schroedinger') {
@@ -96,28 +121,41 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
 
     const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 
+    const isHarmonicOscillatorMode = config.quantumMode === 'harmonicOscillator'
+
+    const sqActions: SecondQuantizationActions = {
+      setEnabled: setSqLayerEnabled,
+      setMode: setSqLayerMode,
+      setSelectedModeIndex: setSqLayerSelectedModeIndex,
+      setShowOccupation: setSqLayerShowOccupation,
+      setShowUncertainty: setSqLayerShowUncertainty,
+      setCoherentAlphaRe: setSqLayerCoherentAlphaRe,
+      setCoherentAlphaIm: setSqLayerCoherentAlphaIm,
+      setSqueezeR: setSqLayerSqueezeR,
+      setSqueezeTheta: setSqLayerSqueezeTheta,
+    }
+
     return (
       <Section
         title="Analysis"
         defaultOpen={defaultOpen}
         data-testid="cross-section-slice-section"
       >
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Enable Slice Plane</label>
-            <ToggleButton
-              pressed={config.crossSectionEnabled ?? false}
-              onToggle={() => setCrossSectionEnabled(!(config.crossSectionEnabled ?? false))}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle cross-section slice"
+        {/* Slice Plane */}
+        <ControlGroup
+          title="Slice Plane"
+          collapsible
+          defaultOpen
+          rightElement={
+            <Switch
+              checked={config.crossSectionEnabled ?? false}
+              onCheckedChange={(checked) => setCrossSectionEnabled(checked)}
               data-testid="schroedinger-cross-section-toggle"
-            >
-              {config.crossSectionEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-
+            />
+          }
+        >
           {config.crossSectionEnabled && (
-            <div className="ps-2 mt-2 border-s border-border-default space-y-2">
+            <div className="space-y-2">
               <Select
                 label="Compositing"
                 options={CROSS_SECTION_COMPOSITE_OPTIONS}
@@ -273,24 +311,24 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
               </p>
             </div>
           )}
-        </div>
+        </ControlGroup>
 
+        {/* Radial Probability (hydrogen ND only) */}
         {config.quantumMode === 'hydrogenND' && (
-          <div className="space-y-1 mt-3 pt-3 border-t border-border-subtle">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-text-secondary">Radial Probability P(r)</label>
-              <ToggleButton
-                pressed={config.radialProbabilityEnabled ?? false}
-                onToggle={() => setRadialProbabilityEnabled(!(config.radialProbabilityEnabled ?? false))}
-                className="text-xs px-2 py-1 h-auto"
-                ariaLabel="Toggle radial probability overlay"
+          <ControlGroup
+            title="Radial Probability P(r)"
+            collapsible
+            defaultOpen={false}
+            rightElement={
+              <Switch
+                checked={config.radialProbabilityEnabled ?? false}
+                onCheckedChange={(checked) => setRadialProbabilityEnabled(checked)}
                 data-testid="schroedinger-radial-probability-toggle"
-              >
-                {config.radialProbabilityEnabled ? 'ON' : 'OFF'}
-              </ToggleButton>
-            </div>
+              />
+            }
+          >
             {config.radialProbabilityEnabled && (
-              <div className="ps-2 border-s border-border-default space-y-2">
+              <div className="space-y-2">
                 <Slider
                   label="Opacity"
                   min={0}
@@ -315,7 +353,12 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
                 </div>
               </div>
             )}
-          </div>
+          </ControlGroup>
+        )}
+
+        {/* Second Quantization Educational Layer (HO modes only) */}
+        {isHarmonicOscillatorMode && (
+          <SecondQuantizationSection config={config} dimension={dimension} actions={sqActions} />
         )}
       </Section>
     )

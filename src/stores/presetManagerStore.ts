@@ -23,6 +23,7 @@ import {
   serializeRotationState,
   serializeExtendedState,
   sanitizeLoadedState,
+  sanitizeExtendedLoadedState,
   sanitizeStyleData,
   sanitizeSceneData,
 } from './utils/presetSerialization'
@@ -425,7 +426,7 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // mergeExtendedObjectStateForType merges with defaults and only touches the relevant config
         useExtendedObjectStore.setState(
           mergeExtendedObjectStateForType(
-            sanitizeLoadedState(scene.data.extended),
+            sanitizeExtendedLoadedState(scene.data.extended),
             loadedObjectType
           )
         )
