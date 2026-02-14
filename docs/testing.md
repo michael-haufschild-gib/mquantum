@@ -49,27 +49,13 @@ Vitest is configured with `src/tests/setup.ts` which already:
 
 ## How to Run Tests (Commands)
 
-```bash
-# All Vitest tests (CI-safe)
-npm test
-
-# Single Vitest file
-npx vitest run src/tests/path/to/test.test.ts
-
-# Tests matching a name/pattern
-npx vitest run -t "Render graph"
-
-# Playwright E2E (auto-starts dev server via playwright.config.ts)
-npx playwright test
-
-# Single Playwright spec file
-npx playwright test scripts/playwright/object-types-rendering.spec.ts
-```
-
-### Watch mode rule
-
-- **Never** run watch mode in automation.
-- For local interactive debugging only: `npm run test:watch` (human-authorized).
+| Task | Command |
+|------|---------|
+| All unit tests (CI-safe) | `npm test` |
+| Single file | `npx vitest run src/tests/path/to/test.test.ts` |
+| Pattern match | `npx vitest run -t "Render graph"` |
+| Playwright E2E | `npx playwright test` |
+| Single Playwright spec | `npx playwright test scripts/playwright/file.spec.ts` |
 
 ## Templates (Copy/Paste)
 
@@ -244,12 +230,6 @@ test('<feature> does not emit WebGPU or render graph errors', async ({ page }) =
 2. **Center pixel gate**: sample a small canvas region to detect "all black" renders.
 3. **Full screenshot analysis**: only when necessary (most expensive).
 
-## Memory-Safe Testing Rules (Do not break these)
-
-- Do **not** increase Vitest workers. Keep `maxWorkers: 4` and `pool: 'threads'` in `vitest.config.ts`.
-- Keep tests small: avoid huge arrays; batch in chunks of 100.
-- Always clean up timers/listeners you create in tests.
-
 ## Common Mistakes
 
 - **Don't**: Write tests outside `src/tests/` or Playwright specs outside `scripts/playwright/`.
@@ -261,14 +241,8 @@ test('<feature> does not emit WebGPU or render graph errors', async ({ page }) =
 - **Don't**: Use fetch-based debugging or remote logging in tests.
   **Do**: Use Playwright console capture (`page.on('console')`) and assert on collected logs.
 
-- **Don't**: Run Vitest watch mode in automation.
-  **Do**: Use `npm test` (`vitest run`) for CI-safe execution.
-
 - **Don't**: Forget store resets (test pollution).
   **Do**: Reset stores in `beforeEach` (or `setState` to initial state).
-
-- **Don't**: Change `maxWorkers`/pool config to "make tests faster".
-  **Do**: Keep worker limits stable to prevent memory exhaustion.
 
 - **Don't**: Test WebGPU internals (exact buffer contents, pipeline state) in Vitest.
   **Do**: Test your own inputs/outputs and use Playwright for visual/rendering validation.

@@ -110,7 +110,7 @@ export type SchroedingerRepresentation = 'position' | 'momentum' | 'wigner'
  * UI display units for momentum-space interpretation.
  * Internal evaluation remains in k-space.
  */
-export type SchroedingerMomentumDisplayUnits = 'normalized' | 'k' | 'p'
+export type SchroedingerMomentumDisplayUnits = 'k' | 'p'
 
 /**
  * Physically grounded nodal set definitions.
@@ -536,7 +536,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Representation
   representation: 'position',
-  momentumDisplayUnits: 'normalized',
+  momentumDisplayUnits: 'k',
   momentumScale: 1.0,
   momentumHbar: 1.0,
 
@@ -635,7 +635,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Isosurface (disabled by default)
   isoEnabled: false,
-  isoThreshold: -0.76,
+  isoThreshold: -3.0,
 
   // 2D Cross-Section Slice
   crossSectionEnabled: false,

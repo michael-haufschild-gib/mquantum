@@ -22,7 +22,7 @@ export type ColorAlgorithm =
   | 8 // Domain coloring for wavefunctions (HSL + log-modulus contours)
   | 9 // Zero-centered diverging map for Re/Im(psi)
   | 10 // Relative phase to spatial reference arg(conj(psi_ref)*psi)
-  | 11 // Energy (spectral distance-based)
+  | 11 // Radial Distance (spectral)
 
 /**
  * Lighting mode for compile-time optimization

@@ -8,6 +8,4 @@ export {
   MAX_MULTIPLIER,
   MAX_DEVIATION,
   getPlaneMultiplier,
-  getAllPlaneMultipliers,
-  getAverageMultiplier,
 } from './biasCalculation'

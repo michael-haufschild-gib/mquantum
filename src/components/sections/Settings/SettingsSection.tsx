@@ -15,9 +15,6 @@ import { useUIStore } from '@/stores/uiStore'
 import React, { useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-/** Database name - must match IndexedDBCache.ts */
-const GEOMETRY_CACHE_DB_NAME = 'mdimension-cache'
-
 export interface SettingsSectionProps {
   defaultOpen?: boolean
 }
@@ -32,7 +29,6 @@ export interface SettingsSectionProps {
  */
 export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
   ({ defaultOpen = true }) => {
-    const [showClearIndexDBModal, setShowClearIndexDBModal] = useState(false)
     const [showClearLocalStorageModal, setShowClearLocalStorageModal] = useState(false)
     const { addToast } = useToast()
 
@@ -59,26 +55,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
         }))
       )
 
-    const handleClearGeometryCache = useCallback(async () => {
-      try {
-        // Delete only our app's geometry cache database
-        await new Promise<void>((resolve, reject) => {
-          const request = indexedDB.deleteDatabase(GEOMETRY_CACHE_DB_NAME)
-          request.onsuccess = () => resolve()
-          request.onerror = () => reject(request.error)
-          request.onblocked = () => {
-            // Database is in use - will be deleted on next app load
-            console.warn('[Settings] Database delete blocked, will clear on next load')
-            resolve()
-          }
-        })
-
-        addToast('Geometry cache cleared', 'success')
-      } catch {
-        addToast('Failed to clear geometry cache', 'error')
-      }
-    }, [addToast])
-
     const handleClearLocalStorage = useCallback(() => {
       try {
         localStorage.clear()
@@ -92,14 +68,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
       resetAllDismissed()
       addToast('All hints restored', 'success')
     }, [resetAllDismissed, addToast])
-
-    const handleOpenClearIndexDBModal = useCallback(() => {
-      setShowClearIndexDBModal(true)
-    }, [])
-
-    const handleCloseClearIndexDBModal = useCallback(() => {
-      setShowClearIndexDBModal(false)
-    }, [])
 
     const handleOpenClearLocalStorageModal = useCallback(() => {
       setShowClearLocalStorageModal(true)
@@ -157,30 +125,12 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
           <Button
             variant="secondary"
             size="sm"
-            onClick={handleOpenClearIndexDBModal}
-            data-testid="clear-cache-button"
-          >
-            Clear Geometry Cache
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
             onClick={handleOpenClearLocalStorageModal}
             data-testid="clear-localstorage-button"
           >
             Clear localStorage
           </Button>
         </div>
-
-        <ConfirmModal
-          isOpen={showClearIndexDBModal}
-          onClose={handleCloseClearIndexDBModal}
-          onConfirm={handleClearGeometryCache}
-          title="Clear Geometry Cache"
-          message="This will delete all cached wavefunction geometry. Next loads will regenerate from scratch."
-          confirmText="Clear Cache"
-          isDestructive
-        />
 
         <ConfirmModal
           isOpen={showClearLocalStorageModal}

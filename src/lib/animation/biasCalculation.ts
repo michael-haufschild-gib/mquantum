@@ -69,28 +69,3 @@ export function getPlaneMultiplier(planeIndex: number, _totalPlanes: number, bia
   // Safety clamp: ensure multiplier stays within valid bounds
   return Math.max(MIN_MULTIPLIER, Math.min(MAX_MULTIPLIER, multiplier))
 }
-
-/**
- * Gets all plane multipliers for a given configuration.
- * Useful for testing and debugging.
- *
- * @param totalPlanes - Total number of rotation planes
- * @param bias - Bias value from 0 to 1
- * @returns Array of multipliers, one per plane
- */
-export function getAllPlaneMultipliers(totalPlanes: number, bias: number): number[] {
-  return Array.from({ length: totalPlanes }, (_, i) => getPlaneMultiplier(i, totalPlanes, bias))
-}
-
-/**
- * Calculates the average multiplier across all planes.
- * Should be close to 1.0 to preserve overall rotation rate.
- *
- * @param totalPlanes - Total number of rotation planes
- * @param bias - Bias value from 0 to 1
- * @returns Average multiplier value
- */
-export function getAverageMultiplier(totalPlanes: number, bias: number): number {
-  const multipliers = getAllPlaneMultipliers(totalPlanes, bias)
-  return multipliers.reduce((sum, m) => sum + m, 0) / multipliers.length
-}

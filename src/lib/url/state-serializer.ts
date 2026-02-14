@@ -9,10 +9,15 @@ import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { AllShaderSettings, ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
 import {
-  DEFAULT_BLOOM_INTENSITY,
-  DEFAULT_BLOOM_LEVELS,
-  DEFAULT_BLOOM_RADIUS,
-  DEFAULT_BLOOM_SMOOTHING,
+  type BloomBandSettings,
+  type BloomMode,
+  DEFAULT_BLOOM_CONVOLUTION_BOOST,
+  DEFAULT_BLOOM_CONVOLUTION_RADIUS,
+  DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
+  DEFAULT_BLOOM_CONVOLUTION_TINT,
+  DEFAULT_BLOOM_GAIN,
+  DEFAULT_BLOOM_KNEE,
+  DEFAULT_BLOOM_MODE,
   DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_EXPOSURE,
   DEFAULT_SHADER_SETTINGS,
@@ -39,13 +44,17 @@ export interface ShareableState {
   shaderSettings?: AllShaderSettings
   edgeColor?: string
   backgroundColor?: string
-  // Bloom settings (Dual Filter Bloom)
+  // Bloom settings (Bloom V2)
   bloomEnabled?: boolean
-  bloomIntensity?: number
+  bloomMode?: BloomMode
+  bloomGain?: number
   bloomThreshold?: number
-  bloomRadius?: number
-  bloomSoftKnee?: number
-  bloomLevels?: number
+  bloomKnee?: number
+  bloomBands?: BloomBandSettings[]
+  bloomConvolutionRadius?: number
+  bloomConvolutionResolutionScale?: number
+  bloomConvolutionBoost?: number
+  bloomConvolutionTint?: string
   // Enhanced lighting settings
   specularColor?: string
   toneMappingEnabled?: boolean
@@ -81,29 +90,60 @@ export function serializeState(state: ShareableState): string {
     params.set('bg', state.backgroundColor.replace('#', ''))
   }
 
-  // Bloom settings (Dual Filter Bloom)
-  if (state.bloomEnabled === false) {
-    params.set('be', '0')
+  // Bloom settings (Bloom V2)
+  if (state.bloomEnabled === true) {
+    params.set('be', '1')
   }
 
-  if (state.bloomIntensity !== undefined && state.bloomIntensity !== DEFAULT_BLOOM_INTENSITY) {
-    params.set('bi', state.bloomIntensity.toFixed(2))
+  if (state.bloomMode !== undefined && state.bloomMode !== DEFAULT_BLOOM_MODE) {
+    params.set('bm', state.bloomMode === 'convolution' ? 'c' : 'g')
+  }
+
+  if (state.bloomGain !== undefined && state.bloomGain !== DEFAULT_BLOOM_GAIN) {
+    params.set('bga', state.bloomGain.toFixed(2))
   }
 
   if (state.bloomThreshold !== undefined && state.bloomThreshold !== DEFAULT_BLOOM_THRESHOLD) {
     params.set('bt', state.bloomThreshold.toFixed(2))
   }
 
-  if (state.bloomRadius !== undefined && state.bloomRadius !== DEFAULT_BLOOM_RADIUS) {
-    params.set('br', state.bloomRadius.toFixed(2))
+  if (state.bloomKnee !== undefined && state.bloomKnee !== DEFAULT_BLOOM_KNEE) {
+    params.set('bk', state.bloomKnee.toFixed(2))
   }
 
-  if (state.bloomSoftKnee !== undefined && state.bloomSoftKnee !== DEFAULT_BLOOM_SMOOTHING) {
-    params.set('bk', state.bloomSoftKnee.toFixed(2))
+  if (state.bloomBands !== undefined) {
+    state.bloomBands.slice(0, 5).forEach((band, index) => {
+      const token = `${band.enabled ? 1 : 0}|${band.weight.toFixed(2)}|${band.size.toFixed(2)}|${band.tint.replace('#', '')}`
+      params.set(`bb${index}`, token)
+    })
   }
 
-  if (state.bloomLevels !== undefined && state.bloomLevels !== DEFAULT_BLOOM_LEVELS) {
-    params.set('bl', state.bloomLevels.toString())
+  if (
+    state.bloomConvolutionRadius !== undefined &&
+    state.bloomConvolutionRadius !== DEFAULT_BLOOM_CONVOLUTION_RADIUS
+  ) {
+    params.set('bcr', state.bloomConvolutionRadius.toFixed(2))
+  }
+
+  if (
+    state.bloomConvolutionResolutionScale !== undefined &&
+    state.bloomConvolutionResolutionScale !== DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE
+  ) {
+    params.set('bcs', state.bloomConvolutionResolutionScale.toFixed(2))
+  }
+
+  if (
+    state.bloomConvolutionBoost !== undefined &&
+    state.bloomConvolutionBoost !== DEFAULT_BLOOM_CONVOLUTION_BOOST
+  ) {
+    params.set('bcb', state.bloomConvolutionBoost.toFixed(2))
+  }
+
+  if (
+    state.bloomConvolutionTint !== undefined &&
+    state.bloomConvolutionTint !== DEFAULT_BLOOM_CONVOLUTION_TINT
+  ) {
+    params.set('bct', state.bloomConvolutionTint.replace('#', ''))
   }
 
   // Enhanced lighting settings (omit defaults for shorter URLs)
@@ -224,52 +264,102 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     state.backgroundColor = `#${backgroundColor}`
   }
 
-  // Bloom settings (Dual Filter Bloom)
+  // Bloom settings (Bloom V2)
   const bloomEnabled = params.get('be')
-  if (bloomEnabled === '0') {
-    state.bloomEnabled = false
-  } else if (bloomEnabled === '1') {
+  if (bloomEnabled === '1') {
     state.bloomEnabled = true
   }
 
-  const bloomIntensity = params.get('bi')
-  if (bloomIntensity) {
-    const bi = parseFloat(bloomIntensity)
-    if (!isNaN(bi) && bi >= 0 && bi <= 2) {
-      state.bloomIntensity = bi
+  const bloomMode = params.get('bm')
+  if (bloomMode === 'g') {
+    state.bloomMode = 'gaussian'
+  } else if (bloomMode === 'c') {
+    state.bloomMode = 'convolution'
+  }
+
+  const bloomGain = params.get('bga')
+  if (bloomGain) {
+    const parsed = parseFloat(bloomGain)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 3) {
+      state.bloomGain = parsed
     }
   }
 
   const bloomThreshold = params.get('bt')
   if (bloomThreshold) {
-    const bt = parseFloat(bloomThreshold)
-    if (!isNaN(bt) && bt >= 0 && bt <= 1) {
-      state.bloomThreshold = bt
+    const parsed = parseFloat(bloomThreshold)
+    if (!isNaN(parsed) && parsed >= -1 && parsed <= 20) {
+      state.bloomThreshold = parsed
     }
   }
 
-  const bloomRadius = params.get('br')
-  if (bloomRadius) {
-    const br = parseFloat(bloomRadius)
-    if (!isNaN(br) && br >= 0 && br <= 1) {
-      state.bloomRadius = br
+  const bloomKnee = params.get('bk')
+  if (bloomKnee) {
+    const parsed = parseFloat(bloomKnee)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 5) {
+      state.bloomKnee = parsed
     }
   }
 
-  const bloomSoftKnee = params.get('bk')
-  if (bloomSoftKnee) {
-    const bk = parseFloat(bloomSoftKnee)
-    if (!isNaN(bk) && bk >= 0 && bk <= 1) {
-      state.bloomSoftKnee = bk
+  const bands: BloomBandSettings[] = []
+  for (let i = 0; i < 5; i++) {
+    const token = params.get(`bb${i}`)
+    if (!token) break
+    const [enabledRaw, weightRaw, sizeRaw, tintRaw] = token.split('|')
+    const weight = parseFloat(weightRaw ?? '')
+    const size = parseFloat(sizeRaw ?? '')
+    const tint = tintRaw ? `#${tintRaw}` : ''
+    if (
+      (enabledRaw === '0' || enabledRaw === '1') &&
+      Number.isFinite(weight) &&
+      weight >= 0 &&
+      weight <= 4 &&
+      Number.isFinite(size) &&
+      size >= 0.25 &&
+      size <= 4 &&
+      /^#[0-9A-Fa-f]{6}$/.test(tint)
+    ) {
+      bands.push({ enabled: enabledRaw === '1', weight, size, tint })
+    } else {
+      break
+    }
+  }
+  if (bands.length > 0) {
+    let hasDisabledBand = false
+    state.bloomBands = bands.map((band) => {
+      const enabled = !hasDisabledBand && band.enabled
+      if (!enabled) hasDisabledBand = true
+      return { ...band, enabled }
+    })
+  }
+
+  const bloomConvolutionRadius = params.get('bcr')
+  if (bloomConvolutionRadius) {
+    const parsed = parseFloat(bloomConvolutionRadius)
+    if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 6) {
+      state.bloomConvolutionRadius = parsed
     }
   }
 
-  const bloomLevels = params.get('bl')
-  if (bloomLevels) {
-    const bl = parseInt(bloomLevels, 10)
-    if (!isNaN(bl) && bl >= 1 && bl <= 5) {
-      state.bloomLevels = bl
+  const bloomConvolutionResolutionScale = params.get('bcs')
+  if (bloomConvolutionResolutionScale) {
+    const parsed = parseFloat(bloomConvolutionResolutionScale)
+    if (!isNaN(parsed) && parsed >= 0.25 && parsed <= 1) {
+      state.bloomConvolutionResolutionScale = parsed
     }
+  }
+
+  const bloomConvolutionBoost = params.get('bcb')
+  if (bloomConvolutionBoost) {
+    const parsed = parseFloat(bloomConvolutionBoost)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 4) {
+      state.bloomConvolutionBoost = parsed
+    }
+  }
+
+  const bloomConvolutionTint = params.get('bct')
+  if (bloomConvolutionTint && /^[0-9A-Fa-f]{6}$/.test(bloomConvolutionTint)) {
+    state.bloomConvolutionTint = `#${bloomConvolutionTint}`
   }
 
   // Enhanced lighting settings

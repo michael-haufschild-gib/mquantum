@@ -219,66 +219,11 @@ const { wgsl, modules } = assembleShaderBlocks(blocks)
 ## Zustand Rules (Performance-critical)
 
 - **Never** subscribe to an entire store object in a React component.
-- **Always** use either:
-  - Individual selectors (`useStore(s => s.value)`) OR
-  - A shallow object selector via `useShallow`.
+- **Always** use individual selectors (`useStore(s => s.value)`) or `useShallow` for multi-value selectors.
+- **CRITICAL**: `useShallow` is a hook — do **not** nest it inside another hook call. See `.claude/rules/stores.md` for correct patterns.
+- Stores use version counters for dirty-flag render optimization. WebGPU passes compare versions to skip redundant uniform uploads.
 
-### CRITICAL `useShallow` rule (React 19 + Zustand 5)
-
-`useShallow` is a hook. **Do not call it inside another hook call**.
-
-```ts
-// CORRECT:
-import { useShallow } from 'zustand/react/shallow'
-const uiSelector = useShallow((s: ReturnType<typeof useUIStore.getState>) => ({
-  isOpen: s.isOpen,
-  setOpen: s.setOpen,
-}))
-export function Component() {
-  const { isOpen, setOpen } = useUIStore(uiSelector)
-}
-
-// WRONG: Do NOT nest useShallow inside the store hook call
-const { isOpen } = useUIStore(useShallow((s) => ({ isOpen: s.isOpen })))
-```
-
-### Version tracking pattern
-
-Stores use version counters for dirty-flag render optimization:
-
-```ts
-// In a store slice:
-setWithVersion: (updater) => {
-  set((state) => ({
-    ...updater(state),
-    schroedingerVersion: state.schroedingerVersion + 1,
-  }))
-}
-```
-
-WebGPU passes compare version numbers to skip redundant uniform uploads.
-
-### Template: add a new store
-
-Create: `src/stores/<domain>Store.ts`, export from `src/stores/index.ts`.
-
-```ts
-import { create } from 'zustand'
-
-export interface <Domain>State {
-  value: number
-  setValue: (value: number) => void
-  reset: () => void
-}
-
-const DEFAULT_VALUE = 0
-
-export const use<Domain>Store = create<<Domain>State>((set) => ({
-  value: DEFAULT_VALUE,
-  setValue: (value) => set({ value }),
-  reset: () => set({ value: DEFAULT_VALUE }),
-}))
-```
+For component-to-store connection patterns, see `docs/frontend.md`. For Zustand conventions, see `.claude/rules/stores.md`.
 
 ## Object Type Registry
 
@@ -316,12 +261,6 @@ Query helpers: `isAvailableForDimension()`, `getRecommendedDimension()`, `canRen
 - **Don't**: Add new object types beyond `'schroedinger'`.
   **Do**: Add new quantum modes or dimension-specific SDFs within the Schroedinger system.
 
-- **Don't**: Subscribe to a whole Zustand store object.
-  **Do**: Use individual selectors or `useShallow` selectors.
-
-- **Don't**: Call `useShallow` inside another hook call.
-  **Do**: Create the selector via `useShallow(...)` first, then pass it to the store hook.
-
 - **Don't**: Hardcode colors or invent new design tokens.
   **Do**: Use Tailwind theme variables from `src/index.css`.
 
@@ -330,6 +269,3 @@ Query helpers: `isAvailableForDimension()`, `getRecommendedDimension()`, `canRen
 
 - **Don't**: Create GPU resources without going through `WebGPUResourcePool`.
   **Do**: Use the resource pool for textures, buffers, and samplers.
-
-- **Don't**: Access stores directly in render passes.
-  **Do**: Use `getStore(ctx, 'storeName')` via the frame context.

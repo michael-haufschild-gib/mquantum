@@ -37,7 +37,7 @@ export type ColorAlgorithm =
   | 'domainColoringPsi'
   | 'relativePhase'
   | 'blackbody'
-  | 'energy'
+  | 'radialDistance'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -54,7 +54,7 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'domainColoringPsi' as const, label: 'Domain Coloring Psi' },
   { value: 'relativePhase' as const, label: 'Relative Phase (ref)' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
-  { value: 'energy' as const, label: 'Energy (Spectral)' },
+  { value: 'radialDistance' as const, label: 'Radial Distance (Spectral)' },
 ] as const
 
 /**
@@ -72,7 +72,7 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   domainColoringPsi: 8,
   diverging: 9,
   relativePhase: 10,
-  energy: 11,
+  radialDistance: 11,
 }
 
 /**
@@ -190,7 +190,7 @@ export const DEFAULT_DIVERGING_PSI_SETTINGS: DivergingPsiSettings = {
 /**
  * Default color algorithm for new sessions.
  */
-export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'mixed'
+export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 
 /**
  * Multi-source weight configuration for blending different value sources.

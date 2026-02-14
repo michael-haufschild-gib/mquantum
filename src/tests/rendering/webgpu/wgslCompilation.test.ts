@@ -635,7 +635,7 @@ describe('WGSL Color Algorithm Specialization', () => {
     expect(features).toContain('Color: Relative Phase')
   })
 
-  it('adds energy feature tag when colorAlgorithm=11', () => {
+  it('adds radial distance feature tag when colorAlgorithm=11', () => {
     const { features } = composeSchroedingerShader({
       dimension: 4,
       temporal: false,
@@ -644,7 +644,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       colorAlgorithm: 11,
     })
 
-    expect(features).toContain('Color: Energy')
+    expect(features).toContain('Color: Radial Distance')
   })
 
   it('uses density-grid relative-phase channel for colorAlgorithm=10', () => {

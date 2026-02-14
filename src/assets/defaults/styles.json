@@ -133,11 +133,7 @@
       },
       "postProcessing": {
         "bloomEnabled": true,
-        "bloomIntensity": 0.75,
         "bloomThreshold": 0.45,
-        "bloomRadius": 0.1,
-        "bloomSmoothing": 0.59,
-        "bloomLevels": 4,
         "antiAliasingMethod": "fxaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0.005,
@@ -166,7 +162,46 @@
         "paperQuality": "medium",
         "paperIntensity": 1,
         "frameBlendingEnabled": true,
-        "frameBlendingFactor": 0.3
+        "frameBlendingFactor": 0.3,
+        "bloomMode": "gaussian",
+        "bloomGain": 2.25,
+        "bloomKnee": 0.59,
+        "bloomBands": [
+          {
+            "enabled": true,
+            "weight": 1,
+            "size": 0.65,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.8,
+            "size": 0.65,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.6,
+            "size": 0.65,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.4,
+            "size": 0.65,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": false,
+            "weight": 0.2,
+            "size": 0.65,
+            "tint": "#ffffff"
+          }
+        ],
+        "bloomConvolutionRadius": 2,
+        "bloomConvolutionResolutionScale": 0.5,
+        "bloomConvolutionBoost": 1,
+        "bloomConvolutionTint": "#ffffff"
       },
       "environment": {
         "activeWalls": [],
@@ -279,7 +314,7 @@
         "faceColor": "#dd2727",
         "backgroundColor": "#0F0F1A",
         "perDimensionColorEnabled": false,
-        "colorAlgorithm": "mixed",
+        "colorAlgorithm": "radialDistance",
         "cosineCoefficients": {
           "a": [
             0.5,
@@ -358,11 +393,7 @@
       },
       "postProcessing": {
         "bloomEnabled": false,
-        "bloomIntensity": 0.85,
         "bloomThreshold": 0.2,
-        "bloomRadius": 0.05,
-        "bloomSmoothing": 0.95,
-        "bloomLevels": 1,
         "antiAliasingMethod": "smaa",
         "cinematicEnabled": true,
         "cinematicAberration": 0,
@@ -391,7 +422,46 @@
         "paperQuality": "high",
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
+        "frameBlendingFactor": 0.3,
+        "bloomMode": "gaussian",
+        "bloomGain": 2.55,
+        "bloomKnee": 0.95,
+        "bloomBands": [
+          {
+            "enabled": true,
+            "weight": 1,
+            "size": 0.575,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": false,
+            "weight": 0.8,
+            "size": 0.575,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": false,
+            "weight": 0.6,
+            "size": 0.575,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": false,
+            "weight": 0.4,
+            "size": 0.575,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": false,
+            "weight": 0.2,
+            "size": 0.575,
+            "tint": "#ffffff"
+          }
+        ],
+        "bloomConvolutionRadius": 2,
+        "bloomConvolutionResolutionScale": 0.5,
+        "bloomConvolutionBoost": 1,
+        "bloomConvolutionTint": "#ffffff"
       },
       "environment": {
         "activeWalls": [],
@@ -606,11 +676,7 @@
       },
       "postProcessing": {
         "bloomEnabled": false,
-        "bloomIntensity": 0.5,
         "bloomThreshold": 0.8,
-        "bloomRadius": 0.4,
-        "bloomSmoothing": 0.1,
-        "bloomLevels": 5,
         "antiAliasingMethod": "none",
         "cinematicEnabled": false,
         "cinematicAberration": 0.005,
@@ -639,7 +705,46 @@
         "paperQuality": "medium",
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
-        "frameBlendingFactor": 0.3
+        "frameBlendingFactor": 0.3,
+        "bloomMode": "gaussian",
+        "bloomGain": 1.5,
+        "bloomKnee": 0.1,
+        "bloomBands": [
+          {
+            "enabled": true,
+            "weight": 1,
+            "size": 1.1,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.8,
+            "size": 1.1,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.6,
+            "size": 1.1,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.4,
+            "size": 1.1,
+            "tint": "#ffffff"
+          },
+          {
+            "enabled": true,
+            "weight": 0.2,
+            "size": 1.1,
+            "tint": "#ffffff"
+          }
+        ],
+        "bloomConvolutionRadius": 2,
+        "bloomConvolutionResolutionScale": 0.5,
+        "bloomConvolutionBoost": 1,
+        "bloomConvolutionTint": "#ffffff"
       },
       "environment": {
         "activeWalls": [

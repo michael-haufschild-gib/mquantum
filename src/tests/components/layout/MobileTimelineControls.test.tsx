@@ -64,10 +64,6 @@ vi.mock('@/hooks/useMediaQuery', () => ({
   useIsDesktop: () => mockIsDesktop,
 }))
 
-vi.mock('@/hooks/useKonamiCode', () => ({
-  useKonamiCode: vi.fn(),
-}))
-
 vi.mock('zustand/react/shallow', () => ({
   useShallow: <T,>(selector: T) => selector,
 }))

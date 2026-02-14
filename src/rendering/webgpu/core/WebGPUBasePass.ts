@@ -381,7 +381,7 @@ export abstract class WebGPUBaseComputePass extends WebGPUBasePass {
   protected computePipeline: GPUComputePipeline | null = null
 
   /**
-   * Create a compute pipeline.
+   * Create a compute pipeline (synchronous).
    * @param device
    * @param shaderModule
    * @param bindGroupLayouts
@@ -401,6 +401,38 @@ export abstract class WebGPUBaseComputePass extends WebGPUBasePass {
     this.pipelineLayout = pipelineLayout
 
     return device.createComputePipeline({
+      label: label ?? `${this.id}-compute-pipeline`,
+      layout: pipelineLayout,
+      compute: {
+        module: shaderModule,
+        entryPoint: 'main',
+      },
+    })
+  }
+
+  /**
+   * Create a compute pipeline asynchronously (non-blocking).
+   * Identical to createComputePipeline but uses device.createComputePipelineAsync
+   * to avoid blocking the main thread during shader compilation.
+   * @param device
+   * @param shaderModule
+   * @param bindGroupLayouts
+   * @param label
+   */
+  protected async createComputePipelineAsync(
+    device: GPUDevice,
+    shaderModule: GPUShaderModule,
+    bindGroupLayouts: GPUBindGroupLayout[],
+    label?: string
+  ): Promise<GPUComputePipeline> {
+    const pipelineLayout = device.createPipelineLayout({
+      label: label ? `${label}-layout` : `${this.id}-compute-layout`,
+      bindGroupLayouts,
+    })
+
+    this.pipelineLayout = pipelineLayout
+
+    return device.createComputePipelineAsync({
       label: label ?? `${this.id}-compute-pipeline`,
       layout: pipelineLayout,
       compute: {

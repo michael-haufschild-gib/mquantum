@@ -53,30 +53,7 @@ export {
 } from './rotation'
 
 // Transformation operations
-export {
-  composeTransformations,
-  createScaleMatrix,
-  createShearMatrix,
-  createTransformMatrix,
-  createTranslationMatrix,
-  createUniformScaleMatrix,
-  fromHomogeneous,
-  toHomogeneous,
-  translateVector,
-} from './transform'
-
-// Projection operations
-export {
-  calculateDepth,
-  calculateProjectionDistance,
-  clipLine,
-  DEFAULT_PROJECTION_DISTANCE,
-  MIN_SAFE_DISTANCE,
-  projectPerspective,
-  projectVertices,
-  projectVerticesToPositions,
-  sortByDepth,
-} from './projection'
+export { createScaleMatrix } from './transform'
 
 // Fast trigonometric approximations (for animations)
 export { fcos, fsin } from './trig'

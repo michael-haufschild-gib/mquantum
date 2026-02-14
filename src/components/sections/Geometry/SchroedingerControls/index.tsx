@@ -186,12 +186,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               <div className="space-y-3">
                 <ToggleGroup
                   options={[
-                    { value: 'normalized', label: 'Normalized' },
                     { value: 'k', label: 'k-Space' },
                     { value: 'p', label: 'p-Space' },
                   ]}
                   value={config.momentumDisplayUnits}
-                  onChange={(v) => setMomentumDisplayUnits(v as 'normalized' | 'k' | 'p')}
+                  onChange={(v) => setMomentumDisplayUnits(v as 'k' | 'p')}
                   ariaLabel="Select momentum display units"
                   data-testid="momentum-units-selector"
                 />

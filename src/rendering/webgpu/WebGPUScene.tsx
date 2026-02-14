@@ -305,6 +305,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const statsCollectorRef = useRef<WebGPUStatsCollector>(new WebGPUStatsCollector())
   const exportRuntimeRef = useRef<ExportRuntimeState>(createInitialExportRuntimeState())
 
+  // Selective pass rebuild tracking
+  const lastSchrodingerConfigRef = useRef<SchrodingerPassConfig | null>(null)
+  const lastPPConfigRef = useRef<PPPassConfig | null>(null)
+  const needsFullRebuildRef = useRef(true)
+
   // WebGPU camera for view/projection matrices (since we don't have THREE.js camera)
   const cameraRef = useRef<WebGPUCamera | null>(null)
   if (!cameraRef.current) {
@@ -488,93 +493,162 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     mergedState: null,
   })
 
-  // Initialize passes - rebuild when dependencies change
+  // Initialize passes - rebuild when dependencies change.
+  // Uses selective rebuild: only the pass group whose config changed is rebuilt,
+  // avoiding unnecessary GPU pipeline compilations.
   useEffect(() => {
     let cancelled = false
     const setupGeneration = ++setupGenerationRef.current
     const shouldAbortSetup = () => cancelled || setupGeneration !== setupGenerationRef.current
     const previousSetupTask = setupTaskRef.current
 
+    // Build the full PassConfig from current values
+    const fullConfig: PassConfig = {
+      objectType,
+      dimension,
+      bloomEnabled: postProcessing.bloomEnabled,
+      antiAliasingMethod: postProcessing.antiAliasingMethod,
+      paperEnabled: postProcessing.paperEnabled,
+      frameBlendingEnabled: postProcessing.frameBlendingEnabled,
+      isosurface: schroedingerIsoEnabled,
+      quantumMode: schroedingerCompile.quantumMode,
+      termCount: schroedingerCompile.termCount,
+      nodalEnabled: schroedingerCompile.nodalEnabled,
+      phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
+      interferenceEnabled: schroedingerCompile.interferenceEnabled,
+      uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
+      temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
+      eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
+      renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
+      colorAlgorithm: appearance.colorAlgorithm,
+      representation: schroedingerCompile.representation,
+      skyboxEnabled: environment.skyboxEnabled,
+      skyboxMode: environment.skyboxMode as SkyboxMode,
+      backgroundColor: environment.backgroundColor,
+    }
+
+    // Extract group-level configs for comparison
+    const schrodingerConfig = extractSchrodingerConfig(fullConfig)
+    const ppConfig = extractPPConfig(fullConfig)
+
+    // Determine which groups changed
+    const schrodingerChanged = !shallowEqual(lastSchrodingerConfigRef.current, schrodingerConfig)
+    const ppChanged = !shallowEqual(lastPPConfigRef.current, ppConfig)
+    const isFullRebuild = needsFullRebuildRef.current
+
     const setupPasses = async () => {
       // Serialize async pass setup to prevent stale setup races creating duplicate passes.
       await previousSetupTask
       if (shouldAbortSetup()) return
 
-      // Always clear existing passes before setting up new ones
-      // This ensures no duplicate passes when dependencies change
-      graph.clearPasses()
-      if (shouldAbortSetup()) return
-
       currentObjectTypeRef.current = objectType
 
-      console.log('[WebGPUScene] Setting up render passes for:', objectType)
-
-      // Signal the shader compilation overlay before any GPU work.
-      // waitForPaint() guarantees the overlay is rendered to screen
-      // before createShaderModule() blocks the main thread.
+      // Always show the compilation overlay so the user knows what is displayed.
+      // For a scientific application, deterministic feedback is more important than
+      // seamless background swaps — the user must know when the view has updated.
+      const isWarmSwap = !isFullRebuild && schrodingerChanged
       const perfStore = usePerformanceStore.getState()
-      perfStore.setShaderCompiling('pipeline', true)
-      perfStore.resetRefinement()
 
+      perfStore.setShaderCompiling('pipeline', true)
       await waitForPaint()
       if (shouldAbortSetup()) {
         usePerformanceStore.getState().setShaderCompiling('pipeline', false)
-        graph.clearPasses()
         return
       }
+      perfStore.resetRefinement()
 
       try {
-        await setupRenderPasses(
-          graph,
-          {
-            objectType,
-            dimension,
-            bloomEnabled: postProcessing.bloomEnabled,
-            antiAliasingMethod: postProcessing.antiAliasingMethod,
-            paperEnabled: postProcessing.paperEnabled,
-            frameBlendingEnabled: postProcessing.frameBlendingEnabled,
-            isosurface: schroedingerIsoEnabled,
-            quantumMode: schroedingerCompile.quantumMode,
-            termCount: schroedingerCompile.termCount,
-            nodalEnabled: schroedingerCompile.nodalEnabled,
-            phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
-            interferenceEnabled: schroedingerCompile.interferenceEnabled,
-            uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
-            temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
-            eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
-            // Read directly from store to avoid coupling pass setup dependencies to runtime scale changes.
-            renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
-            colorAlgorithm: appearance.colorAlgorithm,
-            representation: schroedingerCompile.representation,
-            // Skybox settings
-            skyboxEnabled: environment.skyboxEnabled,
-            skyboxMode: environment.skyboxMode as SkyboxMode,
-            backgroundColor: environment.backgroundColor,
-          },
-          shouldAbortSetup
-        )
+        if (isFullRebuild) {
+          // Full rebuild: clear everything, set up from scratch
+          graph.clearPasses()
+          if (shouldAbortSetup()) return
+
+          console.log('[WebGPUScene] Full pass rebuild for:', objectType)
+
+          setupSharedResources(graph, fullConfig)
+          if (shouldAbortSetup()) return
+
+          await setupSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
+          if (shouldAbortSetup()) return
+
+          await setupPPPasses(graph, fullConfig, shouldAbortSetup)
+        } else if (schrodingerChanged && ppChanged) {
+          // Both groups changed — warm swap Schrodinger, then rebuild PP
+          console.log('[WebGPUScene] Rebuilding both pass groups (warm swap)')
+
+          // Pre-swap: only ADD temporal resources (old passes keep their resources)
+          ensureTemporalResources(graph, fullConfig)
+          if (shouldAbortSetup()) return
+
+          // Warm swap: old Schrodinger renders while new one compiles
+          await warmSwapSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
+          if (shouldAbortSetup()) return
+
+          // Post-swap: safe to remove stale resources — new pass is in place
+          removeStaleTemporalResources(graph, fullConfig)
+          cleanupSchrodingerPasses(graph, fullConfig)
+          cleanupPPPasses(graph, fullConfig)
+
+          await setupPPPasses(graph, fullConfig, shouldAbortSetup)
+        } else if (schrodingerChanged) {
+          // Only Schrodinger group changed — warm swap (old pass renders during compilation)
+          console.log('[WebGPUScene] Warm swap: Schrodinger passes only')
+
+          // Pre-swap: only ADD temporal resources (old passes keep their resources)
+          ensureTemporalResources(graph, fullConfig)
+          if (shouldAbortSetup()) return
+
+          // Warm swap: old Schrodinger renders while new one compiles
+          await warmSwapSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
+          if (shouldAbortSetup()) return
+
+          // Post-swap: safe to remove stale resources — new pass is in place
+          removeStaleTemporalResources(graph, fullConfig)
+          cleanupSchrodingerPasses(graph, fullConfig)
+        } else if (ppChanged) {
+          // Only PP group changed — skip Schrodinger pipeline compilations
+          console.log('[WebGPUScene] Selective rebuild: PP passes only')
+
+          cleanupPPPasses(graph, fullConfig)
+          if (shouldAbortSetup()) return
+
+          await setupPPPasses(graph, fullConfig, shouldAbortSetup)
+        }
       } catch (err) {
-        console.error('[WebGPUScene] CRITICAL: setupRenderPasses failed:', err)
+        console.error('[WebGPUScene] CRITICAL: pass setup failed:', err)
+        // Recovery: force full rebuild on next attempt.
+        // Return early — do NOT update config tracking or compile graph,
+        // so the next config change triggers a proper full rebuild.
+        needsFullRebuildRef.current = true
+        lastSchrodingerConfigRef.current = null
+        lastPPConfigRef.current = null
+        usePerformanceStore.getState().setShaderCompiling('pipeline', false)
+        // Compile the graph to render whatever old passes remain
+        graph.compile()
+        return
       } finally {
         usePerformanceStore.getState().setShaderCompiling('pipeline', false)
       }
 
       if (shouldAbortSetup()) {
-        // Drop stale partial setup before the next serialized setup starts.
+        // Abort mid-selective-rebuild: clear graph to prevent auto-compile
+        // of partially mutated state, then force full rebuild on next attempt.
         graph.clearPasses()
+        needsFullRebuildRef.current = true
+        lastSchrodingerConfigRef.current = null
+        lastPPConfigRef.current = null
         return
       }
 
       // Compile the graph
       graph.compile()
 
+      // Update config tracking on success ONLY — not after error
+      needsFullRebuildRef.current = false
+      lastSchrodingerConfigRef.current = { ...schrodingerConfig }
+      lastPPConfigRef.current = { ...ppConfig }
+
       // Force-sync canvas pixel dimensions and graph/pool size after rebuild.
-      // During the async rebuild, the canvas or pool may have stale dimensions
-      // (e.g., if a resize occurred mid-rebuild when pool had no configs).
-      // This mirrors what the resize handler does and prevents the vertical
-      // squish that would otherwise require a manual window resize to fix.
-      // IMPORTANT: Use the actual DPR (window.devicePixelRatio × renderResolutionScale)
-      // instead of deriving it from canvas.width/clientWidth, which can be stale.
       if (canvas.clientWidth > 0 && canvas.clientHeight > 0) {
         const renderScale = usePerformanceStore.getState().renderResolutionScale
         const effectiveDpr = window.devicePixelRatio * renderScale
@@ -583,7 +657,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         canvas.width = w
         canvas.height = h
         graph.setSize(w, h)
-        // Also re-sync camera aspect ratio to match the freshly-set dimensions
         if (cameraRef.current) {
           cameraRef.current.setAspect(w / h)
         }
@@ -594,6 +667,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
     const setupTask = setupPasses().catch((err) => {
       console.error('[WebGPUScene] setupPasses task failed:', err)
+      // Recovery: force full rebuild on next attempt
+      needsFullRebuildRef.current = true
+      lastSchrodingerConfigRef.current = null
+      lastPPConfigRef.current = null
     })
     setupTaskRef.current = setupTask
 
@@ -1635,6 +1712,74 @@ export interface PassConfig {
   backgroundColor: string
 }
 
+// ============================================================================
+// Selective Rebuild Types
+// ============================================================================
+
+/** Fields that require Schrodinger renderer rebuild when changed */
+interface SchrodingerPassConfig {
+  objectType: ObjectType
+  dimension: number
+  quantumMode: 'harmonicOscillator' | 'hydrogenND'
+  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  colorAlgorithm: PaletteColorAlgorithm
+  isosurface: boolean
+  nodalEnabled: boolean
+  phaseMaterialityEnabled: boolean
+  interferenceEnabled: boolean
+  uncertaintyBoundaryEnabled: boolean
+  representation: 'position' | 'momentum' | 'wigner'
+  eigenfunctionCacheEnabled: boolean
+  temporalReprojectionEnabled: boolean
+}
+
+/** Fields that require post-processing pass rebuild when changed */
+interface PPPassConfig {
+  bloomEnabled: boolean
+  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
+  paperEnabled: boolean
+  frameBlendingEnabled: boolean
+  skyboxEnabled: boolean
+  skyboxMode: SkyboxMode
+  temporalReprojectionEnabled: boolean
+}
+
+function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
+  return {
+    objectType: config.objectType,
+    dimension: config.dimension,
+    quantumMode: config.quantumMode,
+    termCount: config.termCount,
+    colorAlgorithm: config.colorAlgorithm,
+    isosurface: config.isosurface,
+    nodalEnabled: config.nodalEnabled,
+    phaseMaterialityEnabled: config.phaseMaterialityEnabled,
+    interferenceEnabled: config.interferenceEnabled,
+    uncertaintyBoundaryEnabled: config.uncertaintyBoundaryEnabled,
+    representation: config.representation,
+    eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
+    temporalReprojectionEnabled: config.temporalReprojectionEnabled,
+  }
+}
+
+function extractPPConfig(config: PassConfig): PPPassConfig {
+  return {
+    bloomEnabled: config.bloomEnabled,
+    antiAliasingMethod: config.antiAliasingMethod,
+    paperEnabled: config.paperEnabled,
+    frameBlendingEnabled: config.frameBlendingEnabled,
+    skyboxEnabled: config.skyboxEnabled,
+    skyboxMode: config.skyboxMode,
+    temporalReprojectionEnabled: config.temporalReprojectionEnabled,
+  }
+}
+
+function shallowEqual<T extends Record<string, unknown>>(a: T | null, b: T): boolean {
+  if (!a) return false
+  const keys = Object.keys(b) as (keyof T)[]
+  return keys.every((k) => a[k] === b[k])
+}
+
 interface ScenePassBackgroundColorUpdateArgs {
   graph: Pick<WebGPURenderGraph, 'getPass'>
   skyboxEnabled: boolean
@@ -1753,7 +1898,80 @@ async function safeAddPass(
   }
 }
 
-export async function setupRenderPasses(
+/**
+ * Register always-present GPU resources needed by both pass groups.
+ * Called once on initial setup or after a full rebuild.
+ */
+function setupSharedResources(graph: WebGPURenderGraph, config: PassConfig): void {
+  const useTemporalCloudAccumulation =
+    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
+
+  graph.addResource('scene-render', {
+    type: 'texture',
+    format: 'rgba16float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  // Always include COPY_SRC to avoid resource recreation on temporal toggle
+  graph.addResource('object-color', {
+    type: 'texture',
+    format: 'rgba16float',
+    usage:
+      GPUTextureUsage.RENDER_ATTACHMENT |
+      GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_SRC,
+  })
+
+  if (useTemporalCloudAccumulation) {
+    graph.addResource('quarter-color', {
+      type: 'texture',
+      size: { mode: 'fraction', fraction: 0.5 },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    graph.addResource('quarter-position', {
+      type: 'texture',
+      size: { mode: 'fraction', fraction: 0.5 },
+      format: 'rgba32float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+  }
+
+  graph.addResource('hdr-color', {
+    type: 'texture',
+    format: 'rgba16float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  graph.addResource('normal-buffer', {
+    type: 'texture',
+    format: 'rgba16float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  graph.addResource('depth-buffer', {
+    type: 'texture',
+    format: 'depth24plus',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  graph.addResource('ldr-color', {
+    type: 'texture',
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  graph.addResource('final-color', {
+    type: 'texture',
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+}
+
+/**
+ * Set up Schrodinger-group passes: object renderer + temporal cloud accumulation.
+ */
+async function setupSchrodingerPasses(
   graph: WebGPURenderGraph,
   config: PassConfig,
   shouldAbort?: () => boolean
@@ -1763,92 +1981,7 @@ export async function setupRenderPasses(
   const useTemporalCloudAccumulation =
     config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
 
-  const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
-
-  // ============================================================================
-  // Define Resources
-  // ============================================================================
-
-  // Initial scene render (before post-processing)
-  graph.addResource('scene-render', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // Object render buffer (Schroedinger output, composited over environment)
-  graph.addResource('object-color', {
-    type: 'texture',
-    format: 'rgba16float',
-    // COPY_SRC needed when temporal cloud accumulation is enabled
-    // (reconstructed output is copied to the internal history buffer).
-    usage:
-      GPUTextureUsage.RENDER_ATTACHMENT |
-      GPUTextureUsage.TEXTURE_BINDING |
-      (useTemporalCloudAccumulation ? GPUTextureUsage.COPY_SRC : 0),
-  })
-
-  // Quarter-resolution temporal resources for Schrödinger volumetric accumulation
-  if (useTemporalCloudAccumulation) {
-    graph.addResource('quarter-color', {
-      type: 'texture',
-      size: { mode: 'fraction', fraction: 0.5 },
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    graph.addResource('quarter-position', {
-      type: 'texture',
-      size: { mode: 'fraction', fraction: 0.5 },
-      format: 'rgba32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-  }
-
-  // Final HDR buffer (TonemappingPass reads from this)
-  graph.addResource('hdr-color', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // Normal buffer for screen-space effects
-  graph.addResource('normal-buffer', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // Depth buffer
-  graph.addResource('depth-buffer', {
-    type: 'texture',
-    format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // TonemappingPass expects this output name (LDR buffer)
-  graph.addResource('ldr-color', {
-    type: 'texture',
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // Final color buffer (after anti-aliasing)
-  graph.addResource('final-color', {
-    type: 'texture',
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // Intermediate buffers for HDR post-processing chain
-  // We use hdr-color-a and hdr-color-b for ping-pong when multiple HDR effects are enabled
-  let currentHDRBuffer = 'hdr-color'
-
-  // ============================================================================
-  // Add Passes in Execution Order
-  // ============================================================================
-
-  // 1. Object renderer - Schroedinger only
+  // 1. Object renderer
   const objectRenderer = createObjectRenderer(config.objectType, config)
   if (objectRenderer) {
     await safeAddPass(graph, objectRenderer, `object-renderer(${config.objectType})`, shouldAbort)
@@ -1867,10 +2000,93 @@ export async function setupRenderPasses(
       shouldAbort
     )
   }
+}
 
-  // 3. Skybox or scene clear pass - outputs to scene-render buffer
+/**
+ * Warm swap: pre-initialize Schrodinger passes while old passes keep rendering,
+ * then atomically swap them in. Eliminates visible freeze during shader compilation.
+ */
+async function warmSwapSchrodingerPasses(
+  graph: WebGPURenderGraph,
+  config: PassConfig,
+  shouldAbort?: () => boolean
+): Promise<void> {
+  if (shouldAbort?.()) return
+
+  const setupCtx = graph.getSetupContext()
+  if (!setupCtx) {
+    // Fallback to cold swap if setup context unavailable
+    await setupSchrodingerPasses(graph, config, shouldAbort)
+    return
+  }
+
+  const useTemporalCloudAccumulation =
+    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
+
+  // 1. Create new passes (fast — just constructors)
+  const newRenderer = createObjectRenderer(config.objectType, config)
+  const newTemporalPass = useTemporalCloudAccumulation
+    ? new WebGPUTemporalCloudPass({
+        quarterColorInput: 'quarter-color',
+        quarterPositionInput: 'quarter-position',
+        outputResource: 'object-color',
+      })
+    : null
+
+  // 2. Initialize passes in background (SLOW: shader compilation happens here).
+  //    The old passes remain in the graph and keep rendering during this await.
+  try {
+    if (newRenderer) {
+      console.log('[WebGPU warmSwap] Initializing new renderer for dim:', config.dimension)
+      await newRenderer.initialize(setupCtx)
+      if (shouldAbort?.()) {
+        newRenderer.dispose()
+        newTemporalPass?.dispose()
+        return
+      }
+    }
+    if (newTemporalPass) {
+      await newTemporalPass.initialize(setupCtx)
+      if (shouldAbort?.()) {
+        newRenderer?.dispose()
+        newTemporalPass.dispose()
+        return
+      }
+    }
+  } catch (err) {
+    console.error('[WebGPU warmSwap] Pass pre-initialization failed:', err)
+    newRenderer?.dispose()
+    newTemporalPass?.dispose()
+    throw err
+  }
+
+  // 3. Atomic swap: remove old, insert new (fast — no compilation)
+  if (newRenderer) {
+    graph.addInitializedPass(newRenderer)
+    console.log('[WebGPU warmSwap] Swap complete for dim:', config.dimension)
+  }
+  if (newTemporalPass) {
+    graph.addInitializedPass(newTemporalPass)
+  }
+}
+
+/**
+ * Set up post-processing passes: skybox/scene, environment composite, bloom,
+ * frame blending, tonemapping, paper, AA, to-screen, buffer preview.
+ */
+async function setupPPPasses(
+  graph: WebGPURenderGraph,
+  config: PassConfig,
+  shouldAbort?: () => boolean
+): Promise<void> {
+  if (shouldAbort?.()) return
+
+  const useTemporalCloudAccumulation =
+    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
+  const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
+
+  // 3. Skybox or scene clear pass
   if (config.skyboxEnabled) {
-    // Skybox renderer clears scene-render + depth-buffer and renders procedural skybox
     await safeAddPass(
       graph,
       new WebGPUSkyboxRenderer({
@@ -1882,7 +2098,6 @@ export async function setupRenderPasses(
       shouldAbort
     )
   } else {
-    // No skybox: clear the scene-render buffer to the configured background color
     await safeAddPass(
       graph,
       new ScenePass({
@@ -1901,12 +2116,12 @@ export async function setupRenderPasses(
     )
   }
 
-  // 4. Environment composite - composites object over environment, outputs to hdr-color
+  // 4. Environment composite
   await safeAddPass(
     graph,
     new EnvironmentCompositePass({
       lensedEnvironmentInput: 'scene-render',
-      mainObjectInput: 'object-color', // Read from object renderer output
+      mainObjectInput: 'object-color',
       mainObjectDepthInput: 'depth-buffer',
       outputResource: 'hdr-color',
     }),
@@ -1914,7 +2129,10 @@ export async function setupRenderPasses(
     shouldAbort
   )
 
-  // 6. Bloom (optional) - multi-scale MIP pyramid matching UnrealBloomPass
+  // Track HDR buffer chain through optional passes
+  let currentHDRBuffer = 'hdr-color'
+
+  // 5. Bloom (optional)
   if (config.bloomEnabled) {
     graph.addResource('bloom-output', {
       type: 'texture',
@@ -1931,16 +2149,14 @@ export async function setupRenderPasses(
       'bloom',
       shouldAbort
     )
-
     if (ok) currentHDRBuffer = 'bloom-output'
   }
 
-  // 7. Frame Blending (optional) - temporal smoothing
+  // 6. Frame Blending (optional)
   if (config.frameBlendingEnabled) {
     graph.addResource('frame-blend-output', {
       type: 'texture',
       format: 'rgba16float',
-      // COPY_SRC needed for FrameBlendingPass to copy output to history buffer
       usage:
         GPUTextureUsage.RENDER_ATTACHMENT |
         GPUTextureUsage.TEXTURE_BINDING |
@@ -1957,13 +2173,10 @@ export async function setupRenderPasses(
       'frame-blending',
       shouldAbort
     )
-
     if (ok) currentHDRBuffer = 'frame-blend-output'
   }
 
-  // 9. Tone mapping + cinematic (CRITICAL -- always required)
-  // Combined pass: HDR→LDR conversion + chromatic aberration, vignette, film grain.
-  // Cinematic effects are controlled via store values (0 = disabled).
+  // 7. Tone mapping + cinematic (always required)
   await safeAddPass(
     graph,
     new ToneMappingCinematicPass({
@@ -1974,10 +2187,9 @@ export async function setupRenderPasses(
     shouldAbort
   )
 
-  // Track current LDR buffer for post-tonemapping effects
   let currentLDRBuffer = 'ldr-color'
 
-  // 11. Paper Texture (optional) - paper/parchment overlay effect
+  // 8. Paper Texture (optional)
   if (config.paperEnabled) {
     graph.addResource('paper-output', {
       type: 'texture',
@@ -1994,12 +2206,10 @@ export async function setupRenderPasses(
       'paper-texture',
       shouldAbort
     )
-
     if (ok) currentLDRBuffer = 'paper-output'
   }
 
-  // 12. Anti-aliasing (optional) - FXAA or SMAA
-  // Reads from currentLDRBuffer (after cinematic/paper) to match WebGL pass ordering
+  // 9. Anti-aliasing (optional)
   if (config.antiAliasingMethod === 'fxaa') {
     const ok = await safeAddPass(
       graph,
@@ -2027,14 +2237,11 @@ export async function setupRenderPasses(
     if (ok) currentLDRBuffer = 'final-color'
   }
 
-  // 13. Copy to screen (CRITICAL -- always required)
-  // Use currentLDRBuffer which tracks the last active pass in the chain
-  const finalInput = currentLDRBuffer
-
+  // 10. Copy to screen (always required)
   await safeAddPass(
     graph,
     new ToScreenPass({
-      inputResource: finalInput,
+      inputResource: currentLDRBuffer,
       gammaCorrection: true,
       sharpness: computeCasSharpnessFromRenderScale(config.renderResolutionScale ?? 1),
     }),
@@ -2042,9 +2249,7 @@ export async function setupRenderPasses(
     shouldAbort
   )
 
-  // 14. Buffer preview (debug visualization, renders directly to canvas)
-  // Always added — acts as no-op when no preview toggle is active.
-  // Reads from depth-buffer, normal-buffer, or quarter-position depending on store flags.
+  // 11. Buffer preview (debug visualization)
   const bufferPreviewInputs = ['depth-buffer', 'normal-buffer']
   if (useTemporalCloudAccumulation) {
     bufferPreviewInputs.push('quarter-position')
@@ -2060,6 +2265,122 @@ export async function setupRenderPasses(
     'buffer-preview',
     shouldAbort
   )
+}
+
+/** Remove Schrodinger-group passes that should no longer exist */
+function cleanupSchrodingerPasses(graph: WebGPURenderGraph, config: PassConfig): void {
+  if (!config.temporalReprojectionEnabled) {
+    if (graph.getPass('temporal-cloud')) graph.removePass('temporal-cloud')
+  }
+}
+
+/** Remove PP-group passes and resources that should no longer exist */
+function cleanupPPPasses(graph: WebGPURenderGraph, config: PassConfig): void {
+  if (!config.bloomEnabled) {
+    if (graph.getPass('bloom')) graph.removePass('bloom')
+    graph.removeResource('bloom-output')
+  }
+  if (!config.frameBlendingEnabled) {
+    if (graph.getPass('frame-blending')) graph.removePass('frame-blending')
+    graph.removeResource('frame-blend-output')
+  }
+  if (!config.paperEnabled) {
+    if (graph.getPass('paper-texture')) graph.removePass('paper-texture')
+    graph.removeResource('paper-output')
+  }
+  if (config.antiAliasingMethod !== 'fxaa' && graph.getPass('fxaa')) {
+    graph.removePass('fxaa')
+  }
+  if (config.antiAliasingMethod !== 'smaa' && graph.getPass('smaa')) {
+    graph.removePass('smaa')
+  }
+  if (config.skyboxEnabled && graph.getPass('scene')) {
+    graph.removePass('scene')
+  }
+  if (!config.skyboxEnabled && graph.getPass('skybox')) {
+    graph.removePass('skybox')
+  }
+}
+
+/**
+ * Pre-swap phase: only ADD temporal resources if the new config requires them.
+ * Safe to call before warm swap — old passes don't reference new resources.
+ * Never removes resources here, because old passes may still be rendering
+ * to them during the warm swap await.
+ */
+function ensureTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
+  const needsTemporal =
+    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
+
+  if (needsTemporal) {
+    graph.addResource('quarter-color', {
+      type: 'texture',
+      size: { mode: 'fraction', fraction: 0.5 },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+    graph.addResource('quarter-position', {
+      type: 'texture',
+      size: { mode: 'fraction', fraction: 0.5 },
+      format: 'rgba32float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })
+  }
+}
+
+/**
+ * Post-swap phase: remove temporal resources if no longer needed.
+ * Only call AFTER the new pass has been swapped in, so no pass
+ * references the removed resources.
+ */
+function removeStaleTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
+  const needsTemporal =
+    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
+
+  if (!needsTemporal) {
+    graph.removeResource('quarter-color')
+    graph.removeResource('quarter-position')
+  }
+}
+
+/**
+ * Full sync for non-warm-swap paths (full rebuild, tests).
+ * Safe because no old passes are rendering concurrently.
+ */
+function syncTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
+  ensureTemporalResources(graph, config)
+  removeStaleTemporalResources(graph, config)
+}
+
+/**
+ * Set up render passes for the WebGPU pipeline.
+ *
+ * Pass order:
+ * 1. Object Renderer - Render main object to MRT (color, normal, depth/quarter buffers)
+ * 2. Temporal Cloud Accumulation (optional) - Reconstruct full-res object-color from quarter-res
+ * 3. ScenePass - Render environment/clear target
+ * 4. EnvironmentCompositePass - Composite environment with main object
+ * 5. BloomPass (optional) - Bloom effect
+ * 6. FrameBlendingPass (optional) - Temporal smoothing
+ * 7. ToneMappingCinematicPass - HDR→LDR + cinematic effects (vignette, aberration, grain)
+ * 8. PaperTexturePass (optional) - Paper texture overlay
+ * 9. FXAA/SMAAPass (optional) - Anti-aliasing
+ * 10. ToScreenPass - Copy to canvas
+ */
+export async function setupRenderPasses(
+  graph: WebGPURenderGraph,
+  config: PassConfig,
+  shouldAbort?: () => boolean
+): Promise<void> {
+  if (shouldAbort?.()) return
+
+  setupSharedResources(graph, config)
+  if (shouldAbort?.()) return
+
+  await setupSchrodingerPasses(graph, config, shouldAbort)
+  if (shouldAbort?.()) return
+
+  await setupPPPasses(graph, config, shouldAbort)
 }
 
 /**

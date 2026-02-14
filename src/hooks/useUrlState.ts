@@ -57,24 +57,44 @@ function applyUrlStateParams(urlState: Partial<ShareableState>): void {
   if (urlState.exposure !== undefined) {
     useLightingStore.getState().setExposure(urlState.exposure)
   }
-  // Apply to post-processing store (bloom settings moved here from lighting)
+  // Apply to post-processing store (Bloom V2 settings)
+  const postProcessing = usePostProcessingStore.getState()
   if (urlState.bloomEnabled !== undefined) {
-    usePostProcessingStore.getState().setBloomEnabled(urlState.bloomEnabled)
+    postProcessing.setBloomEnabled(urlState.bloomEnabled)
   }
-  if (urlState.bloomIntensity !== undefined) {
-    usePostProcessingStore.getState().setBloomIntensity(urlState.bloomIntensity)
+  if (urlState.bloomMode !== undefined) {
+    postProcessing.setBloomMode(urlState.bloomMode)
+  }
+  if (urlState.bloomGain !== undefined) {
+    postProcessing.setBloomGain(urlState.bloomGain)
   }
   if (urlState.bloomThreshold !== undefined) {
-    usePostProcessingStore.getState().setBloomThreshold(urlState.bloomThreshold)
+    postProcessing.setBloomThreshold(urlState.bloomThreshold)
   }
-  if (urlState.bloomRadius !== undefined) {
-    usePostProcessingStore.getState().setBloomRadius(urlState.bloomRadius)
+  if (urlState.bloomKnee !== undefined) {
+    postProcessing.setBloomKnee(urlState.bloomKnee)
   }
-  if (urlState.bloomSoftKnee !== undefined) {
-    usePostProcessingStore.getState().setBloomSmoothing(urlState.bloomSoftKnee)
+  if (urlState.bloomBands !== undefined) {
+    for (let i = 0; i < urlState.bloomBands.length; i++) {
+      const band = urlState.bloomBands[i]
+      if (!band) continue
+      postProcessing.setBloomBandEnabled(i, band.enabled)
+      postProcessing.setBloomBandWeight(i, band.weight)
+      postProcessing.setBloomBandSize(i, band.size)
+      postProcessing.setBloomBandTint(i, band.tint)
+    }
   }
-  if (urlState.bloomLevels !== undefined) {
-    usePostProcessingStore.getState().setBloomLevels(urlState.bloomLevels)
+  if (urlState.bloomConvolutionRadius !== undefined) {
+    postProcessing.setBloomConvolutionRadius(urlState.bloomConvolutionRadius)
+  }
+  if (urlState.bloomConvolutionResolutionScale !== undefined) {
+    postProcessing.setBloomConvolutionResolutionScale(urlState.bloomConvolutionResolutionScale)
+  }
+  if (urlState.bloomConvolutionBoost !== undefined) {
+    postProcessing.setBloomConvolutionBoost(urlState.bloomConvolutionBoost)
+  }
+  if (urlState.bloomConvolutionTint !== undefined) {
+    postProcessing.setBloomConvolutionTint(urlState.bloomConvolutionTint)
   }
 
 }

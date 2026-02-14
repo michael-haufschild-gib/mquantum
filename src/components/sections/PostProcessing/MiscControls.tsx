@@ -3,7 +3,7 @@
  *
  * UI controls for post-processing FX effects:
  * - Anti-aliasing method selector: None, FXAA, SMAA
- * - Object depth settings
+ * - Frame blending settings
  *
  * @see {@link PostProcessing} for the effect implementation
  * @see {@link usePostProcessingStore} for state management
@@ -36,8 +36,6 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
   const postProcessingSelector = useShallow((state: PostProcessingSlice) => ({
     antiAliasingMethod: state.antiAliasingMethod,
     setAntiAliasingMethod: state.setAntiAliasingMethod,
-    objectOnlyDepth: state.objectOnlyDepth,
-    setObjectOnlyDepth: state.setObjectOnlyDepth,
     frameBlendingEnabled: state.frameBlendingEnabled,
     setFrameBlendingEnabled: state.setFrameBlendingEnabled,
     frameBlendingFactor: state.frameBlendingFactor,
@@ -46,8 +44,6 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
   const {
     antiAliasingMethod,
     setAntiAliasingMethod,
-    objectOnlyDepth,
-    setObjectOnlyDepth,
     frameBlendingEnabled,
     setFrameBlendingEnabled,
     frameBlendingFactor,
@@ -65,18 +61,6 @@ export const MiscControls: React.FC<MiscControlsProps> = React.memo(({ className
           onChange={setAntiAliasingMethod}
           data-testid="anti-aliasing-select"
         />
-      </ControlGroup>
-
-      {/* Depth Settings */}
-      <ControlGroup title="Depth">
-        <Switch
-          checked={objectOnlyDepth}
-          onCheckedChange={setObjectOnlyDepth}
-          label="Object Only Depth"
-        />
-        <p className="text-[10px] text-text-secondary mt-1">
-          Exclude background from depth-based effects.
-        </p>
       </ControlGroup>
 
       {/* Frame Blending */}

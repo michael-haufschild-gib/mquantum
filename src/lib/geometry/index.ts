@@ -72,34 +72,4 @@ export {
 } from './extended'
 
 // Extended object generator exports
-export {
-  generateSchroedinger,
-  generateExtendedObject,
-  buildKnnEdges,
-  buildShortEdges,
-} from './extended'
-
-import type { NdGeometry, ObjectType } from './types'
-import type { ExtendedObjectParams } from './extended'
-import { DEFAULT_EXTENDED_OBJECT_PARAMS, generateExtendedObject } from './extended'
-
-/**
- * Generates geometry for the given object type and dimension.
- *
- * Since the only supported ObjectType is 'schroedinger', this delegates
- * directly to {@link generateExtendedObject}.
- *
- * @param type - Object type to generate (currently only 'schroedinger')
- * @param dimension - Dimensionality of the ambient space
- * @param params - Extended object parameters (optional, uses defaults)
- * @returns NdGeometry representing the object
- * @throws {Error} If type is invalid or dimension constraints are violated
- */
-export function generateGeometry(
-  type: ObjectType,
-  dimension: number,
-  params?: ExtendedObjectParams
-): NdGeometry {
-  const effectiveParams = params ?? DEFAULT_EXTENDED_OBJECT_PARAMS
-  return generateExtendedObject(type, dimension, effectiveParams)
-}
+export { generateSchroedinger } from './extended'

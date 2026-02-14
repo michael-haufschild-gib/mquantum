@@ -55,6 +55,7 @@ export function useProgressiveRefinement(
     qualityMultiplier,
     isInteracting,
     sceneTransitioning,
+    isShaderCompiling,
     setRefinementStage,
     setRefinementProgress,
   } = usePerformanceStore(
@@ -65,6 +66,7 @@ export function useProgressiveRefinement(
       qualityMultiplier: s.qualityMultiplier,
       isInteracting: s.isInteracting,
       sceneTransitioning: s.sceneTransitioning,
+      isShaderCompiling: s.isShaderCompiling,
       setRefinementStage: s.setRefinementStage,
       setRefinementProgress: s.setRefinementProgress,
     }))
@@ -153,8 +155,8 @@ export function useProgressiveRefinement(
       return
     }
 
-    // Keep low quality while skybox is loading, during interaction, or scene transition
-    if (isInteracting || skyboxLoading || sceneTransitioning) {
+    // Keep low quality while skybox is loading, during interaction, scene transition, or shader compilation
+    if (isInteracting || skyboxLoading || sceneTransitioning || isShaderCompiling) {
       // Interaction/loading/transition - reset to low quality
       stopRefinement()
     } else {
@@ -167,6 +169,7 @@ export function useProgressiveRefinement(
     enabled,
     isExporting,
     isInteracting,
+    isShaderCompiling,
     skyboxLoading,
     sceneTransitioning,
     startRefinement,

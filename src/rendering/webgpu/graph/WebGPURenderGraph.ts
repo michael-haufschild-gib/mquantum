@@ -444,6 +444,14 @@ export class WebGPURenderGraph {
   }
 
   /**
+   * Expose setup context for external pass pre-initialization (warm swap).
+   * Returns null if the graph has not been initialized.
+   */
+  getSetupContext(): WebGPUSetupContext | null {
+    return this.setupContext
+  }
+
+  /**
    * Add a render pass.
    * @param pass
    */
@@ -458,6 +466,20 @@ export class WebGPURenderGraph {
       await pass.initialize(this.setupContext)
     }
 
+    this.passes.set(pass.id, pass)
+    this.compiled = false
+  }
+
+  /**
+   * Add a pass that has already been initialized externally.
+   * Used for warm swap: the pass was initialized while the old pass was still rendering.
+   * Disposes and replaces any existing pass with the same ID.
+   */
+  addInitializedPass(pass: WebGPURenderPass): void {
+    const existing = this.passes.get(pass.id)
+    if (existing) {
+      existing.dispose()
+    }
     this.passes.set(pass.id, pass)
     this.compiled = false
   }

@@ -67,6 +67,19 @@ export interface DensityGridComputeConfig {
  * texture instead of computing density per-pixel.
  */
 export class DensityGridComputePass extends WebGPUBaseComputePass {
+  /** LRU cache for compiled compute pipelines keyed by shader config */
+  private static pipelineCache = new Map<string, GPUComputePipeline>()
+  private static readonly MAX_PIPELINE_CACHE_SIZE = 8
+
+  private static computeCacheKey(config: DensityGridComputeConfig, format: string): string {
+    return `density:${config.dimension}:${config.quantumMode ?? 'harmonicOscillator'}:${config.termCount ?? -1}:${format}`
+  }
+
+  /** Clear the static pipeline cache (e.g. on device loss). */
+  static clearPipelineCache(): void {
+    DensityGridComputePass.pipelineCache.clear()
+  }
+
   // Configuration
   private passConfig: DensityGridComputeConfig
 
@@ -243,13 +256,31 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       ],
     })
 
-    // Create compute pipeline
-    this.computePipeline = this.createComputePipeline(
-      device,
-      shaderModule,
-      [this.computeBindGroupLayout],
-      'density-grid-compute'
-    )
+    // Check pipeline cache before compiling
+    const cacheKey = DensityGridComputePass.computeCacheKey(this.passConfig, this.densityTextureFormat)
+    const cached = DensityGridComputePass.pipelineCache.get(cacheKey)
+    console.log(`[DensityGrid] Pipeline ${cached ? 'CACHE HIT' : 'CACHE MISS'} key=${cacheKey}`)
+
+    if (cached) {
+      this.computePipeline = cached
+      // LRU: move to end
+      DensityGridComputePass.pipelineCache.delete(cacheKey)
+      DensityGridComputePass.pipelineCache.set(cacheKey, cached)
+    } else {
+      // Cache miss: async compilation (non-blocking)
+      this.computePipeline = await this.createComputePipelineAsync(
+        device,
+        shaderModule,
+        [this.computeBindGroupLayout],
+        'density-grid-compute'
+      )
+      // Store in cache with LRU eviction
+      if (DensityGridComputePass.pipelineCache.size >= DensityGridComputePass.MAX_PIPELINE_CACHE_SIZE) {
+        const oldest = DensityGridComputePass.pipelineCache.keys().next().value!
+        DensityGridComputePass.pipelineCache.delete(oldest)
+      }
+      DensityGridComputePass.pipelineCache.set(cacheKey, this.computePipeline)
+    }
   }
 
   private async selectGridTextureFormat(

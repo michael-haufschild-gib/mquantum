@@ -38,8 +38,30 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ className = '' }) => {
       backgroundColor: s.backgroundColor,
     }))
   )
-  const { bloomEnabled, bloomIntensity } = usePostProcessingStore(
-    useShallow((s) => ({ bloomEnabled: s.bloomEnabled, bloomIntensity: s.bloomIntensity }))
+  const {
+    bloomEnabled,
+    bloomMode,
+    bloomGain,
+    bloomThreshold,
+    bloomKnee,
+    bloomBands,
+    bloomConvolutionRadius,
+    bloomConvolutionResolutionScale,
+    bloomConvolutionBoost,
+    bloomConvolutionTint,
+  } = usePostProcessingStore(
+    useShallow((s) => ({
+      bloomEnabled: s.bloomEnabled,
+      bloomMode: s.bloomMode,
+      bloomGain: s.bloomGain,
+      bloomThreshold: s.bloomThreshold,
+      bloomKnee: s.bloomKnee,
+      bloomBands: s.bloomBands,
+      bloomConvolutionRadius: s.bloomConvolutionRadius,
+      bloomConvolutionResolutionScale: s.bloomConvolutionResolutionScale,
+      bloomConvolutionBoost: s.bloomConvolutionBoost,
+      bloomConvolutionTint: s.bloomConvolutionTint,
+    }))
   )
 
   // Cleanup timeout on unmount
@@ -66,7 +88,15 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ className = '' }) => {
       edgeColor,
       backgroundColor,
       bloomEnabled,
-      bloomIntensity,
+      bloomMode,
+      bloomGain,
+      bloomThreshold,
+      bloomKnee,
+      bloomBands,
+      bloomConvolutionRadius,
+      bloomConvolutionResolutionScale,
+      bloomConvolutionBoost,
+      bloomConvolutionTint,
     })
 
     try {

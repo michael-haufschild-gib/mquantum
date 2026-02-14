@@ -218,7 +218,7 @@ describe('presetManagerStore', () => {
       expect(savedConfig.momentumHbar).toBe(1.75)
 
       extended.setSchroedingerRepresentation('position')
-      extended.setSchroedingerMomentumDisplayUnits('normalized')
+      extended.setSchroedingerMomentumDisplayUnits('k')
       extended.setSchroedingerMomentumScale(1.0)
       extended.setSchroedingerMomentumHbar(1.0)
 

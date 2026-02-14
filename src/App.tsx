@@ -13,7 +13,7 @@ import { ScreenshotModal } from '@/components/overlays/ScreenshotModal'
 import { ShaderCompilationOverlay } from '@/components/overlays/ShaderCompilationOverlay'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { ToastProvider } from '@/contexts/ToastContext'
-import { useCachePrewarming } from '@/hooks/useCachePrewarming'
+
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { useDynamicFavicon } from '@/hooks/useDynamicFavicon'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
@@ -34,9 +34,6 @@ import { useCallback, useMemo } from 'react'
 function AppContent() {
   // Initialize state from URL parameters (must be first)
   useUrlState()
-
-  // Pre-warm geometry cache from IndexedDB (non-blocking)
-  useCachePrewarming()
 
   // Enable keyboard shortcuts
   useKeyboardShortcuts()

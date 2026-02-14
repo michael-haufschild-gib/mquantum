@@ -31,7 +31,7 @@ interface ScenePassConfig {
     | 'phaseDiverging'
     | 'diverging'
     | 'relativePhase'
-    | 'energy'
+    | 'radialDistance'
     | 'domainColoringPsi'
   skyboxEnabled: boolean
   skyboxMode:
@@ -88,7 +88,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     representation: 'position',
-    colorAlgorithm: 'mixed',
+    colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
     skyboxMode: 'classic',
     backgroundColor: '#232323',

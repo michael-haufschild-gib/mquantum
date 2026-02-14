@@ -127,10 +127,9 @@ struct NDTransformUniforms {
 
 struct PostProcessUniforms {
   // Bloom
-  bloomStrength: f32,
-  bloomRadius: f32,
+  bloomGain: f32,
   bloomThreshold: f32,
-  bloomSmoothing: f32,
+  bloomKnee: f32,
 
   // Tone mapping
   exposure: f32,

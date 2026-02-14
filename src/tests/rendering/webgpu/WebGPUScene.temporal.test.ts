@@ -32,7 +32,7 @@ interface ScenePassConfig {
     | 'phaseDiverging'
     | 'diverging'
     | 'relativePhase'
-    | 'energy'
+    | 'radialDistance'
     | 'domainColoringPsi'
   skyboxEnabled: boolean
   skyboxMode:
@@ -75,7 +75,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     representation: 'position',
-    colorAlgorithm: 'mixed',
+    colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
     skyboxMode: 'classic',
     backgroundColor: '#232323',
@@ -242,8 +242,9 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(resources.has('quarter-position')).toBe(false)
     expect(passes.some((pass) => pass.id === 'temporal-cloud')).toBe(false)
 
+    // object-color always includes COPY_SRC to avoid resource recreation on temporal toggle
     const objectColorUsage = resources.get('object-color')?.usage as number
-    expect((objectColorUsage & GPUTextureUsage.COPY_SRC) !== 0).toBe(false)
+    expect((objectColorUsage & GPUTextureUsage.COPY_SRC) !== 0).toBe(true)
   })
 
   it('uses configured background color for no-skybox scene clear pass', async () => {

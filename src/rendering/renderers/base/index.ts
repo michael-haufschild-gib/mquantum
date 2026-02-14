@@ -20,22 +20,9 @@ export {
 
 // Hooks
 export {
-  useQualityTracking,
-  type UseQualityTrackingOptions,
-  type UseQualityTrackingResult,
-} from './useQualityTracking'
-
-export {
   useRotationUpdates,
   type BasisVectorsResult,
   type OriginResult,
   type UseRotationUpdatesOptions,
   type UseRotationUpdatesResult,
 } from './useRotationUpdates'
-
-export {
-  calculateSafeProjectionDistance,
-  DEFAULT_PROJECTION_DISTANCE,
-  useProjectionDistanceCache,
-  type UseProjectionDistanceCacheResult,
-} from './projectionUtils'

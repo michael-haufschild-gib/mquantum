@@ -18,25 +18,12 @@ export { oklabBlock } from './color/oklab.wgsl'
 // Lighting
 export { ggxBlock } from './lighting/ggx.wgsl'
 export { multiLightBlock } from './lighting/multi-light.wgsl'
-export { sssBlock } from './lighting/sss.wgsl'
 
 // Raymarching
-export { raymarchCoreBlock } from './raymarch/core.wgsl'
-export { normalBlock } from './raymarch/normal.wgsl'
 export { sphereIntersectBlock } from './raymarch/sphere-intersect.wgsl'
-
-// Math utilities
-export { safeMathBlock } from './math/safe-math.wgsl'
 
 // Features
 export { temporalBlock } from './features/temporal.wgsl'
-
-// Depth rendering
-export {
-  packDepthBlock,
-  depthUniformsBlock,
-  ndTransformDepthBlock,
-} from './depth/customDepth.wgsl'
 
 // Composition helpers
 export {

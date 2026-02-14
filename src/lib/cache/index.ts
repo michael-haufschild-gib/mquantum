@@ -1,7 +1,13 @@
 /**
- * Cache module - IndexedDB caching for mdimension.
+ * Cache module - Hermite polynomial constants for quantum harmonic oscillator.
  *
  * @module lib/cache
  */
 
-export { IndexedDBCache, type IndexedDBCacheStore } from './IndexedDBCache'
+export {
+  HERMITE_COEFFICIENTS,
+  HERMITE_COEFFICIENTS_FLAT,
+  HERMITE_COEFF_COUNT,
+  MAX_HERMITE_ORDER,
+  hermiteEval,
+} from './constants/hermite'

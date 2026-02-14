@@ -58,24 +58,6 @@ export function exportCanvasToPNG(canvas: HTMLCanvasElement, options: ExportOpti
 }
 
 /**
- * Finds a canvas in the legacy export wrapper.
- * @deprecated The WebGPU screenshot pipeline no longer depends on direct DOM canvas lookup.
- *
- * @returns The canvas element or null if not found
- */
-export function findThreeCanvas(): HTMLCanvasElement | null {
-  // The 'main-webgl-canvas' ID is on the R3F wrapper div, so we need to find the canvas inside it
-  const wrapper = document.getElementById('main-webgl-canvas')
-  if (!wrapper) return null
-
-  if (wrapper instanceof HTMLCanvasElement) {
-    return wrapper
-  }
-
-  return wrapper.querySelector('canvas')
-}
-
-/**
  * Captures the current Three.js scene and opens the preview modal.
  * Uses the on-demand screenshot capture system which works without
  * preserveDrawingBuffer being enabled.

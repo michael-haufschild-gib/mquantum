@@ -71,6 +71,14 @@ interface DeduplicationResult {
 }
 
 export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
+  /** Single cached pipeline — the eigenfunction compute shader has no config variants. */
+  private static cachedPipeline: GPUComputePipeline | null = null
+
+  /** Clear the static pipeline cache (e.g. on device loss). */
+  static clearPipelineCache(): void {
+    EigenfunctionCacheComputePass.cachedPipeline = null
+  }
+
   // GPU resources
   private cacheBuffer: GPUBuffer | null = null
   private computeParamsBuffer: GPUBuffer | null = null
@@ -170,12 +178,19 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
       ],
     })
 
-    this.computePipeline = this.createComputePipeline(
-      device,
-      shaderModule,
-      [this.computeBindGroupLayout],
-      'eigenfunction-cache-compute'
-    )
+    // Reuse cached pipeline (shader is config-independent)
+    if (EigenfunctionCacheComputePass.cachedPipeline) {
+      this.computePipeline = EigenfunctionCacheComputePass.cachedPipeline
+    } else {
+      // Cache miss: async compilation (non-blocking)
+      this.computePipeline = await this.createComputePipelineAsync(
+        device,
+        shaderModule,
+        [this.computeBindGroupLayout],
+        'eigenfunction-cache-compute'
+      )
+      EigenfunctionCacheComputePass.cachedPipeline = this.computePipeline
+    }
   }
 
   /**

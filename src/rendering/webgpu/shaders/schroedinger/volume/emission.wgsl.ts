@@ -220,10 +220,10 @@ const ALGO_BRANCH: Record<number, string> = {
     col = hsl2rgb(relativePhaseNorm, 0.85, rhoNorm);`,
 
   11: /* wgsl */ `
-    // 11: Energy (spectral distance-based)
+    // 11: Radial Distance (spectral)
     let r = length(pos);
-    let energyProxy = clamp(r * 0.5, 0.0, 1.0);
-    let hue = 0.8 * energyProxy;
+    let distanceNorm = clamp(r * 0.5, 0.0, 1.0);
+    let hue = 0.8 * distanceNorm;
     col = hsl2rgb(hue, 1.0, 0.5);`,
 }
 
@@ -240,7 +240,7 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   8: 'Domain Coloring Psi',
   9: 'Diverging',
   10: 'Relative Phase',
-  11: 'Energy',
+  11: 'Radial Distance',
 }
 
 export { COLOR_ALG_NAMES }

@@ -213,21 +213,26 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(0)
     })
 
-    it('clamps bloom intensity/threshold/radius to safe ranges', () => {
-      usePostProcessingStore.getState().setBloomIntensity(999)
-      expect(usePostProcessingStore.getState().bloomIntensity).toBe(2)
-      usePostProcessingStore.getState().setBloomIntensity(-1)
-      expect(usePostProcessingStore.getState().bloomIntensity).toBe(0)
+    it('clamps bloom v2 controls to safe ranges', () => {
+      usePostProcessingStore.getState().setBloomGain(999)
+      expect(usePostProcessingStore.getState().bloomGain).toBe(3)
+      usePostProcessingStore.getState().setBloomGain(-1)
+      expect(usePostProcessingStore.getState().bloomGain).toBe(0)
 
       usePostProcessingStore.getState().setBloomThreshold(999)
-      expect(usePostProcessingStore.getState().bloomThreshold).toBe(1)
-      usePostProcessingStore.getState().setBloomThreshold(-1)
-      expect(usePostProcessingStore.getState().bloomThreshold).toBe(0)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(20)
+      usePostProcessingStore.getState().setBloomThreshold(-999)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(-1)
 
-      usePostProcessingStore.getState().setBloomRadius(999)
-      expect(usePostProcessingStore.getState().bloomRadius).toBe(1)
-      usePostProcessingStore.getState().setBloomRadius(-1)
-      expect(usePostProcessingStore.getState().bloomRadius).toBe(0)
+      usePostProcessingStore.getState().setBloomKnee(999)
+      expect(usePostProcessingStore.getState().bloomKnee).toBe(5)
+      usePostProcessingStore.getState().setBloomKnee(-999)
+      expect(usePostProcessingStore.getState().bloomKnee).toBe(0)
+
+      usePostProcessingStore.getState().setBloomBandSize(0, 999)
+      expect(usePostProcessingStore.getState().bloomBands[0]!.size).toBe(4)
+      usePostProcessingStore.getState().setBloomBandSize(0, -999)
+      expect(usePostProcessingStore.getState().bloomBands[0]!.size).toBe(0.25)
     })
 
     it('normalizes/clamps lighting angles to prevent invalid light vectors', () => {

@@ -188,12 +188,14 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     this.createSharedResources(device)
 
     if (this.twoPhaseActive) {
-      // Two-phase pipeline
-      this.createSpatialPipeline(device)
-      this.createReconstructPipeline(device)
+      // Two-phase pipeline — compile both concurrently
+      await Promise.all([
+        this.createSpatialPipeline(device),
+        this.createReconstructPipeline(device),
+      ])
     } else {
       // Legacy single-pass pipeline
-      this.createLegacyPipeline(device)
+      await this.createLegacyPipeline(device)
     }
   }
 
@@ -252,7 +254,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
    * Create the legacy single-pass pipeline (same as before the refactor).
    * Used for hydrogen mode and single-term HO where two-phase isn't beneficial.
    */
-  private createLegacyPipeline(device: GPUDevice): void {
+  private async createLegacyPipeline(device: GPUDevice): Promise<void> {
     const { wgsl } = composeWignerCacheComputeShader({
       dimension: this.passConfig.dimension,
       quantumMode: this.passConfig.quantumMode,
@@ -290,7 +292,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       ],
     })
 
-    this.legacyPipeline = this.createComputePipeline(
+    this.legacyPipeline = await this.createComputePipelineAsync(
       device, shaderModule, [this.legacyBindGroupLayout], 'wigner-legacy'
     )
 
@@ -301,7 +303,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
   /**
    * Create Phase 1: Spatial precompute pipeline.
    */
-  private createSpatialPipeline(device: GPUDevice): void {
+  private async createSpatialPipeline(device: GPUDevice): Promise<void> {
     const { wgsl } = composeWignerSpatialComputeShader({
       dimension: this.passConfig.dimension,
       quantumMode: this.passConfig.quantumMode,
@@ -388,7 +390,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       ],
     })
 
-    this.spatialPipeline = this.createComputePipeline(
+    this.spatialPipeline = await this.createComputePipelineAsync(
       device, shaderModule, [this.spatialBindGroupLayout], 'wigner-spatial'
     )
   }
@@ -396,7 +398,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
   /**
    * Create Phase 2: Reconstruction pipeline.
    */
-  private createReconstructPipeline(device: GPUDevice): void {
+  private async createReconstructPipeline(device: GPUDevice): Promise<void> {
     const { wgsl } = composeWignerReconstructComputeShader()
     const shaderModule = this.createShaderModule(device, wgsl, 'wigner-reconstruct')
 
@@ -443,7 +445,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       ],
     })
 
-    this.reconstructPipeline = this.createComputePipeline(
+    this.reconstructPipeline = await this.createComputePipelineAsync(
       device, shaderModule, [this.reconstructBindGroupLayout], 'wigner-reconstruct'
     )
   }

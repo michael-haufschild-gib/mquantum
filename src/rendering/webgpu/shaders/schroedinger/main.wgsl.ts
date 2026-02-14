@@ -362,12 +362,12 @@ export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = 
   } else if (USE_ANALYTICAL_GRADIENT) {
     rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
   } else {
-    rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+    rawGrad = computeGradientTetrahedral(p, animTime, schroedinger.boundingRadius * 0.005, schroedinger);
   }`
     : `if (USE_ANALYTICAL_GRADIENT) {
     rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
   } else {
-    rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+    rawGrad = computeGradientTetrahedral(p, animTime, schroedinger.boundingRadius * 0.005, schroedinger);
   }`
 
   const colorSample = useDensityGrid
@@ -827,12 +827,12 @@ export function generateMainBlockIsosurfaceTemporal(
   } else if (USE_ANALYTICAL_GRADIENT) {
     rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
   } else {
-    rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+    rawGrad = computeGradientTetrahedral(p, animTime, schroedinger.boundingRadius * 0.005, schroedinger);
   }`
     : `if (USE_ANALYTICAL_GRADIENT) {
     rawGrad = computeAnalyticalGradient(p, animTime, schroedinger);
   } else {
-    rawGrad = computeGradientTetrahedral(p, animTime, 0.01, schroedinger);
+    rawGrad = computeGradientTetrahedral(p, animTime, schroedinger.boundingRadius * 0.005, schroedinger);
   }`
 
   const colorSample = useDensityGrid

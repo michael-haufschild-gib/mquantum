@@ -32,9 +32,8 @@ const QUANTUM_MODE_HYDROGEN_ND: i32 = 1;
 // Representation-space constants
 const REPRESENTATION_POSITION: i32 = 0;
 const REPRESENTATION_MOMENTUM: i32 = 1;
-const MOMENTUM_UNITS_NORMALIZED: i32 = 0;
-const MOMENTUM_UNITS_K: i32 = 1;
-const MOMENTUM_UNITS_P: i32 = 2;
+const MOMENTUM_UNITS_K: i32 = 0;
+const MOMENTUM_UNITS_P: i32 = 1;
 
 // Physical nodal-definition constants
 const NODAL_DEFINITION_PSI_ABS: i32 = 0;

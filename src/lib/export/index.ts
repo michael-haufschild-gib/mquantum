@@ -2,10 +2,5 @@
  * Export Utilities
  */
 
-export {
-  exportCanvasToPNG,
-  exportSceneToPNG,
-  findThreeCanvas,
-  generateTimestampFilename,
-} from './image'
+export { exportCanvasToPNG, exportSceneToPNG, generateTimestampFilename } from './image'
 export type { ExportOptions } from './image'

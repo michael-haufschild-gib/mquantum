@@ -179,65 +179,15 @@ export function {Name}Controls() {
 ### Other primitives
 `Switch`, `Input`, `NumberInput`, `ColorPicker`, `Modal`, `ConfirmModal`, `InputModal`, `Tooltip`, `Popover`, `DropdownMenu`, `Tabs`, `Knob`, `Envelope`, `ControlGroup`, `InlineEdit`, `LoadingSpinner`
 
-## WebGPU Rendering Patterns
+## WebGPU Rendering
 
-### Architecture overview
-
-This project uses a **custom WebGPU renderer**. The rendering pipeline:
-1. **WebGPUCanvas** (`src/rendering/webgpu/WebGPUCanvas.tsx`) - React component providing the canvas
-2. **WebGPUScene** (`src/rendering/webgpu/WebGPUScene.tsx`) - Sets up render graph, creates passes, runs frame loop
-3. **WebGPURenderGraph** - Declarative pass orchestration with automatic resource management
-4. **Passes** - Individual render operations (scene, bloom, tonemapping, etc.)
-5. **Renderers** - Object-specific rendering (Schroedinger, Skybox, GroundPlane)
-
-### How to add a new render pass
-
-1. Create `src/rendering/webgpu/passes/{Name}Pass.ts`
-2. Extend `WebGPUBasePass`
-3. Declare inputs/outputs/enabled in a static `declare()` method
-4. Implement `render(ctx, encoder)` method
-5. Register in `WebGPUScene.tsx` `setupRenderPasses()`
-6. Export from `src/rendering/webgpu/passes/index.ts`
-
-See `docs/architecture.md` for the pass template.
-
-### How to add a new WGSL shader module
-
-1. Create `src/rendering/webgpu/shaders/<category>/<name>.wgsl.ts`
-2. Export a `const <name>Block = /* wgsl */ \`...\`` template string
-3. Import and compose via `assembleShaderBlocks()` in the relevant `compose.ts`
-4. Use `ShaderBlock.condition` for conditional inclusion (set to `false` to skip)
-
-### Schroedinger shader system
-
-The Schroedinger renderer composes shaders from modular blocks:
-- **SDF functions**: `sdf3d.wgsl.ts` through `sdf11d.wgsl.ts` (dimension-specific)
-- **Quantum functions**: `hydrogenPsi.wgsl.ts`, `hoNDVariants.wgsl.ts`, etc.
-- **Volume integration**: `absorption.wgsl.ts`, `emission.wgsl.ts`, `densityGridSampling.wgsl.ts`
-- **Shared modules**: Lighting (PBR, SSS, GGX, IBL), color (oklab, HSL, cosine-palette), math (safe operations)
-
-The `compose.ts` file in `shaders/schroedinger/` selects blocks based on dimension and quantum mode.
+For render pass templates, shader module templates, and render graph architecture, see `docs/architecture.md`.
 
 ## State Management Patterns
 
 ### Connecting Component to Store
 
-```tsx
-// GOOD: Individual selectors (prevents unnecessary re-renders)
-const dimension = useGeometryStore((s) => s.dimension)
-const setDimension = useGeometryStore((s) => s.setDimension)
-
-// GOOD: Multiple values with useShallow
-import { useShallow } from 'zustand/react/shallow'
-const selector = useShallow((s: ReturnType<typeof useGeometryStore.getState>) => ({
-  dimension: s.dimension,
-  objectType: s.objectType,
-}))
-const { dimension, objectType } = useGeometryStore(selector)
-
-// BAD: Full store subscription
-const { dimension, setDimension } = useGeometryStore()
-```
+Use individual selectors or `useShallow` for multi-value selectors. See `.claude/rules/stores.md` for correct patterns.
 
 ### Key stores
 
@@ -253,18 +203,6 @@ const { dimension, setDimension } = useGeometryStore()
 | `animationStore` | Animation | `isPlaying`, `animatingPlanes`, rotation speeds |
 | `rotationStore` | N-D rotation | `rotations` Map, dimension |
 | `cameraStore` | Camera | Position, target, FOV |
-
-### Store access in WebGPU passes
-
-WebGPU passes access stores through the render graph's frame context:
-
-```ts
-// In pass render method:
-const appearance = getStore(ctx, 'appearance')
-const pp = getStore(ctx, 'postProcessing')
-```
-
-Do **not** import stores directly in pass files. Always use `getStore()`.
 
 ## Tailwind Patterns
 
@@ -309,25 +247,9 @@ This project uses Tailwind CSS 4 with the Vite plugin:
 
 ## Performance Patterns
 
-### Memoize expensive computations
-```tsx
-const transformedData = useMemo(() => expensiveTransform(data), [data])
-```
-
-### Memoize callback references
-```tsx
-const handleChange = useCallback((value: number) => setValue(value), [setValue])
-```
-
-### Avoid inline objects in JSX
-```tsx
-// BAD: Creates new object every render
-<Component position={{ x: 0, y: 0 }} />
-
-// GOOD: Stable reference
-const position = useMemo(() => ({ x: 0, y: 0 }), [])
-<Component position={position} />
-```
+- **Memoize derived data**: `useMemo(() => expensiveTransform(data), [data])`
+- **Memoize callbacks**: `useCallback((value: number) => setValue(value), [setValue])`
+- **No inline objects in JSX props**: create stable references with `useMemo` or outside the component
 
 ## Hook Decision Tree
 
@@ -346,9 +268,6 @@ const position = useMemo(() => ({ x: 0, y: 0 }), [])
 
 - **Don't**: Use inline styles for layout.
   **Do**: Use Tailwind utility classes.
-
-- **Don't**: Subscribe to entire store state.
-  **Do**: Use individual state selectors or `useShallow`.
 
 - **Don't**: Use arbitrary color values (hex literals).
   **Do**: Use Tailwind color tokens (`accent-cyan`, `text-primary`, etc.).

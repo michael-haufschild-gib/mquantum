@@ -45,21 +45,7 @@ if (newFeature) {
 
 ## Internal Module Interfaces
 
-### 1. Geometry Generators (`src/lib/geometry/`)
-**Contract**: Functions that return raw vertex/edge data.
-**Pattern**:
-```typescript
-export function generateMyShape(dimension: number): GeometryData {
-  // Pure math, no side effects
-  return {
-    vertices: [...],
-    edges: [...],
-    faces: [...]
-  };
-}
-```
-
-### 2. Shader Interfaces (`src/rendering/webgpu/shaders/`)
+### Shader Interfaces (`src/rendering/webgpu/shaders/`)
 **Contract**: WGSL shader blocks composed via `assembleShaderBlocks()`.
 **Pattern**:
 ```typescript

@@ -7,7 +7,13 @@
  */
 
 // Bloom
-export { bloomThresholdShader, createBloomBlurShader, bloomCompositeShader } from './bloom.wgsl'
+export {
+  bloomThresholdShader,
+  createBloomBlurShader,
+  createBloomCompositeShader,
+  bloomConvolutionCompositeShader,
+  bloomCopyShader,
+} from './bloom.wgsl'
 
 // Anti-aliasing
 export { fxaaShader } from './fxaa.wgsl'
@@ -17,24 +23,3 @@ export {
   smaaNeighborhoodBlendingShader,
   smaaShaders,
 } from './smaa.wgsl'
-
-// Normal compositing
-export {
-  normalCompositeUniformsBlock,
-  normalCompositeVertexShader,
-  normalCompositeFragmentShader,
-} from './normal-composite.wgsl'
-
-// Frame blending
-export {
-  frameBlendingUniformsBlock,
-  frameBlendingVertexShader,
-  frameBlendingFragmentShader,
-} from './frame-blending.wgsl'
-
-// Cloud compositing
-export {
-  cloudCompositeUniformsBlock,
-  cloudCompositeVertexShader,
-  cloudCompositeFragmentShader,
-} from './cloud-composite.wgsl'

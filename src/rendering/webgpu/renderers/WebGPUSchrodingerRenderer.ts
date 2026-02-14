@@ -59,7 +59,7 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   domainColoringPsi: 8,
   diverging: 9,
   relativePhase: 10,
-  energy: 11,
+  radialDistance: 11,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -106,9 +106,8 @@ const REPRESENTATION_MODE_MAP: Record<string, number> = {
   wigner: 2,
 }
 const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
-  normalized: 0,
-  k: 1,
-  p: 2,
+  k: 0,
+  p: 1,
 }
 
 export interface SchrodingerRendererConfig {
@@ -140,6 +139,46 @@ export interface SchrodingerRendererConfig {
  * WebGPU renderer for quantum wavefunctions.
  */
 export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
+  /** LRU cache for compiled render pipelines keyed by shader config. */
+  private static renderPipelineCache = new Map<string, GPURenderPipeline>()
+  private static readonly MAX_CACHE_SIZE = 16
+
+  /**
+   * Compute a cache key that uniquely identifies the compiled shader + pipeline descriptor.
+   * Two configs producing the same key MUST produce identical shader code and pipeline state.
+   */
+  private static computePipelineCacheKey(
+    config: SchroedingerWGSLShaderConfig,
+    rendererConfig: SchrodingerRendererConfig
+  ): string {
+    const pipelineIs2D = (rendererConfig.dimension ?? 3) === 2 || rendererConfig.representation === 'wigner'
+    return [
+      config.dimension,
+      rendererConfig.representation ?? 'position',
+      config.isosurface ? 1 : 0,
+      config.temporalAccumulation ? 1 : 0,
+      config.quantumMode ?? 'harmonicOscillator',
+      config.termCount ?? -1,
+      config.nodal ? 1 : 0,
+      config.phaseMateriality ? 1 : 0,
+      config.interference ? 1 : 0,
+      config.uncertaintyBoundary ? 1 : 0,
+      config.useEigenfunctionCache ? 1 : 0,
+      config.colorAlgorithm ?? 4,
+      config.useDensityGrid ? 1 : 0,
+      config.densityGridHasPhase ? 1 : 0,
+      config.densityGridSize ?? 64,
+      config.isWigner ? 1 : 0,
+      config.useWignerCache ? 1 : 0,
+      pipelineIs2D ? 1 : 0,
+    ].join(':')
+  }
+
+  /** Clear the static render pipeline cache (e.g. on device loss). */
+  static clearPipelineCache(): void {
+    WebGPUSchrodingerRenderer.renderPipelineCache.clear()
+  }
+
   private renderPipeline: GPURenderPipeline | null = null
   private vertexBuffer: GPUBuffer | null = null
   private indexBuffer: GPUBuffer | null = null
@@ -388,6 +427,22 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
+
+    try {
+      await this.createPipelineImpl(ctx)
+    } catch (err) {
+      // On ANY error, clear all static pipeline caches to prevent stale/bad entries
+      // from persisting across rebuild attempts.
+      console.error('[SchrodingerRenderer] Pipeline creation failed, clearing all caches:', err)
+      WebGPUSchrodingerRenderer.renderPipelineCache.clear()
+      DensityGridComputePass.clearPipelineCache()
+      EigenfunctionCacheComputePass.clearPipelineCache()
+      throw err
+    }
+  }
+
+  private async createPipelineImpl(ctx: WebGPUSetupContext): Promise<void> {
+    const { device } = ctx
     // Force a lighting buffer write on first frame after (re)initialization.
     this.lastLightingVersion = -1
     this.lastQualitySignature = ''
@@ -398,7 +453,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastPbrVersion = -1
     this.lastSchrodingerPbrVersion = -1
 
-    const pipelineIs2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
+    const dim = this.rendererConfig.dimension ?? 3
+    const pipelineIs2D = dim === 2 || this.rendererConfig.representation === 'wigner'
+    const forceRgba = dim > 3
+
+    // =====================================================================
+    // Phase 1: Construct compute passes and start parallel initialization
+    // =====================================================================
 
     // Density grid compute pass provides uncertainty boundary threshold extraction.
     // Skip for 2D mode (no volumetric raymarching).
@@ -406,16 +467,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.densityGridPass = null
     this.densityGridInitialized = false
 
+    let densityPromise: Promise<void> | null = null
     if (!pipelineIs2D) {
       this.densityGridPass = new DensityGridComputePass({
-        dimension: this.rendererConfig.dimension ?? 3,
+        dimension: dim,
         quantumMode: this.rendererConfig.quantumMode,
         termCount: this.rendererConfig.termCount,
         gridSize: this.shaderConfig.densityGridSize,
-        forceRgba: (this.rendererConfig.dimension ?? 3) > 3,
+        forceRgba,
       })
-      await this.densityGridPass.initialize(ctx)
-      this.densityGridInitialized = true
+      densityPromise = this.densityGridPass.initialize(ctx)
     }
 
     // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
@@ -424,13 +485,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.eigenCachePass = null
     this.eigenCacheInitialized = false
 
+    let eigenPromise: Promise<void> | null = null
     if (!pipelineIs2D && this.shaderConfig.useEigenfunctionCache) {
       this.eigenCachePass = new EigenfunctionCacheComputePass({
-        dimension: this.rendererConfig.dimension ?? 3,
+        dimension: dim,
         isHydrogenND: this.rendererConfig.quantumMode === 'hydrogenND',
       })
-      await this.eigenCachePass.initialize(ctx)
-      this.eigenCacheInitialized = true
+      eigenPromise = this.eigenCachePass.initialize(ctx)
     }
 
     // Wigner cache compute pass (pre-computes W(x,p) on a 2D grid)
@@ -438,33 +499,47 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.wignerCachePass = null
     this.wignerCacheInitialized = false
 
+    let wignerPromise: Promise<void> | null = null
     if (this.shaderConfig.isWigner) {
       this.wignerCachePass = new WignerCacheComputePass({
-        dimension: this.rendererConfig.dimension ?? 3,
+        dimension: dim,
         quantumMode: this.rendererConfig.quantumMode,
         termCount: this.rendererConfig.termCount,
       })
-      await this.wignerCachePass.initialize(ctx)
-      this.wignerCacheInitialized = true
+      wignerPromise = this.wignerCachePass.initialize(ctx)
     }
 
-    // Update density grid phase availability based on actual texture format
-    // r16float only stores rho (R channel); rgba16float stores rho, logRho, phase (R, G, B)
+    // =====================================================================
+    // Phase 2: Determine density grid format for shader composition
+    // For hydrogen 4D+ (forceRgba=true), the format is always 'rgba16float' — known early.
+    // For 3D hydrogen, we must await the density grid format probe first.
+    // =====================================================================
+
     if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
-      this.shaderConfig.densityGridHasPhase = this.densityGridPass.getTextureFormat() === 'rgba16float'
+      if (forceRgba) {
+        // Format known early — no need to wait for density grid initialization
+        this.shaderConfig.densityGridHasPhase = true
+      } else {
+        // 3D hydrogen: must await density grid to probe GPU format support
+        await densityPromise
+        densityPromise = null // Already resolved
+        this.densityGridInitialized = true
+        this.shaderConfig.densityGridHasPhase = this.densityGridPass.getTextureFormat() === 'rgba16float'
+      }
     }
 
-    // Compose shaders
-    const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
-    const vertexShader = pipelineIs2D
-      ? composeSchroedingerVertexShader2D()
-      : composeSchroedingerVertexShader()
+    // =====================================================================
+    // Phase 3: Render pipeline — check cache or start async compilation
+    // =====================================================================
 
-    // Create shader modules
-    const vertexModule = this.createShaderModule(device, vertexShader, 'schroedinger-vertex')
-    const fragmentModule = this.createShaderModule(device, fragmentShader, 'schroedinger-fragment')
+    const cacheKey = WebGPUSchrodingerRenderer.computePipelineCacheKey(this.shaderConfig, this.rendererConfig)
+    const cachedPipeline = WebGPUSchrodingerRenderer.renderPipelineCache.get(cacheKey)
 
-    // Create bind group layouts - consolidated to stay within 4-group limit
+    console.log(
+      `[SchrodingerRenderer] Pipeline ${cachedPipeline ? 'CACHE HIT' : 'CACHE MISS'} dim=${dim} key=${cacheKey}`
+    )
+
+    // Always create bind group layouts (cheap, needed for bind groups regardless of cache)
     // Group 0: Camera
     const cameraBindGroupLayout = device.createBindGroupLayout({
       label: 'schroedinger-camera-bgl',
@@ -534,131 +609,181 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       entries: objectBindGroupEntries,
     })
     this.objectBindGroupLayout = objectBindGroupLayout
-    // Create pipeline layout
-    const bindGroupLayouts: GPUBindGroupLayout[] = [
-      cameraBindGroupLayout,
-      combinedBindGroupLayout, // Contains combined lighting+material+quality
-      objectBindGroupLayout,
-    ]
 
-    const pipelineLayout = device.createPipelineLayout({
-      label: 'schroedinger-pipeline-layout',
-      bindGroupLayouts,
-    })
+    let renderPipelinePromise: Promise<GPURenderPipeline> | null = null
 
-    // Create render pipeline (async to avoid freezing browser during compilation)
-    // The Schroedinger shader is 3000-5000 lines of WGSL (quantum math, volume integration,
-    // PBR lighting, etc.) and synchronous compilation blocks the main thread for seconds.
-    this.renderPipeline = await device.createRenderPipelineAsync({
-      label: 'schroedinger-pipeline',
-      layout: pipelineLayout,
-      vertex: {
-        module: vertexModule,
-        entryPoint: 'main',
-        buffers: pipelineIs2D
-          ? [] // 2D fullscreen triangle uses vertex_index, no vertex buffer
-          : [
-              {
-                arrayStride: 12, // 3 floats position
-                attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' as const }],
-              },
-            ],
-      },
-      fragment: {
-        module: fragmentModule,
-        entryPoint: 'fragmentMain',
-        // Target configuration depends on mode:
-        // - 2D: single target with alpha blend (direct pixel evaluation)
-        // - Temporal (volumetric or isosurface): MRT (color + position), with alpha blend on color
-        // - Isosurface (non-temporal): MRT (color + normal), no blend
-        // - Standard volumetric: single target with alpha blend
-        targets: pipelineIs2D
-          ? [
-              {
-                // 2D mode: single color output with alpha blend
-                format: 'rgba16float' as GPUTextureFormat,
-                blend: {
-                  color: {
-                    srcFactor: 'src-alpha' as const,
-                    dstFactor: 'one-minus-src-alpha' as const,
-                    operation: 'add' as const,
-                  },
-                  alpha: {
-                    srcFactor: 'one' as const,
-                    dstFactor: 'one-minus-src-alpha' as const,
-                    operation: 'add' as const,
-                  },
+    if (cachedPipeline) {
+      // Cache hit — reuse compiled pipeline (skip shader composition + compilation)
+      this.renderPipeline = cachedPipeline
+      // LRU: move to end of map
+      WebGPUSchrodingerRenderer.renderPipelineCache.delete(cacheKey)
+      WebGPUSchrodingerRenderer.renderPipelineCache.set(cacheKey, cachedPipeline)
+    } else {
+      // Cache miss — compose shader and start async compilation
+      const { wgsl: fragmentShader } = composeSchroedingerShader(this.shaderConfig)
+      const vertexShader = pipelineIs2D
+        ? composeSchroedingerVertexShader2D()
+        : composeSchroedingerVertexShader()
+
+      const vertexModule = this.createShaderModule(device, vertexShader, 'schroedinger-vertex')
+      const fragmentModule = this.createShaderModule(device, fragmentShader, 'schroedinger-fragment')
+
+      const pipelineLayout = device.createPipelineLayout({
+        label: 'schroedinger-pipeline-layout',
+        bindGroupLayouts: [cameraBindGroupLayout, combinedBindGroupLayout, objectBindGroupLayout],
+      })
+
+      // Start async compilation (non-blocking, runs in parallel with compute passes)
+      renderPipelinePromise = device.createRenderPipelineAsync({
+        label: 'schroedinger-pipeline',
+        layout: pipelineLayout,
+        vertex: {
+          module: vertexModule,
+          entryPoint: 'main',
+          buffers: pipelineIs2D
+            ? [] // 2D fullscreen triangle uses vertex_index, no vertex buffer
+            : [
+                {
+                  arrayStride: 12, // 3 floats position
+                  attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' as const }],
                 },
-              },
-            ]
-          : this.rendererConfig.temporal
+              ],
+        },
+        fragment: {
+          module: fragmentModule,
+          entryPoint: 'fragmentMain',
+          targets: pipelineIs2D
             ? [
                 {
-                  // Temporal color output (volumetric: alpha blend, isosurface: no blend)
                   format: 'rgba16float' as GPUTextureFormat,
-                  ...(this.rendererConfig.isosurface
-                    ? {}
-                    : {
-                        blend: {
-                          color: {
-                            srcFactor: 'src-alpha' as const,
-                            dstFactor: 'one-minus-src-alpha' as const,
-                            operation: 'add' as const,
-                          },
-                          alpha: {
-                            srcFactor: 'one' as const,
-                            dstFactor: 'one-minus-src-alpha' as const,
-                            operation: 'add' as const,
-                          },
-                        },
-                      }),
-                },
-                {
-                  // Position buffer (rgba32float for world positions) - no blend
-                  format: 'rgba32float' as GPUTextureFormat,
-                },
-              ]
-            : this.rendererConfig.isosurface
-              ? [
-                  { format: 'rgba16float' as GPUTextureFormat }, // Color buffer (no blend for solid surface)
-                  { format: 'rgba16float' as GPUTextureFormat }, // Normal buffer
-                ]
-              : [
-                  {
-                    // Standard volumetric mode needs alpha blending
-                    format: 'rgba16float' as GPUTextureFormat,
-                    blend: {
-                      color: {
-                        srcFactor: 'src-alpha' as const,
-                        dstFactor: 'one-minus-src-alpha' as const,
-                        operation: 'add' as const,
-                      },
-                      alpha: {
-                        srcFactor: 'one' as const,
-                        dstFactor: 'one-minus-src-alpha' as const,
-                        operation: 'add' as const,
-                      },
+                  blend: {
+                    color: {
+                      srcFactor: 'src-alpha' as const,
+                      dstFactor: 'one-minus-src-alpha' as const,
+                      operation: 'add' as const,
+                    },
+                    alpha: {
+                      srcFactor: 'one' as const,
+                      dstFactor: 'one-minus-src-alpha' as const,
+                      operation: 'add' as const,
                     },
                   },
-                ],
-      },
-      primitive: {
-        topology: 'triangle-list' as const,
-        // 2D: no culling (fullscreen triangle)
-        // 3D: 'front' to match THREE.BackSide (render back faces = cull front faces)
-        cullMode: pipelineIs2D ? ('none' as const) : ('front' as const),
-      },
-      // Depth state: 2D has no depth buffer, temporal also has none
-      depthStencil: pipelineIs2D
-        ? undefined
-        : this.rendererConfig.temporal
+                },
+              ]
+            : this.rendererConfig.temporal
+              ? [
+                  {
+                    format: 'rgba16float' as GPUTextureFormat,
+                    ...(this.rendererConfig.isosurface
+                      ? {}
+                      : {
+                          blend: {
+                            color: {
+                              srcFactor: 'src-alpha' as const,
+                              dstFactor: 'one-minus-src-alpha' as const,
+                              operation: 'add' as const,
+                            },
+                            alpha: {
+                              srcFactor: 'one' as const,
+                              dstFactor: 'one-minus-src-alpha' as const,
+                              operation: 'add' as const,
+                            },
+                          },
+                        }),
+                  },
+                  {
+                    format: 'rgba32float' as GPUTextureFormat,
+                  },
+                ]
+              : this.rendererConfig.isosurface
+                ? [
+                    { format: 'rgba16float' as GPUTextureFormat },
+                    { format: 'rgba16float' as GPUTextureFormat },
+                  ]
+                : [
+                    {
+                      format: 'rgba16float' as GPUTextureFormat,
+                      blend: {
+                        color: {
+                          srcFactor: 'src-alpha' as const,
+                          dstFactor: 'one-minus-src-alpha' as const,
+                          operation: 'add' as const,
+                        },
+                        alpha: {
+                          srcFactor: 'one' as const,
+                          dstFactor: 'one-minus-src-alpha' as const,
+                          operation: 'add' as const,
+                        },
+                      },
+                    },
+                  ],
+        },
+        primitive: {
+          topology: 'triangle-list' as const,
+          cullMode: pipelineIs2D ? ('none' as const) : ('front' as const),
+        },
+        depthStencil: pipelineIs2D
           ? undefined
-          : {
-              format: 'depth24plus' as GPUTextureFormat,
-              depthWriteEnabled: true,
-              depthCompare: 'less' as GPUCompareFunction,
-            },
-    })
+          : this.rendererConfig.temporal
+            ? undefined
+            : {
+                format: 'depth24plus' as GPUTextureFormat,
+                depthWriteEnabled: true,
+                depthCompare: 'less' as GPUCompareFunction,
+              },
+      })
+    }
+
+    // =====================================================================
+    // Phase 4: Wait for all pending compilations in parallel
+    // =====================================================================
+
+    const pendingWork: Promise<void>[] = []
+
+    // Remaining compute pass initializations (some may already be resolved)
+    if (densityPromise) {
+      pendingWork.push(densityPromise.then(() => { this.densityGridInitialized = true }))
+    }
+    if (eigenPromise) {
+      pendingWork.push(eigenPromise.then(() => { this.eigenCacheInitialized = true }))
+    }
+    if (wignerPromise) {
+      pendingWork.push(wignerPromise.then(() => { this.wignerCacheInitialized = true }))
+    }
+
+    // Render pipeline compilation (cache miss only)
+    if (renderPipelinePromise) {
+      pendingWork.push(renderPipelinePromise.then((pipeline) => {
+        this.renderPipeline = pipeline
+        // Store in cache with LRU eviction
+        if (WebGPUSchrodingerRenderer.renderPipelineCache.size >= WebGPUSchrodingerRenderer.MAX_CACHE_SIZE) {
+          const oldest = WebGPUSchrodingerRenderer.renderPipelineCache.keys().next().value!
+          WebGPUSchrodingerRenderer.renderPipelineCache.delete(oldest)
+        }
+        WebGPUSchrodingerRenderer.renderPipelineCache.set(cacheKey, pipeline)
+      }))
+    }
+
+    if (pendingWork.length > 0) {
+      await Promise.all(pendingWork)
+    }
+
+    // Safety check: render pipeline must be valid after Phase 4
+    if (!this.renderPipeline) {
+      throw new Error(
+        `[SchrodingerRenderer] Render pipeline is null after Phase 4 (dim=${dim}, cacheHit=${!!cachedPipeline})`
+      )
+    }
+
+    console.log(
+      `[SchrodingerRenderer] Phase 4 complete: pipeline=${!!this.renderPipeline}`,
+      `density=${this.densityGridInitialized} eigen=${this.eigenCacheInitialized} wigner=${this.wignerCacheInitialized}`
+    )
+
+    // =====================================================================
+    // Phase 5: Create uniform buffers, bind groups, geometry (always fresh)
+    // These are per-instance and cheap to create (~1ms total).
+    // =====================================================================
 
     // Create uniform buffers
     // CameraUniforms: 7 mat4x4f (448) + vec3f+f32 (16) + 4×f32+vec2f (16) + 4×f32 (16) = 496 bytes, round to 512
@@ -1237,6 +1362,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     }
 
+    // Compute effective momentum scale incorporating display units.
+    // p-space (p = ħk) requires dividing the zoom by ħ so the shader evaluates at k = p/ħ.
+    // For normalized/k-space (ħ=1 by definition), this is a no-op.
+    const isPSpace = schroedinger?.momentumDisplayUnits === 'p'
+    const hbar = isPSpace ? Math.max(schroedinger?.momentumHbar ?? 1.0, 1e-4) : 1.0
+    const effectiveMomentumScale = (schroedinger?.momentumScale ?? 1.0) / hbar
+
     // Compute physics-based bounding radius for this state.
     // Must run on EVERY full update (not just preset regen) because hydrogen n/l/m
     // changes affect bounding radius but don't trigger HO preset regeneration.
@@ -1244,7 +1376,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
       const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
       const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
-      const newBoundR = computeBoundingRadius(
+      const rawBoundR = computeBoundingRadius(
         quantumModeStr,
         this.cachedPreset,
         dimension,
@@ -1253,8 +1385,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         extraDimQuantumNumbers,
         extraDimOmega,
         schroedinger?.representation ?? 'position',
-        schroedinger?.momentumScale ?? 1.0
+        effectiveMomentumScale
       )
+      // Convert from physical to model-space: fieldScale rescales coordinates
+      // via mapPosToND, so the bounding sphere must shrink accordingly.
+      const fieldScale = schroedinger?.fieldScale ?? 1.0
+      const newBoundR = rawBoundR / Math.max(fieldScale, 1e-4)
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
       // Rebuild bounding geometry only when quantized bound shifts enough.
@@ -1340,13 +1476,26 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const hydrogenBoost = 50.0 * validN * validN * lBoost
     floatView[596 / 4] = hydrogenBoost
 
-    // hydrogenNDBoost = hydrogenBoost * (1 + (dim - 3) * 0.3)
-    const dimFactor = 1.0 + (dimension - 3) * 0.3
-    const hydrogenNDBoost = hydrogenBoost * dimFactor
+    // hydrogenNDBoost: compensate for HO normalization in extra dimensions.
+    // Each extra dim's ho1D includes alphaNorm = (ω/π)^{1/4}, giving density
+    // factor (ω/π)^{1/2} per dim. This compounds exponentially and makes
+    // high-D orbitals invisible. Invert the normalization: Π sqrt(π/ω_i).
+    const numExtraDims = Math.max(0, dimension - 3)
+    let normCompensation = 1.0
+    for (let i = 0; i < numExtraDims; i++) {
+      const baseOmega = (schroedinger?.extraDimOmega as number[] | undefined)?.[i] ?? 1.0
+      const spread = 1.0 + (i - 3.5) * (schroedinger?.extraDimFrequencySpread ?? 0)
+      const effectiveOmega = Math.max(baseOmega * spread, 0.01)
+      normCompensation *= Math.sqrt(Math.PI / effectiveOmega)
+    }
+    const hydrogenNDBoost = hydrogenBoost * normCompensation
     floatView[600 / 4] = hydrogenNDBoost
 
-    // hydrogenRadialThreshold = 25 * n * a0 * (1 + 0.1*l)
-    const hydrogenRadialThreshold = 25.0 * validN * bohrRadius * (1.0 + 0.1 * validL)
+    // hydrogenRadialThreshold = 25 * n * a0 * (1 + 0.1*l) * fieldScale
+    // Shader compares against length(ndPos) which is already scaled by fieldScale,
+    // so the threshold must be in the same scaled coordinate space.
+    const hydrogenFieldScale = schroedinger?.fieldScale ?? 1.0
+    const hydrogenRadialThreshold = 25.0 * validN * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
     floatView[604 / 4] = hydrogenRadialThreshold
 
     // --- extraDimN array (offset 608, 2 vec4i = 8 ints) ---
@@ -1469,7 +1618,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Color algorithm system (offset 940+)
     // Use canonical mapping shared with WebGL (palette/types.ts COLOR_ALGORITHM_TO_INT)
-    const colorAlgorithm = COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'mixed'] ?? 4
+    const colorAlgorithm = COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'radialDistance'] ?? 11
     intView[940 / 4] = colorAlgorithm
     floatView[944 / 4] = appearance?.distribution?.power ?? 1.0
     floatView[948 / 4] = appearance?.distribution?.cycles ?? 1.0
@@ -1634,9 +1783,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1324 / 4] = schroedinger?.probabilityCurrentOpacity ?? 0.7
 
     // Representation + momentum controls (offset 1328-1344)
+    // effectiveMomentumScale already incorporates ħ for p-space (computed above).
+    // The shader reads momentumScale and applies it directly as kScale.
     intView[1328 / 4] = REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0
-    intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'normalized'] ?? 0
-    floatView[1336 / 4] = schroedinger?.momentumScale ?? 1.0
+    intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'k'] ?? 0
+    floatView[1336 / 4] = effectiveMomentumScale
     floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
 
     // Radial probability overlay (offset 1344-1376)
@@ -1709,6 +1860,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // Physics: HO eigenfunctions are eigenfunctions of the Fourier transform.
     // φ̃_n(k, ω) = (-i)^n · φ_n(k, 1/ω) — same function, reciprocal ω, phase rotation.
+    // For p-space (p = ħk), the transform becomes ω → 1/(ħ²ω) so the shader evaluates
+    // the correct function in p-coordinates: φ_n(p, 1/(ħ²ω)).
     // Transform the uniform buffer so the GPU shader runs the normal position-mode path
     // and produces correct momentum-space wavefunctions automatically.
     // All optimizations (eigencache, analytical gradient, temporal reprojection) work at 60 FPS.
@@ -1718,11 +1871,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       quantumModeStr !== 'hydrogenND'
 
     if (isHOMomentum) {
-      // 1. Invert omegas: ω_j → 1/ω_j
+      // 1. Invert omegas: ω_j → 1/(ħ²·ω_j)
+      // For normalized/k-space (hbar=1), this reduces to the standard 1/ω.
+      // For p-space, the ħ² factor maps coordinates from p to the correct k = p/ħ.
+      const hbar2 = hbar * hbar
       const omegaOff = 16 / 4
       for (let j = 0; j < MAX_DIM; j++) {
         const omega = floatView[omegaOff + j]!
-        floatView[omegaOff + j] = 1.0 / Math.max(omega, 0.01)
+        floatView[omegaOff + j] = 1.0 / (hbar2 * Math.max(omega, 0.01))
       }
 
       // 2. Rotate coefficients by (-i)^{Σ n_j} per term
@@ -2100,6 +2256,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.qualityUniformBuffer, data)
   }
 
+  private executeNullGuardWarned = false
+
   execute(ctx: WebGPURenderContext): void {
     const is2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
 
@@ -2111,6 +2269,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       !this.lightingBindGroup ||
       !this.objectBindGroup
     ) {
+      if (!this.executeNullGuardWarned) {
+        this.executeNullGuardWarned = true
+        console.warn(
+          `[SchrodingerRenderer] execute() skipped — null resources:`,
+          `device=${!!this.device} pipeline=${!!this.renderPipeline}`,
+          `camera=${!!this.cameraBindGroup} lighting=${!!this.lightingBindGroup}`,
+          `object=${!!this.objectBindGroup}`
+        )
+      }
       return
     }
     // 3D mode additionally requires vertex/index buffers

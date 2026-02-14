@@ -2,23 +2,28 @@
  * Post-processing slice for visual store
  *
  * Manages post-processing effects:
- * - Bloom (glow effect)
+ * - Bloom (Gaussian sum + optional convolution)
  */
 
 import type { StateCreator } from 'zustand'
 import {
   type AntiAliasingMethod,
+  type BloomBandSettings,
+  type BloomMode,
   type PaperQuality,
   DEFAULT_ANTI_ALIASING_METHOD,
+  DEFAULT_BLOOM_BANDS,
+  DEFAULT_BLOOM_CONVOLUTION_BOOST,
+  DEFAULT_BLOOM_CONVOLUTION_RADIUS,
+  DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
+  DEFAULT_BLOOM_CONVOLUTION_TINT,
   DEFAULT_BLOOM_ENABLED,
-  DEFAULT_BLOOM_INTENSITY,
-  DEFAULT_BLOOM_LEVELS,
-  DEFAULT_BLOOM_RADIUS,
-  DEFAULT_BLOOM_SMOOTHING,
+  DEFAULT_BLOOM_GAIN,
+  DEFAULT_BLOOM_KNEE,
+  DEFAULT_BLOOM_MODE,
   DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_FRAME_BLENDING_ENABLED,
   DEFAULT_FRAME_BLENDING_FACTOR,
-  DEFAULT_OBJECT_ONLY_DEPTH,
   DEFAULT_PAPER_COLOR_BACK,
   DEFAULT_PAPER_COLOR_FRONT,
   DEFAULT_PAPER_CONTRAST,
@@ -37,6 +42,28 @@ import {
   DEFAULT_PAPER_SEED,
 } from '../defaults/visualDefaults'
 
+const BLOOM_BAND_COUNT = 5
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value))
+}
+
+function isValidHexColor(color: string): boolean {
+  return /^#[0-9A-Fa-f]{6}$/.test(color)
+}
+
+function cloneDefaultBands(): BloomBandSettings[] {
+  return DEFAULT_BLOOM_BANDS.map((band) => ({ ...band }))
+}
+
+function mapBloomBands(
+  bands: BloomBandSettings[],
+  index: number,
+  updater: (band: BloomBandSettings) => BloomBandSettings
+): BloomBandSettings[] {
+  return bands.map((band, bandIndex) => (bandIndex === index ? updater({ ...band }) : { ...band }))
+}
+
 // ============================================================================
 // State Interface
 // ============================================================================
@@ -44,16 +71,23 @@ import {
 export interface PostProcessingSliceState {
   // --- Bloom ---
   bloomEnabled: boolean
-  /** Bloom intensity/strength (0-2) */
-  bloomIntensity: number
-  /** Luminance threshold - pixels below this won't bloom (0-1) */
+  bloomMode: BloomMode
+  /** Global gain multiplier (0-3). */
+  bloomGain: number
+  /** Scene-linear threshold. -1 bypasses threshold extraction. */
   bloomThreshold: number
-  /** Blur radius/spread (0-1) */
-  bloomRadius: number
-  /** Luminance smoothing - softens the threshold transition (0-1) */
-  bloomSmoothing: number
-  /** Number of blur levels/mip levels (1-5) */
-  bloomLevels: number
+  /** Threshold smooth knee width. */
+  bloomKnee: number
+  /** UE-style 5 bloom bands for gaussian mode. */
+  bloomBands: BloomBandSettings[]
+  /** Convolution mode radius scale. */
+  bloomConvolutionRadius: number
+  /** Convolution mode internal resolution scale. */
+  bloomConvolutionResolutionScale: number
+  /** Convolution mode scatter/boost. */
+  bloomConvolutionBoost: number
+  /** Convolution mode tint color. */
+  bloomConvolutionTint: string
 
   // --- Anti-aliasing ---
   antiAliasingMethod: AntiAliasingMethod
@@ -63,10 +97,6 @@ export interface PostProcessingSliceState {
   cinematicAberration: number
   cinematicVignette: number
   cinematicGrain: number
-
-  // --- Depth Buffer ---
-  /** When true, depth-based effects use object-only depth. */
-  objectOnlyDepth: boolean
 
   // --- Paper Texture Effect ---
   /** Whether paper texture effect is enabled */
@@ -112,11 +142,19 @@ export interface PostProcessingSliceState {
 export interface PostProcessingSliceActions {
   // --- Bloom Actions ---
   setBloomEnabled: (enabled: boolean) => void
-  setBloomIntensity: (intensity: number) => void
+  setBloomMode: (mode: BloomMode) => void
+  setBloomGain: (gain: number) => void
   setBloomThreshold: (threshold: number) => void
+  setBloomKnee: (knee: number) => void
+  setBloomBandEnabled: (index: number, enabled: boolean) => void
+  setBloomBandWeight: (index: number, weight: number) => void
+  setBloomBandSize: (index: number, size: number) => void
+  setBloomBandTint: (index: number, tint: string) => void
   setBloomRadius: (radius: number) => void
-  setBloomSmoothing: (smoothing: number) => void
-  setBloomLevels: (levels: number) => void
+  setBloomConvolutionRadius: (radius: number) => void
+  setBloomConvolutionResolutionScale: (scale: number) => void
+  setBloomConvolutionBoost: (boost: number) => void
+  setBloomConvolutionTint: (tint: string) => void
 
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => void
@@ -126,9 +164,6 @@ export interface PostProcessingSliceActions {
   setCinematicAberration: (intensity: number) => void
   setCinematicVignette: (intensity: number) => void
   setCinematicGrain: (intensity: number) => void
-
-  // --- Depth Buffer Actions ---
-  setObjectOnlyDepth: (objectOnly: boolean) => void
 
   // --- Paper Texture Actions ---
   setPaperEnabled: (enabled: boolean) => void
@@ -162,11 +197,15 @@ export type PostProcessingSlice = PostProcessingSliceState & PostProcessingSlice
 export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   // Bloom
   bloomEnabled: DEFAULT_BLOOM_ENABLED,
-  bloomIntensity: DEFAULT_BLOOM_INTENSITY,
+  bloomMode: DEFAULT_BLOOM_MODE,
+  bloomGain: DEFAULT_BLOOM_GAIN,
   bloomThreshold: DEFAULT_BLOOM_THRESHOLD,
-  bloomRadius: DEFAULT_BLOOM_RADIUS,
-  bloomSmoothing: DEFAULT_BLOOM_SMOOTHING,
-  bloomLevels: DEFAULT_BLOOM_LEVELS,
+  bloomKnee: DEFAULT_BLOOM_KNEE,
+  bloomBands: cloneDefaultBands(),
+  bloomConvolutionRadius: DEFAULT_BLOOM_CONVOLUTION_RADIUS,
+  bloomConvolutionResolutionScale: DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
+  bloomConvolutionBoost: DEFAULT_BLOOM_CONVOLUTION_BOOST,
+  bloomConvolutionTint: DEFAULT_BLOOM_CONVOLUTION_TINT,
 
   // Anti-aliasing
   antiAliasingMethod: DEFAULT_ANTI_ALIASING_METHOD,
@@ -176,9 +215,6 @@ export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   cinematicAberration: 0.005,
   cinematicVignette: 1.2,
   cinematicGrain: 0.0,
-
-  // Depth Buffer
-  objectOnlyDepth: DEFAULT_OBJECT_ONLY_DEPTH,
 
   // Paper Texture
   paperEnabled: DEFAULT_PAPER_ENABLED,
@@ -220,24 +256,93 @@ export const createPostProcessingSlice: StateCreator<
     set({ bloomEnabled: enabled })
   },
 
-  setBloomIntensity: (intensity: number) => {
-    set({ bloomIntensity: Math.max(0, Math.min(2, intensity)) })
+  setBloomMode: (mode: BloomMode) => {
+    set({ bloomMode: mode })
+  },
+
+  setBloomGain: (gain: number) => {
+    set({ bloomGain: clamp(gain, 0, 3) })
   },
 
   setBloomThreshold: (threshold: number) => {
-    set({ bloomThreshold: Math.max(0, Math.min(1, threshold)) })
+    set({ bloomThreshold: clamp(threshold, -1, 5) })
+  },
+
+  setBloomKnee: (knee: number) => {
+    set({ bloomKnee: clamp(knee, 0, 5) })
+  },
+
+  setBloomBandEnabled: (index: number, enabled: boolean) => {
+    if (index < 0 || index >= BLOOM_BAND_COUNT) return
+
+    set((state) => {
+      const nextBands = state.bloomBands.map((band) => ({ ...band }))
+
+      if (enabled) {
+        // Enabling a band enables all lower bands to keep a contiguous active prefix.
+        for (let i = 0; i <= index; i++) nextBands[i]!.enabled = true
+      } else {
+        // Disabling a band disables this and all higher bands for level specialization.
+        for (let i = index; i < BLOOM_BAND_COUNT; i++) nextBands[i]!.enabled = false
+      }
+
+      return { bloomBands: nextBands }
+    })
+  },
+
+  setBloomBandWeight: (index: number, weight: number) => {
+    if (index < 0 || index >= BLOOM_BAND_COUNT) return
+    set((state) => ({
+      bloomBands: mapBloomBands(state.bloomBands, index, (band) => ({
+        ...band,
+        weight: clamp(weight, 0, 4),
+      })),
+    }))
+  },
+
+  setBloomBandSize: (index: number, size: number) => {
+    if (index < 0 || index >= BLOOM_BAND_COUNT) return
+    set((state) => ({
+      bloomBands: mapBloomBands(state.bloomBands, index, (band) => ({
+        ...band,
+        size: clamp(size, 0.25, 4),
+      })),
+    }))
+  },
+
+  setBloomBandTint: (index: number, tint: string) => {
+    if (index < 0 || index >= BLOOM_BAND_COUNT) return
+    if (!isValidHexColor(tint)) return
+    set((state) => ({
+      bloomBands: mapBloomBands(state.bloomBands, index, (band) => ({
+        ...band,
+        tint,
+      })),
+    }))
   },
 
   setBloomRadius: (radius: number) => {
-    set({ bloomRadius: Math.max(0, Math.min(1, radius)) })
+    const clamped = clamp(radius, 0.25, 4)
+    set((state) => ({
+      bloomBands: state.bloomBands.map((band) => ({ ...band, size: clamped })),
+    }))
   },
 
-  setBloomSmoothing: (smoothing: number) => {
-    set({ bloomSmoothing: Math.max(0, Math.min(1, smoothing)) })
+  setBloomConvolutionRadius: (radius: number) => {
+    set({ bloomConvolutionRadius: clamp(radius, 0.5, 6) })
   },
 
-  setBloomLevels: (levels: number) => {
-    set({ bloomLevels: Math.max(1, Math.min(5, Math.round(levels))) })
+  setBloomConvolutionResolutionScale: (scale: number) => {
+    set({ bloomConvolutionResolutionScale: clamp(scale, 0.25, 1) })
+  },
+
+  setBloomConvolutionBoost: (boost: number) => {
+    set({ bloomConvolutionBoost: clamp(boost, 0, 4) })
+  },
+
+  setBloomConvolutionTint: (tint: string) => {
+    if (!isValidHexColor(tint)) return
+    set({ bloomConvolutionTint: tint })
   },
 
   // --- Anti-aliasing Actions ---
@@ -260,11 +365,6 @@ export const createPostProcessingSlice: StateCreator<
 
   setCinematicGrain: (intensity: number) => {
     set({ cinematicGrain: Math.max(0, Math.min(0.2, intensity)) })
-  },
-
-  // --- Depth Buffer Actions ---
-  setObjectOnlyDepth: (objectOnly: boolean) => {
-    set({ objectOnlyDepth: objectOnly })
   },
 
   // --- Paper Texture Actions ---
