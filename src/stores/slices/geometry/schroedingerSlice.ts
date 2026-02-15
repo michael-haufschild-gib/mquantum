@@ -1,5 +1,8 @@
 import {
+  DEFAULT_FREE_SCALAR_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
+  type FreeScalarConfig,
+  type SchroedingerConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
   SCHROEDINGER_QUALITY_PRESETS,
@@ -72,6 +75,40 @@ export const createSchroedingerSlice: StateCreator<
       return [0, 0, 1]
     }
     return [x / length, y / length, z / length]
+  }
+
+  /**
+   * Compute the CFL stability limit for the lattice Klein-Gordon field.
+   * For a leapfrog integrator the maximum eigenfrequency is:
+   *   omega_max^2 = m^2 + sum_i (2/a_i)^2
+   * and the stability condition is dt * omega_max < 2, giving:
+   *   dt_max = 2 / sqrt(m^2 + sum_i (2/a_i)^2)
+   * @param spacing - Lattice spacing per dimension [ax, ay, az]
+   * @param latticeDim - Active spatial dimensions (1, 2, or 3)
+   * @param mass - Klein-Gordon mass parameter
+   */
+  const computeCflLimit = (spacing: [number, number, number], latticeDim: number, mass: number): number => {
+    let sumInvA2 = 0
+    for (let i = 0; i < latticeDim; i++) {
+      const twoOverA = 2 / spacing[i]
+      sumInvA2 += twoOverA * twoOverA
+    }
+    const omegaMax = Math.sqrt(mass * mass + sumInvA2)
+    return 2 / omegaMax
+  }
+
+  /**
+   * Clamp dt to be within [0.001, min(0.1, CFL limit * safety factor)].
+   * Uses a 0.9 safety factor to stay well within the stable region.
+   * @param dt - Requested time step
+   * @param spacing - Lattice spacing
+   * @param latticeDim - Active dimensions
+   * @param mass - Klein-Gordon mass parameter
+   */
+  const clampDtWithCfl = (dt: number, spacing: [number, number, number], latticeDim: number, mass: number): number => {
+    const cflLimit = computeCflLimit(spacing, latticeDim, mass)
+    const maxDt = Math.min(0.1, cflLimit * 0.9)
+    return Math.max(0.001, Math.min(maxDt, dt))
   }
 
   const axisToNormal = (axis: 'x' | 'y' | 'z'): [number, number, number] => {
@@ -275,7 +312,16 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     // === Quantum Mode Selection ===
-    setSchroedingerQuantumMode: valueSetter('quantumMode'),
+    setSchroedingerQuantumMode: (mode) => {
+      setWithVersion((state) => {
+        const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
+        // Free scalar field doesn't support Wigner or momentum representation
+        if (mode === 'freeScalarField' && state.schroedinger.representation !== 'position') {
+          updates.representation = 'position'
+        }
+        return { schroedinger: { ...state.schroedinger, ...updates } }
+      })
+    },
     setSchroedingerRepresentation: valueSetter('representation'),
     setSchroedingerMomentumDisplayUnits: valueSetter('momentumDisplayUnits'),
     setSchroedingerMomentumScale: clampedSetter('momentumScale', 0.1, 4.0),
@@ -647,6 +693,171 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerSqLayerCoherentAlphaIm: clampedSetter('sqLayerCoherentAlphaIm', -5, 5),
     setSchroedingerSqLayerSqueezeR: clampedSetter('sqLayerSqueezeR', 0, 3),
     setSchroedingerSqLayerSqueezeTheta: clampedSetter('sqLayerSqueezeTheta', 0, 2 * Math.PI),
+
+    // === Free Scalar Field ===
+    setFreeScalarLatticeDim: (dim) => {
+      const clamped = Math.max(1, Math.min(3, Math.floor(dim))) as 1 | 2 | 3
+      setWithVersion((state) => {
+        const prev = state.schroedinger.freeScalar
+        // Set unused dimensions to 1 in gridSize
+        const gridSize: [number, number, number] = [
+          prev.gridSize[0],
+          clamped >= 2 ? prev.gridSize[1] : 1,
+          clamped >= 3 ? prev.gridSize[2] : 1,
+        ]
+        // Re-clamp dt to respect CFL limit with new dimensionality
+        const newDt = clampDtWithCfl(prev.dt, prev.spacing, clamped, prev.mass)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...prev, latticeDim: clamped, gridSize, dt: newDt, needsReset: true },
+          },
+        }
+      })
+    },
+    setFreeScalarGridSize: (size) => {
+      setWithVersion((state) => {
+        const { latticeDim } = state.schroedinger.freeScalar
+        const clamped: [number, number, number] = [
+          Math.max(8, Math.min(128, Math.round(size[0]))),
+          latticeDim >= 2 ? Math.max(1, Math.min(128, Math.round(size[1]))) : 1,
+          latticeDim >= 3 ? Math.max(1, Math.min(128, Math.round(size[2]))) : 1,
+        ]
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...state.schroedinger.freeScalar, gridSize: clamped, needsReset: true },
+          },
+        }
+      })
+    },
+    setFreeScalarSpacing: (spacing) => {
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        const clamped: [number, number, number] = [
+          Math.max(0.01, Math.min(1.0, spacing[0])),
+          Math.max(0.01, Math.min(1.0, spacing[1])),
+          Math.max(0.01, Math.min(1.0, spacing[2])),
+        ]
+        // Re-clamp dt to respect CFL limit with new spacing
+        const newDt = clampDtWithCfl(fs.dt, clamped, fs.latticeDim, fs.mass)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...fs, spacing: clamped, dt: newDt, needsReset: true },
+          },
+        }
+      })
+    },
+    setFreeScalarMass: (mass) => {
+      const clamped = Math.max(0.0, Math.min(10.0, mass))
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        // Re-clamp dt to respect CFL limit with new mass
+        const newDt = clampDtWithCfl(fs.dt, fs.spacing, fs.latticeDim, clamped)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...fs, mass: clamped, dt: newDt },
+          },
+        }
+      })
+    },
+    setFreeScalarDt: (dt) => {
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        const clamped = clampDtWithCfl(dt, fs.spacing, fs.latticeDim, fs.mass)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...fs, dt: clamped },
+          },
+        }
+      })
+    },
+    setFreeScalarStepsPerFrame: (steps) => {
+      const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, stepsPerFrame: clamped },
+        },
+      }))
+    },
+    setFreeScalarInitialCondition: (condition) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, initialCondition: condition, needsReset: true },
+        },
+      }))
+    },
+    setFreeScalarFieldView: (view) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, fieldView: view },
+        },
+      }))
+    },
+    setFreeScalarPacketCenter: (center) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, packetCenter: center },
+        },
+      }))
+    },
+    setFreeScalarPacketWidth: (width) => {
+      const clamped = Math.max(0.01, Math.min(5.0, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, packetWidth: clamped },
+        },
+      }))
+    },
+    setFreeScalarPacketAmplitude: (amplitude) => {
+      const clamped = Math.max(0.01, Math.min(10.0, amplitude))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, packetAmplitude: clamped },
+        },
+      }))
+    },
+    setFreeScalarModeK: (k) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, modeK: k },
+        },
+      }))
+    },
+    setFreeScalarAutoScale: (autoScale) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, autoScale },
+        },
+      }))
+    },
+    resetFreeScalarField: () => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, needsReset: true },
+        },
+      }))
+    },
+    clearFreeScalarNeedsReset: () => {
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, needsReset: false },
+        },
+      }))
+    },
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {

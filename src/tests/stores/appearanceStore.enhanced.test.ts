@@ -220,9 +220,9 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(usePostProcessingStore.getState().bloomGain).toBe(0)
 
       usePostProcessingStore.getState().setBloomThreshold(999)
-      expect(usePostProcessingStore.getState().bloomThreshold).toBe(20)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(5)
       usePostProcessingStore.getState().setBloomThreshold(-999)
-      expect(usePostProcessingStore.getState().bloomThreshold).toBe(-1)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(0)
 
       usePostProcessingStore.getState().setBloomKnee(999)
       expect(usePostProcessingStore.getState().bloomKnee).toBe(5)

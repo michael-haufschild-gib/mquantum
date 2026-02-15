@@ -26,7 +26,7 @@ import {
   bloomConvolutionCompositeShader,
   bloomCopyShader,
   bloomThresholdShader,
-  createBloomBlurShader,
+  createBloomBlurComputeShader,
   createBloomCompositeShader,
 } from '../shaders/postprocessing/bloom.wgsl'
 
@@ -35,6 +35,8 @@ const KERNEL_SIZES = [6, 10, 14, 18, 22] as const
 const NUM_MIPS = 5
 /** Packed coefficient slots (array<vec4f, 6> = 24 floats). */
 const COEFF_SLOTS = 24
+/** Compute shader workgroup tile width. */
+const WORKGROUP_SIZE = 256
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -44,9 +46,15 @@ function cloneDefaultBands(): BloomBandSettings[] {
   return DEFAULT_BLOOM_BANDS.map((band) => ({ ...band }))
 }
 
-function sanitizeBand(input: Partial<BloomBandSettings> | undefined, fallback: BloomBandSettings): BloomBandSettings {
+function sanitizeBand(
+  input: Partial<BloomBandSettings> | undefined,
+  fallback: BloomBandSettings
+): BloomBandSettings {
   if (!input) return { ...fallback }
-  const tint = typeof input.tint === 'string' && /^#[0-9A-Fa-f]{6}$/.test(input.tint) ? input.tint : fallback.tint
+  const tint =
+    typeof input.tint === 'string' && /^#[0-9A-Fa-f]{6}$/.test(input.tint)
+      ? input.tint
+      : fallback.tint
   return {
     enabled: input.enabled ?? fallback.enabled,
     weight: clamp(input.weight ?? fallback.weight, 0, 4),
@@ -84,7 +92,7 @@ export interface BloomPassOptions {
 export class BloomPass extends WebGPUBasePass {
   // Pipelines
   private thresholdPipeline: GPURenderPipeline | null = null
-  private blurPipelines: (GPURenderPipeline | null)[] = new Array(NUM_MIPS).fill(null)
+  private blurPipelines: (GPUComputePipeline | null)[] = new Array(NUM_MIPS).fill(null)
   private compositePipelines: (GPURenderPipeline | null)[] = new Array(NUM_MIPS).fill(null)
   private copyPipeline: GPURenderPipeline | null = null
   private convolutionPipeline: GPURenderPipeline | null = null
@@ -103,7 +111,9 @@ export class BloomPass extends WebGPUBasePass {
   private convolutionUB: GPUBuffer | null = null
 
   private thresholdUniformData = new Float32Array(4)
-  private blurUniformScratch = new Float32Array(4 + COEFF_SLOTS)
+  private blurUniformBuffer = new ArrayBuffer(4 * (4 + COEFF_SLOTS))
+  private blurUniformScratch = new Float32Array(this.blurUniformBuffer)
+  private blurUniformScratchU32 = new Uint32Array(this.blurUniformBuffer)
   private compositeUniformData = new Float32Array(32)
   private convolutionUniformData = new Float32Array(12)
 
@@ -180,10 +190,12 @@ export class BloomPass extends WebGPUBasePass {
 
     if (options?.mode) this.mode = options.mode
     if (options?.gain !== undefined) this.gain = clamp(options.gain, 0, 3)
-    if (options?.threshold !== undefined) this.threshold = clamp(options.threshold, -1, 20)
+    if (options?.threshold !== undefined) this.threshold = clamp(options.threshold, 0, 20)
     if (options?.knee !== undefined) this.knee = clamp(options.knee, 0, 5)
     if (options?.bands) {
-      this.bands = cloneDefaultBands().map((fallback, index) => sanitizeBand(options.bands?.[index], fallback))
+      this.bands = cloneDefaultBands().map((fallback, index) =>
+        sanitizeBand(options.bands?.[index], fallback)
+      )
     }
     if (options?.convolutionRadius !== undefined) {
       this.convolutionRadius = clamp(options.convolutionRadius, 0.5, 6)
@@ -194,7 +206,10 @@ export class BloomPass extends WebGPUBasePass {
     if (options?.convolutionBoost !== undefined) {
       this.convolutionBoost = clamp(options.convolutionBoost, 0, 4)
     }
-    if (options?.convolutionTint !== undefined && /^#[0-9A-Fa-f]{6}$/.test(options.convolutionTint)) {
+    if (
+      options?.convolutionTint !== undefined &&
+      /^#[0-9A-Fa-f]{6}$/.test(options.convolutionTint)
+    ) {
       this.convolutionTint = options.convolutionTint
     }
 
@@ -228,7 +243,7 @@ export class BloomPass extends WebGPUBasePass {
       this.gain = clamp(postProcessing.bloomGain, 0, 3)
     }
     if (postProcessing.bloomThreshold !== undefined) {
-      this.threshold = clamp(postProcessing.bloomThreshold, -1, 5)
+      this.threshold = clamp(postProcessing.bloomThreshold, 0, 5)
     }
     if (postProcessing.bloomKnee !== undefined) {
       this.knee = clamp(postProcessing.bloomKnee, 0, 5)
@@ -242,7 +257,11 @@ export class BloomPass extends WebGPUBasePass {
       this.convolutionRadius = clamp(postProcessing.bloomConvolutionRadius, 0.5, 6)
     }
     if (postProcessing.bloomConvolutionResolutionScale !== undefined) {
-      this.convolutionResolutionScale = clamp(postProcessing.bloomConvolutionResolutionScale, 0.25, 1)
+      this.convolutionResolutionScale = clamp(
+        postProcessing.bloomConvolutionResolutionScale,
+        0.25,
+        1
+      )
     }
     if (postProcessing.bloomConvolutionBoost !== undefined) {
       this.convolutionBoost = clamp(postProcessing.bloomConvolutionBoost, 0, 4)
@@ -276,11 +295,15 @@ export class BloomPass extends WebGPUBasePass {
     })
 
     this.blurBGL = device.createBindGroupLayout({
-      label: 'bloom-blur-bgl',
+      label: 'bloom-blur-compute-bgl',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: { access: 'write-only', format: 'rgba16float' },
+        },
       ],
     })
 
@@ -338,7 +361,11 @@ export class BloomPass extends WebGPUBasePass {
       }
     }
 
-    const thresholdModule = this.createShaderModule(device, bloomThresholdShader, 'bloom-threshold-shader')
+    const thresholdModule = this.createShaderModule(
+      device,
+      bloomThresholdShader,
+      'bloom-threshold-shader'
+    )
     this.thresholdPipeline = this.createFullscreenPipeline(
       device,
       thresholdModule,
@@ -347,11 +374,17 @@ export class BloomPass extends WebGPUBasePass {
       { label: 'bloom-threshold' }
     )
 
+    const blurPipelineLayout = device.createPipelineLayout({
+      label: 'bloom-blur-compute-layout',
+      bindGroupLayouts: [this.blurBGL],
+    })
     for (let i = 0; i < NUM_MIPS; i++) {
-      const blurCode = createBloomBlurShader(KERNEL_SIZES[i]!)
-      const blurModule = this.createShaderModule(device, blurCode, `bloom-blur-L${i}-shader`)
-      this.blurPipelines[i] = this.createFullscreenPipeline(device, blurModule, [this.blurBGL], 'rgba16float', {
-        label: `bloom-blur-L${i}`,
+      const blurCode = createBloomBlurComputeShader(KERNEL_SIZES[i]!)
+      const blurModule = this.createShaderModule(device, blurCode, `bloom-blur-compute-L${i}`)
+      this.blurPipelines[i] = device.createComputePipeline({
+        label: `bloom-blur-compute-L${i}`,
+        layout: blurPipelineLayout,
+        compute: { module: blurModule, entryPoint: 'main' },
       })
     }
 
@@ -372,9 +405,15 @@ export class BloomPass extends WebGPUBasePass {
     }
 
     const copyModule = this.createShaderModule(device, bloomCopyShader, 'bloom-copy-shader')
-    this.copyPipeline = this.createFullscreenPipeline(device, copyModule, [this.copyBGL], 'rgba16float', {
-      label: 'bloom-copy',
-    })
+    this.copyPipeline = this.createFullscreenPipeline(
+      device,
+      copyModule,
+      [this.copyBGL],
+      'rgba16float',
+      {
+        label: 'bloom-copy',
+      }
+    )
 
     const convolutionModule = this.createShaderModule(
       device,
@@ -426,7 +465,7 @@ export class BloomPass extends WebGPUBasePass {
       const desc = {
         size: { width: mipWidth, height: mipHeight },
         format: 'rgba16float' as const,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
       }
 
       this.horizontalTextures.push(device.createTexture({ ...desc, label: `bloom-H-L${i}` }))
@@ -437,7 +476,10 @@ export class BloomPass extends WebGPUBasePass {
 
     this.thresholdTexture = device.createTexture({
       label: 'bloom-threshold-tex',
-      size: { width: Math.max(1, Math.round(width / 2)), height: Math.max(1, Math.round(height / 2)) },
+      size: {
+        width: Math.max(1, Math.round(width / 2)),
+        height: Math.max(1, Math.round(height / 2)),
+      },
       format: 'rgba16float',
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
     })
@@ -496,8 +538,14 @@ export class BloomPass extends WebGPUBasePass {
     if (key === this.lastBlurSizeKey) return
 
     for (let level = 0; level < NUM_MIPS; level++) {
-      const mipWidth = Math.max(1, Math.round(this.gaussianTextureSize.width / Math.pow(2, level + 1)))
-      const mipHeight = Math.max(1, Math.round(this.gaussianTextureSize.height / Math.pow(2, level + 1)))
+      const mipWidth = Math.max(
+        1,
+        Math.round(this.gaussianTextureSize.width / Math.pow(2, level + 1))
+      )
+      const mipHeight = Math.max(
+        1,
+        Math.round(this.gaussianTextureSize.height / Math.pow(2, level + 1))
+      )
       const coeffs = this.gaussianCoefficients[level]!
       const sizeScale = clamp(this.bands[level]?.size ?? 1, 0.25, 4)
 
@@ -506,10 +554,13 @@ export class BloomPass extends WebGPUBasePass {
         const buffer = this.blurUBs[bufferIndex]!
 
         this.blurUniformScratch.fill(0)
-        this.blurUniformScratch[0] = dir === 0 ? 1 : 0
-        this.blurUniformScratch[1] = dir === 0 ? 0 : 1
-        this.blurUniformScratch[2] = (1 / mipWidth) * sizeScale
-        this.blurUniformScratch[3] = (1 / mipHeight) * sizeScale
+        // outputSize: vec2u (offsets 0, 1 as u32)
+        this.blurUniformScratchU32[0] = mipWidth
+        this.blurUniformScratchU32[1] = mipHeight
+        // direction: u32 (offset 2 as u32)
+        this.blurUniformScratchU32[2] = dir
+        // sizeScale: f32 (offset 3 as f32)
+        this.blurUniformScratch[3] = sizeScale
 
         for (let i = 0; i < COEFF_SLOTS; i++) {
           this.blurUniformScratch[4 + i] = coeffs[i]!
@@ -542,7 +593,11 @@ export class BloomPass extends WebGPUBasePass {
     return false
   }
 
-  private renderCopy(ctx: WebGPURenderContext, inputView: GPUTextureView, outputView: GPUTextureView): void {
+  private renderCopy(
+    ctx: WebGPURenderContext,
+    inputView: GPUTextureView,
+    outputView: GPUTextureView
+  ): void {
     if (!this.device || !this.copyPipeline || !this.copyBGL || !this.sampler) return
 
     if (!this.copyBindGroup || this.copyBindGroupInputView !== inputView) {
@@ -645,73 +700,47 @@ export class BloomPass extends WebGPUBasePass {
       return
     }
 
-    let blurInputView: GPUTextureView = inputView
-
-    if (this.threshold >= 0) {
-      if (this.threshold !== this.lastThreshold || this.knee !== this.lastKnee) {
-        this.thresholdUniformData[0] = this.threshold
-        this.thresholdUniformData[1] = this.knee
-        this.thresholdUniformData[2] = 0
-        this.thresholdUniformData[3] = 0
-        this.writeUniformBuffer(this.device, this.thresholdUB, this.thresholdUniformData)
-        this.lastThreshold = this.threshold
-        this.lastKnee = this.knee
-      }
-
-      if (!this.thresholdBindGroup || this.thresholdBindGroupInputView !== inputView) {
-        this.thresholdBindGroup = this.createBindGroup(this.device, this.thresholdBGL, [
-          { binding: 0, resource: { buffer: this.thresholdUB } },
-          { binding: 1, resource: inputView },
-          { binding: 2, resource: this.sampler },
-        ])
-        this.thresholdBindGroupInputView = inputView
-      }
-
-      const thresholdPass = ctx.beginRenderPass({
-        label: 'bloom-threshold',
-        colorAttachments: [
-          {
-            view: this.thresholdTextureView,
-            loadOp: 'clear',
-            storeOp: 'store',
-            clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          },
-        ],
-      })
-      this.renderFullscreen(thresholdPass, this.thresholdPipeline, [this.thresholdBindGroup])
-      thresholdPass.end()
-
-      blurInputView = this.thresholdTextureView
-    } else {
-      if (!this.copyPipeline || !this.copyBGL) return
-
-      if (!this.copyBindGroup || this.copyBindGroupInputView !== inputView) {
-        this.copyBindGroup = this.createBindGroup(this.device, this.copyBGL, [
-          { binding: 0, resource: inputView },
-          { binding: 1, resource: this.sampler },
-        ])
-        this.copyBindGroupInputView = inputView
-      }
-
-      const downsamplePass = ctx.beginRenderPass({
-        label: 'bloom-prefilter-bypass-downsample',
-        colorAttachments: [
-          {
-            view: this.thresholdTextureView,
-            loadOp: 'clear',
-            storeOp: 'store',
-            clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          },
-        ],
-      })
-      this.renderFullscreen(downsamplePass, this.copyPipeline, [this.copyBindGroup])
-      downsamplePass.end()
-      blurInputView = this.thresholdTextureView
+    if (this.threshold !== this.lastThreshold || this.knee !== this.lastKnee) {
+      this.thresholdUniformData[0] = this.threshold
+      this.thresholdUniformData[1] = this.knee
+      this.thresholdUniformData[2] = 0
+      this.thresholdUniformData[3] = 0
+      this.writeUniformBuffer(this.device, this.thresholdUB, this.thresholdUniformData)
+      this.lastThreshold = this.threshold
+      this.lastKnee = this.knee
     }
+
+    if (!this.thresholdBindGroup || this.thresholdBindGroupInputView !== inputView) {
+      this.thresholdBindGroup = this.createBindGroup(this.device, this.thresholdBGL, [
+        { binding: 0, resource: { buffer: this.thresholdUB } },
+        { binding: 1, resource: inputView },
+        { binding: 2, resource: this.sampler },
+      ])
+      this.thresholdBindGroupInputView = inputView
+    }
+
+    const thresholdPass = ctx.beginRenderPass({
+      label: 'bloom-threshold',
+      colorAttachments: [
+        {
+          view: this.thresholdTextureView,
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        },
+      ],
+    })
+    this.renderFullscreen(thresholdPass, this.thresholdPipeline, [this.thresholdBindGroup])
+    thresholdPass.end()
+
+    const blurInputView: GPUTextureView = this.thresholdTextureView
 
     for (let level = 0; level < activeLevels; level++) {
       const pipeline = this.blurPipelines[level]
       if (!pipeline) return
+
+      const mipWidth = Math.max(1, Math.round(ctx.size.width / Math.pow(2, level + 1)))
+      const mipHeight = Math.max(1, Math.round(ctx.size.height / Math.pow(2, level + 1)))
 
       const hReadView = level === 0 ? blurInputView : this.verticalTextureViews[level - 1]!
       const hBufferIdx = level * 2
@@ -720,23 +749,15 @@ export class BloomPass extends WebGPUBasePass {
         this.blurHBindGroups[level] = this.createBindGroup(this.device, this.blurBGL, [
           { binding: 0, resource: { buffer: this.blurUBs[hBufferIdx]! } },
           { binding: 1, resource: hReadView },
-          { binding: 2, resource: this.sampler },
+          { binding: 2, resource: this.horizontalTextureViews[level]! },
         ])
         this.blurHBindGroupInputViews[level] = hReadView
       }
 
-      const hPass = ctx.beginRenderPass({
-        label: `bloom-blur-H-L${level}`,
-        colorAttachments: [
-          {
-            view: this.horizontalTextureViews[level]!,
-            loadOp: 'clear',
-            storeOp: 'store',
-            clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          },
-        ],
-      })
-      this.renderFullscreen(hPass, pipeline, [this.blurHBindGroups[level]!])
+      const hPass = ctx.beginComputePass({ label: `bloom-blur-H-L${level}` })
+      hPass.setPipeline(pipeline)
+      hPass.setBindGroup(0, this.blurHBindGroups[level]!)
+      hPass.dispatchWorkgroups(Math.ceil(mipWidth / WORKGROUP_SIZE), mipHeight, 1)
       hPass.end()
 
       const vBufferIdx = level * 2 + 1
@@ -745,23 +766,15 @@ export class BloomPass extends WebGPUBasePass {
         this.blurVBindGroups[level] = this.createBindGroup(this.device, this.blurBGL, [
           { binding: 0, resource: { buffer: this.blurUBs[vBufferIdx]! } },
           { binding: 1, resource: vReadView },
-          { binding: 2, resource: this.sampler },
+          { binding: 2, resource: this.verticalTextureViews[level]! },
         ])
         this.blurVBindGroupInputViews[level] = vReadView
       }
 
-      const vPass = ctx.beginRenderPass({
-        label: `bloom-blur-V-L${level}`,
-        colorAttachments: [
-          {
-            view: this.verticalTextureViews[level]!,
-            loadOp: 'clear',
-            storeOp: 'store',
-            clearValue: { r: 0, g: 0, b: 0, a: 0 },
-          },
-        ],
-      })
-      this.renderFullscreen(vPass, pipeline, [this.blurVBindGroups[level]!])
+      const vPass = ctx.beginComputePass({ label: `bloom-blur-V-L${level}` })
+      vPass.setPipeline(pipeline)
+      vPass.setBindGroup(0, this.blurVBindGroups[level]!)
+      vPass.dispatchWorkgroups(Math.ceil(mipHeight / WORKGROUP_SIZE), mipWidth, 1)
       vPass.end()
     }
 
@@ -770,7 +783,10 @@ export class BloomPass extends WebGPUBasePass {
     const pipeline = this.compositePipelines[activeLevels - 1]!
     const bgl = this.compositeBGLs[activeLevels - 1]!
 
-    if (!this.compositeBindGroups[activeLevels - 1] || this.compositeBindGroupInputViews[activeLevels - 1] !== inputView) {
+    if (
+      !this.compositeBindGroups[activeLevels - 1] ||
+      this.compositeBindGroupInputViews[activeLevels - 1] !== inputView
+    ) {
       const entries: GPUBindGroupEntry[] = [
         { binding: 0, resource: { buffer: this.compositeUB } },
         { binding: 1, resource: inputView },

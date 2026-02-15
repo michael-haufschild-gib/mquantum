@@ -37,6 +37,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         label: 'Hydrogen Orbitals',
         description: 'N-dimensional hydrogen atom in 3D space.',
       },
+      {
+        value: 'freeScalarField' as SchroedingerQuantumMode,
+        label: 'Free Scalar Field',
+        description: 'Klein-Gordon field on a lattice with real-time evolution.',
+      },
     ],
     []
   )

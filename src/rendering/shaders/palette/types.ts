@@ -193,6 +193,26 @@ export const DEFAULT_DIVERGING_PSI_SETTINGS: DivergingPsiSettings = {
 export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 
 /**
+ * Returns the color algorithm options available for the given quantum mode.
+ *
+ * The 'relativePhase' algorithm requires a reference wavefunction
+ * (arg(conj(psi_ref) * psi)), which does not exist for classical field modes.
+ * All other algorithms work because sign-as-phase encoding provides meaningful
+ * positive/negative coloring.
+ *
+ * @param quantumMode - Current quantum mode
+ * @returns Filtered array of color algorithm options
+ */
+export function getAvailableColorAlgorithms(
+  quantumMode: string
+): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
+  if (quantumMode === 'freeScalarField') {
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => opt.value !== 'relativePhase')
+  }
+  return COLOR_ALGORITHM_OPTIONS
+}
+
+/**
  * Multi-source weight configuration for blending different value sources.
  */
 export interface MultiSourceWeights {

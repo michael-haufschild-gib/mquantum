@@ -5,6 +5,7 @@
 
 import { Section } from '@/components/sections/Section'
 import { ControlGroup } from '@/components/ui/ControlGroup'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import React from 'react'
 import { DimensionSelector } from './DimensionSelector'
 import { ObjectSettingsSection } from './ObjectSettingsSection'
@@ -16,11 +17,15 @@ export interface GeometrySectionProps {
 
 export const GeometrySection: React.FC<GeometrySectionProps> = React.memo(
   ({ defaultOpen = true }) => {
+    const isFreeScalarField = useExtendedObjectStore(
+      (s) => s.schroedinger.quantumMode === 'freeScalarField'
+    )
+
     return (
       <Section title="Geometry" defaultOpen={defaultOpen} data-testid="geometry-section">
         <div className="space-y-1">
           <ControlGroup title="Dimensions" collapsible defaultOpen>
-            <DimensionSelector />
+            <DimensionSelector disabled={isFreeScalarField} />
           </ControlGroup>
 
           <ControlGroup title="Object Type" collapsible defaultOpen>

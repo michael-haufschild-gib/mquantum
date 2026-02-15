@@ -1694,7 +1694,7 @@ export interface PassConfig {
   frameBlendingEnabled: boolean
   // Schrodinger isosurface mode (compile-time shader selection)
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
@@ -1720,7 +1720,7 @@ export interface PassConfig {
 interface SchrodingerPassConfig {
   objectType: ObjectType
   dimension: number
-  quantumMode: 'harmonicOscillator' | 'hydrogenND'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   colorAlgorithm: PaletteColorAlgorithm
   isosurface: boolean

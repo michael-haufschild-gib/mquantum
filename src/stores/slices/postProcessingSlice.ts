@@ -74,7 +74,7 @@ export interface PostProcessingSliceState {
   bloomMode: BloomMode
   /** Global gain multiplier (0-3). */
   bloomGain: number
-  /** Scene-linear threshold. -1 bypasses threshold extraction. */
+  /** Scene-linear threshold (0-5). */
   bloomThreshold: number
   /** Threshold smooth knee width. */
   bloomKnee: number
@@ -265,7 +265,7 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setBloomThreshold: (threshold: number) => {
-    set({ bloomThreshold: clamp(threshold, -1, 5) })
+    set({ bloomThreshold: clamp(threshold, 0, 5) })
   },
 
   setBloomKnee: (knee: number) => {

@@ -28,6 +28,7 @@ import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boun
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
+import { FreeScalarFieldComputePass } from '../passes/FreeScalarFieldComputePass'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
@@ -113,7 +114,7 @@ const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
-  quantumMode?: QuantumModeForShader
+  quantumMode?: QuantumModeForShader | 'freeScalarField'
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color module selection (0-11) */
   colorAlgorithm?: WGSLColorAlgorithm
@@ -151,7 +152,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     config: SchroedingerWGSLShaderConfig,
     rendererConfig: SchrodingerRendererConfig
   ): string {
-    const pipelineIs2D = (rendererConfig.dimension ?? 3) === 2 || rendererConfig.representation === 'wigner'
+    const pipelineIs2D =
+      (rendererConfig.dimension ?? 3) === 2 || rendererConfig.representation === 'wigner'
     return [
       config.dimension,
       rendererConfig.representation ?? 'position',
@@ -204,6 +206,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private densityGridPass: DensityGridComputePass | null = null
   private densityGridInitialized = false
   private densityGridSampler: GPUSampler | null = null
+
+  // Free Scalar Field Compute Pass (Klein-Gordon lattice simulation)
+  private freeScalarFieldPass: FreeScalarFieldComputePass | null = null
 
   // Eigenfunction Cache Compute Pass (HO mode acceleration)
   private eigenCachePass: EigenfunctionCacheComputePass | null = null
@@ -375,9 +380,20 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.rendererConfig.eigenfunctionCacheEnabled = false
     }
 
-    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? (!pipelineIs2D)
+    const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
 
-    // Density grid raymarching: for hydrogen VOLUMETRIC mode at all dimensions (3-11D).
+    // Free scalar field mode: uses density grid exclusively, no eigencache or wigner
+    const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
+
+    // Free scalar field: temporal reprojection is unsupported (no world position output).
+    // Must be set here (not just in shaderConfig) so pipeline targets and render pass
+    // attachment counts match the fragment shader output count.
+    if (isFreeScalar) {
+      this.rendererConfig.temporal = false
+    }
+
+    // Density grid raymarching: for hydrogen VOLUMETRIC mode at all dimensions (3-11D),
+    // AND for free scalar field mode (writes to density grid via compute pass).
     // Adaptive grid resolution: 64^3 for 3D, 96^3 for 4-5D, 128^3 for 6-11D.
     // Extra-dim HO quantum numbers are clamped to max 6 → at 96^3 we get ~16 samples/period.
     // HO mode uses eigencache + analytical gradient in both position and momentum representations.
@@ -387,29 +403,48 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
     const dim = this.rendererConfig.dimension ?? 3
     const isosurface = this.rendererConfig.isosurface ?? false
-    const useDensityGrid = enableCache && isHydrogen && !isosurface
-    const densityGridSize = !useDensityGrid ? 64 : dim <= 3 ? 64 : dim <= 5 ? 96 : 128
+    const useDensityGrid = isFreeScalar || (enableCache && isHydrogen && !isosurface)
+    const densityGridSize = isFreeScalar
+      ? 64
+      : !useDensityGrid
+        ? 64
+        : dim <= 3
+          ? 64
+          : dim <= 5
+            ? 96
+            : 128
 
-    // Eigenfunction cache: always enabled when cache is on.
+    // Eigenfunction cache: always enabled when cache is on, except for free scalar field.
     // For HO momentum, the uniform buffer contains 1/ω → cache produces k-space functions automatically.
-    const useEigenfunctionCache = enableCache
+    const useEigenfunctionCache = isFreeScalar ? false : enableCache
+
+    // For shader composition, free scalar field maps to 'harmonicOscillator' since
+    // it only uses the density grid sampling path (no inline wavefunction evaluation).
+    const shaderQuantumMode: QuantumModeForShader = isFreeScalar
+      ? 'harmonicOscillator'
+      : (this.rendererConfig.quantumMode as QuantumModeForShader)
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
-      isosurface: this.rendererConfig.isosurface,
-      quantumMode: this.rendererConfig.quantumMode,
-      termCount: this.rendererConfig.termCount,
-      nodal: this.rendererConfig.nodalEnabled ?? true,
+      isosurface: isFreeScalar ? false : this.rendererConfig.isosurface,
+      quantumMode: shaderQuantumMode,
+      termCount: isFreeScalar ? 1 : this.rendererConfig.termCount,
+      nodal: isFreeScalar ? false : (this.rendererConfig.nodalEnabled ?? true),
       colorAlgorithm: this.rendererConfig.colorAlgorithm,
-      temporalAccumulation: this.rendererConfig.temporal,
-      phaseMateriality: this.rendererConfig.phaseMaterialityEnabled ?? true,
-      interference: this.rendererConfig.interferenceEnabled ?? true,
-      uncertaintyBoundary: this.rendererConfig.uncertaintyBoundaryEnabled ?? true,
+      temporalAccumulation: isFreeScalar ? false : this.rendererConfig.temporal,
+      phaseMateriality: isFreeScalar
+        ? false
+        : (this.rendererConfig.phaseMaterialityEnabled ?? true),
+      interference: isFreeScalar ? false : (this.rendererConfig.interferenceEnabled ?? true),
+      uncertaintyBoundary: isFreeScalar
+        ? false
+        : (this.rendererConfig.uncertaintyBoundaryEnabled ?? true),
       useEigenfunctionCache,
       useDensityGrid,
       densityGridSize,
-      isWigner,
-      useWignerCache: isWigner,
+      densityGridHasPhase: isFreeScalar ? true : undefined,
+      isWigner: isFreeScalar ? false : isWigner,
+      useWignerCache: isFreeScalar ? false : isWigner,
     }
   }
 
@@ -456,6 +491,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const dim = this.rendererConfig.dimension ?? 3
     const pipelineIs2D = dim === 2 || this.rendererConfig.representation === 'wigner'
     const forceRgba = dim > 3
+    const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
 
     // =====================================================================
     // Phase 1: Construct compute passes and start parallel initialization
@@ -463,20 +499,31 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Density grid compute pass provides uncertainty boundary threshold extraction.
     // Skip for 2D mode (no volumetric raymarching).
+    // Free scalar field mode uses its own compute pass instead.
     this.densityGridPass?.dispose()
     this.densityGridPass = null
     this.densityGridInitialized = false
+    this.freeScalarFieldPass?.dispose()
+    this.freeScalarFieldPass = null
 
     let densityPromise: Promise<void> | null = null
-    if (!pipelineIs2D) {
+    if (!pipelineIs2D && !isFreeScalar) {
       this.densityGridPass = new DensityGridComputePass({
         dimension: dim,
-        quantumMode: this.rendererConfig.quantumMode,
+        quantumMode: this.rendererConfig.quantumMode as 'harmonicOscillator' | 'hydrogenND',
         termCount: this.rendererConfig.termCount,
         gridSize: this.shaderConfig.densityGridSize,
         forceRgba,
       })
       densityPromise = this.densityGridPass.initialize(ctx)
+    }
+
+    // Free scalar field: create its own compute pass
+    if (isFreeScalar) {
+      this.freeScalarFieldPass = new FreeScalarFieldComputePass()
+      // Eagerly create density texture so it's available for bind group creation below.
+      // Field buffers and pipelines are built lazily on first executeField().
+      this.freeScalarFieldPass.initializeDensityTexture(device)
     }
 
     // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
@@ -524,7 +571,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         await densityPromise
         densityPromise = null // Already resolved
         this.densityGridInitialized = true
-        this.shaderConfig.densityGridHasPhase = this.densityGridPass.getTextureFormat() === 'rgba16float'
+        this.shaderConfig.densityGridHasPhase =
+          this.densityGridPass.getTextureFormat() === 'rgba16float'
       }
     }
 
@@ -532,7 +580,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Phase 3: Render pipeline — check cache or start async compilation
     // =====================================================================
 
-    const cacheKey = WebGPUSchrodingerRenderer.computePipelineCacheKey(this.shaderConfig, this.rendererConfig)
+    const cacheKey = WebGPUSchrodingerRenderer.computePipelineCacheKey(
+      this.shaderConfig,
+      this.rendererConfig
+    )
     const cachedPipeline = WebGPUSchrodingerRenderer.renderPipelineCache.get(cacheKey)
 
     console.log(
@@ -570,8 +621,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Eigenfunction cache: storage buffer + metadata uniform
     if (this.eigenCachePass) {
       objectBindGroupEntries.push(
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' as const } }, // eigenCache
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } }, // eigenMeta
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'read-only-storage' as const },
+        }, // eigenCache
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } } // eigenMeta
       )
     }
     // Wigner cache: pre-computed 2D texture + bilinear sampler (same slots as eigencache, mutually exclusive)
@@ -586,11 +641,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           binding: 3,
           visibility: GPUShaderStage.FRAGMENT,
           sampler: { type: 'filtering' as const },
-        }, // wignerCacheSampler
+        } // wignerCacheSampler
       )
     }
-    // Density grid texture + sampler for grid-based hydrogen raymarching
-    if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
+    // Density grid texture + sampler for grid-based raymarching (hydrogen or free scalar)
+    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass)) {
       objectBindGroupEntries.push(
         {
           binding: 4,
@@ -601,7 +656,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           binding: 5,
           visibility: GPUShaderStage.FRAGMENT,
           sampler: { type: 'filtering' as const },
-        }, // densityGridSampler
+        } // densityGridSampler
       )
     }
     const objectBindGroupLayout = device.createBindGroupLayout({
@@ -626,7 +681,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         : composeSchroedingerVertexShader()
 
       const vertexModule = this.createShaderModule(device, vertexShader, 'schroedinger-vertex')
-      const fragmentModule = this.createShaderModule(device, fragmentShader, 'schroedinger-fragment')
+      const fragmentModule = this.createShaderModule(
+        device,
+        fragmentShader,
+        'schroedinger-fragment'
+      )
 
       const pipelineLayout = device.createPipelineLayout({
         label: 'schroedinger-pipeline-layout',
@@ -742,26 +801,43 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Remaining compute pass initializations (some may already be resolved)
     if (densityPromise) {
-      pendingWork.push(densityPromise.then(() => { this.densityGridInitialized = true }))
+      pendingWork.push(
+        densityPromise.then(() => {
+          this.densityGridInitialized = true
+        })
+      )
     }
     if (eigenPromise) {
-      pendingWork.push(eigenPromise.then(() => { this.eigenCacheInitialized = true }))
+      pendingWork.push(
+        eigenPromise.then(() => {
+          this.eigenCacheInitialized = true
+        })
+      )
     }
     if (wignerPromise) {
-      pendingWork.push(wignerPromise.then(() => { this.wignerCacheInitialized = true }))
+      pendingWork.push(
+        wignerPromise.then(() => {
+          this.wignerCacheInitialized = true
+        })
+      )
     }
 
     // Render pipeline compilation (cache miss only)
     if (renderPipelinePromise) {
-      pendingWork.push(renderPipelinePromise.then((pipeline) => {
-        this.renderPipeline = pipeline
-        // Store in cache with LRU eviction
-        if (WebGPUSchrodingerRenderer.renderPipelineCache.size >= WebGPUSchrodingerRenderer.MAX_CACHE_SIZE) {
-          const oldest = WebGPUSchrodingerRenderer.renderPipelineCache.keys().next().value!
-          WebGPUSchrodingerRenderer.renderPipelineCache.delete(oldest)
-        }
-        WebGPUSchrodingerRenderer.renderPipelineCache.set(cacheKey, pipeline)
-      }))
+      pendingWork.push(
+        renderPipelinePromise.then((pipeline) => {
+          this.renderPipeline = pipeline
+          // Store in cache with LRU eviction
+          if (
+            WebGPUSchrodingerRenderer.renderPipelineCache.size >=
+            WebGPUSchrodingerRenderer.MAX_CACHE_SIZE
+          ) {
+            const oldest = WebGPUSchrodingerRenderer.renderPipelineCache.keys().next().value!
+            WebGPUSchrodingerRenderer.renderPipelineCache.delete(oldest)
+          }
+          WebGPUSchrodingerRenderer.renderPipelineCache.set(cacheKey, pipeline)
+        })
+      )
     }
 
     if (pendingWork.length > 0) {
@@ -832,7 +908,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       if (cacheBuffer && metaBuffer) {
         objectBindGroupEntries2.push(
           { binding: 2, resource: { buffer: cacheBuffer } },
-          { binding: 3, resource: { buffer: metaBuffer } },
+          { binding: 3, resource: { buffer: metaBuffer } }
         )
       }
     }
@@ -843,25 +919,26 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       if (cacheView && cacheSampler) {
         objectBindGroupEntries2.push(
           { binding: 2, resource: cacheView },
-          { binding: 3, resource: cacheSampler },
+          { binding: 3, resource: cacheSampler }
         )
       }
     }
-    // Density grid texture + sampler for grid-based hydrogen raymarching
-    if (this.shaderConfig.useDensityGrid && this.densityGridPass) {
-      const densityView = this.densityGridPass.getDensityTextureView()
-      if (densityView) {
-        // Create trilinear-filtering sampler for smooth grid interpolation
-        this.densityGridSampler = device.createSampler({
-          label: 'density-grid-sampler',
-          magFilter: 'linear',
-          minFilter: 'linear',
-        })
-        objectBindGroupEntries2.push(
-          { binding: 4, resource: densityView },
-          { binding: 5, resource: this.densityGridSampler },
-        )
-      }
+    // Density grid texture + sampler for grid-based raymarching
+    // Used by both hydrogen density grid mode and free scalar field mode
+    const densityView = this.freeScalarFieldPass
+      ? this.freeScalarFieldPass.getDensityTextureView()
+      : (this.densityGridPass?.getDensityTextureView() ?? null)
+    if (this.shaderConfig.useDensityGrid && densityView) {
+      // Create trilinear-filtering sampler for smooth grid interpolation
+      this.densityGridSampler = device.createSampler({
+        label: 'density-grid-sampler',
+        magFilter: 'linear',
+        minFilter: 'linear',
+      })
+      objectBindGroupEntries2.push(
+        { binding: 4, resource: densityView },
+        { binding: 5, resource: this.densityGridSampler }
+      )
     }
     this.objectBindGroup = device.createBindGroup({
       label: 'schroedinger-object-bg',
@@ -978,7 +1055,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Model matrices for raymarching coordinate space conversion
-    const is2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
+    const is2D =
+      (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
     let scale: number
     let posX: number
     let posY: number
@@ -1072,7 +1150,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const projAspect = camera.projectionMatrix.elements[5] / camera.projectionMatrix.elements[0]
       const ctxAspect = ctx.size.width / ctx.size.height
       if (Math.abs(projAspect - ctxAspect) > 0.01) {
-        console.warn(`[Schrodinger] ASPECT MISMATCH! projection: ${projAspect.toFixed(4)}, ctx.size: ${ctxAspect.toFixed(4)} (${ctx.size.width}×${ctx.size.height})`)
+        console.warn(
+          `[Schrodinger] ASPECT MISMATCH! projection: ${projAspect.toFixed(4)}, ctx.size: ${ctxAspect.toFixed(4)} (${ctx.size.width}×${ctx.size.height})`
+        )
       }
     }
     data[121] = animationTime // time (respects animation pause state)
@@ -1131,13 +1211,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private computeCanonicalCompensation(preset: QuantumPreset, dimension: number): number {
     // Physicists' Hermite polynomial coefficients H_n(u), stored as [u^0, u^1, ..., u^6]
     const HERMITE_COEFFS: number[][] = [
-      [1],                                      // H_0
-      [0, 2],                                    // H_1
-      [-2, 0, 4],                                // H_2
-      [0, -12, 0, 8],                            // H_3
-      [12, 0, -48, 0, 16],                       // H_4
-      [0, 120, 0, -160, 0, 32],                  // H_5
-      [-120, 0, 720, 0, -480, 0, 64],            // H_6
+      [1], // H_0
+      [0, 2], // H_1
+      [-2, 0, 4], // H_2
+      [0, -12, 0, 8], // H_3
+      [12, 0, -48, 0, 16], // H_4
+      [0, 120, 0, -160, 0, 32], // H_5
+      [-120, 0, 720, 0, -480, 0, 64], // H_6
     ]
     const FACTORIALS = [1, 1, 2, 6, 24, 120, 720]
 
@@ -1186,7 +1266,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
       const factorial = FACTORIALS[n] ?? 1
       const twoN_nFact = Math.pow(2, n) * factorial
-      const peak1D = Math.sqrt(omega / Math.PI) / twoN_nFact * maxHermiteSq
+      const peak1D = (Math.sqrt(omega / Math.PI) / twoN_nFact) * maxHermiteSq
       peakDensity *= peak1D
     }
 
@@ -1359,7 +1439,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.cachedPreset = preset
       this.cachedPresetConfig = { ...currentConfig }
       this.flattenedPreset = flattenPresetForUniforms(preset)
-
     }
 
     // Compute effective momentum scale incorporating display units.
@@ -1369,10 +1448,29 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const hbar = isPSpace ? Math.max(schroedinger?.momentumHbar ?? 1.0, 1e-4) : 1.0
     const effectiveMomentumScale = (schroedinger?.momentumScale ?? 1.0) / hbar
 
+    // Compute bounding radius for free scalar field mode (lattice extent)
+    if (schroedinger?.quantumMode === 'freeScalarField' && schroedinger?.freeScalar) {
+      const fs = schroedinger.freeScalar
+      const Lx = (fs.gridSize?.[0] ?? 32) * (fs.spacing?.[0] ?? 0.1)
+      const Ly = (fs.gridSize?.[1] ?? 32) * (fs.spacing?.[1] ?? 0.1)
+      const Lz = (fs.gridSize?.[2] ?? 32) * (fs.spacing?.[2] ?? 0.1)
+      const newBoundR = Math.max(Lx, Ly, Lz) / 2
+      const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
+      const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
+      if (
+        Math.abs(quantizedBoundR - this.boundingRadius) >=
+          WebGPUSchrodingerRenderer.BOUND_RADIUS_REBUILD_THRESHOLD &&
+        this.device
+      ) {
+        this.boundingRadius = quantizedBoundR
+        this.createBoundingGeometry(this.device)
+      }
+    }
+
     // Compute physics-based bounding radius for this state.
     // Must run on EVERY full update (not just preset regen) because hydrogen n/l/m
     // changes affect bounding radius but don't trigger HO preset regeneration.
-    if (this.cachedPreset) {
+    if (this.cachedPreset && schroedinger?.quantumMode !== 'freeScalarField') {
       const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
       const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
       const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
@@ -1407,7 +1505,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Compute auto-compensation AFTER bounding radius update so stepLen estimate is correct
     if (needsPresetRegen && this.cachedPreset) {
-      this.canonicalDensityCompensation = this.computeCanonicalCompensation(this.cachedPreset, dimension)
+      this.canonicalDensityCompensation = this.computeCanonicalCompensation(
+        this.cachedPreset,
+        dimension
+      )
     }
 
     // Use cached flattened preset data
@@ -1495,7 +1596,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Shader compares against length(ndPos) which is already scaled by fieldScale,
     // so the threshold must be in the same scaled coordinate space.
     const hydrogenFieldScale = schroedinger?.fieldScale ?? 1.0
-    const hydrogenRadialThreshold = 25.0 * validN * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
+    const hydrogenRadialThreshold =
+      25.0 * validN * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
     floatView[604 / 4] = hydrogenRadialThreshold
 
     // --- extraDimN array (offset 608, 2 vec4i = 8 ints) ---
@@ -1537,7 +1639,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // SSS fields in SchroedingerUniforms are DEAD — shader reads from MaterialUniforms
     // (material.sss* in bind group 1). Keep struct layout stable by zero-filling.
-    intView[720 / 4] = 0     // sssEnabled (dead)
+    intView[720 / 4] = 0 // sssEnabled (dead)
     floatView[724 / 4] = 0.0 // sssIntensity (dead)
     // bytes 728-735: implicit padding before vec3f
     floatView[736 / 4] = 0.0 // sssColor.r (dead)
@@ -1604,10 +1706,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const defaultSampleCount = fastMode ? 32 : 64
     const baseSampleCount = schroedinger?.sampleCount ?? defaultSampleCount
     const radiusScale = this.boundingRadius / 2.0
-    const effectiveSampleCount = Math.min(
-      Math.max(8, Math.ceil(baseSampleCount * radiusScale)),
-      96
-    )
+    const effectiveSampleCount = Math.min(Math.max(8, Math.ceil(baseSampleCount * radiusScale)), 96)
     intView[920 / 4] = effectiveSampleCount
 
     // Phase shift fields
@@ -1658,7 +1757,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[1024 / 4] = schroedinger?.fogIntegrationEnabled ? 1 : 0
     floatView[1028 / 4] = schroedinger?.fogContribution ?? 1.0
     floatView[1032 / 4] = schroedinger?.internalFogDensity ?? 0.0
-    intView[1036 / 4] = 0  // Reserved (formerly erosionHQ)
+    intView[1036 / 4] = 0 // Reserved (formerly erosionHQ)
 
     // Dynamic bounding radius (offset 1040+)
     floatView[1040 / 4] = this.boundingRadius
@@ -1751,7 +1850,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1256 / 4] = schroedinger?.crossSectionOpacity ?? 0.75
     floatView[1260 / 4] = schroedinger?.crossSectionThickness ?? 0.02
 
-    const crossSectionPlaneColor = this.parseColor(schroedinger?.crossSectionPlaneColor ?? '#66ccff')
+    const crossSectionPlaneColor = this.parseColor(
+      schroedinger?.crossSectionPlaneColor ?? '#66ccff'
+    )
     floatView[1264 / 4] = crossSectionPlaneColor[0]
     floatView[1268 / 4] = crossSectionPlaneColor[1]
     floatView[1272 / 4] = crossSectionPlaneColor[2]
@@ -1763,9 +1864,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[1284 / 4] =
       PROBABILITY_CURRENT_STYLE_MAP[schroedinger?.probabilityCurrentStyle ?? 'magnitude'] ?? 0
     intView[1288 / 4] =
-      PROBABILITY_CURRENT_PLACEMENT_MAP[schroedinger?.probabilityCurrentPlacement ?? 'isosurface'] ?? 0
+      PROBABILITY_CURRENT_PLACEMENT_MAP[
+        schroedinger?.probabilityCurrentPlacement ?? 'isosurface'
+      ] ?? 0
     intView[1292 / 4] =
-      PROBABILITY_CURRENT_COLOR_MODE_MAP[schroedinger?.probabilityCurrentColorMode ?? 'magnitude'] ?? 0
+      PROBABILITY_CURRENT_COLOR_MODE_MAP[
+        schroedinger?.probabilityCurrentColorMode ?? 'magnitude'
+      ] ?? 0
 
     floatView[1296 / 4] = schroedinger?.probabilityCurrentScale ?? 1.0
     floatView[1300 / 4] = schroedinger?.probabilityCurrentSpeed ?? 1.0
@@ -1794,15 +1899,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const radialProbEnabled = schroedinger?.radialProbabilityEnabled ?? false
     intView[1344 / 4] = radialProbEnabled ? 1 : 0
     floatView[1348 / 4] = schroedinger?.radialProbabilityOpacity ?? 0.6
-    floatView[1352 / 4] = (radialProbEnabled && quantumModeStr !== 'harmonicOscillator')
-      ? computeRadialProbabilityNorm(validN, validL, bohrRadius)
-      : 1.0
-    floatView[1356 / 4] = 0.0  // padding
+    floatView[1352 / 4] =
+      radialProbEnabled && quantumModeStr !== 'harmonicOscillator'
+        ? computeRadialProbabilityNorm(validN, validL, bohrRadius)
+        : 1.0
+    floatView[1356 / 4] = 0.0 // padding
     const rpColor = this.parseColor(schroedinger?.radialProbabilityColor ?? '#44aaff')
     floatView[1360 / 4] = rpColor[0]
     floatView[1364 / 4] = rpColor[1]
     floatView[1368 / 4] = rpColor[2]
-    floatView[1372 / 4] = 0.0  // padding
+    floatView[1372 / 4] = 0.0 // padding
 
     // Domain coloring controls (offset 1376-1408)
     const domainColoring = appearance?.domainColoring
@@ -1848,7 +1954,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1432 / 4] = divergingPositive[2]
     floatView[1436 / 4] = usePhaseDivergingPalette
       ? 0.0
-      : (divergingPsi?.component === 'imag' ? 1.0 : 0.0)
+      : divergingPsi?.component === 'imag'
+        ? 1.0
+        : 0.0
 
     floatView[1440 / 4] = divergingNegative[0]
     floatView[1444 / 4] = divergingNegative[1]
@@ -1867,8 +1975,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // All optimizations (eigencache, analytical gradient, temporal reprojection) work at 60 FPS.
     // Exception: Hydrogen momentum has genuinely different functional form (Gegenbauer polynomials),
     // so it keeps representationMode=1 and its own shader path in psiBlockHydrogenND.
-    const isHOMomentum = (schroedinger?.representation === 'momentum') &&
-      quantumModeStr !== 'hydrogenND'
+    const isHOMomentum =
+      schroedinger?.representation === 'momentum' && quantumModeStr !== 'hydrogenND'
 
     if (isHOMomentum) {
       // 1. Invert omegas: ω_j → 1/(ħ²·ω_j)
@@ -1898,10 +2006,20 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         const im = floatView[coeffOff + k * 4 + 1]!
         const mod = ((totalN % 4) + 4) % 4
         switch (mod) {
-          case 0: break                                                                            // ×1
-          case 1: floatView[coeffOff + k * 4] = im; floatView[coeffOff + k * 4 + 1] = -re; break  // ×(-i)
-          case 2: floatView[coeffOff + k * 4] = -re; floatView[coeffOff + k * 4 + 1] = -im; break // ×(-1)
-          case 3: floatView[coeffOff + k * 4] = -im; floatView[coeffOff + k * 4 + 1] = re; break  // ×(i)
+          case 0:
+            break // ×1
+          case 1:
+            floatView[coeffOff + k * 4] = im
+            floatView[coeffOff + k * 4 + 1] = -re
+            break // ×(-i)
+          case 2:
+            floatView[coeffOff + k * 4] = -re
+            floatView[coeffOff + k * 4 + 1] = -im
+            break // ×(-1)
+          case 3:
+            floatView[coeffOff + k * 4] = -im
+            floatView[coeffOff + k * 4 + 1] = re
+            break // ×(i)
         }
       }
 
@@ -1962,8 +2080,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
     intView[1472 / 4] = schroedinger?.wignerQuadPoints ?? 32
     intView[1476 / 4] = schroedinger?.wignerClassicalOverlay ? 1 : 0
-    floatView[1480 / 4] = 0.0  // padding
-    floatView[1484 / 4] = 0.0  // padding
+    floatView[1480 / 4] = 0.0 // padding
+    floatView[1484 / 4] = 0.0 // padding
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -2259,7 +2377,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private executeNullGuardWarned = false
 
   execute(ctx: WebGPURenderContext): void {
-    const is2D = (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
+    const is2D =
+      (this.rendererConfig.dimension ?? 3) === 2 || this.rendererConfig.representation === 'wigner'
 
     // Guard: 2D mode doesn't use vertex/index buffers
     if (
@@ -2315,6 +2434,24 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // ALWAYS update: Quality (cheap, needed for fast/slow toggle responsiveness)
     this.updateQualityUniforms(ctx)
+
+    // ============================================
+    // FREE SCALAR FIELD COMPUTE PASS (if in freeScalarField mode)
+    // ============================================
+    const freeScalarPass = this.freeScalarFieldPass
+    if (freeScalarPass) {
+      const extended = ctx.frame?.stores?.['extended'] as any
+      const animation = ctx.frame?.stores?.['animation'] as any
+      const freeScalarConfig = extended?.schroedinger?.freeScalar
+      const isPlaying = animation?.isPlaying ?? false
+      if (freeScalarConfig) {
+        freeScalarPass.executeField(ctx, freeScalarConfig, isPlaying)
+        // Clear needsReset after processing (targeted mutation, no version bump)
+        if (freeScalarConfig.needsReset) {
+          ;(extended as any)?.clearFreeScalarNeedsReset?.()
+        }
+      }
+    }
 
     // ============================================
     // DENSITY GRID COMPUTE PASS (if enabled)
@@ -2401,7 +2538,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         const didResize = wignerPass.resize(ctx.device, wignerCacheResolution)
         this.lastWignerCacheResolution = wignerCacheResolution
         // Rebuild fragment shader bind group to reference the new cache texture view
-        if (didResize && this.objectBindGroupLayout && this.schroedingerUniformBuffer && this.basisUniformBuffer) {
+        if (
+          didResize &&
+          this.objectBindGroupLayout &&
+          this.schroedingerUniformBuffer &&
+          this.basisUniformBuffer
+        ) {
           const newCacheView = wignerPass.getCacheTextureView()
           const newCacheSampler = wignerPass.getCacheSampler()
           if (newCacheView && newCacheSampler) {
@@ -2427,11 +2569,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       )
 
       // Sync basis uniforms (version-tracked)
-      wignerPass.updateBasisUniforms(
-        ctx.device,
-        this.basisUniformData.buffer,
-        rotationVersion
-      )
+      wignerPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, rotationVersion)
 
       // Determine mode for grid range and update logic
       const schroedinger = extended?.schroedinger
@@ -2470,7 +2608,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         wignerPass.updateTimeOnly(ctx.device, time)
       }
 
-      const updateFlags = wignerPass.needsUpdate(isAnimating, crossTermsEnabled, termCount, isHydrogen)
+      const updateFlags = wignerPass.needsUpdate(
+        isAnimating,
+        crossTermsEnabled,
+        termCount,
+        isHydrogen
+      )
 
       if (wignerPass.isTwoPhaseActive()) {
         // Two-phase pipeline: spatial + reconstruct dispatched independently
@@ -2480,7 +2623,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         if (updateFlags.reconstruct) {
           const time = ctx.frame?.time ?? 0
           const timeScale = this.schroedingerFloatView[676 / 4] ?? 0.8
-          wignerPass.updateReconstructParams(ctx.device, this.schroedingerUniformData, time, timeScale)
+          wignerPass.updateReconstructParams(
+            ctx.device,
+            this.schroedingerUniformData,
+            time,
+            timeScale
+          )
           wignerPass.executeReconstruct(ctx)
         }
       } else {
@@ -2664,6 +2812,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.densityGridPass = null
     this.densityGridInitialized = false
     this.densityGridSampler = null
+
+    this.freeScalarFieldPass?.dispose()
+    this.freeScalarFieldPass = null
 
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null

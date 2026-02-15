@@ -41,12 +41,12 @@ describe('postProcessingStore', () => {
       expect(usePostProcessingStore.getState().bloomGain).toBe(3)
     })
 
-    it('should clamp threshold to [-1, 5]', () => {
+    it('should clamp threshold to [0, 5]', () => {
       const { setBloomThreshold } = usePostProcessingStore.getState()
       setBloomThreshold(2.5)
       expect(usePostProcessingStore.getState().bloomThreshold).toBe(2.5)
       setBloomThreshold(-99)
-      expect(usePostProcessingStore.getState().bloomThreshold).toBe(-1)
+      expect(usePostProcessingStore.getState().bloomThreshold).toBe(0)
       setBloomThreshold(99)
       expect(usePostProcessingStore.getState().bloomThreshold).toBe(5)
     })

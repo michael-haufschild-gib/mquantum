@@ -96,8 +96,84 @@ export type SchroedingerRenderStyle = 'rayMarching'
  * Quantum physics mode for Schroedinger visualization
  * - harmonicOscillator: Cartesian-separable harmonic oscillator (default)
  * - hydrogenND: N-dimensional hydrogen orbital (hybrid: Y_lm for first 3D + HO for extra dims)
+ * - freeScalarField: Real Klein-Gordon scalar field on a 1D-3D spatial lattice with leapfrog evolution
  */
-export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND'
+export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
+
+/**
+ * Which field quantity to visualize for the free scalar field mode
+ * - phi: Field amplitude
+ * - pi: Conjugate momentum (time derivative of phi)
+ * - energyDensity: Local energy density (kinetic + gradient + mass)
+ */
+export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity'
+
+/**
+ * Initial condition type for the free scalar field
+ * - vacuumNoise: Hash-based pseudo-random Gaussian noise
+ * - singleMode: Single plane-wave mode A*cos(k.x)
+ * - gaussianPacket: Gaussian wave packet A*exp(-|x-x0|^2/(2*sigma^2))*cos(k.x)
+ */
+export type FreeScalarInitialCondition = 'vacuumNoise' | 'singleMode' | 'gaussianPacket'
+
+/**
+ * Configuration for the free scalar field (Klein-Gordon) lattice simulation.
+ * Controls lattice geometry, physics parameters, initial conditions, and visualization.
+ */
+export interface FreeScalarConfig {
+  /** Spatial dimensionality of the lattice (1, 2, or 3) */
+  latticeDim: 1 | 2 | 3
+  /** Lattice grid size per dimension [Nx, Ny, Nz] — unused dims set to 1 */
+  gridSize: [number, number, number]
+  /** Lattice spacing per dimension [ax, ay, az] */
+  spacing: [number, number, number]
+  /** Klein-Gordon mass parameter m */
+  mass: number
+  /** Leapfrog time step */
+  dt: number
+  /** Number of leapfrog steps per render frame (1-16) */
+  stepsPerFrame: number
+
+  /** Initial condition type */
+  initialCondition: FreeScalarInitialCondition
+  /** Gaussian packet center position */
+  packetCenter: [number, number, number]
+  /** Gaussian packet width (sigma) */
+  packetWidth: number
+  /** Gaussian packet / single-mode amplitude */
+  packetAmplitude: number
+  /** Wave vector indices for single-mode / packet carrier */
+  modeK: [number, number, number]
+
+  /** Which field quantity to render */
+  fieldView: FreeScalarFieldView
+  /** Auto-scale density normalization from field maximum */
+  autoScale: boolean
+  /** Runtime flag to trigger field re-initialization (not persisted) */
+  needsReset: boolean
+}
+
+/**
+ * Default configuration for the free scalar field lattice simulation
+ */
+export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
+  latticeDim: 3,
+  gridSize: [32, 32, 32],
+  spacing: [0.1, 0.1, 0.1],
+  mass: 1.0,
+  dt: 0.01,
+  stepsPerFrame: 4,
+
+  initialCondition: 'gaussianPacket',
+  packetCenter: [0, 0, 0],
+  packetWidth: 0.3,
+  packetAmplitude: 1.0,
+  modeK: [1, 0, 0],
+
+  fieldView: 'phi',
+  autoScale: true,
+  needsReset: false,
+}
 
 /**
  * Second-quantization educational layer interpretation mode.
@@ -512,6 +588,10 @@ export interface SchroedingerConfig {
   sqLayerSqueezeR: number
   /** Squeeze angle theta */
   sqLayerSqueezeTheta: number
+
+  // === Free Scalar Field Configuration (when quantumMode === 'freeScalarField') ===
+  /** Klein-Gordon lattice field configuration */
+  freeScalar: FreeScalarConfig
 }
 
 /**
@@ -713,6 +793,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   sqLayerCoherentAlphaIm: 0.0,
   sqLayerSqueezeR: 0.5,
   sqLayerSqueezeTheta: 0.0,
+
+  // Free Scalar Field
+  freeScalar: DEFAULT_FREE_SCALAR_CONFIG,
 }
 
 // ============================================================================

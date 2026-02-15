@@ -20,6 +20,8 @@ const SURFACE_MODE_OPTIONS = [
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
   const dimension = useGeometryStore((state) => state.dimension)
+  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+  const isFreeScalarField = quantumMode === 'freeScalarField'
   const isoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
     isoThreshold: state.schroedinger?.isoThreshold ?? -3,
@@ -27,9 +29,8 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
     setIsoEnabled: state.setSchroedingerIsoEnabled,
     setIsoThreshold: state.setSchroedingerIsoThreshold,
   }))
-  const { isoEnabled, isoThreshold, representation, setIsoEnabled, setIsoThreshold } = useExtendedObjectStore(
-    isoSelector
-  )
+  const { isoEnabled, isoThreshold, representation, setIsoEnabled, setIsoThreshold } =
+    useExtendedObjectStore(isoSelector)
 
   const handleSurfaceModeChange = (mode: SurfaceMode) => {
     setIsoEnabled(mode === 'isosurface')
@@ -83,14 +84,12 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
         {/* Fixed Header Section with Dimension Selector */}
         <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-hover)] shrink-0">
-
           <div className="px-4 py-2">
-            <DimensionSelector />
+            <DimensionSelector disabled={isFreeScalarField} />
           </div>
-          {dimension > 2 && representation !== 'wigner' && (
+          {dimension > 2 && representation !== 'wigner' && !isFreeScalarField && (
             <div className="px-4 pb-2">
               <div className="space-y-1">
-
                 <ToggleGroup
                   options={SURFACE_MODE_OPTIONS}
                   value={isoEnabled ? 'isosurface' : 'volumetric'}
@@ -110,7 +109,6 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
                     data-testid="schroedinger-iso-threshold"
                   />
                 )}
-
               </div>
             </div>
           )}

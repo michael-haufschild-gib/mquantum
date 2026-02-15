@@ -101,6 +101,9 @@ export const TRANSIENT_FIELDS = new Set([
   // Legacy skybox sync-with-object toggle (removed — skybox always uses palette)
   'syncWithObject',
 
+  // Free scalar field runtime trigger (not persisted in presets)
+  'needsReset',
+
   // Second quantization educational layer — session-specific interpretive UI, not scene state
   'sqLayerEnabled',
   'sqLayerMode',
@@ -239,7 +242,15 @@ export const sanitizeExtendedLoadedState = <T extends Record<string, unknown>>(s
   for (const key of Object.keys(clean)) {
     const value = clean[key]
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      clean[key] = sanitizeLoadedState(value as Record<string, unknown>)
+      const sanitized = sanitizeLoadedState(value as Record<string, unknown>)
+      // Sanitize doubly-nested config objects (e.g., schroedinger.freeScalar)
+      for (const innerKey of Object.keys(sanitized)) {
+        const innerValue = sanitized[innerKey]
+        if (innerValue && typeof innerValue === 'object' && !Array.isArray(innerValue)) {
+          sanitized[innerKey] = sanitizeLoadedState(innerValue as Record<string, unknown>)
+        }
+      }
+      clean[key] = sanitized
     }
   }
   return clean

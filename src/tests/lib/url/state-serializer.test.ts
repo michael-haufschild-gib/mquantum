@@ -39,7 +39,7 @@ describe('state-serializer', () => {
         bloomEnabled: true,
         bloomMode: 'convolution',
         bloomGain: 2.5,
-        bloomThreshold: -1,
+        bloomThreshold: 0.5,
         bloomKnee: 0.25,
         bloomBands: [
           { enabled: true, weight: 1.0, size: 1.1, tint: '#FF0000' },
@@ -57,7 +57,7 @@ describe('state-serializer', () => {
       expect(result).toContain('be=1')
       expect(result).toContain('bm=c')
       expect(result).toContain('bga=2.50')
-      expect(result).toContain('bt=-1.00')
+      expect(result).toContain('bt=0.50')
       expect(result).toContain('bk=0.25')
       expect(result).toContain('bb0=1%7C1.00%7C1.10%7CFF0000')
       expect(result).toContain('bcr=3.00')
@@ -91,13 +91,13 @@ describe('state-serializer', () => {
 
     it('should deserialize bloom v2 settings', () => {
       const result = deserializeState(
-        'be=1&bm=g&bga=2.20&bt=-1.00&bk=0.30&bb0=1|1.00|1.10|FF0000&bb1=1|0.80|1.20|00FF00&bcr=2.50&bcs=0.60&bcb=1.50&bct=abcdef'
+        'be=1&bm=g&bga=2.20&bt=0.50&bk=0.30&bb0=1|1.00|1.10|FF0000&bb1=1|0.80|1.20|00FF00&bcr=2.50&bcs=0.60&bcb=1.50&bct=abcdef'
       )
 
       expect(result.bloomEnabled).toBe(true)
       expect(result.bloomMode).toBe('gaussian')
       expect(result.bloomGain).toBeCloseTo(2.2)
-      expect(result.bloomThreshold).toBeCloseTo(-1)
+      expect(result.bloomThreshold).toBeCloseTo(0.5)
       expect(result.bloomKnee).toBeCloseTo(0.3)
       expect(result.bloomBands?.[0]).toEqual({
         enabled: true,

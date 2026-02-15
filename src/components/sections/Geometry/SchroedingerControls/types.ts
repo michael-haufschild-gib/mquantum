@@ -2,7 +2,7 @@
  * Shared types for SchroedingerControls components
  */
 
-import type { SchroedingerConfig, SecondQuantizationMode } from '@/lib/geometry/extended/types'
+import type { FreeScalarFieldView, FreeScalarInitialCondition, SchroedingerConfig, SecondQuantizationMode } from '@/lib/geometry/extended/types'
 import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
 /**
@@ -104,4 +104,32 @@ export interface WignerControlsProps {
   config: SchroedingerConfig
   dimension: number
   actions: WignerActions
+}
+
+/**
+ * Actions for Free Scalar Field mode
+ */
+export interface FreeScalarFieldActions {
+  setLatticeDim: ExtendedObjectState['setFreeScalarLatticeDim']
+  setGridSize: ExtendedObjectState['setFreeScalarGridSize']
+  setSpacing: ExtendedObjectState['setFreeScalarSpacing']
+  setMass: ExtendedObjectState['setFreeScalarMass']
+  setDt: ExtendedObjectState['setFreeScalarDt']
+  setStepsPerFrame: ExtendedObjectState['setFreeScalarStepsPerFrame']
+  setInitialCondition: ExtendedObjectState['setFreeScalarInitialCondition']
+  setFieldView: ExtendedObjectState['setFreeScalarFieldView']
+  setPacketCenter: ExtendedObjectState['setFreeScalarPacketCenter']
+  setPacketWidth: ExtendedObjectState['setFreeScalarPacketWidth']
+  setPacketAmplitude: ExtendedObjectState['setFreeScalarPacketAmplitude']
+  setModeK: ExtendedObjectState['setFreeScalarModeK']
+  setAutoScale: ExtendedObjectState['setFreeScalarAutoScale']
+  resetField: ExtendedObjectState['resetFreeScalarField']
+}
+
+/**
+ * Props for Free Scalar Field Controls
+ */
+export interface FreeScalarFieldControlsProps {
+  config: SchroedingerConfig
+  actions: FreeScalarFieldActions
 }

@@ -44,8 +44,8 @@ fn softThreshold(color: vec3f, threshold: f32, knee: f32) -> vec3f {
   let quadratic = soft * soft / (4.0 * safeKnee + 0.00001);
   // Above threshold + knee: use linear (brightness - threshold)
   let contribution = max(quadratic, brightness - threshold);
-  let factor = contribution / max(brightness, 0.00001);
-  return color * max(factor, 0.0);
+  let factor = min(contribution / max(brightness, 0.00001), 1.0);
+  return color * factor;
 }
 
 @fragment
@@ -57,46 +57,108 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 `
 
 /**
- * Creates a Gaussian blur shader for a specific kernel radius.
+ * Creates a compute-shader Gaussian blur for a specific kernel radius.
+ *
+ * Uses shared workgroup memory to reduce redundant global texture reads.
+ * A single `direction` uniform (0=horizontal, 1=vertical) controls axis.
  *
  * Uniform layout (112 bytes):
- *   direction: vec2f, texelSize: vec2f, coefficients: array<vec4f, 6>
+ *   outputSize: vec2u, direction: u32, sizeScale: f32, coefficients: array<vec4f, 6>
  */
-export function createBloomBlurShader(kernelRadius: number): string {
+export function createBloomBlurComputeShader(kernelRadius: number): string {
   return /* wgsl */ `
-struct BlurUniforms {
-  direction: vec2f,
-  texelSize: vec2f,
+struct BlurComputeUniforms {
+  outputSize: vec2u,
+  direction: u32,
+  sizeScale: f32,
   coefficients: array<vec4f, 6>,
 }
 
-@group(0) @binding(0) var<uniform> uniforms: BlurUniforms;
+@group(0) @binding(0) var<uniform> uniforms: BlurComputeUniforms;
 @group(0) @binding(1) var tInput: texture_2d<f32>;
-@group(0) @binding(2) var linearSampler: sampler;
+@group(0) @binding(2) var tOutput: texture_storage_2d<rgba16float, write>;
 
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
+const TILE_SIZE = 256u;
+const KERNEL_RADIUS = ${kernelRadius}u;
+
+var<workgroup> tile: array<vec3f, ${256 + 2 * kernelRadius}>;
 
 fn getCoeff(i: u32) -> f32 {
   return uniforms.coefficients[i / 4u][i % 4u];
 }
 
-@fragment
-fn main(input: VertexOutput) -> @location(0) vec4f {
-  let offset = uniforms.direction * uniforms.texelSize;
+fn loadTexel(major: i32, minor: i32, dimMajor: i32, dimMinor: i32) -> vec3f {
+  let cMajor = clamp(major, 0, dimMajor - 1);
+  let cMinor = clamp(minor, 0, dimMinor - 1);
+  var coord: vec2i;
+  if (uniforms.direction == 0u) {
+    coord = vec2i(cMajor, cMinor);
+  } else {
+    coord = vec2i(cMinor, cMajor);
+  }
+  return textureLoad(tInput, coord, 0).rgb;
+}
 
-  var result = textureSample(tInput, linearSampler, input.uv).rgb * getCoeff(0u);
+@compute @workgroup_size(256, 1, 1)
+fn main(@builtin(local_invocation_id) lid: vec3u,
+        @builtin(workgroup_id) wid: vec3u) {
+  var dimMajor: i32;
+  var dimMinor: i32;
+  if (uniforms.direction == 0u) {
+    dimMajor = i32(uniforms.outputSize.x);
+    dimMinor = i32(uniforms.outputSize.y);
+  } else {
+    dimMajor = i32(uniforms.outputSize.y);
+    dimMinor = i32(uniforms.outputSize.x);
+  }
+
+  let minorIdx = i32(wid.y);
+  let tileStart = i32(wid.x * TILE_SIZE);
+  let localIdx = i32(lid.x);
+
+  // --- Load center texel ---
+  let centerMajor = tileStart + localIdx;
+  tile[u32(localIdx) + KERNEL_RADIUS] = loadTexel(centerMajor, minorIdx, dimMajor, dimMinor);
+
+  // --- Load left/top border ---
+  if (u32(localIdx) < KERNEL_RADIUS) {
+    let borderMajor = tileStart - i32(KERNEL_RADIUS) + localIdx;
+    tile[u32(localIdx)] = loadTexel(borderMajor, minorIdx, dimMajor, dimMinor);
+  }
+
+  // --- Load right/bottom border ---
+  if (u32(localIdx) >= TILE_SIZE - KERNEL_RADIUS) {
+    let offset = u32(localIdx) - (TILE_SIZE - KERNEL_RADIUS);
+    let borderMajor = tileStart + i32(TILE_SIZE) + i32(offset);
+    tile[TILE_SIZE + KERNEL_RADIUS + offset] = loadTexel(borderMajor, minorIdx, dimMajor, dimMinor);
+  }
+
+  workgroupBarrier();
+
+  // --- Bounds check: skip threads beyond texture dimensions ---
+  if (centerMajor >= dimMajor || minorIdx >= dimMinor) {
+    return;
+  }
+
+  // --- Apply Gaussian kernel from shared memory ---
+  let tileIdx = u32(localIdx) + KERNEL_RADIUS;
+  var result = tile[tileIdx] * getCoeff(0u);
 
   for (var i = 1u; i < ${kernelRadius}u; i++) {
     let w = getCoeff(i);
-    let o = offset * f32(i);
-    result += textureSample(tInput, linearSampler, input.uv + o).rgb * w;
-    result += textureSample(tInput, linearSampler, input.uv - o).rgb * w;
+    let rawStep = max(1i, i32(round(f32(i) * uniforms.sizeScale)));
+    let step = u32(min(rawStep, i32(KERNEL_RADIUS) - 1));
+    result += (tile[tileIdx - step] + tile[tileIdx + step]) * w;
   }
 
-  return vec4f(result, 1.0);
+  // --- Write output ---
+  var outCoord: vec2i;
+  if (uniforms.direction == 0u) {
+    outCoord = vec2i(centerMajor, minorIdx);
+  } else {
+    outCoord = vec2i(minorIdx, centerMajor);
+  }
+  textureStore(tOutput, outCoord, vec4f(result, 1.0));
 }
 `
 }
@@ -214,16 +276,12 @@ struct VertexOutput {
 }
 
 fn softThresholdFactor(color: vec3f) -> f32 {
-  if (uniforms.threshold < 0.0) {
-    return 1.0;
-  }
-
   let brightness = max(color.r, max(color.g, color.b));
   let safeKnee = max(uniforms.knee, 0.0001);
   let soft = clamp(brightness - uniforms.threshold + safeKnee, 0.0, 2.0 * safeKnee);
   let quadratic = soft * soft / (4.0 * safeKnee + 0.00001);
   let contribution = max(quadratic, brightness - uniforms.threshold);
-  return max(contribution / max(brightness, 0.00001), 0.0);
+  return min(contribution / max(brightness, 0.00001), 1.0);
 }
 
 fn sampleBloom(uv: vec2f) -> vec3f {

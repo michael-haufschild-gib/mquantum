@@ -99,8 +99,6 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
     setBloomConvolutionTint,
   } = usePostProcessingStore(postProcessingSelector)
 
-  const thresholdBypassed = bloomThreshold < 0
-
   return (
     <div className={`space-y-4 ${className}`}>
       <Slider
@@ -115,13 +113,12 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
 
       <Slider
         label="Threshold"
-        min={-1}
+        min={0}
         max={5}
         step={0.01}
         value={bloomThreshold}
         onChange={setBloomThreshold}
         showValue
-        formatValue={(value) => (value < 0 ? 'Bypass' : value.toFixed(2))}
       />
 
       <Slider
@@ -143,7 +140,6 @@ export const BloomControls: React.FC<BloomControlsProps> = React.memo(({ classNa
           value={bloomKnee}
           onChange={setBloomKnee}
           showValue
-          disabled={thresholdBypassed}
         />
 
         <ToggleGroup

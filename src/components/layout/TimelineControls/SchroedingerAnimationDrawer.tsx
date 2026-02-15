@@ -149,6 +149,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
     // Check quantum mode for UI visibility
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
+    const isFreeScalarField = config.quantumMode === 'freeScalarField'
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
@@ -172,8 +173,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         </div>
 
-        {/* Interference Fringing */}
-        <div className="space-y-4" data-testid="animation-panel-interference">
+        {/* Interference Fringing — not applicable for free scalar field (requires inline wavefunction) */}
+        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-interference">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Interference Fringing
@@ -218,10 +219,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               showValue
             />
           </div>
-        </div>
+        </div>}
 
-        {/* Phase-coherent quantum texture */}
-        <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
+        {/* Phase-coherent quantum texture — not applicable for free scalar field */}
+        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
           <div className="flex items-center justify-between">
             <label
               className="text-xs font-bold text-text-secondary uppercase tracking-widest"
@@ -260,10 +261,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               showValue
             />
           </div>
-        </div>
+        </div>}
 
-        {/* Probability Current (j-field) */}
-        <div className="space-y-4" data-testid="animation-panel-probabilityCurrent">
+        {/* Probability Current (j-field) — not applicable for free scalar field (requires complex wavefunction) */}
+        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-probabilityCurrent">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Probability Current (j)
@@ -402,7 +403,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               </>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Slice Animation - 4D+ only */}
         {dimension >= 4 && (

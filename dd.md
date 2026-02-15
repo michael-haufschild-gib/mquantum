@@ -174,3 +174,6 @@ also: debugoverlaypass dead code? are the debug overlays working at all? light g
  ────────────────────────────────────────
  Item: Additional docs consolidation/deprecation
  Why deferred: Can be done incrementally as docs are touched
+  1. Bloom blur compute — largest single-pass FPS improvement, well-understood technique
+  2. FXAA compute — good bandwidth reduction, straightforward tiling
+  3. Pass fusion (tonemapping + paper) — eliminates intermediate texture, moderate effort

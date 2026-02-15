@@ -6,11 +6,12 @@
 
 import { Select } from '@/components/ui/Select'
 import {
-  COLOR_ALGORITHM_OPTIONS,
+  getAvailableColorAlgorithms,
   type ColorAlgorithm,
 } from '@/rendering/shaders/palette'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
-import React, { useMemo, useCallback } from 'react'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import React, { useMemo, useCallback, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 export interface ColorAlgorithmSelectorProps {
@@ -26,14 +27,29 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       }))
     )
 
+    const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+
+    const availableOptions = useMemo(
+      () => getAvailableColorAlgorithms(quantumMode),
+      [quantumMode]
+    )
+
     const selectOptions = useMemo(
       () =>
-        COLOR_ALGORITHM_OPTIONS.map((opt) => ({
+        availableOptions.map((opt) => ({
           value: opt.value,
           label: opt.label,
         })),
-      []
+      [availableOptions]
     )
+
+    // Auto-switch away from unavailable algorithm when mode changes
+    useEffect(() => {
+      const isAvailable = availableOptions.some((opt) => opt.value === colorAlgorithm)
+      if (!isAvailable) {
+        setColorAlgorithm('diverging')
+      }
+    }, [availableOptions, colorAlgorithm, setColorAlgorithm])
 
     const handleChange = useCallback(
       (v: string) => {

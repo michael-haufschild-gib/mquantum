@@ -1,4 +1,6 @@
 import {
+  type FreeScalarFieldView,
+  type FreeScalarInitialCondition,
   HydrogenNDPresetName,
   RaymarchQuality,
   SchroedingerColorMode,
@@ -210,6 +212,23 @@ export interface SchroedingerSliceActions {
   setSchroedingerSqLayerCoherentAlphaIm: (im: number) => void
   setSchroedingerSqLayerSqueezeR: (r: number) => void
   setSchroedingerSqLayerSqueezeTheta: (theta: number) => void
+
+  // Free Scalar Field Configuration
+  setFreeScalarLatticeDim: (dim: 1 | 2 | 3) => void
+  setFreeScalarGridSize: (size: [number, number, number]) => void
+  setFreeScalarSpacing: (spacing: [number, number, number]) => void
+  setFreeScalarMass: (mass: number) => void
+  setFreeScalarDt: (dt: number) => void
+  setFreeScalarStepsPerFrame: (steps: number) => void
+  setFreeScalarInitialCondition: (condition: FreeScalarInitialCondition) => void
+  setFreeScalarFieldView: (view: FreeScalarFieldView) => void
+  setFreeScalarPacketCenter: (center: [number, number, number]) => void
+  setFreeScalarPacketWidth: (width: number) => void
+  setFreeScalarPacketAmplitude: (amplitude: number) => void
+  setFreeScalarModeK: (k: [number, number, number]) => void
+  setFreeScalarAutoScale: (autoScale: boolean) => void
+  resetFreeScalarField: () => void
+  clearFreeScalarNeedsReset: () => void
 
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void

@@ -9,7 +9,7 @@
 // Bloom
 export {
   bloomThresholdShader,
-  createBloomBlurShader,
+  createBloomBlurComputeShader,
   createBloomCompositeShader,
   bloomConvolutionCompositeShader,
   bloomCopyShader,
