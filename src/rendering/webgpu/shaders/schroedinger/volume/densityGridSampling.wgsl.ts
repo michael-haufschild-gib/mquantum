@@ -50,7 +50,18 @@ export const densityGridSamplingBlock = /* wgsl */ `
  */
 fn worldToDensityGridUVW(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   let bound = uniforms.boundingRadius;
-  return (pos + vec3f(bound)) / (2.0 * bound);
+
+  // Apply basis rotation: transform from visual space to grid-aligned space.
+  // The density grid is computed axis-aligned; the basis transform rotates
+  // the sampling coordinates so the pre-computed grid appears correctly oriented.
+  // Uses first 3 components of each N-D basis vector (grid is 3D).
+  let gridPos = vec3f(
+    pos.x * getBasisComponent(basis.basisX, 0) + pos.y * getBasisComponent(basis.basisY, 0) + pos.z * getBasisComponent(basis.basisZ, 0) + getBasisComponent(basis.origin, 0),
+    pos.x * getBasisComponent(basis.basisX, 1) + pos.y * getBasisComponent(basis.basisY, 1) + pos.z * getBasisComponent(basis.basisZ, 1) + getBasisComponent(basis.origin, 1),
+    pos.x * getBasisComponent(basis.basisX, 2) + pos.y * getBasisComponent(basis.basisY, 2) + pos.z * getBasisComponent(basis.basisZ, 2) + getBasisComponent(basis.origin, 2),
+  );
+
+  return (gridPos + vec3f(bound)) / (2.0 * bound);
 }
 
 /**
