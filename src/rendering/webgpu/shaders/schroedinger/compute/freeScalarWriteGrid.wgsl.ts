@@ -56,34 +56,36 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // pi (conjugate momentum)
     fieldValue = piVal;
   } else {
-    // Energy density: E = 0.5*(pi^2 + |grad phi|^2 + m^2*phi^2)
-    var gradPhiSq: f32 = 0.0;
+    // Energy density: lattice Hamiltonian density at site n.
+    // Uses forward-difference gradient consistent with the discrete EOM:
+    //   E_n = 0.5*pi_n^2 + 0.5*m^2*phi_n^2
+    //       + 0.5 * sum_i (phi_{n+e_i} - phi_n)^2 / a_i^2
+    // Each bond's gradient energy is split equally between its two sites,
+    // so sum_n E_n = H (the conserved Hamiltonian).
+    var gradEnergy: f32 = 0.0;
 
-    // Gradient in X
+    // Gradient energy in X (forward difference)
     if (nx > 1u) {
       let phiXp = phi[coordToIdx(wrapCoord(i32(ix) + 1, nx), iy, iz)];
-      let phiXm = phi[coordToIdx(wrapCoord(i32(ix) - 1, nx), iy, iz)];
-      let dPhiDx = (phiXp - phiXm) / (2.0 * params.spacing.x);
-      gradPhiSq += dPhiDx * dPhiDx;
+      let dPhi = phiXp - phiVal;
+      gradEnergy += dPhi * dPhi / (params.spacing.x * params.spacing.x);
     }
 
-    // Gradient in Y
+    // Gradient energy in Y (forward difference)
     if (params.latticeDim >= 2u && ny > 1u) {
       let phiYp = phi[coordToIdx(ix, wrapCoord(i32(iy) + 1, ny), iz)];
-      let phiYm = phi[coordToIdx(ix, wrapCoord(i32(iy) - 1, ny), iz)];
-      let dPhiDy = (phiYp - phiYm) / (2.0 * params.spacing.y);
-      gradPhiSq += dPhiDy * dPhiDy;
+      let dPhi = phiYp - phiVal;
+      gradEnergy += dPhi * dPhi / (params.spacing.y * params.spacing.y);
     }
 
-    // Gradient in Z
+    // Gradient energy in Z (forward difference)
     if (params.latticeDim >= 3u && nz > 1u) {
       let phiZp = phi[coordToIdx(ix, iy, wrapCoord(i32(iz) + 1, nz))];
-      let phiZm = phi[coordToIdx(ix, iy, wrapCoord(i32(iz) - 1, nz))];
-      let dPhiDz = (phiZp - phiZm) / (2.0 * params.spacing.z);
-      gradPhiSq += dPhiDz * dPhiDz;
+      let dPhi = phiZp - phiVal;
+      gradEnergy += dPhi * dPhi / (params.spacing.z * params.spacing.z);
     }
 
-    fieldValue = 0.5 * (piVal * piVal + gradPhiSq + params.mass * params.mass * phiVal * phiVal);
+    fieldValue = 0.5 * (piVal * piVal + params.mass * params.mass * phiVal * phiVal + gradEnergy);
   }
 
   // Encode for density grid:

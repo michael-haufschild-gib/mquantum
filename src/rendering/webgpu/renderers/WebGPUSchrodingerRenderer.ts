@@ -47,6 +47,7 @@ const SCHROEDINGER_UNIFORM_SIZE = 1488
 const QUANTUM_MODE_MAP: Record<string, number> = {
   harmonicOscillator: 0,
   hydrogenND: 1,
+  freeScalarField: 2,
 }
 const COLOR_ALGORITHM_MAP: Record<string, number> = {
   lch: 0,
@@ -173,6 +174,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       config.isWigner ? 1 : 0,
       config.useWignerCache ? 1 : 0,
       pipelineIs2D ? 1 : 0,
+      config.isFreeScalar ? 1 : 0,
     ].join(':')
   }
 
@@ -319,6 +321,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Wigner cache resolution tracking
   private lastWignerCacheResolution = 256
 
+  // FSF diagnostic: throttled per-second state reporting
+  private _fsfDiagLastTime = 0
+  private _fsfDiagLastCamDist = -1
+  private _fsfDiagLastCanvasW = -1
+  private _fsfDiagLastCanvasH = -1
+
   constructor(config?: SchrodingerRendererConfig) {
     // Determine outputs based on mode
     // Write to 'object-color' like other renderers (Mandelbulb, Julia, Polytope)
@@ -328,10 +336,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Temporal mode uses quarter-res outputs that get accumulated by WebGPUTemporalCloudPass
     // Temporal takes priority: isosurface+temporal uses quarter-res (no normal/depth buffer)
     const isIsosurface = config?.isosurface ?? false
-    const isTemporal = config?.temporal ?? false
     const isWigner = config?.representation === 'wigner'
-    const is2D = (config?.dimension ?? 3) === 2
-    const pipelineIs2D = is2D || isWigner
+    // Free scalar field requires volumetric 3D rendering — override 2D pipeline even if dimension=2
+    const isFreeScalarEarly = config?.quantumMode === 'freeScalarField'
+    // Free scalar field does not support temporal reprojection (no world position output)
+    const isTemporal = (config?.temporal ?? false) && !isFreeScalarEarly
+    const is2D = !isFreeScalarEarly && (config?.dimension ?? 3) === 2
+    const pipelineIs2D = is2D || (isWigner && !isFreeScalarEarly)
     const outputs = pipelineIs2D
       ? [
           // 2D mode: only color output (no depth, no normal, no temporal)
@@ -388,8 +399,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Free scalar field: temporal reprojection is unsupported (no world position output).
     // Must be set here (not just in shaderConfig) so pipeline targets and render pass
     // attachment counts match the fragment shader output count.
+    // Also force dimension to at least 3 for shader composition (free scalar uses volumetric 3D).
     if (isFreeScalar) {
       this.rendererConfig.temporal = false
+      if ((this.rendererConfig.dimension ?? 3) < 3) {
+        this.rendererConfig.dimension = 3
+      }
     }
 
     // Density grid raymarching: for hydrogen VOLUMETRIC mode at all dimensions (3-11D),
@@ -426,7 +441,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     this.shaderConfig = {
       dimension: this.rendererConfig.dimension!,
-      isosurface: isFreeScalar ? false : this.rendererConfig.isosurface,
+      isosurface: this.rendererConfig.isosurface,
       quantumMode: shaderQuantumMode,
       termCount: isFreeScalar ? 1 : this.rendererConfig.termCount,
       nodal: isFreeScalar ? false : (this.rendererConfig.nodalEnabled ?? true),
@@ -445,6 +460,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       densityGridHasPhase: isFreeScalar ? true : undefined,
       isWigner: isFreeScalar ? false : isWigner,
       useWignerCache: isFreeScalar ? false : isWigner,
+      isFreeScalar,
     }
   }
 
@@ -461,8 +477,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device } = ctx
-
     try {
       await this.createPipelineImpl(ctx)
     } catch (err) {
@@ -478,7 +492,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   private async createPipelineImpl(ctx: WebGPUSetupContext): Promise<void> {
     const { device } = ctx
-    // Force a lighting buffer write on first frame after (re)initialization.
+    // Force full uniform buffer writes on first frame after (re)initialization.
+    // All version trackers must be reset because uniform buffers are recreated empty.
     this.lastLightingVersion = -1
     this.lastQualitySignature = ''
     this.lastBasisRotationVersion = -1
@@ -487,11 +502,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastBasisAnimationTime = Number.NaN
     this.lastPbrVersion = -1
     this.lastSchrodingerPbrVersion = -1
+    this.lastSchroedingerVersion = -1
+    this.lastSchrodingerAppearanceVersion = -1
+    this.lastAppearanceVersion = -1
 
     const dim = this.rendererConfig.dimension ?? 3
-    const pipelineIs2D = dim === 2 || this.rendererConfig.representation === 'wigner'
-    const forceRgba = dim > 3
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
+    // Free scalar field requires volumetric 3D rendering — override 2D pipeline
+    const pipelineIs2D = !isFreeScalar && (dim === 2 || this.rendererConfig.representation === 'wigner')
+    const forceRgba = dim > 3
 
     // =====================================================================
     // Phase 1: Construct compute passes and start parallel initialization
@@ -550,7 +569,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (this.shaderConfig.isWigner) {
       this.wignerCachePass = new WignerCacheComputePass({
         dimension: dim,
-        quantumMode: this.rendererConfig.quantumMode,
+        quantumMode: this.shaderConfig.quantumMode,
         termCount: this.rendererConfig.termCount,
       })
       wignerPromise = this.wignerCachePass.initialize(ctx)
@@ -586,9 +605,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     )
     const cachedPipeline = WebGPUSchrodingerRenderer.renderPipelineCache.get(cacheKey)
 
-    console.log(
-      `[SchrodingerRenderer] Pipeline ${cachedPipeline ? 'CACHE HIT' : 'CACHE MISS'} dim=${dim} key=${cacheKey}`
-    )
+    if (import.meta.env.DEV) {
+      console.log(
+        `[SchrodingerRenderer] Pipeline ${cachedPipeline ? 'CACHE HIT' : 'CACHE MISS'} dim=${dim} key=${cacheKey}`
+      )
+    }
 
     // Always create bind group layouts (cheap, needed for bind groups regardless of cache)
     // Group 0: Camera
@@ -851,10 +872,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       )
     }
 
-    console.log(
-      `[SchrodingerRenderer] Phase 4 complete: pipeline=${!!this.renderPipeline}`,
-      `density=${this.densityGridInitialized} eigen=${this.eigenCacheInitialized} wigner=${this.wignerCacheInitialized}`
-    )
+    if (import.meta.env.DEV) {
+      console.log(
+        `[SchrodingerRenderer] Phase 4 complete: pipeline=${!!this.renderPipeline}`,
+        `density=${this.densityGridInitialized} eigen=${this.eigenCacheInitialized} wigner=${this.wignerCacheInitialized}`
+      )
+    }
 
     // =====================================================================
     // Phase 5: Create uniform buffers, bind groups, geometry (always fresh)
@@ -1462,6 +1485,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           WebGPUSchrodingerRenderer.BOUND_RADIUS_REBUILD_THRESHOLD &&
         this.device
       ) {
+        if (import.meta.env.DEV) {
+          console.log(
+            `[FSF-DIAG] boundingRadius: ${this.boundingRadius.toFixed(3)} → ${quantizedBoundR.toFixed(3)}` +
+              ` (L=${Lx.toFixed(2)},${Ly.toFixed(2)},${Lz.toFixed(2)})`
+          )
+        }
         this.boundingRadius = quantizedBoundR
         this.createBoundingGeometry(this.device)
       }
@@ -1503,12 +1532,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // Compute auto-compensation AFTER bounding radius update so stepLen estimate is correct
+    // Compute auto-compensation AFTER bounding radius update so stepLen estimate is correct.
+    // Free scalar field uses its own auto-scale normalization (maxFieldValue), so the HO
+    // canonical compensation factor is irrelevant and must remain 1.0.
     if (needsPresetRegen && this.cachedPreset) {
-      this.canonicalDensityCompensation = this.computeCanonicalCompensation(
-        this.cachedPreset,
-        dimension
-      )
+      if (schroedinger?.quantumMode === 'freeScalarField') {
+        this.canonicalDensityCompensation = 1.0
+        // Free scalar density grid stores normalized values in [0, 1].
+        // Set peakDensity to match so applyDensityContrast doesn't cap the range.
+        this.cachedPeakDensity = 1.0
+      } else {
+        this.canonicalDensityCompensation = this.computeCanonicalCompensation(
+          this.cachedPreset,
+          dimension
+        )
+      }
     }
 
     // Use cached flattened preset data
@@ -2444,11 +2482,44 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const animation = ctx.frame?.stores?.['animation'] as any
       const freeScalarConfig = extended?.schroedinger?.freeScalar
       const isPlaying = animation?.isPlaying ?? false
+
       if (freeScalarConfig) {
         freeScalarPass.executeField(ctx, freeScalarConfig, isPlaying)
         // Clear needsReset after processing (targeted mutation, no version bump)
         if (freeScalarConfig.needsReset) {
           ;(extended as any)?.clearFreeScalarNeedsReset?.()
+        }
+
+        // FSF diagnostic: log state changes once per second (dev only)
+        if (import.meta.env.DEV) {
+          const now = performance.now()
+          if (now - this._fsfDiagLastTime > 1000) {
+            this._fsfDiagLastTime = now
+            const camera = ctx.frame?.stores?.['camera'] as any
+            const camPos = camera?.position
+            const camDist = camPos
+              ? Math.sqrt(camPos.x * camPos.x + camPos.y * camPos.y + camPos.z * camPos.z)
+              : -1
+            const canvasW = ctx.size.width
+            const canvasH = ctx.size.height
+            const camChanged = Math.abs(camDist - this._fsfDiagLastCamDist) > 0.01
+            const sizeChanged =
+              canvasW !== this._fsfDiagLastCanvasW || canvasH !== this._fsfDiagLastCanvasH
+            if (camChanged || sizeChanged) {
+              console.log(
+                `[FSF-DIAG] cam=${camDist.toFixed(2)} canvas=${canvasW}x${canvasH}` +
+                  ` bound=${this.boundingRadius.toFixed(2)}` +
+                  ` hash=${freeScalarPass.getConfigHash()}` +
+                  ` maxPhi=${freeScalarPass.getMaxFieldValue().toFixed(4)}` +
+                  ` dim=${freeScalarConfig.latticeDim} grid=${freeScalarConfig.gridSize}` +
+                  ` vtx=${!!this.vertexBuffer} idx=${!!this.indexBuffer}` +
+                  ` idxCount=${this.indexCount}`
+              )
+              this._fsfDiagLastCamDist = camDist
+              this._fsfDiagLastCanvasW = canvasW
+              this._fsfDiagLastCanvasH = canvasH
+            }
+          }
         }
       }
     }

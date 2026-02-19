@@ -1172,10 +1172,13 @@ fn volumeRaymarchGrid(
     // PERF: Gaussian envelope early-skip for deep tail region.
     // The outer ~15% shell of the bounding sphere is exponentially low density.
     // Skip expensive texture lookups and take 8x steps through it.
-    let r2 = dot(pos, pos);
-    if (r2 > boundR2Skip) {
-      t += stepLen * 8.0;
-      continue;
+    // Free scalar fills a cube, not a sphere — skip this optimization.
+    if (!IS_FREE_SCALAR) {
+      let r2 = dot(pos, pos);
+      if (r2 > boundR2Skip) {
+        t += stepLen * 8.0;
+        continue;
+      }
     }
 
     // Sample density from pre-computed 3D grid texture

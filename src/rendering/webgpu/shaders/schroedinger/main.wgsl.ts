@@ -39,8 +39,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let worldRayDir = normalize(input.vPosition - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
-  // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  // Intersect with bounding volume (box for free scalar field, sphere otherwise)
+  var tSphere: vec2f;
+  if (IS_FREE_SCALAR) {
+    tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);
+  } else {
+    tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  }
 
   // No intersection with bounding volume
   if (tSphere.y < 0.0) {
@@ -212,8 +217,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let worldRayDir = normalize(input.vPosition - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
-  // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  // Intersect with bounding volume (box for free scalar field, sphere otherwise)
+  var tSphere: vec2f;
+  if (IS_FREE_SCALAR) {
+    tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);
+  } else {
+    tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  }
 
   // No intersection with bounding volume
   if (tSphere.y < 0.0) {
@@ -427,8 +437,13 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   let worldRayDir = normalize(input.vPosition - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
-  // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  // Intersect with bounding volume (box for free scalar field, sphere otherwise)
+  var tSphere: vec2f;
+  if (IS_FREE_SCALAR) {
+    tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);
+  } else {
+    tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  }
   if (tSphere.y < 0.0) {
     discard;
   }
@@ -893,8 +908,13 @@ ${bayerJitterSection}
   let worldRayDir = normalize(${rayDirSource} - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
-  // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  // Intersect with bounding volume (box for free scalar field, sphere otherwise)
+  var tSphere: vec2f;
+  if (IS_FREE_SCALAR) {
+    tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);
+  } else {
+    tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  }
   if (tSphere.y < 0.0) {
     discard;
   }
@@ -1305,7 +1325,8 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
     // re-evaluate with direct sampling to avoid blank frames.
     // This can happen when the density grid hasn't been populated yet
     // or when coordinate mapping produces out-of-range lookups.
-    if (volumeResult.alpha < 0.01) {
+    // Skip for free scalar: inline HO evaluation is wrong for lattice data.
+    if (!IS_FREE_SCALAR && volumeResult.alpha < 0.01) {
       if (fastMode) {
         volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
       } else {
@@ -1340,8 +1361,13 @@ ${bayerJitterSection}
   let worldRayDir = normalize(${rayDirSource} - camera.cameraPosition);
   let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
 
-  // Intersect with bounding sphere
-  let tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  // Intersect with bounding volume (box for free scalar field, sphere otherwise)
+  var tSphere: vec2f;
+  if (IS_FREE_SCALAR) {
+    tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);
+  } else {
+    tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
+  }
 
   // No intersection with bounding volume
   if (tSphere.y < 0.0) {

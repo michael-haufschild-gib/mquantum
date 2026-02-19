@@ -124,6 +124,16 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     return this.densityTextureView
   }
 
+  /** Current config hash for diagnostic logging. */
+  getConfigHash(): string {
+    return this.lastConfigHash
+  }
+
+  /** Current maxFieldValue used for normalization. */
+  getMaxFieldValue(): number {
+    return this.maxFieldValue
+  }
+
   /**
    * Get the density texture for direct access.
    * @returns The 3D density texture, or null if not initialized.
@@ -186,7 +196,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * Called during pass initialization.
    * @param ctx - WebGPU setup context
    */
-  protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
+  protected async createPipeline(_ctx: WebGPUSetupContext): Promise<void> {
     // Resources will be created on first execute when config is available
   }
 
@@ -484,7 +494,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     // Check if field buffers need rebuild (grid size changed)
     const configHash = this.computeConfigHash(config)
+
     if (configHash !== this.lastConfigHash || !this.phiBuffer) {
+      if (import.meta.env.DEV) {
+        console.log(
+          `[FSF-COMPUTE] rebuild: ${this.lastConfigHash} → ${configHash}` +
+            ` (latticeDim=${config.latticeDim}, grid=${config.gridSize}, needsReset=${config.needsReset})`
+        )
+      }
       this.rebuildFieldBuffers(device, config)
       this.buildPipelines(device)
       this.rebuildBindGroups(device)
@@ -615,6 +632,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         gridWorkgroups
       )
       gridPass.end()
+    } else {
+      console.warn(`[FreeScalarFieldComputePass] writeGrid skipped: pipeline=${!!this.writeGridPipeline}, bindGroup=${!!this.writeGridBindGroup}`)
     }
   }
 

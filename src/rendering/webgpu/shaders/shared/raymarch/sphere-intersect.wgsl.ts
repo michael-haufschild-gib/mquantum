@@ -68,4 +68,30 @@ fn intersectSphereAt(ro: vec3f, rd: vec3f, center: vec3f, radius: f32) -> vec2f 
 fn isInsideSphere(p: vec3f, center: vec3f, radius: f32) -> bool {
   return length(p - center) < radius;
 }
+
+/**
+ * Ray-AABB intersection test for an axis-aligned box centered at the origin.
+ *
+ * Uses the slab method (Kay-Kajiya). Returns near/far distances along the ray,
+ * or vec2(-1.0) if no intersection. Handles rays parallel to slab planes
+ * correctly via IEEE 754 infinity arithmetic.
+ *
+ * @param ro - Ray origin
+ * @param rd - Ray direction (should be normalized)
+ * @param halfSize - Half-extent of the box (box spans [-halfSize, +halfSize] on each axis)
+ * @returns vec2(near, far) intersection distances, or vec2(-1.0) if no intersection
+ */
+fn intersectBox(ro: vec3f, rd: vec3f, halfSize: f32) -> vec2f {
+  let invRd = 1.0 / rd;
+  let t0 = (-halfSize - ro) * invRd;
+  let t1 = (halfSize - ro) * invRd;
+  let tmin = min(t0, t1);
+  let tmax = max(t0, t1);
+  let tNear = max(max(tmin.x, tmin.y), tmin.z);
+  let tFar = min(min(tmax.x, tmax.y), tmax.z);
+  if (tNear > tFar || tFar < 0.0) {
+    return vec2f(-1.0);
+  }
+  return vec2f(tNear, tFar);
+}
 `

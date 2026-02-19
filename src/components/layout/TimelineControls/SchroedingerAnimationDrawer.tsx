@@ -153,8 +153,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
-        {/* Time Evolution (Always Active) */}
-        <div className="space-y-4" data-testid="animation-panel-timeEvolution">
+        {/* Time Evolution — not applicable for free scalar field (uses its own dt/stepsPerFrame) */}
+        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Time Evolution
@@ -171,7 +171,7 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               showValue
             />
           </div>
-        </div>
+        </div>}
 
         {/* Interference Fringing — not applicable for free scalar field (requires inline wavefunction) */}
         {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-interference">

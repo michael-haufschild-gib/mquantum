@@ -62,19 +62,25 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(useExtendedObjectStore.getState().schroedinger.freeScalar.fieldView).toBe('energyDensity')
   })
 
-  it('setFreeScalarPacketWidth updates packet width', () => {
+  it('setFreeScalarPacketWidth updates packet width and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarPacketWidth(0.5)
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.packetWidth).toBe(0.5)
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(fs.packetWidth).toBe(0.5)
+    expect(fs.needsReset).toBe(true)
   })
 
-  it('setFreeScalarPacketAmplitude updates amplitude', () => {
+  it('setFreeScalarPacketAmplitude updates amplitude and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarPacketAmplitude(2.0)
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.packetAmplitude).toBe(2.0)
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(fs.packetAmplitude).toBe(2.0)
+    expect(fs.needsReset).toBe(true)
   })
 
-  it('setFreeScalarModeK updates wave vector', () => {
+  it('setFreeScalarModeK updates wave vector and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarModeK([3, -1, 2])
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.modeK).toEqual([3, -1, 2])
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(fs.modeK).toEqual([3, -1, 2])
+    expect(fs.needsReset).toBe(true)
   })
 
   it('setFreeScalarAutoScale toggles auto-scale', () => {
@@ -92,9 +98,11 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(useExtendedObjectStore.getState().schroedinger.freeScalar.spacing).toEqual([0.2, 0.2, 0.2])
   })
 
-  it('setFreeScalarPacketCenter updates center', () => {
+  it('setFreeScalarPacketCenter updates center and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarPacketCenter([1, 0.5, -0.5])
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.packetCenter).toEqual([1, 0.5, -0.5])
+    const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(fs.packetCenter).toEqual([1, 0.5, -0.5])
+    expect(fs.needsReset).toBe(true)
   })
 
   it('all setters increment schroedingerVersion', () => {

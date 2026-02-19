@@ -1,7 +1,5 @@
 import {
-  DEFAULT_FREE_SCALAR_CONFIG,
   DEFAULT_SCHROEDINGER_CONFIG,
-  type FreeScalarConfig,
   type SchroedingerConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
@@ -14,6 +12,7 @@ import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroe
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { StateCreator } from 'zustand'
+import { useGeometryStore } from '@/stores/geometryStore'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
 export const createSchroedingerSlice: StateCreator<
@@ -90,7 +89,8 @@ export const createSchroedingerSlice: StateCreator<
   const computeCflLimit = (spacing: [number, number, number], latticeDim: number, mass: number): number => {
     let sumInvA2 = 0
     for (let i = 0; i < latticeDim; i++) {
-      const twoOverA = 2 / spacing[i]
+      const a = spacing[i as 0 | 1 | 2]
+      const twoOverA = 2 / a
       sumInvA2 += twoOverA * twoOverA
     }
     const omegaMax = Math.sqrt(mass * mass + sumInvA2)
@@ -271,7 +271,7 @@ export const createSchroedingerSlice: StateCreator<
 
     setSchroedingerSeed: (seed) => {
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, seed: Math.floor(seed) },
+        schroedinger: { ...state.schroedinger, seed: Math.floor(seed), presetName: 'custom' },
       }))
     },
 
@@ -315,9 +315,20 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerQuantumMode: (mode) => {
       setWithVersion((state) => {
         const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
-        // Free scalar field doesn't support Wigner or momentum representation
-        if (mode === 'freeScalarField' && state.schroedinger.representation !== 'position') {
-          updates.representation = 'position'
+        if (mode === 'freeScalarField') {
+          // Free scalar field requires volumetric 3D rendering (no 2D pipeline).
+          // Enforce dimension >= 3 globally, not just in the UI click handler.
+          if (useGeometryStore.getState().dimension < 3) {
+            useGeometryStore.getState().setDimension(3)
+          }
+          // Free scalar field doesn't support Wigner or momentum representation
+          if (state.schroedinger.representation !== 'position') {
+            updates.representation = 'position'
+          }
+          // Cross-section calls evalPsi() (HO wavefunction), not the actual scalar field
+          if (state.schroedinger.crossSectionEnabled) {
+            updates.crossSectionEnabled = false
+          }
         }
         return { schroedinger: { ...state.schroedinger, ...updates } }
       })
@@ -804,7 +815,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetCenter: center },
+          freeScalar: { ...state.schroedinger.freeScalar, packetCenter: center, needsReset: true },
         },
       }))
     },
@@ -813,7 +824,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetWidth: clamped },
+          freeScalar: { ...state.schroedinger.freeScalar, packetWidth: clamped, needsReset: true },
         },
       }))
     },
@@ -822,7 +833,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetAmplitude: clamped },
+          freeScalar: { ...state.schroedinger.freeScalar, packetAmplitude: clamped, needsReset: true },
         },
       }))
     },
@@ -830,7 +841,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, modeK: k },
+          freeScalar: { ...state.schroedinger.freeScalar, modeK: k, needsReset: true },
         },
       }))
     },

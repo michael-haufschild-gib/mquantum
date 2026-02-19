@@ -87,7 +87,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           <div className="px-4 py-2">
             <DimensionSelector disabled={isFreeScalarField} />
           </div>
-          {dimension > 2 && representation !== 'wigner' && !isFreeScalarField && (
+          {dimension > 2 && representation !== 'wigner' && (
             <div className="px-4 pb-2">
               <div className="space-y-1">
                 <ToggleGroup

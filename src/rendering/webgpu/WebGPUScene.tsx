@@ -517,7 +517,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
       interferenceEnabled: schroedingerCompile.interferenceEnabled,
       uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
-      temporalReprojectionEnabled: performance_.temporalReprojectionEnabled,
+      temporalReprojectionEnabled: schroedingerCompile.quantumMode === 'freeScalarField'
+        ? false
+        : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
@@ -538,8 +540,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
     const setupPasses = async () => {
       // Serialize async pass setup to prevent stale setup races creating duplicate passes.
+      console.log(`[WebGPUScene] setupPasses: awaiting previous task (gen=${setupGeneration})`,
+        `schrodingerChanged=${schrodingerChanged} ppChanged=${ppChanged} fullRebuild=${isFullRebuild}`,
+        `iso=${schrodingerConfig.isosurface} qm=${schrodingerConfig.quantumMode}`)
       await previousSetupTask
-      if (shouldAbortSetup()) return
+      if (shouldAbortSetup()) {
+        console.log(`[WebGPUScene] setupPasses: ABORTED after await (gen=${setupGeneration})`)
+        return
+      }
 
       currentObjectTypeRef.current = objectType
 
@@ -592,7 +600,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           await setupPPPasses(graph, fullConfig, shouldAbortSetup)
         } else if (schrodingerChanged) {
           // Only Schrodinger group changed — warm swap (old pass renders during compilation)
-          console.log('[WebGPUScene] Warm swap: Schrodinger passes only')
+          console.log('[WebGPUScene] Warm swap: Schrodinger passes only',
+            `iso=${fullConfig.isosurface} qm=${fullConfig.quantumMode}`)
 
           // Pre-swap: only ADD temporal resources (old passes keep their resources)
           ensureTemporalResources(graph, fullConfig)
@@ -600,6 +609,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
           // Warm swap: old Schrodinger renders while new one compiles
           await warmSwapSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
+          console.log('[WebGPUScene] Warm swap COMPLETE',
+            `aborted=${shouldAbortSetup()} gen=${setupGeneration}`)
           if (shouldAbortSetup()) return
 
           // Post-swap: safe to remove stale resources — new pass is in place
@@ -633,6 +644,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       if (shouldAbortSetup()) {
         // Abort mid-selective-rebuild: clear graph to prevent auto-compile
         // of partially mutated state, then force full rebuild on next attempt.
+        console.warn(`[WebGPUScene] ABORT mid-rebuild (gen=${setupGeneration}), clearing graph`)
         graph.clearPasses()
         needsFullRebuildRef.current = true
         lastSchrodingerConfigRef.current = null
@@ -642,6 +654,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
       // Compile the graph
       graph.compile()
+      console.log(`[WebGPUScene] Graph compiled OK (gen=${setupGeneration})`)
 
       // Update config tracking on success ONLY — not after error
       needsFullRebuildRef.current = false
@@ -1745,20 +1758,26 @@ interface PPPassConfig {
 }
 
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
+  const isFreeScalar = config.quantumMode === 'freeScalarField'
   return {
     objectType: config.objectType,
-    dimension: config.dimension,
+    // Free scalar field forces dimension >= 3 and disables features unsupported by its pipeline.
+    // Normalize these values here so toggling them in the UI while in freeScalar mode
+    // does not trigger wasteful renderer rebuilds.
+    dimension: isFreeScalar ? Math.max(config.dimension, 3) : config.dimension,
     quantumMode: config.quantumMode,
-    termCount: config.termCount,
-    colorAlgorithm: config.colorAlgorithm,
+    termCount: isFreeScalar ? 1 : config.termCount,
+    colorAlgorithm: isFreeScalar && config.colorAlgorithm === 'relativePhase'
+      ? 'mixed'
+      : config.colorAlgorithm,
     isosurface: config.isosurface,
-    nodalEnabled: config.nodalEnabled,
-    phaseMaterialityEnabled: config.phaseMaterialityEnabled,
-    interferenceEnabled: config.interferenceEnabled,
-    uncertaintyBoundaryEnabled: config.uncertaintyBoundaryEnabled,
-    representation: config.representation,
-    eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
-    temporalReprojectionEnabled: config.temporalReprojectionEnabled,
+    nodalEnabled: isFreeScalar ? false : config.nodalEnabled,
+    phaseMaterialityEnabled: isFreeScalar ? false : config.phaseMaterialityEnabled,
+    interferenceEnabled: isFreeScalar ? false : config.interferenceEnabled,
+    uncertaintyBoundaryEnabled: isFreeScalar ? false : config.uncertaintyBoundaryEnabled,
+    representation: isFreeScalar ? 'position' : config.representation,
+    eigenfunctionCacheEnabled: isFreeScalar ? false : config.eigenfunctionCacheEnabled,
+    temporalReprojectionEnabled: isFreeScalar ? false : config.temporalReprojectionEnabled,
   }
 }
 

@@ -174,6 +174,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   isWigner?: boolean
   /** Use pre-computed Wigner cache texture instead of inline evaluation. */
   useWignerCache?: boolean
+  /** Free scalar field mode — cubic lattice, no Gaussian envelope. */
+  isFreeScalar?: boolean
 }
 
 /**
@@ -202,6 +204,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     useEigenfunctionCache = false,
     isWigner = false,
     useWignerCache = false,
+    isFreeScalar = false,
     overrides = [],
   } = config
 
@@ -325,6 +328,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const DENSITY_GRID_HAS_PHASE: bool = ${densityGridHasPhase};`)
   // Grid resolution for gradient central-difference step size
   defines.push(`const DENSITY_GRID_SIZE: f32 = ${densityGridSize}.0;`)
+  // Free scalar field: cubic lattice geometry, no Gaussian envelope optimization
+  defines.push(`const IS_FREE_SCALAR: bool = ${isFreeScalar};`)
   if (useDensityGrid) {
     features.push('Density Grid Raymarching')
   }

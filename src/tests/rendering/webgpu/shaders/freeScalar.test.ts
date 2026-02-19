@@ -3,6 +3,7 @@ import { freeScalarInitBlock, freeScalarUniformsBlock } from '@/rendering/webgpu
 import { freeScalarUpdatePiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarUpdatePhiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
 import { freeScalarWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
+import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
 
 describe('Free Scalar Field WGSL Shaders', () => {
   describe('uniforms block', () => {
@@ -108,6 +109,31 @@ describe('Free Scalar Field WGSL Shaders', () => {
     })
   })
 
+  describe('renderer temporal + free scalar interaction', () => {
+    it('disables temporal outputs when quantumMode is freeScalarField even if temporal flag is true', () => {
+      const renderer = new WebGPUSchrodingerRenderer({
+        temporal: true,
+        quantumMode: 'freeScalarField',
+        dimension: 3,
+      })
+      const outputIds = renderer.config.outputs.map((o) => o.resourceId)
+      expect(outputIds).not.toContain('quarter-color')
+      expect(outputIds).not.toContain('quarter-position')
+      expect(outputIds).toContain('object-color')
+    })
+
+    it('allows temporal outputs for non-free-scalar modes when temporal is true', () => {
+      const renderer = new WebGPUSchrodingerRenderer({
+        temporal: true,
+        quantumMode: 'harmonicOscillator',
+        dimension: 3,
+      })
+      const outputIds = renderer.config.outputs.map((o) => o.resourceId)
+      expect(outputIds).toContain('quarter-color')
+      expect(outputIds).toContain('quarter-position')
+    })
+  })
+
   describe('writeGrid shader', () => {
     it('declares 3D workgroup compute entry point', () => {
       expect(freeScalarWriteGridBlock).toContain('@compute @workgroup_size(4, 4, 4)')
@@ -141,9 +167,11 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarWriteGridBlock).not.toContain('log(rho + 1e-10)')
     })
 
-    it('computes energy density with gradient term', () => {
-      expect(freeScalarWriteGridBlock).toContain('gradPhiSq')
+    it('computes energy density with forward-difference gradient matching lattice Hamiltonian', () => {
+      expect(freeScalarWriteGridBlock).toContain('gradEnergy')
       expect(freeScalarWriteGridBlock).toContain('params.mass * params.mass')
+      // Forward difference: (phi[n+1] - phiVal), not central (phi[n+1] - phi[n-1])/(2a)
+      expect(freeScalarWriteGridBlock).toContain('phiVal')
     })
 
     it('composes correctly with uniforms block', () => {

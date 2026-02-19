@@ -197,7 +197,20 @@ export const serializeExtendedState = <T extends object>(
   for (const key in configRecord) {
     if (typeof configRecord[key] === 'function') continue
     if (TRANSIENT_FIELDS.has(key)) continue
-    filtered[key] = configRecord[key]
+    const val = configRecord[key]
+    // Recursively strip transient fields from nested objects (e.g., freeScalar.needsReset)
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const nested = val as Record<string, unknown>
+      const cleanNested: Record<string, unknown> = {}
+      for (const nk in nested) {
+        if (typeof nested[nk] === 'function') continue
+        if (TRANSIENT_FIELDS.has(nk)) continue
+        cleanNested[nk] = nested[nk]
+      }
+      filtered[key] = cleanNested
+    } else {
+      filtered[key] = val
+    }
   }
 
   // Return only the relevant config, keyed by its config key

@@ -2,7 +2,7 @@
  * Shared types for SchroedingerControls components
  */
 
-import type { FreeScalarFieldView, FreeScalarInitialCondition, SchroedingerConfig, SecondQuantizationMode } from '@/lib/geometry/extended/types'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
 /**

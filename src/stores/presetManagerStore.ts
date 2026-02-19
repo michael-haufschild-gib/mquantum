@@ -474,6 +474,15 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           }
         }
 
+        // Post-load invariant: free scalar field requires dimension >= 3
+        // (loadGeometry + setState bypass setSchroedingerQuantumMode's enforcement)
+        if (
+          useExtendedObjectStore.getState().schroedinger?.quantumMode === 'freeScalarField' &&
+          useGeometryStore.getState().dimension < 3
+        ) {
+          useGeometryStore.getState().setDimension(3)
+        }
+
         // Bump version counters to trigger re-renders after direct setState calls
         // This is necessary because setState bypasses the wrapped setters that auto-increment versions
         useAppearanceStore.getState().bumpVersion()

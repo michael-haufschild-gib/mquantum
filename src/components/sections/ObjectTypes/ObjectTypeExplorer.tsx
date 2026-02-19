@@ -49,9 +49,14 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const handleSelect = useCallback(
     (value: SchroedingerQuantumMode) => {
       soundManager.playClick()
+      // Free scalar field requires volumetric 3D rendering (no 2D pipeline support).
+      // Force dimension to 3 if currently at 2.
+      if (value === 'freeScalarField' && dimension < 3) {
+        useGeometryStore.getState().setDimension(3)
+      }
       setQuantumMode(value)
     },
-    [setQuantumMode]
+    [dimension, setQuantumMode]
   )
 
   const containerVariants = {

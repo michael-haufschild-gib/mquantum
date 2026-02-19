@@ -413,6 +413,91 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).not.toContain('* pixelSize * 2.0')
   })
 
+  it('uses box intersection for free scalar field bounding volume', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      isFreeScalar: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const IS_FREE_SCALAR: bool = true;')
+    expect(wgsl).toContain('fn intersectBox(')
+    expect(wgsl).toContain('tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);')
+  })
+
+  it('composes isosurface mode for free scalar field with density grid', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: true,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      densityGridHasPhase: true,
+      quantumMode: 'harmonicOscillator',
+      termCount: 1,
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      isFreeScalar: true,
+      colorAlgorithm: 4,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const IS_FREE_SCALAR: bool = true;')
+    expect(wgsl).toContain('Main Fragment Shader - Isosurface Mode')
+    expect(wgsl).toContain('struct FragmentOutput')
+    expect(wgsl).toContain('fn intersectBox(')
+    expect(wgsl).toContain('sampleDensityFromGrid')
+    expect(wgsl).toContain('computePBRSpecular')
+    expect(features).toContain('Isosurface Mode')
+  })
+
+  it('composes volumetric mode for free scalar field with density grid', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 3,
+      isosurface: false,
+      temporalAccumulation: false,
+      useDensityGrid: true,
+      densityGridSize: 64,
+      densityGridHasPhase: true,
+      quantumMode: 'harmonicOscillator',
+      termCount: 1,
+      nodal: false,
+      phaseMateriality: false,
+      interference: false,
+      uncertaintyBoundary: false,
+      isFreeScalar: true,
+      colorAlgorithm: 4,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const IS_FREE_SCALAR: bool = true;')
+    expect(wgsl).toContain('Main Fragment Shader - Volumetric Mode')
+    expect(wgsl).toContain('fn intersectBox(')
+    expect(wgsl).toContain('volumeRaymarchGrid')
+    expect(features).toContain('Volumetric Mode')
+    // Volumetric mode should NOT have FragmentOutput struct (single output)
+    expect(wgsl).not.toContain('struct FragmentOutput')
+  })
+
+  it('uses sphere intersection for non-free-scalar modes', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 3,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const IS_FREE_SCALAR: bool = false;')
+    expect(wgsl).toContain('fn intersectBox(')
+    expect(wgsl).toContain('tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);')
+  })
+
 })
 
 describe('WGSL Color Algorithm Specialization', () => {

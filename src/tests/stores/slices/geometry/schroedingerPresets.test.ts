@@ -28,6 +28,20 @@ describe('Schroedinger Store Presets', () => {
     expect(config.frequencySpread).toBe(presetConfig.frequencySpread)
   })
 
+  it('should switch to custom when seed changes after selecting a named preset', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerPresetName('groundState')
+    const selectedPreset = useExtendedObjectStore.getState().schroedinger
+    const updatedSeed = selectedPreset.seed + 1
+
+    store.setSchroedingerSeed(updatedSeed)
+
+    const config = useExtendedObjectStore.getState().schroedinger
+    expect(config.seed).toBe(updatedSeed)
+    expect(config.presetName).toBe('custom')
+  })
+
   it('should not update parameters when switching to custom', () => {
     const store = useExtendedObjectStore.getState()
 
