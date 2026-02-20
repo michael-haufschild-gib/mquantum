@@ -823,9 +823,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const analysisMode = this.uniformU32[47]!
     if (analysisMode === 3 && this.initialized) {
       this.kSpaceFrameCounter++
-      if (!this.kSpacePending && this.kSpaceFrameCounter >= this.K_SPACE_UPDATE_INTERVAL) {
+      if (
+        !this.kSpacePending && this.kSpaceFrameCounter >= this.K_SPACE_UPDATE_INTERVAL &&
+        this.phiBuffer && this.piBuffer &&
+        this.phiReadbackBuffer && this.piReadbackBuffer
+      ) {
         this.kSpaceFrameCounter = 0
-        this.computeAndUploadKSpace(device, config) // fire-and-forget async
+        // Encode copies on the main encoder so they execute after this frame's
+        // compute dispatches, reading the current frame's phi/pi state.
+        const bufferSize = this.totalSites * 4
+        encoder.copyBufferToBuffer(this.phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
+        encoder.copyBufferToBuffer(this.piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
+        this.readbackAndComputeKSpace(device, config) // fire-and-forget async
       }
     } else {
       this.kSpaceFrameCounter = 0
@@ -833,38 +842,28 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
-   * Async: read phi/pi from GPU, compute k-space occupation via FFT.
-   * Stores results in pendingKSpaceData for synchronous upload next frame.
+   * Async: map staging buffers (already copied on the main encoder), compute
+   * k-space occupation via FFT, and store results for next-frame texture upload.
    * Fire-and-forget — sets kSpacePending to prevent overlapping computations.
+   * Buffer copies are encoded on the main encoder by the caller so they execute
+   * in correct command-buffer order after this frame's compute dispatches.
    */
-  private async computeAndUploadKSpace(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
-    if (
-      !this.phiBuffer || !this.piBuffer ||
-      !this.phiReadbackBuffer || !this.piReadbackBuffer
-    ) return
-
+  private async readbackAndComputeKSpace(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
     this.kSpacePending = true
-    const bufferSize = this.totalSites * 4
 
     try {
-      // Copy phi/pi storage buffers → staging buffers
-      const copyEncoder = device.createCommandEncoder({ label: 'kspace-copy' })
-      copyEncoder.copyBufferToBuffer(this.phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
-      copyEncoder.copyBufferToBuffer(this.piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
-      device.queue.submit([copyEncoder.finish()])
-
-      // Wait for GPU work to complete before mapping
+      // Wait for the main encoder (including our copy commands) to finish
       await device.queue.onSubmittedWorkDone()
 
       // Map staging buffers for CPU read
-      await this.phiReadbackBuffer.mapAsync(GPUMapMode.READ)
-      await this.piReadbackBuffer.mapAsync(GPUMapMode.READ)
+      await this.phiReadbackBuffer!.mapAsync(GPUMapMode.READ)
+      await this.piReadbackBuffer!.mapAsync(GPUMapMode.READ)
 
-      const phiData = new Float32Array(this.phiReadbackBuffer.getMappedRange().slice(0))
-      const piData = new Float32Array(this.piReadbackBuffer.getMappedRange().slice(0))
+      const phiData = new Float32Array(this.phiReadbackBuffer!.getMappedRange().slice(0))
+      const piData = new Float32Array(this.piReadbackBuffer!.getMappedRange().slice(0))
 
-      this.phiReadbackBuffer.unmap()
-      this.piReadbackBuffer.unmap()
+      this.phiReadbackBuffer!.unmap()
+      this.piReadbackBuffer!.unmap()
 
       // Compute raw k-space data (FFT + occupation numbers)
       const activeDims = config.gridSize.slice(0, config.latticeDim)

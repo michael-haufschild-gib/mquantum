@@ -8,7 +8,7 @@
 
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
-import { OUTPUT_GRID_SIZE, linearToNDCoords } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import type { KSpaceDisplayGrid } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 
 // ============================================================================

@@ -3,6 +3,7 @@
  */
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
 import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
 /**
@@ -146,8 +147,8 @@ export interface FreeScalarFieldControlsProps {
   config: SchroedingerConfig
   dimension: number
   actions: FreeScalarFieldActions
-  /** Current color algorithm index (15 = k-space occupation) */
-  colorAlgorithm: number
+  /** Current color algorithm key */
+  colorAlgorithm: ColorAlgorithm
 }
 
 /**

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import { fftNd } from '@/lib/math/fft'
 import {
-  computeKSpaceTextures,
   float32ToFloat16,
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { computeOmegaK } from '@/lib/physics/freeScalar/vacuumSpectrum'
@@ -35,91 +34,7 @@ describe('float32ToFloat16', () => {
   })
 })
 
-describe('computeKSpaceTextures', () => {
-  it('returns correctly shaped output arrays for a 3D grid', () => {
-    const gridSize = [4, 4, 4]
-    const spacing = [1.0, 1.0, 1.0]
-    const totalSites = 64
-    const phi = new Float32Array(totalSites)
-    const pi = new Float32Array(totalSites)
-
-    const { density, analysis } = computeKSpaceTextures(
-      phi, pi, gridSize, spacing, 1.0, 3
-    )
-
-    // Output is 64^3 × 4 channels (rgba16float → Uint16Array)
-    expect(density.length).toBe(64 * 64 * 64 * 4)
-    expect(analysis.length).toBe(64 * 64 * 64 * 4)
-  })
-
-  it('produces vacuum baseline (n_k ≈ 0) for zero field', () => {
-    const gridSize = [4, 4, 4]
-    const spacing = [1.0, 1.0, 1.0]
-    const totalSites = 64
-    const phi = new Float32Array(totalSites) // all zero
-    const pi = new Float32Array(totalSites)  // all zero
-
-    const { density } = computeKSpaceTextures(
-      phi, pi, gridSize, spacing, 1.0, 3
-    )
-
-    // With zero field, n_k = -0.5 (clamped to 0 in output).
-    // All density values should be zero or very small
-    // Check a few center voxels where data exists
-    const offset = Math.floor((64 - 4) / 2)
-    let maxDensity = 0
-    for (let z = offset; z < offset + 4; z++) {
-      for (let y = offset; y < offset + 4; y++) {
-        for (let x = offset; x < offset + 4; x++) {
-          const idx = (z * 64 + y) * 64 + x
-          // R channel is n_k/n_k_max (or 0 if all n_k <= 0)
-          const rBits = density[idx * 4]!
-          // For zero field, n_k = -0.5, clamped to 0, so density should be 0
-          // The f16 value of 0 is 0x0000
-          if (rBits > maxDensity) maxDensity = rBits
-        }
-      }
-    }
-    // All occupation numbers should be zero (vacuum with zero field)
-    expect(maxDensity).toBe(0)
-  })
-
-  it('detects a single excited mode when field is initialized to a plane wave', () => {
-    // Initialize phi and pi as a single-mode excitation at k-index (1,0,0)
-    const N = 4
-    const gridSize = [N, N, N]
-    const spacing = [1.0, 1.0, 1.0]
-    const totalSites = N ** 3
-    const phi = new Float32Array(totalSites)
-    const pi = new Float32Array(totalSites)
-
-    // Set up a plane wave along x: phi(x,y,z) = A * cos(2π*1*x/N)
-    const A = 1.0
-    for (let iz = 0; iz < N; iz++) {
-      for (let iy = 0; iy < N; iy++) {
-        for (let ix = 0; ix < N; ix++) {
-          const idx = (iz * N + iy) * N + ix
-          phi[idx] = A * Math.cos((2 * Math.PI * ix) / N)
-        }
-      }
-    }
-
-    const { density } = computeKSpaceTextures(
-      phi, pi, gridSize, spacing, 1.0, 3
-    )
-
-    // There should be at least some non-zero occupation
-    // Check that the density texture has non-zero values
-    let hasNonZero = false
-    for (let i = 0; i < density.length; i += 4) {
-      if (density[i]! !== 0) {
-        hasNonZero = true
-        break
-      }
-    }
-    expect(hasNonZero).toBe(true)
-  })
-
+describe('k-space energy conservation', () => {
   it('conserves energy: sum(n_k * omega_k) ≈ total field energy', () => {
     const N = 8
     const gridSize = [N, N]
@@ -184,21 +99,5 @@ describe('computeKSpaceTextures', () => {
 
     // Real-space and k-space energies should match
     expect(Math.abs(realEnergy - kEnergy) / Math.max(realEnergy, 1e-10)).toBeLessThan(0.01)
-  })
-
-  it('handles N-D grids (4D → 3D marginalization)', () => {
-    const gridSize = [4, 4, 4, 4]
-    const spacing = [1.0, 1.0, 1.0, 1.0]
-    const totalSites = 256
-    const phi = new Float32Array(totalSites)
-    const pi = new Float32Array(totalSites)
-
-    // Just verify it doesn't crash and returns correct sizes
-    const { density, analysis } = computeKSpaceTextures(
-      phi, pi, gridSize, spacing, 1.0, 4
-    )
-
-    expect(density.length).toBe(64 * 64 * 64 * 4)
-    expect(analysis.length).toBe(64 * 64 * 64 * 4)
   })
 })

@@ -5,7 +5,6 @@ import { PASSTHROUGH_KSPACE_VIZ, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/exten
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   computeRawKSpaceData,
-  computeKSpaceTextures,
   OUTPUT_GRID_SIZE,
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
@@ -314,64 +313,6 @@ describe('packDisplayTextures', () => {
     const expected = OUTPUT_GRID_SIZE ** 3 * 4
     expect(density.length).toBe(expected)
     expect(analysis.length).toBe(expected)
-  })
-})
-
-// ============================================================================
-// Backward Compatibility
-// ============================================================================
-
-describe('backward compatibility', () => {
-  it('pipeline passthrough matches legacy for non-zero occupation voxels', () => {
-    const N = 4
-    const gridSize = [N, N, N] as const
-    const spacing = [1.0, 1.0, 1.0] as const
-    const totalSites = N ** 3
-    const phi = new Float32Array(totalSites)
-    const pi = new Float32Array(totalSites)
-
-    // Set up a plane wave
-    for (let iz = 0; iz < N; iz++) {
-      for (let iy = 0; iy < N; iy++) {
-        for (let ix = 0; ix < N; ix++) {
-          phi[(iz * N + iy) * N + ix] = Math.cos((2 * Math.PI * ix) / N)
-        }
-      }
-    }
-
-    // Legacy path (inline passthrough, no display transforms)
-    const legacy = computeKSpaceTextures(phi, pi, gridSize, spacing, 1.0, 3)
-
-    // New pipeline path with passthrough config
-    const raw = computeRawKSpaceData(phi, pi, gridSize, spacing, 1.0, 3)
-    const pipeline = buildKSpaceDisplayTextures(raw, PASSTHROUGH_KSPACE_VIZ)
-
-    expect(legacy.density.length).toBe(pipeline.density.length)
-    expect(legacy.analysis.length).toBe(pipeline.analysis.length)
-
-    // For every pixel with non-zero occupation (R channel), density R channel must match.
-    // Zero-occupation voxels may differ in log channel — acceptable divergence.
-    const densityMismatches: string[] = []
-    const pixelCount = legacy.density.length / 4
-
-    for (let p = 0; p < pixelCount; p++) {
-      const base = p * 4
-      const legacyR = legacy.density[base]!
-      const pipeR = pipeline.density[base]!
-
-      // R channel (nk/nkMax) must match for all voxels
-      if (legacyR !== pipeR) {
-        const oz = Math.floor(p / (OUTPUT_GRID_SIZE * OUTPUT_GRID_SIZE))
-        const rem = p % (OUTPUT_GRID_SIZE * OUTPUT_GRID_SIZE)
-        const oy = Math.floor(rem / OUTPUT_GRID_SIZE)
-        const ox = rem % OUTPUT_GRID_SIZE
-        densityMismatches.push(
-          `pixel ${p} (${ox},${oy},${oz}): legacy R=${legacyR}, pipe R=${pipeR}`
-        )
-      }
-    }
-
-    expect(densityMismatches).toEqual([])
   })
 })
 

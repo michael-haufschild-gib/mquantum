@@ -106,7 +106,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
 
     const isVacuum = fs.initialCondition === 'vacuumNoise'
     const latticeDim = fs.latticeDim
-    const isKSpaceActive = colorAlgorithm === 15
+    const isKSpaceActive = colorAlgorithm === 'kSpaceOccupation'
 
     // Initial condition options
     const initConditionOptions = useMemo(

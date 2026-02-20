@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { type FreeScalarConfig, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/extended/types'
 import { fft } from '@/lib/math/fft'
 import {
   computeOmegaK,
@@ -27,6 +27,7 @@ function makeConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig
     needsReset: false,
     vacuumSeed: 42,
     slicePositions: [],
+    kSpaceViz: { ...DEFAULT_KSPACE_VIZ },
     ...overrides,
   }
 }

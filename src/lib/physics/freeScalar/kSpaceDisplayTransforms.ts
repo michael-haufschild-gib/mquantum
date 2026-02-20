@@ -226,57 +226,50 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
 
   const len = grid.nk.length
 
-  // Collect positive values
-  const positives: number[] = []
+  // Collect values from occupied voxels (nk > 0 before any transform)
+  const occupied: number[] = []
   for (let i = 0; i < len; i++) {
-    if (grid.nk[i]! > 0) positives.push(grid.nk[i]!)
+    if (grid.nk[i]! > 0) occupied.push(i)
   }
 
-  // Fewer than 2 positives → nothing to remap
-  if (positives.length < 2) return
+  if (occupied.length < 2) return
 
-  // Apply log transform if configured
+  // Apply log transform in-place to occupied voxels
   if (config.exposureMode === 'log') {
-    for (let i = 0; i < len; i++) {
-      if (grid.nk[i]! > 0) {
-        grid.nk[i] = Math.log(grid.nk[i]! + 1e-20)
-      }
+    for (const i of occupied) {
+      grid.nk[i] = Math.log(grid.nk[i]! + 1e-20)
     }
-    // Recollect after log
-    positives.length = 0
-    for (let i = 0; i < len; i++) {
-      if (grid.nk[i]! > 0) positives.push(grid.nk[i]!)
-    }
-    if (positives.length < 2) return
+  }
+
+  // Collect transformed values from the same occupied set
+  const transformed: number[] = []
+  for (const i of occupied) {
+    transformed.push(grid.nk[i]!)
   }
 
   // Sort for percentile computation
-  positives.sort((a, b) => a - b)
+  transformed.sort((a, b) => a - b)
 
-  const lowIdx = Math.floor((config.lowPercentile / 100) * (positives.length - 1))
-  const highIdx = Math.ceil((config.highPercentile / 100) * (positives.length - 1))
-  const qLow = positives[Math.max(0, lowIdx)]!
-  const qHigh = positives[Math.min(positives.length - 1, highIdx)]!
+  const lowIdx = Math.floor((config.lowPercentile / 100) * (transformed.length - 1))
+  const highIdx = Math.ceil((config.highPercentile / 100) * (transformed.length - 1))
+  const qLow = transformed[Math.max(0, lowIdx)]!
+  const qHigh = transformed[Math.min(transformed.length - 1, highIdx)]!
 
   const range = qHigh - qLow
   if (range < 1e-30) return // Degenerate — all values equal
 
   const gamma = config.gamma
 
-  for (let i = 0; i < len; i++) {
-    const v = grid.nk[i]!
-    if (v <= 0) continue
-    // Normalize to [0, 1] within percentile window
-    let mapped = (v - qLow) / range
+  // Remap occupied voxels to [0, 1] within percentile window
+  for (const i of occupied) {
+    let mapped = (grid.nk[i]! - qLow) / range
     mapped = Math.max(0, Math.min(1, mapped))
-    // Apply gamma
     if (gamma !== 1.0) {
       mapped = Math.pow(mapped, gamma)
     }
     grid.nk[i] = mapped
   }
 
-  // Update nkMax after normalization
   grid.nkMax = 1.0
 }
 
@@ -415,7 +408,6 @@ function blurAxis(data: Float64Array, kernel: Float64Array, radius: number, G: n
     for (let z = 0; z < G; z++) {
       for (let x = 0; x < G; x++) {
         for (let y = 0; y < G; y++) {
-          const idx = (z * G + y) * G + x
           let sum = 0
           for (let k = -radius; k <= radius; k++) {
             const sy = Math.max(0, Math.min(G - 1, y + k))
@@ -476,7 +468,7 @@ export function packDisplayTextures(grid: KSpaceDisplayGrid): { density: Uint16A
   for (let i = 0; i < outputTotal; i++) {
     const n = grid.nk[i]!
     if (n <= 0) {
-      // Empty voxels: write all zeros (matches legacy behavior)
+      // Empty voxels: write all zeros
       packRGBA16F(density, i, 0, 0, 0, 0)
       packRGBA16F(analysis, i, 0, 0, 0, 0)
       continue

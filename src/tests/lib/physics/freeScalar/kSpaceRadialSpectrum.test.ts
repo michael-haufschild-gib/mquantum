@@ -120,8 +120,7 @@ describe('buildRadialDisplayGrid', () => {
     for (let b = 0; b < shells.binCount; b++) {
       if (shells.shellCounts[b]! > 1) {
         // kCenter should be within expected range for this bin
-        const expectedCenter = (b + 0.5) / shells.binCount
-        // Just verify it's a reasonable value (not NaN or negative)
+        // Verify kCenter is a reasonable value (not NaN or negative)
         expect(shells.shellKCenter[b]).toBeGreaterThanOrEqual(0)
         expect(shells.shellKCenter[b]).toBeLessThanOrEqual(1.001)
       }
