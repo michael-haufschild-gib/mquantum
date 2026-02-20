@@ -4604,7 +4604,7 @@ fn project_vertices_4d(positions: &mut [f32], verts: &[f64], count: usize, proj_
 /// 5D projection (unrolled, two higher dims)
 #[inline(always)]
 fn project_vertices_5d(positions: &mut [f32], verts: &[f64], count: usize, proj_dist: f64) {
-    const NORM_FACTOR: f64 = 1.4142135623730951; // sqrt(2)
+    const NORM_FACTOR: f64 = std::f64::consts::SQRT_2;
     for i in 0..count {
         let offset = i * 5;
         let x = verts[offset];

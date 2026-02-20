@@ -123,6 +123,7 @@ export interface FreeScalarFieldActions {
   setPacketAmplitude: ExtendedObjectState['setFreeScalarPacketAmplitude']
   setModeK: ExtendedObjectState['setFreeScalarModeK']
   setAutoScale: ExtendedObjectState['setFreeScalarAutoScale']
+  setVacuumSeed: ExtendedObjectState['setFreeScalarVacuumSeed']
   resetField: ExtendedObjectState['resetFreeScalarField']
 }
 

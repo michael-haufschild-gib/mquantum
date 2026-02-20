@@ -6,6 +6,7 @@
  */
 
 import { Button } from '@/components/ui/Button'
+import { NumberInput } from '@/components/ui/NumberInput'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
@@ -13,6 +14,15 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type { FreeScalarFieldView, FreeScalarInitialCondition } from '@/lib/geometry/extended/types'
 import React, { useCallback, useMemo } from 'react'
 import type { FreeScalarFieldControlsProps } from './types'
+
+/** Power-of-2 grid size options for exact vacuum mode */
+const POWER_OF_2_GRID_OPTIONS = [
+  { value: '8', label: '8' },
+  { value: '16', label: '16' },
+  { value: '32', label: '32' },
+  { value: '64', label: '64' },
+  { value: '128', label: '128' },
+]
 
 /**
  * FreeScalarFieldControls component
@@ -46,8 +56,11 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setPacketAmplitude,
       setModeK,
       setAutoScale,
+      setVacuumSeed,
       resetField,
     } = actions
+
+    const isVacuum = fs.initialCondition === 'vacuumNoise'
 
     // Lattice dimension options
     const latticeDimOptions = useMemo(
@@ -62,7 +75,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     // Initial condition options
     const initConditionOptions = useMemo(
       () => [
-        { value: 'vacuumNoise', label: 'Vacuum Noise' },
+        { value: 'vacuumNoise', label: 'Exact Vacuum' },
         { value: 'singleMode', label: 'Single Mode' },
         { value: 'gaussianPacket', label: 'Gaussian Packet' },
       ],
@@ -83,6 +96,20 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     const handleGridSize = useCallback(
       (size: number) => {
         const s = Math.round(size)
+        const gs: [number, number, number] = [
+          s,
+          fs.latticeDim >= 2 ? s : 1,
+          fs.latticeDim >= 3 ? s : 1,
+        ]
+        setGridSize(gs)
+      },
+      [fs.latticeDim, setGridSize]
+    )
+
+    // Power-of-2 grid size handler for vacuum mode (from Select)
+    const handlePow2GridSize = useCallback(
+      (v: string) => {
+        const s = Number(v)
         const gs: [number, number, number] = [
           s,
           fs.latticeDim >= 2 ? s : 1,
@@ -155,6 +182,11 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       [fs.packetCenter, setPacketCenter]
     )
 
+    // Vacuum seed randomize
+    const handleRandomizeSeed = useCallback(() => {
+      setVacuumSeed(Math.floor(Math.random() * 2147483647))
+    }, [setVacuumSeed])
+
     const activeGridSize = fs.gridSize[0]
 
     return (
@@ -168,16 +200,26 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             ariaLabel="Lattice dimensionality"
             data-testid="lattice-dim-selector"
           />
-          <Slider
-            label="Grid Size"
-            min={8}
-            max={128}
-            step={8}
-            value={activeGridSize}
-            onChange={handleGridSize}
-            showValue
-            data-testid="grid-size-slider"
-          />
+          {isVacuum ? (
+            <Select
+              label="Grid Size"
+              options={POWER_OF_2_GRID_OPTIONS}
+              value={String(activeGridSize)}
+              onChange={handlePow2GridSize}
+              data-testid="grid-size-select"
+            />
+          ) : (
+            <Slider
+              label="Grid Size"
+              min={8}
+              max={128}
+              step={8}
+              value={activeGridSize}
+              onChange={handleGridSize}
+              showValue
+              data-testid="grid-size-slider"
+            />
+          )}
           <Slider
             label="Spacing (a)"
             min={0.01}
@@ -230,16 +272,42 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             data-testid="init-condition-select"
           />
 
-          <Slider
-            label="Amplitude"
-            min={0.1}
-            max={5.0}
-            step={0.1}
-            value={fs.packetAmplitude}
-            onChange={setPacketAmplitude}
-            showValue
-            data-testid="amplitude-slider"
-          />
+          {isVacuum && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <NumberInput
+                  label="Seed"
+                  value={fs.vacuumSeed}
+                  onChange={setVacuumSeed}
+                  min={0}
+                  max={2147483647}
+                  step={1}
+                  data-testid="vacuum-seed-input"
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRandomizeSeed}
+                  data-testid="randomize-seed-button"
+                >
+                  Randomize
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!isVacuum && (
+            <Slider
+              label="Amplitude"
+              min={0.1}
+              max={5.0}
+              step={0.1}
+              value={fs.packetAmplitude}
+              onChange={setPacketAmplitude}
+              showValue
+              data-testid="amplitude-slider"
+            />
+          )}
 
           {fs.initialCondition === 'singleMode' && (
             <div className="space-y-2">

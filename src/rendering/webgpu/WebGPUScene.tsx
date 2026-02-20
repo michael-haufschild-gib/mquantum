@@ -82,6 +82,10 @@ import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
 // Rotation hooks for Schroedinger basis vectors
 import { useRotationUpdates } from '@/rendering/renderers/base'
 
+// Animation bias
+import { getRotationPlanes } from '@/lib/math/rotation'
+import { getPlaneMultiplier } from '@/lib/animation/biasCalculation'
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -554,7 +558,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // Always show the compilation overlay so the user knows what is displayed.
       // For a scientific application, deterministic feedback is more important than
       // seamless background swaps — the user must know when the view has updated.
-      const isWarmSwap = !isFullRebuild && schrodingerChanged
       const perfStore = usePerformanceStore.getState()
 
       perfStore.setShaderCompiling('pipeline', true)
@@ -926,9 +929,17 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           const updates = rotationUpdatesRef.current
           updates.clear()
 
+          const bias = useUIStore.getState().animationBias
+          const planeList = getRotationPlanes(dimension)
+          const totalPlanes = planeList.length
+
           for (const plane of animatingPlanes) {
+            const planeIndex = planeList.findIndex(p => p.name === plane)
+            const multiplier = bias > 0 && planeIndex >= 0
+              ? getPlaneMultiplier(planeIndex, totalPlanes, bias)
+              : 1.0
             const currentAngle = rotationState.rotations.get(plane) ?? 0
-            updates.set(plane, currentAngle + rotationDelta)
+            updates.set(plane, currentAngle + rotationDelta * multiplier)
           }
 
           if (updates.size > 0) {
@@ -946,7 +957,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         }
       }
     },
-    [objectType, schroedingerRotation]
+    [objectType, dimension, schroedingerRotation]
   )
 
   const executeSceneFrame = useCallback(
@@ -1793,7 +1804,7 @@ function extractPPConfig(config: PassConfig): PPPassConfig {
   }
 }
 
-function shallowEqual<T extends Record<string, unknown>>(a: T | null, b: T): boolean {
+function shallowEqual<T extends object>(a: T | null, b: T): boolean {
   if (!a) return false
   const keys = Object.keys(b) as (keyof T)[]
   return keys.every((k) => a[k] === b[k])
@@ -2360,15 +2371,6 @@ function removeStaleTemporalResources(graph: WebGPURenderGraph, config: PassConf
     graph.removeResource('quarter-color')
     graph.removeResource('quarter-position')
   }
-}
-
-/**
- * Full sync for non-warm-swap paths (full rebuild, tests).
- * Safe because no old passes are rendering concurrently.
- */
-function syncTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
-  ensureTemporalResources(graph, config)
-  removeStaleTemporalResources(graph, config)
 }
 
 /**

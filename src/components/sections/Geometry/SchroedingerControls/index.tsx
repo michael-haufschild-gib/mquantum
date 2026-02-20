@@ -107,6 +107,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarPacketAmplitude: state.setFreeScalarPacketAmplitude,
       setFreeScalarModeK: state.setFreeScalarModeK,
       setFreeScalarAutoScale: state.setFreeScalarAutoScale,
+      setFreeScalarVacuumSeed: state.setFreeScalarVacuumSeed,
       resetFreeScalarField: state.resetFreeScalarField,
     }))
     const {
@@ -158,6 +159,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarPacketAmplitude,
       setFreeScalarModeK,
       setFreeScalarAutoScale,
+      setFreeScalarVacuumSeed,
       resetFreeScalarField,
     } = useExtendedObjectStore(extendedObjectSelector)
 
@@ -217,6 +219,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setPacketAmplitude: setFreeScalarPacketAmplitude,
       setModeK: setFreeScalarModeK,
       setAutoScale: setFreeScalarAutoScale,
+      setVacuumSeed: setFreeScalarVacuumSeed,
       resetField: resetFreeScalarField,
     }
 

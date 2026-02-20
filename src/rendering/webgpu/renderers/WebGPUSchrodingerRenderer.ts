@@ -2655,8 +2655,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       // in phase space, so the cache must cover the same aspect-scaled x range.
       // Hydrogen radial: centered on rCenter = n²a₀, range [max(0, rCenter-halfExt), rCenter+halfExt]
       // HO / extra dims: x-axis is [-xRange * aspect, +xRange * aspect] (symmetric)
-      const xRange = this.schroedingerFloatView[1464 / 4]
-      const pRange = this.schroedingerFloatView[1468 / 4]
+      const xRange = this.schroedingerFloatView[1464 / 4]!
+      const pRange = this.schroedingerFloatView[1468 / 4]!
       const aspect = ctx.size.width / ctx.size.height
       let xMin: number
       let xMax: number

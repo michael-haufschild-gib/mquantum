@@ -38,11 +38,6 @@ const BASIS_UNIFORM_SIZE = 192
 /** Offset of the `time` field in SchroedingerUniforms (f32 at offset 908) */
 const TIME_FIELD_OFFSET = 908
 
-/** Maximum cross pairs for 8 terms: C(8,2) = 28 */
-const MAX_CROSS_PAIRS = 28
-
-/** Maximum layers in cross-term texture array (2 pairs per layer) */
-const MAX_CROSS_LAYERS = 14
 
 /**
  * Configuration for the Wigner cache compute pass.

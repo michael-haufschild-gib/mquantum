@@ -15,6 +15,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { estimateVacuumMaxPhi, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import {
@@ -513,7 +514,13 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     // Initialize or reset field
     if (!this.initialized || config.needsReset) {
-      if (this.initPipeline && this.initBindGroup) {
+      if (config.initialCondition === 'vacuumNoise') {
+        // CPU-side exact vacuum spectrum sampling
+        const { phi, pi } = sampleVacuumSpectrum(config, config.vacuumSeed)
+        device.queue.writeBuffer(this.phiBuffer!, 0, phi as Float32Array<ArrayBuffer>)
+        device.queue.writeBuffer(this.piBuffer!, 0, pi as Float32Array<ArrayBuffer>)
+      } else if (this.initPipeline && this.initBindGroup) {
+        // WGSL init shader for singleMode, gaussianPacket
         const pass = encoder.beginComputePass({ label: 'free-scalar-init-pass' })
         this.dispatchCompute(
           pass,
@@ -573,7 +580,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       if (config.autoScale) {
         this.maxPhiEstimate =
           config.initialCondition === 'vacuumNoise'
-            ? config.packetAmplitude * 0.03 // shader scales by 0.01; ~3 sigma
+            ? estimateVacuumMaxPhi(config)
             : config.packetAmplitude
       } else {
         this.maxPhiEstimate = 1.0

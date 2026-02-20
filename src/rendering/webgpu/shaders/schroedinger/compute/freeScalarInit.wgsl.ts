@@ -2,9 +2,11 @@
  * Free Scalar Field Initialization Compute Shader
  *
  * Initializes phi and pi storage buffers from selected initial conditions:
- * - vacuumNoise: pseudo-random Gaussian noise
- * - singleMode: plane wave A*cos(k.x) with conjugate momentum
- * - gaussianPacket: Gaussian envelope with carrier wave
+ * - singleMode (1u): plane wave A*cos(k.x) with conjugate momentum
+ * - gaussianPacket (2u): Gaussian envelope with carrier wave
+ *
+ * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
+ * (see src/lib/physics/freeScalar/vacuumSpectrum.ts).
  */
 
 /**
@@ -18,7 +20,7 @@ struct FreeScalarUniforms {
   spacing: vec3f,          // offset 16, 12 bytes
   mass: f32,               // offset 28, 4 bytes
   dt: f32,                 // offset 32, 4 bytes
-  initCondition: u32,      // offset 36, 4 bytes (0=vacuumNoise, 1=singleMode, 2=gaussianPacket)
+  initCondition: u32,      // offset 36, 4 bytes (0=vacuumNoise/CPU, 1=singleMode, 2=gaussianPacket)
   fieldView: u32,          // offset 40, 4 bytes (0=phi, 1=pi, 2=energyDensity)
   stepsPerFrame: u32,      // offset 44, 4 bytes
   packetCenter: vec3f,     // offset 48, 12 bytes (aligned to 16)
@@ -40,30 +42,14 @@ struct FreeScalarUniforms {
  * Initialization compute shader entry point.
  * Maps 1D global invocation ID to 3D lattice index, computes world position,
  * and initializes phi/pi from the selected initial condition.
+ *
+ * Note: initCondition == 0u (vacuumNoise) is a no-op here since it is
+ * handled by CPU-side exact vacuum spectrum sampling via writeBuffer.
  */
 export const freeScalarInitBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> params: FreeScalarUniforms;
 @group(0) @binding(1) var<storage, read_write> phi: array<f32>;
 @group(0) @binding(2) var<storage, read_write> pi: array<f32>;
-
-// Simple hash-based pseudo-random number generator
-fn pcgHash(input: u32) -> u32 {
-  var state = input * 747796405u + 2891336453u;
-  let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-  return (word >> 22u) ^ word;
-}
-
-// Convert hash to float in [0, 1)
-fn hashToFloat(h: u32) -> f32 {
-  return f32(h) / 4294967296.0;
-}
-
-// Box-Muller approximation for Gaussian noise from uniform hash
-fn gaussianNoise(seed1: u32, seed2: u32) -> f32 {
-  let u1 = max(hashToFloat(pcgHash(seed1)), 1e-10);
-  let u2 = hashToFloat(pcgHash(seed2));
-  return sqrt(-2.0 * log(u1)) * cos(6.283185307 * u2);
-}
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -92,12 +78,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var phiVal: f32 = 0.0;
   var piVal: f32 = 0.0;
 
-  if (params.initCondition == 0u) {
-    // Vacuum noise: small Gaussian fluctuations
-    let seed = idx * 1337u + 42u;
-    phiVal = gaussianNoise(seed, seed + 7919u) * params.packetAmplitude * 0.01;
-    piVal = gaussianNoise(seed + 15487u, seed + 23456u) * params.packetAmplitude * 0.01;
-  } else if (params.initCondition == 1u) {
+  if (params.initCondition == 1u) {
     // Single mode: phi = A * cos(k . x), pi = -A * omega * sin(k . x)
     let k = vec3f(f32(params.modeK.x), f32(params.modeK.y), f32(params.modeK.z));
     // Physical wave vector: k_phys = 2*pi*n / L
@@ -120,7 +101,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let omega = sqrt(skx * skx + sky * sky + skz * skz + params.mass * params.mass);
     phiVal = params.packetAmplitude * cos(phase);
     piVal = -params.packetAmplitude * omega * sin(phase);
-  } else {
+  } else if (params.initCondition == 2u) {
     // Gaussian packet: phi = A * exp(-|x-x0|^2 / (2*sigma^2)) * cos(k . x)
     // Gate inactive dimensions to zero so residual packetCenter.y/z from 3D
     // don't kill the envelope when latticeDim < 3
@@ -149,6 +130,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     phiVal = envelope * cos(phase);
     piVal = 0.0; // Static initial condition (packet at rest)
   }
+  // initCondition == 0u (vacuumNoise): no-op, data written by CPU
 
   phi[idx] = phiVal;
   pi[idx] = piVal;

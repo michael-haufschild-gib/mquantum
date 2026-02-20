@@ -227,6 +227,7 @@ export interface SchroedingerSliceActions {
   setFreeScalarPacketAmplitude: (amplitude: number) => void
   setFreeScalarModeK: (k: [number, number, number]) => void
   setFreeScalarAutoScale: (autoScale: boolean) => void
+  setFreeScalarVacuumSeed: (seed: number) => void
   resetFreeScalarField: () => void
   clearFreeScalarNeedsReset: () => void
 

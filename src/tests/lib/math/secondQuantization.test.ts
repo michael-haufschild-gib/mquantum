@@ -15,11 +15,11 @@ describe('coherentFockCoefficients', () => {
   it('returns vacuum state when alpha = 0', () => {
     const coeffs = coherentFockCoefficients(0, 0, 5)
     // |alpha=0> = |0>, so c_0 = 1, c_n = 0 for n > 0
-    expect(coeffs[0].re).toBeCloseTo(1, 10)
-    expect(coeffs[0].im).toBeCloseTo(0, 10)
+    expect(coeffs[0]!.re).toBeCloseTo(1, 10)
+    expect(coeffs[0]!.im).toBeCloseTo(0, 10)
     for (let n = 1; n < 5; n++) {
-      expect(coeffs[n].re).toBeCloseTo(0, 10)
-      expect(coeffs[n].im).toBeCloseTo(0, 10)
+      expect(coeffs[n]!.re).toBeCloseTo(0, 10)
+      expect(coeffs[n]!.im).toBeCloseTo(0, 10)
     }
   })
 
@@ -44,7 +44,7 @@ describe('coherentFockCoefficients', () => {
     const totalProb = coeffs.reduce((sum, c) => sum + c.re * c.re + c.im * c.im, 0)
     expect(totalProb).toBeCloseTo(1, 4)
     // c_1 should be proportional to i (imaginary alpha)
-    expect(coeffs[1].im).not.toBeCloseTo(0, 2)
+    expect(coeffs[1]!.im).not.toBeCloseTo(0, 2)
   })
 })
 
@@ -54,10 +54,10 @@ describe('coherentFockCoefficients', () => {
 describe('squeezedFockCoefficients', () => {
   it('returns vacuum state when r = 0', () => {
     const coeffs = squeezedFockCoefficients(0, 0, 6)
-    expect(coeffs[0].re).toBeCloseTo(1, 10)
+    expect(coeffs[0]!.re).toBeCloseTo(1, 10)
     for (let n = 1; n < 6; n++) {
-      expect(coeffs[n].re).toBeCloseTo(0, 10)
-      expect(coeffs[n].im).toBeCloseTo(0, 10)
+      expect(coeffs[n]!.re).toBeCloseTo(0, 10)
+      expect(coeffs[n]!.im).toBeCloseTo(0, 10)
     }
   })
 
@@ -65,8 +65,8 @@ describe('squeezedFockCoefficients', () => {
     const coeffs = squeezedFockCoefficients(0.8, 0, 10)
     for (let n = 0; n < 10; n++) {
       if (n % 2 === 1) {
-        expect(coeffs[n].re).toBeCloseTo(0, 10)
-        expect(coeffs[n].im).toBeCloseTo(0, 10)
+        expect(coeffs[n]!.re).toBeCloseTo(0, 10)
+        expect(coeffs[n]!.im).toBeCloseTo(0, 10)
       }
     }
   })

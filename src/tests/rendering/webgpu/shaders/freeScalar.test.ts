@@ -27,13 +27,13 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarInitBlock).toContain('fn main(')
     })
 
-    it('handles all three initial conditions', () => {
-      // vacuumNoise = 0
-      expect(freeScalarInitBlock).toContain('params.initCondition == 0u')
+    it('handles singleMode and gaussianPacket initial conditions (vacuum is CPU-side)', () => {
       // singleMode = 1
       expect(freeScalarInitBlock).toContain('params.initCondition == 1u')
-      // gaussianPacket = 2 (else branch)
-      expect(freeScalarInitBlock).toContain('gaussian')
+      // gaussianPacket = 2
+      expect(freeScalarInitBlock).toContain('params.initCondition == 2u')
+      // vacuumNoise (0u) is handled CPU-side — shader notes this as no-op
+      expect(freeScalarInitBlock).toContain('vacuumNoise')
     })
 
     it('writes to both phi and pi buffers', () => {

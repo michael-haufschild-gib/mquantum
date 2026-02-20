@@ -1158,7 +1158,7 @@ describe('WGSL Shader Compilation - Wigner Cache', () => {
   })
 
   it('composes fragment shader with Wigner cache enabled', () => {
-    const { wgsl, modules, features } = composeSchroedingerShader({
+    const { wgsl, features } = composeSchroedingerShader({
       dimension: 3,
       isWigner: true,
       useWignerCache: true,

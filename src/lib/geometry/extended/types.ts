@@ -144,6 +144,8 @@ export interface FreeScalarConfig {
   packetAmplitude: number
   /** Wave vector indices for single-mode / packet carrier */
   modeK: [number, number, number]
+  /** Seed for deterministic vacuum state sampling */
+  vacuumSeed: number
 
   /** Which field quantity to render */
   fieldView: FreeScalarFieldView
@@ -169,6 +171,7 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   packetWidth: 0.3,
   packetAmplitude: 1.0,
   modeK: [1, 0, 0],
+  vacuumSeed: 42,
 
   fieldView: 'phi',
   autoScale: true,

@@ -71,7 +71,6 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   const {
     dimension,
     quantumMode = 'harmonicOscillator',
-    termCount,
   } = config
 
   const defines: string[] = []

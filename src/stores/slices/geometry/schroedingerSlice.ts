@@ -728,11 +728,19 @@ export const createSchroedingerSlice: StateCreator<
     },
     setFreeScalarGridSize: (size) => {
       setWithVersion((state) => {
-        const { latticeDim } = state.schroedinger.freeScalar
+        const { latticeDim, initialCondition } = state.schroedinger.freeScalar
+        const needsPow2 = initialCondition === 'vacuumNoise'
+        const snap = (v: number, min: number, max: number) => {
+          const clamped = Math.max(min, Math.min(max, Math.round(v)))
+          if (!needsPow2) return clamped
+          // Snap to nearest power of 2
+          const log2 = Math.round(Math.log2(clamped))
+          return Math.max(min, Math.min(max, 2 ** log2))
+        }
         const clamped: [number, number, number] = [
-          Math.max(8, Math.min(128, Math.round(size[0]))),
-          latticeDim >= 2 ? Math.max(1, Math.min(128, Math.round(size[1]))) : 1,
-          latticeDim >= 3 ? Math.max(1, Math.min(128, Math.round(size[2]))) : 1,
+          snap(size[0], 8, 128),
+          latticeDim >= 2 ? snap(size[1], 1, 128) : 1,
+          latticeDim >= 3 ? snap(size[2], 1, 128) : 1,
         ]
         return {
           schroedinger: {
@@ -850,6 +858,15 @@ export const createSchroedingerSlice: StateCreator<
         schroedinger: {
           ...state.schroedinger,
           freeScalar: { ...state.schroedinger.freeScalar, autoScale },
+        },
+      }))
+    },
+
+    setFreeScalarVacuumSeed: (seed) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, vacuumSeed: Math.round(seed), needsReset: true },
         },
       }))
     },

@@ -250,7 +250,7 @@ export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T)
  * @returns A sanitized copy with transient fields removed at all levels.
  */
 export const sanitizeExtendedLoadedState = <T extends Record<string, unknown>>(state: T): T => {
-  const clean = sanitizeLoadedState(state)
+  const clean = sanitizeLoadedState(state) as Record<string, unknown>
   // Also sanitize nested config objects (e.g., clean.schroedinger)
   for (const key of Object.keys(clean)) {
     const value = clean[key]
@@ -266,7 +266,7 @@ export const sanitizeExtendedLoadedState = <T extends Record<string, unknown>>(s
       clean[key] = sanitized
     }
   }
-  return clean
+  return clean as T
 }
 
 /**

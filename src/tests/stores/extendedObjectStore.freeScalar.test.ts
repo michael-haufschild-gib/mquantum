@@ -187,6 +187,41 @@ describe('extendedObjectStore — free scalar field actions', () => {
     })
   })
 
+  describe('vacuum seed', () => {
+    it('setFreeScalarVacuumSeed updates seed and triggers reset', () => {
+      useExtendedObjectStore.getState().setFreeScalarVacuumSeed(123)
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.vacuumSeed).toBe(123)
+      expect(fs.needsReset).toBe(true)
+    })
+
+    it('setFreeScalarVacuumSeed rounds to integer', () => {
+      useExtendedObjectStore.getState().setFreeScalarVacuumSeed(42.7)
+      expect(useExtendedObjectStore.getState().schroedinger.freeScalar.vacuumSeed).toBe(43)
+    })
+
+    it('default vacuumSeed is 42', () => {
+      expect(useExtendedObjectStore.getState().schroedinger.freeScalar.vacuumSeed).toBe(42)
+    })
+  })
+
+  describe('power-of-2 grid snapping for vacuumNoise', () => {
+    it('snaps grid size to nearest power of 2 when vacuumNoise is selected', () => {
+      useExtendedObjectStore.getState().setFreeScalarInitialCondition('vacuumNoise')
+      useExtendedObjectStore.getState().setFreeScalarGridSize([48, 48, 48])
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      // 48 is between 32 and 64; round(log2(48)) = round(5.58) = 6, so 2^6 = 64
+      expect(fs.gridSize[0]).toBe(64)
+    })
+
+    it('does not snap grid size for non-vacuum initial conditions', () => {
+      useExtendedObjectStore.getState().setFreeScalarInitialCondition('singleMode')
+      useExtendedObjectStore.getState().setFreeScalarGridSize([48, 48, 48])
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.gridSize[0]).toBe(48)
+    })
+  })
+
   describe('CFL stability enforcement', () => {
     it('clamps dt to CFL limit for default 3D spacing', () => {
       // Default: spacing=[0.1, 0.1, 0.1], latticeDim=3
