@@ -16,6 +16,7 @@ import { usePostProcessingStore } from './postProcessingStore'
 import { useRotationStore } from './rotationStore'
 import { useTransformStore } from './transformStore'
 import { useUIStore } from './uiStore'
+import type { SkyboxMode, SkyboxSelection, SkyboxTexture } from './defaults/visualDefaults'
 import { mergeExtendedObjectStateForType } from './utils/mergeWithDefaults'
 import {
   serializeState,
@@ -49,6 +50,103 @@ function scheduleSceneLoadComplete(): void {
     usePerformanceStore.getState().setIsLoadingScene(false)
     usePerformanceStore.getState().setSceneTransitioning(false)
   })
+}
+
+const SKYBOX_SELECTION_SET = new Set<SkyboxSelection>([
+  'none',
+  'space_blue',
+  'space_lightblue',
+  'space_red',
+  'procedural_aurora',
+  'procedural_nebula',
+  'procedural_crystalline',
+  'procedural_horizon',
+  'procedural_ocean',
+  'procedural_twilight',
+])
+
+const PROCEDURAL_SKYBOX_MODE_SET = new Set<SkyboxMode>([
+  'procedural_aurora',
+  'procedural_nebula',
+  'procedural_crystalline',
+  'procedural_horizon',
+  'procedural_ocean',
+  'procedural_twilight',
+])
+
+const SKYBOX_TEXTURE_SET = new Set<SkyboxTexture>([
+  'none',
+  'space_blue',
+  'space_lightblue',
+  'space_red',
+])
+
+function isSkyboxSelection(value: unknown): value is SkyboxSelection {
+  return typeof value === 'string' && SKYBOX_SELECTION_SET.has(value as SkyboxSelection)
+}
+
+function isProceduralSkyboxMode(value: unknown): value is Exclude<SkyboxMode, 'classic'> {
+  return typeof value === 'string' && PROCEDURAL_SKYBOX_MODE_SET.has(value as SkyboxMode)
+}
+
+function isSkyboxTexture(value: unknown): value is SkyboxTexture {
+  return typeof value === 'string' && SKYBOX_TEXTURE_SET.has(value as SkyboxTexture)
+}
+
+function deriveSkyboxStateFromSelection(selection: SkyboxSelection): {
+  skyboxEnabled: boolean
+  skyboxMode: SkyboxMode
+  skyboxTexture: SkyboxTexture
+} {
+  if (selection === 'none') {
+    return {
+      skyboxEnabled: false,
+      skyboxMode: 'classic',
+      skyboxTexture: 'none',
+    }
+  }
+
+  if (isProceduralSkyboxMode(selection)) {
+    return {
+      skyboxEnabled: true,
+      skyboxMode: selection,
+      skyboxTexture: 'space_blue',
+    }
+  }
+
+  return {
+    skyboxEnabled: true,
+    skyboxMode: 'classic',
+    skyboxTexture: selection as SkyboxTexture,
+  }
+}
+
+/**
+ * Normalize imported environment payloads so unified skybox fields stay in sync.
+ * Legacy presets may omit `skyboxSelection` or include removed fields like `classicSkyboxType`.
+ */
+function normalizeEnvironmentLoadData(rawEnvironment: Record<string, unknown>): Record<string, unknown> {
+  const environment = { ...rawEnvironment }
+  delete environment.classicSkyboxType
+
+  let selection: SkyboxSelection | null = null
+  if (isSkyboxSelection(environment.skyboxSelection)) {
+    selection = environment.skyboxSelection
+  } else if (environment.skyboxEnabled === false) {
+    selection = 'none'
+  } else if (isProceduralSkyboxMode(environment.skyboxMode)) {
+    selection = environment.skyboxMode
+  } else if (isSkyboxTexture(environment.skyboxTexture) && environment.skyboxTexture !== 'none') {
+    selection = environment.skyboxTexture
+  } else {
+    selection = 'none'
+  }
+
+  return {
+    ...environment,
+    skyboxSelection: selection,
+    ...deriveSkyboxStateFromSelection(selection),
+  }
 }
 
 // -- Types --
@@ -177,11 +275,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         useLightingStore.setState(sanitizeLoadedState(style.data.lighting))
         usePostProcessingStore.setState(sanitizeLoadedState(style.data.postProcessing))
 
-        // Handle legacy environment data (fallback to no skybox)
-        const envData = sanitizeLoadedState({ ...style.data.environment })
-        if (envData.skyboxEnabled === undefined) {
-          envData.skyboxEnabled = false
-        }
+        // Handle legacy environment data and keep unified skybox fields canonical.
+        const envData = normalizeEnvironmentLoadData(
+          sanitizeLoadedState({ ...style.data.environment })
+        )
         useEnvironmentStore.setState(envData)
 
         // Restore PBR settings (handle legacy presets without pbr)
@@ -383,11 +480,10 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         useLightingStore.setState(sanitizeLoadedState(scene.data.lighting))
         usePostProcessingStore.setState(sanitizeLoadedState(scene.data.postProcessing))
 
-        // Handle legacy environment data
-        const envData = sanitizeLoadedState({ ...scene.data.environment })
-        if (envData.skyboxEnabled === undefined) {
-          envData.skyboxEnabled = false
-        }
+        // Handle legacy environment data and keep unified skybox fields canonical.
+        const envData = normalizeEnvironmentLoadData(
+          sanitizeLoadedState({ ...scene.data.environment })
+        )
         useEnvironmentStore.setState(envData)
 
         // Restore PBR settings (handle legacy presets without pbr)
@@ -432,8 +528,18 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         )
         useTransformStore.setState(sanitizeLoadedState(scene.data.transform))
 
-        // Sanitize UI data (already strips transient fields)
-        useUIStore.setState(sanitizeLoadedState(scene.data.ui))
+        // Sanitize UI data (already strips transient fields) and enforce
+        // runtime invariants for fields normally guarded by store actions.
+        const uiData = sanitizeLoadedState(scene.data.ui) as Record<string, unknown>
+        const rawAnimationBias = uiData.animationBias
+        if (rawAnimationBias !== undefined) {
+          if (typeof rawAnimationBias === 'number' && Number.isFinite(rawAnimationBias)) {
+            uiData.animationBias = Math.max(0, Math.min(1, rawAnimationBias))
+          } else {
+            delete uiData.animationBias
+          }
+        }
+        useUIStore.setState(uiData)
 
         // Special handling for Rotation (Object -> Map)
         if (scene.data.rotation) {

@@ -94,6 +94,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let needGrad = params.fieldView == 2u || params.analysisMode > 0u;
   if (needGrad) {
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      // Initialize per-axis gradient so flux mode stays defined even on degenerate axes.
+      gradPhi[d] = 0.0;
       if (params.gridSize[d] <= 1u) { continue; }
 
       var fwdCoords = coords;

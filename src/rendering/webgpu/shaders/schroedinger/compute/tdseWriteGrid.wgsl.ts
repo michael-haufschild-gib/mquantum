@@ -20,7 +20,8 @@ export const tdseWriteGridBlock = /* wgsl */ `
 @group(0) @binding(0) var<uniform> params: TDSEUniforms;
 @group(0) @binding(1) var<storage, read> psiRe: array<f32>;
 @group(0) @binding(2) var<storage, read> psiIm: array<f32>;
-@group(0) @binding(3) var outputTex: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(3) var<storage, read> potential: array<f32>;
+@group(0) @binding(4) var outputTex: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -73,18 +74,53 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = ndToLinear(coords, params.strides, params.latticeDim);
   let re = psiRe[idx];
   let im = psiIm[idx];
+  let potentialVal = potential[idx];
 
   // Probability density |psi|^2
   let density = re * re + im * im;
-
-  // Normalize density
-  let normDensity = select(density / params.maxDensity, density, params.maxDensity <= 0.0);
-
-  // Log density for volume rendering
-  let logDensity = log(normDensity + 1e-10);
-
   // Phase angle arg(psi) in [0, 2*pi]
   let phase = atan2(im, re) + 3.14159265;
+
+  // Probability current magnitude |j| using central differences:
+  // j_d = (hbar / m) * Im(conj(psi) * d_d psi)
+  var currentMagSq: f32 = 0.0;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    if (params.gridSize[d] <= 1u) {
+      continue;
+    }
+    var fwdCoords = coords;
+    fwdCoords[d] = wrapCoord(i32(coords[d]) + 1, params.gridSize[d]);
+    var bwdCoords = coords;
+    bwdCoords[d] = wrapCoord(i32(coords[d]) - 1, params.gridSize[d]);
+    let fwdIdx = ndToLinear(fwdCoords, params.strides, params.latticeDim);
+    let bwdIdx = ndToLinear(bwdCoords, params.strides, params.latticeDim);
+    let invDx = 0.5 / params.spacing[d];
+    let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+    let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+    let jd = (params.hbar / max(params.mass, 1e-6)) * (re * dIm - im * dRe);
+    currentMagSq += jd * jd;
+  }
+  let currentMag = sqrt(currentMagSq);
+
+  // Encode selected field into display scalar [0,1] for the density-grid contract.
+  var displayScalar: f32 = 0.0;
+  if (params.fieldView == 0u) {
+    // density
+    displayScalar = select(density / params.maxDensity, density, params.maxDensity <= 0.0);
+  } else if (params.fieldView == 1u) {
+    // phase
+    displayScalar = phase / (2.0 * 3.14159265);
+  } else if (params.fieldView == 2u) {
+    // current magnitude
+    displayScalar = 1.0 - exp(-currentMag);
+  } else {
+    // potential
+    let potentialScale = max(max(params.barrierHeight, abs(params.wellDepth)), 1.0);
+    displayScalar = 0.5 + 0.5 * tanh(potentialVal / potentialScale);
+  }
+
+  let normDensity = clamp(displayScalar, 0.0, 1.0);
+  let logDensity = log(normDensity + 1e-10);
 
   textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, 0.0));
 }

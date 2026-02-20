@@ -27,4 +27,14 @@ describe('Schroedinger SQ Layer — dimension change clamping', () => {
     const config = useExtendedObjectStore.getState().schroedinger
     expect(config.sqLayerSelectedModeIndex).toBe(2)
   })
+
+  it('clamps sqLayerFockQuantumNumber to configured bounds', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerSqLayerFockQuantumNumber(-3)
+    expect(useExtendedObjectStore.getState().schroedinger.sqLayerFockQuantumNumber).toBe(0)
+
+    store.setSchroedingerSqLayerFockQuantumNumber(99)
+    expect(useExtendedObjectStore.getState().schroedinger.sqLayerFockQuantumNumber).toBe(10)
+  })
 })

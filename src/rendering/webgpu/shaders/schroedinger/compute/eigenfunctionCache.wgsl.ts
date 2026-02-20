@@ -98,18 +98,18 @@ fn computeHo1DDeriv(n: i32, x: f32, omega: f32, phi_n: f32) -> f32 {
   return sqrtOmega * (sqrt(2.0 * f32(n)) * phi_nm1 - sqrtOmega * x * phi_n);
 }
 
-// Workgroups per function: ceil(EIGEN_CACHE_SAMPLES / 256) = 4
-const WORKGROUPS_PER_FUNC: u32 = 4u;
+const WORKGROUP_SIZE: u32 = 256u;
+const WORKGROUPS_PER_FUNC: u32 = (EIGEN_CACHE_SAMPLES + WORKGROUP_SIZE - 1u) / WORKGROUP_SIZE;
 
 @compute @workgroup_size(256, 1, 1)
 fn main(
-  @builtin(global_invocation_id) gid: vec3u,
+  @builtin(local_invocation_id) lid: vec3u,
   @builtin(workgroup_id) wgid: vec3u
 ) {
   // Each function uses WORKGROUPS_PER_FUNC workgroups
   let funcIdx = wgid.x / WORKGROUPS_PER_FUNC;
   let localWgIdx = wgid.x % WORKGROUPS_PER_FUNC;
-  let sampleIdx = localWgIdx * 256u + (gid.x % 256u);
+  let sampleIdx = localWgIdx * WORKGROUP_SIZE + lid.x;
 
   // Bounds check
   if (funcIdx >= cacheParams.numFuncs || sampleIdx >= EIGEN_CACHE_SAMPLES) {

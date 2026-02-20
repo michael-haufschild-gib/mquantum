@@ -204,14 +204,20 @@ export function computeBoundingRadius(
   representation: 'position' | 'momentum' = 'position',
   momentumScale: number = 1.0
 ): number {
+  // Only dimensions 4..11 contribute hydrogen extra-dimension factors.
+  // Ignore stale hidden slots when current dimension is lower.
+  const activeExtraDimCount = Math.max(0, Math.min(dimension - 3, 8))
+  const activeExtraDimN = extraDimN?.slice(0, activeExtraDimCount)
+  const activeExtraDimOmega = extraDimOmega?.slice(0, activeExtraDimCount)
+
   if (representation === 'momentum') {
     if (quantumMode === 'hydrogenND') {
       return computeHydrogenMomentumBoundingRadius(
         principalN,
         bohrRadius,
         momentumScale,
-        extraDimN,
-        extraDimOmega
+        activeExtraDimN,
+        activeExtraDimOmega
       )
     }
     // Harmonic oscillator momentum space
@@ -228,7 +234,12 @@ export function computeBoundingRadius(
 
   // Position space (default)
   if (quantumMode === 'hydrogenND') {
-    return computeHydrogenBoundingRadius(principalN, bohrRadius, extraDimN, extraDimOmega)
+    return computeHydrogenBoundingRadius(
+      principalN,
+      bohrRadius,
+      activeExtraDimN,
+      activeExtraDimOmega
+    )
   }
 
   if (preset) {

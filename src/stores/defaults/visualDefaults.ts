@@ -212,7 +212,7 @@ export type SkyboxSelection =
   | 'procedural_twilight'
 
 export const DEFAULT_SKYBOX_ENABLED = false
-export const DEFAULT_SKYBOX_TEXTURE: SkyboxTexture = 'space_blue'
+export const DEFAULT_SKYBOX_TEXTURE: SkyboxTexture = 'none'
 export const DEFAULT_SKYBOX_SELECTION: SkyboxSelection = 'none'
 export const DEFAULT_SKYBOX_INTENSITY = 1
 export const DEFAULT_SKYBOX_ROTATION = 0
@@ -293,7 +293,7 @@ export interface SkyboxProceduralSettings {
   ocean: OceanSettings
 }
 
-export const DEFAULT_SKYBOX_MODE: SkyboxMode = 'procedural_aurora'
+export const DEFAULT_SKYBOX_MODE: SkyboxMode = 'classic'
 
 export const DEFAULT_SKYBOX_PROCEDURAL_SETTINGS: SkyboxProceduralSettings = {
   scale: 1.0,

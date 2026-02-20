@@ -821,6 +821,8 @@ export interface SchroedingerConfig {
   sqLayerMode: SecondQuantizationMode
   /** Which HO dimension mode index to inspect (0-based) */
   sqLayerSelectedModeIndex: number
+  /** Fock-state quantum number n for educational number-state interpretation */
+  sqLayerFockQuantumNumber: number
   /** Show occupation number table */
   sqLayerShowOccupation: boolean
   /** Show uncertainty metrics card */
@@ -1036,6 +1038,7 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   sqLayerEnabled: false,
   sqLayerMode: 'fock' as SecondQuantizationMode,
   sqLayerSelectedModeIndex: 0,
+  sqLayerFockQuantumNumber: 0,
   sqLayerShowOccupation: true,
   sqLayerShowUncertainty: true,
   sqLayerCoherentAlphaRe: 1.0,

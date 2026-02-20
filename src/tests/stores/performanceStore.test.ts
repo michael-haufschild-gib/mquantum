@@ -139,6 +139,43 @@ describe('performanceStore', () => {
     })
   })
 
+  describe('eigenfunction cache fidelity controls', () => {
+    it('defaults analytical gradient and robust interpolation to enabled', () => {
+      const state = usePerformanceStore.getState()
+      expect(state.analyticalGradientEnabled).toBe(true)
+      expect(state.robustEigenInterpolationEnabled).toBe(true)
+    })
+
+    it('sets analytical gradient and robust interpolation independently', () => {
+      const {
+        setEigenfunctionCacheEnabled,
+        setAnalyticalGradientEnabled,
+        setRobustEigenInterpolationEnabled,
+      } = usePerformanceStore.getState()
+
+      setAnalyticalGradientEnabled(false)
+      setRobustEigenInterpolationEnabled(false)
+      setEigenfunctionCacheEnabled(false)
+
+      const state = usePerformanceStore.getState()
+      expect(state.eigenfunctionCacheEnabled).toBe(false)
+      expect(state.analyticalGradientEnabled).toBe(false)
+      expect(state.robustEigenInterpolationEnabled).toBe(false)
+    })
+
+    it('reset restores analytical gradient and robust interpolation defaults', () => {
+      const store = usePerformanceStore.getState()
+      store.setAnalyticalGradientEnabled(false)
+      store.setRobustEigenInterpolationEnabled(false)
+
+      store.reset()
+
+      const state = usePerformanceStore.getState()
+      expect(state.analyticalGradientEnabled).toBe(true)
+      expect(state.robustEigenInterpolationEnabled).toBe(true)
+    })
+  })
+
   describe('fractal animation quality', () => {
     it('should set fractalAnimationLowQuality', () => {
       const { setFractalAnimationLowQuality } = usePerformanceStore.getState()

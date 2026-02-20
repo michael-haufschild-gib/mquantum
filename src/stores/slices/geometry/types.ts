@@ -210,6 +210,7 @@ export interface SchroedingerSliceActions {
   setSchroedingerSqLayerEnabled: (enabled: boolean) => void
   setSchroedingerSqLayerMode: (mode: SecondQuantizationMode) => void
   setSchroedingerSqLayerSelectedModeIndex: (index: number) => void
+  setSchroedingerSqLayerFockQuantumNumber: (n: number) => void
   setSchroedingerSqLayerShowOccupation: (show: boolean) => void
   setSchroedingerSqLayerShowUncertainty: (show: boolean) => void
   setSchroedingerSqLayerCoherentAlphaRe: (re: number) => void

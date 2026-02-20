@@ -102,3 +102,105 @@ describe('WebGPUSchrodingerRenderer material dirty-checking', () => {
     expect(renderer.updateMaterialUniforms).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => {
+  function prepareRendererForUniformWrites(
+    renderer: WebGPUSchrodingerRenderer
+  ): WebGPUSchrodingerRenderer & { [key: string]: unknown } {
+    const mutable = renderer as WebGPUSchrodingerRenderer & { [key: string]: unknown }
+    mutable.device = { queue: { writeBuffer: vi.fn() } }
+    mutable.schroedingerUniformBuffer = {}
+    mutable.createBoundingGeometry = vi.fn()
+    return mutable
+  }
+
+  it('keeps compile-time diverging algorithm in uniforms even if appearance switches to k-space', () => {
+    const renderer = prepareRendererForUniformWrites(
+      new WebGPUSchrodingerRenderer({
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: 9,
+      })
+    )
+    const { ctx } = createMockCtx()
+    ctx.frame.stores.appearance = { appearanceVersion: 1, colorAlgorithm: 'kSpaceOccupation' }
+    ctx.frame.stores.extended = {
+      schroedingerVersion: 1,
+      schroedinger: { quantumMode: 'harmonicOscillator' },
+    }
+
+    renderer.updateSchroedingerUniforms(ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0])
+
+    expect((renderer['schroedingerIntView'] as Int32Array)[940 / 4]).toBe(9)
+  })
+
+  it('keeps compile-time k-space algorithm in free scalar uniforms even if appearance is relative phase', () => {
+    const renderer = prepareRendererForUniformWrites(
+      new WebGPUSchrodingerRenderer({
+        quantumMode: 'freeScalarField',
+        colorAlgorithm: 15,
+      })
+    )
+    const { ctx } = createMockCtx()
+    ctx.frame.stores.appearance = { appearanceVersion: 1, colorAlgorithm: 'relativePhase' }
+    ctx.frame.stores.extended = {
+      schroedingerVersion: 1,
+      schroedinger: { quantumMode: 'freeScalarField' },
+    }
+
+    renderer.updateSchroedingerUniforms(ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0])
+
+    expect((renderer['schroedingerIntView'] as Int32Array)[940 / 4]).toBe(15)
+  })
+})
+
+describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
+  function prepareRendererForUniformWrites(
+    renderer: WebGPUSchrodingerRenderer
+  ): WebGPUSchrodingerRenderer & { [key: string]: unknown } {
+    const mutable = renderer as WebGPUSchrodingerRenderer & { [key: string]: unknown }
+    mutable.device = { queue: { writeBuffer: vi.fn() } }
+    mutable.schroedingerUniformBuffer = {}
+    mutable.createBoundingGeometry = vi.fn()
+    return mutable
+  }
+
+  it('regenerates cached preset when frequencySpread changes by UI slider step (0.0001)', () => {
+    const renderer = prepareRendererForUniformWrites(
+      new WebGPUSchrodingerRenderer({ quantumMode: 'harmonicOscillator' })
+    )
+    const { ctx } = createMockCtx()
+
+    ctx.frame.stores.extended = {
+      schroedingerVersion: 1,
+      schroedinger: {
+        quantumMode: 'harmonicOscillator',
+        presetName: 'custom',
+        seed: 42,
+        termCount: 3,
+        maxQuantumNumber: 6,
+        frequencySpread: 0.01,
+      },
+    }
+
+    renderer.updateSchroedingerUniforms(
+      ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
+    )
+
+    expect((renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread).toBeCloseTo(
+      0.01,
+      6
+    )
+
+    ctx.frame.stores.extended.schroedingerVersion = 2
+    ctx.frame.stores.extended.schroedinger.frequencySpread = 0.0101
+
+    renderer.updateSchroedingerUniforms(
+      ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
+    )
+
+    expect((renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread).toBeCloseTo(
+      0.0101,
+      6
+    )
+  })
+})

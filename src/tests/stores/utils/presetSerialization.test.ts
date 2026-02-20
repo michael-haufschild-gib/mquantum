@@ -25,6 +25,18 @@ describe('sanitizeLoadedState', () => {
     expect('faceOpacity' in shaderSettings.surface).toBe(false)
     expect(shaderSettings.surface.specularIntensity).toBe(0.8)
   })
+
+  it('removes legacy classicSkyboxType from environment payloads', () => {
+    const sanitized = sanitizeLoadedState({
+      classicSkyboxType: 'sunset',
+      skyboxEnabled: false,
+      backgroundColor: '#101010',
+    })
+
+    expect('classicSkyboxType' in sanitized).toBe(false)
+    expect(sanitized.skyboxEnabled).toBe(false)
+    expect(sanitized.backgroundColor).toBe('#101010')
+  })
 })
 
 describe('sanitizeExtendedLoadedState', () => {
@@ -37,6 +49,7 @@ describe('sanitizeExtendedLoadedState', () => {
         sqLayerMode: 'coherent',
         sqLayerCoherentAlphaRe: 2.5,
         sqLayerSelectedModeIndex: 1,
+        sqLayerFockQuantumNumber: 4,
       },
     }
     const sanitized = sanitizeExtendedLoadedState(input)
@@ -51,6 +64,30 @@ describe('sanitizeExtendedLoadedState', () => {
     expect('sqLayerMode' in config).toBe(false)
     expect('sqLayerCoherentAlphaRe' in config).toBe(false)
     expect('sqLayerSelectedModeIndex' in config).toBe(false)
+    expect('sqLayerFockQuantumNumber' in config).toBe(false)
+  })
+
+  it('preserves tdse mode while stripping nested tdse runtime flags', () => {
+    const input = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          latticeDim: 3,
+          fieldView: 'density',
+          diagnosticsInterval: 9,
+          needsReset: true,
+        },
+      },
+    }
+    const sanitized = sanitizeExtendedLoadedState(input)
+    const config = sanitized.schroedinger as Record<string, unknown>
+    const tdse = config.tdse as Record<string, unknown>
+
+    expect(config.quantumMode).toBe('tdseDynamics')
+    expect(tdse.latticeDim).toBe(3)
+    expect(tdse.fieldView).toBe('density')
+    expect(tdse.diagnosticsInterval).toBe(9)
+    expect('needsReset' in tdse).toBe(false)
   })
 })
 
@@ -67,6 +104,7 @@ describe('serializeExtendedState', () => {
         sqLayerSqueezeR: 0.5,
         sqLayerSqueezeTheta: 0,
         sqLayerSelectedModeIndex: 1,
+        sqLayerFockQuantumNumber: 4,
         sqLayerShowOccupation: true,
         sqLayerShowUncertainty: false,
       },
@@ -86,7 +124,35 @@ describe('serializeExtendedState', () => {
     expect('sqLayerSqueezeR' in config).toBe(false)
     expect('sqLayerSqueezeTheta' in config).toBe(false)
     expect('sqLayerSelectedModeIndex' in config).toBe(false)
+    expect('sqLayerFockQuantumNumber' in config).toBe(false)
     expect('sqLayerShowOccupation' in config).toBe(false)
     expect('sqLayerShowUncertainty' in config).toBe(false)
+  })
+
+  it('preserves tdse config while excluding nested tdse runtime flags', () => {
+    const state = {
+      schroedinger: {
+        quantumMode: 'tdseDynamics',
+        tdse: {
+          latticeDim: 3,
+          packetMomentum: [4, 0, 0],
+          potentialType: 'barrier',
+          diagnosticsEnabled: true,
+          diagnosticsInterval: 6,
+          needsReset: true,
+        },
+      },
+    }
+    const serialized = serializeExtendedState(state, 'schroedinger')
+    const config = serialized.schroedinger as Record<string, unknown>
+    const tdse = config.tdse as Record<string, unknown>
+
+    expect(config.quantumMode).toBe('tdseDynamics')
+    expect(tdse.latticeDim).toBe(3)
+    expect(tdse.packetMomentum).toEqual([4, 0, 0])
+    expect(tdse.potentialType).toBe('barrier')
+    expect(tdse.diagnosticsEnabled).toBe(true)
+    expect(tdse.diagnosticsInterval).toBe(6)
+    expect('needsReset' in tdse).toBe(false)
   })
 })

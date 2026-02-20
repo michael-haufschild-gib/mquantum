@@ -101,6 +101,9 @@ export const TRANSIENT_FIELDS = new Set([
   // Legacy skybox sync-with-object toggle (removed — skybox always uses palette)
   'syncWithObject',
 
+  // Legacy skybox selector replaced by unified skyboxSelection
+  'classicSkyboxType',
+
   // Legacy bloom fields (removed — replaced by progressive downsample/upsample bloom)
   'bloomMode',
   'bloomBands',
@@ -109,6 +112,14 @@ export const TRANSIENT_FIELDS = new Set([
   'bloomConvolutionBoost',
   'bloomConvolutionTint',
 
+  // Legacy depth/gravity post-processing fields (removed from quantum-only pipeline)
+  'objectOnlyDepth',
+  'gravityEnabled',
+  'gravityStrength',
+  'gravityDistortionScale',
+  'gravityFalloff',
+  'gravityChromaticAberration',
+
   // Free scalar field runtime trigger (not persisted in presets)
   'needsReset',
 
@@ -116,6 +127,7 @@ export const TRANSIENT_FIELDS = new Set([
   'sqLayerEnabled',
   'sqLayerMode',
   'sqLayerSelectedModeIndex',
+  'sqLayerFockQuantumNumber',
   'sqLayerShowOccupation',
   'sqLayerShowUncertainty',
   'sqLayerCoherentAlphaRe',

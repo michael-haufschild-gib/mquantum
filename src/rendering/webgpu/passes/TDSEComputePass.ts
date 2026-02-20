@@ -384,7 +384,8 @@ struct PackUniforms {
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, storageTexture: {
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 4, visibility: GPUShaderStage.COMPUTE, storageTexture: {
           access: 'write-only', format: 'rgba16float', viewDimension: '3d',
         } },
       ],
@@ -487,7 +488,8 @@ struct PackUniforms {
       { binding: 0, resource: { buffer: this.uniformBuffer } },
       { binding: 1, resource: { buffer: this.psiReBuffer } },
       { binding: 2, resource: { buffer: this.psiImBuffer } },
-      { binding: 3, resource: this.densityTextureView },
+      { binding: 3, resource: { buffer: this.potentialBuffer } },
+      { binding: 4, resource: this.densityTextureView },
     ] })
 
     // Diagnostics bind groups

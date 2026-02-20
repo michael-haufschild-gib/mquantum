@@ -9,6 +9,7 @@ function createMockActions(): SecondQuantizationActions {
     setEnabled: vi.fn(),
     setMode: vi.fn(),
     setSelectedModeIndex: vi.fn(),
+    setFockQuantumNumber: vi.fn(),
     setShowOccupation: vi.fn(),
     setShowUncertainty: vi.fn(),
     setCoherentAlphaRe: vi.fn(),
@@ -71,6 +72,7 @@ describe('SecondQuantizationSection', () => {
     expect(screen.getByTestId('sq-preset-vacuum')).toBeInTheDocument()
     expect(screen.getByTestId('sq-preset-coherent')).toBeInTheDocument()
     expect(screen.getByTestId('sq-preset-squeezed')).toBeInTheDocument()
+    expect(screen.getByTestId('sq-layer-fock-n')).toBeInTheDocument()
   })
 
   it('shows coherent controls when mode is coherent', () => {
@@ -88,6 +90,7 @@ describe('SecondQuantizationSection', () => {
     expandSection()
     expect(screen.getByTestId('sq-layer-alpha-re')).toBeInTheDocument()
     expect(screen.getByTestId('sq-layer-alpha-im')).toBeInTheDocument()
+    expect(screen.queryByTestId('sq-layer-fock-n')).not.toBeInTheDocument()
     expect(screen.queryByTestId('sq-layer-squeeze-r')).not.toBeInTheDocument()
   })
 
@@ -106,7 +109,27 @@ describe('SecondQuantizationSection', () => {
     expandSection()
     expect(screen.getByTestId('sq-layer-squeeze-r')).toBeInTheDocument()
     expect(screen.getByTestId('sq-layer-squeeze-theta')).toBeInTheDocument()
+    expect(screen.queryByTestId('sq-layer-fock-n')).not.toBeInTheDocument()
     expect(screen.queryByTestId('sq-layer-alpha-re')).not.toBeInTheDocument()
+  })
+
+  it('uses Fock quantum number for occupation, independent of selected mode index', () => {
+    render(
+      <SecondQuantizationSection
+        config={{
+          ...DEFAULT_SCHROEDINGER_CONFIG,
+          sqLayerEnabled: true,
+          sqLayerMode: 'fock',
+          sqLayerSelectedModeIndex: 1,
+          sqLayerFockQuantumNumber: 4,
+        }}
+        dimension={3}
+        actions={actions}
+      />
+    )
+    expandSection()
+    expect(screen.getByText('Mode k=1 — fock')).toBeInTheDocument()
+    expect(screen.getByText('4.000')).toBeInTheDocument()
   })
 
   it('displays occupation table when enabled', () => {
@@ -166,6 +189,7 @@ describe('SecondQuantizationSection', () => {
     fireEvent.click(screen.getByTestId('sq-preset-vacuum'))
     expect(actions.setMode).toHaveBeenCalledWith('fock')
     expect(actions.setSelectedModeIndex).toHaveBeenCalledWith(0)
+    expect(actions.setFockQuantumNumber).toHaveBeenCalledWith(0)
   })
 
   it('applies coherent preset when clicking Coherent button', () => {

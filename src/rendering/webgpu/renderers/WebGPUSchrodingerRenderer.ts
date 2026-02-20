@@ -137,6 +137,10 @@ export interface SchrodingerRendererConfig {
   uncertaintyBoundaryEnabled?: boolean
   /** Whether eigenfunction caching is enabled (compile-time shader specialization). */
   eigenfunctionCacheEnabled?: boolean
+  /** Whether analytical gradient path is enabled when cache is active (HO only). */
+  analyticalGradientEnabled?: boolean
+  /** Whether robust eigencache interpolation/extrapolation is enabled. */
+  robustEigenInterpolationEnabled?: boolean
   /** Wavefunction representation — triggers pipeline rebuild when changed.
    *  HO momentum uses CPU uniform transform; hydrogen momentum uses shader path.
    *  Wigner uses 2D pipeline for phase-space visualization. */
@@ -173,6 +177,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       config.interference ? 1 : 0,
       config.uncertaintyBoundary ? 1 : 0,
       config.useEigenfunctionCache ? 1 : 0,
+      config.useAnalyticalGradient ? 1 : 0,
+      config.useRobustEigenInterpolation ? 1 : 0,
       config.colorAlgorithm ?? 4,
       config.useDensityGrid ? 1 : 0,
       config.densityGridHasPhase ? 1 : 0,
@@ -393,6 +399,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       phaseMaterialityEnabled: true,
       interferenceEnabled: true,
       uncertaintyBoundaryEnabled: true,
+      analyticalGradientEnabled: true,
+      robustEigenInterpolationEnabled: true,
       ...config,
     }
 
@@ -400,6 +408,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (pipelineIs2D) {
       this.rendererConfig.temporal = false
       this.rendererConfig.eigenfunctionCacheEnabled = false
+      this.rendererConfig.analyticalGradientEnabled = false
+      this.rendererConfig.robustEigenInterpolationEnabled = false
     }
 
     const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
@@ -450,9 +460,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
             ? 96
             : 128
 
-    // Eigenfunction cache: always enabled when cache is on, except for free scalar field.
-    // For HO momentum, the uniform buffer contains 1/ω → cache produces k-space functions automatically.
-    const useEigenfunctionCache = (isFreeScalar || isTdse) ? false : enableCache
+    // Eigenfunction cache is only supported on 3D pipelines.
+    // 2D/Wigner reuses group(2) bindings 2/3 for the Wigner cache texture + sampler.
+    // For HO momentum (3D), the uniform buffer contains 1/ω → cache produces k-space functions automatically.
+    const useEigenfunctionCache = (isFreeScalar || isTdse || pipelineIs2D) ? false : enableCache
+    const useAnalyticalGradient = (isFreeScalar || isTdse)
+      ? false
+      : (this.rendererConfig.analyticalGradientEnabled ?? true)
+    const useRobustEigenInterpolation = (isFreeScalar || isTdse)
+      ? false
+      : (this.rendererConfig.robustEigenInterpolationEnabled ?? true)
 
     // For shader composition, free scalar field maps to 'harmonicOscillator' since
     // it only uses the density grid sampling path (no inline wavefunction evaluation).
@@ -476,6 +493,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         ? false
         : (this.rendererConfig.uncertaintyBoundaryEnabled ?? true),
       useEigenfunctionCache,
+      useAnalyticalGradient,
+      useRobustEigenInterpolation,
       useDensityGrid,
       densityGridSize,
       densityGridHasPhase: (isFreeScalar || isTdse) ? true : undefined,
@@ -1483,13 +1502,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       dimension,
     }
 
+    // UI slider step is 1e-4, so use a much smaller epsilon to avoid regeneration dead zones.
+    const frequencySpreadChanged =
+      !this.cachedPresetConfig ||
+      Math.abs(this.cachedPresetConfig.frequencySpread - currentConfig.frequencySpread) > 1e-6
+
     const needsPresetRegen =
       !this.cachedPresetConfig ||
       this.cachedPresetConfig.presetName !== currentConfig.presetName ||
       this.cachedPresetConfig.seed !== currentConfig.seed ||
       this.cachedPresetConfig.termCount !== currentConfig.termCount ||
       this.cachedPresetConfig.maxQuantumNumber !== currentConfig.maxQuantumNumber ||
-      Math.abs(this.cachedPresetConfig.frequencySpread - currentConfig.frequencySpread) > 0.001 ||
+      frequencySpreadChanged ||
       this.cachedPresetConfig.dimension !== currentConfig.dimension
 
     if (needsPresetRegen) {
@@ -1831,7 +1855,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Color algorithm system (offset 940+)
     // Use canonical mapping shared with WebGL (palette/types.ts COLOR_ALGORITHM_TO_INT)
-    const colorAlgorithm = COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'radialDistance'] ?? 11
+    const colorAlgorithm =
+      this.rendererConfig.colorAlgorithm ??
+      COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'radialDistance'] ??
+      11
     intView[940 / 4] = colorAlgorithm
     floatView[944 / 4] = appearance?.distribution?.power ?? 1.0
     floatView[948 / 4] = appearance?.distribution?.cycles ?? 1.0

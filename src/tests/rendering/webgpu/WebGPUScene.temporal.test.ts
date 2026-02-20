@@ -12,7 +12,7 @@ interface ScenePassConfig {
   paperEnabled: boolean
   frameBlendingEnabled: boolean
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
@@ -20,6 +20,8 @@ interface ScenePassConfig {
   uncertaintyBoundaryEnabled: boolean
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
+  analyticalGradientEnabled: boolean
+  robustEigenInterpolationEnabled: boolean
   representation: 'position' | 'momentum'
   colorAlgorithm:
     | 'lch'
@@ -34,6 +36,10 @@ interface ScenePassConfig {
     | 'relativePhase'
     | 'radialDistance'
     | 'domainColoringPsi'
+    | 'hamiltonianDecomposition'
+    | 'modeCharacter'
+    | 'energyFlux'
+    | 'kSpaceOccupation'
   skyboxEnabled: boolean
   skyboxMode:
     | 'classic'
@@ -74,6 +80,8 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     uncertaintyBoundaryEnabled: false,
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
+    analyticalGradientEnabled: true,
+    robustEigenInterpolationEnabled: true,
     representation: 'position',
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
@@ -200,6 +208,60 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     }
 
     expect(renderer.rendererConfig?.colorAlgorithm).toBe(10)
+  })
+
+  it('falls back kSpaceOccupation to diverging for non-free-scalar modes', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        quantumMode: 'harmonicOscillator',
+        colorAlgorithm: 'kSpaceOccupation',
+      })
+    ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(9)
+  })
+
+  it('falls back relativePhase to diverging in free scalar mode', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        quantumMode: 'freeScalarField',
+        colorAlgorithm: 'relativePhase',
+      })
+    ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(9)
+  })
+
+  it('keeps kSpaceOccupation in free scalar mode', async () => {
+    ensureGpuTextureUsageConstants()
+    const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
+    const renderer = createObjectRenderer(
+      'schroedinger',
+      createPassConfig({
+        quantumMode: 'freeScalarField',
+        colorAlgorithm: 'kSpaceOccupation',
+      })
+    ) as unknown as { rendererConfig?: { colorAlgorithm?: number } } | null
+
+    if (!renderer) {
+      throw new Error('Expected Schrödinger renderer to be created')
+    }
+
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(15)
   })
 
   it('creates Schrödinger renderer in quarter-res temporal mode when enabled', async () => {

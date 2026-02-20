@@ -4,10 +4,10 @@
  * Extends hydrogen orbitals to N dimensions using a hybrid approach:
  * - First 3 dimensions: Standard spherical harmonics Y_lm(θ,φ) for angular shape
  * - Extra dimensions (4+): Harmonic oscillator basis φ_n(x) for each extra dim
- * - Radial decay: Uses full ND radius r_D = √(x₁² + ... + x_D²)
+ * - Radial decay: Uses 3D hydrogen core radius r₃ = √(x₁² + x₂² + x₃²)
  *
  * The wavefunction formula is:
- * ψ_ND = R_nl(r_D) × Y_lm(θ,φ) × ∏_{j=4}^{D} φ_{nj}(xj)
+ * ψ_ND = R_nl(r₃) × Y_lm(θ,φ) × ∏_{j=4}^{D} φ_{nj}(xj)
  *
  * This gives a physically meaningful visualization of "what would a hydrogen
  * atom look like if the electron could move in D spatial dimensions".

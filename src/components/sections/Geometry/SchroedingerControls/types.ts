@@ -62,6 +62,7 @@ export interface SecondQuantizationActions {
   setEnabled: ExtendedObjectState['setSchroedingerSqLayerEnabled']
   setMode: ExtendedObjectState['setSchroedingerSqLayerMode']
   setSelectedModeIndex: ExtendedObjectState['setSchroedingerSqLayerSelectedModeIndex']
+  setFockQuantumNumber: ExtendedObjectState['setSchroedingerSqLayerFockQuantumNumber']
   setShowOccupation: ExtendedObjectState['setSchroedingerSqLayerShowOccupation']
   setShowUncertainty: ExtendedObjectState['setSchroedingerSqLayerShowUncertainty']
   setCoherentAlphaRe: ExtendedObjectState['setSchroedingerSqLayerCoherentAlphaRe']

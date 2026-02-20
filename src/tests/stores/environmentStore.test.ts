@@ -18,6 +18,14 @@ describe('environmentStore', () => {
 
   describe('skybox slice', () => {
     describe('skybox selection', () => {
+      it('should initialize with canonical derived fields for none selection', () => {
+        const state = useEnvironmentStore.getState()
+        expect(state.skyboxSelection).toBe('none')
+        expect(state.skyboxEnabled).toBe(false)
+        expect(state.skyboxMode).toBe('classic')
+        expect(state.skyboxTexture).toBe('none')
+      })
+
       it('should set skybox selection and derive state', () => {
         const { setSkyboxSelection } = useEnvironmentStore.getState()
 
@@ -174,6 +182,9 @@ describe('environmentStore', () => {
 
         const state = useEnvironmentStore.getState()
         expect(state.skyboxSelection).toBe(SKYBOX_INITIAL_STATE.skyboxSelection)
+        expect(state.skyboxEnabled).toBe(SKYBOX_INITIAL_STATE.skyboxEnabled)
+        expect(state.skyboxMode).toBe(SKYBOX_INITIAL_STATE.skyboxMode)
+        expect(state.skyboxTexture).toBe(SKYBOX_INITIAL_STATE.skyboxTexture)
         expect(state.skyboxIntensity).toBe(SKYBOX_INITIAL_STATE.skyboxIntensity)
       })
 

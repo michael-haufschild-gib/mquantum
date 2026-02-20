@@ -45,6 +45,7 @@ export function SecondQuantizationSection({
     sqLayerEnabled,
     sqLayerMode,
     sqLayerSelectedModeIndex,
+    sqLayerFockQuantumNumber,
     sqLayerShowOccupation,
     sqLayerShowUncertainty,
     sqLayerCoherentAlphaRe,
@@ -56,7 +57,7 @@ export function SecondQuantizationSection({
   // Build params for the selected dimension mode
   const params: SecondQuantParams = useMemo(
     () => ({
-      n: sqLayerSelectedModeIndex,
+      n: sqLayerFockQuantumNumber,
       alphaRe: sqLayerCoherentAlphaRe,
       alphaIm: sqLayerCoherentAlphaIm,
       squeezeR: sqLayerSqueezeR,
@@ -64,7 +65,7 @@ export function SecondQuantizationSection({
       omega: 1.0,
     }),
     [
-      sqLayerSelectedModeIndex,
+      sqLayerFockQuantumNumber,
       sqLayerCoherentAlphaRe,
       sqLayerCoherentAlphaIm,
       sqLayerSqueezeR,
@@ -118,6 +119,20 @@ export function SecondQuantizationSection({
               showValue
               data-testid="sq-layer-mode-index"
             />
+
+            {/* Fock number state parameter */}
+            {sqLayerMode === 'fock' && (
+              <Slider
+                label="Fock quantum number (n)"
+                min={0}
+                max={10}
+                step={1}
+                value={sqLayerFockQuantumNumber}
+                onChange={actions.setFockQuantumNumber}
+                showValue
+                data-testid="sq-layer-fock-n"
+              />
+            )}
 
             {/* Coherent state parameters */}
             {sqLayerMode === 'coherent' && (
@@ -179,6 +194,7 @@ export function SecondQuantizationSection({
                 onClick={() => {
                   actions.setMode('fock')
                   actions.setSelectedModeIndex(0)
+                  actions.setFockQuantumNumber(0)
                 }}
                 data-testid="sq-preset-vacuum"
               >

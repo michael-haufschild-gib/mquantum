@@ -120,6 +120,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
 }
 `
 
+/**
+ * Cubemap face format used by capture textures and pipeline targets.
+ * Must stay in sync with createCubemapResource().
+ */
+const CUBEMAP_CAPTURE_FORMAT: GPUTextureFormat = 'rgba16float'
+
 // =============================================================================
 // CubemapCapturePass
 // =============================================================================
@@ -185,7 +191,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
    * @param ctx
    */
   protected async createPipeline(ctx: WebGPUSetupContext): Promise<void> {
-    const { device, format } = ctx
+    const { device } = ctx
 
     // Create procedural skybox bind group layout (uniform buffer only)
     this.proceduralBindGroupLayout = device.createBindGroupLayout({
@@ -207,7 +213,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
       device,
       proceduralModule,
       [this.proceduralBindGroupLayout],
-      format,
+      CUBEMAP_CAPTURE_FORMAT,
       'cubemap-capture-procedural'
     )
 
@@ -289,7 +295,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
         height: resolution,
         depthOrArrayLayers: 6,
       },
-      format: 'rgba16float',
+      format: CUBEMAP_CAPTURE_FORMAT,
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.RENDER_ATTACHMENT |
@@ -505,7 +511,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
       skyboxMode?: string
       skyboxAnimationMode?: string
       skyboxAnimationSpeed?: number
-      skyboxTimeScale?: number
+      proceduralSettings?: { timeScale?: number }
     } | undefined
 
     const currentSkyboxMode = env?.skyboxMode ?? null
@@ -553,7 +559,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
       skyboxMode?: string
       skyboxAnimationMode?: string
       skyboxAnimationSpeed?: number
-      skyboxTimeScale?: number
+      proceduralSettings?: { timeScale?: number }
     } | undefined,
     isPlaying: boolean
   ): boolean {
@@ -567,7 +573,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
       const hasAnimationSpeed = (env.skyboxAnimationSpeed ?? 0) > 0
       return hasAnimationMode && hasAnimationSpeed
     } else {
-      const hasTimeScale = (env.skyboxTimeScale ?? 0) > 0
+      const hasTimeScale = (env.proceduralSettings?.timeScale ?? 0) > 0
       const hasRotation = (env.skyboxAnimationSpeed ?? 0) > 0 && env.skyboxAnimationMode !== 'none'
       return hasTimeScale || hasRotation
     }

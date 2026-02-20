@@ -9,6 +9,7 @@ import {
   generateShareUrl,
   type ShareableState,
 } from '@/lib/url/state-serializer'
+import { DEFAULT_SHADER_SETTINGS } from '@/stores/defaults/visualDefaults'
 
 describe('state-serializer', () => {
   describe('serializeState', () => {
@@ -22,6 +23,16 @@ describe('state-serializer', () => {
       expect(result).toContain('t=schroedinger')
     })
 
+    it('should serialize quantum mode when non-default', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        quantumMode: 'tdseDynamics',
+      }
+      const result = serializeState(state)
+      expect(result).toContain('qm=tdseDynamics')
+    })
+
     it('should include uniformScale when not 1', () => {
       const state: ShareableState = {
         dimension: 4,
@@ -30,6 +41,44 @@ describe('state-serializer', () => {
       }
       const result = serializeState(state)
       expect(result).toContain('s=1.50')
+    })
+
+    it('should serialize non-default skybox selection', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        skyboxSelection: 'procedural_aurora',
+      }
+      const result = serializeState(state)
+      expect(result).toContain('sb=procedural_aurora')
+    })
+
+    it('should omit default skybox selection for shorter URLs', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        skyboxSelection: 'none',
+      }
+      const result = serializeState(state)
+      expect(result).not.toContain('sb=')
+    })
+
+    it('should serialize non-default core skybox controls', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        skyboxIntensity: 2.4,
+        skyboxRotation: 1.2345,
+        skyboxAnimationMode: 'ethereal',
+        skyboxAnimationSpeed: 1.25,
+        skyboxHighQuality: true,
+      }
+      const result = serializeState(state)
+      expect(result).toContain('sbi=2.40')
+      expect(result).toContain('sbr=1.2345')
+      expect(result).toContain('sbm=ethereal')
+      expect(result).toContain('sbs=1.250')
+      expect(result).toContain('sbh=1')
     })
 
     it('should serialize bloom settings', () => {
@@ -89,6 +138,16 @@ describe('state-serializer', () => {
       expect(result.uniformScale).toBeCloseTo(1.5)
     })
 
+    it('should deserialize valid quantum mode', () => {
+      const result = deserializeState('qm=tdseDynamics')
+      expect(result.quantumMode).toBe('tdseDynamics')
+    })
+
+    it('should ignore invalid quantum mode', () => {
+      const result = deserializeState('qm=unknownMode')
+      expect(result.quantumMode).toBeUndefined()
+    })
+
     it('should deserialize bloom settings', () => {
       const result = deserializeState('be=1&bga=2.20&bt=0.50&bk=0.30&br=2.50')
 
@@ -105,6 +164,14 @@ describe('state-serializer', () => {
       expect(result.bloomThreshold).toBeUndefined()
       expect(result.bloomKnee).toBeUndefined()
       expect(result.bloomRadius).toBeUndefined()
+    })
+
+    it('should reject bloom threshold outside the 0..5 contract', () => {
+      const negative = deserializeState('bt=-0.5')
+      const aboveMax = deserializeState('bt=5.1')
+
+      expect(negative.bloomThreshold).toBeUndefined()
+      expect(aboveMax.bloomThreshold).toBeUndefined()
     })
 
     it('should reject below-minimum bloom radius', () => {
@@ -139,6 +206,34 @@ describe('state-serializer', () => {
       const result = deserializeState('ec=FF0000&bg=000000')
       expect(result.edgeColor).toBe('#FF0000')
       expect(result.backgroundColor).toBe('#000000')
+    })
+
+    it('should deserialize valid skybox selection', () => {
+      const result = deserializeState('sb=procedural_ocean')
+      expect(result.skyboxSelection).toBe('procedural_ocean')
+    })
+
+    it('should ignore invalid skybox selection', () => {
+      const result = deserializeState('sb=invalid_selection')
+      expect(result.skyboxSelection).toBeUndefined()
+    })
+
+    it('should deserialize valid core skybox controls', () => {
+      const result = deserializeState('sbi=2.25&sbr=1.5&sbm=cinematic&sbs=0.750&sbh=1')
+      expect(result.skyboxIntensity).toBeCloseTo(2.25)
+      expect(result.skyboxRotation).toBeCloseTo(1.5)
+      expect(result.skyboxAnimationMode).toBe('cinematic')
+      expect(result.skyboxAnimationSpeed).toBeCloseTo(0.75)
+      expect(result.skyboxHighQuality).toBe(true)
+    })
+
+    it('should reject invalid core skybox control values', () => {
+      const result = deserializeState('sbi=-1&sbr=abc&sbm=invalid&sbs=7&sbh=2')
+      expect(result.skyboxIntensity).toBeUndefined()
+      expect(result.skyboxRotation).toBeUndefined()
+      expect(result.skyboxAnimationMode).toBeUndefined()
+      expect(result.skyboxAnimationSpeed).toBeUndefined()
+      expect(result.skyboxHighQuality).toBeUndefined()
     })
 
     it('should ignore invalid objectType', () => {
@@ -176,6 +271,63 @@ describe('state-serializer', () => {
       expect(deserialized.bloomThreshold).toBeCloseTo(original.bloomThreshold!)
       expect(deserialized.bloomKnee).toBeCloseTo(original.bloomKnee!)
       expect(deserialized.bloomRadius).toBeCloseTo(original.bloomRadius!)
+    })
+
+    it('should preserve default surface shader settings when sh param is omitted', () => {
+      const original: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        shaderType: 'surface',
+        shaderSettings: {
+          wireframe: { ...DEFAULT_SHADER_SETTINGS.wireframe },
+          surface: {
+            ...DEFAULT_SHADER_SETTINGS.surface,
+            specularIntensity: 1.3,
+          },
+        },
+      }
+
+      const serialized = serializeState(original)
+      const deserialized = deserializeState(serialized)
+
+      expect(serialized).toContain('ss=')
+      expect(serialized).not.toMatch(/(?:^|&)sh=/)
+      expect(deserialized.shaderType).toBe('surface')
+      expect(deserialized.shaderSettings?.surface.specularIntensity).toBeCloseTo(1.3)
+    })
+
+    it('should preserve skybox selection through serialize/deserialize cycle', () => {
+      const original: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        skyboxSelection: 'procedural_nebula',
+      }
+
+      const serialized = serializeState(original)
+      const deserialized = deserializeState(serialized)
+
+      expect(deserialized.skyboxSelection).toBe('procedural_nebula')
+    })
+
+    it('should preserve core skybox controls through serialize/deserialize cycle', () => {
+      const original: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        skyboxIntensity: 1.8,
+        skyboxRotation: 2.2,
+        skyboxAnimationMode: 'tumble',
+        skyboxAnimationSpeed: 0.6,
+        skyboxHighQuality: true,
+      }
+
+      const serialized = serializeState(original)
+      const deserialized = deserializeState(serialized)
+
+      expect(deserialized.skyboxIntensity).toBeCloseTo(1.8)
+      expect(deserialized.skyboxRotation).toBeCloseTo(2.2)
+      expect(deserialized.skyboxAnimationMode).toBe('tumble')
+      expect(deserialized.skyboxAnimationSpeed).toBeCloseTo(0.6)
+      expect(deserialized.skyboxHighQuality).toBe(true)
     })
   })
 

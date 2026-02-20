@@ -172,6 +172,12 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarWriteGridBlock).toContain('phiVal')
     })
 
+    it('initializes gradPhi before degenerate-axis early-continue in gradient loop', () => {
+      // Flux analysis reads gradPhi[d] for every active dimension; degenerate axes must be zero-initialized.
+      expect(freeScalarWriteGridBlock).toContain('gradPhi[d] = 0.0')
+      expect(freeScalarWriteGridBlock).toContain('params.gridSize[d] <= 1u')
+    })
+
     it('composes correctly with uniforms block', () => {
       const composed = freeScalarUniformsBlock + freeScalarWriteGridBlock
       expect(composed).toContain('struct FreeScalarUniforms')

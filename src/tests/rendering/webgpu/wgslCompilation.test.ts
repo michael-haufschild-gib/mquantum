@@ -942,6 +942,10 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     expect(wgsl).toContain('eigenCacheOut')
     expect(wgsl).toContain('computeHo1D')
     expect(wgsl).toContain('computeHo1DDeriv')
+    expect(wgsl).toContain('const EIGEN_CACHE_SAMPLES: u32 = 2048u;')
+    expect(wgsl).toContain(
+      'const WORKGROUPS_PER_FUNC: u32 = (EIGEN_CACHE_SAMPLES + WORKGROUP_SIZE - 1u) / WORKGROUP_SIZE;'
+    )
     expect(features).toContain('Eigenfunction Cache Compute')
   })
 
@@ -961,11 +965,49 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     expect(modules).toContain('Analytical Gradient')
     expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
     expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = true;')
+    expect(wgsl).toContain('const USE_ROBUST_EIGEN_INTERPOLATION: bool = true;')
     expect(wgsl).toContain('fn lookupEigenfunction(')
     expect(wgsl).toContain('fn ho1DCached(')
     expect(wgsl).toContain('fn sampleDensityWithAnalyticalGradient(')
     expect(wgsl).toContain('var<storage, read> eigenCache')
     expect(wgsl).toContain('var<uniform> eigenMeta')
+  })
+
+  it('allows disabling analytical gradient while keeping eigencache enabled', () => {
+    const { wgsl } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+      useAnalyticalGradient: false,
+    })
+
+    verifyWgsl(wgsl, true)
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
+    expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+  })
+
+  it('toggles robust eigencache interpolation define independently', () => {
+    const { wgsl: robustOn } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+      useRobustEigenInterpolation: true,
+    })
+    const { wgsl: robustOff } = composeSchroedingerShader({
+      dimension: 4,
+      temporal: false,
+      sss: false,
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+      useRobustEigenInterpolation: false,
+    })
+
+    expect(robustOn).toContain('const USE_ROBUST_EIGEN_INTERPOLATION: bool = true;')
+    expect(robustOff).toContain('const USE_ROBUST_EIGEN_INTERPOLATION: bool = false;')
   })
 
   it('composes HO shader with cache and unrolled terms', () => {
@@ -1019,6 +1061,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     // Analytical gradient function is included (WGSL needs symbol resolution) but NOT enabled
     expect(modules).toContain('Analytical Gradient')
     expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+    expect(wgsl).toContain('const USE_ROBUST_EIGEN_INTERPOLATION: bool = true;')
     // Cached hydrogen ND variant should be present
     expect(wgsl).toContain('evalHydrogenNDPsi5DCached')
     expect(wgsl).toContain('ho1DCached')
@@ -1039,6 +1082,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
     expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
     // No analytical gradient for hydrogen (3D core isn't HO)
     expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+    expect(wgsl).toContain('const USE_ROBUST_EIGEN_INTERPOLATION: bool = true;')
     // No cached variant — no extra dims to cache
     expect(wgsl).not.toContain('evalHydrogenNDPsi3DCached')
   })
@@ -1057,6 +1101,7 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
       expect(wgsl).toContain(`evalHydrogenNDPsi${dimension}DCached`)
       expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = true;')
       expect(wgsl).toContain('const USE_ANALYTICAL_GRADIENT: bool = false;')
+      expect(wgsl).toContain('const USE_ROBUST_EIGEN_INTERPOLATION: bool = true;')
     }
   })
 
@@ -1171,6 +1216,41 @@ describe('WGSL Shader Compilation - Wigner Cache', () => {
     expect(wgsl).toContain('wignerCacheTexture')
     expect(wgsl).toContain('wignerCacheSampler')
     expect(wgsl).toContain('textureSampleLevel')
+  })
+
+  it('suppresses eigenfunction cache bindings in Wigner mode', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 4,
+      isWigner: true,
+      useWignerCache: true,
+      quantumMode: 'hydrogenND',
+      useEigenfunctionCache: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    verifyNoGlslLeakage(wgsl)
+    expect(features).not.toContain('Eigenfunction Cache')
+    expect(wgsl).toContain('wignerCacheTexture')
+    expect(wgsl).toContain('wignerCacheSampler')
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = false;')
+    expect(wgsl).not.toContain('var<storage, read> eigenCache')
+    expect(wgsl).not.toContain('var<uniform> eigenMeta')
+  })
+
+  it('suppresses eigenfunction cache bindings in native 2D mode', () => {
+    const { wgsl, features } = composeSchroedingerShader({
+      dimension: 2,
+      isWigner: false,
+      quantumMode: 'harmonicOscillator',
+      useEigenfunctionCache: true,
+    })
+
+    verifyWgsl(wgsl, true)
+    verifyNoGlslLeakage(wgsl)
+    expect(features).not.toContain('Eigenfunction Cache')
+    expect(wgsl).toContain('const USE_EIGENFUNCTION_CACHE: bool = false;')
+    expect(wgsl).not.toContain('var<storage, read> eigenCache')
+    expect(wgsl).not.toContain('var<uniform> eigenMeta')
   })
 
   it('composes fragment shader with Wigner inline evaluation', () => {

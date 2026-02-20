@@ -814,6 +814,7 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerSqLayerEnabled: valueSetter('sqLayerEnabled'),
     setSchroedingerSqLayerMode: valueSetter('sqLayerMode'),
     setSchroedingerSqLayerSelectedModeIndex: clampedSetter('sqLayerSelectedModeIndex', 0, 10),
+    setSchroedingerSqLayerFockQuantumNumber: clampedSetter('sqLayerFockQuantumNumber', 0, 10),
     setSchroedingerSqLayerShowOccupation: valueSetter('sqLayerShowOccupation'),
     setSchroedingerSqLayerShowUncertainty: valueSetter('sqLayerShowUncertainty'),
     setSchroedingerSqLayerCoherentAlphaRe: clampedSetter('sqLayerCoherentAlphaRe', -5, 5),

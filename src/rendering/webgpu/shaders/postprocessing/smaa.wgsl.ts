@@ -204,8 +204,9 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 fn searchXLeft(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
   var coord = texcoord;
+  let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
-  for (var i = 0; i < 16; i++) {
+  for (var i = 0; i < maxSteps; i++) {
     if (coord.x <= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.g < 0.8281) { break; }  // Found a discontinuity
@@ -219,8 +220,9 @@ fn searchXLeft(texcoord: vec2f, end: f32) -> f32 {
 fn searchXRight(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
   var coord = texcoord;
+  let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
-  for (var i = 0; i < 16; i++) {
+  for (var i = 0; i < maxSteps; i++) {
     if (coord.x >= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.g < 0.8281) { break; }
@@ -233,8 +235,9 @@ fn searchXRight(texcoord: vec2f, end: f32) -> f32 {
 fn searchYUp(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
   var coord = texcoord;
+  let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
-  for (var i = 0; i < 16; i++) {
+  for (var i = 0; i < maxSteps; i++) {
     if (coord.y <= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.r < 0.8281) { break; }
@@ -247,8 +250,9 @@ fn searchYUp(texcoord: vec2f, end: f32) -> f32 {
 fn searchYDown(texcoord: vec2f, end: f32) -> f32 {
   let texelSize = 1.0 / uniforms.resolution;
   var coord = texcoord;
+  let maxSteps = clamp(i32(uniforms.maxSearchSteps), 1, 32);
 
-  for (var i = 0; i < 16; i++) {
+  for (var i = 0; i < maxSteps; i++) {
     if (coord.y >= end) { break; }
     let e = textureSampleLevel(tEdges, linearSampler, coord, 0.0).rg;
     if (e.r < 0.8281) { break; }

@@ -171,4 +171,25 @@ describe('computeBoundingRadius (dispatch)', () => {
     expect(R_pos).toBeGreaterThan(40)
     expect(R_mom).toBeLessThan(10)
   })
+
+  it('ignores inactive extra-dimension slots when dimension is lower', () => {
+    // Only dim 4 is active (one extra dim: index 0).
+    // Hidden higher slots may still contain stale values from a previous higher dimension.
+    const extraDimN = [0, 0, 0, 0, 0, 0, 0, 6]
+    const extraDimOmega = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1]
+
+    const R = computeBoundingRadius(
+      'hydrogenND',
+      null,
+      4,
+      2,
+      1.0,
+      extraDimN,
+      extraDimOmega
+    )
+
+    // Active physics is n=2 hydrogen core + one extra dim in ground state.
+    // Radius should be dominated by hydrogen core: 2^2 * 1.0 * 3.0 = 12.
+    expect(R).toBeCloseTo(12, 6)
+  })
 })

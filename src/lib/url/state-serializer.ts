@@ -7,6 +7,7 @@
  */
 
 import { isValidObjectType } from '@/lib/geometry/registry'
+import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { AllShaderSettings, ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
 import {
@@ -15,11 +16,17 @@ import {
   DEFAULT_BLOOM_RADIUS,
   DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_EXPOSURE,
+  DEFAULT_SKYBOX_ANIMATION_MODE,
+  DEFAULT_SKYBOX_ANIMATION_SPEED,
+  DEFAULT_SKYBOX_HIGH_QUALITY,
+  DEFAULT_SKYBOX_INTENSITY,
+  DEFAULT_SKYBOX_ROTATION,
   DEFAULT_SHADER_SETTINGS,
   DEFAULT_SHADER_TYPE,
   DEFAULT_SPECULAR_COLOR,
   DEFAULT_TONE_MAPPING_ALGORITHM,
 } from '@/stores/defaults/visualDefaults'
+import type { SkyboxAnimationMode, SkyboxSelection } from '@/stores/defaults/visualDefaults'
 import { MAX_DIMENSION, MIN_DIMENSION } from '@/stores/geometryStore'
 
 /** Valid shader types for URL validation */
@@ -28,9 +35,38 @@ const VALID_SHADER_TYPES: ShaderType[] = ['wireframe', 'surface']
 /** Legacy shader type for backward compatibility */
 const LEGACY_SHADER_TYPE_DUAL_OUTLINE = 'dualOutline'
 
+/** Valid unified skybox selections for URL validation */
+const VALID_SKYBOX_SELECTIONS: SkyboxSelection[] = [
+  'none',
+  'space_blue',
+  'space_lightblue',
+  'space_red',
+  'procedural_aurora',
+  'procedural_nebula',
+  'procedural_crystalline',
+  'procedural_horizon',
+  'procedural_ocean',
+  'procedural_twilight',
+]
+
+/** Valid skybox animation modes for URL validation */
+const VALID_SKYBOX_ANIMATION_MODES: SkyboxAnimationMode[] = [
+  'none',
+  'cinematic',
+  'heatwave',
+  'tumble',
+  'ethereal',
+  'nebula',
+]
+
+/**
+ * URL-shareable subset of application state.
+ * Values are validated and transformed by `serializeState`/`deserializeState`.
+ */
 export interface ShareableState {
   dimension: number
   objectType: ObjectType
+  quantumMode?: SchroedingerQuantumMode
   uniformScale?: number
   // Scene preset name (case-insensitive lookup, mutually exclusive with other params)
   scene?: string
@@ -39,6 +75,12 @@ export interface ShareableState {
   shaderSettings?: AllShaderSettings
   edgeColor?: string
   backgroundColor?: string
+  skyboxSelection?: SkyboxSelection
+  skyboxIntensity?: number
+  skyboxRotation?: number
+  skyboxAnimationMode?: SkyboxAnimationMode
+  skyboxAnimationSpeed?: number
+  skyboxHighQuality?: boolean
   // Bloom settings (progressive downsample/upsample)
   bloomEnabled?: boolean
   bloomGain?: number
@@ -62,6 +104,9 @@ export function serializeState(state: ShareableState): string {
 
   params.set('d', state.dimension.toString())
   params.set('t', state.objectType)
+  if (state.quantumMode && state.quantumMode !== 'harmonicOscillator') {
+    params.set('qm', state.quantumMode)
+  }
 
   if (state.uniformScale !== undefined && state.uniformScale !== 1) {
     params.set('s', state.uniformScale.toFixed(2))
@@ -78,6 +123,31 @@ export function serializeState(state: ShareableState): string {
 
   if (state.backgroundColor) {
     params.set('bg', state.backgroundColor.replace('#', ''))
+  }
+
+  if (state.skyboxSelection && state.skyboxSelection !== 'none') {
+    params.set('sb', state.skyboxSelection)
+  }
+  if (state.skyboxIntensity !== undefined && state.skyboxIntensity !== DEFAULT_SKYBOX_INTENSITY) {
+    params.set('sbi', state.skyboxIntensity.toFixed(2))
+  }
+  if (state.skyboxRotation !== undefined && state.skyboxRotation !== DEFAULT_SKYBOX_ROTATION) {
+    params.set('sbr', state.skyboxRotation.toFixed(4))
+  }
+  if (
+    state.skyboxAnimationMode &&
+    state.skyboxAnimationMode !== DEFAULT_SKYBOX_ANIMATION_MODE
+  ) {
+    params.set('sbm', state.skyboxAnimationMode)
+  }
+  if (
+    state.skyboxAnimationSpeed !== undefined &&
+    state.skyboxAnimationSpeed !== DEFAULT_SKYBOX_ANIMATION_SPEED
+  ) {
+    params.set('sbs', state.skyboxAnimationSpeed.toFixed(3))
+  }
+  if (state.skyboxHighQuality === true && state.skyboxHighQuality !== DEFAULT_SKYBOX_HIGH_QUALITY) {
+    params.set('sbh', '1')
   }
 
   // Bloom settings (progressive downsample/upsample)
@@ -188,6 +258,19 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     }
   }
 
+  const quantumMode = params.get('qm')
+  if (quantumMode) {
+    const validModes: SchroedingerQuantumMode[] = [
+      'harmonicOscillator',
+      'hydrogenND',
+      'freeScalarField',
+      'tdseDynamics',
+    ]
+    if (validModes.includes(quantumMode as SchroedingerQuantumMode)) {
+      state.quantumMode = quantumMode as SchroedingerQuantumMode
+    }
+  }
+
   // Note: 'pd' (projectionDistance) is no longer used but we ignore it for backward compatibility
 
   const uniformScale = params.get('s')
@@ -219,6 +302,48 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     state.backgroundColor = `#${backgroundColor}`
   }
 
+  const skyboxSelection = params.get('sb')
+  if (
+    skyboxSelection &&
+    VALID_SKYBOX_SELECTIONS.includes(skyboxSelection as SkyboxSelection)
+  ) {
+    state.skyboxSelection = skyboxSelection as SkyboxSelection
+  }
+  const skyboxIntensity = params.get('sbi')
+  if (skyboxIntensity) {
+    const parsed = parseFloat(skyboxIntensity)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 10) {
+      state.skyboxIntensity = parsed
+    }
+  }
+  const skyboxRotation = params.get('sbr')
+  if (skyboxRotation) {
+    const parsed = parseFloat(skyboxRotation)
+    if (!isNaN(parsed)) {
+      state.skyboxRotation = parsed
+    }
+  }
+  const skyboxAnimationMode = params.get('sbm')
+  if (
+    skyboxAnimationMode &&
+    VALID_SKYBOX_ANIMATION_MODES.includes(skyboxAnimationMode as SkyboxAnimationMode)
+  ) {
+    state.skyboxAnimationMode = skyboxAnimationMode as SkyboxAnimationMode
+  }
+  const skyboxAnimationSpeed = params.get('sbs')
+  if (skyboxAnimationSpeed) {
+    const parsed = parseFloat(skyboxAnimationSpeed)
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 5) {
+      state.skyboxAnimationSpeed = parsed
+    }
+  }
+  const skyboxHighQuality = params.get('sbh')
+  if (skyboxHighQuality === '1') {
+    state.skyboxHighQuality = true
+  } else if (skyboxHighQuality === '0') {
+    state.skyboxHighQuality = false
+  }
+
   // Bloom settings (progressive downsample/upsample)
   const bloomEnabled = params.get('be')
   if (bloomEnabled === '1') {
@@ -238,7 +363,7 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
   const bloomThreshold = params.get('bt')
   if (bloomThreshold) {
     const parsed = parseFloat(bloomThreshold)
-    if (!isNaN(parsed) && parsed >= -1 && parsed <= 20) {
+    if (!isNaN(parsed) && parsed >= 0 && parsed <= 5) {
       state.bloomThreshold = parsed
     }
   }
@@ -318,13 +443,15 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
 
   // Per-shader settings (PRD Story 7 AC7)
   const shaderSettingsStr = params.get('ss')
-  if (shaderSettingsStr && state.shaderType) {
+  if (shaderSettingsStr) {
+    // When sh is omitted, settings belong to the default shader type.
+    const effectiveShaderType: ShaderType = state.shaderType ?? DEFAULT_SHADER_TYPE
     const shaderSettings: AllShaderSettings = {
       wireframe: { ...DEFAULT_SHADER_SETTINGS.wireframe },
       surface: { ...DEFAULT_SHADER_SETTINGS.surface },
     }
-    const currentSettings = shaderSettings[state.shaderType] as unknown as Record<string, unknown>
-    const defaultObj = DEFAULT_SHADER_SETTINGS[state.shaderType] as unknown as Record<
+    const currentSettings = shaderSettings[effectiveShaderType] as unknown as Record<string, unknown>
+    const defaultObj = DEFAULT_SHADER_SETTINGS[effectiveShaderType] as unknown as Record<
       string,
       unknown
     >
@@ -354,6 +481,9 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     })
 
     state.shaderSettings = shaderSettings
+    if (!state.shaderType) {
+      state.shaderType = effectiveShaderType
+    }
   }
 
   return state

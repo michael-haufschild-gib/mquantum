@@ -107,6 +107,7 @@ export function buildRadialDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConf
   const shells = computeRadialShells(raw, config.radialBinCount)
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
+  const omegaScale = Math.max(raw.omegaMax, 1e-10)
 
   const gridDims = [
     activeDims[0] ?? 1,
@@ -158,7 +159,8 @@ export function buildRadialDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConf
         nk[outIdx] = n
         kNorm[outIdx] = shells.shellKCenter[bin]!
         omegaNorm[outIdx] = shells.shellOmegaCenter[bin]!
-        nkOmega[outIdx] = n * shells.shellOmegaCenter[bin]!
+        // Keep nkOmega in physical units (n * omega), matching non-radial display modes.
+        nkOmega[outIdx] = n * shells.shellOmegaCenter[bin]! * omegaScale
 
         if (n > gridNkMax) gridNkMax = n
       }

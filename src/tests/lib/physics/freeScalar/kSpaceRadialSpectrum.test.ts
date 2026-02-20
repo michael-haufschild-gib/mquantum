@@ -153,4 +153,27 @@ describe('buildRadialDisplayGrid', () => {
     }
     expect(Math.abs(sumNoShift - sumShift) / Math.max(sumNoShift, 1e-10)).toBeLessThan(0.01)
   })
+
+  it('keeps nkOmega in physical n*omega units (not normalized omega)', () => {
+    const raw = makePlaneWaveRawData(8)
+    const grid = buildRadialDisplayGrid(raw, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      displayMode: 'radial3d',
+      fftShiftEnabled: false,
+      radialBinCount: 32,
+    })
+
+    let checked = 0
+    for (let i = 0; i < grid.nk.length; i++) {
+      const n = grid.nk[i]!
+      if (n <= 0) continue
+      const expected = n * grid.omegaNorm[i]! * raw.omegaMax
+      const relErr = Math.abs(grid.nkOmega[i]! - expected) / Math.max(expected, 1e-12)
+      expect(relErr).toBeLessThan(1e-10)
+      checked++
+      if (checked >= 128) break
+    }
+
+    expect(checked).toBeGreaterThan(0)
+  })
 })

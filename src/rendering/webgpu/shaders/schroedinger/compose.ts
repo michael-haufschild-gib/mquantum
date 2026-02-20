@@ -170,6 +170,10 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   interference?: boolean
   /** Use 1D eigenfunction cache for HO mode (replaces inline ho1D + tetrahedral gradient). */
   useEigenfunctionCache?: boolean
+  /** Explicitly enable analytical gradient path when cache is active (HO only). */
+  useAnalyticalGradient?: boolean
+  /** Enable robust eigencache interpolation/extrapolation policy when cache is active. */
+  useRobustEigenInterpolation?: boolean
   /** Compile-time specialization for uncertainty boundary emphasis. */
   uncertaintyBoundary?: boolean
   /** Wigner phase-space mode — forces 2D pipeline with phase-space evaluation. */
@@ -206,6 +210,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     uncertaintyBoundary = true,
     colorAlgorithm = 4,
     useEigenfunctionCache = false,
+    useAnalyticalGradient: useAnalyticalGradientFlag = true,
+    useRobustEigenInterpolation: useRobustEigenInterpolationFlag = true,
     isWigner = false,
     useWignerCache = false,
     isFreeScalar = false,
@@ -237,12 +243,13 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   // Determine if we should use unrolled HO superposition
   const useUnrolledHO = includeHarmonic && termCount !== undefined
 
-  // Eigenfunction cache: always enabled when requested.
-  // HO mode: caches all dimensions. Hydrogen ND: caches extra dims (4+). Hydrogen 3D: 0 entries (harmless).
-  const useCache = useEigenfunctionCache
+  // Eigenfunction cache is only valid for 3D volumetric/isosurface pipelines.
+  // In 2D/Wigner pipelines, group(2) bindings 2/3 are reserved for Wigner cache texture/sampler.
+  const useCache = useEigenfunctionCache && !is2D
   // Analytical gradient: for pure HO mode (all dimensions are HO eigenfunctions).
   // HO momentum uses CPU uniform transform (1/ω), so gradient d/dx becomes d/dk automatically.
-  const useAnalyticalGradient = useCache && includeHarmonic
+  const useAnalyticalGradient = useCache && includeHarmonic && useAnalyticalGradientFlag
+  const useRobustEigenInterpolation = useCache && useRobustEigenInterpolationFlag
 
   // Add dimension define
   defines.push(`const DIMENSION: i32 = ${dimension};`)
@@ -292,6 +299,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   }
   // Analytical gradient: only for pure HO mode (hydrogen ND keeps tetrahedral for 3D core)
   defines.push(`const USE_ANALYTICAL_GRADIENT: bool = ${useAnalyticalGradient};`)
+  defines.push(`const USE_ROBUST_EIGEN_INTERPOLATION: bool = ${useRobustEigenInterpolation};`)
 
   // Radial probability overlay: compile-time guard (hydrogen only)
   defines.push(`const FEATURE_RADIAL_PROBABILITY: bool = ${includeHydrogen};`)

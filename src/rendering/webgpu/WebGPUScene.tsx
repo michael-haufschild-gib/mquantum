@@ -75,6 +75,7 @@ import type { ObjectType } from '@/lib/geometry/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
 import {
   COLOR_ALGORITHM_TO_INT,
+  getAvailableColorAlgorithms,
   type ColorAlgorithm as PaletteColorAlgorithm,
 } from '@/rendering/shaders/palette/types'
 import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
@@ -117,6 +118,8 @@ const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getSta
   maxFps: state.maxFps,
   temporalReprojectionEnabled: state.temporalReprojectionEnabled,
   eigenfunctionCacheEnabled: state.eigenfunctionCacheEnabled,
+  analyticalGradientEnabled: state.analyticalGradientEnabled,
+  robustEigenInterpolationEnabled: state.robustEigenInterpolationEnabled,
 })
 
 const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.getState>) => ({
@@ -526,6 +529,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         schroedingerCompile.quantumMode === 'tdseDynamics'
       ) ? false : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
+      analyticalGradientEnabled: performance_.analyticalGradientEnabled,
+      robustEigenInterpolationEnabled: performance_.robustEigenInterpolationEnabled,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
       representation: schroedingerCompile.representation,
@@ -720,6 +725,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.representation,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
+    performance_.analyticalGradientEnabled,
+    performance_.robustEigenInterpolationEnabled,
   ])
 
   // Runtime scene clear-color update (avoids full pass rebuild for background color changes).
@@ -1732,6 +1739,8 @@ export interface PassConfig {
   uncertaintyBoundaryEnabled: boolean
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
+  analyticalGradientEnabled: boolean
+  robustEigenInterpolationEnabled: boolean
   renderResolutionScale?: number
   colorAlgorithm: PaletteColorAlgorithm
   // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
@@ -1760,6 +1769,8 @@ interface SchrodingerPassConfig {
   uncertaintyBoundaryEnabled: boolean
   representation: 'position' | 'momentum' | 'wigner'
   eigenfunctionCacheEnabled: boolean
+  analyticalGradientEnabled: boolean
+  robustEigenInterpolationEnabled: boolean
   temporalReprojectionEnabled: boolean
 }
 
@@ -1774,12 +1785,26 @@ interface PPPassConfig {
   temporalReprojectionEnabled: boolean
 }
 
+function normalizeColorAlgorithmForQuantumMode(
+  quantumMode: PassConfig['quantumMode'],
+  colorAlgorithm: PaletteColorAlgorithm
+): PaletteColorAlgorithm {
+  const isAvailable = getAvailableColorAlgorithms(quantumMode).some(
+    (option) => option.value === colorAlgorithm
+  )
+  return isAvailable ? colorAlgorithm : 'diverging'
+}
+
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isFreeScalar = config.quantumMode === 'freeScalarField'
   const isTdse = config.quantumMode === 'tdseDynamics'
   // Both free scalar and TDSE use GPU compute pipelines with density grid output,
   // so they disable analytic-only features and force position representation.
   const isComputeMode = isFreeScalar || isTdse
+  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
+    config.quantumMode,
+    config.colorAlgorithm
+  )
   return {
     objectType: config.objectType,
     // Compute modes force dimension >= 3 and disable features unsupported by their pipeline.
@@ -1788,15 +1813,7 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
     dimension: isComputeMode ? Math.max(config.dimension, 3) : config.dimension,
     quantumMode: config.quantumMode,
     termCount: isComputeMode ? 1 : config.termCount,
-    colorAlgorithm: !isComputeMode && (
-      config.colorAlgorithm === 'hamiltonianDecomposition' ||
-      config.colorAlgorithm === 'modeCharacter' ||
-      config.colorAlgorithm === 'energyFlux'
-    )
-      ? 'radialDistance'
-      : isComputeMode && config.colorAlgorithm === 'relativePhase'
-        ? 'mixed'
-        : config.colorAlgorithm,
+    colorAlgorithm: normalizedColorAlgorithm,
     isosurface: config.isosurface,
     nodalEnabled: isComputeMode ? false : config.nodalEnabled,
     phaseMaterialityEnabled: isComputeMode ? false : config.phaseMaterialityEnabled,
@@ -1804,6 +1821,8 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
     uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
     representation: isComputeMode ? 'position' : config.representation,
     eigenfunctionCacheEnabled: isComputeMode ? false : config.eigenfunctionCacheEnabled,
+    analyticalGradientEnabled: isComputeMode ? false : config.analyticalGradientEnabled,
+    robustEigenInterpolationEnabled: isComputeMode ? false : config.robustEigenInterpolationEnabled,
     temporalReprojectionEnabled: isComputeMode ? false : config.temporalReprojectionEnabled,
   }
 }
@@ -2458,7 +2477,11 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     interferenceEnabled,
     uncertaintyBoundaryEnabled,
   } = config
-  const colorAlgorithm = COLOR_ALGORITHM_TO_INT[config.colorAlgorithm] as
+  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
+    quantumMode,
+    config.colorAlgorithm
+  )
+  const colorAlgorithm = COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as
     | WGSLColorAlgorithm
     | undefined
   const useTemporalCloudAccumulation =
@@ -2480,6 +2503,8 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         uncertaintyBoundaryEnabled,
         temporal: useTemporalCloudAccumulation,
         eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
+        analyticalGradientEnabled: config.analyticalGradientEnabled,
+        robustEigenInterpolationEnabled: config.robustEigenInterpolationEnabled,
         representation: config.representation,
       })
 

@@ -193,6 +193,12 @@ interface PerformanceState {
   /** Whether eigenfunction caching is enabled (compile-time shader specialization) */
   eigenfunctionCacheEnabled: boolean
 
+  /** Whether cached analytical gradient path is enabled for harmonic oscillator rendering */
+  analyticalGradientEnabled: boolean
+
+  /** Whether robust interpolation/extrapolation policy is enabled for eigencache lookups */
+  robustEigenInterpolationEnabled: boolean
+
   // -------------------------------------------------------------------------
   // Schroedinger Animation Quality
   // -------------------------------------------------------------------------
@@ -256,6 +262,8 @@ interface PerformanceState {
 
   // Eigenfunction Cache
   setEigenfunctionCacheEnabled: (enabled: boolean) => void
+  setAnalyticalGradientEnabled: (enabled: boolean) => void
+  setRobustEigenInterpolationEnabled: (enabled: boolean) => void
 
   // Fractal Animation Quality
   setFractalAnimationLowQuality: (enabled: boolean) => void
@@ -317,6 +325,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Eigenfunction Cache
   eigenfunctionCacheEnabled: true,
+  analyticalGradientEnabled: true,
+  robustEigenInterpolationEnabled: true,
 
   // Schroedinger Animation Quality
   fractalAnimationLowQuality: true,
@@ -417,6 +427,14 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ eigenfunctionCacheEnabled: enabled })
   },
 
+  setAnalyticalGradientEnabled: (enabled: boolean) => {
+    set({ analyticalGradientEnabled: enabled })
+  },
+
+  setRobustEigenInterpolationEnabled: (enabled: boolean) => {
+    set({ robustEigenInterpolationEnabled: enabled })
+  },
+
   // Fractal Animation Quality
   setFractalAnimationLowQuality: (enabled: boolean) => {
     set({ fractalAnimationLowQuality: enabled })
@@ -506,6 +524,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       temporalReprojectionEnabled: true,
       cameraTeleported: false,
       eigenfunctionCacheEnabled: true,
+      analyticalGradientEnabled: true,
+      robustEigenInterpolationEnabled: true,
       fractalAnimationLowQuality: true,
       renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
       maxFps: DEFAULT_MAX_FPS,

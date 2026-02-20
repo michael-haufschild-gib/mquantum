@@ -47,6 +47,8 @@ const DRIVE_WAVEFORM_OPTIONS = [
 const FIELD_VIEW_OPTIONS = [
   { value: 'density', label: 'Density |ψ|²' },
   { value: 'phase', label: 'Phase arg(ψ)' },
+  { value: 'current', label: 'Current |j|' },
+  { value: 'potential', label: 'Potential V(x)' },
 ]
 
 /**
@@ -319,8 +321,8 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             <>
               <Slider
                 label="Absorber Width"
-                min={0.01}
-                max={0.5}
+                min={0.05}
+                max={0.3}
                 step={0.01}
                 value={td.absorberWidth}
                 onChange={actions.setAbsorberWidth}
@@ -363,7 +365,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           <Slider
             label="Lattice Dim"
             min={1}
-            max={Math.min(dimension, 6)}
+            max={Math.min(dimension, 11)}
             step={1}
             value={activeDims}
             onChange={actions.setLatticeDim}
@@ -407,6 +409,16 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             data-testid="tdse-mass"
           />
           <Slider
+            label="Reduced Planck Constant (ħ)"
+            min={0.01}
+            max={10}
+            step={0.01}
+            value={td.hbar}
+            onChange={actions.setHbar}
+            showValue
+            data-testid="tdse-hbar"
+          />
+          <Slider
             label="dt"
             min={0.0001}
             max={0.1}
@@ -419,7 +431,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           <Slider
             label="Steps/Frame"
             min={1}
-            max={20}
+            max={16}
             step={1}
             value={td.stepsPerFrame}
             onChange={actions.setStepsPerFrame}
@@ -436,6 +448,18 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             onCheckedChange={actions.setDiagnosticsEnabled}
             data-testid="tdse-diagnostics-enabled"
           />
+          {td.diagnosticsEnabled && (
+            <Slider
+              label="Diagnostics Interval (frames)"
+              min={1}
+              max={60}
+              step={1}
+              value={td.diagnosticsInterval}
+              onChange={actions.setDiagnosticsInterval}
+              showValue
+              data-testid="tdse-diagnostics-interval"
+            />
+          )}
         </div>
 
         {/* Slice positions for dims > 3 */}

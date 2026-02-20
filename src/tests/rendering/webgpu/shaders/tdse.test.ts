@@ -129,10 +129,21 @@ describe('TDSE write grid shader', () => {
     expect(tdseWriteGridBlock).toContain('textureStore(outputTex')
   })
 
-  it('encodes density, log-density, and phase', () => {
+  it('binds potential buffer and output texture', () => {
+    expect(tdseWriteGridBlock).toContain('@group(0) @binding(3) var<storage, read> potential')
+    expect(tdseWriteGridBlock).toContain('@group(0) @binding(4) var outputTex')
+  })
+
+  it('encodes selected field scalar, log-density, and phase', () => {
     expect(tdseWriteGridBlock).toContain('normDensity')
     expect(tdseWriteGridBlock).toContain('logDensity')
     expect(tdseWriteGridBlock).toContain('phase')
+  })
+
+  it('branches on fieldView modes', () => {
+    expect(tdseWriteGridBlock).toContain('params.fieldView == 0u')
+    expect(tdseWriteGridBlock).toContain('params.fieldView == 1u')
+    expect(tdseWriteGridBlock).toContain('params.fieldView == 2u')
   })
 
   it('uses basis vectors for N-D projection', () => {

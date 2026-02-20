@@ -122,7 +122,7 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
     const shaderModule = this.createShaderModule(device, wgsl, 'eigenfunction-cache-compute')
 
     // Storage buffer for cached eigenfunctions: array<vec2f>
-    // Size: MAX_EIGEN_FUNCS × SAMPLES × 2 × 4 bytes = 704 KB
+    // Size: MAX_EIGEN_FUNCS × SAMPLES × 2 × 4 bytes (88 × 2048 × 8 ≈ 1.38 MiB)
     const cacheBufferSize = MAX_EIGEN_FUNCS * EIGEN_CACHE_SAMPLES * 2 * 4
     this.cacheBuffer = device.createBuffer({
       label: 'eigenfunction-cache-storage',
@@ -366,12 +366,8 @@ export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
       label: 'eigenfunction-cache-compute-pass',
     })
 
-    // Each workgroup handles one function (256 threads per function)
-    // With 1024 samples and 256 threads, each workgroup handles 4 passes
-    // Actually: workgroup_size=256, SAMPLES=1024, so we need ceil(1024/256) = 4 dispatches per func
-    // But the shader uses global_invocation_id.x % SAMPLES and workgroup_id.x = funcIdx
-    // So we need numFuncs workgroups in x, each of size 256
-    // 256 threads per workgroup, 1024 samples → need 4 workgroups per function
+    // One function spans ceil(SAMPLES / WORKGROUP_SIZE) workgroups.
+    // Keep CPU dispatch and WGSL workgroup mapping derived from shared constants.
     const workgroupsPerFunc = Math.ceil(EIGEN_CACHE_SAMPLES / WORKGROUP_SIZE)
 
     this.dispatchCompute(

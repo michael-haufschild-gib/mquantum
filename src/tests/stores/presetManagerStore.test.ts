@@ -5,6 +5,7 @@ import { useAnimationStore } from '@/stores/animationStore'
 import { useRotationStore } from '@/stores/rotationStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { useEnvironmentStore } from '@/stores/environmentStore'
+import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
@@ -193,6 +194,38 @@ describe('presetManagerStore', () => {
       expect(restoredRotations).toBeInstanceOf(Map)
       expect(restoredRotations.get('XY')).toBeCloseTo(1.5, 5)
       expect(restoredRotations.get('YZ')).toBeCloseTo(2.0, 5)
+    })
+
+    it('clamps imported scene animationBias to the UI contract [0, 1] on load', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Out Of Range Bias',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 4, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: [] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: { animationBias: 42 },
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      useUIStore.setState({ animationBias: 0 })
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(useUIStore.getState().animationBias).toBe(1)
     })
 
     it('persists momentum representation settings in saved scenes', () => {
@@ -598,8 +631,13 @@ describe('presetManagerStore', () => {
       // Load the legacy style
       usePresetManagerStore.getState().loadStyle(imported!.id)
 
-      // Should have set skyboxEnabled to false as fallback
-      expect(useEnvironmentStore.getState().skyboxEnabled).toBe(false)
+      // Should have canonical skybox fallback and strip legacy field
+      const environment = useEnvironmentStore.getState()
+      expect(environment.skyboxEnabled).toBe(false)
+      expect(environment.skyboxSelection).toBe('none')
+      expect(environment.skyboxMode).toBe('classic')
+      expect(environment.skyboxTexture).toBe('none')
+      expect((environment as Record<string, unknown>).classicSkyboxType).toBeUndefined()
     })
 
     it('should handle legacy scene without skyboxEnabled', () => {
@@ -629,8 +667,42 @@ describe('presetManagerStore', () => {
       // Load the legacy scene
       usePresetManagerStore.getState().loadScene(imported!.id)
 
-      // Should have set skyboxEnabled to false as fallback
-      expect(useEnvironmentStore.getState().skyboxEnabled).toBe(false)
+      // Should have canonical skybox fallback and strip legacy field
+      const environment = useEnvironmentStore.getState()
+      expect(environment.skyboxEnabled).toBe(false)
+      expect(environment.skyboxSelection).toBe('none')
+      expect(environment.skyboxMode).toBe('classic')
+      expect(environment.skyboxTexture).toBe('none')
+      expect((environment as Record<string, unknown>).classicSkyboxType).toBeUndefined()
+    })
+
+    it('should derive missing skybox selection from legacy mode/texture fields', () => {
+      const legacyStyle = {
+        id: 'legacy-derive-id',
+        name: 'Legacy Derived Style',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#ff0000' },
+          lighting: { lightEnabled: true },
+          postProcessing: { bloomEnabled: false },
+          environment: {
+            skyboxEnabled: true,
+            skyboxMode: 'classic',
+            skyboxTexture: 'space_red',
+          }, // No skyboxSelection
+        },
+      }
+
+      usePresetManagerStore.getState().importStyles(JSON.stringify([legacyStyle]))
+      const [imported] = usePresetManagerStore.getState().savedStyles
+
+      usePresetManagerStore.getState().loadStyle(imported!.id)
+
+      const environment = useEnvironmentStore.getState()
+      expect(environment.skyboxSelection).toBe('space_red')
+      expect(environment.skyboxEnabled).toBe(true)
+      expect(environment.skyboxMode).toBe('classic')
+      expect(environment.skyboxTexture).toBe('space_red')
     })
 
     it('should strip nested sqLayer transient fields when loading a scene', () => {
@@ -653,6 +725,7 @@ describe('presetManagerStore', () => {
               sqLayerMode: 'coherent',
               sqLayerCoherentAlphaRe: 2.5,
               sqLayerSelectedModeIndex: 1,
+              sqLayerFockQuantumNumber: 4,
             },
           },
           transform: {},
@@ -679,6 +752,7 @@ describe('presetManagerStore', () => {
       expect(config.sqLayerEnabled).toBe(false)
       expect(config.sqLayerMode).toBe('fock')
       expect(config.sqLayerSelectedModeIndex).toBe(0)
+      expect(config.sqLayerFockQuantumNumber).toBe(0)
     })
 
     it('should strip version fields when importing styles', () => {
@@ -742,6 +816,101 @@ describe('presetManagerStore', () => {
       // Actual data should be preserved
       expect(imported!.data.appearance.edgeColor).toBe('#ff0000')
       expect(imported!.data.geometry.dimension).toBe(4)
+    })
+
+    it('should strip removed gravity/object-depth fields when importing styles', () => {
+      const styleWithLegacyPostProcessing = {
+        id: 'legacy-post-style-id',
+        name: 'Legacy Post Style',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#ff0000' },
+          lighting: { lightEnabled: true },
+          postProcessing: {
+            bloomEnabled: false,
+            objectOnlyDepth: true,
+            gravityEnabled: true,
+            gravityStrength: 0.8,
+            gravityDistortionScale: 1.2,
+            gravityFalloff: 1.6,
+            gravityChromaticAberration: 0.05,
+          },
+          environment: { skyboxEnabled: false },
+        },
+      }
+
+      usePresetManagerStore.getState().importStyles(JSON.stringify([styleWithLegacyPostProcessing]))
+      const [imported] = usePresetManagerStore.getState().savedStyles
+      expect(imported).toBeDefined()
+
+      // Removed fields should not be kept in persisted imported data
+      expect(imported!.data.postProcessing.objectOnlyDepth).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityEnabled).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityStrength).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityDistortionScale).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityFalloff).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityChromaticAberration).toBeUndefined()
+
+      // Nor should they be applied to runtime post-processing state
+      usePresetManagerStore.getState().loadStyle(imported!.id)
+      const pp = usePostProcessingStore.getState() as Record<string, unknown>
+      expect(pp.objectOnlyDepth).toBeUndefined()
+      expect(pp.gravityEnabled).toBeUndefined()
+      expect(pp.gravityStrength).toBeUndefined()
+      expect(pp.gravityDistortionScale).toBeUndefined()
+      expect(pp.gravityFalloff).toBeUndefined()
+      expect(pp.gravityChromaticAberration).toBeUndefined()
+    })
+
+    it('should strip removed gravity/object-depth fields when importing scenes', () => {
+      const sceneWithLegacyPostProcessing = {
+        id: 'legacy-post-scene-id',
+        name: 'Legacy Post Scene',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#ff0000' },
+          lighting: { lightEnabled: true },
+          postProcessing: {
+            bloomEnabled: false,
+            objectOnlyDepth: true,
+            gravityEnabled: true,
+            gravityStrength: 0.8,
+            gravityDistortionScale: 1.2,
+            gravityFalloff: 1.6,
+            gravityChromaticAberration: 0.05,
+          },
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: {},
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: [] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      usePresetManagerStore.getState().importScenes(JSON.stringify([sceneWithLegacyPostProcessing]))
+      const [imported] = usePresetManagerStore.getState().savedScenes
+      expect(imported).toBeDefined()
+
+      // Removed fields should not be kept in persisted imported data
+      expect(imported!.data.postProcessing.objectOnlyDepth).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityEnabled).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityStrength).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityDistortionScale).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityFalloff).toBeUndefined()
+      expect(imported!.data.postProcessing.gravityChromaticAberration).toBeUndefined()
+
+      // Nor should they be applied to runtime post-processing state
+      usePresetManagerStore.getState().loadScene(imported!.id)
+      const pp = usePostProcessingStore.getState() as Record<string, unknown>
+      expect(pp.objectOnlyDepth).toBeUndefined()
+      expect(pp.gravityEnabled).toBeUndefined()
+      expect(pp.gravityStrength).toBeUndefined()
+      expect(pp.gravityDistortionScale).toBeUndefined()
+      expect(pp.gravityFalloff).toBeUndefined()
+      expect(pp.gravityChromaticAberration).toBeUndefined()
     })
   })
 
