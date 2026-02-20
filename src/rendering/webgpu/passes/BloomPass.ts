@@ -1,244 +1,160 @@
 /**
- * WebGPU Bloom Pass (Bloom V2)
+ * WebGPU Bloom Pass (Progressive Downsample/Upsample)
  *
- * Features:
- * 1. Gaussian mode: threshold -> progressive blur -> level-specialized composite
- * 2. Convolution mode: optional downsample + convolution composite
- * 3. Zero-strength fast path: single copy pass
+ * Jimenez 2014 / Call of Duty bloom:
+ * 1. Prefilter: luminance threshold + Karis average -> downMips[0] (half-res)
+ * 2. Downsample x4: 13-tap box filter through mip chain
+ * 3. Upsample x4: 9-tap tent filter + additive blend up the chain
+ * 4. Composite: scene + gain * upMips[0]
+ * 5. Zero-strength fast path: single copy pass
+ *
+ * 10 render passes, 0 compute passes. All rgba16float fragment shaders.
  */
 
-import type { BloomBandSettings, BloomMode } from '@/stores/defaults/visualDefaults'
 import {
-  DEFAULT_BLOOM_BANDS,
-  DEFAULT_BLOOM_CONVOLUTION_BOOST,
-  DEFAULT_BLOOM_CONVOLUTION_RADIUS,
-  DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
-  DEFAULT_BLOOM_CONVOLUTION_TINT,
   DEFAULT_BLOOM_GAIN,
   DEFAULT_BLOOM_KNEE,
-  DEFAULT_BLOOM_MODE,
+  DEFAULT_BLOOM_RADIUS,
   DEFAULT_BLOOM_THRESHOLD,
 } from '@/stores/defaults/visualDefaults'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
-import { parseHexColorToLinearRgb } from '../utils/color'
 import {
-  bloomConvolutionCompositeShader,
+  bloomCompositeShader,
   bloomCopyShader,
-  bloomThresholdShader,
-  createBloomBlurComputeShader,
-  createBloomCompositeShader,
+  bloomDownsampleShader,
+  bloomPrefilterShader,
+  bloomUpsampleShader,
 } from '../shaders/postprocessing/bloom.wgsl'
 
-/** Kernel sizes per MIP level matching UnrealBloomPass. */
-const KERNEL_SIZES = [6, 10, 14, 18, 22] as const
-const NUM_MIPS = 5
-/** Packed coefficient slots (array<vec4f, 6> = 24 floats). */
-const COEFF_SLOTS = 24
-/** Compute shader workgroup tile width. */
-const WORKGROUP_SIZE = 256
+/** Number of downsample mip levels (including prefilter output). */
+const NUM_DOWN_MIPS = 5
+/** Number of upsample mip levels. */
+const NUM_UP_MIPS = 4
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-function cloneDefaultBands(): BloomBandSettings[] {
-  return DEFAULT_BLOOM_BANDS.map((band) => ({ ...band }))
-}
-
-function sanitizeBand(
-  input: Partial<BloomBandSettings> | undefined,
-  fallback: BloomBandSettings
-): BloomBandSettings {
-  if (!input) return { ...fallback }
-  const tint =
-    typeof input.tint === 'string' && /^#[0-9A-Fa-f]{6}$/.test(input.tint)
-      ? input.tint
-      : fallback.tint
-  return {
-    enabled: input.enabled ?? fallback.enabled,
-    weight: clamp(input.weight ?? fallback.weight, 0, 4),
-    size: clamp(input.size ?? fallback.size, 0.25, 4),
-    tint,
-  }
-}
-
 interface BloomStoreState {
-  bloomMode?: BloomMode
   bloomGain?: number
   bloomThreshold?: number
   bloomKnee?: number
-  bloomBands?: BloomBandSettings[]
-  bloomConvolutionRadius?: number
-  bloomConvolutionResolutionScale?: number
-  bloomConvolutionBoost?: number
-  bloomConvolutionTint?: string
+  bloomRadius?: number
 }
 
 export interface BloomPassOptions {
+  /**
+   * Base scene color input used for final composite.
+   */
   inputResource?: string
+  /**
+   * Optional bloom extraction source.
+   * If omitted, bloom is extracted from `inputResource`.
+   */
+  bloomInputResource?: string
   outputResource?: string
-  mode?: BloomMode
   gain?: number
   threshold?: number
   knee?: number
-  bands?: BloomBandSettings[]
-  convolutionRadius?: number
-  convolutionResolutionScale?: number
-  convolutionBoost?: number
-  convolutionTint?: string
+  filterRadius?: number
 }
 
 export class BloomPass extends WebGPUBasePass {
   // Pipelines
-  private thresholdPipeline: GPURenderPipeline | null = null
-  private blurPipelines: (GPUComputePipeline | null)[] = new Array(NUM_MIPS).fill(null)
-  private compositePipelines: (GPURenderPipeline | null)[] = new Array(NUM_MIPS).fill(null)
+  private prefilterPipeline: GPURenderPipeline | null = null
+  private downsamplePipeline: GPURenderPipeline | null = null
+  private upsamplePipeline: GPURenderPipeline | null = null
+  private compositePipeline: GPURenderPipeline | null = null
   private copyPipeline: GPURenderPipeline | null = null
-  private convolutionPipeline: GPURenderPipeline | null = null
 
   // Bind group layouts
-  private thresholdBGL: GPUBindGroupLayout | null = null
-  private blurBGL: GPUBindGroupLayout | null = null
-  private compositeBGLs: (GPUBindGroupLayout | null)[] = new Array(NUM_MIPS).fill(null)
+  private prefilterBGL: GPUBindGroupLayout | null = null
+  private downsampleBGL: GPUBindGroupLayout | null = null
+  private upsampleBGL: GPUBindGroupLayout | null = null
+  private compositeBGL: GPUBindGroupLayout | null = null
   private copyBGL: GPUBindGroupLayout | null = null
-  private convolutionBGL: GPUBindGroupLayout | null = null
 
   // Uniform buffers
-  private thresholdUB: GPUBuffer | null = null
-  private blurUBs: GPUBuffer[] = []
+  private prefilterUB: GPUBuffer | null = null
+  private upsampleUB: GPUBuffer | null = null
   private compositeUB: GPUBuffer | null = null
-  private convolutionUB: GPUBuffer | null = null
 
-  private thresholdUniformData = new Float32Array(4)
-  private blurUniformBuffer = new ArrayBuffer(4 * (8 + COEFF_SLOTS))
-  private blurUniformScratch = new Float32Array(this.blurUniformBuffer)
-  private blurUniformScratchU32 = new Uint32Array(this.blurUniformBuffer)
-  private compositeUniformData = new Float32Array(32)
-  private convolutionUniformData = new Float32Array(12)
+  // Scratch data
+  private prefilterUniformData = new Float32Array(4)
+  private upsampleUniformData = new Float32Array(4)
+  private compositeUniformData = new Float32Array(4)
 
   // Sampler
   private sampler: GPUSampler | null = null
 
-  // Gaussian textures
-  private thresholdTexture: GPUTexture | null = null
-  private thresholdTextureView: GPUTextureView | null = null
-  private horizontalTextures: GPUTexture[] = []
-  private verticalTextures: GPUTexture[] = []
-  private horizontalTextureViews: GPUTextureView[] = []
-  private verticalTextureViews: GPUTextureView[] = []
-  private gaussianTextureSize = { width: 0, height: 0 }
-
-  // Convolution texture
-  private convolutionTexture: GPUTexture | null = null
-  private convolutionTextureView: GPUTextureView | null = null
-  private convolutionTextureSize = { width: 0, height: 0, scale: -1 }
+  // Mip textures
+  private downMips: GPUTexture[] = []
+  private downMipViews: GPUTextureView[] = []
+  private upMips: GPUTexture[] = []
+  private upMipViews: GPUTextureView[] = []
+  private textureSize = { width: 0, height: 0 }
 
   // Cached bind groups
-  private thresholdBindGroup: GPUBindGroup | null = null
-  private thresholdBindGroupInputView: GPUTextureView | null = null
-  private blurHBindGroups: (GPUBindGroup | null)[] = new Array(NUM_MIPS).fill(null)
-  private blurVBindGroups: (GPUBindGroup | null)[] = new Array(NUM_MIPS).fill(null)
-  private blurHBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_MIPS).fill(null)
-  private blurVBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_MIPS).fill(null)
-  private compositeBindGroups: (GPUBindGroup | null)[] = new Array(NUM_MIPS).fill(null)
-  private compositeBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_MIPS).fill(null)
+  private prefilterBindGroup: GPUBindGroup | null = null
+  private prefilterBindGroupInputView: GPUTextureView | null = null
+  private downsampleBindGroups: (GPUBindGroup | null)[] = new Array(NUM_DOWN_MIPS - 1).fill(null)
+  private downsampleBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_DOWN_MIPS - 1).fill(null)
+  private upsampleBindGroups: (GPUBindGroup | null)[] = new Array(NUM_UP_MIPS).fill(null)
+  private upsampleBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_UP_MIPS).fill(null)
+  private compositeBindGroup: GPUBindGroup | null = null
+  private compositeBindGroupSceneView: GPUTextureView | null = null
   private copyBindGroup: GPUBindGroup | null = null
   private copyBindGroupInputView: GPUTextureView | null = null
-  private convolutionBindGroup: GPUBindGroup | null = null
-  private convolutionBindGroupSceneView: GPUTextureView | null = null
-  private convolutionBindGroupInputView: GPUTextureView | null = null
 
   // Configurable resources
-  private inputResource: string
+  private sceneInputResource: string
+  private bloomInputResource: string
   private outputResource: string
 
   // Parameters
-  private mode: BloomMode = DEFAULT_BLOOM_MODE
   private gain = DEFAULT_BLOOM_GAIN
   private threshold = DEFAULT_BLOOM_THRESHOLD
   private knee = DEFAULT_BLOOM_KNEE
-  private bands: BloomBandSettings[] = cloneDefaultBands()
-  private convolutionRadius = DEFAULT_BLOOM_CONVOLUTION_RADIUS
-  private convolutionResolutionScale = DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE
-  private convolutionBoost = DEFAULT_BLOOM_CONVOLUTION_BOOST
-  private convolutionTint = DEFAULT_BLOOM_CONVOLUTION_TINT
+  private filterRadius = DEFAULT_BLOOM_RADIUS
 
-  // Cached state keys
-  private lastThreshold = Number.NaN
-  private lastKnee = Number.NaN
-  private lastBlurSizeKey = ''
+  // Cached uniform keys for dirty-flag optimization
+  private lastPrefilterKey = ''
+  private lastUpsampleKey = ''
   private lastCompositeKey = ''
-  private lastConvolutionKey = ''
-
-  // Precomputed Gaussian coefficients per MIP level
-  private gaussianCoefficients: Float32Array[] = []
 
   constructor(options?: BloomPassOptions) {
     const inputResource = options?.inputResource ?? 'hdr-color'
+    const bloomInputResource = options?.bloomInputResource ?? inputResource
     const outputResource = options?.outputResource ?? 'bloom-output'
+    const inputs = [
+      { resourceId: inputResource, access: 'read' as const, binding: 0 },
+      ...(bloomInputResource !== inputResource
+        ? [{ resourceId: bloomInputResource, access: 'read' as const, binding: 1 }]
+        : []),
+    ]
 
     super({
       id: 'bloom',
       priority: 800,
-      inputs: [{ resourceId: inputResource, access: 'read', binding: 0 }],
+      inputs,
       outputs: [{ resourceId: outputResource, access: 'write', binding: 0 }],
     })
 
-    this.inputResource = inputResource
+    this.sceneInputResource = inputResource
+    this.bloomInputResource = bloomInputResource
     this.outputResource = outputResource
 
-    if (options?.mode) this.mode = options.mode
     if (options?.gain !== undefined) this.gain = clamp(options.gain, 0, 3)
-    if (options?.threshold !== undefined) this.threshold = clamp(options.threshold, 0, 20)
+    if (options?.threshold !== undefined) this.threshold = clamp(options.threshold, 0, 5)
     if (options?.knee !== undefined) this.knee = clamp(options.knee, 0, 5)
-    if (options?.bands) {
-      this.bands = cloneDefaultBands().map((fallback, index) =>
-        sanitizeBand(options.bands?.[index], fallback)
-      )
-    }
-    if (options?.convolutionRadius !== undefined) {
-      this.convolutionRadius = clamp(options.convolutionRadius, 0.5, 6)
-    }
-    if (options?.convolutionResolutionScale !== undefined) {
-      this.convolutionResolutionScale = clamp(options.convolutionResolutionScale, 0.25, 1)
-    }
-    if (options?.convolutionBoost !== undefined) {
-      this.convolutionBoost = clamp(options.convolutionBoost, 0, 4)
-    }
-    if (
-      options?.convolutionTint !== undefined &&
-      /^#[0-9A-Fa-f]{6}$/.test(options.convolutionTint)
-    ) {
-      this.convolutionTint = options.convolutionTint
-    }
-
-    this.precomputeGaussianCoefficients()
-  }
-
-  private precomputeGaussianCoefficients(): void {
-    this.gaussianCoefficients = []
-
-    for (let level = 0; level < NUM_MIPS; level++) {
-      const kernelRadius = KERNEL_SIZES[level]!
-      const sigma = kernelRadius / 3.0
-      const coeffs = new Float32Array(COEFF_SLOTS)
-
-      for (let i = 0; i < kernelRadius; i++) {
-        coeffs[i] = (0.39894 * Math.exp((-0.5 * i * i) / (sigma * sigma))) / sigma
-      }
-
-      this.gaussianCoefficients.push(coeffs)
-    }
+    if (options?.filterRadius !== undefined) this.filterRadius = clamp(options.filterRadius, 0.25, 4)
   }
 
   private updateFromStores(ctx: WebGPURenderContext): void {
     const postProcessing = ctx.frame?.stores?.['postProcessing'] as BloomStoreState | undefined
     if (!postProcessing) return
 
-    if (postProcessing.bloomMode) {
-      this.mode = postProcessing.bloomMode
-    }
     if (postProcessing.bloomGain !== undefined) {
       this.gain = clamp(postProcessing.bloomGain, 0, 3)
     }
@@ -248,29 +164,8 @@ export class BloomPass extends WebGPUBasePass {
     if (postProcessing.bloomKnee !== undefined) {
       this.knee = clamp(postProcessing.bloomKnee, 0, 5)
     }
-    if (postProcessing.bloomBands && postProcessing.bloomBands.length > 0) {
-      this.bands = cloneDefaultBands().map((fallback, index) =>
-        sanitizeBand(postProcessing.bloomBands?.[index], fallback)
-      )
-    }
-    if (postProcessing.bloomConvolutionRadius !== undefined) {
-      this.convolutionRadius = clamp(postProcessing.bloomConvolutionRadius, 0.5, 6)
-    }
-    if (postProcessing.bloomConvolutionResolutionScale !== undefined) {
-      this.convolutionResolutionScale = clamp(
-        postProcessing.bloomConvolutionResolutionScale,
-        0.25,
-        1
-      )
-    }
-    if (postProcessing.bloomConvolutionBoost !== undefined) {
-      this.convolutionBoost = clamp(postProcessing.bloomConvolutionBoost, 0, 4)
-    }
-    if (
-      postProcessing.bloomConvolutionTint !== undefined &&
-      /^#[0-9A-Fa-f]{6}$/.test(postProcessing.bloomConvolutionTint)
-    ) {
-      this.convolutionTint = postProcessing.bloomConvolutionTint
+    if (postProcessing.bloomRadius !== undefined) {
+      this.filterRadius = clamp(postProcessing.bloomRadius, 0.25, 4)
     }
   }
 
@@ -285,8 +180,10 @@ export class BloomPass extends WebGPUBasePass {
       addressModeV: 'clamp-to-edge',
     })
 
-    this.thresholdBGL = device.createBindGroupLayout({
-      label: 'bloom-threshold-bgl',
+    // --- Bind Group Layouts ---
+
+    this.prefilterBGL = device.createBindGroupLayout({
+      label: 'bloom-prefilter-bgl',
       entries: [
         { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
@@ -294,43 +191,33 @@ export class BloomPass extends WebGPUBasePass {
       ],
     })
 
-    this.blurBGL = device.createBindGroupLayout({
-      label: 'bloom-blur-compute-bgl',
+    this.downsampleBGL = device.createBindGroupLayout({
+      label: 'bloom-downsample-bgl',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, texture: { sampleType: 'float' } },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: { access: 'write-only', format: 'rgba16float' },
-        },
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       ],
     })
 
-    this.compositeBGLs = new Array(NUM_MIPS).fill(null)
-    for (let levelCount = 1; levelCount <= NUM_MIPS; levelCount++) {
-      const entries: GPUBindGroupLayoutEntry[] = [
+    this.upsampleBGL = device.createBindGroupLayout({
+      label: 'bloom-upsample-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-      ]
-      for (let i = 0; i < levelCount; i++) {
-        entries.push({
-          binding: i + 2,
-          visibility: GPUShaderStage.FRAGMENT,
-          texture: { sampleType: 'float' },
-        })
-      }
-      entries.push({
-        binding: levelCount + 2,
-        visibility: GPUShaderStage.FRAGMENT,
-        sampler: { type: 'filtering' },
-      })
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      ],
+    })
 
-      this.compositeBGLs[levelCount - 1] = device.createBindGroupLayout({
-        label: `bloom-composite-bgl-L${levelCount}`,
-        entries,
-      })
-    }
+    this.compositeBGL = device.createBindGroupLayout({
+      label: 'bloom-composite-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      ],
+    })
 
     this.copyBGL = device.createBindGroupLayout({
       label: 'bloom-copy-bgl',
@@ -340,267 +227,98 @@ export class BloomPass extends WebGPUBasePass {
       ],
     })
 
-    this.convolutionBGL = device.createBindGroupLayout({
-      label: 'bloom-convolution-bgl',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
-      ],
-    })
+    // --- Uniform Buffers ---
 
-    this.thresholdUB = this.createUniformBuffer(device, 16, 'bloom-threshold-ub')
-    this.compositeUB = this.createUniformBuffer(device, 128, 'bloom-composite-ub')
-    this.convolutionUB = this.createUniformBuffer(device, 48, 'bloom-convolution-ub')
+    this.prefilterUB = this.createUniformBuffer(device, 16, 'bloom-prefilter-ub')
+    this.upsampleUB = this.createUniformBuffer(device, 16, 'bloom-upsample-ub')
+    this.compositeUB = this.createUniformBuffer(device, 16, 'bloom-composite-ub')
 
-    this.blurUBs = []
-    for (let level = 0; level < NUM_MIPS; level++) {
-      for (let dir = 0; dir < 2; dir++) {
-        this.blurUBs.push(this.createUniformBuffer(device, 128, `bloom-blur-ub-L${level}-${dir}`))
-      }
-    }
+    // --- Pipelines ---
 
-    const thresholdModule = this.createShaderModule(
-      device,
-      bloomThresholdShader,
-      'bloom-threshold-shader'
-    )
-    this.thresholdPipeline = this.createFullscreenPipeline(
-      device,
-      thresholdModule,
-      [this.thresholdBGL],
-      'rgba16float',
-      { label: 'bloom-threshold' }
+    const prefilterModule = this.createShaderModule(device, bloomPrefilterShader, 'bloom-prefilter-shader')
+    this.prefilterPipeline = this.createFullscreenPipeline(
+      device, prefilterModule, [this.prefilterBGL], 'rgba16float', { label: 'bloom-prefilter' }
     )
 
-    const blurPipelineLayout = device.createPipelineLayout({
-      label: 'bloom-blur-compute-layout',
-      bindGroupLayouts: [this.blurBGL],
-    })
-    for (let i = 0; i < NUM_MIPS; i++) {
-      const blurCode = createBloomBlurComputeShader(KERNEL_SIZES[i]!)
-      const blurModule = this.createShaderModule(device, blurCode, `bloom-blur-compute-L${i}`)
-      this.blurPipelines[i] = device.createComputePipeline({
-        label: `bloom-blur-compute-L${i}`,
-        layout: blurPipelineLayout,
-        compute: { module: blurModule, entryPoint: 'main' },
-      })
-    }
+    const downsampleModule = this.createShaderModule(device, bloomDownsampleShader, 'bloom-downsample-shader')
+    this.downsamplePipeline = this.createFullscreenPipeline(
+      device, downsampleModule, [this.downsampleBGL], 'rgba16float', { label: 'bloom-downsample' }
+    )
 
-    for (let levelCount = 1; levelCount <= NUM_MIPS; levelCount++) {
-      const compositeCode = createBloomCompositeShader(levelCount)
-      const compositeModule = this.createShaderModule(
-        device,
-        compositeCode,
-        `bloom-composite-L${levelCount}-shader`
-      )
-      this.compositePipelines[levelCount - 1] = this.createFullscreenPipeline(
-        device,
-        compositeModule,
-        [this.compositeBGLs[levelCount - 1]!],
-        'rgba16float',
-        { label: `bloom-composite-L${levelCount}` }
-      )
-    }
+    const upsampleModule = this.createShaderModule(device, bloomUpsampleShader, 'bloom-upsample-shader')
+    this.upsamplePipeline = this.createFullscreenPipeline(
+      device, upsampleModule, [this.upsampleBGL], 'rgba16float', { label: 'bloom-upsample' }
+    )
+
+    const compositeModule = this.createShaderModule(device, bloomCompositeShader, 'bloom-composite-shader')
+    this.compositePipeline = this.createFullscreenPipeline(
+      device, compositeModule, [this.compositeBGL], 'rgba16float', { label: 'bloom-composite' }
+    )
 
     const copyModule = this.createShaderModule(device, bloomCopyShader, 'bloom-copy-shader')
     this.copyPipeline = this.createFullscreenPipeline(
-      device,
-      copyModule,
-      [this.copyBGL],
-      'rgba16float',
-      {
-        label: 'bloom-copy',
-      }
-    )
-
-    const convolutionModule = this.createShaderModule(
-      device,
-      bloomConvolutionCompositeShader,
-      'bloom-convolution-shader'
-    )
-    this.convolutionPipeline = this.createFullscreenPipeline(
-      device,
-      convolutionModule,
-      [this.convolutionBGL],
-      'rgba16float',
-      { label: 'bloom-convolution' }
+      device, copyModule, [this.copyBGL], 'rgba16float', { label: 'bloom-copy' }
     )
   }
 
   private invalidateBindGroups(): void {
-    this.thresholdBindGroup = null
-    this.thresholdBindGroupInputView = null
+    this.prefilterBindGroup = null
+    this.prefilterBindGroupInputView = null
+    this.downsampleBindGroups.fill(null)
+    this.downsampleBindGroupInputViews.fill(null)
+    this.upsampleBindGroups.fill(null)
+    this.upsampleBindGroupInputViews.fill(null)
+    this.compositeBindGroup = null
+    this.compositeBindGroupSceneView = null
     this.copyBindGroup = null
     this.copyBindGroupInputView = null
-    this.convolutionBindGroup = null
-    this.convolutionBindGroupSceneView = null
-    this.convolutionBindGroupInputView = null
-    this.compositeBindGroups.fill(null)
-    this.compositeBindGroupInputViews.fill(null)
-    this.blurHBindGroups.fill(null)
-    this.blurVBindGroups.fill(null)
-    this.blurHBindGroupInputViews.fill(null)
-    this.blurVBindGroupInputViews.fill(null)
   }
 
-  private ensureGaussianTextures(device: GPUDevice, width: number, height: number): void {
-    if (this.gaussianTextureSize.width === width && this.gaussianTextureSize.height === height) {
+  private ensureTextures(device: GPUDevice, width: number, height: number): void {
+    if (this.textureSize.width === width && this.textureSize.height === height) {
       return
     }
 
-    this.thresholdTexture?.destroy()
-    for (const tex of this.horizontalTextures) tex?.destroy()
-    for (const tex of this.verticalTextures) tex?.destroy()
+    // Destroy old textures
+    for (const tex of this.downMips) tex?.destroy()
+    for (const tex of this.upMips) tex?.destroy()
 
-    this.horizontalTextures = []
-    this.verticalTextures = []
-    this.horizontalTextureViews = []
-    this.verticalTextureViews = []
+    this.downMips = []
+    this.downMipViews = []
+    this.upMips = []
+    this.upMipViews = []
 
-    for (let i = 0; i < NUM_MIPS; i++) {
+    // Create downsample mip chain (5 levels: half, quarter, eighth, sixteenth, 1/32)
+    for (let i = 0; i < NUM_DOWN_MIPS; i++) {
       const mipWidth = Math.max(1, Math.round(width / Math.pow(2, i + 1)))
       const mipHeight = Math.max(1, Math.round(height / Math.pow(2, i + 1)))
-      const desc = {
+      const tex = device.createTexture({
+        label: `bloom-down-${i}`,
         size: { width: mipWidth, height: mipHeight },
-        format: 'rgba16float' as const,
-        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.STORAGE_BINDING,
-      }
-
-      this.horizontalTextures.push(device.createTexture({ ...desc, label: `bloom-H-L${i}` }))
-      this.verticalTextures.push(device.createTexture({ ...desc, label: `bloom-V-L${i}` }))
-      this.horizontalTextureViews.push(this.horizontalTextures[i]!.createView())
-      this.verticalTextureViews.push(this.verticalTextures[i]!.createView())
+        format: 'rgba16float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      })
+      this.downMips.push(tex)
+      this.downMipViews.push(tex.createView())
     }
 
-    this.thresholdTexture = device.createTexture({
-      label: 'bloom-threshold-tex',
-      size: {
-        width: Math.max(1, Math.round(width / 2)),
-        height: Math.max(1, Math.round(height / 2)),
-      },
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-    this.thresholdTextureView = this.thresholdTexture.createView()
+    // Create upsample mip chain (4 levels: matches downMips[3] through downMips[0])
+    for (let i = 0; i < NUM_UP_MIPS; i++) {
+      const downIndex = NUM_DOWN_MIPS - 2 - i // 3, 2, 1, 0
+      const mipWidth = Math.max(1, Math.round(width / Math.pow(2, downIndex + 1)))
+      const mipHeight = Math.max(1, Math.round(height / Math.pow(2, downIndex + 1)))
+      const tex = device.createTexture({
+        label: `bloom-up-${i}`,
+        size: { width: mipWidth, height: mipHeight },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      })
+      this.upMips.push(tex)
+      this.upMipViews.push(tex.createView())
+    }
 
-    this.gaussianTextureSize = { width, height }
-    this.lastBlurSizeKey = ''
+    this.textureSize = { width, height }
     this.invalidateBindGroups()
-  }
-
-  private ensureConvolutionTexture(device: GPUDevice, width: number, height: number): void {
-    const scale = this.convolutionResolutionScale
-
-    if (scale >= 0.999) {
-      this.convolutionTexture?.destroy()
-      this.convolutionTexture = null
-      this.convolutionTextureView = null
-      this.convolutionTextureSize = { width: 0, height: 0, scale: -1 }
-      this.convolutionBindGroup = null
-      this.convolutionBindGroupInputView = null
-      return
-    }
-
-    const targetWidth = Math.max(1, Math.round(width * scale))
-    const targetHeight = Math.max(1, Math.round(height * scale))
-
-    if (
-      this.convolutionTexture &&
-      this.convolutionTextureSize.width === targetWidth &&
-      this.convolutionTextureSize.height === targetHeight &&
-      Math.abs(this.convolutionTextureSize.scale - scale) < 1e-4
-    ) {
-      return
-    }
-
-    this.convolutionTexture?.destroy()
-    this.convolutionTexture = device.createTexture({
-      label: 'bloom-convolution-input',
-      size: { width: targetWidth, height: targetHeight },
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-    this.convolutionTextureView = this.convolutionTexture.createView()
-    this.convolutionTextureSize = { width: targetWidth, height: targetHeight, scale }
-    this.copyBindGroup = null
-    this.copyBindGroupInputView = null
-    this.convolutionBindGroup = null
-    this.convolutionBindGroupInputView = null
-  }
-
-  private writeBlurUniformsIfNeeded(device: GPUDevice): void {
-    const key = `${this.gaussianTextureSize.width}x${this.gaussianTextureSize.height}:${this.bands
-      .map((band) => band.size.toFixed(3))
-      .join('|')}`
-
-    if (key === this.lastBlurSizeKey) return
-
-    for (let level = 0; level < NUM_MIPS; level++) {
-      const mipWidth = Math.max(
-        1,
-        Math.round(this.gaussianTextureSize.width / Math.pow(2, level + 1))
-      )
-      const mipHeight = Math.max(
-        1,
-        Math.round(this.gaussianTextureSize.height / Math.pow(2, level + 1))
-      )
-      const coeffs = this.gaussianCoefficients[level]!
-      const sizeScale = clamp(this.bands[level]?.size ?? 1, 0.25, 4)
-
-      for (let dir = 0; dir < 2; dir++) {
-        const bufferIndex = level * 2 + dir
-        const buffer = this.blurUBs[bufferIndex]!
-        const inputWidth =
-          dir === 0 && level > 0
-            ? Math.max(1, Math.round(this.gaussianTextureSize.width / Math.pow(2, level)))
-            : mipWidth
-        const inputHeight =
-          dir === 0 && level > 0
-            ? Math.max(1, Math.round(this.gaussianTextureSize.height / Math.pow(2, level)))
-            : mipHeight
-
-        this.blurUniformScratch.fill(0)
-        // outputSize: vec2u (offsets 0,1), inputSize: vec2u (offsets 2,3)
-        this.blurUniformScratchU32[0] = mipWidth
-        this.blurUniformScratchU32[1] = mipHeight
-        this.blurUniformScratchU32[2] = inputWidth
-        this.blurUniformScratchU32[3] = inputHeight
-        // direction: u32 (offset 4 as u32)
-        this.blurUniformScratchU32[4] = dir
-        // sizeScale: f32 (offset 5 as f32)
-        this.blurUniformScratch[5] = sizeScale
-
-        for (let i = 0; i < COEFF_SLOTS; i++) {
-          this.blurUniformScratch[8 + i] = coeffs[i]!
-        }
-
-        this.writeUniformBuffer(device, buffer, this.blurUniformScratch)
-      }
-    }
-
-    this.lastBlurSizeKey = key
-  }
-
-  private computeActiveGaussianLevels(): number {
-    let active = 0
-    for (let i = 0; i < NUM_MIPS; i++) {
-      const band = this.bands[i]!
-      if (band.enabled) {
-        active = i + 1
-      } else {
-        break
-      }
-    }
-    return active
-  }
-
-  private hasAnyGaussianContribution(activeLevels: number): boolean {
-    for (let i = 0; i < activeLevels; i++) {
-      if (this.bands[i]!.weight > 0) return true
-    }
-    return false
   }
 
   private renderCopy(
@@ -633,296 +351,174 @@ export class BloomPass extends WebGPUBasePass {
     pass.end()
   }
 
-  private writeCompositeUniformsIfNeeded(activeLevels: number): void {
-    if (!this.device || !this.compositeUB) return
-
-    const weights = new Float32Array(NUM_MIPS)
-    const tints = new Float32Array(NUM_MIPS * 4)
-
-    for (let i = 0; i < NUM_MIPS; i++) {
-      const band = this.bands[i]!
-      weights[i] = i < activeLevels && band.enabled ? band.weight : 0
-      const linearTint = parseHexColorToLinearRgb(band.tint, [1, 1, 1])
-      tints[i * 4 + 0] = linearTint[0]
-      tints[i * 4 + 1] = linearTint[1]
-      tints[i * 4 + 2] = linearTint[2]
-      tints[i * 4 + 3] = 1
-    }
-
-    const compositeKey = `${this.gain.toFixed(4)}:${Array.from(weights)
-      .map((value) => value.toFixed(4))
-      .join('|')}:${Array.from(tints)
-      .map((value) => value.toFixed(4))
-      .join('|')}`
-
-    if (compositeKey === this.lastCompositeKey) return
-
-    this.compositeUniformData.fill(0)
-    this.compositeUniformData[0] = this.gain
-    this.compositeUniformData[4] = weights[0]!
-    this.compositeUniformData[5] = weights[1]!
-    this.compositeUniformData[6] = weights[2]!
-    this.compositeUniformData[7] = weights[3]!
-    this.compositeUniformData[8] = weights[4]!
-
-    for (let i = 0; i < NUM_MIPS; i++) {
-      const base = 12 + i * 4
-      this.compositeUniformData[base + 0] = tints[i * 4 + 0]!
-      this.compositeUniformData[base + 1] = tints[i * 4 + 1]!
-      this.compositeUniformData[base + 2] = tints[i * 4 + 2]!
-      this.compositeUniformData[base + 3] = 1
-    }
-
-    this.writeUniformBuffer(this.device, this.compositeUB, this.compositeUniformData)
-    this.lastCompositeKey = compositeKey
-  }
-
-  private executeGaussian(
+  private executeBloom(
     ctx: WebGPURenderContext,
-    inputView: GPUTextureView,
-    outputView: GPUTextureView,
-    activeLevels: number
+    sceneView: GPUTextureView,
+    bloomInputView: GPUTextureView,
+    outputView: GPUTextureView
   ): void {
     if (
       !this.device ||
-      !this.thresholdPipeline ||
-      !this.thresholdBGL ||
-      !this.blurBGL ||
-      !this.thresholdUB ||
+      !this.prefilterPipeline ||
+      !this.downsamplePipeline ||
+      !this.upsamplePipeline ||
+      !this.compositePipeline ||
+      !this.prefilterBGL ||
+      !this.downsampleBGL ||
+      !this.upsampleBGL ||
+      !this.compositeBGL ||
+      !this.prefilterUB ||
+      !this.upsampleUB ||
       !this.compositeUB ||
       !this.sampler
     ) {
       return
     }
 
-    if (!this.compositePipelines[activeLevels - 1] || !this.compositeBGLs[activeLevels - 1]) {
+    this.ensureTextures(this.device, ctx.size.width, ctx.size.height)
+
+    if (this.downMipViews.length < NUM_DOWN_MIPS || this.upMipViews.length < NUM_UP_MIPS) {
       return
     }
 
-    this.ensureGaussianTextures(this.device, ctx.size.width, ctx.size.height)
-    this.writeBlurUniformsIfNeeded(this.device)
-
-    if (
-      !this.thresholdTextureView ||
-      this.horizontalTextureViews.length < NUM_MIPS ||
-      this.verticalTextureViews.length < NUM_MIPS
-    ) {
-      return
+    // --- Write prefilter uniforms ---
+    const prefilterKey = `${this.threshold.toFixed(4)}:${this.knee.toFixed(4)}`
+    if (prefilterKey !== this.lastPrefilterKey) {
+      this.prefilterUniformData[0] = this.threshold
+      this.prefilterUniformData[1] = this.knee
+      this.prefilterUniformData[2] = 0
+      this.prefilterUniformData[3] = 0
+      this.writeUniformBuffer(this.device, this.prefilterUB, this.prefilterUniformData)
+      this.lastPrefilterKey = prefilterKey
     }
 
-    if (this.threshold !== this.lastThreshold || this.knee !== this.lastKnee) {
-      this.thresholdUniformData[0] = this.threshold
-      this.thresholdUniformData[1] = this.knee
-      this.thresholdUniformData[2] = 0
-      this.thresholdUniformData[3] = 0
-      this.writeUniformBuffer(this.device, this.thresholdUB, this.thresholdUniformData)
-      this.lastThreshold = this.threshold
-      this.lastKnee = this.knee
+    // --- Write upsample uniforms ---
+    const upsampleKey = this.filterRadius.toFixed(4)
+    if (upsampleKey !== this.lastUpsampleKey) {
+      this.upsampleUniformData[0] = this.filterRadius
+      this.upsampleUniformData[1] = 0
+      this.upsampleUniformData[2] = 0
+      this.upsampleUniformData[3] = 0
+      this.writeUniformBuffer(this.device, this.upsampleUB, this.upsampleUniformData)
+      this.lastUpsampleKey = upsampleKey
     }
 
-    if (!this.thresholdBindGroup || this.thresholdBindGroupInputView !== inputView) {
-      this.thresholdBindGroup = this.createBindGroup(this.device, this.thresholdBGL, [
-        { binding: 0, resource: { buffer: this.thresholdUB } },
-        { binding: 1, resource: inputView },
+    // --- Write composite uniforms ---
+    const compositeKey = this.gain.toFixed(4)
+    if (compositeKey !== this.lastCompositeKey) {
+      this.compositeUniformData[0] = this.gain
+      this.compositeUniformData[1] = 0
+      this.compositeUniformData[2] = 0
+      this.compositeUniformData[3] = 0
+      this.writeUniformBuffer(this.device, this.compositeUB, this.compositeUniformData)
+      this.lastCompositeKey = compositeKey
+    }
+
+    // === PREFILTER: full-res input -> downMips[0] (half-res) ===
+    if (!this.prefilterBindGroup || this.prefilterBindGroupInputView !== bloomInputView) {
+      this.prefilterBindGroup = this.createBindGroup(this.device, this.prefilterBGL, [
+        { binding: 0, resource: { buffer: this.prefilterUB } },
+        { binding: 1, resource: bloomInputView },
         { binding: 2, resource: this.sampler },
       ])
-      this.thresholdBindGroupInputView = inputView
+      this.prefilterBindGroupInputView = bloomInputView
     }
 
-    const thresholdPass = ctx.beginRenderPass({
-      label: 'bloom-threshold',
-      colorAttachments: [
-        {
-          view: this.thresholdTextureView,
+    const prefilterPass = ctx.beginRenderPass({
+      label: 'bloom-prefilter',
+      colorAttachments: [{
+        view: this.downMipViews[0]!,
+        loadOp: 'clear',
+        storeOp: 'store',
+        clearValue: { r: 0, g: 0, b: 0, a: 0 },
+      }],
+    })
+    this.renderFullscreen(prefilterPass, this.prefilterPipeline, [this.prefilterBindGroup])
+    prefilterPass.end()
+
+    // === DOWNSAMPLE x4: downMips[0] -> [1] -> [2] -> [3] -> [4] ===
+    for (let i = 0; i < NUM_DOWN_MIPS - 1; i++) {
+      const srcView = this.downMipViews[i]!
+      const dstView = this.downMipViews[i + 1]!
+
+      if (!this.downsampleBindGroups[i] || this.downsampleBindGroupInputViews[i] !== srcView) {
+        this.downsampleBindGroups[i] = this.createBindGroup(this.device, this.downsampleBGL, [
+          { binding: 0, resource: srcView },
+          { binding: 1, resource: this.sampler },
+        ])
+        this.downsampleBindGroupInputViews[i] = srcView
+      }
+
+      const dsPass = ctx.beginRenderPass({
+        label: `bloom-downsample-${i}`,
+        colorAttachments: [{
+          view: dstView,
           loadOp: 'clear',
           storeOp: 'store',
           clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        },
-      ],
-    })
-    this.renderFullscreen(thresholdPass, this.thresholdPipeline, [this.thresholdBindGroup])
-    thresholdPass.end()
-
-    const blurInputView: GPUTextureView = this.thresholdTextureView
-
-    for (let level = 0; level < activeLevels; level++) {
-      const pipeline = this.blurPipelines[level]
-      if (!pipeline) return
-
-      const mipWidth = Math.max(1, Math.round(ctx.size.width / Math.pow(2, level + 1)))
-      const mipHeight = Math.max(1, Math.round(ctx.size.height / Math.pow(2, level + 1)))
-
-      const hReadView = level === 0 ? blurInputView : this.verticalTextureViews[level - 1]!
-      const hBufferIdx = level * 2
-
-      if (!this.blurHBindGroups[level] || this.blurHBindGroupInputViews[level] !== hReadView) {
-        this.blurHBindGroups[level] = this.createBindGroup(this.device, this.blurBGL, [
-          { binding: 0, resource: { buffer: this.blurUBs[hBufferIdx]! } },
-          { binding: 1, resource: hReadView },
-          { binding: 2, resource: this.horizontalTextureViews[level]! },
-        ])
-        this.blurHBindGroupInputViews[level] = hReadView
-      }
-
-      const hPass = ctx.beginComputePass({ label: `bloom-blur-H-L${level}` })
-      hPass.setPipeline(pipeline)
-      hPass.setBindGroup(0, this.blurHBindGroups[level]!)
-      hPass.dispatchWorkgroups(Math.ceil(mipWidth / WORKGROUP_SIZE), mipHeight, 1)
-      hPass.end()
-
-      const vBufferIdx = level * 2 + 1
-      const vReadView = this.horizontalTextureViews[level]!
-      if (!this.blurVBindGroups[level] || this.blurVBindGroupInputViews[level] !== vReadView) {
-        this.blurVBindGroups[level] = this.createBindGroup(this.device, this.blurBGL, [
-          { binding: 0, resource: { buffer: this.blurUBs[vBufferIdx]! } },
-          { binding: 1, resource: vReadView },
-          { binding: 2, resource: this.verticalTextureViews[level]! },
-        ])
-        this.blurVBindGroupInputViews[level] = vReadView
-      }
-
-      const vPass = ctx.beginComputePass({ label: `bloom-blur-V-L${level}` })
-      vPass.setPipeline(pipeline)
-      vPass.setBindGroup(0, this.blurVBindGroups[level]!)
-      vPass.dispatchWorkgroups(Math.ceil(mipHeight / WORKGROUP_SIZE), mipWidth, 1)
-      vPass.end()
+        }],
+      })
+      this.renderFullscreen(dsPass, this.downsamplePipeline, [this.downsampleBindGroups[i]!])
+      dsPass.end()
     }
 
-    this.writeCompositeUniformsIfNeeded(activeLevels)
+    // === UPSAMPLE x4: blend up the mip chain ===
+    // upMips[0]: downMips[4] + downMips[3] -> upMips[0] (at downMips[3] resolution)
+    // upMips[1]: upMips[0]   + downMips[2] -> upMips[1] (at downMips[2] resolution)
+    // upMips[2]: upMips[1]   + downMips[1] -> upMips[2] (at downMips[1] resolution)
+    // upMips[3]: upMips[2]   + downMips[0] -> upMips[3] (at downMips[0] resolution)
+    for (let i = 0; i < NUM_UP_MIPS; i++) {
+      const lowerMipView = i === 0 ? this.downMipViews[NUM_DOWN_MIPS - 1]! : this.upMipViews[i - 1]!
+      const currentDownIndex = NUM_DOWN_MIPS - 2 - i // 3, 2, 1, 0
+      const currentMipView = this.downMipViews[currentDownIndex]!
+      const dstView = this.upMipViews[i]!
 
-    const pipeline = this.compositePipelines[activeLevels - 1]!
-    const bgl = this.compositeBGLs[activeLevels - 1]!
-
-    if (
-      !this.compositeBindGroups[activeLevels - 1] ||
-      this.compositeBindGroupInputViews[activeLevels - 1] !== inputView
-    ) {
-      const entries: GPUBindGroupEntry[] = [
-        { binding: 0, resource: { buffer: this.compositeUB } },
-        { binding: 1, resource: inputView },
-      ]
-
-      for (let i = 0; i < activeLevels; i++) {
-        entries.push({ binding: i + 2, resource: this.verticalTextureViews[i]! })
+      if (!this.upsampleBindGroups[i] || this.upsampleBindGroupInputViews[i] !== lowerMipView) {
+        this.upsampleBindGroups[i] = this.createBindGroup(this.device, this.upsampleBGL, [
+          { binding: 0, resource: { buffer: this.upsampleUB } },
+          { binding: 1, resource: lowerMipView },
+          { binding: 2, resource: currentMipView },
+          { binding: 3, resource: this.sampler },
+        ])
+        this.upsampleBindGroupInputViews[i] = lowerMipView
       }
 
-      entries.push({ binding: activeLevels + 2, resource: this.sampler })
+      const usPass = ctx.beginRenderPass({
+        label: `bloom-upsample-${i}`,
+        colorAttachments: [{
+          view: dstView,
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        }],
+      })
+      this.renderFullscreen(usPass, this.upsamplePipeline, [this.upsampleBindGroups[i]!])
+      usPass.end()
+    }
 
-      this.compositeBindGroups[activeLevels - 1] = this.createBindGroup(this.device, bgl, entries)
-      this.compositeBindGroupInputViews[activeLevels - 1] = inputView
+    // === COMPOSITE: scene + gain * upMips[3] (half-res bloom) -> output ===
+    const bloomView = this.upMipViews[NUM_UP_MIPS - 1]!
+    if (!this.compositeBindGroup || this.compositeBindGroupSceneView !== sceneView) {
+      this.compositeBindGroup = this.createBindGroup(this.device, this.compositeBGL, [
+        { binding: 0, resource: { buffer: this.compositeUB } },
+        { binding: 1, resource: sceneView },
+        { binding: 2, resource: bloomView },
+        { binding: 3, resource: this.sampler },
+      ])
+      this.compositeBindGroupSceneView = sceneView
     }
 
     const compositePass = ctx.beginRenderPass({
-      label: `bloom-composite-L${activeLevels}`,
-      colorAttachments: [
-        {
-          view: outputView,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
+      label: 'bloom-composite',
+      colorAttachments: [{
+        view: outputView,
+        loadOp: 'clear',
+        storeOp: 'store',
+        clearValue: { r: 0, g: 0, b: 0, a: 1 },
+      }],
     })
-    this.renderFullscreen(compositePass, pipeline, [this.compositeBindGroups[activeLevels - 1]!])
+    this.renderFullscreen(compositePass, this.compositePipeline, [this.compositeBindGroup])
     compositePass.end()
-  }
-
-  private executeConvolution(
-    ctx: WebGPURenderContext,
-    inputView: GPUTextureView,
-    outputView: GPUTextureView
-  ): void {
-    if (
-      !this.device ||
-      !this.copyPipeline ||
-      !this.copyBGL ||
-      !this.convolutionPipeline ||
-      !this.convolutionBGL ||
-      !this.convolutionUB ||
-      !this.sampler
-    ) {
-      return
-    }
-
-    this.ensureConvolutionTexture(this.device, ctx.size.width, ctx.size.height)
-
-    let convolutionInputView = inputView
-
-    if (this.convolutionTextureView) {
-      if (!this.copyBindGroup || this.copyBindGroupInputView !== inputView) {
-        this.copyBindGroup = this.createBindGroup(this.device, this.copyBGL, [
-          { binding: 0, resource: inputView },
-          { binding: 1, resource: this.sampler },
-        ])
-        this.copyBindGroupInputView = inputView
-      }
-
-      const copyPass = ctx.beginRenderPass({
-        label: 'bloom-convolution-downsample',
-        colorAttachments: [
-          {
-            view: this.convolutionTextureView,
-            loadOp: 'clear',
-            storeOp: 'store',
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          },
-        ],
-      })
-      this.renderFullscreen(copyPass, this.copyPipeline, [this.copyBindGroup])
-      copyPass.end()
-      convolutionInputView = this.convolutionTextureView
-    }
-
-    const convolutionTint = parseHexColorToLinearRgb(this.convolutionTint, [1, 1, 1])
-    const convolutionKey = `${this.gain.toFixed(4)}:${this.convolutionRadius.toFixed(4)}:${this.convolutionBoost.toFixed(4)}:${this.threshold.toFixed(4)}:${this.knee.toFixed(4)}:${convolutionTint
-      .map((value) => value.toFixed(4))
-      .join('|')}`
-
-    if (convolutionKey !== this.lastConvolutionKey) {
-      this.convolutionUniformData[0] = this.gain
-      this.convolutionUniformData[1] = this.convolutionRadius
-      this.convolutionUniformData[2] = this.convolutionBoost
-      this.convolutionUniformData[3] = this.threshold
-      this.convolutionUniformData[4] = this.knee
-      this.convolutionUniformData[5] = 0
-      this.convolutionUniformData[6] = 0
-      this.convolutionUniformData[7] = 0
-      this.convolutionUniformData[8] = convolutionTint[0]
-      this.convolutionUniformData[9] = convolutionTint[1]
-      this.convolutionUniformData[10] = convolutionTint[2]
-      this.convolutionUniformData[11] = 1
-      this.writeUniformBuffer(this.device, this.convolutionUB, this.convolutionUniformData)
-      this.lastConvolutionKey = convolutionKey
-    }
-
-    if (
-      !this.convolutionBindGroup ||
-      this.convolutionBindGroupSceneView !== inputView ||
-      this.convolutionBindGroupInputView !== convolutionInputView
-    ) {
-      this.convolutionBindGroup = this.createBindGroup(this.device, this.convolutionBGL, [
-        { binding: 0, resource: { buffer: this.convolutionUB } },
-        { binding: 1, resource: inputView },
-        { binding: 2, resource: convolutionInputView },
-        { binding: 3, resource: this.sampler },
-      ])
-      this.convolutionBindGroupSceneView = inputView
-      this.convolutionBindGroupInputView = convolutionInputView
-    }
-
-    const pass = ctx.beginRenderPass({
-      label: 'bloom-convolution',
-      colorAttachments: [
-        {
-          view: outputView,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 1 },
-        },
-      ],
-    })
-    this.renderFullscreen(pass, this.convolutionPipeline, [this.convolutionBindGroup])
-    pass.end()
   }
 
   execute(ctx: WebGPURenderContext): void {
@@ -930,70 +526,42 @@ export class BloomPass extends WebGPUBasePass {
 
     this.updateFromStores(ctx)
 
-    const inputView = ctx.getTextureView(this.inputResource)
+    const sceneView = ctx.getTextureView(this.sceneInputResource)
+    const bloomInputView = ctx.getTextureView(this.bloomInputResource)
     const outputView = ctx.getWriteTarget(this.outputResource) ?? ctx.getCanvasTextureView()
-    if (!inputView) return
+    if (!sceneView || !bloomInputView) return
 
     if (this.gain <= 0) {
-      this.renderCopy(ctx, inputView, outputView)
+      this.renderCopy(ctx, sceneView, outputView)
       return
     }
 
-    if (this.mode === 'convolution') {
-      this.executeConvolution(ctx, inputView, outputView)
-      return
-    }
-
-    const activeLevels = this.computeActiveGaussianLevels()
-    if (activeLevels <= 0 || !this.hasAnyGaussianContribution(activeLevels)) {
-      this.renderCopy(ctx, inputView, outputView)
-      return
-    }
-
-    this.executeGaussian(ctx, inputView, outputView, activeLevels)
-  }
-
-  private releaseGaussianTextures(): void {
-    this.thresholdTexture?.destroy()
-    for (const tex of this.horizontalTextures) tex?.destroy()
-    for (const tex of this.verticalTextures) tex?.destroy()
-
-    this.thresholdTexture = null
-    this.thresholdTextureView = null
-    this.horizontalTextures = []
-    this.verticalTextures = []
-    this.horizontalTextureViews = []
-    this.verticalTextureViews = []
-    this.gaussianTextureSize = { width: 0, height: 0 }
-    this.lastBlurSizeKey = ''
-  }
-
-  private releaseConvolutionTexture(): void {
-    this.convolutionTexture?.destroy()
-    this.convolutionTexture = null
-    this.convolutionTextureView = null
-    this.convolutionTextureSize = { width: 0, height: 0, scale: -1 }
+    this.executeBloom(ctx, sceneView, bloomInputView, outputView)
   }
 
   releaseInternalResources(): void {
-    this.releaseGaussianTextures()
-    this.releaseConvolutionTexture()
+    for (const tex of this.downMips) tex?.destroy()
+    for (const tex of this.upMips) tex?.destroy()
+
+    this.downMips = []
+    this.downMipViews = []
+    this.upMips = []
+    this.upMipViews = []
+    this.textureSize = { width: 0, height: 0 }
+
     this.invalidateBindGroups()
   }
 
   dispose(): void {
-    this.thresholdUB?.destroy()
+    this.prefilterUB?.destroy()
+    this.upsampleUB?.destroy()
     this.compositeUB?.destroy()
-    this.convolutionUB?.destroy()
-    for (const buf of this.blurUBs) buf?.destroy()
 
-    this.releaseGaussianTextures()
-    this.releaseConvolutionTexture()
+    this.releaseInternalResources()
 
-    this.thresholdUB = null
+    this.prefilterUB = null
+    this.upsampleUB = null
     this.compositeUB = null
-    this.convolutionUB = null
-    this.blurUBs = []
     this.invalidateBindGroups()
 
     super.dispose()

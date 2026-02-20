@@ -267,6 +267,20 @@ const ALGO_BRANCH: Record<number, string> = {
     let elevation = Snorm.y * 0.5 + 0.5;
     let fluxBrightness = clamp(log(Smag + eps) / 4.0 + 1.0, 0.0, 1.0);
     col = hsl2rgb(fluxHue, 0.8, mix(0.2, 0.6, elevation)) * fluxBrightness;`,
+
+  15: /* wgsl */ `
+    // 15: k-Space Occupation Map — sequential colormap by occupation number
+    let analysis = sampleAnalysisFromGrid(pos, uniforms);
+    let nk = max(analysis.r, 0.0);
+    let kNorm = analysis.g;
+    let omegaNorm = analysis.b;
+    let eps = 1e-6;
+    let logNk = clamp(log(nk + eps) / 8.0 + 1.0, 0.0, 1.0);
+    // Viridis-like: low n_k → deep blue, mid → teal, high → yellow
+    let hue = mix(0.7, 0.12, logNk);
+    let saturation = mix(0.6, 0.95, smoothstep(0.0, 0.5, logNk));
+    let lightness = mix(0.08, 0.55, logNk);
+    col = hsl2rgb(hue, saturation, lightness);`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -286,9 +300,10 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   12: 'Hamiltonian Decomposition',
   13: 'Mode Character',
   14: 'Energy Flux',
+  15: 'k-Space Occupation',
 }
 
-export { COLOR_ALG_NAMES }
+export { ALGO_BRANCH, COLOR_ALG_NAMES }
 
 /**
  * Generate the computeBaseColor() WGSL function for a specific color algorithm.

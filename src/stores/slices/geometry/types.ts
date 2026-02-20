@@ -232,6 +232,18 @@ export interface SchroedingerSliceActions {
   resetFreeScalarField: () => void
   clearFreeScalarNeedsReset: () => void
 
+  // k-Space Visualization Display Transforms
+  setFreeScalarKSpaceDisplayMode: (mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode) => void
+  setFreeScalarKSpaceFftShift: (enabled: boolean) => void
+  setFreeScalarKSpaceExposureMode: (mode: import('@/lib/geometry/extended/types').KSpaceExposureMode) => void
+  setFreeScalarKSpaceLowPercentile: (value: number) => void
+  setFreeScalarKSpaceHighPercentile: (value: number) => void
+  setFreeScalarKSpaceGamma: (value: number) => void
+  setFreeScalarKSpaceBroadeningEnabled: (enabled: boolean) => void
+  setFreeScalarKSpaceBroadeningRadius: (value: number) => void
+  setFreeScalarKSpaceBroadeningSigma: (value: number) => void
+  setFreeScalarKSpaceRadialBinCount: (value: number) => void
+
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void
   initializeSchroedingerForDimension: (dimension: number) => void

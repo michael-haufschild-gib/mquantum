@@ -25,7 +25,8 @@ export type ColorAlgorithm =
   | 11 // Radial distance spectral
   | 12 // Hamiltonian decomposition (K/G/V fractions)
   | 13 // Mode character map (wave-like vs mass-dominated)
-  | 14 // Energy flux map (S direction + magnitude) // Radial Distance (spectral)
+  | 14 // Energy flux map (S direction + magnitude)
+  | 15 // k-Space occupation map (FFT-based)
 
 /**
  * Lighting mode for compile-time optimization

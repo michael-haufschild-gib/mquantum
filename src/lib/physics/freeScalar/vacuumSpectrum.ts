@@ -21,7 +21,7 @@ import { ifftNd } from '@/lib/math/fft'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 /** Minimum mass used for zero-mode regularization when physical mass is zero. */
-const M_FLOOR = 0.01
+export const M_FLOOR = 0.01
 
 /**
  * Computes the lattice dispersion relation omega_k for a given mode.

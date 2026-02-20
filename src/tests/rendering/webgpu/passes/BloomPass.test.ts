@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { BloomPass } from '@/rendering/webgpu/passes/BloomPass'
 import type { WebGPURenderContext } from '@/rendering/webgpu/core/types'
 import {
-  bloomThresholdShader,
-  createBloomBlurComputeShader,
-  createBloomCompositeShader,
+  bloomPrefilterShader,
+  bloomDownsampleShader,
+  bloomUpsampleShader,
+  bloomCompositeShader,
+  bloomCopyShader,
 } from '@/rendering/webgpu/shaders/postprocessing/bloom.wgsl'
 
 function primeInternals(pass: BloomPass): Record<string, unknown> {
@@ -13,35 +15,32 @@ function primeInternals(pass: BloomPass): Record<string, unknown> {
   internals['device'] = {} as GPUDevice
   internals['sampler'] = {} as GPUSampler
 
-  internals['thresholdPipeline'] = {} as GPURenderPipeline
-  internals['thresholdBGL'] = {} as GPUBindGroupLayout
-  internals['thresholdUB'] = {} as GPUBuffer
+  internals['prefilterPipeline'] = {} as GPURenderPipeline
+  internals['prefilterBGL'] = {} as GPUBindGroupLayout
+  internals['prefilterUB'] = {} as GPUBuffer
 
-  internals['blurBGL'] = {} as GPUBindGroupLayout
-  internals['blurPipelines'] = new Array(5).fill({}) as GPUComputePipeline[]
-  internals['blurUBs'] = new Array(10).fill({}) as GPUBuffer[]
+  internals['downsamplePipeline'] = {} as GPURenderPipeline
+  internals['downsampleBGL'] = {} as GPUBindGroupLayout
 
+  internals['upsamplePipeline'] = {} as GPURenderPipeline
+  internals['upsampleBGL'] = {} as GPUBindGroupLayout
+  internals['upsampleUB'] = {} as GPUBuffer
+
+  internals['compositePipeline'] = {} as GPURenderPipeline
+  internals['compositeBGL'] = {} as GPUBindGroupLayout
   internals['compositeUB'] = {} as GPUBuffer
-  internals['compositePipelines'] = new Array(5).fill({}) as GPURenderPipeline[]
-  internals['compositeBGLs'] = new Array(5).fill({}) as GPUBindGroupLayout[]
 
   internals['copyPipeline'] = {} as GPURenderPipeline
   internals['copyBGL'] = {} as GPUBindGroupLayout
 
-  internals['convolutionPipeline'] = {} as GPURenderPipeline
-  internals['convolutionBGL'] = {} as GPUBindGroupLayout
-  internals['convolutionUB'] = {} as GPUBuffer
+  // Mock textures: 5 down + 4 up
+  internals['downMips'] = new Array(5).fill({}) as GPUTexture[]
+  internals['downMipViews'] = new Array(5).fill({}) as GPUTextureView[]
+  internals['upMips'] = new Array(4).fill({}) as GPUTexture[]
+  internals['upMipViews'] = new Array(4).fill({}) as GPUTextureView[]
+  internals['textureSize'] = { width: 1920, height: 1080 }
 
-  internals['thresholdTexture'] = {} as GPUTexture
-  internals['thresholdTextureView'] = {} as GPUTextureView
-  internals['horizontalTextures'] = new Array(5).fill({}) as GPUTexture[]
-  internals['verticalTextures'] = new Array(5).fill({}) as GPUTexture[]
-  internals['horizontalTextureViews'] = new Array(5).fill({}) as GPUTextureView[]
-  internals['verticalTextureViews'] = new Array(5).fill({}) as GPUTextureView[]
-
-  internals['ensureGaussianTextures'] = () => undefined
-  internals['ensureConvolutionTexture'] = () => undefined
-
+  internals['ensureTextures'] = () => undefined
   internals['createBindGroup'] = () => ({}) as GPUBindGroup
   internals['writeUniformBuffer'] = () => undefined
   internals['renderFullscreen'] = () => undefined
@@ -49,50 +48,61 @@ function primeInternals(pass: BloomPass): Record<string, unknown> {
   return internals
 }
 
-function createMockComputePassEncoder(): GPUComputePassEncoder {
-  return {
-    setPipeline: () => undefined,
-    setBindGroup: () => undefined,
-    dispatchWorkgroups: () => undefined,
-    end: () => undefined,
-  } as unknown as GPUComputePassEncoder
-}
-
-describe('BloomPass v2', () => {
-  it('precomputes coefficients for gaussian kernels', () => {
-    const pass = new BloomPass()
-    const gaussianCoefficients = (pass as unknown as { gaussianCoefficients: Float32Array[] })
-      .gaussianCoefficients
-
-    expect(gaussianCoefficients).toHaveLength(5)
-    expect(gaussianCoefficients[0]![5]).toBeGreaterThan(0)
-    expect(gaussianCoefficients[0]![6]).toBe(0)
-    expect(gaussianCoefficients[4]![21]).toBeGreaterThan(0)
-    expect(gaussianCoefficients[4]![22]).toBe(0)
+describe('BloomPass (progressive downsample/upsample)', () => {
+  it('prefilter shader uses luminance instead of max(r,g,b)', () => {
+    expect(bloomPrefilterShader).toContain('fn luminance(c: vec3f) -> f32')
+    expect(bloomPrefilterShader).toContain('dot(c, vec3f(0.2126, 0.7152, 0.0722))')
+    expect(bloomPrefilterShader).not.toContain('max(color.r, max(color.g, color.b))')
   })
 
-  it('uses soft threshold with max-component brightness', () => {
-    expect(bloomThresholdShader).toContain(
-      'fn softThreshold(color: vec3f, threshold: f32, knee: f32) -> vec3f'
-    )
-    expect(bloomThresholdShader).toContain('max(color.r, max(color.g, color.b))')
-    expect(bloomThresholdShader).not.toContain('luminance')
+  it('prefilter shader applies Karis average weighting', () => {
+    expect(bloomPrefilterShader).toContain('1.0 / (1.0 + luminance(t')
   })
 
-  it('specializes blur compute and composite shader generation by level count', () => {
-    const blurShader = createBloomBlurComputeShader(22)
-    expect(blurShader).toContain('for (var i = 1u; i < 22u; i++)')
-    expect(blurShader).toContain('@compute @workgroup_size(256, 1, 1)')
-    expect(blurShader).toContain('var<workgroup> tile')
-
-    const compositeL2 = createBloomCompositeShader(2)
-    expect(compositeL2).toContain('@binding(4) var linearSampler')
-    expect(compositeL2).toContain('tMip0')
-    expect(compositeL2).toContain('tMip1')
-    expect(compositeL2).not.toContain('tMip2')
+  it('prefilter shader is alpha-aware for premultiplied bloom input', () => {
+    expect(bloomPrefilterShader).toContain('fn extractBloomSample(colorSample: vec4f')
+    expect(bloomPrefilterShader).toContain('let straightColor = colorSample.rgb / alpha')
+    expect(bloomPrefilterShader).toContain('return thresholded * alpha')
   })
 
-  it('uses zero-strength fast path (single copy pass)', () => {
+  it('prefilter shader clamps negative radiance before thresholding', () => {
+    expect(bloomPrefilterShader).toContain('let radiance = max(color, vec3f(0.0))')
+    expect(bloomPrefilterShader).toContain('return radiance * factor')
+  })
+
+  it('downsample shader uses 13-tap filter with no uniforms', () => {
+    expect(bloomDownsampleShader).toContain('textureDimensions(tInput)')
+    expect(bloomDownsampleShader).not.toContain('var<uniform>')
+    // Verify 5 overlapping blocks with correct weights
+    expect(bloomDownsampleShader).toContain('0.125')
+    expect(bloomDownsampleShader).toContain('0.03125')
+  })
+
+  it('upsample shader uses 9-tap tent filter with additive blend', () => {
+    expect(bloomUpsampleShader).toContain('struct UpsampleUniforms')
+    expect(bloomUpsampleShader).toContain('filterRadius')
+    expect(bloomUpsampleShader).toContain('tLowerMip')
+    expect(bloomUpsampleShader).toContain('tCurrentMip')
+    // 9-tap weights: center 4, edges 2, corners 1, all /16
+    expect(bloomUpsampleShader).toContain('* 4.0')
+    expect(bloomUpsampleShader).toContain('* 2.0')
+    expect(bloomUpsampleShader).toContain('1.0 / 16.0')
+    // Additive blend
+    expect(bloomUpsampleShader).toContain('bloom + current')
+  })
+
+  it('composite shader adds bloom with gain multiplier', () => {
+    expect(bloomCompositeShader).toContain('struct CompositeUniforms')
+    expect(bloomCompositeShader).toContain('bloomGain')
+    expect(bloomCompositeShader).toContain('sceneColor + uniforms.bloomGain * bloomColor')
+  })
+
+  it('copy shader passes through without modification', () => {
+    expect(bloomCopyShader).toContain('textureSample(tInput, linearSampler, input.uv)')
+    expect(bloomCopyShader).not.toContain('var<uniform>')
+  })
+
+  it('uses zero-strength fast path (single copy pass) when gain=0', () => {
     const pass = new BloomPass()
     primeInternals(pass)
 
@@ -107,7 +117,6 @@ describe('BloomPass v2', () => {
         renderPassCount += 1
         return { end: () => undefined } as unknown as GPURenderPassEncoder
       },
-      beginComputePass: () => createMockComputePassEncoder(),
     } as unknown as WebGPURenderContext
 
     pass.execute(ctx)
@@ -115,26 +124,20 @@ describe('BloomPass v2', () => {
     expect(renderPassCount).toBe(1)
   })
 
-  it('runs threshold + blur + composite for one active gaussian level', () => {
+  it('runs 10 render passes for full bloom pipeline', () => {
     const pass = new BloomPass()
     primeInternals(pass)
 
     let renderPassCount = 0
-    let computePassCount = 0
     const ctx = {
-      size: { width: 1280, height: 720 },
+      size: { width: 1920, height: 1080 },
       frame: {
         stores: {
           postProcessing: {
-            bloomGain: 1,
-            bloomThreshold: 0,
-            bloomBands: [
-              { enabled: true, weight: 1, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.8, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.6, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.4, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.2, size: 1, tint: '#ffffff' },
-            ],
+            bloomGain: 0.8,
+            bloomThreshold: 1.0,
+            bloomKnee: 0.2,
+            bloomRadius: 1.0,
           },
         },
       },
@@ -145,107 +148,85 @@ describe('BloomPass v2', () => {
         renderPassCount += 1
         return { end: () => undefined } as unknown as GPURenderPassEncoder
       },
-      beginComputePass: () => {
-        computePassCount += 1
-        return createMockComputePassEncoder()
-      },
     } as unknown as WebGPURenderContext
 
     pass.execute(ctx)
 
-    // threshold + composite = 2 render passes
-    expect(renderPassCount).toBe(2)
-    // 1 level * (H + V) = 2 compute passes
-    expect(computePassCount).toBe(2)
+    // 1 prefilter + 4 downsample + 4 upsample + 1 composite = 10
+    expect(renderPassCount).toBe(10)
   })
 
-  it('does not collapse active levels when lower band weight is zero', () => {
-    const pass = new BloomPass()
+  it('accepts constructor options', () => {
+    const pass = new BloomPass({
+      gain: 1.5,
+      threshold: 0.5,
+      knee: 0.3,
+      filterRadius: 2.0,
+    })
+    const internals = pass as unknown as Record<string, number>
+    expect(internals['gain']).toBe(1.5)
+    expect(internals['threshold']).toBe(0.5)
+    expect(internals['knee']).toBe(0.3)
+    expect(internals['filterRadius']).toBe(2.0)
+  })
+
+  it('clamps constructor option values', () => {
+    const pass = new BloomPass({
+      gain: 99,
+      threshold: -1,
+      knee: 99,
+      filterRadius: 0.1,
+    })
+    const internals = pass as unknown as Record<string, number>
+    expect(internals['gain']).toBe(3)
+    expect(internals['threshold']).toBe(0)
+    expect(internals['knee']).toBe(5)
+    expect(internals['filterRadius']).toBe(0.25)
+  })
+
+  it('declares both scene and bloom source dependencies when resources differ', () => {
+    const pass = new BloomPass({
+      inputResource: 'hdr-color',
+      bloomInputResource: 'object-color',
+      outputResource: 'bloom-output',
+    })
+
+    expect(pass.config.inputs).toHaveLength(2)
+    expect(pass.config.inputs[0]?.resourceId).toBe('hdr-color')
+    expect(pass.config.inputs[1]?.resourceId).toBe('object-color')
+  })
+
+  it('uses scene input for zero-gain passthrough even with separate bloom source', () => {
+    const pass = new BloomPass({
+      inputResource: 'hdr-color',
+      bloomInputResource: 'object-color',
+    })
     primeInternals(pass)
 
-    let renderPassCount = 0
-    let computePassCount = 0
-    const ctx = {
-      size: { width: 1280, height: 720 },
-      frame: {
-        stores: {
-          postProcessing: {
-            bloomGain: 1,
-            bloomThreshold: 0,
-            bloomBands: [
-              { enabled: true, weight: 0, size: 1, tint: '#ffffff' },
-              { enabled: true, weight: 1, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.6, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.4, size: 1, tint: '#ffffff' },
-              { enabled: false, weight: 0.2, size: 1, tint: '#ffffff' },
-            ],
-          },
-        },
-      },
-      getTextureView: () => ({}) as GPUTextureView,
-      getWriteTarget: () => ({}) as GPUTextureView,
-      getCanvasTextureView: () => ({}) as GPUTextureView,
-      beginRenderPass: () => {
-        renderPassCount += 1
-        return { end: () => undefined } as unknown as GPURenderPassEncoder
-      },
-      beginComputePass: () => {
-        computePassCount += 1
-        return createMockComputePassEncoder()
-      },
-    } as unknown as WebGPURenderContext
+    const sceneView = {} as GPUTextureView
+    const bloomView = {} as GPUTextureView
+    const outputView = {} as GPUTextureView
 
-    pass.execute(ctx)
-
-    // threshold + composite = 2 render passes
-    expect(renderPassCount).toBe(2)
-    // 2 levels * (H + V) = 4 compute passes
-    expect(computePassCount).toBe(4)
-  })
-
-  it('writes higher mip blur uniforms with previous-level input dimensions', () => {
-    const pass = new BloomPass()
-    const internals = pass as unknown as Record<string, unknown>
-
-    internals['gaussianTextureSize'] = { width: 1920, height: 1080 }
-    internals['lastBlurSizeKey'] = ''
-
-    const blurBuffers = Array.from({ length: 10 }, () => ({} as GPUBuffer))
-    internals['blurUBs'] = blurBuffers
-
-    const writesByBuffer = new Map<GPUBuffer, Float32Array>()
-    internals['writeUniformBuffer'] = (
-      _device: GPUDevice,
-      buffer: GPUBuffer,
-      data: Float32Array
+    let copiedInput: GPUTextureView | null = null
+    ;(pass as unknown as { renderCopy: (...args: unknown[]) => void }).renderCopy = (
+      _ctx: WebGPURenderContext,
+      input: GPUTextureView
     ) => {
-      writesByBuffer.set(buffer, new Float32Array(data))
+      copiedInput = input
     }
 
-    ;(
-      pass as unknown as {
-        writeBlurUniformsIfNeeded: (device: GPUDevice) => void
-      }
-    ).writeBlurUniformsIfNeeded({} as GPUDevice)
+    const ctx = {
+      size: { width: 1280, height: 720 },
+      frame: { stores: { postProcessing: { bloomGain: 0 } } },
+      getTextureView: (resourceId: string) =>
+        resourceId === 'object-color' ? bloomView : sceneView,
+      getWriteTarget: () => outputView,
+      getCanvasTextureView: () => outputView,
+      beginRenderPass: () => ({ end: () => undefined }) as unknown as GPURenderPassEncoder,
+    } as unknown as WebGPURenderContext
 
-    const level1Horizontal = writesByBuffer.get(blurBuffers[2]!)
-    const level1Vertical = writesByBuffer.get(blurBuffers[3]!)
-    expect(level1Horizontal).toBeDefined()
-    expect(level1Vertical).toBeDefined()
+    pass.execute(ctx)
 
-    const level1HorizontalU32 = new Uint32Array(level1Horizontal!.buffer.slice(0))
-    const level1VerticalU32 = new Uint32Array(level1Vertical!.buffer.slice(0))
-
-    // Level 1 outputs quarter-res but must read from previous half-res level.
-    expect(level1HorizontalU32[0]).toBe(480)
-    expect(level1HorizontalU32[1]).toBe(270)
-    expect(level1HorizontalU32[2]).toBe(960)
-    expect(level1HorizontalU32[3]).toBe(540)
-
-    // Vertical pass reads same-size horizontal intermediate.
-    expect(level1VerticalU32[0]).toBe(480)
-    expect(level1VerticalU32[1]).toBe(270)
-    expect(level1VerticalU32[2]).toBe(480)
-    expect(level1VerticalU32[3]).toBe(270)
+    expect(copiedInput).toBe(sceneView)
   })
 })

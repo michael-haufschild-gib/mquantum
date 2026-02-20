@@ -20,6 +20,7 @@ const EDUCATIONAL_ALGOS = [
   'hamiltonianDecomposition',
   'modeCharacter',
   'energyFlux',
+  'kSpaceOccupation',
 ]
 
 describe('getAvailableColorAlgorithms', () => {
@@ -101,6 +102,10 @@ describe('educational color algorithms in COLOR_ALGORITHM_TO_INT', () => {
   it('maps energyFlux to 14', () => {
     expect(COLOR_ALGORITHM_TO_INT.energyFlux).toBe(14)
   })
+
+  it('maps kSpaceOccupation to 15', () => {
+    expect(COLOR_ALGORITHM_TO_INT.kSpaceOccupation).toBe(15)
+  })
 })
 
 describe('educational algorithms in COLOR_ALGORITHM_OPTIONS', () => {
@@ -120,6 +125,12 @@ describe('educational algorithms in COLOR_ALGORITHM_OPTIONS', () => {
     const opt = COLOR_ALGORITHM_OPTIONS.find((o) => o.value === 'energyFlux')
     expect(opt).toBeDefined()
     expect(opt!.label).toBe('Energy Flux Map')
+  })
+
+  it('includes kSpaceOccupation with correct label', () => {
+    const opt = COLOR_ALGORITHM_OPTIONS.find((o) => o.value === 'kSpaceOccupation')
+    expect(opt).toBeDefined()
+    expect(opt!.label).toBe('k-Space Occupation Map')
   })
 })
 

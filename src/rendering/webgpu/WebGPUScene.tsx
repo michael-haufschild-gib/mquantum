@@ -2200,6 +2200,7 @@ async function setupPPPasses(
       graph,
       new BloomPass({
         inputResource: currentHDRBuffer,
+        bloomInputResource: 'object-color',
         outputResource: 'bloom-output',
       }),
       'bloom',

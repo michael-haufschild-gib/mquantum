@@ -32,38 +32,38 @@ describe('state-serializer', () => {
       expect(result).toContain('s=1.50')
     })
 
-    it('should serialize bloom v2 settings', () => {
+    it('should serialize bloom settings', () => {
       const state: ShareableState = {
         dimension: 4,
         objectType: 'schroedinger',
         bloomEnabled: true,
-        bloomMode: 'convolution',
         bloomGain: 2.5,
         bloomThreshold: 0.5,
         bloomKnee: 0.25,
-        bloomBands: [
-          { enabled: true, weight: 1.0, size: 1.1, tint: '#FF0000' },
-          { enabled: true, weight: 0.8, size: 1.2, tint: '#00FF00' },
-          { enabled: false, weight: 0.0, size: 1.0, tint: '#0000FF' },
-          { enabled: false, weight: 0.0, size: 1.0, tint: '#FFFFFF' },
-          { enabled: false, weight: 0.0, size: 1.0, tint: '#FFFFFF' },
-        ],
-        bloomConvolutionRadius: 3,
-        bloomConvolutionResolutionScale: 0.75,
-        bloomConvolutionBoost: 1.8,
-        bloomConvolutionTint: '#112233',
+        bloomRadius: 2.0,
       }
       const result = serializeState(state)
       expect(result).toContain('be=1')
-      expect(result).toContain('bm=c')
       expect(result).toContain('bga=2.50')
       expect(result).toContain('bt=0.50')
       expect(result).toContain('bk=0.25')
-      expect(result).toContain('bb0=1%7C1.00%7C1.10%7CFF0000')
-      expect(result).toContain('bcr=3.00')
-      expect(result).toContain('bcs=0.75')
-      expect(result).toContain('bcb=1.80')
-      expect(result).toContain('bct=112233')
+      expect(result).toContain('br=2.00')
+    })
+
+    it('should omit default bloom values for shorter URLs', () => {
+      const state: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        bloomGain: 0.8, // DEFAULT_BLOOM_GAIN
+        bloomThreshold: 1.0, // DEFAULT_BLOOM_THRESHOLD
+        bloomKnee: 0.2, // DEFAULT_BLOOM_KNEE
+        bloomRadius: 1.0, // DEFAULT_BLOOM_RADIUS
+      }
+      const result = serializeState(state)
+      expect(result).not.toContain('bga=')
+      expect(result).not.toContain('bt=')
+      expect(result).not.toContain('bk=')
+      expect(result).not.toContain('br=')
     })
 
     it('should serialize tone mapping settings', () => {
@@ -89,79 +89,50 @@ describe('state-serializer', () => {
       expect(result.uniformScale).toBeCloseTo(1.5)
     })
 
-    it('should deserialize bloom v2 settings', () => {
-      const result = deserializeState(
-        'be=1&bm=g&bga=2.20&bt=0.50&bk=0.30&bb0=1|1.00|1.10|FF0000&bb1=1|0.80|1.20|00FF00&bcr=2.50&bcs=0.60&bcb=1.50&bct=abcdef'
-      )
+    it('should deserialize bloom settings', () => {
+      const result = deserializeState('be=1&bga=2.20&bt=0.50&bk=0.30&br=2.50')
 
       expect(result.bloomEnabled).toBe(true)
-      expect(result.bloomMode).toBe('gaussian')
       expect(result.bloomGain).toBeCloseTo(2.2)
       expect(result.bloomThreshold).toBeCloseTo(0.5)
       expect(result.bloomKnee).toBeCloseTo(0.3)
-      expect(result.bloomBands?.[0]).toEqual({
-        enabled: true,
-        weight: 1,
-        size: 1.1,
-        tint: '#FF0000',
-      })
-      expect(result.bloomBands?.[1]).toEqual({
-        enabled: true,
-        weight: 0.8,
-        size: 1.2,
-        tint: '#00FF00',
-      })
-      expect(result.bloomConvolutionRadius).toBeCloseTo(2.5)
-      expect(result.bloomConvolutionResolutionScale).toBeCloseTo(0.6)
-      expect(result.bloomConvolutionBoost).toBeCloseTo(1.5)
-      expect(result.bloomConvolutionTint).toBe('#abcdef')
+      expect(result.bloomRadius).toBeCloseTo(2.5)
     })
 
-    it('should reject out-of-range bloom v2 values', () => {
-      const result = deserializeState('bga=99&bt=99&bk=99&bcr=99&bcs=99&bcb=99&bct=ZZZZZZ')
+    it('should reject out-of-range bloom values', () => {
+      const result = deserializeState('bga=99&bt=99&bk=99&br=99')
       expect(result.bloomGain).toBeUndefined()
       expect(result.bloomThreshold).toBeUndefined()
       expect(result.bloomKnee).toBeUndefined()
-      expect(result.bloomConvolutionRadius).toBeUndefined()
-      expect(result.bloomConvolutionResolutionScale).toBeUndefined()
-      expect(result.bloomConvolutionBoost).toBeUndefined()
-      expect(result.bloomConvolutionTint).toBeUndefined()
+      expect(result.bloomRadius).toBeUndefined()
     })
 
-    it('should ignore sparse bloom band tokens after first missing band', () => {
-      const result = deserializeState('bb0=1|1.00|1.10|FF0000&bb2=1|0.60|1.20|00FF00')
-      expect(result.bloomBands).toEqual([
-        {
-          enabled: true,
-          weight: 1,
-          size: 1.1,
-          tint: '#FF0000',
-        },
-      ])
+    it('should reject below-minimum bloom radius', () => {
+      const result = deserializeState('br=0.1')
+      expect(result.bloomRadius).toBeUndefined()
     })
 
-    it('should normalize bloom band enabled flags to a contiguous prefix', () => {
-      const result = deserializeState('bb0=1|1.00|1.00|FFFFFF&bb1=0|0.80|1.00|00FF00&bb2=1|0.60|1.00|FF0000')
-      expect(result.bloomBands).toEqual([
-        {
-          enabled: true,
-          weight: 1,
-          size: 1,
-          tint: '#FFFFFF',
-        },
-        {
-          enabled: false,
-          weight: 0.8,
-          size: 1,
-          tint: '#00FF00',
-        },
-        {
-          enabled: false,
-          weight: 0.6,
-          size: 1,
-          tint: '#FF0000',
-        },
-      ])
+    it('should extract bloomRadius from old band size params (backward compat)', () => {
+      // Old format: bb0=enabled|weight|size|tint
+      const result = deserializeState('bb0=1|1.00|1.50|FF0000&bb1=1|0.80|2.50|00FF00')
+      // Average of sizes: (1.5 + 2.5) / 2 = 2.0
+      expect(result.bloomRadius).toBeCloseTo(2.0)
+    })
+
+    it('should ignore old band params when new br param is present', () => {
+      const result = deserializeState('br=3.00&bb0=1|1.00|1.50|FF0000&bb1=1|0.80|2.50|00FF00')
+      // br takes precedence — should NOT average band sizes
+      expect(result.bloomRadius).toBeCloseTo(3.0)
+    })
+
+    it('should ignore old bloom mode and convolution params silently', () => {
+      const result = deserializeState('bm=c&bcr=3.00&bcs=0.75&bcb=1.80&bct=112233')
+      // None of the removed fields should appear on result
+      expect(result).not.toHaveProperty('bloomMode')
+      expect(result).not.toHaveProperty('bloomConvolutionRadius')
+      expect(result).not.toHaveProperty('bloomConvolutionResolutionScale')
+      expect(result).not.toHaveProperty('bloomConvolutionBoost')
+      expect(result).not.toHaveProperty('bloomConvolutionTint')
     })
 
     it('should deserialize colors with # prefix', () => {
@@ -184,22 +155,15 @@ describe('state-serializer', () => {
   })
 
   describe('roundtrip serialization', () => {
-    it('should preserve bloom v2 state through serialize/deserialize cycle', () => {
+    it('should preserve bloom state through serialize/deserialize cycle', () => {
       const original: ShareableState = {
         dimension: 5,
         objectType: 'schroedinger',
         bloomEnabled: true,
-        bloomMode: 'convolution',
         bloomGain: 1.8,
         bloomThreshold: 1.2,
         bloomKnee: 0.12,
-        bloomBands: [
-          { enabled: true, weight: 1.0, size: 1.0, tint: '#ffffff' },
-          { enabled: true, weight: 0.8, size: 1.1, tint: '#ffeeaa' },
-          { enabled: true, weight: 0.6, size: 1.2, tint: '#aaffee' },
-          { enabled: false, weight: 0.4, size: 1.3, tint: '#ffffff' },
-          { enabled: false, weight: 0.2, size: 1.4, tint: '#ffffff' },
-        ],
+        bloomRadius: 2.5,
       }
 
       const serialized = serializeState(original)
@@ -207,12 +171,11 @@ describe('state-serializer', () => {
 
       expect(deserialized.dimension).toBe(original.dimension)
       expect(deserialized.objectType).toBe(original.objectType)
-      expect(deserialized.bloomMode).toBe(original.bloomMode)
+      expect(deserialized.bloomEnabled).toBe(true)
       expect(deserialized.bloomGain).toBeCloseTo(original.bloomGain!)
       expect(deserialized.bloomThreshold).toBeCloseTo(original.bloomThreshold!)
       expect(deserialized.bloomKnee).toBeCloseTo(original.bloomKnee!)
-      expect(deserialized.bloomBands?.[0]?.enabled).toBe(true)
-      expect(deserialized.bloomBands?.[3]?.enabled).toBe(false)
+      expect(deserialized.bloomRadius).toBeCloseTo(original.bloomRadius!)
     })
   })
 

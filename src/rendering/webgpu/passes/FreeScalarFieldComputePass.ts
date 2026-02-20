@@ -15,6 +15,8 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { computeRawKSpaceData } from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { buildKSpaceDisplayTextures } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 import { estimateVacuumMaxPhi, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
@@ -78,6 +80,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private maxPhiEstimate = 1.0
   private pendingStagingBuffers: GPUBuffer[] = []
 
+  // k-Space readback state
+  private phiReadbackBuffer: GPUBuffer | null = null
+  private piReadbackBuffer: GPUBuffer | null = null
+  private kSpacePending = false
+  private kSpaceFrameCounter = 0
+  private readonly K_SPACE_UPDATE_INTERVAL = 5
+  /** Pending k-space texture data computed async, uploaded synchronously next frame */
+  private pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null = null
+
   // Pre-allocated uniform data views (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
   private readonly uniformU32 = new Uint32Array(this.uniformData)
@@ -115,7 +126,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       usage:
         GPUTextureUsage.STORAGE_BINDING |
         GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
+        GPUTextureUsage.COPY_SRC |
+        GPUTextureUsage.COPY_DST,
     })
 
     this.densityTextureView = this.densityTexture.createView({
@@ -135,7 +147,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       usage:
         GPUTextureUsage.STORAGE_BINDING |
         GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
+        GPUTextureUsage.COPY_SRC |
+        GPUTextureUsage.COPY_DST,
     })
 
     this.analysisTextureView = this.analysisTexture.createView({
@@ -199,6 +212,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.phiBuffer?.destroy()
     this.piBuffer?.destroy()
     this.uniformBuffer?.destroy()
+    this.phiReadbackBuffer?.destroy()
+    this.piReadbackBuffer?.destroy()
 
     // Compute total sites as product of all active dimensions
     this.totalSites = 1
@@ -207,17 +222,30 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
     const bufferSize = this.totalSites * 4 // f32 per site
 
-    // Create phi and pi storage buffers
+    // Create phi and pi storage buffers (COPY_SRC needed for k-space readback)
     this.phiBuffer = device.createBuffer({
       label: 'free-scalar-phi',
       size: bufferSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     })
 
     this.piBuffer = device.createBuffer({
       label: 'free-scalar-pi',
       size: bufferSize,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    })
+
+    // Staging buffers for k-space readback (MAP_READ | COPY_DST)
+    this.phiReadbackBuffer = device.createBuffer({
+      label: 'free-scalar-phi-readback',
+      size: bufferSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+
+    this.piReadbackBuffer = device.createBuffer({
+      label: 'free-scalar-pi-readback',
+      size: bufferSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     })
 
     // Create uniform buffer
@@ -505,10 +533,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.maxFieldValue = this.estimateMaxFieldValue(config)
     f32[45] = this.maxFieldValue                              // offset 180
     f32[46] = boundingRadius ?? 2.0                           // offset 184
-    // analysisMode at index 47 (offset 188): 0=off, 1=hamiltonian/character, 2=flux
-    // Derived from the numeric color algorithm: 12/13 → mode 1, 14 → mode 2
+    // analysisMode at index 47 (offset 188): 0=off, 1=hamiltonian/character, 2=flux, 3=kSpace
+    // Derived from the numeric color algorithm: 12/13 → mode 1, 14 → mode 2, 15 → mode 3
     const alg = colorAlgorithm ?? 0
-    u32[47] = alg === 12 || alg === 13 ? 1 : alg === 14 ? 2 : 0
+    u32[47] = alg === 12 || alg === 13 ? 1 : alg === 14 ? 2 : alg === 15 ? 3 : 0
 
     // packetCenter: array<f32, 12> (offset 192, indices 48-59)
     for (let d = 0; d < config.latticeDim; d++) {
@@ -616,6 +644,27 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Clean up staging buffers from previous frame's kickstart
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
+
+    // Flush pending k-space texture data (computed async in previous frame)
+    if (this.pendingKSpaceData && this.densityTexture && this.analysisTexture) {
+      const { density, analysis } = this.pendingKSpaceData
+      const bytesPerTexel = 8 // rgba16float = 4 × 2
+      const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
+      const rowsPerImage = DENSITY_GRID_SIZE
+      device.queue.writeTexture(
+        { texture: this.densityTexture },
+        density.buffer,
+        { offset: density.byteOffset, bytesPerRow, rowsPerImage },
+        { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE }
+      )
+      device.queue.writeTexture(
+        { texture: this.analysisTexture },
+        analysis.buffer,
+        { offset: analysis.byteOffset, bytesPerRow, rowsPerImage },
+        { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE }
+      )
+      this.pendingKSpaceData = null
+    }
 
     // Check if field buffers need rebuild (grid size changed)
     const configHash = this.computeConfigHash(config)
@@ -769,6 +818,78 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     } else {
       console.warn(`[FreeScalarFieldComputePass] writeGrid skipped: pipeline=${!!this.writeGridPipeline}, bindGroup=${!!this.writeGridBindGroup}`)
     }
+
+    // k-Space occupation: async CPU readback → FFT → texture upload
+    const analysisMode = this.uniformU32[47]!
+    if (analysisMode === 3 && this.initialized) {
+      this.kSpaceFrameCounter++
+      if (!this.kSpacePending && this.kSpaceFrameCounter >= this.K_SPACE_UPDATE_INTERVAL) {
+        this.kSpaceFrameCounter = 0
+        this.computeAndUploadKSpace(device, config) // fire-and-forget async
+      }
+    } else {
+      this.kSpaceFrameCounter = 0
+    }
+  }
+
+  /**
+   * Async: read phi/pi from GPU, compute k-space occupation via FFT.
+   * Stores results in pendingKSpaceData for synchronous upload next frame.
+   * Fire-and-forget — sets kSpacePending to prevent overlapping computations.
+   */
+  private async computeAndUploadKSpace(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
+    if (
+      !this.phiBuffer || !this.piBuffer ||
+      !this.phiReadbackBuffer || !this.piReadbackBuffer
+    ) return
+
+    this.kSpacePending = true
+    const bufferSize = this.totalSites * 4
+
+    try {
+      // Copy phi/pi storage buffers → staging buffers
+      const copyEncoder = device.createCommandEncoder({ label: 'kspace-copy' })
+      copyEncoder.copyBufferToBuffer(this.phiBuffer, 0, this.phiReadbackBuffer, 0, bufferSize)
+      copyEncoder.copyBufferToBuffer(this.piBuffer, 0, this.piReadbackBuffer, 0, bufferSize)
+      device.queue.submit([copyEncoder.finish()])
+
+      // Wait for GPU work to complete before mapping
+      await device.queue.onSubmittedWorkDone()
+
+      // Map staging buffers for CPU read
+      await this.phiReadbackBuffer.mapAsync(GPUMapMode.READ)
+      await this.piReadbackBuffer.mapAsync(GPUMapMode.READ)
+
+      const phiData = new Float32Array(this.phiReadbackBuffer.getMappedRange().slice(0))
+      const piData = new Float32Array(this.piReadbackBuffer.getMappedRange().slice(0))
+
+      this.phiReadbackBuffer.unmap()
+      this.piReadbackBuffer.unmap()
+
+      // Compute raw k-space data (FFT + occupation numbers)
+      const activeDims = config.gridSize.slice(0, config.latticeDim)
+      const activeSpacing = config.spacing.slice(0, config.latticeDim)
+      const raw = computeRawKSpaceData(
+        phiData,
+        piData,
+        activeDims,
+        activeSpacing,
+        config.mass,
+        config.latticeDim
+      )
+
+      // Apply display transforms (FFT shift, exposure, broadening) and pack to textures
+      const { density, analysis } = buildKSpaceDisplayTextures(raw, config.kSpaceViz)
+
+      // Store for synchronous upload at the start of next frame's executeField
+      this.pendingKSpaceData = { density, analysis }
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn('[FreeScalarFieldComputePass] k-space readback failed:', e)
+      }
+    } finally {
+      this.kSpacePending = false
+    }
   }
 
   /**
@@ -788,6 +909,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.uniformBuffer?.destroy()
     this.densityTexture?.destroy()
     this.analysisTexture?.destroy()
+    this.phiReadbackBuffer?.destroy()
+    this.piReadbackBuffer?.destroy()
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
 
@@ -798,6 +921,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.densityTextureView = null
     this.analysisTexture = null
     this.analysisTextureView = null
+    this.phiReadbackBuffer = null
+    this.piReadbackBuffer = null
+    this.kSpacePending = false
+    this.kSpaceFrameCounter = 0
+    this.pendingKSpaceData = null
 
     this.initPipeline = null
     this.updatePiPipeline = null

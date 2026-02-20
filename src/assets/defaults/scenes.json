@@ -163,45 +163,9 @@
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
         "frameBlendingFactor": 0.3,
-        "bloomMode": "gaussian",
-        "bloomGain": 3,
+        "bloomGain": 3.0,
         "bloomKnee": 0.95,
-        "bloomBands": [
-          {
-            "enabled": true,
-            "weight": 1,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.8,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.6,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.4,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.2,
-            "size": 0.575,
-            "tint": "#ffffff"
-          }
-        ],
-        "bloomConvolutionRadius": 2,
-        "bloomConvolutionResolutionScale": 0.5,
-        "bloomConvolutionBoost": 1,
-        "bloomConvolutionTint": "#ffffff"
+        "bloomRadius": 1.0
       },
       "environment": {
         "activeWalls": [],
@@ -841,45 +805,9 @@
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
         "frameBlendingFactor": 0.3,
-        "bloomMode": "gaussian",
-        "bloomGain": 3,
+        "bloomGain": 3.0,
         "bloomKnee": 0.95,
-        "bloomBands": [
-          {
-            "enabled": true,
-            "weight": 1,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.8,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.6,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.4,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.2,
-            "size": 0.575,
-            "tint": "#ffffff"
-          }
-        ],
-        "bloomConvolutionRadius": 2,
-        "bloomConvolutionResolutionScale": 0.5,
-        "bloomConvolutionBoost": 1,
-        "bloomConvolutionTint": "#ffffff"
+        "bloomRadius": 1.0
       },
       "environment": {
         "activeWalls": [],
@@ -1555,45 +1483,9 @@
         "paperIntensity": 1,
         "frameBlendingEnabled": true,
         "frameBlendingFactor": 0.3,
-        "bloomMode": "gaussian",
         "bloomGain": 2.7,
         "bloomKnee": 0.77,
-        "bloomBands": [
-          {
-            "enabled": true,
-            "weight": 1,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": true,
-            "weight": 0.8,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": true,
-            "weight": 0.6,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.4,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.2,
-            "size": 0.65,
-            "tint": "#ffffff"
-          }
-        ],
-        "bloomConvolutionRadius": 2,
-        "bloomConvolutionResolutionScale": 0.5,
-        "bloomConvolutionBoost": 1,
-        "bloomConvolutionTint": "#ffffff"
+        "bloomRadius": 1.0
       },
       "environment": {
         "activeWalls": [],
@@ -2221,45 +2113,9 @@
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
         "frameBlendingFactor": 0.3,
-        "bloomMode": "gaussian",
         "bloomGain": 1.5,
         "bloomKnee": 0.84,
-        "bloomBands": [
-          {
-            "enabled": true,
-            "weight": 1,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": true,
-            "weight": 0.8,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": true,
-            "weight": 0.6,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.4,
-            "size": 0.65,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.2,
-            "size": 0.65,
-            "tint": "#ffffff"
-          }
-        ],
-        "bloomConvolutionRadius": 2,
-        "bloomConvolutionResolutionScale": 0.5,
-        "bloomConvolutionBoost": 1,
-        "bloomConvolutionTint": "#ffffff"
+        "bloomRadius": 1.0
       },
       "environment": {
         "activeWalls": [],
@@ -2823,45 +2679,9 @@
         "paperIntensity": 1,
         "frameBlendingEnabled": false,
         "frameBlendingFactor": 0.3,
-        "bloomMode": "gaussian",
         "bloomGain": 2.55,
         "bloomKnee": 0.95,
-        "bloomBands": [
-          {
-            "enabled": true,
-            "weight": 1,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.8,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.6,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.4,
-            "size": 0.575,
-            "tint": "#ffffff"
-          },
-          {
-            "enabled": false,
-            "weight": 0.2,
-            "size": 0.575,
-            "tint": "#ffffff"
-          }
-        ],
-        "bloomConvolutionRadius": 2,
-        "bloomConvolutionResolutionScale": 0.5,
-        "bloomConvolutionBoost": 1,
-        "bloomConvolutionTint": "#ffffff"
+        "bloomRadius": 1.0
       },
       "environment": {
         "activeWalls": [],

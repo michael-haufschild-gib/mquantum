@@ -269,6 +269,12 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           // Full hue wheel (directional color) with magnitude brightness
           const brightness = Math.max(0, Math.min(1, Math.log(t + 1e-6) / 4 + 1))
           ;[r, g, b] = hslToRgb(t, 0.8, Math.max(0.2, 0.6 * brightness))
+        } else if (colorAlgorithm === 'kSpaceOccupation') {
+          // Viridis-like: deep blue → teal → yellow (matches WGSL algo 15)
+          const hue = 0.7 + (0.12 - 0.7) * t // 0.7 → 0.12
+          const sat = 0.6 + (0.95 - 0.6) * Math.min(1, Math.max(0, (t - 0) / 0.5))
+          const lit = 0.08 + (0.55 - 0.08) * t
+          ;[r, g, b] = hslToRgb(hue, sat, lit)
         } else {
           // Cosine palette (multiSource, radial)
           // Shows the underlying palette that will be sampled by position/density.

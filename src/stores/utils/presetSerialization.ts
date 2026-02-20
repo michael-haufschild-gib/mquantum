@@ -101,6 +101,14 @@ export const TRANSIENT_FIELDS = new Set([
   // Legacy skybox sync-with-object toggle (removed — skybox always uses palette)
   'syncWithObject',
 
+  // Legacy bloom fields (removed — replaced by progressive downsample/upsample bloom)
+  'bloomMode',
+  'bloomBands',
+  'bloomConvolutionRadius',
+  'bloomConvolutionResolutionScale',
+  'bloomConvolutionBoost',
+  'bloomConvolutionTint',
+
   // Free scalar field runtime trigger (not persisted in presets)
   'needsReset',
 

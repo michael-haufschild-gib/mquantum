@@ -40,27 +40,17 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ className = '' }) => {
   )
   const {
     bloomEnabled,
-    bloomMode,
     bloomGain,
     bloomThreshold,
     bloomKnee,
-    bloomBands,
-    bloomConvolutionRadius,
-    bloomConvolutionResolutionScale,
-    bloomConvolutionBoost,
-    bloomConvolutionTint,
+    bloomRadius,
   } = usePostProcessingStore(
     useShallow((s) => ({
       bloomEnabled: s.bloomEnabled,
-      bloomMode: s.bloomMode,
       bloomGain: s.bloomGain,
       bloomThreshold: s.bloomThreshold,
       bloomKnee: s.bloomKnee,
-      bloomBands: s.bloomBands,
-      bloomConvolutionRadius: s.bloomConvolutionRadius,
-      bloomConvolutionResolutionScale: s.bloomConvolutionResolutionScale,
-      bloomConvolutionBoost: s.bloomConvolutionBoost,
-      bloomConvolutionTint: s.bloomConvolutionTint,
+      bloomRadius: s.bloomRadius,
     }))
   )
 
@@ -88,15 +78,10 @@ export const ShareButton: React.FC<ShareButtonProps> = ({ className = '' }) => {
       edgeColor,
       backgroundColor,
       bloomEnabled,
-      bloomMode,
       bloomGain,
       bloomThreshold,
       bloomKnee,
-      bloomBands,
-      bloomConvolutionRadius,
-      bloomConvolutionResolutionScale,
-      bloomConvolutionBoost,
-      bloomConvolutionTint,
+      bloomRadius,
     })
 
     try {

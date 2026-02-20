@@ -32,48 +32,18 @@ export const DEFAULT_ROUGHNESS = 0.3
 export const DEFAULT_METALLIC = 0.0
 
 // ============================================================================
-// Bloom Defaults (Bloom V2)
+// Bloom Defaults (Progressive Downsample/Upsample)
 // ============================================================================
 
-export type BloomMode = 'gaussian' | 'convolution'
-
-export interface BloomBandSettings {
-  enabled: boolean
-  weight: number
-  /** Per-band blur scale multiplier. */
-  size: number
-  /** Hex tint color applied at composite stage. */
-  tint: string
-}
-
 export const DEFAULT_BLOOM_ENABLED = false
-/** Preferred bloom method. */
-export const DEFAULT_BLOOM_MODE: BloomMode = 'gaussian'
 /** Global bloom gain multiplier (0-3). */
-export const DEFAULT_BLOOM_GAIN = 1.25
-/**
- * Minimum brightness for bloom contribution.
- * -1 disables thresholding and routes all pixels into bloom.
- */
+export const DEFAULT_BLOOM_GAIN = 0.8
+/** Minimum brightness for bloom contribution (0-5). */
 export const DEFAULT_BLOOM_THRESHOLD = 1.0
 /** Threshold soft knee width (0-5). */
-export const DEFAULT_BLOOM_KNEE = 0.5
-/** Per-band Gaussian controls matching UE-style 5-band setup. */
-export const DEFAULT_BLOOM_BANDS: ReadonlyArray<BloomBandSettings> = [
-  { enabled: true, weight: 1.0, size: 1.0, tint: '#ffffff' },
-  { enabled: true, weight: 0.8, size: 1.0, tint: '#ffffff' },
-  { enabled: true, weight: 0.6, size: 1.0, tint: '#ffffff' },
-  { enabled: true, weight: 0.4, size: 1.0, tint: '#ffffff' },
-  { enabled: true, weight: 0.2, size: 1.0, tint: '#ffffff' },
-]
-/** Convolution kernel radius scale (0.5-6). */
-export const DEFAULT_BLOOM_CONVOLUTION_RADIUS = 2.0
-/** Internal convolution source resolution scale (0.25-1). */
-export const DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE = 0.5
-/** Convolution scatter/boost multiplier (0-4). */
-export const DEFAULT_BLOOM_CONVOLUTION_BOOST = 1.0
-/** Convolution tint color. */
-export const DEFAULT_BLOOM_CONVOLUTION_TINT = '#ffffff'
+export const DEFAULT_BLOOM_KNEE = 0.2
+/** Upsample filter radius (0.25-4). */
+export const DEFAULT_BLOOM_RADIUS = 1.0
 
 // ============================================================================
 // Anti-aliasing Defaults

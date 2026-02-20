@@ -13,6 +13,7 @@
  * the analysis texture:
  *   mode 1 (Hamiltonian/Character): R=K, G=gradE, B=V, A=E
  *   mode 2 (Energy Flux): R=Sx, G=Sy, B=Sz, A=|S|
+ *   mode 3 (k-Space): CPU manages both textures — GPU skips all writes
  *
  * Requires freeScalarUniformsBlock + freeScalarNDIndexBlock to be prepended.
  */
@@ -28,6 +29,9 @@ export const freeScalarWriteGridBlock = /* wgsl */ `
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
   if (gid.x >= texDims.x || gid.y >= texDims.y || gid.z >= texDims.z) { return; }
+
+  // k-Space mode (analysisMode 3): CPU manages both textures — skip all GPU writes
+  if (params.analysisMode == 3u) { return; }
 
   let bound = params.boundingRadius;
   if (bound <= 0.0) {

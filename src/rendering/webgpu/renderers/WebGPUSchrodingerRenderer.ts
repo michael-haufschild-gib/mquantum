@@ -65,6 +65,7 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   hamiltonianDecomposition: 12,
   modeCharacter: 13,
   energyFlux: 14,
+  kSpaceOccupation: 15,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,

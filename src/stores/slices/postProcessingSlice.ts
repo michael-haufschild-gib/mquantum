@@ -2,25 +2,18 @@
  * Post-processing slice for visual store
  *
  * Manages post-processing effects:
- * - Bloom (Gaussian sum + optional convolution)
+ * - Bloom (progressive downsample/upsample)
  */
 
 import type { StateCreator } from 'zustand'
 import {
   type AntiAliasingMethod,
-  type BloomBandSettings,
-  type BloomMode,
   type PaperQuality,
   DEFAULT_ANTI_ALIASING_METHOD,
-  DEFAULT_BLOOM_BANDS,
-  DEFAULT_BLOOM_CONVOLUTION_BOOST,
-  DEFAULT_BLOOM_CONVOLUTION_RADIUS,
-  DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
-  DEFAULT_BLOOM_CONVOLUTION_TINT,
   DEFAULT_BLOOM_ENABLED,
   DEFAULT_BLOOM_GAIN,
   DEFAULT_BLOOM_KNEE,
-  DEFAULT_BLOOM_MODE,
+  DEFAULT_BLOOM_RADIUS,
   DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_FRAME_BLENDING_ENABLED,
   DEFAULT_FRAME_BLENDING_FACTOR,
@@ -42,26 +35,8 @@ import {
   DEFAULT_PAPER_SEED,
 } from '../defaults/visualDefaults'
 
-const BLOOM_BAND_COUNT = 5
-
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
-}
-
-function isValidHexColor(color: string): boolean {
-  return /^#[0-9A-Fa-f]{6}$/.test(color)
-}
-
-function cloneDefaultBands(): BloomBandSettings[] {
-  return DEFAULT_BLOOM_BANDS.map((band) => ({ ...band }))
-}
-
-function mapBloomBands(
-  bands: BloomBandSettings[],
-  index: number,
-  updater: (band: BloomBandSettings) => BloomBandSettings
-): BloomBandSettings[] {
-  return bands.map((band, bandIndex) => (bandIndex === index ? updater({ ...band }) : { ...band }))
 }
 
 // ============================================================================
@@ -71,23 +46,14 @@ function mapBloomBands(
 export interface PostProcessingSliceState {
   // --- Bloom ---
   bloomEnabled: boolean
-  bloomMode: BloomMode
   /** Global gain multiplier (0-3). */
   bloomGain: number
   /** Scene-linear threshold (0-5). */
   bloomThreshold: number
   /** Threshold smooth knee width. */
   bloomKnee: number
-  /** UE-style 5 bloom bands for gaussian mode. */
-  bloomBands: BloomBandSettings[]
-  /** Convolution mode radius scale. */
-  bloomConvolutionRadius: number
-  /** Convolution mode internal resolution scale. */
-  bloomConvolutionResolutionScale: number
-  /** Convolution mode scatter/boost. */
-  bloomConvolutionBoost: number
-  /** Convolution mode tint color. */
-  bloomConvolutionTint: string
+  /** Upsample filter radius (0.25-4). */
+  bloomRadius: number
 
   // --- Anti-aliasing ---
   antiAliasingMethod: AntiAliasingMethod
@@ -142,19 +108,10 @@ export interface PostProcessingSliceState {
 export interface PostProcessingSliceActions {
   // --- Bloom Actions ---
   setBloomEnabled: (enabled: boolean) => void
-  setBloomMode: (mode: BloomMode) => void
   setBloomGain: (gain: number) => void
   setBloomThreshold: (threshold: number) => void
   setBloomKnee: (knee: number) => void
-  setBloomBandEnabled: (index: number, enabled: boolean) => void
-  setBloomBandWeight: (index: number, weight: number) => void
-  setBloomBandSize: (index: number, size: number) => void
-  setBloomBandTint: (index: number, tint: string) => void
   setBloomRadius: (radius: number) => void
-  setBloomConvolutionRadius: (radius: number) => void
-  setBloomConvolutionResolutionScale: (scale: number) => void
-  setBloomConvolutionBoost: (boost: number) => void
-  setBloomConvolutionTint: (tint: string) => void
 
   // --- Anti-aliasing Actions ---
   setAntiAliasingMethod: (method: AntiAliasingMethod) => void
@@ -197,15 +154,10 @@ export type PostProcessingSlice = PostProcessingSliceState & PostProcessingSlice
 export const POST_PROCESSING_INITIAL_STATE: PostProcessingSliceState = {
   // Bloom
   bloomEnabled: DEFAULT_BLOOM_ENABLED,
-  bloomMode: DEFAULT_BLOOM_MODE,
   bloomGain: DEFAULT_BLOOM_GAIN,
   bloomThreshold: DEFAULT_BLOOM_THRESHOLD,
   bloomKnee: DEFAULT_BLOOM_KNEE,
-  bloomBands: cloneDefaultBands(),
-  bloomConvolutionRadius: DEFAULT_BLOOM_CONVOLUTION_RADIUS,
-  bloomConvolutionResolutionScale: DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
-  bloomConvolutionBoost: DEFAULT_BLOOM_CONVOLUTION_BOOST,
-  bloomConvolutionTint: DEFAULT_BLOOM_CONVOLUTION_TINT,
+  bloomRadius: DEFAULT_BLOOM_RADIUS,
 
   // Anti-aliasing
   antiAliasingMethod: DEFAULT_ANTI_ALIASING_METHOD,
@@ -256,10 +208,6 @@ export const createPostProcessingSlice: StateCreator<
     set({ bloomEnabled: enabled })
   },
 
-  setBloomMode: (mode: BloomMode) => {
-    set({ bloomMode: mode })
-  },
-
   setBloomGain: (gain: number) => {
     set({ bloomGain: clamp(gain, 0, 3) })
   },
@@ -272,77 +220,8 @@ export const createPostProcessingSlice: StateCreator<
     set({ bloomKnee: clamp(knee, 0, 5) })
   },
 
-  setBloomBandEnabled: (index: number, enabled: boolean) => {
-    if (index < 0 || index >= BLOOM_BAND_COUNT) return
-
-    set((state) => {
-      const nextBands = state.bloomBands.map((band) => ({ ...band }))
-
-      if (enabled) {
-        // Enabling a band enables all lower bands to keep a contiguous active prefix.
-        for (let i = 0; i <= index; i++) nextBands[i]!.enabled = true
-      } else {
-        // Disabling a band disables this and all higher bands for level specialization.
-        for (let i = index; i < BLOOM_BAND_COUNT; i++) nextBands[i]!.enabled = false
-      }
-
-      return { bloomBands: nextBands }
-    })
-  },
-
-  setBloomBandWeight: (index: number, weight: number) => {
-    if (index < 0 || index >= BLOOM_BAND_COUNT) return
-    set((state) => ({
-      bloomBands: mapBloomBands(state.bloomBands, index, (band) => ({
-        ...band,
-        weight: clamp(weight, 0, 4),
-      })),
-    }))
-  },
-
-  setBloomBandSize: (index: number, size: number) => {
-    if (index < 0 || index >= BLOOM_BAND_COUNT) return
-    set((state) => ({
-      bloomBands: mapBloomBands(state.bloomBands, index, (band) => ({
-        ...band,
-        size: clamp(size, 0.25, 4),
-      })),
-    }))
-  },
-
-  setBloomBandTint: (index: number, tint: string) => {
-    if (index < 0 || index >= BLOOM_BAND_COUNT) return
-    if (!isValidHexColor(tint)) return
-    set((state) => ({
-      bloomBands: mapBloomBands(state.bloomBands, index, (band) => ({
-        ...band,
-        tint,
-      })),
-    }))
-  },
-
   setBloomRadius: (radius: number) => {
-    const clamped = clamp(radius, 0.25, 4)
-    set((state) => ({
-      bloomBands: state.bloomBands.map((band) => ({ ...band, size: clamped })),
-    }))
-  },
-
-  setBloomConvolutionRadius: (radius: number) => {
-    set({ bloomConvolutionRadius: clamp(radius, 0.5, 6) })
-  },
-
-  setBloomConvolutionResolutionScale: (scale: number) => {
-    set({ bloomConvolutionResolutionScale: clamp(scale, 0.25, 1) })
-  },
-
-  setBloomConvolutionBoost: (boost: number) => {
-    set({ bloomConvolutionBoost: clamp(boost, 0, 4) })
-  },
-
-  setBloomConvolutionTint: (tint: string) => {
-    if (!isValidHexColor(tint)) return
-    set({ bloomConvolutionTint: tint })
+    set({ bloomRadius: clamp(radius, 0.25, 4) })
   },
 
   // --- Anti-aliasing Actions ---

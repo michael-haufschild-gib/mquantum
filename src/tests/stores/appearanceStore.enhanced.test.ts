@@ -213,7 +213,7 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(0)
     })
 
-    it('clamps bloom v2 controls to safe ranges', () => {
+    it('clamps bloom controls to safe ranges', () => {
       usePostProcessingStore.getState().setBloomGain(999)
       expect(usePostProcessingStore.getState().bloomGain).toBe(3)
       usePostProcessingStore.getState().setBloomGain(-1)
@@ -229,10 +229,10 @@ describe('Enhanced Features Stores (invariants)', () => {
       usePostProcessingStore.getState().setBloomKnee(-999)
       expect(usePostProcessingStore.getState().bloomKnee).toBe(0)
 
-      usePostProcessingStore.getState().setBloomBandSize(0, 999)
-      expect(usePostProcessingStore.getState().bloomBands[0]!.size).toBe(4)
-      usePostProcessingStore.getState().setBloomBandSize(0, -999)
-      expect(usePostProcessingStore.getState().bloomBands[0]!.size).toBe(0.25)
+      usePostProcessingStore.getState().setBloomRadius(999)
+      expect(usePostProcessingStore.getState().bloomRadius).toBe(4)
+      usePostProcessingStore.getState().setBloomRadius(-999)
+      expect(usePostProcessingStore.getState().bloomRadius).toBe(0.25)
     })
 
     it('normalizes/clamps lighting angles to prevent invalid light vectors', () => {

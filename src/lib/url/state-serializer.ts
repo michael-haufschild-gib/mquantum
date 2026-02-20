@@ -2,22 +2,17 @@
  * URL State Serializer
  * Serializes and deserializes app state to/from URL parameters
  *
- * Supports both polytope and extended object types.
+ * Bloom uses progressive downsample/upsample (gain, threshold, knee, radius).
+ * Old bloom band/convolution URL params are parsed for backward compatibility.
  */
 
 import { isValidObjectType } from '@/lib/geometry/registry'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { AllShaderSettings, ShaderType, ToneMappingAlgorithm } from '@/rendering/shaders/types'
 import {
-  type BloomBandSettings,
-  type BloomMode,
-  DEFAULT_BLOOM_CONVOLUTION_BOOST,
-  DEFAULT_BLOOM_CONVOLUTION_RADIUS,
-  DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE,
-  DEFAULT_BLOOM_CONVOLUTION_TINT,
   DEFAULT_BLOOM_GAIN,
   DEFAULT_BLOOM_KNEE,
-  DEFAULT_BLOOM_MODE,
+  DEFAULT_BLOOM_RADIUS,
   DEFAULT_BLOOM_THRESHOLD,
   DEFAULT_EXPOSURE,
   DEFAULT_SHADER_SETTINGS,
@@ -44,17 +39,12 @@ export interface ShareableState {
   shaderSettings?: AllShaderSettings
   edgeColor?: string
   backgroundColor?: string
-  // Bloom settings (Bloom V2)
+  // Bloom settings (progressive downsample/upsample)
   bloomEnabled?: boolean
-  bloomMode?: BloomMode
   bloomGain?: number
   bloomThreshold?: number
   bloomKnee?: number
-  bloomBands?: BloomBandSettings[]
-  bloomConvolutionRadius?: number
-  bloomConvolutionResolutionScale?: number
-  bloomConvolutionBoost?: number
-  bloomConvolutionTint?: string
+  bloomRadius?: number
   // Enhanced lighting settings
   specularColor?: string
   toneMappingEnabled?: boolean
@@ -90,13 +80,9 @@ export function serializeState(state: ShareableState): string {
     params.set('bg', state.backgroundColor.replace('#', ''))
   }
 
-  // Bloom settings (Bloom V2)
+  // Bloom settings (progressive downsample/upsample)
   if (state.bloomEnabled === true) {
     params.set('be', '1')
-  }
-
-  if (state.bloomMode !== undefined && state.bloomMode !== DEFAULT_BLOOM_MODE) {
-    params.set('bm', state.bloomMode === 'convolution' ? 'c' : 'g')
   }
 
   if (state.bloomGain !== undefined && state.bloomGain !== DEFAULT_BLOOM_GAIN) {
@@ -111,39 +97,8 @@ export function serializeState(state: ShareableState): string {
     params.set('bk', state.bloomKnee.toFixed(2))
   }
 
-  if (state.bloomBands !== undefined) {
-    state.bloomBands.slice(0, 5).forEach((band, index) => {
-      const token = `${band.enabled ? 1 : 0}|${band.weight.toFixed(2)}|${band.size.toFixed(2)}|${band.tint.replace('#', '')}`
-      params.set(`bb${index}`, token)
-    })
-  }
-
-  if (
-    state.bloomConvolutionRadius !== undefined &&
-    state.bloomConvolutionRadius !== DEFAULT_BLOOM_CONVOLUTION_RADIUS
-  ) {
-    params.set('bcr', state.bloomConvolutionRadius.toFixed(2))
-  }
-
-  if (
-    state.bloomConvolutionResolutionScale !== undefined &&
-    state.bloomConvolutionResolutionScale !== DEFAULT_BLOOM_CONVOLUTION_RESOLUTION_SCALE
-  ) {
-    params.set('bcs', state.bloomConvolutionResolutionScale.toFixed(2))
-  }
-
-  if (
-    state.bloomConvolutionBoost !== undefined &&
-    state.bloomConvolutionBoost !== DEFAULT_BLOOM_CONVOLUTION_BOOST
-  ) {
-    params.set('bcb', state.bloomConvolutionBoost.toFixed(2))
-  }
-
-  if (
-    state.bloomConvolutionTint !== undefined &&
-    state.bloomConvolutionTint !== DEFAULT_BLOOM_CONVOLUTION_TINT
-  ) {
-    params.set('bct', state.bloomConvolutionTint.replace('#', ''))
+  if (state.bloomRadius !== undefined && state.bloomRadius !== DEFAULT_BLOOM_RADIUS) {
+    params.set('br', state.bloomRadius.toFixed(2))
   }
 
   // Enhanced lighting settings (omit defaults for shorter URLs)
@@ -264,18 +219,13 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     state.backgroundColor = `#${backgroundColor}`
   }
 
-  // Bloom settings (Bloom V2)
+  // Bloom settings (progressive downsample/upsample)
   const bloomEnabled = params.get('be')
   if (bloomEnabled === '1') {
     state.bloomEnabled = true
   }
 
-  const bloomMode = params.get('bm')
-  if (bloomMode === 'g') {
-    state.bloomMode = 'gaussian'
-  } else if (bloomMode === 'c') {
-    state.bloomMode = 'convolution'
-  }
+  // 'bm' (bloom mode) is ignored for backward compat — no longer used
 
   const bloomGain = params.get('bga')
   if (bloomGain) {
@@ -301,66 +251,33 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
     }
   }
 
-  const bands: BloomBandSettings[] = []
-  for (let i = 0; i < 5; i++) {
-    const token = params.get(`bb${i}`)
-    if (!token) break
-    const [enabledRaw, weightRaw, sizeRaw, tintRaw] = token.split('|')
-    const weight = parseFloat(weightRaw ?? '')
-    const size = parseFloat(sizeRaw ?? '')
-    const tint = tintRaw ? `#${tintRaw}` : ''
-    if (
-      (enabledRaw === '0' || enabledRaw === '1') &&
-      Number.isFinite(weight) &&
-      weight >= 0 &&
-      weight <= 4 &&
-      Number.isFinite(size) &&
-      size >= 0.25 &&
-      size <= 4 &&
-      /^#[0-9A-Fa-f]{6}$/.test(tint)
-    ) {
-      bands.push({ enabled: enabledRaw === '1', weight, size, tint })
-    } else {
-      break
-    }
-  }
-  if (bands.length > 0) {
-    let hasDisabledBand = false
-    state.bloomBands = bands.map((band) => {
-      const enabled = !hasDisabledBand && band.enabled
-      if (!enabled) hasDisabledBand = true
-      return { ...band, enabled }
-    })
-  }
-
-  const bloomConvolutionRadius = params.get('bcr')
-  if (bloomConvolutionRadius) {
-    const parsed = parseFloat(bloomConvolutionRadius)
-    if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 6) {
-      state.bloomConvolutionRadius = parsed
+  const bloomRadius = params.get('br')
+  if (bloomRadius) {
+    const parsed = parseFloat(bloomRadius)
+    if (!isNaN(parsed) && parsed >= 0.25 && parsed <= 4) {
+      state.bloomRadius = parsed
     }
   }
 
-  const bloomConvolutionResolutionScale = params.get('bcs')
-  if (bloomConvolutionResolutionScale) {
-    const parsed = parseFloat(bloomConvolutionResolutionScale)
-    if (!isNaN(parsed) && parsed >= 0.25 && parsed <= 1) {
-      state.bloomConvolutionResolutionScale = parsed
+  // Backward compat: extract radius from old band size params (bb0..bb4)
+  if (!bloomRadius) {
+    const bandSizes: number[] = []
+    for (let i = 0; i < 5; i++) {
+      const token = params.get(`bb${i}`)
+      if (!token) break
+      const parts = token.split('|')
+      const size = parseFloat(parts[2] ?? '')
+      if (Number.isFinite(size) && size >= 0.25 && size <= 4) {
+        bandSizes.push(size)
+      }
+    }
+    if (bandSizes.length > 0) {
+      const avg = bandSizes.reduce((sum, s) => sum + s, 0) / bandSizes.length
+      state.bloomRadius = Math.round(avg * 100) / 100
     }
   }
 
-  const bloomConvolutionBoost = params.get('bcb')
-  if (bloomConvolutionBoost) {
-    const parsed = parseFloat(bloomConvolutionBoost)
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 4) {
-      state.bloomConvolutionBoost = parsed
-    }
-  }
-
-  const bloomConvolutionTint = params.get('bct')
-  if (bloomConvolutionTint && /^[0-9A-Fa-f]{6}$/.test(bloomConvolutionTint)) {
-    state.bloomConvolutionTint = `#${bloomConvolutionTint}`
-  }
+  // 'bcr', 'bcs', 'bcb', 'bct' (convolution params) are ignored for backward compat
 
   // Enhanced lighting settings
   const specularColor = params.get('sc')

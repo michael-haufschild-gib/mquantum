@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { fft, ifft, ifft3d } from '@/lib/math/fft'
+import { fft, fftNd, ifft, ifft3d, ifftNd } from '@/lib/math/fft'
 
 const TOL = 1e-10
 
@@ -121,6 +121,101 @@ describe('ifft3d', () => {
     expect(() => ifft3d(data, 6, 4, 4)).toThrow('power-of-2')
     expect(() => ifft3d(data, 4, 6, 4)).toThrow('power-of-2')
     expect(() => ifft3d(data, 4, 4, 6)).toThrow('power-of-2')
+  })
+})
+
+describe('fftNd (N-dimensional forward)', () => {
+  it('roundtrips a 4x4x4 signal through fftNd/ifftNd', () => {
+    const dims = [4, 4, 4]
+    const total = 64
+    const original = new Float64Array(2 * total)
+
+    for (let iz = 0; iz < 4; iz++) {
+      for (let iy = 0; iy < 4; iy++) {
+        for (let ix = 0; ix < 4; ix++) {
+          const idx = (iz * 16 + iy * 4 + ix)
+          original[idx * 2] = Math.sin((2 * Math.PI * ix) / 4) * Math.cos((2 * Math.PI * iy) / 4)
+          original[idx * 2 + 1] = 0
+        }
+      }
+    }
+
+    const data = new Float64Array(original)
+    fftNd(data, dims)
+    ifftNd(data, dims)
+
+    expectComplexClose(data, original)
+  })
+
+  it('roundtrips a 2D signal (8x4)', () => {
+    const dims = [8, 4]
+    const total = 32
+    const original = new Float64Array(2 * total)
+
+    for (let iy = 0; iy < 4; iy++) {
+      for (let ix = 0; ix < 8; ix++) {
+        const idx = iy * 8 + ix
+        original[idx * 2] = Math.cos((2 * Math.PI * 2 * ix) / 8) + Math.sin((2 * Math.PI * iy) / 4)
+      }
+    }
+
+    const data = new Float64Array(original)
+    fftNd(data, dims)
+    ifftNd(data, dims)
+
+    expectComplexClose(data, original)
+  })
+
+  it('satisfies Parseval energy conservation for N-D FFT', () => {
+    const dims = [4, 4, 4]
+    const total = 64
+    const data = new Float64Array(2 * total)
+
+    for (let i = 0; i < total; i++) {
+      data[i * 2] = Math.sin((2 * Math.PI * 3 * i) / total)
+    }
+
+    let timeEnergy = 0
+    for (let i = 0; i < total; i++) {
+      timeEnergy += data[i * 2]! ** 2 + data[i * 2 + 1]! ** 2
+    }
+
+    fftNd(data, dims)
+
+    let freqEnergy = 0
+    for (let i = 0; i < total; i++) {
+      freqEnergy += data[i * 2]! ** 2 + data[i * 2 + 1]! ** 2
+    }
+    freqEnergy /= total
+
+    expect(Math.abs(timeEnergy - freqEnergy)).toBeLessThan(TOL)
+  })
+
+  it('throws on non-power-of-2 dimensions', () => {
+    const data = new Float64Array(2 * 6 * 4)
+    expect(() => fftNd(data, [6, 4])).toThrow('power-of-2')
+  })
+
+  it('is a no-op for empty dims', () => {
+    const data = new Float64Array([3.0, 1.0])
+    fftNd(data, [])
+    expect(data[0]).toBeCloseTo(3.0)
+    expect(data[1]).toBeCloseTo(1.0)
+  })
+
+  it('matches manual 1D fft for a 1D signal', () => {
+    const n = 8
+    const dataA = new Float64Array(2 * n)
+    const dataB = new Float64Array(2 * n)
+    for (let i = 0; i < n; i++) {
+      dataA[i * 2] = Math.cos((2 * Math.PI * i) / n)
+      dataB[i * 2] = Math.cos((2 * Math.PI * i) / n)
+    }
+
+    fft(dataA, n)
+    fftNd(dataB, [n])
+
+    expectComplexClose(dataA, dataB)
   })
 })
 

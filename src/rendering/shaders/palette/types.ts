@@ -41,6 +41,7 @@ export type ColorAlgorithm =
   | 'hamiltonianDecomposition'
   | 'modeCharacter'
   | 'energyFlux'
+  | 'kSpaceOccupation'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -61,6 +62,7 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'hamiltonianDecomposition' as const, label: 'Hamiltonian Decomposition' },
   { value: 'modeCharacter' as const, label: 'Mode Character Map' },
   { value: 'energyFlux' as const, label: 'Energy Flux Map' },
+  { value: 'kSpaceOccupation' as const, label: 'k-Space Occupation Map' },
 ] as const
 
 /**
@@ -82,6 +84,7 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   hamiltonianDecomposition: 12,
   modeCharacter: 13,
   energyFlux: 14,
+  kSpaceOccupation: 15,
 }
 
 /**
@@ -220,6 +223,7 @@ export function getAvailableColorAlgorithms(
     'hamiltonianDecomposition',
     'modeCharacter',
     'energyFlux',
+    'kSpaceOccupation',
   ])
 
   if (quantumMode === 'freeScalarField') {

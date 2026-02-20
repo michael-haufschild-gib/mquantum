@@ -1,33 +1,32 @@
 /**
- * WGSL Bloom Shaders (Bloom V2)
+ * WGSL Bloom Shaders (Progressive Downsample/Upsample)
  *
- * Supports:
- * - Threshold extraction
- * - Per-level Gaussian blur shaders
- * - Level-specialized Gaussian composite shaders
- * - Convolution composite shader
- * - Copy shader for zero-strength fast path
+ * Jimenez 2014 / Call of Duty bloom algorithm:
+ * - Prefilter: luminance threshold + Karis average
+ * - Downsample: 13-tap box filter
+ * - Upsample: 9-tap tent filter + additive blend
+ * - Composite: scene + gain * bloom
+ * - Copy: zero-gain fast path passthrough
  */
 
 /**
- * Brightness threshold shader (UE4/Catlike-style soft threshold).
+ * Prefilter shader: luminance-based threshold with Karis average.
  *
- * Uses max(r,g,b) brightness instead of luminance to avoid chromatic bias
- * (luminance weights green at 71.5%, causing green fringes on dark backgrounds).
- * Quadratic soft knee creates a gradual bloom onset instead of a hard cutoff.
+ * Samples 4 quadrant texels at half-res, weights by 1/(1+luma),
+ * applies soft threshold per sample, averages with Karis weights.
  *
  * Uniform layout (16 bytes):
- *   threshold: f32, knee: f32, _padding0: f32, _padding1: f32
+ *   threshold: f32, knee: f32, _pad0: f32, _pad1: f32
  */
-export const bloomThresholdShader = /* wgsl */ `
-struct ThresholdUniforms {
+export const bloomPrefilterShader = /* wgsl */ `
+struct PrefilterUniforms {
   threshold: f32,
   knee: f32,
-  _padding0: f32,
-  _padding1: f32,
+  _pad0: f32,
+  _pad1: f32,
 }
 
-@group(0) @binding(0) var<uniform> uniforms: ThresholdUniforms;
+@group(0) @binding(0) var<uniform> uniforms: PrefilterUniforms;
 @group(0) @binding(1) var tInput: texture_2d<f32>;
 @group(0) @binding(2) var linearSampler: sampler;
 
@@ -36,225 +35,189 @@ struct VertexOutput {
   @location(0) uv: vec2f,
 }
 
+fn luminance(c: vec3f) -> f32 {
+  return dot(c, vec3f(0.2126, 0.7152, 0.0722));
+}
+
 fn softThreshold(color: vec3f, threshold: f32, knee: f32) -> vec3f {
-  let brightness = max(color.r, max(color.g, color.b));
+  let radiance = max(color, vec3f(0.0));
+  let luma = luminance(radiance);
   let safeKnee = max(knee, 0.0001);
-  // Quadratic ramp in the knee region [threshold - knee, threshold + knee]
-  let soft = clamp(brightness - threshold + safeKnee, 0.0, 2.0 * safeKnee);
+  let soft = clamp(luma - threshold + safeKnee, 0.0, 2.0 * safeKnee);
   let quadratic = soft * soft / (4.0 * safeKnee + 0.00001);
-  // Above threshold + knee: use linear (brightness - threshold)
-  let contribution = max(quadratic, brightness - threshold);
-  let factor = min(contribution / max(brightness, 0.00001), 1.0);
-  return color * factor;
+  let contribution = max(quadratic, luma - threshold);
+  let factor = min(contribution / max(luma, 0.00001), 1.0);
+  return radiance * factor;
+}
+
+fn extractBloomSample(colorSample: vec4f, threshold: f32, knee: f32) -> vec3f {
+  // object-color is premultiplied-alpha. Threshold in straight color space
+  // and then re-apply alpha so transparent edge pixels don't leak bloom rings.
+  let alpha = clamp(colorSample.a, 0.0, 1.0);
+  if (alpha <= 0.0001) {
+    return vec3f(0.0);
+  }
+
+  let straightColor = colorSample.rgb / alpha;
+  let thresholded = softThreshold(straightColor, threshold, knee);
+  return thresholded * alpha;
 }
 
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
-  let color = textureSample(tInput, linearSampler, input.uv).rgb;
-  let result = softThreshold(color, uniforms.threshold, uniforms.knee);
+  let dims = vec2f(textureDimensions(tInput));
+  let texelSize = 1.0 / dims;
+
+  // Sample 4 quadrant texels (bilinear-filtered at half-pixel offsets)
+  let a = textureSample(tInput, linearSampler, input.uv + texelSize * vec2f(-1.0, -1.0));
+  let b = textureSample(tInput, linearSampler, input.uv + texelSize * vec2f( 1.0, -1.0));
+  let c = textureSample(tInput, linearSampler, input.uv + texelSize * vec2f(-1.0,  1.0));
+  let d = textureSample(tInput, linearSampler, input.uv + texelSize * vec2f( 1.0,  1.0));
+
+  // Apply threshold to each sample independently
+  let ta = extractBloomSample(a, uniforms.threshold, uniforms.knee);
+  let tb = extractBloomSample(b, uniforms.threshold, uniforms.knee);
+  let tc = extractBloomSample(c, uniforms.threshold, uniforms.knee);
+  let td = extractBloomSample(d, uniforms.threshold, uniforms.knee);
+
+  // Karis average: weight by 1/(1+luma) to prevent firefly artifacts
+  let wa = 1.0 / (1.0 + luminance(ta));
+  let wb = 1.0 / (1.0 + luminance(tb));
+  let wc = 1.0 / (1.0 + luminance(tc));
+  let wd = 1.0 / (1.0 + luminance(td));
+
+  let result = (ta * wa + tb * wb + tc * wc + td * wd) / (wa + wb + wc + wd);
   return vec4f(result, 1.0);
 }
 `
 
 /**
- * Creates a compute-shader Gaussian blur for a specific kernel radius.
+ * 13-tap downsample filter (Jimenez 2014).
  *
- * Uses shared workgroup memory to reduce redundant global texture reads.
- * A single `direction` uniform (0=horizontal, 1=vertical) controls axis.
- *
- * Uniform layout (128 bytes):
- *   outputSize: vec2u, inputSize: vec2u, direction: u32, sizeScale: f32, _pad: vec2f,
- *   coefficients: array<vec4f, 6>
+ * Samples a 4x4 texel area via 5 overlapping 2x2 blocks, weighted to sum to 1.0.
+ * No uniforms — texel size derived from textureDimensions().
  */
-export function createBloomBlurComputeShader(kernelRadius: number): string {
-  return /* wgsl */ `
-struct BlurComputeUniforms {
-  outputSize: vec2u,
-  inputSize: vec2u,
-  direction: u32,
-  sizeScale: f32,
-  coefficients: array<vec4f, 6>,
+export const bloomDownsampleShader = /* wgsl */ `
+@group(0) @binding(0) var tInput: texture_2d<f32>;
+@group(0) @binding(1) var linearSampler: sampler;
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
 }
 
-@group(0) @binding(0) var<uniform> uniforms: BlurComputeUniforms;
-@group(0) @binding(1) var tInput: texture_2d<f32>;
-@group(0) @binding(2) var tOutput: texture_storage_2d<rgba16float, write>;
+@fragment
+fn main(input: VertexOutput) -> @location(0) vec4f {
+  let dims = vec2f(textureDimensions(tInput));
+  let texelSize = 1.0 / dims;
+  let uv = input.uv;
 
-const TILE_SIZE = 256u;
-const KERNEL_RADIUS = ${kernelRadius}u;
+  // 13-tap filter: 5 overlapping 2x2 bilinear taps
+  //
+  //   a . b . c
+  //   . d . e .
+  //   f . g . h
+  //   . i . j .
+  //   k . l . m
+  //
+  // Weights: center cross = 0.125 each (×4 = 0.5),
+  //   corner blocks = 0.03125 each (×4 per block × 4 blocks = 0.5)
+  //   Total = 1.0
 
-var<workgroup> tile: array<vec3f, ${256 + 2 * kernelRadius}>;
+  let a = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0, -2.0)).rgb;
+  let b = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0, -2.0)).rgb;
+  let c = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0, -2.0)).rgb;
+  let d = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-1.0, -1.0)).rgb;
+  let e = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 1.0, -1.0)).rgb;
+  let f = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0,  0.0)).rgb;
+  let g = textureSample(tInput, linearSampler, uv).rgb;
+  let h = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  0.0)).rgb;
+  let i = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-1.0,  1.0)).rgb;
+  let j = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 1.0,  1.0)).rgb;
+  let k = textureSample(tInput, linearSampler, uv + texelSize * vec2f(-2.0,  2.0)).rgb;
+  let l = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 0.0,  2.0)).rgb;
+  let m = textureSample(tInput, linearSampler, uv + texelSize * vec2f( 2.0,  2.0)).rgb;
 
-fn getCoeff(i: u32) -> f32 {
-  return uniforms.coefficients[i / 4u][i % 4u];
-}
+  // Center diamond (d+e+i+j) gets weight 0.5 (0.125 each)
+  // Four corner blocks get weight 0.125 total each (0.03125 per sample)
+  var result = (d + e + i + j) * 0.125;
+  result += (a + b + f + g) * 0.03125;
+  result += (b + c + g + h) * 0.03125;
+  result += (f + g + k + l) * 0.03125;
+  result += (g + h + l + m) * 0.03125;
 
-fn mapOutputToInputCoord(index: i32, outDim: i32, inDim: i32) -> i32 {
-  let safeOutDim = max(outDim, 1);
-  let safeInDim = max(inDim, 1);
-  if (safeOutDim == safeInDim) {
-    return clamp(index, 0, safeInDim - 1);
-  }
-  let scale = f32(safeInDim) / f32(safeOutDim);
-  let mapped = (f32(index) + 0.5) * scale - 0.5;
-  return clamp(i32(round(mapped)), 0, safeInDim - 1);
-}
-
-fn loadTexel(
-  major: i32,
-  minor: i32,
-  outDimMajor: i32,
-  outDimMinor: i32,
-  inDimMajor: i32,
-  inDimMinor: i32
-) -> vec3f {
-  let cMajor = mapOutputToInputCoord(major, outDimMajor, inDimMajor);
-  let cMinor = mapOutputToInputCoord(minor, outDimMinor, inDimMinor);
-  var coord: vec2i;
-  if (uniforms.direction == 0u) {
-    coord = vec2i(cMajor, cMinor);
-  } else {
-    coord = vec2i(cMinor, cMajor);
-  }
-  return textureLoad(tInput, coord, 0).rgb;
-}
-
-@compute @workgroup_size(256, 1, 1)
-fn main(@builtin(local_invocation_id) lid: vec3u,
-        @builtin(workgroup_id) wid: vec3u) {
-  var outDimMajor: i32;
-  var outDimMinor: i32;
-  var inDimMajor: i32;
-  var inDimMinor: i32;
-  if (uniforms.direction == 0u) {
-    outDimMajor = i32(uniforms.outputSize.x);
-    outDimMinor = i32(uniforms.outputSize.y);
-    inDimMajor = i32(uniforms.inputSize.x);
-    inDimMinor = i32(uniforms.inputSize.y);
-  } else {
-    outDimMajor = i32(uniforms.outputSize.y);
-    outDimMinor = i32(uniforms.outputSize.x);
-    inDimMajor = i32(uniforms.inputSize.y);
-    inDimMinor = i32(uniforms.inputSize.x);
-  }
-
-  let minorIdx = i32(wid.y);
-  let tileStart = i32(wid.x * TILE_SIZE);
-  let localIdx = i32(lid.x);
-
-  // --- Load center texel ---
-  let centerMajor = tileStart + localIdx;
-  tile[u32(localIdx) + KERNEL_RADIUS] = loadTexel(
-    centerMajor,
-    minorIdx,
-    outDimMajor,
-    outDimMinor,
-    inDimMajor,
-    inDimMinor
-  );
-
-  // --- Load left/top border ---
-  if (u32(localIdx) < KERNEL_RADIUS) {
-    let borderMajor = tileStart - i32(KERNEL_RADIUS) + localIdx;
-    tile[u32(localIdx)] = loadTexel(
-      borderMajor,
-      minorIdx,
-      outDimMajor,
-      outDimMinor,
-      inDimMajor,
-      inDimMinor
-    );
-  }
-
-  // --- Load right/bottom border ---
-  if (u32(localIdx) >= TILE_SIZE - KERNEL_RADIUS) {
-    let offset = u32(localIdx) - (TILE_SIZE - KERNEL_RADIUS);
-    let borderMajor = tileStart + i32(TILE_SIZE) + i32(offset);
-    tile[TILE_SIZE + KERNEL_RADIUS + offset] = loadTexel(
-      borderMajor,
-      minorIdx,
-      outDimMajor,
-      outDimMinor,
-      inDimMajor,
-      inDimMinor
-    );
-  }
-
-  workgroupBarrier();
-
-  // --- Bounds check: skip threads beyond texture dimensions ---
-  if (centerMajor >= outDimMajor || minorIdx >= outDimMinor) {
-    return;
-  }
-
-  // --- Apply Gaussian kernel from shared memory ---
-  let tileIdx = u32(localIdx) + KERNEL_RADIUS;
-  var result = tile[tileIdx] * getCoeff(0u);
-
-  for (var i = 1u; i < ${kernelRadius}u; i++) {
-    let w = getCoeff(i);
-    let rawStep = max(1i, i32(round(f32(i) * uniforms.sizeScale)));
-    let step = u32(min(rawStep, i32(KERNEL_RADIUS) - 1));
-    result += (tile[tileIdx - step] + tile[tileIdx + step]) * w;
-  }
-
-  // --- Write output ---
-  var outCoord: vec2i;
-  if (uniforms.direction == 0u) {
-    outCoord = vec2i(centerMajor, minorIdx);
-  } else {
-    outCoord = vec2i(minorIdx, centerMajor);
-  }
-  textureStore(tOutput, outCoord, vec4f(result, 1.0));
+  return vec4f(result, 1.0);
 }
 `
-}
-
-function weightExpr(index: number): string {
-  if (index === 4) return 'uniforms.weights1.x'
-  const channels = ['x', 'y', 'z', 'w'] as const
-  return `uniforms.weights0.${channels[index]!}`
-}
 
 /**
- * Creates a level-specialized Gaussian composite shader.
+ * 9-tap tent upsample filter with additive blend.
  *
- * Uniform layout (128 bytes):
- *   bloomGain: f32, _pad: vec3f,
- *   weights0: vec4f, weights1: vec4f,
- *   tint0..tint4: vec4f
+ * Samples lower mip with 9-tap tent kernel, adds to current mip.
+ *
+ * Uniform layout (16 bytes):
+ *   filterRadius: f32, _pad0: f32, _pad1: f32, _pad2: f32
  */
-export function createBloomCompositeShader(activeLevels: number): string {
-  const clampedLevels = Math.max(1, Math.min(5, Math.floor(activeLevels)))
-  const samplerBinding = clampedLevels + 2
+export const bloomUpsampleShader = /* wgsl */ `
+struct UpsampleUniforms {
+  filterRadius: f32,
+  _pad0: f32,
+  _pad1: f32,
+  _pad2: f32,
+}
 
-  const mipBindings = Array.from({ length: clampedLevels }, (_, i) => {
-    return `@group(0) @binding(${i + 2}) var tMip${i}: texture_2d<f32>;`
-  }).join('\n')
+@group(0) @binding(0) var<uniform> uniforms: UpsampleUniforms;
+@group(0) @binding(1) var tLowerMip: texture_2d<f32>;
+@group(0) @binding(2) var tCurrentMip: texture_2d<f32>;
+@group(0) @binding(3) var linearSampler: sampler;
 
-  const bloomTerms = Array.from({ length: clampedLevels }, (_, i) => {
-    return `${weightExpr(i)} * uniforms.tint${i}.rgb * textureSample(tMip${i}, linearSampler, input.uv).rgb`
-  }).join(' +\n    ')
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
 
-  return /* wgsl */ `
+@fragment
+fn main(input: VertexOutput) -> @location(0) vec4f {
+  let dims = vec2f(textureDimensions(tLowerMip));
+  let texelSize = uniforms.filterRadius / dims;
+  let uv = input.uv;
+
+  // 9-tap tent filter: corners 1/16, edges 2/16, center 4/16
+  var bloom = textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x, -texelSize.y)).rgb;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,           -texelSize.y)).rgb * 2.0;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,   -texelSize.y)).rgb;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    0.0)).rgb * 2.0;
+  bloom += textureSample(tLowerMip, linearSampler, uv).rgb * 4.0;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    0.0)).rgb * 2.0;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f(-texelSize.x,    texelSize.y)).rgb;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( 0.0,            texelSize.y)).rgb * 2.0;
+  bloom += textureSample(tLowerMip, linearSampler, uv + vec2f( texelSize.x,    texelSize.y)).rgb;
+  bloom *= (1.0 / 16.0);
+
+  // Additive blend with current mip
+  let current = textureSample(tCurrentMip, linearSampler, uv).rgb;
+  return vec4f(bloom + current, 1.0);
+}
+`
+
+/**
+ * Bloom composite shader: adds bloom to scene.
+ *
+ * Uniform layout (16 bytes):
+ *   bloomGain: f32, _pad0: f32, _pad1: f32, _pad2: f32
+ */
+export const bloomCompositeShader = /* wgsl */ `
 struct CompositeUniforms {
   bloomGain: f32,
   _pad0: f32,
   _pad1: f32,
   _pad2: f32,
-  weights0: vec4f,
-  weights1: vec4f,
-  tint0: vec4f,
-  tint1: vec4f,
-  tint2: vec4f,
-  tint3: vec4f,
-  tint4: vec4f,
 }
 
 @group(0) @binding(0) var<uniform> uniforms: CompositeUniforms;
 @group(0) @binding(1) var tScene: texture_2d<f32>;
-${mipBindings}
-@group(0) @binding(${samplerBinding}) var linearSampler: sampler;
+@group(0) @binding(2) var tBloom: texture_2d<f32>;
+@group(0) @binding(3) var linearSampler: sampler;
 
 struct VertexOutput {
   @builtin(position) position: vec4f,
@@ -264,17 +227,13 @@ struct VertexOutput {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   let sceneColor = textureSample(tScene, linearSampler, input.uv).rgb;
-  let bloom = uniforms.bloomGain * (
-    ${bloomTerms}
-  );
-
-  return vec4f(sceneColor + bloom, 1.0);
+  let bloomColor = textureSample(tBloom, linearSampler, input.uv).rgb;
+  return vec4f(sceneColor + uniforms.bloomGain * bloomColor, 1.0);
 }
 `
-}
 
 /**
- * Copy shader used for zero-strength fast path and convolution downsample pass.
+ * Copy shader for zero-gain fast path passthrough.
  */
 export const bloomCopyShader = /* wgsl */ `
 @group(0) @binding(0) var tInput: texture_2d<f32>;
@@ -288,86 +247,5 @@ struct VertexOutput {
 @fragment
 fn main(input: VertexOutput) -> @location(0) vec4f {
   return vec4f(textureSample(tInput, linearSampler, input.uv).rgb, 1.0);
-}
-`
-
-/**
- * Convolution bloom shader.
- *
- * Uniform layout (48 bytes):
- *   gain: f32, radius: f32, boost: f32, threshold: f32,
- *   knee: f32, _pad: vec3f,
- *   tint: vec4f
- */
-export const bloomConvolutionCompositeShader = /* wgsl */ `
-struct ConvolutionUniforms {
-  gain: f32,
-  radius: f32,
-  boost: f32,
-  threshold: f32,
-  knee: f32,
-  _pad0: f32,
-  _pad1: f32,
-  _pad2: f32,
-  tint: vec4f,
-}
-
-@group(0) @binding(0) var<uniform> uniforms: ConvolutionUniforms;
-@group(0) @binding(1) var tScene: texture_2d<f32>;
-@group(0) @binding(2) var tBloomInput: texture_2d<f32>;
-@group(0) @binding(3) var linearSampler: sampler;
-
-struct VertexOutput {
-  @builtin(position) position: vec4f,
-  @location(0) uv: vec2f,
-}
-
-fn softThresholdFactor(color: vec3f) -> f32 {
-  let brightness = max(color.r, max(color.g, color.b));
-  let safeKnee = max(uniforms.knee, 0.0001);
-  let soft = clamp(brightness - uniforms.threshold + safeKnee, 0.0, 2.0 * safeKnee);
-  let quadratic = soft * soft / (4.0 * safeKnee + 0.00001);
-  let contribution = max(quadratic, brightness - uniforms.threshold);
-  return min(contribution / max(brightness, 0.00001), 1.0);
-}
-
-fn sampleBloom(uv: vec2f) -> vec3f {
-  let color = textureSample(tBloomInput, linearSampler, uv).rgb;
-  return color * softThresholdFactor(color);
-}
-
-@fragment
-fn main(input: VertexOutput) -> @location(0) vec4f {
-  let sceneColor = textureSample(tScene, linearSampler, input.uv).rgb;
-
-  let dims = vec2f(textureDimensions(tBloomInput));
-  let texel = vec2f(1.0) / max(dims, vec2f(1.0));
-  let radius = uniforms.radius * texel;
-
-  let offX = vec2f(radius.x, 0.0);
-  let offY = vec2f(0.0, radius.y);
-  let offHalfX = offX * 0.5;
-  let offHalfY = offY * 0.5;
-  let offDiag = vec2f(radius.x * 0.70710678, radius.y * 0.70710678);
-
-  var blurred = sampleBloom(input.uv) * 0.22;
-
-  blurred += sampleBloom(input.uv + offX) * 0.09;
-  blurred += sampleBloom(input.uv - offX) * 0.09;
-  blurred += sampleBloom(input.uv + offY) * 0.09;
-  blurred += sampleBloom(input.uv - offY) * 0.09;
-
-  blurred += sampleBloom(input.uv + offDiag) * 0.07;
-  blurred += sampleBloom(input.uv - offDiag) * 0.07;
-  blurred += sampleBloom(input.uv + vec2f(offDiag.x, -offDiag.y)) * 0.07;
-  blurred += sampleBloom(input.uv + vec2f(-offDiag.x, offDiag.y)) * 0.07;
-
-  blurred += sampleBloom(input.uv + offHalfX) * 0.035;
-  blurred += sampleBloom(input.uv - offHalfX) * 0.035;
-  blurred += sampleBloom(input.uv + offHalfY) * 0.035;
-  blurred += sampleBloom(input.uv - offHalfY) * 0.035;
-
-  let bloomColor = blurred * uniforms.boost;
-  return vec4f(sceneColor + uniforms.gain * uniforms.tint.rgb * bloomColor, 1.0);
 }
 `

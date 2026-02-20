@@ -117,6 +117,71 @@ export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity'
  */
 export type FreeScalarInitialCondition = 'vacuumNoise' | 'singleMode' | 'gaussianPacket'
 
+// ============================================================================
+// k-Space Visualization Config
+// ============================================================================
+
+/** How k-space data is projected to the 3D display volume. */
+export type KSpaceDisplayMode = 'raw3d' | 'radial3d'
+
+/** Exposure transfer function for k-space occupation mapping. */
+export type KSpaceExposureMode = 'none' | 'linear' | 'log'
+
+/**
+ * Display-only transforms applied to k-space occupation data before GPU upload.
+ * These do not affect the underlying physics — only how n_k values are visualized.
+ */
+export interface KSpaceVizConfig {
+  /** Display projection mode */
+  displayMode: KSpaceDisplayMode
+  /** Whether to apply FFT shift (center low |k| in the volume) */
+  fftShiftEnabled: boolean
+  /** Exposure transfer function */
+  exposureMode: KSpaceExposureMode
+  /** Low percentile cutoff for exposure windowing [0, 99] */
+  lowPercentile: number
+  /** High percentile cutoff for exposure windowing [1, 100] */
+  highPercentile: number
+  /** Gamma correction exponent [0.1, 3.0] */
+  gamma: number
+  /** Whether to apply Gaussian broadening (display-only smoothing) */
+  broadeningEnabled: boolean
+  /** Half-width of broadening kernel in voxels [1, 5] */
+  broadeningRadius: number
+  /** Sigma of Gaussian broadening kernel [0.5, 3.0] */
+  broadeningSigma: number
+  /** Number of radial bins for radial3d mode [16, 128] */
+  radialBinCount: number
+}
+
+/** Default k-space visualization config — log exposure + FFT shift + mild broadening. */
+export const DEFAULT_KSPACE_VIZ: KSpaceVizConfig = {
+  displayMode: 'raw3d',
+  fftShiftEnabled: true,
+  exposureMode: 'log',
+  lowPercentile: 0,
+  highPercentile: 99.5,
+  gamma: 1.0,
+  broadeningEnabled: true,
+  broadeningRadius: 2,
+  broadeningSigma: 1.0,
+  radialBinCount: 32,
+}
+
+/** Passthrough config — no transforms, identical to pre-refactor behavior. */
+export const PASSTHROUGH_KSPACE_VIZ: KSpaceVizConfig = {
+  displayMode: 'raw3d',
+  fftShiftEnabled: false,
+  exposureMode: 'none',
+  lowPercentile: 0,
+  highPercentile: 100,
+  gamma: 1.0,
+  broadeningEnabled: false,
+  broadeningRadius: 1,
+  broadeningSigma: 1.0,
+  radialBinCount: 32,
+}
+
 /**
  * Configuration for the free scalar field (Klein-Gordon) lattice simulation.
  * Controls lattice geometry, physics parameters, initial conditions, and visualization.
@@ -157,6 +222,9 @@ export interface FreeScalarConfig {
 
   /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
   slicePositions: number[]
+
+  /** Display-only transforms for k-space occupation visualization */
+  kSpaceViz: KSpaceVizConfig
 }
 
 /**
@@ -181,6 +249,7 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   autoScale: true,
   needsReset: false,
   slicePositions: [],
+  kSpaceViz: { ...DEFAULT_KSPACE_VIZ },
 }
 
 /**

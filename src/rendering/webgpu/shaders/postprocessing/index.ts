@@ -6,12 +6,12 @@
  * @module rendering/webgpu/shaders/postprocessing
  */
 
-// Bloom
+// Bloom (progressive downsample/upsample)
 export {
-  bloomThresholdShader,
-  createBloomBlurComputeShader,
-  createBloomCompositeShader,
-  bloomConvolutionCompositeShader,
+  bloomPrefilterShader,
+  bloomDownsampleShader,
+  bloomUpsampleShader,
+  bloomCompositeShader,
   bloomCopyShader,
 } from './bloom.wgsl'
 
