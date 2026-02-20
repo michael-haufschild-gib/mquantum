@@ -12,20 +12,20 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(fs).toEqual(DEFAULT_FREE_SCALAR_CONFIG)
   })
 
-  it('setFreeScalarLatticeDim updates latticeDim and adjusts gridSize', () => {
+  it('setFreeScalarLatticeDim truncates arrays to new latticeDim length', () => {
     useExtendedObjectStore.getState().setFreeScalarLatticeDim(2)
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
     expect(fs.latticeDim).toBe(2)
-    expect(fs.gridSize[2]).toBe(1)
+    expect(fs.gridSize).toHaveLength(2)
     expect(fs.needsReset).toBe(true)
   })
 
-  it('setFreeScalarLatticeDim(1) collapses Y and Z', () => {
+  it('setFreeScalarLatticeDim(1) truncates gridSize to single element', () => {
     useExtendedObjectStore.getState().setFreeScalarLatticeDim(1)
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
     expect(fs.latticeDim).toBe(1)
-    expect(fs.gridSize[1]).toBe(1)
-    expect(fs.gridSize[2]).toBe(1)
+    expect(fs.gridSize).toHaveLength(1)
+    expect(fs.spacing).toHaveLength(1)
   })
 
   it('setFreeScalarGridSize sets grid and triggers reset', () => {
@@ -156,18 +156,18 @@ describe('extendedObjectStore — free scalar field actions', () => {
   })
 
   describe('grid-size dimension enforcement (Fix 6)', () => {
-    it('forces Y and Z to 1 when latticeDim is 1', () => {
+    it('truncates gridSize to single element for 1D', () => {
       useExtendedObjectStore.getState().setFreeScalarLatticeDim(1)
       useExtendedObjectStore.getState().setFreeScalarGridSize([32, 64, 64])
       const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
-      expect(fs.gridSize).toEqual([32, 1, 1])
+      expect(fs.gridSize).toEqual([32])
     })
 
-    it('forces Z to 1 when latticeDim is 2', () => {
+    it('truncates gridSize to two elements for 2D', () => {
       useExtendedObjectStore.getState().setFreeScalarLatticeDim(2)
       useExtendedObjectStore.getState().setFreeScalarGridSize([32, 32, 64])
       const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
-      expect(fs.gridSize).toEqual([32, 32, 1])
+      expect(fs.gridSize).toEqual([32, 32])
     })
 
     it('allows all dims when latticeDim is 3', () => {
@@ -177,13 +177,12 @@ describe('extendedObjectStore — free scalar field actions', () => {
       expect(fs.gridSize).toEqual([32, 32, 32])
     })
 
-    it('spacing setter clamps all dimensions uniformly regardless of latticeDim', () => {
+    it('spacing setter truncates to latticeDim length', () => {
       useExtendedObjectStore.getState().setFreeScalarLatticeDim(1)
       useExtendedObjectStore.getState().setFreeScalarSpacing([0.5, 0.3, 0.3])
       const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.spacing).toHaveLength(1)
       expect(fs.spacing[0]).toBe(0.5)
-      expect(fs.spacing[1]).toBe(0.3)
-      expect(fs.spacing[2]).toBe(0.3)
     })
   })
 

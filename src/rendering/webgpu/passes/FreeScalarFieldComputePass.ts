@@ -385,9 +385,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    */
   private computeStrides(config: FreeScalarConfig): number[] {
     const strides = new Array(MAX_DIM).fill(0)
-    strides[0] = 1
-    for (let d = 1; d < config.latticeDim; d++) {
-      strides[d] = strides[d - 1]! * config.gridSize[d - 1]!
+    strides[config.latticeDim - 1] = 1
+    for (let d = config.latticeDim - 2; d >= 0; d--) {
+      strides[d] = strides[d + 1]! * config.gridSize[d + 1]!
     }
     return strides
   }
@@ -586,6 +586,19 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.initialized = false
     }
 
+    // Pre-compute maxPhiEstimate before updateUniforms so the first frame
+    // after a reset uses the correct normalization (not the stale value).
+    if (!this.initialized || config.needsReset) {
+      if (config.autoScale) {
+        this.maxPhiEstimate =
+          config.initialCondition === 'vacuumNoise'
+            ? estimateVacuumMaxPhi(config)
+            : config.packetAmplitude
+      } else {
+        this.maxPhiEstimate = 1.0
+      }
+    }
+
     // Update uniforms every frame (includes basis vectors for writeGrid)
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
 
@@ -654,15 +667,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       }
 
       this.initialized = true
-      // Estimate max phi value from initial condition
-      if (config.autoScale) {
-        this.maxPhiEstimate =
-          config.initialCondition === 'vacuumNoise'
-            ? estimateVacuumMaxPhi(config)
-            : config.packetAmplitude
-      } else {
-        this.maxPhiEstimate = 1.0
-      }
     }
 
     // Leapfrog time steps (only when playing)

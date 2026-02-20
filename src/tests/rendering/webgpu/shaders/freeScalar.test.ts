@@ -11,8 +11,8 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarUniformsBlock).toContain('struct FreeScalarUniforms')
     })
 
-    it('contains required uniform fields', () => {
-      expect(freeScalarUniformsBlock).toContain('gridSize: vec3u')
+    it('contains required uniform fields for N-D layout', () => {
+      expect(freeScalarUniformsBlock).toContain('gridSize: array<u32, 12>')
       expect(freeScalarUniformsBlock).toContain('latticeDim: u32')
       expect(freeScalarUniformsBlock).toContain('mass: f32')
       expect(freeScalarUniformsBlock).toContain('dt: f32')
@@ -41,17 +41,15 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarInitBlock).toContain('pi[idx]')
     })
 
-    it('gates Gaussian packet dx by latticeDim to avoid stale Y/Z center values', () => {
-      // The envelope distance dx must zero out inactive dimensions so that
-      // residual packetCenter.y/z from 3D mode don't kill the Gaussian in 1D/2D
-      expect(freeScalarInitBlock).toContain('select(0.0, worldPos.y - params.packetCenter.y, params.latticeDim >= 2u)')
-      expect(freeScalarInitBlock).toContain('select(0.0, worldPos.z - params.packetCenter.z, params.latticeDim >= 3u)')
+    it('computes distance using N-D loop over active dimensions', () => {
+      // N-D refactor: distance is computed via loop, not per-component select()
+      expect(freeScalarInitBlock).toContain('worldPos[d] - params.packetCenter[d]')
     })
 
-    it('gates kPhys by latticeDim to zero inactive wave vector components', () => {
-      // kPhys must be zeroed for inactive dimensions — both in single-mode and Gaussian
-      expect(freeScalarInitBlock).toContain('params.latticeDim >= 2u && latticeL.y > 0.0')
-      expect(freeScalarInitBlock).toContain('params.latticeDim >= 3u && latticeL.z > 0.0')
+    it('gates kPhys by gridSize within N-D loop', () => {
+      // N-D refactor: kPhys validity is checked per-dimension in the loop
+      expect(freeScalarInitBlock).toContain('params.gridSize[d]')
+      expect(freeScalarInitBlock).toContain('latticeL > 0.0')
     })
   })
 
@@ -70,8 +68,8 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarUpdatePiBlock).toContain('laplacian')
     })
 
-    it('uses periodic boundary conditions', () => {
-      expect(freeScalarUpdatePiBlock).toContain('fn wrap(')
+    it('uses periodic boundary conditions via wrapCoord', () => {
+      expect(freeScalarUpdatePiBlock).toContain('wrapCoord(')
     })
 
     it('implements Klein-Gordon update equation', () => {

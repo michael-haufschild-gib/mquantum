@@ -108,7 +108,7 @@ export const createSchroedingerSlice: StateCreator<
    */
   const defaultGridPerDim = (d: number): number => {
     const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / d))
-    return Math.max(3, Math.min(128, raw))
+    return Math.max(2, Math.min(128, raw))
   }
 
   /**
@@ -123,7 +123,7 @@ export const createSchroedingerSlice: StateCreator<
     const needsPow2 = prev.initialCondition === 'vacuumNoise'
     const snapToPow2 = (v: number): number => {
       const log2 = Math.round(Math.log2(v))
-      return Math.max(3, Math.min(gridDefault, 2 ** log2))
+      return Math.max(2, Math.min(gridDefault, 2 ** log2))
     }
     const gridSize = Array.from({ length: newDim }, (_, i) => {
       const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
@@ -785,7 +785,7 @@ export const createSchroedingerSlice: StateCreator<
         }
         const clamped = Array.from({ length: latticeDim }, (_, i) => {
           const s = i < size.length ? size[i]! : 1
-          return i < latticeDim ? snap(s, 3, maxPerDim) : 1
+          return i < latticeDim ? snap(s, 2, maxPerDim) : 1
         })
         return {
           schroedinger: {
@@ -854,9 +854,9 @@ export const createSchroedingerSlice: StateCreator<
         if (condition === 'vacuumNoise') {
           const maxPerDim = defaultGridPerDim(fs.latticeDim)
           gridSize = gridSize.map((s) => {
-            const clamped = Math.max(3, Math.min(maxPerDim, s))
+            const clamped = Math.max(2, Math.min(maxPerDim, s))
             const log2 = Math.round(Math.log2(clamped))
-            return Math.max(3, Math.min(maxPerDim, 2 ** log2))
+            return Math.max(2, Math.min(maxPerDim, 2 ** log2))
           })
         }
 

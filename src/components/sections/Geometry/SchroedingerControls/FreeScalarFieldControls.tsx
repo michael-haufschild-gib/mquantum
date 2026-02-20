@@ -179,7 +179,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     // Max grid size for current dimension (budget cap)
     const maxGridPerDim = useMemo(() => {
       const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / latticeDim))
-      return Math.max(4, Math.min(128, raw))
+      return Math.max(2, Math.min(128, raw))
     }, [latticeDim])
 
     // Filter power-of-2 options by budget
