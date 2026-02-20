@@ -2,6 +2,7 @@ import {
   DEFAULT_SCHROEDINGER_CONFIG,
   type FreeScalarConfig,
   type SchroedingerConfig,
+  type TdseConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
   SCHROEDINGER_QUALITY_PRESETS,
@@ -144,6 +145,51 @@ export const createSchroedingerSlice: StateCreator<
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
     return { latticeDim: newDim, gridSize, spacing, packetCenter, modeK, slicePositions }
+  }
+
+  /** Maximum total TDSE lattice sites — FFT needs power-of-2 per axis */
+  const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
+
+  /**
+   * Compute default per-dimension grid size for a given TDSE dimensionality.
+   * TDSE requires power-of-2 per axis for FFT. Ensures total sites within budget.
+   */
+  const defaultTdseGridPerDim = (d: number): number => {
+    const raw = Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
+    const pow2 = 2 ** Math.floor(Math.log2(Math.max(4, raw)))
+    return Math.max(4, Math.min(128, pow2))
+  }
+
+  /**
+   * Resize TDSE arrays to match a new latticeDim, preserving existing values
+   * where possible and filling new dimensions with defaults.
+   */
+  const resizeTdseArrays = (
+    prev: TdseConfig,
+    newDim: number
+  ): Partial<TdseConfig> => {
+    const gridDefault = defaultTdseGridPerDim(newDim)
+    const snapToPow2 = (v: number): number => {
+      const log2 = Math.round(Math.log2(Math.max(4, v)))
+      return Math.max(4, Math.min(gridDefault, 2 ** log2))
+    }
+    const gridSize = Array.from({ length: newDim }, (_, i) => {
+      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
+      return snapToPow2(raw)
+    })
+    const spacing = Array.from({ length: newDim }, (_, i) =>
+      i < prev.spacing.length ? prev.spacing[i]! : 0.1
+    )
+    const packetCenter = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
+    )
+    const packetMomentum = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
+    )
+    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
+      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
+    )
+    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions }
   }
 
   /**
@@ -963,6 +1009,327 @@ export const createSchroedingerSlice: StateCreator<
         schroedinger: {
           ...state.schroedinger,
           freeScalar: { ...state.schroedinger.freeScalar, needsReset: false },
+        },
+      }))
+    },
+
+    // === TDSE (Time-Dependent Schroedinger Equation) ===
+    setTdseLatticeDim: (dim) => {
+      const clamped = Math.max(1, Math.min(11, Math.floor(dim)))
+      setWithVersion((state) => {
+        const prev = state.schroedinger.tdse
+        const resized = resizeTdseArrays(prev, clamped)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...prev, ...resized, needsReset: true },
+          },
+        }
+      })
+    },
+    setTdseGridSize: (size) => {
+      setWithVersion((state) => {
+        const { latticeDim } = state.schroedinger.tdse
+        const maxPerDim = defaultTdseGridPerDim(latticeDim)
+        const clamped = Array.from({ length: latticeDim }, (_, i) => {
+          const s = i < size.length ? size[i]! : 4
+          const val = Math.max(4, Math.min(maxPerDim, Math.round(s)))
+          const log2 = Math.round(Math.log2(val))
+          return Math.max(4, Math.min(maxPerDim, 2 ** log2))
+        })
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...state.schroedinger.tdse, gridSize: clamped, needsReset: true },
+          },
+        }
+      })
+    },
+    setTdseSpacing: (spacing) => {
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        const clamped = Array.from({ length: td.latticeDim }, (_, i) =>
+          Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
+        )
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...td, spacing: clamped, needsReset: true },
+          },
+        }
+      })
+    },
+    setTdseMass: (mass) => {
+      const clamped = Math.max(0.01, Math.min(100.0, mass))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, mass: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseHbar: (hbar) => {
+      const clamped = Math.max(0.01, Math.min(10.0, hbar))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, hbar: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseDt: (dt) => {
+      const clamped = Math.max(0.0001, Math.min(0.1, dt))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, dt: clamped },
+        },
+      }))
+    },
+    setTdseStepsPerFrame: (steps) => {
+      const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, stepsPerFrame: clamped },
+        },
+      }))
+    },
+    setTdseInitialCondition: (condition) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, initialCondition: condition, needsReset: true },
+        },
+      }))
+    },
+    setTdsePacketCenter: (center) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, packetCenter: center, needsReset: true },
+        },
+      }))
+    },
+    setTdsePacketWidth: (width) => {
+      const clamped = Math.max(0.01, Math.min(5.0, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, packetWidth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdsePacketAmplitude: (amplitude) => {
+      const clamped = Math.max(0.01, Math.min(10.0, amplitude))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, packetAmplitude: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdsePacketMomentum: (momentum) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, packetMomentum: momentum, needsReset: true },
+        },
+      }))
+    },
+    setTdsePotentialType: (type) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, potentialType: type, needsReset: true },
+        },
+      }))
+    },
+    setTdseBarrierHeight: (height) => {
+      const clamped = Math.max(0.0, Math.min(100.0, height))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, barrierHeight: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseBarrierWidth: (width) => {
+      const clamped = Math.max(0.01, Math.min(5.0, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, barrierWidth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseBarrierCenter: (center) => {
+      const clamped = Math.max(-10.0, Math.min(10.0, center))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, barrierCenter: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseWellDepth: (depth) => {
+      const clamped = Math.max(0.0, Math.min(100.0, depth))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wellDepth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseWellWidth: (width) => {
+      const clamped = Math.max(0.01, Math.min(10.0, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wellWidth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseHarmonicOmega: (omega) => {
+      const clamped = Math.max(0.01, Math.min(100.0, omega))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, harmonicOmega: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseStepHeight: (height) => {
+      const clamped = Math.max(0.0, Math.min(100.0, height))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, stepHeight: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseDriveEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled },
+        },
+      }))
+    },
+    setTdseDriveWaveform: (waveform) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, driveWaveform: waveform },
+        },
+      }))
+    },
+    setTdseDriveFrequency: (frequency) => {
+      const clamped = Math.max(0.01, Math.min(100.0, frequency))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, driveFrequency: clamped },
+        },
+      }))
+    },
+    setTdseDriveAmplitude: (amplitude) => {
+      const clamped = Math.max(0.0, Math.min(100.0, amplitude))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, driveAmplitude: clamped },
+        },
+      }))
+    },
+    setTdseAbsorberEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, absorberEnabled: enabled },
+        },
+      }))
+    },
+    setTdseAbsorberWidth: (width) => {
+      const clamped = Math.max(0.05, Math.min(0.3, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, absorberWidth: clamped },
+        },
+      }))
+    },
+    setTdseAbsorberStrength: (strength) => {
+      const clamped = Math.max(0.0, Math.min(50.0, strength))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, absorberStrength: clamped },
+        },
+      }))
+    },
+    setTdseFieldView: (view) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, fieldView: view },
+        },
+      }))
+    },
+    setTdseAutoScale: (autoScale) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, autoScale },
+        },
+      }))
+    },
+    setTdseDiagnosticsEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, diagnosticsEnabled: enabled },
+        },
+      }))
+    },
+    setTdseDiagnosticsInterval: (interval) => {
+      const clamped = Math.max(1, Math.min(60, Math.floor(interval)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, diagnosticsInterval: clamped },
+        },
+      }))
+    },
+    setTdseSlicePosition: (dimIndex, value) => {
+      setWithVersion((state) => {
+        const td = state.schroedinger.tdse
+        const slicePositions = [...td.slicePositions]
+        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
+          const halfExtent = (td.gridSize[dimIndex + 3] ?? 1) * (td.spacing[dimIndex + 3] ?? 0.1) * 0.5
+          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...td, slicePositions },
+          },
+        }
+      })
+    },
+    resetTdseField: () => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, needsReset: true },
+        },
+      }))
+    },
+    clearTdseNeedsReset: () => {
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, needsReset: false },
         },
       }))
     },

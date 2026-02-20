@@ -42,6 +42,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         label: 'Free Scalar Field',
         description: 'Klein-Gordon field on a lattice with real-time evolution.',
       },
+      {
+        value: 'tdseDynamics' as SchroedingerQuantumMode,
+        label: 'TDSE Dynamics',
+        description: 'Time-dependent Schroedinger equation: wavepackets, tunneling, scattering.',
+      },
     ],
     []
   )
@@ -49,9 +54,9 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const handleSelect = useCallback(
     (value: SchroedingerQuantumMode) => {
       soundManager.playClick()
-      // Free scalar field requires volumetric 3D rendering (no 2D pipeline support).
+      // Free scalar field and TDSE require volumetric 3D rendering (no 2D pipeline support).
       // Force dimension to 3 if currently at 2.
-      if (value === 'freeScalarField' && dimension < 3) {
+      if ((value === 'freeScalarField' || value === 'tdseDynamics') && dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
       setQuantumMode(value)

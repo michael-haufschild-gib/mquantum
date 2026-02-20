@@ -136,3 +136,51 @@ export interface FreeScalarFieldControlsProps {
   dimension: number
   actions: FreeScalarFieldActions
 }
+
+/**
+ * Actions for TDSE Dynamics mode
+ */
+export interface TdseActions {
+  setLatticeDim: ExtendedObjectState['setTdseLatticeDim']
+  setGridSize: ExtendedObjectState['setTdseGridSize']
+  setSpacing: ExtendedObjectState['setTdseSpacing']
+  setMass: ExtendedObjectState['setTdseMass']
+  setHbar: ExtendedObjectState['setTdseHbar']
+  setDt: ExtendedObjectState['setTdseDt']
+  setStepsPerFrame: ExtendedObjectState['setTdseStepsPerFrame']
+  setInitialCondition: ExtendedObjectState['setTdseInitialCondition']
+  setPacketCenter: ExtendedObjectState['setTdsePacketCenter']
+  setPacketWidth: ExtendedObjectState['setTdsePacketWidth']
+  setPacketAmplitude: ExtendedObjectState['setTdsePacketAmplitude']
+  setPacketMomentum: ExtendedObjectState['setTdsePacketMomentum']
+  setPotentialType: ExtendedObjectState['setTdsePotentialType']
+  setBarrierHeight: ExtendedObjectState['setTdseBarrierHeight']
+  setBarrierWidth: ExtendedObjectState['setTdseBarrierWidth']
+  setBarrierCenter: ExtendedObjectState['setTdseBarrierCenter']
+  setWellDepth: ExtendedObjectState['setTdseWellDepth']
+  setWellWidth: ExtendedObjectState['setTdseWellWidth']
+  setHarmonicOmega: ExtendedObjectState['setTdseHarmonicOmega']
+  setStepHeight: ExtendedObjectState['setTdseStepHeight']
+  setDriveEnabled: ExtendedObjectState['setTdseDriveEnabled']
+  setDriveWaveform: ExtendedObjectState['setTdseDriveWaveform']
+  setDriveFrequency: ExtendedObjectState['setTdseDriveFrequency']
+  setDriveAmplitude: ExtendedObjectState['setTdseDriveAmplitude']
+  setAbsorberEnabled: ExtendedObjectState['setTdseAbsorberEnabled']
+  setAbsorberWidth: ExtendedObjectState['setTdseAbsorberWidth']
+  setAbsorberStrength: ExtendedObjectState['setTdseAbsorberStrength']
+  setFieldView: ExtendedObjectState['setTdseFieldView']
+  setAutoScale: ExtendedObjectState['setTdseAutoScale']
+  setDiagnosticsEnabled: ExtendedObjectState['setTdseDiagnosticsEnabled']
+  setDiagnosticsInterval: ExtendedObjectState['setTdseDiagnosticsInterval']
+  setSlicePosition: ExtendedObjectState['setTdseSlicePosition']
+  resetField: ExtendedObjectState['resetTdseField']
+}
+
+/**
+ * Props for TDSE Controls
+ */
+export interface TdseControlsProps {
+  config: SchroedingerConfig
+  dimension: number
+  actions: TdseActions
+}

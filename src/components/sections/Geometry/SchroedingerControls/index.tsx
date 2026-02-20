@@ -24,11 +24,13 @@ import React from 'react'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
+import { TDSEControls } from './TDSEControls'
 import { WignerControls } from './WignerControls'
 import type {
   FreeScalarFieldActions,
   HarmonicOscillatorActions,
   HydrogenNDActions,
+  TdseActions,
   WignerActions,
 } from './types'
 
@@ -110,6 +112,40 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarVacuumSeed: state.setFreeScalarVacuumSeed,
       setFreeScalarSlicePosition: state.setFreeScalarSlicePosition,
       resetFreeScalarField: state.resetFreeScalarField,
+      // TDSE dynamics actions
+      setTdseLatticeDim: state.setTdseLatticeDim,
+      setTdseGridSize: state.setTdseGridSize,
+      setTdseSpacing: state.setTdseSpacing,
+      setTdseMass: state.setTdseMass,
+      setTdseHbar: state.setTdseHbar,
+      setTdseDt: state.setTdseDt,
+      setTdseStepsPerFrame: state.setTdseStepsPerFrame,
+      setTdseInitialCondition: state.setTdseInitialCondition,
+      setTdsePacketCenter: state.setTdsePacketCenter,
+      setTdsePacketWidth: state.setTdsePacketWidth,
+      setTdsePacketAmplitude: state.setTdsePacketAmplitude,
+      setTdsePacketMomentum: state.setTdsePacketMomentum,
+      setTdsePotentialType: state.setTdsePotentialType,
+      setTdseBarrierHeight: state.setTdseBarrierHeight,
+      setTdseBarrierWidth: state.setTdseBarrierWidth,
+      setTdseBarrierCenter: state.setTdseBarrierCenter,
+      setTdseWellDepth: state.setTdseWellDepth,
+      setTdseWellWidth: state.setTdseWellWidth,
+      setTdseHarmonicOmega: state.setTdseHarmonicOmega,
+      setTdseStepHeight: state.setTdseStepHeight,
+      setTdseDriveEnabled: state.setTdseDriveEnabled,
+      setTdseDriveWaveform: state.setTdseDriveWaveform,
+      setTdseDriveFrequency: state.setTdseDriveFrequency,
+      setTdseDriveAmplitude: state.setTdseDriveAmplitude,
+      setTdseAbsorberEnabled: state.setTdseAbsorberEnabled,
+      setTdseAbsorberWidth: state.setTdseAbsorberWidth,
+      setTdseAbsorberStrength: state.setTdseAbsorberStrength,
+      setTdseFieldView: state.setTdseFieldView,
+      setTdseAutoScale: state.setTdseAutoScale,
+      setTdseDiagnosticsEnabled: state.setTdseDiagnosticsEnabled,
+      setTdseDiagnosticsInterval: state.setTdseDiagnosticsInterval,
+      setTdseSlicePosition: state.setTdseSlicePosition,
+      resetTdseField: state.resetTdseField,
     }))
     const {
       config,
@@ -163,6 +199,40 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarVacuumSeed,
       setFreeScalarSlicePosition,
       resetFreeScalarField,
+      // TDSE dynamics actions
+      setTdseLatticeDim,
+      setTdseGridSize,
+      setTdseSpacing,
+      setTdseMass,
+      setTdseHbar,
+      setTdseDt,
+      setTdseStepsPerFrame,
+      setTdseInitialCondition,
+      setTdsePacketCenter,
+      setTdsePacketWidth,
+      setTdsePacketAmplitude,
+      setTdsePacketMomentum,
+      setTdsePotentialType,
+      setTdseBarrierHeight,
+      setTdseBarrierWidth,
+      setTdseBarrierCenter,
+      setTdseWellDepth,
+      setTdseWellWidth,
+      setTdseHarmonicOmega,
+      setTdseStepHeight,
+      setTdseDriveEnabled,
+      setTdseDriveWaveform,
+      setTdseDriveFrequency,
+      setTdseDriveAmplitude,
+      setTdseAbsorberEnabled,
+      setTdseAbsorberWidth,
+      setTdseAbsorberStrength,
+      setTdseFieldView,
+      setTdseAutoScale,
+      setTdseDiagnosticsEnabled,
+      setTdseDiagnosticsInterval,
+      setTdseSlicePosition,
+      resetTdseField,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Get current dimension to show/hide dimension-specific controls
@@ -171,6 +241,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     // Check current mode
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
+    const isTdseDynamics = config.quantumMode === 'tdseDynamics'
 
     // Build action objects for child components
     const harmonicActions: HarmonicOscillatorActions = {
@@ -226,10 +297,46 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       resetField: resetFreeScalarField,
     }
 
+    const tdseActions: TdseActions = {
+      setLatticeDim: setTdseLatticeDim,
+      setGridSize: setTdseGridSize,
+      setSpacing: setTdseSpacing,
+      setMass: setTdseMass,
+      setHbar: setTdseHbar,
+      setDt: setTdseDt,
+      setStepsPerFrame: setTdseStepsPerFrame,
+      setInitialCondition: setTdseInitialCondition,
+      setPacketCenter: setTdsePacketCenter,
+      setPacketWidth: setTdsePacketWidth,
+      setPacketAmplitude: setTdsePacketAmplitude,
+      setPacketMomentum: setTdsePacketMomentum,
+      setPotentialType: setTdsePotentialType,
+      setBarrierHeight: setTdseBarrierHeight,
+      setBarrierWidth: setTdseBarrierWidth,
+      setBarrierCenter: setTdseBarrierCenter,
+      setWellDepth: setTdseWellDepth,
+      setWellWidth: setTdseWellWidth,
+      setHarmonicOmega: setTdseHarmonicOmega,
+      setStepHeight: setTdseStepHeight,
+      setDriveEnabled: setTdseDriveEnabled,
+      setDriveWaveform: setTdseDriveWaveform,
+      setDriveFrequency: setTdseDriveFrequency,
+      setDriveAmplitude: setTdseDriveAmplitude,
+      setAbsorberEnabled: setTdseAbsorberEnabled,
+      setAbsorberWidth: setTdseAbsorberWidth,
+      setAbsorberStrength: setTdseAbsorberStrength,
+      setFieldView: setTdseFieldView,
+      setAutoScale: setTdseAutoScale,
+      setDiagnosticsEnabled: setTdseDiagnosticsEnabled,
+      setDiagnosticsInterval: setTdseDiagnosticsInterval,
+      setSlicePosition: setTdseSlicePosition,
+      resetField: resetTdseField,
+    }
+
     return (
       <div className={className} data-testid="schroedinger-controls">
-        {/* Representation Selection — hidden for free scalar field (not a quantum wavefunction) */}
-        {!isFreeScalarField && (
+        {/* Representation Selection — hidden for compute modes (free scalar / TDSE) */}
+        {!isFreeScalarField && !isTdseDynamics && (
           <Section title="Representation" defaultOpen={true}>
             <div className="space-y-3">
               <ToggleGroup
@@ -295,8 +402,10 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         )}
 
         {/* Quantum State / Field Config Section - content depends on mode */}
-        <Section title={isFreeScalarField ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
-          {isFreeScalarField ? (
+        <Section title={isFreeScalarField || isTdseDynamics ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
+          {isTdseDynamics ? (
+            <TDSEControls config={config} dimension={dimension} actions={tdseActions} />
+          ) : isFreeScalarField ? (
             <FreeScalarFieldControls config={config} dimension={dimension} actions={freeScalarActions} />
           ) : isHydrogenNDMode ? (
             <HydrogenNDControls config={config} dimension={dimension} actions={hydrogenNDActions} />
@@ -320,6 +429,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               {config.freeScalar.latticeDim}D lattice, {config.freeScalar.gridSize.slice(0, config.freeScalar.latticeDim).join('\u00D7')} sites
             </p>
           )}
+          {isTdseDynamics && (
+            <p className="text-text-tertiary mt-1">
+              {config.tdse.latticeDim}D TDSE, {config.tdse.gridSize.slice(0, config.tdse.latticeDim).join('\u00D7')} sites
+            </p>
+          )}
         </div>
       </div>
     )
@@ -332,5 +446,6 @@ SchroedingerControls.displayName = 'SchroedingerControls'
 export { FreeScalarFieldControls } from './FreeScalarFieldControls'
 export { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 export { HydrogenNDControls } from './HydrogenNDControls'
+export { TDSEControls } from './TDSEControls'
 export { WignerControls } from './WignerControls'
 export type * from './types'
