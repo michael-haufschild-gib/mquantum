@@ -29,6 +29,7 @@ import { DomainColoringControls } from './DomainColoringControls'
 import { LchPresetSelector } from './LchPresetSelector'
 import { PresetSelector } from './PresetSelector'
 import { RealImagDivergingControls } from './RealImagDivergingControls'
+import { KSpaceVizControls } from './KSpaceVizControls'
 import { SignedPhaseDivergingControls } from './SignedPhaseDivergingControls'
 
 /** Algorithms that use the cosine palette (preset selector + advanced editor) */
@@ -291,6 +292,9 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
 
         {/* Distribution controls (power, cycles, offset) */}
         {USES_DISTRIBUTION.has(colorAlgorithm) && <DistributionControls />}
+
+        {/* k-Space occupation map visualization controls */}
+        {colorAlgorithm === 'kSpaceOccupation' && <KSpaceVizControls />}
       </div>
     )
   }

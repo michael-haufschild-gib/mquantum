@@ -119,7 +119,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
     }
     // Free scalar field: cross-section calls evalPsi() (HO, not the actual scalar field),
     // and radial probability + SQ are already hidden for non-HO/hydrogen modes.
-    if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField') return null
+    if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics') return null
 
     const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 

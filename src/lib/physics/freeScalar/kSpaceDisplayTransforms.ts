@@ -287,7 +287,7 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
  * @param grid - Display grid to modify in-place
  * @param config - Visualization config
  */
-export function applyBroadening(grid: KSpaceDisplayGrid, config: KSpaceVizConfig): void {
+export function applyBroadening(grid: KSpaceDisplayGrid, config: KSpaceVizConfig, latticeDim: number = 3): void {
   if (!config.broadeningEnabled) return
 
   const G = OUTPUT_GRID_SIZE
@@ -324,18 +324,14 @@ export function applyBroadening(grid: KSpaceDisplayGrid, config: KSpaceVizConfig
     oW[i] = grid.nk[i]! * grid.omegaNorm[i]!
   }
 
-  // Separable blur: X pass, Y pass, Z pass
-  blurAxis(nkW, kernel, radius, G, 0)
-  blurAxis(kW, kernel, radius, G, 0)
-  blurAxis(oW, kernel, radius, G, 0)
-
-  blurAxis(nkW, kernel, radius, G, 1)
-  blurAxis(kW, kernel, radius, G, 1)
-  blurAxis(oW, kernel, radius, G, 1)
-
-  blurAxis(nkW, kernel, radius, G, 2)
-  blurAxis(kW, kernel, radius, G, 2)
-  blurAxis(oW, kernel, radius, G, 2)
+  // Separable blur: only blur axes that correspond to physical lattice dimensions.
+  // For latticeDim < 3, blurring unused axes would create non-physical spread.
+  const blurDims = Math.min(latticeDim, 3)
+  for (let axis = 0; axis < blurDims; axis++) {
+    blurAxis(nkW, kernel, radius, G, axis)
+    blurAxis(kW, kernel, radius, G, axis)
+    blurAxis(oW, kernel, radius, G, axis)
+  }
 
   // Recover ratios and write back
   const eps = 1e-20
@@ -510,8 +506,8 @@ export function buildKSpaceDisplayTextures(
   // Apply exposure transfer
   applyExposureTransfer(grid, config)
 
-  // Apply broadening
-  applyBroadening(grid, config)
+  // Apply broadening (only blur axes with physical lattice dimensions)
+  applyBroadening(grid, config, raw.latticeDim)
 
   // Pack to textures
   return packDisplayTextures(grid)

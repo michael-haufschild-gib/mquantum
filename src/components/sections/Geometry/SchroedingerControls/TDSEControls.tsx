@@ -45,10 +45,8 @@ const DRIVE_WAVEFORM_OPTIONS = [
 ]
 
 const FIELD_VIEW_OPTIONS = [
-  { value: 'density', label: 'Density |psi|^2' },
-  { value: 'phase', label: 'Phase arg(psi)' },
-  { value: 'current', label: 'Probability Current' },
-  { value: 'potential', label: 'Potential V(x)' },
+  { value: 'density', label: 'Density |ψ|²' },
+  { value: 'phase', label: 'Phase arg(ψ)' },
 ]
 
 /**
@@ -444,18 +442,18 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         {activeDims > 3 && (
           <div className="border-t border-border-subtle pt-3 space-y-3">
             {Array.from({ length: activeDims - 3 }, (_, i) => {
-              const d = i + 3
+              const dimIdx = i + 3
               return (
                 <Slider
-                  key={`slice-${d}`}
-                  label={`Slice ${AXIS_LABELS[d]}`}
+                  key={`slice-${dimIdx}`}
+                  label={`Slice ${AXIS_LABELS[dimIdx]}`}
                   min={-5}
                   max={5}
                   step={0.1}
-                  value={td.slicePositions[d] ?? 0}
-                  onChange={(v) => actions.setSlicePosition(d, v)}
+                  value={td.slicePositions[i] ?? 0}
+                  onChange={(v) => actions.setSlicePosition(i, v)}
                   showValue
-                  data-testid={`tdse-slice-${d}`}
+                  data-testid={`tdse-slice-${dimIdx}`}
                 />
               )
             })}

@@ -4,7 +4,7 @@
  * Controls for configuring the free Klein-Gordon scalar field lattice simulation.
  * Supports N-dimensional lattices (1-11D) driven by the global dimension selector.
  * Provides lattice setup, initial condition selection, slice position controls
- * for extra dimensions (d>3), field view controls, and k-space visualization settings.
+ * for extra dimensions (d>3), and field view controls.
  */
 
 import { Button } from '@/components/ui/Button'
@@ -16,8 +16,6 @@ import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import type {
   FreeScalarFieldView,
   FreeScalarInitialCondition,
-  KSpaceDisplayMode,
-  KSpaceExposureMode,
 } from '@/lib/geometry/extended/types'
 import React, { useCallback, useMemo } from 'react'
 import type { FreeScalarFieldControlsProps } from './types'
@@ -39,19 +37,6 @@ const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 /** Max total lattice sites for memory budget (~8MB for phi+pi buffers) */
 const MAX_TOTAL_SITES = 1048576
 
-/** k-Space display mode toggle options */
-const KSPACE_DISPLAY_MODE_OPTIONS = [
-  { value: 'raw3d', label: 'Raw 3D' },
-  { value: 'radial3d', label: 'Radial 3D' },
-]
-
-/** k-Space exposure mode toggle options */
-const KSPACE_EXPOSURE_MODE_OPTIONS = [
-  { value: 'none', label: 'None' },
-  { value: 'linear', label: 'Linear' },
-  { value: 'log', label: 'Log' },
-]
-
 /**
  * FreeScalarFieldControls component
  *
@@ -62,19 +47,16 @@ const KSPACE_EXPOSURE_MODE_OPTIONS = [
  * - Slice position controls for extra dimensions (d > 3)
  * - Field view selection (phi, pi, energy density)
  * - Memory budget display
- * - k-Space visualization transforms (when algorithm 15 is active)
  *
  * @param props - Component props
  * @param props.config - Full Schroedinger config containing freeScalar sub-config
  * @param props.dimension - Current global dimension (drives latticeDim)
  * @param props.actions - Store action callbacks
- * @param props.colorAlgorithm - Current color algorithm index
  * @returns React component
  */
 export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = React.memo(
-  ({ config, dimension: _dimension, actions, colorAlgorithm }) => {
+  ({ config, dimension: _dimension, actions }) => {
     const fs = config.freeScalar
-    const kv = fs.kSpaceViz
 
     const {
       setGridSize,
@@ -92,21 +74,10 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setVacuumSeed,
       setSlicePosition,
       resetField,
-      setKSpaceDisplayMode,
-      setKSpaceFftShift,
-      setKSpaceExposureMode,
-      setKSpaceLowPercentile,
-      setKSpaceHighPercentile,
-      setKSpaceGamma,
-      setKSpaceBroadeningEnabled,
-      setKSpaceBroadeningRadius,
-      setKSpaceBroadeningSigma,
-      setKSpaceRadialBinCount,
     } = actions
 
     const isVacuum = fs.initialCondition === 'vacuumNoise'
     const latticeDim = fs.latticeDim
-    const isKSpaceActive = colorAlgorithm === 'kSpaceOccupation'
 
     // Initial condition options
     const initConditionOptions = useMemo(
@@ -185,18 +156,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     const handleRandomizeSeed = useCallback(() => {
       setVacuumSeed(Math.floor(Math.random() * 2147483647))
     }, [setVacuumSeed])
-
-    // k-Space display mode handler
-    const handleKSpaceDisplayMode = useCallback(
-      (v: string) => setKSpaceDisplayMode(v as KSpaceDisplayMode),
-      [setKSpaceDisplayMode]
-    )
-
-    // k-Space exposure mode handler
-    const handleKSpaceExposureMode = useCallback(
-      (v: string) => setKSpaceExposureMode(v as KSpaceExposureMode),
-      [setKSpaceExposureMode]
-    )
 
     const activeGridSize = fs.gridSize[0] ?? 16
 
@@ -446,121 +405,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             data-testid="auto-scale-switch"
           />
         </div>
-
-        {/* k-Space Visualization (only when algorithm 15 is active) */}
-        {isKSpaceActive && (
-          <div className="space-y-3 border-t border-border-subtle pt-3">
-            <div className="text-xs text-text-secondary font-medium">
-              k-Space Visualization
-            </div>
-
-            <ToggleGroup
-              options={KSPACE_DISPLAY_MODE_OPTIONS}
-              value={kv.displayMode}
-              onChange={handleKSpaceDisplayMode}
-              ariaLabel="Display mode"
-              data-testid="kspace-display-mode"
-            />
-
-            <Switch
-              label="Center Low |k|"
-              checked={kv.fftShiftEnabled}
-              onCheckedChange={setKSpaceFftShift}
-              data-testid="kspace-fft-shift"
-            />
-
-            {/* Exposure */}
-            <div className="space-y-2 ps-3 border-s border-border-subtle">
-              <div className="text-xs text-text-tertiary">Exposure</div>
-              <ToggleGroup
-                options={KSPACE_EXPOSURE_MODE_OPTIONS}
-                value={kv.exposureMode}
-                onChange={handleKSpaceExposureMode}
-                ariaLabel="Exposure mode"
-                data-testid="kspace-exposure-mode"
-              />
-              <Slider
-                label="Low %"
-                min={0}
-                max={99}
-                step={0.5}
-                value={kv.lowPercentile}
-                onChange={setKSpaceLowPercentile}
-                showValue
-                data-testid="kspace-low-percentile"
-              />
-              <Slider
-                label="High %"
-                min={1}
-                max={100}
-                step={0.5}
-                value={kv.highPercentile}
-                onChange={setKSpaceHighPercentile}
-                showValue
-                data-testid="kspace-high-percentile"
-              />
-              <Slider
-                label="Gamma"
-                min={0.1}
-                max={3.0}
-                step={0.1}
-                value={kv.gamma}
-                onChange={setKSpaceGamma}
-                showValue
-                data-testid="kspace-gamma"
-              />
-            </div>
-
-            {/* Broadening */}
-            <div className="space-y-2 ps-3 border-s border-border-subtle">
-              <div className="text-xs text-text-tertiary">Broadening (display only)</div>
-              <Switch
-                label="Enable"
-                checked={kv.broadeningEnabled}
-                onCheckedChange={setKSpaceBroadeningEnabled}
-                data-testid="kspace-broadening-enabled"
-              />
-              {kv.broadeningEnabled && (
-                <>
-                  <Slider
-                    label="Radius"
-                    min={1}
-                    max={5}
-                    step={1}
-                    value={kv.broadeningRadius}
-                    onChange={setKSpaceBroadeningRadius}
-                    showValue
-                    data-testid="kspace-broadening-radius"
-                  />
-                  <Slider
-                    label="Sigma"
-                    min={0.5}
-                    max={3.0}
-                    step={0.1}
-                    value={kv.broadeningSigma}
-                    onChange={setKSpaceBroadeningSigma}
-                    showValue
-                    data-testid="kspace-broadening-sigma"
-                  />
-                </>
-              )}
-            </div>
-
-            {/* Radial bin count (only for radial3d mode) */}
-            {kv.displayMode === 'radial3d' && (
-              <Slider
-                label="Radial Bins"
-                min={16}
-                max={128}
-                step={1}
-                value={kv.radialBinCount}
-                onChange={setKSpaceRadialBinCount}
-                showValue
-                data-testid="kspace-radial-bins"
-              />
-            )}
-          </div>
-        )}
       </div>
     )
   }

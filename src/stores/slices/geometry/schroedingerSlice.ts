@@ -108,7 +108,7 @@ export const createSchroedingerSlice: StateCreator<
    * @param d - Number of spatial dimensions
    */
   const defaultGridPerDim = (d: number): number => {
-    const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / d))
+    const raw = Math.round(Math.pow(MAX_TOTAL_SITES, 1 / d))
     // Round down to nearest power-of-2 so exact vacuum always has a valid grid size
     const pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
     return Math.max(2, Math.min(128, pow2))
@@ -155,7 +155,7 @@ export const createSchroedingerSlice: StateCreator<
    * TDSE requires power-of-2 per axis for FFT. Ensures total sites within budget.
    */
   const defaultTdseGridPerDim = (d: number): number => {
-    const raw = Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
+    const raw = Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
     const pow2 = 2 ** Math.floor(Math.log2(Math.max(4, raw)))
     return Math.max(4, Math.min(128, pow2))
   }

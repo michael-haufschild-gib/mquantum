@@ -171,9 +171,11 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
         const modeName =
           quantumMode === 'freeScalarField'
             ? 'Free Scalar Field'
-            : quantumMode === 'hydrogenND'
-              ? 'Hydrogen ND'
-              : 'Harmonic Oscillator'
+            : quantumMode === 'tdseDynamics'
+              ? 'TDSE Dynamics'
+              : quantumMode === 'hydrogenND'
+                ? 'Hydrogen ND'
+                : 'Harmonic Oscillator'
         defaultText = `${dimension}D ${modeName}`
       } else {
         const entry = OBJECT_TYPE_REGISTRY.get(objectType)

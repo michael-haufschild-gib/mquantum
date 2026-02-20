@@ -18,7 +18,6 @@ import { useShallow } from 'zustand/react/shallow'
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { Section } from '@/components/sections/Section'
-import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
@@ -113,17 +112,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarVacuumSeed: state.setFreeScalarVacuumSeed,
       setFreeScalarSlicePosition: state.setFreeScalarSlicePosition,
       resetFreeScalarField: state.resetFreeScalarField,
-      // k-Space viz
-      setFreeScalarKSpaceDisplayMode: state.setFreeScalarKSpaceDisplayMode,
-      setFreeScalarKSpaceFftShift: state.setFreeScalarKSpaceFftShift,
-      setFreeScalarKSpaceExposureMode: state.setFreeScalarKSpaceExposureMode,
-      setFreeScalarKSpaceLowPercentile: state.setFreeScalarKSpaceLowPercentile,
-      setFreeScalarKSpaceHighPercentile: state.setFreeScalarKSpaceHighPercentile,
-      setFreeScalarKSpaceGamma: state.setFreeScalarKSpaceGamma,
-      setFreeScalarKSpaceBroadeningEnabled: state.setFreeScalarKSpaceBroadeningEnabled,
-      setFreeScalarKSpaceBroadeningRadius: state.setFreeScalarKSpaceBroadeningRadius,
-      setFreeScalarKSpaceBroadeningSigma: state.setFreeScalarKSpaceBroadeningSigma,
-      setFreeScalarKSpaceRadialBinCount: state.setFreeScalarKSpaceRadialBinCount,
       // TDSE dynamics actions
       setTdseLatticeDim: state.setTdseLatticeDim,
       setTdseGridSize: state.setTdseGridSize,
@@ -211,17 +199,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarVacuumSeed,
       setFreeScalarSlicePosition,
       resetFreeScalarField,
-      // k-Space viz
-      setFreeScalarKSpaceDisplayMode,
-      setFreeScalarKSpaceFftShift,
-      setFreeScalarKSpaceExposureMode,
-      setFreeScalarKSpaceLowPercentile,
-      setFreeScalarKSpaceHighPercentile,
-      setFreeScalarKSpaceGamma,
-      setFreeScalarKSpaceBroadeningEnabled,
-      setFreeScalarKSpaceBroadeningRadius,
-      setFreeScalarKSpaceBroadeningSigma,
-      setFreeScalarKSpaceRadialBinCount,
       // TDSE dynamics actions
       setTdseLatticeDim,
       setTdseGridSize,
@@ -260,7 +237,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
     // Get current dimension to show/hide dimension-specific controls
     const dimension = useGeometryStore((state) => state.dimension)
-    const colorAlgorithm = useAppearanceStore((state) => state.colorAlgorithm)
 
     // Check current mode
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
@@ -319,16 +295,6 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setVacuumSeed: setFreeScalarVacuumSeed,
       setSlicePosition: setFreeScalarSlicePosition,
       resetField: resetFreeScalarField,
-      setKSpaceDisplayMode: setFreeScalarKSpaceDisplayMode,
-      setKSpaceFftShift: setFreeScalarKSpaceFftShift,
-      setKSpaceExposureMode: setFreeScalarKSpaceExposureMode,
-      setKSpaceLowPercentile: setFreeScalarKSpaceLowPercentile,
-      setKSpaceHighPercentile: setFreeScalarKSpaceHighPercentile,
-      setKSpaceGamma: setFreeScalarKSpaceGamma,
-      setKSpaceBroadeningEnabled: setFreeScalarKSpaceBroadeningEnabled,
-      setKSpaceBroadeningRadius: setFreeScalarKSpaceBroadeningRadius,
-      setKSpaceBroadeningSigma: setFreeScalarKSpaceBroadeningSigma,
-      setKSpaceRadialBinCount: setFreeScalarKSpaceRadialBinCount,
     }
 
     const tdseActions: TdseActions = {
@@ -440,7 +406,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           {isTdseDynamics ? (
             <TDSEControls config={config} dimension={dimension} actions={tdseActions} />
           ) : isFreeScalarField ? (
-            <FreeScalarFieldControls config={config} dimension={dimension} actions={freeScalarActions} colorAlgorithm={colorAlgorithm} />
+            <FreeScalarFieldControls config={config} dimension={dimension} actions={freeScalarActions} />
           ) : isHydrogenNDMode ? (
             <HydrogenNDControls config={config} dimension={dimension} actions={hydrogenNDActions} />
           ) : (

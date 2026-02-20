@@ -150,11 +150,12 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     // Check quantum mode for UI visibility
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
+    const isTdse = config.quantumMode === 'tdseDynamics'
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
-        {/* Time Evolution — not applicable for free scalar field (uses its own dt/stepsPerFrame) */}
-        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
+        {/* Time Evolution — not applicable for free scalar field or TDSE (uses its own dt/stepsPerFrame) */}
+        {!isFreeScalarField && !isTdse && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Time Evolution

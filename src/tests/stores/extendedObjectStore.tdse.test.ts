@@ -112,8 +112,8 @@ describe('TDSE store slice', () => {
     expect(td.gridSize[0]).toBe(16)
     // 30 -> min(maxPerDim, 30)=30, round(log2(30))=5, 2^5=32
     expect(td.gridSize[1]).toBe(32)
-    // 48 -> clamped to maxPerDim first (32 due to FP in cube root of 262144), stays 32
-    expect(td.gridSize[2]).toBe(32)
+    // 48 -> clamped to maxPerDim first (64 after FP fix: round(262144^(1/3))=64), min(64, 48)=48, round(log2(48))=6, 2^6=64, min(64,64)=64
+    expect(td.gridSize[2]).toBe(64)
   })
 
   it('setTdseInitialCondition accepts valid values', () => {

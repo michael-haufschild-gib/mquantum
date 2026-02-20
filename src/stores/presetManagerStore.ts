@@ -474,10 +474,11 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           }
         }
 
-        // Post-load invariant: free scalar field requires dimension >= 3
+        // Post-load invariant: free scalar field and TDSE require dimension >= 3
         // (loadGeometry + setState bypass setSchroedingerQuantumMode's enforcement)
+        const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
         if (
-          useExtendedObjectStore.getState().schroedinger?.quantumMode === 'freeScalarField' &&
+          (qm === 'freeScalarField' || qm === 'tdseDynamics') &&
           useGeometryStore.getState().dimension < 3
         ) {
           useGeometryStore.getState().setDimension(3)

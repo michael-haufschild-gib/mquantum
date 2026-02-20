@@ -3,7 +3,6 @@
  */
 
 import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
-import type { ColorAlgorithm } from '@/rendering/shaders/palette/types'
 import type { ExtendedObjectState } from '@/stores/extendedObjectStore'
 
 /**
@@ -127,17 +126,6 @@ export interface FreeScalarFieldActions {
   setVacuumSeed: ExtendedObjectState['setFreeScalarVacuumSeed']
   setSlicePosition: ExtendedObjectState['setFreeScalarSlicePosition']
   resetField: ExtendedObjectState['resetFreeScalarField']
-  // k-Space Visualization
-  setKSpaceDisplayMode: ExtendedObjectState['setFreeScalarKSpaceDisplayMode']
-  setKSpaceFftShift: ExtendedObjectState['setFreeScalarKSpaceFftShift']
-  setKSpaceExposureMode: ExtendedObjectState['setFreeScalarKSpaceExposureMode']
-  setKSpaceLowPercentile: ExtendedObjectState['setFreeScalarKSpaceLowPercentile']
-  setKSpaceHighPercentile: ExtendedObjectState['setFreeScalarKSpaceHighPercentile']
-  setKSpaceGamma: ExtendedObjectState['setFreeScalarKSpaceGamma']
-  setKSpaceBroadeningEnabled: ExtendedObjectState['setFreeScalarKSpaceBroadeningEnabled']
-  setKSpaceBroadeningRadius: ExtendedObjectState['setFreeScalarKSpaceBroadeningRadius']
-  setKSpaceBroadeningSigma: ExtendedObjectState['setFreeScalarKSpaceBroadeningSigma']
-  setKSpaceRadialBinCount: ExtendedObjectState['setFreeScalarKSpaceRadialBinCount']
 }
 
 /**
@@ -147,8 +135,6 @@ export interface FreeScalarFieldControlsProps {
   config: SchroedingerConfig
   dimension: number
   actions: FreeScalarFieldActions
-  /** Current color algorithm key */
-  colorAlgorithm: ColorAlgorithm
 }
 
 /**

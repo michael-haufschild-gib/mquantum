@@ -49,8 +49,11 @@ export function float32ToFloat16(val: number): number {
   if (newExp <= 0) {
     // Denormalized or underflow
     if (newExp < -10) return sign << 15 // Too small → ±0
-    const mantissa = (frac | 0x800000) >> (1 - newExp + 13)
-    return (sign << 15) | (mantissa >> 10)
+    // Shift the 24-bit significand (implicit 1 + 23-bit frac) right to produce
+    // a 10-bit subnormal mantissa. Total shift = (1 - newExp) denormal offset + 13
+    // to go from 24-bit to 10-bit, i.e. >> (14 - newExp).
+    const mantissa = (frac | 0x800000) >> (14 - newExp)
+    return (sign << 15) | mantissa
   }
 
   return (sign << 15) | (newExp << 10) | (frac >> 13)
