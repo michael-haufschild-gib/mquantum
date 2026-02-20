@@ -99,6 +99,57 @@ function createGraphHarness() {
   return { graph, resources, passes }
 }
 
+describe('WebGPUScene mode-switch rebuild strategy', () => {
+  it('forces full rebuild when switching into or out of free scalar mode', async () => {
+    ensureGpuTextureUsageConstants()
+    const { shouldForceFullRebuildForQuantumModeTransition } = await import(
+      '@/rendering/webgpu/WebGPUScene'
+    )
+
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        { quantumMode: 'freeScalarField' },
+        { quantumMode: 'hydrogenND' }
+      )
+    ).toBe(true)
+
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        { quantumMode: 'harmonicOscillator' },
+        { quantumMode: 'freeScalarField' }
+      )
+    ).toBe(true)
+  })
+
+  it('keeps warm-swap eligibility for non-free-scalar transitions', async () => {
+    ensureGpuTextureUsageConstants()
+    const { shouldForceFullRebuildForQuantumModeTransition } = await import(
+      '@/rendering/webgpu/WebGPUScene'
+    )
+
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        { quantumMode: 'harmonicOscillator' },
+        { quantumMode: 'hydrogenND' }
+      )
+    ).toBe(false)
+
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        { quantumMode: 'hydrogenND' },
+        { quantumMode: 'hydrogenND' }
+      )
+    ).toBe(false)
+
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        null,
+        { quantumMode: 'freeScalarField' }
+      )
+    ).toBe(false)
+  })
+})
+
 describe('WebGPUScene temporal reprojection wiring', () => {
   it('maps domainColoringPsi to compile-time colorAlgorithm=8', async () => {
     ensureGpuTextureUsageConstants()

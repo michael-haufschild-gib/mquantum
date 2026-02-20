@@ -540,12 +540,17 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     // Determine which groups changed
     const schrodingerChanged = !shallowEqual(lastSchrodingerConfigRef.current, schrodingerConfig)
     const ppChanged = !shallowEqual(lastPPConfigRef.current, ppConfig)
-    const isFullRebuild = needsFullRebuildRef.current
+    const forceFullRebuildForModeTransition = shouldForceFullRebuildForQuantumModeTransition(
+      lastSchrodingerConfigRef.current,
+      schrodingerConfig
+    )
+    const isFullRebuild = needsFullRebuildRef.current || forceFullRebuildForModeTransition
 
     const setupPasses = async () => {
       // Serialize async pass setup to prevent stale setup races creating duplicate passes.
       console.log(`[WebGPUScene] setupPasses: awaiting previous task (gen=${setupGeneration})`,
         `schrodingerChanged=${schrodingerChanged} ppChanged=${ppChanged} fullRebuild=${isFullRebuild}`,
+        `forceFull=${forceFullRebuildForModeTransition}`,
         `iso=${schrodingerConfig.isosurface} qm=${schrodingerConfig.quantumMode}`)
       await previousSetupTask
       if (shouldAbortSetup()) {
@@ -1808,6 +1813,21 @@ function shallowEqual<T extends object>(a: T | null, b: T): boolean {
   if (!a) return false
   const keys = Object.keys(b) as (keyof T)[]
   return keys.every((k) => a[k] === b[k])
+}
+
+/**
+ * Free-scalar mode has a distinct rendering data path (lattice compute grid).
+ * Warm-swapping between free-scalar and non-free-scalar keeps stale visuals visible
+ * during async compilation, so these transitions should force a cold rebuild.
+ */
+export function shouldForceFullRebuildForQuantumModeTransition(
+  previous: Pick<SchrodingerPassConfig, 'quantumMode'> | null,
+  next: Pick<SchrodingerPassConfig, 'quantumMode'>
+): boolean {
+  if (!previous) return false
+  if (previous.quantumMode === next.quantumMode) return false
+
+  return previous.quantumMode === 'freeScalarField' || next.quantumMode === 'freeScalarField'
 }
 
 interface ScenePassBackgroundColorUpdateArgs {
