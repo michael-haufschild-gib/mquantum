@@ -2484,7 +2484,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const isPlaying = animation?.isPlaying ?? false
 
       if (freeScalarConfig) {
-        freeScalarPass.executeField(ctx, freeScalarConfig, isPlaying)
+        const schroedinger = extended?.schroedinger
+        freeScalarPass.executeField(
+          ctx,
+          freeScalarConfig,
+          isPlaying,
+          schroedinger?.basisX as Float32Array | undefined,
+          schroedinger?.basisY as Float32Array | undefined,
+          schroedinger?.basisZ as Float32Array | undefined,
+          this.boundingRadius
+        )
         // Clear needsReset after processing (targeted mutation, no version bump)
         if (freeScalarConfig.needsReset) {
           ;(extended as any)?.clearFreeScalarNeedsReset?.()

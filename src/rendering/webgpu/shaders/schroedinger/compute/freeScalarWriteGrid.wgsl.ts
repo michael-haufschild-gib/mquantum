@@ -1,15 +1,15 @@
 /**
  * Free Scalar Field — Write to 3D Density Grid Compute Shader
  *
- * Reads the selected field quantity (phi, pi, or energy density) from
- * storage buffers and writes to the 3D density grid texture used by
- * the existing raymarching pipeline.
+ * Writes the N-D scalar field data into a 3D density texture for raymarching.
+ * Uses basis-rotated slicing: each 3D texture voxel maps to a model-space
+ * position, which is projected into the N-D lattice via the inverse basis
+ * transform. Extra dimensions (d >= 3) use configurable slice positions.
  *
- * Sign encoding: |value| stored in R channel, sign encoded as phase
- * in B channel (0.0 = positive, PI = negative). This makes diverging
- * and phase color algorithms work naturally.
+ * The density texture is written in model space, so the fragment shader
+ * samples directly with pos (no additional basis remap needed).
  *
- * Requires freeScalarUniformsBlock to be prepended for struct definition.
+ * Requires freeScalarUniformsBlock + freeScalarNDIndexBlock to be prepended.
  */
 
 export const freeScalarWriteGridBlock = /* wgsl */ `
@@ -18,32 +18,57 @@ export const freeScalarWriteGridBlock = /* wgsl */ `
 @group(0) @binding(2) var<storage, read> pi: array<f32>;
 @group(0) @binding(3) var outputTex: texture_storage_3d<rgba16float, write>;
 
-// Convert 3D lattice coordinates to 1D buffer index
-fn coordToIdx(ix: u32, iy: u32, iz: u32) -> u32 {
-  return iz * params.gridSize.x * params.gridSize.y + iy * params.gridSize.x + ix;
-}
-
-// Periodic boundary wrap
-fn wrapCoord(coord: i32, size: u32) -> u32 {
-  return u32((coord + i32(size)) % i32(size));
-}
-
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
-  let nx = params.gridSize.x;
-  let ny = params.gridSize.y;
-  let nz = params.gridSize.z;
-
-  // For lower-dimensional lattices, map appropriately to 3D texture
   let texDims = textureDimensions(outputTex);
   if (gid.x >= texDims.x || gid.y >= texDims.y || gid.z >= texDims.z) { return; }
 
-  // Nearest-neighbor resample: map texture coordinate to lattice coordinate
-  var ix = min(u32(f32(gid.x) * f32(nx) / f32(texDims.x)), nx - 1u);
-  var iy = select(min(u32(f32(gid.y) * f32(ny) / f32(texDims.y)), ny - 1u), 0u, params.latticeDim < 2u);
-  var iz = select(min(u32(f32(gid.z) * f32(nz) / f32(texDims.z)), nz - 1u), 0u, params.latticeDim < 3u);
+  let bound = params.boundingRadius;
+  if (bound <= 0.0) {
+    textureStore(outputTex, gid, vec4f(0.0));
+    return;
+  }
 
-  let idx = coordToIdx(ix, iy, iz);
+  // Map texture voxel to model-space position [-bound, +bound]^3
+  let modelPos = vec3f(
+    (f32(gid.x) + 0.5) / f32(texDims.x) * 2.0 * bound - bound,
+    (f32(gid.y) + 0.5) / f32(texDims.y) * 2.0 * bound - bound,
+    (f32(gid.z) + 0.5) / f32(texDims.z) * 2.0 * bound - bound
+  );
+
+  // Project model-space position into N-D lattice coordinates via basis vectors
+  // ndWorldPos[d] = modelPos.x * basisX[d] + modelPos.y * basisY[d] + modelPos.z * basisZ[d]
+  // For d >= 3, add slice offset
+  var ndWorldPos: array<f32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    ndWorldPos[d] = modelPos.x * params.basisX[d]
+                  + modelPos.y * params.basisY[d]
+                  + modelPos.z * params.basisZ[d];
+    if (d >= 3u) {
+      ndWorldPos[d] += params.slicePositions[d];
+    }
+  }
+
+  // Convert N-D world position to lattice coordinates
+  var coords: array<u32, 12>;
+  var inBounds: bool = true;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
+    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d];
+    let coordI = i32(round(coordF));
+    if (coordI < 0 || coordI >= i32(params.gridSize[d])) {
+      inBounds = false;
+      break;
+    }
+    coords[d] = u32(coordI);
+  }
+
+  if (!inBounds) {
+    textureStore(outputTex, gid, vec4f(0.0));
+    return;
+  }
+
+  let idx = ndToLinear(coords, params.strides, params.latticeDim);
   let phiVal = phi[idx];
   let piVal = pi[idx];
 
@@ -57,32 +82,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     fieldValue = piVal;
   } else {
     // Energy density: lattice Hamiltonian density at site n.
-    // Uses forward-difference gradient consistent with the discrete EOM:
-    //   E_n = 0.5*pi_n^2 + 0.5*m^2*phi_n^2
-    //       + 0.5 * sum_i (phi_{n+e_i} - phi_n)^2 / a_i^2
-    // Each bond's gradient energy is split equally between its two sites,
-    // so sum_n E_n = H (the conserved Hamiltonian).
+    // E_n = 0.5*pi_n^2 + 0.5*m^2*phi_n^2
+    //     + 0.5 * sum_d (phi_{n+e_d} - phi_n)^2 / a_d^2
     var gradEnergy: f32 = 0.0;
 
-    // Gradient energy in X (forward difference)
-    if (nx > 1u) {
-      let phiXp = phi[coordToIdx(wrapCoord(i32(ix) + 1, nx), iy, iz)];
-      let dPhi = phiXp - phiVal;
-      gradEnergy += dPhi * dPhi / (params.spacing.x * params.spacing.x);
-    }
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      if (params.gridSize[d] <= 1u) { continue; }
 
-    // Gradient energy in Y (forward difference)
-    if (params.latticeDim >= 2u && ny > 1u) {
-      let phiYp = phi[coordToIdx(ix, wrapCoord(i32(iy) + 1, ny), iz)];
-      let dPhi = phiYp - phiVal;
-      gradEnergy += dPhi * dPhi / (params.spacing.y * params.spacing.y);
-    }
-
-    // Gradient energy in Z (forward difference)
-    if (params.latticeDim >= 3u && nz > 1u) {
-      let phiZp = phi[coordToIdx(ix, iy, wrapCoord(i32(iz) + 1, nz))];
-      let dPhi = phiZp - phiVal;
-      gradEnergy += dPhi * dPhi / (params.spacing.z * params.spacing.z);
+      var fwdCoords = coords;
+      fwdCoords[d] = wrapCoord(i32(coords[d]) + 1, params.gridSize[d]);
+      let fwdIdx = ndToLinear(fwdCoords, params.strides, params.latticeDim);
+      let dPhi = phi[fwdIdx] - phiVal;
+      gradEnergy += dPhi * dPhi / (params.spacing[d] * params.spacing[d]);
     }
 
     fieldValue = 0.5 * (piVal * piVal + params.mass * params.mass * phiVal * phiVal + gradEnergy);

@@ -108,6 +108,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarModeK: state.setFreeScalarModeK,
       setFreeScalarAutoScale: state.setFreeScalarAutoScale,
       setFreeScalarVacuumSeed: state.setFreeScalarVacuumSeed,
+      setFreeScalarSlicePosition: state.setFreeScalarSlicePosition,
       resetFreeScalarField: state.resetFreeScalarField,
     }))
     const {
@@ -160,6 +161,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setFreeScalarModeK,
       setFreeScalarAutoScale,
       setFreeScalarVacuumSeed,
+      setFreeScalarSlicePosition,
       resetFreeScalarField,
     } = useExtendedObjectStore(extendedObjectSelector)
 
@@ -220,6 +222,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setModeK: setFreeScalarModeK,
       setAutoScale: setFreeScalarAutoScale,
       setVacuumSeed: setFreeScalarVacuumSeed,
+      setSlicePosition: setFreeScalarSlicePosition,
       resetField: resetFreeScalarField,
     }
 
@@ -294,7 +297,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         {/* Quantum State / Field Config Section - content depends on mode */}
         <Section title={isFreeScalarField ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
           {isFreeScalarField ? (
-            <FreeScalarFieldControls config={config} actions={freeScalarActions} />
+            <FreeScalarFieldControls config={config} dimension={dimension} actions={freeScalarActions} />
           ) : isHydrogenNDMode ? (
             <HydrogenNDControls config={config} dimension={dimension} actions={hydrogenNDActions} />
           ) : (
@@ -314,9 +317,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           )}
           {isFreeScalarField && (
             <p className="text-text-tertiary mt-1">
-              {config.freeScalar.latticeDim}D lattice, {config.freeScalar.gridSize[0]}
-              {config.freeScalar.latticeDim >= 2 ? `\u00D7${config.freeScalar.gridSize[1]}` : ''}
-              {config.freeScalar.latticeDim >= 3 ? `\u00D7${config.freeScalar.gridSize[2]}` : ''} sites
+              {config.freeScalar.latticeDim}D lattice, {config.freeScalar.gridSize.slice(0, config.freeScalar.latticeDim).join('\u00D7')} sites
             </p>
           )}
         </div>

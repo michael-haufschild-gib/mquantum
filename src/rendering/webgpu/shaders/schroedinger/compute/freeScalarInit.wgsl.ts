@@ -5,43 +5,56 @@
  * - singleMode (1u): plane wave A*cos(k.x) with conjugate momentum
  * - gaussianPacket (2u): Gaussian envelope with carrier wave
  *
+ * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
  * (see src/lib/physics/freeScalar/vacuumSpectrum.ts).
  */
 
 /**
  * Uniform struct for free scalar field parameters.
- * WGSL alignment: total 112 bytes (rounded to 16-byte alignment).
+ * N-D capable layout with per-dimension arrays of 12 elements each.
+ * WGSL alignment: total 480 bytes.
  */
 export const freeScalarUniformsBlock = /* wgsl */ `
 struct FreeScalarUniforms {
-  gridSize: vec3u,         // offset 0, 12 bytes
-  latticeDim: u32,         // offset 12, 4 bytes
-  spacing: vec3f,          // offset 16, 12 bytes
-  mass: f32,               // offset 28, 4 bytes
-  dt: f32,                 // offset 32, 4 bytes
-  initCondition: u32,      // offset 36, 4 bytes (0=vacuumNoise/CPU, 1=singleMode, 2=gaussianPacket)
-  fieldView: u32,          // offset 40, 4 bytes (0=phi, 1=pi, 2=energyDensity)
-  stepsPerFrame: u32,      // offset 44, 4 bytes
-  packetCenter: vec3f,     // offset 48, 12 bytes (aligned to 16)
-  packetWidth: f32,        // offset 60, 4 bytes
-  packetAmplitude: f32,    // offset 64, 4 bytes
-  _pad0: u32,              // offset 68, 4 bytes
-  _pad1: u32,              // offset 72, 4 bytes
-  _pad2: u32,              // offset 76, 4 bytes
-  modeK: vec3i,            // offset 80, 12 bytes (aligned to 16)
-  totalSites: u32,         // offset 92, 4 bytes
-  maxFieldValue: f32,      // offset 96, 4 bytes (for auto-scale normalization)
-  _pad3: u32,              // offset 100
-  _pad4: u32,              // offset 104
-  _pad5: u32,              // offset 108
+  // Scalars (16 bytes)
+  latticeDim: u32,           // offset 0
+  totalSites: u32,           // offset 4
+  mass: f32,                 // offset 8
+  dt: f32,                   // offset 12
+
+  // Per-dimension arrays (48 bytes each)
+  gridSize: array<u32, 12>,  // offset 16
+  strides: array<u32, 12>,   // offset 64
+  spacing: array<f32, 12>,   // offset 112
+
+  // Init/display scalars (32 bytes)
+  initCondition: u32,        // offset 160
+  fieldView: u32,            // offset 164
+  stepsPerFrame: u32,        // offset 168
+  packetWidth: f32,          // offset 172
+  packetAmplitude: f32,      // offset 176
+  maxFieldValue: f32,        // offset 180
+  boundingRadius: f32,       // offset 184
+  _pad1: u32,                // offset 188
+
+  // Per-dimension init arrays (48 bytes each)
+  packetCenter: array<f32, 12>, // offset 192
+  modeK: array<i32, 12>,       // offset 240
+  slicePositions: array<f32, 12>, // offset 288
+
+  // Basis vectors for N-D -> 3D projection (48 bytes each)
+  basisX: array<f32, 12>,    // offset 336
+  basisY: array<f32, 12>,    // offset 384
+  basisZ: array<f32, 12>,    // offset 432
 }
 `
 
 /**
  * Initialization compute shader entry point.
- * Maps 1D global invocation ID to 3D lattice index, computes world position,
- * and initializes phi/pi from the selected initial condition.
+ * Maps 1D global invocation ID to N-D lattice coordinates via stride table,
+ * computes world position per dimension, and initializes phi/pi from the
+ * selected initial condition.
  *
  * Note: initCondition == 0u (vacuumNoise) is a no-op here since it is
  * handled by CPU-side exact vacuum spectrum sampling via writeBuffer.
@@ -56,77 +69,58 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= params.totalSites) { return; }
 
-  // Map 1D index to 3D lattice coordinates
-  let nx = params.gridSize.x;
-  let ny = params.gridSize.y;
-  let iz = idx / (nx * ny);
-  let iy = (idx % (nx * ny)) / nx;
-  let ix = idx % nx;
+  // Map 1D index to N-D lattice coordinates
+  let coords = linearToND(idx, params.gridSize, params.latticeDim);
 
-  // Compute world-space position (centered on origin)
-  let halfExtent = vec3f(
-    f32(nx) * params.spacing.x * 0.5,
-    f32(ny) * params.spacing.y * 0.5,
-    f32(params.gridSize.z) * params.spacing.z * 0.5
-  );
-  let worldPos = vec3f(
-    f32(ix) * params.spacing.x - halfExtent.x,
-    f32(iy) * params.spacing.y - halfExtent.y,
-    f32(iz) * params.spacing.z - halfExtent.z
-  );
+  // Compute world-space position per dimension (centered on origin)
+  var worldPos: array<f32, 12>;
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
+    worldPos[d] = f32(coords[d]) * params.spacing[d] - halfExtent;
+  }
 
   var phiVal: f32 = 0.0;
   var piVal: f32 = 0.0;
 
   if (params.initCondition == 1u) {
     // Single mode: phi = A * cos(k . x), pi = -A * omega * sin(k . x)
-    let k = vec3f(f32(params.modeK.x), f32(params.modeK.y), f32(params.modeK.z));
-    // Physical wave vector: k_phys = 2*pi*n / L
-    let latticeL = vec3f(
-      f32(nx) * params.spacing.x,
-      f32(ny) * params.spacing.y,
-      f32(params.gridSize.z) * params.spacing.z
-    );
-    // Gate kPhys by latticeDim to zero out inactive dimensions
-    let kPhys = vec3f(
-      select(0.0, 6.283185307 * k.x / latticeL.x, params.latticeDim >= 1u && latticeL.x > 0.0),
-      select(0.0, 6.283185307 * k.y / latticeL.y, params.latticeDim >= 2u && latticeL.y > 0.0),
-      select(0.0, 6.283185307 * k.z / latticeL.z, params.latticeDim >= 3u && latticeL.z > 0.0)
-    );
-    let phase = dot(kPhys, worldPos);
-    // Lattice dispersion: omega_k^2 = m^2 + sum_i [(2/a_i) * sin(k_i * a_i / 2)]^2
-    let skx = select(0.0, 2.0 * sin(kPhys.x * params.spacing.x * 0.5) / params.spacing.x, params.latticeDim >= 1u && latticeL.x > 0.0);
-    let sky = select(0.0, 2.0 * sin(kPhys.y * params.spacing.y * 0.5) / params.spacing.y, params.latticeDim >= 2u && latticeL.y > 0.0);
-    let skz = select(0.0, 2.0 * sin(kPhys.z * params.spacing.z * 0.5) / params.spacing.z, params.latticeDim >= 3u && latticeL.z > 0.0);
-    let omega = sqrt(skx * skx + sky * sky + skz * skz + params.mass * params.mass);
+    // Physical wave vector: k_phys_d = 2*pi*n_d / L_d
+    var phase: f32 = 0.0;
+    var omegaSq: f32 = params.mass * params.mass;
+
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      let latticeL = f32(params.gridSize[d]) * params.spacing[d];
+      if (latticeL <= 0.0 || params.gridSize[d] <= 1u) { continue; }
+
+      let kPhys = 6.283185307 * f32(params.modeK[d]) / latticeL;
+      phase += kPhys * worldPos[d];
+
+      // Lattice dispersion: (2/a) * sin(k * a / 2)
+      let sk = 2.0 * sin(kPhys * params.spacing[d] * 0.5) / params.spacing[d];
+      omegaSq += sk * sk;
+    }
+
+    let omega = sqrt(omegaSq);
     phiVal = params.packetAmplitude * cos(phase);
     piVal = -params.packetAmplitude * omega * sin(phase);
   } else if (params.initCondition == 2u) {
     // Gaussian packet: phi = A * exp(-|x-x0|^2 / (2*sigma^2)) * cos(k . x)
-    // Gate inactive dimensions to zero so residual packetCenter.y/z from 3D
-    // don't kill the envelope when latticeDim < 3
-    let dx = vec3f(
-      worldPos.x - params.packetCenter.x,
-      select(0.0, worldPos.y - params.packetCenter.y, params.latticeDim >= 2u),
-      select(0.0, worldPos.z - params.packetCenter.z, params.latticeDim >= 3u)
-    );
-    let r2 = dot(dx, dx);
+    var r2: f32 = 0.0;
+    var phase: f32 = 0.0;
+
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      let dx = worldPos[d] - params.packetCenter[d];
+      r2 += dx * dx;
+
+      let latticeL = f32(params.gridSize[d]) * params.spacing[d];
+      if (latticeL > 0.0 && params.gridSize[d] > 1u) {
+        let kPhys = 6.283185307 * f32(params.modeK[d]) / latticeL;
+        phase += kPhys * worldPos[d];
+      }
+    }
+
     let sigma2 = params.packetWidth * params.packetWidth;
     let envelope = params.packetAmplitude * exp(-r2 / (2.0 * sigma2));
-
-    let k = vec3f(f32(params.modeK.x), f32(params.modeK.y), f32(params.modeK.z));
-    let latticeL = vec3f(
-      f32(nx) * params.spacing.x,
-      f32(ny) * params.spacing.y,
-      f32(params.gridSize.z) * params.spacing.z
-    );
-    // Gate kPhys by latticeDim to zero out inactive dimensions
-    let kPhys = vec3f(
-      select(0.0, 6.283185307 * k.x / latticeL.x, params.latticeDim >= 1u && latticeL.x > 0.0),
-      select(0.0, 6.283185307 * k.y / latticeL.y, params.latticeDim >= 2u && latticeL.y > 0.0),
-      select(0.0, 6.283185307 * k.z / latticeL.z, params.latticeDim >= 3u && latticeL.z > 0.0)
-    );
-    let phase = dot(kPhys, worldPos);
     phiVal = envelope * cos(phase);
     piVal = 0.0; // Static initial condition (packet at rest)
   }

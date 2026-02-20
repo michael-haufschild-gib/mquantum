@@ -157,71 +157,82 @@ export function ifft(data: Float64Array, n: number): void {
  * ```
  */
 export function ifft3d(data: Float64Array, nx: number, ny: number, nz: number): void {
-  assertPowerOf2(nx)
-  assertPowerOf2(ny)
-  assertPowerOf2(nz)
+  ifftNd(data, [nx, ny, nz])
+}
 
-  // IFFT along x (rows within each yz-plane)
-  if (nx > 1) {
-    const row = new Float64Array(2 * nx)
-    for (let iz = 0; iz < nz; iz++) {
-      for (let iy = 0; iy < ny; iy++) {
-        const base = (iz * ny + iy) * nx
-        // Extract row
-        for (let ix = 0; ix < nx; ix++) {
-          row[ix * 2] = data[(base + ix) * 2]!
-          row[ix * 2 + 1] = data[(base + ix) * 2 + 1]!
-        }
-        ifft(row, nx)
-        // Write back
-        for (let ix = 0; ix < nx; ix++) {
-          data[(base + ix) * 2] = row[ix * 2]!
-          data[(base + ix) * 2 + 1] = row[ix * 2 + 1]!
-        }
-      }
-    }
+/**
+ * In-place N-dimensional inverse FFT via iterated 1D transforms.
+ *
+ * Applies 1D IFFT along each axis sequentially, from the first dimension
+ * to the last. Data is in row-major order (last dimension varies fastest):
+ * `index = coords[0] * stride[0] + coords[1] * stride[1] + ... + coords[D-1]`
+ *
+ * Each dimension must be a power of 2. Dimensions of size 1 are skipped.
+ *
+ * @param data - Interleaved complex array of length `2 * product(gridSize)`
+ * @param gridSize - Array of grid sizes per dimension (each must be power of 2)
+ *
+ * @example
+ * ```ts
+ * const data = new Float64Array(2 * 4 * 4 * 4 * 4)
+ * // ... fill with k-space data ...
+ * ifftNd(data, [4, 4, 4, 4])
+ * ```
+ */
+export function ifftNd(data: Float64Array, gridSize: readonly number[]): void {
+  const dim = gridSize.length
+  if (dim === 0) return
+
+  const totalSites = gridSize.reduce((a, b) => a * b, 1)
+  if (totalSites <= 1) return
+
+  // Row-major strides: last dimension has stride 1
+  const strides = new Array<number>(dim)
+  strides[dim - 1] = 1
+  for (let d = dim - 2; d >= 0; d--) {
+    strides[d] = strides[d + 1]! * gridSize[d + 1]!
   }
 
-  // IFFT along y (columns within each xz-plane)
-  if (ny > 1) {
-    const col = new Float64Array(2 * ny)
-    for (let iz = 0; iz < nz; iz++) {
-      for (let ix = 0; ix < nx; ix++) {
-        // Extract column
-        for (let iy = 0; iy < ny; iy++) {
-          const idx = (iz * ny + iy) * nx + ix
-          col[iy * 2] = data[idx * 2]!
-          col[iy * 2 + 1] = data[idx * 2 + 1]!
-        }
-        ifft(col, ny)
-        // Write back
-        for (let iy = 0; iy < ny; iy++) {
-          const idx = (iz * ny + iy) * nx + ix
-          data[idx * 2] = col[iy * 2]!
-          data[idx * 2 + 1] = col[iy * 2 + 1]!
-        }
-      }
-    }
-  }
+  // For each dimension, apply 1D IFFT along all fibers
+  for (let d = 0; d < dim; d++) {
+    const n = gridSize[d]!
+    if (n <= 1) continue
+    assertPowerOf2(n)
 
-  // IFFT along z (tubes along z)
-  if (nz > 1) {
-    const tube = new Float64Array(2 * nz)
-    for (let iy = 0; iy < ny; iy++) {
-      for (let ix = 0; ix < nx; ix++) {
-        // Extract tube
-        for (let iz = 0; iz < nz; iz++) {
-          const idx = (iz * ny + iy) * nx + ix
-          tube[iz * 2] = data[idx * 2]!
-          tube[iz * 2 + 1] = data[idx * 2 + 1]!
-        }
-        ifft(tube, nz)
-        // Write back
-        for (let iz = 0; iz < nz; iz++) {
-          const idx = (iz * ny + iy) * nx + ix
-          data[idx * 2] = tube[iz * 2]!
-          data[idx * 2 + 1] = tube[iz * 2 + 1]!
-        }
+    const fiberStride = strides[d]!
+    const fiberCount = totalSites / n
+    const fiber = new Float64Array(2 * n)
+
+    // Collect dimensions to iterate (all except d), in reverse for decomposition
+    const otherDims: number[] = []
+    for (let dd = dim - 1; dd >= 0; dd--) {
+      if (dd !== d) otherDims.push(dd)
+    }
+
+    for (let f = 0; f < fiberCount; f++) {
+      // Decompose fiber index f into coordinates for all dims except d
+      let base = 0
+      let remaining = f
+      for (const dd of otherDims) {
+        const coord = remaining % gridSize[dd]!
+        remaining = Math.floor(remaining / gridSize[dd]!)
+        base += coord * strides[dd]!
+      }
+
+      // Extract fiber along dimension d
+      for (let i = 0; i < n; i++) {
+        const flatIdx = base + i * fiberStride
+        fiber[i * 2] = data[flatIdx * 2]!
+        fiber[i * 2 + 1] = data[flatIdx * 2 + 1]!
+      }
+
+      ifft(fiber, n)
+
+      // Write back
+      for (let i = 0; i < n; i++) {
+        const flatIdx = base + i * fiberStride
+        data[flatIdx * 2] = fiber[i * 2]!
+        data[flatIdx * 2 + 1] = fiber[i * 2 + 1]!
       }
     }
   }

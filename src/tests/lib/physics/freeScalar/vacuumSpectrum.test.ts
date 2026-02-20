@@ -26,6 +26,7 @@ function makeConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig
     autoScale: true,
     needsReset: false,
     vacuumSeed: 42,
+    slicePositions: [],
     ...overrides,
   }
 }

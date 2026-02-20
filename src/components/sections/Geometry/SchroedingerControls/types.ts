@@ -124,6 +124,7 @@ export interface FreeScalarFieldActions {
   setModeK: ExtendedObjectState['setFreeScalarModeK']
   setAutoScale: ExtendedObjectState['setFreeScalarAutoScale']
   setVacuumSeed: ExtendedObjectState['setFreeScalarVacuumSeed']
+  setSlicePosition: ExtendedObjectState['setFreeScalarSlicePosition']
   resetField: ExtendedObjectState['resetFreeScalarField']
 }
 
@@ -132,5 +133,6 @@ export interface FreeScalarFieldActions {
  */
 export interface FreeScalarFieldControlsProps {
   config: SchroedingerConfig
+  dimension: number
   actions: FreeScalarFieldActions
 }

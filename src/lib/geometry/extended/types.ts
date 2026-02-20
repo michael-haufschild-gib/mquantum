@@ -121,12 +121,12 @@ export type FreeScalarInitialCondition = 'vacuumNoise' | 'singleMode' | 'gaussia
  * Controls lattice geometry, physics parameters, initial conditions, and visualization.
  */
 export interface FreeScalarConfig {
-  /** Spatial dimensionality of the lattice (1, 2, or 3) */
-  latticeDim: 1 | 2 | 3
-  /** Lattice grid size per dimension [Nx, Ny, Nz] — unused dims set to 1 */
-  gridSize: [number, number, number]
-  /** Lattice spacing per dimension [ax, ay, az] */
-  spacing: [number, number, number]
+  /** Spatial dimensionality of the lattice (1-11), driven by global dimension selector */
+  latticeDim: number
+  /** Lattice grid size per dimension — length equals latticeDim */
+  gridSize: number[]
+  /** Lattice spacing per dimension — length equals latticeDim */
+  spacing: number[]
   /** Klein-Gordon mass parameter m */
   mass: number
   /** Leapfrog time step */
@@ -136,14 +136,14 @@ export interface FreeScalarConfig {
 
   /** Initial condition type */
   initialCondition: FreeScalarInitialCondition
-  /** Gaussian packet center position */
-  packetCenter: [number, number, number]
+  /** Gaussian packet center position — length equals latticeDim */
+  packetCenter: number[]
   /** Gaussian packet width (sigma) */
   packetWidth: number
   /** Gaussian packet / single-mode amplitude */
   packetAmplitude: number
-  /** Wave vector indices for single-mode / packet carrier */
-  modeK: [number, number, number]
+  /** Wave vector indices for single-mode / packet carrier — length equals latticeDim */
+  modeK: number[]
   /** Seed for deterministic vacuum state sampling */
   vacuumSeed: number
 
@@ -153,6 +153,9 @@ export interface FreeScalarConfig {
   autoScale: boolean
   /** Runtime flag to trigger field re-initialization (not persisted) */
   needsReset: boolean
+
+  /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
+  slicePositions: number[]
 }
 
 /**
@@ -176,6 +179,7 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   fieldView: 'phi',
   autoScale: true,
   needsReset: false,
+  slicePositions: [],
 }
 
 /**

@@ -2,7 +2,9 @@
  * FreeScalarFieldControls Component
  *
  * Controls for configuring the free Klein-Gordon scalar field lattice simulation.
- * Provides lattice setup, initial condition selection, and field view controls.
+ * Supports N-dimensional lattices (1-11D) driven by the global dimension selector.
+ * Provides lattice setup, initial condition selection, slice position controls
+ * for extra dimensions (d>3), and field view controls.
  */
 
 import { Button } from '@/components/ui/Button'
@@ -17,6 +19,7 @@ import type { FreeScalarFieldControlsProps } from './types'
 
 /** Power-of-2 grid size options for exact vacuum mode */
 const POWER_OF_2_GRID_OPTIONS = [
+  { value: '4', label: '4' },
   { value: '8', label: '8' },
   { value: '16', label: '16' },
   { value: '32', label: '32' },
@@ -24,26 +27,34 @@ const POWER_OF_2_GRID_OPTIONS = [
   { value: '128', label: '128' },
 ]
 
+/** Dimension axis labels */
+const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
+
+/** Max total lattice sites for memory budget (~8MB for phi+pi buffers) */
+const MAX_TOTAL_SITES = 1048576
+
 /**
  * FreeScalarFieldControls component
  *
  * Provides controls for Klein-Gordon scalar field simulation:
- * - Lattice dimensionality and grid size
- * - Mass parameter, time step, steps per frame
+ * - Lattice dimension info (driven by global dimension selector)
+ * - Grid size, mass parameter, time step, steps per frame
  * - Initial condition selection with mode-specific parameters
+ * - Slice position controls for extra dimensions (d > 3)
  * - Field view selection (phi, pi, energy density)
+ * - Memory budget display
  *
  * @param props - Component props
  * @param props.config - Full Schroedinger config containing freeScalar sub-config
+ * @param props.dimension - Current global dimension (drives latticeDim)
  * @param props.actions - Store action callbacks
  * @returns React component
  */
 export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = React.memo(
-  ({ config, actions }) => {
+  ({ config, dimension: _dimension, actions }) => {
     const fs = config.freeScalar
 
     const {
-      setLatticeDim,
       setGridSize,
       setSpacing,
       setMass,
@@ -57,20 +68,12 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setModeK,
       setAutoScale,
       setVacuumSeed,
+      setSlicePosition,
       resetField,
     } = actions
 
     const isVacuum = fs.initialCondition === 'vacuumNoise'
-
-    // Lattice dimension options
-    const latticeDimOptions = useMemo(
-      () => [
-        { value: '1', label: '1D' },
-        { value: '2', label: '2D' },
-        { value: '3', label: '3D' },
-      ],
-      []
-    )
+    const latticeDim = fs.latticeDim
 
     // Initial condition options
     const initConditionOptions = useMemo(
@@ -96,35 +99,20 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     const handleGridSize = useCallback(
       (size: number) => {
         const s = Math.round(size)
-        const gs: [number, number, number] = [
-          s,
-          fs.latticeDim >= 2 ? s : 1,
-          fs.latticeDim >= 3 ? s : 1,
-        ]
+        const gs = Array.from({ length: latticeDim }, (_, d) => (d < latticeDim ? s : 1))
         setGridSize(gs)
       },
-      [fs.latticeDim, setGridSize]
+      [latticeDim, setGridSize]
     )
 
     // Power-of-2 grid size handler for vacuum mode (from Select)
     const handlePow2GridSize = useCallback(
       (v: string) => {
         const s = Number(v)
-        const gs: [number, number, number] = [
-          s,
-          fs.latticeDim >= 2 ? s : 1,
-          fs.latticeDim >= 3 ? s : 1,
-        ]
+        const gs = Array.from({ length: latticeDim }, (_, d) => (d < latticeDim ? s : 1))
         setGridSize(gs)
       },
-      [fs.latticeDim, setGridSize]
-    )
-
-    const handleLatticeDim = useCallback(
-      (v: string) => {
-        setLatticeDim(Number(v) as 1 | 2 | 3)
-      },
-      [setLatticeDim]
+      [latticeDim, setGridSize]
     )
 
     const handleInitCondition = useCallback(
@@ -141,44 +129,32 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       [setFieldView]
     )
 
-    // Mode K handlers — individual axis
-    const handleModeKx = useCallback(
-      (v: number) => setModeK([Math.round(v), fs.modeK[1], fs.modeK[2]]),
-      [fs.modeK, setModeK]
-    )
-    const handleModeKy = useCallback(
-      (v: number) => setModeK([fs.modeK[0], Math.round(v), fs.modeK[2]]),
-      [fs.modeK, setModeK]
-    )
-    const handleModeKz = useCallback(
-      (v: number) => setModeK([fs.modeK[0], fs.modeK[1], Math.round(v)]),
+    // Mode K handler for a specific dimension
+    const handleModeK = useCallback(
+      (dimIdx: number, v: number) => {
+        const newK = [...fs.modeK]
+        newK[dimIdx] = Math.round(v)
+        setModeK(newK)
+      },
       [fs.modeK, setModeK]
     )
 
     // Spacing handler — uniform spacing for all active dimensions
     const handleSpacing = useCallback(
       (v: number) => {
-        const s: [number, number, number] = [
-          v,
-          fs.latticeDim >= 2 ? v : fs.spacing[1],
-          fs.latticeDim >= 3 ? v : fs.spacing[2],
-        ]
+        const s = Array.from({ length: latticeDim }, () => v)
         setSpacing(s)
       },
-      [fs.latticeDim, fs.spacing, setSpacing]
+      [latticeDim, setSpacing]
     )
 
-    // Packet center handlers — individual axis
-    const handleCenterX = useCallback(
-      (v: number) => setPacketCenter([v, fs.packetCenter[1], fs.packetCenter[2]]),
-      [fs.packetCenter, setPacketCenter]
-    )
-    const handleCenterY = useCallback(
-      (v: number) => setPacketCenter([fs.packetCenter[0], v, fs.packetCenter[2]]),
-      [fs.packetCenter, setPacketCenter]
-    )
-    const handleCenterZ = useCallback(
-      (v: number) => setPacketCenter([fs.packetCenter[0], fs.packetCenter[1], v]),
+    // Packet center handler for a specific dimension
+    const handlePacketCenter = useCallback(
+      (dimIdx: number, v: number) => {
+        const newCenter = [...fs.packetCenter]
+        newCenter[dimIdx] = v
+        setPacketCenter(newCenter)
+      },
       [fs.packetCenter, setPacketCenter]
     )
 
@@ -187,23 +163,43 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setVacuumSeed(Math.floor(Math.random() * 2147483647))
     }, [setVacuumSeed])
 
-    const activeGridSize = fs.gridSize[0]
+    const activeGridSize = fs.gridSize[0] ?? 16
+
+    // Compute memory estimate
+    const totalSites = useMemo(() => {
+      let sites = 1
+      for (let d = 0; d < latticeDim; d++) {
+        sites *= fs.gridSize[d] ?? 1
+      }
+      return sites
+    }, [fs.gridSize, latticeDim])
+
+    const memoryKB = Math.round((totalSites * 2 * 4) / 1024)
+
+    // Max grid size for current dimension (budget cap)
+    const maxGridPerDim = useMemo(() => {
+      const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / latticeDim))
+      return Math.max(4, Math.min(128, raw))
+    }, [latticeDim])
+
+    // Filter power-of-2 options by budget
+    const filteredPow2Options = useMemo(
+      () => POWER_OF_2_GRID_OPTIONS.filter((opt) => Number(opt.value) <= maxGridPerDim),
+      [maxGridPerDim]
+    )
 
     return (
       <div className="space-y-4">
-        {/* Lattice Setup */}
+        {/* Lattice Info */}
         <div className="space-y-3">
-          <ToggleGroup
-            options={latticeDimOptions}
-            value={String(fs.latticeDim)}
-            onChange={handleLatticeDim}
-            ariaLabel="Lattice dimensionality"
-            data-testid="lattice-dim-selector"
-          />
+          <div className="text-xs text-text-secondary">
+            Lattice: {latticeDim}D (set via dimension selector)
+          </div>
+
           {isVacuum ? (
             <Select
               label="Grid Size"
-              options={POWER_OF_2_GRID_OPTIONS}
+              options={filteredPow2Options}
               value={String(activeGridSize)}
               onChange={handlePow2GridSize}
               data-testid="grid-size-select"
@@ -211,9 +207,9 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           ) : (
             <Slider
               label="Grid Size"
-              min={8}
-              max={128}
-              step={8}
+              min={4}
+              max={maxGridPerDim}
+              step={latticeDim <= 3 ? 8 : 1}
               value={activeGridSize}
               onChange={handleGridSize}
               showValue
@@ -225,7 +221,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             min={0.01}
             max={1.0}
             step={0.01}
-            value={fs.spacing[0]}
+            value={fs.spacing[0] ?? 0.1}
             onChange={handleSpacing}
             showValue
             data-testid="spacing-slider"
@@ -260,7 +256,38 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             showValue
             data-testid="steps-per-frame-slider"
           />
+
+          {/* Memory budget display */}
+          <div className="text-xs text-text-tertiary">
+            {totalSites.toLocaleString()} sites ({maxGridPerDim}^{latticeDim} max) · {memoryKB} KB
+          </div>
         </div>
+
+        {/* Slice Positions for extra dimensions (d > 3) */}
+        {latticeDim > 3 && (
+          <div className="space-y-2 border-t border-border-subtle pt-3">
+            <div className="text-xs text-text-secondary font-medium">
+              Extra-Dimension Slice
+            </div>
+            {Array.from({ length: latticeDim - 3 }, (_, i) => {
+              const dimIdx = i + 3
+              const halfExtent =
+                ((fs.gridSize[dimIdx] ?? 4) * (fs.spacing[dimIdx] ?? fs.spacing[0] ?? 0.1)) / 2
+              return (
+                <Slider
+                  key={`slice-${dimIdx}`}
+                  label={`${AXIS_LABELS[dimIdx] ?? `d${dimIdx}`} slice`}
+                  min={-halfExtent}
+                  max={halfExtent}
+                  step={halfExtent / 20}
+                  value={fs.slicePositions[i] ?? 0}
+                  onChange={(v) => setSlicePosition(i, v)}
+                  showValue
+                />
+              )
+            })}
+          </div>
+        )}
 
         {/* Initial Condition */}
         <div className="space-y-3 border-t border-border-subtle pt-3">
@@ -311,37 +338,18 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
 
           {fs.initialCondition === 'singleMode' && (
             <div className="space-y-2">
-              <Slider
-                label="k_x"
-                min={-8}
-                max={8}
-                step={1}
-                value={fs.modeK[0]}
-                onChange={handleModeKx}
-                showValue
-              />
-              {fs.latticeDim >= 2 && (
+              {Array.from({ length: latticeDim }, (_, d) => (
                 <Slider
-                  label="k_y"
+                  key={`modeK-${d}`}
+                  label={`k_${AXIS_LABELS[d] ?? d}`}
                   min={-8}
                   max={8}
                   step={1}
-                  value={fs.modeK[1]}
-                  onChange={handleModeKy}
+                  value={fs.modeK[d] ?? 0}
+                  onChange={(v) => handleModeK(d, v)}
                   showValue
                 />
-              )}
-              {fs.latticeDim >= 3 && (
-                <Slider
-                  label="k_z"
-                  min={-8}
-                  max={8}
-                  step={1}
-                  value={fs.modeK[2]}
-                  onChange={handleModeKz}
-                  showValue
-                />
-              )}
+              ))}
             </div>
           )}
 
@@ -356,68 +364,30 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 onChange={setPacketWidth}
                 showValue
               />
-              <Slider
-                label="Center x"
-                min={-5.0}
-                max={5.0}
-                step={0.1}
-                value={fs.packetCenter[0]}
-                onChange={handleCenterX}
-                showValue
-              />
-              {fs.latticeDim >= 2 && (
+              {Array.from({ length: latticeDim }, (_, d) => (
                 <Slider
-                  label="Center y"
+                  key={`center-${d}`}
+                  label={`Center ${AXIS_LABELS[d] ?? d}`}
                   min={-5.0}
                   max={5.0}
                   step={0.1}
-                  value={fs.packetCenter[1]}
-                  onChange={handleCenterY}
+                  value={fs.packetCenter[d] ?? 0}
+                  onChange={(v) => handlePacketCenter(d, v)}
                   showValue
                 />
-              )}
-              {fs.latticeDim >= 3 && (
+              ))}
+              {Array.from({ length: latticeDim }, (_, d) => (
                 <Slider
-                  label="Center z"
-                  min={-5.0}
-                  max={5.0}
-                  step={0.1}
-                  value={fs.packetCenter[2]}
-                  onChange={handleCenterZ}
-                  showValue
-                />
-              )}
-              <Slider
-                label="k_x"
-                min={-8}
-                max={8}
-                step={1}
-                value={fs.modeK[0]}
-                onChange={handleModeKx}
-                showValue
-              />
-              {fs.latticeDim >= 2 && (
-                <Slider
-                  label="k_y"
+                  key={`modeK-${d}`}
+                  label={`k_${AXIS_LABELS[d] ?? d}`}
                   min={-8}
                   max={8}
                   step={1}
-                  value={fs.modeK[1]}
-                  onChange={handleModeKy}
+                  value={fs.modeK[d] ?? 0}
+                  onChange={(v) => handleModeK(d, v)}
                   showValue
                 />
-              )}
-              {fs.latticeDim >= 3 && (
-                <Slider
-                  label="k_z"
-                  min={-8}
-                  max={8}
-                  step={1}
-                  value={fs.modeK[2]}
-                  onChange={handleModeKz}
-                  showValue
-                />
-              )}
+              ))}
             </div>
           )}
 

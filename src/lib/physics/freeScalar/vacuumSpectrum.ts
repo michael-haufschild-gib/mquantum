@@ -8,6 +8,8 @@
  * The sampling enforces Hermitian symmetry in k-space so that the real-space
  * fields are strictly real after inverse FFT.
  *
+ * Supports N-dimensional lattices (1-11D) via stride-based iteration.
+ *
  * Scope: free (non-interacting) Gaussian theory only.
  * References: Tong QFT lectures, lattice field theory texts.
  *
@@ -15,7 +17,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
-import { ifft3d } from '@/lib/math/fft'
+import { ifftNd } from '@/lib/math/fft'
 import { gaussianPair, mulberry32 } from '@/lib/math/rng'
 
 /** Minimum mass used for zero-mode regularization when physical mass is zero. */
@@ -28,11 +30,11 @@ const M_FLOOR = 0.01
  * in `freeScalarUpdatePi.wgsl.ts`:
  * `omega^2 = m_eff^2 + sum_i [2 * sin(pi * n_i / N_i) / a_i]^2`
  *
- * @param nIndices - Mode index in each dimension `[nx, ny, nz]`
- * @param gridSize - Number of grid points per dimension `[Nx, Ny, Nz]`
- * @param spacing - Lattice spacing per dimension `[ax, ay, az]`
+ * @param nIndices - Mode index in each dimension
+ * @param gridSize - Number of grid points per dimension
+ * @param spacing - Lattice spacing per dimension
  * @param mass - Physical mass parameter
- * @param latticeDim - Number of active spatial dimensions (1, 2, or 3)
+ * @param latticeDim - Number of active spatial dimensions (1-11)
  * @returns omega_k (always positive)
  *
  * @example
@@ -74,6 +76,55 @@ function isPowerOf2(n: number): boolean {
 }
 
 /**
+ * Computes row-major strides for an N-D array.
+ *
+ * @param gridSize - Per-dimension sizes
+ * @returns Array of strides (last dimension has stride 1)
+ */
+function computeStrides(gridSize: readonly number[]): number[] {
+  const dim = gridSize.length
+  const strides = new Array<number>(dim)
+  strides[dim - 1] = 1
+  for (let d = dim - 2; d >= 0; d--) {
+    strides[d] = strides[d + 1]! * gridSize[d + 1]!
+  }
+  return strides
+}
+
+/**
+ * Converts a flat index to N-D coordinates (row-major, last dim varies fastest).
+ *
+ * @param flatIdx - Linear index
+ * @param gridSize - Per-dimension sizes
+ * @returns Array of coordinates
+ */
+function linearToNDCoords(flatIdx: number, gridSize: readonly number[]): number[] {
+  const dim = gridSize.length
+  const coords = new Array<number>(dim)
+  let remaining = flatIdx
+  for (let d = dim - 1; d >= 0; d--) {
+    coords[d] = remaining % gridSize[d]!
+    remaining = Math.floor(remaining / gridSize[d]!)
+  }
+  return coords
+}
+
+/**
+ * Converts N-D coordinates to a flat index (row-major).
+ *
+ * @param coords - Per-dimension coordinates
+ * @param strides - Row-major strides
+ * @returns Linear index
+ */
+function ndToLinearIdx(coords: readonly number[], strides: readonly number[]): number {
+  let idx = 0
+  for (let d = 0; d < coords.length; d++) {
+    idx += coords[d]! * strides[d]!
+  }
+  return idx
+}
+
+/**
  * Samples the exact free-field vacuum state on a periodic lattice.
  *
  * For each independent k-mode, draws phi_k and pi_k from Gaussians with
@@ -81,6 +132,7 @@ function isPowerOf2(n: number): boolean {
  * `sigma_pi^2 = N_total * omega_k / 2` (the factor of N_total compensates
  * for the IFFT's 1/N normalization).
  *
+ * Supports N-dimensional lattices (1-11D) via stride-based iteration.
  * The result is deterministic for a given seed.
  *
  * @param config - Free scalar field configuration
@@ -99,7 +151,7 @@ export function sampleVacuumSpectrum(
   seed: number
 ): { phi: Float32Array; pi: Float32Array } {
   const { gridSize, spacing, mass, latticeDim } = config
-  const dims = [gridSize[0], gridSize[1], gridSize[2]] as const
+  const dims = gridSize.slice(0, latticeDim)
 
   // Validate power-of-2 for active dimensions
   for (let d = 0; d < latticeDim; d++) {
@@ -110,10 +162,8 @@ export function sampleVacuumSpectrum(
     }
   }
 
-  const nx = dims[0]
-  const ny = dims[1]
-  const nz = dims[2]
-  const totalSites = nx * ny * nz
+  const totalSites = dims.reduce((a, b) => a * b, 1)
+  const strides = computeStrides(dims)
 
   const rng = mulberry32(seed)
 
@@ -124,71 +174,67 @@ export function sampleVacuumSpectrum(
   // Track visited modes to enforce Hermitian symmetry
   const visited = new Uint8Array(totalSites)
 
-  for (let iz = 0; iz < nz; iz++) {
-    for (let iy = 0; iy < ny; iy++) {
-      for (let ix = 0; ix < nx; ix++) {
-        const idx = (iz * ny + iy) * nx + ix
-        if (visited[idx]) continue
+  for (let idx = 0; idx < totalSites; idx++) {
+    if (visited[idx]) continue
 
-        // Conjugate mode: (-nx mod Nx, -ny mod Ny, -nz mod Nz)
-        const cix = (nx - ix) % nx
-        const ciy = (ny - iy) % ny
-        const ciz = (nz - iz) % nz
-        const cidx = (ciz * ny + ciy) * nx + cix
+    const coords = linearToNDCoords(idx, dims)
 
-        const omega = computeOmegaK([ix, iy, iz], dims, spacing, mass, latticeDim)
-
-        // Variances in k-space (compensating for IFFT 1/N normalization):
-        // After IFFT, phi_x = (1/N) * sum_k phi_k * exp(+ikx)
-        // We want <phi_x^2> = (1/N) * sum_k 1/(2*omega_k)
-        // This means <|phi_k|^2> = N / (2*omega_k) for the k-space amplitudes
-        const sigmaPhiSq = totalSites / (2 * omega)
-        const sigmaPiSq = (totalSites * omega) / 2
-
-        if (idx === cidx) {
-          // Self-conjugate mode (k = -k mod N): must be real
-          // For real-valued mode: sample real part only, variance = sigmaPhiSq
-          const [gPhi] = gaussianPair(rng)
-          const [gPi] = gaussianPair(rng)
-
-          phiK[idx * 2] = gPhi * Math.sqrt(sigmaPhiSq)
-          phiK[idx * 2 + 1] = 0
-
-          piK[idx * 2] = gPi * Math.sqrt(sigmaPiSq)
-          piK[idx * 2 + 1] = 0
-        } else {
-          // Independent complex mode: sample both real and imaginary parts
-          // Each has variance sigmaPhiSq/2 so that |phi_k|^2 has expectation sigmaPhiSq
-          const [gPhiRe, gPhiIm] = gaussianPair(rng)
-          const [gPiRe, gPiIm] = gaussianPair(rng)
-
-          const phiAmp = Math.sqrt(sigmaPhiSq / 2)
-          const piAmp = Math.sqrt(sigmaPiSq / 2)
-
-          phiK[idx * 2] = gPhiRe * phiAmp
-          phiK[idx * 2 + 1] = gPhiIm * phiAmp
-
-          piK[idx * 2] = gPiRe * piAmp
-          piK[idx * 2 + 1] = gPiIm * piAmp
-
-          // Conjugate partner: phi_{-k} = conj(phi_k)
-          phiK[cidx * 2] = phiK[idx * 2]!
-          phiK[cidx * 2 + 1] = -phiK[idx * 2 + 1]!
-
-          piK[cidx * 2] = piK[idx * 2]!
-          piK[cidx * 2 + 1] = -piK[idx * 2 + 1]!
-
-          visited[cidx] = 1
-        }
-
-        visited[idx] = 1
-      }
+    // Conjugate mode: (-n_d mod N_d) for each dimension
+    const conjCoords = new Array<number>(latticeDim)
+    for (let d = 0; d < latticeDim; d++) {
+      conjCoords[d] = (dims[d]! - coords[d]!) % dims[d]!
     }
+    const cidx = ndToLinearIdx(conjCoords, strides)
+
+    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+
+    // Variances in k-space (compensating for IFFT 1/N normalization):
+    // After IFFT, phi_x = (1/N) * sum_k phi_k * exp(+ikx)
+    // We want <phi_x^2> = (1/N) * sum_k 1/(2*omega_k)
+    // This means <|phi_k|^2> = N / (2*omega_k) for the k-space amplitudes
+    const sigmaPhiSq = totalSites / (2 * omega)
+    const sigmaPiSq = (totalSites * omega) / 2
+
+    if (idx === cidx) {
+      // Self-conjugate mode (k = -k mod N): must be real
+      const [gPhi] = gaussianPair(rng)
+      const [gPi] = gaussianPair(rng)
+
+      phiK[idx * 2] = gPhi * Math.sqrt(sigmaPhiSq)
+      phiK[idx * 2 + 1] = 0
+
+      piK[idx * 2] = gPi * Math.sqrt(sigmaPiSq)
+      piK[idx * 2 + 1] = 0
+    } else {
+      // Independent complex mode: sample both real and imaginary parts
+      const [gPhiRe, gPhiIm] = gaussianPair(rng)
+      const [gPiRe, gPiIm] = gaussianPair(rng)
+
+      const phiAmp = Math.sqrt(sigmaPhiSq / 2)
+      const piAmp = Math.sqrt(sigmaPiSq / 2)
+
+      phiK[idx * 2] = gPhiRe * phiAmp
+      phiK[idx * 2 + 1] = gPhiIm * phiAmp
+
+      piK[idx * 2] = gPiRe * piAmp
+      piK[idx * 2 + 1] = gPiIm * piAmp
+
+      // Conjugate partner: phi_{-k} = conj(phi_k)
+      phiK[cidx * 2] = phiK[idx * 2]!
+      phiK[cidx * 2 + 1] = -phiK[idx * 2 + 1]!
+
+      piK[cidx * 2] = piK[idx * 2]!
+      piK[cidx * 2 + 1] = -piK[idx * 2 + 1]!
+
+      visited[cidx] = 1
+    }
+
+    visited[idx] = 1
   }
 
-  // 3D inverse FFT to real space
-  ifft3d(phiK, nx, ny, nz)
-  ifft3d(piK, nx, ny, nz)
+  // N-D inverse FFT to real space
+  ifftNd(phiK, dims)
+  ifftNd(piK, dims)
 
   // Extract real parts into Float32Array (GPU buffer format)
   const phi = new Float32Array(totalSites)
@@ -208,6 +254,8 @@ export function sampleVacuumSpectrum(
  * Computes a 3-sigma estimate: `3 * sqrt(variance_per_site)` where
  * `variance_per_site = (1/N) * sum_k 1/(2*omega_k)`.
  *
+ * Supports N-dimensional lattices.
+ *
  * @param config - Free scalar field configuration
  * @returns Estimated maximum phi value (positive)
  *
@@ -218,19 +266,14 @@ export function sampleVacuumSpectrum(
  */
 export function estimateVacuumMaxPhi(config: FreeScalarConfig): number {
   const { gridSize, spacing, mass, latticeDim } = config
-  const nx = gridSize[0]
-  const ny = gridSize[1]
-  const nz = gridSize[2]
-  const totalSites = nx * ny * nz
+  const dims = gridSize.slice(0, latticeDim)
+  const totalSites = dims.reduce((a, b) => a * b, 1)
 
   let varianceSum = 0
-  for (let iz = 0; iz < nz; iz++) {
-    for (let iy = 0; iy < ny; iy++) {
-      for (let ix = 0; ix < nx; ix++) {
-        const omega = computeOmegaK([ix, iy, iz], gridSize, spacing, mass, latticeDim)
-        varianceSum += 1 / (2 * omega)
-      }
-    }
+  for (let idx = 0; idx < totalSites; idx++) {
+    const coords = linearToNDCoords(idx, dims)
+    const omega = computeOmegaK(coords, dims, spacing, mass, latticeDim)
+    varianceSum += 1 / (2 * omega)
   }
 
   const variancePerSite = varianceSum / totalSites

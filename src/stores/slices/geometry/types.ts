@@ -214,20 +214,21 @@ export interface SchroedingerSliceActions {
   setSchroedingerSqLayerSqueezeTheta: (theta: number) => void
 
   // Free Scalar Field Configuration
-  setFreeScalarLatticeDim: (dim: 1 | 2 | 3) => void
-  setFreeScalarGridSize: (size: [number, number, number]) => void
-  setFreeScalarSpacing: (spacing: [number, number, number]) => void
+  setFreeScalarLatticeDim: (dim: number) => void
+  setFreeScalarGridSize: (size: number[]) => void
+  setFreeScalarSpacing: (spacing: number[]) => void
   setFreeScalarMass: (mass: number) => void
   setFreeScalarDt: (dt: number) => void
   setFreeScalarStepsPerFrame: (steps: number) => void
   setFreeScalarInitialCondition: (condition: FreeScalarInitialCondition) => void
   setFreeScalarFieldView: (view: FreeScalarFieldView) => void
-  setFreeScalarPacketCenter: (center: [number, number, number]) => void
+  setFreeScalarPacketCenter: (center: number[]) => void
   setFreeScalarPacketWidth: (width: number) => void
   setFreeScalarPacketAmplitude: (amplitude: number) => void
-  setFreeScalarModeK: (k: [number, number, number]) => void
+  setFreeScalarModeK: (k: number[]) => void
   setFreeScalarAutoScale: (autoScale: boolean) => void
   setFreeScalarVacuumSeed: (seed: number) => void
+  setFreeScalarSlicePosition: (dimIndex: number, value: number) => void
   resetFreeScalarField: () => void
   clearFreeScalarNeedsReset: () => void
 

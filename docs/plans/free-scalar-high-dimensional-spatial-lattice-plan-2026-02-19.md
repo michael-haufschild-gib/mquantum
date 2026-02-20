@@ -1,7 +1,7 @@
 # Plan: Free Scalar Field with True High-D Spatial Lattice (d > 3)
 
-Date: 2026-02-19  
-Status: Proposed  
+Date: 2026-02-19
+Status: Proposed
 Scope: `freeScalarField` extension to physically true spatial dimensions above 3
 
 ## 1. Objective
@@ -198,16 +198,16 @@ Phase 4 (UX and observables):
 
 ## 8. Risks and Mitigations
 
-1. Curse of dimensionality (memory/compute blowup).  
+1. Curse of dimensionality (memory/compute blowup).
    Mitigation: backend strategy, strict caps, fallback policy.
 
-2. Numerical instability with aggressive `dt`.  
+2. Numerical instability with aggressive `dt`.
    Mitigation: generalized CFL clamp + warnings + test gates.
 
-3. Misleading visuals due projection choices.  
+3. Misleading visuals due projection choices.
    Mitigation: explicit projection labels and reproducible slice controls.
 
-4. Complexity creep across renderer/store/shader boundaries.  
+4. Complexity creep across renderer/store/shader boundaries.
    Mitigation: isolate ND-specific logic in dedicated passes/modules and keep existing 3D raymarch contract unchanged.
 
 ## 9. Definition of Done
@@ -223,3 +223,9 @@ Phase 4 (UX and observables):
 - Sparse-grid high-dimensional PDE methods: https://arxiv.org/abs/1710.09356
 - Compressed Fourier high-dimensional PDE methods: https://arxiv.org/abs/2206.01255
 
+
+
+478
+2309686574
+23
+1237429979

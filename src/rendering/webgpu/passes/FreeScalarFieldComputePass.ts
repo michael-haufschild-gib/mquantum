@@ -1,7 +1,7 @@
 /**
  * Free Scalar Field Compute Pass
  *
- * Implements a real Klein-Gordon scalar field on a 1D-3D spatial lattice
+ * Implements a real Klein-Gordon scalar field on a 1D-11D spatial lattice
  * with symplectic leapfrog time integration.
  *
  * Architecture:
@@ -10,8 +10,8 @@
  * - Per-frame: stepsPerFrame leapfrog steps, then one grid write
  * - Output: rgba16float 3D texture compatible with existing raymarching pipeline
  *
- * The output texture is wired into the same bind group slot as the existing
- * density grid texture, so the entire volume rendering pipeline is reused.
+ * N-D support: dense N^d storage with stride-based indexing. The writeGrid shader
+ * uses basis-rotated slicing to project the N-D field into a 3D density texture.
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
@@ -22,18 +22,23 @@ import {
   freeScalarUniformsBlock,
   freeScalarInitBlock,
 } from '../shaders/schroedinger/compute/freeScalarInit.wgsl'
+import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
 import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
 
-/** Uniform buffer size: FreeScalarUniforms struct = 112 bytes (aligned to 16) */
-const UNIFORM_SIZE = 112
+/** Uniform buffer size: FreeScalarUniforms struct = 480 bytes */
+const UNIFORM_SIZE = 480
 /** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
 const LINEAR_WORKGROUP_SIZE = 64
 /** 3D dispatch workgroup size for write-grid pass (must match WGSL @workgroup_size) */
 const GRID_WORKGROUP_SIZE = 4
 /** Density grid texture resolution (matches existing density grid) */
 const DENSITY_GRID_SIZE = 64
+/** Maximum number of dimensions in uniform arrays */
+const MAX_DIM = 12
+/** Byte offset of the `dt` field in the uniform buffer */
+const DT_BYTE_OFFSET = 12
 
 /**
  * Compute pass for free scalar field simulation on a lattice.
@@ -148,7 +153,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param config - Free scalar field configuration
    */
   private computeConfigHash(config: FreeScalarConfig): string {
-    return `${config.gridSize[0]}x${config.gridSize[1]}x${config.gridSize[2]}_${config.latticeDim}`
+    return `${config.gridSize.join('x')}_d${config.latticeDim}`
   }
 
   /**
@@ -164,10 +169,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.piBuffer?.destroy()
     this.uniformBuffer?.destroy()
 
-    const nx = config.gridSize[0]
-    const ny = config.gridSize[1]
-    const nz = config.gridSize[2]
-    this.totalSites = nx * ny * nz
+    // Compute total sites as product of all active dimensions
+    this.totalSites = 1
+    for (let d = 0; d < config.latticeDim; d++) {
+      this.totalSites *= config.gridSize[d]!
+    }
     const bufferSize = this.totalSites * 4 // f32 per site
 
     // Create phi and pi storage buffers
@@ -206,10 +212,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param device - GPU device
    */
   private buildPipelines(device: GPUDevice): void {
+    const uniformsAndIndex = freeScalarUniformsBlock + freeScalarNDIndexBlock
+
     // === Init pipeline (phi + pi read_write) ===
     const initShader = this.createShaderModule(
       device,
-      freeScalarUniformsBlock + freeScalarInitBlock,
+      uniformsAndIndex + freeScalarInitBlock,
       'free-scalar-init'
     )
 
@@ -232,7 +240,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // === Update Pi pipeline (phi read-only, pi read_write) ===
     const updatePiShader = this.createShaderModule(
       device,
-      freeScalarUniformsBlock + freeScalarUpdatePiBlock,
+      uniformsAndIndex + freeScalarUpdatePiBlock,
       'free-scalar-update-pi'
     )
 
@@ -278,7 +286,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // === Write Grid pipeline (phi + pi read-only, texture write) ===
     const writeGridShader = this.createShaderModule(
       device,
-      freeScalarUniformsBlock + freeScalarWriteGridBlock,
+      uniformsAndIndex + freeScalarWriteGridBlock,
       'free-scalar-write-grid'
     )
 
@@ -371,11 +379,37 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
+   * Compute strides for N-D indexing: strides[0] = 1, strides[i] = strides[i-1] * gridSize[i-1]
+   * @param config - Free scalar field configuration
+   * @returns Array of strides (length MAX_DIM, unused entries = 0)
+   */
+  private computeStrides(config: FreeScalarConfig): number[] {
+    const strides = new Array(MAX_DIM).fill(0)
+    strides[0] = 1
+    for (let d = 1; d < config.latticeDim; d++) {
+      strides[d] = strides[d - 1]! * config.gridSize[d - 1]!
+    }
+    return strides
+  }
+
+  /**
    * Write the uniform buffer with current config values.
+   * Layout matches the N-D FreeScalarUniforms struct (480 bytes).
    * @param device - GPU device
    * @param config - Free scalar field configuration
+   * @param basisX - Basis vector X (length = dimension, up to 11)
+   * @param basisY - Basis vector Y
+   * @param basisZ - Basis vector Z
+   * @param boundingRadius - Bounding radius from Schroedinger uniforms
    */
-  updateUniforms(device: GPUDevice, config: FreeScalarConfig): void {
+  updateUniforms(
+    device: GPUDevice,
+    config: FreeScalarConfig,
+    basisX?: Float32Array,
+    basisY?: Float32Array,
+    basisZ?: Float32Array,
+    boundingRadius?: number
+  ): void {
     if (!this.uniformBuffer) return
 
     const initConditionMap: Record<string, number> = {
@@ -389,56 +423,92 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       energyDensity: 2,
     }
 
-    // Reuse pre-allocated typed array views (112 bytes = 28 x f32)
     const u32 = this.uniformU32
     const f32 = this.uniformF32
     const i32 = this.uniformI32
 
-    // gridSize: vec3u (offset 0)
-    u32[0] = config.gridSize[0]
-    u32[1] = config.gridSize[1]
-    u32[2] = config.gridSize[2]
-    // latticeDim: u32 (offset 12)
-    u32[3] = config.latticeDim
-    // spacing: vec3f (offset 16)
-    f32[4] = config.spacing[0]
-    f32[5] = config.spacing[1]
-    f32[6] = config.spacing[2]
-    // mass: f32 (offset 28)
-    f32[7] = config.mass
-    // dt: f32 (offset 32)
-    f32[8] = config.dt
-    // initCondition: u32 (offset 36)
-    u32[9] = initConditionMap[config.initialCondition] ?? 2
-    // fieldView: u32 (offset 40)
-    u32[10] = fieldViewMap[config.fieldView] ?? 0
-    // stepsPerFrame: u32 (offset 44)
-    u32[11] = config.stepsPerFrame
-    // packetCenter: vec3f (offset 48, aligned to 16)
-    f32[12] = config.packetCenter[0]
-    f32[13] = config.packetCenter[1]
-    f32[14] = config.packetCenter[2]
-    // packetWidth: f32 (offset 60)
-    f32[15] = config.packetWidth
-    // packetAmplitude: f32 (offset 64)
-    f32[16] = config.packetAmplitude
-    // _pad0-2 (offset 68-76)
-    u32[17] = 0
-    u32[18] = 0
-    u32[19] = 0
-    // modeK: vec3i (offset 80, aligned to 16)
-    i32[20] = config.modeK[0]
-    i32[21] = config.modeK[1]
-    i32[22] = config.modeK[2]
-    // totalSites: u32 (offset 92)
-    u32[23] = this.totalSites
-    // maxFieldValue: f32 (offset 96) — per-fieldView auto-scale estimate
+    // Zero out the entire buffer first (ensures unused array slots are 0)
+    u32.fill(0)
+
+    const strides = this.computeStrides(config)
+
+    // Scalars (offset 0-15, 4 u32s)
+    u32[0] = config.latticeDim        // offset 0
+    u32[1] = this.totalSites          // offset 4
+    f32[2] = config.mass              // offset 8
+    f32[3] = config.dt                // offset 12
+
+    // gridSize: array<u32, 12> (offset 16, indices 4-15)
+    for (let d = 0; d < config.latticeDim; d++) {
+      u32[4 + d] = config.gridSize[d]!
+    }
+
+    // strides: array<u32, 12> (offset 64, indices 16-27)
+    for (let d = 0; d < config.latticeDim; d++) {
+      u32[16 + d] = strides[d]!
+    }
+
+    // spacing: array<f32, 12> (offset 112, indices 28-39)
+    for (let d = 0; d < config.latticeDim; d++) {
+      f32[28 + d] = config.spacing[d]!
+    }
+
+    // Init/display scalars (offset 160-191, indices 40-47)
+    u32[40] = initConditionMap[config.initialCondition] ?? 2  // offset 160
+    u32[41] = fieldViewMap[config.fieldView] ?? 0             // offset 164
+    u32[42] = config.stepsPerFrame                            // offset 168
+    f32[43] = config.packetWidth                              // offset 172
+    f32[44] = config.packetAmplitude                          // offset 176
     this.maxFieldValue = this.estimateMaxFieldValue(config)
-    f32[24] = this.maxFieldValue
-    // _pad3-5 (offset 100-108)
-    u32[25] = 0
-    u32[26] = 0
-    u32[27] = 0
+    f32[45] = this.maxFieldValue                              // offset 180
+    f32[46] = boundingRadius ?? 2.0                           // offset 184
+    // _pad1 at index 47 (offset 188)
+
+    // packetCenter: array<f32, 12> (offset 192, indices 48-59)
+    for (let d = 0; d < config.latticeDim; d++) {
+      f32[48 + d] = config.packetCenter[d] ?? 0
+    }
+
+    // modeK: array<i32, 12> (offset 240, indices 60-71)
+    for (let d = 0; d < config.latticeDim; d++) {
+      i32[60 + d] = config.modeK[d] ?? 0
+    }
+
+    // slicePositions: array<f32, 12> (offset 288, indices 72-83)
+    // Store slicePositions[i] maps to extra dims i=0,1,... (dim 3,4,...).
+    // WGSL reads slicePositions[d] where d is the full dimension index (d >= 3),
+    // so write at index 72 + 3 + i to align with WGSL array indexing.
+    for (let i = 0; i < config.slicePositions.length; i++) {
+      f32[72 + 3 + i] = config.slicePositions[i]!
+    }
+
+    // basisX: array<f32, 12> (offset 336, indices 84-95)
+    if (basisX) {
+      for (let d = 0; d < Math.min(basisX.length, MAX_DIM); d++) {
+        f32[84 + d] = basisX[d]!
+      }
+    } else {
+      // Default identity: basisX = [1,0,0,...], basisY = [0,1,0,...], basisZ = [0,0,1,...]
+      f32[84] = 1.0
+    }
+
+    // basisY: array<f32, 12> (offset 384, indices 96-107)
+    if (basisY) {
+      for (let d = 0; d < Math.min(basisY.length, MAX_DIM); d++) {
+        f32[96 + d] = basisY[d]!
+      }
+    } else {
+      f32[97] = 1.0
+    }
+
+    // basisZ: array<f32, 12> (offset 432, indices 108-119)
+    if (basisZ) {
+      for (let d = 0; d < Math.min(basisZ.length, MAX_DIM); d++) {
+        f32[108 + d] = basisZ[d]!
+      }
+    } else {
+      f32[110] = 1.0
+    }
 
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
   }
@@ -446,10 +516,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   /**
    * Estimate maxFieldValue for auto-scale normalization, accounting for
    * initial condition type and current field view.
-   *
-   * - phi view: uses maxPhiEstimate (set at init, condition-aware)
-   * - pi view: scales by estimated omega (lattice dispersion relation)
-   * - energyDensity view: scales by omega² (kinetic + gradient + mass terms)
    * @param config - Free scalar field configuration
    * @returns Estimated maximum field value for normalization
    */
@@ -462,16 +528,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       return phi0
     }
 
-    // Estimate omega from lattice dispersion: omega² = m² + sum_i (2/a_i)²
-    const a = config.spacing
+    // Estimate omega from lattice dispersion: omega² = m² + sum_d (2/a_d)²
     let omegaSq = config.mass * config.mass
-    if (config.latticeDim >= 1) omegaSq += (2 / a[0]) * (2 / a[0])
-    if (config.latticeDim >= 2) omegaSq += (2 / a[1]) * (2 / a[1])
-    if (config.latticeDim >= 3) omegaSq += (2 / a[2]) * (2 / a[2])
+    for (let d = 0; d < config.latticeDim; d++) {
+      const a = config.spacing[d]!
+      omegaSq += (2 / a) * (2 / a)
+    }
     const omega = Math.sqrt(omegaSq)
 
     if (config.fieldView === 'pi') {
-      // pi_max ~ phi_max * omega (conjugate momentum at max frequency)
       return phi0 * omega
     }
 
@@ -485,8 +550,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param ctx - WebGPU render context
    * @param config - Free scalar field configuration
    * @param isPlaying - Whether animation is playing (controls whether to step)
+   * @param basisX - Basis vector X from rotation (optional)
+   * @param basisY - Basis vector Y from rotation (optional)
+   * @param basisZ - Basis vector Z from rotation (optional)
+   * @param boundingRadius - Current bounding radius (optional)
    */
-  executeField(ctx: WebGPURenderContext, config: FreeScalarConfig, isPlaying: boolean): void {
+  executeField(
+    ctx: WebGPURenderContext,
+    config: FreeScalarConfig,
+    isPlaying: boolean,
+    basisX?: Float32Array,
+    basisY?: Float32Array,
+    basisZ?: Float32Array,
+    boundingRadius?: number
+  ): void {
     const { device, encoder } = ctx
 
     // Clean up staging buffers from previous frame's kickstart
@@ -509,8 +586,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.initialized = false
     }
 
-    // Update uniforms every frame
-    this.updateUniforms(device, config)
+    // Update uniforms every frame (includes basis vectors for writeGrid)
+    this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
 
     // Initialize or reset field
     if (!this.initialized || config.needsReset) {
@@ -547,7 +624,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         halfDtStaging.unmap()
 
         // Copy dt/2 into uniform buffer within command buffer timeline
-        encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, 32, 4)
+        // dt is at byte offset DT_BYTE_OFFSET (field index 3)
+        encoder.copyBufferToBuffer(halfDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
 
         const kickPass = encoder.beginComputePass({ label: 'free-scalar-leapfrog-kickstart' })
         this.dispatchCompute(
@@ -569,7 +647,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         fullDtStaging.unmap()
 
         // Restore full dt within command buffer timeline
-        encoder.copyBufferToBuffer(fullDtStaging, 0, this.uniformBuffer, 32, 4)
+        encoder.copyBufferToBuffer(fullDtStaging, 0, this.uniformBuffer, DT_BYTE_OFFSET, 4)
 
         // Schedule cleanup for next frame (GPU retains references until submit completes)
         this.pendingStagingBuffers.push(halfDtStaging, fullDtStaging)
@@ -601,8 +679,6 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         // Leapfrog drift-kick ordering (after dt/2 pi kickstart):
         //   phi_{n+1} = phi_n + dt * pi_{n+1/2}          (drift)
         //   pi_{n+3/2} = pi_{n+1/2} + dt * F(phi_{n+1})  (kick)
-        // This gives second-order accuracy O(dt²). Reversing the order
-        // (kick-drift) would degrade to first-order O(dt).
 
         // Step 1: Update phi (drift — reads staggered pi, writes phi)
         const phiPass = encoder.beginComputePass({ label: `free-scalar-update-phi-${step}` })

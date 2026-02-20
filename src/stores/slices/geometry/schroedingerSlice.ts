@@ -1,5 +1,6 @@
 import {
   DEFAULT_SCHROEDINGER_CONFIG,
+  type FreeScalarConfig,
   type SchroedingerConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
@@ -86,15 +87,61 @@ export const createSchroedingerSlice: StateCreator<
    * @param latticeDim - Active spatial dimensions (1, 2, or 3)
    * @param mass - Klein-Gordon mass parameter
    */
-  const computeCflLimit = (spacing: [number, number, number], latticeDim: number, mass: number): number => {
+  const computeCflLimit = (spacing: number[], latticeDim: number, mass: number): number => {
     let sumInvA2 = 0
     for (let i = 0; i < latticeDim; i++) {
-      const a = spacing[i as 0 | 1 | 2]
+      const a = spacing[i]!
       const twoOverA = 2 / a
       sumInvA2 += twoOverA * twoOverA
     }
     const omegaMax = Math.sqrt(mass * mass + sumInvA2)
     return 2 / omegaMax
+  }
+
+  /** Maximum total lattice sites for memory budget (~8MB for phi+pi buffers) */
+  const MAX_TOTAL_SITES = 1048576
+
+  /**
+   * Compute default per-dimension grid size for a given dimensionality.
+   * Ensures total sites stays within MAX_TOTAL_SITES budget.
+   * @param d - Number of spatial dimensions
+   */
+  const defaultGridPerDim = (d: number): number => {
+    const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / d))
+    return Math.max(3, Math.min(128, raw))
+  }
+
+  /**
+   * Resize free scalar arrays to match a new latticeDim, preserving existing values
+   * where possible and filling new dimensions with defaults.
+   */
+  const resizeFreeScalarArrays = (
+    prev: FreeScalarConfig,
+    newDim: number
+  ): Partial<FreeScalarConfig> => {
+    const gridDefault = defaultGridPerDim(newDim)
+    const needsPow2 = prev.initialCondition === 'vacuumNoise'
+    const snapToPow2 = (v: number): number => {
+      const log2 = Math.round(Math.log2(v))
+      return Math.max(3, Math.min(gridDefault, 2 ** log2))
+    }
+    const gridSize = Array.from({ length: newDim }, (_, i) => {
+      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
+      return needsPow2 ? snapToPow2(raw) : raw
+    })
+    const spacing = Array.from({ length: newDim }, (_, i) =>
+      i < prev.spacing.length ? prev.spacing[i]! : 0.1
+    )
+    const packetCenter = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
+    )
+    const modeK = Array.from({ length: newDim }, (_, i) =>
+      i < prev.modeK.length ? prev.modeK[i]! : 0
+    )
+    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
+      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
+    )
+    return { latticeDim: newDim, gridSize, spacing, packetCenter, modeK, slicePositions }
   }
 
   /**
@@ -105,7 +152,7 @@ export const createSchroedingerSlice: StateCreator<
    * @param latticeDim - Active dimensions
    * @param mass - Klein-Gordon mass parameter
    */
-  const clampDtWithCfl = (dt: number, spacing: [number, number, number], latticeDim: number, mass: number): number => {
+  const clampDtWithCfl = (dt: number, spacing: number[], latticeDim: number, mass: number): number => {
     const cflLimit = computeCflLimit(spacing, latticeDim, mass)
     const maxDt = Math.min(0.1, cflLimit * 0.9)
     return Math.max(0.001, Math.min(maxDt, dt))
@@ -316,11 +363,6 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => {
         const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
         if (mode === 'freeScalarField') {
-          // Free scalar field requires volumetric 3D rendering (no 2D pipeline).
-          // Enforce dimension >= 3 globally, not just in the UI click handler.
-          if (useGeometryStore.getState().dimension < 3) {
-            useGeometryStore.getState().setDimension(3)
-          }
           // Free scalar field doesn't support Wigner or momentum representation
           if (state.schroedinger.representation !== 'position') {
             updates.representation = 'position'
@@ -328,6 +370,15 @@ export const createSchroedingerSlice: StateCreator<
           // Cross-section calls evalPsi() (HO wavefunction), not the actual scalar field
           if (state.schroedinger.crossSectionEnabled) {
             updates.crossSectionEnabled = false
+          }
+          // Sync latticeDim to current global dimension and resize arrays
+          const dim = useGeometryStore.getState().dimension
+          const prev = state.schroedinger.freeScalar
+          if (prev.latticeDim !== dim) {
+            const resized = resizeFreeScalarArrays(prev, dim)
+            const newSpacing = resized.spacing ?? prev.spacing
+            const newDt = clampDtWithCfl(prev.dt, newSpacing, dim, prev.mass)
+            updates.freeScalar = { ...prev, ...resized, dt: newDt, needsReset: true }
           }
         }
         return { schroedinger: { ...state.schroedinger, ...updates } }
@@ -707,21 +758,16 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Free Scalar Field ===
     setFreeScalarLatticeDim: (dim) => {
-      const clamped = Math.max(1, Math.min(3, Math.floor(dim))) as 1 | 2 | 3
+      const clamped = Math.max(1, Math.min(11, Math.floor(dim)))
       setWithVersion((state) => {
         const prev = state.schroedinger.freeScalar
-        // Set unused dimensions to 1 in gridSize
-        const gridSize: [number, number, number] = [
-          prev.gridSize[0],
-          clamped >= 2 ? prev.gridSize[1] : 1,
-          clamped >= 3 ? prev.gridSize[2] : 1,
-        ]
-        // Re-clamp dt to respect CFL limit with new dimensionality
-        const newDt = clampDtWithCfl(prev.dt, prev.spacing, clamped, prev.mass)
+        const resized = resizeFreeScalarArrays(prev, clamped)
+        const newSpacing = resized.spacing ?? prev.spacing
+        const newDt = clampDtWithCfl(prev.dt, newSpacing, clamped, prev.mass)
         return {
           schroedinger: {
             ...state.schroedinger,
-            freeScalar: { ...prev, latticeDim: clamped, gridSize, dt: newDt, needsReset: true },
+            freeScalar: { ...prev, ...resized, dt: newDt, needsReset: true },
           },
         }
       })
@@ -730,18 +776,17 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => {
         const { latticeDim, initialCondition } = state.schroedinger.freeScalar
         const needsPow2 = initialCondition === 'vacuumNoise'
+        const maxPerDim = defaultGridPerDim(latticeDim)
         const snap = (v: number, min: number, max: number) => {
           const clamped = Math.max(min, Math.min(max, Math.round(v)))
           if (!needsPow2) return clamped
-          // Snap to nearest power of 2
           const log2 = Math.round(Math.log2(clamped))
           return Math.max(min, Math.min(max, 2 ** log2))
         }
-        const clamped: [number, number, number] = [
-          snap(size[0], 8, 128),
-          latticeDim >= 2 ? snap(size[1], 1, 128) : 1,
-          latticeDim >= 3 ? snap(size[2], 1, 128) : 1,
-        ]
+        const clamped = Array.from({ length: latticeDim }, (_, i) => {
+          const s = i < size.length ? size[i]! : 1
+          return i < latticeDim ? snap(s, 3, maxPerDim) : 1
+        })
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -753,12 +798,9 @@ export const createSchroedingerSlice: StateCreator<
     setFreeScalarSpacing: (spacing) => {
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
-        const clamped: [number, number, number] = [
-          Math.max(0.01, Math.min(1.0, spacing[0])),
-          Math.max(0.01, Math.min(1.0, spacing[1])),
-          Math.max(0.01, Math.min(1.0, spacing[2])),
-        ]
-        // Re-clamp dt to respect CFL limit with new spacing
+        const clamped = Array.from({ length: fs.latticeDim }, (_, i) =>
+          Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
+        )
         const newDt = clampDtWithCfl(fs.dt, clamped, fs.latticeDim, fs.mass)
         return {
           schroedinger: {
@@ -804,12 +846,27 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarInitialCondition: (condition) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, initialCondition: condition, needsReset: true },
-        },
-      }))
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        let gridSize = fs.gridSize
+
+        // Snap grid sizes to power-of-2 when switching to vacuumNoise
+        if (condition === 'vacuumNoise') {
+          const maxPerDim = defaultGridPerDim(fs.latticeDim)
+          gridSize = gridSize.map((s) => {
+            const clamped = Math.max(3, Math.min(maxPerDim, s))
+            const log2 = Math.round(Math.log2(clamped))
+            return Math.max(3, Math.min(maxPerDim, 2 ** log2))
+          })
+        }
+
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...fs, initialCondition: condition, gridSize, needsReset: true },
+          },
+        }
+      })
     },
     setFreeScalarFieldView: (view) => {
       setWithVersion((state) => ({
@@ -878,6 +935,23 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setFreeScalarSlicePosition: (dimIndex, value) => {
+      setWithVersion((state) => {
+        const fs = state.schroedinger.freeScalar
+        const slicePositions = [...fs.slicePositions]
+        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
+          const halfExtent = (fs.gridSize[dimIndex + 3] ?? 1) * (fs.spacing[dimIndex + 3] ?? 0.1) * 0.5
+          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            freeScalar: { ...fs, slicePositions },
+          },
+        }
+      })
+    },
+
     clearFreeScalarNeedsReset: () => {
       set((state) => ({
         schroedinger: {
@@ -935,6 +1009,19 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
+      // Sync free scalar latticeDim to global dimension when in free scalar mode
+      const currentState = get().schroedinger
+      let freeScalarUpdate: Partial<FreeScalarConfig> | undefined
+      if (currentState.quantumMode === 'freeScalarField') {
+        const prev = currentState.freeScalar
+        if (prev.latticeDim !== dimension) {
+          const resized = resizeFreeScalarArrays(prev, dimension)
+          const newSpacing = resized.spacing ?? prev.spacing
+          const newDt = clampDtWithCfl(prev.dt, newSpacing, dimension, prev.mass)
+          freeScalarUpdate = { ...resized, dt: newDt, needsReset: true }
+        }
+      }
+
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -950,6 +1037,9 @@ export const createSchroedingerSlice: StateCreator<
             Math.max(0, dimension - 1)
           ),
           ...hydrogenUpdate,
+          ...(freeScalarUpdate
+            ? { freeScalar: { ...state.schroedinger.freeScalar, ...freeScalarUpdate } }
+            : {}),
         },
       }))
     },
