@@ -9,6 +9,11 @@
  * The density texture is written in model space, so the fragment shader
  * samples directly with pos (no additional basis remap needed).
  *
+ * When analysisMode > 0, also writes per-voxel physics observables to
+ * the analysis texture:
+ *   mode 1 (Hamiltonian/Character): R=K, G=gradE, B=V, A=E
+ *   mode 2 (Energy Flux): R=Sx, G=Sy, B=Sz, A=|S|
+ *
  * Requires freeScalarUniformsBlock + freeScalarNDIndexBlock to be prepended.
  */
 
@@ -17,6 +22,7 @@ export const freeScalarWriteGridBlock = /* wgsl */ `
 @group(0) @binding(1) var<storage, read> phi: array<f32>;
 @group(0) @binding(2) var<storage, read> pi: array<f32>;
 @group(0) @binding(3) var outputTex: texture_storage_3d<rgba16float, write>;
+@group(0) @binding(4) var analysisTex: texture_storage_3d<rgba16float, write>;
 
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
@@ -26,6 +32,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let bound = params.boundingRadius;
   if (bound <= 0.0) {
     textureStore(outputTex, gid, vec4f(0.0));
+    textureStore(analysisTex, gid, vec4f(0.0));
     return;
   }
 
@@ -65,6 +72,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   if (!inBounds) {
     textureStore(outputTex, gid, vec4f(0.0));
+    textureStore(analysisTex, gid, vec4f(0.0));
     return;
   }
 
@@ -74,18 +82,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   var fieldValue: f32 = 0.0;
 
-  if (params.fieldView == 0u) {
-    // phi (field amplitude)
-    fieldValue = phiVal;
-  } else if (params.fieldView == 1u) {
-    // pi (conjugate momentum)
-    fieldValue = piVal;
-  } else {
-    // Energy density: lattice Hamiltonian density at site n.
-    // E_n = 0.5*pi_n^2 + 0.5*m^2*phi_n^2
-    //     + 0.5 * sum_d (phi_{n+e_d} - phi_n)^2 / a_d^2
-    var gradEnergy: f32 = 0.0;
+  // Compute gradient energy (shared between energy density view and analysis modes)
+  var gradEnergy: f32 = 0.0;
+  var gradPhi: array<f32, 12>; // per-dimension gradient for flux computation
 
+  // Always compute gradient when analysis mode is active or fieldView == energyDensity
+  let needGrad = params.fieldView == 2u || params.analysisMode > 0u;
+  if (needGrad) {
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       if (params.gridSize[d] <= 1u) { continue; }
 
@@ -93,9 +96,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       fwdCoords[d] = wrapCoord(i32(coords[d]) + 1, params.gridSize[d]);
       let fwdIdx = ndToLinear(fwdCoords, params.strides, params.latticeDim);
       let dPhi = phi[fwdIdx] - phiVal;
-      gradEnergy += dPhi * dPhi / (params.spacing[d] * params.spacing[d]);
+      let invA = 1.0 / params.spacing[d];
+      gradPhi[d] = dPhi * invA;
+      gradEnergy += dPhi * dPhi * invA * invA;
     }
+  }
 
+  if (params.fieldView == 0u) {
+    // phi (field amplitude)
+    fieldValue = phiVal;
+  } else if (params.fieldView == 1u) {
+    // pi (conjugate momentum)
+    fieldValue = piVal;
+  } else {
+    // Energy density: E = 0.5*pi^2 + 0.5*m^2*phi^2 + 0.5*|grad phi|^2
     fieldValue = 0.5 * (piVal * piVal + params.mass * params.mass * phiVal * phiVal + gradEnergy);
   }
 
@@ -110,5 +124,31 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let phase = select(0.0, 3.14159265, fieldValue < 0.0);
 
   textureStore(outputTex, gid, vec4f(normRho, logRho, phase, 0.0));
+
+  // Analysis texture output (educational color modes)
+  if (params.analysisMode == 1u) {
+    // Hamiltonian decomposition / Mode character: R=K, G=gradE, B=V, A=E
+    let K = 0.5 * piVal * piVal;
+    let G = 0.5 * gradEnergy;
+    let V = 0.5 * params.mass * params.mass * phiVal * phiVal;
+    let E = K + G + V;
+    textureStore(analysisTex, gid, vec4f(K, G, V, E));
+  } else if (params.analysisMode == 2u) {
+    // Energy flux: S_i = -pi * grad_i(phi)
+    // Project N-D flux vector onto the 3D basis for visualization
+    var Sx: f32 = 0.0;
+    var Sy: f32 = 0.0;
+    var Sz: f32 = 0.0;
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      let fluxD = -piVal * gradPhi[d];
+      Sx += fluxD * params.basisX[d];
+      Sy += fluxD * params.basisY[d];
+      Sz += fluxD * params.basisZ[d];
+    }
+    let Smag = sqrt(Sx * Sx + Sy * Sy + Sz * Sz);
+    textureStore(analysisTex, gid, vec4f(Sx, Sy, Sz, Smag));
+  } else {
+    textureStore(analysisTex, gid, vec4f(0.0));
+  }
 }
 `

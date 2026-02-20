@@ -32,6 +32,53 @@ export function generateDensityGridFragmentBindings(startBinding: number = 4): s
 }
 
 /**
+ * Bind group declarations for free-scalar analysis texture.
+ * Reuses the same sampler as the density grid (trilinear filtering).
+ * Added to Group 2 (object-specific) after density grid bindings.
+ *
+ * @param startBinding The binding index for the analysis texture
+ */
+export function generateAnalysisTextureBindings(startBinding: number = 6): string {
+  return /* wgsl */ `
+// ============================================
+// Analysis Texture Bindings (Fragment)
+// ============================================
+
+@group(2) @binding(${startBinding}) var analysisTexture: texture_3d<f32>;
+`
+}
+
+/**
+ * Analysis texture sampling function for fragment-shader educational color modes.
+ * Samples per-voxel physics observables from the analysis 3D texture.
+ */
+export const analysisTextureSamplingBlock = /* wgsl */ `
+// ============================================
+// Analysis Texture Sampling Functions
+// ============================================
+
+/**
+ * Sample analysis data from the free-scalar analysis 3D texture.
+ * Contents depend on the active educational mode:
+ *   Hamiltonian/Character: R=K, G=gradE, B=V, A=E
+ *   Energy Flux: R=Sx, G=Sy, B=Sz, A=|S|
+ *
+ * @param pos World-space position (model space during raymarching)
+ * @param uniforms Schroedinger uniforms containing boundingRadius
+ * @return vec4f with analysis data channels
+ */
+fn sampleAnalysisFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
+  let uvw = worldToDensityGridUVW(pos, uniforms);
+
+  if (any(uvw < vec3f(0.0)) || any(uvw > vec3f(1.0))) {
+    return vec4f(0.0);
+  }
+
+  return textureSampleLevel(analysisTexture, densityGridSampler, uvw, 0.0);
+}
+`
+
+/**
  * Density grid sampling functions for fragment-shader raymarching.
  * Replaces inline wavefunction evaluation with texture lookups.
  */

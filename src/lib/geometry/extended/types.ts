@@ -108,6 +108,7 @@ export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'fre
  */
 export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity'
 
+
 /**
  * Initial condition type for the free scalar field
  * - vacuumNoise: Hash-based pseudo-random Gaussian noise

@@ -36,7 +36,7 @@ struct FreeScalarUniforms {
   packetAmplitude: f32,      // offset 176
   maxFieldValue: f32,        // offset 180
   boundingRadius: f32,       // offset 184
-  _pad1: u32,                // offset 188
+  analysisMode: u32,         // offset 188 (0=off, 1=hamiltonian/character, 2=flux)
 
   // Per-dimension init arrays (48 bytes each)
   packetCenter: array<f32, 12>, // offset 192

@@ -251,6 +251,24 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             g = Math.min(1, Math.max(0, (100040000 * invTemp + 66) / 255))
             b = Math.min(1, Math.max(0, (194180000 * invTemp + 30) / 255))
           }
+        } else if (colorAlgorithm === 'hamiltonianDecomposition') {
+          // K(red)/G(green)/V(blue) energy fractions
+          const fK = t * t
+          const fG = Math.sin(t * Math.PI) * 0.8
+          const fV = (1 - t) * (1 - t)
+          const brightness = Math.max(0, Math.min(1, t * 1.5))
+          r = fK * brightness
+          g = fG * brightness
+          b = fV * brightness
+        } else if (colorAlgorithm === 'modeCharacter') {
+          // HSL hue sweep (0..0.8) matching shader charHue range
+          const saturation = Math.min(1, t * 10)
+          const brightness = Math.min(1, Math.sqrt(t) * 2)
+          ;[r, g, b] = hslToRgb(t * 0.8, saturation, brightness * 0.5)
+        } else if (colorAlgorithm === 'energyFlux') {
+          // Full hue wheel (directional color) with magnitude brightness
+          const brightness = Math.max(0, Math.min(1, Math.log(t + 1e-6) / 4 + 1))
+          ;[r, g, b] = hslToRgb(t, 0.8, Math.max(0.2, 0.6 * brightness))
         } else {
           // Cosine palette (multiSource, radial)
           // Shows the underlying palette that will be sampled by position/density.

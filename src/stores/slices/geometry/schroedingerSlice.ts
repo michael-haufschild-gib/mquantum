@@ -108,7 +108,9 @@ export const createSchroedingerSlice: StateCreator<
    */
   const defaultGridPerDim = (d: number): number => {
     const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / d))
-    return Math.max(2, Math.min(128, raw))
+    // Round down to nearest power-of-2 so exact vacuum always has a valid grid size
+    const pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
+    return Math.max(2, Math.min(128, pow2))
   }
 
   /**
@@ -816,10 +818,13 @@ export const createSchroedingerSlice: StateCreator<
         const fs = state.schroedinger.freeScalar
         // Re-clamp dt to respect CFL limit with new mass
         const newDt = clampDtWithCfl(fs.dt, fs.spacing, fs.latticeDim, clamped)
+        // Vacuum noise spectrum depends on mass — trigger re-initialization.
+        // Preserve any pending reset from another setter (e.g. setFreeScalarLatticeDim).
+        const needsReset = fs.needsReset || fs.initialCondition === 'vacuumNoise'
         return {
           schroedinger: {
             ...state.schroedinger,
-            freeScalar: { ...fs, mass: clamped, dt: newDt },
+            freeScalar: { ...fs, mass: clamped, dt: newDt, needsReset },
           },
         }
       })
@@ -876,6 +881,7 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+
     setFreeScalarPacketCenter: (center) => {
       setWithVersion((state) => ({
         schroedinger: {

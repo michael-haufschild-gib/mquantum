@@ -111,7 +111,7 @@ export class BloomPass extends WebGPUBasePass {
   private convolutionUB: GPUBuffer | null = null
 
   private thresholdUniformData = new Float32Array(4)
-  private blurUniformBuffer = new ArrayBuffer(4 * (4 + COEFF_SLOTS))
+  private blurUniformBuffer = new ArrayBuffer(4 * (8 + COEFF_SLOTS))
   private blurUniformScratch = new Float32Array(this.blurUniformBuffer)
   private blurUniformScratchU32 = new Uint32Array(this.blurUniformBuffer)
   private compositeUniformData = new Float32Array(32)
@@ -357,7 +357,7 @@ export class BloomPass extends WebGPUBasePass {
     this.blurUBs = []
     for (let level = 0; level < NUM_MIPS; level++) {
       for (let dir = 0; dir < 2; dir++) {
-        this.blurUBs.push(this.createUniformBuffer(device, 112, `bloom-blur-ub-L${level}-${dir}`))
+        this.blurUBs.push(this.createUniformBuffer(device, 128, `bloom-blur-ub-L${level}-${dir}`))
       }
     }
 
@@ -552,18 +552,28 @@ export class BloomPass extends WebGPUBasePass {
       for (let dir = 0; dir < 2; dir++) {
         const bufferIndex = level * 2 + dir
         const buffer = this.blurUBs[bufferIndex]!
+        const inputWidth =
+          dir === 0 && level > 0
+            ? Math.max(1, Math.round(this.gaussianTextureSize.width / Math.pow(2, level)))
+            : mipWidth
+        const inputHeight =
+          dir === 0 && level > 0
+            ? Math.max(1, Math.round(this.gaussianTextureSize.height / Math.pow(2, level)))
+            : mipHeight
 
         this.blurUniformScratch.fill(0)
-        // outputSize: vec2u (offsets 0, 1 as u32)
+        // outputSize: vec2u (offsets 0,1), inputSize: vec2u (offsets 2,3)
         this.blurUniformScratchU32[0] = mipWidth
         this.blurUniformScratchU32[1] = mipHeight
-        // direction: u32 (offset 2 as u32)
-        this.blurUniformScratchU32[2] = dir
-        // sizeScale: f32 (offset 3 as f32)
-        this.blurUniformScratch[3] = sizeScale
+        this.blurUniformScratchU32[2] = inputWidth
+        this.blurUniformScratchU32[3] = inputHeight
+        // direction: u32 (offset 4 as u32)
+        this.blurUniformScratchU32[4] = dir
+        // sizeScale: f32 (offset 5 as f32)
+        this.blurUniformScratch[5] = sizeScale
 
         for (let i = 0; i < COEFF_SLOTS; i++) {
-          this.blurUniformScratch[4 + i] = coeffs[i]!
+          this.blurUniformScratch[8 + i] = coeffs[i]!
         }
 
         this.writeUniformBuffer(device, buffer, this.blurUniformScratch)

@@ -131,7 +131,9 @@ import { absorptionBlock } from './volume/absorption.wgsl'
 import { crossSectionBlock } from './volume/crossSection.wgsl'
 import {
   generateDensityGridFragmentBindings,
+  generateAnalysisTextureBindings,
   densityGridSamplingBlock,
+  analysisTextureSamplingBlock,
 } from './volume/densityGridSampling.wgsl'
 import { generateEmissionPreBlock, generateComputeBaseColor, emissionPostBlock, COLOR_ALG_NAMES } from './volume/emission.wgsl'
 import { volumeGradientBlock, volumeIntegrationBlock, volumeRaymarchGridBlock } from './volume/integration.wgsl'
@@ -176,6 +178,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useWignerCache?: boolean
   /** Free scalar field mode — cubic lattice, no Gaussian envelope. */
   isFreeScalar?: boolean
+  /** Include analysis texture bindings for free-scalar educational color modes. */
+  freeScalarAnalysis?: boolean
 }
 
 /**
@@ -205,6 +209,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isWigner = false,
     useWignerCache = false,
     isFreeScalar = false,
+    freeScalarAnalysis = false,
     overrides = [],
   } = config
 
@@ -443,7 +448,8 @@ struct VertexOutput {
 @group(2) @binding(2) var wignerCacheTexture: texture_2d<f32>;
 @group(2) @binding(3) var wignerCacheSampler: sampler;`
           : '') +
-        (useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : ''),
+        (useDensityGrid ? '\n' + generateDensityGridFragmentBindings(4) : '') +
+        (freeScalarAnalysis ? '\n' + generateAnalysisTextureBindings(6) : ''),
     },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
@@ -608,6 +614,15 @@ struct VertexOutput {
             'fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
             'fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f { return vec3f(0.0); }',
           ].join('\n'),
+    },
+    // Analysis texture sampling (free-scalar educational color modes)
+    // Always emitted (no is2D guard) — the stub is harmless and prevents undefined symbols
+    // when generateComputeBaseColor(12/13/14) references sampleAnalysisFromGrid.
+    {
+      name: 'Analysis Texture Sampling',
+      content: freeScalarAnalysis
+        ? analysisTextureSamplingBlock
+        : '// Stub: analysis texture unavailable\nfn sampleAnalysisFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f { return vec4f(0.0); }',
     },
     { name: 'Volume Integration', content: volumeIntegrationBlock, condition: !is2D },
     // Grid-based raymarching (uses density grid texture instead of inline evaluation)

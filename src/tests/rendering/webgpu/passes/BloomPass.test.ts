@@ -202,4 +202,50 @@ describe('BloomPass v2', () => {
     // 2 levels * (H + V) = 4 compute passes
     expect(computePassCount).toBe(4)
   })
+
+  it('writes higher mip blur uniforms with previous-level input dimensions', () => {
+    const pass = new BloomPass()
+    const internals = pass as unknown as Record<string, unknown>
+
+    internals['gaussianTextureSize'] = { width: 1920, height: 1080 }
+    internals['lastBlurSizeKey'] = ''
+
+    const blurBuffers = Array.from({ length: 10 }, () => ({} as GPUBuffer))
+    internals['blurUBs'] = blurBuffers
+
+    const writesByBuffer = new Map<GPUBuffer, Float32Array>()
+    internals['writeUniformBuffer'] = (
+      _device: GPUDevice,
+      buffer: GPUBuffer,
+      data: Float32Array
+    ) => {
+      writesByBuffer.set(buffer, new Float32Array(data))
+    }
+
+    ;(
+      pass as unknown as {
+        writeBlurUniformsIfNeeded: (device: GPUDevice) => void
+      }
+    ).writeBlurUniformsIfNeeded({} as GPUDevice)
+
+    const level1Horizontal = writesByBuffer.get(blurBuffers[2]!)
+    const level1Vertical = writesByBuffer.get(blurBuffers[3]!)
+    expect(level1Horizontal).toBeDefined()
+    expect(level1Vertical).toBeDefined()
+
+    const level1HorizontalU32 = new Uint32Array(level1Horizontal!.buffer.slice(0))
+    const level1VerticalU32 = new Uint32Array(level1Vertical!.buffer.slice(0))
+
+    // Level 1 outputs quarter-res but must read from previous half-res level.
+    expect(level1HorizontalU32[0]).toBe(480)
+    expect(level1HorizontalU32[1]).toBe(270)
+    expect(level1HorizontalU32[2]).toBe(960)
+    expect(level1HorizontalU32[3]).toBe(540)
+
+    // Vertical pass reads same-size horizontal intermediate.
+    expect(level1VerticalU32[0]).toBe(480)
+    expect(level1VerticalU32[1]).toBe(270)
+    expect(level1VerticalU32[2]).toBe(480)
+    expect(level1VerticalU32[3]).toBe(270)
+  })
 })

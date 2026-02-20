@@ -19,6 +19,7 @@ import type { FreeScalarFieldControlsProps } from './types'
 
 /** Power-of-2 grid size options for exact vacuum mode */
 const POWER_OF_2_GRID_OPTIONS = [
+  { value: '2', label: '2' },
   { value: '4', label: '4' },
   { value: '8', label: '8' },
   { value: '16', label: '16' },
@@ -179,7 +180,9 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     // Max grid size for current dimension (budget cap)
     const maxGridPerDim = useMemo(() => {
       const raw = Math.floor(Math.pow(MAX_TOTAL_SITES, 1 / latticeDim))
-      return Math.max(2, Math.min(128, raw))
+      // Round down to nearest power-of-2 to match store logic and dropdown options
+      const pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
+      return Math.max(2, Math.min(128, pow2))
     }, [latticeDim])
 
     // Filter power-of-2 options by budget
@@ -195,6 +198,11 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           <div className="text-xs text-text-secondary">
             Lattice: {latticeDim}D (set via dimension selector)
           </div>
+          {latticeDim <= 2 && (
+            <div className="text-xs text-text-secondary/70 italic">
+              Rendered as 3D volume (2D data extruded along z-axis)
+            </div>
+          )}
 
           {isVacuum ? (
             <Select

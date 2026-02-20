@@ -51,6 +51,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private uniformBuffer: GPUBuffer | null = null
   private densityTexture: GPUTexture | null = null
   private densityTextureView: GPUTextureView | null = null
+  private analysisTexture: GPUTexture | null = null
+  private analysisTextureView: GPUTextureView | null = null
 
   // Pipelines (4 separate compute pipelines)
   private initPipeline: GPUComputePipeline | null = null
@@ -120,6 +122,26 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       label: 'free-scalar-density-view',
       dimension: '3d',
     })
+
+    this.analysisTexture = device.createTexture({
+      label: 'free-scalar-analysis-grid',
+      size: {
+        width: DENSITY_GRID_SIZE,
+        height: DENSITY_GRID_SIZE,
+        depthOrArrayLayers: DENSITY_GRID_SIZE,
+      },
+      format: 'rgba16float',
+      dimension: '3d',
+      usage:
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_SRC,
+    })
+
+    this.analysisTextureView = this.analysisTexture.createView({
+      label: 'free-scalar-analysis-view',
+      dimension: '3d',
+    })
   }
 
   /**
@@ -128,6 +150,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    */
   getDensityTextureView(): GPUTextureView | null {
     return this.densityTextureView
+  }
+
+  /**
+   * Get the analysis texture view for binding into the raymarching pipeline.
+   * Contains per-voxel physics analysis data (K/G/V/E or Sx/Sy/Sz/|S|).
+   * @returns The 3D analysis texture view, or null if not initialized.
+   */
+  getAnalysisTextureView(): GPUTextureView | null {
+    return this.analysisTextureView
   }
 
   /** Current config hash for diagnostic logging. */
@@ -305,6 +336,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
             viewDimension: '3d',
           },
         },
+        {
+          binding: 4,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'rgba16float',
+            viewDimension: '3d',
+          },
+        },
       ],
     })
 
@@ -322,7 +362,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param device - GPU device
    */
   private rebuildBindGroups(device: GPUDevice): void {
-    if (!this.uniformBuffer || !this.phiBuffer || !this.piBuffer || !this.densityTextureView) return
+    if (!this.uniformBuffer || !this.phiBuffer || !this.piBuffer || !this.densityTextureView || !this.analysisTextureView) return
 
     // Init bind group (phi + pi read-write)
     if (this.initBindGroupLayout) {
@@ -363,7 +403,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       })
     }
 
-    // Write Grid bind group (phi + pi read-only, texture write)
+    // Write Grid bind group (phi + pi read-only, density + analysis texture write)
     if (this.writeGridBindGroupLayout) {
       this.writeGridBindGroup = device.createBindGroup({
         label: 'free-scalar-write-grid-bg',
@@ -373,13 +413,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
           { binding: 1, resource: { buffer: this.phiBuffer } },
           { binding: 2, resource: { buffer: this.piBuffer } },
           { binding: 3, resource: this.densityTextureView },
+          { binding: 4, resource: this.analysisTextureView },
         ],
       })
     }
   }
 
   /**
-   * Compute strides for N-D indexing: strides[0] = 1, strides[i] = strides[i-1] * gridSize[i-1]
+   * Compute strides for N-D indexing (C-order / last-dimension-fastest):
+   * strides[latticeDim-1] = 1, strides[d] = strides[d+1] * gridSize[d+1]
    * @param config - Free scalar field configuration
    * @returns Array of strides (length MAX_DIM, unused entries = 0)
    */
@@ -408,7 +450,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
-    boundingRadius?: number
+    boundingRadius?: number,
+    colorAlgorithm?: number
   ): void {
     if (!this.uniformBuffer) return
 
@@ -462,7 +505,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.maxFieldValue = this.estimateMaxFieldValue(config)
     f32[45] = this.maxFieldValue                              // offset 180
     f32[46] = boundingRadius ?? 2.0                           // offset 184
-    // _pad1 at index 47 (offset 188)
+    // analysisMode at index 47 (offset 188): 0=off, 1=hamiltonian/character, 2=flux
+    // Derived from the numeric color algorithm: 12/13 → mode 1, 14 → mode 2
+    const alg = colorAlgorithm ?? 0
+    u32[47] = alg === 12 || alg === 13 ? 1 : alg === 14 ? 2 : 0
 
     // packetCenter: array<f32, 12> (offset 192, indices 48-59)
     for (let d = 0; d < config.latticeDim; d++) {
@@ -562,7 +608,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
-    boundingRadius?: number
+    boundingRadius?: number,
+    colorAlgorithm?: number
   ): void {
     const { device, encoder } = ctx
 
@@ -600,7 +647,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
 
     // Update uniforms every frame (includes basis vectors for writeGrid)
-    this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
+    this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius, colorAlgorithm)
 
     // Initialize or reset field
     if (!this.initialized || config.needsReset) {
@@ -740,6 +787,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.piBuffer?.destroy()
     this.uniformBuffer?.destroy()
     this.densityTexture?.destroy()
+    this.analysisTexture?.destroy()
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
 
@@ -748,6 +796,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.uniformBuffer = null
     this.densityTexture = null
     this.densityTextureView = null
+    this.analysisTexture = null
+    this.analysisTextureView = null
 
     this.initPipeline = null
     this.updatePiPipeline = null

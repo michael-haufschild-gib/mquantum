@@ -298,4 +298,31 @@ describe('extendedObjectStore — free scalar field actions', () => {
       expect(fs.dt).toBeCloseTo(0.0577 * 0.9, 3)
     })
   })
+
+  describe('setFreeScalarMass preserves pending needsReset', () => {
+    it('preserves existing needsReset when changing mass on non-vacuumNoise condition', () => {
+      // Use singleMode (not vacuumNoise) so mass change alone wouldn't set needsReset
+      useExtendedObjectStore.getState().setFreeScalarInitialCondition('singleMode')
+      // Set needsReset via another setter
+      useExtendedObjectStore.getState().setFreeScalarLatticeDim(2)
+      expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(true)
+
+      // Change mass — needsReset must survive
+      useExtendedObjectStore.getState().setFreeScalarMass(5.0)
+      const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
+      expect(fs.mass).toBe(5.0)
+      expect(fs.needsReset).toBe(true)
+    })
+
+    it('sets needsReset when on vacuumNoise even if not previously set', () => {
+      useExtendedObjectStore.getState().setFreeScalarInitialCondition('vacuumNoise')
+      // Clear the needsReset from initialCondition change
+      useExtendedObjectStore.getState().clearFreeScalarNeedsReset()
+      expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(false)
+
+      // Mass change on vacuumNoise should trigger needsReset
+      useExtendedObjectStore.getState().setFreeScalarMass(2.0)
+      expect(useExtendedObjectStore.getState().schroedinger.freeScalar.needsReset).toBe(true)
+    })
+  })
 })

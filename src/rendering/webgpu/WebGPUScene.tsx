@@ -1783,9 +1783,15 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
     dimension: isFreeScalar ? Math.max(config.dimension, 3) : config.dimension,
     quantumMode: config.quantumMode,
     termCount: isFreeScalar ? 1 : config.termCount,
-    colorAlgorithm: isFreeScalar && config.colorAlgorithm === 'relativePhase'
-      ? 'mixed'
-      : config.colorAlgorithm,
+    colorAlgorithm: !isFreeScalar && (
+      config.colorAlgorithm === 'hamiltonianDecomposition' ||
+      config.colorAlgorithm === 'modeCharacter' ||
+      config.colorAlgorithm === 'energyFlux'
+    )
+      ? 'radialDistance'
+      : isFreeScalar && config.colorAlgorithm === 'relativePhase'
+        ? 'mixed'
+        : config.colorAlgorithm,
     isosurface: config.isosurface,
     nodalEnabled: isFreeScalar ? false : config.nodalEnabled,
     phaseMaterialityEnabled: isFreeScalar ? false : config.phaseMaterialityEnabled,

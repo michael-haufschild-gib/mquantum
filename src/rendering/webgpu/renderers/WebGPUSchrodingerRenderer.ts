@@ -62,6 +62,9 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   diverging: 9,
   relativePhase: 10,
   radialDistance: 11,
+  hamiltonianDecomposition: 12,
+  modeCharacter: 13,
+  energyFlux: 14,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -461,6 +464,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isWigner: isFreeScalar ? false : isWigner,
       useWignerCache: isFreeScalar ? false : isWigner,
       isFreeScalar,
+      freeScalarAnalysis:
+        isFreeScalar &&
+        this.rendererConfig.colorAlgorithm !== undefined &&
+        this.rendererConfig.colorAlgorithm >= 12,
     }
   }
 
@@ -679,6 +686,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           sampler: { type: 'filtering' as const },
         } // densityGridSampler
       )
+    }
+    // Analysis texture for free-scalar educational color modes (binding 6)
+    if (this.shaderConfig.freeScalarAnalysis && this.freeScalarFieldPass) {
+      objectBindGroupEntries.push({
+        binding: 6,
+        visibility: GPUShaderStage.FRAGMENT,
+        texture: { sampleType: 'float' as const, viewDimension: '3d' as const },
+      }) // analysisTexture (reuses densityGridSampler at binding 5)
     }
     const objectBindGroupLayout = device.createBindGroupLayout({
       label: 'schroedinger-object-bgl',
@@ -962,6 +977,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         { binding: 4, resource: densityView },
         { binding: 5, resource: this.densityGridSampler }
       )
+    }
+    // Analysis texture for free-scalar educational color modes
+    if (this.shaderConfig.freeScalarAnalysis && this.freeScalarFieldPass) {
+      const analysisView = this.freeScalarFieldPass.getAnalysisTextureView()
+      if (analysisView) {
+        objectBindGroupEntries2.push({ binding: 6, resource: analysisView })
+      }
     }
     this.objectBindGroup = device.createBindGroup({
       label: 'schroedinger-object-bg',
@@ -2492,7 +2514,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           schroedinger?.basisX as Float32Array | undefined,
           schroedinger?.basisY as Float32Array | undefined,
           schroedinger?.basisZ as Float32Array | undefined,
-          this.boundingRadius
+          this.boundingRadius,
+          this.rendererConfig.colorAlgorithm
         )
         // Clear needsReset after processing (targeted mutation, no version bump)
         if (freeScalarConfig.needsReset) {

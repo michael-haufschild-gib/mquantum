@@ -38,6 +38,9 @@ export type ColorAlgorithm =
   | 'relativePhase'
   | 'blackbody'
   | 'radialDistance'
+  | 'hamiltonianDecomposition'
+  | 'modeCharacter'
+  | 'energyFlux'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -55,6 +58,9 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'relativePhase' as const, label: 'Relative Phase (ref)' },
   { value: 'blackbody' as const, label: 'Blackbody (Heat)' },
   { value: 'radialDistance' as const, label: 'Radial Distance (Spectral)' },
+  { value: 'hamiltonianDecomposition' as const, label: 'Hamiltonian Decomposition' },
+  { value: 'modeCharacter' as const, label: 'Mode Character Map' },
+  { value: 'energyFlux' as const, label: 'Energy Flux Map' },
 ] as const
 
 /**
@@ -73,6 +79,9 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   diverging: 9,
   relativePhase: 10,
   radialDistance: 11,
+  hamiltonianDecomposition: 12,
+  modeCharacter: 13,
+  energyFlux: 14,
 }
 
 /**
@@ -206,10 +215,28 @@ export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 export function getAvailableColorAlgorithms(
   quantumMode: string
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
+  // Educational analysis algorithms — only available for free scalar field
+  const educationalAlgos = new Set<string>([
+    'hamiltonianDecomposition',
+    'modeCharacter',
+    'energyFlux',
+  ])
+
   if (quantumMode === 'freeScalarField') {
-    return COLOR_ALGORITHM_OPTIONS.filter((opt) => opt.value !== 'relativePhase')
+    // Exclude algorithms that require continuous complex phase — free scalar field
+    // stores sign-proxy phase (0 or π), so phase-dependent coloring degenerates
+    const excluded = new Set<string>([
+      'phase',
+      'mixed',
+      'phaseCyclicUniform',
+      'domainColoringPsi',
+      'relativePhase',
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => !excluded.has(opt.value))
   }
-  return COLOR_ALGORITHM_OPTIONS
+
+  // Non-freeScalar modes: exclude educational analysis algorithms
+  return COLOR_ALGORITHM_OPTIONS.filter((opt) => !educationalAlgos.has(opt.value))
 }
 
 /**

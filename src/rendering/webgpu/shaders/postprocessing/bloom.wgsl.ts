@@ -62,13 +62,15 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
  * Uses shared workgroup memory to reduce redundant global texture reads.
  * A single `direction` uniform (0=horizontal, 1=vertical) controls axis.
  *
- * Uniform layout (112 bytes):
- *   outputSize: vec2u, direction: u32, sizeScale: f32, coefficients: array<vec4f, 6>
+ * Uniform layout (128 bytes):
+ *   outputSize: vec2u, inputSize: vec2u, direction: u32, sizeScale: f32, _pad: vec2f,
+ *   coefficients: array<vec4f, 6>
  */
 export function createBloomBlurComputeShader(kernelRadius: number): string {
   return /* wgsl */ `
 struct BlurComputeUniforms {
   outputSize: vec2u,
+  inputSize: vec2u,
   direction: u32,
   sizeScale: f32,
   coefficients: array<vec4f, 6>,
@@ -87,9 +89,27 @@ fn getCoeff(i: u32) -> f32 {
   return uniforms.coefficients[i / 4u][i % 4u];
 }
 
-fn loadTexel(major: i32, minor: i32, dimMajor: i32, dimMinor: i32) -> vec3f {
-  let cMajor = clamp(major, 0, dimMajor - 1);
-  let cMinor = clamp(minor, 0, dimMinor - 1);
+fn mapOutputToInputCoord(index: i32, outDim: i32, inDim: i32) -> i32 {
+  let safeOutDim = max(outDim, 1);
+  let safeInDim = max(inDim, 1);
+  if (safeOutDim == safeInDim) {
+    return clamp(index, 0, safeInDim - 1);
+  }
+  let scale = f32(safeInDim) / f32(safeOutDim);
+  let mapped = (f32(index) + 0.5) * scale - 0.5;
+  return clamp(i32(round(mapped)), 0, safeInDim - 1);
+}
+
+fn loadTexel(
+  major: i32,
+  minor: i32,
+  outDimMajor: i32,
+  outDimMinor: i32,
+  inDimMajor: i32,
+  inDimMinor: i32
+) -> vec3f {
+  let cMajor = mapOutputToInputCoord(major, outDimMajor, inDimMajor);
+  let cMinor = mapOutputToInputCoord(minor, outDimMinor, inDimMinor);
   var coord: vec2i;
   if (uniforms.direction == 0u) {
     coord = vec2i(cMajor, cMinor);
@@ -102,14 +122,20 @@ fn loadTexel(major: i32, minor: i32, dimMajor: i32, dimMinor: i32) -> vec3f {
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(local_invocation_id) lid: vec3u,
         @builtin(workgroup_id) wid: vec3u) {
-  var dimMajor: i32;
-  var dimMinor: i32;
+  var outDimMajor: i32;
+  var outDimMinor: i32;
+  var inDimMajor: i32;
+  var inDimMinor: i32;
   if (uniforms.direction == 0u) {
-    dimMajor = i32(uniforms.outputSize.x);
-    dimMinor = i32(uniforms.outputSize.y);
+    outDimMajor = i32(uniforms.outputSize.x);
+    outDimMinor = i32(uniforms.outputSize.y);
+    inDimMajor = i32(uniforms.inputSize.x);
+    inDimMinor = i32(uniforms.inputSize.y);
   } else {
-    dimMajor = i32(uniforms.outputSize.y);
-    dimMinor = i32(uniforms.outputSize.x);
+    outDimMajor = i32(uniforms.outputSize.y);
+    outDimMinor = i32(uniforms.outputSize.x);
+    inDimMajor = i32(uniforms.inputSize.y);
+    inDimMinor = i32(uniforms.inputSize.x);
   }
 
   let minorIdx = i32(wid.y);
@@ -118,25 +144,46 @@ fn main(@builtin(local_invocation_id) lid: vec3u,
 
   // --- Load center texel ---
   let centerMajor = tileStart + localIdx;
-  tile[u32(localIdx) + KERNEL_RADIUS] = loadTexel(centerMajor, minorIdx, dimMajor, dimMinor);
+  tile[u32(localIdx) + KERNEL_RADIUS] = loadTexel(
+    centerMajor,
+    minorIdx,
+    outDimMajor,
+    outDimMinor,
+    inDimMajor,
+    inDimMinor
+  );
 
   // --- Load left/top border ---
   if (u32(localIdx) < KERNEL_RADIUS) {
     let borderMajor = tileStart - i32(KERNEL_RADIUS) + localIdx;
-    tile[u32(localIdx)] = loadTexel(borderMajor, minorIdx, dimMajor, dimMinor);
+    tile[u32(localIdx)] = loadTexel(
+      borderMajor,
+      minorIdx,
+      outDimMajor,
+      outDimMinor,
+      inDimMajor,
+      inDimMinor
+    );
   }
 
   // --- Load right/bottom border ---
   if (u32(localIdx) >= TILE_SIZE - KERNEL_RADIUS) {
     let offset = u32(localIdx) - (TILE_SIZE - KERNEL_RADIUS);
     let borderMajor = tileStart + i32(TILE_SIZE) + i32(offset);
-    tile[TILE_SIZE + KERNEL_RADIUS + offset] = loadTexel(borderMajor, minorIdx, dimMajor, dimMinor);
+    tile[TILE_SIZE + KERNEL_RADIUS + offset] = loadTexel(
+      borderMajor,
+      minorIdx,
+      outDimMajor,
+      outDimMinor,
+      inDimMajor,
+      inDimMinor
+    );
   }
 
   workgroupBarrier();
 
   // --- Bounds check: skip threads beyond texture dimensions ---
-  if (centerMajor >= dimMajor || minorIdx >= dimMinor) {
+  if (centerMajor >= outDimMajor || minorIdx >= outDimMinor) {
     return;
   }
 
