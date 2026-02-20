@@ -29,6 +29,7 @@ import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbabili
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
 import { FreeScalarFieldComputePass } from '../passes/FreeScalarFieldComputePass'
+import { TDSEComputePass } from '../passes/TDSEComputePass'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
@@ -48,6 +49,7 @@ const QUANTUM_MODE_MAP: Record<string, number> = {
   harmonicOscillator: 0,
   hydrogenND: 1,
   freeScalarField: 2,
+  tdseDynamics: 3,
 }
 const COLOR_ALGORITHM_MAP: Record<string, number> = {
   lch: 0,
@@ -119,7 +121,7 @@ const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
-  quantumMode?: QuantumModeForShader | 'freeScalarField'
+  quantumMode?: QuantumModeForShader | 'freeScalarField' | 'tdseDynamics'
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color module selection (0-11) */
   colorAlgorithm?: WGSLColorAlgorithm
@@ -215,6 +217,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   // Free Scalar Field Compute Pass (Klein-Gordon lattice simulation)
   private freeScalarFieldPass: FreeScalarFieldComputePass | null = null
+
+  // TDSE Compute Pass (time-dependent Schroedinger equation dynamics)
+  private tdsePass: TDSEComputePass | null = null
 
   // Eigenfunction Cache Compute Pass (HO mode acceleration)
   private eigenCachePass: EigenfunctionCacheComputePass | null = null
@@ -516,8 +521,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const dim = this.rendererConfig.dimension ?? 3
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
-    // Free scalar field requires volumetric 3D rendering — override 2D pipeline
-    const pipelineIs2D = !isFreeScalar && (dim === 2 || this.rendererConfig.representation === 'wigner')
+    const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics'
+    // Free scalar / TDSE require volumetric 3D rendering — override 2D pipeline
+    const pipelineIs2D = !isFreeScalar && !isTdse && (dim === 2 || this.rendererConfig.representation === 'wigner')
     const forceRgba = dim > 3
 
     // =====================================================================
@@ -532,9 +538,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.densityGridInitialized = false
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = null
+    this.tdsePass?.dispose()
+    this.tdsePass = null
 
     let densityPromise: Promise<void> | null = null
-    if (!pipelineIs2D && !isFreeScalar) {
+    if (!pipelineIs2D && !isFreeScalar && !isTdse) {
       this.densityGridPass = new DensityGridComputePass({
         dimension: dim,
         quantumMode: this.rendererConfig.quantumMode as 'harmonicOscillator' | 'hydrogenND',
@@ -551,6 +559,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       // Eagerly create density texture so it's available for bind group creation below.
       // Field buffers and pipelines are built lazily on first executeField().
       this.freeScalarFieldPass.initializeDensityTexture(device)
+    }
+
+    // TDSE dynamics: create its own compute pass
+    if (isTdse) {
+      this.tdsePass = new TDSEComputePass()
+      this.tdsePass.initializeDensityTexture(device)
     }
 
     // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
@@ -673,8 +687,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         } // wignerCacheSampler
       )
     }
-    // Density grid texture + sampler for grid-based raymarching (hydrogen or free scalar)
-    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass)) {
+    // Density grid texture + sampler for grid-based raymarching (hydrogen, free scalar, or TDSE)
+    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass || this.tdsePass)) {
       objectBindGroupEntries.push(
         {
           binding: 4,
@@ -963,10 +977,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
     // Density grid texture + sampler for grid-based raymarching
-    // Used by both hydrogen density grid mode and free scalar field mode
+    // Used by hydrogen density grid mode, free scalar field mode, and TDSE mode
     const densityView = this.freeScalarFieldPass
       ? this.freeScalarFieldPass.getDensityTextureView()
-      : (this.densityGridPass?.getDensityTextureView() ?? null)
+      : this.tdsePass
+        ? this.tdsePass.getDensityTextureView()
+        : (this.densityGridPass?.getDensityTextureView() ?? null)
     if (this.shaderConfig.useDensityGrid && densityView) {
       // Create trilinear-filtering sampler for smooth grid interpolation
       this.densityGridSampler = device.createSampler({
@@ -2558,6 +2574,34 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // ============================================
+    // TDSE DYNAMICS COMPUTE PASS (if in tdseDynamics mode)
+    // ============================================
+    const tdsePass = this.tdsePass
+    if (tdsePass) {
+      const extended = ctx.frame?.stores?.['extended'] as any
+      const animation = ctx.frame?.stores?.['animation'] as any
+      const tdseConfig = extended?.schroedinger?.tdse
+      const isPlaying = animation?.isPlaying ?? false
+
+      if (tdseConfig) {
+        const schroedinger = extended?.schroedinger
+        tdsePass.executeTDSE(
+          ctx,
+          tdseConfig,
+          isPlaying,
+          schroedinger?.basisX as Float32Array | undefined,
+          schroedinger?.basisY as Float32Array | undefined,
+          schroedinger?.basisZ as Float32Array | undefined,
+          this.boundingRadius,
+        )
+        // Clear needsReset after processing (targeted mutation, no version bump)
+        if (tdseConfig.needsReset) {
+          ;(extended as any)?.clearTdseNeedsReset?.()
+        }
+      }
+    }
+
+    // ============================================
     // DENSITY GRID COMPUTE PASS (if enabled)
     // ============================================
     // Run compute shader to pre-compute density texture before rendering
@@ -2919,6 +2963,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = null
+
+    this.tdsePass?.dispose()
+    this.tdsePass = null
 
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null

@@ -98,7 +98,7 @@ export type SchroedingerRenderStyle = 'rayMarching'
  * - hydrogenND: N-dimensional hydrogen orbital (hybrid: Y_lm for first 3D + HO for extra dims)
  * - freeScalarField: Real Klein-Gordon scalar field on a 1D-3D spatial lattice with leapfrog evolution
  */
-export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
+export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
 
 /**
  * Which field quantity to visualize for the free scalar field mode
@@ -250,6 +250,174 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   needsReset: false,
   slicePositions: [],
   kSpaceViz: { ...DEFAULT_KSPACE_VIZ },
+}
+
+// ============================================================================
+// TDSE (Time-Dependent Schroedinger Equation) Configuration
+// ============================================================================
+
+/**
+ * Which field quantity to visualize for TDSE mode
+ * - density: Probability density |psi|^2
+ * - phase: Wavefunction phase arg(psi)
+ * - current: Probability current j = Im(psi* grad psi) / m
+ * - potential: External potential V(x)
+ */
+export type TdseFieldView = 'density' | 'phase' | 'current' | 'potential'
+
+/**
+ * Initial condition type for the TDSE wavepacket
+ * - gaussianPacket: Gaussian wavepacket exp(-|x-x0|^2/(4s^2)) * exp(i*k0.x)
+ * - planeWave: Plane wave exp(i*k0.x) with Gaussian envelope
+ * - superposition: Sum of two Gaussian wavepackets
+ */
+export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superposition'
+
+/**
+ * External potential type for the TDSE
+ * - free: No potential (V=0)
+ * - barrier: Rectangular potential barrier
+ * - step: Potential step
+ * - finiteWell: Finite square well
+ * - harmonicTrap: Harmonic oscillator trapping potential
+ * - driven: Time-dependent driven potential
+ */
+export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven'
+
+/**
+ * Drive waveform type for time-dependent potentials
+ * - sine: Sinusoidal drive
+ * - pulse: Gaussian pulse envelope
+ * - chirp: Linearly chirped sinusoidal drive
+ */
+export type TdseDriveWaveform = 'sine' | 'pulse' | 'chirp'
+
+/**
+ * Configuration for the TDSE (time-dependent Schroedinger equation) solver.
+ * Uses split-operator Strang splitting with Stockham FFT on the GPU.
+ */
+export interface TdseConfig {
+  /** Spatial dimensionality of the lattice (1-3 active, up to 11 with slicing) */
+  latticeDim: number
+  /** Lattice grid size per dimension — length equals latticeDim */
+  gridSize: number[]
+  /** Lattice spacing per dimension — length equals latticeDim */
+  spacing: number[]
+
+  /** Particle mass (atomic units) */
+  mass: number
+  /** Reduced Planck constant (default 1.0 in atomic units) */
+  hbar: number
+  /** Time step for split-operator evolution */
+  dt: number
+  /** Number of Strang splitting substeps per render frame (1-16) */
+  stepsPerFrame: number
+
+  /** Initial condition type */
+  initialCondition: TdseInitialCondition
+  /** Gaussian wavepacket center position — length equals latticeDim */
+  packetCenter: number[]
+  /** Gaussian wavepacket width (sigma) */
+  packetWidth: number
+  /** Gaussian wavepacket amplitude */
+  packetAmplitude: number
+  /** Initial momentum vector k0 — length equals latticeDim */
+  packetMomentum: number[]
+
+  /** External potential type */
+  potentialType: TdsePotentialType
+  /** Barrier height (energy units) */
+  barrierHeight: number
+  /** Barrier width (spatial units) */
+  barrierWidth: number
+  /** Barrier center position along first axis */
+  barrierCenter: number
+  /** Finite well depth */
+  wellDepth: number
+  /** Finite well width */
+  wellWidth: number
+  /** Harmonic trap angular frequency */
+  harmonicOmega: number
+  /** Step potential height */
+  stepHeight: number
+
+  /** Enable time-dependent drive */
+  driveEnabled: boolean
+  /** Drive waveform type */
+  driveWaveform: TdseDriveWaveform
+  /** Drive oscillation frequency */
+  driveFrequency: number
+  /** Drive oscillation amplitude */
+  driveAmplitude: number
+
+  /** Enable complex absorbing potential (CAP) at domain boundaries */
+  absorberEnabled: boolean
+  /** CAP absorption region width (fraction of domain, 0.05-0.3) */
+  absorberWidth: number
+  /** CAP absorption strength */
+  absorberStrength: number
+
+  /** Which field quantity to render */
+  fieldView: TdseFieldView
+  /** Auto-scale density normalization from wavefunction maximum */
+  autoScale: boolean
+
+  /** Enable diagnostic readback (norm, current) */
+  diagnosticsEnabled: boolean
+  /** Diagnostic computation interval in frames */
+  diagnosticsInterval: number
+
+  /** Runtime flag to trigger wavefunction re-initialization (not persisted) */
+  needsReset: boolean
+  /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
+  slicePositions: number[]
+}
+
+/**
+ * Default configuration for the TDSE solver
+ */
+export const DEFAULT_TDSE_CONFIG: TdseConfig = {
+  latticeDim: 3,
+  gridSize: [64, 64, 64],
+  spacing: [0.1, 0.1, 0.1],
+
+  mass: 1.0,
+  hbar: 1.0,
+  dt: 0.005,
+  stepsPerFrame: 4,
+
+  initialCondition: 'gaussianPacket',
+  packetCenter: [0, 0, 0],
+  packetWidth: 0.3,
+  packetAmplitude: 1.0,
+  packetMomentum: [5.0, 0, 0],
+
+  potentialType: 'barrier',
+  barrierHeight: 10.0,
+  barrierWidth: 0.2,
+  barrierCenter: 1.0,
+  wellDepth: 5.0,
+  wellWidth: 1.0,
+  harmonicOmega: 1.0,
+  stepHeight: 5.0,
+
+  driveEnabled: false,
+  driveWaveform: 'sine',
+  driveFrequency: 1.0,
+  driveAmplitude: 1.0,
+
+  absorberEnabled: true,
+  absorberWidth: 0.1,
+  absorberStrength: 5.0,
+
+  fieldView: 'density',
+  autoScale: true,
+
+  diagnosticsEnabled: false,
+  diagnosticsInterval: 5,
+
+  needsReset: false,
+  slicePositions: [],
 }
 
 /**
@@ -669,6 +837,10 @@ export interface SchroedingerConfig {
   // === Free Scalar Field Configuration (when quantumMode === 'freeScalarField') ===
   /** Klein-Gordon lattice field configuration */
   freeScalar: FreeScalarConfig
+
+  // === TDSE Configuration (when quantumMode === 'tdseDynamics') ===
+  /** Time-dependent Schroedinger equation solver configuration */
+  tdse: TdseConfig
 }
 
 /**
@@ -873,6 +1045,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // Free Scalar Field
   freeScalar: DEFAULT_FREE_SCALAR_CONFIG,
+
+  // TDSE
+  tdse: DEFAULT_TDSE_CONFIG,
 }
 
 // ============================================================================

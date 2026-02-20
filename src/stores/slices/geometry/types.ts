@@ -1,6 +1,10 @@
 import {
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
+  type TdseDriveWaveform,
+  type TdseFieldView,
+  type TdseInitialCondition,
+  type TdsePotentialType,
   HydrogenNDPresetName,
   RaymarchQuality,
   SchroedingerColorMode,
@@ -243,6 +247,42 @@ export interface SchroedingerSliceActions {
   setFreeScalarKSpaceBroadeningRadius: (value: number) => void
   setFreeScalarKSpaceBroadeningSigma: (value: number) => void
   setFreeScalarKSpaceRadialBinCount: (value: number) => void
+
+  // TDSE (Time-Dependent Schroedinger Equation) Configuration
+  setTdseLatticeDim: (dim: number) => void
+  setTdseGridSize: (size: number[]) => void
+  setTdseSpacing: (spacing: number[]) => void
+  setTdseMass: (mass: number) => void
+  setTdseHbar: (hbar: number) => void
+  setTdseDt: (dt: number) => void
+  setTdseStepsPerFrame: (steps: number) => void
+  setTdseInitialCondition: (condition: TdseInitialCondition) => void
+  setTdsePacketCenter: (center: number[]) => void
+  setTdsePacketWidth: (width: number) => void
+  setTdsePacketAmplitude: (amplitude: number) => void
+  setTdsePacketMomentum: (momentum: number[]) => void
+  setTdsePotentialType: (type: TdsePotentialType) => void
+  setTdseBarrierHeight: (height: number) => void
+  setTdseBarrierWidth: (width: number) => void
+  setTdseBarrierCenter: (center: number) => void
+  setTdseWellDepth: (depth: number) => void
+  setTdseWellWidth: (width: number) => void
+  setTdseHarmonicOmega: (omega: number) => void
+  setTdseStepHeight: (height: number) => void
+  setTdseDriveEnabled: (enabled: boolean) => void
+  setTdseDriveWaveform: (waveform: TdseDriveWaveform) => void
+  setTdseDriveFrequency: (frequency: number) => void
+  setTdseDriveAmplitude: (amplitude: number) => void
+  setTdseAbsorberEnabled: (enabled: boolean) => void
+  setTdseAbsorberWidth: (width: number) => void
+  setTdseAbsorberStrength: (strength: number) => void
+  setTdseFieldView: (view: TdseFieldView) => void
+  setTdseAutoScale: (autoScale: boolean) => void
+  setTdseDiagnosticsEnabled: (enabled: boolean) => void
+  setTdseDiagnosticsInterval: (interval: number) => void
+  setTdseSlicePosition: (dimIndex: number, value: number) => void
+  resetTdseField: () => void
+  clearTdseNeedsReset: () => void
 
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void

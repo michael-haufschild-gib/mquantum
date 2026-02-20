@@ -78,7 +78,7 @@ const PROBABILITY_CURRENT_COLOR_MODE_CIRCULATION_SIGN: i32 = 2;
 // All arrays are packed into vec4f/vec4i types with helper functions for access.
 struct SchroedingerUniforms {
   // Quantum mode selection
-  quantumMode: i32,              // 0 = harmonic oscillator, 1 = hydrogen ND, 2 = free scalar field
+  quantumMode: i32,              // 0 = harmonic oscillator, 1 = hydrogen ND, 2 = free scalar field, 3 = TDSE dynamics
 
   // Harmonic oscillator state configuration
   termCount: i32,                // Number of superposition terms (1-8)

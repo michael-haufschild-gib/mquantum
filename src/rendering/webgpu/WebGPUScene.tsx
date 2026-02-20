@@ -521,9 +521,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
       interferenceEnabled: schroedingerCompile.interferenceEnabled,
       uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
-      temporalReprojectionEnabled: schroedingerCompile.quantumMode === 'freeScalarField'
-        ? false
-        : performance_.temporalReprojectionEnabled,
+      temporalReprojectionEnabled: (
+        schroedingerCompile.quantumMode === 'freeScalarField' ||
+        schroedingerCompile.quantumMode === 'tdseDynamics'
+      ) ? false : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
@@ -1723,7 +1724,7 @@ export interface PassConfig {
   frameBlendingEnabled: boolean
   // Schrodinger isosurface mode (compile-time shader selection)
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
@@ -1749,7 +1750,7 @@ export interface PassConfig {
 interface SchrodingerPassConfig {
   objectType: ObjectType
   dimension: number
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   colorAlgorithm: PaletteColorAlgorithm
   isosurface: boolean
@@ -1775,31 +1776,35 @@ interface PPPassConfig {
 
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isFreeScalar = config.quantumMode === 'freeScalarField'
+  const isTdse = config.quantumMode === 'tdseDynamics'
+  // Both free scalar and TDSE use GPU compute pipelines with density grid output,
+  // so they disable analytic-only features and force position representation.
+  const isComputeMode = isFreeScalar || isTdse
   return {
     objectType: config.objectType,
-    // Free scalar field forces dimension >= 3 and disables features unsupported by its pipeline.
-    // Normalize these values here so toggling them in the UI while in freeScalar mode
+    // Compute modes force dimension >= 3 and disable features unsupported by their pipeline.
+    // Normalize these values here so toggling them in the UI while in compute mode
     // does not trigger wasteful renderer rebuilds.
-    dimension: isFreeScalar ? Math.max(config.dimension, 3) : config.dimension,
+    dimension: isComputeMode ? Math.max(config.dimension, 3) : config.dimension,
     quantumMode: config.quantumMode,
-    termCount: isFreeScalar ? 1 : config.termCount,
-    colorAlgorithm: !isFreeScalar && (
+    termCount: isComputeMode ? 1 : config.termCount,
+    colorAlgorithm: !isComputeMode && (
       config.colorAlgorithm === 'hamiltonianDecomposition' ||
       config.colorAlgorithm === 'modeCharacter' ||
       config.colorAlgorithm === 'energyFlux'
     )
       ? 'radialDistance'
-      : isFreeScalar && config.colorAlgorithm === 'relativePhase'
+      : isComputeMode && config.colorAlgorithm === 'relativePhase'
         ? 'mixed'
         : config.colorAlgorithm,
     isosurface: config.isosurface,
-    nodalEnabled: isFreeScalar ? false : config.nodalEnabled,
-    phaseMaterialityEnabled: isFreeScalar ? false : config.phaseMaterialityEnabled,
-    interferenceEnabled: isFreeScalar ? false : config.interferenceEnabled,
-    uncertaintyBoundaryEnabled: isFreeScalar ? false : config.uncertaintyBoundaryEnabled,
-    representation: isFreeScalar ? 'position' : config.representation,
-    eigenfunctionCacheEnabled: isFreeScalar ? false : config.eigenfunctionCacheEnabled,
-    temporalReprojectionEnabled: isFreeScalar ? false : config.temporalReprojectionEnabled,
+    nodalEnabled: isComputeMode ? false : config.nodalEnabled,
+    phaseMaterialityEnabled: isComputeMode ? false : config.phaseMaterialityEnabled,
+    interferenceEnabled: isComputeMode ? false : config.interferenceEnabled,
+    uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
+    representation: isComputeMode ? 'position' : config.representation,
+    eigenfunctionCacheEnabled: isComputeMode ? false : config.eigenfunctionCacheEnabled,
+    temporalReprojectionEnabled: isComputeMode ? false : config.temporalReprojectionEnabled,
   }
 }
 
@@ -1833,7 +1838,8 @@ export function shouldForceFullRebuildForQuantumModeTransition(
   if (!previous) return false
   if (previous.quantumMode === next.quantumMode) return false
 
-  return previous.quantumMode === 'freeScalarField' || next.quantumMode === 'freeScalarField'
+  const computeModes = new Set(['freeScalarField', 'tdseDynamics'])
+  return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
 }
 
 interface ScenePassBackgroundColorUpdateArgs {

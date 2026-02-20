@@ -2,6 +2,7 @@ import {
   DEFAULT_SCHROEDINGER_CONFIG,
   type FreeScalarConfig,
   type SchroedingerConfig,
+  type TdseConfig,
   RAYMARCH_QUALITY_TO_SAMPLES,
   type RaymarchQuality,
   SCHROEDINGER_QUALITY_PRESETS,
@@ -144,6 +145,51 @@ export const createSchroedingerSlice: StateCreator<
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
     return { latticeDim: newDim, gridSize, spacing, packetCenter, modeK, slicePositions }
+  }
+
+  /** Maximum total TDSE lattice sites — FFT needs power-of-2 per axis */
+  const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
+
+  /**
+   * Compute default per-dimension grid size for a given TDSE dimensionality.
+   * TDSE requires power-of-2 per axis for FFT. Ensures total sites within budget.
+   */
+  const defaultTdseGridPerDim = (d: number): number => {
+    const raw = Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
+    const pow2 = 2 ** Math.floor(Math.log2(Math.max(4, raw)))
+    return Math.max(4, Math.min(128, pow2))
+  }
+
+  /**
+   * Resize TDSE arrays to match a new latticeDim, preserving existing values
+   * where possible and filling new dimensions with defaults.
+   */
+  const resizeTdseArrays = (
+    prev: TdseConfig,
+    newDim: number
+  ): Partial<TdseConfig> => {
+    const gridDefault = defaultTdseGridPerDim(newDim)
+    const snapToPow2 = (v: number): number => {
+      const log2 = Math.round(Math.log2(Math.max(4, v)))
+      return Math.max(4, Math.min(gridDefault, 2 ** log2))
+    }
+    const gridSize = Array.from({ length: newDim }, (_, i) => {
+      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
+      return snapToPow2(raw)
+    })
+    const spacing = Array.from({ length: newDim }, (_, i) =>
+      i < prev.spacing.length ? prev.spacing[i]! : 0.1
+    )
+    const packetCenter = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
+    )
+    const packetMomentum = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
+    )
+    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
+      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
+    )
+    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions }
   }
 
   /**
