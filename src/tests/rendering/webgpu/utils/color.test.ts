@@ -41,6 +41,7 @@ describe('rendering/webgpu/utils/color', () => {
       expect(parseHexColorToSrgbRgb('')).toBeNull()
       expect(parseHexColorToSrgbRgb('#12')).toBeNull()
       expect(parseHexColorToSrgbRgb('#zzzzzz')).toBeNull()
+      expect(parseHexColorToSrgbRgb('#ff00zz')).toBeNull()
     })
   })
 
@@ -62,6 +63,17 @@ describe('rendering/webgpu/utils/color', () => {
       const first = parseHexColorToLinearRgb('#FFAA00', [0, 0, 0])
       const second = parseHexColorToLinearRgb('  #ffaa00  ', [0, 0, 0])
       expect(second).toBe(first)
+    })
+
+    it('parses whitespace-wrapped hex input on a cold cache entry', () => {
+      const fallback: [number, number, number] = [0.9, 0.8, 0.7]
+      const parsed = parseHexColorToLinearRgb('  #123456  ', fallback)
+      const expected = parseHexColorToLinearRgb('#123456', [0, 0, 0])
+
+      expect(parsed).not.toBe(fallback)
+      expect(parsed[0]).toBeCloseTo(expected[0], 7)
+      expect(parsed[1]).toBeCloseTo(expected[1], 7)
+      expect(parsed[2]).toBeCloseTo(expected[2], 7)
     })
   })
 })

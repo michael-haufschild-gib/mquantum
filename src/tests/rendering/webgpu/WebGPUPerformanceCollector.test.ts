@@ -20,7 +20,6 @@ function resetMetricsStore(): void {
     viewport: { width: 0, height: 0, dpr: 1 },
     buffers: {
       depth: { width: 0, height: 0 },
-      normal: { width: 0, height: 0 },
       temporal: { width: 0, height: 0 },
       screen: { width: 0, height: 0 },
     },
@@ -57,7 +56,6 @@ function createGraphMock() {
       () =>
         new Map<string, { width: number; height: number }>([
           ['depth-buffer', { width: 1280, height: 720 }],
-          ['normal-buffer', { width: 1280, height: 720 }],
           ['temporal-depth', { width: 640, height: 360 }],
         ])
     ),
@@ -166,7 +164,6 @@ describe('WebGPUStatsCollector', () => {
     })
     expect(metrics.buffers).toEqual({
       depth: { width: 1280, height: 720 },
-      normal: { width: 1280, height: 720 },
       temporal: { width: 640, height: 360 },
       screen: { width: 1920, height: 1080 },
     })

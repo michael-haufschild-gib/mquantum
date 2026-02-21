@@ -7,12 +7,18 @@
 
 const FRAME_INTERVAL_EPSILON_MS = 0.05
 
+/**
+ * Input arguments for FPS limiter evaluation.
+ */
 export interface EvaluateFpsLimitArgs {
   nowMs: number
   throttleAnchorMs: number
   maxFps: number
 }
 
+/**
+ * Result of an FPS limiter evaluation step.
+ */
 export interface FpsLimitDecision {
   shouldRender: boolean
   nextThrottleAnchorMs: number
@@ -32,10 +38,13 @@ export function evaluateFpsLimit({
   throttleAnchorMs,
   maxFps,
 }: EvaluateFpsLimitArgs): FpsLimitDecision {
+  const safeNowMs = Number.isFinite(nowMs) ? nowMs : 0
+  const safeThrottleAnchorMs = Number.isFinite(throttleAnchorMs) ? throttleAnchorMs : 0
+
   if (!(maxFps > 0) || !Number.isFinite(maxFps)) {
     return {
       shouldRender: true,
-      nextThrottleAnchorMs: nowMs,
+      nextThrottleAnchorMs: safeNowMs,
     }
   }
 
@@ -43,22 +52,22 @@ export function evaluateFpsLimit({
   if (!(targetFrameIntervalMs > 0) || !Number.isFinite(targetFrameIntervalMs)) {
     return {
       shouldRender: true,
-      nextThrottleAnchorMs: nowMs,
+      nextThrottleAnchorMs: safeNowMs,
     }
   }
 
-  const nextEligibleRenderMs = throttleAnchorMs > 0 ? throttleAnchorMs : nowMs
-  if (nowMs + FRAME_INTERVAL_EPSILON_MS < nextEligibleRenderMs) {
+  const nextEligibleRenderMs = safeThrottleAnchorMs > 0 ? safeThrottleAnchorMs : safeNowMs
+  if (safeNowMs + FRAME_INTERVAL_EPSILON_MS < nextEligibleRenderMs) {
     return {
       shouldRender: false,
-      nextThrottleAnchorMs: throttleAnchorMs,
+      nextThrottleAnchorMs: safeThrottleAnchorMs,
     }
   }
 
   let nextThrottleAnchorMs = nextEligibleRenderMs + targetFrameIntervalMs
-  if (nextThrottleAnchorMs <= nowMs) {
+  if (nextThrottleAnchorMs <= safeNowMs) {
     const skippedIntervals =
-      Math.floor((nowMs - nextThrottleAnchorMs) / targetFrameIntervalMs) + 1
+      Math.floor((safeNowMs - nextThrottleAnchorMs) / targetFrameIntervalMs) + 1
     nextThrottleAnchorMs += skippedIntervals * targetFrameIntervalMs
   }
 

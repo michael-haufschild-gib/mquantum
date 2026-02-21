@@ -112,7 +112,7 @@ export const Sparkline = React.memo(function Sparkline({
   data,
   width = 100,
   height = 30,
-  color = '#34d399',
+  color = 'var(--color-accent)',
   fill = false,
   minY = 0,
   maxY = 70,

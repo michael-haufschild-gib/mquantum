@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import {
   usePresetManagerStore,
   type SavedScene,
@@ -49,8 +49,6 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
       }))
     )
   const { addToast } = useToast()
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
   const [sceneToDelete, setSceneToDelete] = useState<SavedScene | null>(null)
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null)
 
@@ -62,11 +60,8 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
     [renameScene, addToast]
   )
 
-  const handleImport = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-
+  const handleImportFile = useCallback(
+    (file: File) => {
       const reader = new FileReader()
       reader.onload = (event) => {
         const content = event.target?.result
@@ -84,10 +79,22 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
         addToast('Failed to read file', 'error')
       }
       reader.readAsText(file)
-      e.target.value = '' // Reset
     },
     [importScenes, addToast]
   )
+
+  const openImportPicker = useCallback(() => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (file) {
+        handleImportFile(file)
+      }
+    }
+    input.click()
+  }, [handleImportFile])
 
   const handleExport = useCallback(() => {
     const data = exportScenes()
@@ -120,20 +127,12 @@ export const SceneManager: React.FC<SceneManagerProps> = React.memo(({ onClose }
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={openImportPicker}
           className="flex-1"
           ariaLabel="Import scenes from JSON file"
         >
           Import JSON
         </Button>
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="hidden"
-          accept=".json"
-          onChange={handleImport}
-          aria-label="Select JSON file to import"
-        />
         <Button
           variant="secondary"
           size="sm"

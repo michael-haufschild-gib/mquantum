@@ -7,6 +7,9 @@ import { Section } from '@/components/sections/Section'
 import React from 'react'
 import { LightingControls } from './LightingControls'
 
+/**
+ *
+ */
 export interface LightsSectionProps {
   defaultOpen?: boolean
 }

@@ -208,11 +208,8 @@ describe('BloomPass (progressive downsample/upsample)', () => {
     const outputView = {} as GPUTextureView
 
     let copiedInput: GPUTextureView | null = null
-    ;(pass as unknown as { renderCopy: (...args: unknown[]) => void }).renderCopy = (
-      _ctx: WebGPURenderContext,
-      input: GPUTextureView
-    ) => {
-      copiedInput = input
+    ;(pass as unknown as { renderCopy: (...args: unknown[]) => void }).renderCopy = (...args) => {
+      copiedInput = args[1] as GPUTextureView
     }
 
     const ctx = {

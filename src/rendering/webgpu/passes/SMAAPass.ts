@@ -1,3 +1,4 @@
+/* global GPUTextureFormat */
 /**
  * WebGPU SMAA Pass
  *
@@ -21,6 +22,9 @@ import {
   smaaNeighborhoodBlendingShader,
 } from '../shaders/postprocessing/smaa.wgsl'
 
+/**
+ *
+ */
 export interface SMAAPassOptions {
   /** Input color resource (default: 'ldr-color') */
   colorInput?: string

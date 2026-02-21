@@ -27,7 +27,9 @@ export * from './renderers'
 export * from './shaders'
 
 // React Components
-export { WebGPUCanvas, WebGPUContext, useWebGPU } from './WebGPUCanvas'
-export type { WebGPUCanvasProps, WebGPUCanvasContext } from './WebGPUCanvas'
+export { WebGPUCanvas } from './WebGPUCanvas'
+export { WebGPUContext, useWebGPU } from './WebGPUContext'
+export type { WebGPUCanvasProps } from './WebGPUCanvas'
+export type { WebGPUCanvasContext } from './WebGPUContext'
 export { WebGPUScene } from './WebGPUScene'
 export type { WebGPUSceneProps } from './WebGPUScene'

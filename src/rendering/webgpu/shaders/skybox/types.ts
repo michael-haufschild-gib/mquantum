@@ -3,6 +3,9 @@
  * Port of: src/rendering/shaders/skybox/types.ts
  */
 
+/**
+ *
+ */
 export type SkyboxMode =
   | 'classic'
   | 'aurora'
@@ -12,11 +15,17 @@ export type SkyboxMode =
   | 'ocean'
   | 'twilight'
 
+/**
+ *
+ */
 export interface SkyboxEffects {
   sun: boolean
   vignette: boolean
 }
 
+/**
+ *
+ */
 export interface SkyboxShaderConfig {
   mode: SkyboxMode
   effects: SkyboxEffects

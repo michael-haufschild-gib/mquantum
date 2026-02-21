@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { Tooltip } from '../../../components/ui/Tooltip'
+import { Button } from '../../../components/ui/Button'
 
 describe('Tooltip', () => {
   beforeEach(() => {
@@ -15,7 +16,7 @@ describe('Tooltip', () => {
   it('shows tooltip after delay on hover', async () => {
     render(
       <Tooltip content="Tooltip text" delay={300}>
-        <button>Hover me</button>
+        <Button>Hover me</Button>
       </Tooltip>
     )
 
@@ -34,7 +35,7 @@ describe('Tooltip', () => {
   it('does not show tooltip before delay', () => {
     render(
       <Tooltip content="Tooltip text" delay={500}>
-        <button>Hover me</button>
+        <Button>Hover me</Button>
       </Tooltip>
     )
 

@@ -31,19 +31,19 @@ describe('pass resource caching', () => {
     const historyTexture = {} as GPUTexture
     const historyView = {} as GPUTextureView
 
-    ;(pass as any).device = device
-    ;(pass as any).blendPipeline = {} as GPURenderPipeline
-    ;(pass as any).copyPipeline = {} as GPURenderPipeline
-    ;(pass as any).passBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as any).copyBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as any).uniformBuffer = {} as GPUBuffer
-    ;(pass as any).sampler = {} as GPUSampler
-    ;(pass as any).historyTexture = historyTexture
-    ;(pass as any).historyView = historyView
-    ;(pass as any).historyInitialized = true
-    ;(pass as any).lastWidth = 800
-    ;(pass as any).lastHeight = 600
-    ;(pass as any).renderFullscreen = vi.fn()
+    ;(pass as unknown as Record<string, unknown>).device = device
+    ;(pass as unknown as Record<string, unknown>).blendPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).copyPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).passBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).copyBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).uniformBuffer = {} as GPUBuffer
+    ;(pass as unknown as Record<string, unknown>).sampler = {} as GPUSampler
+    ;(pass as unknown as Record<string, unknown>).historyTexture = historyTexture
+    ;(pass as unknown as Record<string, unknown>).historyView = historyView
+    ;(pass as unknown as Record<string, unknown>).historyInitialized = true
+    ;(pass as unknown as Record<string, unknown>).lastWidth = 800
+    ;(pass as unknown as Record<string, unknown>).lastHeight = 600
+    ;(pass as unknown as Record<string, unknown>).renderFullscreen = vi.fn()
 
     const renderContext = {
       size: { width: 800, height: 600 },
@@ -64,7 +64,7 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as any).createBindGroup).toHaveBeenCalledTimes(1)
+    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
   })
 
   it('reuses TemporalCloud reprojection/reconstruction bind groups across frames', () => {
@@ -91,17 +91,17 @@ describe('pass resource caching', () => {
     const reprojColorView = {} as GPUTextureView
     const reprojValidityView = {} as GPUTextureView
 
-    ;(pass as any).device = device
-    ;(pass as any).reprojectionPipeline = {} as GPURenderPipeline
-    ;(pass as any).reconstructionPipeline = {} as GPURenderPipeline
-    ;(pass as any).reprojectionUniformBuffer = {} as GPUBuffer
-    ;(pass as any).reconstructionUniformBuffer = {} as GPUBuffer
-    ;(pass as any).passBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as any).reconstructionBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as any).sampler = {} as GPUSampler
-    ;(pass as any).hasValidHistory = true
-    ;(pass as any).frameIndex = 0
-    ;(pass as any).renderFullscreen = vi.fn()
+    ;(pass as unknown as Record<string, unknown>).device = device
+    ;(pass as unknown as Record<string, unknown>).reprojectionPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).reconstructionPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).reprojectionUniformBuffer = {} as GPUBuffer
+    ;(pass as unknown as Record<string, unknown>).reconstructionUniformBuffer = {} as GPUBuffer
+    ;(pass as unknown as Record<string, unknown>).passBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).sampler = {} as GPUSampler
+    ;(pass as unknown as Record<string, unknown>).hasValidHistory = true
+    ;(pass as unknown as Record<string, unknown>).frameIndex = 0
+    ;(pass as unknown as Record<string, unknown>).renderFullscreen = vi.fn()
 
     const renderContext = {
       size: { width: 800, height: 600 },
@@ -139,7 +139,7 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as any).createBindGroup).toHaveBeenCalledTimes(2)
+    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(2)
   })
 
   it('reuses WebGPUTemporalCloud bind groups across ping-pong frames', () => {
@@ -164,25 +164,25 @@ describe('pass resource caching', () => {
     const accumulationTextureA = {} as GPUTexture
     const accumulationTextureB = {} as GPUTexture
 
-    ;(pass as any).device = device
-    ;(pass as any).reprojectionPipeline = {} as GPURenderPipeline
-    ;(pass as any).reconstructionPipeline = {} as GPURenderPipeline
-    ;(pass as any).reprojectionBindGroupLayout0 = {} as GPUBindGroupLayout
-    ;(pass as any).reprojectionBindGroupLayout1 = {} as GPUBindGroupLayout
-    ;(pass as any).reconstructionBindGroupLayout0 = {} as GPUBindGroupLayout
-    ;(pass as any).reconstructionBindGroupLayout1 = {} as GPUBindGroupLayout
-    ;(pass as any).temporalUniformBuffer = {} as GPUBuffer
-    ;(pass as any).linearSampler = {} as GPUSampler
-    ;(pass as any).nearestSampler = {} as GPUSampler
-    ;(pass as any).reprojectedHistoryView = reprojHistoryView
-    ;(pass as any).accumulationViewA = accumulationViewA
-    ;(pass as any).accumulationViewB = accumulationViewB
-    ;(pass as any).accumulationTextureA = accumulationTextureA
-    ;(pass as any).accumulationTextureB = accumulationTextureB
-    ;(pass as any).hasValidHistory = true
-    ;(pass as any).lastWidth = 800
-    ;(pass as any).lastHeight = 600
-    ;(pass as any).renderFullscreen = vi.fn()
+    ;(pass as unknown as Record<string, unknown>).device = device
+    ;(pass as unknown as Record<string, unknown>).reprojectionPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).reconstructionPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).reprojectionBindGroupLayout0 = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reprojectionBindGroupLayout1 = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout0 = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout1 = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).temporalUniformBuffer = {} as GPUBuffer
+    ;(pass as unknown as Record<string, unknown>).linearSampler = {} as GPUSampler
+    ;(pass as unknown as Record<string, unknown>).nearestSampler = {} as GPUSampler
+    ;(pass as unknown as Record<string, unknown>).reprojectedHistoryView = reprojHistoryView
+    ;(pass as unknown as Record<string, unknown>).accumulationViewA = accumulationViewA
+    ;(pass as unknown as Record<string, unknown>).accumulationViewB = accumulationViewB
+    ;(pass as unknown as Record<string, unknown>).accumulationTextureA = accumulationTextureA
+    ;(pass as unknown as Record<string, unknown>).accumulationTextureB = accumulationTextureB
+    ;(pass as unknown as Record<string, unknown>).hasValidHistory = true
+    ;(pass as unknown as Record<string, unknown>).lastWidth = 800
+    ;(pass as unknown as Record<string, unknown>).lastHeight = 600
+    ;(pass as unknown as Record<string, unknown>).renderFullscreen = vi.fn()
 
     const renderContext = {
       size: { width: 800, height: 600 },
@@ -213,7 +213,7 @@ describe('pass resource caching', () => {
 
     // 1x reprojection uniforms + 2x reprojection ping-pong variants +
     // 1x reconstruction uniforms + 1x reconstruction textures.
-    expect((device as any).createBindGroup).toHaveBeenCalledTimes(5)
+    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(5)
   })
 
   it('reuses TemporalCloudDepth bind groups when input view is unchanged', () => {
@@ -230,12 +230,12 @@ describe('pass resource caching', () => {
     const positionView = {} as GPUTextureView
     const outputView = {} as GPUTextureView
 
-    ;(pass as any).device = device
-    ;(pass as any).renderPipeline = {} as GPURenderPipeline
-    ;(pass as any).uniformBuffer = {} as GPUBuffer
-    ;(pass as any).passBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as any).sampler = {} as GPUSampler
-    ;(pass as any).renderFullscreen = vi.fn()
+    ;(pass as unknown as Record<string, unknown>).device = device
+    ;(pass as unknown as Record<string, unknown>).renderPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).uniformBuffer = {} as GPUBuffer
+    ;(pass as unknown as Record<string, unknown>).passBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).sampler = {} as GPUSampler
+    ;(pass as unknown as Record<string, unknown>).renderFullscreen = vi.fn()
 
     const renderContext = {
       size: { width: 640, height: 360 },
@@ -256,7 +256,7 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as any).createBindGroup).toHaveBeenCalledTimes(1)
+    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
   })
 
   it('uses one render pass plus texture copy in TemporalDepthCapture execution', () => {
@@ -274,15 +274,15 @@ describe('pass resource caching', () => {
     const outputView = {} as GPUTextureView
     const outputTexture = {} as GPUTexture
 
-    ;(pass as any).device = device
-    ;(pass as any).renderPipeline = {} as GPURenderPipeline
-    ;(pass as any).passBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as any).sampler = {} as GPUSampler
-    ;(pass as any).historyTexture = {} as GPUTexture
-    ;(pass as any).historyView = {} as GPUTextureView
-    ;(pass as any).lastWidth = 800
-    ;(pass as any).lastHeight = 600
-    ;(pass as any).renderFullscreen = vi.fn()
+    ;(pass as unknown as Record<string, unknown>).device = device
+    ;(pass as unknown as Record<string, unknown>).renderPipeline = {} as GPURenderPipeline
+    ;(pass as unknown as Record<string, unknown>).passBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).sampler = {} as GPUSampler
+    ;(pass as unknown as Record<string, unknown>).historyTexture = {} as GPUTexture
+    ;(pass as unknown as Record<string, unknown>).historyView = {} as GPUTextureView
+    ;(pass as unknown as Record<string, unknown>).lastWidth = 800
+    ;(pass as unknown as Record<string, unknown>).lastHeight = 600
+    ;(pass as unknown as Record<string, unknown>).renderFullscreen = vi.fn()
     vi.spyOn(pass, 'isEnabled').mockReturnValue(true)
 
     const beginRenderPass = vi.fn(() => createRenderPassEncoder())

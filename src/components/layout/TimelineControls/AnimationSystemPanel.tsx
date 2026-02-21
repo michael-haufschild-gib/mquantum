@@ -47,6 +47,9 @@ function formatParamLabel(paramKey: string): string {
     .trim()
 }
 
+/**
+ *
+ */
 export interface AnimationSystemPanelProps {
   /** Key identifying this animation system */
   systemKey: string

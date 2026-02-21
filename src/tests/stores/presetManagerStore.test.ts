@@ -169,6 +169,96 @@ describe('presetManagerStore', () => {
       expect(lighting.selectedLightId).toBe('light-1')
     })
 
+    it('preserves imported light range=0 sentinel for infinite attenuation distance', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Infinite Range Light',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {
+            lights: [
+              {
+                id: 'light-1',
+                name: 'Imported Light',
+                type: 'point',
+                enabled: true,
+                position: [1, 2, 3],
+                rotation: [0, 0, 0],
+                color: '#ffffff',
+                intensity: 1,
+                coneAngle: 30,
+                penumbra: 0.2,
+                range: 0,
+                decay: 2,
+              },
+            ],
+            selectedLightId: 'light-1',
+          },
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const lighting = useLightingStore.getState()
+      const importedLight = lighting.lights.find((light) => light.id === 'light-1')
+      expect(importedLight).toBeDefined()
+      expect(importedLight!.range).toBe(0)
+    })
+
+    it('preserves imported light decay=0 sentinel for no distance attenuation decay', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Zero Decay Light',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {
+            lights: [
+              {
+                id: 'light-1',
+                name: 'Imported Light',
+                type: 'point',
+                enabled: true,
+                position: [1, 2, 3],
+                rotation: [0, 0, 0],
+                color: '#ffffff',
+                intensity: 1,
+                coneAngle: 30,
+                penumbra: 0.2,
+                range: 10,
+                decay: 0,
+              },
+            ],
+            selectedLightId: 'light-1',
+          },
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const lighting = useLightingStore.getState()
+      const importedLight = lighting.lights.find((light) => light.id === 'light-1')
+      expect(importedLight).toBeDefined()
+      expect(importedLight!.decay).toBe(0)
+    })
+
     it('drops unknown imported style lighting fields on load', () => {
       const importedStyle = {
         id: 'style-id',
@@ -193,7 +283,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
-      const lighting = useLightingStore.getState() as Record<string, unknown>
+      const lighting = useLightingStore.getState() as unknown as Record<string, unknown>
       expect(lighting.lightStrength).toBe(1.5)
       expect(lighting.mysteryLighting).toBeUndefined()
     })
@@ -298,7 +388,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
-      const pp = usePostProcessingStore.getState() as Record<string, unknown>
+      const pp = usePostProcessingStore.getState() as unknown as Record<string, unknown>
       expect(pp.bloomEnabled).toBe(true)
       expect(pp.mysteryEffect).toBeUndefined()
     })
@@ -406,8 +496,8 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
-      const pbr = usePBRStore.getState() as Record<string, unknown>
-      expect((pbr.face as Record<string, unknown>).roughness).toBe(0.6)
+      const pbr = usePBRStore.getState() as unknown as Record<string, unknown>
+      expect((pbr.face as unknown as Record<string, unknown>).roughness).toBe(0.6)
       expect(pbr.mysteryPbr).toBeUndefined()
     })
 
@@ -572,7 +662,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
-      const environment = useEnvironmentStore.getState() as Record<string, unknown>
+      const environment = useEnvironmentStore.getState() as unknown as Record<string, unknown>
       expect(environment.skyboxSelection).toBe('space_red')
       expect(environment.mysteryEnvironment).toBeUndefined()
     })
@@ -601,7 +691,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
-      const appearance = useAppearanceStore.getState() as Record<string, unknown>
+      const appearance = useAppearanceStore.getState() as unknown as Record<string, unknown>
       expect(appearance.edgeColor).toBe('#123123')
       expect(appearance.mysteryAppearance).toBeUndefined()
     })
@@ -869,9 +959,8 @@ describe('presetManagerStore', () => {
       expect(ui.perfMonitorExpanded).toBe(true)
       expect(ui.perfMonitorTab).toBe('shader')
       expect(ui.showDepthBuffer).toBe(false)
-      expect(ui.showNormalBuffer).toBe(false)
       expect(ui.showTemporalDepthBuffer).toBe(false)
-      expect((ui as Record<string, unknown>).mysteryFlag).toBeUndefined()
+      expect((ui as unknown as Record<string, unknown>).mysteryFlag).toBeUndefined()
     })
 
     it('ignores non-finite numeric fields from imported scene payloads', () => {
@@ -1064,7 +1153,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
-      const animation = useAnimationStore.getState() as Record<string, unknown>
+      const animation = useAnimationStore.getState() as unknown as Record<string, unknown>
       expect(animation.mysteryAnimation).toBeUndefined()
     })
 
@@ -1101,7 +1190,7 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
-      const schroedinger = useExtendedObjectStore.getState().schroedinger as Record<string, unknown>
+      const schroedinger = useExtendedObjectStore.getState().schroedinger as unknown as Record<string, unknown>
       expect(schroedinger.termCount).toBe(4)
       expect(schroedinger.mysteryExtended).toBeUndefined()
     })
@@ -1224,7 +1313,6 @@ describe('presetManagerStore', () => {
       // Note: maxFps is now in performanceStore, not uiStore
       useUIStore.setState({
         showDepthBuffer: true,
-        showNormalBuffer: true,
         showTemporalDepthBuffer: true,
       })
 
@@ -1233,7 +1321,6 @@ describe('presetManagerStore', () => {
 
       // Device-specific settings should be excluded from ui data
       expect(saved!.data.ui.showDepthBuffer).toBeUndefined()
-      expect(saved!.data.ui.showNormalBuffer).toBeUndefined()
       expect(saved!.data.ui.showTemporalDepthBuffer).toBeUndefined()
     })
   })
@@ -1644,7 +1731,7 @@ describe('presetManagerStore', () => {
       expect(environment.skyboxSelection).toBe('none')
       expect(environment.skyboxMode).toBe('classic')
       expect(environment.skyboxTexture).toBe('none')
-      expect((environment as Record<string, unknown>).classicSkyboxType).toBeUndefined()
+      expect((environment as unknown as Record<string, unknown>).classicSkyboxType).toBeUndefined()
     })
 
     it('should handle legacy scene without skyboxEnabled', () => {
@@ -1680,7 +1767,7 @@ describe('presetManagerStore', () => {
       expect(environment.skyboxSelection).toBe('none')
       expect(environment.skyboxMode).toBe('classic')
       expect(environment.skyboxTexture).toBe('none')
-      expect((environment as Record<string, unknown>).classicSkyboxType).toBeUndefined()
+      expect((environment as unknown as Record<string, unknown>).classicSkyboxType).toBeUndefined()
     })
 
     it('should derive missing skybox selection from legacy mode/texture fields', () => {
@@ -1860,7 +1947,7 @@ describe('presetManagerStore', () => {
 
       // Nor should they be applied to runtime post-processing state
       usePresetManagerStore.getState().loadStyle(imported!.id)
-      const pp = usePostProcessingStore.getState() as Record<string, unknown>
+      const pp = usePostProcessingStore.getState() as unknown as Record<string, unknown>
       expect(pp.objectOnlyDepth).toBeUndefined()
       expect(pp.gravityEnabled).toBeUndefined()
       expect(pp.gravityStrength).toBeUndefined()
@@ -1911,7 +1998,7 @@ describe('presetManagerStore', () => {
 
       // Nor should they be applied to runtime post-processing state
       usePresetManagerStore.getState().loadScene(imported!.id)
-      const pp = usePostProcessingStore.getState() as Record<string, unknown>
+      const pp = usePostProcessingStore.getState() as unknown as Record<string, unknown>
       expect(pp.objectOnlyDepth).toBeUndefined()
       expect(pp.gravityEnabled).toBeUndefined()
       expect(pp.gravityStrength).toBeUndefined()

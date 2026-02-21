@@ -16,6 +16,9 @@ import React, { memo, useMemo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { AMBIENT_LIGHT_ID, LightListItem } from './LightListItem'
 
+/**
+ *
+ */
 export interface LightListProps {
   className?: string
 }

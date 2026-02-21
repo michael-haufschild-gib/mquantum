@@ -2,6 +2,9 @@ import React, { useCallback } from 'react'
 import { m } from 'motion/react'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface SwitchProps {
   checked: boolean
   onCheckedChange: (checked: boolean) => void

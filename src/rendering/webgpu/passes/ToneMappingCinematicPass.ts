@@ -44,6 +44,35 @@ const ALGORITHM_TO_MODE: Record<string, ToneMappingMode> = {
   neutral: ToneMappingMode.Neutral,
 }
 
+const MIN_EXPOSURE = 0.1
+const MAX_EXPOSURE = 3
+const MIN_ABERRATION = 0
+const MAX_ABERRATION = 0.1
+const MIN_VIGNETTE = 0
+const MAX_VIGNETTE = 3
+const MIN_GRAIN = 0
+const MAX_GRAIN = 0.2
+
+function clampFinite(value: number, min: number, max: number): number | null {
+  if (!Number.isFinite(value)) {
+    return null
+  }
+  return Math.max(min, Math.min(max, value))
+}
+
+function clampFiniteOrFallback(
+  value: number | undefined,
+  min: number,
+  max: number,
+  fallback: number
+): number {
+  if (typeof value !== 'number') {
+    return fallback
+  }
+  const clamped = clampFinite(value, min, max)
+  return clamped ?? fallback
+}
+
 /**
  * Configuration for ToneMappingCinematicPass.
  */
@@ -373,13 +402,13 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
     // Tone mapping settings
     this.toneMapping = config.toneMapping ?? ToneMappingMode.ACESFilmic
-    this.exposure = config.exposure ?? 1.0
+    this.exposure = clampFiniteOrFallback(config.exposure, MIN_EXPOSURE, MAX_EXPOSURE, 1.0)
 
     // Cinematic settings
-    this.aberration = config.aberration ?? 0.005
-    this.vignette = config.vignette ?? 1.2
+    this.aberration = clampFiniteOrFallback(config.aberration, MIN_ABERRATION, MAX_ABERRATION, 0.005)
+    this.vignette = clampFiniteOrFallback(config.vignette, MIN_VIGNETTE, MAX_VIGNETTE, 1.2)
     this.vignetteOffset = 1.0
-    this.grain = config.grain ?? 0.05
+    this.grain = clampFiniteOrFallback(config.grain, MIN_GRAIN, MAX_GRAIN, 0.05)
   }
 
   /**
@@ -453,7 +482,10 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
    * @param value
    */
   setExposure(value: number): void {
-    this.exposure = value
+    const clamped = clampFinite(value, MIN_EXPOSURE, MAX_EXPOSURE)
+    if (clamped !== null) {
+      this.exposure = clamped
+    }
   }
 
   /**
@@ -461,7 +493,10 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
    * @param value
    */
   setAberration(value: number): void {
-    this.aberration = value
+    const clamped = clampFinite(value, MIN_ABERRATION, MAX_ABERRATION)
+    if (clamped !== null) {
+      this.aberration = clamped
+    }
   }
 
   /**
@@ -469,7 +504,10 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
    * @param value
    */
   setVignette(value: number): void {
-    this.vignette = value
+    const clamped = clampFinite(value, MIN_VIGNETTE, MAX_VIGNETTE)
+    if (clamped !== null) {
+      this.vignette = clamped
+    }
   }
 
   /**
@@ -477,7 +515,10 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
    * @param value
    */
   setGrain(value: number): void {
-    this.grain = value
+    const clamped = clampFinite(value, MIN_GRAIN, MAX_GRAIN)
+    if (clamped !== null) {
+      this.grain = clamped
+    }
   }
 
   /**
@@ -510,7 +551,10 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
 
     // Exposure from lighting store
     if (lighting?.exposure !== undefined) {
-      this.exposure = lighting.exposure
+      const clamped = clampFinite(lighting.exposure, MIN_EXPOSURE, MAX_EXPOSURE)
+      if (clamped !== null) {
+        this.exposure = clamped
+      }
     }
 
     // Tonemapping algorithm from lighting store
@@ -532,13 +576,22 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
       this.grain = 0
     } else {
       if (postProcessing?.cinematicVignette !== undefined) {
-        this.vignette = postProcessing.cinematicVignette
+        const clamped = clampFinite(postProcessing.cinematicVignette, MIN_VIGNETTE, MAX_VIGNETTE)
+        if (clamped !== null) {
+          this.vignette = clamped
+        }
       }
       if (postProcessing?.cinematicAberration !== undefined) {
-        this.aberration = postProcessing.cinematicAberration
+        const clamped = clampFinite(postProcessing.cinematicAberration, MIN_ABERRATION, MAX_ABERRATION)
+        if (clamped !== null) {
+          this.aberration = clamped
+        }
       }
       if (postProcessing?.cinematicGrain !== undefined) {
-        this.grain = postProcessing.cinematicGrain
+        const clamped = clampFinite(postProcessing.cinematicGrain, MIN_GRAIN, MAX_GRAIN)
+        if (clamped !== null) {
+          this.grain = clamped
+        }
       }
     }
   }
@@ -588,7 +641,7 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     floatView[1] = ctx.size.height
     // Use animation time (pauses with animation) instead of wall-clock time
     // to prevent film grain noise pattern from jittering when paused
-    const animation = ctx.frame?.stores?.['animation'] as any
+    const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
     floatView[2] = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     intView[3] = this.toneMapping // i32
     floatView[4] = this.exposure

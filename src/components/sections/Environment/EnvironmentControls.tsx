@@ -8,6 +8,9 @@ import React, { useState, useCallback, useMemo } from 'react'
 import { BackgroundColorControls } from './BackgroundColorControls'
 import { SkyboxControls } from './SkyboxControls'
 
+/**
+ *
+ */
 export interface EnvironmentControlsProps {
   className?: string
 }

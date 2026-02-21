@@ -4,6 +4,9 @@ import { Icon } from './Icon'
 import { Button } from './Button'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface InlineEditProps {
   /** Current value to display */
   value: string
@@ -72,8 +75,12 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
     // Update editValue when value prop changes (external update)
     useEffect(() => {
       if (!isEditing) {
-        setEditValue(value)
+        const syncValueTimer = window.setTimeout(() => {
+          setEditValue(value)
+        }, 0)
+        return () => clearTimeout(syncValueTimer)
       }
+      return undefined
     }, [value, isEditing])
 
     // Handle controlled editing state - initialize editValue when entering edit mode externally
@@ -83,12 +90,19 @@ export const InlineEdit: React.FC<InlineEditProps> = memo(
       if (controlledIsEditing === undefined) return
 
       if (controlledIsEditing && !internalIsEditing) {
-        setEditValue(value)
-        setError(undefined)
-        setInternalIsEditing(true)
+        const enterEditTimer = window.setTimeout(() => {
+          setEditValue(value)
+          setError(undefined)
+          setInternalIsEditing(true)
+        }, 0)
+        return () => clearTimeout(enterEditTimer)
       } else if (!controlledIsEditing && internalIsEditing) {
-        setInternalIsEditing(false)
+        const exitEditTimer = window.setTimeout(() => {
+          setInternalIsEditing(false)
+        }, 0)
+        return () => clearTimeout(exitEditTimer)
       }
+      return undefined
     }, [controlledIsEditing, internalIsEditing, value])
 
     // Focus and select input when entering edit mode

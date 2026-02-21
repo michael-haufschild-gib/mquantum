@@ -70,6 +70,9 @@ interface DeduplicationResult {
   funcMeta: Float32Array
 }
 
+/**
+ *
+ */
 export class EigenfunctionCacheComputePass extends WebGPUBaseComputePass {
   /** Single cached pipeline — the eigenfunction compute shader has no config variants. */
   private static cachedPipeline: GPUComputePipeline | null = null

@@ -11,6 +11,9 @@
 // Types
 // ============================================================================
 
+/**
+ *
+ */
 export interface WebGPUCameraState {
   /** Camera position in world space */
   position: [number, number, number]
@@ -28,6 +31,9 @@ export interface WebGPUCameraState {
   aspect: number
 }
 
+/**
+ *
+ */
 export interface WebGPUCameraMatrices {
   /** View matrix (world to camera) - column-major Float32Array */
   viewMatrix: Float32Array

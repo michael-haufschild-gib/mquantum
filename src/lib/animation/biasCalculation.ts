@@ -51,8 +51,11 @@ const PHASE_OFFSET = Math.PI / 4
  * @returns Rotation speed multiplier in range [MIN_MULTIPLIER, MAX_MULTIPLIER]
  */
 export function getPlaneMultiplier(planeIndex: number, _totalPlanes: number, bias: number): number {
+  // Defensive normalization: keep helper robust even if callers bypass store clamps.
+  const normalizedBias = Number.isFinite(bias) ? Math.max(0, Math.min(1, bias)) : 0
+
   // Fast path: no bias means uniform speed
-  if (bias === 0) return 1.0
+  if (normalizedBias === 0) return 1.0
 
   // Golden angle spread: each plane gets unique position on unit circle
   // The golden ratio ensures each successive plane is maximally distant
@@ -64,7 +67,7 @@ export function getPlaneMultiplier(planeIndex: number, _totalPlanes: number, bia
   // Calculate multiplier:
   // - At bias=0: multiplier = 1.0 (no change)
   // - At bias=1: multiplier ranges from (1 - MAX_DEVIATION) to (1 + MAX_DEVIATION)
-  const multiplier = 1 + bias * spread * MAX_DEVIATION
+  const multiplier = 1 + normalizedBias * spread * MAX_DEVIATION
 
   // Safety clamp: ensure multiplier stays within valid bounds
   return Math.max(MIN_MULTIPLIER, Math.min(MAX_MULTIPLIER, multiplier))

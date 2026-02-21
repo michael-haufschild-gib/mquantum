@@ -166,17 +166,6 @@ struct VertexOutput {
 `
 
 /**
- * Standard fragment output for MRT (Multiple Render Targets).
- */
-export const mrtOutputBlock = /* wgsl */ `
-// MRT output structure
-struct FragmentOutput {
-  @location(0) color: vec4f,      // Color buffer (RGB = color, A = alpha)
-  @location(1) normal: vec4f,     // Normal buffer (RGB = normal, A = metallic)
-}
-`
-
-/**
  * Standard fragment output for single target.
  */
 export const singleOutputBlock = /* wgsl */ `

@@ -4,6 +4,8 @@ import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { useThemeStore } from '@/stores/themeStore'
 import { useCameraStore } from '@/stores/cameraStore'
 import { useShallow } from 'zustand/react/shallow'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface Command {
   id: string
@@ -281,13 +283,20 @@ export const CommandPalette: React.FC = React.memo(() => {
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 10)
-      setSelectedIndex(0)
+      const resetSelectionTimer = window.setTimeout(() => {
+        setSelectedIndex(0)
+      }, 0)
+      return () => clearTimeout(resetSelectionTimer)
     }
+    return undefined
   }, [isOpen])
 
   useEffect(() => {
     // Reset selection when query changes
-    setSelectedIndex(0)
+    const resetSelectionTimer = window.setTimeout(() => {
+      setSelectedIndex(0)
+    }, 0)
+    return () => clearTimeout(resetSelectionTimer)
   }, [query])
 
   const handleListKeyDown = (e: React.KeyboardEvent) => {
@@ -340,14 +349,14 @@ export const CommandPalette: React.FC = React.memo(() => {
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
               </div>
-              <input
+              <Input
                 ref={inputRef}
                 type="text"
                 placeholder="Type a command or search..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleListKeyDown}
-                className="w-full bg-transparent border-none py-3.5 pl-12 pr-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:ring-0 focus:outline-none text-base"
+                className="w-full border-none py-3.5 pl-12 pr-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:ring-0 focus:outline-none text-base rounded-none"
               />
               <div className="absolute right-3 top-3.5 px-2 py-0.5 rounded border border-[var(--border-subtle)] text-[10px] font-mono text-[var(--text-tertiary)]">
                 ESC
@@ -363,7 +372,7 @@ export const CommandPalette: React.FC = React.memo(() => {
                 <ul className="space-y-1">
                   {filteredCommands.map((cmd, index) => (
                     <li key={cmd.id}>
-                      <button
+                      <Button
                         onClick={() => {
                           cmd.action()
                           setIsOpen(false)
@@ -373,6 +382,8 @@ export const CommandPalette: React.FC = React.memo(() => {
                            w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors
                            ${index === selectedIndex ? 'bg-accent/20 text-accent' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'}
                          `}
+                        variant="ghost"
+                        size="sm"
                       >
                         <div className="flex items-center gap-3">
                           <span
@@ -391,7 +402,7 @@ export const CommandPalette: React.FC = React.memo(() => {
                             {cmd.shortcut}
                           </span>
                         )}
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>

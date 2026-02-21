@@ -3,6 +3,9 @@ import { Section } from '@/components/sections/Section'
 import { Knob } from '@/components/ui/Knob'
 import { Envelope } from '@/components/ui/Envelope'
 
+/**
+ *
+ */
 export interface TestSectionProps {
   defaultOpen?: boolean
 }

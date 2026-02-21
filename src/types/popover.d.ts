@@ -47,7 +47,7 @@ declare global {
 }
 
 declare module 'react' {
-  interface HTMLAttributes<T> {
+  interface HTMLAttributes<_T> {
     /**
      * Turns an element into a popover element.
      * - `auto`: Light-dismiss (click outside, Escape key), only one visible at a time.

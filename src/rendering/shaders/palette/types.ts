@@ -25,6 +25,9 @@
  * - relativePhase: Relative phase map hue=arg(conj(ψ_ref)*ψ), lightness≈|ψ|²
  */
 
+/**
+ *
+ */
 export type ColorAlgorithm =
   | 'lch'
   | 'multiSource'
@@ -117,8 +120,14 @@ export interface DistributionSettings {
   offset: number
 }
 
+/**
+ *
+ */
 export type DomainColoringModulusMode = 'logPsiAbsSquared' | 'logPsiAbs'
 
+/**
+ *
+ */
 export interface DomainColoringSettings {
   /** Log modulus source: log(|psi|^2) or log(|psi|) */
   modulusMode: DomainColoringModulusMode
@@ -132,6 +141,9 @@ export interface DomainColoringSettings {
   contourStrength: number
 }
 
+/**
+ *
+ */
 export interface PhaseDivergingSettings {
   /** Center color pinned at cos(phase) = 0 crossings. */
   neutralColor: string
@@ -141,6 +153,9 @@ export interface PhaseDivergingSettings {
   negativeColor: string
 }
 
+/**
+ *
+ */
 export interface DivergingPsiSettings {
   /** Center color pinned at zero crossing. */
   neutralColor: string

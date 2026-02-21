@@ -9,18 +9,18 @@ describe('EigenfunctionCacheControls', () => {
     usePerformanceStore.getState().reset()
   })
 
-  it('renders cache, analytical gradient, and robust interpolation toggles', () => {
+  it('renders cache, analytical gradient, and fast interpolation toggles', () => {
     render(<EigenfunctionCacheControls />)
 
     const cacheToggle = screen.getByRole('switch', { name: 'Eigenfunction Cache' })
     const analyticalToggle = screen.getByRole('switch', { name: 'Analytical Gradient' })
-    const robustToggle = screen.getByRole('switch', { name: 'Robust Eigen Interpolation' })
+    const fastToggle = screen.getByRole('switch', { name: 'Fast Eigen Interpolation' })
 
     expect(cacheToggle).toBeChecked()
     expect(analyticalToggle).toBeChecked()
-    expect(robustToggle).toBeChecked()
+    expect(fastToggle).toBeChecked()
     expect(analyticalToggle).not.toBeDisabled()
-    expect(robustToggle).not.toBeDisabled()
+    expect(fastToggle).not.toBeDisabled()
   })
 
   it('disables subordinate toggles when cache is off and preserves their values', async () => {
@@ -29,25 +29,25 @@ describe('EigenfunctionCacheControls', () => {
 
     const cacheToggle = screen.getByRole('switch', { name: 'Eigenfunction Cache' })
     const analyticalToggle = screen.getByRole('switch', { name: 'Analytical Gradient' })
-    const robustToggle = screen.getByRole('switch', { name: 'Robust Eigen Interpolation' })
+    const fastToggle = screen.getByRole('switch', { name: 'Fast Eigen Interpolation' })
 
     await user.click(analyticalToggle)
-    await user.click(robustToggle)
+    await user.click(fastToggle)
     expect(analyticalToggle).not.toBeChecked()
-    expect(robustToggle).not.toBeChecked()
+    expect(fastToggle).not.toBeChecked()
 
     await user.click(cacheToggle)
     expect(cacheToggle).not.toBeChecked()
     expect(analyticalToggle).toBeDisabled()
-    expect(robustToggle).toBeDisabled()
+    expect(fastToggle).toBeDisabled()
     expect(analyticalToggle).not.toBeChecked()
-    expect(robustToggle).not.toBeChecked()
+    expect(fastToggle).not.toBeChecked()
 
     await user.click(cacheToggle)
     expect(cacheToggle).toBeChecked()
     expect(analyticalToggle).not.toBeDisabled()
-    expect(robustToggle).not.toBeDisabled()
+    expect(fastToggle).not.toBeDisabled()
     expect(analyticalToggle).not.toBeChecked()
-    expect(robustToggle).not.toBeChecked()
+    expect(fastToggle).not.toBeChecked()
   })
 })

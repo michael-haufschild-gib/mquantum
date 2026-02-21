@@ -3,7 +3,6 @@
  *
  * Debug visualization pass for viewing various G-buffer contents:
  * - Depth buffer (raw, linear, focus zones)
- * - Normal buffer
  * - Temporal depth buffer
  * - Generic texture copy
  *
@@ -20,7 +19,7 @@ import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 /**
  * Buffer types that can be previewed.
  */
-export type BufferType = 'copy' | 'depth' | 'normal' | 'temporalDepth'
+export type BufferType = 'copy' | 'depth' | 'temporalDepth'
 
 /**
  * Depth visualization modes.
@@ -66,7 +65,7 @@ export interface BufferPreviewStoreConfig {
  */
 const BUFFER_PREVIEW_SHADER = /* wgsl */ `
 struct Uniforms {
-  bufferType: i32,    // 0=Copy, 1=Depth, 2=Normal, 3=TemporalDepth
+  bufferType: i32,    // 0=Copy, 1=Depth, 2=TemporalDepth
   depthMode: i32,     // 0=Raw, 1=Linear, 2=FocusZones
   nearClip: f32,
   farClip: f32,
@@ -135,25 +134,9 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
     }
   }
 
-  // Type 2: Normal Buffer
-  if (uniforms.bufferType == 2) {
-    let normal = texel.rgb;
-
-    // Check for valid data (empty/background = near-zero)
-    let hasNormal = step(0.01, length(normal));
-
-    if (hasNormal < 0.5) {
-      return vec4f(0.05, 0.05, 0.1, 1.0);
-    } else {
-      // Map from [-1, 1] to [0, 1] for visualization
-      let displayNormal = normal * 0.5 + 0.5;
-      return vec4f(displayNormal, 1.0);
-    }
-  }
-
-  // Type 3: Temporal Depth
+  // Type 2: Temporal Depth
   // gPosition buffer: xyz = model-space position, w = model-space ray distance
-  if (uniforms.bufferType == 3) {
+  if (uniforms.bufferType == 2) {
     let temporalDepth = texel.w;  // Use .w (ray distance), NOT .r (X position)!
 
     // 0.0 indicates invalid/empty data (no hit)
@@ -184,7 +167,6 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
  * ```typescript
  * const bufferPreview = new BufferPreviewPass({
  *   bufferInput: 'depth-buffer',
- *   additionalInputs: ['normal-buffer'],
  *   bufferType: 'depth',
  *   depthMode: 'linear',
  * });
@@ -240,8 +222,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     const typeMap: Record<BufferType, number> = {
       copy: 0,
       depth: 1,
-      normal: 2,
-      temporalDepth: 3,
+      temporalDepth: 2,
     }
 
     // Map depth mode to int
@@ -304,8 +285,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
     const typeMap: Record<BufferType, number> = {
       copy: 0,
       depth: 1,
-      normal: 2,
-      temporalDepth: 3,
+      temporalDepth: 2,
     }
     this.bufferType = typeMap[type]
   }

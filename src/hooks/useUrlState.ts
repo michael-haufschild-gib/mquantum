@@ -7,7 +7,7 @@
  */
 
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
-import { parseCurrentUrl, type ShareableState } from '@/lib/url/state-serializer'
+import { parseCurrentUrl, type ParsedShareableState } from '@/lib/url/state-serializer'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -17,7 +17,7 @@ import { useEffect, useRef } from 'react'
  * Apply individual URL state parameters to stores.
  * @param urlState - Parsed URL state to apply
  */
-function applyUrlStateParams(urlState: Partial<ShareableState>): void {
+function applyUrlStateParams(urlState: ParsedShareableState): void {
   try {
     // Set dimension FIRST (enables more object types), then objectType
     if (urlState.dimension !== undefined) {

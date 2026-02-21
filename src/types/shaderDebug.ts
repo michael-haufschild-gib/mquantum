@@ -1,3 +1,6 @@
+/**
+ *
+ */
 export interface ShaderDebugInfo {
   name: string
   vertexShaderLength: number

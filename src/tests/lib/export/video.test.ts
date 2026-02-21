@@ -192,6 +192,50 @@ describe('VideoRecorder', () => {
       expect(Number.isFinite(progressValue)).toBe(true)
       expect(progressValue).toBe(0)
     })
+
+    it('falls back to full-frame draw when crop dimensions are non-positive', async () => {
+      const recorderWithInvalidCrop = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        crop: {
+          enabled: true,
+          x: 0.2,
+          y: 0.1,
+          width: 0,
+          height: 0.8,
+        },
+      })
+
+      await recorderWithInvalidCrop.initialize()
+
+      const drawImage = vi.fn()
+      ;(
+        recorderWithInvalidCrop as unknown as {
+          compositionCanvas: HTMLCanvasElement | null
+          compositionCtx: CanvasRenderingContext2D | null
+        }
+      ).compositionCanvas = document.createElement('canvas')
+      ;(
+        recorderWithInvalidCrop as unknown as {
+          compositionCanvas: HTMLCanvasElement | null
+          compositionCtx: CanvasRenderingContext2D | null
+        }
+      ).compositionCtx = {
+        globalCompositeOperation: 'source-over',
+        fillStyle: '#000000',
+        filter: 'none',
+        fillRect: vi.fn(),
+        drawImage,
+      } as unknown as CanvasRenderingContext2D
+
+      await recorderWithInvalidCrop.captureFrame(0, 1 / 60)
+
+      expect(drawImage).toHaveBeenCalledTimes(1)
+      const args = drawImage.mock.calls[0]
+      expect(args?.[1]).toBe(0)
+      expect(args?.[2]).toBe(0)
+      expect(args?.[3]).toBe(canvas.width)
+      expect(args?.[4]).toBe(canvas.height)
+    })
   })
 
   describe('finalize', () => {

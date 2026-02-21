@@ -22,6 +22,9 @@ import { useIsMobile } from '@/hooks/useMediaQuery'
  */
 const SubmenuPortalContext = createContext<React.RefObject<HTMLDivElement | null> | null>(null)
 
+/**
+ *
+ */
 export interface DropdownMenuItem {
   label: string
   onClick?: () => void
@@ -31,6 +34,9 @@ export interface DropdownMenuItem {
   items?: DropdownMenuItem[] // Submenu support
 }
 
+/**
+ *
+ */
 export interface DropdownMenuProps {
   trigger: React.ReactNode
   items: DropdownMenuItem[]
@@ -63,7 +69,14 @@ const PortaledSubmenu: React.FC<{
   // otherwise fall back to document.body. This ensures submenus stay in the
   // same stacking context as the parent menu when using native popover API.
   const portalContainerRef = useContext(SubmenuPortalContext)
-  const portalTarget = portalContainerRef?.current ?? document.body
+  const [portalTarget, setPortalTarget] = useState<HTMLElement>(() => document.body)
+
+  useLayoutEffect(() => {
+    const syncPortalTargetTimer = window.setTimeout(() => {
+      setPortalTarget(portalContainerRef?.current ?? document.body)
+    }, 0)
+    return () => clearTimeout(syncPortalTargetTimer)
+  }, [portalContainerRef])
 
   useLayoutEffect(() => {
     if (menuRef.current) {
@@ -91,9 +104,13 @@ const PortaledSubmenu: React.FC<{
         top = Math.max(8, viewportHeight - menuRect.height - 8)
       }
 
-      setCoords({ top, left })
-      setReady(true)
+      const positionSyncTimer = window.setTimeout(() => {
+        setCoords({ top, left })
+        setReady(true)
+      }, 0)
+      return () => clearTimeout(positionSyncTimer)
     }
+    return undefined
   }, [triggerRect])
 
   const submenuContent = (

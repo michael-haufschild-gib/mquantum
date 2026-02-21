@@ -57,4 +57,19 @@ describe('Section', () => {
       expect(button).toHaveAttribute('aria-expanded', 'true')
     })
   })
+
+  it('falls back to defaultOpen when persisted state is non-boolean JSON', () => {
+    localStorage.setItem('section-state-settings', JSON.stringify('false'))
+
+    render(
+      <Section title="Settings" defaultOpen={false}>
+        <div data-testid="section-content">Content</div>
+      </Section>
+    )
+
+    const button = screen.getByRole('button', { name: /settings/i })
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('section-content')).not.toBeInTheDocument()
+  })
+
 })

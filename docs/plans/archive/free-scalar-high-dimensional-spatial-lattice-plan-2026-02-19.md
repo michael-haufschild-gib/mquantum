@@ -224,8 +224,3 @@ Phase 4 (UX and observables):
 - Compressed Fourier high-dimensional PDE methods: https://arxiv.org/abs/2206.01255
 
 
-
-478
-2309686574
-23
-1237429979

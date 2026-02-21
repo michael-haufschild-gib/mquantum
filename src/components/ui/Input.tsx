@@ -3,6 +3,9 @@ import { m, AnimatePresence } from 'motion/react'
 import { LoadingSpinner } from './LoadingSpinner'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   leftIcon?: React.ReactNode
   rightIcon?: React.ReactNode
@@ -32,6 +35,7 @@ export const Input = ({
   ...props
 }: InputProps & { ref?: React.Ref<HTMLInputElement> }) => {
   const [isFocused, setIsFocused] = useState(false)
+  const [internalValue, setInternalValue] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   // Proper ref merging using callback ref pattern
@@ -57,11 +61,22 @@ export const Input = ({
     }
   }, [error])
 
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (value === undefined) {
+        setInternalValue(e.target.value)
+      }
+      onChange?.(e)
+    },
+    [onChange, value]
+  )
+
   const handleClear = (e: React.MouseEvent) => {
     e.stopPropagation()
     soundManager.playClick()
     if (inputRef.current) {
       inputRef.current.value = ''
+      setInternalValue('')
       const event = new Event('input', { bubbles: true })
       inputRef.current.dispatchEvent(event)
       inputRef.current.focus()
@@ -74,8 +89,7 @@ export const Input = ({
     if (onClear) onClear()
   }
 
-  const hasValue =
-    value !== undefined ? String(value).length > 0 : (inputRef.current?.value.length ?? 0) > 0
+  const hasValue = value !== undefined ? String(value).length > 0 : internalValue.length > 0
 
   return (
     <div className={`flex flex-col gap-1.5 ${containerClassName}`}>
@@ -101,7 +115,7 @@ export const Input = ({
           ref={setRefs}
           type={type}
           value={value}
-          onChange={onChange}
+          onChange={handleChange}
           disabled={disabled || loading}
           onFocus={(e) => {
             setIsFocused(true)

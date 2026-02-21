@@ -6,6 +6,7 @@ import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { useUIStore, type UISlice } from '@/stores/uiStore'
 import React, { useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { Button } from '@/components/ui/Button'
 
 // SVGR icon imports
 import CinematicIcon from '@/assets/icons/film.svg?react'
@@ -32,8 +33,7 @@ interface IconButtonProps {
 /** Reusable icon button - extracted for memoization stability */
 const IconButton: React.FC<IconButtonProps> = React.memo(
   ({ icon: IconComponent, active, onClick, label, small = false, className = '' }) => (
-    <button
-      type="button"
+    <Button
       onClick={onClick}
       onMouseEnter={() => soundManager.playHover()}
       aria-label={label}
@@ -50,9 +50,11 @@ const IconButton: React.FC<IconButtonProps> = React.memo(
       }
       ${className}
     `}
+      variant="ghost"
+      size={small ? 'sm' : 'md'}
     >
       <IconComponent className="w-4 h-4" />
-    </button>
+    </Button>
   )
 )
 
@@ -165,8 +167,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
       ) : (
         /* Desktop: utility icon buttons */
         <>
-          <button
-            type="button"
+          <Button
             onClick={toggleRepresentation}
             onMouseEnter={() => soundManager.playHover()}
             aria-label="Switch Representation Space"
@@ -177,9 +178,11 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
               px-3 py-1.5
               bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]
             `}
+            variant="ghost"
+            size="md"
           >
             {representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}
-          </button>
+          </Button>
 
           <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
 

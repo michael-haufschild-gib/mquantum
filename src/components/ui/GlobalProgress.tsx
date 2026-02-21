@@ -22,7 +22,7 @@ export const GlobalProgress: React.FC = React.memo(() => {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>
     if (sceneTransitioning || skyboxLoading || refinementProgress < 100) {
-      setIsVisible(true)
+      timer = setTimeout(() => setIsVisible(true), 0)
     } else {
       // Small delay before hiding to prevent flickering
       timer = setTimeout(() => setIsVisible(false), 500)

@@ -20,42 +20,26 @@ describe('uiStore.bufferVisualization', () => {
 
   describe('Mutual Exclusivity', () => {
     it('enabling showDepthBuffer should disable other buffer visualizations', () => {
-      // First enable normal buffer
-      useUIStore.getState().setShowNormalBuffer(true)
-      expect(useUIStore.getState().showNormalBuffer).toBe(true)
+      // First enable temporal depth preview.
+      useUIStore.getState().setShowTemporalDepthBuffer(true)
+      expect(useUIStore.getState().showTemporalDepthBuffer).toBe(true)
 
-      // Enable depth buffer - should disable normal buffer
+      // Enable depth buffer - should disable temporal depth preview.
       useUIStore.getState().setShowDepthBuffer(true)
       const state = useUIStore.getState()
       expect(state.showDepthBuffer).toBe(true)
-      expect(state.showNormalBuffer).toBe(false)
-      expect(state.showTemporalDepthBuffer).toBe(false)
-    })
-
-    it('enabling showNormalBuffer should disable other buffer visualizations', () => {
-      // First enable depth buffer
-      useUIStore.getState().setShowDepthBuffer(true)
-      expect(useUIStore.getState().showDepthBuffer).toBe(true)
-
-      // Enable normal buffer - should disable depth buffer
-      useUIStore.getState().setShowNormalBuffer(true)
-      const state = useUIStore.getState()
-      expect(state.showDepthBuffer).toBe(false)
-      expect(state.showNormalBuffer).toBe(true)
       expect(state.showTemporalDepthBuffer).toBe(false)
     })
 
     it('enabling showTemporalDepthBuffer should disable other buffer visualizations', () => {
-      // First enable depth and normal buffers
+      // First enable depth buffer
       useUIStore.getState().setShowDepthBuffer(true)
-      useUIStore.getState().setShowNormalBuffer(true) // This also disables depth
-      expect(useUIStore.getState().showNormalBuffer).toBe(true)
+      expect(useUIStore.getState().showDepthBuffer).toBe(true)
 
-      // Enable temporal depth - should disable normal buffer
+      // Enable temporal depth - should disable depth buffer.
       useUIStore.getState().setShowTemporalDepthBuffer(true)
       const state = useUIStore.getState()
       expect(state.showDepthBuffer).toBe(false)
-      expect(state.showNormalBuffer).toBe(false)
       expect(state.showTemporalDepthBuffer).toBe(true)
     })
 
@@ -68,7 +52,6 @@ describe('uiStore.bufferVisualization', () => {
       useUIStore.getState().setShowDepthBuffer(false)
       const state = useUIStore.getState()
       expect(state.showDepthBuffer).toBe(false)
-      expect(state.showNormalBuffer).toBe(false)
       expect(state.showTemporalDepthBuffer).toBe(false)
     })
   })

@@ -1,3 +1,4 @@
+/* global GPUFeatureName, GPUTextureFormat */
 /**
  * WebGPU Device Manager
  *

@@ -9,6 +9,9 @@ import React, { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface RefinementIndicatorProps {
   /** Position in the viewport */
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
@@ -46,33 +49,44 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
   // Show/hide logic
   useEffect(() => {
     if (!enabled) {
-      setIsVisible(false)
-      setFadeOut(false)
-      return undefined
+      const hideTimer = window.setTimeout(() => {
+        setIsVisible(false)
+        setFadeOut(false)
+      }, 0)
+      return () => clearTimeout(hideTimer)
     }
 
     if (isInteracting) {
       // During interaction - hide immediately
-      setIsVisible(false)
-      setFadeOut(false)
-      return undefined
+      const interactionTimer = window.setTimeout(() => {
+        setIsVisible(false)
+        setFadeOut(false)
+      }, 0)
+      return () => clearTimeout(interactionTimer)
     }
 
     if (progress < 100) {
       // During refinement - show
-      setIsVisible(true)
-      setFadeOut(false)
-      return undefined
+      const showTimer = window.setTimeout(() => {
+        setIsVisible(true)
+        setFadeOut(false)
+      }, 0)
+      return () => clearTimeout(showTimer)
     }
 
     if (progress >= 100 && stage === 'final') {
       // Complete - start fade out
-      setFadeOut(true)
+      const fadeTimer = window.setTimeout(() => {
+        setFadeOut(true)
+      }, 0)
       const timer = setTimeout(() => {
         setIsVisible(false)
         setFadeOut(false)
       }, autoHideDelay)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(fadeTimer)
+        clearTimeout(timer)
+      }
     }
 
     return undefined

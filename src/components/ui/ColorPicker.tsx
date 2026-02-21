@@ -10,6 +10,8 @@ import {
   generatePalette,
   type HSVA,
 } from '@/lib/colors/colorUtils'
+import { HISTORY_KEY, MAX_HISTORY, clampAlpha, sanitizeColorHistory } from './colorPickerUtils'
+import { CopyIcon, EyeDropperIcon } from './colorPickerIcons'
 
 interface ColorPickerProps {
   value: string // Hex, Hex8, or RGB string
@@ -23,9 +25,6 @@ interface ColorPickerProps {
 }
 
 type ColorMode = 'HEX' | 'RGB' | 'CSS'
-
-const HISTORY_KEY = 'mdimension_color_history'
-const MAX_HISTORY = 8
 
 export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
   ({
@@ -41,7 +40,21 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     // --- State ---
     const [hsv, setHsv] = useState<HSVA>({ h: 0, s: 0, v: 0, a: 1 })
     const [mode, setMode] = useState<ColorMode>('HEX')
-    const [history, setHistory] = useState<string[]>([])
+    const [history, setHistory] = useState<string[]>(() => {
+      try {
+        const stored = localStorage.getItem(HISTORY_KEY)
+        if (!stored) return []
+        const parsed: unknown = JSON.parse(stored)
+        return sanitizeColorHistory(parsed)
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+          console.warn('ColorPicker: localStorage quota exceeded')
+        } else {
+          console.error('ColorPicker: failed to load color history', error)
+        }
+        return []
+      }
+    })
     const [isOpen, setIsOpen] = useState(false)
     const [initialColor, setInitialColor] = useState(value) // For comparison
 
@@ -55,24 +68,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     const [hexInput, setHexInput] = useState(value)
     const [rgbInput, setRgbInput] = useState({ r: 0, g: 0, b: 0, a: 1 })
 
-    // Initialize History
-    useEffect(() => {
-      try {
-        const stored = localStorage.getItem(HISTORY_KEY)
-        if (stored) setHistory(JSON.parse(stored))
-      } catch (error) {
-        // Log localStorage errors for debugging, but don't crash the picker
-        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-          console.warn('ColorPicker: localStorage quota exceeded')
-        } else {
-          console.error('ColorPicker: failed to load color history', error)
-        }
-      }
-    }, [])
-
     const addToHistory = (color: string) => {
       setHistory((prev) => {
-        const filtered = prev.filter((c) => c !== color)
+        const safePrev = sanitizeColorHistory(prev)
+        const filtered = safePrev.filter((c) => c !== color)
         const newHistory = [color, ...filtered].slice(0, MAX_HISTORY)
         try {
           localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory))
@@ -92,7 +91,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       if (value === lastEmittedRef.current) {
         // Still need to handle alpha prop changes even on echoed values
         if (alpha !== undefined && alpha !== hsv.a) {
-          setHsv((prev) => ({ ...prev, a: disableAlpha ? 1 : alpha }))
+          const alphaSyncTimer = window.setTimeout(() => {
+            setHsv((prev) => ({ ...prev, a: disableAlpha ? 1 : clampAlpha(alpha) }))
+          }, 0)
+          return () => clearTimeout(alphaSyncTimer)
         }
         return
       }
@@ -103,16 +105,19 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       if (disableAlpha) {
         newHsv.a = 1
       } else if (alpha !== undefined) {
-        newHsv.a = alpha
+        newHsv.a = clampAlpha(alpha)
       }
 
-      setHsv(newHsv)
-      setHexInput(
-        newHsv.a === 1
-          ? hsvToHex(newHsv.h, newHsv.s, newHsv.v)
-          : hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a)
-      )
-      setRgbInput(hsvToRgb(newHsv.h, newHsv.s, newHsv.v, newHsv.a))
+      const propSyncTimer = window.setTimeout(() => {
+        setHsv(newHsv)
+        setHexInput(
+          newHsv.a === 1
+            ? hsvToHex(newHsv.h, newHsv.s, newHsv.v)
+            : hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a)
+        )
+        setRgbInput(hsvToRgb(newHsv.h, newHsv.s, newHsv.v, newHsv.a))
+      }, 0)
+      return () => clearTimeout(propSyncTimer)
     }, [value, alpha, disableAlpha, hsv.a])
 
     // On Open -> Capture Initial
@@ -128,23 +133,22 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
     // --- Internal Updates ---
     const updateExternal = useCallback(
       (newHsv: HSVA) => {
+        const safeAlpha = disableAlpha ? 1 : clampAlpha(newHsv.a)
+        const safeHsv = safeAlpha === newHsv.a ? newHsv : { ...newHsv, a: safeAlpha }
         let output: string
-
-        // Enforce disableAlpha
-        if (disableAlpha) newHsv.a = 1
 
         // Handle Alpha Output
         if (onChangeAlpha) {
-          onChangeAlpha(newHsv.a)
+          onChangeAlpha(safeHsv.a)
           // Convention: if onChangeAlpha is present, assume parent handles them separately
           // So we output Hex6 to onChange to keep Three.js happy.
-          output = hsvToHex(newHsv.h, newHsv.s, newHsv.v)
+          output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
         } else {
           // Standard mode: Combine them
-          if (newHsv.a === 1) {
-            output = hsvToHex(newHsv.h, newHsv.s, newHsv.v)
+          if (safeHsv.a === 1) {
+            output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
           } else {
-            output = hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a)
+            output = hsvToHex8(safeHsv.h, safeHsv.s, safeHsv.v, safeHsv.a)
           }
         }
 
@@ -158,21 +162,24 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
 
     const handleHsvChange = useCallback(
       (newHsv: HSVA) => {
-        setHsv(newHsv)
-        updateExternal(newHsv)
+        const safeHsv = disableAlpha
+          ? { ...newHsv, a: 1 }
+          : { ...newHsv, a: clampAlpha(newHsv.a) }
+        setHsv(safeHsv)
+        updateExternal(safeHsv)
 
         // Update local inputs
         // We display what we emitted, mostly. But if alpha is handled separately,
         // we might want to still show it in the UI input?
         // Yes, the UI should reflect the *state* `newHsv`.
         const displayHex =
-          newHsv.a === 1
-            ? hsvToHex(newHsv.h, newHsv.s, newHsv.v)
-            : hsvToHex8(newHsv.h, newHsv.s, newHsv.v, newHsv.a)
+          safeHsv.a === 1
+            ? hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
+            : hsvToHex8(safeHsv.h, safeHsv.s, safeHsv.v, safeHsv.a)
         setHexInput(displayHex)
-        setRgbInput(hsvToRgb(newHsv.h, newHsv.s, newHsv.v, newHsv.a))
+        setRgbInput(hsvToRgb(safeHsv.h, safeHsv.s, safeHsv.v, safeHsv.a))
       },
-      [updateExternal]
+      [updateExternal, disableAlpha]
     )
 
     // --- Interactions ---
@@ -249,6 +256,12 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAIklEQVQIW2NkQAKrVq36zwjjgzhhYWGMYAEYB8RmROaABADeOQ8CXl/xfgAAAABJRU5ErkJggg=='
 
     // --- Render ---
+    const saturationBrightnessBackground = hsvToHex(hsv.h, 1, 1)
+    const hueStops = [0, 1 / 6, 2 / 6, 3 / 6, 4 / 6, 5 / 6, 1]
+    const hueGradient = `linear-gradient(to right, ${hueStops
+      .map((stop) => `${hsvToHex(stop, 1, 1)} ${Math.round(stop * 100)}%`)
+      .join(', ')})`
+
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         {label && (
@@ -304,20 +317,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                       className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors"
                       title="Pick color"
                     >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M2 22l5-5 5-5 5 5-5 5-5-5z" />
-                        <path d="M17 7l-5 5" />
-                        <path d="M14 2l8 8" />
-                      </svg>
+                      <EyeDropperIcon />
                     </button>
                   )}
                   {/* Copy */}
@@ -326,19 +326,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                     className="p-1.5 rounded hover:bg-[var(--bg-hover)] text-text-tertiary hover:text-text-primary transition-colors"
                     title="Copy to clipboard"
                   >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                    </svg>
+                    <CopyIcon />
                   </button>
                 </div>
               </div>
@@ -352,7 +340,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   setIsDraggingSV(true)
                   updateSV(e.clientX, e.clientY)
                 }}
-                style={{ backgroundColor: `hsl(${hsv.h * 360}, 100%, 50%)` }}
+                style={{ backgroundColor: saturationBrightnessBackground }}
                 role="slider"
                 aria-label="Saturation and brightness"
                 aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, Brightness ${Math.round(hsv.v * 100)}%`}
@@ -383,8 +371,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
                   <div
                     className="absolute inset-0"
                     style={{
-                      background:
-                        'linear-gradient(to right, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%)',
+                      background: hueGradient,
                     }}
                   />
                   <input

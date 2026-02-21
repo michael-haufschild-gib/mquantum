@@ -14,6 +14,9 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { ResizeHandle } from '@/components/layout/ResizeHandle'
 
+/**
+ *
+ */
 export interface ControlPanelProps {
   children: React.ReactNode
   title?: string

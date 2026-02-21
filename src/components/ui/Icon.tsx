@@ -66,6 +66,9 @@ const icons = {
   dice: DiceIcon,
 } as const
 
+/**
+ *
+ */
 export type IconName = keyof typeof icons
 
 interface IconProps extends React.SVGProps<SVGSVGElement> {

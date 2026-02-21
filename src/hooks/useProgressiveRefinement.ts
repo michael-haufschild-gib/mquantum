@@ -14,11 +14,17 @@ import { useExportStore } from '@/stores/exportStore'
 import { useCallback, useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface UseProgressiveRefinementOptions {
   /** Enable progressive refinement (default: true) */
   enabled?: boolean
 }
 
+/**
+ *
+ */
 export interface ProgressiveRefinementState {
   /** Current refinement stage */
   stage: RefinementStage

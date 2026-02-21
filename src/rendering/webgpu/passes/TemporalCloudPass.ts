@@ -1,3 +1,4 @@
+/* global GPUColorTargetState, GPUTextureFormat */
 /**
  * WebGPU Temporal Cloud Pass
  *

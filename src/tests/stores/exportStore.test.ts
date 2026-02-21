@@ -175,6 +175,7 @@ describe('exportStore', () => {
 
       useExportStore.getState().updateSettings({
         crop: {
+          enabled: before.enabled,
           x: Number.NaN,
           y: 1.2,
           width: Number.POSITIVE_INFINITY,

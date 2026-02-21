@@ -1,3 +1,4 @@
+/* global GPUTextureFormat */
 /**
  * WebGPU Temporal Position Capture Pass
  *
@@ -20,6 +21,9 @@ import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 // Temporal Depth Uniforms Interface
 // =============================================================================
 
+/**
+ *
+ */
 export interface TemporalDepthUniforms {
   /** Previous frame's position texture (xyz=world pos, w=model-space ray distance) */
   prevPositionTexture: GPUTextureView | null
@@ -37,6 +41,9 @@ export interface TemporalDepthUniforms {
 // Pass Configuration
 // =============================================================================
 
+/**
+ *
+ */
 export interface TemporalDepthCapturePassConfig {
   /** Position input resource ID (MRT with gPosition) */
   positionInput: string

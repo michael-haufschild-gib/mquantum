@@ -46,6 +46,19 @@ const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
 const MAX_FPS_KEY = 'mdim_max_fps'
 
 /**
+ * Parse persisted numeric strings without accepting partial prefixes.
+ * Rejects malformed payloads such as `0.75junk` or `45fps`.
+ */
+function parseStrictPersistedNumber(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(trimmed)) {
+    return null
+  }
+  const value = Number(trimmed)
+  return Number.isFinite(value) ? value : null
+}
+
+/**
  * Load persisted render resolution scale from localStorage.
  * @returns The persisted value, or null if not set
  */
@@ -53,8 +66,8 @@ function loadPersistedResolutionScale(): number | null {
   try {
     const stored = localStorage.getItem(RESOLUTION_SCALE_KEY)
     if (stored !== null) {
-      const value = parseFloat(stored)
-      if (!isNaN(value) && value >= 0.1 && value <= 1.0) {
+      const value = parseStrictPersistedNumber(stored)
+      if (value !== null && value >= 0.1 && value <= 1.0) {
         return value
       }
     }
@@ -92,8 +105,8 @@ function loadPersistedMaxFps(): number | null {
   try {
     const stored = localStorage.getItem(MAX_FPS_KEY)
     if (stored !== null) {
-      const value = parseInt(stored, 10)
-      if (!isNaN(value) && value >= MIN_MAX_FPS && value <= MAX_MAX_FPS) {
+      const value = parseStrictPersistedNumber(stored)
+      if (value !== null && value >= MIN_MAX_FPS && value <= MAX_MAX_FPS) {
         return value
       }
     }
@@ -196,8 +209,8 @@ interface PerformanceState {
   /** Whether cached analytical gradient path is enabled for harmonic oscillator rendering */
   analyticalGradientEnabled: boolean
 
-  /** Whether robust interpolation/extrapolation policy is enabled for eigencache lookups */
-  robustEigenInterpolationEnabled: boolean
+  /** Whether fast eigencache interpolation is enabled (faster, lower-fidelity path). */
+  fastEigenInterpolationEnabled: boolean
 
   // -------------------------------------------------------------------------
   // Schroedinger Animation Quality
@@ -263,7 +276,7 @@ interface PerformanceState {
   // Eigenfunction Cache
   setEigenfunctionCacheEnabled: (enabled: boolean) => void
   setAnalyticalGradientEnabled: (enabled: boolean) => void
-  setRobustEigenInterpolationEnabled: (enabled: boolean) => void
+  setFastEigenInterpolationEnabled: (enabled: boolean) => void
 
   // Fractal Animation Quality
   setFractalAnimationLowQuality: (enabled: boolean) => void
@@ -326,7 +339,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   // Eigenfunction Cache
   eigenfunctionCacheEnabled: true,
   analyticalGradientEnabled: true,
-  robustEigenInterpolationEnabled: true,
+  fastEigenInterpolationEnabled: true,
 
   // Schroedinger Animation Quality
   fractalAnimationLowQuality: true,
@@ -437,8 +450,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
     set({ analyticalGradientEnabled: enabled })
   },
 
-  setRobustEigenInterpolationEnabled: (enabled: boolean) => {
-    set({ robustEigenInterpolationEnabled: enabled })
+  setFastEigenInterpolationEnabled: (enabled: boolean) => {
+    set({ fastEigenInterpolationEnabled: enabled })
   },
 
   // Fractal Animation Quality
@@ -543,7 +556,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       cameraTeleported: false,
       eigenfunctionCacheEnabled: true,
       analyticalGradientEnabled: true,
-      robustEigenInterpolationEnabled: true,
+      fastEigenInterpolationEnabled: true,
       fractalAnimationLowQuality: true,
       renderResolutionScale: DESKTOP_DEFAULT_RESOLUTION_SCALE,
       maxFps: DEFAULT_MAX_FPS,

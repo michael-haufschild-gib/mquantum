@@ -1,3 +1,4 @@
+/* global GPUBindGroupEntry, GPUBlendState, GPUColorTargetState, GPUTextureFormat, GPUVertexBufferLayout */
 /**
  * WebGPU Base Pass
  *

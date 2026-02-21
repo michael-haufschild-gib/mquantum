@@ -24,6 +24,7 @@ const parseHexToRgb = (hex: string): { r: number; g: number; b: number } | null 
     h = (h[0] ?? '') + (h[0] ?? '') + (h[1] ?? '') + (h[1] ?? '') + (h[2] ?? '') + (h[2] ?? '')
   }
   if (h.length !== 6) return null
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
   const num = parseInt(h, 16)
   if (isNaN(num)) return null
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 }
@@ -37,25 +38,48 @@ const parseHexToRgb = (hex: string): { r: number; g: number; b: number } | null 
  * @returns The parsed HSVA color object.
  */
 export const parseColorToHsv = (input: string): HSVA => {
+  const normalizedInput = input.trim()
+
   // 1. Try Hex/Hex8
-  if (input.startsWith('#')) {
-    const hex = input.substring(1)
+  if (normalizedInput.startsWith('#')) {
+    const hex = normalizedInput.substring(1)
     if (hex.length === 3 || hex.length === 6) {
-      return hexToHsv(input)
+      return hexToHsv(normalizedInput)
     }
     if (hex.length === 4 || hex.length === 8) {
-      return hex8ToHsv(input)
+      return hex8ToHsv(normalizedInput)
     }
   }
 
-  // 2. Try RGB/RGBA regex (basic)
-  const rgbaMatch = input.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/)
+  const isValidRgbChannel = (value: number): boolean =>
+    Number.isInteger(value) && value >= 0 && value <= 255
+  const isValidAlpha = (value: number): boolean => Number.isFinite(value) && value >= 0 && value <= 1
+
+  // 2. Try strict RGB
+  const rgbMatch = normalizedInput.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
+  if (rgbMatch) {
+    const r = parseInt(rgbMatch[1] ?? '0', 10)
+    const g = parseInt(rgbMatch[2] ?? '0', 10)
+    const b = parseInt(rgbMatch[3] ?? '0', 10)
+    if (isValidRgbChannel(r) && isValidRgbChannel(g) && isValidRgbChannel(b)) {
+      return rgbToHsv(r, g, b, 1)
+    }
+    return { h: 0, s: 0, v: 0, a: 1 }
+  }
+
+  // 3. Try strict RGBA
+  const rgbaMatch = normalizedInput.match(
+    /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*((?:\d+\.?\d*|\.\d+))\s*\)$/i
+  )
   if (rgbaMatch) {
     const r = parseInt(rgbaMatch[1] ?? '0', 10)
     const g = parseInt(rgbaMatch[2] ?? '0', 10)
     const b = parseInt(rgbaMatch[3] ?? '0', 10)
-    const a = rgbaMatch[4] ? parseFloat(rgbaMatch[4]) : 1
-    return rgbToHsv(r, g, b, a)
+    const a = parseFloat(rgbaMatch[4] ?? '1')
+    if (isValidRgbChannel(r) && isValidRgbChannel(g) && isValidRgbChannel(b) && isValidAlpha(a)) {
+      return rgbToHsv(r, g, b, a)
+    }
+    return { h: 0, s: 0, v: 0, a: 1 }
   }
 
   // Fallback: black

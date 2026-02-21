@@ -1,7 +1,13 @@
 import React, { useId, useMemo } from 'react'
 
+/**
+ *
+ */
 export type EnvelopeMode = 'AD' | 'AR' | 'ADSR' | 'AHDSR'
 
+/**
+ *
+ */
 export interface EnvelopeProps {
   mode?: EnvelopeMode
   delay?: number // Time

@@ -125,6 +125,34 @@ describe('rendering/webgpu/utils/lighting', () => {
       const view = new DataView(data.buffer)
       expect(view.getInt32(132 * 4, true)).toBe(8)
     })
+
+    it('writes lightCount at the typed-array-local offset when data has a byte offset', () => {
+      const backingBuffer = new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT * 200)
+      const prefixFloats = 16
+      const data = new Float32Array(backingBuffer, prefixFloats * Float32Array.BYTES_PER_ELEMENT, 144)
+
+      const lights = [
+        {
+          id: 'light-offset',
+          name: 'Offset Light',
+          type: 'point' as const,
+          enabled: true,
+          position: [1, 2, 3] as [number, number, number],
+          rotation: [0, 0, 0] as [number, number, number],
+          color: '#ffffff',
+          intensity: 1.0,
+          coneAngle: 30,
+          penumbra: 0.5,
+          range: 0,
+          decay: 2.0,
+        },
+      ]
+
+      packLightingUniforms(data, { lights })
+
+      const view = new DataView(backingBuffer)
+      expect(view.getInt32((prefixFloats + 132) * 4, true)).toBe(1)
+      expect(view.getInt32(132 * 4, true)).toBe(0)
+    })
   })
 })
-

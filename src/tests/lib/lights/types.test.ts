@@ -349,6 +349,7 @@ describe('Light Types', () => {
 
     describe('clampRange', () => {
       it('should clamp values to valid range', () => {
+        expect(clampRange(0)).toBe(0)
         expect(clampRange(-10)).toBe(1)
         expect(clampRange(50)).toBe(50)
         expect(clampRange(150)).toBe(100)
@@ -357,7 +358,8 @@ describe('Light Types', () => {
 
     describe('clampDecay', () => {
       it('should clamp values to valid range', () => {
-        expect(clampDecay(-1)).toBe(0.1)
+        expect(clampDecay(0)).toBe(0)
+        expect(clampDecay(-1)).toBe(0)
         expect(clampDecay(1.5)).toBe(1.5)
         expect(clampDecay(5)).toBe(3)
       })

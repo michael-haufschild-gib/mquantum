@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Popover } from '@/components/ui/Popover'
+import { Button } from '@/components/ui/Button'
 
 // Mock the sound manager
 vi.mock('@/lib/audio/SoundManager', () => ({
@@ -40,7 +41,7 @@ describe('Popover', () => {
       const user = userEvent.setup()
       render(
         <Popover
-          trigger={<button>Open</button>}
+          trigger={<Button>Open</Button>}
           content={<div data-testid="content">Content</div>}
         />
       )
@@ -54,7 +55,7 @@ describe('Popover', () => {
       const user = userEvent.setup()
       render(
         <Popover
-          trigger={<button>Open</button>}
+          trigger={<Button>Open</Button>}
           content={<div data-testid="content">Content</div>}
         />
       )
@@ -73,7 +74,7 @@ describe('Popover', () => {
     it('should respect controlled open state', () => {
       render(
         <Popover
-          trigger={<button>Open</button>}
+          trigger={<Button>Open</Button>}
           content={<div data-testid="content">Content</div>}
           open={true}
           onOpenChange={vi.fn()}
@@ -88,7 +89,7 @@ describe('Popover', () => {
       const user = userEvent.setup()
       render(
         <Popover
-          trigger={<button>Open</button>}
+          trigger={<Button>Open</Button>}
           content={<div>Content</div>}
           open={false}
           onOpenChange={handleOpenChange}
@@ -103,7 +104,7 @@ describe('Popover', () => {
 
   describe('accessibility', () => {
     it('should have correct aria attributes on trigger', () => {
-      render(<Popover trigger={<button>Open</button>} content={<div>Content</div>} />)
+      render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
       const trigger = screen.getByText('Open').closest('[role="button"]')
       expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
@@ -112,7 +113,7 @@ describe('Popover', () => {
 
     it('should update aria-expanded when open', async () => {
       const user = userEvent.setup()
-      render(<Popover trigger={<button>Open</button>} content={<div>Content</div>} />)
+      render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
       await user.click(screen.getByText('Open'))
 
@@ -132,7 +133,7 @@ describe('Popover', () => {
 
       render(
         <Popover
-          trigger={<button data-testid="trigger">Open</button>}
+          trigger={<Button data-testid="trigger">Open</Button>}
           content={
             <div data-testid="content" style={{ width: 260, height: 400 }}>
               Content
@@ -154,7 +155,7 @@ describe('Popover', () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
       const user = userEvent.setup()
 
-      render(<Popover trigger={<button>Open</button>} content={<div>Content</div>} />)
+      render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
       await user.click(screen.getByText('Open'))
 
@@ -165,7 +166,7 @@ describe('Popover', () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener')
       const user = userEvent.setup()
 
-      render(<Popover trigger={<button>Open</button>} content={<div>Content</div>} />)
+      render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
       await user.click(screen.getByText('Open'))
 
@@ -176,7 +177,7 @@ describe('Popover', () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener')
       const user = userEvent.setup()
 
-      render(<Popover trigger={<button>Open</button>} content={<div>Content</div>} />)
+      render(<Popover trigger={<Button>Open</Button>} content={<div>Content</div>} />)
 
       await user.click(screen.getByText('Open'))
       await user.click(screen.getByText('Open'))
@@ -192,7 +193,7 @@ describe('Popover', () => {
 
       render(
         <Popover
-          trigger={<button>Open</button>}
+          trigger={<Button>Open</Button>}
           content={<div data-testid="content">Content</div>}
         />
       )
@@ -212,7 +213,7 @@ describe('Popover', () => {
     it('should apply custom className to trigger wrapper', () => {
       render(
         <Popover
-          trigger={<button data-testid="trigger">Open</button>}
+          trigger={<Button data-testid="trigger">Open</Button>}
           content={<div>Content</div>}
           className="custom-class"
         />

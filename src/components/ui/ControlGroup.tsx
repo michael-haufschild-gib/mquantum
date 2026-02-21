@@ -2,6 +2,9 @@ import { soundManager } from '@/lib/audio/SoundManager'
 import { AnimatePresence, m } from 'motion/react'
 import React, { useState, useCallback } from 'react'
 
+/**
+ *
+ */
 export interface ControlGroupProps {
   title: string
   children: React.ReactNode

@@ -15,6 +15,9 @@ import { useUIStore } from '@/stores/uiStore'
 import React, { useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface SettingsSectionProps {
   defaultOpen?: boolean
 }

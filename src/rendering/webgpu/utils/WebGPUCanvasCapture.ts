@@ -13,16 +13,21 @@ function alignTo(value: number, alignment: number): number {
   return Math.ceil(value / alignment) * alignment
 }
 
-function isBGRAFormat(format: GPUTextureFormat): boolean {
+type CanvasCaptureTextureFormat = string
+
+function isBGRAFormat(format: CanvasCaptureTextureFormat): boolean {
   return format === 'bgra8unorm' || format === 'bgra8unorm-srgb'
 }
 
+/**
+ * Parameters required to queue a single screenshot capture readback.
+ */
 export interface QueueCanvasCaptureParams {
   encoder: GPUCommandEncoder
   texture: GPUTexture
   width: number
   height: number
-  format: GPUTextureFormat
+  format: CanvasCaptureTextureFormat
   requestId: number
   onSuccess: (dataUrl: string, requestId: number) => void
   onError: (error: string, requestId: number) => void
@@ -38,7 +43,7 @@ export class WebGPUCanvasCapture {
   private readbackBufferSize = 0
   private readbackWidth = 0
   private readbackHeight = 0
-  private readbackFormat: GPUTextureFormat | null = null
+  private readbackFormat: CanvasCaptureTextureFormat | null = null
   private inFlight = false
   private disposed = false
 
@@ -46,7 +51,7 @@ export class WebGPUCanvasCapture {
     this.device = device
   }
 
-  private ensureReadbackBuffer(width: number, height: number, format: GPUTextureFormat): void {
+  private ensureReadbackBuffer(width: number, height: number, format: CanvasCaptureTextureFormat): void {
     const bytesPerRowUnaligned = width * BYTES_PER_PIXEL
     const bytesPerRow = alignTo(bytesPerRowUnaligned, COPY_BYTES_PER_ROW_ALIGNMENT)
     const bufferSize = bytesPerRow * height
@@ -79,7 +84,7 @@ export class WebGPUCanvasCapture {
     width: number,
     height: number,
     bytesPerRow: number,
-    format: GPUTextureFormat
+    format: CanvasCaptureTextureFormat
   ): Uint8ClampedArray {
     const out = new Uint8ClampedArray(width * height * BYTES_PER_PIXEL)
     const bgraInput = isBGRAFormat(format)
@@ -172,7 +177,10 @@ export class WebGPUCanvasCapture {
     this.device.queue
       .onSubmittedWorkDone()
       .then(async () => {
-        if (this.disposed || this.readbackBuffer !== readbackBuffer || !readbackBuffer) return
+        if (this.disposed || this.readbackBuffer !== readbackBuffer || !readbackBuffer) {
+          onError('Screenshot capture canceled.', requestId)
+          return
+        }
 
         await readbackBuffer.mapAsync(GPUMapMode.READ, 0, readbackBufferSize)
         try {
@@ -186,8 +194,12 @@ export class WebGPUCanvasCapture {
         }
       })
       .catch((error) => {
-        if (this.disposed) return // Buffer destroyed by dispose() — expected
-        const message = error instanceof Error ? error.message : 'Screenshot readback failed'
+        const message =
+          this.disposed
+            ? 'Screenshot capture canceled.'
+            : error instanceof Error
+              ? error.message
+              : 'Screenshot readback failed'
         onError(message, requestId)
       })
       .finally(() => {

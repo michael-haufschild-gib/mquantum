@@ -1,4 +1,0 @@
-Root cause: exportStore.updateSettings only rejected invalid warmupFrames but accepted fractional finite values, allowing non-integer frame counts into settings.
-Fix: in src/stores/exportStore.ts updateSettings, when warmupFrames is finite and >=0, normalize with Math.round and clamp to >=0; retain rejection for non-finite/negative values.
-Fail-first test: src/tests/stores/exportStore.test.ts -> 'normalizes warmupFrames to a non-negative integer' failed before fix (7.8 stayed 7.8), passes after fix.
-Verification: npx vitest run --maxWorkers=4 src/tests/stores/exportStore.test.ts -t "warmupFrames" and full export suite pass.

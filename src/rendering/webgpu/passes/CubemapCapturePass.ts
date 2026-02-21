@@ -1,3 +1,4 @@
+/* global GPUTextureFormat */
 /**
  * WebGPU Cubemap Capture Pass
  *

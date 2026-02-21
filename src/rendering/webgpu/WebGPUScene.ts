@@ -9,7 +9,7 @@
 
 import React, { useEffect, useRef, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useWebGPU } from './WebGPUCanvas'
+import { useWebGPU } from './WebGPUContext'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import type { WebGPUFrameStats, WebGPURenderPass } from './core/types'
 import { WebGPUCamera } from './core/WebGPUCamera'
@@ -92,6 +92,9 @@ import { getPlaneMultiplier } from '@/lib/animation/biasCalculation'
 // Types
 // ============================================================================
 
+/**
+ *
+ */
 export interface WebGPUSceneProps {
   /** Current object type to render */
   objectType: ObjectType
@@ -120,7 +123,7 @@ const performanceSelector = (state: ReturnType<typeof usePerformanceStore.getSta
   temporalReprojectionEnabled: state.temporalReprojectionEnabled,
   eigenfunctionCacheEnabled: state.eigenfunctionCacheEnabled,
   analyticalGradientEnabled: state.analyticalGradientEnabled,
-  robustEigenInterpolationEnabled: state.robustEigenInterpolationEnabled,
+  fastEigenInterpolationEnabled: state.fastEigenInterpolationEnabled,
 })
 
 const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.getState>) => ({
@@ -201,6 +204,9 @@ interface ExportRuntimeState {
   loop: ExportLoopState
 }
 
+/**
+ *
+ */
 export function isExportRuntimeActive(
   runtime: Pick<
     ExportRuntimeState,
@@ -339,7 +345,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     return () => {
       useCameraStore.getState().registerCamera(null)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- camera is created once via ref
+  }, [])  
 
   // Camera control state
   const isDraggingRef = useRef(false)
@@ -541,7 +547,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       ) ? false : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
       analyticalGradientEnabled: performance_.analyticalGradientEnabled,
-      robustEigenInterpolationEnabled: performance_.robustEigenInterpolationEnabled,
+      fastEigenInterpolationEnabled: performance_.fastEigenInterpolationEnabled,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
       representation: schroedingerCompile.representation,
@@ -723,8 +729,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     postProcessing.antiAliasingMethod,
     postProcessing.paperEnabled,
     postProcessing.frameBlendingEnabled,
+    canvas,
     environment.skyboxEnabled,
     environment.skyboxMode,
+    environment.backgroundColor,
     appearance.colorAlgorithm,
     schroedingerIsoEnabled,
     schroedingerCompile.quantumMode,
@@ -737,17 +745,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
     performance_.analyticalGradientEnabled,
-    performance_.robustEigenInterpolationEnabled,
+    performance_.fastEigenInterpolationEnabled,
   ])
 
   // Runtime scene clear-color update (avoids full pass rebuild for background color changes).
   useEffect(() => {
-    console.warn(
-      `[WebGPUScene] BG COLOR UPDATE: ${environment.backgroundColor}`,
-      `\n  canvas: ${canvas?.width}×${canvas?.height}, client: ${canvas?.clientWidth}×${canvas?.clientHeight}`,
-      `\n  context size: ${size.width}×${size.height}`,
-      `\n  DPR: ${window.devicePixelRatio}`,
-    )
     updateScenePassBackgroundColor({
       graph,
       skyboxEnabled: environment.skyboxEnabled,
@@ -856,8 +858,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           bufferInput: 'depth-buffer',
           depthMode: 'linear' as const,
         }
-      if (ui.showNormalBuffer)
-        return { bufferType: 'normal' as const, bufferInput: 'normal-buffer' }
       if (ui.showTemporalDepthBuffer)
         return { bufferType: 'temporalDepth' as const, bufferInput: 'quarter-position' }
       return null
@@ -1682,23 +1682,21 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   }, [renderFrame, resetExportRuntime, restoreRuntimeState])
 
   // Render event capture overlay for camera controls
-  return (
-    <div
-      ref={overlayRef}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        cursor: isDraggingRef.current ? 'grabbing' : 'grab',
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseUp}
-    />
-  )
+  return React.createElement('div', {
+    ref: overlayRef,
+    style: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      cursor: isDraggingRef.current ? 'grabbing' : 'grab',
+    },
+    onMouseDown: handleMouseDown,
+    onMouseUp: handleMouseUp,
+    onMouseMove: handleMouseMove,
+    onMouseLeave: handleMouseUp,
+  })
 }
 
 // ============================================================================
@@ -1731,6 +1729,9 @@ export function executeFrameAndCollectMetrics({
   return frameStats
 }
 
+/**
+ *
+ */
 export interface PassConfig {
   objectType: ObjectType
   dimension: number
@@ -1751,7 +1752,7 @@ export interface PassConfig {
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
   analyticalGradientEnabled: boolean
-  robustEigenInterpolationEnabled: boolean
+  fastEigenInterpolationEnabled: boolean
   renderResolutionScale?: number
   colorAlgorithm: PaletteColorAlgorithm
   // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
@@ -1781,7 +1782,7 @@ interface SchrodingerPassConfig {
   representation: 'position' | 'momentum' | 'wigner'
   eigenfunctionCacheEnabled: boolean
   analyticalGradientEnabled: boolean
-  robustEigenInterpolationEnabled: boolean
+  fastEigenInterpolationEnabled: boolean
   temporalReprojectionEnabled: boolean
 }
 
@@ -1833,7 +1834,7 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
     representation: isComputeMode ? 'position' : config.representation,
     eigenfunctionCacheEnabled: isComputeMode ? false : config.eigenfunctionCacheEnabled,
     analyticalGradientEnabled: isComputeMode ? false : config.analyticalGradientEnabled,
-    robustEigenInterpolationEnabled: isComputeMode ? false : config.robustEigenInterpolationEnabled,
+    fastEigenInterpolationEnabled: isComputeMode ? false : config.fastEigenInterpolationEnabled,
     temporalReprojectionEnabled: isComputeMode ? false : config.temporalReprojectionEnabled,
   }
 }
@@ -2030,12 +2031,6 @@ function setupSharedResources(graph: WebGPURenderGraph, config: PassConfig): voi
   }
 
   graph.addResource('hdr-color', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  graph.addResource('normal-buffer', {
     type: 'texture',
     format: 'rgba16float',
     usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
@@ -2343,7 +2338,7 @@ async function setupPPPasses(
   )
 
   // 11. Buffer preview (debug visualization)
-  const bufferPreviewInputs = ['depth-buffer', 'normal-buffer']
+  const bufferPreviewInputs = ['depth-buffer']
   if (useTemporalCloudAccumulation) {
     bufferPreviewInputs.push('quarter-position')
   }
@@ -2351,7 +2346,7 @@ async function setupPPPasses(
     graph,
     new BufferPreviewPass({
       bufferInput: 'depth-buffer',
-      additionalInputs: bufferPreviewInputs.slice(1),
+      additionalInputs: bufferPreviewInputs.length > 1 ? bufferPreviewInputs.slice(1) : undefined,
       bufferType: 'depth',
       depthMode: 'linear',
     }),
@@ -2515,7 +2510,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         temporal: useTemporalCloudAccumulation,
         eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
         analyticalGradientEnabled: config.analyticalGradientEnabled,
-        robustEigenInterpolationEnabled: config.robustEigenInterpolationEnabled,
+        fastEigenInterpolationEnabled: config.fastEigenInterpolationEnabled,
         representation: config.representation,
       })
 

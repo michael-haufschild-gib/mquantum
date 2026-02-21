@@ -6,6 +6,9 @@
 import React from 'react'
 import { SHORTCUTS, getShortcutLabel } from '@/hooks/useKeyboardShortcuts'
 
+/**
+ *
+ */
 export interface KeyboardShortcutsProps {
   className?: string
 }

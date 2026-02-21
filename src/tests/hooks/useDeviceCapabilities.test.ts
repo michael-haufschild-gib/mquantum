@@ -24,6 +24,8 @@ import { detectDeviceCapabilities } from '@/lib/deviceCapabilities'
 describe('useDeviceCapabilities', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.removeItem('mdim_render_resolution_scale')
+    localStorage.removeItem('mdim_max_fps')
     // Reset stores to initial state
     usePerformanceStore.setState({
       gpuTier: 3,
@@ -36,6 +38,8 @@ describe('useDeviceCapabilities', () => {
   })
 
   afterEach(() => {
+    localStorage.removeItem('mdim_render_resolution_scale')
+    localStorage.removeItem('mdim_max_fps')
     vi.restoreAllMocks()
   })
 
@@ -85,6 +89,31 @@ describe('useDeviceCapabilities', () => {
     expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
     expect(usePerformanceStore.getState().isMobileGPU).toBe(true)
     expect(usePerformanceStore.getState().gpuTier).toBe(2)
+  })
+
+  it('applies mobile defaults when persisted preference strings are malformed', async () => {
+    localStorage.setItem('mdim_render_resolution_scale', '0.75junk')
+    localStorage.setItem('mdim_max_fps', '45fps')
+
+    vi.mocked(detectDeviceCapabilities).mockResolvedValue({
+      webgl2Supported: true,
+      gpuTier: 2,
+      isMobileGPU: true,
+      gpuName: 'apple a14 gpu',
+      detectionType: 'BENCHMARK',
+      estimatedFps: 35,
+    })
+
+    renderHook(() => useDeviceCapabilities())
+
+    await waitFor(() => {
+      expect(usePerformanceStore.getState().deviceCapabilitiesDetected).toBe(true)
+    })
+
+    expect(usePerformanceStore.getState().renderResolutionScale).toBe(
+      MOBILE_DEFAULT_RESOLUTION_SCALE
+    )
+    expect(usePerformanceStore.getState().maxFps).toBe(MOBILE_DEFAULT_MAX_FPS)
   })
 
   it('should handle WebGL2 not supported', async () => {

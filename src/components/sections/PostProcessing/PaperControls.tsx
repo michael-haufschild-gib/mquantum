@@ -14,6 +14,9 @@ import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postP
 import { useShallow } from 'zustand/react/shallow'
 import type { PaperQuality } from '@/stores/defaults/visualDefaults'
 
+/**
+ *
+ */
 export interface PaperControlsProps {
   className?: string
 }

@@ -21,7 +21,7 @@ interface ScenePassConfig {
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
   analyticalGradientEnabled: boolean
-  robustEigenInterpolationEnabled: boolean
+  fastEigenInterpolationEnabled: boolean
   representation: 'position' | 'momentum'
   colorAlgorithm:
     | 'lch'
@@ -81,7 +81,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     analyticalGradientEnabled: true,
-    robustEigenInterpolationEnabled: true,
+    fastEigenInterpolationEnabled: true,
     representation: 'position',
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
@@ -296,7 +296,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(outputResourceIds).toEqual(['quarter-color', 'quarter-position'])
   })
 
-  it('uses full-resolution MRT outputs for isosurface without temporal', async () => {
+  it('uses full-resolution color + depth outputs for isosurface without temporal', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
@@ -312,7 +312,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     }
 
     const outputResourceIds = renderer.config.outputs.map((output) => output.resourceId)
-    expect(outputResourceIds).toEqual(['object-color', 'normal-buffer', 'depth-buffer'])
+    expect(outputResourceIds).toEqual(['object-color', 'depth-buffer'])
   })
 
   it('adds quarter-res resources and temporal cloud pass when temporal reprojection is enabled', async () => {

@@ -8,6 +8,7 @@ import type {
   SchroedingerNodalFamilyFilter,
   SchroedingerNodalRenderMode,
 } from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
@@ -31,6 +32,9 @@ const NODAL_RENDER_MODE_OPTIONS: { value: SchroedingerNodalRenderMode; label: st
   { value: 'surface', label: 'Ray-Hit Surface' },
 ]
 
+/**
+ *
+ */
 export interface SchroedingerQuantumEffectsSectionProps {
   defaultOpen?: boolean
 }
@@ -186,7 +190,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<
                   >
                     <label className="text-xs text-text-secondary">Positive Lobe</label>
                     <ColorPicker
-                      value={config.nodalColorPositive ?? '#22c55e'}
+                      value={
+                        config.nodalColorPositive ??
+                        DEFAULT_SCHROEDINGER_CONFIG.nodalColorPositive
+                      }
                       onChange={setNodalColorPositive}
                       disableAlpha={true}
                       className="w-24"
@@ -198,7 +205,10 @@ export const SchroedingerQuantumEffectsSection: React.FC<
                   >
                     <label className="text-xs text-text-secondary">Negative Lobe</label>
                     <ColorPicker
-                      value={config.nodalColorNegative ?? '#ef4444'}
+                      value={
+                        config.nodalColorNegative ??
+                        DEFAULT_SCHROEDINGER_CONFIG.nodalColorNegative
+                      }
                       onChange={setNodalColorNegative}
                       disableAlpha={true}
                       className="w-24"
@@ -213,7 +223,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
                   >
                     <label className="text-xs text-text-secondary">|ψ| Color</label>
                     <ColorPicker
-                      value={config.nodalColor ?? '#00ffff'}
+                      value={config.nodalColor ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColor}
                       onChange={setNodalColor}
                       disableAlpha={true}
                       className="w-24"
@@ -225,7 +235,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
                   >
                     <label className="text-xs text-text-secondary">Re(ψ) Color</label>
                     <ColorPicker
-                      value={config.nodalColorReal ?? '#00ffff'}
+                      value={config.nodalColorReal ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorReal}
                       onChange={setNodalColorReal}
                       disableAlpha={true}
                       className="w-24"
@@ -237,7 +247,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
                   >
                     <label className="text-xs text-text-secondary">Im(ψ) Color</label>
                     <ColorPicker
-                      value={config.nodalColorImag ?? '#ff66ff'}
+                      value={config.nodalColorImag ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorImag}
                       onChange={setNodalColorImag}
                       disableAlpha={true}
                       className="w-24"

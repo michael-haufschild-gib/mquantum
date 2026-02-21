@@ -71,6 +71,9 @@ export function formatShaderName(key: string, objectType: string): string {
 }
 
 // --- Color helper for collapsed view ---
+/**
+ *
+ */
 export type FpsColorLevel = 'high' | 'medium' | 'low'
 export const FPS_COLORS = {
   high: { text: 'health-high', bg: 'bg-health-high', stroke: 'var(--health-high-stroke)' },

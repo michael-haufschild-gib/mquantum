@@ -14,6 +14,9 @@ import { clampSidebarWidth, useLayoutStore } from '@/stores/layoutStore'
 import React, { useCallback, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface ResizeHandleProps {
   /** Additional CSS classes */
   className?: string

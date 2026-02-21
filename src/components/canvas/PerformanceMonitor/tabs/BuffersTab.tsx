@@ -18,22 +18,21 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
   const {
     showDepthBuffer,
     setShowDepthBuffer,
-    showNormalBuffer,
-    setShowNormalBuffer,
     showTemporalDepthBuffer,
     setShowTemporalDepthBuffer,
   } = useUIStore(
     useShallow((s) => ({
       showDepthBuffer: s.showDepthBuffer,
       setShowDepthBuffer: s.setShowDepthBuffer,
-      showNormalBuffer: s.showNormalBuffer,
-      setShowNormalBuffer: s.setShowNormalBuffer,
       showTemporalDepthBuffer: s.showTemporalDepthBuffer,
       setShowTemporalDepthBuffer: s.setShowTemporalDepthBuffer,
     }))
   )
 
-  const [bufferStats, setBufferStats] = useState<BufferStats | null>(null)
+  const [bufferStats, setBufferStats] = useState<BufferStats | null>(() => {
+    const currentStats = usePerformanceMetricsStore.getState().buffers
+    return { ...currentStats }
+  })
 
   // Temporal preview availability
   const temporalPreviewAvailable =
@@ -51,10 +50,6 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
     const currentStats = usePerformanceMetricsStore.getState().buffers
     setBufferStats({ ...currentStats })
   }, [])
-
-  useEffect(() => {
-    refreshBufferStats()
-  }, [refreshBufferStats])
 
   return (
     <div className="space-y-5 p-5">
@@ -86,12 +81,6 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
             baseW={bufferStats.screen.width}
           />
           <BufferRow
-            label="Normal"
-            w={bufferStats.normal.width}
-            h={bufferStats.normal.height}
-            baseW={bufferStats.screen.width}
-          />
-          <BufferRow
             label="Temporal"
             w={bufferStats.temporal.width}
             h={bufferStats.temporal.height}
@@ -102,16 +91,11 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
       )}
       <div className="space-y-3 pt-3 border-t border-border-subtle">
         <SectionHeader icon={<Icons.Monitor />} label="Debug View" />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <DebugToggle
             label="Depth"
             active={showDepthBuffer}
             onClick={() => setShowDepthBuffer(!showDepthBuffer)}
-          />
-          <DebugToggle
-            label="Normal"
-            active={showNormalBuffer}
-            onClick={() => setShowNormalBuffer(!showNormalBuffer)}
           />
           <DebugToggle
             label="Temporal"

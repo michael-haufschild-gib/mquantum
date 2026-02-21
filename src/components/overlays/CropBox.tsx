@@ -2,6 +2,9 @@ import { m, useMotionValue } from 'motion/react'
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+/**
+ *
+ */
 export interface CropValues {
   x: number // 0-1
   y: number // 0-1
@@ -191,7 +194,7 @@ export const CropBox = ({ containerRef, crop, onCropChange, minSize = 0.05 }: Cr
         top: `${crop.y * 100}%`,
         width: `${crop.width * 100}%`,
         height: `${crop.height * 100}%`,
-        boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)',
+        boxShadow: '0 0 0 9999px var(--bg-overlay)',
         x: dragX,
         y: dragY,
       }}

@@ -36,7 +36,6 @@ export const TRANSIENT_FIELDS = new Set([
 
   // UI - debug buffer visualizations (developer tools, not scene/style config)
   'showDepthBuffer',
-  'showNormalBuffer',
   'showTemporalDepthBuffer',
 
   // Version counters - internal dirty-flag optimization state

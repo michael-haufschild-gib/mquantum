@@ -393,8 +393,10 @@ export const getRecommendedBitrate = (
   // For custom resolution, scale based on pixel count relative to 1080p
   if (
     safeResolution === 'custom' &&
+    typeof customWidth === 'number' &&
     Number.isFinite(customWidth) &&
     customWidth > 0 &&
+    typeof customHeight === 'number' &&
     Number.isFinite(customHeight) &&
     customHeight > 0
   ) {

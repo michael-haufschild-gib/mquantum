@@ -41,6 +41,18 @@ describe('state-serializer', () => {
       const result = serializeState(state)
       expect(result).not.toContain('qm=')
     })
+
+    it('should serialize scene-only payloads and skip object params', () => {
+      const state: ShareableState = {
+        scene: 'schroedinger bloom',
+      }
+
+      const result = serializeState(state)
+      expect(result).toBe('scene=schroedinger+bloom')
+      expect(result).not.toContain('d=')
+      expect(result).not.toContain('t=')
+      expect(result).not.toContain('qm=')
+    })
   })
 
   describe('deserializeState', () => {
@@ -70,6 +82,16 @@ describe('state-serializer', () => {
       const tooHigh = deserializeState('d=99')
       expect(tooLow.dimension).toBeUndefined()
       expect(tooHigh.dimension).toBeUndefined()
+    })
+
+    it('should reject malformed dimension tokens', () => {
+      const trailingText = deserializeState('d=4abc&t=schroedinger')
+      const decimalNumber = deserializeState('d=3.9&t=schroedinger')
+
+      expect(trailingText.dimension).toBeUndefined()
+      expect(decimalNumber.dimension).toBeUndefined()
+      expect(trailingText.objectType).toBe('schroedinger')
+      expect(decimalNumber.objectType).toBe('schroedinger')
     })
 
     it('should return scene param and skip other params', () => {

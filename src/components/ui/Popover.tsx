@@ -171,7 +171,9 @@ export const Popover: React.FC<PopoverProps> = React.memo(
     useLayoutEffect(() => {
       if (isOpen) {
         // Initial position (may have zero dimensions)
-        updatePosition()
+        const initialPositionTimer = window.setTimeout(() => {
+          updatePosition()
+        }, 0)
 
         // Re-position after content renders and has actual dimensions
         // Use double rAF to ensure content is painted before measuring
@@ -198,6 +200,7 @@ export const Popover: React.FC<PopoverProps> = React.memo(
         window.addEventListener('scroll', updatePosition, true) // Capture phase for nested scrolls
 
         return () => {
+          clearTimeout(initialPositionTimer)
           cancelAnimationFrame(rafId)
           resizeObserver?.disconnect()
           window.removeEventListener('resize', updatePosition)

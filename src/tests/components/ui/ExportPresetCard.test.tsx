@@ -13,7 +13,7 @@ vi.mock('@/lib/audio/SoundManager', () => ({
 describe('ExportPresetCard', () => {
   it('does not submit an ancestor form when clicked', async () => {
     const user = userEvent.setup()
-    const onSubmit = vi.fn((event: SubmitEvent) => event.preventDefault())
+    const onSubmit = vi.fn((event: Event) => event.preventDefault())
 
     render(
       <form

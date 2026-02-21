@@ -10,10 +10,14 @@
  */
 
 import { getCosinePaletteColorTS, applyDistributionTS } from '@/rendering/shaders/palette'
+import { rgbToHex } from '@/lib/colors/colorUtils'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import React, { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface ColorPreviewProps {
   className?: string
   width?: number
@@ -251,6 +255,12 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             g = Math.min(1, Math.max(0, (100040000 * invTemp + 66) / 255))
             b = Math.min(1, Math.max(0, (194180000 * invTemp + 30) / 255))
           }
+        } else if (colorAlgorithm === 'radialDistance') {
+          // Radial Distance (spectral): mirror WGSL algo 11 in emission.wgsl.ts.
+          // Shader uses: hue = 0.8 * distanceNorm, saturation=1.0, lightness=0.5.
+          const distanceNorm = Math.max(0, Math.min(1, t))
+          const hue = 0.8 * distanceNorm
+          ;[r, g, b] = hslToRgb(hue, 1.0, 0.5)
         } else if (colorAlgorithm === 'hamiltonianDecomposition') {
           // K(red)/G(green)/V(blue) energy fractions
           const fK = t * t
@@ -298,7 +308,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
         const g8 = Math.round(Math.max(0, Math.min(1, g)) * 255)
         const b8 = Math.round(Math.max(0, Math.min(1, b)) * 255)
 
-        ctx.fillStyle = `rgb(${r8}, ${g8}, ${b8})`
+        ctx.fillStyle = rgbToHex(r8, g8, b8)
         ctx.fillRect(x, 0, 1, canvas.height)
       }
     }, [

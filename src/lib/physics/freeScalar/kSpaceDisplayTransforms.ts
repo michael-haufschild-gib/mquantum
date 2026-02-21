@@ -248,26 +248,24 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
 
   if (occupied.length < 2) return
 
-  // Apply log transform in-place to occupied voxels
-  if (config.exposureMode === 'log') {
-    for (const i of occupied) {
-      grid.nk[i] = Math.log(grid.nk[i]! + 1e-20)
-    }
+  // Collect transformed values without mutating the grid until we know the
+  // percentile window is valid. This avoids leaving log-scaled negative values
+  // behind when the window is degenerate.
+  const transformed = new Float64Array(occupied.length)
+  for (let j = 0; j < occupied.length; j++) {
+    const i = occupied[j]!
+    transformed[j] =
+      config.exposureMode === 'log' ? Math.log(grid.nk[i]! + 1e-20) : grid.nk[i]!
   }
 
-  // Collect transformed values from the same occupied set
-  const transformed: number[] = []
-  for (const i of occupied) {
-    transformed.push(grid.nk[i]!)
-  }
+  // Sort copy for percentile computation
+  const sorted = Array.from(transformed)
+  sorted.sort((a, b) => a - b)
 
-  // Sort for percentile computation
-  transformed.sort((a, b) => a - b)
-
-  const lowIdx = Math.floor((pLow / 100) * (transformed.length - 1))
-  const highIdx = Math.ceil((pHigh / 100) * (transformed.length - 1))
-  const qLow = transformed[Math.max(0, lowIdx)]!
-  const qHigh = transformed[Math.min(transformed.length - 1, highIdx)]!
+  const lowIdx = Math.floor((pLow / 100) * (sorted.length - 1))
+  const highIdx = Math.ceil((pHigh / 100) * (sorted.length - 1))
+  const qLow = sorted[Math.max(0, lowIdx)]!
+  const qHigh = sorted[Math.min(sorted.length - 1, highIdx)]!
 
   const range = qHigh - qLow
   if (range < 1e-30) return // Degenerate — all values equal
@@ -275,8 +273,9 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
   const gamma = Number.isFinite(config.gamma) && config.gamma > 0 ? config.gamma : 1.0
 
   // Remap occupied voxels to [0, 1] within percentile window
-  for (const i of occupied) {
-    let mapped = (grid.nk[i]! - qLow) / range
+  for (let j = 0; j < occupied.length; j++) {
+    const i = occupied[j]!
+    let mapped = (transformed[j]! - qLow) / range
     mapped = Math.max(0, Math.min(1, mapped))
     if (gamma !== 1.0) {
       mapped = Math.pow(mapped, gamma)

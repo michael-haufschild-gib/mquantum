@@ -25,7 +25,7 @@ export function buildAccentItems(
 ): MenuItem[] {
   const accents: ThemeAccent[] = ['cyan', 'blue', 'green', 'magenta', 'orange', 'violet', 'red']
   return accents.map((a) => ({
-    label: (accent === a ? '\u2713 ' : '  ') + a.charAt(0).toUpperCase() + a.slice(1),
+    label: (accent === a ? '[x] ' : '[ ] ') + a.charAt(0).toUpperCase() + a.slice(1),
     onClick: () => setAccent(a),
   }))
 }
@@ -38,7 +38,7 @@ export function buildAccentItems(
 export function buildModeItems(mode: ThemeMode, setMode: (mode: ThemeMode) => void): MenuItem[] {
   const modes: ThemeMode[] = ['light', 'dark', 'system']
   return modes.map((m) => ({
-    label: (mode === m ? '\u2713 ' : '  ') + m.charAt(0).toUpperCase() + m.slice(1),
+    label: (mode === m ? '[x] ' : '[ ] ') + m.charAt(0).toUpperCase() + m.slice(1),
     onClick: () => setMode(m),
   }))
 }

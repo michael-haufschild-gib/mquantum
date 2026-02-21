@@ -7,6 +7,9 @@ import { Section } from '@/components/sections/Section'
 import React from 'react'
 import { EnvironmentControls } from './EnvironmentControls'
 
+/**
+ *
+ */
 export interface EnvironmentSectionProps {
   defaultOpen?: boolean
 }

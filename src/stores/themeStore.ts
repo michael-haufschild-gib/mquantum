@@ -1,9 +1,18 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+/**
+ *
+ */
 export type ThemeMode = 'light' | 'dark' | 'system'
+/**
+ *
+ */
 export type ThemeAccent = 'cyan' | 'green' | 'magenta' | 'orange' | 'blue' | 'violet' | 'red'
 
+/**
+ *
+ */
 export interface ThemePreset {
   id: string
   label: string
@@ -41,6 +50,9 @@ function isValidMode(value: unknown): value is ThemeMode {
   return typeof value === 'string' && ['light', 'dark', 'system'].includes(value)
 }
 
+/**
+ *
+ */
 export interface ThemeState {
   mode: ThemeMode
   accent: ThemeAccent

@@ -15,6 +15,9 @@ import {
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface DimensionSelectorProps {
   className?: string
   disabled?: boolean

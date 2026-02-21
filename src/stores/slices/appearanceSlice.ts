@@ -21,6 +21,9 @@ import {
   ADVANCED_RENDERING_INITIAL_STATE,
 } from './visual/advancedRenderingSlice'
 
+/**
+ *
+ */
 export type AppearanceSlice = AppearanceSliceType
 export * from './visual/types'
 

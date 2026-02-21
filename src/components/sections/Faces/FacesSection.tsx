@@ -45,6 +45,9 @@ const USES_DISTRIBUTION = new Set([
 /** Algorithms that use the base/face color (HSL-based) */
 const USES_BASE_COLOR = new Set(['phase', 'mixed'])
 
+/**
+ *
+ */
 export interface FacesSectionProps {
   defaultOpen?: boolean
 }

@@ -104,5 +104,21 @@ describe('biasCalculation', () => {
       expect(atOne).toBeGreaterThanOrEqual(MIN_MULTIPLIER)
       expect(atOne).toBeLessThanOrEqual(MAX_MULTIPLIER)
     })
+
+    it('clamps out-of-range bias values to the [0, 1] contract', () => {
+      const belowRange = getPlaneMultiplier(1, 10, -2)
+      const aboveRange = getPlaneMultiplier(1, 10, 5)
+      const atZero = getPlaneMultiplier(1, 10, 0)
+      const atOne = getPlaneMultiplier(1, 10, 1)
+
+      expect(belowRange).toBe(atZero)
+      expect(aboveRange).toBe(atOne)
+    })
+
+    it('falls back to neutral multiplier for non-finite bias values', () => {
+      expect(getPlaneMultiplier(2, 10, Number.NaN)).toBe(1.0)
+      expect(getPlaneMultiplier(2, 10, Number.POSITIVE_INFINITY)).toBe(1.0)
+      expect(getPlaneMultiplier(2, 10, Number.NEGATIVE_INFINITY)).toBe(1.0)
+    })
   })
 })

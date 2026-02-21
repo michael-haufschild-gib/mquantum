@@ -86,6 +86,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private kSpacePending = false
   private kSpaceFrameCounter = 0
   private readonly K_SPACE_UPDATE_INTERVAL = 5
+  /** Monotonic epoch used to invalidate stale async readback jobs after rebuild/dispose. */
+  private kSpaceReadbackEpoch = 0
   /** Pending k-space texture data computed async, uploaded synchronously next frame */
   private pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null = null
 
@@ -208,6 +210,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param config - Free scalar field configuration
    */
   private rebuildFieldBuffers(device: GPUDevice, config: FreeScalarConfig): void {
+    // Invalidate in-flight async readback jobs before replacing buffers.
+    this.kSpaceReadbackEpoch++
+    this.pendingKSpaceData = null
+
     // Destroy old field buffers
     this.phiBuffer?.destroy()
     this.piBuffer?.destroy()
@@ -849,21 +855,35 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * in correct command-buffer order after this frame's compute dispatches.
    */
   private async readbackAndComputeKSpace(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
+    const phiReadbackBuffer = this.phiReadbackBuffer
+    const piReadbackBuffer = this.piReadbackBuffer
+    const readbackEpoch = this.kSpaceReadbackEpoch
+    if (!phiReadbackBuffer || !piReadbackBuffer) {
+      return
+    }
+
     this.kSpacePending = true
 
     try {
       // Wait for the main encoder (including our copy commands) to finish
       await device.queue.onSubmittedWorkDone()
+      if (readbackEpoch !== this.kSpaceReadbackEpoch) {
+        return
+      }
 
       // Map staging buffers for CPU read
-      await this.phiReadbackBuffer!.mapAsync(GPUMapMode.READ)
-      await this.piReadbackBuffer!.mapAsync(GPUMapMode.READ)
+      await phiReadbackBuffer.mapAsync(GPUMapMode.READ)
+      await piReadbackBuffer.mapAsync(GPUMapMode.READ)
 
-      const phiData = new Float32Array(this.phiReadbackBuffer!.getMappedRange().slice(0))
-      const piData = new Float32Array(this.piReadbackBuffer!.getMappedRange().slice(0))
+      const phiData = new Float32Array(phiReadbackBuffer.getMappedRange().slice(0))
+      const piData = new Float32Array(piReadbackBuffer.getMappedRange().slice(0))
 
-      this.phiReadbackBuffer!.unmap()
-      this.piReadbackBuffer!.unmap()
+      phiReadbackBuffer.unmap()
+      piReadbackBuffer.unmap()
+
+      if (readbackEpoch !== this.kSpaceReadbackEpoch) {
+        return
+      }
 
       // Compute raw k-space data (FFT + occupation numbers)
       const activeDims = config.gridSize.slice(0, config.latticeDim)
@@ -881,7 +901,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       const { density, analysis } = buildKSpaceDisplayTextures(raw, config.kSpaceViz)
 
       // Store for synchronous upload at the start of next frame's executeField
-      this.pendingKSpaceData = { density, analysis }
+      if (readbackEpoch === this.kSpaceReadbackEpoch) {
+        this.pendingKSpaceData = { density, analysis }
+      }
     } catch (e) {
       if (import.meta.env.DEV) {
         console.warn('[FreeScalarFieldComputePass] k-space readback failed:', e)
@@ -924,6 +946,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.piReadbackBuffer = null
     this.kSpacePending = false
     this.kSpaceFrameCounter = 0
+    this.kSpaceReadbackEpoch++
     this.pendingKSpaceData = null
 
     this.initPipeline = null

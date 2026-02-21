@@ -21,6 +21,9 @@ import React, {
   useMemo,
 } from 'react'
 
+/**
+ *
+ */
 export interface Tab {
   /** Unique identifier for the tab */
   id: string
@@ -32,6 +35,9 @@ export interface Tab {
   disabled?: boolean
 }
 
+/**
+ *
+ */
 export interface TabsProps {
   /** Array of tab definitions */
   tabs: Tab[]

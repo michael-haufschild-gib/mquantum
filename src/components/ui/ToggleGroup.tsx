@@ -2,12 +2,18 @@ import React, { useCallback } from 'react'
 import { m, LayoutGroup } from 'motion/react'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface ToggleOption<T extends string = string> {
   value: T
   label: string
   disabled?: boolean
 }
 
+/**
+ *
+ */
 export interface ToggleGroupProps<T extends string = string> {
   options: ToggleOption<T>[]
   value: T

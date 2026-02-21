@@ -68,9 +68,11 @@ export const ShaderCompilationOverlay: React.FC = () => {
     if (isCompiling) {
       // Show immediately when compilation starts
       showStartTimeRef.current = Date.now()
-      setIsVisible(true)
-      setDisplayMessage(message)
-      return
+      const showTimer = window.setTimeout(() => {
+        setIsVisible(true)
+        setDisplayMessage(message)
+      }, 0)
+      return () => clearTimeout(showTimer)
     }
 
     if (isVisible) {
@@ -91,8 +93,12 @@ export const ShaderCompilationOverlay: React.FC = () => {
   // Update message while visible (in case shader name changes)
   useEffect(() => {
     if (isCompiling && message) {
-      setDisplayMessage(message)
+      const messageSyncTimer = window.setTimeout(() => {
+        setDisplayMessage(message)
+      }, 0)
+      return () => clearTimeout(messageSyncTimer)
     }
+    return undefined
   }, [isCompiling, message])
 
   return (

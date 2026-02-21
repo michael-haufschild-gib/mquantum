@@ -9,6 +9,9 @@ import scenesData from '@/assets/defaults/scenes.json'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
+/**
+ * Bundled scene example metadata exposed to UI menus.
+ */
 export interface SceneExample {
   id: string
   name: string
@@ -64,8 +67,9 @@ export function getSceneExamples(): SceneExample[] {
       name: scene.name,
       description: `Load ${scene.name} example scene`,
       apply: () => {
-        // Use the preset manager's loadScene function with the scene data
-        usePresetManagerStore.getState().loadScene(scene.id)
+        // Reuse the bundled-example path so loading works even when examples
+        // are not present in savedScenes.
+        applySceneExample(scene.id)
       },
     }))
     .sort((a, b) => a.name.localeCompare(b.name))

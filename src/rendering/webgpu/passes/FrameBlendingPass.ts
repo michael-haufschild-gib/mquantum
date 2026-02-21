@@ -1,3 +1,4 @@
+/* global GPUTextureFormat */
 /**
  * WebGPU Frame Blending Pass
  *

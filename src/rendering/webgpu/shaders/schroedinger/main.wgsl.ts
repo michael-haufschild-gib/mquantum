@@ -202,6 +202,9 @@ export interface IsosurfaceMainBlockConfig {
   useDensityGrid?: boolean
 }
 
+/**
+ *
+ */
 export function generateMainBlockIsosurface(config: IsosurfaceMainBlockConfig = {}): string {
   const { useDensityGrid = false } = config
 
@@ -411,9 +414,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
   if (hitT < 0.0) {
     if (sliceOnlyCrossSection && crossSection.alpha > 0.0) {
-      let planeNormal = normalize(schroedinger.crossSectionPlane.xyz);
       output.color = vec4f(crossSection.color, crossSection.alpha);
-      output.normal = vec4f(planeNormal * 0.5 + 0.5, material.metallic);
       return output;
     }
     discard;
@@ -618,10 +619,8 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     discard;
   }
 
-  // Output color and normal for MRT
+  // Output final color.
   output.color = vec4f(finalColor, finalAlpha);
-  // Normal buffer: RGB = world-space normal (encoded 0-1), A = metallic
-  output.normal = vec4f(finalNormal * 0.5 + 0.5, material.metallic);
 
   return output;
 }

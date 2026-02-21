@@ -2,7 +2,41 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { WebGPUSchrodingerRenderer } from '@/rendering/webgpu/renderers/WebGPUSchrodingerRenderer'
 
-function createMockCtx() {
+interface MockRenderContext {
+  device: Record<string, unknown>
+  frame: {
+    stores: {
+      appearance: Record<string, unknown>
+      pbr: Record<string, unknown>
+      performance: Record<string, unknown>
+      extended: Record<string, unknown>
+      animation: Record<string, unknown>
+      geometry: Record<string, unknown>
+      rotation: Record<string, unknown>
+      transform: Record<string, unknown>
+      camera: Record<string, unknown>
+      lighting: Record<string, unknown>
+      [key: string]: Record<string, unknown>
+    }
+    frameNumber: number
+    delta: number
+    time: number
+  }
+  size: { width: number; height: number }
+  getWriteTarget: ReturnType<typeof vi.fn>
+  beginRenderPass: ReturnType<typeof vi.fn>
+}
+
+interface MockPassEncoder {
+  setPipeline: ReturnType<typeof vi.fn>
+  setBindGroup: ReturnType<typeof vi.fn>
+  setVertexBuffer: ReturnType<typeof vi.fn>
+  setIndexBuffer: ReturnType<typeof vi.fn>
+  drawIndexed: ReturnType<typeof vi.fn>
+  end: ReturnType<typeof vi.fn>
+}
+
+function createMockCtx(): { ctx: MockRenderContext; passEncoder: MockPassEncoder } {
   const passEncoder = {
     setPipeline: vi.fn(),
     setBindGroup: vi.fn(),
@@ -84,7 +118,7 @@ describe('WebGPUSchrodingerRenderer material dirty-checking', () => {
     expect(renderer.updateMaterialUniforms).toHaveBeenCalledTimes(1)
 
     ctx.frame.frameNumber = 2
-    ctx.frame.stores.pbr.pbrVersion = 1
+    ctx.frame.stores.pbr = { ...ctx.frame.stores.pbr, pbrVersion: 1 }
 
     renderer.execute(ctx)
     expect(renderer.updateMaterialUniforms).toHaveBeenCalledTimes(2)
@@ -108,9 +142,9 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
     renderer: WebGPUSchrodingerRenderer
   ): WebGPUSchrodingerRenderer & { [key: string]: unknown } {
     const mutable = renderer as WebGPUSchrodingerRenderer & { [key: string]: unknown }
-    mutable.device = { queue: { writeBuffer: vi.fn() } }
-    mutable.schroedingerUniformBuffer = {}
-    mutable.createBoundingGeometry = vi.fn()
+    mutable['device'] = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+    mutable['schroedingerUniformBuffer'] = {} as unknown as GPUBuffer
+    mutable['createBoundingGeometry'] = vi.fn()
     return mutable
   }
 
@@ -158,9 +192,9 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
     renderer: WebGPUSchrodingerRenderer
   ): WebGPUSchrodingerRenderer & { [key: string]: unknown } {
     const mutable = renderer as WebGPUSchrodingerRenderer & { [key: string]: unknown }
-    mutable.device = { queue: { writeBuffer: vi.fn() } }
-    mutable.schroedingerUniformBuffer = {}
-    mutable.createBoundingGeometry = vi.fn()
+    mutable['device'] = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+    mutable['schroedingerUniformBuffer'] = {} as unknown as GPUBuffer
+    mutable['createBoundingGeometry'] = vi.fn()
     return mutable
   }
 
@@ -202,5 +236,27 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
       0.0101,
       6
     )
+  })
+})
+
+describe('WebGPUSchrodingerRenderer fast eigen interpolation semantics', () => {
+  it('maps fast toggle ON to non-robust shader interpolation and OFF to robust interpolation', () => {
+    const fastRenderer = new WebGPUSchrodingerRenderer({
+      quantumMode: 'harmonicOscillator',
+      eigenfunctionCacheEnabled: true,
+      fastEigenInterpolationEnabled: true,
+    }) as WebGPUSchrodingerRenderer & { [key: string]: unknown }
+
+    const robustRenderer = new WebGPUSchrodingerRenderer({
+      quantumMode: 'harmonicOscillator',
+      eigenfunctionCacheEnabled: true,
+      fastEigenInterpolationEnabled: false,
+    }) as WebGPUSchrodingerRenderer & { [key: string]: unknown }
+
+    const fastShaderConfig = fastRenderer['shaderConfig'] as { useRobustEigenInterpolation?: boolean }
+    const robustShaderConfig = robustRenderer['shaderConfig'] as { useRobustEigenInterpolation?: boolean }
+
+    expect(fastShaderConfig.useRobustEigenInterpolation).toBe(false)
+    expect(robustShaderConfig.useRobustEigenInterpolation).toBe(true)
   })
 })

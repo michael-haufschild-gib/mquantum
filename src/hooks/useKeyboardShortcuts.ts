@@ -13,6 +13,9 @@ import { useExportStore } from '@/stores/exportStore'
 import { useCallback, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface ShortcutConfig {
   key: string
   ctrl?: boolean
@@ -22,6 +25,9 @@ export interface ShortcutConfig {
   action: () => void
 }
 
+/**
+ *
+ */
 export interface UseKeyboardShortcutsOptions {
   enabled?: boolean
 }

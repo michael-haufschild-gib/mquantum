@@ -5,7 +5,7 @@
  */
 
 import type { TransformMode } from '@/rendering/lights/types'
-import { createDefaultLight, createDefaultSpotLight } from '@/rendering/lights/types'
+import { createDefaultLight } from '@/rendering/lights/types'
 import {
   DEFAULT_COLOR_ALGORITHM,
   DEFAULT_COSINE_COEFFICIENTS,
@@ -128,7 +128,7 @@ export const DEFAULT_LIGHT_COLOR = '#FFFFFF'
 export const DEFAULT_LIGHT_HORIZONTAL_ANGLE = 145
 export const DEFAULT_LIGHT_VERTICAL_ANGLE = 30
 export const DEFAULT_AMBIENT_ENABLED = true
-export const DEFAULT_AMBIENT_INTENSITY = 0.15
+export const DEFAULT_AMBIENT_INTENSITY = 0.55
 export const DEFAULT_AMBIENT_COLOR = '#FFFFFF'
 export const DEFAULT_SPECULAR_INTENSITY = 0.8
 export const DEFAULT_SHOW_LIGHT_INDICATOR = false
@@ -141,8 +141,7 @@ export const DEFAULT_TONE_MAPPING_ALGORITHM: ToneMappingAlgorithm = 'aces'
 export const DEFAULT_EXPOSURE = 0.7
 
 // Multi-light system
-//export const DEFAULT_LIGHTS = [createDefaultLight(), createDefaultSpotLight()]
-export const DEFAULT_LIGHTS = [createDefaultLight(), createDefaultSpotLight()]
+export const DEFAULT_LIGHTS = [createDefaultLight()]
 export const DEFAULT_SELECTED_LIGHT_ID: string | null = null
 export const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate'
 export const DEFAULT_SHOW_LIGHT_GIZMOS = false
@@ -187,8 +186,14 @@ export const DEFAULT_FACE_PBR: PBRConfig = {
 // Skybox Defaults
 // ============================================================================
 
+/**
+ *
+ */
 export type SkyboxTexture = 'space_blue' | 'space_lightblue' | 'space_red' | 'none'
 
+/**
+ *
+ */
 export type SkyboxMode =
   | 'classic'
   | 'procedural_aurora'
@@ -218,6 +223,9 @@ export const DEFAULT_SKYBOX_INTENSITY = 1
 export const DEFAULT_SKYBOX_ROTATION = 0
 export const DEFAULT_SKYBOX_HIGH_QUALITY = false
 
+/**
+ *
+ */
 export type SkyboxAnimationMode =
   | 'none'
   | 'cinematic' // Smooth Y orbit + subtle vertical bob (The "Standard")
@@ -268,6 +276,9 @@ export const DEFAULT_OCEAN_SETTINGS: OceanSettings = {
   surfaceShimmer: 0.4,
 }
 
+/**
+ *
+ */
 export interface SkyboxProceduralSettings {
   // Core
   scale: number
@@ -339,7 +350,6 @@ export const DEFAULT_SHADER_SETTINGS = {
 export const DEFAULT_SHOW_AXIS_HELPER = false
 export const DEFAULT_SHOW_PERF_MONITOR = true
 export const DEFAULT_SHOW_DEPTH_BUFFER = false
-export const DEFAULT_SHOW_NORMAL_BUFFER = false
 export const DEFAULT_SHOW_TEMPORAL_DEPTH_BUFFER = false
 export const DEFAULT_ANIMATION_BIAS = 0
 export const MIN_ANIMATION_BIAS = 0

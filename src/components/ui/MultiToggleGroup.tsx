@@ -1,11 +1,17 @@
 import React, { useCallback } from 'react'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface MultiToggleOption<T extends string = string> {
   value: T
   label: string
 }
 
+/**
+ *
+ */
 export interface MultiToggleGroupProps<T extends string = string> {
   options: MultiToggleOption<T>[]
   value: T[]

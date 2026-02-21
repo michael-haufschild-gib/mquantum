@@ -1,6 +1,9 @@
 import React, { useCallback } from 'react'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface ToggleButtonProps extends Omit<
   React.ComponentPropsWithoutRef<'button'>,
   'onToggle'

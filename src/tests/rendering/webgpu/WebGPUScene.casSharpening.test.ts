@@ -20,7 +20,7 @@ interface ScenePassConfig {
   temporalReprojectionEnabled: boolean
   eigenfunctionCacheEnabled: boolean
   analyticalGradientEnabled: boolean
-  robustEigenInterpolationEnabled: boolean
+  fastEigenInterpolationEnabled: boolean
   representation: 'position' | 'momentum'
   colorAlgorithm:
     | 'lch'
@@ -90,7 +90,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     temporalReprojectionEnabled: true,
     eigenfunctionCacheEnabled: true,
     analyticalGradientEnabled: true,
-    robustEigenInterpolationEnabled: true,
+    fastEigenInterpolationEnabled: true,
     representation: 'position',
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,

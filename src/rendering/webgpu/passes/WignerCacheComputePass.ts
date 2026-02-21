@@ -1,3 +1,4 @@
+/* global GPUTextureFormat, GPUTextureViewDimension */
 /**
  * Wigner Cache Compute Pass — Two-Phase Pipeline
  *

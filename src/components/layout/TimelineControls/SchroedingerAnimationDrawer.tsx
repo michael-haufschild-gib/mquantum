@@ -59,6 +59,9 @@ const PROBABILITY_CURRENT_COLOR_MODE_OPTIONS: {
   { value: 'circulationSign', label: 'Circulation Sign' },
 ]
 
+/**
+ *
+ */
 export interface SchroedingerAnimationDrawerProps {
   /** Callback to close the drawer */
   onClose?: () => void

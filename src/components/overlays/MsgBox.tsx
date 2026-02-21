@@ -4,6 +4,7 @@ import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Icon, type IconName } from '@/components/ui/Icon'
+import { Switch } from '@/components/ui/Switch'
 
 export const MsgBox: React.FC = () => {
   const { isOpen, title, message, type, actions, dismissible, dismissId, closeMsgBox } =
@@ -16,8 +17,12 @@ export const MsgBox: React.FC = () => {
   // Reset checkbox state when dialog opens/closes
   useEffect(() => {
     if (!isOpen) {
-      setDontShowAgain(false)
+      const resetTimer = window.setTimeout(() => {
+        setDontShowAgain(false)
+      }, 0)
+      return () => clearTimeout(resetTimer)
     }
+    return undefined
   }, [isOpen])
 
   /**
@@ -95,18 +100,13 @@ export const MsgBox: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           {/* "Don't show again" checkbox - only shown when dismissible */}
           {dismissible && dismissId ? (
-            <label className="flex items-center gap-2 text-sm cursor-pointer select-none group">
-              <input
-                type="checkbox"
-                checked={dontShowAgain}
-                onChange={(e) => setDontShowAgain(e.target.checked)}
-                className="w-4 h-4 rounded border-panel-border bg-bg-input accent-[var(--accent)] cursor-pointer"
-                aria-describedby="msgbox-message"
-              />
-              <span className="text-text-secondary group-hover:text-text-primary transition-colors">
-                Don't show again
-              </span>
-            </label>
+            <Switch
+              checked={dontShowAgain}
+              onCheckedChange={setDontShowAgain}
+              label="Don't show again"
+              className="text-sm"
+              data-testid="msgbox-dismiss-switch"
+            />
           ) : (
             <div /> // Spacer to keep buttons right-aligned
           )}

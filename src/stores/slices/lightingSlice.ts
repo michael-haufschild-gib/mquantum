@@ -13,8 +13,10 @@ import {
   MAX_LIGHTS,
   MIN_LIGHTS,
   clampConeAngle,
+  clampDecay,
   clampIntensity,
   clampPenumbra,
+  clampRange,
   cloneLight,
   createNewLight,
   normalizeRotationTupleSigned,
@@ -292,6 +294,8 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
           updates.coneAngle !== undefined && !isValidLightingNumber(updates.coneAngle)
         const hasInvalidPenumbra =
           updates.penumbra !== undefined && !isValidLightingNumber(updates.penumbra)
+        const hasInvalidRange = updates.range !== undefined && !isValidLightingNumber(updates.range)
+        const hasInvalidDecay = updates.decay !== undefined && !isValidLightingNumber(updates.decay)
         const hasInvalidRotation =
           updates.rotation !== undefined && !isValidRotationTuple(updates.rotation)
 
@@ -305,6 +309,12 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
           if (hasInvalidPenumbra) {
             console.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
           }
+          if (hasInvalidRange) {
+            console.warn('[lightingSlice] Ignoring non-finite range update:', updates.range)
+          }
+          if (hasInvalidDecay) {
+            console.warn('[lightingSlice] Ignoring non-finite decay update:', updates.decay)
+          }
           if (hasInvalidRotation) {
             console.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
           }
@@ -314,6 +324,8 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
         if (hasInvalidIntensity) delete sanitizedUpdates.intensity
         if (hasInvalidConeAngle) delete sanitizedUpdates.coneAngle
         if (hasInvalidPenumbra) delete sanitizedUpdates.penumbra
+        if (hasInvalidRange) delete sanitizedUpdates.range
+        if (hasInvalidDecay) delete sanitizedUpdates.decay
         if (hasInvalidRotation) delete sanitizedUpdates.rotation
 
         return {
@@ -331,6 +343,14 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
             sanitizedUpdates.penumbra !== undefined
               ? clampPenumbra(sanitizedUpdates.penumbra)
               : light.penumbra,
+          range:
+            sanitizedUpdates.range !== undefined
+              ? clampRange(sanitizedUpdates.range)
+              : light.range,
+          decay:
+            sanitizedUpdates.decay !== undefined
+              ? clampDecay(sanitizedUpdates.decay)
+              : light.decay,
           rotation:
             sanitizedUpdates.rotation !== undefined
               ? normalizeRotationTupleSigned(sanitizedUpdates.rotation)

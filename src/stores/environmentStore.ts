@@ -3,6 +3,9 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { createSkyboxSlice, SkyboxSlice } from './slices/skyboxSlice'
 
 // Extended type with version tracking for dirty-flag optimization
+/**
+ *
+ */
 export interface EnvironmentStore extends SkyboxSlice {
   /** Version counter for skybox/procedural setting changes */
   skyboxVersion: number

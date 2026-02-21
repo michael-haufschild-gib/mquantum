@@ -15,6 +15,9 @@ import type { WebGPUCapabilityInfo, WebGPUAdapterMode } from '@/stores/rendererS
 // Types
 // ============================================================================
 
+/**
+ *
+ */
 export interface UseWebGPUSupportResult {
   /** Whether detection is still in progress */
   isChecking: boolean

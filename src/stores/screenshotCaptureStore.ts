@@ -22,8 +22,14 @@
 
 import { create } from 'zustand'
 
+/**
+ *
+ */
 export type CaptureStatus = 'idle' | 'capturing' | 'ready' | 'error'
 
+/**
+ *
+ */
 export interface ScreenshotCaptureState {
   /** Current capture status */
   status: CaptureStatus

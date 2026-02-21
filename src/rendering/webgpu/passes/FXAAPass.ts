@@ -10,6 +10,9 @@ import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { fxaaShader } from '../shaders/postprocessing/fxaa.wgsl'
 
+/**
+ *
+ */
 export interface FXAAPassOptions {
   /** Input color resource (default: 'ldr-color') */
   colorInput?: string

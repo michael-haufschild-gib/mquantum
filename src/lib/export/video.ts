@@ -225,12 +225,27 @@ export class VideoRecorder {
 
         ctx.filter = 'none'
 
-        if (crop?.enabled) {
+        const hasValidCrop =
+          crop?.enabled &&
+          Number.isFinite(crop.x) &&
+          Number.isFinite(crop.y) &&
+          Number.isFinite(crop.width) &&
+          Number.isFinite(crop.height) &&
+          crop.width > 0 &&
+          crop.height > 0
+
+        if (hasValidCrop && crop) {
+          // Clamp crop coordinates to normalized canvas bounds.
+          const normalizedX = Math.min(Math.max(crop.x, 0), 1)
+          const normalizedY = Math.min(Math.max(crop.y, 0), 1)
+          const normalizedWidth = Math.min(Math.max(crop.width, 0), 1)
+          const normalizedHeight = Math.min(Math.max(crop.height, 0), 1)
+
           // Source coordinates (relative to original canvas)
-          const sx = crop.x * this.canvas.width
-          const sy = crop.y * this.canvas.height
-          const sw = crop.width * this.canvas.width
-          const sh = crop.height * this.canvas.height
+          const sx = normalizedX * this.canvas.width
+          const sy = normalizedY * this.canvas.height
+          const sw = normalizedWidth * this.canvas.width
+          const sh = normalizedHeight * this.canvas.height
 
           // Calculate aspect ratios to maintain proportions (no stretching)
           const cropAspect = sw / sh

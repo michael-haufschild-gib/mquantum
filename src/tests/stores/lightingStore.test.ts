@@ -72,6 +72,53 @@ describe('lightingStore (invariants)', () => {
     expect(light.rotation[1]).toBeLessThan(Math.PI)
   })
 
+  it('updateLight clamps range and decay to valid bounds', () => {
+    const id = useLightingStore.getState().addLight('point')
+    expect(id).not.toBeNull()
+
+    useLightingStore.getState().updateLight(id!, {
+      range: -10,
+      decay: 9,
+    })
+
+    let light = useLightingStore.getState().lights.find((l) => l.id === id)!
+    expect(light.range).toBe(1)
+    expect(light.decay).toBe(3)
+
+    useLightingStore.getState().updateLight(id!, {
+      range: 150,
+      decay: -2,
+    })
+
+    light = useLightingStore.getState().lights.find((l) => l.id === id)!
+    expect(light.range).toBe(100)
+    expect(light.decay).toBe(0)
+  })
+
+  it('updateLight preserves explicit range=0 sentinel (infinite range)', () => {
+    const id = useLightingStore.getState().addLight('point')
+    expect(id).not.toBeNull()
+
+    useLightingStore.getState().updateLight(id!, {
+      range: 0,
+    })
+
+    const light = useLightingStore.getState().lights.find((l) => l.id === id)!
+    expect(light.range).toBe(0)
+  })
+
+  it('updateLight preserves explicit decay=0 sentinel (no distance falloff power)', () => {
+    const id = useLightingStore.getState().addLight('point')
+    expect(id).not.toBeNull()
+
+    useLightingStore.getState().updateLight(id!, {
+      decay: 0,
+    })
+
+    const light = useLightingStore.getState().lights.find((l) => l.id === id)!
+    expect(light.decay).toBe(0)
+  })
+
   it('updateLight ignores non-finite numeric and rotation updates while applying valid fields', () => {
     const id = useLightingStore.getState().addLight('spot')
     expect(id).not.toBeNull()
@@ -99,6 +146,30 @@ describe('lightingStore (invariants)', () => {
     expect(after.coneAngle).toBe(before.coneAngle)
     expect(after.penumbra).toBe(before.penumbra)
     expect(after.rotation).toEqual(before.rotation)
+    expect(after.color).toBe('#00FF00')
+  })
+
+  it('updateLight ignores non-finite range/decay updates while applying valid fields', () => {
+    const id = useLightingStore.getState().addLight('point')
+    expect(id).not.toBeNull()
+
+    useLightingStore.getState().updateLight(id!, {
+      range: 42,
+      decay: 1.7,
+      color: '#ABCDEF',
+    })
+
+    const before = useLightingStore.getState().lights.find((l) => l.id === id)!
+
+    useLightingStore.getState().updateLight(id!, {
+      range: Number.NaN,
+      decay: Number.POSITIVE_INFINITY,
+      color: '#00FF00',
+    })
+
+    const after = useLightingStore.getState().lights.find((l) => l.id === id)!
+    expect(after.range).toBe(before.range)
+    expect(after.decay).toBe(before.decay)
     expect(after.color).toBe('#00FF00')
   })
 

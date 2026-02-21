@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/Button'
 import { Switch } from '@/components/ui/Switch'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Icons } from '../icons'
 import { InfoCard, SectionHeader } from '../subcomponents'
@@ -21,24 +21,18 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
     }))
   )
 
-  const [selectedShaderKey, setSelectedShaderKey] = useState<string | null>(null)
-
-  // Auto-select shader when available
-  useEffect(() => {
-    const keys = Object.keys(shaderDebugInfos)
-    if (keys.length > 0) {
-      if (!selectedShaderKey || !shaderDebugInfos[selectedShaderKey]) {
-        if (keys.includes('object')) setSelectedShaderKey('object')
-        else setSelectedShaderKey(keys[0]!)
-      }
-    } else {
-      setSelectedShaderKey(null)
-    }
-  }, [shaderDebugInfos, selectedShaderKey])
+  const [selectedShaderKeyState, setSelectedShaderKey] = useState<string | null>(null)
+  const shaderKeys = Object.keys(shaderDebugInfos)
+  const selectedShaderKey =
+    selectedShaderKeyState && shaderDebugInfos[selectedShaderKeyState]
+      ? selectedShaderKeyState
+      : shaderKeys.includes('object')
+        ? 'object'
+        : shaderKeys[0] ?? null
 
   const activeShaderInfo = selectedShaderKey ? shaderDebugInfos[selectedShaderKey] : null
 
-  if (Object.keys(shaderDebugInfos).length === 0) {
+  if (shaderKeys.length === 0) {
     return (
       <div className="space-y-5 p-5">
         <div className="text-center text-text-tertiary py-8 text-xs">No shader data available</div>
@@ -49,7 +43,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
   return (
     <div className="space-y-5 p-5">
       <div className="flex gap-2 overflow-x-auto pb-2 -mx-2 px-2 scrollbar-none">
-        {Object.keys(shaderDebugInfos).map((key) => (
+        {shaderKeys.map((key) => (
           <Button
             key={key}
             variant={selectedShaderKey === key ? 'primary' : 'ghost'}

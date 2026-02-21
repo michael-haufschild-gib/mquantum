@@ -34,8 +34,8 @@ export const WebGPUFallbackNotification: React.FC = () => {
       const timer = setTimeout(() => setIsVisible(true), 50)
       return () => clearTimeout(timer)
     }
-    setIsVisible(false)
-    return undefined
+    const hideTimer = window.setTimeout(() => setIsVisible(false), 0)
+    return () => clearTimeout(hideTimer)
   }, [showNotification])
 
   // Auto-dismiss after 8 seconds
@@ -88,9 +88,9 @@ export const WebGPUFallbackNotification: React.FC = () => {
         gap: '12px',
         padding: '12px 16px',
         borderRadius: '8px',
-        backgroundColor: 'var(--color-surface-elevated, #1a1a1a)',
-        border: '1px solid var(--color-border, #333)',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'var(--bg-elevated)',
+        border: '1px solid var(--border-subtle)',
+        boxShadow: '0 4px 12px var(--bg-overlay)',
         maxWidth: '90vw',
       }}
     >
@@ -100,7 +100,7 @@ export const WebGPUFallbackNotification: React.FC = () => {
         height="20"
         viewBox="0 0 20 20"
         fill="none"
-        style={{ flexShrink: 0, color: 'var(--color-warning, #f59e0b)' }}
+        style={{ flexShrink: 0, color: 'var(--text-warning)' }}
       >
         <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" />
         <path
@@ -112,10 +112,10 @@ export const WebGPUFallbackNotification: React.FC = () => {
       </svg>
 
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text, #fff)' }}>
+        <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
           WebGPU unavailable
         </div>
-        <div style={{ fontSize: '12px', color: 'var(--color-text-muted, #888)', marginTop: '2px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
           {reasonMessage}
         </div>
       </div>

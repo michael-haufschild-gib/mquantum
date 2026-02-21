@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { m, AnimatePresence } from 'motion/react'
+import { Button } from '@/components/ui/Button'
 
+/**
+ *
+ */
 export interface SectionProps {
   title: string
   defaultOpen?: boolean
@@ -36,7 +40,11 @@ export const Section: React.FC<SectionProps> = React.memo(
     const [isOpen, setIsOpen] = useState(() => {
       try {
         const stored = localStorage.getItem(storageKey)
-        return stored !== null ? JSON.parse(stored) : defaultOpen
+        if (stored === null) {
+          return defaultOpen
+        }
+        const parsed: unknown = JSON.parse(stored)
+        return typeof parsed === 'boolean' ? parsed : defaultOpen
       } catch {
         return defaultOpen
       }
@@ -80,12 +88,13 @@ export const Section: React.FC<SectionProps> = React.memo(
         data-testid={dataTestId}
       >
         <div className="flex items-center justify-between bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-active)] transition-colors duration-200">
-          <button
-            type="button"
+          <Button
             onClick={handleToggle}
             className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none focus:outline-none focus-visible:outline-none border-none focus:ring-0 z-10"
             aria-expanded={isOpen}
             data-testid={dataTestId ? `${dataTestId}-header` : undefined}
+            variant="ghost"
+            size="md"
           >
             <div className="flex items-center gap-3">
               {/* LED Indicator - static glow, no animation = 0 style recalcs */}
@@ -124,7 +133,7 @@ export const Section: React.FC<SectionProps> = React.memo(
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </m.div>
-          </button>
+          </Button>
 
           {isOpen && onReset && (
             <m.button

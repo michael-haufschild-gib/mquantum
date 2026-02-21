@@ -5,6 +5,9 @@
 
 import { useEffect, useState } from 'react'
 
+/**
+ *
+ */
 export type Breakpoint = 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 
 export const BREAKPOINTS: Record<Breakpoint, string> = {
@@ -34,7 +37,9 @@ export function useMediaQuery(query: string): boolean {
     }
 
     const mediaQuery = window.matchMedia(query)
-    setMatches(mediaQuery.matches)
+    const syncTimer = window.setTimeout(() => {
+      setMatches(mediaQuery.matches)
+    }, 0)
 
     const handler = (event: MediaQueryListEvent) => {
       setMatches(event.matches)
@@ -42,6 +47,7 @@ export function useMediaQuery(query: string): boolean {
 
     mediaQuery.addEventListener('change', handler)
     return () => {
+      clearTimeout(syncTimer)
       mediaQuery.removeEventListener('change', handler)
     }
   }, [query])

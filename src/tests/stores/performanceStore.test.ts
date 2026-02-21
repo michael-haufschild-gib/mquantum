@@ -152,39 +152,39 @@ describe('performanceStore', () => {
   })
 
   describe('eigenfunction cache fidelity controls', () => {
-    it('defaults analytical gradient and robust interpolation to enabled', () => {
+    it('defaults analytical gradient and fast interpolation to enabled', () => {
       const state = usePerformanceStore.getState()
       expect(state.analyticalGradientEnabled).toBe(true)
-      expect(state.robustEigenInterpolationEnabled).toBe(true)
+      expect(state.fastEigenInterpolationEnabled).toBe(true)
     })
 
-    it('sets analytical gradient and robust interpolation independently', () => {
+    it('sets analytical gradient and fast interpolation independently', () => {
       const {
         setEigenfunctionCacheEnabled,
         setAnalyticalGradientEnabled,
-        setRobustEigenInterpolationEnabled,
+        setFastEigenInterpolationEnabled,
       } = usePerformanceStore.getState()
 
       setAnalyticalGradientEnabled(false)
-      setRobustEigenInterpolationEnabled(false)
+      setFastEigenInterpolationEnabled(false)
       setEigenfunctionCacheEnabled(false)
 
       const state = usePerformanceStore.getState()
       expect(state.eigenfunctionCacheEnabled).toBe(false)
       expect(state.analyticalGradientEnabled).toBe(false)
-      expect(state.robustEigenInterpolationEnabled).toBe(false)
+      expect(state.fastEigenInterpolationEnabled).toBe(false)
     })
 
-    it('reset restores analytical gradient and robust interpolation defaults', () => {
+    it('reset restores analytical gradient and fast interpolation defaults', () => {
       const store = usePerformanceStore.getState()
       store.setAnalyticalGradientEnabled(false)
-      store.setRobustEigenInterpolationEnabled(false)
+      store.setFastEigenInterpolationEnabled(false)
 
       store.reset()
 
       const state = usePerformanceStore.getState()
       expect(state.analyticalGradientEnabled).toBe(true)
-      expect(state.robustEigenInterpolationEnabled).toBe(true)
+      expect(state.fastEigenInterpolationEnabled).toBe(true)
     })
   })
 
@@ -401,6 +401,10 @@ describe('render resolution scale persistence', () => {
       localStorage.setItem(RESOLUTION_SCALE_KEY, 'invalid')
       expect(hasPersistedResolutionScale()).toBe(false)
 
+      // Set a malformed value with a valid numeric prefix
+      localStorage.setItem(RESOLUTION_SCALE_KEY, '0.75junk')
+      expect(hasPersistedResolutionScale()).toBe(false)
+
       // Set a value out of range (below 0.1)
       localStorage.setItem(RESOLUTION_SCALE_KEY, '0.05')
       expect(hasPersistedResolutionScale()).toBe(false)
@@ -516,6 +520,10 @@ describe('max FPS persistence', () => {
     it('should return false for invalid persisted values', () => {
       // Set an invalid value directly
       localStorage.setItem(MAX_FPS_KEY, 'invalid')
+      expect(hasPersistedMaxFps()).toBe(false)
+
+      // Set a malformed value with a valid numeric prefix
+      localStorage.setItem(MAX_FPS_KEY, '45fps')
       expect(hasPersistedMaxFps()).toBe(false)
 
       // Set a value out of range (below MIN)

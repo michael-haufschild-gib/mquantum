@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { Button } from '@/components/ui/Button'
 import { DropdownMenu, type DropdownMenuItem } from '@/components/ui/DropdownMenu'
 import { useDropdownStore } from '@/stores/dropdownStore'
 
@@ -33,14 +34,14 @@ describe('DropdownMenu', () => {
 
   describe('rendering', () => {
     it('should not render menu content when closed', () => {
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       expect(screen.queryByText('Item 1')).not.toBeInTheDocument()
     })
 
     it('should render menu content when trigger is clicked', async () => {
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 
@@ -52,7 +53,7 @@ describe('DropdownMenu', () => {
   describe('store integration', () => {
     it('should update store when opening dropdown', async () => {
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 
@@ -61,7 +62,7 @@ describe('DropdownMenu', () => {
 
     it('should close dropdown when clicking trigger again', async () => {
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
       expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
@@ -76,8 +77,8 @@ describe('DropdownMenu', () => {
       const user = userEvent.setup()
       render(
         <div>
-          <DropdownMenu trigger={<button>Menu 1</button>} items={mockItems} id="menu-1" />
-          <DropdownMenu trigger={<button>Menu 2</button>} items={mockItems} id="menu-2" />
+          <DropdownMenu trigger={<Button>Menu 1</Button>} items={mockItems} id="menu-1" />
+          <DropdownMenu trigger={<Button>Menu 2</Button>} items={mockItems} id="menu-2" />
         </div>
       )
 
@@ -95,12 +96,12 @@ describe('DropdownMenu', () => {
       render(
         <div>
           <DropdownMenu
-            trigger={<button>Menu 1</button>}
+            trigger={<Button>Menu 1</Button>}
             items={[{ label: 'Menu 1 Item', onClick: vi.fn() }]}
             id="menu-1"
           />
           <DropdownMenu
-            trigger={<button>Menu 2</button>}
+            trigger={<Button>Menu 2</Button>}
             items={[{ label: 'Menu 2 Item', onClick: vi.fn() }]}
             id="menu-2"
           />
@@ -123,7 +124,7 @@ describe('DropdownMenu', () => {
       render(
         <div>
           <div data-testid="outside">Outside Area</div>
-          <DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />
+          <DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />
         </div>
       )
 
@@ -138,7 +139,7 @@ describe('DropdownMenu', () => {
 
     it('should not close dropdown when clicking inside menu content', async () => {
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
       expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
@@ -152,7 +153,7 @@ describe('DropdownMenu', () => {
   describe('escape key', () => {
     it('should close dropdown when pressing Escape', async () => {
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
       expect(useDropdownStore.getState().openDropdownId).toBe('test-menu')
@@ -168,7 +169,7 @@ describe('DropdownMenu', () => {
       const items: DropdownMenuItem[] = [{ label: 'Clickable Item', onClick: handleClick }]
 
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={items} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
       await user.click(screen.getByText('Clickable Item'))
@@ -184,7 +185,7 @@ describe('DropdownMenu', () => {
       ]
 
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={items} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 
@@ -200,7 +201,7 @@ describe('DropdownMenu', () => {
       const user = userEvent.setup()
       render(
         <DropdownMenu
-          trigger={<button>Open Menu</button>}
+          trigger={<Button>Open Menu</Button>}
           items={mockItems}
           id="test-menu"
           onClose={handleClose}
@@ -226,7 +227,7 @@ describe('DropdownMenu', () => {
       ]
 
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={items} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 
@@ -242,7 +243,7 @@ describe('DropdownMenu', () => {
       ]
 
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={items} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 
@@ -265,7 +266,7 @@ describe('DropdownMenu', () => {
       ]
 
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={items} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={items} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 
@@ -278,7 +279,7 @@ describe('DropdownMenu', () => {
 
   describe('data attributes', () => {
     it('should add data-dropdown-trigger attribute to trigger', async () => {
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       const trigger = screen.getByText('Open Menu').closest('[data-dropdown-trigger]')
       expect(trigger).toHaveAttribute('data-dropdown-trigger', 'test-menu')
@@ -286,7 +287,7 @@ describe('DropdownMenu', () => {
 
     it('should add data-dropdown-content attribute to menu content', async () => {
       const user = userEvent.setup()
-      render(<DropdownMenu trigger={<button>Open Menu</button>} items={mockItems} id="test-menu" />)
+      render(<DropdownMenu trigger={<Button>Open Menu</Button>} items={mockItems} id="test-menu" />)
 
       await user.click(screen.getByText('Open Menu'))
 

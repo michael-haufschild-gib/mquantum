@@ -82,7 +82,6 @@ export interface MainObjectMRTPassConfig {
  * const mrtPass = new MainObjectMRTPass({
  *   attachments: [
  *     { resourceId: 'hdr-color', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
- *     { resourceId: 'normal-buffer', clearValue: { r: 0.5, g: 0.5, b: 1.0, a: 0 } },
  *     { resourceId: 'position-buffer', clearValue: { r: 0, g: 0, b: 0, a: 0 } },
  *   ],
  *   depthAttachment: 'depth-buffer',

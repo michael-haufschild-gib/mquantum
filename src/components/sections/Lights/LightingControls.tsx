@@ -15,6 +15,9 @@ import { useShallow } from 'zustand/react/shallow'
 import { LightEditor } from './LightEditor'
 import { LightList } from './LightList'
 
+/**
+ *
+ */
 export interface LightingControlsProps {
   className?: string
 }

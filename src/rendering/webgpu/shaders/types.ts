@@ -37,6 +37,9 @@ export type LightingMode =
   | 'simple' // Basic diffuse only (no modules needed)
   | 'pbr' // GGX + Multi-Light
 
+/**
+ *
+ */
 export interface WGSLShaderConfig {
   dimension: number
   temporal: boolean

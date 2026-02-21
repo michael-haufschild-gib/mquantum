@@ -1,5 +1,8 @@
 import { create } from 'zustand'
 
+/**
+ *
+ */
 export interface GPUStats {
   calls: number
   triangles: number
@@ -8,6 +11,9 @@ export interface GPUStats {
   uniqueVertices?: number // Actual vertex buffer count (for indexed geometry)
 }
 
+/**
+ *
+ */
 export interface MemoryStats {
   geometries: number
   textures: number
@@ -15,30 +21,44 @@ export interface MemoryStats {
   heap: number
 }
 
+/**
+ *
+ */
 export interface VRAMStats {
   geometries: number
   textures: number
   total: number
 }
 
+/**
+ *
+ */
 export interface GraphData {
   fps: number[]
   cpu: number[]
   mem: number[]
 }
 
+/**
+ *
+ */
 export interface BufferDimensions {
   width: number
   height: number
 }
 
+/**
+ *
+ */
 export interface BufferStats {
   depth: BufferDimensions
-  normal: BufferDimensions
   temporal: BufferDimensions
   screen: BufferDimensions
 }
 
+/**
+ *
+ */
 export interface PerformanceMetricsState {
   fps: number
   minFps: number
@@ -79,7 +99,6 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
   viewport: { width: 0, height: 0, dpr: 1 },
   buffers: {
     depth: { ...DEFAULT_BUFFER_DIMENSIONS },
-    normal: { ...DEFAULT_BUFFER_DIMENSIONS },
     temporal: { ...DEFAULT_BUFFER_DIMENSIONS },
     screen: { ...DEFAULT_BUFFER_DIMENSIONS },
   },

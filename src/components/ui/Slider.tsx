@@ -9,6 +9,9 @@ const DRAG_SENSITIVITY_PRECISE = 0.05
 /** Pixels of mouse movement to traverse full range */
 const DRAG_PIXELS_TO_FULL_RANGE = 200
 
+/**
+ *
+ */
 export interface SliderProps {
   label: string
   value: number
@@ -64,8 +67,12 @@ export const Slider: React.FC<SliderProps> = React.memo(
     // Sync input value with external value, but only when input is not focused
     useEffect(() => {
       if (!isInputFocused) {
-        setInputValue(value.toFixed(decimals))
+        const syncInputTimer = window.setTimeout(() => {
+          setInputValue(value.toFixed(decimals))
+        }, 0)
+        return () => clearTimeout(syncInputTimer)
       }
+      return undefined
     }, [value, decimals, isInputFocused])
 
     // Cleanup event listeners on unmount

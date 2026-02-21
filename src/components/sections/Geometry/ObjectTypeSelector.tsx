@@ -17,6 +17,9 @@ import type { ObjectType } from '@/lib/geometry/types'
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface ObjectTypeSelectorProps {
   className?: string
   disabled?: boolean

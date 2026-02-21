@@ -22,6 +22,9 @@ import React, { memo, useCallback } from 'react'
 /** Special ID for the virtual ambient light entry */
 export const AMBIENT_LIGHT_ID = '__ambient__'
 
+/**
+ *
+ */
 export interface LightListItemProps {
   light: LightSource
   isSelected: boolean

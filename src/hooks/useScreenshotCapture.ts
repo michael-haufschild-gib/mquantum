@@ -18,6 +18,9 @@ import { useCallback } from 'react'
 
 const CAPTURE_TIMEOUT_MS = 5000
 
+/**
+ *
+ */
 export interface UseScreenshotCaptureResult {
   /** Request a screenshot and wait for the result */
   captureScreenshot: () => Promise<string>

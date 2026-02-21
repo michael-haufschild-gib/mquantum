@@ -11,6 +11,9 @@ import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceSto
 import React, { useMemo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface LchPresetSelectorProps {
   className?: string
 }

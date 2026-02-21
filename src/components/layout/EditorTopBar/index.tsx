@@ -25,7 +25,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { usePresetManagerStore, type PresetManagerState } from '@/stores/presetManagerStore'
 import { useThemeStore } from '@/stores/themeStore'
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   useFileMenuItems,
@@ -136,9 +136,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
 
     // Sync sound state for menu toggle
     const [isSoundEnabled, setIsSoundEnabled] = useState(soundManager.isEnabled)
-    useEffect(() => {
-      setIsSoundEnabled(soundManager.isEnabled)
-    }, [])
 
     // --- Handlers ---
 

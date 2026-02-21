@@ -1,3 +1,4 @@
+/* global GPUComputePassDescriptor, GPUComputePassTimestampWrites, GPURenderPassDescriptor, GPURenderPassTimestampWrites, GPUSamplerDescriptor, GPUTextureFormat */
 /**
  * WebGPU Render Graph
  *
@@ -213,6 +214,9 @@ class SetupContextImpl implements WebGPUSetupContext {
 // Render Graph
 // =============================================================================
 
+/**
+ *
+ */
 export interface WebGPUBeforeSubmitHookContext {
   device: GPUDevice
   encoder: GPUCommandEncoder

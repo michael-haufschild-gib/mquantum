@@ -18,7 +18,7 @@ import {
   assembleShaderBlocks,
   generateConsolidatedBindGroups,
   generateObjectBindGroup,
-  mrtOutputBlock,
+  singleOutputBlock,
   type WGSLShaderConfig,
 } from '../shared/compose-helpers'
 
@@ -659,10 +659,10 @@ struct VertexOutput {
       condition: enableTemporal && !is2D,
     },
 
-    // MRT output struct for isosurface mode (outputs color + normal for post-processing)
+    // Non-temporal isosurface now uses a single color output.
     {
       name: 'Fragment Output (Isosurface)',
-      content: mrtOutputBlock,
+      content: singleOutputBlock,
       condition: isosurface && !enableTemporal && !is2D,
     },
 

@@ -20,13 +20,32 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
  * URL-shareable subset of application state.
  * Either a scene name or object type + dimension + quantum mode.
  */
-export interface ShareableState {
+export interface ShareableObjectState {
   dimension: number
   objectType: ObjectType
   quantumMode?: SchroedingerQuantumMode
-  /** Scene preset name (case-insensitive lookup, mutually exclusive with other params) */
-  scene?: string
 }
+
+/**
+ * Scene-based share payload.
+ * Scene links are mutually exclusive with object parameter links.
+ */
+export interface ShareableSceneState {
+  /** Scene preset name (case-insensitive lookup, mutually exclusive with other params) */
+  scene: string
+}
+
+/** Union of all URL-shareable payload variants. */
+export type ShareableState = ShareableObjectState | ShareableSceneState
+
+/**
+ * Parsed URL state where each shareable field is optional.
+ * This intentionally supports partial payloads while parsing query params.
+ */
+export type ParsedShareableState = Partial<ShareableObjectState> & Partial<ShareableSceneState>
+
+/** Strict integer parser for dimension URL params. */
+const INTEGER_PARAM_PATTERN = /^-?\d+$/
 
 /**
  * Serializes state to URL search params.
@@ -35,6 +54,14 @@ export interface ShareableState {
  */
 export function serializeState(state: ShareableState): string {
   const params = new URLSearchParams()
+
+  if ('scene' in state) {
+    const scene = state.scene.trim()
+    if (scene) {
+      params.set('scene', scene)
+    }
+    return params.toString()
+  }
 
   params.set('d', state.dimension.toString())
   params.set('t', state.objectType)
@@ -50,9 +77,9 @@ export function serializeState(state: ShareableState): string {
  * @param searchParams - URL search params string
  * @returns Partial state object
  */
-export function deserializeState(searchParams: string): Partial<ShareableState> {
+export function deserializeState(searchParams: string): ParsedShareableState {
   const params = new URLSearchParams(searchParams)
-  const state: Partial<ShareableState> = {}
+  const state: ParsedShareableState = {}
 
   // Scene parameter (mutually exclusive with other params)
   const sceneParam = params.get('scene')
@@ -65,10 +92,10 @@ export function deserializeState(searchParams: string): Partial<ShareableState> 
   }
 
   const dimension = params.get('d')
-  if (dimension) {
-    const dim = parseInt(dimension, 10)
-    if (dim >= MIN_DIMENSION && dim <= MAX_DIMENSION) {
-      state.dimension = dim
+  if (dimension && INTEGER_PARAM_PATTERN.test(dimension)) {
+    const parsed = Number(dimension)
+    if (Number.isSafeInteger(parsed) && parsed >= MIN_DIMENSION && parsed <= MAX_DIMENSION) {
+      state.dimension = parsed
     }
   }
 
@@ -101,7 +128,7 @@ export function generateShareUrl(state: ShareableState): string {
  * Parses the current URL to extract state.
  * @returns Partial state object from current URL
  */
-export function parseCurrentUrl(): Partial<ShareableState> {
+export function parseCurrentUrl(): ParsedShareableState {
   if (typeof window === 'undefined') {
     return {}
   }

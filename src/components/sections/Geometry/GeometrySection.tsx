@@ -10,6 +10,9 @@ import { DimensionSelector } from './DimensionSelector'
 import { ObjectSettingsSection } from './ObjectSettingsSection'
 import { ObjectTypeSelector } from './ObjectTypeSelector'
 
+/**
+ *
+ */
 export interface GeometrySectionProps {
   defaultOpen?: boolean
 }

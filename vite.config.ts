@@ -20,7 +20,7 @@ const faviconFiles = [
 ]
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig((_env) => ({
   plugins: [
     tailwindcss(),
     react(),

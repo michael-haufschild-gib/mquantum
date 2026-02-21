@@ -1,3 +1,4 @@
+/* global GPURenderPassDepthStencilAttachment */
 /**
  * WebGPU Scene Pass
  *

@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { Input, InputProps } from './Input'
 
+/**
+ *
+ */
 export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'> {
   value: number
   onChange: (value: number) => void
@@ -9,6 +12,8 @@ export interface NumberInputProps extends Omit<InputProps, 'onChange' | 'value'>
   step?: number
   precision?: number
 }
+
+const DECIMAL_TOKEN_PATTERN = /^(?:\d+\.?\d*|\.\d+)$/
 
 /**
  * Tokenizes a math expression into numbers, operators, and parentheses.
@@ -42,6 +47,7 @@ function tokenize(expr: string): (string | number)[] | null {
         numStr += expr.charAt(i)
         i++
       }
+      if (!DECIMAL_TOKEN_PATTERN.test(numStr)) return null
       const num = parseFloat(numStr)
       if (isNaN(num)) return null
       tokens.push(num)
@@ -209,12 +215,16 @@ export const NumberInput: React.FC<NumberInputProps> = React.memo(
     useEffect(() => {
       // Only update local value when not focused to allow typing without snapping
       if (!isFocused) {
-        setLocalValue(
-          Number(value)
-            .toFixed(precision)
-            .replace(/\.?0+$/, '')
-        )
+        const syncValueTimer = window.setTimeout(() => {
+          setLocalValue(
+            Number(value)
+              .toFixed(precision)
+              .replace(/\.?0+$/, '')
+          )
+        }, 0)
+        return () => clearTimeout(syncValueTimer)
       }
+      return undefined
     }, [value, precision, isFocused])
 
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

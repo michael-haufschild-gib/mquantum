@@ -116,12 +116,12 @@ fn lookupEigenfunction(funcIdx: i32, x: f32) -> vec2f {
 
   // Robust mode: explicit linear extrapolation outside cache domain.
   if (USE_ROBUST_EIGEN_INTERPOLATION) {
-    let left = readCacheEntry(funcIdx, 0);
-    let right = readCacheEntry(funcIdx, i32(EIGEN_CACHE_SAMPLES) - 1);
     if (x <= xMin) {
+      let left = readCacheEntry(funcIdx, 0);
       return vec2f(left.x + left.y * (x - xMin), left.y);
     }
     if (x >= xMax) {
+      let right = readCacheEntry(funcIdx, i32(EIGEN_CACHE_SAMPLES) - 1);
       return vec2f(right.x + right.y * (x - xMax), right.y);
     }
   }
@@ -158,11 +158,55 @@ fn lookupEigenfunction(funcIdx: i32, x: f32) -> vec2f {
   return result;
 }
 
+// Value-only cache lookup for hot density sampling paths (e.g. isosurface march loop).
+// Keeps robust interpolation semantics while avoiding derivative-channel interpolation work.
+fn lookupEigenfunctionValue(funcIdx: i32, x: f32) -> f32 {
+  let fMeta = eigenMeta.funcMeta[funcIdx];
+  let xMin = fMeta.x;
+  let xMax = fMeta.y;
+  let invRange = fMeta.z;
+
+  if (USE_ROBUST_EIGEN_INTERPOLATION) {
+    if (x <= xMin) {
+      let left = readCacheEntry(funcIdx, 0);
+      return left.x + left.y * (x - xMin);
+    }
+    if (x >= xMax) {
+      let right = readCacheEntry(funcIdx, i32(EIGEN_CACHE_SAMPLES) - 1);
+      return right.x + right.y * (x - xMax);
+    }
+  }
+
+  let tNorm = clamp((x - xMin) * invRange, 0.0, f32(EIGEN_CACHE_SAMPLES - 1u));
+  let i = i32(floor(tNorm));
+  let f = tNorm - f32(i);
+
+  let p0 = readCacheEntry(funcIdx, i - 1).x;
+  let p1 = readCacheEntry(funcIdx, i).x;
+  let p2 = readCacheEntry(funcIdx, i + 1).x;
+  let p3 = readCacheEntry(funcIdx, i + 2).x;
+
+  if (USE_ROBUST_EIGEN_INTERPOLATION) {
+    let signSensitive = (p0 * p1 <= 0.0) || (p1 * p2 <= 0.0) || (p2 * p3 <= 0.0);
+    if (signSensitive) {
+      return p1 + f * (p2 - p1);
+    }
+    return monotoneHermiteScalar(p0, p1, p2, p3, f);
+  }
+
+  let f2 = f * f;
+  let f3 = f2 * f;
+  return p1
+    + 0.5 * f * (p2 - p0)
+    + 0.5 * f2 * (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3)
+    + 0.5 * f3 * (3.0 * (p1 - p2) + p3 - p0);
+}
+
 // Drop-in replacement for ho1D() using cache lookup
 // Returns φ_n(x) (eigenfunction value)
 fn ho1DCached(funcIdx: i32, x: f32) -> f32 {
   if (funcIdx < 0) { return 0.0; }
-  return lookupEigenfunction(funcIdx, x).x;
+  return lookupEigenfunctionValue(funcIdx, x);
 }
 
 // Returns φ'_n(x) (eigenfunction derivative)

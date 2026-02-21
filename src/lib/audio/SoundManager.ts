@@ -163,6 +163,7 @@ class SoundManager {
   public playSuccess() {
     if (!this.ctx || !this.masterGain || !this.enabled) return
     const ctx = this.ctx
+    const masterGain = this.masterGain
 
     const now = ctx.currentTime
 
@@ -179,7 +180,7 @@ class SoundManager {
       gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4)
 
       osc.connect(gain)
-      gain.connect(this.masterGain)
+      gain.connect(masterGain)
 
       osc.start(now + i * 0.05)
       osc.stop(now + i * 0.05 + 0.4)

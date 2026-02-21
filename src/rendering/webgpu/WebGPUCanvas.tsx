@@ -11,11 +11,15 @@ import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 import { useRendererStore } from '@/stores/rendererStore'
+import { WebGPUContext, type WebGPUCanvasContext } from './WebGPUContext'
 
 // ============================================================================
 // Types
 // ============================================================================
 
+/**
+ *
+ */
 export interface WebGPUCanvasProps {
   /** CSS class name for the canvas container */
   className?: string
@@ -29,34 +33,6 @@ export interface WebGPUCanvasProps {
   dpr?: number
   /** Children to render (typically WebGPUScene) */
   children?: React.ReactNode
-}
-
-export interface WebGPUCanvasContext {
-  /** The WebGPU device manager */
-  device: WebGPUDevice
-  /** The render graph */
-  graph: WebGPURenderGraph
-  /** Canvas element */
-  canvas: HTMLCanvasElement
-  /** Current canvas size */
-  size: { width: number; height: number }
-}
-
-// ============================================================================
-// Context
-// ============================================================================
-
-export const WebGPUContext = React.createContext<WebGPUCanvasContext | null>(null)
-
-/**
- * Hook to access WebGPU context from child components.
- */
-export function useWebGPU(): WebGPUCanvasContext {
-  const context = React.useContext(WebGPUContext)
-  if (!context) {
-    throw new Error('useWebGPU must be used within a WebGPUCanvas')
-  }
-  return context
 }
 
 // ============================================================================
@@ -94,7 +70,6 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<WebGPURenderGraph | null>(null)
-  const frameIdRef = useRef<number>(0)
   const dprRef = useRef<number | undefined>(dpr)
   dprRef.current = dpr
 
@@ -180,9 +155,6 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         graphRef.current.dispose()
         graphRef.current = null
       }
-      if (frameIdRef.current) {
-        cancelAnimationFrame(frameIdRef.current)
-      }
     }
   }, [onReady, onError, handleDeviceLost])
 
@@ -242,7 +214,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'var(--color-error, #ff4444)',
+          color: 'var(--text-danger)',
         }}
       >
         <div style={{ textAlign: 'center', padding: '20px' }}>

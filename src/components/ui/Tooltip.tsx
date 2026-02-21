@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { m, AnimatePresence } from 'motion/react'
 import { createPortal } from 'react-dom'
 
+/**
+ *
+ */
 export interface TooltipProps {
   content: string | React.ReactNode
   children: React.ReactNode

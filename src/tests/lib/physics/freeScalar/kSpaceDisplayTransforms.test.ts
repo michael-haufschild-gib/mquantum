@@ -277,6 +277,33 @@ describe('applyExposureTransfer', () => {
     expect(grid.nk[0]).toBe(5.0)
   })
 
+  it('keeps original values when log exposure percentile window is degenerate', () => {
+    const G = OUTPUT_GRID_SIZE
+    const nk = new Float64Array(G ** 3)
+    nk[0] = 0.5
+    nk[1] = 0.5
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 0.5,
+    }
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'log',
+      lowPercentile: 0,
+      highPercentile: 100,
+      gamma: 1.0,
+    })
+
+    expect(grid.nk[0]).toBe(0.5)
+    expect(grid.nk[1]).toBe(0.5)
+    expect(grid.nkMax).toBe(0.5)
+  })
+
   it('sanitizes non-finite percentile/gamma parameters', () => {
     const G = OUTPUT_GRID_SIZE
     const nk = new Float64Array(G ** 3)

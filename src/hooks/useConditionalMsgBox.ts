@@ -10,6 +10,9 @@ import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
 import { useMsgBoxStore, type MsgBoxAction, type MsgBoxType } from '@/stores/msgBoxStore'
 import { useCallback } from 'react'
 
+/**
+ *
+ */
 export interface UseConditionalMsgBoxResult {
   /**
    * Shows a message box only if it hasn't been permanently dismissed.

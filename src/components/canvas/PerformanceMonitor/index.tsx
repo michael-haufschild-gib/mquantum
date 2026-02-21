@@ -39,8 +39,6 @@ export function PerformanceMonitor() {
   // Resize Observer - only when expanded
   useEffect(() => {
     if (!expanded) {
-      setWidth(180)
-      setHeight(48)
       return
     }
 
@@ -57,8 +55,11 @@ export function PerformanceMonitor() {
     return () => observer.disconnect()
   }, [expanded])
 
+  const effectiveWidth = expanded ? width : 180
+  const effectiveHeight = expanded ? height : 48
+
   // Panel collision - keeps monitor from being covered by sidebars/toolbars
-  usePanelCollision(x, y, width, height, isDragging)
+  usePanelCollision(x, y, effectiveWidth, effectiveHeight, isDragging)
 
   return (
     <LazyMotion features={domMax}>

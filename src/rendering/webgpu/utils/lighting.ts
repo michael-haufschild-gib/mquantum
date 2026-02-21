@@ -103,6 +103,6 @@ export function packLightingUniforms(data: Float32Array, lighting: WebGPULightin
   data[131] = (lighting.ambientEnabled !== false ? 1 : 0) * (lighting.ambientIntensity ?? 0.3)
 
   // lightCount: i32 at offset 132 (use DataView for correct type)
-  const view = new DataView(data.buffer)
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
   view.setInt32(132 * 4, lightCount, true)
 }

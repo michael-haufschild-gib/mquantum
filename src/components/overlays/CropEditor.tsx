@@ -41,12 +41,16 @@ export const CropEditor = () => {
   useEffect(() => {
     if (isCropEditorOpen) {
       const { x, y, width, height, enabled } = settings.crop
-      if (enabled && width > 0) {
-        setCrop({ x, y, width, height })
-      } else {
-        setCrop({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 })
-      }
+      const syncCropTimer = window.setTimeout(() => {
+        if (enabled && width > 0) {
+          setCrop({ x, y, width, height })
+        } else {
+          setCrop({ x: 0.1, y: 0.1, width: 0.8, height: 0.8 })
+        }
+      }, 0)
+      return () => clearTimeout(syncCropTimer)
     }
+    return undefined
   }, [isCropEditorOpen, settings.crop])
 
   // Recapture screenshot before reopening modal
@@ -146,12 +150,14 @@ export const CropEditor = () => {
         </div>
 
         <div className="flex gap-3">
-          <button
+          <Button
             onClick={handleCancel}
             className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+            variant="ghost"
+            size="sm"
           >
             Cancel
-          </button>
+          </Button>
           <Button variant="primary" onClick={handleConfirm} glow className="px-6">
             <Icon name="check" className="mr-2" />
             Confirm Area

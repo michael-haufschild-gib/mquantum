@@ -10,6 +10,9 @@ import { useShallow } from 'zustand/react/shallow'
 import { Slider } from '@/components/ui/Slider'
 import { usePostProcessingStore, type PostProcessingSlice } from '@/stores/postProcessingStore'
 
+/**
+ *
+ */
 export interface BloomControlsProps {
   className?: string
 }

@@ -9,6 +9,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+/**
+ *
+ */
 export interface DismissedDialogsState {
   /** Set of dialog IDs that have been dismissed */
   dismissedIds: Set<string>

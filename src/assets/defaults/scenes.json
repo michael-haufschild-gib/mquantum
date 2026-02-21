@@ -624,7 +624,6 @@
       },
       "ui": {
         "showDepthBuffer": false,
-        "showNormalBuffer": false,
         "showTemporalDepthBuffer": false,
         "animationBias": 0,
         "maxFps": 60,
@@ -1302,7 +1301,6 @@
       },
       "ui": {
         "showDepthBuffer": false,
-        "showNormalBuffer": false,
         "showTemporalDepthBuffer": false,
         "animationBias": 0.55,
         "maxFps": 60,
@@ -1932,7 +1930,6 @@
       },
       "ui": {
         "showDepthBuffer": false,
-        "showNormalBuffer": false,
         "showTemporalDepthBuffer": false,
         "animationBias": 0.6,
         "maxFps": 60,
@@ -2522,7 +2519,6 @@
       },
       "ui": {
         "showDepthBuffer": false,
-        "showNormalBuffer": false,
         "showTemporalDepthBuffer": false,
         "animationBias": 0,
         "maxFps": 120
@@ -3101,7 +3097,6 @@
       },
       "ui": {
         "showDepthBuffer": false,
-        "showNormalBuffer": false,
         "showTemporalDepthBuffer": false,
         "animationBias": 0,
         "maxFps": 60,

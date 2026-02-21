@@ -11,6 +11,7 @@ import type {
   SchroedingerCrossSectionPlaneMode,
   SchroedingerCrossSectionScalar,
 } from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
 import { SecondQuantizationSection } from '@/components/sections/Geometry/SchroedingerControls/SecondQuantizationSection'
 import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
@@ -46,6 +47,9 @@ const CROSS_SECTION_AXIS_OPTIONS: { value: SchroedingerCrossSectionAxis; label: 
   { value: 'z', label: 'XY (Z-Normal)' },
 ]
 
+/**
+ *
+ */
 export interface SchroedingerCrossSectionSectionProps {
   defaultOpen?: boolean
 }
@@ -267,7 +271,10 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
               <div data-testid="schroedinger-cross-section-plane-color">
                 <ColorPicker
                   label="Plane Color"
-                  value={config.crossSectionPlaneColor ?? '#66ccff'}
+                  value={
+                    config.crossSectionPlaneColor ??
+                    DEFAULT_SCHROEDINGER_CONFIG.crossSectionPlaneColor
+                  }
                   onChange={setCrossSectionPlaneColor}
                   disableAlpha={true}
                   className="w-full"
@@ -350,7 +357,10 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
                 >
                   <label className="text-xs text-text-secondary">Shell Color</label>
                   <ColorPicker
-                    value={config.radialProbabilityColor ?? '#44aaff'}
+                    value={
+                      config.radialProbabilityColor ??
+                      DEFAULT_SCHROEDINGER_CONFIG.radialProbabilityColor
+                    }
                     onChange={setRadialProbabilityColor}
                     disableAlpha={true}
                     className="w-24"

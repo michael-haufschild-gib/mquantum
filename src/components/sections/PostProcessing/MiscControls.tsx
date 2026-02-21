@@ -18,6 +18,9 @@ import { type AntiAliasingMethod } from '@/stores/defaults/visualDefaults'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface MiscControlsProps {
   className?: string
 }

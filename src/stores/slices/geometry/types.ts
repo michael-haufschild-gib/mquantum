@@ -20,10 +20,16 @@ import {
 // ============================================================================
 // Schroedinger Slice
 // ============================================================================
+/**
+ *
+ */
 export interface SchroedingerSliceState {
   schroedinger: SchroedingerConfig
 }
 
+/**
+ *
+ */
 export interface SchroedingerSliceActions {
   // Geometry Settings
   setSchroedingerScale: (scale: number) => void
@@ -291,11 +297,17 @@ export interface SchroedingerSliceActions {
   getSchroedingerConfig: () => SchroedingerConfig
 }
 
+/**
+ *
+ */
 export type SchroedingerSlice = SchroedingerSliceState & SchroedingerSliceActions
 
 // ============================================================================
 // Combined Extended Object Slice
 // ============================================================================
+/**
+ *
+ */
 export type ExtendedObjectSlice = SchroedingerSlice & {
   /** Version counter for schroedinger state changes (dirty-flag tracking) */
   schroedingerVersion: number

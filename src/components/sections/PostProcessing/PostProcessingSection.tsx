@@ -7,6 +7,9 @@ import { Section } from '@/components/sections/Section'
 import React from 'react'
 import { PostProcessingControls } from './PostProcessingControls'
 
+/**
+ *
+ */
 export interface PostProcessingSectionProps {
   defaultOpen?: boolean
 }

@@ -1,3 +1,4 @@
+/* global GPUTextureViewDimension */
 /**
  * Density Grid Compute Pass
  *
@@ -624,7 +625,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     }
 
     // Early exit if no update needed (same config, no quantum parameter changes)
-    const animation = ctx.frame?.stores?.['animation'] as any
+    const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
     const time = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     if (!this.needsUpdate(time, this.passConfig.dimension, this.passConfig.quantumMode)) {
       return

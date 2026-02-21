@@ -1,4 +1,0 @@
-Root cause: exportStore persist.merge deep-merged persisted settings without runtime validation, allowing corrupted localStorage values to bypass updateSettings sanitization.
-Fix: introduced sanitizeHydratedSettings/sanitizeHydratedTextOverlay/sanitizeHydratedCrop plus shared enum guards in src/stores/exportStore.ts, and changed persist.merge to hydrate through sanitizeHydratedSettings.
-Fail-first test: src/tests/stores/exportStore.test.ts -> 'sanitizes invalid persisted export settings on rehydrate' failed before fix (format hydrated as 'avi'), passes after fix.
-Verification: targeted rehydrate test passes; export-related suite passes (139 tests); eslint passes on touched files.

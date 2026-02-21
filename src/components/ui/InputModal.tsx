@@ -35,15 +35,22 @@ export const InputModal: React.FC<InputModalProps> = React.memo(
 
     useEffect(() => {
       if (isOpen) {
-        setValue(initialValue)
+        const syncValueTimer = window.setTimeout(() => {
+          setValue(initialValue)
+        }, 0)
         // Focus after animation
-        setTimeout(() => {
+        const focusTimer = window.setTimeout(() => {
           inputRef.current?.focus()
           if (readOnly) {
             inputRef.current?.select()
           }
         }, 100)
+        return () => {
+          clearTimeout(syncValueTimer)
+          clearTimeout(focusTimer)
+        }
       }
+      return undefined
     }, [isOpen, initialValue, readOnly])
 
     const handleConfirm = useCallback(() => {

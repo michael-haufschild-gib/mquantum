@@ -9,6 +9,9 @@ import { EigenfunctionCacheControls } from './EigenfunctionCacheControls'
 import { ProgressiveRefinementControls } from './ProgressiveRefinementControls'
 import { TemporalReprojectionControls } from './TemporalReprojectionControls'
 
+/**
+ *
+ */
 export interface PerformanceSectionProps {
   defaultOpen?: boolean
 }

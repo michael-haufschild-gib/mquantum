@@ -7,6 +7,9 @@ import { Section } from '@/components/sections/Section'
 import React from 'react'
 import { KeyboardShortcuts } from '@/components/sections/Shortcuts/KeyboardShortcuts'
 
+/**
+ *
+ */
 export interface ShortcutsSectionProps {
   defaultOpen?: boolean
 }

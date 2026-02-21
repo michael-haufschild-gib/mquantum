@@ -92,4 +92,15 @@ describe('evaluateFpsLimit', () => {
     expect(result.achievedFps).toBeGreaterThan(59.5)
     expect(result.achievedFps).toBeLessThan(60.5)
   })
+
+  it('recovers when limiter anchor is non-finite instead of freezing render decisions', () => {
+    const decision = evaluateFpsLimit({
+      nowMs: 100,
+      throttleAnchorMs: Number.POSITIVE_INFINITY,
+      maxFps: 60,
+    })
+
+    expect(decision.shouldRender).toBe(true)
+    expect(Number.isFinite(decision.nextThrottleAnchorMs)).toBe(true)
+  })
 })

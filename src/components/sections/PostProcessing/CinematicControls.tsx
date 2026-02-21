@@ -12,6 +12,9 @@ import { TONE_MAPPING_OPTIONS, type ToneMappingAlgorithm } from '@/rendering/sha
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface CinematicControlsProps {
   className?: string
 }

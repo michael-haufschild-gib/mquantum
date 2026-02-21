@@ -1,3 +1,4 @@
+/* global GPUBlendState */
 /**
  * WebGPU Debug Overlay Pass
  *

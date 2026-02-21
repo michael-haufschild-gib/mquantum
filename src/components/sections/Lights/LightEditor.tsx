@@ -26,7 +26,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { AMBIENT_LIGHT_ID } from './LightListItem'
 import { Vector3Input } from './Vector3Input'
 
+/**
+ * Props for LightEditor.
+ */
 export interface LightEditorProps {
+  /** Optional container class name. */
   className?: string
 }
 
@@ -280,7 +284,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
         <>
           <Slider
             label="Range"
-            min={1}
+            min={0}
             max={100}
             step={1}
             value={selectedLight.range}
@@ -290,7 +294,7 @@ export const LightEditor: React.FC<LightEditorProps> = memo(function LightEditor
 
           <Slider
             label="Decay"
-            min={0.1}
+            min={0}
             max={3}
             step={0.1}
             value={selectedLight.decay}

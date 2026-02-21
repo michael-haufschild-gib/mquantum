@@ -1,3 +1,4 @@
+/* global GPUBindGroupEntry, GPUBindGroupLayoutEntry, GPUBlendState, GPULoadOp */
 /**
  * WebGPU Fullscreen Pass
  *

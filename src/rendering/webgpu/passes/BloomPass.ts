@@ -43,6 +43,9 @@ interface BloomStoreState {
   bloomRadius?: number
 }
 
+/**
+ *
+ */
 export interface BloomPassOptions {
   /**
    * Base scene color input used for final composite.
@@ -60,6 +63,9 @@ export interface BloomPassOptions {
   filterRadius?: number
 }
 
+/**
+ *
+ */
 export class BloomPass extends WebGPUBasePass {
   // Pipelines
   private prefilterPipeline: GPURenderPipeline | null = null

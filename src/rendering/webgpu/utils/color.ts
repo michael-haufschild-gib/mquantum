@@ -8,6 +8,7 @@
  * @module rendering/webgpu/utils/color
  */
 
+/** RGB triplet with channels normalized to [0, 1]. */
 export type Rgb = readonly [number, number, number]
 const LINEAR_COLOR_CACHE_MAX_ENTRIES = 512
 const linearColorCache = new Map<string, Rgb>()
@@ -31,7 +32,9 @@ export function srgbToLinearChannel(c: number): number {
  */
 export function parseHexColorToSrgbRgb(hex: string): Rgb | null {
   if (!hex || typeof hex !== 'string') return null
-  const cleaned = hex.startsWith('#') ? hex.slice(1) : hex
+  const normalized = hex.trim()
+  if (!normalized) return null
+  const cleaned = normalized.startsWith('#') ? normalized.slice(1) : normalized
 
   const expanded =
     cleaned.length === 3
@@ -41,6 +44,7 @@ export function parseHexColorToSrgbRgb(hex: string): Rgb | null {
         : null
 
   if (!expanded) return null
+  if (!/^[0-9a-f]{6}$/i.test(expanded)) return null
 
   const value = Number.parseInt(expanded, 16)
   if (!Number.isFinite(value)) return null

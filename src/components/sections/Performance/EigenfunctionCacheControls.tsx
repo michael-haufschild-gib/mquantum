@@ -19,16 +19,16 @@ export const EigenfunctionCacheControls: React.FC = () => {
     setCacheEnabled,
     analyticalGradientEnabled,
     setAnalyticalGradientEnabled,
-    robustEigenInterpolationEnabled,
-    setRobustEigenInterpolationEnabled,
+    fastEigenInterpolationEnabled,
+    setFastEigenInterpolationEnabled,
   } = usePerformanceStore(
     useShallow((s) => ({
       cacheEnabled: s.eigenfunctionCacheEnabled,
       setCacheEnabled: s.setEigenfunctionCacheEnabled,
       analyticalGradientEnabled: s.analyticalGradientEnabled,
       setAnalyticalGradientEnabled: s.setAnalyticalGradientEnabled,
-      robustEigenInterpolationEnabled: s.robustEigenInterpolationEnabled,
-      setRobustEigenInterpolationEnabled: s.setRobustEigenInterpolationEnabled,
+      fastEigenInterpolationEnabled: s.fastEigenInterpolationEnabled,
+      setFastEigenInterpolationEnabled: s.setFastEigenInterpolationEnabled,
     }))
   )
 
@@ -49,15 +49,15 @@ export const EigenfunctionCacheControls: React.FC = () => {
           data-testid="analytical-gradient-toggle"
         />
         <Switch
-          checked={robustEigenInterpolationEnabled}
-          onCheckedChange={setRobustEigenInterpolationEnabled}
-          label="Robust Eigen Interpolation"
+          checked={fastEigenInterpolationEnabled}
+          onCheckedChange={setFastEigenInterpolationEnabled}
+          label="Fast Eigen Interpolation"
           disabled={!cacheEnabled}
-          data-testid="robust-eigen-interpolation-toggle"
+          data-testid="fast-eigen-interpolation-toggle"
         />
       </div>
       <p className="text-xs text-text-tertiary ml-4">
-        Cache accelerates HO/Hydrogen-ND lookups; subordinate toggles let you isolate gradient and interpolation effects.
+        Fast Eigen Interpolation ON favors FPS; OFF enables the slower robust interpolation path.
       </p>
     </div>
   )

@@ -32,7 +32,6 @@ export {
   generateObjectBindGroup,
   generateStandardBindGroups,
   generateTextureBindings,
-  mrtOutputBlock,
   processFeatureFlags,
   raymarchVertexInputsBlock,
   singleOutputBlock,

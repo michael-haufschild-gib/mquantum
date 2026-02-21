@@ -3,6 +3,9 @@ import { m, HTMLMotionProps } from 'motion/react'
 import { LoadingSpinner } from './LoadingSpinner'
 import { soundManager } from '@/lib/audio/SoundManager'
 
+/**
+ *
+ */
 export interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   size?: 'sm' | 'md' | 'lg' | 'icon'

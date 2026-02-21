@@ -14,6 +14,9 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import React, { useMemo, useCallback, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface ColorAlgorithmSelectorProps {
   className?: string
 }

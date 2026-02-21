@@ -1,6 +1,9 @@
 import { m, PanInfo } from 'motion/react'
 import React, { useCallback, useId } from 'react'
 
+/**
+ *
+ */
 export interface KnobProps {
   value: number
   min?: number

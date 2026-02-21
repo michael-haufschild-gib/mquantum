@@ -6,7 +6,11 @@
  */
 
 import React, { memo, useCallback, useState, useEffect, useRef } from 'react'
+import { Input } from '@/components/ui/Input'
 
+/**
+ *
+ */
 export interface Vector3InputProps {
   label: string
   value: [number, number, number]
@@ -117,7 +121,7 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
             >
               {axis}
             </span>
-            <input
+            <Input
               type="number"
               value={localValues[i]}
               onFocus={() => handleFocus(i)}
@@ -125,6 +129,7 @@ export const Vector3Input: React.FC<Vector3InputProps> = memo(function Vector3In
               onBlur={() => handleBlur(i as 0 | 1 | 2)}
               step={step * displayMultiplier}
               className="w-full pl-6 pr-2 py-1.5 text-xs font-mono bg-panel-border/50 border border-panel-border rounded text-text-primary focus:outline-none focus:border-accent"
+              containerClassName=""
               aria-label={`${label} ${axis}`}
             />
           </div>

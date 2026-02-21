@@ -332,10 +332,16 @@ export function clampPenumbra(penumbra: number): number {
  * Validate range is within bounds.
  *
  * @param range - Input range value
- * @returns Clamped range (1-100)
+ * @returns Clamped range (0 for infinite, otherwise 1-100)
  */
 export function clampRange(range: number): number {
   if (!Number.isFinite(range)) {
+    return 1
+  }
+  if (range === 0) {
+    return 0
+  }
+  if (range < 0) {
     return 1
   }
   return Math.max(1, Math.min(100, range))
@@ -346,13 +352,16 @@ export function clampRange(range: number): number {
  * 1 = linear, 2 = physically correct inverse square.
  *
  * @param decay - Input decay value
- * @returns Clamped decay (0.1-3)
+ * @returns Clamped decay (0 = no decay, 1 = linear, 2 = inverse square, max 3)
  */
 export function clampDecay(decay: number): number {
   if (!Number.isFinite(decay)) {
     return 0.1
   }
-  return Math.max(0.1, Math.min(3, decay))
+  if (decay <= 0) {
+    return 0
+  }
+  return Math.max(0, Math.min(3, decay))
 }
 
 /**

@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 
+/**
+ *
+ */
 export type MsgBoxType = 'info' | 'success' | 'warning' | 'error'
 
+/**
+ *
+ */
 export interface MsgBoxAction {
   label: string
   onClick: () => void

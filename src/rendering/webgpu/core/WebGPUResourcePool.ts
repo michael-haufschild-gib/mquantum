@@ -1,3 +1,4 @@
+/* global GPUTextureFormat */
 /**
  * WebGPU Resource Pool
  *
@@ -414,12 +415,13 @@ export class WebGPUResourcePool {
           height: size.height ?? 256,
         }
 
-      case 'fraction':
+      case 'fraction': {
         const fraction = size.fraction ?? 1
         return {
           width: Math.max(1, Math.floor((this.width || 1) * fraction)),
           height: Math.max(1, Math.floor((this.height || 1) * fraction)),
         }
+      }
 
       default:
         return { width: this.width || 1, height: this.height || 1 }

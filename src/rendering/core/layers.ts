@@ -39,6 +39,9 @@ export const RENDER_LAYERS = {
   DEBUG: 4,
 } as const
 
+/**
+ *
+ */
 export type RenderLayer = (typeof RENDER_LAYERS)[keyof typeof RENDER_LAYERS]
 
 /**

@@ -4,10 +4,12 @@
 
 import { renderHook, waitFor } from '@testing-library/react'
 import { useUrlState } from '@/hooks/useUrlState'
+import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
 import type { ShareableState } from '@/lib/url/state-serializer'
 import { parseCurrentUrl } from '@/lib/url/state-serializer'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { usePresetManagerStore } from '@/stores/presetManagerStore'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/url/state-serializer', async () => {
@@ -21,11 +23,20 @@ vi.mock('@/lib/url/state-serializer', async () => {
   }
 })
 
+vi.mock('@/lib/sceneExamples', () => ({
+  findSceneByName: vi.fn(),
+  applySceneExample: vi.fn(),
+}))
+
 describe('useUrlState', () => {
   const mockedParseCurrentUrl = vi.mocked(parseCurrentUrl)
+  const mockedFindSceneByName = vi.mocked(findSceneByName)
+  const mockedApplySceneExample = vi.mocked(applySceneExample)
 
   beforeEach(() => {
     mockedParseCurrentUrl.mockReset()
+    mockedFindSceneByName.mockReset()
+    mockedApplySceneExample.mockReset()
     useGeometryStore.getState().reset()
     useExtendedObjectStore.getState().reset()
   })
@@ -73,5 +84,20 @@ describe('useUrlState', () => {
     await waitFor(() => {
       expect(useGeometryStore.getState().dimension).toBe(initialDimension)
     })
+  })
+
+  it('loads scene examples when scene parameter is present', async () => {
+    const hasHydratedSpy = vi.spyOn(usePresetManagerStore.persist, 'hasHydrated').mockReturnValue(true)
+    mockedParseCurrentUrl.mockReturnValue({ scene: 'schroedinger bloom' })
+    mockedFindSceneByName.mockReturnValue({ id: 'schroedinger-bloom', source: 'example' })
+
+    renderHook(() => useUrlState())
+
+    await waitFor(() => {
+      expect(mockedFindSceneByName).toHaveBeenCalledWith('schroedinger bloom')
+      expect(mockedApplySceneExample).toHaveBeenCalledWith('schroedinger-bloom')
+    })
+
+    hasHydratedSpy.mockRestore()
   })
 })

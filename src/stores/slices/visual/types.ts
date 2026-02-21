@@ -18,6 +18,9 @@ import type {
 // Color Slice
 // ============================================================================
 
+/**
+ *
+ */
 export interface ColorSliceState {
   // Basic
   edgeColor: string
@@ -37,6 +40,9 @@ export interface ColorSliceState {
   divergingPsi: DivergingPsiSettings
 }
 
+/**
+ *
+ */
 export interface ColorSliceActions {
   setEdgeColor: (color: string) => void
   setFaceColor: (color: string) => void
@@ -55,6 +61,9 @@ export interface ColorSliceActions {
   setDivergingPsiSettings: (settings: Partial<DivergingPsiSettings>) => void
 }
 
+/**
+ *
+ */
 export type ColorSlice = ColorSliceState & ColorSliceActions
 
 // ============================================================================
@@ -73,36 +82,54 @@ export interface MaterialSliceState {
   faceEmissionColorShift: number
 }
 
+/**
+ *
+ */
 export interface MaterialSliceActions {
   setFaceEmission: (emission: number) => void
   setFaceEmissionThreshold: (threshold: number) => void
   setFaceEmissionColorShift: (shift: number) => void
 }
 
+/**
+ *
+ */
 export type MaterialSlice = MaterialSliceState & MaterialSliceActions
 
 // ============================================================================
 // Render Slice
 // ============================================================================
 
+/**
+ *
+ */
 export interface RenderSliceState {
   // Shader System
   shaderType: ShaderType
   shaderSettings: AllShaderSettings
 }
 
+/**
+ *
+ */
 export interface RenderSliceActions {
   setShaderType: (shaderType: ShaderType) => void
   setWireframeSettings: (settings: Partial<WireframeSettings>) => void
   setSurfaceSettings: (settings: Partial<SurfaceSettings>) => void
 }
 
+/**
+ *
+ */
 export type RenderSlice = RenderSliceState & RenderSliceActions
 
 // ============================================================================
 // Advanced Rendering Slice
 // ============================================================================
 
+/**
+ *
+ */
 export interface AdvancedRenderingState {
   // Subsurface Scattering
   sssEnabled: boolean
@@ -112,6 +139,9 @@ export interface AdvancedRenderingState {
   sssJitter: number
 }
 
+/**
+ *
+ */
 export interface AdvancedRenderingActions {
   setSssEnabled: (enabled: boolean) => void
   setSssIntensity: (intensity: number) => void
@@ -120,16 +150,25 @@ export interface AdvancedRenderingActions {
   setSssJitter: (jitter: number) => void
 }
 
+/**
+ *
+ */
 export type AdvancedRenderingSlice = AdvancedRenderingState & AdvancedRenderingActions
 
 // ============================================================================
 // Combined Appearance Slice
 // ============================================================================
 
+/**
+ *
+ */
 export interface AppearanceResetAction {
   reset: () => void
 }
 
+/**
+ *
+ */
 export type AppearanceSlice = ColorSlice &
   MaterialSlice &
   RenderSlice &

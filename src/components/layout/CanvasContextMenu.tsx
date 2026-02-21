@@ -6,6 +6,7 @@ import { useDropdownStore } from '@/stores/dropdownStore'
 import { useShallow } from 'zustand/react/shallow'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { getModifierSymbols } from '@/lib/platform'
+import { Button } from '@/components/ui/Button'
 
 const DROPDOWN_ID = 'canvas-context-menu'
 
@@ -147,11 +148,13 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
                 return <div key={index} className="h-[1px] bg-[var(--border-subtle)] my-1 mx-2" />
               }
               return (
-                <button
+                <Button
                   key={index}
                   onClick={() => handleItemClick(item.action)}
                   onMouseEnter={handleItemHover}
-                  className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group"
+                  className="w-full text-left px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex justify-between items-center transition-colors group rounded-none border-none bg-transparent"
+                  size="sm"
+                  variant="ghost"
                 >
                   <span>{item.label}</span>
                   {item.shortcut && (
@@ -159,7 +162,7 @@ export const CanvasContextMenu: React.FC = React.memo(() => {
                       {item.shortcut}
                     </span>
                   )}
-                </button>
+                </Button>
               )
             })}
           </m.div>

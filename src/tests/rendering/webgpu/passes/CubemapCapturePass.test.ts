@@ -1,3 +1,4 @@
+/* global GPURenderPipelineDescriptor */
 import { describe, expect, it, vi } from 'vitest'
 import type { WebGPUSetupContext } from '@/rendering/webgpu/core/types'
 import { CubemapCapturePass } from '@/rendering/webgpu/passes/CubemapCapturePass'
@@ -47,7 +48,8 @@ describe('CubemapCapturePass', () => {
 
     expect(createRenderPipeline).toHaveBeenCalledTimes(1)
     const descriptor = createRenderPipeline.mock.calls[0]?.[0] as GPURenderPipelineDescriptor
-    expect(descriptor.fragment?.targets?.[0]?.format).toBe('rgba16float')
+    const fragmentTargets = Array.from(descriptor.fragment?.targets ?? [])
+    expect(fragmentTargets[0]?.format).toBe('rgba16float')
   })
 
   it('detects procedural animation from proceduralSettings.timeScale', () => {

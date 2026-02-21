@@ -1,3 +1,4 @@
+/* global GPUBindGroupEntry, GPUBindGroupLayoutEntry, GPUCompareFunction, GPURenderPassColorAttachment, GPUTextureFormat */
 /**
  * WebGPU Schrödinger Renderer
  *
@@ -24,6 +25,7 @@ import {
   flattenPresetForUniforms,
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
 import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
@@ -33,6 +35,11 @@ import { TDSEComputePass } from '../passes/TDSEComputePass'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
+import type { AppearanceStoreState } from '@/stores/appearanceStore'
+import type { AnimationState } from '@/stores/animationStore'
+import type { GeometryState } from '@/stores/geometryStore'
+import type { RotationState } from '@/stores/rotationStore'
+import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
 /** Bayer pattern offsets for 4-frame temporal jitter cycle */
 const BAYER_OFFSETS: [number, number][] = [
@@ -118,6 +125,47 @@ const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
   p: 1,
 }
 
+type CameraMatrix = { elements: ArrayLike<number> }
+
+interface CameraSnapshot {
+  viewMatrix?: CameraMatrix
+  projectionMatrix?: CameraMatrix
+  viewProjectionMatrix?: CameraMatrix
+  inverseViewMatrix?: CameraMatrix
+  inverseProjectionMatrix?: CameraMatrix
+  position?: { x: number; y: number; z: number }
+  target?: { x: number; y: number; z: number }
+  near?: number
+  far?: number
+  fov?: number
+}
+
+interface ExtendedStoreSnapshot {
+  schroedinger?: Partial<SchroedingerConfig>
+  schroedingerVersion?: number
+  clearFreeScalarNeedsReset?: () => void
+  clearTdseNeedsReset?: () => void
+}
+
+interface TransformSnapshot {
+  uniformScale?: number
+  position?: number[]
+}
+
+interface PerformanceSnapshot {
+  qualityMultiplier?: number
+}
+
+type LightingSnapshot = Parameters<typeof packLightingUniforms>[1]
+
+function getStoreSnapshot<T>(ctx: WebGPURenderContext, key: string): T | undefined {
+  const snapshot = ctx.frame?.stores?.[key]
+  return snapshot as T | undefined
+}
+
+/**
+ *
+ */
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
@@ -139,8 +187,8 @@ export interface SchrodingerRendererConfig {
   eigenfunctionCacheEnabled?: boolean
   /** Whether analytical gradient path is enabled when cache is active (HO only). */
   analyticalGradientEnabled?: boolean
-  /** Whether robust eigencache interpolation/extrapolation is enabled. */
-  robustEigenInterpolationEnabled?: boolean
+  /** Whether the fast eigencache interpolation path is enabled (legacy Catmull-Rom). */
+  fastEigenInterpolationEnabled?: boolean
   /** Wavefunction representation — triggers pipeline rebuild when changed.
    *  HO momentum uses CPU uniform transform; hydrogen momentum uses shader path.
    *  Wigner uses 2D pipeline for phase-space visualization. */
@@ -298,7 +346,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private timeUpdateBuffer = new Float32Array(1)
   // PERF: Pre-allocated clearValue objects to avoid per-frame object literal allocation
   private readonly clearValueTransparent = { r: 0, g: 0, b: 0, a: 0 }
-  private readonly clearValueNormal = { r: 0.5, g: 0.5, b: 1, a: 0 }
   private readonly clearValueInvalidPos = { r: 0, g: 0, b: 0, a: -1 }
   // PERF: Pre-allocated DataView for camera uniform uint32 writes (avoids per-frame allocation)
   private cameraDataView = new DataView(this.cameraUniformData.buffer)
@@ -347,11 +394,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Determine outputs based on mode
     // Write to 'object-color' like other renderers (Mandelbulb, Julia, Polytope)
     // EnvironmentCompositePass will composite object-color over environment to produce hdr-color
-    // Isosurface mode uses MRT (color + normal + depth) like Mandelbulb
+    // Isosurface mode uses color + depth
     // Volumetric mode uses color + depth (alpha blending handled by EnvironmentCompositePass)
     // Temporal mode uses quarter-res outputs that get accumulated by WebGPUTemporalCloudPass
-    // Temporal takes priority: isosurface+temporal uses quarter-res (no normal/depth buffer)
-    const isIsosurface = config?.isosurface ?? false
+    // Temporal takes priority: isosurface+temporal uses quarter-res (no depth buffer)
     const isWigner = config?.representation === 'wigner'
     // Free scalar field requires volumetric 3D rendering — override 2D pipeline even if dimension=2
     const isFreeScalarEarly = config?.quantumMode === 'freeScalarField'
@@ -373,16 +419,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
             { resourceId: 'quarter-color', access: 'write' as const, binding: 0 },
             { resourceId: 'quarter-position', access: 'write' as const, binding: 1 },
           ]
-        : isIsosurface
-          ? [
-              { resourceId: 'object-color', access: 'write' as const, binding: 0 },
-              { resourceId: 'normal-buffer', access: 'write' as const, binding: 1 },
-              { resourceId: 'depth-buffer', access: 'write' as const, binding: 2 },
-            ]
-          : [
-              { resourceId: 'object-color', access: 'write' as const, binding: 0 },
-              { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
-            ]
+        : [
+            { resourceId: 'object-color', access: 'write' as const, binding: 0 },
+            { resourceId: 'depth-buffer', access: 'write' as const, binding: 1 },
+          ]
 
     super({
       id: 'schroedinger',
@@ -401,7 +441,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       interferenceEnabled: true,
       uncertaintyBoundaryEnabled: true,
       analyticalGradientEnabled: true,
-      robustEigenInterpolationEnabled: true,
+      fastEigenInterpolationEnabled: true,
       ...config,
     }
 
@@ -410,7 +450,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.rendererConfig.temporal = false
       this.rendererConfig.eigenfunctionCacheEnabled = false
       this.rendererConfig.analyticalGradientEnabled = false
-      this.rendererConfig.robustEigenInterpolationEnabled = false
+      this.rendererConfig.fastEigenInterpolationEnabled = false
     }
 
     const enableCache = this.rendererConfig.eigenfunctionCacheEnabled ?? !pipelineIs2D
@@ -468,9 +508,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const useAnalyticalGradient = (isFreeScalar || isTdse)
       ? false
       : (this.rendererConfig.analyticalGradientEnabled ?? true)
+    // Fast toggle semantics:
+    // - ON  => fast legacy interpolation (robust mode OFF)
+    // - OFF => robust interpolation/extrapolation (higher quality, slower)
     const useRobustEigenInterpolation = (isFreeScalar || isTdse)
       ? false
-      : (this.rendererConfig.robustEigenInterpolationEnabled ?? true)
+      : !(this.rendererConfig.fastEigenInterpolationEnabled ?? true)
 
     // For shader composition, free scalar field maps to 'harmonicOscillator' since
     // it only uses the density grid sampling path (no inline wavefunction evaluation).
@@ -840,7 +883,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
               : this.rendererConfig.isosurface
                 ? [
                     { format: 'rgba16float' as GPUTextureFormat },
-                    { format: 'rgba16float' as GPUTextureFormat },
                   ]
                 : [
                     {
@@ -1123,11 +1165,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   updateCameraUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.cameraUniformBuffer) return
 
-    const camera = ctx.frame?.stores?.['camera'] as any
+    const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
     if (!camera) return
 
     // Get animation time (respects pause state)
-    const animation = ctx.frame?.stores?.['animation'] as any
+    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
     const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
     // CameraUniforms layout (512 bytes = 128 floats):
@@ -1179,7 +1221,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       posZ = 0
     } else {
       // 3D mode: read transform from store for position/scale
-      const transform = ctx.frame?.stores?.['transform'] as any
+      const transform = getStoreSnapshot<TransformSnapshot>(ctx, 'transform')
       scale = transform?.uniformScale ?? 1.0
       const position = transform?.position ?? [0, 0, 0]
       posX = position[0]
@@ -1390,15 +1432,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   updateSchroedingerUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.schroedingerUniformBuffer) return
 
-    const extended = ctx.frame?.stores?.['extended'] as any
+    const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const schroedinger = extended?.schroedinger
     const schroedingerVersion = extended?.schroedingerVersion ?? 0
     // Get PBR data for roughness (WebGL uses 'pbr-face' source via UniformManager)
-    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
     // Get appearance data for SSS/Fresnel (global appearance controls)
-    const appearance = ctx.frame?.stores?.['appearance'] as any
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
     // Get animation time (respects pause state)
-    const animation = ctx.frame?.stores?.['animation'] as any
+    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
     const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
     const uncertaintyConfidenceMass = schroedinger?.uncertaintyConfidenceMass ?? 0.68
@@ -1482,7 +1524,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // }
 
     // --- Get geometry store for dimension ---
-    const geometry = ctx.frame?.stores?.['geometry'] as any
+    const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
     const dimension = geometry?.dimension ?? this.rendererConfig.dimension ?? 3
 
     // --- Quantum mode mapping (string to int, like WebGL) ---
@@ -1843,7 +1885,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[916 / 4] = schroedinger?.isoThreshold ?? -3.0 // WebGL default: -3.0
     // HQ mode (quality >= 0.75) uses 64 samples, fast mode uses 32
     // Scale sample count by bounding radius ratio to maintain step density
-    const performance = ctx.frame?.stores?.['performance'] as any
+    const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
     const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
     const fastMode = qualityMultiplier < 0.75
     const defaultSampleCount = fastMode ? 32 : 64
@@ -2235,13 +2277,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   updateBasisVectors(ctx: WebGPURenderContext): void {
     if (!this.device || !this.basisUniformBuffer) return
 
-    const extended = ctx.frame?.stores?.['extended'] as any
+    const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
     const schroedinger = extended?.schroedinger
     const schroedingerVersion = extended?.schroedingerVersion ?? 0
-    const rotation = ctx.frame?.stores?.['rotation'] as any
+    const rotation = getStoreSnapshot<RotationState>(ctx, 'rotation')
     const rotationVersion = rotation?.version ?? 0
-    const geometry = ctx.frame?.stores?.['geometry'] as any
-    const animation = ctx.frame?.stores?.['animation'] as any
+    const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+    const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
     const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
 
     // Get dimension from geometry store
@@ -2351,7 +2393,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   updateLightingUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.lightingUniformBuffer) return
 
-    const lighting = ctx.frame?.stores?.['lighting'] as any
+    const lighting = getStoreSnapshot<LightingSnapshot>(ctx, 'lighting')
     if (!lighting) return
     const lightingVersion = lighting?.version ?? 0
     if (lightingVersion === this.lastLightingVersion) return
@@ -2371,8 +2413,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   updateMaterialUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.materialUniformBuffer) return
 
-    const pbr = ctx.frame?.stores?.['pbr'] as any
-    const appearance = ctx.frame?.stores?.['appearance'] as any
+    const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
 
     // MaterialUniforms struct layout - WGSL vec3f has 16-byte alignment!
     // Byte offsets shown in comments (index = byte/4):
@@ -2479,7 +2521,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   updateQualityUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.qualityUniformBuffer) return
 
-    const performance = ctx.frame?.stores?.['performance'] as any
+    const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
 
     // QualityUniforms struct layout:
     // sdfMaxIterations: i32 (0)
@@ -2554,8 +2596,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // DIRTY-FLAG OPTIMIZATION: Only update changed uniform categories
     // ============================================
     // Get store versions for dirty checking
-    const appearance = ctx.frame?.stores?.['appearance'] as any
-    const pbr = ctx.frame?.stores?.['pbr'] as any
+    const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+    const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
     const appearanceVersion = appearance?.appearanceVersion ?? 0
     const pbrVersion = pbr?.pbrVersion ?? 0
 
@@ -2586,8 +2628,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     const freeScalarPass = this.freeScalarFieldPass
     if (freeScalarPass) {
-      const extended = ctx.frame?.stores?.['extended'] as any
-      const animation = ctx.frame?.stores?.['animation'] as any
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
       const freeScalarConfig = extended?.schroedinger?.freeScalar
       const isPlaying = animation?.isPlaying ?? false
 
@@ -2605,7 +2647,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         )
         // Clear needsReset after processing (targeted mutation, no version bump)
         if (freeScalarConfig.needsReset) {
-          ;(extended as any)?.clearFreeScalarNeedsReset?.()
+          extended?.clearFreeScalarNeedsReset?.()
         }
 
         // FSF diagnostic: log state changes once per second (dev only)
@@ -2613,7 +2655,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           const now = performance.now()
           if (now - this._fsfDiagLastTime > 1000) {
             this._fsfDiagLastTime = now
-            const camera = ctx.frame?.stores?.['camera'] as any
+            const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
             const camPos = camera?.position
             const camDist = camPos
               ? Math.sqrt(camPos.x * camPos.x + camPos.y * camPos.y + camPos.z * camPos.z)
@@ -2647,8 +2689,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     const tdsePass = this.tdsePass
     if (tdsePass) {
-      const extended = ctx.frame?.stores?.['extended'] as any
-      const animation = ctx.frame?.stores?.['animation'] as any
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
       const tdseConfig = extended?.schroedinger?.tdse
       const isPlaying = animation?.isPlaying ?? false
 
@@ -2665,7 +2707,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         )
         // Clear needsReset after processing (targeted mutation, no version bump)
         if (tdseConfig.needsReset) {
-          ;(extended as any)?.clearTdseNeedsReset?.()
+          extended?.clearTdseNeedsReset?.()
         }
       }
     }
@@ -2678,10 +2720,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const gridPass = this.densityGridPass
     if (gridPass && this.densityGridInitialized) {
       // Get versions for dirty tracking - prevents unnecessary grid recomputation
-      const extended = ctx.frame?.stores?.['extended'] as any
-      const rotation = ctx.frame?.stores?.['rotation'] as any
-      const geometry = ctx.frame?.stores?.['geometry'] as any
-      const animation = ctx.frame?.stores?.['animation'] as any
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const rotation = getStoreSnapshot<RotationState>(ctx, 'rotation')
+      const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+      const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
       const schroedingerVersion = extended?.schroedingerVersion ?? 0
       const rotationVersion = rotation?.version ?? 0
       const dimension = geometry?.dimension ?? this.rendererConfig.dimension ?? 3
@@ -2716,8 +2758,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Pre-compute 1D eigenfunctions for cache-accelerated rendering
     const cachePass = this.eigenCachePass
     if (cachePass && this.eigenCacheInitialized) {
-      const extended = ctx.frame?.stores?.['extended'] as any
-      const geometry = ctx.frame?.stores?.['geometry'] as any
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
       const schroedingerVersion = extended?.schroedingerVersion ?? 0
       const dimension = geometry?.dimension ?? this.rendererConfig.dimension ?? 3
 
@@ -2742,9 +2784,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // + reconstruction (cheap, every animated frame with cross terms)
     const wignerPass = this.wignerCachePass
     if (wignerPass && this.wignerCacheInitialized) {
-      const extended = ctx.frame?.stores?.['extended'] as any
-      const rotation = ctx.frame?.stores?.['rotation'] as any
-      const animation = ctx.frame?.stores?.['animation'] as any
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const rotation = getStoreSnapshot<RotationState>(ctx, 'rotation')
+      const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
       const schroedingerVersion = extended?.schroedingerVersion ?? 0
       const rotationVersion = rotation?.version ?? 0
       const isAnimating = animation?.isPlaying ?? false
@@ -2903,8 +2945,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // ============================================
     // Get render targets based on mode:
     // - Temporal (volumetric or isosurface): quarter-color + quarter-position (no depth)
-    // - Isosurface (non-temporal): object-color + normal-buffer + depth-buffer
-    // - Standard volumetric: object-color + depth-buffer
+    // - Isosurface/standard volumetric (non-temporal): object-color + depth-buffer
     const isTemporal = !!this.rendererConfig.temporal
 
     // Color output target
@@ -2926,26 +2967,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       return
     }
 
-    // Secondary MRT output based on mode
-    // - Temporal (volumetric or isosurface): world position buffer
-    // - Isosurface (non-temporal): normal buffer
-    const secondaryView = isTemporal
-      ? ctx.getWriteTarget('quarter-position')
-      : this.rendererConfig.isosurface
-        ? ctx.getWriteTarget('normal-buffer')
-        : null
+    // Secondary MRT output is only used by temporal accumulation.
+    const secondaryView = isTemporal ? ctx.getWriteTarget('quarter-position') : null
 
     if (isTemporal && !secondaryView) {
       console.warn('[WebGPU Schrödinger] Temporal mode requires quarter-position target')
       return
     }
 
-    if (!isTemporal && this.rendererConfig.isosurface && !secondaryView) {
-      console.warn('[WebGPU Schrödinger] Isosurface mode requires normal-buffer target')
-      return
-    }
-
-    // Build color attachments - MRT for isosurface/temporal, single for standard volumetric
+    // Build color attachments - MRT for temporal, single target otherwise.
     // Use alpha=0 clear value for proper compositing (transparent where nothing rendered)
     // PERF: Use pre-allocated clearValue objects to avoid per-frame literal allocation
     const colorAttachments: GPURenderPassColorAttachment[] = [
@@ -2957,7 +2987,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       },
     ]
 
-    // Add secondary MRT attachment based on mode
+    // Add secondary MRT attachment for temporal mode.
     if (isTemporal && secondaryView) {
       // Temporal mode (volumetric or isosurface): world position buffer
       colorAttachments.push({
@@ -2965,14 +2995,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         loadOp: 'clear' as const,
         storeOp: 'store' as const,
         clearValue: this.clearValueInvalidPos, // Invalid position (a < 0 means no hit)
-      })
-    } else if (this.rendererConfig.isosurface && secondaryView) {
-      // Isosurface mode (non-temporal): normal buffer
-      colorAttachments.push({
-        view: secondaryView,
-        loadOp: 'clear' as const,
-        storeOp: 'store' as const,
-        clearValue: this.clearValueNormal, // Default normal pointing up (+Z)
       })
     }
 

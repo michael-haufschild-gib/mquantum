@@ -19,6 +19,9 @@ import {
 import { useGeometryStore } from '@/stores/geometryStore'
 import React, { Suspense, useMemo } from 'react'
 
+/**
+ *
+ */
 export interface ObjectSettingsSectionProps {
   className?: string
 }
@@ -49,6 +52,10 @@ const ControlsError: React.FC = () => (
   </div>
 )
 
+const CONTROLS_COMPONENTS: Record<string, React.ComponentType<unknown> | null> = {
+  SchroedingerControls: getControlsComponent('SchroedingerControls'),
+}
+
 /**
  * Main ObjectSettingsSection component
  *
@@ -67,12 +74,12 @@ export const ObjectSettingsSection: React.FC<ObjectSettingsSectionProps> = React
     // Get the controls component key from registry
     const componentKey = useMemo(() => getControlsComponentKey(objectType), [objectType])
 
-    // Get the lazy-loaded component from registry
+    // Use a static component registry to avoid creating component types during render.
     const ControlsComponent = useMemo(() => {
       if (!componentKey || !hasControlsComponent(componentKey)) {
         return null
       }
-      return getControlsComponent(componentKey)
+      return CONTROLS_COMPONENTS[componentKey] ?? null
     }, [componentKey])
 
     return (

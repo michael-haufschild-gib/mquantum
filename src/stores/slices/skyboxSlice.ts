@@ -216,10 +216,9 @@ function mergeProceduralSettings(
   base: SkyboxProceduralSettings,
   patch: Partial<SkyboxProceduralSettings>
 ): SkyboxProceduralSettings {
-  return deepMergeRecord(
-    base as Record<string, unknown>,
-    patch as Record<string, unknown>
-  ) as SkyboxProceduralSettings
+  const baseRecord: Record<string, unknown> = { ...base }
+  const patchRecord: Record<string, unknown> = { ...patch }
+  return deepMergeRecord(baseRecord, patchRecord) as unknown as SkyboxProceduralSettings
 }
 
 /**

@@ -6,11 +6,15 @@
  */
 
 import { Button } from '@/components/ui/Button'
+import { Slider } from '@/components/ui/Slider'
 import { DEFAULT_COSINE_COEFFICIENTS } from '@/rendering/shaders/palette'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import React, { useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
+/**
+ *
+ */
 export interface CosineGradientEditorProps {
   className?: string
 }
@@ -92,17 +96,15 @@ export const CosineGradientEditor: React.FC<CosineGradientEditorProps> = React.m
                 <div className="grid grid-cols-3 gap-2">
                   {CHANNEL_LABELS.map((channel, index) => (
                     <div key={channel} className="space-y-1">
-                      <label className="block text-xs text-text-muted text-center">{channel}</label>
-                      <input
-                        type="range"
+                      <Slider
+                        label={channel}
                         min={0}
                         max={2}
                         step={0.01}
-                        value={cosineCoefficients[key][index]}
-                        onChange={(e) =>
-                          setCosineCoefficient(key, index, parseFloat(e.target.value))
-                        }
-                        className="w-full h-2 bg-panel-border rounded-lg appearance-none cursor-pointer accent-accent"
+                        value={cosineCoefficients[key][index] ?? 0}
+                        onChange={(value) => setCosineCoefficient(key, index, value)}
+                        showValue={false}
+                        className="w-full"
                       />
                       <div className="text-xs text-text-muted text-center">
                         {(cosineCoefficients[key][index] ?? 0).toFixed(2)}

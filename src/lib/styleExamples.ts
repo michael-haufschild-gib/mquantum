@@ -9,6 +9,9 @@ import stylesData from '@/assets/defaults/styles.json'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { usePresetManagerStore } from '@/stores/presetManagerStore'
 
+/**
+ *
+ */
 export interface StyleExample {
   id: string
   name: string
