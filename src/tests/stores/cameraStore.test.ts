@@ -56,6 +56,23 @@ describe('useCameraStore', () => {
       expect(camera.setPosition).not.toHaveBeenCalled()
       expect(camera.setTarget).not.toHaveBeenCalled()
     })
+
+    it('drops invalid pending state instead of applying malformed coordinates', () => {
+      useCameraStore.setState({
+        camera: null,
+        pendingState: {
+          position: [1, Number.NaN, 3] as unknown as [number, number, number],
+          target: [4, 5] as unknown as [number, number, number],
+        },
+      })
+
+      const camera = createMockCamera()
+      useCameraStore.getState().registerCamera(camera)
+
+      expect(camera.setPosition).not.toHaveBeenCalled()
+      expect(camera.setTarget).not.toHaveBeenCalled()
+      expect(useCameraStore.getState().pendingState).toBeNull()
+    })
   })
 
   describe('captureState', () => {
@@ -105,6 +122,22 @@ describe('useCameraStore', () => {
 
       expect(camera.setPosition).toHaveBeenCalledWith(10, 20, 30)
       expect(camera.setTarget).toHaveBeenCalledWith(1, 2, 3)
+      expect(useCameraStore.getState().pendingState).toBeNull()
+    })
+
+    it('rejects malformed camera state and does not call camera setters', () => {
+      const camera = createMockCamera()
+      useCameraStore.getState().registerCamera(camera)
+      camera.setPosition.mockClear()
+      camera.setTarget.mockClear()
+
+      useCameraStore.getState().applyState({
+        position: [1, 2] as unknown as [number, number, number],
+        target: [4, Number.POSITIVE_INFINITY, 6] as unknown as [number, number, number],
+      })
+
+      expect(camera.setPosition).not.toHaveBeenCalled()
+      expect(camera.setTarget).not.toHaveBeenCalled()
       expect(useCameraStore.getState().pendingState).toBeNull()
     })
   })

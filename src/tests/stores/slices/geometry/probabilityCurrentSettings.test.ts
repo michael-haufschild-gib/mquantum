@@ -65,4 +65,21 @@ describe('Schroedinger probability current settings', () => {
     expect(config.probabilityCurrentPlacement).toBe('volume')
     expect(config.probabilityCurrentColorMode).toBe('direction')
   })
+
+  it('ignores non-finite probability current numeric updates', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setSchroedingerProbabilityCurrentScale(1.2)
+    store.setSchroedingerProbabilityCurrentDensityThreshold(0.2)
+    store.setSchroedingerProbabilityCurrentLineDensity(10)
+
+    store.setSchroedingerProbabilityCurrentScale(Number.NaN)
+    store.setSchroedingerProbabilityCurrentDensityThreshold(Number.POSITIVE_INFINITY)
+    store.setSchroedingerProbabilityCurrentLineDensity(Number.NEGATIVE_INFINITY)
+
+    const config = useExtendedObjectStore.getState().schroedinger
+    expect(config.probabilityCurrentScale).toBe(1.2)
+    expect(config.probabilityCurrentDensityThreshold).toBe(0.2)
+    expect(config.probabilityCurrentLineDensity).toBe(10)
+  })
 })

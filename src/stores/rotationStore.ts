@@ -42,6 +42,9 @@ export const MAX_ROTATION = 2 * Math.PI
  */
 const LAZY_NORMALIZE_THRESHOLD = 10000
 
+/**
+ * Rotation store state and actions.
+ */
 export interface RotationState {
   /** Map of plane name (e.g. "XY") to rotation angle in radians */
   rotations: Map<string, number>
@@ -94,12 +97,28 @@ function normalizeAngle(angle: number): number {
   return angle
 }
 
+/**
+ * Checks whether a rotation angle is finite.
+ * @param angle - Angle in radians
+ * @returns True when angle is finite
+ */
+function isValidRotationAngle(angle: number): boolean {
+  return Number.isFinite(angle)
+}
+
 export const useRotationStore = create<RotationState>((set) => ({
   rotations: new Map(),
   dimension: 4,
   version: 0,
 
   setRotation: (plane: string, angle: number) => {
+    if (!isValidRotationAngle(angle)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[rotationStore] Ignoring non-finite angle for ${plane}: ${angle}`)
+      }
+      return
+    }
+
     set((state) => {
       // Only set rotation if plane is valid for current dimension
       // Use cached Set to avoid recreation on every call
@@ -126,7 +145,7 @@ export const useRotationStore = create<RotationState>((set) => ({
       // Avoids creating a new Map when all updates are no-ops (same values)
       let hasChanges = false
       for (const [plane, angle] of updates.entries()) {
-        if (validPlanes.has(plane)) {
+        if (validPlanes.has(plane) && isValidRotationAngle(angle)) {
           const normalizedAngle = normalizeAngle(angle)
           const currentAngle = state.rotations.get(plane)
           // Check if value is different (with tolerance for floating point)
@@ -145,7 +164,7 @@ export const useRotationStore = create<RotationState>((set) => ({
       // Second pass - create new Map only when we have actual changes
       const newRotations = new Map(state.rotations)
       for (const [plane, angle] of updates.entries()) {
-        if (validPlanes.has(plane)) {
+        if (validPlanes.has(plane) && isValidRotationAngle(angle)) {
           newRotations.set(plane, normalizeAngle(angle))
         }
       }
@@ -162,6 +181,13 @@ export const useRotationStore = create<RotationState>((set) => ({
   },
 
   setDimension: (dimension: number) => {
+    if (!Number.isFinite(dimension) || !Number.isInteger(dimension)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[rotationStore] Ignoring invalid dimension: ${dimension}`)
+      }
+      return
+    }
+
     if (dimension < MIN_DIMENSION || dimension > MAX_DIMENSION) {
       return
     }

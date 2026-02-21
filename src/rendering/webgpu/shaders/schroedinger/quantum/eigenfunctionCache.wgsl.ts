@@ -138,7 +138,7 @@ fn lookupEigenfunction(funcIdx: i32, x: f32) -> vec2f {
   let p3 = readCacheEntry(funcIdx, i + 2);
 
   if (USE_ROBUST_EIGEN_INTERPOLATION) {
-    // Near extrema/sign changes use linear fallback to avoid cubic ringing.
+    // Near nodal crossings (sign changes) use linear fallback to avoid cubic ringing.
     let signSensitive = (p0.x * p1.x <= 0.0) || (p1.x * p2.x <= 0.0) || (p2.x * p3.x <= 0.0);
     if (signSensitive) {
       return p1 + f * (p2 - p1);

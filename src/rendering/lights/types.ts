@@ -296,6 +296,9 @@ export function directionToRotation(direction: [number, number, number]): [numbe
  * @returns Clamped intensity (0.1-3)
  */
 export function clampIntensity(intensity: number): number {
+  if (!Number.isFinite(intensity)) {
+    return 0.1
+  }
   return Math.max(0.1, Math.min(3, intensity))
 }
 
@@ -306,6 +309,9 @@ export function clampIntensity(intensity: number): number {
  * @returns Clamped angle (1-120)
  */
 export function clampConeAngle(angle: number): number {
+  if (!Number.isFinite(angle)) {
+    return 1
+  }
   return Math.max(1, Math.min(120, angle))
 }
 
@@ -316,6 +322,9 @@ export function clampConeAngle(angle: number): number {
  * @returns Clamped penumbra (0-1)
  */
 export function clampPenumbra(penumbra: number): number {
+  if (!Number.isFinite(penumbra)) {
+    return 0
+  }
   return Math.max(0, Math.min(1, penumbra))
 }
 
@@ -326,6 +335,9 @@ export function clampPenumbra(penumbra: number): number {
  * @returns Clamped range (1-100)
  */
 export function clampRange(range: number): number {
+  if (!Number.isFinite(range)) {
+    return 1
+  }
   return Math.max(1, Math.min(100, range))
 }
 
@@ -337,6 +349,9 @@ export function clampRange(range: number): number {
  * @returns Clamped decay (0.1-3)
  */
 export function clampDecay(decay: number): number {
+  if (!Number.isFinite(decay)) {
+    return 0.1
+  }
   return Math.max(0.1, Math.min(3, decay))
 }
 
@@ -383,6 +398,9 @@ export function normalizeRotationTuple(
  * @returns Normalized angle in [-π, π) radians
  */
 export function normalizeRotationSigned(angle: number): number {
+  if (!Number.isFinite(angle)) {
+    return 0
+  }
   const TWO_PI = Math.PI * 2
 
   // First normalize to [0, 2π)

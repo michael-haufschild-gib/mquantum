@@ -57,6 +57,25 @@ function clampScale(value: number): number {
 }
 
 /**
+ * Validates scale input before clamping.
+ * @param value - Raw scale input
+ * @returns True when value is finite
+ */
+function isValidScaleInput(value: number): boolean {
+  return Number.isFinite(value)
+}
+
+/**
+ * Checks whether axis index is valid for the current dimension.
+ * @param axis - Axis index to validate
+ * @param dimension - Current dimension
+ * @returns True when axis is an in-range integer index
+ */
+function isValidAxisIndex(axis: number, dimension: number): boolean {
+  return Number.isInteger(axis) && axis >= 0 && axis < dimension
+}
+
+/**
  * Creates default per-axis scale array for given dimension
  * @param dimension - Number of dimensions
  * @returns Array of default scale values
@@ -74,6 +93,13 @@ export const useTransformStore = create<TransformState>((set, get) => ({
 
   // Scale actions
   setUniformScale: (value: number) => {
+    if (!isValidScaleInput(value)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[transformStore] Ignoring non-finite uniform scale: ${value}`)
+      }
+      return
+    }
+
     const clamped = clampScale(value)
     set((state) => {
       if (state.scaleLocked) {
@@ -88,9 +114,16 @@ export const useTransformStore = create<TransformState>((set, get) => ({
   },
 
   setAxisScale: (axis: number, value: number) => {
+    if (!isValidScaleInput(value)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[transformStore] Ignoring non-finite axis scale: ${value}`)
+      }
+      return
+    }
+
     const clamped = clampScale(value)
     set((state) => {
-      if (axis < 0 || axis >= state.dimension) {
+      if (!isValidAxisIndex(axis, state.dimension)) {
         return state
       }
 
@@ -141,6 +174,12 @@ export const useTransformStore = create<TransformState>((set, get) => ({
 
   // General actions
   setDimension: (dimension: number) => {
+    if (!Number.isFinite(dimension) || !Number.isInteger(dimension)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[transformStore] Ignoring invalid dimension: ${dimension}`)
+      }
+      return
+    }
     if (dimension < MIN_DIMENSION || dimension > MAX_DIMENSION) {
       return
     }

@@ -136,6 +136,48 @@ export const TRANSIENT_FIELDS = new Set([
   'sqLayerSqueezeTheta',
 ])
 
+function warnDroppedNonFinitePresetValue(path: string, value: number): void {
+  if (import.meta.env.DEV) {
+    console.warn(`[presetSerialization] Dropping non-finite numeric value at "${path}":`, value)
+  }
+}
+
+function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | undefined {
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) {
+      return value
+    }
+    warnDroppedNonFinitePresetValue(path, value)
+    return undefined
+  }
+
+  if (Array.isArray(value)) {
+    const sanitizedArray: unknown[] = []
+    for (let index = 0; index < value.length; index += 1) {
+      const sanitizedItem = sanitizeFiniteLoadedValue(value[index], `${path}[${index}]`)
+      // Preserve array shape invariants by dropping the whole array when any item is invalid.
+      if (sanitizedItem === undefined) {
+        return undefined
+      }
+      sanitizedArray.push(sanitizedItem)
+    }
+    return sanitizedArray
+  }
+
+  if (value && typeof value === 'object') {
+    const sanitizedRecord: Record<string, unknown> = {}
+    for (const [key, candidateValue] of Object.entries(value as Record<string, unknown>)) {
+      const sanitizedChild = sanitizeFiniteLoadedValue(candidateValue, `${path}.${key}`)
+      if (sanitizedChild !== undefined) {
+        sanitizedRecord[key] = sanitizedChild
+      }
+    }
+    return sanitizedRecord
+  }
+
+  return value
+}
+
 /**
  * Deep clones state and removes functions and transient fields to ensure JSON serializability.
  * Prevents reference mutation issues where saved presets would change when store changes.
@@ -259,7 +301,12 @@ export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T)
     delete surfaceSettings.faceOpacity
   }
 
-  return clean
+  const sanitized = sanitizeFiniteLoadedValue(clean, 'state')
+  if (sanitized && typeof sanitized === 'object' && !Array.isArray(sanitized)) {
+    return sanitized as T
+  }
+
+  return {} as T
 }
 
 /**

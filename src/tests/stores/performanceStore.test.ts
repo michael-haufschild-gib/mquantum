@@ -95,6 +95,18 @@ describe('performanceStore', () => {
       expect(usePerformanceStore.getState().refinementProgress).toBe(50)
     })
 
+    it('should ignore non-finite refinement progress updates', () => {
+      const { setRefinementProgress } = usePerformanceStore.getState()
+      setRefinementProgress(80)
+      expect(usePerformanceStore.getState().refinementProgress).toBe(80)
+
+      setRefinementProgress(Number.NaN)
+      setRefinementProgress(Number.POSITIVE_INFINITY)
+      setRefinementProgress(Number.NEGATIVE_INFINITY)
+
+      expect(usePerformanceStore.getState().refinementProgress).toBe(80)
+    })
+
     it('should reset refinement when enabled', () => {
       const { setRefinementStage, resetRefinement } = usePerformanceStore.getState()
 
@@ -356,6 +368,19 @@ describe('render resolution scale persistence', () => {
       expect(usePerformanceStore.getState().renderResolutionScale).toBe(1.0)
       expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('1')
     })
+
+    it('ignores non-finite resolution scales', () => {
+      const { setRenderResolutionScale } = usePerformanceStore.getState()
+      setRenderResolutionScale(0.75)
+
+      setRenderResolutionScale(Number.NaN)
+      expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.75)
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.75')
+
+      setRenderResolutionScale(Number.POSITIVE_INFINITY)
+      expect(usePerformanceStore.getState().renderResolutionScale).toBe(0.75)
+      expect(localStorage.getItem(RESOLUTION_SCALE_KEY)).toBe('0.75')
+    })
   })
 
   describe('hasPersistedResolutionScale', () => {
@@ -459,6 +484,19 @@ describe('max FPS persistence', () => {
         usePerformanceStore.getState().setMaxFps(input)
         expect(usePerformanceStore.getState().maxFps).toBe(expected)
       }
+    })
+
+    it('ignores non-finite max FPS values', () => {
+      const { setMaxFps } = usePerformanceStore.getState()
+      setMaxFps(60)
+
+      setMaxFps(Number.NaN)
+      expect(usePerformanceStore.getState().maxFps).toBe(60)
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60')
+
+      setMaxFps(Number.POSITIVE_INFINITY)
+      expect(usePerformanceStore.getState().maxFps).toBe(60)
+      expect(localStorage.getItem(MAX_FPS_KEY)).toBe('60')
     })
   })
 

@@ -72,4 +72,25 @@ describe('uiStore.bufferVisualization', () => {
       expect(state.showTemporalDepthBuffer).toBe(false)
     })
   })
+
+  describe('Animation Bias', () => {
+    it('clamps animation bias to [0, 1]', () => {
+      useUIStore.getState().setAnimationBias(-1)
+      expect(useUIStore.getState().animationBias).toBe(0)
+
+      useUIStore.getState().setAnimationBias(2)
+      expect(useUIStore.getState().animationBias).toBe(1)
+
+      useUIStore.getState().setAnimationBias(0.4)
+      expect(useUIStore.getState().animationBias).toBe(0.4)
+    })
+
+    it('ignores non-finite animation bias updates', () => {
+      useUIStore.getState().setAnimationBias(0.4)
+      useUIStore.getState().setAnimationBias(Number.NaN)
+      useUIStore.getState().setAnimationBias(Number.POSITIVE_INFINITY)
+      useUIStore.getState().setAnimationBias(Number.NEGATIVE_INFINITY)
+      expect(useUIStore.getState().animationBias).toBe(0.4)
+    })
+  })
 })

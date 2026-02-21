@@ -1,0 +1,4 @@
+Root cause: exportSceneToPNG returned true immediately despite async capture, so caller feedback could show optimistic success even when capture failed later.
+Fix: made exportSceneToPNG async returning Promise<boolean> tied to actual capture result in src/lib/export/image.ts; updated ExportButton to await result before toast decision in src/components/controls/ExportButton.tsx.
+Fail-first test: src/tests/lib/export/image.test.ts -> 'returns false when async screenshot capture fails' failed before fix and passes after.
+Verification: image + export-related test suite passes (145 tests) and eslint passes for touched files.

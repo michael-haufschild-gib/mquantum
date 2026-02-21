@@ -68,6 +68,33 @@ describe('videoExportPlanning', () => {
       expect(result.width % 2).toBe(0)
       expect(result.height % 2).toBe(0)
     })
+
+    it('falls back to export dimensions when original aspect is non-positive', () => {
+      const result = computeRenderDimensions({
+        exportWidth: 1920,
+        exportHeight: 1080,
+        originalAspect: 0,
+        maxTextureDimension2D: 8192,
+        crop: { enabled: true, x: 0, y: 0, width: 0.5, height: 0.5 },
+      })
+
+      expect(result).toEqual({ width: 1920, height: 1080 })
+    })
+
+    it('falls back to internal 8192 clamp when max texture limit is non-finite', () => {
+      const result = computeRenderDimensions({
+        exportWidth: 3840,
+        exportHeight: 2160,
+        originalAspect: 16 / 9,
+        maxTextureDimension2D: Number.NaN,
+        crop: { enabled: true, x: 0, y: 0, width: 0.05, height: 1 },
+      })
+
+      expect(result.width).toBeLessThanOrEqual(8192)
+      expect(result.height).toBeLessThanOrEqual(8192)
+      expect(result.width % 2).toBe(0)
+      expect(result.height % 2).toBe(0)
+    })
   })
 
   describe('computeSegmentDurationFrames', () => {
@@ -90,6 +117,17 @@ describe('videoExportPlanning', () => {
       })
 
       expect(frames).toBe(4 * 30)
+    })
+
+    it('returns a finite minimum frame count for non-finite timing inputs', () => {
+      const frames = computeSegmentDurationFrames({
+        durationSeconds: Number.NaN,
+        fps: Number.POSITIVE_INFINITY,
+        bitrateMbps: Number.NaN,
+      })
+
+      expect(Number.isFinite(frames)).toBe(true)
+      expect(frames).toBe(1)
     })
   })
 })

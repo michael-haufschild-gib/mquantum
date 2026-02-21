@@ -160,6 +160,38 @@ describe('VideoRecorder', () => {
       const progressValue = onProgress.mock.calls[0]![0]
       expect(progressValue).toBeLessThanOrEqual(0.99)
     })
+
+    it('should clamp progress to a minimum of 0 for negative timestamps', async () => {
+      const onProgress = vi.fn()
+      const recorderWithProgress = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        onProgress,
+      })
+
+      await recorderWithProgress.initialize()
+      await recorderWithProgress.captureFrame(-1, 1 / 60)
+
+      expect(onProgress).toHaveBeenCalled()
+      const progressValue = onProgress.mock.calls[0]![0]
+      expect(progressValue).toBe(0)
+    })
+
+    it('should report finite progress when total duration is non-finite', async () => {
+      const onProgress = vi.fn()
+      const recorderWithProgress = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        duration: Number.NaN,
+        onProgress,
+      })
+
+      await recorderWithProgress.initialize()
+      await recorderWithProgress.captureFrame(1, 1 / 60)
+
+      expect(onProgress).toHaveBeenCalled()
+      const progressValue = onProgress.mock.calls[0]![0]
+      expect(Number.isFinite(progressValue)).toBe(true)
+      expect(progressValue).toBe(0)
+    })
   })
 
   describe('finalize', () => {
@@ -302,6 +334,21 @@ describe('VideoRecorder', () => {
   })
 
   describe('options validation', () => {
+    it('rejects non-positive numeric runtime options during initialize', async () => {
+      const invalidRecorder = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        width: 0,
+        height: -1,
+        fps: 0,
+        duration: -2,
+        bitrate: 0,
+      })
+
+      await expect(invalidRecorder.initialize()).rejects.toThrow(
+        'Video initialization failed: Invalid width: 0'
+      )
+    })
+
     it('should handle different FPS values', async () => {
       const recorder24fps = new VideoRecorder(canvas, { ...defaultOptions, fps: 24 })
       await expect(recorder24fps.initialize()).resolves.not.toThrow()
@@ -322,6 +369,19 @@ describe('VideoRecorder', () => {
         bitrate: 50,
       })
       await expect(recorderHighBitrate.initialize()).resolves.not.toThrow()
+    })
+
+    it('coerces invalid runtime rotation metadata to 0 degrees', async () => {
+      const recorderWithInvalidRotation = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        rotation: 45 as unknown as 0,
+      })
+
+      await recorderWithInvalidRotation.initialize()
+
+      const output = (recorderWithInvalidRotation as unknown as { output: { addVideoTrack: ReturnType<typeof vi.fn> } }).output
+      const trackOptions = output.addVideoTrack.mock.calls[0]?.[1] as { rotation?: number } | undefined
+      expect(trackOptions?.rotation).toBe(0)
     })
   })
 })

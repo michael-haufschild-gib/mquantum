@@ -8,6 +8,11 @@ import { useEnvironmentStore } from '@/stores/environmentStore'
 import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
+import { useTransformStore } from '@/stores/transformStore'
+import { usePBRStore } from '@/stores/pbrStore'
+import { APPEARANCE_INITIAL_STATE } from '@/stores/slices/appearanceSlice'
+import { DEFAULT_FACE_PBR } from '@/stores/defaults/visualDefaults'
 
 // Mock msgBoxStore to prevent actual dialog displays
 vi.mock('@/stores/msgBoxStore', () => ({
@@ -48,6 +53,557 @@ describe('presetManagerStore', () => {
 
       // Check it's restored
       expect(useAppearanceStore.getState().edgeColor).toBe('#ff0000')
+    })
+
+    it('normalizes imported style lighting scalar fields to store invariants on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Out Of Range Lighting',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {
+            lightHorizontalAngle: -450,
+            lightVerticalAngle: 200,
+            ambientIntensity: 5,
+            lightStrength: -2,
+            exposure: 99,
+          },
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const lighting = useLightingStore.getState()
+      expect(lighting.lightHorizontalAngle).toBe(270)
+      expect(lighting.lightVerticalAngle).toBe(90)
+      expect(lighting.ambientIntensity).toBe(1)
+      expect(lighting.lightStrength).toBe(0)
+      expect(lighting.exposure).toBe(3)
+    })
+
+    it('resets PBR to defaults when loading imported style without pbr payload', () => {
+      usePBRStore.getState().setFaceRoughness(0.82)
+      usePBRStore.getState().setFaceMetallic(0.73)
+      usePBRStore.getState().setFaceSpecularIntensity(1.6)
+      usePBRStore.getState().setFaceSpecularColor('#123456')
+
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Legacy Style Without PBR',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#ff00ff' },
+          lighting: {},
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      expect(usePBRStore.getState().face).toEqual(DEFAULT_FACE_PBR)
+    })
+
+    it('normalizes imported style light entries to runtime light constraints on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Out Of Range Lights',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {
+            lights: [
+              {
+                id: 'light-1',
+                name: 'Imported Light',
+                type: 'spot',
+                enabled: true,
+                position: [1, 2, 3],
+                rotation: [0, 0, 0],
+                color: '#ffffff',
+                intensity: -5,
+                coneAngle: 300,
+                penumbra: -1,
+                range: -10,
+                decay: 9,
+              },
+            ],
+            selectedLightId: 'light-1',
+          },
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const lighting = useLightingStore.getState()
+      const importedLight = lighting.lights.find((light) => light.id === 'light-1')
+      expect(importedLight).toBeDefined()
+      expect(importedLight!.intensity).toBe(0.1)
+      expect(importedLight!.coneAngle).toBe(120)
+      expect(importedLight!.penumbra).toBe(0)
+      expect(importedLight!.range).toBe(1)
+      expect(importedLight!.decay).toBe(3)
+      expect(lighting.selectedLightId).toBe('light-1')
+    })
+
+    it('drops unknown imported style lighting fields on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Unknown Lighting Field',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {
+            mysteryLighting: true,
+            lightStrength: 1.5,
+          },
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const lighting = useLightingStore.getState() as Record<string, unknown>
+      expect(lighting.lightStrength).toBe(1.5)
+      expect(lighting.mysteryLighting).toBeUndefined()
+    })
+
+    it('normalizes imported style post-processing payload to store invariants on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Out Of Range Post Processing',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {
+            bloomEnabled: 'yes',
+            bloomGain: -10,
+            bloomThreshold: 9,
+            bloomKnee: -4,
+            bloomRadius: 10,
+            antiAliasingMethod: 'taa',
+            cinematicAberration: 1,
+            cinematicVignette: -1,
+            cinematicGrain: 3,
+            paperContrast: 2,
+            paperRoughness: -1,
+            paperFiber: 3,
+            paperFiberSize: -1,
+            paperCrumples: 3,
+            paperCrumpleSize: 99,
+            paperFolds: -5,
+            paperFoldCount: 99,
+            paperDrops: -2,
+            paperFade: 9,
+            paperSeed: -100,
+            paperQuality: 'ultra',
+            paperIntensity: 4,
+            frameBlendingEnabled: 'true',
+            frameBlendingFactor: -9,
+          },
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const pp = usePostProcessingStore.getState()
+      expect(pp.bloomEnabled).toBe(false)
+      expect(pp.bloomGain).toBe(0)
+      expect(pp.bloomThreshold).toBe(5)
+      expect(pp.bloomKnee).toBe(0)
+      expect(pp.bloomRadius).toBe(4)
+      expect(pp.antiAliasingMethod).toBe('none')
+
+      expect(pp.cinematicAberration).toBe(0.1)
+      expect(pp.cinematicVignette).toBe(0)
+      expect(pp.cinematicGrain).toBe(0.2)
+
+      expect(pp.paperContrast).toBe(1)
+      expect(pp.paperRoughness).toBe(0)
+      expect(pp.paperFiber).toBe(1)
+      expect(pp.paperFiberSize).toBe(0.1)
+      expect(pp.paperCrumples).toBe(1)
+      expect(pp.paperCrumpleSize).toBe(2)
+      expect(pp.paperFolds).toBe(0)
+      expect(pp.paperFoldCount).toBe(15)
+      expect(pp.paperDrops).toBe(0)
+      expect(pp.paperFade).toBe(1)
+      expect(pp.paperSeed).toBe(0)
+      expect(pp.paperQuality).toBe('medium')
+      expect(pp.paperIntensity).toBe(1)
+
+      expect(pp.frameBlendingEnabled).toBe(false)
+      expect(pp.frameBlendingFactor).toBe(0)
+    })
+
+    it('drops unknown imported style post-processing fields on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Unknown Post Processing Field',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {
+            mysteryEffect: true,
+            bloomEnabled: true,
+          },
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const pp = usePostProcessingStore.getState() as Record<string, unknown>
+      expect(pp.bloomEnabled).toBe(true)
+      expect(pp.mysteryEffect).toBeUndefined()
+    })
+
+    it('normalizes imported style PBR payload to store invariants on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Out Of Range PBR',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: {},
+          pbr: {
+            face: {
+              roughness: -5,
+              metallic: 99,
+              specularIntensity: -2,
+              specularColor: '#123456',
+            },
+          },
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const pbr = usePBRStore.getState()
+      expect(pbr.face.roughness).toBe(0.04)
+      expect(pbr.face.metallic).toBe(1)
+      expect(pbr.face.specularIntensity).toBe(0)
+      expect(pbr.face.specularColor).toBe('#123456')
+    })
+
+    it('preserves missing PBR face fields when imported payload is partial', () => {
+      usePBRStore.getState().setFacePBR({
+        roughness: 0.55,
+        metallic: 0.77,
+        specularIntensity: 1.4,
+        specularColor: '#abcdef',
+      })
+
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Partial PBR Face',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: {},
+          pbr: {
+            face: {
+              roughness: 0.8,
+            },
+          },
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const pbr = usePBRStore.getState()
+      expect(pbr.face.roughness).toBe(0.8)
+      expect(pbr.face.metallic).toBe(0.77)
+      expect(pbr.face.specularIntensity).toBe(1.4)
+      expect(pbr.face.specularColor).toBe('#abcdef')
+    })
+
+    it('drops unknown imported style PBR fields on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Unknown PBR Field',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: {},
+          pbr: {
+            mysteryPbr: true,
+            face: {
+              roughness: 0.6,
+            },
+          },
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const pbr = usePBRStore.getState() as Record<string, unknown>
+      expect((pbr.face as Record<string, unknown>).roughness).toBe(0.6)
+      expect(pbr.mysteryPbr).toBeUndefined()
+    })
+
+    it('normalizes imported style appearance payload to store invariants on load', () => {
+      useAppearanceStore.setState(APPEARANCE_INITIAL_STATE)
+      useAppearanceStore.getState().setColorAlgorithm('phase')
+      useAppearanceStore.getState().setPerDimensionColorEnabled(true)
+      useAppearanceStore.getState().setShaderType('wireframe')
+      useAppearanceStore.getState().setPhaseDivergingSettings({
+        neutralColor: '#111111',
+      })
+      useAppearanceStore.getState().setDivergingPsiSettings({
+        component: 'imag',
+      })
+
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Out Of Range Appearance',
+        timestamp: 123,
+        data: {
+          appearance: {
+            colorAlgorithm: 'invalid',
+            perDimensionColorEnabled: 'yes',
+            shaderType: 'toon',
+            lchLightness: -3,
+            lchChroma: 2,
+            faceEmission: -7,
+            faceEmissionThreshold: 5,
+            faceEmissionColorShift: -3,
+            distribution: {
+              power: 0.1,
+              cycles: 9,
+              offset: -2,
+            },
+            multiSourceWeights: {
+              depth: -1,
+              orbitTrap: 2,
+              normal: 'bad',
+            },
+            domainColoring: {
+              modulusMode: 'bad',
+              contoursEnabled: 'yes',
+              contourDensity: 0,
+              contourWidth: 1,
+              contourStrength: 2,
+            },
+            phaseDiverging: {
+              neutralColor: 42,
+              positiveColor: '#00ff00',
+              negativeColor: '#0000ff',
+            },
+            divergingPsi: {
+              neutralColor: '#101010',
+              positiveColor: '#202020',
+              negativeColor: '#303030',
+              intensityFloor: 4,
+              component: 'phase',
+            },
+            shaderSettings: {
+              wireframe: {
+                lineThickness: 99,
+              },
+              surface: {
+                specularIntensity: -5,
+              },
+            },
+            sssEnabled: 'true',
+            sssIntensity: 9,
+            sssThickness: 0,
+            sssJitter: -2,
+            cosineCoefficients: {
+              a: [-1, 3, 0.5],
+              b: [0.1, 0.2, 0.3],
+              c: [0.4, 0.5, 0.6],
+              d: [0, 0, 0],
+            },
+          },
+          lighting: {},
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const appearance = useAppearanceStore.getState()
+      expect(appearance.colorAlgorithm).toBe('phase')
+      expect(appearance.perDimensionColorEnabled).toBe(true)
+      expect(appearance.shaderType).toBe('wireframe')
+
+      expect(appearance.lchLightness).toBe(0.1)
+      expect(appearance.lchChroma).toBe(0.4)
+      expect(appearance.faceEmission).toBe(0)
+      expect(appearance.faceEmissionThreshold).toBe(1)
+      expect(appearance.faceEmissionColorShift).toBe(-1)
+
+      expect(appearance.distribution).toEqual({
+        power: 0.25,
+        cycles: 5,
+        offset: 0,
+      })
+      expect(appearance.multiSourceWeights).toEqual({
+        depth: 0,
+        orbitTrap: 1,
+        normal: 0.2,
+      })
+
+      expect(appearance.domainColoring.modulusMode).toBe('logPsiAbsSquared')
+      expect(appearance.domainColoring.contoursEnabled).toBe(true)
+      expect(appearance.domainColoring.contourDensity).toBe(1)
+      expect(appearance.domainColoring.contourWidth).toBe(0.25)
+      expect(appearance.domainColoring.contourStrength).toBe(1)
+
+      expect(appearance.phaseDiverging.neutralColor).toBe('#111111')
+      expect(appearance.phaseDiverging.positiveColor).toBe('#00ff00')
+      expect(appearance.phaseDiverging.negativeColor).toBe('#0000ff')
+
+      expect(appearance.divergingPsi.neutralColor).toBe('#101010')
+      expect(appearance.divergingPsi.positiveColor).toBe('#202020')
+      expect(appearance.divergingPsi.negativeColor).toBe('#303030')
+      expect(appearance.divergingPsi.intensityFloor).toBe(1)
+      expect(appearance.divergingPsi.component).toBe('imag')
+
+      expect(appearance.shaderSettings.wireframe.lineThickness).toBe(5)
+      expect(appearance.shaderSettings.surface.specularIntensity).toBe(0)
+
+      expect(appearance.sssEnabled).toBe(false)
+      expect(appearance.sssIntensity).toBe(2)
+      expect(appearance.sssThickness).toBe(0.1)
+      expect(appearance.sssJitter).toBe(0)
+
+      expect(appearance.cosineCoefficients.a).toEqual([0, 2, 0.5])
+    })
+
+    it('drops unknown imported style environment fields on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Unknown Environment Field',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: {
+            mysteryEnvironment: true,
+            skyboxSelection: 'space_red',
+          },
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const environment = useEnvironmentStore.getState() as Record<string, unknown>
+      expect(environment.skyboxSelection).toBe('space_red')
+      expect(environment.mysteryEnvironment).toBeUndefined()
+    })
+
+    it('drops unknown imported style appearance fields on load', () => {
+      const importedStyle = {
+        id: 'style-id',
+        name: 'Unknown Appearance Field',
+        timestamp: 123,
+        data: {
+          appearance: {
+            mysteryAppearance: true,
+            edgeColor: '#123123',
+          },
+          lighting: {},
+          postProcessing: {},
+          environment: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importStyles(JSON.stringify([importedStyle]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedStyles
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadStyle(saved!.id)
+
+      const appearance = useAppearanceStore.getState() as Record<string, unknown>
+      expect(appearance.edgeColor).toBe('#123123')
+      expect(appearance.mysteryAppearance).toBeUndefined()
     })
 
     it('should delete a style', () => {
@@ -165,6 +721,42 @@ describe('presetManagerStore', () => {
       expect(useAnimationStore.getState().animatingPlanes).toBeInstanceOf(Set)
     })
 
+    it('resets PBR to defaults when loading imported scene without pbr payload', () => {
+      usePBRStore.getState().setFaceRoughness(0.9)
+      usePBRStore.getState().setFaceMetallic(0.8)
+      usePBRStore.getState().setFaceSpecularIntensity(1.8)
+      usePBRStore.getState().setFaceSpecularColor('#abcdef')
+
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Legacy Scene Without PBR',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: ['XY'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(usePBRStore.getState().face).toEqual(DEFAULT_FACE_PBR)
+    })
+
     it('should save and load a scene with rotation Map', () => {
       // Setup rotation state
       const rotStore = useRotationStore.getState()
@@ -226,6 +818,292 @@ describe('presetManagerStore', () => {
       usePresetManagerStore.getState().loadScene(saved!.id)
 
       expect(useUIStore.getState().animationBias).toBe(1)
+    })
+
+    it('normalizes imported scene UI payload fields to store invariants on load', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Invalid UI Payload',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 4, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, animatingPlanes: [] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {
+            animationBias: -3,
+            showAxisHelper: 'yes',
+            showPerfMonitor: 'no',
+            perfMonitorExpanded: 'open',
+            perfMonitorTab: 'gpu',
+            mysteryFlag: true,
+          },
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      useUIStore.setState({
+        showAxisHelper: true,
+        showPerfMonitor: false,
+        perfMonitorExpanded: true,
+        perfMonitorTab: 'shader',
+      })
+
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      const ui = useUIStore.getState()
+      expect(ui.animationBias).toBe(0)
+      expect(ui.showAxisHelper).toBe(true)
+      expect(ui.showPerfMonitor).toBe(false)
+      expect(ui.perfMonitorExpanded).toBe(true)
+      expect(ui.perfMonitorTab).toBe('shader')
+      expect(ui.showDepthBuffer).toBe(false)
+      expect(ui.showNormalBuffer).toBe(false)
+      expect(ui.showTemporalDepthBuffer).toBe(false)
+      expect((ui as Record<string, unknown>).mysteryFlag).toBeUndefined()
+    })
+
+    it('ignores non-finite numeric fields from imported scene payloads', () => {
+      // NOTE: Use raw JSON so 1e309 survives parsing as Infinity.
+      const importedSceneJson = `[
+        {
+          "id": "scene-id",
+          "name": "Infinite Numeric Scene",
+          "timestamp": 123,
+          "data": {
+            "appearance": {},
+            "lighting": {},
+            "postProcessing": {},
+            "environment": { "skyboxEnabled": true, "skyboxIntensity": 1e309 },
+            "geometry": { "dimension": 3, "objectType": "schroedinger" },
+            "extended": { "schroedinger": {} },
+            "transform": { "uniformScale": 1 },
+            "rotation": { "rotations": {} },
+            "animation": { "speed": 1e309, "animatingPlanes": ["XY"] },
+            "camera": { "position": [0, 0, 5], "target": [0, 0, 0] },
+            "ui": {}
+          }
+        }
+      ]`
+
+      const ok = usePresetManagerStore.getState().importScenes(importedSceneJson)
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      useEnvironmentStore.getState().setSkyboxIntensity(1.25)
+      useAnimationStore.getState().setSpeed(0.75)
+
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(useEnvironmentStore.getState().skyboxIntensity).toBe(1.25)
+      expect(useAnimationStore.getState().speed).toBe(0.75)
+    })
+
+    it('keeps transform dimension aligned with loaded geometry when importing scenes', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Mismatched Transform Dimension',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 4, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: {
+            uniformScale: 1.75,
+            perAxisScale: [1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75],
+            scaleLocked: true,
+            dimension: 11,
+          },
+          rotation: { rotations: { XY: 0.75, XW: 'bad-angle' }, dimension: 11 },
+          animation: { speed: 1, animatingPlanes: [] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      useGeometryStore.getState().setDimension(3)
+      useTransformStore.getState().setDimension(3)
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(useGeometryStore.getState().dimension).toBe(4)
+      expect(useTransformStore.getState().dimension).toBe(4)
+      expect(useTransformStore.getState().uniformScale).toBe(1.75)
+      expect(useTransformStore.getState().perAxisScale).toHaveLength(4)
+      expect(useTransformStore.getState().perAxisScale.every((s) => s === 1.75)).toBe(true)
+      expect(useRotationStore.getState().dimension).toBe(4)
+      expect(useRotationStore.getState().rotations.get('XY')).toBeCloseTo(0.75, 6)
+      expect(useRotationStore.getState().rotations.has('XW')).toBe(false)
+    })
+
+    it('filters imported animation planes to the loaded geometry dimension', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Mismatched Animation Planes',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, isPlaying: true, animatingPlanes: ['XY', 'XW'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      expect(useGeometryStore.getState().dimension).toBe(3)
+      expect(useAnimationStore.getState().animatingPlanes.has('XY')).toBe(true)
+      expect(useAnimationStore.getState().animatingPlanes.has('XW')).toBe(false)
+    })
+
+    it('normalizes imported animation payload fields to store invariants', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Invalid Animation Payload',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: {
+            speed: -100,
+            direction: 0,
+            isPlaying: 'yes',
+            animatingPlanes: ['XY'],
+          },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      useAnimationStore.getState().setSpeed(0.8)
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      const animation = useAnimationStore.getState()
+      expect(animation.speed).toBe(0.1)
+      expect(animation.direction).toBe(1)
+      expect(animation.isPlaying).toBe(true)
+      expect(animation.animatingPlanes.has('XY')).toBe(true)
+    })
+
+    it('drops unknown imported scene animation fields on load', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Animation Unknown Key',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: { schroedinger: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: {
+            speed: 1,
+            isPlaying: true,
+            animatingPlanes: ['XY'],
+            mysteryAnimation: true,
+          },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      const animation = useAnimationStore.getState() as Record<string, unknown>
+      expect(animation.mysteryAnimation).toBeUndefined()
+    })
+
+    it('drops unknown imported scene extended schroedinger fields on load', () => {
+      const importedScene = {
+        id: 'scene-id',
+        name: 'Extended Unknown Key',
+        timestamp: 123,
+        data: {
+          appearance: {},
+          lighting: {},
+          postProcessing: {},
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 3, objectType: 'schroedinger' },
+          extended: {
+            schroedinger: {
+              termCount: 4,
+              mysteryExtended: 42,
+            },
+          },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1, isPlaying: true, animatingPlanes: ['XY'] },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([importedScene]))
+      expect(ok).toBe(true)
+
+      const [saved] = usePresetManagerStore.getState().savedScenes
+      expect(saved).toBeDefined()
+
+      usePresetManagerStore.getState().loadScene(saved!.id)
+
+      const schroedinger = useExtendedObjectStore.getState().schroedinger as Record<string, unknown>
+      expect(schroedinger.termCount).toBe(4)
+      expect(schroedinger.mysteryExtended).toBeUndefined()
     })
 
     it('persists momentum representation settings in saved scenes', () => {
@@ -384,6 +1262,26 @@ describe('presetManagerStore', () => {
       expect(ok).toBe(false)
     })
 
+    it('should reject style import entries with whitespace-only names', () => {
+      const styleWithWhitespaceName = {
+        id: 'test-id',
+        name: '   ',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#0000ff' },
+          lighting: { lightEnabled: true },
+          postProcessing: { bloomEnabled: false },
+          environment: { skyboxEnabled: false },
+        },
+      }
+
+      const ok = usePresetManagerStore
+        .getState()
+        .importStyles(JSON.stringify([styleWithWhitespaceName]))
+      expect(ok).toBe(false)
+      expect(usePresetManagerStore.getState().savedStyles).toHaveLength(0)
+    })
+
     it('should accept complete style data', () => {
       const completeStyle = {
         id: 'test-id',
@@ -418,6 +1316,33 @@ describe('presetManagerStore', () => {
 
       const ok = usePresetManagerStore.getState().importScenes(JSON.stringify([incompleteScene]))
       expect(ok).toBe(false)
+    })
+
+    it('should reject scene import entries with whitespace-only names', () => {
+      const sceneWithWhitespaceName = {
+        id: 'test-id',
+        name: '   ',
+        timestamp: 123,
+        data: {
+          appearance: { edgeColor: '#0000ff' },
+          lighting: { lightEnabled: true },
+          postProcessing: { bloomEnabled: false },
+          environment: { skyboxEnabled: false },
+          geometry: { dimension: 4, objectType: 'hypercube' },
+          extended: { polytope: {} },
+          transform: { uniformScale: 1 },
+          rotation: { rotations: {} },
+          animation: { speed: 1 },
+          camera: { position: [0, 0, 5], target: [0, 0, 0] },
+          ui: {},
+        },
+      }
+
+      const ok = usePresetManagerStore
+        .getState()
+        .importScenes(JSON.stringify([sceneWithWhitespaceName]))
+      expect(ok).toBe(false)
+      expect(usePresetManagerStore.getState().savedScenes).toHaveLength(0)
     })
 
     it('should accept complete scene data', () => {
@@ -494,6 +1419,40 @@ describe('presetManagerStore', () => {
       expect(styles[1]!.name).toBe('My Style (imported)')
     })
 
+    it('deduplicates duplicate style names within the same import batch', () => {
+      const duplicateStyles = [
+        {
+          id: 'style-a',
+          name: 'Batch Style',
+          timestamp: 123,
+          data: {
+            appearance: {},
+            lighting: {},
+            postProcessing: {},
+            environment: {},
+          },
+        },
+        {
+          id: 'style-b',
+          name: 'Batch Style',
+          timestamp: 124,
+          data: {
+            appearance: {},
+            lighting: {},
+            postProcessing: {},
+            environment: {},
+          },
+        },
+      ]
+
+      usePresetManagerStore.getState().importStyles(JSON.stringify(duplicateStyles))
+
+      const styles = usePresetManagerStore.getState().savedStyles
+      expect(styles).toHaveLength(2)
+      expect(styles[0]!.name).toBe('Batch Style')
+      expect(styles[1]!.name).toBe('Batch Style (imported)')
+    })
+
     it('should regenerate IDs for imported scenes', () => {
       const scene = {
         id: 'original-id',
@@ -553,6 +1512,54 @@ describe('presetManagerStore', () => {
       expect(scenes).toHaveLength(2)
       expect(scenes[0]!.name).toBe('My Scene')
       expect(scenes[1]!.name).toBe('My Scene (imported)')
+    })
+
+    it('deduplicates duplicate scene names within the same import batch', () => {
+      const duplicateScenes = [
+        {
+          id: 'scene-a',
+          name: 'Batch Scene',
+          timestamp: 123,
+          data: {
+            appearance: {},
+            lighting: {},
+            postProcessing: {},
+            environment: {},
+            geometry: {},
+            extended: {},
+            transform: {},
+            rotation: {},
+            animation: {},
+            camera: {},
+            ui: {},
+          },
+        },
+        {
+          id: 'scene-b',
+          name: 'Batch Scene',
+          timestamp: 124,
+          data: {
+            appearance: {},
+            lighting: {},
+            postProcessing: {},
+            environment: {},
+            geometry: {},
+            extended: {},
+            transform: {},
+            rotation: {},
+            animation: {},
+            camera: {},
+            ui: {},
+          },
+        },
+      ]
+
+      usePresetManagerStore.getState().importScenes(JSON.stringify(duplicateScenes))
+
+      const scenes = usePresetManagerStore.getState().savedScenes
+      expect(scenes).toHaveLength(2)
+      expect(scenes[0]!.name).toBe('Batch Scene')
+      expect(scenes[1]!.name).toBe('Batch Scene (imported)')
     })
   })
 

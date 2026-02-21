@@ -28,6 +28,26 @@ describe('extendedObjectStore — free scalar field actions', () => {
     expect(fs.spacing).toHaveLength(1)
   })
 
+  it('ignores non-finite lattice and grid-size updates', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setFreeScalarLatticeDim(3)
+    store.setFreeScalarGridSize([32, 32, 32])
+
+    const before = useExtendedObjectStore.getState().schroedinger.freeScalar
+
+    store.setFreeScalarLatticeDim(Number.NaN)
+    store.setFreeScalarLatticeDim(Number.POSITIVE_INFINITY)
+    store.setFreeScalarLatticeDim(Number.NEGATIVE_INFINITY)
+    store.setFreeScalarGridSize([Number.NaN, 64, 64])
+    store.setFreeScalarGridSize([32, Number.POSITIVE_INFINITY, 64])
+    store.setFreeScalarGridSize([32, 64, Number.NEGATIVE_INFINITY])
+
+    const after = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(after.latticeDim).toBe(before.latticeDim)
+    expect(after.gridSize).toEqual(before.gridSize)
+    expect(after.gridSize.every((v) => Number.isFinite(v))).toBe(true)
+  })
+
   it('setFreeScalarGridSize sets grid and triggers reset', () => {
     useExtendedObjectStore.getState().setFreeScalarGridSize([64, 64, 64])
     const fs = useExtendedObjectStore.getState().schroedinger.freeScalar
@@ -38,6 +58,58 @@ describe('extendedObjectStore — free scalar field actions', () => {
   it('setFreeScalarMass updates mass parameter', () => {
     useExtendedObjectStore.getState().setFreeScalarMass(2.5)
     expect(useExtendedObjectStore.getState().schroedinger.freeScalar.mass).toBe(2.5)
+  })
+
+  it('ignores non-finite scalar numeric updates', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setFreeScalarLatticeDim(4)
+    store.setFreeScalarSpacing([0.2, 0.2, 0.2, 0.2])
+    store.setFreeScalarMass(2.0)
+    store.setFreeScalarDt(0.01)
+    store.setFreeScalarStepsPerFrame(8)
+    store.setFreeScalarPacketWidth(0.5)
+    store.setFreeScalarPacketAmplitude(2.0)
+    store.setFreeScalarVacuumSeed(77)
+    store.setFreeScalarKSpaceLowPercentile(10)
+    store.setFreeScalarKSpaceHighPercentile(90)
+    store.setFreeScalarKSpaceGamma(1.5)
+    store.setFreeScalarKSpaceBroadeningRadius(3)
+    store.setFreeScalarKSpaceBroadeningSigma(1.2)
+    store.setFreeScalarKSpaceRadialBinCount(64)
+    store.setFreeScalarSlicePosition(0, 0.5)
+
+    const before = useExtendedObjectStore.getState().schroedinger.freeScalar
+
+    store.setFreeScalarSpacing([0.2, Number.NaN, 0.2, 0.2])
+    store.setFreeScalarMass(Number.NaN)
+    store.setFreeScalarDt(Number.POSITIVE_INFINITY)
+    store.setFreeScalarStepsPerFrame(Number.NEGATIVE_INFINITY)
+    store.setFreeScalarPacketWidth(Number.NaN)
+    store.setFreeScalarPacketAmplitude(Number.POSITIVE_INFINITY)
+    store.setFreeScalarVacuumSeed(Number.NaN)
+    store.setFreeScalarKSpaceLowPercentile(Number.NaN)
+    store.setFreeScalarKSpaceHighPercentile(Number.POSITIVE_INFINITY)
+    store.setFreeScalarKSpaceGamma(Number.NaN)
+    store.setFreeScalarKSpaceBroadeningRadius(Number.POSITIVE_INFINITY)
+    store.setFreeScalarKSpaceBroadeningSigma(Number.NaN)
+    store.setFreeScalarKSpaceRadialBinCount(Number.NEGATIVE_INFINITY)
+    store.setFreeScalarSlicePosition(0, Number.NaN)
+
+    const after = useExtendedObjectStore.getState().schroedinger.freeScalar
+    expect(after.spacing).toEqual(before.spacing)
+    expect(after.mass).toBe(before.mass)
+    expect(after.dt).toBe(before.dt)
+    expect(after.stepsPerFrame).toBe(before.stepsPerFrame)
+    expect(after.packetWidth).toBe(before.packetWidth)
+    expect(after.packetAmplitude).toBe(before.packetAmplitude)
+    expect(after.vacuumSeed).toBe(before.vacuumSeed)
+    expect(after.kSpaceViz.lowPercentile).toBe(before.kSpaceViz.lowPercentile)
+    expect(after.kSpaceViz.highPercentile).toBe(before.kSpaceViz.highPercentile)
+    expect(after.kSpaceViz.gamma).toBe(before.kSpaceViz.gamma)
+    expect(after.kSpaceViz.broadeningRadius).toBe(before.kSpaceViz.broadeningRadius)
+    expect(after.kSpaceViz.broadeningSigma).toBe(before.kSpaceViz.broadeningSigma)
+    expect(after.kSpaceViz.radialBinCount).toBe(before.kSpaceViz.radialBinCount)
+    expect(after.slicePositions).toEqual(before.slicePositions)
   })
 
   it('setFreeScalarDt updates time step', () => {

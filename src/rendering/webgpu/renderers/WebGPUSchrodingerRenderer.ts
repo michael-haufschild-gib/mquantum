@@ -165,6 +165,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   ): string {
     const pipelineIs2D =
       (rendererConfig.dimension ?? 3) === 2 || rendererConfig.representation === 'wigner'
+    const cacheOn = config.useEigenfunctionCache ? 1 : 0
     return [
       config.dimension,
       rendererConfig.representation ?? 'position',
@@ -176,9 +177,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       config.phaseMateriality ? 1 : 0,
       config.interference ? 1 : 0,
       config.uncertaintyBoundary ? 1 : 0,
-      config.useEigenfunctionCache ? 1 : 0,
-      config.useAnalyticalGradient ? 1 : 0,
-      config.useRobustEigenInterpolation ? 1 : 0,
+      cacheOn,
+      cacheOn && config.useAnalyticalGradient ? 1 : 0,
+      cacheOn && config.useRobustEigenInterpolation ? 1 : 0,
       config.colorAlgorithm ?? 4,
       config.useDensityGrid ? 1 : 0,
       config.densityGridHasPhase ? 1 : 0,

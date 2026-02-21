@@ -38,6 +38,26 @@ describe('TDSE store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.tdse.latticeDim).toBe(3)
   })
 
+  it('ignores non-finite lattice and grid-size updates', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setTdseLatticeDim(3)
+    store.setTdseGridSize([16, 32, 32])
+
+    const before = useExtendedObjectStore.getState().schroedinger.tdse
+
+    store.setTdseLatticeDim(Number.NaN)
+    store.setTdseLatticeDim(Number.POSITIVE_INFINITY)
+    store.setTdseLatticeDim(Number.NEGATIVE_INFINITY)
+    store.setTdseGridSize([Number.NaN, 32, 32])
+    store.setTdseGridSize([16, Number.POSITIVE_INFINITY, 32])
+    store.setTdseGridSize([16, 32, Number.NEGATIVE_INFINITY])
+
+    const after = useExtendedObjectStore.getState().schroedinger.tdse
+    expect(after.latticeDim).toBe(before.latticeDim)
+    expect(after.gridSize).toEqual(before.gridSize)
+    expect(after.gridSize.every((v) => Number.isFinite(v))).toBe(true)
+  })
+
   it('setTdseMass clamps to [0.01, 100]', () => {
     const store = useExtendedObjectStore.getState()
     store.setTdseMass(0.001)
@@ -45,6 +65,76 @@ describe('TDSE store slice', () => {
 
     store.setTdseMass(200)
     expect(useExtendedObjectStore.getState().schroedinger.tdse.mass).toBe(100)
+  })
+
+  it('ignores non-finite scalar numeric updates', () => {
+    const store = useExtendedObjectStore.getState()
+    store.setTdseLatticeDim(4)
+    store.setTdseSpacing([0.2, 0.2, 0.2, 0.2])
+    store.setTdseMass(2.0)
+    store.setTdseHbar(0.8)
+    store.setTdseDt(0.01)
+    store.setTdseStepsPerFrame(8)
+    store.setTdsePacketWidth(0.6)
+    store.setTdsePacketAmplitude(1.5)
+    store.setTdseBarrierHeight(12)
+    store.setTdseBarrierWidth(0.6)
+    store.setTdseBarrierCenter(0.5)
+    store.setTdseWellDepth(15)
+    store.setTdseWellWidth(2.2)
+    store.setTdseHarmonicOmega(3.4)
+    store.setTdseStepHeight(7)
+    store.setTdseDriveFrequency(2.5)
+    store.setTdseDriveAmplitude(1.2)
+    store.setTdseAbsorberWidth(0.12)
+    store.setTdseAbsorberStrength(10)
+    store.setTdseDiagnosticsInterval(9)
+    store.setTdseSlicePosition(0, 0.4)
+
+    const before = useExtendedObjectStore.getState().schroedinger.tdse
+
+    store.setTdseSpacing([0.2, Number.NaN, 0.2, 0.2])
+    store.setTdseMass(Number.NaN)
+    store.setTdseHbar(Number.POSITIVE_INFINITY)
+    store.setTdseDt(Number.NaN)
+    store.setTdseStepsPerFrame(Number.NEGATIVE_INFINITY)
+    store.setTdsePacketWidth(Number.NaN)
+    store.setTdsePacketAmplitude(Number.POSITIVE_INFINITY)
+    store.setTdseBarrierHeight(Number.NaN)
+    store.setTdseBarrierWidth(Number.POSITIVE_INFINITY)
+    store.setTdseBarrierCenter(Number.NaN)
+    store.setTdseWellDepth(Number.POSITIVE_INFINITY)
+    store.setTdseWellWidth(Number.NaN)
+    store.setTdseHarmonicOmega(Number.POSITIVE_INFINITY)
+    store.setTdseStepHeight(Number.NaN)
+    store.setTdseDriveFrequency(Number.POSITIVE_INFINITY)
+    store.setTdseDriveAmplitude(Number.NaN)
+    store.setTdseAbsorberWidth(Number.POSITIVE_INFINITY)
+    store.setTdseAbsorberStrength(Number.NaN)
+    store.setTdseDiagnosticsInterval(Number.NaN)
+    store.setTdseSlicePosition(0, Number.NaN)
+
+    const after = useExtendedObjectStore.getState().schroedinger.tdse
+    expect(after.spacing).toEqual(before.spacing)
+    expect(after.mass).toBe(before.mass)
+    expect(after.hbar).toBe(before.hbar)
+    expect(after.dt).toBe(before.dt)
+    expect(after.stepsPerFrame).toBe(before.stepsPerFrame)
+    expect(after.packetWidth).toBe(before.packetWidth)
+    expect(after.packetAmplitude).toBe(before.packetAmplitude)
+    expect(after.barrierHeight).toBe(before.barrierHeight)
+    expect(after.barrierWidth).toBe(before.barrierWidth)
+    expect(after.barrierCenter).toBe(before.barrierCenter)
+    expect(after.wellDepth).toBe(before.wellDepth)
+    expect(after.wellWidth).toBe(before.wellWidth)
+    expect(after.harmonicOmega).toBe(before.harmonicOmega)
+    expect(after.stepHeight).toBe(before.stepHeight)
+    expect(after.driveFrequency).toBe(before.driveFrequency)
+    expect(after.driveAmplitude).toBe(before.driveAmplitude)
+    expect(after.absorberWidth).toBe(before.absorberWidth)
+    expect(after.absorberStrength).toBe(before.absorberStrength)
+    expect(after.diagnosticsInterval).toBe(before.diagnosticsInterval)
+    expect(after.slicePositions).toEqual(before.slicePositions)
   })
 
   it('setTdseDt clamps to [0.0001, 0.1]', () => {

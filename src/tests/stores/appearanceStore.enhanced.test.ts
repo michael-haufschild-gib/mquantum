@@ -213,6 +213,131 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(useAppearanceStore.getState().shaderSettings.surface.specularIntensity).toBe(0)
     })
 
+    it('ignores non-finite render numeric setting updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setWireframeSettings({ lineThickness: 2.5 })
+      store.setSurfaceSettings({ specularIntensity: 0.9 })
+
+      store.setWireframeSettings({ lineThickness: Number.NaN })
+      store.setSurfaceSettings({ specularIntensity: Number.POSITIVE_INFINITY })
+
+      const next = useAppearanceStore.getState()
+      expect(next.shaderSettings.wireframe.lineThickness).toBe(2.5)
+      expect(next.shaderSettings.surface.specularIntensity).toBe(0.9)
+    })
+
+    it('ignores non-finite material emission controls', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setFaceEmission(1.4)
+      store.setFaceEmissionThreshold(0.35)
+      store.setFaceEmissionColorShift(0.2)
+
+      store.setFaceEmission(Number.NaN)
+      store.setFaceEmissionThreshold(Number.POSITIVE_INFINITY)
+      store.setFaceEmissionColorShift(Number.NEGATIVE_INFINITY)
+
+      const next = useAppearanceStore.getState()
+      expect(next.faceEmission).toBe(1.4)
+      expect(next.faceEmissionThreshold).toBe(0.35)
+      expect(next.faceEmissionColorShift).toBe(0.2)
+    })
+
+    it('ignores non-finite color-slice numeric updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setDistribution({ power: 2.5, cycles: 3.0, offset: 0.6 })
+      store.setMultiSourceWeights({ depth: 0.4, orbitTrap: 0.3, normal: 0.2 })
+      store.setLchLightness(0.7)
+      store.setLchChroma(0.2)
+      store.setDomainColoringSettings({
+        contourDensity: 6,
+        contourWidth: 0.08,
+        contourStrength: 0.45,
+      })
+      store.setDivergingPsiSettings({ intensityFloor: 0.33 })
+
+      store.setDistribution({
+        power: Number.NaN,
+        cycles: Number.POSITIVE_INFINITY,
+        offset: Number.NEGATIVE_INFINITY,
+      })
+      store.setMultiSourceWeights({
+        depth: Number.NaN,
+        orbitTrap: Number.POSITIVE_INFINITY,
+        normal: Number.NEGATIVE_INFINITY,
+      })
+      store.setLchLightness(Number.NaN)
+      store.setLchChroma(Number.POSITIVE_INFINITY)
+      store.setDomainColoringSettings({
+        contourDensity: Number.NaN,
+        contourWidth: Number.POSITIVE_INFINITY,
+        contourStrength: Number.NEGATIVE_INFINITY,
+      })
+      store.setDivergingPsiSettings({ intensityFloor: Number.NaN })
+
+      const next = useAppearanceStore.getState()
+      expect(next.distribution).toEqual({ power: 2.5, cycles: 3.0, offset: 0.6 })
+      expect(next.multiSourceWeights).toEqual({ depth: 0.4, orbitTrap: 0.3, normal: 0.2 })
+      expect(next.lchLightness).toBe(0.7)
+      expect(next.lchChroma).toBe(0.2)
+      expect(next.domainColoring.contourDensity).toBe(6)
+      expect(next.domainColoring.contourWidth).toBe(0.08)
+      expect(next.domainColoring.contourStrength).toBe(0.45)
+      expect(next.divergingPsi.intensityFloor).toBe(0.33)
+    })
+
+    it('ignores invalid cosine coefficient updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setCosineCoefficients({
+        a: [0.4, 0.5, 0.6],
+        b: [0.2, 0.2, 0.2],
+        c: [1, 1, 1],
+        d: [0, 0, 0],
+      })
+      store.setCosineCoefficient('a', 1, 1.25)
+      store.setCosineCoefficient('a', 1, Number.NaN)
+      store.setCosineCoefficient('a', 99, 0.5)
+      store.setCosineCoefficient('a', -1, 0.5)
+      store.setCosineCoefficient('a', 1.5, 0.5)
+
+      const next = useAppearanceStore.getState()
+      expect(next.cosineCoefficients.a).toEqual([0.4, 1.25, 0.6])
+      expect(next.cosineCoefficients.a).toHaveLength(3)
+    })
+
+    it('clamps advanced SSS controls to shader-safe ranges', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setSssIntensity(999)
+      store.setSssThickness(-5)
+      store.setSssJitter(3)
+
+      const next = useAppearanceStore.getState()
+      expect(next.sssIntensity).toBe(2)
+      expect(next.sssThickness).toBe(0.1)
+      expect(next.sssJitter).toBe(1)
+    })
+
+    it('ignores non-finite advanced SSS updates', () => {
+      const store = useAppearanceStore.getState()
+
+      store.setSssIntensity(1.4)
+      store.setSssThickness(1.8)
+      store.setSssJitter(0.3)
+
+      store.setSssIntensity(Number.NaN)
+      store.setSssThickness(Number.POSITIVE_INFINITY)
+      store.setSssJitter(Number.NEGATIVE_INFINITY)
+
+      const next = useAppearanceStore.getState()
+      expect(next.sssIntensity).toBe(1.4)
+      expect(next.sssThickness).toBe(1.8)
+      expect(next.sssJitter).toBe(0.3)
+    })
+
     it('clamps bloom controls to safe ranges', () => {
       usePostProcessingStore.getState().setBloomGain(999)
       expect(usePostProcessingStore.getState().bloomGain).toBe(3)

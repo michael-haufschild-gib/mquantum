@@ -24,6 +24,9 @@ import {
 // Types
 // ============================================================================
 
+/**
+ * PBR slice state fields.
+ */
 export interface PBRSliceState {
   /** PBR settings for main objects (faces) */
   face: PBRConfig
@@ -31,6 +34,9 @@ export interface PBRSliceState {
   pbrVersion: number
 }
 
+/**
+ * PBR slice actions.
+ */
 export interface PBRSliceActions {
   // Face setters
   setFaceRoughness: (roughness: number) => void
@@ -47,6 +53,9 @@ export interface PBRSliceActions {
   resetPBR: () => void
 }
 
+/**
+ * Combined PBR slice type.
+ */
 export type PBRSlice = PBRSliceState & PBRSliceActions
 
 // ============================================================================
@@ -74,6 +83,8 @@ const clampMetallic = (value: number): number => Math.max(0.0, Math.min(1.0, val
  */
 const clampSpecularIntensity = (value: number): number => Math.max(0.0, Math.min(2.0, value))
 
+const isFinitePBRInput = (value: number): boolean => Number.isFinite(value)
+
 // ============================================================================
 // Initial State
 // ============================================================================
@@ -91,23 +102,44 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
   ...PBR_INITIAL_STATE,
 
   // --- Face Setters ---
-  setFaceRoughness: (roughness) =>
+  setFaceRoughness: (roughness) => {
+    if (!isFinitePBRInput(roughness)) {
+      if (import.meta.env.DEV) {
+        console.warn('[pbrSlice] Ignoring non-finite roughness:', roughness)
+      }
+      return
+    }
     set((state) => ({
       face: { ...state.face, roughness: clampRoughness(roughness) },
       pbrVersion: state.pbrVersion + 1,
-    })),
+    }))
+  },
 
-  setFaceMetallic: (metallic) =>
+  setFaceMetallic: (metallic) => {
+    if (!isFinitePBRInput(metallic)) {
+      if (import.meta.env.DEV) {
+        console.warn('[pbrSlice] Ignoring non-finite metallic:', metallic)
+      }
+      return
+    }
     set((state) => ({
       face: { ...state.face, metallic: clampMetallic(metallic) },
       pbrVersion: state.pbrVersion + 1,
-    })),
+    }))
+  },
 
-  setFaceSpecularIntensity: (intensity) =>
+  setFaceSpecularIntensity: (intensity) => {
+    if (!isFinitePBRInput(intensity)) {
+      if (import.meta.env.DEV) {
+        console.warn('[pbrSlice] Ignoring non-finite specular intensity:', intensity)
+      }
+      return
+    }
     set((state) => ({
       face: { ...state.face, specularIntensity: clampSpecularIntensity(intensity) },
       pbrVersion: state.pbrVersion + 1,
-    })),
+    }))
+  },
 
   setFaceSpecularColor: (color) =>
     set((state) => ({
@@ -116,18 +148,52 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
     })),
 
   setFacePBR: (config) =>
-    set((state) => ({
-      face: {
-        ...state.face,
-        ...(config.roughness !== undefined && { roughness: clampRoughness(config.roughness) }),
-        ...(config.metallic !== undefined && { metallic: clampMetallic(config.metallic) }),
-        ...(config.specularIntensity !== undefined && {
-          specularIntensity: clampSpecularIntensity(config.specularIntensity),
-        }),
-        ...(config.specularColor !== undefined && { specularColor: config.specularColor }),
-      },
-      pbrVersion: state.pbrVersion + 1,
-    })),
+    set((state) => {
+      const nextFace: Partial<PBRConfig> = {}
+
+      if (config.roughness !== undefined) {
+        if (isFinitePBRInput(config.roughness)) {
+          nextFace.roughness = clampRoughness(config.roughness)
+        } else if (import.meta.env.DEV) {
+          console.warn('[pbrSlice] Ignoring non-finite roughness in setFacePBR:', config.roughness)
+        }
+      }
+
+      if (config.metallic !== undefined) {
+        if (isFinitePBRInput(config.metallic)) {
+          nextFace.metallic = clampMetallic(config.metallic)
+        } else if (import.meta.env.DEV) {
+          console.warn('[pbrSlice] Ignoring non-finite metallic in setFacePBR:', config.metallic)
+        }
+      }
+
+      if (config.specularIntensity !== undefined) {
+        if (isFinitePBRInput(config.specularIntensity)) {
+          nextFace.specularIntensity = clampSpecularIntensity(config.specularIntensity)
+        } else if (import.meta.env.DEV) {
+          console.warn(
+            '[pbrSlice] Ignoring non-finite specular intensity in setFacePBR:',
+            config.specularIntensity
+          )
+        }
+      }
+
+      if (config.specularColor !== undefined) {
+        nextFace.specularColor = config.specularColor
+      }
+
+      if (Object.keys(nextFace).length === 0) {
+        return state
+      }
+
+      return {
+        face: {
+          ...state.face,
+          ...nextFace,
+        },
+        pbrVersion: state.pbrVersion + 1,
+      }
+    }),
 
   // --- Version Bump ---
   bumpVersion: () => set((state) => ({ pbrVersion: state.pbrVersion + 1 })),

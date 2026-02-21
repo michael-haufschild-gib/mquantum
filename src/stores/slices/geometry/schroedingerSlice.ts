@@ -42,6 +42,16 @@ export const createSchroedingerSlice: StateCreator<
   // === Setter Factories ===
   // Reduce boilerplate for common setter patterns
 
+  const isFiniteSchroedingerInput = (value: number): boolean => Number.isFinite(value)
+  const hasOnlyFiniteNumbers = (values: number[]): boolean =>
+    values.every((value) => Number.isFinite(value))
+
+  const warnNonFiniteSchroedingerInput = (name: string, value: unknown): void => {
+    if (import.meta.env.DEV) {
+      console.warn(`[schroedingerSlice] Ignoring non-finite input for ${name}:`, value)
+    }
+  }
+
   /**
    * Factory for simple value setters (no validation)
    * @param key
@@ -63,6 +73,15 @@ export const createSchroedingerSlice: StateCreator<
   const clampedSetter =
     <K extends keyof typeof DEFAULT_SCHROEDINGER_CONFIG>(key: K, min: number, max: number) =>
     (value: number) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            `[schroedingerSlice] Ignoring non-finite numeric update for ${String(key)}:`,
+            value
+          )
+        }
+        return
+      }
       const clamped = Math.max(min, Math.min(max, value))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, [key]: clamped },
@@ -217,6 +236,12 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Geometry Settings ===
     setSchroedingerScale: (scale) => {
+      if (!isFiniteSchroedingerInput(scale)) {
+        if (import.meta.env.DEV) {
+          console.warn('[schroedingerSlice] Ignoring non-finite scale:', scale)
+        }
+        return
+      }
       const clampedScale = Math.max(0.1, Math.min(2.0, scale))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, scale: clampedScale },
@@ -236,6 +261,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerResolution: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('resolution', value)
+        return
+      }
       const validResolutions = [16, 24, 32, 48, 64, 96, 128]
       const closest = validResolutions.reduce((prev, curr) =>
         Math.abs(curr - value) < Math.abs(prev - value) ? curr : prev
@@ -253,6 +282,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerVisualizationAxis: (index, dimIndex) => {
+      if (!isFiniteSchroedingerInput(dimIndex)) {
+        warnNonFiniteSchroedingerInput('visualizationAxes', dimIndex)
+        return
+      }
       const clampedDimIndex = Math.max(0, Math.min(10, Math.floor(dimIndex)))
       const current = [...get().schroedinger.visualizationAxes] as [number, number, number]
       current[index] = clampedDimIndex
@@ -263,6 +296,18 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Slice Parameters ===
     setSchroedingerParameterValue: (dimIndex, value) => {
+      if (!Number.isInteger(dimIndex)) {
+        if (import.meta.env.DEV) {
+          console.warn(
+            `setSchroedingerParameterValue: Invalid non-integer dimension index ${dimIndex}`
+          )
+        }
+        return
+      }
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('parameterValues', value)
+        return
+      }
       const values = [...get().schroedinger.parameterValues]
       if (dimIndex < 0 || dimIndex >= values.length) {
         if (import.meta.env.DEV) {
@@ -280,6 +325,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerParameterValues: (values) => {
+      if (!hasOnlyFiniteNumbers(values)) {
+        warnNonFiniteSchroedingerInput('parameterValues', values)
+        return
+      }
       const clampedValues = values.map((v) => Math.max(-2.0, Math.min(2.0, v)))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, parameterValues: clampedValues },
@@ -301,6 +350,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerExtent: (extent) => {
+      if (!isFiniteSchroedingerInput(extent)) {
+        warnNonFiniteSchroedingerInput('extent', extent)
+        return
+      }
       const clampedExtent = Math.max(0.001, Math.min(10.0, extent))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, extent: clampedExtent },
@@ -365,6 +418,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerSeed: (seed) => {
+      if (!isFiniteSchroedingerInput(seed)) {
+        warnNonFiniteSchroedingerInput('seed', seed)
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, seed: Math.floor(seed), presetName: 'custom' },
       }))
@@ -378,6 +435,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerTermCount: (count) => {
+      if (!isFiniteSchroedingerInput(count)) {
+        warnNonFiniteSchroedingerInput('termCount', count)
+        return
+      }
       const clampedCount = Math.max(1, Math.min(8, Math.floor(count)))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, termCount: clampedCount, presetName: 'custom' },
@@ -385,6 +446,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerMaxQuantumNumber: (maxN) => {
+      if (!isFiniteSchroedingerInput(maxN)) {
+        warnNonFiniteSchroedingerInput('maxQuantumNumber', maxN)
+        return
+      }
       const clampedMaxN = Math.max(2, Math.min(6, Math.floor(maxN)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -396,6 +461,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerFrequencySpread: (spread) => {
+      if (!isFiniteSchroedingerInput(spread)) {
+        warnNonFiniteSchroedingerInput('frequencySpread', spread)
+        return
+      }
       const clampedSpread = Math.max(0, Math.min(0.5, spread))
       setWithVersion((state) => ({
         schroedinger: {
@@ -455,6 +524,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerMomentumHbar: clampedSetter('momentumHbar', 0.01, 10.0),
 
     setSchroedingerPrincipalQuantumNumber: (n: number) => {
+      if (!isFiniteSchroedingerInput(n)) {
+        warnNonFiniteSchroedingerInput('principalQuantumNumber', n)
+        return
+      }
       const clamped = Math.max(1, Math.min(7, Math.floor(n)))
       const currentL = get().schroedinger.azimuthalQuantumNumber
       const currentM = get().schroedinger.magneticQuantumNumber
@@ -476,6 +549,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerAzimuthalQuantumNumber: (l: number) => {
+      if (!isFiniteSchroedingerInput(l)) {
+        warnNonFiniteSchroedingerInput('azimuthalQuantumNumber', l)
+        return
+      }
       const currentN = get().schroedinger.principalQuantumNumber
       const currentM = get().schroedinger.magneticQuantumNumber
 
@@ -495,6 +572,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerMagneticQuantumNumber: (m: number) => {
+      if (!isFiniteSchroedingerInput(m)) {
+        warnNonFiniteSchroedingerInput('magneticQuantumNumber', m)
+        return
+      }
       const currentL = get().schroedinger.azimuthalQuantumNumber
       // Enforce |m| <= l constraint
       const clamped = Math.max(-currentL, Math.min(currentL, Math.floor(m)))
@@ -518,6 +599,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setSchroedingerBohrRadiusScale: (bohrRadiusScale) => {
+      if (!isFiniteSchroedingerInput(bohrRadiusScale)) {
+        warnNonFiniteSchroedingerInput('bohrRadiusScale', bohrRadiusScale)
+        return
+      }
       const clamped = Math.max(0.5, Math.min(3.0, bohrRadiusScale))
       setWithVersion((state) => ({
         schroedinger: {
@@ -561,8 +646,12 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerExtraDimQuantumNumber: (dimIndex: number, n: number) => {
+      if (!Number.isInteger(dimIndex) || dimIndex < 0 || dimIndex >= 8) return
+      if (!isFiniteSchroedingerInput(n)) {
+        warnNonFiniteSchroedingerInput('extraDimQuantumNumbers', n)
+        return
+      }
       const numbers = [...get().schroedinger.extraDimQuantumNumbers]
-      if (dimIndex < 0 || dimIndex >= 8) return
       numbers[dimIndex] = Math.max(0, Math.min(6, Math.floor(n)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -574,6 +663,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerExtraDimQuantumNumbers: (numbers: number[]) => {
+      if (!hasOnlyFiniteNumbers(numbers)) {
+        warnNonFiniteSchroedingerInput('extraDimQuantumNumbers', numbers)
+        return
+      }
       const clamped = numbers.slice(0, 8).map((n) => Math.max(0, Math.min(6, Math.floor(n))))
       while (clamped.length < 8) clamped.push(0)
       setWithVersion((state) => ({
@@ -588,6 +681,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerExtraDimOmega: (dimIndex: number, omega: number) => {
       const omegas = [...get().schroedinger.extraDimOmega]
       if (dimIndex < 0 || dimIndex >= 8) return
+      if (!isFiniteSchroedingerInput(omega)) {
+        warnNonFiniteSchroedingerInput('extraDimOmega', omega)
+        return
+      }
       omegas[dimIndex] = Math.max(0.1, Math.min(2.0, omega))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, extraDimOmega: omegas },
@@ -595,6 +692,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerExtraDimOmegaAll: (omegas: number[]) => {
+      if (!hasOnlyFiniteNumbers(omegas)) {
+        warnNonFiniteSchroedingerInput('extraDimOmegaAll', omegas)
+        return
+      }
       const clamped = omegas.slice(0, 8).map((o) => Math.max(0.1, Math.min(2.0, o)))
       while (clamped.length < 8) clamped.push(1.0)
       setWithVersion((state) => ({
@@ -603,6 +704,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setSchroedingerExtraDimFrequencySpread: (spread: number) => {
+      if (!isFiniteSchroedingerInput(spread)) {
+        warnNonFiniteSchroedingerInput('extraDimFrequencySpread', spread)
+        return
+      }
       const clamped = Math.max(0, Math.min(0.5, spread))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, extraDimFrequencySpread: clamped },
@@ -699,6 +804,10 @@ export const createSchroedingerSlice: StateCreator<
       0.2
     ),
     setSchroedingerProbabilityCurrentSteps: (steps: number) => {
+      if (!isFiniteSchroedingerInput(steps)) {
+        warnNonFiniteSchroedingerInput('probabilityCurrentSteps', steps)
+        return
+      }
       const clamped = Math.max(4, Math.min(64, Math.floor(steps)))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, probabilityCurrentSteps: clamped },
@@ -746,6 +855,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerCrossSectionPlaneColor: valueSetter('crossSectionPlaneColor'),
     setSchroedingerCrossSectionAutoWindow: valueSetter('crossSectionAutoWindow'),
     setSchroedingerCrossSectionWindowMin: (minValue) => {
+      if (!isFiniteSchroedingerInput(minValue)) {
+        warnNonFiniteSchroedingerInput('crossSectionWindowMin', minValue)
+        return
+      }
       setWithVersion((state) => {
         const clampedMin = Math.max(-10.0, Math.min(10.0, minValue))
         const clampedMax = Math.max(state.schroedinger.crossSectionWindowMax, clampedMin + 1e-4)
@@ -759,6 +872,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setSchroedingerCrossSectionWindowMax: (maxValue) => {
+      if (!isFiniteSchroedingerInput(maxValue)) {
+        warnNonFiniteSchroedingerInput('crossSectionWindowMax', maxValue)
+        return
+      }
       setWithVersion((state) => {
         const clampedMax = Math.max(-10.0, Math.min(10.0, maxValue))
         const clampedMin = Math.min(state.schroedinger.crossSectionWindowMin, clampedMax - 1e-4)
@@ -782,10 +899,14 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Wigner Phase-Space Visualization ===
     setSchroedingerWignerDimensionIndex: (index: number) => {
+      if (!isFiniteSchroedingerInput(index)) {
+        warnNonFiniteSchroedingerInput('wignerDimensionIndex', index)
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          wignerDimensionIndex: Math.max(0, Math.min(index, 10)),
+          wignerDimensionIndex: Math.max(0, Math.min(Math.floor(index), 10)),
         },
       }))
     },
@@ -794,6 +915,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerWignerPRange: clampedSetter('wignerPRange', 1.0, 30.0),
     setSchroedingerWignerCrossTermsEnabled: valueSetter('wignerCrossTermsEnabled'),
     setSchroedingerWignerQuadPoints: (points: number) => {
+      if (!isFiniteSchroedingerInput(points)) {
+        warnNonFiniteSchroedingerInput('wignerQuadPoints', points)
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -804,6 +929,10 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerWignerClassicalOverlay: valueSetter('wignerClassicalOverlay'),
 
     setSchroedingerWignerCacheResolution: (resolution: number) => {
+      if (!isFiniteSchroedingerInput(resolution)) {
+        warnNonFiniteSchroedingerInput('wignerCacheResolution', resolution)
+        return
+      }
       const clamped = Math.max(128, Math.min(1024, Math.round(resolution)))
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, wignerCacheResolution: clamped },
@@ -824,6 +953,10 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Free Scalar Field ===
     setFreeScalarLatticeDim: (dim) => {
+      if (!isFiniteSchroedingerInput(dim)) {
+        warnNonFiniteSchroedingerInput('freeScalar.latticeDim', dim)
+        return
+      }
       const clamped = Math.max(1, Math.min(11, Math.floor(dim)))
       setWithVersion((state) => {
         const prev = state.schroedinger.freeScalar
@@ -839,6 +972,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarGridSize: (size) => {
+      if (!hasOnlyFiniteNumbers(size)) {
+        warnNonFiniteSchroedingerInput('freeScalar.gridSize', size)
+        return
+      }
       setWithVersion((state) => {
         const { latticeDim, initialCondition } = state.schroedinger.freeScalar
         const needsPow2 = initialCondition === 'vacuumNoise'
@@ -862,6 +999,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarSpacing: (spacing) => {
+      if (!hasOnlyFiniteNumbers(spacing)) {
+        warnNonFiniteSchroedingerInput('freeScalar.spacing', spacing)
+        return
+      }
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         const clamped = Array.from({ length: fs.latticeDim }, (_, i) =>
@@ -877,6 +1018,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarMass: (mass) => {
+      if (!isFiniteSchroedingerInput(mass)) {
+        warnNonFiniteSchroedingerInput('freeScalar.mass', mass)
+        return
+      }
       const clamped = Math.max(0.0, Math.min(10.0, mass))
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
@@ -894,6 +1039,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarDt: (dt) => {
+      if (!isFiniteSchroedingerInput(dt)) {
+        warnNonFiniteSchroedingerInput('freeScalar.dt', dt)
+        return
+      }
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         const clamped = clampDtWithCfl(dt, fs.spacing, fs.latticeDim, fs.mass)
@@ -906,6 +1055,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarStepsPerFrame: (steps) => {
+      if (!isFiniteSchroedingerInput(steps)) {
+        warnNonFiniteSchroedingerInput('freeScalar.stepsPerFrame', steps)
+        return
+      }
       const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -955,6 +1108,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarPacketWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) {
+        warnNonFiniteSchroedingerInput('freeScalar.packetWidth', width)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(5.0, width))
       setWithVersion((state) => ({
         schroedinger: {
@@ -964,6 +1121,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarPacketAmplitude: (amplitude) => {
+      if (!isFiniteSchroedingerInput(amplitude)) {
+        warnNonFiniteSchroedingerInput('freeScalar.packetAmplitude', amplitude)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(10.0, amplitude))
       setWithVersion((state) => ({
         schroedinger: {
@@ -990,6 +1151,10 @@ export const createSchroedingerSlice: StateCreator<
     },
 
     setFreeScalarVacuumSeed: (seed) => {
+      if (!isFiniteSchroedingerInput(seed)) {
+        warnNonFiniteSchroedingerInput('freeScalar.vacuumSeed', seed)
+        return
+      }
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -1006,6 +1171,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarSlicePosition: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.slicePositions', value)
+        return
+      }
       setWithVersion((state) => {
         const fs = state.schroedinger.freeScalar
         const slicePositions = [...fs.slicePositions]
@@ -1066,6 +1235,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarKSpaceLowPercentile: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.lowPercentile', value)
+        return
+      }
       setWithVersion((state) => {
         const viz = state.schroedinger.freeScalar.kSpaceViz
         const clamped = Math.max(0, Math.min(viz.highPercentile - 0.5, value))
@@ -1081,6 +1254,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarKSpaceHighPercentile: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.highPercentile', value)
+        return
+      }
       setWithVersion((state) => {
         const viz = state.schroedinger.freeScalar.kSpaceViz
         const clamped = Math.max(viz.lowPercentile + 0.5, Math.min(100, value))
@@ -1096,6 +1273,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setFreeScalarKSpaceGamma: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.gamma', value)
+        return
+      }
       const clamped = Math.max(0.1, Math.min(3.0, value))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1119,6 +1300,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarKSpaceBroadeningRadius: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.broadeningRadius', value)
+        return
+      }
       const clamped = Math.max(1, Math.min(5, Math.round(value)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1131,6 +1316,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarKSpaceBroadeningSigma: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.broadeningSigma', value)
+        return
+      }
       const clamped = Math.max(0.5, Math.min(3.0, value))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1143,6 +1332,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setFreeScalarKSpaceRadialBinCount: (value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.radialBinCount', value)
+        return
+      }
       const clamped = Math.max(16, Math.min(128, Math.round(value)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1157,6 +1350,10 @@ export const createSchroedingerSlice: StateCreator<
 
     // === TDSE (Time-Dependent Schroedinger Equation) ===
     setTdseLatticeDim: (dim) => {
+      if (!isFiniteSchroedingerInput(dim)) {
+        warnNonFiniteSchroedingerInput('tdse.latticeDim', dim)
+        return
+      }
       const clamped = Math.max(1, Math.min(11, Math.floor(dim)))
       setWithVersion((state) => {
         const prev = state.schroedinger.tdse
@@ -1170,6 +1367,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setTdseGridSize: (size) => {
+      if (!hasOnlyFiniteNumbers(size)) {
+        warnNonFiniteSchroedingerInput('tdse.gridSize', size)
+        return
+      }
       setWithVersion((state) => {
         const { latticeDim } = state.schroedinger.tdse
         const maxPerDim = defaultTdseGridPerDim(latticeDim)
@@ -1189,6 +1390,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setTdseSpacing: (spacing) => {
+      if (!hasOnlyFiniteNumbers(spacing)) {
+        warnNonFiniteSchroedingerInput('tdse.spacing', spacing)
+        return
+      }
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const clamped = Array.from({ length: td.latticeDim }, (_, i) =>
@@ -1203,6 +1408,10 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setTdseMass: (mass) => {
+      if (!isFiniteSchroedingerInput(mass)) {
+        warnNonFiniteSchroedingerInput('tdse.mass', mass)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(100.0, mass))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1212,6 +1421,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseHbar: (hbar) => {
+      if (!isFiniteSchroedingerInput(hbar)) {
+        warnNonFiniteSchroedingerInput('tdse.hbar', hbar)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(10.0, hbar))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1221,6 +1434,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseDt: (dt) => {
+      if (!isFiniteSchroedingerInput(dt)) {
+        warnNonFiniteSchroedingerInput('tdse.dt', dt)
+        return
+      }
       const clamped = Math.max(0.0001, Math.min(0.1, dt))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1230,6 +1447,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseStepsPerFrame: (steps) => {
+      if (!isFiniteSchroedingerInput(steps)) {
+        warnNonFiniteSchroedingerInput('tdse.stepsPerFrame', steps)
+        return
+      }
       const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1255,6 +1476,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdsePacketWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) {
+        warnNonFiniteSchroedingerInput('tdse.packetWidth', width)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(5.0, width))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1264,6 +1489,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdsePacketAmplitude: (amplitude) => {
+      if (!isFiniteSchroedingerInput(amplitude)) {
+        warnNonFiniteSchroedingerInput('tdse.packetAmplitude', amplitude)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(10.0, amplitude))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1289,6 +1518,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseBarrierHeight: (height) => {
+      if (!isFiniteSchroedingerInput(height)) {
+        warnNonFiniteSchroedingerInput('tdse.barrierHeight', height)
+        return
+      }
       const clamped = Math.max(0.0, Math.min(100.0, height))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1298,6 +1531,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseBarrierWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) {
+        warnNonFiniteSchroedingerInput('tdse.barrierWidth', width)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(5.0, width))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1307,6 +1544,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseBarrierCenter: (center) => {
+      if (!isFiniteSchroedingerInput(center)) {
+        warnNonFiniteSchroedingerInput('tdse.barrierCenter', center)
+        return
+      }
       const clamped = Math.max(-10.0, Math.min(10.0, center))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1316,6 +1557,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseWellDepth: (depth) => {
+      if (!isFiniteSchroedingerInput(depth)) {
+        warnNonFiniteSchroedingerInput('tdse.wellDepth', depth)
+        return
+      }
       const clamped = Math.max(0.0, Math.min(100.0, depth))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1325,6 +1570,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseWellWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) {
+        warnNonFiniteSchroedingerInput('tdse.wellWidth', width)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(10.0, width))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1334,6 +1583,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseHarmonicOmega: (omega) => {
+      if (!isFiniteSchroedingerInput(omega)) {
+        warnNonFiniteSchroedingerInput('tdse.harmonicOmega', omega)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(100.0, omega))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1343,6 +1596,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseStepHeight: (height) => {
+      if (!isFiniteSchroedingerInput(height)) {
+        warnNonFiniteSchroedingerInput('tdse.stepHeight', height)
+        return
+      }
       const clamped = Math.max(0.0, Math.min(100.0, height))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1368,6 +1625,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseDriveFrequency: (frequency) => {
+      if (!isFiniteSchroedingerInput(frequency)) {
+        warnNonFiniteSchroedingerInput('tdse.driveFrequency', frequency)
+        return
+      }
       const clamped = Math.max(0.01, Math.min(100.0, frequency))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1377,6 +1638,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseDriveAmplitude: (amplitude) => {
+      if (!isFiniteSchroedingerInput(amplitude)) {
+        warnNonFiniteSchroedingerInput('tdse.driveAmplitude', amplitude)
+        return
+      }
       const clamped = Math.max(0.0, Math.min(100.0, amplitude))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1394,6 +1659,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseAbsorberWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) {
+        warnNonFiniteSchroedingerInput('tdse.absorberWidth', width)
+        return
+      }
       const clamped = Math.max(0.05, Math.min(0.3, width))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1403,6 +1672,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseAbsorberStrength: (strength) => {
+      if (!isFiniteSchroedingerInput(strength)) {
+        warnNonFiniteSchroedingerInput('tdse.absorberStrength', strength)
+        return
+      }
       const clamped = Math.max(0.0, Math.min(50.0, strength))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1436,6 +1709,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseDiagnosticsInterval: (interval) => {
+      if (!isFiniteSchroedingerInput(interval)) {
+        warnNonFiniteSchroedingerInput('tdse.diagnosticsInterval', interval)
+        return
+      }
       const clamped = Math.max(1, Math.min(60, Math.floor(interval)))
       setWithVersion((state) => ({
         schroedinger: {
@@ -1445,6 +1722,10 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
     setTdseSlicePosition: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) {
+        warnNonFiniteSchroedingerInput('tdse.slicePositions', value)
+        return
+      }
       setWithVersion((state) => {
         const td = state.schroedinger.tdse
         const slicePositions = [...td.slicePositions]

@@ -96,4 +96,49 @@ describe('transformStore', () => {
     useTransformStore.getState().setDimension(100)
     expect(useTransformStore.getState().dimension).toBe(6)
   })
+
+  it('ignores non-finite scale inputs', () => {
+    const initial = useTransformStore.getState()
+
+    useTransformStore.getState().setUniformScale(Number.NaN)
+    expect(useTransformStore.getState().uniformScale).toBe(initial.uniformScale)
+    expect(useTransformStore.getState().perAxisScale).toEqual(initial.perAxisScale)
+
+    useTransformStore.getState().setUniformScale(Number.POSITIVE_INFINITY)
+    expect(useTransformStore.getState().uniformScale).toBe(initial.uniformScale)
+    expect(useTransformStore.getState().perAxisScale).toEqual(initial.perAxisScale)
+
+    useTransformStore.getState().setScaleLocked(false)
+    const beforeAxis = [...useTransformStore.getState().perAxisScale]
+    useTransformStore.getState().setAxisScale(0, Number.NaN)
+    useTransformStore.getState().setAxisScale(0, Number.NEGATIVE_INFINITY)
+    expect(useTransformStore.getState().perAxisScale).toEqual(beforeAxis)
+  })
+
+  it('ignores invalid axis indexes including non-integers and NaN', () => {
+    useTransformStore.getState().setScaleLocked(false)
+    const beforeUnlocked = [...useTransformStore.getState().perAxisScale]
+    useTransformStore.getState().setAxisScale(Number.NaN, 2.0)
+    useTransformStore.getState().setAxisScale(1.2, 2.0)
+    expect(useTransformStore.getState().perAxisScale).toEqual(beforeUnlocked)
+
+    useTransformStore.getState().setScaleLocked(true)
+    useTransformStore.getState().setUniformScale(1.4)
+    useTransformStore.getState().setAxisScale(Number.NaN, 2.5)
+    expect(useTransformStore.getState().uniformScale).toBe(1.4)
+    expect(useTransformStore.getState().perAxisScale.every((s) => s === 1.4)).toBe(true)
+  })
+
+  it('ignores non-integer and non-finite dimensions', () => {
+    const before = useTransformStore.getState()
+
+    expect(() => useTransformStore.getState().setDimension(4.2)).not.toThrow()
+    expect(() => useTransformStore.getState().setDimension(Number.NaN)).not.toThrow()
+    expect(() => useTransformStore.getState().setDimension(Number.POSITIVE_INFINITY)).not.toThrow()
+
+    const after = useTransformStore.getState()
+    expect(after.dimension).toBe(before.dimension)
+    expect(after.uniformScale).toBe(before.uniformScale)
+    expect(after.perAxisScale).toEqual(before.perAxisScale)
+  })
 })

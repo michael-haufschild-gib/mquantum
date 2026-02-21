@@ -41,8 +41,14 @@ export const SIDE_BY_SIDE_BREAKPOINT = 1024
 // Types
 // ============================================================================
 
+/**
+ * Responsive editor layout mode.
+ */
 export type LayoutMode = 'overlay' | 'side-by-side'
 
+/**
+ * Layout store state.
+ */
 export interface LayoutState {
   /** Current sidebar width in pixels */
   sidebarWidth: number
@@ -56,6 +62,9 @@ export interface LayoutState {
   isCinematicMode: boolean
 }
 
+/**
+ * Layout store actions.
+ */
 export interface LayoutActions {
   /**
    * Set sidebar width with clamping.
@@ -93,6 +102,9 @@ export interface LayoutActions {
   reset: () => void
 }
 
+/**
+ * Combined layout store type.
+ */
 export type LayoutStore = LayoutState & LayoutActions
 
 // ============================================================================
@@ -106,8 +118,9 @@ export type LayoutStore = LayoutState & LayoutActions
  * @returns Maximum sidebar width in pixels
  */
 export function getMaxSidebarWidth(viewportWidth: number): number {
+  const safeViewportWidth = Number.isFinite(viewportWidth) ? viewportWidth : SIDE_BY_SIDE_BREAKPOINT
   // Account for some padding (the sidebar has right-4 = 16px margin in side-by-side mode)
-  const maxForCanvas = viewportWidth - MIN_CANVAS_WIDTH - 16
+  const maxForCanvas = safeViewportWidth - MIN_CANVAS_WIDTH - 16
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, maxForCanvas))
 }
 
@@ -118,7 +131,14 @@ export function getMaxSidebarWidth(viewportWidth: number): number {
  * @returns Clamped width
  */
 export function clampSidebarWidth(width: number, viewportWidth: number): number {
-  const max = getMaxSidebarWidth(viewportWidth)
+  const safeViewportWidth = Number.isFinite(viewportWidth) ? viewportWidth : SIDE_BY_SIDE_BREAKPOINT
+  const max = getMaxSidebarWidth(safeViewportWidth)
+  if (!Number.isFinite(width)) {
+    return Math.max(
+      MIN_SIDEBAR_WIDTH,
+      Math.min(max, getDefaultSidebarWidth(safeViewportWidth))
+    )
+  }
   return Math.max(MIN_SIDEBAR_WIDTH, Math.min(max, width))
 }
 
@@ -165,6 +185,15 @@ export const useLayoutStore = create<LayoutStore>()(
       ...INITIAL_STATE,
 
       setSidebarWidth: (width: number, viewportWidth: number) => {
+        if (!Number.isFinite(width) || !Number.isFinite(viewportWidth)) {
+          if (import.meta.env.DEV) {
+            console.warn('[layoutStore] Ignoring non-finite sidebar width update:', {
+              width,
+              viewportWidth,
+            })
+          }
+          return
+        }
         const clampedWidth = clampSidebarWidth(width, viewportWidth)
         set({ sidebarWidth: clampedWidth })
       },

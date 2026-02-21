@@ -19,6 +19,9 @@ export const DEFAULT_SPEED = 0.4
 /** Base rotation rate in radians per second at 1x speed */
 export const BASE_ROTATION_RATE = (2 * Math.PI) / 10 // Full rotation in 10 seconds
 
+/**
+ * Animation store state and actions.
+ */
 export interface AnimationState {
   /** Whether animation is currently playing */
   isPlaying: boolean
@@ -66,6 +69,24 @@ function clampSpeed(speed: number): number {
 }
 
 /**
+ * Checks whether speed input is finite.
+ * @param speed - Speed value to validate
+ * @returns True when speed is finite
+ */
+function isValidSpeedInput(speed: number): boolean {
+  return Number.isFinite(speed)
+}
+
+/**
+ * Checks whether dimension input can be used to resolve rotation planes.
+ * @param dimension - Dimension value to validate
+ * @returns True when dimension is an integer >= 2
+ */
+function isValidDimensionInput(dimension: number): boolean {
+  return Number.isFinite(dimension) && Number.isInteger(dimension) && dimension >= 2
+}
+
+/**
  * Gets all rotation plane names for a given dimension
  * @param dimension - The dimension to get planes for
  * @returns Array of rotation plane names
@@ -96,6 +117,12 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   setSpeed: (speed: number) => {
+    if (!isValidSpeedInput(speed)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[animationStore] Ignoring non-finite speed: ${speed}`)
+      }
+      return
+    }
     set({ speed: clampSpeed(speed) })
   },
 
@@ -177,6 +204,13 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   setDimension: (dimension: number) => {
+    if (!isValidDimensionInput(dimension)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[animationStore] Ignoring invalid dimension: ${dimension}`)
+      }
+      return
+    }
+
     set((state) => {
       // Filter animating planes to only include valid planes for new dimension
       const validPlanes = new Set(getAllPlaneNames(dimension))
@@ -200,6 +234,13 @@ export const useAnimationStore = create<AnimationState>((set, get) => ({
   },
 
   updateAccumulatedTime: (delta: number) => {
+    if (!Number.isFinite(delta)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[animationStore] Ignoring non-finite accumulated-time delta: ${delta}`)
+      }
+      return
+    }
+
     const { isPlaying, speed, direction } = get()
     if (isPlaying) {
       set((state) => ({

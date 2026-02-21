@@ -67,6 +67,17 @@ describe('rotationStore', () => {
       const { rotations } = useRotationStore.getState()
       expect(rotations.get('ZW')).toBeCloseTo(Math.PI / 2)
     })
+
+    it('should ignore non-finite angles', () => {
+      const { setRotation } = useRotationStore.getState()
+
+      setRotation('XY', Number.NaN)
+      setRotation('XZ', Number.POSITIVE_INFINITY)
+
+      const { rotations } = useRotationStore.getState()
+      expect(rotations.has('XY')).toBe(false)
+      expect(rotations.has('XZ')).toBe(false)
+    })
   })
 
   describe('updateRotations', () => {
@@ -112,6 +123,23 @@ describe('rotationStore', () => {
       const { rotations } = useRotationStore.getState()
       expect(rotations.get('XY')).toBeCloseTo(Math.PI)
       expect(rotations.get('XZ')).toBeCloseTo(Math.PI / 2)
+    })
+
+    it('should ignore non-finite angle updates while applying finite ones', () => {
+      const { updateRotations } = useRotationStore.getState()
+
+      updateRotations(
+        new Map([
+          ['XY', Number.NaN],
+          ['XZ', Math.PI / 2],
+          ['YZ', Number.NEGATIVE_INFINITY],
+        ])
+      )
+
+      const { rotations } = useRotationStore.getState()
+      expect(rotations.get('XZ')).toBeCloseTo(Math.PI / 2)
+      expect(rotations.has('XY')).toBe(false)
+      expect(rotations.has('YZ')).toBe(false)
     })
   })
 
@@ -174,6 +202,16 @@ describe('rotationStore', () => {
       // Try dimension above maximum
       setDimension(100)
       expect(useRotationStore.getState().dimension).toBe(4) // Should stay at 4
+    })
+
+    it('should ignore non-integer and non-finite dimensions', () => {
+      const { setDimension } = useRotationStore.getState()
+
+      expect(() => setDimension(4.2)).not.toThrow()
+      expect(() => setDimension(Number.NaN)).not.toThrow()
+      expect(() => setDimension(Number.POSITIVE_INFINITY)).not.toThrow()
+
+      expect(useRotationStore.getState().dimension).toBe(4)
     })
   })
 

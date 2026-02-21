@@ -75,6 +75,9 @@ export interface LightingSliceState {
 
 }
 
+/**
+ * Lighting slice actions.
+ */
 export interface LightingSliceActions {
   // --- Basic Lighting Actions ---
   setLightEnabled: (enabled: boolean) => void
@@ -109,6 +112,9 @@ export interface LightingSliceActions {
   reset: () => void
 }
 
+/**
+ * Combined lighting slice type.
+ */
 export type LightingSlice = LightingSliceState & LightingSliceActions
 
 // ============================================================================
@@ -142,6 +148,14 @@ export const LIGHTING_INITIAL_STATE: LightingSliceState = {
 
 }
 
+function isValidLightingNumber(value: number): boolean {
+  return Number.isFinite(value)
+}
+
+function isValidRotationTuple(value: [number, number, number]): boolean {
+  return value.every((component) => Number.isFinite(component))
+}
+
 // ============================================================================
 // Slice Creator
 // ============================================================================
@@ -162,11 +176,23 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setLightHorizontalAngle: (angle: number) => {
+    if (!isValidLightingNumber(angle)) {
+      if (import.meta.env.DEV) {
+        console.warn('[lightingSlice] Ignoring non-finite horizontal angle:', angle)
+      }
+      return
+    }
     const normalized = ((angle % 360) + 360) % 360
     set({ lightHorizontalAngle: normalized })
   },
 
   setLightVerticalAngle: (angle: number) => {
+    if (!isValidLightingNumber(angle)) {
+      if (import.meta.env.DEV) {
+        console.warn('[lightingSlice] Ignoring non-finite vertical angle:', angle)
+      }
+      return
+    }
     set({ lightVerticalAngle: Math.max(-90, Math.min(90, angle)) })
   },
 
@@ -178,6 +204,12 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setAmbientIntensity: (intensity: number) => {
+    if (!isValidLightingNumber(intensity)) {
+      if (import.meta.env.DEV) {
+        console.warn('[lightingSlice] Ignoring non-finite ambient intensity:', intensity)
+      }
+      return
+    }
     set((state) => ({
       ambientIntensity: Math.max(0, Math.min(1, intensity)),
       version: state.version + 1,
@@ -197,6 +229,12 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
   // --- Enhanced Lighting Actions ---
   setLightStrength: (strength: number) => {
+    if (!isValidLightingNumber(strength)) {
+      if (import.meta.env.DEV) {
+        console.warn('[lightingSlice] Ignoring non-finite light strength:', strength)
+      }
+      return
+    }
     set({ lightStrength: Math.max(0, Math.min(3, strength)) })
   },
 
@@ -209,6 +247,12 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
   },
 
   setExposure: (exposure: number) => {
+    if (!isValidLightingNumber(exposure)) {
+      if (import.meta.env.DEV) {
+        console.warn('[lightingSlice] Ignoring non-finite exposure:', exposure)
+      }
+      return
+    }
     set({ exposure: Math.max(0.1, Math.min(3, exposure)) })
   },
 
@@ -242,18 +286,54 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
       version: state.version + 1,
       lights: state.lights.map((light) => {
         if (light.id !== id) return light
+        const hasInvalidIntensity =
+          updates.intensity !== undefined && !isValidLightingNumber(updates.intensity)
+        const hasInvalidConeAngle =
+          updates.coneAngle !== undefined && !isValidLightingNumber(updates.coneAngle)
+        const hasInvalidPenumbra =
+          updates.penumbra !== undefined && !isValidLightingNumber(updates.penumbra)
+        const hasInvalidRotation =
+          updates.rotation !== undefined && !isValidRotationTuple(updates.rotation)
+
+        if (import.meta.env.DEV) {
+          if (hasInvalidIntensity) {
+            console.warn('[lightingSlice] Ignoring non-finite light intensity update:', updates.intensity)
+          }
+          if (hasInvalidConeAngle) {
+            console.warn('[lightingSlice] Ignoring non-finite cone angle update:', updates.coneAngle)
+          }
+          if (hasInvalidPenumbra) {
+            console.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
+          }
+          if (hasInvalidRotation) {
+            console.warn('[lightingSlice] Ignoring non-finite rotation update:', updates.rotation)
+          }
+        }
+
+        const sanitizedUpdates: Partial<Omit<LightSource, 'id'>> = { ...updates }
+        if (hasInvalidIntensity) delete sanitizedUpdates.intensity
+        if (hasInvalidConeAngle) delete sanitizedUpdates.coneAngle
+        if (hasInvalidPenumbra) delete sanitizedUpdates.penumbra
+        if (hasInvalidRotation) delete sanitizedUpdates.rotation
+
         return {
           ...light,
-          ...updates,
+          ...sanitizedUpdates,
           intensity:
-            updates.intensity !== undefined ? clampIntensity(updates.intensity) : light.intensity,
+            sanitizedUpdates.intensity !== undefined
+              ? clampIntensity(sanitizedUpdates.intensity)
+              : light.intensity,
           coneAngle:
-            updates.coneAngle !== undefined ? clampConeAngle(updates.coneAngle) : light.coneAngle,
+            sanitizedUpdates.coneAngle !== undefined
+              ? clampConeAngle(sanitizedUpdates.coneAngle)
+              : light.coneAngle,
           penumbra:
-            updates.penumbra !== undefined ? clampPenumbra(updates.penumbra) : light.penumbra,
+            sanitizedUpdates.penumbra !== undefined
+              ? clampPenumbra(sanitizedUpdates.penumbra)
+              : light.penumbra,
           rotation:
-            updates.rotation !== undefined
-              ? normalizeRotationTupleSigned(updates.rotation)
+            sanitizedUpdates.rotation !== undefined
+              ? normalizeRotationTupleSigned(sanitizedUpdates.rotation)
               : light.rotation,
         }
       }),

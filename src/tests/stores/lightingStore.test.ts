@@ -71,4 +71,63 @@ describe('lightingStore (invariants)', () => {
     expect(light.rotation[1]).toBeGreaterThanOrEqual(-Math.PI)
     expect(light.rotation[1]).toBeLessThan(Math.PI)
   })
+
+  it('updateLight ignores non-finite numeric and rotation updates while applying valid fields', () => {
+    const id = useLightingStore.getState().addLight('spot')
+    expect(id).not.toBeNull()
+
+    useLightingStore.getState().updateLight(id!, {
+      intensity: 1.6,
+      coneAngle: 40,
+      penumbra: 0.35,
+      rotation: [0.2, -0.3, 0.1],
+      color: '#ABCDEF',
+    })
+
+    const before = useLightingStore.getState().lights.find((l) => l.id === id)!
+
+    useLightingStore.getState().updateLight(id!, {
+      intensity: Number.NaN,
+      coneAngle: Number.POSITIVE_INFINITY,
+      penumbra: Number.NEGATIVE_INFINITY,
+      rotation: [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY],
+      color: '#00FF00',
+    })
+
+    const after = useLightingStore.getState().lights.find((l) => l.id === id)!
+    expect(after.intensity).toBe(before.intensity)
+    expect(after.coneAngle).toBe(before.coneAngle)
+    expect(after.penumbra).toBe(before.penumbra)
+    expect(after.rotation).toEqual(before.rotation)
+    expect(after.color).toBe('#00FF00')
+  })
+
+  it('ignores non-finite updates for core numeric lighting controls', () => {
+    const store = useLightingStore.getState()
+    store.setLightHorizontalAngle(45)
+    store.setLightVerticalAngle(25)
+    store.setAmbientIntensity(0.35)
+    store.setLightStrength(1.2)
+    store.setExposure(1.1)
+
+    const before = useLightingStore.getState()
+
+    store.setLightHorizontalAngle(Number.NaN)
+    store.setLightHorizontalAngle(Number.POSITIVE_INFINITY)
+    store.setLightVerticalAngle(Number.NaN)
+    store.setLightVerticalAngle(Number.NEGATIVE_INFINITY)
+    store.setAmbientIntensity(Number.NaN)
+    store.setAmbientIntensity(Number.POSITIVE_INFINITY)
+    store.setLightStrength(Number.NaN)
+    store.setLightStrength(Number.POSITIVE_INFINITY)
+    store.setExposure(Number.NaN)
+    store.setExposure(Number.NEGATIVE_INFINITY)
+
+    const after = useLightingStore.getState()
+    expect(after.lightHorizontalAngle).toBe(before.lightHorizontalAngle)
+    expect(after.lightVerticalAngle).toBe(before.lightVerticalAngle)
+    expect(after.ambientIntensity).toBe(before.ambientIntensity)
+    expect(after.lightStrength).toBe(before.lightStrength)
+    expect(after.exposure).toBe(before.exposure)
+  })
 })

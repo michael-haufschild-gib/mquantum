@@ -1,10 +1,16 @@
 import type { CropSettings, ExportResolution } from '@/stores/exportStore'
 
+/**
+ * Pixel dimensions in width/height order.
+ */
 export interface Dimensions {
   width: number
   height: number
 }
 
+/**
+ * Inputs required to compute internal render dimensions for export.
+ */
 export interface ComputeRenderDimensionsArgs {
   exportWidth: number
   exportHeight: number
@@ -13,6 +19,9 @@ export interface ComputeRenderDimensionsArgs {
   crop: CropSettings
 }
 
+/**
+ * Inputs required to compute segment frame count for chunked exports.
+ */
 export interface ComputeSegmentDurationFramesArgs {
   durationSeconds: number
   fps: number
@@ -48,8 +57,10 @@ export function resolveExportDimensions(
  * Normalize dimensions to codec-friendly even values.
  */
 export function ensureEvenDimensions(width: number, height: number): Dimensions {
-  const safeWidth = Math.max(2, Math.floor(width / 2) * 2)
-  const safeHeight = Math.max(2, Math.floor(height / 2) * 2)
+  const normalizedWidth = Number.isFinite(width) ? width : 2
+  const normalizedHeight = Number.isFinite(height) ? height : 2
+  const safeWidth = Math.max(2, Math.floor(normalizedWidth / 2) * 2)
+  const safeHeight = Math.max(2, Math.floor(normalizedHeight / 2) * 2)
   return { width: safeWidth, height: safeHeight }
 }
 
@@ -66,7 +77,13 @@ export function computeRenderDimensions({
   maxTextureDimension2D,
   crop,
 }: ComputeRenderDimensionsArgs): Dimensions {
-  if (!crop.enabled || crop.width <= 0 || crop.height <= 0 || !Number.isFinite(originalAspect)) {
+  if (
+    !crop.enabled ||
+    crop.width <= 0 ||
+    crop.height <= 0 ||
+    !Number.isFinite(originalAspect) ||
+    originalAspect <= 0
+  ) {
     return ensureEvenDimensions(exportWidth, exportHeight)
   }
 
@@ -85,7 +102,11 @@ export function computeRenderDimensions({
     renderHeight = Math.round(renderWidth / originalAspect)
   }
 
-  const safeLimit = Math.max(2, Math.min(maxTextureDimension2D, 8192))
+  const finiteTextureLimit =
+    Number.isFinite(maxTextureDimension2D) && maxTextureDimension2D > 0
+      ? maxTextureDimension2D
+      : 8192
+  const safeLimit = Math.max(2, Math.min(finiteTextureLimit, 8192))
   if (renderWidth > safeLimit || renderHeight > safeLimit) {
     const ratio = Math.min(safeLimit / renderWidth, safeLimit / renderHeight)
     renderWidth = Math.floor(renderWidth * ratio)
@@ -107,17 +128,30 @@ export function computeSegmentDurationFrames({
   targetSegmentMB = 50,
   minSegmentSeconds = 5,
 }: ComputeSegmentDurationFramesArgs): number {
-  const fullDurationFrames = Math.max(1, Math.ceil(durationSeconds * fps))
-  if (durationSeconds <= minSegmentSeconds) {
+  const safeDurationSeconds = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 0
+  const safeFps = Number.isFinite(fps) && fps > 0 ? fps : 1
+  const safeBitrateMbps = Number.isFinite(bitrateMbps) && bitrateMbps > 0 ? bitrateMbps : 0
+  const safeTargetSegmentMB = Number.isFinite(targetSegmentMB) && targetSegmentMB > 0 ? targetSegmentMB : 50
+  const safeMinSegmentSeconds =
+    Number.isFinite(minSegmentSeconds) && minSegmentSeconds > 0 ? minSegmentSeconds : 1
+
+  const fullDurationFrames = Math.max(1, Math.ceil(safeDurationSeconds * safeFps))
+  if (safeDurationSeconds <= safeMinSegmentSeconds) {
     return fullDurationFrames
   }
 
-  const targetSizeBytes = targetSegmentMB * 1024 * 1024
-  const bitrateBps = bitrateMbps * 1024 * 1024
-  const calculatedSegmentSeconds = targetSizeBytes > 0 && bitrateBps > 0 ? (targetSizeBytes * 8) / bitrateBps : durationSeconds
+  const targetSizeBytes = safeTargetSegmentMB * 1024 * 1024
+  const bitrateBps = safeBitrateMbps * 1024 * 1024
+  const calculatedSegmentSeconds =
+    targetSizeBytes > 0 && bitrateBps > 0
+      ? (targetSizeBytes * 8) / bitrateBps
+      : safeDurationSeconds
 
-  const segmentSeconds = Math.max(minSegmentSeconds, Math.min(durationSeconds, calculatedSegmentSeconds))
-  const segmentFrames = Math.max(1, Math.ceil(segmentSeconds * fps))
+  const segmentSeconds = Math.max(
+    safeMinSegmentSeconds,
+    Math.min(safeDurationSeconds, calculatedSegmentSeconds)
+  )
+  const segmentFrames = Math.max(1, Math.ceil(segmentSeconds * safeFps))
 
   return Math.min(fullDurationFrames, segmentFrames)
 }

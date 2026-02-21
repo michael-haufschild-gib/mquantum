@@ -116,7 +116,7 @@ export const ExportPreview = () => {
                           top,
                           transform: `translate(${translateX}, ${translateY})`,
                           color: textOverlay.color,
-                          fontFamily: 'Inter, sans-serif',
+                          fontFamily: textOverlay.fontFamily || 'Inter, sans-serif',
                           fontSize: `${scaledFontSize}px`,
                           fontWeight: textOverlay.fontWeight,
                           letterSpacing: `${scaledLetterSpacing}px`,

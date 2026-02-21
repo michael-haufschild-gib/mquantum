@@ -46,6 +46,14 @@ describe('animationStore', () => {
         expect(useAnimationStore.getState().speed).toBe(expected)
       }
     })
+
+    it('ignores non-finite speed values', () => {
+      const initialSpeed = useAnimationStore.getState().speed
+      useAnimationStore.getState().setSpeed(Number.NaN)
+      useAnimationStore.getState().setSpeed(Number.POSITIVE_INFINITY)
+      useAnimationStore.getState().setSpeed(Number.NEGATIVE_INFINITY)
+      expect(useAnimationStore.getState().speed).toBe(initialSpeed)
+    })
   })
 
   describe('toggleDirection', () => {
@@ -280,6 +288,26 @@ describe('animationStore', () => {
       useAnimationStore.getState().setDimension(4)
 
       expect(useAnimationStore.getState().isPlaying).toBe(true)
+    })
+
+    it('ignores non-integer and non-finite dimensions', () => {
+      useAnimationStore.getState().animateAll(4)
+      const before = new Set(useAnimationStore.getState().animatingPlanes)
+
+      expect(() => useAnimationStore.getState().setDimension(4.2)).not.toThrow()
+      expect(() => useAnimationStore.getState().setDimension(Number.NaN)).not.toThrow()
+      expect(() => useAnimationStore.getState().setDimension(Number.POSITIVE_INFINITY)).not.toThrow()
+
+      expect(useAnimationStore.getState().animatingPlanes).toEqual(before)
+    })
+  })
+
+  describe('updateAccumulatedTime', () => {
+    it('ignores non-finite deltas', () => {
+      const before = useAnimationStore.getState().accumulatedTime
+      useAnimationStore.getState().updateAccumulatedTime(Number.NaN)
+      useAnimationStore.getState().updateAccumulatedTime(Number.POSITIVE_INFINITY)
+      expect(useAnimationStore.getState().accumulatedTime).toBe(before)
     })
   })
 })

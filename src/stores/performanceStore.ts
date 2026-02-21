@@ -400,6 +400,12 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   },
 
   setRefinementProgress: (progress: number) => {
+    if (!Number.isFinite(progress)) {
+      if (import.meta.env.DEV) {
+        console.warn('[performanceStore] Ignoring non-finite refinement progress:', progress)
+      }
+      return
+    }
     set({ refinementProgress: Math.max(0, Math.min(100, progress)) })
   },
 
@@ -442,6 +448,12 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // Render Resolution Scale
   setRenderResolutionScale: (scale: number) => {
+    if (!Number.isFinite(scale)) {
+      if (import.meta.env.DEV) {
+        console.warn('[performanceStore] Ignoring non-finite render resolution scale:', scale)
+      }
+      return
+    }
     const clampedScale = Math.max(0.1, Math.min(1.0, scale))
     set({ renderResolutionScale: clampedScale })
     persistResolutionScale(clampedScale)
@@ -449,6 +461,12 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   // FPS Limiting
   setMaxFps: (fps: number) => {
+    if (!Number.isFinite(fps)) {
+      if (import.meta.env.DEV) {
+        console.warn('[performanceStore] Ignoring non-finite max FPS:', fps)
+      }
+      return
+    }
     const clampedFps = Math.max(MIN_MAX_FPS, Math.min(MAX_MAX_FPS, fps))
     set({ maxFps: clampedFps })
     persistMaxFps(clampedFps)
@@ -576,6 +594,9 @@ export const selectTemporalReprojection = (state: PerformanceState) => ({
  */
 const SAMPLE_QUALITY_ORDER = ['low', 'medium', 'high'] as const
 
+/**
+ * Supported discrete sample-quality levels used by progressive refinement.
+ */
 export type SampleQualityLevel = (typeof SAMPLE_QUALITY_ORDER)[number]
 
 /**

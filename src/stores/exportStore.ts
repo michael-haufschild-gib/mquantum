@@ -2,14 +2,23 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { useScreenshotCaptureStore } from './screenshotCaptureStore'
 
+/** Supported container formats for exported videos. */
 export type ExportFormat = 'mp4' | 'webm'
+/** Output resolution presets available in export UI. */
 export type ExportResolution = '720p' | '1080p' | '4k' | 'custom'
+/** Export execution mode selected by capability heuristics or user override. */
 export type ExportMode = 'auto' | 'in-memory' | 'stream' | 'segmented'
+/** Coarse export-size tier used by planner heuristics. */
 export type ExportTier = 'small' | 'medium' | 'large'
+/** Browser capability bucket for file-system streaming support. */
 export type BrowserType = 'chromium-capable' | 'standard'
 
+/** Supported codecs for MediaBunny/WebCodecs encoding. */
 export type VideoCodec = 'avc' | 'hevc' | 'vp9' | 'av1'
 
+/**
+ * Text overlay configuration applied during composed video export.
+ */
 export interface TextOverlaySettings {
   enabled: boolean
   text: string
@@ -26,6 +35,9 @@ export interface TextOverlaySettings {
   padding: number // pixels
 }
 
+/**
+ * Normalized crop rectangle in [0,1] canvas coordinates.
+ */
 export interface CropSettings {
   enabled: boolean
   x: number // 0-1
@@ -34,6 +46,9 @@ export interface CropSettings {
   height: number // 0-1
 }
 
+/**
+ * User-configurable export settings persisted between sessions.
+ */
 export interface ExportSettings {
   format: ExportFormat
   codec: VideoCodec
@@ -54,6 +69,9 @@ export interface ExportSettings {
   crop: CropSettings
 }
 
+/**
+ * Metadata shown after export completion.
+ */
 export interface CompletionDetails {
   type: ExportMode
   segmentCount?: number
@@ -144,6 +162,146 @@ const DEFAULT_SETTINGS: ExportSettings = {
   },
 }
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value)
+
+const clampToRange = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value))
+
+const clampMin = (value: number, min: number): number => Math.max(min, value)
+
+const isExportFormat = (value: unknown): value is ExportFormat => value === 'mp4' || value === 'webm'
+
+const isVideoCodec = (value: unknown): value is VideoCodec =>
+  value === 'avc' || value === 'hevc' || value === 'vp9' || value === 'av1'
+
+const isExportResolution = (value: unknown): value is ExportResolution =>
+  value === '720p' || value === '1080p' || value === '4k' || value === 'custom'
+
+const isBitrateMode = (value: unknown): value is ExportSettings['bitrateMode'] =>
+  value === 'constant' || value === 'variable'
+
+const isHardwareAcceleration = (
+  value: unknown
+): value is ExportSettings['hardwareAcceleration'] =>
+  value === 'no-preference' || value === 'prefer-hardware' || value === 'prefer-software'
+
+const isRotation = (value: unknown): value is ExportSettings['rotation'] =>
+  value === 0 || value === 90 || value === 180 || value === 270
+
+const sanitizeHydratedTextOverlay = (rawTextOverlay: unknown): TextOverlaySettings => {
+  const textOverlay = {
+    ...DEFAULT_SETTINGS.textOverlay,
+    ...(typeof rawTextOverlay === 'object' && rawTextOverlay !== null
+      ? (rawTextOverlay as Partial<TextOverlaySettings>)
+      : {}),
+  }
+
+  if (typeof textOverlay.enabled !== 'boolean') {
+    textOverlay.enabled = DEFAULT_SETTINGS.textOverlay.enabled
+  }
+
+  for (const key of ['text', 'fontFamily', 'color', 'shadowColor'] as const) {
+    if (typeof textOverlay[key] !== 'string') {
+      textOverlay[key] = DEFAULT_SETTINGS.textOverlay[key]
+    }
+  }
+
+  textOverlay.fontSize = isFiniteNumber(textOverlay.fontSize)
+    ? clampMin(textOverlay.fontSize, 1)
+    : DEFAULT_SETTINGS.textOverlay.fontSize
+  textOverlay.fontWeight = isFiniteNumber(textOverlay.fontWeight)
+    ? clampToRange(Math.round(textOverlay.fontWeight), 100, 900)
+    : DEFAULT_SETTINGS.textOverlay.fontWeight
+  textOverlay.letterSpacing = isFiniteNumber(textOverlay.letterSpacing)
+    ? textOverlay.letterSpacing
+    : DEFAULT_SETTINGS.textOverlay.letterSpacing
+  textOverlay.opacity = isFiniteNumber(textOverlay.opacity)
+    ? clampToRange(textOverlay.opacity, 0, 1)
+    : DEFAULT_SETTINGS.textOverlay.opacity
+  textOverlay.shadowBlur = isFiniteNumber(textOverlay.shadowBlur)
+    ? clampMin(textOverlay.shadowBlur, 0)
+    : DEFAULT_SETTINGS.textOverlay.shadowBlur
+  textOverlay.padding = isFiniteNumber(textOverlay.padding)
+    ? clampMin(textOverlay.padding, 0)
+    : DEFAULT_SETTINGS.textOverlay.padding
+
+  if (
+    textOverlay.verticalPlacement !== 'top' &&
+    textOverlay.verticalPlacement !== 'center' &&
+    textOverlay.verticalPlacement !== 'bottom'
+  ) {
+    textOverlay.verticalPlacement = DEFAULT_SETTINGS.textOverlay.verticalPlacement
+  }
+
+  if (
+    textOverlay.horizontalPlacement !== 'left' &&
+    textOverlay.horizontalPlacement !== 'center' &&
+    textOverlay.horizontalPlacement !== 'right'
+  ) {
+    textOverlay.horizontalPlacement = DEFAULT_SETTINGS.textOverlay.horizontalPlacement
+  }
+
+  return textOverlay
+}
+
+const sanitizeHydratedCrop = (rawCrop: unknown): CropSettings => {
+  const crop = {
+    ...DEFAULT_SETTINGS.crop,
+    ...(typeof rawCrop === 'object' && rawCrop !== null ? (rawCrop as Partial<CropSettings>) : {}),
+  }
+
+  if (typeof crop.enabled !== 'boolean') {
+    crop.enabled = DEFAULT_SETTINGS.crop.enabled
+  }
+
+  for (const key of ['x', 'y', 'width', 'height'] as const) {
+    crop[key] = isFiniteNumber(crop[key])
+      ? clampToRange(crop[key], 0, 1)
+      : DEFAULT_SETTINGS.crop[key]
+  }
+
+  return crop
+}
+
+const sanitizeHydratedSettings = (rawPersistedSettings: Partial<ExportSettings> | undefined): ExportSettings => {
+  const persistedSettings =
+    rawPersistedSettings && typeof rawPersistedSettings === 'object' ? rawPersistedSettings : {}
+  const merged = { ...DEFAULT_SETTINGS, ...persistedSettings }
+
+  return {
+    format: isExportFormat(merged.format) ? merged.format : DEFAULT_SETTINGS.format,
+    codec: isVideoCodec(merged.codec) ? merged.codec : DEFAULT_SETTINGS.codec,
+    resolution: isExportResolution(merged.resolution) ? merged.resolution : DEFAULT_SETTINGS.resolution,
+    customWidth:
+      isFiniteNumber(merged.customWidth) && merged.customWidth > 0
+        ? clampToRange(Math.round(merged.customWidth), 2, 8192)
+        : DEFAULT_SETTINGS.customWidth,
+    customHeight:
+      isFiniteNumber(merged.customHeight) && merged.customHeight > 0
+        ? clampToRange(Math.round(merged.customHeight), 2, 8192)
+        : DEFAULT_SETTINGS.customHeight,
+    fps: isFiniteNumber(merged.fps) && merged.fps > 0 ? merged.fps : DEFAULT_SETTINGS.fps,
+    duration:
+      isFiniteNumber(merged.duration) && merged.duration > 0 ? merged.duration : DEFAULT_SETTINGS.duration,
+    bitrate:
+      isFiniteNumber(merged.bitrate) && merged.bitrate > 0
+        ? clampToRange(merged.bitrate, 2, 100)
+        : DEFAULT_SETTINGS.bitrate,
+    bitrateMode: isBitrateMode(merged.bitrateMode) ? merged.bitrateMode : DEFAULT_SETTINGS.bitrateMode,
+    hardwareAcceleration: isHardwareAcceleration(merged.hardwareAcceleration)
+      ? merged.hardwareAcceleration
+      : DEFAULT_SETTINGS.hardwareAcceleration,
+    warmupFrames:
+      isFiniteNumber(merged.warmupFrames) && merged.warmupFrames >= 0
+        ? Math.max(0, Math.round(merged.warmupFrames))
+        : DEFAULT_SETTINGS.warmupFrames,
+    rotation: isRotation(merged.rotation) ? merged.rotation : DEFAULT_SETTINGS.rotation,
+    textOverlay: sanitizeHydratedTextOverlay(persistedSettings.textOverlay),
+    crop: sanitizeHydratedCrop(persistedSettings.crop),
+  }
+}
+
 const detectBrowser = (): BrowserType => {
   if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
     return 'chromium-capable'
@@ -227,10 +385,19 @@ export const getRecommendedBitrate = (
     custom: 12, // Will be calculated below
   }
 
-  let baseBitrate = baseBitrates[resolution]
+  const safeFps = Number.isFinite(fps) && fps > 0 ? fps : 30
+  const safeResolution: ExportResolution =
+    resolution in baseBitrates ? resolution : '1080p'
+  let baseBitrate = baseBitrates[safeResolution]
 
   // For custom resolution, scale based on pixel count relative to 1080p
-  if (resolution === 'custom' && customWidth && customHeight) {
+  if (
+    safeResolution === 'custom' &&
+    Number.isFinite(customWidth) &&
+    customWidth > 0 &&
+    Number.isFinite(customHeight) &&
+    customHeight > 0
+  ) {
     const pixels1080p = 1920 * 1080
     const customPixels = customWidth * customHeight
     const pixelRatio = customPixels / pixels1080p
@@ -238,10 +405,13 @@ export const getRecommendedBitrate = (
   }
 
   // FPS multiplier: proportional to frame rate (30fps = 1.0x)
-  const fpsMultiplier = fps / 30
+  const fpsMultiplier = safeFps / 30
 
   // Calculate final bitrate, with reasonable min/max bounds
   const recommendedBitrate = Math.round(baseBitrate * fpsMultiplier)
+  if (!Number.isFinite(recommendedBitrate)) {
+    return 12
+  }
   return Math.max(4, Math.min(100, recommendedBitrate)) // Clamp between 4-100 Mbps
 }
 
@@ -276,10 +446,26 @@ export const useExportStore = create<ExportStore>()(
         }
       },
       setCropEditorOpen: (isOpen) => set({ isCropEditorOpen: isOpen }),
-      setCanvasAspectRatio: (ratio) => set({ canvasAspectRatio: ratio }),
+      setCanvasAspectRatio: (ratio) => {
+        if (!Number.isFinite(ratio) || ratio <= 0) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring invalid canvas aspect ratio:', ratio)
+          }
+          return
+        }
+        set({ canvasAspectRatio: ratio })
+      },
       setIsExporting: (isExporting) => set({ isExporting }),
       setStatus: (status) => set({ status }),
-      setProgress: (progress) => set({ progress }),
+      setProgress: (progress) => {
+        if (!Number.isFinite(progress)) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring non-finite progress:', progress)
+          }
+          return
+        }
+        set({ progress: Math.max(0, Math.min(1, progress)) })
+      },
       setPreviewUrl: (url) =>
         set((state) => {
           if (state.previewUrl && state.previewUrl !== url) {
@@ -292,8 +478,250 @@ export const useExportStore = create<ExportStore>()(
       setError: (error) => set({ error }),
       updateSettings: (newSettingsOrFn) => {
         const currentSettings = get().settings
-        const newSettings =
+        const rawNewSettings =
           typeof newSettingsOrFn === 'function' ? newSettingsOrFn(currentSettings) : newSettingsOrFn
+        const newSettings: Partial<ExportSettings> = { ...rawNewSettings }
+
+        const stripNonFinitePositive = (
+          key: 'fps' | 'duration' | 'bitrate' | 'customWidth' | 'customHeight'
+        ): void => {
+          const value = newSettings[key]
+          if (value === undefined) {
+            return
+          }
+          if (!Number.isFinite(value) || value <= 0) {
+            if (import.meta.env.DEV) {
+              console.warn(`[exportStore] Ignoring invalid ${key} update:`, value)
+            }
+            delete newSettings[key]
+          }
+        }
+
+        stripNonFinitePositive('fps')
+        stripNonFinitePositive('duration')
+        stripNonFinitePositive('bitrate')
+        stripNonFinitePositive('customWidth')
+        stripNonFinitePositive('customHeight')
+
+        if (newSettings.bitrate !== undefined) {
+          newSettings.bitrate = clampToRange(newSettings.bitrate, 2, 100)
+        }
+
+        const normalizeCustomDimension = (key: 'customWidth' | 'customHeight'): void => {
+          const value = newSettings[key]
+          if (value === undefined) {
+            return
+          }
+          newSettings[key] = Math.max(2, Math.min(8192, Math.round(value)))
+        }
+
+        normalizeCustomDimension('customWidth')
+        normalizeCustomDimension('customHeight')
+
+        if (newSettings.warmupFrames !== undefined) {
+          const { warmupFrames } = newSettings
+          if (!Number.isFinite(warmupFrames) || warmupFrames < 0) {
+            if (import.meta.env.DEV) {
+              console.warn('[exportStore] Ignoring invalid warmupFrames update:', warmupFrames)
+            }
+            delete newSettings.warmupFrames
+          } else {
+            newSettings.warmupFrames = Math.max(0, Math.round(warmupFrames))
+          }
+        }
+
+        if (newSettings.format !== undefined && !isExportFormat(newSettings.format)) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring invalid format update:', newSettings.format)
+          }
+          delete newSettings.format
+        }
+
+        if (newSettings.codec !== undefined && !isVideoCodec(newSettings.codec)) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring invalid codec update:', newSettings.codec)
+          }
+          delete newSettings.codec
+        }
+
+        if (newSettings.resolution !== undefined && !isExportResolution(newSettings.resolution)) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring invalid resolution update:', newSettings.resolution)
+          }
+          delete newSettings.resolution
+        }
+
+        if (newSettings.bitrateMode !== undefined && !isBitrateMode(newSettings.bitrateMode)) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring invalid bitrateMode update:', newSettings.bitrateMode)
+          }
+          delete newSettings.bitrateMode
+        }
+
+        if (
+          newSettings.hardwareAcceleration !== undefined &&
+          !isHardwareAcceleration(newSettings.hardwareAcceleration)
+        ) {
+          if (import.meta.env.DEV) {
+            console.warn(
+              '[exportStore] Ignoring invalid hardwareAcceleration update:',
+              newSettings.hardwareAcceleration
+            )
+          }
+          delete newSettings.hardwareAcceleration
+        }
+
+        if (newSettings.rotation !== undefined && !isRotation(newSettings.rotation)) {
+          if (import.meta.env.DEV) {
+            console.warn('[exportStore] Ignoring invalid rotation update:', newSettings.rotation)
+          }
+          delete newSettings.rotation
+        }
+
+        if (newSettings.textOverlay) {
+          const textPatch = { ...(newSettings.textOverlay as Partial<TextOverlaySettings>) }
+          const clampToRange = (value: number, min: number, max: number): number =>
+            Math.max(min, Math.min(max, value))
+          const clampMin = (value: number, min: number): number => Math.max(min, value)
+
+          const sanitizeFiniteNumber = (
+            key:
+              | 'fontSize'
+              | 'fontWeight'
+              | 'letterSpacing'
+              | 'opacity'
+              | 'shadowBlur'
+              | 'padding'
+          ): number | undefined => {
+            const value = textPatch[key]
+            if (value === undefined) {
+              return undefined
+            }
+            if (!Number.isFinite(value)) {
+              if (import.meta.env.DEV) {
+                console.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, value)
+              }
+              delete textPatch[key]
+              return undefined
+            }
+            return value
+          }
+
+          const fontSize = sanitizeFiniteNumber('fontSize')
+          if (fontSize !== undefined) {
+            textPatch.fontSize = clampMin(fontSize, 1)
+          }
+
+          const fontWeight = sanitizeFiniteNumber('fontWeight')
+          if (fontWeight !== undefined) {
+            textPatch.fontWeight = clampToRange(Math.round(fontWeight), 100, 900)
+          }
+
+          const letterSpacing = sanitizeFiniteNumber('letterSpacing')
+          if (letterSpacing !== undefined) {
+            textPatch.letterSpacing = letterSpacing
+          }
+
+          const opacity = sanitizeFiniteNumber('opacity')
+          if (opacity !== undefined) {
+            textPatch.opacity = clampToRange(opacity, 0, 1)
+          }
+
+          const shadowBlur = sanitizeFiniteNumber('shadowBlur')
+          if (shadowBlur !== undefined) {
+            textPatch.shadowBlur = clampMin(shadowBlur, 0)
+          }
+
+          const padding = sanitizeFiniteNumber('padding')
+          if (padding !== undefined) {
+            textPatch.padding = clampMin(padding, 0)
+          }
+
+          if ('enabled' in textPatch && typeof textPatch.enabled !== 'boolean') {
+            if (import.meta.env.DEV) {
+              console.warn(
+                '[exportStore] Ignoring invalid textOverlay.enabled update:',
+                textPatch.enabled
+              )
+            }
+            delete textPatch.enabled
+          }
+
+          for (const key of ['text', 'fontFamily', 'color', 'shadowColor'] as const) {
+            if (key in textPatch && typeof textPatch[key] !== 'string') {
+              if (import.meta.env.DEV) {
+                console.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, textPatch[key])
+              }
+              delete textPatch[key]
+            }
+          }
+
+          if (
+            'verticalPlacement' in textPatch &&
+            textPatch.verticalPlacement !== 'top' &&
+            textPatch.verticalPlacement !== 'center' &&
+            textPatch.verticalPlacement !== 'bottom'
+          ) {
+            if (import.meta.env.DEV) {
+              console.warn(
+                '[exportStore] Ignoring invalid textOverlay.verticalPlacement update:',
+                textPatch.verticalPlacement
+              )
+            }
+            delete textPatch.verticalPlacement
+          }
+
+          if (
+            'horizontalPlacement' in textPatch &&
+            textPatch.horizontalPlacement !== 'left' &&
+            textPatch.horizontalPlacement !== 'center' &&
+            textPatch.horizontalPlacement !== 'right'
+          ) {
+            if (import.meta.env.DEV) {
+              console.warn(
+                '[exportStore] Ignoring invalid textOverlay.horizontalPlacement update:',
+                textPatch.horizontalPlacement
+              )
+            }
+            delete textPatch.horizontalPlacement
+          }
+
+          newSettings.textOverlay = textPatch as ExportSettings['textOverlay']
+        }
+
+        if (newSettings.crop) {
+          const cropPatch = { ...(newSettings.crop as Partial<CropSettings>) }
+          const clampUnitRange = (value: number): number => Math.max(0, Math.min(1, value))
+
+          const sanitizeCropNumeric = (key: 'x' | 'y' | 'width' | 'height'): void => {
+            const value = cropPatch[key]
+            if (value === undefined) {
+              return
+            }
+            if (!Number.isFinite(value)) {
+              if (import.meta.env.DEV) {
+                console.warn(`[exportStore] Ignoring invalid crop.${key} update:`, value)
+              }
+              delete cropPatch[key]
+              return
+            }
+            cropPatch[key] = clampUnitRange(value)
+          }
+
+          sanitizeCropNumeric('x')
+          sanitizeCropNumeric('y')
+          sanitizeCropNumeric('width')
+          sanitizeCropNumeric('height')
+
+          if ('enabled' in cropPatch && typeof cropPatch.enabled !== 'boolean') {
+            if (import.meta.env.DEV) {
+              console.warn('[exportStore] Ignoring invalid crop.enabled update:', cropPatch.enabled)
+            }
+            delete cropPatch.enabled
+          }
+
+          newSettings.crop = cropPatch as ExportSettings['crop']
+        }
 
         const updatedSettings = { ...currentSettings, ...newSettings }
 
@@ -472,22 +900,10 @@ export const useExportStore = create<ExportStore>()(
       partialize: (state) => ({ settings: state.settings }), // Only persist settings
       merge: (persistedState, currentState) => {
         const persisted = persistedState as { settings?: Partial<ExportSettings> }
-        // Deep merge persisted settings with defaults to handle new properties
+        const hydratedSettings = sanitizeHydratedSettings(persisted?.settings)
         return {
           ...currentState,
-          settings: {
-            ...DEFAULT_SETTINGS,
-            ...persisted?.settings,
-            // Deep merge nested objects to preserve new defaults
-            textOverlay: {
-              ...DEFAULT_SETTINGS.textOverlay,
-              ...persisted?.settings?.textOverlay,
-            },
-            crop: {
-              ...DEFAULT_SETTINGS.crop,
-              ...persisted?.settings?.crop,
-            },
-          },
+          settings: hydratedSettings,
         }
       },
     }

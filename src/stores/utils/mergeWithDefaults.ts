@@ -44,6 +44,11 @@ function deepMerge<T extends object>(defaults: T, loaded: unknown): T {
   const loadedObj = loaded as Record<string, unknown>
 
   for (const key of Object.keys(loadedObj)) {
+    // Only merge keys that exist in defaults to preserve canonical state shape.
+    if (!Object.prototype.hasOwnProperty.call(defaults, key)) {
+      continue
+    }
+
     const loadedVal = loadedObj[key]
     const defaultVal = (defaults as Record<string, unknown>)[key]
 

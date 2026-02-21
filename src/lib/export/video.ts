@@ -10,6 +10,9 @@ import {
 
 import { VideoCodec, TextOverlaySettings, CropSettings } from '@/stores/exportStore'
 
+/**
+ * Runtime video encoding and composition options for export sessions.
+ */
 export interface VideoExportOptions {
   width: number
   height: number
@@ -54,6 +57,49 @@ export class VideoRecorder {
 
   async initialize(): Promise<void> {
     try {
+      const validatePositiveFinite = (name: string, value: number): number => {
+        if (!Number.isFinite(value) || value <= 0) {
+          throw new Error(`Invalid ${name}: ${value}`)
+        }
+        return value
+      }
+
+      const safeWidth = Math.max(2, Math.round(validatePositiveFinite('width', this.options.width)))
+      const safeHeight = Math.max(2, Math.round(validatePositiveFinite('height', this.options.height)))
+      const safeFps = validatePositiveFinite('fps', this.options.fps)
+      const safeBitrate = validatePositiveFinite('bitrate', this.options.bitrate)
+      const safeFormat = this.options.format === 'webm' ? 'webm' : 'mp4'
+      const fallbackCodec = safeFormat === 'webm' ? 'vp9' : 'avc'
+      const safeCodec =
+        this.options.codec === 'avc' ||
+        this.options.codec === 'hevc' ||
+        this.options.codec === 'vp9' ||
+        this.options.codec === 'av1'
+          ? this.options.codec
+          : fallbackCodec
+      const safeBitrateMode =
+        this.options.bitrateMode === 'constant' || this.options.bitrateMode === 'variable'
+          ? this.options.bitrateMode
+          : 'variable'
+      const safeHardwareAcceleration =
+        this.options.hardwareAcceleration === 'no-preference' ||
+        this.options.hardwareAcceleration === 'prefer-hardware' ||
+        this.options.hardwareAcceleration === 'prefer-software'
+          ? this.options.hardwareAcceleration
+          : 'prefer-software'
+
+      this.options = {
+        ...this.options,
+        width: safeWidth,
+        height: safeHeight,
+        fps: safeFps,
+        bitrate: safeBitrate,
+        format: safeFormat,
+        codec: safeCodec,
+        bitrateMode: safeBitrateMode,
+        hardwareAcceleration: safeHardwareAcceleration,
+      }
+
       // 0. Setup Composition Canvas if needed
       const needsComposition = this.options.textOverlay?.enabled || this.options.crop?.enabled
 
@@ -61,8 +107,8 @@ export class VideoRecorder {
 
       if (needsComposition) {
         this.compositionCanvas = document.createElement('canvas')
-        this.compositionCanvas.width = this.options.width
-        this.compositionCanvas.height = this.options.height
+        this.compositionCanvas.width = safeWidth
+        this.compositionCanvas.height = safeHeight
         this.compositionCtx = this.compositionCanvas.getContext('2d', {
           willReadFrequently: false,
           alpha: false,
@@ -78,7 +124,7 @@ export class VideoRecorder {
       //      fastStart 'in-memory' processes moov in memory (for BufferTarget)
       // WebM: appendOnly for streaming avoids seeking during writes
       const format =
-        this.options.format === 'webm'
+        safeFormat === 'webm'
           ? new WebMOutputFormat({
               appendOnly: isStreaming, // Enable append-only for streaming (no seeking during write)
             })
@@ -108,15 +154,21 @@ export class VideoRecorder {
       })
 
       // 3. Configure Encoder with quality-optimized settings
-      const codec = this.options.codec || (this.options.format === 'webm' ? 'vp9' : 'avc')
+      const normalizedRotation =
+        this.options.rotation === 0 ||
+        this.options.rotation === 90 ||
+        this.options.rotation === 180 ||
+        this.options.rotation === 270
+          ? this.options.rotation
+          : 0
 
       const config: VideoEncodingConfig = {
-        codec,
-        bitrate: this.options.bitrate * 1_000_000, // Convert Mbps to bps
-        bitrateMode: this.options.bitrateMode || 'variable', // VBR is WebCodecs default, ~20% smaller files
+        codec: safeCodec,
+        bitrate: safeBitrate * 1_000_000, // Convert Mbps to bps
+        bitrateMode: safeBitrateMode, // VBR is WebCodecs default, ~20% smaller files
         latencyMode: 'quality', // Prioritize visual quality over encoding speed
-        keyFrameInterval: this.options.fps * 2, // Keyframe every 2 seconds for good seeking + quality
-        hardwareAcceleration: this.options.hardwareAcceleration || 'prefer-software',
+        keyFrameInterval: safeFps * 2, // Keyframe every 2 seconds for good seeking + quality
+        hardwareAcceleration: safeHardwareAcceleration,
       }
 
       // 4. Create Source
@@ -124,8 +176,8 @@ export class VideoRecorder {
 
       // 5. Add Track with metadata
       this.output.addVideoTrack(this.source, {
-        frameRate: this.options.fps,
-        rotation: this.options.rotation ?? 0, // Rotation metadata for vertical video support
+        frameRate: safeFps,
+        rotation: normalizedRotation, // Rotation metadata for vertical video support
       })
 
       // 6. Start the output
@@ -305,8 +357,13 @@ export class VideoRecorder {
       await this.source.add(timestamp, duration)
 
       if (this.options.onProgress) {
-        const totalDuration = this.options.duration
-        const progress = Math.min(timestamp / totalDuration, 0.99)
+        const hasValidDuration = Number.isFinite(this.options.duration) && this.options.duration > 0
+        const progress = hasValidDuration
+          ? (() => {
+              const rawProgress = timestamp / this.options.duration
+              return Number.isFinite(rawProgress) ? Math.min(Math.max(rawProgress, 0), 0.99) : 0
+            })()
+          : 0
         this.options.onProgress(progress)
       }
     } catch (error) {

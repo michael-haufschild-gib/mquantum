@@ -72,7 +72,47 @@ export function computeOmegaK(
  * @returns True if n is a power of 2 and >= 1
  */
 function isPowerOf2(n: number): boolean {
-  return n >= 1 && (n & (n - 1)) === 0
+  return Number.isInteger(n) && n >= 1 && (n & (n - 1)) === 0
+}
+
+/**
+ * Validates exact-vacuum sampling configuration for active dimensions.
+ *
+ * @param gridSize - Lattice size per dimension
+ * @param spacing - Lattice spacing per dimension
+ * @param latticeDim - Number of active dimensions
+ * @param mass - Physical mass parameter
+ * @throws {Error} If any active-dimension parameter is invalid
+ */
+function validateVacuumConfig(
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  latticeDim: number,
+  mass: number
+): void {
+  if (!Number.isInteger(latticeDim) || latticeDim < 1) {
+    throw new Error(`latticeDim must be a positive integer, got ${latticeDim}`)
+  }
+  if (latticeDim > gridSize.length) {
+    throw new Error(`gridSize must have at least ${latticeDim} entries, got ${gridSize.length}`)
+  }
+  if (latticeDim > spacing.length) {
+    throw new Error(`spacing must have at least ${latticeDim} entries, got ${spacing.length}`)
+  }
+  if (!Number.isFinite(mass)) {
+    throw new Error(`mass must be finite, got ${mass}`)
+  }
+
+  for (let d = 0; d < latticeDim; d++) {
+    const n = gridSize[d]!
+    if (!isPowerOf2(n)) {
+      throw new Error(`Exact vacuum requires power-of-2 grid sizes, but dimension ${d} has size ${n}`)
+    }
+    const a = spacing[d]!
+    if (!Number.isFinite(a) || a <= 0) {
+      throw new Error(`spacing[${d}] must be a finite positive value, got ${a}`)
+    }
+  }
 }
 
 /**
@@ -151,16 +191,8 @@ export function sampleVacuumSpectrum(
   seed: number
 ): { phi: Float32Array; pi: Float32Array } {
   const { gridSize, spacing, mass, latticeDim } = config
+  validateVacuumConfig(gridSize, spacing, latticeDim, mass)
   const dims = gridSize.slice(0, latticeDim)
-
-  // Validate power-of-2 for active dimensions
-  for (let d = 0; d < latticeDim; d++) {
-    if (!isPowerOf2(dims[d]!)) {
-      throw new Error(
-        `Exact vacuum requires power-of-2 grid sizes, but dimension ${d} has size ${dims[d]}`
-      )
-    }
-  }
 
   const totalSites = dims.reduce((a, b) => a * b, 1)
   const strides = computeStrides(dims)
@@ -266,6 +298,7 @@ export function sampleVacuumSpectrum(
  */
 export function estimateVacuumMaxPhi(config: FreeScalarConfig): number {
   const { gridSize, spacing, mass, latticeDim } = config
+  validateVacuumConfig(gridSize, spacing, latticeDim, mass)
   const dims = gridSize.slice(0, latticeDim)
   const totalSites = dims.reduce((a, b) => a * b, 1)
 

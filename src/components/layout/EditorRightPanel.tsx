@@ -6,7 +6,6 @@ import React, { useMemo, useState } from 'react'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { SchroedingerCrossSectionSection } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
-import { DocumentationSection } from '@/components/sections/Documentation/DocumentationSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
 import { LightsSection } from '@/components/sections/Lights/LightsSection'
@@ -68,7 +67,6 @@ export const EditorRightPanel: React.FC = React.memo(() => {
             {/* The "App" - Settings, Meta, Output */}
             <SettingsSection defaultOpen={true} />
             <PerformanceSection defaultOpen={false} />
-            <DocumentationSection defaultOpen={false} />
           </div>
         ),
       },

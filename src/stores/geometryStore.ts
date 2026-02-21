@@ -54,6 +54,9 @@ export const DEFAULT_DIMENSION = 3
 /** Default object type */
 export const DEFAULT_OBJECT_TYPE: ObjectType = 'schroedinger'
 
+/**
+ * Geometry store state and actions.
+ */
 export interface GeometryState {
   /** Current dimension (3-11) */
   dimension: number
@@ -85,9 +88,13 @@ export interface GeometryState {
 /**
  * Clamps a dimension value to the valid range [MIN_DIMENSION, MAX_DIMENSION]
  * @param dim - Dimension value to clamp
+ * @param fallback - Fallback used when dim is non-finite
  * @returns Clamped dimension value
  */
-function clampDimension(dim: number): number {
+function clampDimension(dim: number, fallback: number = DEFAULT_DIMENSION): number {
+  if (!Number.isFinite(dim)) {
+    return fallback
+  }
   return Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, Math.floor(dim)))
 }
 
@@ -143,9 +150,16 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
   objectType: DEFAULT_OBJECT_TYPE,
 
   setDimension: (dimension: number) => {
-    const clampedDimension = clampDimension(dimension)
     const currentDimension = get().dimension
+    const clampedDimension = clampDimension(dimension, currentDimension)
     const currentType = get().objectType
+
+    if (!Number.isFinite(dimension)) {
+      if (import.meta.env.DEV) {
+        console.warn(`[geometryStore] Ignoring non-finite dimension: ${dimension}`)
+      }
+      return
+    }
 
     // Skip if same dimension (no change needed)
     if (clampedDimension === currentDimension) {
@@ -235,9 +249,15 @@ export const useGeometryStore = create<GeometryState>((set, get) => ({
   },
 
   loadGeometry: (dimension: number, objectType: ObjectType) => {
-    const clampedDimension = clampDimension(dimension)
+    const clampedDimension = clampDimension(dimension, DEFAULT_DIMENSION)
     const currentDimension = get().dimension
     const currentType = get().objectType
+
+    if (!Number.isFinite(dimension) && import.meta.env.DEV) {
+      console.warn(
+        `[geometryStore] Non-finite scene dimension ${dimension}; using default ${DEFAULT_DIMENSION}`
+      )
+    }
 
     // Validate that objectType is valid for dimension
     if (!isValidObjectType(objectType)) {

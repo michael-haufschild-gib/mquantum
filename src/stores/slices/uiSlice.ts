@@ -28,6 +28,9 @@ export type PerfMonitorTab = 'perf' | 'sys' | 'shader' | 'buffers'
 // State Interface
 // ============================================================================
 
+/**
+ * UI slice state fields.
+ */
 export interface UISliceState {
   // --- UI Helpers ---
   showAxisHelper: boolean
@@ -44,6 +47,9 @@ export interface UISliceState {
   animationBias: number
 }
 
+/**
+ * UI slice actions.
+ */
 export interface UISliceActions {
   // --- UI Helper Actions ---
   setShowAxisHelper: (show: boolean) => void
@@ -58,6 +64,9 @@ export interface UISliceActions {
   setAnimationBias: (bias: number) => void
 }
 
+/**
+ * Combined UI slice type.
+ */
 export type UISlice = UISliceState & UISliceActions
 
 // ============================================================================
@@ -126,6 +135,12 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set) => ({
 
   // --- Animation Actions ---
   setAnimationBias: (bias: number) => {
+    if (!Number.isFinite(bias)) {
+      if (import.meta.env.DEV) {
+        console.warn('[uiSlice] Ignoring non-finite animation bias:', bias)
+      }
+      return
+    }
     set({ animationBias: Math.max(0, Math.min(1, bias)) })
   },
 })

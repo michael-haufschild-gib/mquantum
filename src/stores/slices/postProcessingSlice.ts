@@ -39,10 +39,17 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
+function isFinitePostProcessingInput(value: number): boolean {
+  return Number.isFinite(value)
+}
+
 // ============================================================================
 // State Interface
 // ============================================================================
 
+/**
+ * Post-processing slice state fields.
+ */
 export interface PostProcessingSliceState {
   // --- Bloom ---
   bloomEnabled: boolean
@@ -105,6 +112,9 @@ export interface PostProcessingSliceState {
   frameBlendingFactor: number
 }
 
+/**
+ * Post-processing slice actions.
+ */
 export interface PostProcessingSliceActions {
   // --- Bloom Actions ---
   setBloomEnabled: (enabled: boolean) => void
@@ -145,6 +155,9 @@ export interface PostProcessingSliceActions {
   setFrameBlendingFactor: (factor: number) => void
 }
 
+/**
+ * Combined post-processing slice type.
+ */
 export type PostProcessingSlice = PostProcessingSliceState & PostProcessingSliceActions
 
 // ============================================================================
@@ -209,18 +222,42 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setBloomGain: (gain: number) => {
+    if (!isFinitePostProcessingInput(gain)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite bloom gain:', gain)
+      }
+      return
+    }
     set({ bloomGain: clamp(gain, 0, 3) })
   },
 
   setBloomThreshold: (threshold: number) => {
+    if (!isFinitePostProcessingInput(threshold)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite bloom threshold:', threshold)
+      }
+      return
+    }
     set({ bloomThreshold: clamp(threshold, 0, 5) })
   },
 
   setBloomKnee: (knee: number) => {
+    if (!isFinitePostProcessingInput(knee)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite bloom knee:', knee)
+      }
+      return
+    }
     set({ bloomKnee: clamp(knee, 0, 5) })
   },
 
   setBloomRadius: (radius: number) => {
+    if (!isFinitePostProcessingInput(radius)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite bloom radius:', radius)
+      }
+      return
+    }
     set({ bloomRadius: clamp(radius, 0.25, 4) })
   },
 
@@ -235,14 +272,35 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setCinematicAberration: (intensity: number) => {
+    if (!isFinitePostProcessingInput(intensity)) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[postProcessingSlice] Ignoring non-finite cinematic aberration:',
+          intensity
+        )
+      }
+      return
+    }
     set({ cinematicAberration: Math.max(0, Math.min(0.1, intensity)) })
   },
 
   setCinematicVignette: (intensity: number) => {
+    if (!isFinitePostProcessingInput(intensity)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite cinematic vignette:', intensity)
+      }
+      return
+    }
     set({ cinematicVignette: Math.max(0, Math.min(3.0, intensity)) })
   },
 
   setCinematicGrain: (intensity: number) => {
+    if (!isFinitePostProcessingInput(intensity)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite cinematic grain:', intensity)
+      }
+      return
+    }
     set({ cinematicGrain: Math.max(0, Math.min(0.2, intensity)) })
   },
 
@@ -252,46 +310,112 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setPaperContrast: (contrast: number) => {
+    if (!isFinitePostProcessingInput(contrast)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper contrast:', contrast)
+      }
+      return
+    }
     set({ paperContrast: Math.max(0, Math.min(1, contrast)) })
   },
 
   setPaperRoughness: (roughness: number) => {
+    if (!isFinitePostProcessingInput(roughness)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper roughness:', roughness)
+      }
+      return
+    }
     set({ paperRoughness: Math.max(0, Math.min(1, roughness)) })
   },
 
   setPaperFiber: (fiber: number) => {
+    if (!isFinitePostProcessingInput(fiber)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper fiber:', fiber)
+      }
+      return
+    }
     set({ paperFiber: Math.max(0, Math.min(1, fiber)) })
   },
 
   setPaperFiberSize: (size: number) => {
+    if (!isFinitePostProcessingInput(size)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper fiber size:', size)
+      }
+      return
+    }
     set({ paperFiberSize: Math.max(0.1, Math.min(2, size)) })
   },
 
   setPaperCrumples: (crumples: number) => {
+    if (!isFinitePostProcessingInput(crumples)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper crumples:', crumples)
+      }
+      return
+    }
     set({ paperCrumples: Math.max(0, Math.min(1, crumples)) })
   },
 
   setPaperCrumpleSize: (size: number) => {
+    if (!isFinitePostProcessingInput(size)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper crumple size:', size)
+      }
+      return
+    }
     set({ paperCrumpleSize: Math.max(0.1, Math.min(2, size)) })
   },
 
   setPaperFolds: (folds: number) => {
+    if (!isFinitePostProcessingInput(folds)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper folds:', folds)
+      }
+      return
+    }
     set({ paperFolds: Math.max(0, Math.min(1, folds)) })
   },
 
   setPaperFoldCount: (count: number) => {
+    if (!isFinitePostProcessingInput(count)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper fold count:', count)
+      }
+      return
+    }
     set({ paperFoldCount: Math.max(1, Math.min(15, Math.round(count))) })
   },
 
   setPaperDrops: (drops: number) => {
+    if (!isFinitePostProcessingInput(drops)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper drops:', drops)
+      }
+      return
+    }
     set({ paperDrops: Math.max(0, Math.min(1, drops)) })
   },
 
   setPaperFade: (fade: number) => {
+    if (!isFinitePostProcessingInput(fade)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper fade:', fade)
+      }
+      return
+    }
     set({ paperFade: Math.max(0, Math.min(1, fade)) })
   },
 
   setPaperSeed: (seed: number) => {
+    if (!isFinitePostProcessingInput(seed)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper seed:', seed)
+      }
+      return
+    }
     set({ paperSeed: Math.max(0, Math.min(1000, seed)) })
   },
 
@@ -308,6 +432,12 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setPaperIntensity: (intensity: number) => {
+    if (!isFinitePostProcessingInput(intensity)) {
+      if (import.meta.env.DEV) {
+        console.warn('[postProcessingSlice] Ignoring non-finite paper intensity:', intensity)
+      }
+      return
+    }
     set({ paperIntensity: Math.max(0, Math.min(1, intensity)) })
   },
 
@@ -317,6 +447,15 @@ export const createPostProcessingSlice: StateCreator<
   },
 
   setFrameBlendingFactor: (factor: number) => {
+    if (!isFinitePostProcessingInput(factor)) {
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[postProcessingSlice] Ignoring non-finite frame blending factor:',
+          factor
+        )
+      }
+      return
+    }
     set({ frameBlendingFactor: Math.max(0, Math.min(1, factor)) })
   },
 })

@@ -311,6 +311,12 @@ describe('Light Types', () => {
         expect(clampIntensity(1.5)).toBe(1.5)
         expect(clampIntensity(5)).toBe(3)
       })
+
+      it('should return minimum for non-finite values', () => {
+        expect(clampIntensity(Number.NaN)).toBe(0.1)
+        expect(clampIntensity(Number.POSITIVE_INFINITY)).toBe(0.1)
+        expect(clampIntensity(Number.NEGATIVE_INFINITY)).toBe(0.1)
+      })
     })
 
     describe('clampConeAngle', () => {
@@ -319,6 +325,12 @@ describe('Light Types', () => {
         expect(clampConeAngle(45)).toBe(45)
         expect(clampConeAngle(180)).toBe(120)
       })
+
+      it('should return minimum for non-finite values', () => {
+        expect(clampConeAngle(Number.NaN)).toBe(1)
+        expect(clampConeAngle(Number.POSITIVE_INFINITY)).toBe(1)
+        expect(clampConeAngle(Number.NEGATIVE_INFINITY)).toBe(1)
+      })
     })
 
     describe('clampPenumbra', () => {
@@ -326,6 +338,12 @@ describe('Light Types', () => {
         expect(clampPenumbra(-0.5)).toBe(0)
         expect(clampPenumbra(0.5)).toBe(0.5)
         expect(clampPenumbra(2)).toBe(1)
+      })
+
+      it('should return minimum for non-finite values', () => {
+        expect(clampPenumbra(Number.NaN)).toBe(0)
+        expect(clampPenumbra(Number.POSITIVE_INFINITY)).toBe(0)
+        expect(clampPenumbra(Number.NEGATIVE_INFINITY)).toBe(0)
       })
     })
 
@@ -411,6 +429,12 @@ describe('Light Types', () => {
           expect(dir1[1]).toBeCloseTo(dir2[1], 5)
           expect(dir1[2]).toBeCloseTo(dir2[2], 5)
         }
+      })
+
+      it('should return 0 for non-finite values', () => {
+        expect(normalizeRotationSigned(Number.NaN)).toBe(0)
+        expect(normalizeRotationSigned(Number.POSITIVE_INFINITY)).toBe(0)
+        expect(normalizeRotationSigned(Number.NEGATIVE_INFINITY)).toBe(0)
       })
     })
 

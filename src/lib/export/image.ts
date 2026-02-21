@@ -7,6 +7,9 @@ import { useMsgBoxStore } from '@/stores/msgBoxStore'
 import { useScreenshotStore } from '@/stores/screenshotStore'
 import { captureScreenshotAsync } from '@/hooks/useScreenshotCapture'
 
+/**
+ * Options for PNG export capture requests.
+ */
 export interface ExportOptions {
   /** Filename without extension */
   filename?: string
@@ -22,33 +25,28 @@ export interface ExportOptions {
  * preserveDrawingBuffer being enabled.
  *
  * @param _options - Export options (filename ignored in favor of modal flow)
- * @returns True if capture was initiated (async operation)
+ * @returns Promise resolving to true on success, false on failure
  */
-export function exportSceneToPNG(_options: ExportOptions = {}): boolean {
-  // Trigger async capture
-  captureScreenshotAsync()
-    .then((dataUrl) => {
-      // Open the modal with the captured image
-      useScreenshotStore.getState().openModal(dataUrl)
-    })
-    .catch((error) => {
-      // Handle specific error cases with helpful messages
-      let errorMsg = error instanceof Error ? error.message : 'Unknown error'
+export async function exportSceneToPNG(_options: ExportOptions = {}): Promise<boolean> {
+  try {
+    const dataUrl = await captureScreenshotAsync()
+    useScreenshotStore.getState().openModal(dataUrl)
+    return true
+  } catch (error) {
+    // Handle specific error cases with helpful messages
+    let errorMsg = error instanceof Error ? error.message : 'Unknown error'
 
-      if (error instanceof DOMException && error.name === 'SecurityError') {
-        errorMsg =
-          'Canvas is tainted by cross-origin content (CORS). External textures or images were used without proper permissions.'
-        console.error('Export failed: ' + errorMsg)
-      } else {
-        console.error('Export failed:', error)
-      }
+    if (error instanceof DOMException && error.name === 'SecurityError') {
+      errorMsg =
+        'Canvas is tainted by cross-origin content (CORS). External textures or images were used without proper permissions.'
+      console.error('Export failed: ' + errorMsg)
+    } else {
+      console.error('Export failed:', error)
+    }
 
-      useMsgBoxStore.getState().showMsgBox('Export Failed', errorMsg, 'error')
-    })
-
-  // Return true to indicate capture was initiated
-  // The actual result is handled asynchronously
-  return true
+    useMsgBoxStore.getState().showMsgBox('Export Failed', errorMsg, 'error')
+    return false
+  }
 }
 
 /**

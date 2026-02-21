@@ -104,6 +104,26 @@ describe('environmentStore', () => {
         expect(useEnvironmentStore.getState().skyboxAnimationSpeed).toBe(5)
       })
 
+      it('should ignore non-finite numeric skybox updates', () => {
+        const { setSkyboxIntensity, setSkyboxRotation, setSkyboxAnimationSpeed } =
+          useEnvironmentStore.getState()
+
+        setSkyboxIntensity(2)
+        setSkyboxRotation(Math.PI / 3)
+        setSkyboxAnimationSpeed(1.5)
+
+        setSkyboxIntensity(Number.NaN)
+        setSkyboxIntensity(Number.POSITIVE_INFINITY)
+        setSkyboxRotation(Number.NaN)
+        setSkyboxRotation(Number.NEGATIVE_INFINITY)
+        setSkyboxAnimationSpeed(Number.NaN)
+        setSkyboxAnimationSpeed(Number.POSITIVE_INFINITY)
+
+        expect(useEnvironmentStore.getState().skyboxIntensity).toBe(2)
+        expect(useEnvironmentStore.getState().skyboxRotation).toBeCloseTo(Math.PI / 3)
+        expect(useEnvironmentStore.getState().skyboxAnimationSpeed).toBe(1.5)
+      })
+
       it('should set skybox high quality', () => {
         const { setSkyboxHighQuality } = useEnvironmentStore.getState()
 
@@ -123,6 +143,41 @@ describe('environmentStore', () => {
         setSkyboxLoading(false)
         expect(useEnvironmentStore.getState().skyboxLoading).toBe(false)
       })
+
+      it('keeps unified skybox selection and derived fields in sync for direct setters', () => {
+        const { setSkyboxSelection, setSkyboxEnabled, setSkyboxMode, setSkyboxTexture } =
+          useEnvironmentStore.getState()
+
+        setSkyboxSelection('space_blue')
+        setSkyboxMode('procedural_aurora')
+
+        let state = useEnvironmentStore.getState()
+        expect(state.skyboxSelection).toBe('procedural_aurora')
+        expect(state.skyboxEnabled).toBe(true)
+        expect(state.skyboxMode).toBe('procedural_aurora')
+        expect(state.skyboxTexture).toBe('space_blue')
+
+        setSkyboxTexture('space_red')
+        state = useEnvironmentStore.getState()
+        expect(state.skyboxSelection).toBe('space_red')
+        expect(state.skyboxEnabled).toBe(true)
+        expect(state.skyboxMode).toBe('classic')
+        expect(state.skyboxTexture).toBe('space_red')
+
+        setSkyboxEnabled(false)
+        state = useEnvironmentStore.getState()
+        expect(state.skyboxSelection).toBe('none')
+        expect(state.skyboxEnabled).toBe(false)
+        expect(state.skyboxMode).toBe('classic')
+        expect(state.skyboxTexture).toBe('none')
+
+        setSkyboxEnabled(true)
+        state = useEnvironmentStore.getState()
+        expect(state.skyboxSelection).toBe('space_blue')
+        expect(state.skyboxEnabled).toBe(true)
+        expect(state.skyboxMode).toBe('classic')
+        expect(state.skyboxTexture).toBe('space_blue')
+      })
     })
 
     describe('procedural settings', () => {
@@ -137,6 +192,61 @@ describe('environmentStore', () => {
         expect(updated.scale).toBe(2.0)
         // Other settings should be preserved
         expect(updated.complexity).toBe(initial.complexity)
+      })
+
+      it('ignores non-finite procedural numeric updates while applying valid fields', () => {
+        const { setProceduralSettings } = useEnvironmentStore.getState()
+        const initial = useEnvironmentStore.getState().proceduralSettings
+
+        setProceduralSettings({
+          scale: 2.2,
+          hue: Number.NaN,
+          saturation: Number.POSITIVE_INFINITY,
+          sunPosition: [1, Number.NaN, 3],
+          aurora: {
+            curtainHeight: 0.75,
+            waveFrequency: Number.NaN,
+          },
+          ocean: {
+            causticIntensity: initial.ocean.causticIntensity,
+            depthGradient: initial.ocean.depthGradient,
+            bubbleDensity: 0.9,
+            surfaceShimmer: Number.POSITIVE_INFINITY,
+          },
+          distribution: {
+            power: 1.2,
+            cycles: Number.NaN,
+            offset: 0.25,
+          },
+          cosineCoefficients: {
+            a: [0.1, 0.2, 0.3],
+            b: [Number.POSITIVE_INFINITY, 0.2, 0.3],
+            c: [0.4, 0.5, 0.6],
+            d: [0.7, 0.8, 0.9],
+          },
+        })
+
+        const updated = useEnvironmentStore.getState().proceduralSettings
+        expect(updated.scale).toBe(2.2)
+        expect(updated.hue).toBe(initial.hue)
+        expect(updated.saturation).toBe(initial.saturation)
+
+        expect(updated.sunPosition).toEqual(initial.sunPosition)
+
+        expect(updated.aurora.curtainHeight).toBe(0.75)
+        expect(updated.aurora.waveFrequency).toBe(initial.aurora.waveFrequency)
+
+        expect(updated.ocean.bubbleDensity).toBe(0.9)
+        expect(updated.ocean.surfaceShimmer).toBe(initial.ocean.surfaceShimmer)
+
+        expect(updated.distribution.power).toBe(1.2)
+        expect(updated.distribution.cycles).toBe(initial.distribution.cycles)
+        expect(updated.distribution.offset).toBe(0.25)
+
+        expect(updated.cosineCoefficients.a).toEqual([0.1, 0.2, 0.3])
+        expect(updated.cosineCoefficients.b).toEqual(initial.cosineCoefficients.b)
+        expect(updated.cosineCoefficients.c).toEqual([0.4, 0.5, 0.6])
+        expect(updated.cosineCoefficients.d).toEqual([0.7, 0.8, 0.9])
       })
     })
 

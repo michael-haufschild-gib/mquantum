@@ -50,6 +50,28 @@ describe('mergeExtendedObjectState', () => {
       expect(schroedinger.sampleCount).toBe(64)
       expect(schroedinger.densityGain).toBe(5.0)
     })
+
+    it('drops unknown loaded keys that are not part of defaults', () => {
+      const savedState = {
+        schroedinger: {
+          sampleCount: 64,
+          mysteryExtended: 42,
+          cosineParams: {
+            a: [0.1, 0.2, 0.3] as [number, number, number],
+            mysteryNested: true,
+          },
+        },
+      }
+
+      const merged = mergeExtendedObjectState(savedState)
+      const schroedinger = merged.schroedinger as Record<string, unknown>
+      expect(schroedinger.sampleCount).toBe(64)
+      expect(schroedinger.mysteryExtended).toBeUndefined()
+
+      const cosineParams = schroedinger.cosineParams as Record<string, unknown>
+      expect(cosineParams.a).toEqual([0.1, 0.2, 0.3])
+      expect(cosineParams.mysteryNested).toBeUndefined()
+    })
   })
 
   describe('legacy uncertainty shimmer migration', () => {

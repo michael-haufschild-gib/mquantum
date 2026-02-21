@@ -152,6 +152,20 @@ describe('sampleVacuumSpectrum', () => {
     expect(() => sampleVacuumSpectrum(config, 42)).toThrow('power-of-2')
   })
 
+  it('throws on non-integer grid sizes', () => {
+    const config = makeConfig({ gridSize: [8.5, 8, 8] as [number, number, number] })
+    expect(() => sampleVacuumSpectrum(config, 42)).toThrow('power-of-2')
+  })
+
+  it('throws when spacing does not cover all active dimensions', () => {
+    const config = makeConfig({
+      latticeDim: 3,
+      gridSize: [8, 8, 8],
+      spacing: [0.1, 0.1] as number[],
+    })
+    expect(() => sampleVacuumSpectrum(config, 42)).toThrow('spacing')
+  })
+
   it('works with 1D and 2D lattice dimensions', () => {
     const config1d = makeConfig({ latticeDim: 1, gridSize: [16, 1, 1] })
     const result1d = sampleVacuumSpectrum(config1d, 42)

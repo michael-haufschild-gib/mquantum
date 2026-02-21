@@ -23,9 +23,30 @@ interface CameraInstance {
   setTarget(x: number, y: number, z: number): void
 }
 
+/**
+ * Serializable camera position/target tuple used by presets and URL scene loads.
+ */
 export interface CameraState {
   position: [number, number, number]
   target: [number, number, number]
+}
+
+function isFiniteVec3(value: unknown): value is [number, number, number] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every((component) => typeof component === 'number' && Number.isFinite(component))
+  )
+}
+
+function normalizeCameraState(state: CameraState | null | undefined): CameraState | null {
+  if (!state || !isFiniteVec3(state.position) || !isFiniteVec3(state.target)) {
+    return null
+  }
+  return {
+    position: [state.position[0], state.position[1], state.position[2]],
+    target: [state.target[0], state.target[1], state.target[2]],
+  }
 }
 
 interface CameraStore {
@@ -55,12 +76,18 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     // This fixes the race condition when loading scenes via URL parameter
     if (camera) {
       const { pendingState } = get()
-      if (pendingState) {
-        camera.setPosition(...pendingState.position)
-        camera.setTarget(...pendingState.target)
+      const normalized = normalizeCameraState(pendingState)
+      if (normalized) {
+        camera.setPosition(...normalized.position)
+        camera.setTarget(...normalized.target)
         set({ pendingState: null })
         if (import.meta.env.DEV) {
           console.log('[cameraStore] Applied pending camera state after camera registered')
+        }
+      } else if (pendingState) {
+        set({ pendingState: null })
+        if (import.meta.env.DEV) {
+          console.warn('[cameraStore] Dropped invalid pending camera state')
         }
       }
     }
@@ -71,27 +98,40 @@ export const useCameraStore = create<CameraStore>((set, get) => ({
     if (!camera) return null
 
     const state = camera.getState()
-    return {
-      position: [...state.position],
-      target: [...state.target],
+    const normalized = normalizeCameraState(state)
+    if (!normalized) {
+      if (import.meta.env.DEV) {
+        console.warn('[cameraStore] captureState received invalid camera coordinates')
+      }
+      return null
     }
+    return normalized
   },
 
   applyState: (state) => {
     const { camera } = get()
+    const normalized = normalizeCameraState(state)
+
+    if (!normalized) {
+      set({ pendingState: null })
+      if (import.meta.env.DEV) {
+        console.warn('[cameraStore] Ignoring invalid camera state')
+      }
+      return
+    }
 
     // If camera isn't available yet, store as pending state
     // This handles the race condition when scene loads before WebGPUScene mounts
     if (!camera) {
-      set({ pendingState: state })
+      set({ pendingState: normalized })
       if (import.meta.env.DEV) {
         console.log('[cameraStore] Camera not ready, storing pending camera state')
       }
       return
     }
 
-    camera.setPosition(...state.position)
-    camera.setTarget(...state.target)
+    camera.setPosition(...normalized.position)
+    camera.setTarget(...normalized.target)
     set({ pendingState: null })
   },
 

@@ -37,6 +37,14 @@ describe('geometryStore (invariants)', () => {
     expect(useAnimationStore.getState().animatingPlanes.has('XV')).toBe(false)
   })
 
+  it('ignores non-finite dimension updates', () => {
+    useGeometryStore.getState().setDimension(5)
+    useGeometryStore.getState().setDimension(Number.NaN)
+
+    expect(useGeometryStore.getState().dimension).toBe(5)
+    expect(useRotationStore.getState().dimension).toBe(5)
+  })
+
   it('rejects invalid object types', () => {
     // Invalid type throws
     // @ts-expect-error intentional invalid input
