@@ -3,6 +3,9 @@
  * Information about n-dimensional geometry
  */
 
+/**
+ * Static educational topic shown in the documentation panel.
+ */
 export interface EducationTopic {
   id: string
   title: string
@@ -10,6 +13,9 @@ export interface EducationTopic {
   details: string[]
 }
 
+/**
+ * Dimension-specific educational metadata for the documentation panel.
+ */
 export interface DimensionInfo {
   dimension: number
   name: string
@@ -17,6 +23,9 @@ export interface DimensionInfo {
   examples: string[]
   properties: string[]
 }
+
+const MIN_EDUCATION_DIMENSION = 3
+const MAX_EDUCATION_DIMENSION = 11
 
 export const DIMENSION_INFO: Record<number, DimensionInfo> = {
   3: {
@@ -105,13 +114,42 @@ export const ROTATION_INFO: EducationTopic = {
   ],
 }
 
+function buildGeneratedDimensionInfo(dimension: number): DimensionInfo {
+  const rotationPlaneCount = getRotationPlaneCount(dimension)
+  const hypercubeVertexCount = 2 ** dimension
+
+  return {
+    dimension,
+    name: `${dimension}D Space`,
+    description: `${dimension}-dimensional space extends ${dimension - 1}D with one additional perpendicular direction.`,
+    examples: [
+      `An ${dimension}D hypercube has ${hypercubeVertexCount} vertices`,
+      `${rotationPlaneCount} independent rotation planes exist in ${dimension}D`,
+      `Visualization uses 3D projections and slices to inspect ${dimension}D structure`,
+    ],
+    properties: [
+      `${dimension} perpendicular axes`,
+      `${rotationPlaneCount} rotation planes`,
+      'Interpreted through projected 3D volume rendering',
+    ],
+  }
+}
+
 /**
  * Get educational information for a dimension
  * @param dimension - The dimension to get info for
  * @returns Dimension info object or undefined if not found
  */
 export function getDimensionInfo(dimension: number): DimensionInfo | undefined {
-  return DIMENSION_INFO[dimension]
+  if (!Number.isInteger(dimension)) {
+    return undefined
+  }
+
+  if (dimension < MIN_EDUCATION_DIMENSION || dimension > MAX_EDUCATION_DIMENSION) {
+    return undefined
+  }
+
+  return DIMENSION_INFO[dimension] ?? buildGeneratedDimensionInfo(dimension)
 }
 
 /**
@@ -123,4 +161,3 @@ export function getRotationPlaneCount(dimension: number): number {
   // Formula: n*(n-1)/2
   return (dimension * (dimension - 1)) / 2
 }
-

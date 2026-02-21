@@ -149,5 +149,23 @@ describe('animation-wasm helpers', () => {
 
       expect(Array.from(result)).toEqual([42])
     })
+
+    it('throws for ragged vertices with inconsistent dimensions', () => {
+      expect(() =>
+        flattenVertices([
+          [1, 2, 3],
+          [4, 5],
+        ])
+      ).toThrow('Vertex dimension mismatch')
+    })
+
+    it('throws for non-finite vertex coordinates', () => {
+      expect(() =>
+        flattenVertices([
+          [1, 2, 3],
+          [4, Number.NaN, 6],
+        ])
+      ).toThrow('Vertex coordinate must be finite')
+    })
   })
 })

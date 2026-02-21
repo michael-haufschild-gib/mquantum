@@ -48,7 +48,7 @@ export class CanvasErrorBoundary extends Component<
       .getState()
       .showMsgBox(
         'Rendering Error',
-        `A rendering error occurred: ${error.message}\n\nThis may be caused by WebGL context loss or shader compilation failure.`,
+        `A rendering error occurred: ${error.message}\n\nThis may be caused by WebGPU device loss or shader compilation failure.`,
         'error',
         [
           {
@@ -91,7 +91,7 @@ export class CanvasErrorBoundary extends Component<
             </div>
             <h2 className="text-xl font-semibold text-text-primary mb-2">Rendering Error</h2>
             <p className="text-text-secondary text-sm max-w-md">
-              The 3D canvas encountered an error. This may be due to WebGL context loss or a shader
+              The 3D canvas encountered an error. This may be due to WebGPU device loss or a shader
               compilation failure.
             </p>
           </div>

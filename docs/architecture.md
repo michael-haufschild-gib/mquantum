@@ -38,7 +38,6 @@ src/
 ├── lib/
 │   ├── geometry/      # Object type registry, Schroedinger config, presets
 │   ├── math/          # N-D vector, matrix, rotation, projection (pure logic)
-│   ├── cache/         # IndexedDB cache + Hermite polynomial constants
 │   ├── wasm/          # WASM bridge utilities
 │   ├── url/           # URL state serialization
 │   ├── colors/        # Color utilities

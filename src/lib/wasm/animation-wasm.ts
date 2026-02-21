@@ -471,14 +471,28 @@ export function float64ToVector(vector: Float64Array): VectorND {
  */
 export function flattenVertices(vertices: VectorND[]): Float64Array {
   if (vertices.length === 0) return new Float64Array(0)
+
   const dimension = vertices[0]!.length
+  if (dimension === 0) {
+    throw new Error('Vertex dimension must be at least 1')
+  }
+
   const size = vertices.length * dimension
   const flat = getPooledFloat64(size)
+
   for (let i = 0; i < vertices.length; i++) {
     const v = vertices[i]!
+    if (v.length !== dimension) {
+      throw new Error(`Vertex dimension mismatch at index ${i}: expected ${dimension}, got ${v.length}`)
+    }
+
     const offset = i * dimension
     for (let j = 0; j < dimension; j++) {
-      flat[offset + j] = v[j]!
+      const value = v[j]!
+      if (!Number.isFinite(value)) {
+        throw new Error(`Vertex coordinate must be finite at vertex ${i}, axis ${j}`)
+      }
+      flat[offset + j] = value
     }
   }
   return flat

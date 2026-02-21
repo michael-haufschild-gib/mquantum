@@ -51,14 +51,14 @@ describe('useKeyboardShortcuts', () => {
     expect(useGeometryStore.getState().dimension).toBe(5)
   })
 
-  it('should not increase dimension beyond 6', () => {
-    useGeometryStore.getState().setDimension(6)
+  it('should not increase dimension beyond MAX_DIMENSION (11)', () => {
+    useGeometryStore.getState().setDimension(11)
     renderHook(() => useKeyboardShortcuts({ enabled: true }))
 
     const event = new KeyboardEvent('keydown', { key: 'ArrowUp' })
     window.dispatchEvent(event)
 
-    expect(useGeometryStore.getState().dimension).toBe(6)
+    expect(useGeometryStore.getState().dimension).toBe(11)
   })
 
   it('should decrease dimension on arrow down', () => {

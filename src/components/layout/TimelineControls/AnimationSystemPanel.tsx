@@ -30,8 +30,6 @@ import React from 'react'
 function formatParamLabel(paramKey: string): string {
   // Remove common prefixes that are redundant with section title
   const cleanKey = paramKey
-    .replace(/^power/, '')
-    .replace(/^julia/, '')
     .replace(/^slice/, '')
     .replace(/^phase/, '')
     .replace(/^origin/, '')

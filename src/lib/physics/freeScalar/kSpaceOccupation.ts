@@ -16,15 +16,17 @@ import { computeOmegaK, M_FLOOR } from '@/lib/physics/freeScalar/vacuumSpectrum'
 /** Size of the 3D output density grid (must match DENSITY_GRID_SIZE in compute pass). */
 export const OUTPUT_GRID_SIZE = 64
 
-/**
- * Convert a 32-bit float to IEEE 754 half-precision (16-bit) float,
- * returned as an unsigned 16-bit integer suitable for Uint16Array packing.
- */
 // Reusable buffer for float32-to-float16 conversion (avoids per-call allocation)
 const _f16Buf = new ArrayBuffer(4)
 const _f16F32 = new Float32Array(_f16Buf)
 const _f16U32 = new Uint32Array(_f16Buf)
 
+/**
+ * Convert a 32-bit float to IEEE 754 half-precision (16-bit) float.
+ *
+ * @param val - Float32-compatible numeric value to encode
+ * @returns IEEE754 half-float bit pattern stored in a 16-bit unsigned integer
+ */
 export function float32ToFloat16(val: number): number {
   _f16F32[0] = val
   const bits = _f16U32[0]!
@@ -159,8 +161,39 @@ export function computeRawKSpaceData(
   mass: number,
   latticeDim: number
 ): KSpaceRawData {
-  const totalSites = gridSize.reduce((a, b) => a * b, 1)
+  if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
+    throw new Error(
+      `latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`
+    )
+  }
+
   const activeDims = gridSize.slice(0, latticeDim)
+  const totalSites = activeDims.reduce((a, b) => a * b, 1)
+
+  if (spacing.length < latticeDim) {
+    throw new Error(`spacing must provide at least ${latticeDim} entries, got ${spacing.length}`)
+  }
+
+  for (let d = 0; d < latticeDim; d++) {
+    const n = activeDims[d]!
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`gridSize[${d}] must be a positive integer, got ${n}`)
+    }
+    const a = spacing[d]!
+    if (!Number.isFinite(a) || a <= 0) {
+      throw new Error(`spacing[${d}] must be a finite positive number, got ${a}`)
+    }
+  }
+
+  if (!Number.isFinite(mass)) {
+    throw new Error(`mass must be finite, got ${mass}`)
+  }
+
+  if (phi.length < totalSites || pi.length < totalSites) {
+    throw new Error(
+      `phi/pi length too small for active grid: need ${totalSites}, got phi=${phi.length}, pi=${pi.length}`
+    )
+  }
 
   // Convert phi/pi from Float32 real to Float64 interleaved complex
   const phiComplex = new Float64Array(totalSites * 2)

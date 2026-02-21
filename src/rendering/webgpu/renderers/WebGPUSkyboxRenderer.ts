@@ -402,7 +402,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       })
     }
 
-    console.log(`[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height})`)
+    if (import.meta.env.DEV) {
+      console.log(`[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height})`)
+    }
   }
 
   /**

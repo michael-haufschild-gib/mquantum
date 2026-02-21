@@ -247,23 +247,6 @@ ${wignerEvalBlock}
     discard;
   }
 
-  // === DIAGNOSTIC OVERLAY (bottom-left corner) ===
-  // Shows quantum numbers as colored blocks to verify GPU-side values.
-  // Color: R=principalN/7, G=azimuthalL/6, B=magneticM indicator
-  // Position: bottom-left 60x40 pixel region
-  let pixelX = input.uv.x * camera.resolution.x;
-  let pixelY = (1.0 - input.uv.y) * camera.resolution.y; // flip Y: 0=top
-  if (pixelX < 60.0 && pixelY > camera.resolution.y - 40.0) {
-    let n = f32(schroedinger.principalN);
-    let l = f32(schroedinger.azimuthalL);
-    let m = f32(schroedinger.magneticM);
-    // Encode: R = n/7 (bright=high n), G = l/6 (bright=high l), B = (m+l)/(2l+1)
-    let diagR = clamp(n / 7.0, 0.0, 1.0);
-    let diagG = clamp(l / 6.0, 0.0, 1.0);
-    let diagB = select(0.5, clamp((m + l) / max(2.0 * l, 1.0), 0.0, 1.0), l > 0.0);
-    return vec4f(diagR, diagG, diagB, 1.0);
-  }
-
   return vec4f(col, alpha);
 }
 `

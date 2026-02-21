@@ -246,6 +246,61 @@ describe('VideoRecorder', () => {
     })
   })
 
+  describe('streaming mode cleanup', () => {
+    it('should close writable stream on dispose', async () => {
+      const closeFn = vi.fn().mockResolvedValue(undefined)
+      const mockWritable = { close: closeFn } as unknown as FileSystemWritableFileStream
+      const mockHandle = {
+        createWritable: vi.fn().mockResolvedValue(mockWritable),
+      } as unknown as FileSystemFileHandle
+
+      const streamRecorder = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        streamHandle: mockHandle,
+      })
+
+      await streamRecorder.initialize()
+      streamRecorder.dispose()
+
+      expect(closeFn).toHaveBeenCalledTimes(1)
+    })
+
+    it('should close writable stream on cancel', async () => {
+      const closeFn = vi.fn().mockResolvedValue(undefined)
+      const mockWritable = { close: closeFn } as unknown as FileSystemWritableFileStream
+      const mockHandle = {
+        createWritable: vi.fn().mockResolvedValue(mockWritable),
+      } as unknown as FileSystemFileHandle
+
+      const streamRecorder = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        streamHandle: mockHandle,
+      })
+
+      await streamRecorder.initialize()
+      await streamRecorder.cancel()
+
+      expect(closeFn).toHaveBeenCalledTimes(1)
+    })
+
+    it('should not throw if writable stream close fails', async () => {
+      const closeFn = vi.fn().mockRejectedValue(new Error('already closed'))
+      const mockWritable = { close: closeFn } as unknown as FileSystemWritableFileStream
+      const mockHandle = {
+        createWritable: vi.fn().mockResolvedValue(mockWritable),
+      } as unknown as FileSystemFileHandle
+
+      const streamRecorder = new VideoRecorder(canvas, {
+        ...defaultOptions,
+        streamHandle: mockHandle,
+      })
+
+      await streamRecorder.initialize()
+      // dispose should not throw even if close() rejects
+      expect(() => streamRecorder.dispose()).not.toThrow()
+    })
+  })
+
   describe('options validation', () => {
     it('should handle different FPS values', async () => {
       const recorder24fps = new VideoRecorder(canvas, { ...defaultOptions, fps: 24 })

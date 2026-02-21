@@ -20,7 +20,7 @@ type WebGPUInitData = Omit<WebGPUInitSuccess, 'success'>
 /**
  * Check if WebGPU is supported in the current environment.
  */
-export function isWebGPUSupported(): boolean {
+function isWebGPUSupported(): boolean {
   return typeof navigator !== 'undefined' && 'gpu' in navigator
 }
 
@@ -295,13 +295,3 @@ export class WebGPUDevice {
   }
 }
 
-// =============================================================================
-// Convenience Exports
-// =============================================================================
-
-/**
- * Get the WebGPU device manager instance.
- */
-export function getWebGPUDevice(): WebGPUDevice {
-  return WebGPUDevice.getInstance()
-}

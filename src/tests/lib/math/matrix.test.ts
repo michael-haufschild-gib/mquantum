@@ -242,6 +242,14 @@ describe('Matrix Operations', () => {
 
       expect(matricesEqual(out, expectedResult)).toBe(true)
     })
+
+    it('throws for non-square matrix lengths', () => {
+      const a = new Float32Array(6)
+      const b = new Float32Array(6)
+      const out = new Float32Array(6)
+
+      expect(() => multiplyMatricesInto(out, a, b)).toThrow('square')
+    })
   })
 
   describe('multiplyMatrixVector', () => {
@@ -300,6 +308,11 @@ describe('Matrix Operations', () => {
         [1, 2],
         [3, 4],
       ])
+    })
+
+    it('throws for non-square matrix lengths', () => {
+      const nonSquare = new Float32Array(6)
+      expect(() => transposeMatrix(nonSquare)).toThrow('square')
     })
   })
 
@@ -411,6 +424,10 @@ describe('Matrix Operations', () => {
 
     it('handles empty matrix', () => {
       expect(getMatrixDimensions(new Float32Array(0))).toEqual([0, 0])
+    })
+
+    it('throws for non-square matrix lengths', () => {
+      expect(() => getMatrixDimensions(new Float32Array(6))).toThrow('square')
     })
   })
 })

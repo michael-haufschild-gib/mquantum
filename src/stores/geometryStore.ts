@@ -1,10 +1,8 @@
 /**
  * Geometry state management using Zustand
  *
- * Manages the current dimension and object type for the visualizer.
- * Supports both traditional polytopes and extended objects.
- *
- * @see docs/prd/extended-objects.md
+ * Manages the current dimension (3-11) and object type for the
+ * Schroedinger quantum wavefunction visualizer.
  */
 
 import {

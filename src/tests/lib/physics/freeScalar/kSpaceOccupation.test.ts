@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { fftNd } from '@/lib/math/fft'
 import {
+  computeRawKSpaceData,
   float32ToFloat16,
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { computeOmegaK } from '@/lib/physics/freeScalar/vacuumSpectrum'
@@ -99,5 +100,23 @@ describe('k-space energy conservation', () => {
 
     // Real-space and k-space energies should match
     expect(Math.abs(realEnergy - kEnergy) / Math.max(realEnergy, 1e-10)).toBeLessThan(0.01)
+  })
+})
+
+describe('computeRawKSpaceData', () => {
+  it('uses active dimensions for total site count when latticeDim < gridSize.length', () => {
+    const gridSize = [4, 4, 2] as const
+    const latticeDim = 2
+    const activeTotalSites = 16
+    const spacing = [1, 1, 1]
+    const phi = new Float32Array(activeTotalSites)
+    const pi = new Float32Array(activeTotalSites)
+
+    const raw = computeRawKSpaceData(phi, pi, gridSize, spacing, 0.5, latticeDim)
+
+    expect(raw.totalSites).toBe(activeTotalSites)
+    expect(raw.gridSize).toEqual([4, 4])
+    expect(raw.nk).toHaveLength(activeTotalSites)
+    expect(raw.omega).toHaveLength(activeTotalSites)
   })
 })

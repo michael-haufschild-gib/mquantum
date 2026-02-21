@@ -16,49 +16,8 @@ export interface ExportOptions {
   scale?: number
 }
 
-const DEFAULT_OPTIONS: Required<ExportOptions> = {
-  filename: 'ndimensional-export',
-  transparent: false,
-  scale: 1,
-}
-
 /**
- * Exports a canvas element to a PNG file and triggers download
- *
- * @param canvas - The canvas element to export
- * @param options - Export options
- * @throws {Error} If document.body is not available (non-browser context)
- */
-export function exportCanvasToPNG(canvas: HTMLCanvasElement, options: ExportOptions = {}): void {
-  const opts = { ...DEFAULT_OPTIONS, ...options }
-
-  if (opts.scale !== 1 || opts.transparent) {
-    console.warn(
-      'Export options "scale" and "transparent" are not currently supported in this implementation.'
-    )
-  }
-
-  // Validate we're in a browser context with document.body
-  if (typeof document === 'undefined' || !document.body) {
-    throw new Error('Export requires browser context with document.body')
-  }
-
-  // Get the data URL from canvas (can throw if canvas is tainted)
-  const dataUrl = canvas.toDataURL('image/png')
-
-  // Create download link
-  const link = document.createElement('a')
-  link.download = `${opts.filename}.png`
-  link.href = dataUrl
-
-  // Trigger download
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
-
-/**
- * Captures the current Three.js scene and opens the preview modal.
+ * Captures the current WebGPU scene and opens the preview modal.
  * Uses the on-demand screenshot capture system which works without
  * preserveDrawingBuffer being enabled.
  *

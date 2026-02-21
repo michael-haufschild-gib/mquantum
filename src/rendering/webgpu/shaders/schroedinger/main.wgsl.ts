@@ -20,129 +20,6 @@
  */
 
 /**
- * Main block for volumetric rendering mode.
- * Uses volumeRaymarch() / volumeRaymarchHQ() from integration block.
- */
-export const mainBlock = /* wgsl */ `
-// ============================================
-// Main Fragment Shader - Volumetric Mode
-// ============================================
-
-@fragment
-fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // Ray setup: transform to model space
-  // This matches WebGL: ro = (uInverseModelMatrix * vec4(uCameraPosition, 1.0)).xyz
-  let ro = (camera.inverseModelMatrix * vec4f(camera.cameraPosition, 1.0)).xyz;
-
-  // Compute ray direction per-pixel from interpolated world position
-  // This matches WebGL: worldRayDir = normalize(vPosition - uCameraPosition)
-  let worldRayDir = normalize(input.vPosition - camera.cameraPosition);
-  let rd = normalize((camera.inverseModelMatrix * vec4f(worldRayDir, 0.0)).xyz);
-
-  // Intersect with bounding volume (box for free scalar field, sphere otherwise)
-  var tSphere: vec2f;
-  if (IS_FREE_SCALAR) {
-    tSphere = intersectBox(ro, rd, schroedinger.boundingRadius);
-  } else {
-    tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);
-  }
-
-  // No intersection with bounding volume
-  if (tSphere.y < 0.0) {
-    discard;
-  }
-
-  var tNear = max(0.0, tSphere.x);
-  let tFar = tSphere.y;
-
-  // Volumetric raymarching using functions from integration block
-  // Fast mode selection based on quality multiplier
-  var volumeResult: VolumeResult;
-
-  // Use quality multiplier < 1.0 as "fast mode" indicator
-  let fastMode = quality.qualityMultiplier < 0.75;
-
-  if (fastMode) {
-    volumeResult = volumeRaymarch(ro, rd, tNear, tFar, schroedinger);
-  } else {
-    volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
-  }
-
-  var finalColor = volumeResult.color;
-  var finalAlpha = volumeResult.alpha;
-
-  // True nodal-surface ray-hit mode: trace f=0 directly and composite as a crisp surface.
-  if (
-    FEATURE_NODAL &&
-    schroedinger.nodalEnabled != 0u &&
-    schroedinger.nodalStrength > 0.0 &&
-    schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE
-  ) {
-    let animTime = getVolumeTime(schroedinger);
-    let surfaceStrengthT = clamp(schroedinger.nodalStrength * 0.5, 0.0, 1.0);
-    let localSpan = max(
-      (tFar - tNear) * mix(0.14, 0.26, surfaceStrengthT),
-      mix(0.16, 0.36, surfaceStrengthT)
-    );
-    let localNear = max(tNear, volumeResult.primaryHitT - localSpan);
-    let localFar = min(tFar, volumeResult.primaryHitT + localSpan);
-    let nodalHit = findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger);
-    if (nodalHit.hitMask > 0.0) {
-      let nodalColor = selectPhysicalNodalColor(
-        schroedinger,
-        nodalHit.colorMode,
-        nodalHit.signValue
-      );
-      let facing = max(dot(nodalHit.normal, -rd), 0.0);
-      let surfaceLight = 0.35 + 0.65 * facing;
-      let overlayColor = nodalColor * surfaceLight;
-      let overlayAlpha = clamp(
-        (0.45 + 0.55 * nodalHit.hitMask) * schroedinger.nodalStrength,
-        0.0,
-        0.95
-      );
-      finalColor = mix(finalColor, overlayColor, overlayAlpha);
-      finalAlpha = max(finalAlpha, overlayAlpha);
-    }
-  }
-
-  let crossSection = evaluateCrossSectionSample(
-    ro,
-    rd,
-    tNear,
-    tFar,
-    getVolumeTime(schroedinger),
-    schroedinger
-  );
-  if (crossSection.alpha > 0.0) {
-    if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
-      finalColor = crossSection.color;
-      finalAlpha = crossSection.alpha;
-    } else {
-      let crossSectionAlpha = clamp(crossSection.alpha, 0.0, 1.0);
-      finalColor = mix(finalColor, crossSection.color, crossSectionAlpha);
-      finalAlpha = max(finalAlpha, crossSectionAlpha);
-    }
-  } else if (
-    schroedinger.crossSectionEnabled != 0u &&
-    schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY
-  ) {
-    discard;
-  }
-
-  // Discard fully transparent pixels
-  if (finalAlpha < 0.01) {
-    discard;
-  }
-
-  // Note: Powder effect is applied inside computeEmissionLit() in emission.wgsl.ts
-  // matching WebGL behavior (inside light loop, not post-process)
-
-  return vec4f(finalColor, finalAlpha);
-}
-`
-
-/**
  * Configuration for volumetric main block generation.
  */
 export interface VolumetricMainBlockConfig {
@@ -750,12 +627,6 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 }
 `
 }
-
-/**
- * Legacy static export for backward compatibility.
- * @deprecated Use generateMainBlockIsosurface() instead
- */
-export const mainBlockIsosurface = generateMainBlockIsosurface()
 
 /**
  * Configuration for isosurface temporal main block generation.
@@ -1482,8 +1353,3 @@ ${bayerJitterSection}
 }
 `
 }
-
-/**
- * Legacy static export for temporal mode.
- */
-export const mainBlockTemporal = generateMainBlockTemporal()

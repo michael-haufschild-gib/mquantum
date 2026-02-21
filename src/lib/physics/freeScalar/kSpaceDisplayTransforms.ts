@@ -164,10 +164,10 @@ function projectMarginalize(
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
 
-  // Accumulation arrays for averaging |k| and omega
-  const kMagSum = new Float64Array(G ** 3)
-  const omegaSum = new Float64Array(G ** 3)
-  const count = new Float64Array(G ** 3)
+  // Occupation-weighted accumulation arrays for metadata and n*omega energy proxy.
+  // This keeps collapsed voxels consistent with direct 3D mode semantics.
+  const kMagWeightedSum = new Float64Array(G ** 3)
+  const omegaWeightedSum = new Float64Array(G ** 3)
 
   for (let i = 0; i < raw.totalSites; i++) {
     const coords = linearToNDCoords(i, activeDims)
@@ -193,18 +193,26 @@ function projectMarginalize(
 
     const outIdx = (outCoords[2]! * G + outCoords[1]!) * G + outCoords[0]!
     const n = Math.max(raw.nk[i]!, 0)
+    if (n <= 0) continue
+
     nk[outIdx]! += n
-    kMagSum[outIdx]! += raw.kMag[i]!
-    omegaSum[outIdx]! += raw.omega[i]!
-    count[outIdx]! += 1
+    kMagWeightedSum[outIdx]! += n * raw.kMag[i]!
+    omegaWeightedSum[outIdx]! += n * raw.omega[i]!
   }
 
-  // Compute averages for |k| and omega
+  // Compute occupancy-weighted averages for |k| and omega.
+  const eps = 1e-20
   for (let i = 0; i < G ** 3; i++) {
-    const cnt = Math.max(count[i]!, 1)
-    kNorm[i] = kMagSum[i]! / cnt / kNormFactor
-    omegaNorm[i] = omegaSum[i]! / cnt / oNormFactor
-    nkOmega[i] = nk[i]! * (omegaSum[i]! / cnt)
+    const n = nk[i]!
+    if (n <= eps) {
+      kNorm[i] = 0
+      omegaNorm[i] = 0
+      nkOmega[i] = 0
+      continue
+    }
+    kNorm[i] = kMagWeightedSum[i]! / n / kNormFactor
+    omegaNorm[i] = omegaWeightedSum[i]! / n / oNormFactor
+    nkOmega[i] = omegaWeightedSum[i]!
   }
 }
 
@@ -225,6 +233,12 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
   if (config.exposureMode === 'none') return
 
   const len = grid.nk.length
+  const lowPercentile = Number.isFinite(config.lowPercentile) ? config.lowPercentile : 0
+  const highPercentile = Number.isFinite(config.highPercentile) ? config.highPercentile : 100
+  const lowClamped = Math.max(0, Math.min(100, lowPercentile))
+  const highClamped = Math.max(0, Math.min(100, highPercentile))
+  const pLow = Math.min(lowClamped, highClamped)
+  const pHigh = Math.max(lowClamped, highClamped)
 
   // Collect values from occupied voxels (nk > 0 before any transform)
   const occupied: number[] = []
@@ -250,15 +264,15 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
   // Sort for percentile computation
   transformed.sort((a, b) => a - b)
 
-  const lowIdx = Math.floor((config.lowPercentile / 100) * (transformed.length - 1))
-  const highIdx = Math.ceil((config.highPercentile / 100) * (transformed.length - 1))
+  const lowIdx = Math.floor((pLow / 100) * (transformed.length - 1))
+  const highIdx = Math.ceil((pHigh / 100) * (transformed.length - 1))
   const qLow = transformed[Math.max(0, lowIdx)]!
   const qHigh = transformed[Math.min(transformed.length - 1, highIdx)]!
 
   const range = qHigh - qLow
   if (range < 1e-30) return // Degenerate — all values equal
 
-  const gamma = config.gamma
+  const gamma = Number.isFinite(config.gamma) && config.gamma > 0 ? config.gamma : 1.0
 
   // Remap occupied voxels to [0, 1] within percentile window
   for (const i of occupied) {

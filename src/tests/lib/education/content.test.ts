@@ -10,9 +10,26 @@ import {
 
 describe('education content', () => {
   describe('getDimensionInfo', () => {
+    it('should return info for all supported Schroedinger dimensions (3D-11D)', () => {
+      for (let dimension = 3; dimension <= 11; dimension += 1) {
+        const info = getDimensionInfo(dimension)
+        expect(info).toBeDefined()
+        expect(info?.dimension).toBe(dimension)
+      }
+    })
+
     it('should return undefined for unsupported dimensions', () => {
       expect(getDimensionInfo(2)).toBeUndefined()
-      expect(getDimensionInfo(7)).toBeUndefined()
+      expect(getDimensionInfo(12)).toBeUndefined()
+    })
+
+    it('should generate consistent metadata for high dimensions without handcrafted entries', () => {
+      const info11D = getDimensionInfo(11)
+
+      expect(info11D).toBeDefined()
+      expect(info11D?.name).toBe('11D Space')
+      expect(info11D?.properties).toContain('55 rotation planes')
+      expect(info11D?.examples.some((example) => example.includes('2048 vertices'))).toBe(true)
     })
   })
 

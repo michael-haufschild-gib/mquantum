@@ -196,6 +196,18 @@ describe('fftNd (N-dimensional forward)', () => {
     expect(() => fftNd(data, [6, 4])).toThrow('power-of-2')
   })
 
+  it('throws on non-positive or non-integer dimensions', () => {
+    const data = new Float64Array(2 * 4 * 4)
+    expect(() => fftNd(data, [0, 4])).toThrow('positive integer')
+    expect(() => fftNd(data, [2.5, 4])).toThrow('positive integer')
+    expect(() => fftNd(data, [-4, 4])).toThrow('positive integer')
+  })
+
+  it('throws when data buffer is too small for the provided grid', () => {
+    const tooSmall = new Float64Array(2 * 15) // one complex sample short for 4x4
+    expect(() => fftNd(tooSmall, [4, 4])).toThrow('data length too small')
+  })
+
   it('is a no-op for empty dims', () => {
     const data = new Float64Array([3.0, 1.0])
     fftNd(data, [])
@@ -228,6 +240,16 @@ describe('fft throws on invalid input', () => {
   it('rejects size 0', () => {
     const data = new Float64Array(0)
     expect(() => fft(data, 0)).toThrow('power-of-2')
+  })
+
+  it('rejects non-integer sizes', () => {
+    const data = new Float64Array(8)
+    expect(() => fft(data, 2.5)).toThrow('power-of-2')
+  })
+
+  it('rejects undersized buffers', () => {
+    const data = new Float64Array(6) // needs at least 8 values for n=4 complex points
+    expect(() => fft(data, 4)).toThrow('data length too small')
   })
 })
 

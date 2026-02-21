@@ -37,5 +37,10 @@ describe('Transform Operations', () => {
       const scaled = multiplyMatrixVector(S, v)
       expect(scaled).toEqual([-1, 2, 3])
     })
+
+    it('throws error if any scale factor is non-finite', () => {
+      expect(() => createScaleMatrix(3, [1, Number.NaN, 1])).toThrow('finite')
+      expect(() => createScaleMatrix(3, [1, Number.POSITIVE_INFINITY, 1])).toThrow('finite')
+    })
   })
 })

@@ -33,13 +33,12 @@ const componentLoaders: Record<string, () => Promise<{ default: ComponentType<un
  * Gets a lazily-loaded controls component by key.
  * Returns a React.lazy component that can be rendered with Suspense.
  *
- * @param componentKey - The component key from registry (e.g., "MandelbulbControls")
+ * @param componentKey - The component key from registry (e.g., "SchroedingerControls")
  * @returns The lazy component, or null if not found
  *
  * @example
  * ```tsx
- * const entry = getObjectTypeEntry(objectType);
- * const ControlsComponent = getControlsComponent(entry.ui.controlsComponentKey);
+ * const ControlsComponent = getControlsComponent('SchroedingerControls');
  *
  * return (
  *   <Suspense fallback={<ControlsSkeleton />}>
@@ -68,20 +67,6 @@ export function getControlsComponent(componentKey: string): ComponentType<unknow
 }
 
 /**
- * Preloads a controls component.
- * Useful for preloading components that will likely be needed soon.
- *
- * @param componentKey - The component key from registry
- * @returns Promise that resolves when component is loaded
- */
-export async function preloadControlsComponent(componentKey: string): Promise<void> {
-  const loader = componentLoaders[componentKey]
-  if (loader) {
-    await loader()
-  }
-}
-
-/**
  * Checks if a controls component exists for the given key.
  *
  * @param componentKey - The component key to check
@@ -89,14 +74,4 @@ export async function preloadControlsComponent(componentKey: string): Promise<vo
  */
 export function hasControlsComponent(componentKey: string): boolean {
   return componentKey in componentLoaders
-}
-
-/**
- * Gets all available component keys.
- * Useful for debugging and testing.
- *
- * @returns Array of all component keys
- */
-export function getAllComponentKeys(): string[] {
-  return Object.keys(componentLoaders)
 }

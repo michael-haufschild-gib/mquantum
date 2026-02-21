@@ -7,7 +7,6 @@
  */
 
 export { schroedingerUniformsBlock, MAX_DIM, MAX_TERMS, MAX_EXTRA_DIM } from './uniforms.wgsl'
-export { mainBlock, mainBlockIsosurface } from './main.wgsl'
 export { composeSchroedingerShader, composeSchroedingerVertexShader } from './compose'
 export type { SchroedingerWGSLShaderConfig, QuantumModeForShader } from './compose'
 

@@ -99,6 +99,15 @@ describe('TdseDiagnosticsHistory', () => {
     expect(h.getLatest()!.simTime).toBe(3)
   })
 
+  it('stores no snapshots when capacity is 0', () => {
+    const h = new TdseDiagnosticsHistory(0)
+    h.push({ simTime: 0, totalNorm: 1.0, maxDensity: 0.5, normDrift: 0 })
+
+    expect(h.length).toBe(0)
+    expect(h.getLatest()).toBeNull()
+    expect(h.getHistory()).toHaveLength(0)
+  })
+
   it('computes norm drift from history', () => {
     const h = new TdseDiagnosticsHistory()
     h.push({ simTime: 0, totalNorm: 1.0, maxDensity: 0.5, normDrift: 0 })

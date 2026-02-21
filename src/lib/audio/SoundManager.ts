@@ -18,30 +18,49 @@ class SoundManager {
   constructor() {
     // Lazy init on first interaction
     if (typeof window !== 'undefined') {
-      window.addEventListener('click', this.init, { once: true })
-      window.addEventListener('keydown', this.init, { once: true })
+      this.attachInitListeners()
     }
   }
 
-  private init = () => {
-    if (this.initialized) return
-    this.initialized = true
+  private attachInitListeners() {
+    window.addEventListener('click', this.init)
+    window.addEventListener('keydown', this.init)
+  }
 
-    // Remove the other listener since we only need to init once
+  private detachInitListeners() {
     window.removeEventListener('click', this.init)
     window.removeEventListener('keydown', this.init)
+  }
 
-    const AudioContext =
+  private init = () => {
+    if (this.initialized || typeof window === 'undefined') return
+
+    const AudioContextCtor =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof window.AudioContext }).webkitAudioContext
-    this.ctx = new AudioContext()
-    this.masterGain = this.ctx.createGain()
-    this.masterGain.gain.value = 0.15 // Low volume by default
-    this.masterGain.connect(this.ctx.destination)
+    if (!AudioContextCtor) {
+      // Browser does not support Web Audio; stop trying to initialize.
+      this.detachInitListeners()
+      return
+    }
+
+    try {
+      const ctx = new AudioContextCtor()
+      const masterGain = ctx.createGain()
+      masterGain.gain.value = 0.15 // Low volume by default
+      masterGain.connect(ctx.destination)
+
+      this.ctx = ctx
+      this.masterGain = masterGain
+      this.initialized = true
+      this.detachInitListeners()
+    } catch {
+      // Keep listeners attached so we can retry on a later user gesture.
+    }
   }
 
   public playClick() {
-    if (!this.ctx || !this.enabled) return
+    if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const now = this.ctx.currentTime
     const duration = 0.02
@@ -73,14 +92,14 @@ class SoundManager {
 
     source.connect(filter)
     filter.connect(gain)
-    gain.connect(this.masterGain!)
+    gain.connect(this.masterGain)
 
     source.start(now)
     source.stop(now + duration)
   }
 
   public playHover() {
-    if (!this.ctx || !this.enabled) return
+    if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const osc = this.ctx.createOscillator()
     const gain = this.ctx.createGain()
@@ -98,14 +117,14 @@ class SoundManager {
 
     osc.connect(filter)
     filter.connect(gain)
-    gain.connect(this.masterGain!)
+    gain.connect(this.masterGain)
 
     osc.start()
     osc.stop(this.ctx.currentTime + 0.05)
   }
 
   public playSnap() {
-    if (!this.ctx || !this.enabled) return
+    if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const now = this.ctx.currentTime
     const duration = 0.025
@@ -135,21 +154,22 @@ class SoundManager {
 
     source.connect(filter)
     filter.connect(gain)
-    gain.connect(this.masterGain!)
+    gain.connect(this.masterGain)
 
     source.start(now)
     source.stop(now + duration)
   }
 
   public playSuccess() {
-    if (!this.ctx || !this.enabled) return
+    if (!this.ctx || !this.masterGain || !this.enabled) return
+    const ctx = this.ctx
 
-    const now = this.ctx.currentTime
+    const now = ctx.currentTime
 
     // Arpeggio
     ;[440, 554, 659].forEach((freq, i) => {
-      const osc = this.ctx!.createOscillator()
-      const gain = this.ctx!.createGain()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
 
       osc.type = 'sine'
       osc.frequency.value = freq
@@ -159,7 +179,7 @@ class SoundManager {
       gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.4)
 
       osc.connect(gain)
-      gain.connect(this.masterGain!)
+      gain.connect(this.masterGain)
 
       osc.start(now + i * 0.05)
       osc.stop(now + i * 0.05 + 0.4)
@@ -171,7 +191,7 @@ class SoundManager {
    * Very subtle - like a whisper of air.
    */
   public playSwish() {
-    if (!this.ctx || !this.enabled) return
+    if (!this.ctx || !this.masterGain || !this.enabled) return
 
     const now = this.ctx.currentTime
     const duration = 0.08
@@ -204,7 +224,7 @@ class SoundManager {
 
     source.connect(filter)
     filter.connect(gain)
-    gain.connect(this.masterGain!)
+    gain.connect(this.masterGain)
 
     source.start(now)
     source.stop(now + duration)

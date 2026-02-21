@@ -1,4 +1,5 @@
 // Types
+/** HSVA color representation with normalized channels. */
 export interface HSVA {
   h: number // 0-1
   s: number // 0-1
@@ -6,6 +7,7 @@ export interface HSVA {
   a: number // 0-1
 }
 
+/** RGBA color representation with RGB in [0,255] and alpha in [0,1]. */
 export interface RGBA {
   r: number // 0-255
   g: number // 0-255
@@ -92,7 +94,14 @@ export const hex8ToHsv = (hex8: string): HSVA => {
   const r = parseInt(hex.substring(0, 2), 16)
   const g = parseInt(hex.substring(2, 4), 16)
   const b = parseInt(hex.substring(4, 6), 16)
-  const a = parseInt(hex.substring(6, 8), 16) / 255
+  const aByte = parseInt(hex.substring(6, 8), 16)
+
+  // Fallback on invalid hex payload (e.g. '#gggg' or '#zzzzzzzz').
+  if (![r, g, b, aByte].every((channel) => Number.isFinite(channel))) {
+    return { h: 0, s: 0, v: 0, a: 1 }
+  }
+
+  const a = aByte / 255
 
   return rgbToHsv(r, g, b, a)
 }

@@ -56,6 +56,10 @@ describe('Rotation Operations', () => {
       expect(() => getRotationPlaneCount(1)).toThrow()
       expect(() => getRotationPlaneCount(0)).toThrow()
     })
+
+    it('throws error for non-integer dimensions', () => {
+      expect(() => getRotationPlaneCount(2.5)).toThrow('integer')
+    })
   })
 
   describe('getRotationPlanes', () => {
@@ -96,6 +100,10 @@ describe('Rotation Operations', () => {
         expect(plane.indices).toHaveLength(2)
         expect(plane.indices[0]).toBeLessThan(plane.indices[1])
       }
+    })
+
+    it('throws error for non-integer dimensions', () => {
+      expect(() => getRotationPlanes(3.5)).toThrow('integer')
     })
   })
 
@@ -210,6 +218,16 @@ describe('Rotation Operations', () => {
       expect(() => createRotationMatrix(3, 0, 0, 0)).toThrow()
       expect(() => createRotationMatrix(3, 1, 0, 0)).toThrow()
     })
+
+    it('throws error for non-integer plane indices', () => {
+      expect(() => createRotationMatrix(3, 0.5, 1, 0)).toThrow('integer')
+      expect(() => createRotationMatrix(3, 0, 1.25, 0)).toThrow('integer')
+    })
+
+    it('throws error for non-finite angles', () => {
+      expect(() => createRotationMatrix(3, 0, 1, Number.NaN)).toThrow('finite')
+      expect(() => createRotationMatrix(3, 0, 1, Number.POSITIVE_INFINITY)).toThrow('finite')
+    })
   })
 
   describe('composeRotations', () => {
@@ -280,6 +298,11 @@ describe('Rotation Operations', () => {
     it('throws error for plane not valid in dimension', () => {
       const angles = new Map([['XW', Math.PI / 4]])
       expect(() => composeRotations(3, angles)).toThrow()
+    })
+
+    it('throws error for non-finite angles', () => {
+      const angles = new Map([['XY', Number.NaN]])
+      expect(() => composeRotations(3, angles)).toThrow('finite')
     })
   })
 

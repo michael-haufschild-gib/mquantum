@@ -81,6 +81,12 @@ describe('computeRadialShells', () => {
     expect(computeRadialShells(raw, 200).binCount).toBe(128)
   })
 
+  it('handles NaN bin count without throwing', () => {
+    const raw = makeIsotropicRawData(4)
+    const shells = computeRadialShells(raw, Number.NaN)
+    expect(shells.binCount).toBe(1)
+  })
+
   it('shell kCenter values are monotonically non-decreasing', () => {
     const raw = makeIsotropicRawData(8)
     const shells = computeRadialShells(raw, 32)

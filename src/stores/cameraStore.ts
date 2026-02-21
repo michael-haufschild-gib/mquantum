@@ -1,95 +1,105 @@
+/**
+ * Camera Store
+ *
+ * Bridges the WebGPU camera instance with the React/preset ecosystem.
+ * Provides camera state capture/restore for presets and keyboard shortcuts.
+ *
+ * @module stores/cameraStore
+ */
+
 import { create } from 'zustand'
 
-interface CameraControls {
-  object: { position: { x: number; y: number; z: number; set(...args: number[]): void } }
-  target: { x: number; y: number; z: number; set(...args: number[]): void }
-  update(): void
-  reset(): void
+/** Default camera position and target (matches WebGPUCamera constructor defaults) */
+const DEFAULT_POSITION: [number, number, number] = [0, 3.125, 7.5]
+const DEFAULT_TARGET: [number, number, number] = [0, 0, 0]
+
+/**
+ * Minimal camera interface for the store bridge.
+ * Implemented by WebGPUCamera in rendering/webgpu/core.
+ */
+interface CameraInstance {
+  getState(): { position: [number, number, number]; target: [number, number, number] }
+  setPosition(x: number, y: number, z: number): void
+  setTarget(x: number, y: number, z: number): void
 }
 
-interface CameraState {
+export interface CameraState {
   position: [number, number, number]
   target: [number, number, number]
 }
 
 interface CameraStore {
-  controls: CameraControls | null
-  savedState: CameraState | null
-  /** Pending camera state to apply when controls become available (race condition fix) */
+  /** Reference to the active WebGPU camera instance */
+  camera: CameraInstance | null
+  /** Pending camera state to apply when camera becomes available (race condition fix) */
   pendingState: CameraState | null
 
-  registerControls: (controls: CameraControls | null) => void
+  /** Register the WebGPU camera instance. Flushes any pending state. */
+  registerCamera: (camera: CameraInstance | null) => void
+  /** Capture current camera position and target. Returns null if camera not registered. */
   captureState: () => CameraState | null
+  /** Apply camera state. Queues as pending if camera not yet registered. */
   applyState: (state: CameraState) => void
+  /** Reset camera to default position and target. */
   reset: () => void
 }
 
 export const useCameraStore = create<CameraStore>((set, get) => ({
-  controls: null,
-  savedState: null,
+  camera: null,
   pendingState: null,
 
-  registerControls: (controls) => {
-    set({ controls })
+  registerCamera: (camera) => {
+    set({ camera })
 
-    // Apply any pending camera state that was set before controls were available
+    // Apply any pending camera state that was set before camera was available
     // This fixes the race condition when loading scenes via URL parameter
-    if (controls) {
+    if (camera) {
       const { pendingState } = get()
       if (pendingState) {
-        controls.object.position.set(...pendingState.position)
-        controls.target.set(...pendingState.target)
-        controls.update()
+        camera.setPosition(...pendingState.position)
+        camera.setTarget(...pendingState.target)
         set({ pendingState: null })
         if (import.meta.env.DEV) {
-          console.log('[cameraStore] Applied pending camera state after controls registered')
+          console.log('[cameraStore] Applied pending camera state after camera registered')
         }
       }
     }
   },
 
   captureState: () => {
-    const { controls } = get()
-    if (!controls) return null
+    const { camera } = get()
+    if (!camera) return null
 
-    const position: [number, number, number] = [
-      controls.object.position.x,
-      controls.object.position.y,
-      controls.object.position.z,
-    ]
-
-    const target: [number, number, number] = [
-      controls.target.x,
-      controls.target.y,
-      controls.target.z,
-    ]
-
-    return { position, target }
+    const state = camera.getState()
+    return {
+      position: [...state.position],
+      target: [...state.target],
+    }
   },
 
   applyState: (state) => {
-    const { controls } = get()
+    const { camera } = get()
 
-    // If controls aren't available yet, store as pending state
-    // This handles the race condition when scene loads before CameraController mounts
-    if (!controls) {
+    // If camera isn't available yet, store as pending state
+    // This handles the race condition when scene loads before WebGPUScene mounts
+    if (!camera) {
       set({ pendingState: state })
       if (import.meta.env.DEV) {
-        console.log('[cameraStore] Controls not ready, storing pending camera state')
+        console.log('[cameraStore] Camera not ready, storing pending camera state')
       }
       return
     }
 
-    controls.object.position.set(...state.position)
-    controls.target.set(...state.target)
-    controls.update()
-    set({ pendingState: null }) // Clear any pending state
+    camera.setPosition(...state.position)
+    camera.setTarget(...state.target)
+    set({ pendingState: null })
   },
 
   reset: () => {
-    const { controls } = get()
-    if (controls) {
-      controls.reset()
+    const { camera } = get()
+    if (camera) {
+      camera.setPosition(...DEFAULT_POSITION)
+      camera.setTarget(...DEFAULT_TARGET)
     }
   },
 }))

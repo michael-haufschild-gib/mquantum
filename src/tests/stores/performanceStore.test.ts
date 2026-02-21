@@ -290,6 +290,21 @@ describe('performanceStore', () => {
       expect(state.refinementStage).toBe('final')
       expect(state.isShaderCompiling).toBe(false)
     })
+
+    it('should persist default resolution scale and maxFps to localStorage', () => {
+      const store = usePerformanceStore.getState()
+
+      // Set non-default values (persisted to localStorage)
+      store.setRenderResolutionScale(0.5)
+      store.setMaxFps(90)
+      expect(localStorage.getItem('mdim_render_resolution_scale')).toBe('0.5')
+      expect(localStorage.getItem('mdim_max_fps')).toBe('90')
+
+      // Reset should overwrite with defaults in localStorage
+      store.reset()
+      expect(localStorage.getItem('mdim_render_resolution_scale')).not.toBe('0.5')
+      expect(localStorage.getItem('mdim_max_fps')).not.toBe('90')
+    })
   })
 })
 
@@ -309,10 +324,9 @@ describe('render resolution scale persistence', () => {
   const RESOLUTION_SCALE_KEY = 'mdim_render_resolution_scale'
 
   beforeEach(() => {
-    // Clear localStorage before each test
-    localStorage.removeItem(RESOLUTION_SCALE_KEY)
-    // Reset store state
+    // Reset store state, then clear localStorage so tests start with no persisted value
     usePerformanceStore.getState().reset()
+    localStorage.removeItem(RESOLUTION_SCALE_KEY)
   })
 
   afterEach(() => {
@@ -390,10 +404,9 @@ describe('max FPS persistence', () => {
   const MAX_FPS_KEY = 'mdim_max_fps'
 
   beforeEach(() => {
-    // Clear localStorage before each test
-    localStorage.removeItem(MAX_FPS_KEY)
-    // Reset store state
+    // Reset store state, then clear localStorage so tests start with no persisted value
     usePerformanceStore.getState().reset()
+    localStorage.removeItem(MAX_FPS_KEY)
   })
 
   afterEach(() => {

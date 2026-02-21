@@ -92,12 +92,15 @@ fn main(
 ) {
   let local = lid.x;
 
-  // Load partial sums (each thread handles one partial)
+  // Load partial sums — each thread accumulates multiple entries
+  // when numWorkgroups > 256 (e.g. 64^3 grid produces 1024 partials)
   var norm_val: f32 = 0.0;
   var max_val: f32 = 0.0;
-  if (local < diagParams.numWorkgroups) {
-    norm_val = partialSums[local];
-    max_val = partialMax[local];
+  var i = local;
+  while (i < diagParams.numWorkgroups) {
+    norm_val += partialSums[i];
+    max_val = max(max_val, partialMax[i]);
+    i += 256u;
   }
   shared_norm[local] = norm_val;
   shared_max[local] = max_val;

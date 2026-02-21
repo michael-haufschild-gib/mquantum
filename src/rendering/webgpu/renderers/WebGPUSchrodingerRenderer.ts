@@ -1046,6 +1046,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   }
 
   private createBoundingGeometry(device: GPUDevice): void {
+    // Destroy old buffers to prevent GPU memory leaks during dynamic bounding radius changes
+    this.vertexBuffer?.destroy()
+    this.indexBuffer?.destroy()
+
     // Create a cube for volume raymarching sized to bounding radius
     const halfSize = this.boundingRadius
 
@@ -1237,7 +1241,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     data[120] = ctx.size.width / ctx.size.height // aspectRatio
 
     // DIAGNOSTIC: Detect aspect ratio mismatch between projection matrix and ctx.size
-    if (camera.projectionMatrix?.elements) {
+    if (import.meta.env.DEV && camera.projectionMatrix?.elements) {
       // Projection matrix element [0] = 1/(aspect*tan(fov/2)), element [5] = 1/tan(fov/2)
       // So projAspect = element[5] / element[0]
       const projAspect = camera.projectionMatrix.elements[5] / camera.projectionMatrix.elements[0]

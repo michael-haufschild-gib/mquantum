@@ -294,4 +294,30 @@ describe('computeSecondQuantMetrics', () => {
     expect(m.fockDistribution[0]).toBeGreaterThan(0.5) // vacuum component dominates for small r
     expect(m.fockDistribution[2]).toBeGreaterThan(0)
   })
+
+  it('sanitizes invalid Fock n values to non-negative integers', () => {
+    const negative = computeSecondQuantMetrics('fock', {
+      n: -2.4,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    expect(negative.occupation).toBe(0)
+    expect(negative.energy).toBeCloseTo(0.5, 10)
+    expect(negative.fockDistribution[0]).toBe(1)
+
+    const fractional = computeSecondQuantMetrics('fock', {
+      n: 2.9,
+      alphaRe: 0,
+      alphaIm: 0,
+      squeezeR: 0,
+      squeezeTheta: 0,
+      omega: 1,
+    })
+    expect(fractional.occupation).toBe(2)
+    expect(fractional.energy).toBeCloseTo(2.5, 10)
+    expect(fractional.fockDistribution[2]).toBe(1)
+  })
 })

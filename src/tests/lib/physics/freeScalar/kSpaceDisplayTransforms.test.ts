@@ -132,6 +132,62 @@ describe('projectToDisplayGrid — FFT shift', () => {
 
     expect(Math.abs(sumNoShift - sumShift)).toBeLessThan(1e-10)
   })
+
+  it('for latticeDim > 3, uses occupancy-weighted hidden-mode aggregation for metadata and nkOmega', () => {
+    const gridSize = [2, 2, 2, 4]
+    const strides = [16, 8, 4, 1]
+    const totalSites = 32
+
+    const nk = new Float64Array(totalSites)
+    const kMag = new Float64Array(totalSites)
+    const omega = new Float64Array(totalSites)
+
+    // Collapsed voxel (first 3 dims = 0,0,0) has four hidden modes along dim 4.
+    // Two occupied modes carry the physical signal; two zero-occupation modes
+    // intentionally have large metadata to catch unweighted averaging bugs.
+    nk[0] = 1
+    nk[1] = 3
+    nk[2] = 0
+    nk[3] = 0
+
+    kMag[0] = 1
+    kMag[1] = 3
+    kMag[2] = 50
+    kMag[3] = 60
+
+    omega[0] = 1
+    omega[1] = 3
+    omega[2] = 100
+    omega[3] = 200
+
+    const raw: KSpaceRawData = {
+      nk,
+      kMag,
+      omega,
+      nkMax: 3,
+      kMagMax: 60,
+      omegaMax: 200,
+      totalSites,
+      gridSize,
+      strides,
+      latticeDim: 4,
+      spacing: [1, 1, 1, 1],
+    }
+
+    const grid = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: false })
+    const offset = Math.floor((OUTPUT_GRID_SIZE - 2) / 2)
+    const idx = (offset * OUTPUT_GRID_SIZE + offset) * OUTPUT_GRID_SIZE + offset
+
+    // Expected from occupied modes only:
+    // nk = 1 + 3 = 4
+    // nkOmega = 1*1 + 3*3 = 10
+    // omegaNorm = (10 / 4) / 200
+    // kNorm = ((1*1 + 3*3) / 4) / 60
+    expect(grid.nk[idx]).toBeCloseTo(4, 12)
+    expect(grid.nkOmega[idx]).toBeCloseTo(10, 12)
+    expect(grid.omegaNorm[idx]).toBeCloseTo((10 / 4) / 200, 12)
+    expect(grid.kNorm[idx]).toBeCloseTo((10 / 4) / 60, 12)
+  })
 })
 
 // ============================================================================
@@ -219,6 +275,36 @@ describe('applyExposureTransfer', () => {
 
     // Value should be unchanged
     expect(grid.nk[0]).toBe(5.0)
+  })
+
+  it('sanitizes non-finite percentile/gamma parameters', () => {
+    const G = OUTPUT_GRID_SIZE
+    const nk = new Float64Array(G ** 3)
+    nk[0] = 1
+    nk[1] = 2
+    nk[2] = 4
+
+    const grid = {
+      nk,
+      kNorm: new Float64Array(G ** 3),
+      omegaNorm: new Float64Array(G ** 3),
+      nkOmega: new Float64Array(G ** 3),
+      nkMax: 4,
+    }
+
+    applyExposureTransfer(grid, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      exposureMode: 'linear',
+      lowPercentile: Number.NaN,
+      highPercentile: Number.NaN,
+      gamma: Number.NaN,
+    })
+
+    for (let i = 0; i < 3; i++) {
+      expect(Number.isFinite(grid.nk[i]!)).toBe(true)
+      expect(grid.nk[i]).toBeGreaterThanOrEqual(0)
+      expect(grid.nk[i]).toBeLessThanOrEqual(1)
+    }
   })
 })
 

@@ -23,6 +23,12 @@ export function createScaleMatrix(dimension: number, scales: number[]): MatrixND
     throw new Error(`Scales array length (${scales.length}) must match dimension (${dimension})`)
   }
 
+  for (let i = 0; i < dimension; i++) {
+    if (!Number.isFinite(scales[i])) {
+      throw new Error(`Scale factors must be finite numbers (invalid value at index ${i})`)
+    }
+  }
+
   const matrix = createIdentityMatrix(dimension)
 
   for (let i = 0; i < dimension; i++) {

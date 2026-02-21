@@ -46,7 +46,7 @@ fn legendre(l: i32, m: i32, x: f32) -> f32 {
 
   // Start with P^m_m using the closed form:
   // P^m_m(x) = (-1)^m (2m-1)!! (1-x²)^{m/2}
-  // We compute without the (-1)^m phase (handled in spherical harmonics)
+  // Includes the (-1)^m Condon-Shortley phase in the result
   var pmm = 1.0;
 
   if (absM > 0) {

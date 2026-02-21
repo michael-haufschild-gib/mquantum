@@ -34,7 +34,7 @@ export type {
 } from './types'
 
 // Device
-export { getWebGPUDevice, isWebGPUSupported, WebGPUDevice } from './WebGPUDevice'
+export { WebGPUDevice } from './WebGPUDevice'
 
 // Resource Pool
 export { WebGPUResourcePool } from './WebGPUResourcePool'
@@ -47,25 +47,7 @@ export { FULLSCREEN_VERTEX_SHADER, WebGPUBaseComputePass, WebGPUBasePass } from 
 
 // Uniform Buffer
 export {
-  cameraUniformLayout,
   createManagedUniformBuffer,
-  lightingUniformLayout,
-  materialUniformLayout,
   UniformBufferBuilder,
   UniformBufferWriter,
 } from './WebGPUUniformBuffer'
-
-// Store Types (type-safe store access for renderers)
-export type {
-  AppearanceStoreState,
-  CameraStoreState,
-  ExtendedStoreState,
-  LightingStoreState,
-  PBRStoreState,
-  PerformanceStoreState,
-  QualityStoreState,
-  RotationStoreState,
-  TransformStoreState,
-  WebGPUStoreMap,
-} from './storeTypes'
-export { getStore, getStoreOrDefault } from './storeTypes'

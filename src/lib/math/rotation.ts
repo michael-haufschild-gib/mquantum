@@ -15,6 +15,18 @@ import { composeRotationsIndexedWasm, isAnimationWasmReady } from '@/lib/wasm'
  */
 const AXIS_NAMES = ['X', 'Y', 'Z', 'W', 'V', 'U']
 
+function assertRotationDimension(dimension: number): void {
+  if (!Number.isInteger(dimension) || dimension < 2) {
+    throw new Error('Rotation dimension must be an integer >= 2')
+  }
+}
+
+function assertFiniteAngle(angleRadians: number): void {
+  if (!Number.isFinite(angleRadians)) {
+    throw new Error('Rotation angle must be finite')
+  }
+}
+
 /**
  * Module-level scratch matrices for rotation composition
  * Avoids allocation during 60fps animation loops.
@@ -99,9 +111,7 @@ function createRotationMatrixInto(
  * @throws {Error} If dimension is less than 2
  */
 export function getRotationPlaneCount(dimension: number): number {
-  if (dimension < 2) {
-    throw new Error('Rotation requires at least 2 dimensions')
-  }
+  assertRotationDimension(dimension)
   return (dimension * (dimension - 1)) / 2
 }
 
@@ -159,9 +169,7 @@ function getPlaneIndicesLookup(dimension: number): Map<string, [number, number]>
  * @throws {Error} If dimension is less than 2
  */
 export function getRotationPlanes(dimension: number): RotationPlane[] {
-  if (dimension < 2) {
-    throw new Error('Rotation requires at least 2 dimensions')
-  }
+  assertRotationDimension(dimension)
 
   if (planesCache.has(dimension)) {
     return planesCache.get(dimension)!
@@ -189,8 +197,8 @@ export function getRotationPlanes(dimension: number): RotationPlane[] {
  * @returns The axis name (X, Y, Z, W, V, U, or numeric for higher dimensions)
  */
 export function getAxisName(index: number): string {
-  if (index < 0) {
-    throw new Error('Axis index must be non-negative')
+  if (!Number.isInteger(index) || index < 0) {
+    throw new Error('Axis index must be a non-negative integer')
   }
   if (index < AXIS_NAMES.length) {
     return AXIS_NAMES[index]!
@@ -215,8 +223,11 @@ export function createRotationMatrix(
   planeIndex2: number,
   angleRadians: number
 ): MatrixND {
-  if (dimension < 2) {
-    throw new Error('Rotation requires at least 2 dimensions')
+  assertRotationDimension(dimension)
+  assertFiniteAngle(angleRadians)
+
+  if (!Number.isInteger(planeIndex1) || !Number.isInteger(planeIndex2)) {
+    throw new Error('Plane indices must be integers')
   }
 
   if (planeIndex1 < 0 || planeIndex2 < 0 || planeIndex1 >= dimension || planeIndex2 >= dimension) {
@@ -265,9 +276,7 @@ export function composeRotations(
   angles: Map<string, number>,
   out?: MatrixND
 ): MatrixND {
-  if (import.meta.env.DEV && dimension < 2) {
-    throw new Error('Rotation requires at least 2 dimensions')
-  }
+  assertRotationDimension(dimension)
 
   // Use provided output or allocate new matrix
   const result = out ?? createIdentityMatrix(dimension)
@@ -296,9 +305,13 @@ export function composeRotations(
       if (import.meta.env.DEV && !indices) {
         throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
       }
+      if (import.meta.env.DEV && !Number.isFinite(angle)) {
+        throw new Error(`Rotation angle for plane "${planeName}" must be finite`)
+      }
 
       // Skip invalid planes in production (shouldn't happen with valid input)
       if (!indices) continue
+      if (!Number.isFinite(angle)) continue
 
       const pairOffset = rotationCount * 2
       buffers.planeIndices[pairOffset] = indices[0]
@@ -343,9 +356,13 @@ export function composeRotations(
     if (import.meta.env.DEV && !indices) {
       throw new Error(`Invalid plane name "${planeName}" for ${dimension}D space`)
     }
+    if (import.meta.env.DEV && !Number.isFinite(angle)) {
+      throw new Error(`Rotation angle for plane "${planeName}" must be finite`)
+    }
 
     // Skip invalid planes in production (shouldn't happen with valid input)
     if (!indices) continue
+    if (!Number.isFinite(angle)) continue
 
     // Create rotation matrix directly into scratch buffer
     createRotationMatrixInto(scratch.rotation, dimension, indices[0], indices[1], angle)

@@ -392,5 +392,10 @@ export class VideoRecorder {
     this.target = null
     this.compositionCanvas = null
     this.compositionCtx = null
+    // Best-effort close of writable stream (streaming mode)
+    if (this.writableStream) {
+      void this.writableStream.close().catch(() => {})
+      this.writableStream = null
+    }
   }
 }

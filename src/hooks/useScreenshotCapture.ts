@@ -13,6 +13,7 @@
  */
 
 import { useScreenshotCaptureStore, type CaptureStatus } from '@/stores/screenshotCaptureStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useCallback } from 'react'
 
 const CAPTURE_TIMEOUT_MS = 5000
@@ -114,7 +115,9 @@ async function captureWithSubscription(): Promise<string> {
  * ```
  */
 export function useScreenshotCapture(): UseScreenshotCaptureResult {
-  const { status, capturedImage, error } = useScreenshotCaptureStore()
+  const { status, capturedImage, error } = useScreenshotCaptureStore(
+    useShallow((s) => ({ status: s.status, capturedImage: s.capturedImage, error: s.error }))
+  )
 
   const captureScreenshot = useCallback(async (): Promise<string> => {
     return captureWithSubscription()

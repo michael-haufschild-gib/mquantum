@@ -66,11 +66,16 @@ export class TdseDiagnosticsHistory {
   private readonly capacity: number
 
   constructor(capacity = 300) {
-    this.capacity = capacity
+    const normalizedCapacity = Number.isFinite(capacity)
+      ? Math.max(0, Math.floor(capacity))
+      : 300
+    this.capacity = normalizedCapacity
   }
 
   /** Push a new snapshot, evicting the oldest if at capacity */
   push(snapshot: TdseDiagnosticsSnapshot): void {
+    if (this.capacity === 0) return
+
     if (this.buffer.length >= this.capacity) {
       this.buffer.shift()
     }

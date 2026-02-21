@@ -18,8 +18,37 @@
  * @throws If n is not a power of 2
  */
 function assertPowerOf2(n: number): void {
-  if (n < 1 || (n & (n - 1)) !== 0) {
+  if (!Number.isInteger(n) || n < 1 || (n & (n - 1)) !== 0) {
     throw new Error(`FFT requires power-of-2 length, got ${n}`)
+  }
+}
+
+/**
+ * Checks that interleaved complex data contains at least n complex samples.
+ *
+ * @param data - Interleaved complex data buffer
+ * @param n - Number of complex samples required
+ * @throws If data.length < 2 * n
+ */
+function assertComplexDataLength(data: Float64Array, n: number): void {
+  const expected = 2 * n
+  if (data.length < expected) {
+    throw new Error(`FFT data length too small: expected at least ${expected}, got ${data.length}`)
+  }
+}
+
+/**
+ * Validates N-D FFT grid dimensions.
+ *
+ * @param gridSize - Grid dimensions
+ * @throws If any dimension is not a positive integer
+ */
+function assertValidGridSize(gridSize: readonly number[]): void {
+  for (let d = 0; d < gridSize.length; d++) {
+    const n = gridSize[d]!
+    if (!Number.isInteger(n) || n < 1) {
+      throw new Error(`FFT dimension must be positive integer, got ${n} at axis ${d}`)
+    }
   }
 }
 
@@ -68,6 +97,7 @@ function bitReverse(data: Float64Array, n: number): void {
  */
 export function fft(data: Float64Array, n: number): void {
   assertPowerOf2(n)
+  assertComplexDataLength(data, n)
   if (n <= 1) return
 
   bitReverse(data, n)
@@ -121,6 +151,9 @@ export function fft(data: Float64Array, n: number): void {
  * ```
  */
 export function ifft(data: Float64Array, n: number): void {
+  assertPowerOf2(n)
+  assertComplexDataLength(data, n)
+
   // Conjugate
   for (let i = 0; i < n; i++) {
     data[i * 2 + 1] = -data[i * 2 + 1]!
@@ -183,7 +216,10 @@ export function ifftNd(data: Float64Array, gridSize: readonly number[]): void {
   const dim = gridSize.length
   if (dim === 0) return
 
+  assertValidGridSize(gridSize)
+
   const totalSites = gridSize.reduce((a, b) => a * b, 1)
+  assertComplexDataLength(data, totalSites)
   if (totalSites <= 1) return
 
   // Row-major strides: last dimension has stride 1
@@ -248,7 +284,10 @@ export function fftNd(data: Float64Array, gridSize: readonly number[]): void {
   const dim = gridSize.length
   if (dim === 0) return
 
+  assertValidGridSize(gridSize)
+
   const totalSites = gridSize.reduce((a, b) => a * b, 1)
+  assertComplexDataLength(data, totalSites)
   if (totalSites <= 1) return
 
   // Row-major strides: last dimension has stride 1

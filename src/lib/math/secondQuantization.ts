@@ -91,6 +91,16 @@ function factorial(n: number): number {
   return result
 }
 
+/**
+ * Normalize Fock quantum number to a physically valid basis index.
+ * @param n - Raw input quantum number
+ * @returns Non-negative integer quantum number
+ */
+function normalizeFockQuantumNumber(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, Math.floor(n))
+}
+
 // ============================================================================
 // Fock decomposition
 // ============================================================================
@@ -220,7 +230,7 @@ export function squeezedFockCoefficients(r: number, theta: number, maxN: number)
 export function computeOccupation(mode: SecondQuantizationMode, params: SecondQuantParams): number {
   switch (mode) {
     case 'fock':
-      return params.n
+      return normalizeFockQuantumNumber(params.n)
     case 'coherent':
       return params.alphaRe * params.alphaRe + params.alphaIm * params.alphaIm
     case 'squeezed':
@@ -264,7 +274,8 @@ export function computeUncertainties(
 
   switch (mode) {
     case 'fock': {
-      const delta = Math.sqrt((2 * params.n + 1) / 2)
+      const n = normalizeFockQuantumNumber(params.n)
+      const delta = Math.sqrt((2 * n + 1) / 2)
       const varXP = delta * delta
       // Fock states: covariance is zero, RS invariant = Var(X)*Var(P) = ((2n+1)/2)^2
       // Only |0> is minimum-uncertainty (n=0 → product = 1/4)
@@ -358,9 +369,10 @@ export function computeSecondQuantMetrics(
 
   switch (mode) {
     case 'fock': {
+      const n = normalizeFockQuantumNumber(params.n)
       fockDistribution = new Array(maxN).fill(0)
-      if (params.n < maxN) {
-        fockDistribution[params.n] = 1
+      if (n < maxN) {
+        fockDistribution[n] = 1
       }
       break
     }

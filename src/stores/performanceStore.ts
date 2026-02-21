@@ -535,6 +535,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       isShaderCompiling: false,
       shaderCompilationMessage: '',
     })
+    persistResolutionScale(DESKTOP_DEFAULT_RESOLUTION_SCALE)
+    persistMaxFps(DEFAULT_MAX_FPS)
   },
 }))
 

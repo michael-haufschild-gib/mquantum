@@ -1,24 +1,14 @@
 /**
  * Object Type Registry - Helper Functions
  *
- * Helper functions that replace hardcoded object type checks throughout
- * the codebase. These functions provide O(1) lookups from the registry.
+ * Helper functions that provide O(1) lookups from the registry
+ * for the single 'schroedinger' object type.
  *
  * @see src/lib/geometry/registry/registry.ts for the registry data
  */
 
 import type { ObjectType } from '../types'
-import type {
-  AnimationCapabilities,
-  AnimationSystemDef,
-  AvailableTypeInfo,
-  DimensionConstraints,
-  FaceDetectionMethod,
-  ObjectCategory,
-  ObjectTypeEntry,
-  RenderingCapabilities,
-  RenderMethod,
-} from './types'
+import type { AvailableTypeInfo, DimensionConstraints, ObjectTypeEntry } from './types'
 import { OBJECT_TYPE_REGISTRY } from './registry'
 
 // ============================================================================
@@ -36,169 +26,18 @@ export function getObjectTypeEntry(type: ObjectType): ObjectTypeEntry | undefine
   return OBJECT_TYPE_REGISTRY.get(type)
 }
 
-/**
- * Gets the registry entry, throwing if not found.
- * Use when you're certain the type exists.
- *
- * @param type - The object type to look up
- * @returns The registry entry
- * @throws Error if type is not in registry
- */
-export function getObjectTypeEntryOrThrow(type: ObjectType): ObjectTypeEntry {
-  const entry = OBJECT_TYPE_REGISTRY.get(type)
-  if (!entry) {
-    throw new Error(`Unknown object type: ${type}`)
-  }
-  return entry
-}
-
-// ============================================================================
-// Category Helpers
-// ============================================================================
-
-/**
- * Gets the category of an object type.
- *
- * @param type - The object type
- * @returns The category ('fractal'), or undefined
- */
-export function getObjectCategory(type: ObjectType): ObjectCategory | undefined {
-  return getObjectTypeEntry(type)?.category
-}
-
-/**
- * Checks if an object type uses raymarching (schroedinger).
- *
- * @param type - The object type to check
- * @returns true if the type is a fractal
- */
-export function isFractalCategory(type: string): boolean {
-  const entry = OBJECT_TYPE_REGISTRY.get(type as ObjectType)
-  return entry?.category === 'fractal'
-}
-
 // ============================================================================
 // Rendering Capability Helpers
 // ============================================================================
 
 /**
- * Checks if an object type can render faces.
- * Replaces hardcoded canRenderFaces() functions.
- *
- * @param type - The object type
- * @returns true if faces can be rendered
- */
-export function canRenderFaces(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.rendering.supportsFaces ?? false
-}
-
-/**
- * Checks if an object type can render edges.
- *
- * @param type - The object type
- * @returns true if edges can be rendered
- */
-export function canRenderEdges(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.rendering.supportsEdges ?? true
-}
-
-/**
- * Checks if an object type can render points/vertices.
- *
- * @param type - The object type
- * @returns true if points can be rendered
- */
-export function canRenderPoints(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.rendering.supportsPoints ?? false
-}
-
-/**
- * Gets the render method for an object type.
- *
- * @param type - The object type
- * @returns The render method ('raymarch')
- */
-export function getRenderMethod(type: ObjectType): RenderMethod | undefined {
-  return getObjectTypeEntry(type)?.rendering.renderMethod
-}
-
-/**
  * Checks if an object type uses raymarching.
- * Replaces RAYMARCHING_FRACTAL_TYPES array.
  *
  * @param type - The object type
  * @returns true if the type uses raymarching
  */
 export function isRaymarchingType(type: ObjectType): boolean {
   return getObjectTypeEntry(type)?.rendering.renderMethod === 'raymarch'
-}
-
-/**
- * Checks if an object type is a raymarched fractal at a given dimension.
- * Replaces isRaymarchedFractal() function.
- *
- * @param type - The object type
- * @param dimension - The current dimension
- * @returns true if the type uses raymarching at this dimension
- */
-export function isRaymarchingFractal(type: ObjectType, dimension: number): boolean {
-  const entry = getObjectTypeEntry(type)
-  if (!entry) return false
-  return entry.rendering.requiresRaymarching === true && dimension >= 2
-}
-
-/**
- * Checks if an object type supports volumetric emission controls.
- * Only types with density-based rendering (e.g., Schroedinger) support this.
- *
- * @param type - The object type
- * @returns true if the type supports emission controls
- */
-export function supportsEmission(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.rendering.supportsEmission ?? false
-}
-
-/**
- * Gets the full rendering capabilities for an object type.
- *
- * @param type - The object type
- * @returns The rendering capabilities object
- */
-export function getRenderingCapabilities(type: ObjectType): RenderingCapabilities | undefined {
-  return getObjectTypeEntry(type)?.rendering
-}
-
-/**
- * Gets the face detection method for an object type.
- *
- * @param type - The object type
- * @returns The face detection method
- */
-export function getFaceDetectionMethod(type: ObjectType): FaceDetectionMethod {
-  return getObjectTypeEntry(type)?.rendering.faceDetection ?? 'none'
-}
-
-/**
- * Determines render mode based on object type and settings.
- * Replaces determineRenderMode() in UnifiedRenderer.tsx.
- *
- * @param type - The object type
- * @param dimension - The current dimension
- * @returns The render mode to use
- */
-export function determineRenderMode(
-  type: ObjectType,
-  dimension: number
-): 'raymarch-schroedinger' | 'none' {
-  const entry = getObjectTypeEntry(type)
-  if (!entry) return 'none'
-
-  if (entry.rendering.renderMethod === 'raymarch') {
-    if (dimension < 2) return 'none'
-    if (type === 'schroedinger') return 'raymarch-schroedinger'
-  }
-
-  return 'none'
 }
 
 // ============================================================================
@@ -213,26 +52,6 @@ export function determineRenderMode(
  */
 export function getDimensionConstraints(type: ObjectType): DimensionConstraints | undefined {
   return getObjectTypeEntry(type)?.dimensions
-}
-
-/**
- * Gets the minimum dimension for an object type.
- *
- * @param type - The object type
- * @returns The minimum dimension (defaults to 3)
- */
-export function getMinDimension(type: ObjectType): number {
-  return getObjectTypeEntry(type)?.dimensions.min ?? 3
-}
-
-/**
- * Gets the maximum dimension for an object type.
- *
- * @param type - The object type
- * @returns The maximum dimension (defaults to 11)
- */
-export function getMaxDimension(type: ObjectType): number {
-  return getObjectTypeEntry(type)?.dimensions.max ?? 11
 }
 
 /**
@@ -280,7 +99,6 @@ export function getUnavailabilityReason(type: ObjectType, dimension: number): st
 
 /**
  * Gets all available object types for a dimension.
- * Replaces getAvailableTypes() in geometry/index.ts.
  *
  * @param dimension - The current dimension
  * @returns Array of type info with availability status
@@ -300,70 +118,6 @@ export function getAvailableTypesForDimension(dimension: number): AvailableTypeI
   }
 
   return result
-}
-
-// ============================================================================
-// Animation Helpers
-// ============================================================================
-
-/**
- * Gets animation capabilities for an object type.
- *
- * @param type - The object type
- * @returns The animation capabilities
- */
-export function getAnimationCapabilities(type: ObjectType): AnimationCapabilities | undefined {
-  return getObjectTypeEntry(type)?.animation
-}
-
-/**
- * Checks if an object type has type-specific animations.
- *
- * @param type - The object type
- * @returns true if the type has animations beyond global rotation
- */
-export function hasTypeSpecificAnimations(type: ObjectType): boolean {
-  return getObjectTypeEntry(type)?.animation.hasTypeSpecificAnimations ?? false
-}
-
-/**
- * Gets available animation systems for a type at a specific dimension.
- * Filters out systems that require higher dimensions.
- *
- * @param type - The object type
- * @param dimension - The current dimension
- * @returns Record of available animation systems
- */
-export function getAvailableAnimationSystems(
-  type: ObjectType,
-  dimension: number
-): Record<string, AnimationSystemDef> {
-  const entry = getObjectTypeEntry(type)
-  if (!entry?.animation.hasTypeSpecificAnimations) {
-    return {}
-  }
-
-  const available: Record<string, AnimationSystemDef> = {}
-  for (const [key, system] of Object.entries(entry.animation.systems)) {
-    if (system.minDimension === undefined || dimension >= system.minDimension) {
-      available[key] = system
-    }
-  }
-  return available
-}
-
-/**
- * Gets a specific animation system definition.
- *
- * @param type - The object type
- * @param systemKey - The animation system key
- * @returns The animation system definition, or undefined
- */
-export function getAnimationSystem(
-  type: ObjectType,
-  systemKey: string
-): AnimationSystemDef | undefined {
-  return getObjectTypeEntry(type)?.animation.systems[systemKey]
 }
 
 // ============================================================================
@@ -390,29 +144,9 @@ export function hasTimelineControls(type: ObjectType): boolean {
   return getObjectTypeEntry(type)?.ui.hasTimelineControls ?? false
 }
 
-/**
- * Gets quality presets for an object type.
- *
- * @param type - The object type
- * @returns Array of preset names, or undefined
- */
-export function getQualityPresets(type: ObjectType): string[] | undefined {
-  return getObjectTypeEntry(type)?.ui.qualityPresets
-}
-
 // ============================================================================
 // Validation Helpers
 // ============================================================================
-
-/**
- * Gets all valid object types.
- * Replaces VALID_OBJECT_TYPES array.
- *
- * @returns Array of all object type strings
- */
-export function getValidObjectTypes(): ObjectType[] {
-  return Array.from(OBJECT_TYPE_REGISTRY.keys())
-}
 
 /**
  * Validates an object type string.
@@ -423,27 +157,6 @@ export function getValidObjectTypes(): ObjectType[] {
  */
 export function isValidObjectType(type: string): type is ObjectType {
   return OBJECT_TYPE_REGISTRY.has(type as ObjectType)
-}
-
-/**
- * Gets the display name for an object type.
- * Replaces getTypeName() in geometry/index.ts.
- *
- * @param type - The object type
- * @returns The display name
- */
-export function getTypeName(type: ObjectType): string {
-  return getObjectTypeEntry(type)?.name ?? type
-}
-
-/**
- * Gets the description for an object type.
- *
- * @param type - The object type
- * @returns The description
- */
-export function getTypeDescription(type: ObjectType): string {
-  return getObjectTypeEntry(type)?.description ?? ''
 }
 
 // ============================================================================

@@ -29,6 +29,7 @@ import { usePBRStore } from '@/stores/pbrStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
+import { useCameraStore } from '@/stores/cameraStore'
 
 // Passes (import as needed for the pipeline)
 import { ScenePass } from './passes/ScenePass'
@@ -329,6 +330,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       aspect: size.width / size.height || 1,
     })
   }
+
+  // Register camera with Zustand store so presets/shortcuts can read/write camera state
+  useEffect(() => {
+    if (cameraRef.current) {
+      useCameraStore.getState().registerCamera(cameraRef.current)
+    }
+    return () => {
+      useCameraStore.getState().registerCamera(null)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps -- camera is created once via ref
 
   // Camera control state
   const isDraggingRef = useRef(false)

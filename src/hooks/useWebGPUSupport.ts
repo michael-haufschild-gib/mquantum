@@ -230,11 +230,3 @@ export function useWebGPUSupport(): UseWebGPUSupportResult {
     mode,
   }
 }
-
-/**
- * Synchronous check for WebGPU browser API availability.
- * Does not verify adapter/device - use useWebGPUSupport for full detection.
- */
-export function hasWebGPUAPI(): boolean {
-  return isWebGPUInBrowser()
-}

@@ -99,7 +99,7 @@ export const TimelineControls: FC = () => {
   const hasAnythingToAnimate = hasAnimatingPlanes || isAnimating
 
   const [showRotation, setShowRotation] = useState(false)
-  const [showFractalAnim, setShowFractalAnim] = useState(false)
+  const [showAnimDrawer, setShowAnimDrawer] = useState(false)
 
   return (
     <div className="flex flex-col w-full h-full relative">
@@ -180,8 +180,8 @@ export const TimelineControls: FC = () => {
         )}
 
         {/* Schroedinger Animation Drawer */}
-        {showFractalAnim && getConfigStoreKey(objectType) === 'schroedinger' && (
-          <SchroedingerAnimationDrawer onClose={() => setShowFractalAnim(false)} />
+        {showAnimDrawer && getConfigStoreKey(objectType) === 'schroedinger' && (
+          <SchroedingerAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
         )}
       </AnimatePresence>
 
@@ -248,9 +248,9 @@ export const TimelineControls: FC = () => {
         <div className="flex items-center gap-2">
           {hasTimelineControls(objectType) && (
             <ToggleButton
-              pressed={showFractalAnim}
+              pressed={showAnimDrawer}
               onToggle={() => {
-                setShowFractalAnim(!showFractalAnim)
+                setShowAnimDrawer(!showAnimDrawer)
                 setShowRotation(false)
               }}
               sound="swish"
@@ -259,7 +259,7 @@ export const TimelineControls: FC = () => {
             >
               Anim
               <span
-                className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showFractalAnim ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
+                className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showAnimDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
               >
                 {activeAnimationCount}
               </span>
@@ -270,7 +270,7 @@ export const TimelineControls: FC = () => {
             pressed={showRotation}
             onToggle={() => {
               setShowRotation(!showRotation)
-              setShowFractalAnim(false)
+              setShowAnimDrawer(false)
             }}
             sound="swish"
             ariaLabel="Toggle rotation drawer"

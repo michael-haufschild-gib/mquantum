@@ -2,45 +2,34 @@
  * Object Type Registry Tests
  *
  * Tests for the centralized object type registry and helper functions.
- * After cleanup, only 'schroedinger' remains as the sole object type.
+ * Only 'schroedinger' exists as the sole object type.
  */
 
 import { describe, it, expect } from 'vitest'
 import {
   // Registry data
-  getAllObjectTypes,
+  OBJECT_TYPE_REGISTRY,
   // Core lookups
   getObjectTypeEntry,
   // Rendering capabilities
-  canRenderFaces,
-  canRenderEdges,
   isRaymarchingType,
-  isRaymarchingFractal,
-  getFaceDetectionMethod,
-  determineRenderMode,
   // Dimension constraints
   getDimensionConstraints,
   isAvailableForDimension,
   getAvailableTypesForDimension,
   getRecommendedDimension,
-  // Animation
-  getAnimationCapabilities,
-  hasTypeSpecificAnimations,
-  getAvailableAnimationSystems,
   // UI
   getControlsComponentKey,
   hasTimelineControls,
   // Validation
-  getValidObjectTypes,
   isValidObjectType,
-  getTypeName,
-  getTypeDescription,
+  getConfigStoreKey,
 } from '@/lib/geometry/registry'
 
 describe('Object Type Registry', () => {
   describe('Registry Structure', () => {
     it('contains only schroedinger object type', () => {
-      const types = getAllObjectTypes()
+      const types = Array.from(OBJECT_TYPE_REGISTRY.keys())
       expect(types).toHaveLength(1)
       expect(types).toContain('schroedinger')
     })
@@ -60,30 +49,8 @@ describe('Object Type Registry', () => {
   })
 
   describe('Rendering Capabilities', () => {
-    it('schroedinger supports faces and edges', () => {
-      expect(canRenderFaces('schroedinger')).toBe(true)
-      expect(canRenderEdges('schroedinger')).toBe(true)
-    })
-
     it('isRaymarchingType identifies schroedinger as raymarched', () => {
       expect(isRaymarchingType('schroedinger')).toBe(true)
-    })
-
-    it('isRaymarchingFractal checks dimension', () => {
-      expect(isRaymarchingFractal('schroedinger', 2)).toBe(true)
-      expect(isRaymarchingFractal('schroedinger', 3)).toBe(true)
-      expect(isRaymarchingFractal('schroedinger', 4)).toBe(true)
-      expect(isRaymarchingFractal('schroedinger', 1)).toBe(false)
-    })
-
-    it('returns correct face detection method', () => {
-      expect(getFaceDetectionMethod('schroedinger')).toBe('none')
-    })
-
-    it('determineRenderMode returns correct mode', () => {
-      expect(determineRenderMode('schroedinger', 2)).toBe('raymarch-schroedinger')
-      expect(determineRenderMode('schroedinger', 4)).toBe('raymarch-schroedinger')
-      expect(determineRenderMode('schroedinger', 1)).toBe('none')
     })
   })
 
@@ -112,26 +79,6 @@ describe('Object Type Registry', () => {
     })
   })
 
-  describe('Animation Capabilities', () => {
-    it('hasTypeSpecificAnimations returns true for schroedinger', () => {
-      expect(hasTypeSpecificAnimations('schroedinger')).toBe(true)
-    })
-
-    it('getAnimationCapabilities returns animation config', () => {
-      const anim = getAnimationCapabilities('schroedinger')
-      expect(anim?.hasTypeSpecificAnimations).toBe(true)
-      expect(Object.keys(anim?.systems ?? {})).toContain('sliceAnimation')
-    })
-
-    it('getAvailableAnimationSystems filters by dimension', () => {
-      const systems4D = getAvailableAnimationSystems('schroedinger', 4)
-      expect(Object.keys(systems4D)).toContain('sliceAnimation')
-
-      const systems3D = getAvailableAnimationSystems('schroedinger', 3)
-      expect(Object.keys(systems3D)).not.toContain('sliceAnimation')
-    })
-  })
-
   describe('UI Components', () => {
     it('returns controls component key for schroedinger', () => {
       expect(getControlsComponentKey('schroedinger')).toBe('SchroedingerControls')
@@ -143,12 +90,6 @@ describe('Object Type Registry', () => {
   })
 
   describe('Validation', () => {
-    it('getValidObjectTypes returns all types', () => {
-      const validTypes = getValidObjectTypes()
-      expect(validTypes).toHaveLength(1)
-      expect(validTypes).toContain('schroedinger')
-    })
-
     it('isValidObjectType validates correctly', () => {
       expect(isValidObjectType('schroedinger')).toBe(true)
       expect(isValidObjectType('invalid')).toBe(false)
@@ -156,14 +97,8 @@ describe('Object Type Registry', () => {
       expect(isValidObjectType('hypercube')).toBe(false)
     })
 
-    it('getTypeName returns display name', () => {
-      expect(getTypeName('schroedinger')).toBe('Schr\u00f6dinger Slices')
-    })
-
-    it('getTypeDescription returns description', () => {
-      const desc = getTypeDescription('schroedinger')
-      expect(desc).toBeTruthy()
-      expect(typeof desc).toBe('string')
+    it('getConfigStoreKey returns correct key', () => {
+      expect(getConfigStoreKey('schroedinger')).toBe('schroedinger')
     })
   })
 })

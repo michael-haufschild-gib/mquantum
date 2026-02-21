@@ -42,6 +42,20 @@ function getScratch(pool: Map<number, Float64Array>, size: number): Float64Array
 }
 
 /**
+ * Computes the dimension of a square matrix from flattened storage length.
+ * @param length - Flat array length
+ * @returns Matrix dimension n for an n×n matrix
+ * @throws {Error} If length does not represent a square matrix
+ */
+function squareDimensionFromLength(length: number): number {
+  const dim = Math.sqrt(length)
+  if (!Number.isInteger(dim)) {
+    throw new Error('Matrix must be square')
+  }
+  return dim
+}
+
+/**
  * Creates an n×n identity matrix
  * Formula: I[i][j] = 1 if i === j, else 0
  * @param dimension - The size of the matrix (n×n)
@@ -99,10 +113,7 @@ export function multiplyMatrices(a: MatrixND, b: MatrixND, out?: MatrixND): Matr
     )
   }
 
-  const dim = Math.sqrt(len)
-  if (!Number.isInteger(dim)) {
-    throw new Error('Matrix must be square')
-  }
+  const dim = squareDimensionFromLength(len)
 
   // Use provided output matrix or allocate new one
   const result = out ?? new Float32Array(len)
@@ -4902,7 +4913,7 @@ export function multiplyMatricesInto(out: MatrixND, a: MatrixND, b: MatrixND): v
     return
   }
 
-  const dim = Math.sqrt(len)
+  const dim = squareDimensionFromLength(len)
 
   // Handle aliasing: if out is the same reference as a or b, we need a temp buffer
   const isAliased = out === a || out === b
@@ -4944,7 +4955,7 @@ export function multiplyMatrixVector(m: MatrixND, v: VectorND, out?: VectorND): 
     throw new Error('Cannot multiply with empty matrix')
   }
 
-  const dim = Math.sqrt(len)
+  const dim = squareDimensionFromLength(len)
   if (dim !== v.length) {
     throw new Error(
       `Matrix-vector dimensions incompatible: matrix dim ${dim} and vector len ${v.length}`
@@ -5002,7 +5013,7 @@ export function transposeMatrix(m: MatrixND): MatrixND {
   const len = m.length
   if (len === 0) return new Float32Array(0)
 
-  const dim = Math.sqrt(len)
+  const dim = squareDimensionFromLength(len)
   const result = new Float32Array(len)
 
   for (let i = 0; i < dim; i++) {
@@ -5027,10 +5038,7 @@ export function determinant(m: MatrixND): number {
     throw new Error('Cannot compute determinant of empty matrix')
   }
 
-  const dim = Math.sqrt(len)
-  if (!Number.isInteger(dim)) {
-    throw new Error('Matrix must be square')
-  }
+  const dim = squareDimensionFromLength(len)
 
   // Base cases
   if (dim === 1) {
@@ -5121,6 +5129,6 @@ export function getMatrixDimensions(m: MatrixND): [number, number] {
   if (m.length === 0) {
     return [0, 0]
   }
-  const dim = Math.sqrt(m.length)
+  const dim = squareDimensionFromLength(m.length)
   return [dim, dim]
 }

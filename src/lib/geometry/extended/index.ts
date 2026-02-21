@@ -1,12 +1,9 @@
 /**
- * Extended N-Dimensional Objects Library
+ * Schrödinger quantum visualization configuration
  *
- * Provides the Schrödinger quantum visualization generator,
- * a volumetric wavefunction renderer supporting harmonic oscillator
- * and hydrogen ND modes in N dimensions.
- *
- * @see docs/prd/extended-objects.md
- * @see docs/research/nd-extended-objects-guide.md
+ * Provides types, defaults, and quality presets for the Schrödinger
+ * wavefunction renderer supporting harmonic oscillator and hydrogen
+ * modes in N dimensions.
  */
 
 // Type exports
@@ -25,6 +22,3 @@ export {
   DEFAULT_SCHROEDINGER_CONFIG,
   SCHROEDINGER_QUALITY_PRESETS,
 } from './types'
-
-// Schroedinger generator
-export { generateSchroedinger } from './schroedinger'

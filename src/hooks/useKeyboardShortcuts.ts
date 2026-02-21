@@ -6,7 +6,7 @@
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
 import { getModifierSymbols, getPlatformKeyLabel } from '@/lib/platform'
 import { useCameraStore } from '@/stores/cameraStore'
-import { useGeometryStore } from '@/stores/geometryStore'
+import { MAX_DIMENSION, useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore } from '@/stores/layoutStore'
 import { useLightingStore } from '@/stores/lightingStore'
 import { useExportStore } from '@/stores/exportStore'
@@ -203,7 +203,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}):
       // Note: Original implementation allowed modifiers for Arrows and Numbers
       const globalKeyMap: Record<string, () => void> = {
         ArrowUp: () => {
-          if (dimension < 6) setDimension(dimension + 1)
+          if (dimension < MAX_DIMENSION) setDimension(dimension + 1)
         },
         ArrowDown: () => {
           if (dimension > 3) setDimension(dimension - 1)

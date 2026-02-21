@@ -42,7 +42,7 @@ export interface RadialShellData {
  * @returns Radial shell data with per-bin averages
  */
 export function computeRadialShells(raw: KSpaceRawData, binCount: number): RadialShellData {
-  const bins = Math.max(1, Math.min(128, Math.round(binCount)))
+  const bins = Number.isFinite(binCount) ? Math.max(1, Math.min(128, Math.round(binCount))) : 1
   const kMax = Math.max(raw.kMagMax, 1e-10)
   const omegaMax = Math.max(raw.omegaMax, 1e-10)
 

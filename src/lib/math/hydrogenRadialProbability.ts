@@ -33,7 +33,7 @@ function factorial(n: number): number {
 /** Hydrogen radial wavefunction R_nl(r) — mirrors WGSL hydrogenRadial() */
 function hydrogenRadial(n: number, l: number, r: number, a0: number): number {
   if (n < 1 || l < 0 || l >= n) return 0.0
-  const a0Safe = Math.max(a0, 0.001)
+  const a0Safe = Number.isFinite(a0) ? Math.max(a0, 0.001) : 0.001
   const nf = n
   const rho = (2.0 * r) / (nf * a0Safe)
 
@@ -64,15 +64,20 @@ function hydrogenRadial(n: number, l: number, r: number, a0: number): number {
  * Scans a grid of r values to find the peak, returns the inverse for GPU normalization.
  */
 export function computeRadialProbabilityNorm(n: number, l: number, a0: number): number {
+  const validN = Number.isFinite(n) ? Math.max(1, Math.min(20, Math.floor(n))) : 1
+  const validLRaw = Number.isFinite(l) ? Math.floor(l) : 0
+  const validL = Math.max(0, Math.min(validLRaw, validN - 1))
+  const validA0 = Number.isFinite(a0) ? Math.max(a0, 0.001) : 0.001
+
   // P(r) peaks near r ~ n² * a0 for hydrogen; scan from 0 to generous upper bound
-  const rMax = (n * n + n + 2) * Math.max(a0, 0.001) * 2.0
+  const rMax = (validN * validN + validN + 2) * validA0 * 2.0
   const steps = 500
   const dr = rMax / steps
   let maxP = 0.0
 
   for (let i = 1; i <= steps; i++) {
     const r = i * dr
-    const R = hydrogenRadial(n, l, r, a0)
+    const R = hydrogenRadial(validN, validL, r, validA0)
     const P = 4.0 * Math.PI * r * r * R * R
     if (P > maxP) maxP = P
   }
