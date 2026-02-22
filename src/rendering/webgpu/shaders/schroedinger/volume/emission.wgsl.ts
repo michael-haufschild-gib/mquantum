@@ -419,8 +419,9 @@ fn getEmissionLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
     return 1.0;
   }
 
-  let normalizedDist = distance / lightRange;
-  return max(0.0, 1.0 - pow(normalizedDist, decay));
+  let d = max(distance, EPS_DIVISION);
+  let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
+  return pow(rangeAttenuation, decay);
 }
 
 // Helper to get spot attenuation from shared lighting system

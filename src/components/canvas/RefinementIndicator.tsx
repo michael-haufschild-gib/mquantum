@@ -49,44 +49,34 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
   // Show/hide logic
   useEffect(() => {
     if (!enabled) {
-      const hideTimer = window.setTimeout(() => {
-        setIsVisible(false)
-        setFadeOut(false)
-      }, 0)
-      return () => clearTimeout(hideTimer)
+      setIsVisible(false)
+      setFadeOut(false)
+      return undefined
     }
 
     if (isInteracting) {
       // During interaction - hide immediately
-      const interactionTimer = window.setTimeout(() => {
-        setIsVisible(false)
-        setFadeOut(false)
-      }, 0)
-      return () => clearTimeout(interactionTimer)
+      setIsVisible(false)
+      setFadeOut(false)
+      return undefined
     }
 
     if (progress < 100) {
       // During refinement - show
-      const showTimer = window.setTimeout(() => {
-        setIsVisible(true)
-        setFadeOut(false)
-      }, 0)
-      return () => clearTimeout(showTimer)
+      setIsVisible(true)
+      setFadeOut(false)
+      return undefined
     }
 
     if (progress >= 100 && stage === 'final') {
-      // Complete - start fade out
-      const fadeTimer = window.setTimeout(() => {
-        setFadeOut(true)
-      }, 0)
+      // Complete - show briefly then fade out
+      setIsVisible(true)
+      setFadeOut(true)
       const timer = setTimeout(() => {
         setIsVisible(false)
         setFadeOut(false)
       }, autoHideDelay)
-      return () => {
-        clearTimeout(fadeTimer)
-        clearTimeout(timer)
-      }
+      return () => clearTimeout(timer)
     }
 
     return undefined
@@ -108,6 +98,7 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
   return createPortal(
     <div
       className={`fixed ${positionClasses[position]} z-[100] pointer-events-none transition-opacity duration-500 ${fadeOut ? 'opacity-0' : 'opacity-100'}`}
+
       data-testid="refinement-indicator"
     >
       <div className="glass-panel px-3 py-2 rounded-lg border border-[var(--border-subtle)] min-w-[80px]">

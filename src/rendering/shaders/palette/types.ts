@@ -273,12 +273,26 @@ export function getAvailableColorAlgorithms(
     )
   }
 
+  // Phase-dependent algorithms — meaningless in density matrix mode because the
+  // grid's B channel stores coherenceFraction (0-1), not complex phase (0-2π).
+  // Interpreting coherenceFraction as phase produces misleading colors.
+  const phaseDependentAlgos = new Set<string>([
+    'phase',
+    'mixed',
+    'phaseCyclicUniform',
+    'phaseDiverging',
+    'domainColoringPsi',
+    'diverging',
+    'relativePhase',
+  ])
+
   // Non-freeScalar modes: exclude educational analysis algorithms and
-  // conditionally exclude open quantum algorithms
+  // conditionally include/exclude open quantum and phase-dependent algorithms
   return COLOR_ALGORITHM_OPTIONS.filter(
     (opt) =>
       !educationalAlgos.has(opt.value) &&
-      (!openQuantumAlgos.has(opt.value) || openQuantumEnabled)
+      (!openQuantumAlgos.has(opt.value) || openQuantumEnabled) &&
+      (!phaseDependentAlgos.has(opt.value) || !openQuantumEnabled)
   )
 }
 

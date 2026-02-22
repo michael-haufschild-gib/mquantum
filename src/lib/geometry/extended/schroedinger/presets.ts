@@ -8,7 +8,7 @@
  * - Precomputed energies
  */
 
-import { MAX_DIM, MAX_TERMS } from '@/rendering/shaders/schroedinger/uniforms.glsl'
+import { MAX_DIM, MAX_TERMS } from '@/rendering/webgpu/shaders/schroedinger/uniforms.wgsl'
 
 /**
  * Generated quantum state data

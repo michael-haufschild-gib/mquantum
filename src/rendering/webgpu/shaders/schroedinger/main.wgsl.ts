@@ -294,7 +294,7 @@ fn getIsosurfaceLightDir(lightIdx: i32, pos: vec3f) -> vec3f {
   }
 }
 
-// Helper to get light attenuation
+// Helper to get light attenuation (Three.js physically-based falloff)
 fn getIsosurfaceLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
   let light = lighting.lights[lightIdx];
   let lightRange = light.direction.w;
@@ -304,8 +304,9 @@ fn getIsosurfaceLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
     return 1.0;
   }
 
-  let normalizedDist = distance / lightRange;
-  return max(0.0, 1.0 - pow(normalizedDist, decay));
+  let d = max(distance, EPS_DIVISION);
+  let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
+  return pow(rangeAttenuation, decay);
 }
 
 @fragment
@@ -510,7 +511,14 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
 
     // GGX Specular (PBR) with energy conservation
     let F0 = mix(vec3f(0.04), surfaceColor, material.metallic);
-    let H = normalize(l + viewDir);
+    let halfSum = l + viewDir;
+    let halfLen = length(halfSum);
+    var H: vec3f;
+    if (halfLen > EPS_DIVISION) {
+      H = halfSum / halfLen;
+    } else {
+      H = n;
+    }
     let F = fresnelSchlick(max(dot(H, viewDir), 0.0), F0);
 
     // Energy conservation
@@ -755,7 +763,7 @@ fn getIsosurfaceLightDir(lightIdx: i32, pos: vec3f) -> vec3f {
   }
 }
 
-// Helper to get light attenuation
+// Helper to get light attenuation (Three.js physically-based falloff)
 fn getIsosurfaceLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
   let light = lighting.lights[lightIdx];
   let lightRange = light.direction.w;
@@ -765,8 +773,9 @@ fn getIsosurfaceLightAttenuation(lightIdx: i32, distance: f32) -> f32 {
     return 1.0;
   }
 
-  let normalizedDist = distance / lightRange;
-  return max(0.0, 1.0 - pow(normalizedDist, decay));
+  let d = max(distance, EPS_DIVISION);
+  let rangeAttenuation = clamp(1.0 - d / lightRange, 0.0, 1.0);
+  return pow(rangeAttenuation, decay);
 }
 
 @fragment
@@ -955,7 +964,14 @@ ${bayerJitterSection}
     let NdotL = max(dot(n, l), 0.0);
 
     let F0 = mix(vec3f(0.04), surfaceColor, material.metallic);
-    let H = normalize(l + viewDir);
+    let halfSum = l + viewDir;
+    let halfLen = length(halfSum);
+    var H: vec3f;
+    if (halfLen > EPS_DIVISION) {
+      H = halfSum / halfLen;
+    } else {
+      H = n;
+    }
     let F = fresnelSchlick(max(dot(H, viewDir), 0.0), F0);
 
     let kS = F;
@@ -1078,6 +1094,8 @@ export interface TemporalMainBlockConfig {
   bayerJitter?: boolean
   /** Use pre-computed density grid for faster raymarching */
   useDensityGrid?: boolean
+  /** Density matrix mode — disable inline wavefunction fallback */
+  useDensityMatrix?: boolean
 }
 
 /**
@@ -1107,7 +1125,7 @@ struct TemporalFragmentOutput {
  * @param config
  */
 export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}): string {
-  const { bayerJitter = true, useDensityGrid = false } = config
+  const { bayerJitter = true, useDensityGrid = false, useDensityMatrix = false } = config
 
   // Bayer jitter section - applies sub-pixel offset for quarter-res rendering
   // NOTE: Unlike the incorrect previous implementation that DISCARDED pixels,
@@ -1190,7 +1208,13 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
       volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
     }
   } else {
-    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);
+    volumeResult = volumeRaymarchGrid(ro, rd, tNear, tFar, schroedinger);${
+      useDensityMatrix
+        ? `
+    // No inline fallback in density matrix mode: the grid is the authoritative
+    // density source (Tr(ρ|x⟩⟨x|)). Falling back to inline single-wavefunction
+    // evaluation would produce incorrect density and a visible ring artifact.`
+        : `
     // Safety fallback: if grid path yields a fully transparent sample,
     // re-evaluate with direct sampling to avoid blank frames.
     // This can happen when the density grid hasn't been populated yet
@@ -1202,6 +1226,7 @@ export function generateMainBlockTemporal(config: TemporalMainBlockConfig = {}):
       } else {
         volumeResult = volumeRaymarchHQ(ro, rd, tNear, tFar, schroedinger);
       }
+    }`
     }
   }`
     : `if (fastMode) {

@@ -1153,10 +1153,6 @@ fn volumeRaymarchGrid(
 
   var transmittance: f32 = 1.0;
 
-  // PERF: Hoist loop-invariant bounding radius computation
-  let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
-  let boundR2Skip = boundR2 * 0.85;
-
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
     if (i >= sampleCount) { break; }
     iterCount = i + 1;
@@ -1168,18 +1164,6 @@ fn volumeRaymarchGrid(
     if (remainingContributionBound < MIN_REMAINING_CONTRIBUTION) { break; }
 
     let pos = rayOrigin + rayDir * t;
-
-    // PERF: Gaussian envelope early-skip for deep tail region.
-    // The outer ~15% shell of the bounding sphere is exponentially low density.
-    // Skip expensive texture lookups and take 8x steps through it.
-    // Free scalar fills a cube, not a sphere — skip this optimization.
-    if (!IS_FREE_SCALAR) {
-      let r2 = dot(pos, pos);
-      if (r2 > boundR2Skip) {
-        t += stepLen * 8.0;
-        continue;
-      }
-    }
 
     // Sample density from pre-computed 3D grid texture
     // Returns (rho, logRho, spatialPhase, relativePhase) for rgba16float

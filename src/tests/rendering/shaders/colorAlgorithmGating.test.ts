@@ -76,3 +76,64 @@ describe('getAvailableColorAlgorithms — open quantum gating', () => {
     expect(values).not.toContain('coherenceMap')
   })
 })
+
+describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode', () => {
+  const phaseDependentAlgos = [
+    'phase',
+    'mixed',
+    'phaseCyclicUniform',
+    'phaseDiverging',
+    'domainColoringPsi',
+    'diverging',
+    'relativePhase',
+  ] as const
+
+  const densityOnlyAlgos = [
+    'lch',
+    'multiSource',
+    'radial',
+    'blackbody',
+    'radialDistance',
+  ] as const
+
+  it('excludes phase-dependent algorithms when openQuantumEnabled is true', () => {
+    const algos = getAvailableColorAlgorithms('harmonicOscillator', true)
+    const values = algos.map((a) => a.value)
+
+    for (const algo of phaseDependentAlgos) {
+      expect(values, `expected ${algo} to be excluded`).not.toContain(algo)
+    }
+  })
+
+  it('includes phase-dependent algorithms when openQuantumEnabled is false', () => {
+    const algos = getAvailableColorAlgorithms('harmonicOscillator', false)
+    const values = algos.map((a) => a.value)
+
+    for (const algo of phaseDependentAlgos) {
+      expect(values, `expected ${algo} to be included`).toContain(algo)
+    }
+  })
+
+  it('retains density-only algorithms in both OQ modes', () => {
+    const oqOff = getAvailableColorAlgorithms('harmonicOscillator', false).map((a) => a.value)
+    const oqOn = getAvailableColorAlgorithms('harmonicOscillator', true).map((a) => a.value)
+
+    for (const algo of densityOnlyAlgos) {
+      expect(oqOff, `expected ${algo} included when OQ off`).toContain(algo)
+      expect(oqOn, `expected ${algo} included when OQ on`).toContain(algo)
+    }
+  })
+
+  it('excludes phase-dependent algorithms for hydrogenND in OQ mode', () => {
+    const algos = getAvailableColorAlgorithms('hydrogenND', true)
+    const values = algos.map((a) => a.value)
+
+    for (const algo of phaseDependentAlgos) {
+      expect(values, `expected ${algo} to be excluded`).not.toContain(algo)
+    }
+    // But OQ-specific should be included
+    expect(values).toContain('purityMap')
+    expect(values).toContain('entropyMap')
+    expect(values).toContain('coherenceMap')
+  })
+})

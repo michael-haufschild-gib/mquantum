@@ -73,6 +73,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   // Uniform buffers
   private temporalUniformBuffer: GPUBuffer | null = null
   private temporalUniformData = new ArrayBuffer(176) // 11 * 16 bytes aligned
+  // PERF: Pre-allocated typed views to avoid per-frame GC pressure
+  private temporalUniformFloatView = new Float32Array(this.temporalUniformData)
+  private temporalUniformUintView = new Uint32Array(this.temporalUniformData)
 
   // Internal textures (full resolution)
   private reprojectedHistoryTexture: GPUTexture | null = null
@@ -579,8 +582,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     viewProjectionMatrix: Float32Array,
     inverseViewProjectionMatrix: Float32Array
   ): void {
-    const floatView = new Float32Array(this.temporalUniformData)
-    const uintView = new Uint32Array(this.temporalUniformData)
+    // PERF: Reuse pre-allocated typed views instead of creating new ones per frame
+    const floatView = this.temporalUniformFloatView
+    const uintView = this.temporalUniformUintView
 
     // Offset 0: prevViewProjection (64 bytes = 16 floats)
     floatView.set(this.prevViewProjectionMatrix, 0)
@@ -801,7 +805,10 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     this.hasValidHistory = true
 
     // Store camera position for cut detection (BUG-T5)
-    this.prevCameraPosition = { ...cameraPosition }
+    // PERF: Mutate in-place to avoid per-frame object allocation
+    this.prevCameraPosition.x = cameraPosition.x
+    this.prevCameraPosition.y = cameraPosition.y
+    this.prevCameraPosition.z = cameraPosition.z
   }
 
   /**

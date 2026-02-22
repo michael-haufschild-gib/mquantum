@@ -42,7 +42,7 @@ export function generateSingleBasisBlock(
         lines.push(`    let extraN_${i} = getHydrogenBasisQN(hydrogenBasis, i32(k), ${dimQNIdx});`)
         lines.push(`    let omega_${i} = getExtraDimOmega(uniforms, ${i});`)
         lines.push(`    let coord_${i} = xND[${coordIdx}];`)
-        lines.push(`    let ef_${i} = ho1D(extraN_${i}, coord_${i}, omega_${i}, uniforms.fieldScale);`)
+        lines.push(`    let ef_${i} = ho1D(extraN_${i}, coord_${i}, omega_${i});`)
         lines.push(`    extraProduct *= ef_${i};`)
         lines.push(`    if (abs(extraProduct) < 1e-10) { return vec2f(0.0, 0.0); }`)
         lines.push(`  }`)
@@ -85,15 +85,32 @@ fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniform
   // Radial part: R_nl(r) — parameterized by per-basis (n, l)
   let R = hydrogenRadial(n_k, l_k, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm — parameterized by per-basis (l, m)
-  let Y = evalHydrogenNDAngularCartesian(l_k, m_k, nx, ny, nz, uniforms.useRealOrbitals != 0u);
+  // Angular part: Y_lm as vec2f(re, im) — parameterized by per-basis (l, m)
+  // For real orbitals (tesseral harmonics), the imaginary part is zero.
+  // For complex orbitals, we need the full complex Y_lm = K·P·e^{imφ}
+  // so the density matrix cross-terms ψ_k·ψ_l* capture angular interference.
+  var Y_complex: vec2f;
+  if (uniforms.useRealOrbitals != 0u) {
+    Y_complex = vec2f(evalHydrogenNDAngularCartesian(l_k, m_k, nx, ny, nz, true), 0.0);
+  } else {
+    // Z-axis guard: for m≠0, Y_lm vanishes on the z-axis (sinθ = 0)
+    let rxy2 = nx * nx + ny * ny;
+    if (m_k != 0 && rxy2 < 1e-8) {
+      return vec2f(0.0, 0.0);
+    }
+    let theta = acos(clamp(nz, -1.0, 1.0));
+    let phi_angle = atan2(ny, nx);
+    Y_complex = sphericalHarmonic(l_k, m_k, theta, phi_angle);
+  }
 
 ${extraDimCode}
 
-  // Boost (per-basis, computed inline)
-  let boost = 50.0 * f32(n_k * n_k) * pow(3.0, f32(l_k));
+  // No per-basis boost here: density matrix mode applies a uniform
+  // hydrogenNDBoost to the total density after Tr(ρ|x⟩⟨x|) summation,
+  // preserving correct relative scaling between cross-terms and diagonals.
+  let scale = R * extraProduct;
 
-  return vec2f(R * Y * extraProduct * boost, 0.0);
+  return vec2f(scale * Y_complex.x, scale * Y_complex.y);
 }
 `
   }

@@ -83,6 +83,39 @@ export function packForGPU(
 }
 
 /**
+ * Compute effective basis size by trimming trailing states with negligible population.
+ *
+ * Scans diagonal elements ρ_{kk} and finds the last index with population above
+ * the threshold. Returns lastActive + 1, clamped to [minK, K].
+ *
+ * This trims trailing (high-energy) states that are effectively unpopulated,
+ * reducing the GPU's O(K²) contraction loop without reordering the density matrix.
+ *
+ * @param rho - Current density matrix
+ * @param populationThreshold - Minimum diagonal population to consider active (default 0.01)
+ * @param minK - Floor for the returned K to preserve coherence effects (default 2)
+ * @returns Effective K ∈ [minK, rho.K]
+ */
+export function computeActiveK(
+  rho: DensityMatrix,
+  populationThreshold = 0.01,
+  minK = 2,
+): number {
+  const K = rho.K
+  const el = rho.elements
+
+  // Find the last index with significant population
+  let lastActive = 0
+  for (let k = 0; k < K; k++) {
+    if (el[2 * (k * K + k)]! > populationThreshold) {
+      lastActive = k
+    }
+  }
+
+  return Math.max(minK, lastActive + 1)
+}
+
+/**
  * Unpack a GPU buffer back to a DensityMatrix (for testing/debugging).
  *
  * @param buf - Packed Float32Array (length ≥ OPEN_QUANTUM_BUFFER_FLOATS)

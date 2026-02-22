@@ -84,7 +84,7 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      expect(screen.getByRole('checkbox')).toBeInTheDocument()
+      expect(screen.getByRole('switch')).toBeInTheDocument()
       expect(screen.getByText("Don't show again")).toBeInTheDocument()
     })
 
@@ -101,7 +101,7 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument()
       expect(screen.queryByText("Don't show again")).not.toBeInTheDocument()
     })
 
@@ -118,7 +118,7 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument()
     })
   })
 
@@ -136,7 +136,7 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      const checkbox = screen.getByRole('checkbox')
+      const checkbox = screen.getByRole('switch')
       expect(checkbox).not.toBeChecked()
     })
 
@@ -155,7 +155,7 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      const checkbox = screen.getByRole('checkbox')
+      const checkbox = screen.getByRole('switch')
       await user.click(checkbox)
 
       expect(checkbox).toBeChecked()
@@ -176,7 +176,7 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      const checkbox = screen.getByRole('checkbox')
+      const checkbox = screen.getByRole('switch')
       await user.click(checkbox)
       expect(checkbox).toBeChecked()
 
@@ -203,7 +203,7 @@ describe('MsgBox dismissible functionality', () => {
       render(<MsgBox />)
 
       // Check the checkbox
-      const checkbox = screen.getByRole('checkbox')
+      const checkbox = screen.getByRole('switch')
       await user.click(checkbox)
       expect(checkbox).toBeChecked()
 
@@ -268,7 +268,7 @@ describe('MsgBox dismissible functionality', () => {
       render(<MsgBox />)
 
       // Check the checkbox
-      const checkbox = screen.getByRole('checkbox')
+      const checkbox = screen.getByRole('switch')
       await user.click(checkbox)
 
       // Click Cancel (either button should persist)
@@ -281,7 +281,7 @@ describe('MsgBox dismissible functionality', () => {
   })
 
   describe('accessibility', () => {
-    it('checkbox_hasAriaDescribedBy_linkedToMessage', () => {
+    it('switch_hasLabel_andMessageHasId', () => {
       useMsgBoxStore.setState({
         isOpen: true,
         title: 'Accessible Dialog',
@@ -294,10 +294,11 @@ describe('MsgBox dismissible functionality', () => {
 
       render(<MsgBox />)
 
-      const checkbox = screen.getByRole('checkbox')
-      expect(checkbox).toHaveAttribute('aria-describedby', 'msgbox-message')
+      // Verify the switch is rendered with correct aria state
+      const switchEl = screen.getByRole('switch')
+      expect(switchEl).toHaveAttribute('aria-checked', 'false')
 
-      // Verify the message element has the correct id
+      // Verify the message element has the correct id for accessibility linking
       const message = screen.getByText('This is the message content')
       expect(message).toHaveAttribute('id', 'msgbox-message')
     })

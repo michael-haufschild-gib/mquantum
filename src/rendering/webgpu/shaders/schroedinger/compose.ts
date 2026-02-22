@@ -184,6 +184,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   isFreeScalar?: boolean
   /** Include analysis texture bindings for free-scalar educational color modes. */
   freeScalarAnalysis?: boolean
+  /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
+  useDensityMatrix?: boolean
 }
 
 /**
@@ -216,6 +218,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     useWignerCache = false,
     isFreeScalar = false,
     freeScalarAnalysis = false,
+    useDensityMatrix = false,
     overrides = [],
   } = config
 
@@ -372,7 +375,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
         ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
         : generateMainBlockIsosurface({ useDensityGrid })
       : enableTemporal
-        ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid })
+        ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix })
         : generateMainBlockVolumetric({ useDensityGrid })
 
   // Get dimension-specific blocks

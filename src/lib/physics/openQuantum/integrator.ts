@@ -367,9 +367,32 @@ export function hermitianEigendecompose(
  *
  * @param rho - Density matrix (mutated in place)
  */
-function eigenvalueFloor(rho: DensityMatrix): void {
+export function eigenvalueFloor(rho: DensityMatrix): void {
   const K = rho.K
   const EPS = 1e-12
+
+  // Gershgorin pre-check: if min_k(ρ_{kk} - Σ_{l≠k}|ρ_{kl}|) > EPS,
+  // all eigenvalues are positive and we can skip the expensive decomposition.
+  {
+    const elG = rho.elements
+    let gershgorinSafe = true
+    for (let k = 0; k < K; k++) {
+      const diag = elG[2 * (k * K + k)]!
+      let offDiagSum = 0
+      for (let l = 0; l < K; l++) {
+        if (l === k) continue
+        const idx = 2 * (k * K + l)
+        const re = elG[idx]!
+        const im = elG[idx + 1]!
+        offDiagSum += Math.sqrt(re * re + im * im)
+      }
+      if (diag - offDiagSum < EPS) {
+        gershgorinSafe = false
+        break
+      }
+    }
+    if (gershgorinSafe) return
+  }
 
   hermitianEigendecompose(rho, eigenvalues, eigenvectors)
 

@@ -18,7 +18,15 @@ import {
   complexMatZero,
   matrixExponentialPade,
 } from './complexMatrix'
+import { eigenvalueFloor, MAX_K } from './integrator'
 import type { DensityMatrix } from './types'
+
+// Pre-allocated scratch arrays for applyPropagator (avoids per-frame allocation)
+const MAX_N = MAX_K * MAX_K
+const vecReScratch = new Float64Array(MAX_N)
+const vecImScratch = new Float64Array(MAX_N)
+const outReScratch = new Float64Array(MAX_N)
+const outImScratch = new Float64Array(MAX_N)
 
 /**
  * Compute the propagator P = exp(dt · L) for the given Liouvillian.
@@ -61,21 +69,17 @@ export function applyPropagator(
   const N = K * K
   const el = rho.elements
 
-  // Convert ρ elements to separate real/imag arrays
-  const vecRe = new Float64Array(N)
-  const vecIm = new Float64Array(N)
+  // Convert ρ elements to separate real/imag scratch arrays (zero-alloc)
   for (let k = 0; k < K; k++) {
     for (let l = 0; l < K; l++) {
       const matIdx = 2 * (k * K + l)
       const vecIdx = k * K + l
-      vecRe[vecIdx] = el[matIdx]!
-      vecIm[vecIdx] = el[matIdx + 1]!
+      vecReScratch[vecIdx] = el[matIdx]!
+      vecImScratch[vecIdx] = el[matIdx + 1]!
     }
   }
 
   // Matrix-vector multiply: P · vec(ρ)
-  const outRe = new Float64Array(N)
-  const outIm = new Float64Array(N)
   const Pr = propagator.real
   const Pi = propagator.imag
 
@@ -86,13 +90,13 @@ export function applyPropagator(
     for (let j = 0; j < N; j++) {
       const pRe = Pr[iN + j]!
       const pIm = Pi[iN + j]!
-      const vRe = vecRe[j]!
-      const vIm = vecIm[j]!
+      const vRe = vecReScratch[j]!
+      const vIm = vecImScratch[j]!
       sumRe += pRe * vRe - pIm * vIm
       sumIm += pRe * vIm + pIm * vRe
     }
-    outRe[i] = sumRe
-    outIm[i] = sumIm
+    outReScratch[i] = sumRe
+    outImScratch[i] = sumIm
   }
 
   // Write back to density matrix
@@ -100,8 +104,8 @@ export function applyPropagator(
     for (let l = 0; l < K; l++) {
       const matIdx = 2 * (k * K + l)
       const vecIdx = k * K + l
-      el[matIdx] = outRe[vecIdx]!
-      el[matIdx + 1] = outIm[vecIdx]!
+      el[matIdx] = outReScratch[vecIdx]!
+      el[matIdx + 1] = outImScratch[vecIdx]!
     }
   }
 }
@@ -150,4 +154,9 @@ export function evolvePropagatorStep(
       el[i] *= invTrace
     }
   }
+
+  // Eigenvalue floor: clamp negative eigenvalues to ε and reconstruct.
+  // A Hermitian matrix can have non-negative diagonals yet negative eigenvalues,
+  // so a diagonal-only proxy is insufficient. This matches evolveStep behavior.
+  eigenvalueFloor(rho)
 }

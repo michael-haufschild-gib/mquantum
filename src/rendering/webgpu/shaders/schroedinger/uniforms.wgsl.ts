@@ -479,11 +479,11 @@ fn lengthND(p: array<f32, 11>, dimension: i32) -> f32 {
 /**
  * WGSL struct for open quantum system data uploaded from CPU.
  *
- * Layout (544 bytes = 136 floats):
- *   rho: 32 × vec4f = 512 bytes  (8×8 complex matrix, stored as xy/zw pairs)
- *   purity, linearEntropy, vonNeumannEntropy, coherenceMagnitude: 4 × f32
- *   groundPopulation + 3 padding: 4 × f32
- * Total: 544 bytes
+ * Layout (1600 bytes):
+ *   rho: 98 × vec4f = 1568 bytes  (14×14 complex matrix, stored as xy/zw pairs)
+ *   purity, linearEntropy, vonNeumannEntropy, coherenceMagnitude: 4 × f32 = 16 bytes
+ *   groundPopulation, maxK + 2 padding: 4 × f32 = 16 bytes
+ * Total: 1600 bytes
  */
 export const openQuantumUniformsBlock = /* wgsl */ `
 // ============================================
@@ -504,8 +504,8 @@ struct OpenQuantumUniforms {
   coherenceMagnitude: f32,
   /** Re(ρ_{00}) — ground state population */
   groundPopulation: f32,
-  /** Active basis size (1-14) */
-  maxK: u32,
+  /** Active basis size (1-14), written as f32 from CPU packForGPU */
+  maxK: f32,
   /** Padding to align to 16 bytes */
   _pad0: f32,
   _pad1: f32,

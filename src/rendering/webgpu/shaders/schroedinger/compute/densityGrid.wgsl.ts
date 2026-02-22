@@ -265,19 +265,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let uvw = (vec3f(gid) + 0.5) / gridSizeF;
   let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
 
-  // Skip positions outside bounding sphere
-  let dist2 = dot(worldPos, worldPos);
-  let boundR = schroedinger.boundingRadius;
-  if (dist2 > boundR * boundR) {
-    textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
-    return;
-  }
+  // No sphere clip for density matrix mode: the cube grid [-R, R] already bounds
+  // the computation. Sphere clipping creates a hard zero boundary inside the cube
+  // that produces a visible ring artifact when the raymarcher's inline fallback
+  // evaluates a different (single-wavefunction) path for cube corners outside the
+  // inscribed sphere. Basis functions naturally decay to near-zero at the boundary.
 
   // Compute animation time
   let t = schroedinger.time * schroedinger.timeScale;
 
   // Active basis size: use oq.maxK for density matrix mode (supports up to 14)
-  let basisK = min(oq.maxK, 14u);
+  let basisK = min(u32(oq.maxK), 14u);
 
   // Evaluate each basis function ψ_k(x) independently
   // Store as complex values (re, im)
@@ -287,34 +285,50 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Compute n(x) = Σ_{kl} ρ_{kl} · ψ_k(x) · ψ_l*(x)
-  // Also track diagonal contribution for coherence fraction
+  // Hermitian symmetry: ρ_{lk} = conj(ρ_{kl}), so off-diagonal pairs contribute
+  // 2·Re(ρ_{kl} · ψ_k · ψ_l*). Reduces K² iterations to K(K+1)/2.
   var totalDensity: f32 = 0.0;
   var diagDensity: f32 = 0.0;
 
   for (var k = 0u; k < basisK; k = k + 1u) {
-    for (var l = 0u; l < basisK; l = l + 1u) {
-      let rho_kl = getRho(oq, k, l);
-      // ψ_k · ψ_l* = complexMul(ψ_k, conj(ψ_l))
-      let prod = complexMulOQ(basisValues[k], complexConjOQ(basisValues[l]));
-      // Re(ρ_{kl} · ψ_k · ψ_l*) contributes to density
-      totalDensity += rho_kl.x * prod.x - rho_kl.y * prod.y;
-    }
-    // Diagonal: ρ_{kk} |ψ_k|² (always real)
+    // PERF: skip basis states with negligible amplitude at this grid point
+    let psi_k_sq = dot(basisValues[k], basisValues[k]);
+    if (psi_k_sq < 1e-20) { continue; }
+
+    // Diagonal: ρ_{kk} |ψ_k|² (ρ_{kk} is real for Hermitian ρ)
     let rho_kk = getRho(oq, k, k);
-    diagDensity += rho_kk.x * dot(basisValues[k], basisValues[k]);
+    totalDensity += rho_kk.x * psi_k_sq;
+    diagDensity += rho_kk.x * psi_k_sq;
+
+    // Off-diagonal: 2·Re(ρ_{kl} · ψ_k · ψ_l*) for l > k
+    // PERF: inline complex cross-term to avoid intermediate vec2f
+    let pk = basisValues[k];
+    for (var l = k + 1u; l < basisK; l = l + 1u) {
+      let pl = basisValues[l];
+      let rho_kl = getRho(oq, k, l);
+      // Re(ψ_k · ψ_l*) = dot(ψ_k, ψ_l), Im(ψ_k · ψ_l*) = ψk.y·ψl.x - ψk.x·ψl.y
+      totalDensity += 2.0 * (rho_kl.x * dot(pk, pl) - rho_kl.y * (pk.y * pl.x - pk.x * pl.y));
+    }
   }
 
   // Clamp density to non-negative (numerical noise can cause tiny negatives)
   totalDensity = max(totalDensity, 0.0);
 
-  // Log density for rendering
-  let logRho = select(-20.0, log(max(totalDensity, 1e-20)), totalDensity > 1e-10);
-
-  // Coherence fraction: how much of the density comes from off-diagonal terms
+  // Coherence fraction: ratio of off-diagonal contribution (boost-independent)
   let coherenceFraction = select(0.0,
     1.0 - clamp(diagDensity / max(totalDensity, 1e-10), 0.0, 1.0),
     totalDensity > 1e-10
   );
+
+  // Apply uniform visualization boost for hydrogen ND mode.
+  // This replaces the per-basis boost that was removed from evaluateSingleBasis,
+  // ensuring correct relative scaling between cross-terms and diagonals.
+  if (QUANTUM_MODE_DEFAULT == QUANTUM_MODE_HYDROGEN_ND) {
+    totalDensity *= schroedinger.hydrogenNDBoost;
+  }
+
+  // Log density for rendering (from boosted density)
+  let logRho = select(-20.0, log(max(totalDensity, 1e-20)), totalDensity > 1e-10);
 
   // Store: R=density, G=logDensity, B=coherenceFraction, A=0
   textureStore(densityGrid, gid, vec4f(totalDensity, logRho, coherenceFraction, 0.0));

@@ -303,7 +303,6 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // Check pipeline cache before compiling
     const cacheKey = DensityGridComputePass.computeCacheKey(this.passConfig, this.densityTextureFormat)
     const cached = DensityGridComputePass.pipelineCache.get(cacheKey)
-    console.log(`[DensityGrid] Pipeline ${cached ? 'CACHE HIT' : 'CACHE MISS'} key=${cacheKey}`)
 
     if (cached) {
       this.computePipeline = cached

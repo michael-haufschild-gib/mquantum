@@ -1821,7 +1821,11 @@ function normalizeColorAlgorithmForQuantumMode(
   const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled).some(
     (option) => option.value === colorAlgorithm
   )
-  return isAvailable ? colorAlgorithm : 'diverging'
+  if (isAvailable) return colorAlgorithm
+
+  // Fallback: in open quantum mode, use 'purityMap' (designed for density matrix);
+  // otherwise fall back to 'diverging' (density-only, no phase dependency).
+  return openQuantumEnabled ? 'purityMap' : 'diverging'
 }
 
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
@@ -1845,9 +1849,13 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
     termCount: isComputeMode ? 1 : config.termCount,
     colorAlgorithm: normalizedColorAlgorithm,
     isosurface: config.isosurface,
-    nodalEnabled: isComputeMode ? false : config.nodalEnabled,
-    phaseMaterialityEnabled: isComputeMode ? false : config.phaseMaterialityEnabled,
-    interferenceEnabled: isComputeMode ? false : config.interferenceEnabled,
+    // Disable inline-dependent features in compute modes and open quantum mode.
+    // In OQ mode, the density grid stores Tr(ρ|x⟩⟨x|) from the full density matrix;
+    // nodal/phase/interference features use inline single-wavefunction evalPsi which
+    // is physically incorrect for mixed states.
+    nodalEnabled: (isComputeMode || config.openQuantumEnabled) ? false : config.nodalEnabled,
+    phaseMaterialityEnabled: (isComputeMode || config.openQuantumEnabled) ? false : config.phaseMaterialityEnabled,
+    interferenceEnabled: (isComputeMode || config.openQuantumEnabled) ? false : config.interferenceEnabled,
     uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
     representation: isComputeMode ? 'position' : config.representation,
     eigenfunctionCacheEnabled: isComputeMode ? false : config.eigenfunctionCacheEnabled,
