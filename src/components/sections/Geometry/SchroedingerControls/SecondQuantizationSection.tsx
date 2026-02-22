@@ -315,18 +315,20 @@ function FockOccupationTable({
       {/* Fock distribution bar chart */}
       <div className="mt-2 space-y-0.5">
         <div className="text-text-tertiary mb-0.5">P(n) distribution:</div>
-        {fockDistribution.slice(0, 8).map((prob, n) => (
-          <div key={n} className="flex items-center gap-1">
-            <span className="w-4 text-end text-text-tertiary">{n}</span>
-            <div className="flex-1 h-2 rounded-full bg-panel-border overflow-hidden">
-              <div
-                className="h-full rounded-full bg-accent-cyan"
-                style={{ width: `${Math.min(prob * 100, 100)}%` }}
-              />
+        {fockDistribution.slice(0, 8).map((prob, n) => {
+          const rawPercent = prob * 100
+          const percent = Number.isFinite(rawPercent) ? Math.max(0, Math.min(rawPercent, 100)) : 0
+
+          return (
+            <div key={n} className="flex items-center gap-1">
+              <span className="w-4 text-end text-text-tertiary">{n}</span>
+              <div className="flex-1 h-2 rounded-full bg-panel-border overflow-hidden">
+                <div className="h-full rounded-full bg-accent" style={{ width: `${percent}%` }} />
+              </div>
+              <span className="w-10 text-end text-text-tertiary">{percent.toFixed(1)}%</span>
             </div>
-            <span className="w-10 text-end text-text-tertiary">{(prob * 100).toFixed(1)}%</span>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
@@ -366,7 +368,7 @@ function UncertaintyMetricsCard({
         <span>ΔP =</span>
         <span className="text-text-primary">{deltaP.toFixed(4)}</span>
         <span>ΔX·ΔP =</span>
-        <span className={isMinimumUncertainty ? 'text-accent-cyan' : 'text-text-primary'}>
+        <span className={isMinimumUncertainty ? 'text-accent' : 'text-text-primary'}>
           {product.toFixed(4)}
           {isMinimumUncertainty && ' (min)'}
         </span>

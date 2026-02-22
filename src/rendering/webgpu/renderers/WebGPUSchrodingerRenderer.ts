@@ -38,6 +38,27 @@ import { packLightingUniforms } from '../utils/lighting'
 import type { AppearanceStoreState } from '@/stores/appearanceStore'
 import type { AnimationState } from '@/stores/animationStore'
 import type { GeometryState } from '@/stores/geometryStore'
+import type { DensityMatrix, LindbladChannel } from '@/lib/physics/openQuantum/types'
+import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
+import type { HydrogenBasisState, TransitionRate } from '@/lib/physics/openQuantum'
+import {
+  densityMatrixFromCoefficients,
+  evolveMultiStep,
+  MAX_K,
+} from '@/lib/physics/openQuantum/integrator'
+import { buildLindbladChannels } from '@/lib/physics/openQuantum/channels'
+import { computeMetrics } from '@/lib/physics/openQuantum/metrics'
+import { createPackedBuffer, packForGPU } from '@/lib/physics/openQuantum/statePacking'
+import {
+  buildHydrogenBasis,
+  basisEnergies,
+  basisLabels,
+} from '@/lib/physics/openQuantum/hydrogenBasis'
+import { buildTransitionRates } from '@/lib/physics/openQuantum/hydrogenRates'
+import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
+import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
+import { computePropagator, evolvePropagatorStep } from '@/lib/physics/openQuantum/propagator'
+import { useOpenQuantumDiagnosticsStore } from '@/stores/openQuantumDiagnosticsStore'
 import type { RotationState } from '@/stores/rotationStore'
 import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
 
@@ -75,6 +96,9 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   modeCharacter: 13,
   energyFlux: 14,
   kSpaceOccupation: 15,
+  purityMap: 16,
+  entropyMap: 17,
+  coherenceMap: 18,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -123,6 +147,41 @@ const REPRESENTATION_MODE_MAP: Record<string, number> = {
 const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
   k: 0,
   p: 1,
+}
+
+/**
+ * Pack hydrogen basis states into an ArrayBuffer matching HydrogenBasisUniforms layout.
+ *
+ * Layout (704 bytes):
+ * - quantumNumbers: array<vec4<i32>, 39> (624 bytes) — 14 states × 11 dims packed 4-per-vec
+ * - energies: array<vec4f, 4> (64 bytes) — 14 energies packed 4-per-vec
+ * - basisCount: u32 + 3×u32 padding (16 bytes)
+ */
+function packHydrogenBasisForGPU(basis: HydrogenBasisState[], dimension: number): ArrayBuffer {
+  const buffer = new ArrayBuffer(704)
+  const i32View = new Int32Array(buffer, 0, 156) // 39 vec4i = 156 ints
+  const f32View = new Float32Array(buffer, 624, 16) // 4 vec4f = 16 floats
+  const u32View = new Uint32Array(buffer, 688, 4) // basisCount + 3 padding
+
+  const maxDims = 11
+  for (let k = 0; k < basis.length; k++) {
+    const state = basis[k]!
+    // dim 0=n, 1=l, 2=m, 3+=extraDimN[i]
+    const flatBase = k * maxDims
+    i32View[flatBase + 0] = state.n
+    i32View[flatBase + 1] = state.l
+    i32View[flatBase + 2] = state.m
+    const extraCount = Math.min(dimension - 3, state.extraDimN.length)
+    for (let d = 0; d < extraCount; d++) {
+      i32View[flatBase + 3 + d] = state.extraDimN[d]!
+    }
+
+    // Energy
+    f32View[k] = state.energy
+  }
+
+  u32View[0] = basis.length
+  return buffer
 }
 
 type CameraMatrix = { elements: ArrayLike<number> }
@@ -193,6 +252,8 @@ export interface SchrodingerRendererConfig {
    *  HO momentum uses CPU uniform transform; hydrogen momentum uses shader path.
    *  Wigner uses 2D pipeline for phase-space visualization. */
   representation?: 'position' | 'momentum' | 'wigner'
+  /** Open quantum system — density matrix + Lindblad evolution (compile-time shader selection). */
+  openQuantumEnabled?: boolean
 }
 
 /**
@@ -269,6 +330,22 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   private densityGridPass: DensityGridComputePass | null = null
   private densityGridInitialized = false
   private densityGridSampler: GPUSampler | null = null
+
+  // Open Quantum System state (density matrix + Lindblad evolution)
+  private openQuantumState: DensityMatrix | null = null
+  private openQuantumPackedBuffer: Float32Array = createPackedBuffer()
+  private openQuantumFrameCounter = 0
+  private openQuantumLastVonNeumann = 0
+  private openQuantumInitialized = false
+  private openQuantumResetTokenSeen = -1
+
+  // Hydrogen open quantum: cached basis, rates, propagator
+  private hydrogenBasis: HydrogenBasisState[] | null = null
+  private hydrogenRates: TransitionRate[] | null = null
+  private hydrogenChannels: LindbladChannel[] | null = null
+  private hydrogenPropagator: ComplexMatrix | null = null
+  private hydrogenBasisPackedBuffer: ArrayBuffer | null = null
+  private hydrogenOQConfigHash = ''
 
   // Free Scalar Field Compute Pass (Klein-Gordon lattice simulation)
   private freeScalarFieldPass: FreeScalarFieldComputePass | null = null
@@ -597,9 +674,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const dim = this.rendererConfig.dimension ?? 3
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
     const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics'
+    const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
     // Free scalar / TDSE require volumetric 3D rendering — override 2D pipeline
     const pipelineIs2D = !isFreeScalar && !isTdse && (dim === 2 || this.rendererConfig.representation === 'wigner')
-    const forceRgba = dim > 3
+    const openQuantumEnabled = this.rendererConfig.openQuantumEnabled ?? false
+    const forceRgba = dim > 3 || openQuantumEnabled
 
     // =====================================================================
     // Phase 1: Construct compute passes and start parallel initialization
@@ -616,14 +695,30 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.tdsePass?.dispose()
     this.tdsePass = null
 
+    // Reset open quantum state on pipeline rebuild (new shader variant)
+    this.openQuantumState = null
+    this.openQuantumInitialized = false
+    this.openQuantumFrameCounter = 0
+    this.openQuantumResetTokenSeen = -1
+    // Reset hydrogen-specific open quantum caches
+    this.hydrogenBasis = null
+    this.hydrogenRates = null
+    this.hydrogenChannels = null
+    this.hydrogenPropagator = null
+    this.hydrogenBasisPackedBuffer = null
+    this.hydrogenOQConfigHash = ''
+
     let densityPromise: Promise<void> | null = null
     if (!pipelineIs2D && !isFreeScalar && !isTdse) {
+      const isHydrogenOQ = openQuantumEnabled && isHydrogen
       this.densityGridPass = new DensityGridComputePass({
         dimension: dim,
         quantumMode: this.rendererConfig.quantumMode as 'harmonicOscillator' | 'hydrogenND',
         termCount: this.rendererConfig.termCount,
         gridSize: this.shaderConfig.densityGridSize,
         forceRgba,
+        useDensityMatrix: openQuantumEnabled,
+        useHydrogenBasis: isHydrogenOQ,
       })
       densityPromise = this.densityGridPass.initialize(ctx)
     }
@@ -1584,6 +1679,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       this.cachedPreset = preset
       this.cachedPresetConfig = { ...currentConfig }
       this.flattenedPreset = flattenPresetForUniforms(preset)
+      // Reset open quantum state so density matrix re-initializes from new coefficients
+      this.openQuantumInitialized = false
     }
 
     // Compute effective momentum scale incorporating display units.
@@ -2745,6 +2842,147 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       // Sync bounding radius so density grid covers the full wavefunction extent
       gridPass.updateWorldBound(ctx.device, this.boundingRadius)
 
+      // Open quantum system: evolve density matrix and upload to GPU
+      if (this.rendererConfig.openQuantumEnabled && this.cachedPreset) {
+        const oqConfig = extended?.schroedinger?.openQuantum
+        if (oqConfig?.enabled) {
+          const resetToken = oqConfig.resetToken ?? 0
+          if (resetToken !== this.openQuantumResetTokenSeen) {
+            this.openQuantumInitialized = false
+            this.openQuantumResetTokenSeen = resetToken
+          }
+
+          const isHydrogenOQ = this.rendererConfig.quantumMode === 'hydrogenND'
+
+          if (isHydrogenOQ) {
+            // ── Hydrogen mode: physics-rigorous propagator-based evolution ──
+            const dim = this.rendererConfig.dimension ?? 3
+            const maxN = oqConfig.hydrogenBasisMaxN ?? 2
+            const schCfg = extended?.schroedinger
+            const extraDimOmega = (schCfg?.extraDimOmega as number[] | undefined) ?? []
+            const dt = oqConfig.dt ?? 0.01
+            const substeps = oqConfig.substeps ?? 4
+
+            // Config hash for cache invalidation
+            const hash = `h:${maxN}:${dim}:${oqConfig.bathTemperature}:${oqConfig.couplingScale}:${oqConfig.dephasingRate}:${oqConfig.dephasingModel}:${dt}:${substeps}:${extraDimOmega.join(',')}`
+
+            if (hash !== this.hydrogenOQConfigHash) {
+              // Rebuild basis, rates, channels, Liouvillian, propagator
+              this.hydrogenBasis = buildHydrogenBasis(maxN, dim, extraDimOmega)
+              const K = this.hydrogenBasis.length
+              const energies = basisEnergies(this.hydrogenBasis)
+              this.hydrogenRates = buildTransitionRates(
+                this.hydrogenBasis, oqConfig.bathTemperature ?? 300, oqConfig.couplingScale ?? 1.0,
+              )
+              this.hydrogenChannels = buildHydrogenChannels(
+                this.hydrogenBasis, this.hydrogenRates,
+                oqConfig.dephasingRate ?? 0.5,
+                (oqConfig.dephasingModel ?? 'uniform') !== 'none',
+              )
+              const liouvillian = buildLiouvillian(energies, this.hydrogenChannels, K)
+              this.hydrogenPropagator = computePropagator(liouvillian, dt * substeps, K)
+
+              // Pack hydrogen basis data for GPU upload
+              this.hydrogenBasisPackedBuffer = packHydrogenBasisForGPU(this.hydrogenBasis, dim)
+
+              this.hydrogenOQConfigHash = hash
+              // Force ρ re-initialization with new basis size
+              this.openQuantumInitialized = false
+            }
+
+            const basis = this.hydrogenBasis!
+            const K = basis.length
+
+            // Initialize ρ as ground state |0⟩⟨0| (1s orbital)
+            if (!this.openQuantumState || this.openQuantumState.K !== K || !this.openQuantumInitialized) {
+              const coeffsRe = new Float64Array(K)
+              coeffsRe[0] = 1.0 // ground state
+              this.openQuantumState = densityMatrixFromCoefficients(coeffsRe, new Float64Array(K), K)
+              this.openQuantumInitialized = true
+              this.openQuantumFrameCounter = 0
+              this.openQuantumLastVonNeumann = 0
+            }
+
+            // Evolve via cached propagator (single matvec per frame)
+            evolvePropagatorStep(this.hydrogenPropagator!, this.openQuantumState)
+
+            // Compute metrics
+            this.openQuantumFrameCounter++
+            const includeVonNeumann = (this.openQuantumFrameCounter % 4) === 0
+            const metrics = computeMetrics(
+              this.openQuantumState, includeVonNeumann, this.openQuantumLastVonNeumann,
+            )
+            if (includeVonNeumann) {
+              this.openQuantumLastVonNeumann = metrics.vonNeumannEntropy
+            }
+            const diagStore = useOpenQuantumDiagnosticsStore.getState()
+            diagStore.pushMetrics(metrics)
+
+            // Extract per-state populations ρ_{kk} and push to diagnostics
+            const pops = new Float32Array(K)
+            const el = this.openQuantumState.elements
+            for (let k = 0; k < K; k++) {
+              pops[k] = el[2 * (k * K + k)]!
+            }
+            diagStore.setPopulations(pops, basisLabels(basis))
+
+            // Upload ρ + metrics (pack with activeK = K for expanded 14×14 layout)
+            packForGPU(this.openQuantumState, metrics, this.openQuantumPackedBuffer, K)
+            gridPass.updateOpenQuantumUniforms(ctx.device, this.openQuantumPackedBuffer)
+
+            // Upload hydrogen basis quantum numbers for per-basis GPU evaluation
+            gridPass.updateHydrogenBasisUniforms(ctx.device, this.hydrogenBasisPackedBuffer!)
+          } else {
+            // ── HO mode: split-step Lindblad integration ──
+            const K = this.cachedPreset.termCount
+
+            // Initialize ρ from pure-state coefficients on first frame or preset change
+            if (!this.openQuantumState || this.openQuantumState.K !== K || !this.openQuantumInitialized) {
+              const coeffsRe = new Float64Array(K)
+              const coeffsIm = new Float64Array(K)
+              for (let k = 0; k < K; k++) {
+                const pair = this.cachedPreset.coefficients[k]
+                coeffsRe[k] = pair?.[0] ?? 0
+                coeffsIm[k] = pair?.[1] ?? 0
+              }
+              this.openQuantumState = densityMatrixFromCoefficients(coeffsRe, coeffsIm, K)
+              this.openQuantumInitialized = true
+              this.openQuantumFrameCounter = 0
+              this.openQuantumLastVonNeumann = 0
+            }
+
+            // Build Lindblad channels from config
+            const channels = buildLindbladChannels(oqConfig, K)
+
+            // Build energy array (Float64Array for integrator)
+            const energies = new Float64Array(K)
+            for (let k = 0; k < K; k++) {
+              energies[k] = this.cachedPreset.energies[k] ?? 0
+            }
+
+            // Evolve: split-step integration
+            const dt = oqConfig.dt ?? 0.01
+            const substeps = oqConfig.substeps ?? 4
+            evolveMultiStep(this.openQuantumState, energies, channels, dt, substeps)
+
+            // Compute metrics (von Neumann entropy every 4th frame)
+            this.openQuantumFrameCounter++
+            const includeVonNeumann = (this.openQuantumFrameCounter % 4) === 0
+            const metrics = computeMetrics(
+              this.openQuantumState, includeVonNeumann, this.openQuantumLastVonNeumann,
+            )
+            if (includeVonNeumann) {
+              this.openQuantumLastVonNeumann = metrics.vonNeumannEntropy
+            }
+            useOpenQuantumDiagnosticsStore.getState().pushMetrics(metrics)
+
+            // Pack ρ + metrics into GPU buffer and upload
+            packForGPU(this.openQuantumState, metrics, this.openQuantumPackedBuffer)
+            gridPass.updateOpenQuantumUniforms(ctx.device, this.openQuantumPackedBuffer)
+          }
+        }
+      }
+
       // Execute compute pass - fills the 3D density texture
       gridPass.execute(ctx)
       // Internal compute pass is not graph-registered, so trigger its post-frame hook here.
@@ -3051,6 +3289,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.densityGridPass = null
     this.densityGridInitialized = false
     this.densityGridSampler = null
+
+    // Clean up open quantum state
+    this.openQuantumState = null
+    this.openQuantumInitialized = false
+    this.openQuantumFrameCounter = 0
+    this.openQuantumResetTokenSeen = -1
+    this.hydrogenBasis = null
+    this.hydrogenRates = null
+    this.hydrogenChannels = null
+    this.hydrogenPropagator = null
+    this.hydrogenBasisPackedBuffer = null
+    this.hydrogenOQConfigHash = ''
 
     this.freeScalarFieldPass?.dispose()
     this.freeScalarFieldPass = null

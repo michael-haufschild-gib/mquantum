@@ -281,6 +281,40 @@ const ALGO_BRANCH: Record<number, string> = {
     let saturation = mix(0.6, 0.95, smoothstep(0.0, 0.5, logNk));
     let lightness = mix(0.08, 0.55, logNk);
     col = hsl2rgb(hue, saturation, lightness);`,
+
+  // ===== OPEN QUANTUM COLOR ALGORITHMS =====
+  // In density matrix mode, the density grid's B channel (passed as 'phase')
+  // carries the coherence fraction: 1 - diag/total. 0 = fully diagonal (decohered),
+  // 1 = fully off-diagonal (maximally coherent).
+
+  16: /* wgsl */ `
+    // 16: Purity Map — warm tones, saturation from coherence fraction
+    // High coherence → vivid plasma, decohered → muted/desaturated
+    let coherence = clamp(phase, 0.0, 1.0);
+    let hue = mix(0.08, 0.02, normalized); // warm orange-red range
+    let saturation = mix(0.15, 0.9, coherence); // pure=vivid, mixed=muted
+    let lightness = mix(0.12, 0.52, normalized);
+    col = hsl2rgb(hue, saturation, lightness);`,
+
+  17: /* wgsl */ `
+    // 17: Entropy Map — blue (ordered/pure) to red (disordered/mixed)
+    // Maps coherence fraction to a diverging blue-white-red scale
+    let coherence = clamp(phase, 0.0, 1.0);
+    // Invert: high coherence = low entropy = blue, low coherence = high entropy = red
+    let entropy_t = 1.0 - coherence;
+    let hue = mix(0.62, 0.02, entropy_t); // blue(0.62) → red(0.02)
+    let saturation = mix(0.3, 0.85, abs(entropy_t - 0.5) * 2.0); // desaturate at midpoint
+    let lightness = mix(0.15, 0.55, normalized);
+    col = hsl2rgb(hue, saturation, lightness);`,
+
+  18: /* wgsl */ `
+    // 18: Coherence Map — cyan (high coherence) to amber (low coherence)
+    // Most informative: shows spatial variation of quantum coherence
+    let coherence = clamp(phase, 0.0, 1.0);
+    let hue = mix(0.1, 0.5, coherence); // amber(0.1) → cyan(0.5)
+    let saturation = mix(0.6, 0.92, coherence);
+    let lightness = mix(0.10, 0.50, normalized);
+    col = hsl2rgb(hue, saturation, lightness);`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -301,6 +335,9 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   13: 'Mode Character',
   14: 'Energy Flux',
   15: 'k-Space Occupation',
+  16: 'Purity Map',
+  17: 'Entropy Map',
+  18: 'Coherence Map',
 }
 
 export { ALGO_BRANCH, COLOR_ALG_NAMES }

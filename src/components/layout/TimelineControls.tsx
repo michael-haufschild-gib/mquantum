@@ -15,9 +15,10 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 import { AnimatePresence, m } from 'motion/react'
-import { useMemo, useState, type FC } from 'react'
+import { useEffect, useMemo, useState, type FC } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
+import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
 
 export const TimelineControls: FC = () => {
   // Consolidated geometry store subscription
@@ -97,9 +98,22 @@ export const TimelineControls: FC = () => {
 
   // Animation should only be paused when NOTHING is animating
   const hasAnythingToAnimate = hasAnimatingPlanes || isAnimating
+  const isSchroedinger = getConfigStoreKey(objectType) === 'schroedinger'
+  const supportsOpenQuantumControls =
+    isSchroedinger &&
+    (schroedingerConfig.quantumMode === 'harmonicOscillator' ||
+      schroedingerConfig.quantumMode === 'hydrogenND') &&
+    schroedingerConfig.representation !== 'wigner'
 
   const [showRotation, setShowRotation] = useState(false)
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
+  const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
+
+  useEffect(() => {
+    if (!supportsOpenQuantumControls) {
+      setShowOpenQDrawer(false)
+    }
+  }, [supportsOpenQuantumControls])
 
   return (
     <div className="flex flex-col w-full h-full relative">
@@ -180,8 +194,13 @@ export const TimelineControls: FC = () => {
         )}
 
         {/* Schroedinger Animation Drawer */}
-        {showAnimDrawer && getConfigStoreKey(objectType) === 'schroedinger' && (
+        {showAnimDrawer && isSchroedinger && (
           <SchroedingerAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
+        )}
+
+        {/* Schroedinger Open Quantum Drawer */}
+        {showOpenQDrawer && supportsOpenQuantumControls && (
+          <SchroedingerOpenQuantumDrawer onClose={() => setShowOpenQDrawer(false)} />
         )}
       </AnimatePresence>
 
@@ -252,6 +271,7 @@ export const TimelineControls: FC = () => {
               onToggle={() => {
                 setShowAnimDrawer(!showAnimDrawer)
                 setShowRotation(false)
+                setShowOpenQDrawer(false)
               }}
               sound="swish"
               ariaLabel="Toggle animations drawer"
@@ -266,11 +286,28 @@ export const TimelineControls: FC = () => {
             </ToggleButton>
           )}
 
+          {supportsOpenQuantumControls && (
+            <ToggleButton
+              pressed={showOpenQDrawer}
+              onToggle={() => {
+                setShowOpenQDrawer(!showOpenQDrawer)
+                setShowAnimDrawer(false)
+                setShowRotation(false)
+              }}
+              sound="swish"
+              ariaLabel="Toggle open quantum drawer"
+              className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+            >
+              Open Q
+            </ToggleButton>
+          )}
+
           <ToggleButton
             pressed={showRotation}
             onToggle={() => {
               setShowRotation(!showRotation)
               setShowAnimDrawer(false)
+              setShowOpenQDrawer(false)
             }}
             sound="swish"
             ariaLabel="Toggle rotation drawer"

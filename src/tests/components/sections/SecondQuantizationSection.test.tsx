@@ -148,6 +148,34 @@ describe('SecondQuantizationSection', () => {
     expect(screen.getByTestId('sq-occupation-table')).toBeInTheDocument()
   })
 
+  it('renders probability fills with valid accent token and width matching label percentage', () => {
+    render(
+      <SecondQuantizationSection
+        config={{
+          ...DEFAULT_SCHROEDINGER_CONFIG,
+          sqLayerEnabled: true,
+          sqLayerShowOccupation: true,
+          sqLayerMode: 'fock',
+          sqLayerFockQuantumNumber: 0,
+        }}
+        dimension={3}
+        actions={actions}
+      />
+    )
+
+    expandSection()
+
+    const hundredPercentLabel = screen.getByText('100.0%')
+    const row = hundredPercentLabel.parentElement
+    expect(row).not.toBeNull()
+
+    const fill = row?.querySelector<HTMLDivElement>('div.flex-1 > div')
+    expect(fill).toBeTruthy()
+    expect(fill?.classList.contains('bg-accent')).toBe(true)
+    expect(fill?.classList.contains('bg-accent-cyan')).toBe(false)
+    expect(fill).toHaveStyle({ width: '100%' })
+  })
+
   it('displays uncertainty card when enabled', () => {
     render(
       <SecondQuantizationSection

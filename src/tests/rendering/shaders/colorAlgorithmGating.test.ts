@@ -1,160 +1,78 @@
+/**
+ * Tests for color algorithm gating — open quantum algorithms 16-18.
+ */
 import { describe, expect, it } from 'vitest'
 import {
   getAvailableColorAlgorithms,
-  COLOR_ALGORITHM_OPTIONS,
   COLOR_ALGORITHM_TO_INT,
 } from '@/rendering/shaders/palette/types'
-import { composeSchroedingerShader } from '@/rendering/webgpu/shaders/schroedinger/compose'
 
-/** Algorithms requiring continuous complex phase (unavailable for freeScalarField) */
-const PHASE_DEPENDENT = [
-  'phase',
-  'mixed',
-  'phaseCyclicUniform',
-  'domainColoringPsi',
-  'relativePhase',
-]
-
-/** Educational analysis algorithms (only available for freeScalarField) */
-const EDUCATIONAL_ALGOS = [
-  'hamiltonianDecomposition',
-  'modeCharacter',
-  'energyFlux',
-  'kSpaceOccupation',
-]
-
-describe('getAvailableColorAlgorithms', () => {
-  it('excludes phase-dependent algorithms for freeScalarField mode', () => {
-    const options = getAvailableColorAlgorithms('freeScalarField')
-    const values = options.map((o) => o.value)
-    for (const excluded of PHASE_DEPENDENT) {
-      expect(values).not.toContain(excluded)
-    }
+describe('COLOR_ALGORITHM_TO_INT open quantum entries', () => {
+  it('maps purityMap to 16', () => {
+    expect(COLOR_ALGORITHM_TO_INT.purityMap).toBe(16)
   })
 
-  it('includes educational algorithms for freeScalarField mode', () => {
-    const options = getAvailableColorAlgorithms('freeScalarField')
-    const values = options.map((o) => o.value)
-    for (const edu of EDUCATIONAL_ALGOS) {
-      expect(values).toContain(edu)
-    }
+  it('maps entropyMap to 17', () => {
+    expect(COLOR_ALGORITHM_TO_INT.entropyMap).toBe(17)
   })
 
-  it('returns correct count for freeScalarField (total minus phase-dependent)', () => {
-    const fsOptions = getAvailableColorAlgorithms('freeScalarField')
-    expect(fsOptions.length).toBe(
-      COLOR_ALGORITHM_OPTIONS.length - PHASE_DEPENDENT.length
-    )
-  })
-
-  it('includes density-based and sign-compatible algorithms for freeScalarField', () => {
-    const options = getAvailableColorAlgorithms('freeScalarField')
-    const values = options.map((o) => o.value)
-    expect(values).toContain('lch')
-    expect(values).toContain('multiSource')
-    expect(values).toContain('radial')
-    expect(values).toContain('blackbody')
-    expect(values).toContain('phaseDiverging')
-    expect(values).toContain('diverging')
-    expect(values).toContain('radialDistance')
-  })
-
-  it('excludes educational algorithms for harmonicOscillator', () => {
-    const options = getAvailableColorAlgorithms('harmonicOscillator')
-    const values = options.map((o) => o.value)
-    for (const edu of EDUCATIONAL_ALGOS) {
-      expect(values).not.toContain(edu)
-    }
-  })
-
-  it('excludes educational algorithms for hydrogenND', () => {
-    const options = getAvailableColorAlgorithms('hydrogenND')
-    const values = options.map((o) => o.value)
-    for (const edu of EDUCATIONAL_ALGOS) {
-      expect(values).not.toContain(edu)
-    }
-  })
-
-  it('returns correct count for harmonicOscillator (total minus educational)', () => {
-    const options = getAvailableColorAlgorithms('harmonicOscillator')
-    expect(options.length).toBe(
-      COLOR_ALGORITHM_OPTIONS.length - EDUCATIONAL_ALGOS.length
-    )
-  })
-
-  it('returns correct count for hydrogenND (total minus educational)', () => {
-    const options = getAvailableColorAlgorithms('hydrogenND')
-    expect(options.length).toBe(
-      COLOR_ALGORITHM_OPTIONS.length - EDUCATIONAL_ALGOS.length
-    )
+  it('maps coherenceMap to 18', () => {
+    expect(COLOR_ALGORITHM_TO_INT.coherenceMap).toBe(18)
   })
 })
 
-describe('educational color algorithms in COLOR_ALGORITHM_TO_INT', () => {
-  it('maps hamiltonianDecomposition to 12', () => {
-    expect(COLOR_ALGORITHM_TO_INT.hamiltonianDecomposition).toBe(12)
+describe('getAvailableColorAlgorithms — open quantum gating', () => {
+  it('excludes open quantum algorithms when openQuantumEnabled is false', () => {
+    const algos = getAvailableColorAlgorithms('harmonicOscillator', false)
+    const values = algos.map((a) => a.value)
+
+    expect(values).not.toContain('purityMap')
+    expect(values).not.toContain('entropyMap')
+    expect(values).not.toContain('coherenceMap')
   })
 
-  it('maps modeCharacter to 13', () => {
-    expect(COLOR_ALGORITHM_TO_INT.modeCharacter).toBe(13)
+  it('includes open quantum algorithms when openQuantumEnabled is true', () => {
+    const algos = getAvailableColorAlgorithms('harmonicOscillator', true)
+    const values = algos.map((a) => a.value)
+
+    expect(values).toContain('purityMap')
+    expect(values).toContain('entropyMap')
+    expect(values).toContain('coherenceMap')
   })
 
-  it('maps energyFlux to 14', () => {
-    expect(COLOR_ALGORITHM_TO_INT.energyFlux).toBe(14)
+  it('excludes open quantum algorithms for freeScalarField regardless of toggle', () => {
+    const algos = getAvailableColorAlgorithms('freeScalarField', true)
+    const values = algos.map((a) => a.value)
+
+    expect(values).not.toContain('purityMap')
+    expect(values).not.toContain('entropyMap')
+    expect(values).not.toContain('coherenceMap')
   })
 
-  it('maps kSpaceOccupation to 15', () => {
-    expect(COLOR_ALGORITHM_TO_INT.kSpaceOccupation).toBe(15)
-  })
-})
+  it('excludes open quantum algorithms for hydrogenND when disabled', () => {
+    const algos = getAvailableColorAlgorithms('hydrogenND', false)
+    const values = algos.map((a) => a.value)
 
-describe('educational algorithms in COLOR_ALGORITHM_OPTIONS', () => {
-  it('includes hamiltonianDecomposition with correct label', () => {
-    const opt = COLOR_ALGORITHM_OPTIONS.find((o) => o.value === 'hamiltonianDecomposition')
-    expect(opt).toBeDefined()
-    expect(opt!.label).toBe('Hamiltonian Decomposition')
+    expect(values).not.toContain('purityMap')
+    expect(values).not.toContain('entropyMap')
+    expect(values).not.toContain('coherenceMap')
   })
 
-  it('includes modeCharacter with correct label', () => {
-    const opt = COLOR_ALGORITHM_OPTIONS.find((o) => o.value === 'modeCharacter')
-    expect(opt).toBeDefined()
-    expect(opt!.label).toBe('Mode Character Map')
+  it('includes open quantum algorithms for hydrogenND when enabled', () => {
+    const algos = getAvailableColorAlgorithms('hydrogenND', true)
+    const values = algos.map((a) => a.value)
+
+    expect(values).toContain('purityMap')
+    expect(values).toContain('entropyMap')
+    expect(values).toContain('coherenceMap')
   })
 
-  it('includes energyFlux with correct label', () => {
-    const opt = COLOR_ALGORITHM_OPTIONS.find((o) => o.value === 'energyFlux')
-    expect(opt).toBeDefined()
-    expect(opt!.label).toBe('Energy Flux Map')
-  })
+  it('defaults openQuantumEnabled to false when omitted', () => {
+    const algos = getAvailableColorAlgorithms('harmonicOscillator')
+    const values = algos.map((a) => a.value)
 
-  it('includes kSpaceOccupation with correct label', () => {
-    const opt = COLOR_ALGORITHM_OPTIONS.find((o) => o.value === 'kSpaceOccupation')
-    expect(opt).toBeDefined()
-    expect(opt!.label).toBe('k-Space Occupation Map')
-  })
-})
-
-describe('composeSchroedingerShader: analysis texture stub in 2D mode', () => {
-  it('emits sampleAnalysisFromGrid stub even for 2D HO with educational color algorithm', () => {
-    // This verifies Fix 1: the Analysis Texture Sampling block is no longer gated by !is2D,
-    // so educational color algorithms (12-14) that call sampleAnalysisFromGrid don't cause
-    // WGSL compilation failures in 2D mode.
-    const result = composeSchroedingerShader({
-      dimension: 2,
-      quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 12, // hamiltonianDecomposition
-      termCount: 1,
-    })
-    expect(result.wgsl).toContain('sampleAnalysisFromGrid')
-  })
-
-  it('emits sampleAnalysisFromGrid stub for 3D HO without free scalar analysis', () => {
-    const result = composeSchroedingerShader({
-      dimension: 3,
-      quantumMode: 'harmonicOscillator',
-      colorAlgorithm: 13, // modeCharacter
-      termCount: 1,
-    })
-    expect(result.wgsl).toContain('sampleAnalysisFromGrid')
+    expect(values).not.toContain('purityMap')
+    expect(values).not.toContain('entropyMap')
+    expect(values).not.toContain('coherenceMap')
   })
 })

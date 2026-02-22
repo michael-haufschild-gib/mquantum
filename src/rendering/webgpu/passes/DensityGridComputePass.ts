@@ -58,6 +58,10 @@ export interface DensityGridComputeConfig {
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Force rgba16float format (ensures phase data for dim > 3 momentum mode) */
   forceRgba?: boolean
+  /** Use density matrix evaluation (open quantum system mode) */
+  useDensityMatrix?: boolean
+  /** Use hydrogen basis buffer for per-basis quantum numbers (hydrogen + density matrix) */
+  useHydrogenBasis?: boolean
 }
 
 /**
@@ -73,7 +77,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private static readonly MAX_PIPELINE_CACHE_SIZE = 8
 
   private static computeCacheKey(config: DensityGridComputeConfig, format: string): string {
-    return `density:${config.dimension}:${config.quantumMode ?? 'harmonicOscillator'}:${config.termCount ?? -1}:${format}`
+    return `density:${config.dimension}:${config.quantumMode ?? 'harmonicOscillator'}:${config.termCount ?? -1}:${format}:${config.useDensityMatrix ? 'dm' : ''}:${config.useHydrogenBasis ? 'hb' : ''}`
   }
 
   /** Clear the static pipeline cache (e.g. on device loss). */
@@ -90,6 +94,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private gridParamsBuffer: GPUBuffer | null = null
   private schroedingerBuffer: GPUBuffer | null = null
   private basisBuffer: GPUBuffer | null = null
+  private openQuantumBuffer: GPUBuffer | null = null
+  private hydrogenBasisBuffer: GPUBuffer | null = null
   private computeBindGroup: GPUBindGroup | null = null
   private computeBindGroupLayout: GPUBindGroupLayout | null = null
 
@@ -156,6 +162,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
       quantumMode: this.passConfig.quantumMode,
       termCount: this.passConfig.termCount,
       storageFormat: this.densityTextureFormat,
+      useDensityMatrix: this.passConfig.useDensityMatrix,
     })
 
     // Create shader module
@@ -209,52 +216,88 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // Initialize grid params
     this.updateGridParams(device)
 
+    // Create open quantum buffer if density matrix mode is active
+    // Buffer size: 98 vec4f (rho) + 2 vec4f (metrics) = 400 floats = 1600 bytes
+    if (this.passConfig.useDensityMatrix) {
+      this.openQuantumBuffer = this.createUniformBuffer(device, 1600, 'density-open-quantum')
+    }
+
+    // Create hydrogen basis buffer if hydrogen + density matrix mode
+    // Layout: 39 vec4i (quantumNumbers) + 4 vec4f (energies) + 1 vec4u (basisCount+pad)
+    // = (39 + 4 + 1) * 16 = 704 bytes
+    if (this.passConfig.useHydrogenBasis) {
+      this.hydrogenBasisBuffer = this.createUniformBuffer(device, 704, 'density-hydrogen-basis')
+    }
+
     // Create bind group layout for compute shader
     // All bindings in group 0:
     // - binding 0: SchroedingerUniforms (uniform)
     // - binding 1: BasisVectors (uniform)
     // - binding 2: GridParams (uniform)
     // - binding 3: densityGrid (storage texture, write)
+    // - binding 4: OpenQuantumUniforms (uniform) — only when useDensityMatrix
+    const layoutEntries: GPUBindGroupLayoutEntry[] = [
+      {
+        binding: 0,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' as const },
+      },
+      {
+        binding: 1,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' as const },
+      },
+      {
+        binding: 2,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' as const },
+      },
+      {
+        binding: 3,
+        visibility: GPUShaderStage.COMPUTE,
+        storageTexture: {
+          access: 'write-only' as const,
+          format: this.densityTextureFormat,
+          viewDimension: '3d' as GPUTextureViewDimension,
+        },
+      },
+    ]
+    if (this.passConfig.useDensityMatrix) {
+      layoutEntries.push({
+        binding: 4,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' as const },
+      })
+    }
+    if (this.passConfig.useHydrogenBasis) {
+      layoutEntries.push({
+        binding: 5,
+        visibility: GPUShaderStage.COMPUTE,
+        buffer: { type: 'uniform' as const },
+      })
+    }
     this.computeBindGroupLayout = device.createBindGroupLayout({
       label: 'density-grid-compute-bgl',
-      entries: [
-        {
-          binding: 0,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' as const },
-        },
-        {
-          binding: 1,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' as const },
-        },
-        {
-          binding: 2,
-          visibility: GPUShaderStage.COMPUTE,
-          buffer: { type: 'uniform' as const },
-        },
-        {
-          binding: 3,
-          visibility: GPUShaderStage.COMPUTE,
-          storageTexture: {
-            access: 'write-only' as const,
-            format: this.densityTextureFormat,
-            viewDimension: '3d' as GPUTextureViewDimension,
-          },
-        },
-      ],
+      entries: layoutEntries,
     })
 
     // Create bind group
+    const bindGroupEntries: GPUBindGroupEntry[] = [
+      { binding: 0, resource: { buffer: this.schroedingerBuffer } },
+      { binding: 1, resource: { buffer: this.basisBuffer } },
+      { binding: 2, resource: { buffer: this.gridParamsBuffer } },
+      { binding: 3, resource: this.densityTextureView! },
+    ]
+    if (this.passConfig.useDensityMatrix && this.openQuantumBuffer) {
+      bindGroupEntries.push({ binding: 4, resource: { buffer: this.openQuantumBuffer } })
+    }
+    if (this.passConfig.useHydrogenBasis && this.hydrogenBasisBuffer) {
+      bindGroupEntries.push({ binding: 5, resource: { buffer: this.hydrogenBasisBuffer } })
+    }
     this.computeBindGroup = device.createBindGroup({
       label: 'density-grid-compute-bg',
       layout: this.computeBindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.schroedingerBuffer } },
-        { binding: 1, resource: { buffer: this.basisBuffer } },
-        { binding: 2, resource: { buffer: this.gridParamsBuffer } },
-        { binding: 3, resource: this.densityTextureView! },
-      ],
+      entries: bindGroupEntries,
     })
 
     // Check pipeline cache before compiling
@@ -287,6 +330,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private async selectGridTextureFormat(
     device: GPUDevice
   ): Promise<'r16float' | 'rgba16float'> {
+    // Density matrix mode requires rgba16float for coherence fraction in channel B
+    if (this.passConfig.useDensityMatrix) return 'rgba16float'
     if (this.passConfig.forceRgba) return 'rgba16float'
     const r16floatSupported = await this.supportsStorageTextureFormat(device, 'r16float')
     return r16floatSupported ? 'r16float' : 'rgba16float'
@@ -374,6 +419,30 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.needsRecompute = true
     this.shouldRefreshDistribution = true
     this.lastSchroedingerVersion = version
+  }
+
+  /**
+   * Upload open quantum density matrix uniforms to the GPU buffer.
+   *
+   * @param device - GPU device
+   * @param data - Packed Float32Array (136 floats = 544 bytes) from statePacking.packForGPU
+   */
+  updateOpenQuantumUniforms(device: GPUDevice, data: Float32Array): void {
+    if (!this.openQuantumBuffer) return
+    device.queue.writeBuffer(this.openQuantumBuffer, 0, data)
+    this.needsRecompute = true
+  }
+
+  /**
+   * Upload hydrogen basis per-state quantum numbers to GPU.
+   *
+   * @param device - GPU device
+   * @param data - Packed buffer (Int32Array for quantumNumbers, Float32Array for energies+count)
+   */
+  updateHydrogenBasisUniforms(device: GPUDevice, data: ArrayBuffer): void {
+    if (!this.hydrogenBasisBuffer) return
+    device.queue.writeBuffer(this.hydrogenBasisBuffer, 0, data)
+    this.needsRecompute = true
   }
 
   /**
@@ -706,6 +775,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.schroedingerBuffer = null
     this.basisBuffer?.destroy()
     this.basisBuffer = null
+    this.openQuantumBuffer?.destroy()
+    this.openQuantumBuffer = null
+    this.hydrogenBasisBuffer?.destroy()
+    this.hydrogenBasisBuffer = null
     this.computeBindGroup = null
     this.computeBindGroupLayout = null
     if (this.densityReadbackBuffer) {

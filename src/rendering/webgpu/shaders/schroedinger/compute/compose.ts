@@ -62,12 +62,21 @@ import {
   generateHydrogenNDDispatchBlock,
 } from '../quantum/hydrogenNDVariants.wgsl'
 
+// Single basis evaluation for density matrix mode
+import { generateSingleBasisBlock } from '../quantum/singleBasis.wgsl'
+
+// Open quantum uniforms and hydrogen basis uniforms
+import { openQuantumUniformsBlock, hydrogenBasisUniformsBlock } from '../uniforms.wgsl'
+
 // Compute-specific blocks
 import {
   gridParamsBlock,
   generateDensityGridBindingsBlock,
+  generateDensityGridBindingsWithOpenQuantumBlock,
+  generateDensityGridBindingsWithHydrogenBasisBlock,
   densityGridComputeBlock,
   densityGridWithPhaseComputeBlock,
+  densityMatrixComputeBlock,
 } from './densityGrid.wgsl'
 
 /** Quantum mode for compute shader */
@@ -85,6 +94,8 @@ export interface DensityGridComputeConfig {
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Storage texture format for the grid payload */
   storageFormat?: 'r16float' | 'rgba16float'
+  /** Use density matrix evaluation (open quantum system mode) */
+  useDensityMatrix?: boolean
 }
 
 /**
@@ -106,6 +117,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     quantumMode = 'harmonicOscillator',
     termCount,
     storageFormat = 'r16float',
+    useDensityMatrix = false,
   } = config
 
   const defines: string[] = []
@@ -168,6 +180,12 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
   features.push('Density Grid Compute')
   features.push(`Grid Format: ${storageFormat}`)
+  if (useDensityMatrix) {
+    features.push('Density Matrix (Open Quantum)')
+    defines.push('const USE_DENSITY_MATRIX: bool = true;')
+  } else {
+    defines.push('const USE_DENSITY_MATRIX: bool = false;')
+  }
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
@@ -213,11 +231,22 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     // Uniform structs (SchroedingerUniforms, BasisVectors)
     { name: 'Schrödinger Uniforms', content: schroedingerUniformsBlock },
 
+    // Open quantum uniforms struct (always include struct definition for type completeness)
+    { name: 'Open Quantum Uniforms', content: openQuantumUniformsBlock, condition: useDensityMatrix },
+
+    // Hydrogen basis uniforms struct (density matrix + hydrogen mode)
+    { name: 'Hydrogen Basis Uniforms', content: hydrogenBasisUniformsBlock,
+      condition: useDensityMatrix && isHydrogenFamily },
+
     // Grid params struct
     { name: 'Grid Params', content: gridParamsBlock },
 
     // Compute shader bindings
-    { name: 'Compute Bindings', content: generateDensityGridBindingsBlock(storageFormat) },
+    { name: 'Compute Bindings', content: useDensityMatrix
+        ? (isHydrogenFamily
+            ? generateDensityGridBindingsWithHydrogenBasisBlock(storageFormat)
+            : generateDensityGridBindingsWithOpenQuantumBlock(storageFormat))
+        : generateDensityGridBindingsBlock(storageFormat) },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
 
@@ -281,10 +310,16 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: `Density mapPosToND (${actualDim}D)`, content: generateMapPosToND(actualDim) },
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
+    // Single basis function evaluation (density matrix mode only)
+    { name: 'Single Basis', content: generateSingleBasisBlock(
+      quantumMode as 'harmonicOscillator' | 'hydrogenND',
+      actualDim,
+    ), condition: useDensityMatrix },
+
     // ===== COMPUTE SHADER ENTRY POINT =====
-    // Use phase-aware compute block when rgba16float format is available
-    // (stores rho + logRho + spatialPhase vs rho-only for r16float)
-    { name: 'Compute Main', content: storageFormat === 'rgba16float' ? densityGridWithPhaseComputeBlock : densityGridComputeBlock },
+    { name: 'Compute Main', content: useDensityMatrix
+        ? densityMatrixComputeBlock
+        : (storageFormat === 'rgba16float' ? densityGridWithPhaseComputeBlock : densityGridComputeBlock) },
   ]
 
   // Assemble shader

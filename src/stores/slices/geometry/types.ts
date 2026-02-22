@@ -1,6 +1,7 @@
 import {
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
+  type OpenQuantumVisualizationMode,
   type TdseDriveWaveform,
   type TdseFieldView,
   type TdseInitialCondition,
@@ -290,6 +291,25 @@ export interface SchroedingerSliceActions {
   setTdseSlicePosition: (dimIndex: number, value: number) => void
   resetTdseField: () => void
   clearTdseNeedsReset: () => void
+
+  // Open Quantum System
+  setOpenQuantumEnabled: (enabled: boolean) => void
+  setOpenQuantumDephasingRate: (rate: number) => void
+  setOpenQuantumRelaxationRate: (rate: number) => void
+  setOpenQuantumThermalUpRate: (rate: number) => void
+  setOpenQuantumDt: (dt: number) => void
+  setOpenQuantumSubsteps: (n: number) => void
+  setOpenQuantumChannelEnabled: (
+    channel: 'dephasing' | 'relaxation' | 'thermal',
+    enabled: boolean,
+  ) => void
+  setOpenQuantumVisualizationMode: (mode: OpenQuantumVisualizationMode) => void
+  requestOpenQuantumStateReset: () => void
+  resetOpenQuantumToDefault: () => void
+  setOpenQuantumBathTemperature: (T: number) => void
+  setOpenQuantumCouplingScale: (s: number) => void
+  setOpenQuantumHydrogenBasisMaxN: (n: number) => void
+  setOpenQuantumDephasingModel: (model: 'none' | 'uniform') => void
 
   // Config Operations
   setSchroedingerConfig: (config: Partial<SchroedingerConfig>) => void

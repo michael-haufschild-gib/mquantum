@@ -30,11 +30,19 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       }))
     )
 
-    const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+    const { quantumMode, representation, openQuantumEnabled } = useExtendedObjectStore(
+      useShallow((s) => ({
+        quantumMode: s.schroedinger.quantumMode,
+        representation: s.schroedinger.representation,
+        openQuantumEnabled: s.schroedinger.openQuantum?.enabled ?? false,
+      }))
+    )
+    const effectiveOpenQuantumEnabled =
+      openQuantumEnabled && (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') && representation !== 'wigner'
 
     const availableOptions = useMemo(
-      () => getAvailableColorAlgorithms(quantumMode),
-      [quantumMode]
+      () => getAvailableColorAlgorithms(quantumMode, effectiveOpenQuantumEnabled),
+      [quantumMode, effectiveOpenQuantumEnabled]
     )
 
     const selectOptions = useMemo(

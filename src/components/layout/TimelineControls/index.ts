@@ -11,3 +11,4 @@ export { AnimationDrawerContainer } from './AnimationDrawerContainer'
 export type { AnimationDrawerContainerProps } from './AnimationDrawerContainer'
 
 export { SchroedingerAnimationDrawer } from './SchroedingerAnimationDrawer'
+export { SchroedingerOpenQuantumDrawer } from './SchroedingerOpenQuantumDrawer'

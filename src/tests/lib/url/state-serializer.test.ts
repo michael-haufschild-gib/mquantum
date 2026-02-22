@@ -130,6 +130,81 @@ describe('state-serializer', () => {
     })
   })
 
+  describe('open quantum params', () => {
+    it('serializes oq params when enabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        openQuantumEnabled: true,
+        openQuantumDephasingRate: 1.5,
+        openQuantumRelaxationRate: 0.3,
+        openQuantumThermalUpRate: 0.0,
+      }
+      const result = serializeState(state)
+      expect(result).toContain('oq=1')
+      expect(result).toContain('oq_dp=1.50')
+      expect(result).toContain('oq_rx=0.30')
+      // thermalUpRate=0 should be omitted
+      expect(result).not.toContain('oq_th')
+    })
+
+    it('omits all oq params when disabled', () => {
+      const state: ShareableState = {
+        dimension: 3,
+        objectType: 'schroedinger',
+        openQuantumEnabled: false,
+        openQuantumDephasingRate: 2.0,
+      }
+      const result = serializeState(state)
+      expect(result).not.toContain('oq')
+      expect(result).not.toContain('oq_dp')
+    })
+
+    it('deserializes oq params', () => {
+      const result = deserializeState('d=3&t=schroedinger&oq=1&oq_dp=1.50&oq_rx=0.30&oq_th=0.10')
+      expect(result.openQuantumEnabled).toBe(true)
+      expect(result.openQuantumDephasingRate).toBeCloseTo(1.5)
+      expect(result.openQuantumRelaxationRate).toBeCloseTo(0.3)
+      expect(result.openQuantumThermalUpRate).toBeCloseTo(0.1)
+    })
+
+    it('clamps oq rates to [0, 5]', () => {
+      const result = deserializeState('oq=1&oq_dp=-1&oq_rx=99')
+      expect(result.openQuantumDephasingRate).toBe(0)
+      expect(result.openQuantumRelaxationRate).toBe(5)
+    })
+
+    it('ignores oq rate params when oq is not 1', () => {
+      const result = deserializeState('oq_dp=2.0')
+      expect(result.openQuantumEnabled).toBeUndefined()
+      expect(result.openQuantumDephasingRate).toBeUndefined()
+    })
+
+    it('rejects non-finite oq rate values', () => {
+      const result = deserializeState('oq=1&oq_dp=NaN&oq_rx=Infinity')
+      expect(result.openQuantumDephasingRate).toBeUndefined()
+      expect(result.openQuantumRelaxationRate).toBeUndefined()
+    })
+
+    it('roundtrips open quantum state', () => {
+      const original: ShareableState = {
+        dimension: 4,
+        objectType: 'schroedinger',
+        openQuantumEnabled: true,
+        openQuantumDephasingRate: 2.5,
+        openQuantumRelaxationRate: 1.0,
+        openQuantumThermalUpRate: 0.5,
+      }
+      const serialized = serializeState(original)
+      const deserialized = deserializeState(serialized)
+
+      expect(deserialized.openQuantumEnabled).toBe(true)
+      expect(deserialized.openQuantumDephasingRate).toBeCloseTo(2.5)
+      expect(deserialized.openQuantumRelaxationRate).toBeCloseTo(1.0)
+      expect(deserialized.openQuantumThermalUpRate).toBeCloseTo(0.5)
+    })
+  })
+
   describe('generateShareUrl', () => {
     it('should generate URL with state params', () => {
       const originalWindow = globalThis.window

@@ -27,6 +27,9 @@ export type ColorAlgorithm =
   | 13 // Mode character map (wave-like vs mass-dominated)
   | 14 // Energy flux map (S direction + magnitude)
   | 15 // k-Space occupation map (FFT-based)
+  | 16 // Purity map (global purity → saturation)
+  | 17 // Entropy map (global von Neumann entropy → diverging scale)
+  | 18 // Coherence map (spatial coherence fraction → color)
 
 /**
  * Lighting mode for compile-time optimization

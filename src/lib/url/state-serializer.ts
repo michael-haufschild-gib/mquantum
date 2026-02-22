@@ -24,6 +24,14 @@ export interface ShareableObjectState {
   dimension: number
   objectType: ObjectType
   quantumMode?: SchroedingerQuantumMode
+  /** Open quantum system enabled (0/1) */
+  openQuantumEnabled?: boolean
+  /** Open quantum dephasing rate */
+  openQuantumDephasingRate?: number
+  /** Open quantum relaxation rate */
+  openQuantumRelaxationRate?: number
+  /** Open quantum thermal excitation rate */
+  openQuantumThermalUpRate?: number
 }
 
 /**
@@ -69,6 +77,20 @@ export function serializeState(state: ShareableState): string {
     params.set('qm', state.quantumMode)
   }
 
+  // Open quantum params (only serialized when enabled)
+  if (state.openQuantumEnabled) {
+    params.set('oq', '1')
+    if (state.openQuantumDephasingRate !== undefined && state.openQuantumDephasingRate > 0) {
+      params.set('oq_dp', state.openQuantumDephasingRate.toFixed(2))
+    }
+    if (state.openQuantumRelaxationRate !== undefined && state.openQuantumRelaxationRate > 0) {
+      params.set('oq_rx', state.openQuantumRelaxationRate.toFixed(2))
+    }
+    if (state.openQuantumThermalUpRate !== undefined && state.openQuantumThermalUpRate > 0) {
+      params.set('oq_th', state.openQuantumThermalUpRate.toFixed(2))
+    }
+  }
+
   return params.toString()
 }
 
@@ -107,6 +129,27 @@ export function deserializeState(searchParams: string): ParsedShareableState {
   const quantumMode = params.get('qm')
   if (quantumMode && VALID_QUANTUM_MODES.includes(quantumMode as SchroedingerQuantumMode)) {
     state.quantumMode = quantumMode as SchroedingerQuantumMode
+  }
+
+  // Open quantum params
+  const oq = params.get('oq')
+  if (oq === '1') {
+    state.openQuantumEnabled = true
+    const dp = params.get('oq_dp')
+    if (dp) {
+      const v = Number(dp)
+      if (Number.isFinite(v)) state.openQuantumDephasingRate = Math.max(0, Math.min(5, v))
+    }
+    const rx = params.get('oq_rx')
+    if (rx) {
+      const v = Number(rx)
+      if (Number.isFinite(v)) state.openQuantumRelaxationRate = Math.max(0, Math.min(5, v))
+    }
+    const th = params.get('oq_th')
+    if (th) {
+      const v = Number(th)
+      if (Number.isFinite(v)) state.openQuantumThermalUpRate = Math.max(0, Math.min(5, v))
+    }
   }
 
   return state

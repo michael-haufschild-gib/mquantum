@@ -64,6 +64,59 @@ export function generateDensityGridBindingsBlock(
 export const densityGridBindingsBlock = generateDensityGridBindingsBlock()
 
 /**
+ * Extended bindings block that includes the open quantum uniform buffer
+ * at group 0, binding 4.
+ */
+export function generateDensityGridBindingsWithOpenQuantumBlock(
+  storageFormat: 'r16float' | 'rgba16float' = 'rgba16float'
+): string {
+  return /* wgsl */ `
+// ============================================
+// Compute Shader Bind Groups (Open Quantum)
+// ============================================
+
+// Uniform bindings (read-only)
+@group(0) @binding(0) var<uniform> schroedinger: SchroedingerUniforms;
+@group(0) @binding(1) var<uniform> basis: BasisVectors;
+@group(0) @binding(2) var<uniform> gridParams: GridParams;
+
+// Output texture (write-only)
+@group(0) @binding(3) var densityGrid: texture_storage_3d<${storageFormat}, write>;
+
+// Open quantum density matrix uniforms
+@group(0) @binding(4) var<uniform> oq: OpenQuantumUniforms;
+`
+}
+
+/**
+ * Extended bindings block that includes both the open quantum and
+ * hydrogen basis uniform buffers (bindings 4 and 5).
+ */
+export function generateDensityGridBindingsWithHydrogenBasisBlock(
+  storageFormat: 'r16float' | 'rgba16float' = 'rgba16float'
+): string {
+  return /* wgsl */ `
+// ============================================
+// Compute Shader Bind Groups (Open Quantum + Hydrogen Basis)
+// ============================================
+
+// Uniform bindings (read-only)
+@group(0) @binding(0) var<uniform> schroedinger: SchroedingerUniforms;
+@group(0) @binding(1) var<uniform> basis: BasisVectors;
+@group(0) @binding(2) var<uniform> gridParams: GridParams;
+
+// Output texture (write-only)
+@group(0) @binding(3) var densityGrid: texture_storage_3d<${storageFormat}, write>;
+
+// Open quantum density matrix uniforms
+@group(0) @binding(4) var<uniform> oq: OpenQuantumUniforms;
+
+// Hydrogen per-basis quantum numbers
+@group(0) @binding(5) var<uniform> hydrogenBasis: HydrogenBasisUniforms;
+`
+}
+
+/**
  * Main compute shader entry point
  *
  * Each thread computes density for one grid cell.
@@ -166,5 +219,104 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Store all values
   textureStore(densityGrid, gid, vec4f(rho, logRho, spatialPhase, relativePhase));
+}
+`
+
+/**
+ * Density matrix compute shader entry point.
+ *
+ * Evaluates n(x) = Tr(ρ|x⟩⟨x|) = Σ_{kl} ρ_{kl} ψ_k(x) ψ_l*(x)
+ * where ψ_k are the individual basis wavefunctions.
+ *
+ * Output format (rgba16float):
+ *   R: total density n(x)
+ *   G: log density
+ *   B: coherence fraction (off-diagonal contribution / total)
+ *   A: reserved (0)
+ */
+export const densityMatrixComputeBlock = /* wgsl */ `
+// ============================================
+// Density Matrix Compute Shader
+// ============================================
+
+/**
+ * Complex multiplication: (a+bi)(c+di) = (ac-bd) + (ad+bc)i
+ */
+fn complexMulOQ(a: vec2f, b: vec2f) -> vec2f {
+  return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+}
+
+/**
+ * Complex conjugate
+ */
+fn complexConjOQ(a: vec2f) -> vec2f {
+  return vec2f(a.x, -a.y);
+}
+
+@compute @workgroup_size(8, 8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  // Bounds check
+  if (any(gid >= gridParams.gridSize)) {
+    return;
+  }
+
+  // Convert grid coordinate to world-space position
+  let gridSizeF = vec3f(gridParams.gridSize);
+  let uvw = (vec3f(gid) + 0.5) / gridSizeF;
+  let worldPos = mix(gridParams.worldMin, gridParams.worldMax, uvw);
+
+  // Skip positions outside bounding sphere
+  let dist2 = dot(worldPos, worldPos);
+  let boundR = schroedinger.boundingRadius;
+  if (dist2 > boundR * boundR) {
+    textureStore(densityGrid, gid, vec4f(0.0, 0.0, 0.0, 0.0));
+    return;
+  }
+
+  // Compute animation time
+  let t = schroedinger.time * schroedinger.timeScale;
+
+  // Active basis size: use oq.maxK for density matrix mode (supports up to 14)
+  let basisK = min(oq.maxK, 14u);
+
+  // Evaluate each basis function ψ_k(x) independently
+  // Store as complex values (re, im)
+  var basisValues: array<vec2f, 14>;
+  for (var k = 0u; k < basisK; k = k + 1u) {
+    basisValues[k] = evaluateSingleBasis(worldPos, t, k, schroedinger);
+  }
+
+  // Compute n(x) = Σ_{kl} ρ_{kl} · ψ_k(x) · ψ_l*(x)
+  // Also track diagonal contribution for coherence fraction
+  var totalDensity: f32 = 0.0;
+  var diagDensity: f32 = 0.0;
+
+  for (var k = 0u; k < basisK; k = k + 1u) {
+    for (var l = 0u; l < basisK; l = l + 1u) {
+      let rho_kl = getRho(oq, k, l);
+      // ψ_k · ψ_l* = complexMul(ψ_k, conj(ψ_l))
+      let prod = complexMulOQ(basisValues[k], complexConjOQ(basisValues[l]));
+      // Re(ρ_{kl} · ψ_k · ψ_l*) contributes to density
+      totalDensity += rho_kl.x * prod.x - rho_kl.y * prod.y;
+    }
+    // Diagonal: ρ_{kk} |ψ_k|² (always real)
+    let rho_kk = getRho(oq, k, k);
+    diagDensity += rho_kk.x * dot(basisValues[k], basisValues[k]);
+  }
+
+  // Clamp density to non-negative (numerical noise can cause tiny negatives)
+  totalDensity = max(totalDensity, 0.0);
+
+  // Log density for rendering
+  let logRho = select(-20.0, log(max(totalDensity, 1e-20)), totalDensity > 1e-10);
+
+  // Coherence fraction: how much of the density comes from off-diagonal terms
+  let coherenceFraction = select(0.0,
+    1.0 - clamp(diagDensity / max(totalDensity, 1e-10), 0.0, 1.0),
+    totalDensity > 1e-10
+  );
+
+  // Store: R=density, G=logDensity, B=coherenceFraction, A=0
+  textureStore(densityGrid, gid, vec4f(totalDensity, logRho, coherenceFraction, 0.0));
 }
 `

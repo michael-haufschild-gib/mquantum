@@ -141,15 +141,26 @@ const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore
 
 const schroedingerCompileSelector = (
   state: ReturnType<typeof useExtendedObjectStore.getState>
-) => ({
-  quantumMode: state.schroedinger?.quantumMode ?? 'harmonicOscillator',
-  termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
-  nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
-  phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
-  interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
-  uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
-  representation: (state.schroedinger?.representation ?? 'position') as 'position' | 'momentum' | 'wigner',
-})
+) => {
+  const quantumMode = state.schroedinger?.quantumMode ?? 'harmonicOscillator'
+  const representation = (state.schroedinger?.representation ?? 'position') as
+    | 'position'
+    | 'momentum'
+    | 'wigner'
+  const openQuantumEnabled = state.schroedinger?.openQuantum?.enabled ?? false
+  const openQuantumSupported = (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') && representation !== 'wigner'
+
+  return {
+    quantumMode,
+    termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
+    nodalEnabled: state.schroedinger?.nodalEnabled ?? false,
+    phaseMaterialityEnabled: state.schroedinger?.phaseMaterialityEnabled ?? false,
+    interferenceEnabled: state.schroedinger?.interferenceEnabled ?? false,
+    uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
+    representation,
+    openQuantumEnabled: openQuantumEnabled && openQuantumSupported,
+  }
+}
 
 // Schrodinger selector for rotation updates (like WebGL SchroedingerMesh.tsx line 108)
 // Stable empty array to avoid new reference on every render when parameterValues is undefined
@@ -551,6 +562,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
       representation: schroedingerCompile.representation,
+      openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
       skyboxEnabled: environment.skyboxEnabled,
       skyboxMode: environment.skyboxMode as SkyboxMode,
       backgroundColor: environment.backgroundColor,
@@ -746,6 +758,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     performance_.eigenfunctionCacheEnabled,
     performance_.analyticalGradientEnabled,
     performance_.fastEigenInterpolationEnabled,
+    schroedingerCompile.openQuantumEnabled,
   ])
 
   // Runtime scene clear-color update (avoids full pass rebuild for background color changes).
@@ -1757,6 +1770,8 @@ export interface PassConfig {
   colorAlgorithm: PaletteColorAlgorithm
   // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
   representation: 'position' | 'momentum' | 'wigner'
+  // Open quantum system (density matrix + Lindblad) — requires shader recompilation
+  openQuantumEnabled: boolean
   // Skybox settings
   skyboxEnabled: boolean
   skyboxMode: SkyboxMode
@@ -1784,6 +1799,7 @@ interface SchrodingerPassConfig {
   analyticalGradientEnabled: boolean
   fastEigenInterpolationEnabled: boolean
   temporalReprojectionEnabled: boolean
+  openQuantumEnabled: boolean
 }
 
 /** Fields that require post-processing pass rebuild when changed */
@@ -1799,9 +1815,10 @@ interface PPPassConfig {
 
 function normalizeColorAlgorithmForQuantumMode(
   quantumMode: PassConfig['quantumMode'],
-  colorAlgorithm: PaletteColorAlgorithm
+  colorAlgorithm: PaletteColorAlgorithm,
+  openQuantumEnabled: boolean = false,
 ): PaletteColorAlgorithm {
-  const isAvailable = getAvailableColorAlgorithms(quantumMode).some(
+  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled).some(
     (option) => option.value === colorAlgorithm
   )
   return isAvailable ? colorAlgorithm : 'diverging'
@@ -1815,7 +1832,8 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isComputeMode = isFreeScalar || isTdse
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
-    config.colorAlgorithm
+    config.colorAlgorithm,
+    config.openQuantumEnabled,
   )
   return {
     objectType: config.objectType,
@@ -1836,6 +1854,7 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
     analyticalGradientEnabled: isComputeMode ? false : config.analyticalGradientEnabled,
     fastEigenInterpolationEnabled: isComputeMode ? false : config.fastEigenInterpolationEnabled,
     temporalReprojectionEnabled: isComputeMode ? false : config.temporalReprojectionEnabled,
+    openQuantumEnabled: isComputeMode ? false : config.openQuantumEnabled,
   }
 }
 
@@ -2485,7 +2504,8 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
   } = config
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     quantumMode,
-    config.colorAlgorithm
+    config.colorAlgorithm,
+    config.openQuantumEnabled,
   )
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as
     | WGSLColorAlgorithm
@@ -2512,6 +2532,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         analyticalGradientEnabled: config.analyticalGradientEnabled,
         fastEigenInterpolationEnabled: config.fastEigenInterpolationEnabled,
         representation: config.representation,
+        openQuantumEnabled: config.openQuantumEnabled,
       })
 
     default:

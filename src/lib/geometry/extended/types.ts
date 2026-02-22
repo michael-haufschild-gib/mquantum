@@ -7,6 +7,15 @@
  * @see src/lib/shaders/constants.ts for shared visual constants
  */
 
+import {
+  type OpenQuantumConfig,
+  type OpenQuantumVisualizationMode,
+  DEFAULT_OPEN_QUANTUM_CONFIG,
+} from '@/lib/physics/openQuantum/types'
+
+export type { OpenQuantumConfig, OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
+export { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
+
 // ============================================================================
 // Raymarching Quality System
 // ============================================================================
@@ -843,6 +852,10 @@ export interface SchroedingerConfig {
   // === TDSE Configuration (when quantumMode === 'tdseDynamics') ===
   /** Time-dependent Schroedinger equation solver configuration */
   tdse: TdseConfig
+
+  // === Open Quantum System Configuration ===
+  /** Density matrix + Lindblad decoherence configuration */
+  openQuantum: OpenQuantumConfig
 }
 
 /**
@@ -1051,6 +1064,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // TDSE
   tdse: DEFAULT_TDSE_CONFIG,
+
+  // Open Quantum System
+  openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,
 }
 
 // ============================================================================

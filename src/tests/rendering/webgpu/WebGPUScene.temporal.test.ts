@@ -23,6 +23,7 @@ interface ScenePassConfig {
   analyticalGradientEnabled: boolean
   fastEigenInterpolationEnabled: boolean
   representation: 'position' | 'momentum'
+  openQuantumEnabled: boolean
   colorAlgorithm:
     | 'lch'
     | 'multiSource'
@@ -83,6 +84,7 @@ function createPassConfig(overrides: Partial<ScenePassConfig> = {}): ScenePassCo
     analyticalGradientEnabled: true,
     fastEigenInterpolationEnabled: true,
     representation: 'position',
+    openQuantumEnabled: false,
     colorAlgorithm: 'radialDistance',
     skyboxEnabled: false,
     skyboxMode: 'classic',

@@ -56,6 +56,11 @@ describe('SchroedingerAnimationDrawer', () => {
     expect(offButtons.length).toBeGreaterThanOrEqual(1)
   })
 
+  it('should not render Open Quantum controls in the Anim panel', () => {
+    render(<SchroedingerAnimationDrawer />)
+    expect(screen.queryByTestId('animation-panel-openQuantum')).not.toBeInTheDocument()
+  })
+
   it('should toggle Probability Flow', () => {
     render(<SchroedingerAnimationDrawer />)
 

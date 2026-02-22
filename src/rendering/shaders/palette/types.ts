@@ -45,6 +45,9 @@ export type ColorAlgorithm =
   | 'modeCharacter'
   | 'energyFlux'
   | 'kSpaceOccupation'
+  | 'purityMap'
+  | 'entropyMap'
+  | 'coherenceMap'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -66,6 +69,9 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'modeCharacter' as const, label: 'Mode Character Map' },
   { value: 'energyFlux' as const, label: 'Energy Flux Map' },
   { value: 'kSpaceOccupation' as const, label: 'k-Space Occupation Map' },
+  { value: 'purityMap' as const, label: 'Purity Map (Open Quantum)' },
+  { value: 'entropyMap' as const, label: 'Entropy Map (Open Quantum)' },
+  { value: 'coherenceMap' as const, label: 'Coherence Map (Open Quantum)' },
 ] as const
 
 /**
@@ -88,6 +94,9 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   modeCharacter: 13,
   energyFlux: 14,
   kSpaceOccupation: 15,
+  purityMap: 16,
+  entropyMap: 17,
+  coherenceMap: 18,
 }
 
 /**
@@ -231,7 +240,8 @@ export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
  * @returns Filtered array of color algorithm options
  */
 export function getAvailableColorAlgorithms(
-  quantumMode: string
+  quantumMode: string,
+  openQuantumEnabled: boolean = false,
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Educational analysis algorithms — only available for free scalar field
   const educationalAlgos = new Set<string>([
@@ -239,6 +249,13 @@ export function getAvailableColorAlgorithms(
     'modeCharacter',
     'energyFlux',
     'kSpaceOccupation',
+  ])
+
+  // Open quantum algorithms — only available when density matrix mode is active
+  const openQuantumAlgos = new Set<string>([
+    'purityMap',
+    'entropyMap',
+    'coherenceMap',
   ])
 
   if (quantumMode === 'freeScalarField') {
@@ -251,11 +268,18 @@ export function getAvailableColorAlgorithms(
       'domainColoringPsi',
       'relativePhase',
     ])
-    return COLOR_ALGORITHM_OPTIONS.filter((opt) => !excluded.has(opt.value))
+    return COLOR_ALGORITHM_OPTIONS.filter(
+      (opt) => !excluded.has(opt.value) && !openQuantumAlgos.has(opt.value)
+    )
   }
 
-  // Non-freeScalar modes: exclude educational analysis algorithms
-  return COLOR_ALGORITHM_OPTIONS.filter((opt) => !educationalAlgos.has(opt.value))
+  // Non-freeScalar modes: exclude educational analysis algorithms and
+  // conditionally exclude open quantum algorithms
+  return COLOR_ALGORITHM_OPTIONS.filter(
+    (opt) =>
+      !educationalAlgos.has(opt.value) &&
+      (!openQuantumAlgos.has(opt.value) || openQuantumEnabled)
+  )
 }
 
 /**

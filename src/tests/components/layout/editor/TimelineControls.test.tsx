@@ -17,6 +17,8 @@ const mockRandomizePlanes = vi.fn()
 
 const mockExtendedState = {
   schroedinger: {
+    quantumMode: 'harmonicOscillator',
+    representation: 'position',
     sliceAnimationEnabled: false,
     interferenceEnabled: false,
     probabilityFlowEnabled: false,
@@ -89,6 +91,8 @@ describe('TimelineControls', () => {
     mockExtendedState.schroedinger.interferenceEnabled = false
     mockExtendedState.schroedinger.probabilityFlowEnabled = false
     mockExtendedState.schroedinger.probabilityCurrentEnabled = false
+    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+    mockExtendedState.schroedinger.representation = 'position'
     mockRandomizePlanes.mockClear()
   })
 
@@ -184,5 +188,26 @@ describe('TimelineControls', () => {
 
     const animButton = screen.getByRole('button', { name: /toggle animations drawer/i })
     expect((animButton.textContent ?? '').replace(/\s+/g, '')).toContain('Anim1')
+  })
+
+  it('shows an Open Q drawer toggle for schroedinger mode', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+
+    render(<TimelineControls />)
+
+    expect(screen.getByRole('button', { name: /toggle open quantum drawer/i })).toBeInTheDocument()
+  })
+
+  it('hides Open Q drawer toggle in wigner representation', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+    mockExtendedState.schroedinger.representation = 'wigner'
+
+    render(<TimelineControls />)
+
+    expect(
+      screen.queryByRole('button', { name: /toggle open quantum drawer/i })
+    ).not.toBeInTheDocument()
   })
 })

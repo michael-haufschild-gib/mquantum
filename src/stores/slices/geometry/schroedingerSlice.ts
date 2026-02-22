@@ -1,5 +1,6 @@
 import {
   DEFAULT_SCHROEDINGER_CONFIG,
+  DEFAULT_OPEN_QUANTUM_CONFIG,
   type FreeScalarConfig,
   type SchroedingerConfig,
   type TdseConfig,
@@ -1754,6 +1755,169 @@ export const createSchroedingerSlice: StateCreator<
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, needsReset: false },
+        },
+      }))
+    },
+
+    // === Open Quantum System ===
+    setOpenQuantumEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, enabled },
+        },
+      }))
+    },
+    setOpenQuantumDephasingRate: (rate) => {
+      if (!isFiniteSchroedingerInput(rate)) {
+        warnNonFiniteSchroedingerInput('openQuantum.dephasingRate', rate)
+        return
+      }
+      const clamped = Math.max(0, Math.min(5, rate))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, dephasingRate: clamped },
+        },
+      }))
+    },
+    setOpenQuantumRelaxationRate: (rate) => {
+      if (!isFiniteSchroedingerInput(rate)) {
+        warnNonFiniteSchroedingerInput('openQuantum.relaxationRate', rate)
+        return
+      }
+      const clamped = Math.max(0, Math.min(5, rate))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, relaxationRate: clamped },
+        },
+      }))
+    },
+    setOpenQuantumThermalUpRate: (rate) => {
+      if (!isFiniteSchroedingerInput(rate)) {
+        warnNonFiniteSchroedingerInput('openQuantum.thermalUpRate', rate)
+        return
+      }
+      const clamped = Math.max(0, Math.min(5, rate))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, thermalUpRate: clamped },
+        },
+      }))
+    },
+    setOpenQuantumDt: (dt) => {
+      if (!isFiniteSchroedingerInput(dt)) {
+        warnNonFiniteSchroedingerInput('openQuantum.dt', dt)
+        return
+      }
+      const clamped = Math.max(0.001, Math.min(0.1, dt))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, dt: clamped },
+        },
+      }))
+    },
+    setOpenQuantumSubsteps: (n) => {
+      if (!isFiniteSchroedingerInput(n)) {
+        warnNonFiniteSchroedingerInput('openQuantum.substeps', n)
+        return
+      }
+      const clamped = Math.max(1, Math.min(10, Math.floor(n)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, substeps: clamped },
+        },
+      }))
+    },
+    setOpenQuantumChannelEnabled: (channel, enabled) => {
+      const keyMap = {
+        dephasing: 'dephasingEnabled',
+        relaxation: 'relaxationEnabled',
+        thermal: 'thermalEnabled',
+      } as const
+      const key = keyMap[channel]
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, [key]: enabled },
+        },
+      }))
+    },
+    setOpenQuantumVisualizationMode: (mode) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, visualizationMode: mode },
+        },
+      }))
+    },
+    requestOpenQuantumStateReset: () => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: {
+            ...state.schroedinger.openQuantum,
+            resetToken: (state.schroedinger.openQuantum.resetToken ?? 0) + 1,
+          },
+        },
+      }))
+    },
+    resetOpenQuantumToDefault: () => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...DEFAULT_OPEN_QUANTUM_CONFIG },
+        },
+      }))
+    },
+    setOpenQuantumBathTemperature: (T) => {
+      if (!isFiniteSchroedingerInput(T)) {
+        warnNonFiniteSchroedingerInput('openQuantum.bathTemperature', T)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(100000, T))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, bathTemperature: clamped },
+        },
+      }))
+    },
+    setOpenQuantumCouplingScale: (s) => {
+      if (!isFiniteSchroedingerInput(s)) {
+        warnNonFiniteSchroedingerInput('openQuantum.couplingScale', s)
+        return
+      }
+      const clamped = Math.max(0.01, Math.min(100, s))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, couplingScale: clamped },
+        },
+      }))
+    },
+    setOpenQuantumHydrogenBasisMaxN: (n) => {
+      if (!isFiniteSchroedingerInput(n)) {
+        warnNonFiniteSchroedingerInput('openQuantum.hydrogenBasisMaxN', n)
+        return
+      }
+      const clamped = Math.max(1, Math.min(3, Math.floor(n)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, hydrogenBasisMaxN: clamped },
+        },
+      }))
+    },
+    setOpenQuantumDephasingModel: (model) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          openQuantum: { ...state.schroedinger.openQuantum, dephasingModel: model },
         },
       }))
     },

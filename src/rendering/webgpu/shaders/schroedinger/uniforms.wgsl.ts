@@ -471,3 +471,116 @@ fn lengthND(p: array<f32, 11>, dimension: i32) -> f32 {
   return sqrt(lengthSquaredND(p, dimension));
 }
 `
+
+// ---------------------------------------------------------------------------
+// Open Quantum System Uniforms (density matrix + metrics)
+// ---------------------------------------------------------------------------
+
+/**
+ * WGSL struct for open quantum system data uploaded from CPU.
+ *
+ * Layout (544 bytes = 136 floats):
+ *   rho: 32 × vec4f = 512 bytes  (8×8 complex matrix, stored as xy/zw pairs)
+ *   purity, linearEntropy, vonNeumannEntropy, coherenceMagnitude: 4 × f32
+ *   groundPopulation + 3 padding: 4 × f32
+ * Total: 544 bytes
+ */
+export const openQuantumUniformsBlock = /* wgsl */ `
+// ============================================
+// Open Quantum System Uniforms
+// ============================================
+
+struct OpenQuantumUniforms {
+  /** K×K complex density matrix (K_max=14). Packed as xy/zw pairs in vec4f. */
+  /** 14×14 = 196 complex entries → 196 / 2 = 98 vec4f */
+  rho: array<vec4f, 98>,
+  /** Tr(ρ²) — purity ∈ [1/K, 1] */
+  purity: f32,
+  /** 1 − Tr(ρ²) — linear entropy */
+  linearEntropy: f32,
+  /** −Tr(ρ ln ρ) — von Neumann entropy */
+  vonNeumannEntropy: f32,
+  /** Σ_{k≠l} |ρ_{kl}| — off-diagonal coherence */
+  coherenceMagnitude: f32,
+  /** Re(ρ_{00}) — ground state population */
+  groundPopulation: f32,
+  /** Active basis size (1-14) */
+  maxK: u32,
+  /** Padding to align to 16 bytes */
+  _pad0: f32,
+  _pad1: f32,
+}
+
+/**
+ * Access density matrix element ρ_{kl} as vec2f(re, im).
+ * Layout: index = k*14 + l; each vec4f holds 2 complex values (xy, zw).
+ */
+fn getRho(oq: OpenQuantumUniforms, k: u32, l: u32) -> vec2f {
+  let idx = k * 14u + l;
+  let vec_idx = idx / 2u;
+  let comp_idx = idx % 2u;
+  if (comp_idx == 0u) {
+    return oq.rho[vec_idx].xy;
+  } else {
+    return oq.rho[vec_idx].zw;
+  }
+}
+`
+
+/**
+ * Hydrogen basis uniform struct for per-basis quantum number lookup.
+ *
+ * Used in density-matrix mode with hydrogen quantum modes to provide
+ * per-basis (n, l, m, extraDimN[]) quantum numbers to the GPU.
+ *
+ * Layout:
+ *   quantumNumbers: 14 states × 11 values (n, l, m + 8 extraDimN) = 154 i32
+ *                   packed into 39 vec4i (156 slots, 2 unused)
+ *   energies: 14 f32 packed into 4 vec4f (16 slots, 2 unused)
+ *   basisCount: active number of basis states
+ */
+export const hydrogenBasisUniformsBlock = /* wgsl */ `
+// ============================================
+// Hydrogen Basis Uniforms (per-basis quantum numbers)
+// ============================================
+
+struct HydrogenBasisUniforms {
+  /** Per-basis quantum numbers: 14 states × 11 values packed into vec4i */
+  quantumNumbers: array<vec4<i32>, 39>,
+  /** Per-basis energies: 14 f32 packed into vec4f */
+  energies: array<vec4f, 4>,
+  /** Number of active basis states */
+  basisCount: u32,
+  _pad0: u32,
+  _pad1: u32,
+  _pad2: u32,
+}
+
+/**
+ * Get quantum number for basis state stateIdx, dimension dimIdx.
+ * dimIdx: 0=n, 1=l, 2=m, 3..10=extraDimN[0..7]
+ */
+fn getHydrogenBasisQN(hb: HydrogenBasisUniforms, stateIdx: i32, dimIdx: i32) -> i32 {
+  let flatIdx = stateIdx * 11 + dimIdx;
+  let vecIdx = flatIdx / 4;
+  let compIdx = flatIdx % 4;
+  let v = hb.quantumNumbers[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
+}
+
+/**
+ * Get energy for basis state stateIdx.
+ */
+fn getHydrogenBasisEnergy(hb: HydrogenBasisUniforms, stateIdx: i32) -> f32 {
+  let vecIdx = stateIdx / 4;
+  let compIdx = stateIdx % 4;
+  let v = hb.energies[vecIdx];
+  if (compIdx == 0) { return v.x; }
+  else if (compIdx == 1) { return v.y; }
+  else if (compIdx == 2) { return v.z; }
+  else { return v.w; }
+}
+`
