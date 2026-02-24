@@ -1,4 +1,4 @@
-/* global GPUTextureViewDimension */
+/* global GPUBindGroupEntry, GPUBindGroupLayoutEntry, GPUTextureViewDimension */
 /**
  * Density Grid Compute Pass
  *
@@ -428,7 +428,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
    */
   updateOpenQuantumUniforms(device: GPUDevice, data: Float32Array): void {
     if (!this.openQuantumBuffer) return
-    device.queue.writeBuffer(this.openQuantumBuffer, 0, data)
+    device.queue.writeBuffer(this.openQuantumBuffer, 0, data as Float32Array<ArrayBuffer>)
     this.needsRecompute = true
   }
 

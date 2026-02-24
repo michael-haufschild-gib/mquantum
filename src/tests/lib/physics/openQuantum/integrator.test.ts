@@ -17,7 +17,7 @@ import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 function trace(rho: { K: number; elements: Float64Array }): number {
   let tr = 0
   for (let k = 0; k < rho.K; k++) {
-    tr += rho.elements[2 * (k * rho.K + k)]
+    tr += rho.elements[2 * (k * rho.K + k)]!
   }
   return tr
 }
@@ -28,8 +28,8 @@ function isHermitian(rho: { K: number; elements: Float64Array }, tol = 1e-10): b
     for (let l = k + 1; l < rho.K; l++) {
       const idx_kl = 2 * (k * rho.K + l)
       const idx_lk = 2 * (l * rho.K + k)
-      if (Math.abs(rho.elements[idx_kl] - rho.elements[idx_lk]) > tol) return false
-      if (Math.abs(rho.elements[idx_kl + 1] + rho.elements[idx_lk + 1]) > tol) return false
+      if (Math.abs(rho.elements[idx_kl]! - rho.elements[idx_lk]!) > tol) return false
+      if (Math.abs(rho.elements[idx_kl + 1]! + rho.elements[idx_lk + 1]!) > tol) return false
     }
   }
   return true
@@ -126,8 +126,8 @@ describe('evolveMultiStep', () => {
     evolveMultiStep(rho, energies, channels, 0.01, 500)
 
     // Off-diagonal elements should be near zero
-    const offDiagRe = rho.elements[2 * 1] // rho_{01} re
-    const offDiagIm = rho.elements[2 * 1 + 1] // rho_{01} im
+    const offDiagRe = rho.elements[2 * 1]! // rho_{01} re
+    const offDiagIm = rho.elements[2 * 1 + 1]! // rho_{01} im
     const offDiagMag = Math.sqrt(offDiagRe * offDiagRe + offDiagIm * offDiagIm)
     expect(offDiagMag).toBeLessThan(0.01)
 
@@ -138,7 +138,7 @@ describe('evolveMultiStep', () => {
   it('drives ground population up under relaxation', () => {
     // Start in |1> state
     const rho = densityMatrixFromCoefficients([0, 1], [0, 0], 2)
-    const initialGround = rho.elements[0] // rho_{00} re
+    const initialGround = rho.elements[0]! // rho_{00} re
     const energies = new Float64Array([0.5, 1.5])
     const config: OpenQuantumConfig = {
       ...DEFAULT_OPEN_QUANTUM_CONFIG,
@@ -152,6 +152,6 @@ describe('evolveMultiStep', () => {
 
     // Ground population should have increased
     const finalGround = rho.elements[0]
-    expect(finalGround).toBeGreaterThan(initialGround + 0.1)
+    expect(finalGround!).toBeGreaterThan(initialGround + 0.1)
   })
 })

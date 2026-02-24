@@ -226,7 +226,7 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
     )
 
     ctx.frame.stores.extended.schroedingerVersion = 2
-    ctx.frame.stores.extended.schroedinger.frequencySpread = 0.0101
+    ;(ctx.frame.stores.extended.schroedinger as Record<string, unknown>).frequencySpread = 0.0101
 
     renderer.updateSchroedingerUniforms(
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]

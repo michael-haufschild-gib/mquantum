@@ -172,6 +172,10 @@ export interface PBRConfig {
   metallic: number // 0.0-1.0
   specularIntensity: number // 0.0-2.0 (artistic multiplier)
   specularColor: string // hex color string
+  reflectance: number // 0.0-1.0 (dielectric reflectance at normal incidence)
+  ior: number // 1.0-3.0 (index of refraction)
+  transmission: number // 0.0-1.0 (glass/translucency)
+  thickness: number // 0.0-10.0 (volume thickness for transmission)
 }
 
 /** PBR for main objects (schroedinger wavefunctions) */
@@ -180,6 +184,10 @@ export const DEFAULT_FACE_PBR: PBRConfig = {
   metallic: 0.0,
   specularIntensity: 0.8,
   specularColor: '#ffffff',
+  reflectance: 0.5,
+  ior: 1.5,
+  transmission: 0.0,
+  thickness: 1.0,
 }
 
 // ============================================================================

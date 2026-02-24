@@ -64,7 +64,7 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
+    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
   })
 
   it('reuses TemporalCloud reprojection/reconstruction bind groups across frames', () => {
@@ -139,7 +139,7 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(2)
+    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(2)
   })
 
   it('reuses WebGPUTemporalCloud bind groups across ping-pong frames', () => {
@@ -213,7 +213,7 @@ describe('pass resource caching', () => {
 
     // 1x reprojection uniforms + 2x reprojection ping-pong variants +
     // 1x reconstruction uniforms + 1x reconstruction textures.
-    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(5)
+    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(5)
   })
 
   it('reuses TemporalCloudDepth bind groups when input view is unchanged', () => {
@@ -256,7 +256,7 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
+    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
   })
 
   it('uses one render pass plus texture copy in TemporalDepthCapture execution', () => {

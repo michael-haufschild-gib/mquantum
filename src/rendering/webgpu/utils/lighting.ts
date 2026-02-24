@@ -20,6 +20,7 @@ export interface WebGPULightingState {
   ambientColor?: string
   ambientIntensity?: number
   ambientEnabled?: boolean
+  version?: number
 }
 
 /**

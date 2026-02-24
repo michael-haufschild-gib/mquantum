@@ -55,8 +55,8 @@ describe('buildLindbladChannels', () => {
     it('each channel is a diagonal projector |k><k|', () => {
       const channels = buildLindbladChannels(cfg, K)
       for (let k = 0; k < K; k++) {
-        expect(channels[k].row).toBe(k)
-        expect(channels[k].col).toBe(k)
+        expect(channels[k]!.row).toBe(k)
+        expect(channels[k]!.col).toBe(k)
       }
     })
 
@@ -82,8 +82,8 @@ describe('buildLindbladChannels', () => {
     it('each channel maps excited state k to ground state: |0><k|', () => {
       const channels = buildLindbladChannels(cfg, K)
       for (let i = 0; i < channels.length; i++) {
-        expect(channels[i].row).toBe(0)
-        expect(channels[i].col).toBe(i + 1)
+        expect(channels[i]!.row).toBe(0)
+        expect(channels[i]!.col).toBe(i + 1)
       }
     })
 
@@ -109,8 +109,8 @@ describe('buildLindbladChannels', () => {
     it('each channel maps ground state to excited state k: |k><0|', () => {
       const channels = buildLindbladChannels(cfg, K)
       for (let i = 0; i < channels.length; i++) {
-        expect(channels[i].row).toBe(i + 1)
-        expect(channels[i].col).toBe(0)
+        expect(channels[i]!.row).toBe(i + 1)
+        expect(channels[i]!.col).toBe(0)
       }
     })
 
@@ -145,20 +145,20 @@ describe('buildLindbladChannels', () => {
 
       // First K: dephasing (diagonal)
       for (let i = 0; i < K; i++) {
-        expect(channels[i].row).toBe(i)
-        expect(channels[i].col).toBe(i)
+        expect(channels[i]!.row).toBe(i)
+        expect(channels[i]!.col).toBe(i)
       }
 
       // Next K-1: relaxation (row=0, col=1..K-1)
       for (let i = 0; i < K - 1; i++) {
-        expect(channels[K + i].row).toBe(0)
-        expect(channels[K + i].col).toBe(i + 1)
+        expect(channels[K + i]!.row).toBe(0)
+        expect(channels[K + i]!.col).toBe(i + 1)
       }
 
       // Last K-1: thermal (row=1..K-1, col=0)
       for (let i = 0; i < K - 1; i++) {
-        expect(channels[2 * K - 1 + i].row).toBe(i + 1)
-        expect(channels[2 * K - 1 + i].col).toBe(0)
+        expect(channels[2 * K - 1 + i]!.row).toBe(i + 1)
+        expect(channels[2 * K - 1 + i]!.col).toBe(0)
       }
     })
   })
@@ -210,10 +210,10 @@ describe('buildLindbladChannels', () => {
       const channels = buildLindbladChannels(cfg, 2)
       // K=2: 2 dephasing + 1 relaxation + 1 thermal = 4
       expect(channels).toHaveLength(4)
-      expect(channels[0].amplitudeRe).toBeCloseTo(0.5, 12)   // sqrt(0.25)
-      expect(channels[1].amplitudeRe).toBeCloseTo(0.5, 12)   // sqrt(0.25)
-      expect(channels[2].amplitudeRe).toBeCloseTo(2.0, 12)   // sqrt(4.0)
-      expect(channels[3].amplitudeRe).toBeCloseTo(1.0, 12)   // sqrt(1.0)
+      expect(channels[0]!.amplitudeRe).toBeCloseTo(0.5, 12)   // sqrt(0.25)
+      expect(channels[1]!.amplitudeRe).toBeCloseTo(0.5, 12)   // sqrt(0.25)
+      expect(channels[2]!.amplitudeRe).toBeCloseTo(2.0, 12)   // sqrt(4.0)
+      expect(channels[3]!.amplitudeRe).toBeCloseTo(1.0, 12)   // sqrt(1.0)
     })
   })
 })

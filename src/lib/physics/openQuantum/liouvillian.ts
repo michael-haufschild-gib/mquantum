@@ -106,18 +106,18 @@ export function buildLiouvillian(
     // Term 1: L[a*K+a, b*K+b] += |α|²  (real part only)
     const row1 = a * K + a
     const col1 = b * K + b
-    L.real[row1 * N + col1] += ampSq
+    L.real[row1 * N + col1] = L.real[row1 * N + col1]! + ampSq
 
     // Term 2: L[b*K+l, b*K+l] -= 0.5|α|² for all l
     for (let l = 0; l < K; l++) {
       const idx2 = b * K + l
-      L.real[idx2 * N + idx2] -= 0.5 * ampSq
+      L.real[idx2 * N + idx2] = L.real[idx2 * N + idx2]! - 0.5 * ampSq
     }
 
     // Term 3: L[k*K+b, k*K+b] -= 0.5|α|² for all k
     for (let k = 0; k < K; k++) {
       const idx3 = k * K + b
-      L.real[idx3 * N + idx3] -= 0.5 * ampSq
+      L.real[idx3 * N + idx3] = L.real[idx3 * N + idx3]! - 0.5 * ampSq
     }
   }
 

@@ -15,7 +15,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 import { AnimatePresence, m } from 'motion/react'
-import { useEffect, useMemo, useState, type FC } from 'react'
+import { useMemo, useState, type FC } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
@@ -109,11 +109,10 @@ export const TimelineControls: FC = () => {
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
 
-  useEffect(() => {
-    if (!supportsOpenQuantumControls) {
-      setShowOpenQDrawer(false)
-    }
-  }, [supportsOpenQuantumControls])
+  // Close open quantum drawer when controls become unavailable
+  if (showOpenQDrawer && !supportsOpenQuantumControls) {
+    setShowOpenQDrawer(false)
+  }
 
   return (
     <div className="flex flex-col w-full h-full relative">

@@ -43,7 +43,7 @@ export function applyDissipator(
 
   // Term 1: L ρ L† = |a|² ρ_{cc} |r⟩⟨r|
   // Only contributes to (r, r) element
-  dEl[2 * (r * K + r)] += aSq * rho_cc_re
+  dEl[2 * (r * K + r)] = dEl[2 * (r * K + r)]! + aSq * rho_cc_re
 
   // Term 2: −½ {L†L, ρ} where L†L = |a|² |c⟩⟨c|
   // −½ |a|² (δ_{kc} ρ_{cl} + ρ_{kc} δ_{cl})
@@ -55,15 +55,15 @@ export function applyDissipator(
   for (let l = 0; l < K; l++) {
     const idxCL = 2 * (c * K + l)
     // −½ |a|² ρ_{cl}  →  applied to row c
-    dEl[idxCL] -= halfASq * rhoEl[idxCL]!
-    dEl[idxCL + 1] -= halfASq * rhoEl[idxCL + 1]!
+    dEl[idxCL] = dEl[idxCL]! - halfASq * rhoEl[idxCL]!
+    dEl[idxCL + 1] = dEl[idxCL + 1]! - halfASq * rhoEl[idxCL + 1]!
   }
 
   for (let k = 0; k < K; k++) {
     const idxKC = 2 * (k * K + c)
     // −½ |a|² ρ_{kc}  →  applied to col c
-    dEl[idxKC] -= halfASq * rhoEl[idxKC]!
-    dEl[idxKC + 1] -= halfASq * rhoEl[idxKC + 1]!
+    dEl[idxKC] = dEl[idxKC]! - halfASq * rhoEl[idxKC]!
+    dEl[idxKC + 1] = dEl[idxKC + 1]! - halfASq * rhoEl[idxKC + 1]!
   }
 
   // Note: row c, col c gets subtracted twice (once from each loop), total −|a|² ρ_{cc}

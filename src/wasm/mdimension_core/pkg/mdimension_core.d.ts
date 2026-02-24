@@ -101,6 +101,10 @@ export function normalize_vector_wasm(v: Float64Array): Float64Array;
  */
 export function project_vertices_wasm(flat_vertices: Float64Array, dimension: number, projection_distance: number): Float32Array;
 
+/**
+ * Initializes the WASM module: installs the panic hook for readable error
+ * messages in the browser console.
+ */
 export function start(): void;
 
 /**

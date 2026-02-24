@@ -26,9 +26,10 @@ describe('ColorPreview', () => {
     }
 
     const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext')
-    getContextSpy.mockImplementationOnce((contextType: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    getContextSpy.mockImplementationOnce(((contextType: string) =>
       contextType === '2d' ? (mockContext as CanvasRenderingContext2D) : null
-    )
+    ) as any)
 
     try {
       useAppearanceStore.getState().setColorAlgorithm('radialDistance')

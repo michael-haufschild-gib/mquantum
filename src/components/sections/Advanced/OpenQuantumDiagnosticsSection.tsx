@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useCallback } from 'react'
+import { Button } from '@/components/ui/Button'
 import { Section } from '@/components/sections/Section'
 import { Sparkline } from '@/components/ui/Sparkline'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -128,14 +129,15 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
 
       {/* Formula help toggle */}
       <div className="mt-3 px-1">
-        <button
-          type="button"
-          className="text-xs text-accent-cyan hover:text-accent-cyan/80 transition-colors"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={toggleFormulas}
-          aria-expanded={showFormulas}
+          ariaLabel={showFormulas ? 'Hide formulas' : 'Show formulas'}
+          className="text-xs text-accent-cyan hover:text-accent-cyan/80 px-0 py-0"
         >
           {showFormulas ? 'Hide Formulas' : 'Formulas'}
-        </button>
+        </Button>
 
         {showFormulas && (
           <div className="mt-2 space-y-1 text-xs text-text-tertiary font-mono leading-relaxed">

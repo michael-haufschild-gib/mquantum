@@ -409,6 +409,10 @@ export function project_vertices_wasm(flat_vertices, dimension, projection_dista
     }
 }
 
+/**
+ * Initializes the WASM module: installs the panic hook for readable error
+ * messages in the browser console.
+ */
 export function start() {
     wasm.start();
 }

@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   purity,
-  linearEntropy,
   vonNeumannEntropy,
   coherenceMagnitude,
   groundPopulation,

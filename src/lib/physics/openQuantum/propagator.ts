@@ -13,7 +13,6 @@
 
 import type { ComplexMatrix } from './complexMatrix'
 import {
-  complexMatMul,
   complexMatScale,
   complexMatZero,
   matrixExponentialPade,
@@ -151,7 +150,7 @@ export function evolvePropagatorStep(
     const invTrace = 1 / trace
     const size = K * K * 2
     for (let i = 0; i < size; i++) {
-      el[i] *= invTrace
+      el[i] = el[i]! * invTrace
     }
   }
 

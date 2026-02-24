@@ -1,3 +1,6 @@
+//! WASM core module for mdimension — provides N-dimensional rotation composition,
+//! vertex projection, and linear algebra operations for real-time animation.
+
 use wasm_bindgen::prelude::*;
 
 // Import the `window.console.log` function from the Web.
@@ -7,7 +10,8 @@ extern "C" {
     fn log(s: &str);
 }
 
-// Initialize the panic hook to get nice error messages in the console
+/// Initializes the WASM module: installs the panic hook for readable error
+/// messages in the browser console.
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();

@@ -4,7 +4,6 @@ import {
   complexMatIdentity,
   complexMatZero,
 } from '@/lib/physics/openQuantum/complexMatrix'
-import type { ComplexMatrix } from '@/lib/physics/openQuantum/complexMatrix'
 import { densityMatrixFromCoefficients } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
 import { computePropagator, evolvePropagatorStep } from '@/lib/physics/openQuantum/propagator'

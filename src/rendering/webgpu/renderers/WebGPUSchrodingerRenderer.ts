@@ -1338,9 +1338,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const transform = getStoreSnapshot<TransformSnapshot>(ctx, 'transform')
       scale = transform?.uniformScale ?? 1.0
       const position = transform?.position ?? [0, 0, 0]
-      posX = position[0]
-      posY = position[1]
-      posZ = position[2]
+      posX = position[0] ?? 0
+      posY = position[1] ?? 0
+      posZ = position[2] ?? 0
     }
 
     // Build model matrix: translation * scale
@@ -1401,7 +1401,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (import.meta.env.DEV && camera.projectionMatrix?.elements) {
       // Projection matrix element [0] = 1/(aspect*tan(fov/2)), element [5] = 1/tan(fov/2)
       // So projAspect = element[5] / element[0]
-      const projAspect = camera.projectionMatrix.elements[5] / camera.projectionMatrix.elements[0]
+      const projAspect = camera.projectionMatrix.elements[5]! / camera.projectionMatrix.elements[0]!
       const ctxAspect = ctx.size.width / ctx.size.height
       if (Math.abs(projAspect - ctxAspect) > 0.01) {
         console.warn(
@@ -1784,7 +1784,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         schroedinger?.bohrRadiusScale ?? 1.0,
         extraDimQuantumNumbers,
         extraDimOmega,
-        schroedinger?.representation ?? 'position',
+        (schroedinger?.representation === 'momentum' ? 'momentum' : 'position'),
         effectiveMomentumScale
       )
       // Convert from physical to model-space: fieldScale rescales coordinates

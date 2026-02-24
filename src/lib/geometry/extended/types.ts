@@ -9,7 +9,6 @@
 
 import {
   type OpenQuantumConfig,
-  type OpenQuantumVisualizationMode,
   DEFAULT_OPEN_QUANTUM_CONFIG,
 } from '@/lib/physics/openQuantum/types'
 
@@ -853,6 +852,22 @@ export interface SchroedingerConfig {
   /** Time-dependent Schroedinger equation solver configuration */
   tdse: TdseConfig
 
+  // === N-D Basis Vectors (for free scalar field and TDSE) ===
+  /** Basis vector for X axis in N-dimensional space */
+  basisX: Float32Array
+  /** Basis vector for Y axis in N-dimensional space */
+  basisY: Float32Array
+  /** Basis vector for Z axis in N-dimensional space */
+  basisZ: Float32Array
+  /** Origin point in N-dimensional space */
+  origin: Float32Array
+
+  // === Phase Shift (Hydrogen ND phase animation) ===
+  /** Phase rotation angle theta (set by phase animation) */
+  phaseTheta: number
+  /** Phase rotation angle phi (set by phase animation) */
+  phasePhi: number
+
   // === Open Quantum System Configuration ===
   /** Density matrix + Lindblad decoherence configuration */
   openQuantum: OpenQuantumConfig
@@ -1064,6 +1079,16 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // TDSE
   tdse: DEFAULT_TDSE_CONFIG,
+
+  // N-D Basis Vectors
+  basisX: new Float32Array([1, 0, 0]),
+  basisY: new Float32Array([0, 1, 0]),
+  basisZ: new Float32Array([0, 0, 1]),
+  origin: new Float32Array([0, 0, 0]),
+
+  // Phase Shift
+  phaseTheta: 0.0,
+  phasePhi: 0.0,
 
   // Open Quantum System
   openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,

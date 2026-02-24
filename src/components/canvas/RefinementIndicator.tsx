@@ -43,44 +43,28 @@ export const RefinementIndicator: React.FC<RefinementIndicatorProps> = ({
     }))
   )
 
-  const [isVisible, setIsVisible] = useState(false)
-  const [fadeOut, setFadeOut] = useState(false)
+  // Derive visibility directly from store values
+  const shouldShow = enabled && !isInteracting
+  const isComplete = shouldShow && progress >= 100 && stage === 'final'
+  const isRefining = shouldShow && progress > 0 && progress < 100
 
-  // Show/hide logic
+  // Timer state for auto-hide after completion
+  const [autoHidden, setAutoHidden] = useState(false)
+
+  // Reset autoHidden during render when leaving completion phase
+  if (autoHidden && !isComplete) {
+    setAutoHidden(false)
+  }
+
+  // Start auto-hide timer when entering completion phase
   useEffect(() => {
-    if (!enabled) {
-      setIsVisible(false)
-      setFadeOut(false)
-      return undefined
-    }
+    if (!isComplete) return undefined
+    const timer = setTimeout(() => setAutoHidden(true), autoHideDelay)
+    return () => clearTimeout(timer)
+  }, [isComplete, autoHideDelay])
 
-    if (isInteracting) {
-      // During interaction - hide immediately
-      setIsVisible(false)
-      setFadeOut(false)
-      return undefined
-    }
-
-    if (progress < 100) {
-      // During refinement - show
-      setIsVisible(true)
-      setFadeOut(false)
-      return undefined
-    }
-
-    if (progress >= 100 && stage === 'final') {
-      // Complete - show briefly then fade out
-      setIsVisible(true)
-      setFadeOut(true)
-      const timer = setTimeout(() => {
-        setIsVisible(false)
-        setFadeOut(false)
-      }, autoHideDelay)
-      return () => clearTimeout(timer)
-    }
-
-    return undefined
-  }, [enabled, isInteracting, progress, stage, autoHideDelay])
+  const isVisible = isRefining || (isComplete && !autoHidden)
+  const fadeOut = isComplete && !autoHidden
 
   // Don't render if not visible
   if (!isVisible && !fadeOut) {

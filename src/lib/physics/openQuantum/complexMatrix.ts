@@ -89,8 +89,8 @@ export function complexMatMul(
       for (let j = 0; j < N; j++) {
         const bRe = Br[kN + j]!
         const bIm = Bi[kN + j]!
-        Or[iN + j] += aRe * bRe - aIm * bIm
-        Oi[iN + j] += aRe * bIm + aIm * bRe
+        Or[iN + j] = Or[iN + j]! + (aRe * bRe - aIm * bIm)
+        Oi[iN + j] = Oi[iN + j]! + (aRe * bIm + aIm * bRe)
       }
     }
   }
@@ -250,15 +250,15 @@ export function solveLinearSystem(
       for (let j = col; j < N; j++) {
         const pj = col * N + j
         const rj = row * N + j
-        Ar[rj] -= fRe * Ar[pj]! - fIm * Ai[pj]!
-        Ai[rj] -= fRe * Ai[pj]! + fIm * Ar[pj]!
+        Ar[rj] = Ar[rj]! - (fRe * Ar[pj]! - fIm * Ai[pj]!)
+        Ai[rj] = Ai[rj]! - (fRe * Ai[pj]! + fIm * Ar[pj]!)
       }
 
       for (let j = 0; j < N; j++) {
         const pj = col * N + j
         const rj = row * N + j
-        Br[rj] -= fRe * Br[pj]! - fIm * Bi[pj]!
-        Bi[rj] -= fRe * Bi[pj]! + fIm * Br[pj]!
+        Br[rj] = Br[rj]! - (fRe * Br[pj]! - fIm * Bi[pj]!)
+        Bi[rj] = Bi[rj]! - (fRe * Bi[pj]! + fIm * Br[pj]!)
       }
     }
   }

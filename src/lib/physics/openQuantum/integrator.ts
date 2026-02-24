@@ -141,7 +141,7 @@ function dissipativeStep(
   // Euler step: ρ += dt · dRho
   const el = rho.elements
   for (let i = 0; i < size; i++) {
-    el[i] += dt * dRhoBuffer[i]!
+    el[i] = el[i]! + dt * dRhoBuffer[i]!
   }
 }
 
@@ -189,7 +189,7 @@ function traceNormalize(rho: DensityMatrix): void {
     const invTrace = 1 / trace
     const size = K * K * 2
     for (let i = 0; i < size; i++) {
-      el[i] *= invTrace
+      el[i] = el[i]! * invTrace
     }
   }
 }

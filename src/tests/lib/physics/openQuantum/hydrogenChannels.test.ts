@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildHydrogenBasis, basisEnergies } from '@/lib/physics/openQuantum/hydrogenBasis'
+import { buildHydrogenBasis } from '@/lib/physics/openQuantum/hydrogenBasis'
 import { buildHydrogenChannels } from '@/lib/physics/openQuantum/hydrogenChannels'
 import { buildTransitionRates } from '@/lib/physics/openQuantum/hydrogenRates'
 import { isAllowedE1 } from '@/lib/physics/openQuantum/selectionRules'
