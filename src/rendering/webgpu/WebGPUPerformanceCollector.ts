@@ -302,7 +302,7 @@ export class WebGPUStatsCollector {
       const resourceDims = graph.getResourceDimensions()
       const bufferStats: BufferStats = {
         depth: resourceDims.get('depth-buffer') ?? { width: 0, height: 0 },
-        temporal: resourceDims.get('temporal-depth') ?? { width: 0, height: 0 },
+        temporal: resourceDims.get('quarter-position') ?? { width: 0, height: 0 },
         screen: { width: size.width, height: size.height },
       }
       updateBufferStats(bufferStats)

@@ -1,142 +1,43 @@
-# N-Dimensional Object Visualizer
+# mquantum
 
-A React + TypeScript application for visualizing N-dimensional objects using Three.js, with support for interactive 3D projections and transformations.
+An N-dimensional quantum physics visualizer running entirely in the browser via WebGPU.
 
-## Features
+**Live demo**: https://mquantum.vercel.app/
 
-- Interactive 3D visualization with Three.js
-- React Three Fiber for declarative 3D scene management
-- TypeScript strict mode with comprehensive type safety
-- State management with Zustand
-- Tailwind CSS with dark theme
-- Modern build tooling with Vite
-- Comprehensive testing setup with Vitest
+## Honest Disclaimer
+
+This is a vibecoded project. I have no real understanding of the quantum mechanics math behind it. I don't know whether the rendered wavefunctions or the values displayed in the UI are physically correct. It looks cool, and that's about as far as my confidence goes.
+
+The project exists as an experiment in pushing the limits of vibecoding with Claude Code (Opus 4.5 / 4.6). The entire codebase — ~600 source files, 83 WGSL shaders, Rust/WASM math, 1800+ tests, and this README — was written by Claude across ~400 commits. I described what I wanted, Claude wrote the code.
+
+## What It Does
+
+- Renders quantum wavefunctions (hydrogen orbitals, harmonic oscillators) in 2 to 11 dimensions
+- Raymarches volumetric probability densities on the GPU via custom WebGPU shaders
+- Post-processing pipeline: bloom, tonemapping, temporal reprojection, paper texture, FXAA/SMAA
+- Interactive orbit camera, N-dimensional rotation controls, animation
+- PBR-ish lighting with GGX specular (whether this is physically meaningful for a wavefunction is anyone's guess)
 
 ## Tech Stack
 
-- **Frontend Framework**: React 18+
-- **3D Rendering**: Three.js, @react-three/fiber, @react-three/drei
-- **Language**: TypeScript (strict mode)
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **State Management**: Zustand
-- **Testing**: Vitest + React Testing Library
-- **Code Quality**: ESLint + Prettier
+- **Rendering**: Custom WebGPU renderer (raw `GPUDevice` / `GPUCommandEncoder`)
+- **Shaders**: WGSL (83 shader modules)
+- **Frontend**: React 19 + TypeScript + Vite 7
+- **State**: Zustand 5
+- **Styling**: Tailwind CSS 4
+- **Math**: Rust/WASM for rotation and projection math
+- **Testing**: Vitest (1800+ tests) + Playwright E2E
 
-## Project Structure
+## Running Locally
 
-```
-src/
-├── components/           # React components
-│   ├── canvas/          # Three.js canvas components
-│   ├── controls/        # UI control panel components
-│   └── ui/              # Generic UI components
-├── lib/                 # Core libraries
-│   ├── math/            # N-dimensional math utilities
-│   ├── geometry/        # Object generation algorithms
-│   └── projection/      # Projection algorithms
-├── hooks/               # Custom React hooks
-├── stores/              # Zustand state management
-├── types/               # TypeScript type definitions
-├── utils/               # Utility functions
-└── tests/               # Test files and setup
-```
+Requires a browser with WebGPU support (Chrome/Edge 113+, Firefox Nightly).
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ (recommended: use LTS version)
-- npm or pnpm
-
-### Installation
-
-1. Install dependencies:
 ```bash
 npm install
-```
-
-2. Create environment file (optional):
-```bash
-cp .env.example .env
-```
-
-### Development
-
-Start the development server:
-```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:3000`
-
-### Building for Production
-
-Build the application:
-```bash
-npm run build
-```
-
-Preview the production build:
-```bash
-npm run preview
-```
-
-## Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm test` - Run tests once
-- `npm run test:watch` - Run tests in watch mode
-- `npm run lint` - Lint code with ESLint
-- `npm run format` - Format code with Prettier
-
-## Testing
-
-The project uses Vitest for unit and integration tests, with React Testing Library for component testing.
-
-Run tests:
-```bash
-npm test
-```
-
-Run tests in watch mode:
-```bash
-npm run test:watch
-```
-
-## Path Aliases
-
-The project is configured with the following path aliases:
-
-- `@/` → `src/`
-- `@/components` → `src/components`
-- `@/lib` → `src/lib`
-- `@/hooks` → `src/hooks`
-- `@/stores` → `src/stores`
-- `@/types` → `src/types`
-- `@/utils` → `src/utils`
-
-Example usage:
-```typescript
-import { Scene } from '@/components/canvas/Scene'
-import { useStore } from '@/stores'
-```
-
-## Code Quality
-
-The project enforces strict TypeScript rules:
-- No implicit `any` types
-- Strict null checks
-- Unused variables/parameters detection
-- No fallthrough cases in switch statements
-
-ESLint and Prettier are configured to maintain consistent code style.
-
-## Development Guidelines
-
-See `CLAUDE.md` for detailed development guidelines, testing requirements, and folder usage rules.
+Opens at `http://localhost:3000`.
 
 ## License
 

@@ -81,11 +81,11 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
   // Initialize WebGPU
   useEffect(() => {
-    console.warn('[WebGPUCanvas] INIT EFFECT RUNNING — deps changed')
     const canvas = canvasRef.current
     if (!canvas) return
 
     let cancelled = false
+    let unsubDeviceLost: (() => void) | null = null
 
     const initialize = async () => {
       try {
@@ -120,10 +120,16 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         // Initialize graph
         await graph.initialize()
 
+        // Guard against unmount during async initialization
+        if (cancelled) {
+          graph.dispose()
+          return
+        }
+
         graphRef.current = graph
 
-        // Register device lost handler
-        deviceManager.onDeviceLost((reason) => {
+        // Register device lost handler (store unsubscribe for cleanup)
+        unsubDeviceLost = deviceManager.onDeviceLost((reason) => {
           console.error('[WebGPUCanvas] Device lost:', reason)
           handleDeviceLost(reason)
         })
@@ -140,6 +146,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         setIsInitialized(true)
         onReady?.(graph)
       } catch (error) {
+        if (cancelled) return
         console.error('[WebGPUCanvas] Initialization failed:', error)
         const err = error instanceof Error ? error : new Error(String(error))
         setInitError(err)
@@ -151,6 +158,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
 
     return () => {
       cancelled = true
+      unsubDeviceLost?.()
       if (graphRef.current) {
         graphRef.current.dispose()
         graphRef.current = null
@@ -171,7 +179,6 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     const height = Math.floor(container.clientHeight * devicePixelRatio)
 
     if (canvas.width !== width || canvas.height !== height) {
-      console.warn(`[WebGPUCanvas] RESIZE: canvas ${canvas.width}×${canvas.height} → ${width}×${height}, container ${container.clientWidth}×${container.clientHeight}, dpr=${devicePixelRatio}`)
       canvas.width = width
       canvas.height = height
       graph.setSize(width, height)

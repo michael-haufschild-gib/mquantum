@@ -401,7 +401,6 @@ export class WebGPURenderGraph {
   setSize(width: number, height: number): void {
     if (this.width === width && this.height === height) return
 
-    console.warn(`[RenderGraph] setSize: ${this.width}×${this.height} → ${width}×${height}`, new Error().stack?.split('\n').slice(1, 4).join('\n'))
     this.width = width
     this.height = height
     this.pool.setSize(width, height)
@@ -741,9 +740,9 @@ export class WebGPURenderGraph {
     const canvasTexture = this.deviceManager.getCurrentTexture()
     const canvasTextureView = canvasTexture.createView()
 
-    // DIAGNOSTIC: Detect canvas texture vs graph dimension mismatch
-    if (canvasTexture.width !== this.width || canvasTexture.height !== this.height) {
-      console.warn(`[RenderGraph] DIMENSION MISMATCH! canvasTexture: ${canvasTexture.width}×${canvasTexture.height}, graph: ${this.width}×${this.height}`)
+    // Detect canvas texture vs graph dimension mismatch (dev-only)
+    if (import.meta.env.DEV && (canvasTexture.width !== this.width || canvasTexture.height !== this.height)) {
+      console.warn(`[RenderGraph] Dimension mismatch: canvasTexture ${canvasTexture.width}×${canvasTexture.height}, graph ${this.width}×${this.height}`)
     }
 
     // Create command encoder

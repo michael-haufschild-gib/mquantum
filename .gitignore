@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Claude Code launch scripts
+claude.sh
+claude-mcp.sh
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -37,6 +41,6 @@ build
 *.tsbuildinfo
 
 # Screenshots and test artifacts
-#screenshots/
+screenshots/
 scripts/playwright/videos/
 scripts/playwright/screenshots/

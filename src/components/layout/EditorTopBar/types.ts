@@ -50,7 +50,6 @@ export interface MenuContext {
   // Export handlers
   handleExport: () => void
   handleExportVideo: () => void
-  handleShare: () => void
 
   // Sound state
   isSoundEnabled: boolean

@@ -618,7 +618,7 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerHydrogenNDPreset: (preset: HydrogenNDPresetName) => {
       // For 'custom', only update the preset name - preserve existing values
       if (preset === 'custom') {
-        set((state) => ({
+        setWithVersion((state) => ({
           schroedinger: {
             ...state.schroedinger,
             hydrogenNDPreset: preset,

@@ -4,7 +4,7 @@
  * Constructs the K²×K² Liouvillian matrix L such that:
  *   d(vec(ρ))/dt = L · vec(ρ)
  *
- * where vec(ρ) stacks columns of ρ into a vector (column-major vectorization).
+ * where vec(ρ) stacks rows of ρ into a vector (row-major vectorization: vec(ρ)[k*K + l] = ρ_{kl}).
  *
  * The Liouvillian has two parts:
  *   L = L_H + L_D

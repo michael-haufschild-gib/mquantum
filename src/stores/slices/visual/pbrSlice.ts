@@ -6,6 +6,7 @@
  * Properties:
  * - roughness (0.04-1.0)
  * - metallic (0.0-1.0)
+ * - reflectance (0.0-1.0, Filament convention: F0 = 0.16 * reflectance^2)
  * - specularIntensity (0.0-2.0)
  * - specularColor (hex string)
  *
@@ -41,6 +42,7 @@ export interface PBRSliceActions {
   // Face setters
   setFaceRoughness: (roughness: number) => void
   setFaceMetallic: (metallic: number) => void
+  setFaceReflectance: (reflectance: number) => void
   setFaceSpecularIntensity: (intensity: number) => void
   setFaceSpecularColor: (color: string) => void
   setFacePBR: (config: Partial<PBRConfig>) => void
@@ -82,6 +84,13 @@ const clampMetallic = (value: number): number => Math.max(0.0, Math.min(1.0, val
  * @returns Clamped value
  */
 const clampSpecularIntensity = (value: number): number => Math.max(0.0, Math.min(2.0, value))
+
+/**
+ * Clamp reflectance to valid range (Filament convention: 0.5 default → F0=0.04)
+ * @param value - Value to clamp
+ * @returns Clamped value
+ */
+const clampReflectance = (value: number): number => Math.max(0.0, Math.min(1.0, value))
 
 const isFinitePBRInput = (value: number): boolean => Number.isFinite(value)
 
@@ -128,6 +137,19 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
     }))
   },
 
+  setFaceReflectance: (reflectance) => {
+    if (!isFinitePBRInput(reflectance)) {
+      if (import.meta.env.DEV) {
+        console.warn('[pbrSlice] Ignoring non-finite reflectance:', reflectance)
+      }
+      return
+    }
+    set((state) => ({
+      face: { ...state.face, reflectance: clampReflectance(reflectance) },
+      pbrVersion: state.pbrVersion + 1,
+    }))
+  },
+
   setFaceSpecularIntensity: (intensity) => {
     if (!isFinitePBRInput(intensity)) {
       if (import.meta.env.DEV) {
@@ -164,6 +186,14 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
           nextFace.metallic = clampMetallic(config.metallic)
         } else if (import.meta.env.DEV) {
           console.warn('[pbrSlice] Ignoring non-finite metallic in setFacePBR:', config.metallic)
+        }
+      }
+
+      if (config.reflectance !== undefined) {
+        if (isFinitePBRInput(config.reflectance)) {
+          nextFace.reflectance = clampReflectance(config.reflectance)
+        } else if (import.meta.env.DEV) {
+          console.warn('[pbrSlice] Ignoring non-finite reflectance in setFacePBR:', config.reflectance)
         }
       }
 

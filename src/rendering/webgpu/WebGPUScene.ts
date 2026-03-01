@@ -583,13 +583,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
     const setupPasses = async () => {
       // Serialize async pass setup to prevent stale setup races creating duplicate passes.
-      console.log(`[WebGPUScene] setupPasses: awaiting previous task (gen=${setupGeneration})`,
-        `schrodingerChanged=${schrodingerChanged} ppChanged=${ppChanged} fullRebuild=${isFullRebuild}`,
-        `forceFull=${forceFullRebuildForModeTransition}`,
-        `iso=${schrodingerConfig.isosurface} qm=${schrodingerConfig.quantumMode}`)
       await previousSetupTask
       if (shouldAbortSetup()) {
-        console.log(`[WebGPUScene] setupPasses: ABORTED after await (gen=${setupGeneration})`)
         return
       }
 
@@ -614,8 +609,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           graph.clearPasses()
           if (shouldAbortSetup()) return
 
-          console.log('[WebGPUScene] Full pass rebuild for:', objectType)
-
           setupSharedResources(graph, fullConfig)
           if (shouldAbortSetup()) return
 
@@ -625,8 +618,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           await setupPPPasses(graph, fullConfig, shouldAbortSetup)
         } else if (schrodingerChanged && ppChanged) {
           // Both groups changed — warm swap Schrodinger, then rebuild PP
-          console.log('[WebGPUScene] Rebuilding both pass groups (warm swap)')
-
           // Pre-swap: only ADD temporal resources (old passes keep their resources)
           ensureTemporalResources(graph, fullConfig)
           if (shouldAbortSetup()) return
@@ -643,17 +634,12 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           await setupPPPasses(graph, fullConfig, shouldAbortSetup)
         } else if (schrodingerChanged) {
           // Only Schrodinger group changed — warm swap (old pass renders during compilation)
-          console.log('[WebGPUScene] Warm swap: Schrodinger passes only',
-            `iso=${fullConfig.isosurface} qm=${fullConfig.quantumMode}`)
-
           // Pre-swap: only ADD temporal resources (old passes keep their resources)
           ensureTemporalResources(graph, fullConfig)
           if (shouldAbortSetup()) return
 
           // Warm swap: old Schrodinger renders while new one compiles
           await warmSwapSchrodingerPasses(graph, fullConfig, shouldAbortSetup)
-          console.log('[WebGPUScene] Warm swap COMPLETE',
-            `aborted=${shouldAbortSetup()} gen=${setupGeneration}`)
           if (shouldAbortSetup()) return
 
           // Post-swap: safe to remove stale resources — new pass is in place
@@ -661,8 +647,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           cleanupSchrodingerPasses(graph, fullConfig)
         } else if (ppChanged) {
           // Only PP group changed — skip Schrodinger pipeline compilations
-          console.log('[WebGPUScene] Selective rebuild: PP passes only')
-
           cleanupPPPasses(graph, fullConfig)
           if (shouldAbortSetup()) return
 
@@ -687,7 +671,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       if (shouldAbortSetup()) {
         // Abort mid-selective-rebuild: clear graph to prevent auto-compile
         // of partially mutated state, then force full rebuild on next attempt.
-        console.warn(`[WebGPUScene] ABORT mid-rebuild (gen=${setupGeneration}), clearing graph`)
+        if (import.meta.env.DEV) {
+          console.warn(`[WebGPUScene] ABORT mid-rebuild (gen=${setupGeneration}), clearing graph`)
+        }
         graph.clearPasses()
         needsFullRebuildRef.current = true
         lastSchrodingerConfigRef.current = null
@@ -697,7 +683,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
       // Compile the graph
       graph.compile()
-      console.log(`[WebGPUScene] Graph compiled OK (gen=${setupGeneration})`)
 
       // Update config tracking on success ONLY — not after error
       needsFullRebuildRef.current = false
@@ -718,7 +703,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         }
       }
 
-      console.log('[WebGPUScene] Passes initialized, graph compiled')
     }
 
     const setupTask = setupPasses().catch((err) => {
@@ -2151,7 +2135,6 @@ async function warmSwapSchrodingerPasses(
   //    The old passes remain in the graph and keep rendering during this await.
   try {
     if (newRenderer) {
-      console.log('[WebGPU warmSwap] Initializing new renderer for dim:', config.dimension)
       await newRenderer.initialize(setupCtx)
       if (shouldAbort?.()) {
         newRenderer.dispose()
@@ -2177,7 +2160,6 @@ async function warmSwapSchrodingerPasses(
   // 3. Atomic swap: remove old, insert new (fast — no compilation)
   if (newRenderer) {
     graph.addInitializedPass(newRenderer)
-    console.log('[WebGPU warmSwap] Swap complete for dim:', config.dimension)
   }
   if (newTemporalPass) {
     graph.addInitializedPass(newTemporalPass)

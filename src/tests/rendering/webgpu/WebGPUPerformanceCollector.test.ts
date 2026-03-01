@@ -56,7 +56,7 @@ function createGraphMock() {
       () =>
         new Map<string, { width: number; height: number }>([
           ['depth-buffer', { width: 1280, height: 720 }],
-          ['temporal-depth', { width: 640, height: 360 }],
+          ['quarter-position', { width: 640, height: 360 }],
         ])
     ),
   }

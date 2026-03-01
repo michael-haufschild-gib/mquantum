@@ -2,7 +2,7 @@
 
 ## Identity
 
-Scientific research project (PhD thesis). Students study quantum physics simulations in N dimensions: Schroedinger wavefunctions including harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions).
+N-dimensional quantum wavefunction visualizer. Physical accuracy is the primary goal. Renders Schroedinger wavefunctions — harmonic oscillators (1D-11D) and hydrogen orbitals (3D + N-dimensional extensions) — with mathematically correct implementations.
 
 ## Constraints (Immutable)
 

@@ -148,15 +148,17 @@ fn iorToF0(ior: f32) -> f32 {
 }
 
 /**
- * Compute F0 for metals from base color.
- * Metals have F0 equal to their albedo.
+ * Compute F0 (Fresnel reflectance at normal incidence).
+ * Uses Filament convention: F0 = 0.16 * reflectance^2 for dielectrics.
+ * Metals use base color directly as F0.
  *
  * @param baseColor Base color
- * @param metallic Metallic factor
- * @param reflectance Reflectance (default 0.04 for dielectrics)
+ * @param metallic Metallic factor (0 = dielectric, 1 = metal)
+ * @param reflectance Perceptual reflectance (0-1, default 0.5 → F0=0.04)
  * @return F0 vector
  */
 fn computeF0(baseColor: vec3f, metallic: f32, reflectance: f32) -> vec3f {
-  return mix(vec3f(reflectance), baseColor, metallic);
+  let dielectricF0 = 0.16 * reflectance * reflectance;
+  return mix(vec3f(dielectricF0), baseColor, metallic);
 }
 `

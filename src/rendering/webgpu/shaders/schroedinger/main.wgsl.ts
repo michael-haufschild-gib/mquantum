@@ -510,7 +510,9 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     let NdotL = max(dot(n, l), 0.0);
 
     // GGX Specular (PBR) with energy conservation
-    let F0 = mix(vec3f(0.04), surfaceColor, material.metallic);
+    // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04)
+    let dielectricF0 = 0.16 * material.reflectance * material.reflectance;
+    let F0 = mix(vec3f(dielectricF0), surfaceColor, material.metallic);
     let halfSum = l + viewDir;
     let halfLen = length(halfSum);
     var H: vec3f;
@@ -963,7 +965,9 @@ ${bayerJitterSection}
 
     let NdotL = max(dot(n, l), 0.0);
 
-    let F0 = mix(vec3f(0.04), surfaceColor, material.metallic);
+    // Filament convention: F0 = 0.16 * reflectance^2 for dielectrics (0.5 → 0.04)
+    let dielectricF0_iso = 0.16 * material.reflectance * material.reflectance;
+    let F0 = mix(vec3f(dielectricF0_iso), surfaceColor, material.metallic);
     let halfSum = l + viewDir;
     let halfLen = length(halfSum);
     var H: vec3f;

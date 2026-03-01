@@ -1076,6 +1076,7 @@ function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<string, u
   const hasAnyFaceField =
     'roughness' in faceSource ||
     'metallic' in faceSource ||
+    'reflectance' in faceSource ||
     'specularIntensity' in faceSource ||
     'specularColor' in faceSource
 
@@ -1089,6 +1090,10 @@ function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<string, u
         typeof faceSource.metallic === 'number' && Number.isFinite(faceSource.metallic)
           ? clampToRange(faceSource.metallic, 0.0, 1.0)
           : fallbackFace.metallic,
+      reflectance:
+        typeof faceSource.reflectance === 'number' && Number.isFinite(faceSource.reflectance)
+          ? clampToRange(faceSource.reflectance, 0.0, 1.0)
+          : fallbackFace.reflectance,
       specularIntensity:
         typeof faceSource.specularIntensity === 'number' &&
         Number.isFinite(faceSource.specularIntensity)
@@ -1106,6 +1111,7 @@ function normalizePbrLoadData(rawPbr: Record<string, unknown>): Record<string, u
   // Drop legacy flat face PBR fields once normalized into `face`.
   delete pbr.roughness
   delete pbr.metallic
+  delete pbr.reflectance
   delete pbr.specularIntensity
   delete pbr.specularColor
 
