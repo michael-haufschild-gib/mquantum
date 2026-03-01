@@ -2305,5 +2305,459 @@
         "target": [0, 0, 0]
       }
     }
+  },
+  {
+    "id": "9322594c-b475-4295-9c18-cff8898d05b4",
+    "name": "Vacuum kspace",
+    "timestamp": 1772369387683,
+    "data": {
+      "appearance": {
+        "edgeColor": "#ca9c02",
+        "faceColor": "#efd536",
+        "backgroundColor": "#232323",
+        "perDimensionColorEnabled": false,
+        "colorAlgorithm": "kSpaceOccupation",
+        "cosineCoefficients": {
+          "a": [0.6, 0.2, 0.3],
+          "b": [0.4, 0.3, 0.3],
+          "c": [0.5, 0.5, 0.5],
+          "d": [0, 0, 0]
+        },
+        "distribution": {
+          "power": 1,
+          "cycles": 1,
+          "offset": 0
+        },
+        "multiSourceWeights": {
+          "depth": 0.5,
+          "orbitTrap": 0.3,
+          "normal": 0.2
+        },
+        "lchLightness": 0.7,
+        "lchChroma": 0.15,
+        "domainColoring": {
+          "modulusMode": "logPsiAbsSquared",
+          "contoursEnabled": true,
+          "contourDensity": 8,
+          "contourWidth": 0.08,
+          "contourStrength": 0.45
+        },
+        "phaseDiverging": {
+          "neutralColor": "#ebebeb",
+          "positiveColor": "#eb3d38",
+          "negativeColor": "#3866f2"
+        },
+        "divergingPsi": {
+          "neutralColor": "#d9d9d9",
+          "positiveColor": "#e83b3b",
+          "negativeColor": "#3166f5",
+          "intensityFloor": 0.2,
+          "component": "real"
+        },
+        "faceEmission": 0,
+        "faceEmissionThreshold": 0,
+        "faceEmissionColorShift": 0,
+        "shaderType": "surface",
+        "shaderSettings": {
+          "wireframe": {
+            "lineThickness": 1
+          },
+          "surface": {
+            "specularIntensity": 0.8
+          }
+        },
+        "sssEnabled": false,
+        "sssIntensity": 1,
+        "sssColor": "#ff8844",
+        "sssThickness": 1,
+        "sssJitter": 0.2
+      },
+      "lighting": {
+        "lightEnabled": true,
+        "lightColor": "#FFFFFF",
+        "lightHorizontalAngle": 145,
+        "lightVerticalAngle": 30,
+        "ambientEnabled": true,
+        "ambientIntensity": 0.2,
+        "ambientColor": "#FFFFFF",
+        "showLightIndicator": false,
+        "lightStrength": 1,
+        "toneMappingEnabled": true,
+        "toneMappingAlgorithm": "aces",
+        "exposure": 0.8,
+        "lights": [
+          {
+            "id": "light-default",
+            "name": "Main Light",
+            "type": "point",
+            "enabled": true,
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
+            "color": "#FFFFFF",
+            "intensity": 0.7,
+            "coneAngle": 30,
+            "penumbra": 0.5,
+            "range": 100,
+            "decay": 2.1
+          }
+        ],
+        "selectedLightId": "light-default",
+        "transformMode": "translate"
+      },
+      "postProcessing": {
+        "bloomEnabled": false,
+        "bloomGain": 1.5,
+        "bloomThreshold": 0.8,
+        "bloomKnee": 0.1,
+        "bloomRadius": 1,
+        "antiAliasingMethod": "none",
+        "cinematicEnabled": true,
+        "cinematicAberration": 0.001,
+        "cinematicVignette": 1.2,
+        "cinematicGrain": 0.013,
+        "paperEnabled": false,
+        "paperContrast": 0.5,
+        "paperRoughness": 0.3,
+        "paperFiber": 0.4,
+        "paperFiberSize": 0.5,
+        "paperCrumples": 0.2,
+        "paperCrumpleSize": 0.5,
+        "paperFolds": 0.1,
+        "paperFoldCount": 5,
+        "paperDrops": 0,
+        "paperFade": 0,
+        "paperSeed": 42,
+        "paperColorFront": "#f5f5dc",
+        "paperColorBack": "#ffffff",
+        "paperQuality": "medium",
+        "paperIntensity": 1,
+        "frameBlendingEnabled": false,
+        "frameBlendingFactor": 0.3
+      },
+      "environment": {
+        "skyboxSelection": "none",
+        "skyboxEnabled": false,
+        "skyboxMode": "classic",
+        "skyboxTexture": "none",
+        "skyboxIntensity": 1,
+        "skyboxRotation": 0,
+        "skyboxAnimationMode": "heatwave",
+        "skyboxAnimationSpeed": 0.01,
+        "skyboxHighQuality": false,
+        "proceduralSettings": {
+          "scale": 1,
+          "complexity": 0.5,
+          "timeScale": 0.2,
+          "cosineCoefficients": {
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
+          },
+          "distribution": {
+            "power": 1,
+            "cycles": 1,
+            "offset": 0
+          },
+          "hue": 0,
+          "saturation": 1,
+          "turbulence": 0.3,
+          "dualToneContrast": 0.5,
+          "sunIntensity": 0,
+          "sunPosition": [10, 10, 10],
+          "evolution": 0,
+          "aurora": {
+            "curtainHeight": 0.5,
+            "waveFrequency": 1
+          },
+          "horizonGradient": {
+            "gradientContrast": 0.5,
+            "spotlightFocus": 0.5
+          },
+          "ocean": {
+            "causticIntensity": 0.5,
+            "depthGradient": 0.5,
+            "bubbleDensity": 0.3,
+            "surfaceShimmer": 0.4
+          }
+        },
+        "backgroundColor": "#000000"
+      },
+      "pbr": {
+        "face": {
+          "roughness": 0.05,
+          "metallic": 0.15,
+          "reflectance": 0.5,
+          "specularIntensity": 0.9,
+          "specularColor": "#ffffff"
+        }
+      },
+      "geometry": {
+        "dimension": 3,
+        "objectType": "schroedinger"
+      },
+      "extended": {
+        "schroedinger": {
+          "scale": 0.6,
+          "qualityPreset": "standard",
+          "resolution": 32,
+          "visualizationAxes": [0, 1, 2],
+          "parameterValues": [],
+          "center": [0, 0, 0],
+          "extent": 2,
+          "colorMode": "mixed",
+          "palette": "complement",
+          "customPalette": {
+            "start": "#0000ff",
+            "mid": "#ffffff",
+            "end": "#ff8000"
+          },
+          "cosineParams": {
+            "a": [0.5, 0.5, 0.5],
+            "b": [0.5, 0.5, 0.5],
+            "c": [1, 1, 1],
+            "d": [0, 0.33, 0.67]
+          },
+          "invertColors": false,
+          "renderStyle": "rayMarching",
+          "quantumMode": "freeScalarField",
+          "representation": "position",
+          "momentumDisplayUnits": "k",
+          "momentumScale": 1,
+          "momentumHbar": 1,
+          "presetName": "custom",
+          "seed": 13,
+          "termCount": 1,
+          "maxQuantumNumber": 6,
+          "frequencySpread": 0.01,
+          "principalQuantumNumber": 2,
+          "azimuthalQuantumNumber": 1,
+          "magneticQuantumNumber": 0,
+          "useRealOrbitals": true,
+          "bohrRadiusScale": 1,
+          "hydrogenNDPreset": "2pz_4d",
+          "extraDimQuantumNumbers": [0, 0, 0, 0, 0, 0, 0, 0],
+          "extraDimOmega": [1, 1, 1, 1, 1, 1, 1, 1],
+          "extraDimFrequencySpread": 0,
+          "timeScale": 0.8,
+          "fieldScale": 1,
+          "densityGain": 4.5,
+          "densityContrast": 1.8,
+          "powderScale": 1,
+          "sampleCount": 32,
+          "emissionIntensity": 0.5,
+          "emissionThreshold": 0.3,
+          "emissionColorShift": 0,
+          "scatteringAnisotropy": 0,
+          "roughness": 0.3,
+          "fogIntegrationEnabled": true,
+          "fogContribution": 1,
+          "internalFogDensity": 0,
+          "raymarchQuality": "balanced",
+          "sssEnabled": false,
+          "sssIntensity": 1,
+          "sssColor": "#ff8844",
+          "sssThickness": 1,
+          "sssJitter": 0.2,
+          "nodalEnabled": false,
+          "nodalColor": "#00ffff",
+          "nodalStrength": 1,
+          "nodalDefinition": "psiAbs",
+          "nodalTolerance": 0.02,
+          "nodalFamilyFilter": "all",
+          "nodalRenderMode": "band",
+          "nodalLobeColoringEnabled": false,
+          "nodalColorReal": "#00ffff",
+          "nodalColorImag": "#ff66ff",
+          "nodalColorPositive": "#22c55e",
+          "nodalColorNegative": "#ef4444",
+          "uncertaintyBoundaryEnabled": false,
+          "uncertaintyBoundaryStrength": 0.5,
+          "uncertaintyConfidenceMass": 0.68,
+          "uncertaintyBoundaryWidth": 0.3,
+          "phaseMaterialityEnabled": false,
+          "phaseMaterialityStrength": 1,
+          "interferenceEnabled": false,
+          "interferenceAmp": 0.5,
+          "interferenceFreq": 10,
+          "interferenceSpeed": 1,
+          "probabilityCurrentEnabled": false,
+          "probabilityCurrentStyle": "magnitude",
+          "probabilityCurrentPlacement": "isosurface",
+          "probabilityCurrentColorMode": "magnitude",
+          "probabilityCurrentScale": 1,
+          "probabilityCurrentSpeed": 1,
+          "probabilityCurrentDensityThreshold": 0.01,
+          "probabilityCurrentMagnitudeThreshold": 0,
+          "probabilityCurrentLineDensity": 8,
+          "probabilityCurrentStepSize": 0.04,
+          "probabilityCurrentSteps": 20,
+          "probabilityCurrentOpacity": 0.7,
+          "probabilityFlowEnabled": false,
+          "probabilityFlowSpeed": 1,
+          "probabilityFlowStrength": 0.3,
+          "isoEnabled": true,
+          "isoThreshold": -3,
+          "crossSectionEnabled": false,
+          "crossSectionCompositeMode": "overlay",
+          "crossSectionScalar": "density",
+          "crossSectionPlaneMode": "axisAligned",
+          "crossSectionAxis": "z",
+          "crossSectionPlaneNormal": [0, 0, 1],
+          "crossSectionPlaneOffset": 0,
+          "crossSectionOpacity": 0.75,
+          "crossSectionThickness": 0.02,
+          "crossSectionPlaneColor": "#66ccff",
+          "crossSectionAutoWindow": true,
+          "crossSectionWindowMin": 0,
+          "crossSectionWindowMax": 1,
+          "sliceAnimationEnabled": false,
+          "sliceSpeed": 0.02,
+          "sliceAmplitude": 0.3,
+          "phaseAnimationEnabled": false,
+          "radialProbabilityEnabled": false,
+          "radialProbabilityOpacity": 0.6,
+          "radialProbabilityColor": "#44aaff",
+          "wignerDimensionIndex": 0,
+          "wignerAutoRange": true,
+          "wignerXRange": 6,
+          "wignerPRange": 6,
+          "wignerCrossTermsEnabled": true,
+          "wignerQuadPoints": 32,
+          "wignerClassicalOverlay": false,
+          "wignerCacheResolution": 256,
+          "freeScalar": {
+            "latticeDim": 3,
+            "gridSize": [32, 32, 32],
+            "spacing": [0.18, 0.18, 0.18],
+            "mass": 4,
+            "dt": 0.005,
+            "stepsPerFrame": 4,
+            "initialCondition": "vacuumNoise",
+            "packetCenter": [0, 0, 0],
+            "packetWidth": 0.3,
+            "packetAmplitude": 1,
+            "modeK": [1, 0, 0],
+            "vacuumSeed": 42,
+            "fieldView": "energyDensity",
+            "autoScale": true,
+            "slicePositions": [],
+            "kSpaceViz": {
+              "displayMode": "raw3d",
+              "fftShiftEnabled": true,
+              "exposureMode": "none",
+              "lowPercentile": 0,
+              "highPercentile": 99.5,
+              "gamma": 1,
+              "broadeningEnabled": true,
+              "broadeningRadius": 1,
+              "broadeningSigma": 0.5,
+              "radialBinCount": 98
+            }
+          },
+          "tdse": {
+            "latticeDim": 3,
+            "gridSize": [64, 64, 64],
+            "spacing": [0.1, 0.1, 0.1],
+            "mass": 1,
+            "hbar": 1,
+            "dt": 0.005,
+            "stepsPerFrame": 4,
+            "initialCondition": "gaussianPacket",
+            "packetCenter": [0, 0, 0],
+            "packetWidth": 0.3,
+            "packetAmplitude": 1,
+            "packetMomentum": [5, 0, 0],
+            "potentialType": "barrier",
+            "barrierHeight": 10,
+            "barrierWidth": 0.2,
+            "barrierCenter": 1,
+            "wellDepth": 5,
+            "wellWidth": 1,
+            "harmonicOmega": 1,
+            "stepHeight": 5,
+            "driveEnabled": false,
+            "driveWaveform": "sine",
+            "driveFrequency": 1,
+            "driveAmplitude": 1,
+            "absorberEnabled": true,
+            "absorberWidth": 0.1,
+            "absorberStrength": 5,
+            "fieldView": "density",
+            "autoScale": true,
+            "diagnosticsEnabled": false,
+            "diagnosticsInterval": 5,
+            "slicePositions": []
+          },
+          "basisX": {
+            "0": 1,
+            "1": 0,
+            "2": 0
+          },
+          "basisY": {
+            "0": 0,
+            "1": 1,
+            "2": 0
+          },
+          "basisZ": {
+            "0": 0,
+            "1": 0,
+            "2": 1
+          },
+          "origin": {
+            "0": 0,
+            "1": 0,
+            "2": 0
+          },
+          "phaseTheta": 0,
+          "phasePhi": 0,
+          "openQuantum": {
+            "enabled": false,
+            "dt": 0.01,
+            "substeps": 4,
+            "dephasingRate": 0.5,
+            "relaxationRate": 0,
+            "thermalUpRate": 0,
+            "dephasingEnabled": true,
+            "relaxationEnabled": false,
+            "thermalEnabled": false,
+            "resetToken": 0,
+            "visualizationMode": "density",
+            "bathTemperature": 300,
+            "couplingScale": 1,
+            "dephasingModel": "uniform",
+            "hydrogenBasisMaxN": 2
+          }
+        }
+      },
+      "transform": {
+        "uniformScale": 1,
+        "perAxisScale": [1, 1, 1, 1],
+        "scaleLocked": true,
+        "dimension": 4
+      },
+      "ui": {
+        "animationBias": 0
+      },
+      "rotation": {
+        "rotations": {
+          "XY": 249.72107700760063,
+          "YZ": 249.72107700760063,
+          "XZ": 249.72107700760063
+        },
+        "dimension": 4
+      },
+      "animation": {
+        "isPlaying": true,
+        "speed": 0.4,
+        "direction": 1,
+        "animatingPlanes": ["XY", "YZ", "XZ"],
+        "accumulatedTime": 397.44343799992197
+      },
+      "camera": {
+        "position": [5.470312615258029, 4.597681161417617, 3.247887791382964],
+        "target": [0, 0, 0]
+      }
+    }
   }
 ]
