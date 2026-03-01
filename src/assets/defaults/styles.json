@@ -1,274 +1,5 @@
 [
   {
-    "id": "feac1aa8-4345-4184-938d-c8ffb346fb23",
-    "name": "Grayscale",
-    "timestamp": 1767904460214,
-    "data": {
-      "appearance": {
-        "edgeColor": "#d8d8d8",
-        "faceColor": "#969696",
-        "backgroundColor": "#0F0F1A",
-        "perDimensionColorEnabled": false,
-        "colorAlgorithm": "monochromatic",
-        "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            3,
-            3,
-            3
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
-        },
-        "distribution": {
-          "power": 3.05,
-          "cycles": 1,
-          "offset": 0
-        },
-        "multiSourceWeights": {
-          "depth": 0.5,
-          "orbitTrap": 0.3,
-          "normal": 0.2
-        },
-        "lchLightness": 0.7,
-        "lchChroma": 0.15,
-        "edgeThickness": 1.7,
-        "tubeCaps": false,
-        "faceEmission": 0,
-        "faceEmissionThreshold": 0,
-        "faceEmissionColorShift": 0,
-        "faceRimFalloff": 0,
-        "facesVisible": true,
-        "shaderType": "surface",
-        "shaderSettings": {
-          "wireframe": {
-            "lineThickness": 1
-          },
-          "surface": {
-            "specularIntensity": 0.8,
-            "fresnelEnabled": true
-          }
-        },
-        "fresnelEnabled": false,
-        "fresnelIntensity": 0.3,
-        "sssEnabled": true,
-        "sssIntensity": 1.6,
-        "sssColor": "#f3e5e5",
-        "sssThickness": 1,
-        "sssJitter": 0.2
-      },
-      "lighting": {
-        "lightEnabled": true,
-        "lightColor": "#FFFFFF",
-        "lightHorizontalAngle": 145,
-        "lightVerticalAngle": 30,
-        "ambientEnabled": true,
-        "ambientIntensity": 0.3,
-        "ambientColor": "#FFFFFF",
-        "showLightIndicator": false,
-        "lightStrength": 1,
-        "toneMappingEnabled": true,
-        "toneMappingAlgorithm": "cineon",
-        "exposure": 1.6,
-        "lights": [
-          {
-            "id": "light-default",
-            "name": "Main Light",
-            "type": "point",
-            "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1.5,
-            "coneAngle": 30,
-            "penumbra": 0.5,
-            "range": 100,
-            "decay": 0.9
-          },
-          {
-            "id": "light-default-spot",
-            "name": "Spot Light",
-            "type": "spot",
-            "enabled": true,
-            "position": [
-              -5,
-              5,
-              5
-            ],
-            "rotation": [
-              -0.6154797086703874,
-              -0.7853981633974483,
-              0
-            ],
-            "color": "#FFFFFF",
-            "intensity": 1,
-            "coneAngle": 30,
-            "penumbra": 0.2,
-            "range": 100,
-            "decay": 0.9
-          }
-        ],
-        "selectedLightId": "light-default",
-        "transformMode": "translate"
-      },
-      "postProcessing": {
-        "bloomEnabled": true,
-        "bloomThreshold": 0.45,
-        "antiAliasingMethod": "fxaa",
-        "cinematicEnabled": true,
-        "cinematicAberration": 0.005,
-        "cinematicVignette": 1.2,
-        "cinematicGrain": 0.012,
-        "objectOnlyDepth": true,
-        "gravityEnabled": false,
-        "gravityStrength": 1,
-        "gravityDistortionScale": 1,
-        "gravityFalloff": 1.5,
-        "gravityChromaticAberration": 0,
-        "paperEnabled": false,
-        "paperContrast": 0.5,
-        "paperRoughness": 0.3,
-        "paperFiber": 0.4,
-        "paperFiberSize": 0.5,
-        "paperCrumples": 0.2,
-        "paperCrumpleSize": 0.5,
-        "paperFolds": 0.1,
-        "paperFoldCount": 5,
-        "paperDrops": 0,
-        "paperFade": 0,
-        "paperSeed": 42,
-        "paperColorFront": "#f5f5dc",
-        "paperColorBack": "#ffffff",
-        "paperQuality": "medium",
-        "paperIntensity": 1,
-        "frameBlendingEnabled": true,
-        "frameBlendingFactor": 0.3,
-        "bloomGain": 2.25,
-        "bloomKnee": 0.59,
-        "bloomRadius": 1.0
-      },
-      "environment": {
-        "activeWalls": [],
-        "showGroundGrid": true,
-        "skyboxSelection": "procedural_twilight",
-        "skyboxEnabled": true,
-        "skyboxMode": "procedural_twilight",
-        "skyboxTexture": "space_blue",
-        "skyboxIntensity": 1,
-        "skyboxRotation": 0,
-        "skyboxAnimationMode": "heatwave",
-        "skyboxAnimationSpeed": 0.01,
-        "skyboxHighQuality": false,
-        "proceduralSettings": {
-          "scale": 0.4,
-          "complexity": 0.17,
-          "timeScale": 0.2,
-          "cosineCoefficients": {
-            "a": [
-              0.85,
-              0.82,
-              0.92
-            ],
-            "b": [
-              0.1,
-              0.1,
-              0.08
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
-          },
-          "distribution": {
-            "power": 1,
-            "cycles": 1,
-            "offset": 0
-          },
-          "hue": 0,
-          "saturation": 1,
-          "chromaticAberration": 0.1,
-          "horizon": 0,
-          "turbulence": 0.3,
-          "dualToneContrast": 0.5,
-          "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
-          "noiseGrain": 0,
-          "evolution": 2.05,
-          "starfield": {
-            "density": 0.5,
-            "brightness": 1,
-            "size": 0.5,
-            "twinkle": 0.3,
-            "glow": 0.5,
-            "colorVariation": 0.5
-          },
-          "aurora": {
-            "curtainHeight": 0.5,
-            "waveFrequency": 1
-          },
-          "horizonGradient": {
-            "gradientContrast": 0.5,
-            "spotlightFocus": 0.5
-          },
-          "ocean": {
-            "causticIntensity": 0.5,
-            "depthGradient": 0.5,
-            "bubbleDensity": 0.3,
-            "surfaceShimmer": 0.4
-          },
-          "parallaxEnabled": false,
-          "parallaxStrength": 0.5
-        },
-        "backgroundColor": "#070707",
-        "skyboxBlur": 0
-      },
-      "pbr": {
-        "face": {
-          "roughness": 0.5,
-          "metallic": 0.65,
-          "specularIntensity": 1.5,
-          "specularColor": "#8a0397"
-        },
-        "edge": {
-          "roughness": 0.43,
-          "metallic": 0.78,
-          "specularIntensity": 1.6,
-          "specularColor": "#ffffff"
-        }
-      }
-    }
-  },
-  {
     "id": "5915b891-95f3-4675-9182-4e8802d66614",
     "name": "Aquarell",
     "timestamp": 1767904460214,
@@ -280,26 +11,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "radialDistance",
         "cosineCoefficients": {
-          "a": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "b": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "c": [
-            0.8,
-            0.8,
-            0.8
-          ],
-          "d": [
-            0,
-            0.1,
-            0.2
-          ]
+          "a": [0.5, 0.5, 0.5],
+          "b": [0.5, 0.5, 0.5],
+          "c": [0.8, 0.8, 0.8],
+          "d": [0, 0.1, 0.2]
         },
         "distribution": {
           "power": 1,
@@ -408,26 +123,10 @@
           "complexity": 0.5,
           "timeScale": 0.2,
           "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -441,11 +140,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "noiseGrain": 0,
           "evolution": 0,
           "starfield": {
@@ -504,26 +199,10 @@
         "perDimensionColorEnabled": false,
         "colorAlgorithm": "monochromatic",
         "cosineCoefficients": {
-          "a": [
-            0.6,
-            0.2,
-            0.3
-          ],
-          "b": [
-            0.4,
-            0.3,
-            0.3
-          ],
-          "c": [
-            0.5,
-            0.5,
-            0.5
-          ],
-          "d": [
-            0,
-            0,
-            0
-          ]
+          "a": [0.6, 0.2, 0.3],
+          "b": [0.4, 0.3, 0.3],
+          "c": [0.5, 0.5, 0.5],
+          "d": [0, 0, 0]
         },
         "distribution": {
           "power": 1,
@@ -581,16 +260,8 @@
             "name": "Main Light",
             "type": "point",
             "enabled": true,
-            "position": [
-              -3.1816363437043065,
-              5.362311101832846,
-              -3.1816363437043056
-            ],
-            "rotation": [
-              0,
-              0,
-              0
-            ],
+            "position": [-3.1816363437043065, 5.362311101832846, -3.1816363437043056],
+            "rotation": [0, 0, 0],
             "color": "#FFFFFF",
             "intensity": 1.3,
             "coneAngle": 30,
@@ -639,9 +310,7 @@
         "bloomRadius": 1.0
       },
       "environment": {
-        "activeWalls": [
-          "floor"
-        ],
+        "activeWalls": ["floor"],
         "showGroundGrid": true,
         "skyboxSelection": "none",
         "skyboxEnabled": false,
@@ -657,26 +326,10 @@
           "complexity": 0.5,
           "timeScale": 0.2,
           "cosineCoefficients": {
-            "a": [
-              0.6,
-              0.2,
-              0.3
-            ],
-            "b": [
-              0.4,
-              0.3,
-              0.3
-            ],
-            "c": [
-              0.5,
-              0.5,
-              0.5
-            ],
-            "d": [
-              0,
-              0,
-              0
-            ]
+            "a": [0.6, 0.2, 0.3],
+            "b": [0.4, 0.3, 0.3],
+            "c": [0.5, 0.5, 0.5],
+            "d": [0, 0, 0]
           },
           "distribution": {
             "power": 1,
@@ -688,11 +341,7 @@
           "turbulence": 0.3,
           "dualToneContrast": 0.5,
           "sunIntensity": 0,
-          "sunPosition": [
-            10,
-            10,
-            10
-          ],
+          "sunPosition": [10, 10, 10],
           "evolution": 0,
           "aurora": {
             "curtainHeight": 0.5,
