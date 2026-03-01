@@ -987,17 +987,21 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       // ResizeObserver can lag by one frame on sudden layout changes (e.g. dev-tools toggle),
       // causing the old buffer to be stretched into the new CSS rect. Catching it here
       // guarantees the buffer is correct before every paint.
-      const cw = canvas.clientWidth
-      const ch = canvas.clientHeight
-      if (cw > 0 && ch > 0) {
-        const renderScale = usePerformanceStore.getState().renderResolutionScale
-        const dpr = window.devicePixelRatio * renderScale
-        const targetW = Math.floor(cw * dpr)
-        const targetH = Math.floor(ch * dpr)
-        if (canvas.width !== targetW || canvas.height !== targetH) {
-          canvas.width = targetW
-          canvas.height = targetH
-          graph.setSize(targetW, targetH)
+      // Skip during export — the canvas is sized to export dimensions and must not be overwritten.
+      const exporting = isExportRuntimeActive(exportRuntimeRef.current)
+      if (!exporting) {
+        const cw = canvas.clientWidth
+        const ch = canvas.clientHeight
+        if (cw > 0 && ch > 0) {
+          const renderScale = usePerformanceStore.getState().renderResolutionScale
+          const dpr = window.devicePixelRatio * renderScale
+          const targetW = Math.floor(cw * dpr)
+          const targetH = Math.floor(ch * dpr)
+          if (canvas.width !== targetW || canvas.height !== targetH) {
+            canvas.width = targetW
+            canvas.height = targetH
+            graph.setSize(targetW, targetH)
+          }
         }
       }
 
