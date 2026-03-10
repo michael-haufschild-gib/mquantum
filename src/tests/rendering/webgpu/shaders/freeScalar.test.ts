@@ -68,8 +68,10 @@ describe('Free Scalar Field WGSL Shaders', () => {
       expect(freeScalarUpdatePiBlock).toContain('laplacian')
     })
 
-    it('uses periodic boundary conditions via wrapCoord', () => {
-      expect(freeScalarUpdatePiBlock).toContain('wrapCoord(')
+    it('uses periodic boundary conditions via stride wrapping', () => {
+      // Stride-based periodic BCs: select wraps at boundary coords 0 and gridSize-1
+      expect(freeScalarUpdatePiBlock).toContain('params.gridSize[d] - 1u')
+      expect(freeScalarUpdatePiBlock).toContain('coord == 0u')
     })
 
     it('implements Klein-Gordon update equation', () => {

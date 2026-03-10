@@ -783,7 +783,11 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
     const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     const animTimeChanged = currentAnimTime !== this.prevAnimationTime
     const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)
-    const sceneChanged = animTimeChanged || cameraChanged || !this.hasValidHistory
+    // Must match renderer's sceneChanged logic exactly (animTimeChanged || cameraChanged)
+    // to keep Bayer cycling in sync. Do NOT include !hasValidHistory here — that would
+    // cause the temporal pass to advance one extra frame after a resize on a static scene,
+    // permanently desyncing from the renderer's Bayer offset.
+    const sceneChanged = animTimeChanged || cameraChanged
 
     // Update state for next frame
     // Only advance frame index when scene content has changed.

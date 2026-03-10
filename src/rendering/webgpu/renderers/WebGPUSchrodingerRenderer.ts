@@ -642,7 +642,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       densityGridHasPhase: (isFreeScalar || isTdse) ? true : undefined,
       isWigner: (isFreeScalar || isTdse) ? false : isWigner,
       useWignerCache: (isFreeScalar || isTdse) ? false : isWigner,
-      isFreeScalar,
+      isFreeScalar: isFreeScalar || isTdse,
       freeScalarAnalysis:
         isFreeScalar &&
         this.rendererConfig.colorAlgorithm !== undefined &&
@@ -1644,6 +1644,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // --- Quantum mode mapping (string to int, like WebGL) ---
     const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
     const quantumModeInt = QUANTUM_MODE_MAP[quantumModeStr] ?? 0
+    // Compute modes (FSF/TDSE) use density grids; analytic-only features must be disabled
+    // even if stale store state still holds incompatible values (e.g. from preset loading).
+    const isUniformComputeMode = quantumModeStr === 'freeScalarField' || quantumModeStr === 'tdseDynamics'
 
     // --- Quantum preset generation (like WebGL SchroedingerMesh.tsx lines 598-638) ---
     // Read config values from store
@@ -1738,13 +1741,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // Compute bounding radius for TDSE dynamics mode (lattice extent)
+    // Compute bounding radius for TDSE dynamics mode (lattice extent + margin)
+    // 15% margin ensures the writeGrid writes zeros at edges, giving smooth
+    // density falloff instead of hard cutoff at the lattice boundary.
     if (schroedinger?.quantumMode === 'tdseDynamics' && schroedinger?.tdse) {
       const td = schroedinger.tdse
       const Lx = (td.gridSize?.[0] ?? 32) * (td.spacing?.[0] ?? 0.1)
       const Ly = (td.gridSize?.[1] ?? 32) * (td.spacing?.[1] ?? 0.1)
       const Lz = (td.gridSize?.[2] ?? 32) * (td.spacing?.[2] ?? 0.1)
-      const newBoundR = Math.max(Lx, Ly, Lz) / 2
+      const newBoundR = Math.max(Lx, Ly, Lz) / 2 * 1.15
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
       if (
@@ -1806,20 +1811,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Compute auto-compensation AFTER bounding radius update so stepLen estimate is correct.
-    // Free scalar field uses its own auto-scale normalization (maxFieldValue), so the HO
+    // Free scalar field and TDSE use density grids with normalized [0,1] values, so the HO
     // canonical compensation factor is irrelevant and must remain 1.0.
-    if (needsPresetRegen && this.cachedPreset) {
-      if (schroedinger?.quantumMode === 'freeScalarField') {
-        this.canonicalDensityCompensation = 1.0
-        // Free scalar density grid stores normalized values in [0, 1].
-        // Set peakDensity to match so applyDensityContrast doesn't cap the range.
-        this.cachedPeakDensity = 1.0
-      } else {
-        this.canonicalDensityCompensation = this.computeCanonicalCompensation(
-          this.cachedPreset,
-          dimension
-        )
-      }
+    // This guard runs unconditionally for grid-based modes to prevent stale compensation
+    // from a previous mode (e.g., HO) carrying over after a mode switch.
+    if (schroedinger?.quantumMode === 'freeScalarField' || schroedinger?.quantumMode === 'tdseDynamics') {
+      this.canonicalDensityCompensation = 1.0
+      this.cachedPeakDensity = 1.0
+    } else if (needsPresetRegen && this.cachedPreset) {
+      this.canonicalDensityCompensation = this.computeCanonicalCompensation(
+        this.cachedPreset,
+        dimension
+      )
     }
 
     // Use cached flattened preset data
@@ -2155,7 +2158,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const nLen = Math.hypot(nx, ny, nz)
     const invNLen = nLen > 1e-6 ? 1.0 / nLen : 1.0
 
-    intView[1216 / 4] = schroedinger?.crossSectionEnabled ? 1 : 0
+    intView[1216 / 4] = (!isUniformComputeMode && schroedinger?.crossSectionEnabled) ? 1 : 0
     intView[1220 / 4] =
       CROSS_SECTION_COMPOSITE_MODE_MAP[schroedinger?.crossSectionCompositeMode ?? 'overlay'] ?? 0
     intView[1224 / 4] = CROSS_SECTION_SCALAR_MAP[schroedinger?.crossSectionScalar ?? 'density'] ?? 0
@@ -2204,7 +2207,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const integrationSteps = schroedinger?.probabilityCurrentSteps ?? 20
     // Probability current in momentum space uses broader stencil deltas and heavier evaluation;
     // cap line density and integration steps to keep the overlay responsive.
-    const isMomentum = schroedinger?.representation === 'momentum'
+    const isMomentum = !isUniformComputeMode && schroedinger?.representation === 'momentum'
     floatView[1312 / 4] = isMomentum ? Math.min(lineDensity, 3.0) : lineDensity
     floatView[1316 / 4] = isMomentum ? Math.max(stepSize, 0.02) : stepSize
     intView[1320 / 4] = isMomentum ? Math.min(integrationSteps, 8) : integrationSteps
@@ -2213,7 +2216,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Representation + momentum controls (offset 1328-1344)
     // effectiveMomentumScale already incorporates ħ for p-space (computed above).
     // The shader reads momentumScale and applies it directly as kScale.
-    intView[1328 / 4] = REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0
+    intView[1328 / 4] = isUniformComputeMode ? 0 : (REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0)
     intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'k'] ?? 0
     floatView[1336 / 4] = effectiveMomentumScale
     floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
@@ -2299,7 +2302,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Exception: Hydrogen momentum has genuinely different functional form (Gegenbauer polynomials),
     // so it keeps representationMode=1 and its own shader path in psiBlockHydrogenND.
     const isHOMomentum =
-      schroedinger?.representation === 'momentum' && quantumModeStr !== 'hydrogenND'
+      !isUniformComputeMode && schroedinger?.representation === 'momentum' && quantumModeStr !== 'hydrogenND'
 
     if (isHOMomentum) {
       // 1. Invert omegas: ω_j → 1/(ħ²·ω_j)

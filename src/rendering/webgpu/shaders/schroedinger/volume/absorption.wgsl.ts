@@ -45,20 +45,4 @@ fn computeAlpha(rho: f32, stepLen: f32, sigma: f32) -> f32 {
 
   return 1.0 - exp(exponent);
 }
-
-/**
- * Compute alpha with density boost for low-density regions.
- * This helps make faint quantum features more visible.
- *
- * @param rho Local probability density |psi|^2
- * @param stepLen Step length along ray
- * @param sigma Absorption coefficient (densityGain)
- * @param boost Boost factor for low-density regions
- * @return Local opacity [0, 1]
- */
-fn computeAlphaBoost(rho: f32, stepLen: f32, sigma: f32, boost: f32) -> f32 {
-  // Apply boost to low-density regions
-  let boostedRho = rho * (1.0 + boost * exp(-rho * 10.0));
-  return computeAlpha(boostedRho, stepLen, sigma);
-}
 `

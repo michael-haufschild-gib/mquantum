@@ -517,7 +517,7 @@ fn computeEmissionLit(
     if (abs(uniforms.scatteringAnisotropy) > 0.01) {
       let cosTheta = dot(-l, viewDir);
       phaseFactor = henyeyGreenstein(cosTheta, uniforms.scatteringAnisotropy);
-      phaseFactor *= 12.56;
+      phaseFactor *= 4.0 * PI;
     }
 
     // Lambertian diffuse (no PBR specular for volumetric — it has negligible effect on clouds)

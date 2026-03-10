@@ -81,27 +81,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // Phase angle arg(psi) in [0, 2*pi]
   let phase = atan2(im, re) + 3.14159265;
 
-  // Probability current magnitude |j| using central differences:
-  // j_d = (hbar / m) * Im(conj(psi) * d_d psi)
-  var currentMagSq: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    if (params.gridSize[d] <= 1u) {
-      continue;
-    }
-    var fwdCoords = coords;
-    fwdCoords[d] = wrapCoord(i32(coords[d]) + 1, params.gridSize[d]);
-    var bwdCoords = coords;
-    bwdCoords[d] = wrapCoord(i32(coords[d]) - 1, params.gridSize[d]);
-    let fwdIdx = ndToLinear(fwdCoords, params.strides, params.latticeDim);
-    let bwdIdx = ndToLinear(bwdCoords, params.strides, params.latticeDim);
-    let invDx = 0.5 / params.spacing[d];
-    let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-    let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
-    let jd = (params.hbar / max(params.mass, 1e-6)) * (re * dIm - im * dRe);
-    currentMagSq += jd * jd;
-  }
-  let currentMag = sqrt(currentMagSq);
-
   // Encode selected field into display scalar [0,1] for the density-grid contract.
   var displayScalar: f32 = 0.0;
   if (params.fieldView == 0u) {
@@ -111,8 +90,26 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // phase
     displayScalar = phase / (2.0 * 3.14159265);
   } else if (params.fieldView == 2u) {
-    // current magnitude
-    displayScalar = 1.0 - exp(-currentMag);
+    // current magnitude — compute probability current j via central differences
+    // j_d = (hbar / m) * Im(conj(psi) * d_d psi)
+    var currentMagSq: f32 = 0.0;
+    let hbarOverM = params.hbar / max(params.mass, 1e-6);
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      if (params.gridSize[d] <= 1u) {
+        continue;
+      }
+      // Stride-based neighbor lookup: O(1) instead of O(D) per neighbor
+      let stride = params.strides[d];
+      let coord = coords[d];
+      let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
+      let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
+      let invDx = 0.5 / params.spacing[d];
+      let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+      let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      let jd = hbarOverM * (re * dIm - im * dRe);
+      currentMagSq += jd * jd;
+    }
+    displayScalar = 1.0 - exp(-sqrt(currentMagSq));
   } else {
     // potential
     let potentialScale = max(max(params.barrierHeight, abs(params.wellDepth)), 1.0);

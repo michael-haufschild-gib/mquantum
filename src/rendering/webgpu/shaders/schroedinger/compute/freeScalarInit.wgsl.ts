@@ -3,7 +3,7 @@
  *
  * Initializes phi and pi storage buffers from selected initial conditions:
  * - singleMode (1u): plane wave A*cos(k.x) with conjugate momentum
- * - gaussianPacket (2u): Gaussian envelope with carrier wave
+ * - gaussianPacket (2u): Traveling Gaussian wavepacket with carrier wave and conjugate momentum
  *
  * Supports N-dimensional lattices (1-11D) via per-dimension arrays and stride tables.
  * vacuumNoise is handled CPU-side via exact vacuum spectrum sampling
@@ -83,7 +83,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var piVal: f32 = 0.0;
 
   if (params.initCondition == 1u) {
-    // Single mode: phi = A * cos(k . x), pi = -A * omega * sin(k . x)
+    // Single mode: phi = A * cos(k . x), pi = A * omega * sin(k . x)
     // Physical wave vector: k_phys_d = 2*pi*n_d / L_d
     var phase: f32 = 0.0;
     var omegaSq: f32 = params.mass * params.mass;
@@ -102,11 +102,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
     let omega = sqrt(omegaSq);
     phiVal = params.packetAmplitude * cos(phase);
-    piVal = -params.packetAmplitude * omega * sin(phase);
+    piVal = params.packetAmplitude * omega * sin(phase);
   } else if (params.initCondition == 2u) {
     // Gaussian packet: phi = A * exp(-|x-x0|^2 / (2*sigma^2)) * cos(k . x)
+    //                  pi  = A * omega * exp(...) * sin(k . x)  (traveling wave)
     var r2: f32 = 0.0;
     var phase: f32 = 0.0;
+    var omegaSq: f32 = params.mass * params.mass;
 
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       let dx = worldPos[d] - params.packetCenter[d];
@@ -116,13 +118,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       if (latticeL > 0.0 && params.gridSize[d] > 1u) {
         let kPhys = 6.283185307 * f32(params.modeK[d]) / latticeL;
         phase += kPhys * worldPos[d];
+
+        // Lattice dispersion: (2/a) * sin(k * a / 2)
+        let sk = 2.0 * sin(kPhys * params.spacing[d] * 0.5) / params.spacing[d];
+        omegaSq += sk * sk;
       }
     }
 
+    let omega = sqrt(omegaSq);
     let sigma2 = params.packetWidth * params.packetWidth;
     let envelope = params.packetAmplitude * exp(-r2 / (2.0 * sigma2));
     phiVal = envelope * cos(phase);
-    piVal = 0.0; // Static initial condition (packet at rest)
+    piVal = envelope * omega * sin(phase);
   }
   // initCondition == 0u (vacuumNoise): no-op, data written by CPU
 

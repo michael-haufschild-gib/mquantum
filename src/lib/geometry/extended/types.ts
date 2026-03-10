@@ -370,6 +370,9 @@ export interface TdseConfig {
   /** Auto-scale density normalization from wavefunction maximum */
   autoScale: boolean
 
+  /** Auto-loop: reinitialize wavefunction when norm decays below threshold */
+  autoLoop: boolean
+
   /** Enable diagnostic readback (norm, current) */
   diagnosticsEnabled: boolean
   /** Diagnostic computation interval in frames */
@@ -420,6 +423,7 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
 
   fieldView: 'density',
   autoScale: true,
+  autoLoop: true,
 
   diagnosticsEnabled: false,
   diagnosticsInterval: 5,

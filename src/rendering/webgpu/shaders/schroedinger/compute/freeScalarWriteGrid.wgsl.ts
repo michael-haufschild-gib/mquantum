@@ -98,9 +98,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       gradPhi[d] = 0.0;
       if (params.gridSize[d] <= 1u) { continue; }
 
-      var fwdCoords = coords;
-      fwdCoords[d] = wrapCoord(i32(coords[d]) + 1, params.gridSize[d]);
-      let fwdIdx = ndToLinear(fwdCoords, params.strides, params.latticeDim);
+      // Stride-based forward neighbor lookup: O(1) instead of O(D)
+      let stride = params.strides[d];
+      let coord = coords[d];
+      let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
       let dPhi = phi[fwdIdx] - phiVal;
       let invA = 1.0 / params.spacing[d];
       gradPhi[d] = dPhi * invA;

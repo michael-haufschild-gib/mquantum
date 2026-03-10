@@ -23,6 +23,15 @@ import type {
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 
+/** Power-of-2 grid sizes required by Stockham FFT */
+const GRID_SIZE_OPTIONS = [
+  { value: '8', label: '8' },
+  { value: '16', label: '16' },
+  { value: '32', label: '32' },
+  { value: '64', label: '64' },
+  { value: '128', label: '128' },
+]
+
 const INITIAL_CONDITION_OPTIONS = [
   { value: 'gaussianPacket', label: 'Gaussian Packet' },
   { value: 'planeWave', label: 'Plane Wave' },
@@ -373,15 +382,12 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             data-testid="tdse-lattice-dim"
           />
           {Array.from({ length: activeDims }, (_, d) => (
-            <Slider
+            <Select
               key={`grid-${d}`}
               label={`Grid ${AXIS_LABELS[d]}`}
-              min={8}
-              max={128}
-              step={1}
-              value={td.gridSize[d] ?? 32}
-              onChange={(v) => handleGridSizeChange(d, v)}
-              showValue
+              options={GRID_SIZE_OPTIONS}
+              value={String(td.gridSize[d] ?? 32)}
+              onChange={(v) => handleGridSizeChange(d, Number(v))}
               data-testid={`tdse-grid-${d}`}
             />
           ))}

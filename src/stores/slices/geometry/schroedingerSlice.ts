@@ -1613,7 +1613,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled },
+          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled, needsReset: true },
         },
       }))
     },
@@ -1698,6 +1698,14 @@ export const createSchroedingerSlice: StateCreator<
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, autoScale },
+        },
+      }))
+    },
+    setTdseAutoLoop: (autoLoop) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, autoLoop },
         },
       }))
     },

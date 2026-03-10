@@ -286,6 +286,7 @@ export interface SchroedingerSliceActions {
   setTdseAbsorberStrength: (strength: number) => void
   setTdseFieldView: (view: TdseFieldView) => void
   setTdseAutoScale: (autoScale: boolean) => void
+  setTdseAutoLoop: (autoLoop: boolean) => void
   setTdseDiagnosticsEnabled: (enabled: boolean) => void
   setTdseDiagnosticsInterval: (interval: number) => void
   setTdseSlicePosition: (dimIndex: number, value: number) => void

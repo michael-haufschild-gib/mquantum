@@ -727,12 +727,15 @@ fn volumeRaymarch(
     let pos = rayOrigin + rayDir * t;
 
     // PERFORMANCE: Gaussian envelope early-skip for deep tail region.
-    // The outer ~15% shell of the bounding sphere is exponentially low density.
-    // Skip expensive wavefunction evaluation and take 8x steps through it.
-    let r2 = dot(pos, pos);
-    if (r2 > boundR2Skip) {
-      t += stepLen * 8.0;
-      continue;
+    // The outer ~15% shell of the bounding sphere is exponentially low density
+    // for HO/hydrogen wavefunctions (Gaussian/exponential decay).
+    // Free scalar fields use a cubic lattice with no radial falloff — skip is invalid.
+    if (!IS_FREE_SCALAR) {
+      let r2 = dot(pos, pos);
+      if (r2 > boundR2Skip) {
+        t += stepLen * 8.0;
+        continue;
+      }
     }
 
     // Sample density with phase AND get flowed position for optimized gradient computation
@@ -939,10 +942,13 @@ fn volumeRaymarchHQ(
     let pos = rayOrigin + rayDir * t;
 
     // PERFORMANCE: Gaussian envelope early-skip for deep tail region.
-    let r2 = dot(pos, pos);
-    if (r2 > boundR2Skip) {
-      t += stepLen * 8.0;
-      continue;
+    // Disabled for free scalar (cubic lattice, no radial Gaussian decay).
+    if (!IS_FREE_SCALAR) {
+      let r2 = dot(pos, pos);
+      if (r2 > boundR2Skip) {
+        t += stepLen * 8.0;
+        continue;
+      }
     }
 
     // First do cheap center-only density check

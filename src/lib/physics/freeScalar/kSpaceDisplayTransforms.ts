@@ -389,10 +389,6 @@ export function applyBroadening(grid: KSpaceDisplayGrid, config: KSpaceVizConfig
 function blurAxis(data: Float64Array, kernel: Float64Array, radius: number, G: number, axis: number): void {
   const temp = new Float64Array(G)
 
-  // Strides: X=1, Y=G, Z=G*G
-  const outerDim1 = axis === 2 ? G : G // always iterate G
-  const outerDim2 = axis === 2 ? G : G
-
   // For each line along the axis
   if (axis === 0) {
     // Blur along X: for each (y,z), blur the x-line
@@ -447,10 +443,6 @@ function blurAxis(data: Float64Array, kernel: Float64Array, radius: number, G: n
       }
     }
   }
-
-  // Suppress lint: outerDim variables exist for documentation only
-  void outerDim1
-  void outerDim2
 }
 
 // ============================================================================

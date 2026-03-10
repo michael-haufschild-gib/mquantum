@@ -28,15 +28,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     if (params.gridSize[d] <= 1u) { continue; }
 
-    // Forward neighbor
-    var fwdCoords = coords;
-    fwdCoords[d] = wrapCoord(i32(coords[d]) + 1, params.gridSize[d]);
-    let fwdIdx = ndToLinear(fwdCoords, params.strides, params.latticeDim);
-
-    // Backward neighbor
-    var bwdCoords = coords;
-    bwdCoords[d] = wrapCoord(i32(coords[d]) - 1, params.gridSize[d]);
-    let bwdIdx = ndToLinear(bwdCoords, params.strides, params.latticeDim);
+    // Stride-based neighbor lookup: O(1) per dimension instead of O(D)
+    let stride = params.strides[d];
+    let coord = coords[d];
+    let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
+    let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
 
     let a2 = params.spacing[d] * params.spacing[d];
     laplacian += (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;

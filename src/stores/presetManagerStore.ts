@@ -1671,14 +1671,29 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           }
         }
 
-        // Post-load invariant: free scalar field and TDSE require dimension >= 3
-        // (loadGeometry + setState bypass setSchroedingerQuantumMode's enforcement)
+        // Post-load invariants for compute modes (FSF/TDSE).
+        // loadGeometry + setState bypass setSchroedingerQuantumMode's enforcement,
+        // so we must normalize here to prevent stale/incompatible state from leaking
+        // into the renderer (e.g. representation='momentum' or crossSectionEnabled=true
+        // would corrupt the GPU uniform buffer for density-grid-based pipelines).
         const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
-        if (
-          (qm === 'freeScalarField' || qm === 'tdseDynamics') &&
-          useGeometryStore.getState().dimension < 3
-        ) {
-          useGeometryStore.getState().setDimension(3)
+        if (qm === 'freeScalarField' || qm === 'tdseDynamics') {
+          if (useGeometryStore.getState().dimension < 3) {
+            useGeometryStore.getState().setDimension(3)
+          }
+          const sch = useExtendedObjectStore.getState().schroedinger
+          const computePatches: Record<string, unknown> = {}
+          if (sch?.representation !== 'position') {
+            computePatches.representation = 'position'
+          }
+          if (sch?.crossSectionEnabled) {
+            computePatches.crossSectionEnabled = false
+          }
+          if (Object.keys(computePatches).length > 0) {
+            useExtendedObjectStore.setState({
+              schroedinger: { ...sch, ...computePatches },
+            })
+          }
         }
 
         // Bump version counters to trigger re-renders after direct setState calls

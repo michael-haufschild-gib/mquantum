@@ -434,6 +434,48 @@ Note: The base class creates its own vertex shader, so only the fragment entry p
 
 ---
 
+## device.queue.writeBuffer Race Condition (CRITICAL)
+
+**Problem**: `device.queue.writeBuffer()` is a queue operation, not a command buffer operation. All `writeBuffer` calls issued before `device.queue.submit()` complete BEFORE the command buffer executes. If you call `writeBuffer` to the same buffer multiple times (e.g., in a loop for different compute stages), only the LAST write is visible to ALL dispatches in the command buffer.
+
+```typescript
+// ❌ CRITICAL BUG - all dispatches see stage N-1's data
+for (let s = 0; s < stages; s++) {
+  device.queue.writeBuffer(uniformBuffer, 0, stageData[s])  // Overwrites previous!
+  const pass = encoder.beginComputePass()
+  pass.setPipeline(pipeline)
+  pass.setBindGroup(0, bg)
+  pass.dispatchWorkgroups(count)
+  pass.end()
+}
+// On submit: writeBuffer(0), writeBuffer(1), ..., writeBuffer(N-1), THEN command buffer
+// All dispatches see stageData[N-1]!
+
+// ✅ GOOD - use encoder.copyBufferToBuffer (ordered within command buffer)
+// 1. Write ALL stage data to a staging buffer in one call
+device.queue.writeBuffer(stagingBuffer, 0, allStageData)
+
+// 2. Copy per-stage data INSIDE the command buffer (properly ordered)
+for (let s = 0; s < stages; s++) {
+  encoder.copyBufferToBuffer(
+    stagingBuffer, s * UNIFORM_SIZE,
+    uniformBuffer, 0,
+    UNIFORM_SIZE
+  )
+  const pass = encoder.beginComputePass()
+  pass.setPipeline(pipeline)
+  pass.setBindGroup(0, bg)
+  pass.dispatchWorkgroups(count)
+  pass.end()
+}
+```
+
+**Alternative**: Use dynamic uniform buffer offsets (`hasDynamicOffset: true`) to index into a pre-filled buffer.
+
+**Rule**: Never call `device.queue.writeBuffer` to the same buffer region more than once per frame. If you need per-dispatch uniform data, use `encoder.copyBufferToBuffer` from a staging buffer or dynamic uniform offsets.
+
+---
+
 ## Sources
 - https://developer.chrome.com/blog/new-in-webgpu-143
 - https://toji.dev/webgpu-best-practices/

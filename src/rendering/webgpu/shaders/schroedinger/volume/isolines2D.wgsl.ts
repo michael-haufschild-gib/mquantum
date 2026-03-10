@@ -50,10 +50,10 @@ fn evaluateIsolines2D(pos: vec3f, rho: f32, s: f32, uniforms: SchroedingerUnifor
     return vec4f(0.0);
   }
 
-  // Generate multiple contour levels at log-spaced intervals
-  // The isoThreshold sets the base level, and we draw levels at
-  // log(threshold), log(threshold)-1, log(threshold)-2, etc.
-  let baseLevel = log(max(uniforms.isoThreshold, 1e-8));
+  // Generate multiple contour levels at log-spaced intervals.
+  // isoThreshold is already in log-density space (range [-6, 0]),
+  // matching the domain of s = sFromRho(rho) = log(rho + eps).
+  let baseLevel = uniforms.isoThreshold;
 
   // Contour spacing in log-density space
   let spacing = 1.0;

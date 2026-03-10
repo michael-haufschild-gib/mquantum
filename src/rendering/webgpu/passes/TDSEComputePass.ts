@@ -60,6 +60,12 @@ const DIAG_RESULT_COUNT = 2
 /** Run diagnostics every N frames to minimize GPU overhead */
 const DIAG_DECIMATION = 5
 
+/** Snap a value to the nearest power of 2 (minimum 4) for FFT compatibility */
+function nearestPow2(v: number): number {
+  const p = Math.max(4, 2 ** Math.round(Math.log2(Math.max(1, v))))
+  return Math.min(128, p)
+}
+
 /**
  * Compute pass for TDSE split-operator dynamics.
  * Manages psi buffers, FFT scratch, potential buffer, and density grid output.
@@ -76,6 +82,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   // Uniform buffers
   private uniformBuffer: GPUBuffer | null = null
   private fftUniformBuffer: GPUBuffer | null = null
+  private fftStagingBuffer: GPUBuffer | null = null
   private packUniformBuffer: GPUBuffer | null = null
   // Output texture
   private densityTexture: GPUTexture | null = null
@@ -138,6 +145,11 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private totalSites = 0
   private simTime = 0
   private maxDensity = 1.0
+  private fwdStageCount = 0
+
+  // Auto-loop: reinitialize when norm decays below threshold
+  private initialNorm = 1.0
+  private pendingAutoReset = false
 
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -176,6 +188,21 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Get full diagnostics history */
   getDiagnosticsHistory(): readonly TdseDiagnosticsSnapshot[] { return this.diagHistory.getHistory() }
 
+  /** Ensure all grid sizes are power-of-2 for FFT correctness. */
+  private sanitizeGridSizes(config: TdseConfig): TdseConfig {
+    let needsFix = false
+    for (let d = 0; d < config.latticeDim; d++) {
+      const g = config.gridSize[d]!
+      if ((g & (g - 1)) !== 0 || g < 4) { needsFix = true; break }
+    }
+    if (!needsFix) return config
+    const fixed = config.gridSize.map((g) => nearestPow2(g))
+    if (import.meta.env.DEV) {
+      console.warn(`[TDSE] Non-power-of-2 grid sizes clamped: ${config.gridSize} → ${fixed}`)
+    }
+    return { ...config, gridSize: fixed }
+  }
+
   private computeConfigHash(config: TdseConfig): string {
     return `${config.gridSize.join('x')}_d${config.latticeDim}`
   }
@@ -197,6 +224,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.fftScratchB?.destroy()
     this.uniformBuffer?.destroy()
     this.fftUniformBuffer?.destroy()
+    this.fftStagingBuffer?.destroy()
     this.packUniformBuffer?.destroy()
     this.diagUniformBuffer?.destroy()
     this.diagPartialSumsBuffer?.destroy()
@@ -223,15 +251,40 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     })
     this.fftScratchA = device.createBuffer({
       label: 'tdse-fft-scratch-a', size: complexBytes,
-      usage: GPUBufferUsage.STORAGE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     })
     this.fftScratchB = device.createBuffer({
       label: 'tdse-fft-scratch-b', size: complexBytes,
-      usage: GPUBufferUsage.STORAGE,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     })
     this.uniformBuffer = this.createUniformBuffer(device, UNIFORM_SIZE, 'tdse-uniforms')
     this.fftUniformBuffer = this.createUniformBuffer(device, FFT_UNIFORM_SIZE, 'tdse-fft-uniforms')
     this.packUniformBuffer = this.createUniformBuffer(device, PACK_UNIFORM_SIZE, 'tdse-pack-uniforms')
+
+    // FFT staging buffer: pre-computed stage uniforms for all axes × both directions.
+    // encoder.copyBufferToBuffer from staging to fftUniformBuffer before each dispatch
+    // ensures correct per-stage data (device.queue.writeBuffer would race with command buffer).
+    this.fwdStageCount = 0
+    for (let d = 0; d < config.latticeDim; d++) {
+      this.fwdStageCount += Math.log2(config.gridSize[d]!)
+    }
+    const totalFFTStages = this.fwdStageCount * 2 // forward + inverse
+    this.fftStagingBuffer = device.createBuffer({
+      label: 'tdse-fft-staging',
+      size: Math.max(FFT_UNIFORM_SIZE, totalFFTStages * FFT_UNIFORM_SIZE),
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    })
+    // Pre-compute and upload FFT staging data once (only depends on grid config)
+    const fftStagingData = this.buildFFTStagingData(config)
+    device.queue.writeBuffer(this.fftStagingBuffer, 0, fftStagingData)
+
+    // Pack uniforms: totalSites and invN don't change between frames
+    const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
+    const pu32 = new Uint32Array(packData)
+    const pf32 = new Float32Array(packData)
+    pu32[0] = this.totalSites
+    pf32[1] = 1.0 / this.totalSites
+    device.queue.writeBuffer(this.packUniformBuffer, 0, packData)
 
     // Diagnostics: norm reduction buffers
     this.diagNumWorkgroups = Math.ceil(this.totalSites / DIAG_WG)
@@ -607,36 +660,80 @@ struct PackUniforms {
   }
 
   /**
+   * Pre-compute all FFT stage uniforms for all axes and both directions into a
+   * single ArrayBuffer. Slots are laid out in execution order: forward FFT axes
+   * (from latticeDim-1 down to 0), then inverse FFT axes (same order).
+   *
+   * This data is written to fftStagingBuffer once per frame. Individual slots
+   * are then copied to fftUniformBuffer via encoder.copyBufferToBuffer before
+   * each dispatch, ensuring correct per-stage data within the command buffer.
+   *
+   * (device.queue.writeBuffer cannot be used per-stage because all writeBuffer
+   * calls complete before the command buffer executes, so only the last write
+   * would be visible to the GPU.)
+   */
+  private buildFFTStagingData(config: TdseConfig): ArrayBuffer {
+    let totalSlots = 0
+    for (let d = 0; d < config.latticeDim; d++) {
+      totalSlots += Math.log2(config.gridSize[d]!)
+    }
+    totalSlots *= 2 // forward + inverse
+
+    const data = new ArrayBuffer(totalSlots * FFT_UNIFORM_SIZE)
+    let slotIdx = 0
+
+    for (const direction of [1.0, -1.0]) {
+      let axisStride = 1
+      for (let d = config.latticeDim - 1; d >= 0; d--) {
+        const axisDim = config.gridSize[d]!
+        const stages = Math.log2(axisDim)
+
+        for (let s = 0; s < stages; s++) {
+          const offset = slotIdx * FFT_UNIFORM_SIZE
+          const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
+          view.setUint32(0, axisDim, true)
+          view.setUint32(4, s, true)
+          view.setFloat32(8, direction, true)
+          view.setUint32(12, this.totalSites, true)
+          view.setUint32(16, axisStride, true)
+          view.setUint32(20, this.totalSites / axisDim, true)
+          view.setFloat32(24, 1.0 / axisDim, true)
+          view.setUint32(28, 0, true)
+          slotIdx++
+        }
+        axisStride *= axisDim
+      }
+    }
+
+    return data
+  }
+
+  /**
    * Dispatch FFT for one axis: log2(N) stages with ping-pong.
-   * After completion, result is in fftScratchA if log2(N) is even, fftScratchB if odd.
-   * We track parity and swap bind groups to ensure output ends in fftScratchA.
+   * Uses encoder.copyBufferToBuffer from the pre-computed staging buffer to
+   * provide correct per-stage uniforms within the command buffer.
+   *
+   * @returns The next slot offset for subsequent axis dispatches.
    */
   private dispatchFFTAxis(
     encoder: GPUCommandEncoder,
-    device: GPUDevice,
     axisDim: number,
-    axisStride: number,
-    direction: number,
-  ): void {
-    if (!this.fftStagePipeline || !this.fftStageABBG || !this.fftStageBABG || !this.fftUniformBuffer) return
+    slotOffset: number,
+  ): number {
+    if (!this.fftStagePipeline || !this.fftStageABBG || !this.fftStageBABG ||
+        !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
 
     const stages = Math.log2(axisDim)
-    const data = new ArrayBuffer(FFT_UNIFORM_SIZE)
-    const u32 = new Uint32Array(data)
-    const f32 = new Float32Array(data)
     const halfTotal = this.totalSites / 2
 
     for (let s = 0; s < stages; s++) {
-      u32[0] = axisDim
-      u32[1] = s
-      f32[2] = direction
-      u32[3] = this.totalSites
-      u32[4] = axisStride
-      u32[5] = this.totalSites / axisDim
-      f32[6] = 1.0 / axisDim
-      u32[7] = 0
-
-      device.queue.writeBuffer(this.fftUniformBuffer, 0, data)
+      // Copy this stage's uniforms from staging buffer to the active uniform buffer.
+      // This is ordered within the command buffer (unlike device.queue.writeBuffer).
+      encoder.copyBufferToBuffer(
+        this.fftStagingBuffer, (slotOffset + s) * FFT_UNIFORM_SIZE,
+        this.fftUniformBuffer, 0,
+        FFT_UNIFORM_SIZE,
+      )
 
       const bg = (s % 2 === 0) ? this.fftStageABBG : this.fftStageBABG
       const pass = encoder.beginComputePass({ label: `tdse-fft-stage-${s}` })
@@ -648,18 +745,21 @@ struct PackUniforms {
     if (stages % 2 !== 0) {
       encoder.copyBufferToBuffer(this.fftScratchB!, 0, this.fftScratchA!, 0, this.totalSites * 8)
     }
+
+    return slotOffset + stages
   }
 
   /** Execute the full TDSE compute pipeline. */
   executeTDSE(
     ctx: WebGPURenderContext,
-    config: TdseConfig,
+    rawConfig: TdseConfig,
     isPlaying: boolean,
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
     boundingRadius?: number,
   ): void {
+    const config = this.sanitizeGridSizes(rawConfig)
     const { device, encoder } = ctx
     const configHash = this.computeConfigHash(config)
 
@@ -676,19 +776,8 @@ struct PackUniforms {
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
 
-    // Write pack uniforms
-    if (this.packUniformBuffer) {
-      const packData = new ArrayBuffer(PACK_UNIFORM_SIZE)
-      const pu32 = new Uint32Array(packData)
-      const pf32 = new Float32Array(packData)
-      pu32[0] = this.totalSites
-      // invN: product of all grid sizes (total normalization for N-D FFT)
-      pf32[1] = 1.0 / this.totalSites
-      device.queue.writeBuffer(this.packUniformBuffer, 0, packData)
-    }
-
-    // Init or reset
-    if (!this.initialized || config.needsReset) {
+    // Init or reset (includes auto-loop triggered reinit)
+    if (!this.initialized || config.needsReset || this.pendingAutoReset) {
       // Initialize wavefunction
       if (this.initPipeline && this.initBG) {
         const pass = encoder.beginComputePass({ label: 'tdse-init-pass' })
@@ -703,14 +792,29 @@ struct PackUniforms {
         pass.end()
       }
 
-      this.maxDensity = config.packetAmplitude * config.packetAmplitude
+      // Superposition mode sums two packets each scaled by 1/√2,
+      // so peak |ψ|² = (A/√2)² = A²/2 when packets don't overlap.
+      this.maxDensity = config.initialCondition === 'superposition'
+        ? config.packetAmplitude * config.packetAmplitude * 0.5
+        : config.packetAmplitude * config.packetAmplitude
+      this.initialNorm = -1.0  // Will be captured from first diagnostics readback
       this.simTime = 0
+      this.pendingAutoReset = false
       this.initialized = true
+      this.diagHistory.clear()
     }
 
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
     if (isPlaying) {
+      // Refresh potential BEFORE Strang steps for driven systems so the current
+      // frame uses V(t) at the current simTime rather than lagging by one frame.
+      if (config.driveEnabled && this.potentialPipeline && this.potentialBG) {
+        const p = encoder.beginComputePass({ label: 'tdse-potential-drive-update' })
+        this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
+        p.end()
+      }
+
       for (let step = 0; step < config.stepsPerFrame; step++) {
         // 1. Half-step potential
         if (this.potentialHalfPipeline && this.potentialHalfBG) {
@@ -727,10 +831,9 @@ struct PackUniforms {
         }
 
         // 3. Forward FFT (for each spatial axis)
-        let axisStride = 1
+        let fftSlot = 0
         for (let d = config.latticeDim - 1; d >= 0; d--) {
-          this.dispatchFFTAxis(encoder, device, config.gridSize[d]!, axisStride, 1.0)
-          axisStride *= config.gridSize[d]!
+          fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
         }
 
         // 4. Apply kinetic propagator in k-space
@@ -741,10 +844,9 @@ struct PackUniforms {
         }
 
         // 5. Inverse FFT
-        axisStride = 1
+        fftSlot = this.fwdStageCount
         for (let d = config.latticeDim - 1; d >= 0; d--) {
-          this.dispatchFFTAxis(encoder, device, config.gridSize[d]!, axisStride, -1.0)
-          axisStride *= config.gridSize[d]!
+          fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
         }
 
         // 6. Unpack with 1/N normalization
@@ -770,15 +872,6 @@ struct PackUniforms {
 
         this.simTime += config.dt
       }
-
-      // Update potential for driven systems
-      if (config.driveEnabled && this.potentialPipeline && this.potentialBG) {
-        // Re-update uniforms with new simTime for potential refresh
-        this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
-        const p = encoder.beginComputePass({ label: 'tdse-potential-refresh' })
-        this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
-        p.end()
-      }
     }
 
     // Write density grid
@@ -789,18 +882,26 @@ struct PackUniforms {
       pass.end()
     }
 
-    // Diagnostics: decimated norm reduction + async readback
-    if (config.diagnosticsEnabled) {
-      this.diagFrameCounter++
-      if (this.diagFrameCounter >= (config.diagnosticsInterval || DIAG_DECIMATION)) {
-        this.diagFrameCounter = 0
-        this.dispatchDiagnostics(encoder, device)
-      }
+    // Always run decimated norm reduction to keep maxDensity updated for
+    // display normalization. Without this, a spreading wavepacket fades to
+    // invisible because maxDensity stays at the initial peak value.
+    this.diagFrameCounter++
+    const interval = config.diagnosticsEnabled
+      ? (config.diagnosticsInterval || DIAG_DECIMATION)
+      : DIAG_DECIMATION
+    if (this.diagFrameCounter >= interval) {
+      this.diagFrameCounter = 0
+      this.dispatchDiagnostics(encoder, device, config.diagnosticsEnabled, config.autoLoop)
     }
   }
 
-  /** Dispatch GPU norm reduction and schedule async readback. */
-  private dispatchDiagnostics(encoder: GPUCommandEncoder, device: GPUDevice): void {
+  /**
+   * Dispatch GPU norm reduction and schedule async readback.
+   * @param recordHistory - When true, push to diagHistory for the diagnostics panel.
+   *   When false, only update maxDensity for display normalization.
+   * @param autoLoop - When true, trigger reinit when norm drops below 15% of initial.
+   */
+  private dispatchDiagnostics(encoder: GPUCommandEncoder, device: GPUDevice, recordHistory: boolean, autoLoop: boolean): void {
     if (!this.diagReducePipeline || !this.diagReduceBG ||
         !this.diagFinalizePipeline || !this.diagFinalizeBG ||
         !this.diagResultBuffer || !this.diagStagingBuffer) return
@@ -840,18 +941,27 @@ struct PackUniforms {
           const maxDens = data[1]!
           staging.unmap()
 
-          // Update maxDensity for normalization in writeGrid
+          // Always update maxDensity for display normalization
           if (maxDens > 0) this.maxDensity = maxDens
 
-          const norm0 = this.diagHistory.length > 0
-            ? this.diagHistory.getHistory()[0]!.totalNorm
-            : totalNorm
-          this.diagHistory.push({
-            simTime,
-            totalNorm,
-            maxDensity: maxDens,
-            normDrift: norm0 > 0 ? (totalNorm - norm0) / norm0 : 0,
-          })
+          // Auto-loop: capture initial norm after first readback, then check decay
+          if (this.initialNorm < 0) {
+            this.initialNorm = totalNorm
+          } else if (autoLoop && this.initialNorm > 0 && totalNorm < this.initialNorm * 0.15) {
+            this.pendingAutoReset = true
+          }
+
+          if (recordHistory) {
+            const norm0 = this.diagHistory.length > 0
+              ? this.diagHistory.getHistory()[0]!.totalNorm
+              : totalNorm
+            this.diagHistory.push({
+              simTime,
+              totalNorm,
+              maxDensity: maxDens,
+              normDrift: norm0 > 0 ? (totalNorm - norm0) / norm0 : 0,
+            })
+          }
           this.diagMappingInFlight = false
         }).catch(() => {
           this.diagMappingInFlight = false
@@ -874,6 +984,7 @@ struct PackUniforms {
     this.fftScratchB?.destroy()
     this.uniformBuffer?.destroy()
     this.fftUniformBuffer?.destroy()
+    this.fftStagingBuffer?.destroy()
     this.packUniformBuffer?.destroy()
     this.densityTexture?.destroy()
     this.diagUniformBuffer?.destroy()
@@ -889,6 +1000,7 @@ struct PackUniforms {
     this.fftScratchB = null
     this.uniformBuffer = null
     this.fftUniformBuffer = null
+    this.fftStagingBuffer = null
     this.packUniformBuffer = null
     this.densityTexture = null
     this.densityTextureView = null

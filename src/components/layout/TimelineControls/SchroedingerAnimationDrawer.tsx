@@ -85,6 +85,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       config: state.schroedinger,
       // Time Evolution
       setTimeScale: state.setSchroedingerTimeScale,
+      // TDSE Auto-Loop
+      setTdseAutoLoop: state.setTdseAutoLoop,
       // Slice Animation
       setSliceAnimationEnabled: state.setSchroedingerSliceAnimationEnabled,
       setSliceSpeed: state.setSchroedingerSliceSpeed,
@@ -120,6 +122,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       config,
       // Time Evolution
       setTimeScale,
+      // TDSE Auto-Loop
+      setTdseAutoLoop,
       // Slice Animation - 4D+
       setSliceAnimationEnabled,
       setSliceSpeed,
@@ -154,6 +158,10 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdse = config.quantumMode === 'tdseDynamics'
+    // Compute modes (FSF/TDSE) use GPU density grids, not inline evalPsi().
+    // Shader features that depend on inline wavefunction evaluation (interference,
+    // probability flow, probability current) are forcibly disabled in extractSchrodingerConfig.
+    const isComputeMode = isFreeScalarField || isTdse
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
@@ -177,8 +185,28 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         </div>}
 
-        {/* Interference Fringing — not applicable for free scalar field (requires inline wavefunction) */}
-        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-interference">
+        {/* TDSE Auto-Loop — reinitialize wavefunction when norm decays */}
+        {isTdse && <div className="space-y-4" data-testid="animation-panel-tdseAutoLoop">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+              Auto-Loop
+            </label>
+            <ToggleButton
+              pressed={config.tdse?.autoLoop ?? true}
+              onToggle={() => setTdseAutoLoop(!(config.tdse?.autoLoop ?? true))}
+              className="text-xs px-2 py-1 h-auto"
+              ariaLabel="Toggle TDSE auto-loop"
+            >
+              {(config.tdse?.autoLoop ?? true) ? 'ON' : 'OFF'}
+            </ToggleButton>
+          </div>
+          <p className="text-xs text-text-tertiary">
+            Automatically restarts the simulation when the wavefunction is mostly absorbed.
+          </p>
+        </div>}
+
+        {/* Interference Fringing — not applicable for compute modes (requires inline wavefunction) */}
+        {!isComputeMode && <div className="space-y-4" data-testid="animation-panel-interference">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Interference Fringing
@@ -225,8 +253,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         </div>}
 
-        {/* Phase-coherent quantum texture — not applicable for free scalar field */}
-        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
+        {/* Phase-coherent quantum texture — not applicable for compute modes */}
+        {!isComputeMode && <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
           <div className="flex items-center justify-between">
             <label
               className="text-xs font-bold text-text-secondary uppercase tracking-widest"
@@ -267,8 +295,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
           </div>
         </div>}
 
-        {/* Probability Current (j-field) — not applicable for free scalar field (requires complex wavefunction) */}
-        {!isFreeScalarField && <div className="space-y-4" data-testid="animation-panel-probabilityCurrent">
+        {/* Probability Current (j-field) — not applicable for compute modes (requires inline wavefunction) */}
+        {!isComputeMode && <div className="space-y-4" data-testid="animation-panel-probabilityCurrent">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Probability Current (j)

@@ -608,11 +608,28 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       return phi0
     }
 
-    // Estimate omega from lattice dispersion: omega² = m² + sum_d (2/a_d)²
+    // Compute omega from lattice dispersion relation.
+    // For vacuum noise all modes are excited, so omega_max (Nyquist) is correct.
+    // For singleMode / gaussianPacket, use the actual mode wavevector to avoid
+    // overestimating by 10-100x (which makes pi/energy views appear too dim).
     let omegaSq = config.mass * config.mass
-    for (let d = 0; d < config.latticeDim; d++) {
-      const a = config.spacing[d]!
-      omegaSq += (2 / a) * (2 / a)
+    if (config.initialCondition === 'vacuumNoise') {
+      // omega_max² = m² + sum_d (2/a_d)² — conservative upper bound
+      for (let d = 0; d < config.latticeDim; d++) {
+        const a = config.spacing[d]!
+        omegaSq += (2 / a) * (2 / a)
+      }
+    } else {
+      // Lattice dispersion for the actual mode: sk = (2/a) sin(k_phys * a / 2)
+      for (let d = 0; d < config.latticeDim; d++) {
+        const N = config.gridSize[d]!
+        const a = config.spacing[d]!
+        if (N <= 1 || a <= 0) continue
+        const latticeL = N * a
+        const kPhys = (2 * Math.PI * (config.modeK[d] ?? 0)) / latticeL
+        const sk = (2 * Math.sin(kPhys * a * 0.5)) / a
+        omegaSq += sk * sk
+      }
     }
     const omega = Math.sqrt(omegaSq)
 

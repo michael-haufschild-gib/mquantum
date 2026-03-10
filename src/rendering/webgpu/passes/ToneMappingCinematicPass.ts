@@ -321,7 +321,7 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
 
   // -- Step 3: Vignette --
   let d = length(dist);
-  let vignette = smoothstep(uniforms.vignetteOffset, uniforms.vignetteOffset - 0.6, d * uniforms.vignetteDarkness);
+  let vignette = 1.0 - smoothstep(uniforms.vignetteOffset - 0.6, uniforms.vignetteOffset, d * uniforms.vignetteDarkness);
   color = color * vignette;
 
   // -- Step 4: Film Grain --
