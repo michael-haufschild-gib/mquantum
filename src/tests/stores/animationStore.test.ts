@@ -9,13 +9,11 @@ import {
   MIN_SPEED,
   useAnimationStore,
 } from '@/stores/animationStore'
-import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 describe('animationStore', () => {
   beforeEach(() => {
     useAnimationStore.getState().reset()
-    useExtendedObjectStore.getState().reset()
   })
 
   describe('play/pause/toggle', () => {
@@ -126,10 +124,9 @@ describe('animationStore', () => {
   })
 
   describe('clearAllPlanes', () => {
-    it('keeps playback running when probability current animation is enabled', () => {
+    it('clears planes without affecting playback state', () => {
       useAnimationStore.getState().animateAll(4)
       useAnimationStore.getState().play()
-      useExtendedObjectStore.getState().setSchroedingerProbabilityCurrentEnabled(true)
 
       useAnimationStore.getState().clearAllPlanes()
 

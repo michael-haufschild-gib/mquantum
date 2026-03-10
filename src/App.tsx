@@ -5,6 +5,7 @@
  * Renders Schroedinger quantum objects using WebGPU.
  */
 
+import { EnergyDiagramHUD } from '@/components/canvas/EnergyDiagramHUD'
 import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
 import { RefinementIndicator } from '@/components/canvas/RefinementIndicator'
 import { EditorLayout } from '@/components/layout/EditorLayout'
@@ -112,6 +113,8 @@ function AppContent() {
         <MsgBox />
 
         {showPerfMonitor && <PerformanceMonitor />}
+
+        <EnergyDiagramHUD />
 
         {/* Screenshot Preview Modal */}
         <ScreenshotModal />

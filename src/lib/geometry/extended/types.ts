@@ -289,8 +289,10 @@ export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superpositi
  * - finiteWell: Finite square well
  * - harmonicTrap: Harmonic oscillator trapping potential
  * - driven: Time-dependent driven potential
+ * - doubleSlit: Two slits in a barrier wall (2D)
+ * - periodicLattice: Cosine lattice V₀cos²(πx/a)
  */
-export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven'
+export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven' | 'doubleSlit' | 'periodicLattice' | 'doubleWell'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -349,6 +351,30 @@ export interface TdseConfig {
   /** Step potential height */
   stepHeight: number
 
+  // === Double Slit Configuration (when potentialType === 'doubleSlit') ===
+  /** Distance between slit centers along axis 1 */
+  slitSeparation: number
+  /** Width of each slit opening */
+  slitWidth: number
+  /** Thickness of the barrier wall along axis 0 */
+  wallThickness: number
+  /** Potential height of the wall */
+  wallHeight: number
+
+  // === Periodic Lattice Configuration (when potentialType === 'periodicLattice') ===
+  /** Lattice depth V₀ for cosine potential */
+  latticeDepth: number
+  /** Spatial period of the lattice */
+  latticePeriod: number
+
+  // === Double Well Configuration (when potentialType === 'doubleWell') ===
+  /** Quartic coupling λ in V(x) = λ(x² − a²)² − εx */
+  doubleWellLambda: number
+  /** Half-distance between minima (a) */
+  doubleWellSeparation: number
+  /** Asymmetry tilt ε (0 = symmetric, >0 = right well deeper / false vacuum left) */
+  doubleWellAsymmetry: number
+
   /** Enable time-dependent drive */
   driveEnabled: boolean
   /** Drive waveform type */
@@ -369,6 +395,8 @@ export interface TdseConfig {
   fieldView: TdseFieldView
   /** Auto-scale density normalization from wavefunction maximum */
   autoScale: boolean
+  /** Show potential V(x) as a faint overlay in the 3D volume */
+  showPotential: boolean
 
   /** Auto-loop: reinitialize wavefunction when norm decays below threshold */
   autoLoop: boolean
@@ -412,6 +440,18 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   harmonicOmega: 1.0,
   stepHeight: 5.0,
 
+  slitSeparation: 2.0,
+  slitWidth: 0.5,
+  wallThickness: 0.3,
+  wallHeight: 50.0,
+
+  latticeDepth: 5.0,
+  latticePeriod: 1.0,
+
+  doubleWellLambda: 8.0,
+  doubleWellSeparation: 1.0,
+  doubleWellAsymmetry: 0.0,
+
   driveEnabled: false,
   driveWaveform: 'sine',
   driveFrequency: 1.0,
@@ -423,7 +463,8 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
 
   fieldView: 'density',
   autoScale: true,
-  autoLoop: true,
+  showPotential: true,
+  autoLoop: false,
 
   diagnosticsEnabled: false,
   diagnosticsInterval: 5,

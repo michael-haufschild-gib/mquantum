@@ -35,7 +35,8 @@ import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.
 import { tdseComplexPackBlock, tdseComplexUnpackBlock } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
 import { tdseFFTStageUniformsBlock, tdseStockhamFFTBlock } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { tdseDiagNormReduceBlock, tdseDiagNormFinalizeBlock } from '../shaders/schroedinger/compute/tdseDiagnostics.wgsl'
-import { TdseDiagnosticsHistory, type TdseDiagnosticsSnapshot } from '@/lib/physics/tdse/diagnostics'
+import { TdseDiagnosticsHistory, computeReflectionTransmission, type TdseDiagnosticsSnapshot } from '@/lib/physics/tdse/diagnostics'
+import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
 /** TDSEUniforms struct size in bytes */
 const UNIFORM_SIZE = 640
@@ -53,10 +54,10 @@ const FFT_UNIFORM_SIZE = 32
 const PACK_UNIFORM_SIZE = 16
 /** Diagnostics workgroup size (must match @workgroup_size in diagnostic shaders) */
 const DIAG_WG = 256
-/** DiagReduceUniforms struct size (8 bytes: totalSites + numWorkgroups) */
-const DIAG_UNIFORM_SIZE = 8
-/** Number of f32 values in diagnostic result buffer (totalNorm, maxDensity) */
-const DIAG_RESULT_COUNT = 2
+/** DiagReduceUniforms struct size (32 bytes: totalSites, numWorkgroups, barrierCenter, gridSize0, spacing0, stride0, pad, pad) */
+const DIAG_UNIFORM_SIZE = 32
+/** Number of f32 values in diagnostic result buffer (totalNorm, maxDensity, normLeft, normRight) */
+const DIAG_RESULT_COUNT = 4
 /** Run diagnostics every N frames to minimize GPU overhead */
 const DIAG_DECIMATION = 5
 
@@ -126,6 +127,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private diagUniformBuffer: GPUBuffer | null = null
   private diagPartialSumsBuffer: GPUBuffer | null = null
   private diagPartialMaxBuffer: GPUBuffer | null = null
+  private diagPartialLeftBuffer: GPUBuffer | null = null
+  private diagPartialRightBuffer: GPUBuffer | null = null
   private diagResultBuffer: GPUBuffer | null = null
   private diagStagingBuffer: GPUBuffer | null = null
   private diagReducePipeline: GPUComputePipeline | null = null
@@ -229,6 +232,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.diagUniformBuffer?.destroy()
     this.diagPartialSumsBuffer?.destroy()
     this.diagPartialMaxBuffer?.destroy()
+    this.diagPartialLeftBuffer?.destroy()
+    this.diagPartialRightBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
 
@@ -297,6 +302,14 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       label: 'tdse-diag-partial-max', size: this.diagNumWorkgroups * 4,
       usage: GPUBufferUsage.STORAGE,
     })
+    this.diagPartialLeftBuffer = device.createBuffer({
+      label: 'tdse-diag-partial-left', size: this.diagNumWorkgroups * 4,
+      usage: GPUBufferUsage.STORAGE,
+    })
+    this.diagPartialRightBuffer = device.createBuffer({
+      label: 'tdse-diag-partial-right', size: this.diagNumWorkgroups * 4,
+      usage: GPUBufferUsage.STORAGE,
+    })
     this.diagResultBuffer = device.createBuffer({
       label: 'tdse-diag-result', size: DIAG_RESULT_COUNT * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
@@ -305,13 +318,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       label: 'tdse-diag-staging', size: DIAG_RESULT_COUNT * 4,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     })
-    // Write diagnostic uniforms
-    const diagData = new ArrayBuffer(DIAG_UNIFORM_SIZE)
-    const diagU32 = new Uint32Array(diagData)
-    diagU32[0] = this.totalSites
-    diagU32[1] = this.diagNumWorkgroups
-    device.queue.writeBuffer(this.diagUniformBuffer, 0, diagData)
     this.diagHistory.clear()
+    useTdseDiagnosticsStore.getState().reset()
     this.diagFrameCounter = 0
     this.diagMappingInFlight = false
 
@@ -455,6 +463,8 @@ struct PackUniforms {
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
     this.diagReducePipeline = this.createComputePipeline(device,
@@ -468,6 +478,8 @@ struct PackUniforms {
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
       ],
     })
     this.diagFinalizePipeline = this.createComputePipeline(device,
@@ -546,21 +558,25 @@ struct PackUniforms {
     ] })
 
     // Diagnostics bind groups
-    if (this.diagReduceBGL && this.diagUniformBuffer && this.diagPartialSumsBuffer && this.diagPartialMaxBuffer) {
+    if (this.diagReduceBGL && this.diagUniformBuffer && this.diagPartialSumsBuffer && this.diagPartialMaxBuffer && this.diagPartialLeftBuffer && this.diagPartialRightBuffer) {
       this.diagReduceBG = device.createBindGroup({ label: 'tdse-diag-reduce-bg', layout: this.diagReduceBGL, entries: [
         { binding: 0, resource: { buffer: this.diagUniformBuffer } },
         { binding: 1, resource: { buffer: this.psiReBuffer } },
         { binding: 2, resource: { buffer: this.psiImBuffer } },
         { binding: 3, resource: { buffer: this.diagPartialSumsBuffer } },
         { binding: 4, resource: { buffer: this.diagPartialMaxBuffer } },
+        { binding: 5, resource: { buffer: this.diagPartialLeftBuffer } },
+        { binding: 6, resource: { buffer: this.diagPartialRightBuffer } },
       ] })
     }
-    if (this.diagFinalizeBGL && this.diagUniformBuffer && this.diagPartialSumsBuffer && this.diagPartialMaxBuffer && this.diagResultBuffer) {
+    if (this.diagFinalizeBGL && this.diagUniformBuffer && this.diagPartialSumsBuffer && this.diagPartialMaxBuffer && this.diagResultBuffer && this.diagPartialLeftBuffer && this.diagPartialRightBuffer) {
       this.diagFinalizeBG = device.createBindGroup({ label: 'tdse-diag-finalize-bg', layout: this.diagFinalizeBGL, entries: [
         { binding: 0, resource: { buffer: this.diagUniformBuffer } },
         { binding: 1, resource: { buffer: this.diagPartialSumsBuffer } },
         { binding: 2, resource: { buffer: this.diagPartialMaxBuffer } },
         { binding: 3, resource: { buffer: this.diagResultBuffer } },
+        { binding: 4, resource: { buffer: this.diagPartialLeftBuffer } },
+        { binding: 5, resource: { buffer: this.diagPartialRightBuffer } },
       ] })
     }
   }
@@ -582,7 +598,7 @@ struct PackUniforms {
     const strides = this.computeStrides(config)
 
     const initMap: Record<string, number> = { gaussianPacket: 0, planeWave: 1, superposition: 2 }
-    const potMap: Record<string, number> = { free: 0, barrier: 1, step: 2, finiteWell: 3, harmonicTrap: 4, driven: 5 }
+    const potMap: Record<string, number> = { free: 0, barrier: 1, step: 2, finiteWell: 3, harmonicTrap: 4, driven: 5, doubleSlit: 6, periodicLattice: 7, doubleWell: 8 }
     const viewMap: Record<string, number> = { density: 0, phase: 1, current: 2, potential: 3 }
     const waveformMap: Record<string, number> = { sine: 0, pulse: 1, chirp: 2 }
 
@@ -655,6 +671,24 @@ struct PackUniforms {
       const a = config.spacing[d]!
       f32[136 + d] = (2 * Math.PI) / (N * a)
     }
+
+    // Double slit params (592, indices 148-151)
+    f32[148] = config.slitSeparation
+    f32[149] = config.slitWidth
+    f32[150] = config.wallThickness
+    f32[151] = config.wallHeight
+
+    // Periodic lattice params (608, indices 152-153)
+    f32[152] = config.latticeDepth
+    f32[153] = config.latticePeriod
+
+    // Display overlay (616, index 154)
+    u32[154] = config.showPotential ? 1 : 0
+
+    // Double well params (620-631, indices 155-157)
+    f32[155] = config.doubleWellLambda
+    f32[156] = config.doubleWellSeparation
+    f32[157] = config.doubleWellAsymmetry
 
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
   }
@@ -802,6 +836,7 @@ struct PackUniforms {
       this.pendingAutoReset = false
       this.initialized = true
       this.diagHistory.clear()
+    useTdseDiagnosticsStore.getState().reset()
     }
 
     // Strang splitting time steps (only when playing)
@@ -891,7 +926,7 @@ struct PackUniforms {
       : DIAG_DECIMATION
     if (this.diagFrameCounter >= interval) {
       this.diagFrameCounter = 0
-      this.dispatchDiagnostics(encoder, device, config.diagnosticsEnabled, config.autoLoop)
+      this.dispatchDiagnostics(encoder, device, config, config.diagnosticsEnabled, config.autoLoop)
     }
   }
 
@@ -901,10 +936,23 @@ struct PackUniforms {
    *   When false, only update maxDensity for display normalization.
    * @param autoLoop - When true, trigger reinit when norm drops below 15% of initial.
    */
-  private dispatchDiagnostics(encoder: GPUCommandEncoder, device: GPUDevice, recordHistory: boolean, autoLoop: boolean): void {
+  private dispatchDiagnostics(encoder: GPUCommandEncoder, device: GPUDevice, config: TdseConfig, recordHistory: boolean, autoLoop: boolean): void {
     if (!this.diagReducePipeline || !this.diagReduceBG ||
         !this.diagFinalizePipeline || !this.diagFinalizeBG ||
-        !this.diagResultBuffer || !this.diagStagingBuffer) return
+        !this.diagResultBuffer || !this.diagStagingBuffer || !this.diagUniformBuffer) return
+
+    // Write diagnostic uniforms (updated per-frame for barrierCenter etc.)
+    const strides = this.computeStrides(config)
+    const diagData = new ArrayBuffer(DIAG_UNIFORM_SIZE)
+    const diagU32 = new Uint32Array(diagData)
+    const diagF32 = new Float32Array(diagData)
+    diagU32[0] = this.totalSites
+    diagU32[1] = this.diagNumWorkgroups
+    diagF32[2] = config.barrierCenter     // barrierCenter for left/right partition
+    diagU32[3] = config.gridSize[0] ?? 64 // gridSize0
+    diagF32[4] = config.spacing[0] ?? 0.1 // spacing0
+    diagU32[5] = strides[0] ?? 1          // stride0
+    device.queue.writeBuffer(this.diagUniformBuffer, 0, diagData)
 
     // Pass 1: reduce psi -> partial sums
     const reducePass = encoder.beginComputePass({ label: 'tdse-diag-reduce' })
@@ -939,10 +987,20 @@ struct PackUniforms {
           const data = new Float32Array(staging.getMappedRange())
           const totalNorm = data[0]!
           const maxDens = data[1]!
+          const normLeft = data[2]!
+          const normRight = data[3]!
           staging.unmap()
 
-          // Always update maxDensity for display normalization
-          if (maxDens > 0) this.maxDensity = maxDens
+          // Asymmetric maxDensity smoothing to prevent isosurface flicker.
+          // Snap UP instantly (growing density should display immediately),
+          // smooth DOWN to avoid bright flashes when density temporarily dips.
+          if (maxDens > 0) {
+            if (this.maxDensity <= 0 || maxDens >= this.maxDensity) {
+              this.maxDensity = maxDens
+            } else {
+              this.maxDensity += 0.4 * (maxDens - this.maxDensity)
+            }
+          }
 
           // Auto-loop: capture initial norm after first readback, then check decay
           if (this.initialNorm < 0) {
@@ -955,12 +1013,19 @@ struct PackUniforms {
             const norm0 = this.diagHistory.length > 0
               ? this.diagHistory.getHistory()[0]!.totalNorm
               : totalNorm
-            this.diagHistory.push({
+            const { R, T } = computeReflectionTransmission(normLeft, normRight)
+            const snapshot: TdseDiagnosticsSnapshot = {
               simTime,
               totalNorm,
               maxDensity: maxDens,
               normDrift: norm0 > 0 ? (totalNorm - norm0) / norm0 : 0,
-            })
+              normLeft,
+              normRight,
+              R,
+              T,
+            }
+            this.diagHistory.push(snapshot)
+            useTdseDiagnosticsStore.getState().pushSnapshot(snapshot)
           }
           this.diagMappingInFlight = false
         }).catch(() => {
@@ -990,6 +1055,8 @@ struct PackUniforms {
     this.diagUniformBuffer?.destroy()
     this.diagPartialSumsBuffer?.destroy()
     this.diagPartialMaxBuffer?.destroy()
+    this.diagPartialLeftBuffer?.destroy()
+    this.diagPartialRightBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
 
@@ -1007,6 +1074,8 @@ struct PackUniforms {
     this.diagUniformBuffer = null
     this.diagPartialSumsBuffer = null
     this.diagPartialMaxBuffer = null
+    this.diagPartialLeftBuffer = null
+    this.diagPartialRightBuffer = null
     this.diagResultBuffer = null
     this.diagStagingBuffer = null
 
@@ -1036,6 +1105,7 @@ struct PackUniforms {
     this.diagFinalizeBG = null
 
     this.diagHistory.clear()
+    useTdseDiagnosticsStore.getState().reset()
     this.initialized = false
     this.lastConfigHash = ''
 

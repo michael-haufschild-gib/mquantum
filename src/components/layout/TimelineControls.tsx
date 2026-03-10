@@ -69,8 +69,6 @@ export const TimelineControls: FC = () => {
   const schroedingerConfig = useExtendedObjectStore((state) => state.schroedinger)
 
   const planes = useMemo(() => getRotationPlanes(dimension), [dimension])
-  const hasAnimatingPlanes = animatingPlanes.size > 0
-
   // Count active animations for Schroedinger
   const activeAnimationCount = useMemo(() => {
     const configKey = getConfigStoreKey(objectType)
@@ -93,11 +91,6 @@ export const TimelineControls: FC = () => {
     schroedingerConfig.probabilityCurrentEnabled,
   ])
 
-  // Check if any animation is active
-  const isAnimating = activeAnimationCount > 0
-
-  // Animation should only be paused when NOTHING is animating
-  const hasAnythingToAnimate = hasAnimatingPlanes || isAnimating
   const isSchroedinger = getConfigStoreKey(objectType) === 'schroedinger'
   const supportsOpenQuantumControls =
     isSchroedinger &&
@@ -211,7 +204,6 @@ export const TimelineControls: FC = () => {
             variant={isPlaying ? 'primary' : 'secondary'}
             size="icon"
             onClick={toggle}
-            disabled={!hasAnythingToAnimate}
             ariaLabel={isPlaying ? 'Pause' : 'Play'}
             glow={isPlaying}
             className={`w-9 h-9 rounded-full ${isPlaying ? 'bg-accent text-text-inverse' : ''}`}

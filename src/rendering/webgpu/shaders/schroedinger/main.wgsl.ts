@@ -413,7 +413,36 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
     schroedinger.crossSectionEnabled != 0u &&
     schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY;
 
+  // Potential overlay: accumulate V(x) along the ray up to the isosurface hit
+  // (or the full ray if no hit). Renders as a solid wall in front of the wavefunction.
+  let potEnd = select(tFar, hitT, hitT >= 0.0);
+  var potAccColor = vec3f(0.0);
+  var potAccAlpha: f32 = 0.0;
+  if (USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
+    let potStepLen = stepLen * 0.5;
+    var potT = tNear;
+    var potTransmittance: f32 = 1.0;
+    for (var pi = 0; pi < 128; pi++) {
+      if (potT > potEnd || potTransmittance < 0.05) { break; }
+      let potPos = ro + rd * potT;
+      let potSample = sampleDensityFromGrid(potPos, schroedinger);
+      if (potSample.a > 0.01) {
+        let potColor = vec3f(0.35, 0.45, 0.55);
+        let potOpacity = clamp(potSample.a * 0.5, 0.0, 0.7);
+        potAccColor += potTransmittance * potOpacity * potColor;
+        potTransmittance *= (1.0 - potOpacity);
+      }
+      potT += potStepLen;
+    }
+    potAccAlpha = 1.0 - potTransmittance;
+  }
+
   if (hitT < 0.0) {
+    // No isosurface hit — show potential overlay if present
+    if (potAccAlpha > 0.01) {
+      output.color = vec4f(potAccColor, potAccAlpha);
+      return output;
+    }
     if (sliceOnlyCrossSection && crossSection.alpha > 0.0) {
       output.color = vec4f(crossSection.color, crossSection.alpha);
       return output;
@@ -614,6 +643,12 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   var finalColor = col;
   var finalAlpha = 1.0;
   var finalNormal = n;
+
+  // Blend potential overlay OVER the isosurface (front-to-back: potential is closer)
+  if (potAccAlpha > 0.01) {
+    finalColor = potAccColor + (1.0 - potAccAlpha) * finalColor;
+    finalAlpha = potAccAlpha + (1.0 - potAccAlpha) * finalAlpha;
+  }
 
   if (crossSection.alpha > 0.0) {
     if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {
@@ -871,7 +906,36 @@ ${bayerJitterSection}
     schroedinger.crossSectionEnabled != 0u &&
     schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY;
 
+  // Potential overlay: accumulate up to hit point (or full ray if no hit)
+  let potEndT = select(tFar, hitT, hitT >= 0.0);
+  var potAccColor = vec3f(0.0);
+  var potAccAlpha: f32 = 0.0;
+  if (USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
+    let potStepLen = stepLen * 0.5;
+    var potT = tNear;
+    var potTransmittance: f32 = 1.0;
+    for (var pi = 0; pi < 128; pi++) {
+      if (potT > potEndT || potTransmittance < 0.05) { break; }
+      let potPos = ro + rd * potT;
+      let potSample = sampleDensityFromGrid(potPos, schroedinger);
+      if (potSample.a > 0.01) {
+        let potColor = vec3f(0.35, 0.45, 0.55);
+        let potOpacity = clamp(potSample.a * 0.5, 0.0, 0.7);
+        potAccColor += potTransmittance * potOpacity * potColor;
+        potTransmittance *= (1.0 - potOpacity);
+      }
+      potT += potStepLen;
+    }
+    potAccAlpha = 1.0 - potTransmittance;
+  }
+
   if (hitT < 0.0) {
+    if (potAccAlpha > 0.01) {
+      let potHitPosWorld = (camera.modelMatrix * vec4f(ro + rd * ((tNear + tFar) * 0.5), 1.0)).xyz;
+      output.color = vec4f(potAccColor, potAccAlpha);
+      output.worldPosition = vec4f(potHitPosWorld, (tNear + tFar) * 0.5);
+      return output;
+    }
     if (sliceOnlyCrossSection && crossSection.alpha > 0.0) {
       // Cross-section only: output cross-section color with world position
       let crossHitPos = ro + rd * ((tNear + tFar) * 0.5);
@@ -1065,6 +1129,12 @@ ${bayerJitterSection}
 
   var finalColor = col;
   var finalAlpha = 1.0;
+
+  // Blend potential overlay OVER the isosurface (front-to-back: potential is closer)
+  if (potAccAlpha > 0.01) {
+    finalColor = potAccColor + (1.0 - potAccAlpha) * finalColor;
+    finalAlpha = potAccAlpha + (1.0 - potAccAlpha) * finalAlpha;
+  }
 
   if (crossSection.alpha > 0.0) {
     if (schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY) {

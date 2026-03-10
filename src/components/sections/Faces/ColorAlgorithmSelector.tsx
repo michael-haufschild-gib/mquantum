@@ -58,9 +58,23 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
     useEffect(() => {
       const isAvailable = availableOptions.some((opt) => opt.value === colorAlgorithm)
       if (!isAvailable) {
-        setColorAlgorithm('radialDistance')
+        const fallback = quantumMode === 'tdseDynamics' || quantumMode === 'freeScalarField'
+          ? 'blackbody'
+          : 'radialDistance'
+        setColorAlgorithm(fallback)
       }
-    }, [availableOptions, colorAlgorithm, setColorAlgorithm])
+    }, [availableOptions, colorAlgorithm, setColorAlgorithm, quantumMode])
+
+    // Auto-switch to blackbody when entering compute modes (TDSE/free scalar)
+    // if the current algorithm is spatially misleading (radialDistance, radial, lch).
+    // These color by geometric position, not by field value, producing false structure.
+    useEffect(() => {
+      const isComputeMode = quantumMode === 'tdseDynamics' || quantumMode === 'freeScalarField'
+      const misleadingForCompute = new Set<string>(['radialDistance', 'radial', 'lch', 'multiSource'])
+      if (isComputeMode && misleadingForCompute.has(colorAlgorithm)) {
+        setColorAlgorithm('blackbody')
+      }
+    }, [quantumMode, colorAlgorithm, setColorAlgorithm])
 
     const handleChange = useCallback(
       (v: string) => {

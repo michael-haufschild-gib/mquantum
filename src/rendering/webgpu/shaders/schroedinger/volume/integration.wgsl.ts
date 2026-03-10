@@ -1207,27 +1207,42 @@ fn volumeRaymarchGrid(
       sCenter = select(-20.0, log(rho), rho > 1e-9);
     }
 
-    // Skip near-zero density regions
-    if (rho < EMPTY_SKIP_THRESHOLD) {
+    // Skip near-zero density regions (but not potential overlay regions)
+    let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
+    if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
-        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms).r;
-        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms).r;
-        if (probeMid < EMPTY_SKIP_THRESHOLD && probeFar < EMPTY_SKIP_THRESHOLD) {
+        let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
+        let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
+        let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+        let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
+        if (probeMid.r < EMPTY_SKIP_THRESHOLD && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
           t += skipDistance;
           continue;
         }
       }
     }
 
-    // Adaptive step size based on density
+    // Adaptive step size based on density (keep fine steps in potential regions)
     var stepMultiplier = 1.0;
-    if (sCenter < -12.0) {
-      stepMultiplier = 4.0;
-    } else if (sCenter < -8.0) {
-      stepMultiplier = 2.0;
+    if (!hasPotOverlay) {
+      if (sCenter < -12.0) {
+        stepMultiplier = 4.0;
+      } else if (sCenter < -8.0) {
+        stepMultiplier = 2.0;
+      }
     }
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
+
+    // Potential overlay: render V(x) as a solid semi-transparent wall.
+    // Alpha channel encodes normalized |V|/Vmax from the write-grid shader.
+    // Fixed neutral color, independent of the wavefunction color algorithm.
+    if (DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
+      let potColor = vec3f(0.35, 0.45, 0.55);
+      let potOpacity = clamp(gridSample.a * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
+      accColor += transmittance * potOpacity * potColor;
+      transmittance *= (1.0 - potOpacity);
+    }
 
     // Nodal surface overlay (uses inline evaluation, not grid)
     if (

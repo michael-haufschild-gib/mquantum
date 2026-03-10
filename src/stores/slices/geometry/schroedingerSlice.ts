@@ -1,6 +1,7 @@
 import {
   DEFAULT_SCHROEDINGER_CONFIG,
   DEFAULT_OPEN_QUANTUM_CONFIG,
+  DEFAULT_TDSE_CONFIG,
   type FreeScalarConfig,
   type SchroedingerConfig,
   type TdseConfig,
@@ -14,6 +15,7 @@ import {
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
+import { getTdsePreset } from '@/lib/physics/tdse/presets'
 import { StateCreator } from 'zustand'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
@@ -1374,14 +1376,27 @@ export const createSchroedingerSlice: StateCreator<
       }
       setWithVersion((state) => {
         const { latticeDim } = state.schroedinger.tdse
-        const maxPerDim = defaultTdseGridPerDim(latticeDim)
-        const clamped = Array.from({ length: latticeDim }, (_, i) => {
+        // Snap each axis to power-of-2 within [4, 128], then check total budget
+        const snapped = Array.from({ length: latticeDim }, (_, i) => {
           const s = i < size.length ? size[i]! : 4
-          const val = Math.max(4, Math.min(maxPerDim, Math.round(s)))
-          // Snap to power-of-2 for FFT
+          const val = Math.max(4, Math.min(128, Math.round(s)))
           const log2 = Math.round(Math.log2(val))
-          return Math.max(4, Math.min(maxPerDim, 2 ** log2))
+          return Math.max(4, Math.min(128, 2 ** log2))
         })
+        // Verify total sites within budget; if over, reduce the largest axes first
+        const reduceToFit = (grid: number[]): number[] => {
+          const result = [...grid]
+          while (result.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
+            // Find the largest axis and halve it
+            let maxIdx = 0
+            for (let i = 1; i < result.length; i++) {
+              if (result[i]! > result[maxIdx]!) maxIdx = i
+            }
+            result[maxIdx] = Math.max(4, result[maxIdx]! / 2)
+          }
+          return result
+        }
+        const clamped = reduceToFit(snapped)
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -1609,6 +1624,123 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setTdseSlitSeparation: (separation) => {
+      if (!isFiniteSchroedingerInput(separation)) {
+        warnNonFiniteSchroedingerInput('tdse.slitSeparation', separation)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(10.0, separation))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, slitSeparation: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseSlitWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) {
+        warnNonFiniteSchroedingerInput('tdse.slitWidth', width)
+        return
+      }
+      const clamped = Math.max(0.05, Math.min(5.0, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, slitWidth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseWallThickness: (thickness) => {
+      if (!isFiniteSchroedingerInput(thickness)) {
+        warnNonFiniteSchroedingerInput('tdse.wallThickness', thickness)
+        return
+      }
+      const clamped = Math.max(0.05, Math.min(3.0, thickness))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wallThickness: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseWallHeight: (height) => {
+      if (!isFiniteSchroedingerInput(height)) {
+        warnNonFiniteSchroedingerInput('tdse.wallHeight', height)
+        return
+      }
+      const clamped = Math.max(1.0, Math.min(500.0, height))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, wallHeight: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseLatticeDepth: (depth) => {
+      if (!isFiniteSchroedingerInput(depth)) {
+        warnNonFiniteSchroedingerInput('tdse.latticeDepth', depth)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(100.0, depth))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, latticeDepth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseLatticePeriod: (period) => {
+      if (!isFiniteSchroedingerInput(period)) {
+        warnNonFiniteSchroedingerInput('tdse.latticePeriod', period)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(10.0, period))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, latticePeriod: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseDoubleWellLambda: (lambda) => {
+      if (!isFiniteSchroedingerInput(lambda)) {
+        warnNonFiniteSchroedingerInput('tdse.doubleWellLambda', lambda)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(100.0, lambda))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, doubleWellLambda: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseDoubleWellSeparation: (separation) => {
+      if (!isFiniteSchroedingerInput(separation)) {
+        warnNonFiniteSchroedingerInput('tdse.doubleWellSeparation', separation)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(5.0, separation))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, doubleWellSeparation: clamped, needsReset: true },
+        },
+      }))
+    },
+    setTdseDoubleWellAsymmetry: (asymmetry) => {
+      if (!isFiniteSchroedingerInput(asymmetry)) {
+        warnNonFiniteSchroedingerInput('tdse.doubleWellAsymmetry', asymmetry)
+        return
+      }
+      const clamped = Math.max(0, Math.min(50.0, asymmetry))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, doubleWellAsymmetry: clamped, needsReset: true },
+        },
+      }))
+    },
     setTdseDriveEnabled: (enabled) => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -1701,6 +1833,14 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setTdseShowPotential: (showPotential) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, showPotential },
+        },
+      }))
+    },
     setTdseAutoLoop: (autoLoop) => {
       setWithVersion((state) => ({
         schroedinger: {
@@ -1749,6 +1889,21 @@ export const createSchroedingerSlice: StateCreator<
           },
         }
       })
+    },
+    applyTdsePreset: (presetId) => {
+      const preset = getTdsePreset(presetId)
+      if (!preset) return
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: {
+            ...DEFAULT_TDSE_CONFIG,
+            ...preset.overrides,
+            slicePositions: state.schroedinger.tdse.slicePositions,
+            needsReset: true,
+          },
+        },
+      }))
     },
     resetTdseField: () => {
       setWithVersion((state) => ({

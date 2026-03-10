@@ -57,12 +57,12 @@ mquantum/
 │   ├── playwright/          # Playwright E2E tests (*.spec.ts)
 │   └── tools/               # Utility scripts
 │
-├── docs/                    # Documentation
-│   ├── architecture.md      # Architecture guide
-│   ├── testing.md           # Testing guide
-│   ├── frontend.md          # Frontend patterns
+├── docs/                    # Always-loaded agent docs (@import from CLAUDE.md)
+│   ├── architecture.md      # File placement, naming, templates (174 lines)
+│   ├── testing.md           # Test stack, placement, templates (141 lines)
+│   ├── frontend.md          # UI patterns, components, stores (164 lines)
 │   └── meta/
-│       └── styleguide.md    # Style guide
+│       └── styleguide.md    # Immutable style rules (70 lines)
 │
 └── [config files]           # vite.config.ts, vitest.config.ts, etc.
 ```

@@ -11,6 +11,9 @@
  *   3 = finiteWell (symmetric square well along first axis)
  *   4 = harmonicTrap (isotropic harmonic oscillator)
  *   5 = driven (time-dependent barrier with oscillating height)
+ *   6 = doubleSlit (barrier wall with two slit openings along axis 1)
+ *   7 = periodicLattice (cosine lattice V₀cos²(πx/a) along axis 0)
+ *   8 = doubleWell (quartic V(x) = λ(x² − a²)² − εx along axis 0)
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
@@ -92,6 +95,39 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
 
     V = baseV + drive;
+  } else if (params.potentialType == 6u) {
+    // Double slit: barrier wall perpendicular to axis 0 with two slit openings along axis 1
+    let wallDist = abs(pos0 - params.barrierCenter);
+    if (wallDist < params.wallThickness * 0.5) {
+      // Start with wall everywhere
+      V = params.wallHeight;
+      // If latticeDim >= 2, carve out slit openings along axis 1
+      if (params.latticeDim >= 2u) {
+        let pos1 = (f32(coords[1]) - f32(params.gridSize[1]) * 0.5 + 0.5) * params.spacing[1];
+        let halfSep = params.slitSeparation * 0.5;
+        let halfWidth = params.slitWidth * 0.5;
+        // Upper slit: centered at +halfSep
+        if (abs(pos1 - halfSep) < halfWidth) {
+          V = 0.0;
+        }
+        // Lower slit: centered at -halfSep
+        if (abs(pos1 + halfSep) < halfWidth) {
+          V = 0.0;
+        }
+      }
+    }
+  } else if (params.potentialType == 7u) {
+    // Periodic lattice: V = V0 * cos^2(pi * x / a) along axis 0
+    let phase = 3.14159265 * pos0 / params.latticePeriod;
+    let c = cos(phase);
+    V = params.latticeDepth * c * c;
+  } else if (params.potentialType == 8u) {
+    // Double well: V(x) = λ(x² − a²)² − εx
+    let a = params.doubleWellSeparation;
+    let lam = params.doubleWellLambda;
+    let eps = params.doubleWellAsymmetry;
+    let x2_minus_a2 = pos0 * pos0 - a * a;
+    V = lam * x2_minus_a2 * x2_minus_a2 - eps * pos0;
   }
 
   potential[idx] = V;

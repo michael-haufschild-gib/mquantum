@@ -20,6 +20,7 @@ import type {
   TdseDriveWaveform,
   TdseFieldView,
 } from '@/lib/geometry/extended/types'
+import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 
@@ -45,6 +46,9 @@ const POTENTIAL_TYPE_OPTIONS = [
   { value: 'finiteWell', label: 'Finite Well' },
   { value: 'harmonicTrap', label: 'Harmonic Trap' },
   { value: 'driven', label: 'Driven' },
+  { value: 'doubleSlit', label: 'Double Slit' },
+  { value: 'periodicLattice', label: 'Periodic Lattice' },
+  { value: 'doubleWell', label: 'Double Well' },
 ]
 
 const DRIVE_WAVEFORM_OPTIONS = [
@@ -58,6 +62,11 @@ const FIELD_VIEW_OPTIONS = [
   { value: 'phase', label: 'Phase arg(ψ)' },
   { value: 'current', label: 'Current |j|' },
   { value: 'potential', label: 'Potential V(x)' },
+]
+
+const SCENARIO_PRESET_OPTIONS = [
+  { value: '', label: 'Custom' },
+  ...TDSE_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
 ]
 
 /**
@@ -116,9 +125,30 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
     const showHarmonicControls = td.potentialType === 'harmonicTrap'
     const showStepControls = td.potentialType === 'step'
     const showDriveControls = td.potentialType === 'driven'
+    const showSlitControls = td.potentialType === 'doubleSlit'
+    const showLatticeControls = td.potentialType === 'periodicLattice'
+    const showDoubleWellControls = td.potentialType === 'doubleWell'
+
+    const handlePresetChange = useCallback(
+      (value: string) => {
+        if (value) actions.applyPreset(value)
+      },
+      [actions],
+    )
 
     return (
       <div className="space-y-4" data-testid="tdse-controls">
+        {/* Scenario Presets */}
+        <div className="space-y-3">
+          <Select
+            label="Scenario"
+            options={SCENARIO_PRESET_OPTIONS}
+            value=""
+            onChange={handlePresetChange}
+            data-testid="tdse-scenario-preset"
+          />
+        </div>
+
         {/* Initial Condition */}
         <div className="space-y-3">
           <Select
@@ -273,6 +303,121 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
               data-testid="tdse-harmonic-omega"
             />
           )}
+
+          {showSlitControls && (
+            <>
+              <Slider
+                label="Wall Position"
+                min={-10}
+                max={10}
+                step={0.1}
+                value={td.barrierCenter}
+                onChange={actions.setBarrierCenter}
+                showValue
+                data-testid="tdse-slit-wall-position"
+              />
+              <Slider
+                label="Slit Separation"
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={td.slitSeparation}
+                onChange={actions.setSlitSeparation}
+                showValue
+                data-testid="tdse-slit-separation"
+              />
+              <Slider
+                label="Slit Width"
+                min={0.05}
+                max={5}
+                step={0.05}
+                value={td.slitWidth}
+                onChange={actions.setSlitWidth}
+                showValue
+                data-testid="tdse-slit-width"
+              />
+              <Slider
+                label="Wall Thickness"
+                min={0.05}
+                max={3}
+                step={0.05}
+                value={td.wallThickness}
+                onChange={actions.setWallThickness}
+                showValue
+                data-testid="tdse-wall-thickness"
+              />
+              <Slider
+                label="Wall Height"
+                min={1}
+                max={500}
+                step={1}
+                value={td.wallHeight}
+                onChange={actions.setWallHeight}
+                showValue
+                data-testid="tdse-wall-height"
+              />
+            </>
+          )}
+
+          {showLatticeControls && (
+            <>
+              <Slider
+                label="Lattice Depth"
+                min={0.1}
+                max={100}
+                step={0.1}
+                value={td.latticeDepth}
+                onChange={actions.setLatticeDepth}
+                showValue
+                data-testid="tdse-lattice-depth"
+              />
+              <Slider
+                label="Lattice Period"
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={td.latticePeriod}
+                onChange={actions.setLatticePeriod}
+                showValue
+                data-testid="tdse-lattice-period"
+              />
+            </>
+          )}
+
+          {showDoubleWellControls && (
+            <>
+              <Slider
+                label="Coupling (λ)"
+                min={0.1}
+                max={100}
+                step={0.1}
+                value={td.doubleWellLambda}
+                onChange={actions.setDoubleWellLambda}
+                showValue
+                data-testid="tdse-double-well-lambda"
+              />
+              <Slider
+                label="Well Separation (a)"
+                min={0.1}
+                max={5}
+                step={0.05}
+                value={td.doubleWellSeparation}
+                onChange={actions.setDoubleWellSeparation}
+                showValue
+                data-testid="tdse-double-well-separation"
+              />
+              <Slider
+                label="Asymmetry (ε)"
+                min={0}
+                max={50}
+                step={0.1}
+                value={td.doubleWellAsymmetry}
+                onChange={actions.setDoubleWellAsymmetry}
+                showValue
+                data-testid="tdse-double-well-asymmetry"
+              />
+            </>
+          )}
         </div>
 
         {/* Drive (only for driven potential) */}
@@ -366,6 +511,12 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             checked={td.autoScale}
             onCheckedChange={actions.setAutoScale}
             data-testid="tdse-auto-scale"
+          />
+          <Switch
+            label="Show Potential"
+            checked={td.showPotential}
+            onCheckedChange={actions.setShowPotential}
+            data-testid="tdse-show-potential"
           />
         </div>
 

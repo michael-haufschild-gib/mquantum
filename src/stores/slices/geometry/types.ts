@@ -277,6 +277,15 @@ export interface SchroedingerSliceActions {
   setTdseWellWidth: (width: number) => void
   setTdseHarmonicOmega: (omega: number) => void
   setTdseStepHeight: (height: number) => void
+  setTdseSlitSeparation: (separation: number) => void
+  setTdseSlitWidth: (width: number) => void
+  setTdseWallThickness: (thickness: number) => void
+  setTdseWallHeight: (height: number) => void
+  setTdseLatticeDepth: (depth: number) => void
+  setTdseLatticePeriod: (period: number) => void
+  setTdseDoubleWellLambda: (lambda: number) => void
+  setTdseDoubleWellSeparation: (separation: number) => void
+  setTdseDoubleWellAsymmetry: (asymmetry: number) => void
   setTdseDriveEnabled: (enabled: boolean) => void
   setTdseDriveWaveform: (waveform: TdseDriveWaveform) => void
   setTdseDriveFrequency: (frequency: number) => void
@@ -286,10 +295,12 @@ export interface SchroedingerSliceActions {
   setTdseAbsorberStrength: (strength: number) => void
   setTdseFieldView: (view: TdseFieldView) => void
   setTdseAutoScale: (autoScale: boolean) => void
+  setTdseShowPotential: (show: boolean) => void
   setTdseAutoLoop: (autoLoop: boolean) => void
   setTdseDiagnosticsEnabled: (enabled: boolean) => void
   setTdseDiagnosticsInterval: (interval: number) => void
   setTdseSlicePosition: (dimIndex: number, value: number) => void
+  applyTdsePreset: (presetId: string) => void
   resetTdseField: () => void
   clearTdseNeedsReset: () => void
 

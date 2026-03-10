@@ -23,6 +23,36 @@ export const tdseWriteGridBlock = /* wgsl */ `
 @group(0) @binding(3) var<storage, read> potential: array<f32>;
 @group(0) @binding(4) var outputTex: texture_storage_3d<rgba16float, write>;
 
+// Compute the appropriate normalization scale for the active potential type.
+// Each type uses only its own parameters to avoid cross-contamination from defaults.
+fn getPotentialScale() -> f32 {
+  if (params.potentialType == 1u || params.potentialType == 5u) {
+    // barrier / driven
+    return max(params.barrierHeight, 1.0);
+  } else if (params.potentialType == 2u) {
+    // step
+    return max(params.stepHeight, 1.0);
+  } else if (params.potentialType == 3u) {
+    // finiteWell
+    return max(abs(params.wellDepth), 1.0);
+  } else if (params.potentialType == 4u) {
+    // harmonicTrap — scale by V at half the bounding radius
+    let r = params.boundingRadius * 0.5;
+    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
+  } else if (params.potentialType == 6u) {
+    // doubleSlit
+    return max(params.wallHeight, 1.0);
+  } else if (params.potentialType == 7u) {
+    // periodicLattice
+    return max(params.latticeDepth, 1.0);
+  } else if (params.potentialType == 8u) {
+    // doubleWell — barrier height is λa⁴
+    let a2 = params.doubleWellSeparation * params.doubleWellSeparation;
+    return max(params.doubleWellLambda * a2 * a2, 1.0);
+  }
+  return 1.0;
+}
+
 @compute @workgroup_size(4, 4, 4)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let texDims = textureDimensions(outputTex);
@@ -112,13 +142,33 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     displayScalar = 1.0 - exp(-sqrt(currentMagSq));
   } else {
     // potential
-    let potentialScale = max(max(params.barrierHeight, abs(params.wellDepth)), 1.0);
+    let potentialScale = getPotentialScale();
     displayScalar = 0.5 + 0.5 * tanh(potentialVal / potentialScale);
   }
 
   let normDensity = clamp(displayScalar, 0.0, 1.0);
   let logDensity = log(normDensity + 1e-10);
 
-  textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, 0.0));
+  // Potential overlay: encode normalized V(x) in alpha channel for raymarcher.
+  // The raymarcher accumulates overlay opacity per-step, so thin potentials
+  // (barrier: 2 steps) work fine at full scale, but smooth/unbounded potentials
+  // (harmonic, doubleWell: 20-30 steps) saturate to opaque. We reduce the
+  // per-voxel overlay for wide potentials and fade out confining walls.
+  var potOverlay: f32 = 0.0;
+  if (params.showPotential == 1u && params.fieldView != 3u) {
+    let potentialScale = getPotentialScale();
+    let normPot = abs(potentialVal) / potentialScale;
+    let fadeout = 1.0 - smoothstep(1.5, 3.0, normPot);
+    // Bounded step-function potentials (barrier, step, well, slit) occupy thin
+    // regions — full overlay is fine. Smooth/unbounded potentials span many voxels
+    // and need reduced gain to prevent volumetric saturation.
+    var overlayGain: f32 = 1.0;
+    if (params.potentialType == 4u || params.potentialType == 8u) {
+      overlayGain = 0.03;
+    }
+    potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain;
+  }
+
+  textureStore(outputTex, gid, vec4f(normDensity, logDensity, phase, potOverlay));
 }
 `

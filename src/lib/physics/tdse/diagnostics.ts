@@ -18,6 +18,14 @@ export interface TdseDiagnosticsSnapshot {
   maxDensity: number
   /** Fractional norm drift from initial: (norm - norm0) / norm0 */
   normDrift: number
+  /** Norm of psi in the region x < barrierCenter along axis 0 */
+  normLeft: number
+  /** Norm of psi in the region x >= barrierCenter along axis 0 */
+  normRight: number
+  /** Reflection coefficient R = normLeft / (normLeft + normRight) */
+  R: number
+  /** Transmission coefficient T = normRight / (normLeft + normRight) */
+  T: number
 }
 
 /**

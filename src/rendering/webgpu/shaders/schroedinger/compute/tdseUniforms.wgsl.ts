@@ -22,7 +22,7 @@ struct TDSEUniforms {
   mass: f32,                 // offset 16
   stepsPerFrame: u32,        // offset 20
   initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition)
-  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven)
+  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 32
@@ -68,7 +68,23 @@ struct TDSEUniforms {
   // k-space grid info for kinetic step (48 bytes)
   kGridScale: array<f32, 12>, // offset 544 (2*pi/(N*a) per dimension)
 
-  // Padding to round to 640 bytes
-  _pad: array<f32, 12>,      // offset 592
+  // Double slit parameters (16 bytes)
+  slitSeparation: f32,       // offset 592
+  slitWidth: f32,            // offset 596
+  wallThickness: f32,        // offset 600
+  wallHeight: f32,           // offset 604
+
+  // Periodic lattice parameters (8 bytes)
+  latticeDepth: f32,         // offset 608
+  latticePeriod: f32,        // offset 612
+
+  // Display overlay (4 bytes)
+  showPotential: u32,        // offset 616 (0=off, 1=on)
+
+  // Double well parameters: V(x) = λ(x² − a²)² − εx (12 bytes + 8 bytes padding)
+  doubleWellLambda: f32,     // offset 620
+  doubleWellSeparation: f32, // offset 624
+  doubleWellAsymmetry: f32,  // offset 628
+  _pad: array<f32, 2>,       // offset 632 (pad to 640 bytes)
 }
 `
