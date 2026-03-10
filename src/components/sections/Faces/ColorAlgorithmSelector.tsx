@@ -58,7 +58,7 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
     useEffect(() => {
       const isAvailable = availableOptions.some((opt) => opt.value === colorAlgorithm)
       if (!isAvailable) {
-        setColorAlgorithm('diverging')
+        setColorAlgorithm('radialDistance')
       }
     }, [availableOptions, colorAlgorithm, setColorAlgorithm])
 

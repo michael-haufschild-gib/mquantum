@@ -77,7 +77,14 @@ fn sphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> vec2f {
   let K = sphericalHarmonicNorm(l, m);
 
   // Associated Legendre polynomial P^{|m|}_l(cos θ)
-  let P = legendre(l, m, cos(theta));
+  // legendre() includes Condon-Shortley phase (-1)^|m|.
+  var P = legendre(l, m, cos(theta));
+
+  // For m >= 0, the CS phase gives the standard physicist convention directly:
+  //   Y_l^m = K · P_CS · e^{imφ} = (-1)^m · K · P · e^{imφ}  ✓
+  // For m < 0, the standard relation is Y_l^{-|m|} = K · P · e^{-i|m|φ}
+  // (without the extra (-1)^|m| from CS). Undo it for odd |m|.
+  if (m < 0 && (abs(m) & 1) == 1) { P = -P; }
 
   // Phase factor e^{imφ}
   let mPhi = f32(m) * phi;
@@ -101,9 +108,12 @@ fn realSphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
     return length(Y);
   }
 
-  // Real spherical harmonic
+  // Real spherical harmonic (chemistry/visualization convention, no CS phase)
   let K = sphericalHarmonicNorm(l, abs(m));
-  let P = legendre(l, abs(m), cos(theta));
+  // legendre() includes Condon-Shortley (-1)^|m|. Real spherical harmonics
+  // are defined without it, so undo for odd |m|.
+  var P = legendre(l, abs(m), cos(theta));
+  if ((abs(m) & 1) == 1) { P = -P; }
 
   if (m == 0) {
     // m = 0: Y_l0 is already real

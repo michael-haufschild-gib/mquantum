@@ -426,7 +426,7 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   var rawGrad: vec3f;
   ${gradientCompute}
   let gradMag = length(rawGrad);
-  let n = rawGrad / max(gradMag, 1e-6);
+  let n = -rawGrad / max(gradMag, 1e-6);
 
   // Sample for color
   ${colorSample}
@@ -888,7 +888,7 @@ ${bayerJitterSection}
   var rawGrad: vec3f;
   ${gradientCompute}
   let gradMag = length(rawGrad);
-  let n = rawGrad / max(gradMag, 1e-6);
+  let n = -rawGrad / max(gradMag, 1e-6);
 
   // Sample for color
   ${colorSample}

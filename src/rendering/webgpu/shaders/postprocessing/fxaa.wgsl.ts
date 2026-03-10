@@ -90,13 +90,18 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Check if contrast is below threshold (no early return - use select at end)
   let skipAA = lumRange < max(uniforms.edgeThresholdMin, lumMax * uniforms.edgeThreshold);
 
-  // Calculate edge direction
-  let edgeH = abs((lumNW + lumNE) - 2.0 * lumN) +
-              2.0 * abs((lumW + lumE) - 2.0 * lumC) +
-              abs((lumSW + lumSE) - 2.0 * lumS);
-  let edgeV = abs((lumNW + lumSW) - 2.0 * lumW) +
+  // Calculate edge direction.
+  // edgeH sums vertical Laplacians (Y second derivatives at columns W, C, E).
+  // Large edgeH → strong vertical variation → horizontal edge span.
+  // edgeV sums horizontal Laplacians (X second derivatives at rows N, C, S).
+  // Large edgeV → strong horizontal variation → vertical edge span.
+  // (Matches NVIDIA FXAA 3.11: edgeHorz = vertical Laplacian sums.)
+  let edgeH = abs((lumNW + lumSW) - 2.0 * lumW) +
               2.0 * abs((lumN + lumS) - 2.0 * lumC) +
               abs((lumNE + lumSE) - 2.0 * lumE);
+  let edgeV = abs((lumNW + lumNE) - 2.0 * lumN) +
+              2.0 * abs((lumW + lumE) - 2.0 * lumC) +
+              abs((lumSW + lumSE) - 2.0 * lumS);
 
   let isHorizontal = edgeH >= edgeV;
 
@@ -118,11 +123,16 @@ fn main(input: VertexOutput) -> @location(0) vec4f {
   // Use max to avoid division by zero when lumRange is 0
   let subpixelOffset = clamp(abs(lumaAverage - lumC) / max(lumRange, 0.0001), 0.0, 1.0);
   let subpixelOffsetFinal = (-2.0 * subpixelOffset + 3.0) * subpixelOffset * subpixelOffset;
-  let pixelOffset = subpixelOffsetFinal * subpixelOffsetFinal * uniforms.subpixelQuality;
+  let pixelOffset = subpixelOffsetFinal * uniforms.subpixelQuality;
 
-  // Calculate final UV using select for uniform control flow
-  let finalOffsetH = vec2f(pixelOffset * pixelStep, pixelStep * 0.5);
-  let finalOffsetV = vec2f(pixelStep * 0.5, pixelOffset * pixelStep);
+  // Calculate final UV using select for uniform control flow.
+  // pixelStep is the perpendicular step (±texelSize.y for horizontal, ±texelSize.x for vertical).
+  // The perpendicular 0.5-pixel shift moves the sample towards the edge boundary.
+  // The subpixel offset uses the along-edge texel dimension (texelSize.x for horizontal edges,
+  // texelSize.y for vertical edges) — NOT the perpendicular dimension.
+  let alongEdgeStep = select(texelSize.y, texelSize.x, isHorizontal);
+  let finalOffsetH = vec2f(pixelOffset * alongEdgeStep, pixelStep * 0.5);
+  let finalOffsetV = vec2f(pixelStep * 0.5, pixelOffset * alongEdgeStep);
   let finalOffset = select(finalOffsetV, finalOffsetH, isHorizontal);
 
   // Sample final color (must be before any conditionals for uniform control flow)

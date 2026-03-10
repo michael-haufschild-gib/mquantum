@@ -135,12 +135,13 @@ fn sampleDensityFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec4f {
 }
 
 /**
- * Compute density gradient from grid using central differences.
+ * Compute log-density gradient from grid using central differences.
+ * Returns ∇s = ∇log(ρ+ε), consistent with tetrahedral and analytical gradient methods.
  * Uses 6 axis-aligned texture samples (2 per axis) for gradient estimation.
  *
  * @param pos World-space position
  * @param uniforms Schroedinger uniforms containing boundingRadius
- * @return Gradient vector (drho/dx, drho/dy, drho/dz)
+ * @return Gradient vector (ds/dx, ds/dy, ds/dz) where s = log(ρ + ε)
  */
 fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   // Step size: 2 texels in world space for smoother gradient
@@ -152,12 +153,20 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
   let dy = vec3f(0.0, eps, 0.0);
   let dz = vec3f(0.0, 0.0, eps);
 
-  // Central differences on the rho channel (.r)
-  let gradX = sampleDensityFromGrid(pos + dx, uniforms).r - sampleDensityFromGrid(pos - dx, uniforms).r;
-  let gradY = sampleDensityFromGrid(pos + dy, uniforms).r - sampleDensityFromGrid(pos - dy, uniforms).r;
-  let gradZ = sampleDensityFromGrid(pos + dz, uniforms).r - sampleDensityFromGrid(pos - dz, uniforms).r;
-
-  // Normalize by 2*eps for proper central difference derivative
-  return vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+  if (DENSITY_GRID_HAS_PHASE) {
+    // rgba16float grid: logRho stored in .g channel — central-difference directly on s
+    let gradX = sampleDensityFromGrid(pos + dx, uniforms).g - sampleDensityFromGrid(pos - dx, uniforms).g;
+    let gradY = sampleDensityFromGrid(pos + dy, uniforms).g - sampleDensityFromGrid(pos - dy, uniforms).g;
+    let gradZ = sampleDensityFromGrid(pos + dz, uniforms).g - sampleDensityFromGrid(pos - dz, uniforms).g;
+    return vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+  } else {
+    // r16float fallback: only rho available, compute ∇ρ then convert to ∇s = ∇ρ/(ρ+ε)
+    let gradX = sampleDensityFromGrid(pos + dx, uniforms).r - sampleDensityFromGrid(pos - dx, uniforms).r;
+    let gradY = sampleDensityFromGrid(pos + dy, uniforms).r - sampleDensityFromGrid(pos - dy, uniforms).r;
+    let gradZ = sampleDensityFromGrid(pos + dz, uniforms).r - sampleDensityFromGrid(pos - dz, uniforms).r;
+    let gradRho = vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+    let rho = sampleDensityFromGrid(pos, uniforms).r;
+    return gradRho / max(rho + 1e-8, 1e-8);
+  }
 }
 `

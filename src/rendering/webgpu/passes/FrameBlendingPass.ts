@@ -399,7 +399,7 @@ export class FrameBlendingPass extends WebGPUBasePass {
       return
     }
 
-    if (Math.abs(this.blendFactor - this.lastBlendFactor) > 1e-6) {
+    if (this.blendFactor !== this.lastBlendFactor) {
       this.uniformData[0] = this.blendFactor
       this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformData)
       this.lastBlendFactor = this.blendFactor

@@ -293,15 +293,19 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Get edges at current pixel (textureSampleLevel for uniform control flow safety)
   let e = textureSampleLevel(tEdges, pointSampler, input.uv, 0.0).rg;
 
-  // Process horizontal edges (edge.r)
-  if (e.r > 0.0) {
-    // Search left and right
+  // Process horizontal edges (edge.g = |L - Ltop| > threshold).
+  // A horizontal edge is the boundary between current pixel and the one above.
+  // The edge runs horizontally → search LEFT/RIGHT to trace its extent.
+  // Crossing edges are fetched from the G channel (perpendicular horizontal edges).
+  // Blend weights go into R/G channels (used by neighborhood blending for vertical offset).
+  if (e.g > 0.0) {
+    // Search left and right along the horizontal edge
     let d = vec2f(
       searchXLeft(input.offset0.xy, 0.0),
       searchXRight(input.offset0.zw, 1.0)
     );
 
-    // Fetch crossing edges (textureSampleLevel for non-uniform branch)
+    // Fetch crossing edges at left/right endpoints (textureSampleLevel for non-uniform branch)
     let e1 = textureSampleLevel(tEdges, linearSampler, input.uv - vec2f((d.x + 0.5) * texelSize.x, 0.0), 0.0).g;
     let e2 = textureSampleLevel(tEdges, linearSampler, input.uv + vec2f((d.y + 0.5) * texelSize.x, 0.0), 0.0).g;
 
@@ -310,15 +314,19 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     weights.g = area(abs(d), e1, e2).y;
   }
 
-  // Process vertical edges (edge.g)
-  if (e.g > 0.0) {
-    // Search up and down
+  // Process vertical edges (edge.r = |L - Lleft| > threshold).
+  // A vertical edge is the boundary between current pixel and the one to the left.
+  // The edge runs vertically → search UP/DOWN to trace its extent.
+  // Crossing edges are fetched from the R channel (perpendicular vertical edges).
+  // Blend weights go into B/A channels (used by neighborhood blending for horizontal offset).
+  if (e.r > 0.0) {
+    // Search up and down along the vertical edge
     let d = vec2f(
       searchYUp(input.offset1.xy, 0.0),
       searchYDown(input.offset1.zw, 1.0)
     );
 
-    // Fetch crossing edges (textureSampleLevel for non-uniform branch)
+    // Fetch crossing edges at top/bottom endpoints (textureSampleLevel for non-uniform branch)
     let e1 = textureSampleLevel(tEdges, linearSampler, input.uv - vec2f(0.0, (d.x + 0.5) * texelSize.y), 0.0).r;
     let e2 = textureSampleLevel(tEdges, linearSampler, input.uv + vec2f(0.0, (d.y + 0.5) * texelSize.y), 0.0).r;
 
@@ -390,12 +398,21 @@ fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let texelSize = 1.0 / uniforms.resolution;
 
-  // Fetch the blending weights for this pixel and neighbors
+  // Fetch the blending weights for this pixel and neighbors.
+  // Per the SMAA paper (Jimenez 2012), the weight channels are:
+  //   R = horizontal left, G = horizontal right, B = vertical top, A = vertical bottom.
+  // The neighborhood fetch pattern is:
+  //   a.x = right neighbor's A (vertical bottom) → vertical edge to the right
+  //   a.y = bottom neighbor's G (horizontal right) → horizontal edge below
+  //   a.z = current B (vertical top)
+  //   a.w = current R (horizontal left)
   // All samples done upfront using textureSampleLevel for uniform control flow safety
+  let currentWeights = textureSampleLevel(tBlendWeights, linearSampler, input.uv, 0.0);
   var a = vec4f(
-    textureSampleLevel(tBlendWeights, linearSampler, input.offset.xy, 0.0).a,  // Right
-    textureSampleLevel(tBlendWeights, linearSampler, input.offset.zw, 0.0).g,  // Bottom
-    textureSampleLevel(tBlendWeights, linearSampler, input.uv, 0.0).zw         // Current (ba)
+    textureSampleLevel(tBlendWeights, linearSampler, input.offset.xy, 0.0).a,  // Right neighbor's vertical bottom
+    textureSampleLevel(tBlendWeights, linearSampler, input.offset.zw, 0.0).g,  // Bottom neighbor's horizontal right
+    currentWeights.b,  // Current vertical top
+    currentWeights.r   // Current horizontal left
   );
 
   // Sample the center color unconditionally
@@ -412,15 +429,17 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   var blendFactor = vec2f(0.0);
   var offset = vec2f(0.0);
 
-  let isHorizontalDominant = max(a.x, a.z) > max(a.y, a.w);
+  // a.x/a.z are vertical edge weights (from weights.ba) → blend horizontally (offset.x)
+  // a.y/a.w are horizontal edge weights (from weights.rg) → blend vertically (offset.y)
+  let verticalEdgeDominant = max(a.x, a.z) > max(a.y, a.w);
 
-  if (isHorizontalDominant) {
-    // Horizontal direction dominates
+  if (verticalEdgeDominant) {
+    // Vertical edge dominant → blend perpendicular (horizontal offset)
     blendFactor = vec2f(a.x, a.z);
     offset.x = select(-texelSize.x, texelSize.x, blendFactor.y > blendFactor.x);
     offset.x *= abs(blendFactor.y - blendFactor.x) / (blendFactor.x + blendFactor.y);
   } else {
-    // Vertical direction dominates
+    // Horizontal edge dominant → blend perpendicular (vertical offset)
     blendFactor = vec2f(a.y, a.w);
     offset.y = select(-texelSize.y, texelSize.y, blendFactor.y > blendFactor.x);
     offset.y *= abs(blendFactor.y - blendFactor.x) / (blendFactor.x + blendFactor.y);

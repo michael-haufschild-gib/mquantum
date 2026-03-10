@@ -794,12 +794,16 @@ fn volumeRaymarch(
       }
     }
 
+    // PERF: Hoist density threshold check before expensive 7-evaluation current sampling.
+    // sampleProbabilityCurrent evaluates the full wavefunction 7 times (center + 6 finite diffs).
+    // computeProbabilityCurrentOverlay would discard the result anyway if rho < threshold.
     let momentumOverlaySubsample =
       uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
     if (
       !momentumOverlaySubsample &&
       uniforms.probabilityCurrentEnabled != 0u &&
-      uniforms.probabilityCurrentScale > 0.0
+      uniforms.probabilityCurrentScale > 0.0 &&
+      rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
     ) {
       let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
@@ -1032,12 +1036,14 @@ fn volumeRaymarchHQ(
       }
     }
 
+    // PERF: Hoist density threshold check before expensive 7-evaluation current sampling
     let momentumOverlaySubsample =
       uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
     if (
       !momentumOverlaySubsample &&
       uniforms.probabilityCurrentEnabled != 0u &&
-      uniforms.probabilityCurrentScale > 0.0
+      uniforms.probabilityCurrentScale > 0.0 &&
+      rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
     ) {
       let normalProxy = normalize(gradient + pos * 0.2 + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);
@@ -1072,7 +1078,6 @@ fn volumeRaymarchHQ(
       }
     }
 
-    // Phase materiality: smoke regions are denser (more absorbing)
     // Density contrast sharpening: compress low-density tails for sharper lobes
     var effectiveRho = applyDensityContrast(rho, uniforms);
     // Phase materiality: smoke regions are denser (more absorbing)
@@ -1250,12 +1255,14 @@ fn volumeRaymarchGrid(
     }
 
     // Probability current overlay
+    // PERF: Hoist density threshold check before expensive 7-evaluation current sampling
     let momentumOverlaySubsample =
       uniforms.representationMode == REPRESENTATION_MOMENTUM && (i & 3) != 0;
     if (
       !momentumOverlaySubsample &&
       uniforms.probabilityCurrentEnabled != 0u &&
-      uniforms.probabilityCurrentScale > 0.0
+      uniforms.probabilityCurrentScale > 0.0 &&
+      rho >= max(uniforms.probabilityCurrentDensityThreshold, 0.0)
     ) {
       let normalProxy = normalize(pos + vec3f(1e-6, 0.0, 0.0));
       let currentSample = sampleProbabilityCurrent(pos, animTime, uniforms);

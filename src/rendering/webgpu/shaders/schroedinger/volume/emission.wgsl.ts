@@ -234,23 +234,18 @@ const ALGO_BRANCH: Record<number, string> = {
     let V = analysis.b;
     let E = analysis.a;
     let eps = 1e-6;
-    let fK = K / (E + eps);
-    let fG = G / (E + eps);
-    let fV = V / (E + eps);
+    let invE = 1.0 / (E + eps);
     let brightness = clamp((log(E + eps) + 8.0) / 8.0, 0.0, 1.0);
-    col = vec3f(fK, fG, fV) * brightness;`,
+    col = vec3f(K, G, V) * (invE * brightness);`,
 
   13: /* wgsl */ `
     // 13: Mode Character Map — wave-like (gradient) vs mass-dominated (potential)
     let analysis = sampleAnalysisFromGrid(pos, uniforms);
-    let K = analysis.r;
     let G = analysis.g;
     let V = analysis.b;
     let E = analysis.a;
-    let eps = 1e-6;
-    let fWave = G / (E + eps);
-    let fMass = V / (E + eps);
-    let C = atan2(fMass, fWave) / (PI * 0.5);
+    // PERF: atan2(V/(E+eps), G/(E+eps)) = atan2(V, G) — common denominator cancels
+    let C = atan2(V, G) / (PI * 0.5);
     let charHue = clamp(C, 0.0, 1.0) * 0.8;
     let charBrightness = clamp(sqrt(E) * 2.0, 0.0, 1.0);
     let charSaturation = clamp(E * 10.0, 0.0, 1.0);
@@ -262,9 +257,10 @@ const ALGO_BRANCH: Record<number, string> = {
     let S = analysis.rgb;
     let Smag = analysis.a;
     let eps = 1e-6;
-    let Snorm = S / (Smag + eps);
-    let fluxHue = fract(atan2(Snorm.z, Snorm.x) / TAU + 0.5);
-    let elevation = Snorm.y * 0.5 + 0.5;
+    // PERF: atan2(S.z/mag, S.x/mag) = atan2(S.z, S.x) — skip normalization for hue
+    let fluxHue = fract(atan2(S.z, S.x) / TAU + 0.5);
+    let invSmag = 1.0 / (Smag + eps);
+    let elevation = S.y * invSmag * 0.5 + 0.5;
     let fluxBrightness = clamp(log(Smag + eps) / 4.0 + 1.0, 0.0, 1.0);
     col = hsl2rgb(fluxHue, 0.8, mix(0.2, 0.6, elevation)) * fluxBrightness;`,
 
@@ -272,10 +268,7 @@ const ALGO_BRANCH: Record<number, string> = {
     // 15: k-Space Occupation Map — sequential colormap by occupation number
     let analysis = sampleAnalysisFromGrid(pos, uniforms);
     let nk = max(analysis.r, 0.0);
-    let kNorm = analysis.g;
-    let omegaNorm = analysis.b;
-    let eps = 1e-6;
-    let logNk = clamp(log(nk + eps) / 8.0 + 1.0, 0.0, 1.0);
+    let logNk = clamp(log(nk + 1e-6) / 8.0 + 1.0, 0.0, 1.0);
     // Viridis-like: low n_k → deep blue, mid → teal, high → yellow
     let hue = mix(0.7, 0.12, logNk);
     let saturation = mix(0.6, 0.95, smoothstep(0.0, 0.5, logNk));

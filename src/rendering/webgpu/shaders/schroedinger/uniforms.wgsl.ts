@@ -204,7 +204,7 @@ struct SchroedingerUniforms {
   _pad3: f32,                    // Alignment padding
 
   // Color algorithm system (matches WebGL uniform system)
-  colorAlgorithm: i32,           // Color algorithm selector (0-11)
+  colorAlgorithm: i32,           // Color algorithm selector (0-18)
   distPower: f32,                // Distribution power for distance-based coloring
   distCycles: f32,               // Distribution cycles
   distOffset: f32,               // Distribution offset

@@ -1812,8 +1812,8 @@ function normalizeColorAlgorithmForQuantumMode(
   if (isAvailable) return colorAlgorithm
 
   // Fallback: in open quantum mode, use 'purityMap' (designed for density matrix);
-  // otherwise fall back to 'diverging' (density-only, no phase dependency).
-  return openQuantumEnabled ? 'purityMap' : 'diverging'
+  // otherwise fall back to 'radialDistance' (position-based, no phase dependency).
+  return openQuantumEnabled ? 'purityMap' : 'radialDistance'
 }
 
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {

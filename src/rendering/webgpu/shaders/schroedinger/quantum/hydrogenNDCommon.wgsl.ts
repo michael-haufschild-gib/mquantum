@@ -60,12 +60,7 @@ fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
     if (l <= 2) {
       return fastRealSphericalHarmonic(l, m, theta, phi);
     } else {
-      // realSphericalHarmonic includes Condon-Shortley (-1)^|m| via legendre().
-      // The fast path (l <= 2) uses the chemistry convention WITHOUT CS phase.
-      // Undo CS phase for odd |m| so both paths use the same sign convention.
-      var Y = realSphericalHarmonic(l, m, theta, phi, true);
-      if ((abs(m) & 1) == 1) { Y = -Y; }
-      return Y;
+      return realSphericalHarmonic(l, m, theta, phi, true);
     }
   } else {
     // Complex: |Y_lm| = K * |P|
@@ -89,9 +84,7 @@ fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi
     } else {
       // General path needs theta for Legendre recurrence
       let theta = acos(clamp(cosTheta, -1.0, 1.0));
-      var Y = realSphericalHarmonic(l, m, theta, phi, true);
-      if ((abs(m) & 1) == 1) { Y = -Y; }
-      return Y;
+      return realSphericalHarmonic(l, m, theta, phi, true);
     }
   } else {
     // Complex: |Y_lm| = K * |P|
@@ -121,10 +114,7 @@ fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, use
       }
       let theta = acos(clamp(nz, -1.0, 1.0));
       let phi = atan2(ny, nx);
-      var Y = realSphericalHarmonic(l, m, theta, phi, true);
-      // Undo Condon-Shortley phase for odd |m| (same as evalHydrogenNDAngularDirect)
-      if ((abs(m) & 1) == 1) { Y = -Y; }
-      return Y;
+      return realSphericalHarmonic(l, m, theta, phi, true);
     }
   } else {
     // Complex: |Y_lm| = K * |P| — no phi dependency, no singularity
