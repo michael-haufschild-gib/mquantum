@@ -285,6 +285,52 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const sat = 0.6 + (0.95 - 0.6) * Math.min(1, Math.max(0, (t - 0) / 0.5))
           const lit = 0.08 + (0.55 - 0.08) * t
           ;[r, g, b] = hslToRgb(hue, sat, lit)
+        } else if (colorAlgorithm === 'viridis' || colorAlgorithm === 'densityContours') {
+          // Viridis 5-stop piecewise linear (matches WGSL algo 19/21)
+          if (t < 0.25) {
+            const u = t / 0.25
+            r = 0.267 + (0.282 - 0.267) * u; g = 0.004 + (0.140 - 0.004) * u; b = 0.329 + (0.457 - 0.329) * u
+          } else if (t < 0.5) {
+            const u = (t - 0.25) / 0.25
+            r = 0.282 + (0.127 - 0.282) * u; g = 0.140 + (0.566 - 0.140) * u; b = 0.457 + (0.550 - 0.457) * u
+          } else if (t < 0.75) {
+            const u = (t - 0.5) / 0.25
+            r = 0.127 + (0.741 - 0.127) * u; g = 0.566 + (0.873 - 0.566) * u; b = 0.550 + (0.150 - 0.550) * u
+          } else {
+            const u = (t - 0.75) / 0.25
+            r = 0.741 + (0.993 - 0.741) * u; g = 0.873 + (0.906 - 0.873) * u; b = 0.150 + (0.144 - 0.150) * u
+          }
+          // Contour overlay for densityContours
+          if (colorAlgorithm === 'densityContours') {
+            const contourT = (t * 10) % 1
+            const lineDistance = Math.min(contourT, 1 - contourT)
+            const lineMask = lineDistance < 0.06 ? 1 - lineDistance / 0.06 : 0
+            const darken = 1 - 0.7 * lineMask
+            r *= darken; g *= darken; b *= darken
+          }
+        } else if (colorAlgorithm === 'inferno') {
+          // Inferno 5-stop piecewise linear (matches WGSL algo 20)
+          if (t < 0.25) {
+            const u = t / 0.25
+            r = 0.001 + (0.258 - 0.001) * u; g = 0.000 + (0.039 - 0.000) * u; b = 0.014 + (0.406 - 0.014) * u
+          } else if (t < 0.5) {
+            const u = (t - 0.25) / 0.25
+            r = 0.258 + (0.865 - 0.258) * u; g = 0.039 + (0.138 - 0.039) * u; b = 0.406 + (0.082 - 0.406) * u
+          } else if (t < 0.75) {
+            const u = (t - 0.5) / 0.25
+            r = 0.865 + (0.987 - 0.865) * u; g = 0.138 + (0.645 - 0.138) * u; b = 0.082 + (0.040 - 0.082) * u
+          } else {
+            const u = (t - 0.75) / 0.25
+            r = 0.987 + (0.988 - 0.987) * u; g = 0.645 + (0.998 - 0.645) * u; b = 0.040 + (0.645 - 0.040) * u
+          }
+        } else if (colorAlgorithm === 'phaseDensity') {
+          // Phase-density composite: hue sweeps through phase, brightness = density
+          // Preview: t drives both phase (hue) and density (brightness) together
+          const phaseNorm = t
+          const brightness = t
+          const saturation = 0.3 + 0.65 * brightness
+          const lightness = brightness * 0.55
+          ;[r, g, b] = hslToRgb(phaseNorm, saturation, lightness)
         } else {
           // Cosine palette (multiSource, radial)
           // Shows the underlying palette that will be sampled by position/density.

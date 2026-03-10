@@ -12,6 +12,7 @@ const { computeRawKSpaceDataMock, buildKSpaceDisplayTexturesMock } = vi.hoisted(
 
 vi.mock('@/lib/physics/freeScalar/kSpaceOccupation', () => ({
   computeRawKSpaceData: computeRawKSpaceDataMock,
+  computeRawKSpaceDataFromComplex: computeRawKSpaceDataMock,
 }))
 
 vi.mock('@/lib/physics/freeScalar/kSpaceDisplayTransforms', () => ({

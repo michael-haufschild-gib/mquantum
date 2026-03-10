@@ -47,6 +47,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         label: 'TDSE Dynamics',
         description: 'Time-dependent Schroedinger equation: wavepackets, tunneling, scattering.',
       },
+      {
+        value: 'becDynamics' as SchroedingerQuantumMode,
+        label: 'Bose-Einstein Condensate',
+        description: 'Gross-Pitaevskii equation: superfluid dynamics, vortices, solitons.',
+      },
     ],
     []
   )
@@ -56,7 +61,7 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       soundManager.playClick()
       // Free scalar field and TDSE require volumetric 3D rendering (no 2D pipeline support).
       // Force dimension to 3 if currently at 2.
-      if ((value === 'freeScalarField' || value === 'tdseDynamics') && dimension < 3) {
+      if ((value === 'freeScalarField' || value === 'tdseDynamics' || value === 'becDynamics') && dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
       setQuantumMode(value)

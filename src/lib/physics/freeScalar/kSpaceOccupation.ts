@@ -70,6 +70,18 @@ export function packRGBA16F(out: Uint16Array, pixelIdx: number, r: number, g: nu
   out[base + 3] = float32ToFloat16(a)
 }
 
+/** Pack only R and G channels, leaving B and A as zero (Uint16Array is zero-initialized). */
+export function packRG16F(out: Uint16Array, pixelIdx: number, r: number, g: number): void {
+  const base = pixelIdx * 4
+  out[base] = float32ToFloat16(r)
+  out[base + 1] = float32ToFloat16(g)
+}
+
+/** Pack only R channel, leaving G, B, A as zero. */
+export function packR16F(out: Uint16Array, pixelIdx: number, r: number): void {
+  out[pixelIdx * 4] = float32ToFloat16(r)
+}
+
 /**
  * Compute row-major strides for an N-D grid.
  */
@@ -95,6 +107,18 @@ export function linearToNDCoords(flatIdx: number, gridSize: readonly number[]): 
     remaining = Math.floor(remaining / gridSize[d]!)
   }
   return coords
+}
+
+/**
+ * Convert a linear index to N-D coordinates, writing into a pre-allocated output array.
+ * Avoids per-call array allocation.
+ */
+function linearToNDCoordsInto(flatIdx: number, gridSize: readonly number[], out: number[]): void {
+  let remaining = flatIdx
+  for (let d = gridSize.length - 1; d >= 0; d--) {
+    out[d] = remaining % gridSize[d]!
+    remaining = Math.floor(remaining / gridSize[d]!)
+  }
 }
 
 /**
@@ -232,6 +256,97 @@ export function computeRawKSpaceData(
 
     // n_k = (|pi_k|^2 + omega_k^2 * |phi_k|^2) / (2 * omega_k * N) - 0.5
     // The factor of N normalizes the FFT convention (our FFT is unnormalized forward)
+    const omegaSafe = Math.max(omega, M_FLOOR)
+    const nkVal = (piKSq + omegaSafe * omegaSafe * phiKSq) / (2 * omegaSafe * totalSites) - 0.5
+
+    nk[i] = nkVal
+    omegaArr[i] = omega
+
+    // Compute |k| magnitude from lattice momentum
+    let kSq = 0
+    for (let d = 0; d < latticeDim; d++) {
+      const N = activeDims[d]!
+      const a = spacing[d]!
+      if (N <= 1) continue
+      const sinVal = Math.sin((Math.PI * coords[d]!) / N)
+      const kLat = (2 * sinVal) / a
+      kSq += kLat * kLat
+    }
+    kMag[i] = Math.sqrt(kSq)
+
+    if (nkVal > nkMax) nkMax = nkVal
+    if (kMag[i]! > kMagMax) kMagMax = kMag[i]!
+    if (omega > omegaMax) omegaMax = omega
+  }
+
+  return {
+    nk,
+    kMag,
+    omega: omegaArr,
+    nkMax,
+    kMagMax,
+    omegaMax,
+    totalSites,
+    gridSize: activeDims,
+    strides,
+    latticeDim,
+    spacing,
+  }
+}
+
+/**
+ * Compute raw k-space occupation data from pre-interleaved complex arrays.
+ * Avoids the real→complex interleaving copy inside computeRawKSpaceData.
+ * Accepts either Float32Array (faster, less memory) or Float64Array (full precision).
+ *
+ * @param phiComplex - Pre-interleaved complex phi data (modified in-place by FFT)
+ * @param piComplex - Pre-interleaved complex pi data (modified in-place by FFT)
+ * @param gridSize - Per-dimension grid sizes (must all be power-of-2)
+ * @param spacing - Lattice spacings per dimension
+ * @param mass - Field mass parameter
+ * @param latticeDim - Number of active lattice dimensions
+ * @returns Raw k-space data arrays and normalization maxima
+ */
+export function computeRawKSpaceDataFromComplex(
+  phiComplex: Float64Array | Float32Array,
+  piComplex: Float64Array | Float32Array,
+  gridSize: readonly number[],
+  spacing: readonly number[],
+  mass: number,
+  latticeDim: number
+): KSpaceRawData {
+  const activeDims = gridSize.slice(0, latticeDim)
+  const totalSites = activeDims.reduce((a, b) => a * b, 1)
+
+  // Forward FFT (in-place)
+  fftNd(phiComplex, activeDims)
+  fftNd(piComplex, activeDims)
+
+  // Compute n_k per mode, tracking maxima for normalization
+  const nk = new Float64Array(totalSites)
+  const kMag = new Float64Array(totalSites)
+  const omegaArr = new Float64Array(totalSites)
+
+  let nkMax = 0
+  let kMagMax = 0
+  let omegaMax = 0
+
+  const strides = computeStrides(activeDims)
+  // Pre-allocate coords array to avoid per-site allocation
+  const coords = new Array<number>(latticeDim).fill(0)
+
+  for (let i = 0; i < totalSites; i++) {
+    linearToNDCoordsInto(i, activeDims, coords)
+    const omega = computeOmegaK(coords, activeDims, spacing, mass, latticeDim)
+
+    // |phi_k|^2 and |pi_k|^2
+    const phiRe = phiComplex[i * 2]!
+    const phiIm = phiComplex[i * 2 + 1]!
+    const piRe = piComplex[i * 2]!
+    const piIm = piComplex[i * 2 + 1]!
+    const phiKSq = phiRe * phiRe + phiIm * phiIm
+    const piKSq = piRe * piRe + piIm * piIm
+
     const omegaSafe = Math.max(omega, M_FLOOR)
     const nkVal = (piKSq + omegaSafe * omegaSafe * phiKSq) / (2 * omegaSafe * totalSites) - 0.5
 

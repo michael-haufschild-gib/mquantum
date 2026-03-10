@@ -2,10 +2,10 @@
  * TDSE Uniform struct for GPU compute shaders.
  *
  * Contains lattice parameters, physics constants, potential configuration,
- * drive parameters, absorber settings, display options, and basis vectors
- * for N-D to 3D projection.
+ * drive parameters, absorber settings, display options, basis vectors
+ * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 640 bytes (aligned to 16-byte boundaries).
+ * Total size: 688 bytes (aligned to 16-byte boundaries).
  *
  * @module
  */
@@ -21,8 +21,8 @@ struct TDSEUniforms {
   // Physics scalars (16 bytes)
   mass: f32,                 // offset 16
   stepsPerFrame: u32,        // offset 20
-  initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition)
-  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice)
+  initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton)
+  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 32
@@ -35,7 +35,7 @@ struct TDSEUniforms {
   packetWidth: f32,          // offset 272
   packetAmplitude: f32,      // offset 276
   boundingRadius: f32,       // offset 280
-  fieldView: u32,            // offset 284 (0=density, 1=phase, 2=current, 3=potential)
+  fieldView: u32,            // offset 284 (0=density, 1=phase, 2=current, 3=potential, 4=superfluidVelocity, 5=healingLength)
 
   // Potential parameters (32 bytes)
   barrierHeight: f32,        // offset 288
@@ -81,10 +81,14 @@ struct TDSEUniforms {
   // Display overlay (4 bytes)
   showPotential: u32,        // offset 616 (0=off, 1=on)
 
-  // Double well parameters: V(x) = λ(x² − a²)² − εx (12 bytes + 8 bytes padding)
+  // Double well parameters: V(x) = λ(x² − a²)² − εx (12 bytes)
   doubleWellLambda: f32,     // offset 620
   doubleWellSeparation: f32, // offset 624
   doubleWellAsymmetry: f32,  // offset 628
-  _pad: array<f32, 2>,       // offset 632 (pad to 640 bytes)
+  interactionStrength: f32,  // offset 632 (BEC: g|ψ|², 0 = linear TDSE)
+
+  // BEC trap anisotropy ratios ω_d/ω_0 per dimension (48 bytes + 4 bytes padding)
+  trapAnisotropy: array<f32, 12>, // offset 636 (used by becTrap potential type 9)
+  _pad: f32,                 // offset 684 (pad to 688 bytes)
 }
 `

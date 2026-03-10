@@ -48,6 +48,10 @@ export type ColorAlgorithm =
   | 'purityMap'
   | 'entropyMap'
   | 'coherenceMap'
+  | 'viridis'
+  | 'inferno'
+  | 'densityContours'
+  | 'phaseDensity'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -72,6 +76,10 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'purityMap' as const, label: 'Purity Map (Open Quantum)' },
   { value: 'entropyMap' as const, label: 'Entropy Map (Open Quantum)' },
   { value: 'coherenceMap' as const, label: 'Coherence Map (Open Quantum)' },
+  { value: 'viridis' as const, label: 'Viridis' },
+  { value: 'inferno' as const, label: 'Inferno' },
+  { value: 'densityContours' as const, label: 'Density Contours' },
+  { value: 'phaseDensity' as const, label: 'Phase-Density Composite' },
 ] as const
 
 /**
@@ -97,6 +105,10 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   purityMap: 16,
   entropyMap: 17,
   coherenceMap: 18,
+  viridis: 19,
+  inferno: 20,
+  densityContours: 21,
+  phaseDensity: 22,
 }
 
 /**
@@ -258,19 +270,42 @@ export function getAvailableColorAlgorithms(
     'coherenceMap',
   ])
 
-  if (quantumMode === 'freeScalarField') {
-    // Exclude algorithms that require continuous complex phase — free scalar field
-    // stores sign-proxy phase (0 or π), so phase-dependent coloring degenerates
-    const excluded = new Set<string>([
-      'phase',
-      'mixed',
-      'phaseCyclicUniform',
-      'domainColoringPsi',
-      'relativePhase',
+  // TDSE / BEC compute modes render into a density grid texture
+  // (R=density, G=logDensity, B=phase, A=potOverlay). Only algorithms that read
+  // from the grid's R/B channels produce meaningful coloring. Geometric algorithms
+  // (lch, radial, multiSource, radialDistance, phase, mixed) color by world-space
+  // position and silently fall back to blackbody — remove them from the dropdown.
+  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
+    const computeValidAlgos = new Set<string>([
+      'blackbody',          // R (density) → heat ramp
+      'phaseCyclicUniform', // B (phase) → perceptual cyclic hue
+      'phaseDiverging',     // B (phase) → signed diverging
+      'diverging',          // B (phase) → zero-centered Re/Im
+      'domainColoringPsi',  // R+B (density + phase) → domain coloring
+      'viridis',            // R (density) → perceptually uniform scientific ramp
+      'inferno',            // R (density) → high-contrast scientific ramp
+      'densityContours',    // R (density) → viridis + isodensity contour lines
+      'phaseDensity',       // R+B (density + phase) → hue=phase, brightness=density
     ])
-    return COLOR_ALGORITHM_OPTIONS.filter(
-      (opt) => !excluded.has(opt.value) && !openQuantumAlgos.has(opt.value)
-    )
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
+  }
+
+  if (quantumMode === 'freeScalarField') {
+    // Free scalar has sign-proxy phase (0 or π) — exclude continuous-phase algorithms.
+    // Also include educational analysis algorithms unique to this mode.
+    const computeValidAlgos = new Set<string>([
+      'blackbody',
+      'phaseDiverging',
+      'diverging',
+      'viridis',
+      'inferno',
+      'densityContours',
+      'hamiltonianDecomposition',
+      'modeCharacter',
+      'energyFlux',
+      'kSpaceOccupation',
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
   }
 
   // Phase-dependent algorithms — meaningless in density matrix mode because the

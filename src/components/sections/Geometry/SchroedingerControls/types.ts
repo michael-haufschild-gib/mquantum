@@ -196,3 +196,42 @@ export interface TdseControlsProps {
   dimension: number
   actions: TdseActions
 }
+
+/**
+ * Actions interface for BEC controls (maps store setters to shorter names)
+ */
+export interface BecActions {
+  setInteractionStrength: ExtendedObjectState['setBecInteractionStrength']
+  setTrapOmega: ExtendedObjectState['setBecTrapOmega']
+  setTrapAnisotropy: ExtendedObjectState['setBecTrapAnisotropy']
+  setInitialCondition: ExtendedObjectState['setBecInitialCondition']
+  setFieldView: ExtendedObjectState['setBecFieldView']
+  setVortexCharge: ExtendedObjectState['setBecVortexCharge']
+  setVortexLatticeCount: ExtendedObjectState['setBecVortexLatticeCount']
+  setSolitonDepth: ExtendedObjectState['setBecSolitonDepth']
+  setSolitonVelocity: ExtendedObjectState['setBecSolitonVelocity']
+  setAutoScale: ExtendedObjectState['setBecAutoScale']
+  setAbsorberEnabled: ExtendedObjectState['setBecAbsorberEnabled']
+  setAbsorberWidth: ExtendedObjectState['setBecAbsorberWidth']
+  setAbsorberStrength: ExtendedObjectState['setBecAbsorberStrength']
+  setDiagnosticsEnabled: ExtendedObjectState['setBecDiagnosticsEnabled']
+  setDiagnosticsInterval: ExtendedObjectState['setBecDiagnosticsInterval']
+  setDt: ExtendedObjectState['setBecDt']
+  setStepsPerFrame: ExtendedObjectState['setBecStepsPerFrame']
+  setMass: ExtendedObjectState['setBecMass']
+  setHbar: ExtendedObjectState['setBecHbar']
+  setGridSize: ExtendedObjectState['setBecGridSize']
+  setSpacing: ExtendedObjectState['setBecSpacing']
+  setSlicePosition: ExtendedObjectState['setBecSlicePosition']
+  applyPreset: ExtendedObjectState['applyBecPreset']
+  resetField: ExtendedObjectState['resetBecField']
+}
+
+/**
+ * Props for BEC Controls
+ */
+export interface BecControlsProps {
+  config: SchroedingerConfig
+  dimension: number
+  actions: BecActions
+}

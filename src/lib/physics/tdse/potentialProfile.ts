@@ -171,6 +171,38 @@ export function samplePotentialProfile(
 }
 
 /**
+ * Return the characteristic potential scale for the active type.
+ * Used to set meaningful y-axis bounds in the energy diagram —
+ * unbounded potentials (harmonic, doubleWell) diverge at the grid edges,
+ * so we clip the plot to the barrier/well scale instead.
+ */
+export function getPotentialPlotScale(config: TdseConfig): number {
+  switch (config.potentialType) {
+    case 'barrier':
+    case 'driven':
+      return Math.max(config.barrierHeight, 1)
+    case 'step':
+      return Math.max(config.stepHeight, 1)
+    case 'finiteWell':
+      return Math.max(config.wellDepth, 1)
+    case 'harmonicTrap': {
+      const r = (config.gridSize[0] ?? 64) * (config.spacing[0] ?? 0.1) * 0.25
+      return Math.max(0.5 * config.mass * config.harmonicOmega ** 2 * r ** 2, 1)
+    }
+    case 'doubleSlit':
+      return Math.max(config.wallHeight, 1)
+    case 'periodicLattice':
+      return Math.max(config.latticeDepth, 1)
+    case 'doubleWell': {
+      const a2 = config.doubleWellSeparation ** 2
+      return Math.max(config.doubleWellLambda * a2 * a2, 1)
+    }
+    default:
+      return 1
+  }
+}
+
+/**
  * Compute kinetic energy of the initial wavepacket.
  * E_kinetic = ℏ² |k₀|² / (2m)
  */

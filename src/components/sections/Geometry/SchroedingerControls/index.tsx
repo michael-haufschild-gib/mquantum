@@ -25,8 +25,10 @@ import { FreeScalarFieldControls } from './FreeScalarFieldControls'
 import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { TDSEControls } from './TDSEControls'
+import { BECControls } from './BECControls'
 import { WignerControls } from './WignerControls'
 import type {
+  BecActions,
   FreeScalarFieldActions,
   HarmonicOscillatorActions,
   HydrogenNDActions,
@@ -157,6 +159,31 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setTdseSlicePosition: state.setTdseSlicePosition,
       applyTdsePreset: state.applyTdsePreset,
       resetTdseField: state.resetTdseField,
+      // BEC dynamics actions
+      setBecInteractionStrength: state.setBecInteractionStrength,
+      setBecTrapOmega: state.setBecTrapOmega,
+      setBecTrapAnisotropy: state.setBecTrapAnisotropy,
+      setBecInitialCondition: state.setBecInitialCondition,
+      setBecFieldView: state.setBecFieldView,
+      setBecVortexCharge: state.setBecVortexCharge,
+      setBecVortexLatticeCount: state.setBecVortexLatticeCount,
+      setBecSolitonDepth: state.setBecSolitonDepth,
+      setBecSolitonVelocity: state.setBecSolitonVelocity,
+      setBecAutoScale: state.setBecAutoScale,
+      setBecAbsorberEnabled: state.setBecAbsorberEnabled,
+      setBecAbsorberWidth: state.setBecAbsorberWidth,
+      setBecAbsorberStrength: state.setBecAbsorberStrength,
+      setBecDiagnosticsEnabled: state.setBecDiagnosticsEnabled,
+      setBecDiagnosticsInterval: state.setBecDiagnosticsInterval,
+      setBecDt: state.setBecDt,
+      setBecStepsPerFrame: state.setBecStepsPerFrame,
+      setBecMass: state.setBecMass,
+      setBecHbar: state.setBecHbar,
+      setBecGridSize: state.setBecGridSize,
+      setBecSpacing: state.setBecSpacing,
+      setBecSlicePosition: state.setBecSlicePosition,
+      applyBecPreset: state.applyBecPreset,
+      resetBecField: state.resetBecField,
     }))
     const {
       config,
@@ -255,6 +282,31 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setTdseSlicePosition,
       applyTdsePreset,
       resetTdseField,
+      // BEC dynamics actions
+      setBecInteractionStrength,
+      setBecTrapOmega,
+      setBecTrapAnisotropy,
+      setBecInitialCondition,
+      setBecFieldView,
+      setBecVortexCharge,
+      setBecVortexLatticeCount,
+      setBecSolitonDepth,
+      setBecSolitonVelocity,
+      setBecAutoScale,
+      setBecAbsorberEnabled,
+      setBecAbsorberWidth,
+      setBecAbsorberStrength,
+      setBecDiagnosticsEnabled,
+      setBecDiagnosticsInterval,
+      setBecDt,
+      setBecStepsPerFrame,
+      setBecMass,
+      setBecHbar,
+      setBecGridSize,
+      setBecSpacing,
+      setBecSlicePosition,
+      applyBecPreset,
+      resetBecField,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Get current dimension to show/hide dimension-specific controls
@@ -264,6 +316,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdseDynamics = config.quantumMode === 'tdseDynamics'
+    const isBecDynamics = config.quantumMode === 'becDynamics'
 
     // Build action objects for child components
     const harmonicActions: HarmonicOscillatorActions = {
@@ -366,10 +419,37 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       resetField: resetTdseField,
     }
 
+    const becActions: BecActions = {
+      setInteractionStrength: setBecInteractionStrength,
+      setTrapOmega: setBecTrapOmega,
+      setTrapAnisotropy: setBecTrapAnisotropy,
+      setInitialCondition: setBecInitialCondition,
+      setFieldView: setBecFieldView,
+      setVortexCharge: setBecVortexCharge,
+      setVortexLatticeCount: setBecVortexLatticeCount,
+      setSolitonDepth: setBecSolitonDepth,
+      setSolitonVelocity: setBecSolitonVelocity,
+      setAutoScale: setBecAutoScale,
+      setAbsorberEnabled: setBecAbsorberEnabled,
+      setAbsorberWidth: setBecAbsorberWidth,
+      setAbsorberStrength: setBecAbsorberStrength,
+      setDiagnosticsEnabled: setBecDiagnosticsEnabled,
+      setDiagnosticsInterval: setBecDiagnosticsInterval,
+      setDt: setBecDt,
+      setStepsPerFrame: setBecStepsPerFrame,
+      setMass: setBecMass,
+      setHbar: setBecHbar,
+      setGridSize: setBecGridSize,
+      setSpacing: setBecSpacing,
+      setSlicePosition: setBecSlicePosition,
+      applyPreset: applyBecPreset,
+      resetField: resetBecField,
+    }
+
     return (
       <div className={className} data-testid="schroedinger-controls">
         {/* Representation Selection — hidden for compute modes (free scalar / TDSE) */}
-        {!isFreeScalarField && !isTdseDynamics && (
+        {!isFreeScalarField && !isTdseDynamics && !isBecDynamics && (
           <Section title="Representation" defaultOpen={true}>
             <div className="space-y-3">
               <ToggleGroup
@@ -435,8 +515,10 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         )}
 
         {/* Quantum State / Field Config Section - content depends on mode */}
-        <Section title={isFreeScalarField || isTdseDynamics ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
-          {isTdseDynamics ? (
+        <Section title={isFreeScalarField || isTdseDynamics || isBecDynamics ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
+          {isBecDynamics ? (
+            <BECControls config={config} dimension={dimension} actions={becActions} />
+          ) : isTdseDynamics ? (
             <TDSEControls config={config} dimension={dimension} actions={tdseActions} />
           ) : isFreeScalarField ? (
             <FreeScalarFieldControls config={config} dimension={dimension} actions={freeScalarActions} />
@@ -467,6 +549,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
               {config.tdse.latticeDim}D TDSE, {config.tdse.gridSize.slice(0, config.tdse.latticeDim).join('\u00D7')} sites
             </p>
           )}
+          {isBecDynamics && (
+            <p className="text-text-tertiary mt-1">
+              {config.bec.latticeDim}D BEC (GPE), {config.bec.gridSize.slice(0, config.bec.latticeDim).join('\u00D7')} sites
+            </p>
+          )}
         </div>
       </div>
     )
@@ -476,6 +563,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 SchroedingerControls.displayName = 'SchroedingerControls'
 
 // Re-export sub-components for direct imports if needed
+export { BECControls } from './BECControls'
 export { FreeScalarFieldControls } from './FreeScalarFieldControls'
 export { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 export { HydrogenNDControls } from './HydrogenNDControls'

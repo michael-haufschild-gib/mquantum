@@ -308,6 +308,88 @@ const ALGO_BRANCH: Record<number, string> = {
     let saturation = mix(0.6, 0.92, coherence);
     let lightness = mix(0.10, 0.50, normalized);
     col = hsl2rgb(hue, saturation, lightness);`,
+
+  // ===== SCIENTIFIC COLORMAPS (density grid modes: TDSE / BEC) =====
+
+  19: /* wgsl */ `
+    // 19: Viridis — perceptually uniform, colorblind-safe scientific colormap
+    // Attempt to match matplotlib's viridis: dark purple → teal → yellow
+    // 5-stop piecewise-linear approximation in linear RGB
+    let t = clamp(normalized, 0.0, 1.0);
+    var vr: f32; var vg: f32; var vb: f32;
+    if (t < 0.25) {
+      let u = t / 0.25;
+      vr = mix(0.267, 0.282, u); vg = mix(0.004, 0.140, u); vb = mix(0.329, 0.457, u);
+    } else if (t < 0.5) {
+      let u = (t - 0.25) / 0.25;
+      vr = mix(0.282, 0.127, u); vg = mix(0.140, 0.566, u); vb = mix(0.457, 0.550, u);
+    } else if (t < 0.75) {
+      let u = (t - 0.5) / 0.25;
+      vr = mix(0.127, 0.741, u); vg = mix(0.566, 0.873, u); vb = mix(0.550, 0.150, u);
+    } else {
+      let u = (t - 0.75) / 0.25;
+      vr = mix(0.741, 0.993, u); vg = mix(0.873, 0.906, u); vb = mix(0.150, 0.144, u);
+    }
+    col = vec3f(vr, vg, vb);`,
+
+  20: /* wgsl */ `
+    // 20: Inferno — high-contrast scientific colormap, resolves low-density features
+    // 5-stop piecewise-linear: black → dark purple → red-orange → yellow → white
+    let t = clamp(normalized, 0.0, 1.0);
+    var ir: f32; var ig: f32; var ib: f32;
+    if (t < 0.25) {
+      let u = t / 0.25;
+      ir = mix(0.001, 0.258, u); ig = mix(0.000, 0.039, u); ib = mix(0.014, 0.406, u);
+    } else if (t < 0.5) {
+      let u = (t - 0.25) / 0.25;
+      ir = mix(0.258, 0.865, u); ig = mix(0.039, 0.138, u); ib = mix(0.406, 0.082, u);
+    } else if (t < 0.75) {
+      let u = (t - 0.5) / 0.25;
+      ir = mix(0.865, 0.987, u); ig = mix(0.138, 0.645, u); ib = mix(0.082, 0.040, u);
+    } else {
+      let u = (t - 0.75) / 0.25;
+      ir = mix(0.987, 0.988, u); ig = mix(0.645, 0.998, u); ib = mix(0.040, 0.645, u);
+    }
+    col = vec3f(ir, ig, ib);`,
+
+  21: /* wgsl */ `
+    // 21: Density Contours — isodensity contour lines on density colormap
+    // Topographic-style visualization showing quantized density levels.
+    // Useful for verifying Thomas-Fermi profiles, soliton notch depths, vortex cores.
+    let t = clamp(normalized, 0.0, 1.0);
+    // Base color: viridis-style ramp
+    var vr: f32; var vg: f32; var vb: f32;
+    if (t < 0.25) {
+      let u = t / 0.25;
+      vr = mix(0.267, 0.282, u); vg = mix(0.004, 0.140, u); vb = mix(0.329, 0.457, u);
+    } else if (t < 0.5) {
+      let u = (t - 0.25) / 0.25;
+      vr = mix(0.282, 0.127, u); vg = mix(0.140, 0.566, u); vb = mix(0.457, 0.550, u);
+    } else if (t < 0.75) {
+      let u = (t - 0.5) / 0.25;
+      vr = mix(0.127, 0.741, u); vg = mix(0.566, 0.873, u); vb = mix(0.550, 0.150, u);
+    } else {
+      let u = (t - 0.75) / 0.25;
+      vr = mix(0.741, 0.993, u); vg = mix(0.873, 0.906, u); vb = mix(0.150, 0.144, u);
+    }
+    col = vec3f(vr, vg, vb);
+    // Overlay contour lines at 10 evenly-spaced density levels
+    let contourT = fract(t * 10.0);
+    let lineDistance = min(contourT, 1.0 - contourT);
+    let lineMask = 1.0 - smoothstep(0.03, 0.06, lineDistance);
+    col *= (1.0 - 0.7 * lineMask);`,
+
+  22: /* wgsl */ `
+    // 22: Phase-Density Composite — hue=phase, brightness=density
+    // Simultaneously shows condensate shape and phase structure.
+    // Vortex cores appear dark (zero density) with phase winding (hue rotation).
+    // Solitons appear as dark bands with π phase jump across the notch.
+    let phaseNorm = fract((phase + PI) / TAU);
+    let brightness = clamp(normalized, 0.0, 1.0);
+    // Use higher saturation at higher density for visual clarity
+    let saturation = mix(0.3, 0.95, brightness);
+    let lightness = brightness * 0.55;
+    col = hsl2rgb(phaseNorm, saturation, lightness);`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -331,6 +413,10 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   16: 'Purity Map',
   17: 'Entropy Map',
   18: 'Coherence Map',
+  19: 'Viridis',
+  20: 'Inferno',
+  21: 'Density Contours',
+  22: 'Phase-Density',
 }
 
 export { ALGO_BRANCH, COLOR_ALG_NAMES }

@@ -25,13 +25,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let V = potential[idx];
-  let phase = -V * params.dt / (2.0 * params.hbar);
-  let cosP = cos(phase);
-  let sinP = sin(phase);
-
   let re = psiRe[idx];
   let im = psiIm[idx];
+
+  // Effective potential: V(x) + g|ψ|² (GPE nonlinear term; g=0 for linear TDSE)
+  let density = re * re + im * im;
+  let effectiveV = potential[idx] + params.interactionStrength * density;
+
+  let phase = -effectiveV * params.dt / (2.0 * params.hbar);
+  let cosP = cos(phase);
+  let sinP = sin(phase);
 
   // Complex rotation: (re + i*im) * (cosP + i*sinP)
   psiRe[idx] = re * cosP - im * sinP;

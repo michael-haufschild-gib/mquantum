@@ -14,6 +14,7 @@
  *   6 = doubleSlit (barrier wall with two slit openings along axis 1)
  *   7 = periodicLattice (cosine lattice V₀cos²(πx/a) along axis 0)
  *   8 = doubleWell (quartic V(x) = λ(x² − a²)² − εx along axis 0)
+ *   9 = becTrap (anisotropic harmonic trap for BEC, ratios via kGridScale)
  *
  * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
@@ -128,6 +129,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let eps = params.doubleWellAsymmetry;
     let x2_minus_a2 = pos0 * pos0 - a * a;
     V = lam * x2_minus_a2 * x2_minus_a2 - eps * pos0;
+  } else if (params.potentialType == 9u) {
+    // Anisotropic BEC trap: V = 0.5 * m * Σ(ω_d² * x_d²)
+    // Trap anisotropy ratios stored in trapAnisotropy[d] = ω_d / ω_0
+    var r2a: f32 = 0.0;
+    for (var da: u32 = 0u; da < params.latticeDim; da++) {
+      let posa = (f32(coords[da]) - f32(params.gridSize[da]) * 0.5 + 0.5) * params.spacing[da];
+      let omega_d = params.harmonicOmega * params.trapAnisotropy[da];
+      r2a += omega_d * omega_d * posa * posa;
+    }
+    V = 0.5 * params.mass * r2a;
   }
 
   potential[idx] = V;

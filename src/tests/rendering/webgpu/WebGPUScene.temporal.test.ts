@@ -212,7 +212,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(renderer.rendererConfig?.colorAlgorithm).toBe(10)
   })
 
-  it('falls back kSpaceOccupation to diverging for non-free-scalar modes', async () => {
+  it('falls back kSpaceOccupation to radialDistance for non-free-scalar modes', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
@@ -227,10 +227,10 @@ describe('WebGPUScene temporal reprojection wiring', () => {
       throw new Error('Expected Schrödinger renderer to be created')
     }
 
-    expect(renderer.rendererConfig?.colorAlgorithm).toBe(9)
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(11)
   })
 
-  it('falls back relativePhase to diverging in free scalar mode', async () => {
+  it('falls back relativePhase to radialDistance in free scalar mode', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
@@ -245,7 +245,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
       throw new Error('Expected Schrödinger renderer to be created')
     }
 
-    expect(renderer.rendererConfig?.colorAlgorithm).toBe(9)
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(11)
   })
 
   it('keeps kSpaceOccupation in free scalar mode', async () => {

@@ -106,7 +106,7 @@ export type SchroedingerRenderStyle = 'rayMarching'
  * - hydrogenND: N-dimensional hydrogen orbital (hybrid: Y_lm for first 3D + HO for extra dims)
  * - freeScalarField: Real Klein-Gordon scalar field on a 1D-3D spatial lattice with leapfrog evolution
  */
-export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
+export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
 
 /**
  * Which field quantity to visualize for the free scalar field mode
@@ -271,7 +271,7 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
  * - current: Probability current j = Im(psi* grad psi) / m
  * - potential: External potential V(x)
  */
-export type TdseFieldView = 'density' | 'phase' | 'current' | 'potential'
+export type TdseFieldView = 'density' | 'phase' | 'current' | 'potential' | 'superfluidVelocity' | 'healingLength'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -279,7 +279,7 @@ export type TdseFieldView = 'density' | 'phase' | 'current' | 'potential'
  * - planeWave: Plane wave exp(i*k0.x) with Gaussian envelope
  * - superposition: Sum of two Gaussian wavepackets
  */
-export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superposition'
+export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superposition' | 'thomasFermi' | 'vortexImprint' | 'vortexLattice' | 'darkSoliton'
 
 /**
  * External potential type for the TDSE
@@ -291,8 +291,10 @@ export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superpositi
  * - driven: Time-dependent driven potential
  * - doubleSlit: Two slits in a barrier wall (2D)
  * - periodicLattice: Cosine lattice V₀cos²(πx/a)
+ * - doubleWell: Quartic double-well V(x) = λ(x²−a²)² − εx
+ * - becTrap: BEC anisotropic harmonic trap (per-dimension ω ratios via trapAnisotropy)
  */
-export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven' | 'doubleSlit' | 'periodicLattice' | 'doubleWell'
+export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven' | 'doubleSlit' | 'periodicLattice' | 'doubleWell' | 'becTrap'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -410,6 +412,15 @@ export interface TdseConfig {
   needsReset: boolean
   /** Slice positions for extra dimensions (d>3) — length equals max(0, latticeDim - 3) */
   slicePositions: number[]
+
+  /** BEC interaction strength g|ψ|² (0 = linear TDSE, >0 = repulsive GPE, <0 = attractive).
+   *  Set by the renderer when routing BEC config through the TDSE compute pass. */
+  interactionStrength?: number
+
+  /** Per-dimension trap anisotropy ratios for BEC mode (length up to 12).
+   *  Each entry scales harmonicOmega along that axis: ω_d = trapAnisotropy[d] * harmonicOmega.
+   *  Defaults to 1.0 for all dimensions when not specified. */
+  trapAnisotropy?: number[]
 }
 
 /**
@@ -471,6 +482,120 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
 
   needsReset: false,
   slicePositions: [],
+}
+
+/**
+ * BEC initial condition type.
+ * - thomasFermi: Ground state in Thomas-Fermi approximation (inverted parabola)
+ * - gaussianPacket: Standard Gaussian (same as TDSE)
+ * - vortexImprint: Thomas-Fermi with a phase-imprinted vortex at center
+ * - vortexLattice: Thomas-Fermi with an array of imprinted vortices
+ * - darkSoliton: Thomas-Fermi with a density dip (phase step) along axis 0
+ */
+export type BecInitialCondition =
+  | 'thomasFermi'
+  | 'gaussianPacket'
+  | 'vortexImprint'
+  | 'vortexLattice'
+  | 'darkSoliton'
+
+/**
+ * BEC field view type.
+ * - density: |ψ|²
+ * - phase: arg(ψ)
+ * - current: Probability current j = Im(ψ* ∇ψ) / m
+ * - potential: External potential V(x) (trap shape)
+ * - superfluidVelocity: v_s = (ℏ/m) ∇arg(ψ), shows vortex flow
+ * - healingLength: local ξ(x) = ℏ/√(2m·g·|ψ|²)
+ */
+export type BecFieldView = 'density' | 'phase' | 'current' | 'potential' | 'superfluidVelocity' | 'healingLength'
+
+/**
+ * Configuration for the BEC (Gross-Pitaevskii) solver.
+ */
+export interface BecConfig {
+  // === Lattice ===
+  /** Spatial dimensionality (2-11, synced from global dimension) */
+  latticeDim: number
+  /** Grid points per dimension (power of 2, shares TDSE FFT requirement) */
+  gridSize: number[]
+  /** Grid spacing per dimension */
+  spacing: number[]
+
+  // === Physics ===
+  /** Particle mass */
+  mass: number
+  /** Reduced Planck constant */
+  hbar: number
+  /** Time step */
+  dt: number
+  /** Sub-steps per frame */
+  stepsPerFrame: number
+  /** Nonlinear interaction strength g̃ = g·N */
+  interactionStrength: number
+
+  // === Trap ===
+  /** Trap frequency ω (isotropic harmonic trap) */
+  trapOmega: number
+  /** Anisotropy ratios per dimension (ω_d / ω_0) — length matches latticeDim */
+  trapAnisotropy: number[]
+
+  // === Initial condition ===
+  initialCondition: BecInitialCondition
+  /** Vortex charge for vortexImprint (integer, typically ±1 or ±2) */
+  vortexCharge: number
+  /** Number of vortices in lattice arrangement for vortexLattice */
+  vortexLatticeCount: number
+  /** Soliton depth for darkSoliton (0-1, fraction of background density) */
+  solitonDepth: number
+  /** Soliton velocity for darkSoliton (fraction of sound speed) */
+  solitonVelocity: number
+
+  // === Display ===
+  fieldView: BecFieldView
+  /** Auto-scale density normalization */
+  autoScale: boolean
+
+  // === Absorber ===
+  absorberEnabled: boolean
+  absorberWidth: number
+  absorberStrength: number
+
+  // === Diagnostics ===
+  diagnosticsEnabled: boolean
+  diagnosticsInterval: number
+
+  // === Runtime ===
+  needsReset: boolean
+  /** Slice positions for dimensions > 3 */
+  slicePositions: number[]
+}
+
+export const DEFAULT_BEC_CONFIG: BecConfig = {
+  latticeDim: 3,
+  gridSize: [64, 64, 64],
+  spacing: [0.15, 0.15, 0.15],
+  mass: 1.0,
+  hbar: 1.0,
+  dt: 0.002,
+  stepsPerFrame: 4,
+  interactionStrength: 500.0,
+  trapOmega: 1.0,
+  trapAnisotropy: [1.0, 1.0, 1.0],
+  initialCondition: 'thomasFermi',
+  vortexCharge: 1,
+  vortexLatticeCount: 4,
+  solitonDepth: 1.0,
+  solitonVelocity: 0.0,
+  fieldView: 'density',
+  autoScale: true,
+  absorberEnabled: false,
+  absorberWidth: 0.1,
+  absorberStrength: 5.0,
+  diagnosticsEnabled: true,
+  diagnosticsInterval: 5,
+  needsReset: true,
+  slicePositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 }
 
 /**
@@ -897,6 +1022,10 @@ export interface SchroedingerConfig {
   /** Time-dependent Schroedinger equation solver configuration */
   tdse: TdseConfig
 
+  // === BEC Configuration (when quantumMode === 'becDynamics') ===
+  /** Gross-Pitaevskii condensate configuration */
+  bec: BecConfig
+
   // === N-D Basis Vectors (for free scalar field and TDSE) ===
   /** Basis vector for X axis in N-dimensional space */
   basisX: Float32Array
@@ -1124,6 +1253,9 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
 
   // TDSE
   tdse: DEFAULT_TDSE_CONFIG,
+
+  // BEC
+  bec: DEFAULT_BEC_CONFIG,
 
   // N-D Basis Vectors
   basisX: new Float32Array([1, 0, 0]),

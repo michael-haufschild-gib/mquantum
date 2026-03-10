@@ -49,6 +49,10 @@ fn getPotentialScale() -> f32 {
     // doubleWell — barrier height is λa⁴
     let a2 = params.doubleWellSeparation * params.doubleWellSeparation;
     return max(params.doubleWellLambda * a2 * a2, 1.0);
+  } else if (params.potentialType == 9u) {
+    // becTrap — anisotropic harmonic, scale by V at half bounding radius
+    let r = params.boundingRadius * 0.5;
+    return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
   }
   return 1.0;
 }
@@ -112,13 +116,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let phase = atan2(im, re) + 3.14159265;
 
   // Encode selected field into display scalar [0,1] for the density-grid contract.
+  // Density gate: smooth mask that fades to 0 where |ψ|² is negligible.
+  // This prevents vacuum regions from filling the bounding box for derived fields
+  // (phase, current, velocity, healing length) that are undefined or noisy at |ψ|²≈0.
+  let normDensityRaw = select(density / params.maxDensity, 0.0, params.maxDensity <= 0.0);
+  let densityGate = smoothstep(0.0, 0.02, normDensityRaw);
+
   var displayScalar: f32 = 0.0;
   if (params.fieldView == 0u) {
-    // density
-    displayScalar = select(density / params.maxDensity, density, params.maxDensity <= 0.0);
+    // density — no gate needed, naturally 0 in vacuum
+    displayScalar = normDensityRaw;
   } else if (params.fieldView == 1u) {
-    // phase
-    displayScalar = phase / (2.0 * 3.14159265);
+    // phase — gate by density to avoid atan2(0,0) noise in vacuum
+    displayScalar = phase / (2.0 * 3.14159265) * densityGate;
   } else if (params.fieldView == 2u) {
     // current magnitude — compute probability current j via central differences
     // j_d = (hbar / m) * Im(conj(psi) * d_d psi)
@@ -139,11 +149,50 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let jd = hbarOverM * (re * dIm - im * dRe);
       currentMagSq += jd * jd;
     }
-    displayScalar = 1.0 - exp(-sqrt(currentMagSq));
-  } else {
-    // potential
+    // Gate by density: j is only meaningful inside the condensate
+    displayScalar = (1.0 - exp(-sqrt(currentMagSq))) * densityGate;
+  } else if (params.fieldView == 4u) {
+    // superfluid velocity magnitude: v_s = (hbar/m) * Im(ψ*∇ψ) / |ψ|²
+    let hbarOverM = params.hbar / max(params.mass, 1e-6);
+    var vsqMag: f32 = 0.0;
+    let densitySafe = max(density, 1e-20);
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      if (params.gridSize[d] <= 1u) { continue; }
+      let stride = params.strides[d];
+      let coord = coords[d];
+      let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
+      let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
+      let invDx = 0.5 / params.spacing[d];
+      let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+      let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      let jd = hbarOverM * (re * dIm - im * dRe);
+      let vsd = jd / densitySafe;
+      vsqMag += vsd * vsd;
+    }
+    // Normalize by peak sound speed (at maxDensity) for stable mapping across the condensate.
+    // Using local c_s diverges in vacuum; using peak c_s gives uniform reference scale.
+    let cs2Peak = max(abs(params.interactionStrength) * params.maxDensity / max(params.mass, 1e-6), 1e-10);
+    displayScalar = clamp(sqrt(vsqMag) / sqrt(cs2Peak), 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 5u) {
+    // healing length: ξ(x) = hbar / sqrt(2 * m * g * |ψ|²)
+    // Map: small ξ (dense core) → high value, large ξ (edge) → low value
+    let absG = max(abs(params.interactionStrength), 1e-10);
+    let denom = 2.0 * params.mass * absG * max(density, 1e-20);
+    let xi = params.hbar / sqrt(denom);
+    // Reference: ξ at peak density (smallest physical healing length)
+    let xiRef = params.hbar / sqrt(2.0 * params.mass * absG * max(params.maxDensity, 1e-10));
+    // Invert: dense core (ξ ≈ ξ_ref) → 1.0, edge (ξ >> ξ_ref) → 0.0
+    displayScalar = clamp(xiRef / max(xi, 1e-10), 0.0, 1.0) * densityGate;
+  } else if (params.fieldView == 3u) {
+    // potential — gate so only the region inside/near the condensate shows the trap
     let potentialScale = getPotentialScale();
-    displayScalar = 0.5 + 0.5 * tanh(potentialVal / potentialScale);
+    let normPot = clamp(potentialVal / potentialScale, -1.0, 1.0);
+    // Map: V=0 → 0.5, V=scale → 1.0, showing trap shape within the condensate
+    // Use wider gate (extends beyond condensate edge to show the trap walls)
+    let potGate = smoothstep(0.0, 0.5, 1.0 - abs(potentialVal) / (potentialScale * 3.0));
+    displayScalar = (0.5 + 0.5 * normPot) * max(densityGate, potGate);
+  } else {
+    displayScalar = 0.0;
   }
 
   let normDensity = clamp(displayScalar, 0.0, 1.0);
@@ -163,7 +212,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // regions — full overlay is fine. Smooth/unbounded potentials span many voxels
     // and need reduced gain to prevent volumetric saturation.
     var overlayGain: f32 = 1.0;
-    if (params.potentialType == 4u || params.potentialType == 8u) {
+    if (params.potentialType == 4u || params.potentialType == 8u || params.potentialType == 9u) {
       overlayGain = 0.03;
     }
     potOverlay = clamp(normPot, 0.0, 1.0) * fadeout * overlayGain;

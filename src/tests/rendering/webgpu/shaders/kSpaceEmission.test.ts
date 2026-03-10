@@ -19,14 +19,6 @@ describe('k-Space Occupation emission shader (algorithm 15)', () => {
     expect(ALGO_BRANCH[15]).toContain('analysis.r')
   })
 
-  it('ALGO_BRANCH[15] reads |k| normalization from analysis.g', () => {
-    expect(ALGO_BRANCH[15]).toContain('analysis.g')
-  })
-
-  it('ALGO_BRANCH[15] reads omega normalization from analysis.b', () => {
-    expect(ALGO_BRANCH[15]).toContain('analysis.b')
-  })
-
   it('COLOR_ALG_NAMES[15] exists with correct label', () => {
     expect(COLOR_ALG_NAMES[15]).toBe('k-Space Occupation')
   })

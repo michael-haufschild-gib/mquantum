@@ -1744,7 +1744,7 @@ export interface PassConfig {
   frameBlendingEnabled: boolean
   // Schrodinger isosurface mode (compile-time shader selection)
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
@@ -1774,7 +1774,7 @@ export interface PassConfig {
 interface SchrodingerPassConfig {
   objectType: ObjectType
   dimension: number
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   colorAlgorithm: PaletteColorAlgorithm
   isosurface: boolean
@@ -1819,9 +1819,10 @@ function normalizeColorAlgorithmForQuantumMode(
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isFreeScalar = config.quantumMode === 'freeScalarField'
   const isTdse = config.quantumMode === 'tdseDynamics'
-  // Both free scalar and TDSE use GPU compute pipelines with density grid output,
+  const isBec = config.quantumMode === 'becDynamics'
+  // Free scalar, TDSE, and BEC use GPU compute pipelines with density grid output,
   // so they disable analytic-only features and force position representation.
-  const isComputeMode = isFreeScalar || isTdse
+  const isComputeMode = isFreeScalar || isTdse || isBec
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,

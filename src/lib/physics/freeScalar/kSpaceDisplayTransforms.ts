@@ -11,6 +11,8 @@ import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   OUTPUT_GRID_SIZE,
   packRGBA16F,
+  packRG16F,
+  packR16F,
   linearToNDCoords,
   ndToLinearIdx,
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
@@ -80,6 +82,7 @@ export function projectToDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConfig
 /**
  * Direct 3D projection for latticeDim <= 3.
  * Maps each 64^3 output voxel to its corresponding k-space mode.
+ * Uses pre-allocated coordinate arrays to avoid per-voxel heap allocation.
  */
 function projectDirect3D(
   raw: KSpaceRawData,
@@ -101,40 +104,79 @@ function projectDirect3D(
     activeDims[2] ?? 1,
   ]
 
+  // Pre-compute offsets and centers (invariant across voxels)
+  const offsets = [0, 0, 0]
+  const centers = [0, 0, 0]
+  const halfN = [0, 0, 0]
+  for (let d = 0; d < 3; d++) {
+    const N = gridDims[d]!
+    offsets[d] = Math.floor((G - N) / 2)
+    centers[d] = Math.floor(G / 2)
+    halfN[d] = Math.floor(N / 2)
+  }
+
+  // Pre-allocated coordinate array (reused across all voxels)
+  const kCoords = [0, 0, 0]
+
   for (let oz = 0; oz < G; oz++) {
     for (let oy = 0; oy < G; oy++) {
       for (let ox = 0; ox < G; ox++) {
         const outIdx = (oz * G + oy) * G + ox
-        const outCoords = [ox, oy, oz]
+        const outCoords0 = ox
+        const outCoords1 = oy
+        const outCoords2 = oz
 
         let valid = true
-        const kCoords: number[] = []
 
-        for (let d = 0; d < 3; d++) {
-          const N = gridDims[d]!
-          if (N <= 1) {
-            kCoords.push(0)
-            const center = Math.floor(G / 2)
-            if (Math.abs(outCoords[d]! - center) > 0) valid = false
-            continue
+        // Unrolled: dimension 0 (X)
+        const N0 = gridDims[0]!
+        if (N0 <= 1) {
+          kCoords[0] = 0
+          if (outCoords0 !== centers[0]!) valid = false
+        } else {
+          let kIdx = outCoords0 - offsets[0]!
+          if (kIdx < 0 || kIdx >= N0) { valid = false } else {
+            if (shift) kIdx = (kIdx + halfN[0]!) % N0
+            kCoords[0] = kIdx
           }
-          const offset = Math.floor((G - N) / 2)
-          let kIdx = outCoords[d]! - offset
-          if (kIdx < 0 || kIdx >= N) {
-            valid = false
-            break
+        }
+
+        // Unrolled: dimension 1 (Y)
+        if (valid) {
+          const N1 = gridDims[1]!
+          if (N1 <= 1) {
+            kCoords[1] = 0
+            if (outCoords1 !== centers[1]!) valid = false
+          } else {
+            let kIdx = outCoords1 - offsets[1]!
+            if (kIdx < 0 || kIdx >= N1) { valid = false } else {
+              if (shift) kIdx = (kIdx + halfN[1]!) % N1
+              kCoords[1] = kIdx
+            }
           }
-          // Apply FFT shift: remap display index to frequency index
-          if (shift) {
-            kIdx = (kIdx + Math.floor(N / 2)) % N
+        }
+
+        // Unrolled: dimension 2 (Z)
+        if (valid) {
+          const N2 = gridDims[2]!
+          if (N2 <= 1) {
+            kCoords[2] = 0
+            if (outCoords2 !== centers[2]!) valid = false
+          } else {
+            let kIdx = outCoords2 - offsets[2]!
+            if (kIdx < 0 || kIdx >= N2) { valid = false } else {
+              if (shift) kIdx = (kIdx + halfN[2]!) % N2
+              kCoords[2] = kIdx
+            }
           }
-          kCoords.push(kIdx)
         }
 
         if (!valid) continue // nk[outIdx] already 0
 
-        const fullCoords = kCoords.slice(0, raw.latticeDim)
-        const flatIdx = ndToLinearIdx(fullCoords, raw.strides)
+        let flatIdx = 0
+        for (let d = 0; d < raw.latticeDim; d++) {
+          flatIdx += kCoords[d]! * raw.strides[d]!
+        }
 
         const n = Math.max(raw.nk[flatIdx]!, 0)
         nk[outIdx] = n
@@ -240,42 +282,39 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
   const pLow = Math.min(lowClamped, highClamped)
   const pHigh = Math.max(lowClamped, highClamped)
 
-  // Collect values from occupied voxels (nk > 0 before any transform)
-  const occupied: number[] = []
+  // Collect indices and transformed values from occupied voxels (nk > 0)
+  // Use typed array for indices to avoid dynamic array growth
+  const occupiedIndices = new Uint32Array(len)
+  let occupiedCount = 0
   for (let i = 0; i < len; i++) {
-    if (grid.nk[i]! > 0) occupied.push(i)
+    if (grid.nk[i]! > 0) {
+      occupiedIndices[occupiedCount++] = i
+    }
   }
 
-  if (occupied.length < 2) return
+  if (occupiedCount < 2) return
 
-  // Collect transformed values without mutating the grid until we know the
-  // percentile window is valid. This avoids leaving log-scaled negative values
-  // behind when the window is degenerate.
-  const transformed = new Float64Array(occupied.length)
-  for (let j = 0; j < occupied.length; j++) {
-    const i = occupied[j]!
-    transformed[j] =
-      config.exposureMode === 'log' ? Math.log(grid.nk[i]! + 1e-20) : grid.nk[i]!
+  const isLog = config.exposureMode === 'log'
+  const transformed = new Float64Array(occupiedCount)
+  for (let j = 0; j < occupiedCount; j++) {
+    const i = occupiedIndices[j]!
+    transformed[j] = isLog ? Math.log(grid.nk[i]! + 1e-20) : grid.nk[i]!
   }
 
-  // Sort copy for percentile computation
-  const sorted = Array.from(transformed)
-  sorted.sort((a, b) => a - b)
-
-  const lowIdx = Math.floor((pLow / 100) * (sorted.length - 1))
-  const highIdx = Math.ceil((pHigh / 100) * (sorted.length - 1))
-  const qLow = sorted[Math.max(0, lowIdx)]!
-  const qHigh = sorted[Math.min(sorted.length - 1, highIdx)]!
+  // Percentile via histogram (O(n) instead of O(n log n) sort)
+  const qLow = histogramPercentile(transformed, occupiedCount, pLow)
+  const qHigh = histogramPercentile(transformed, occupiedCount, pHigh)
 
   const range = qHigh - qLow
   if (range < 1e-30) return // Degenerate — all values equal
 
   const gamma = Number.isFinite(config.gamma) && config.gamma > 0 ? config.gamma : 1.0
+  const invRange = 1.0 / range
 
   // Remap occupied voxels to [0, 1] within percentile window
-  for (let j = 0; j < occupied.length; j++) {
-    const i = occupied[j]!
-    let mapped = (transformed[j]! - qLow) / range
+  for (let j = 0; j < occupiedCount; j++) {
+    const i = occupiedIndices[j]!
+    let mapped = (transformed[j]! - qLow) * invRange
     mapped = Math.max(0, Math.min(1, mapped))
     if (gamma !== 1.0) {
       mapped = Math.pow(mapped, gamma)
@@ -286,6 +325,41 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
   grid.nkMax = 1.0
 }
 
+/**
+ * Find a percentile value using a histogram approach (O(n)).
+ * Uses 4096 bins for adequate precision.
+ */
+function histogramPercentile(values: Float64Array, count: number, percentile: number): number {
+  // Find min/max
+  let min = values[0]!
+  let max = values[0]!
+  for (let i = 1; i < count; i++) {
+    const v = values[i]!
+    if (v < min) min = v
+    if (v > max) max = v
+  }
+  if (max - min < 1e-30) return min
+
+  const BINS = 4096
+  const bins = new Uint32Array(BINS)
+  const scale = (BINS - 1) / (max - min)
+
+  for (let i = 0; i < count; i++) {
+    const bin = Math.min(BINS - 1, Math.floor((values[i]! - min) * scale))
+    bins[bin]!++
+  }
+
+  const target = Math.floor((percentile / 100) * (count - 1))
+  let cumulative = 0
+  for (let b = 0; b < BINS; b++) {
+    cumulative += bins[b]!
+    if (cumulative > target) {
+      return min + (b + 0.5) / scale
+    }
+  }
+  return max
+}
+
 // ============================================================================
 // Gaussian Broadening
 // ============================================================================
@@ -293,14 +367,20 @@ export function applyExposureTransfer(grid: KSpaceDisplayGrid, config: KSpaceViz
 /**
  * Apply separable 3D Gaussian broadening to the display grid (in-place).
  *
- * Blurs 3 weighted channels (N=nk, K=nk*kNorm, O=nk*omegaNorm),
- * then recovers ratios to preserve physically meaningful aux channels.
- * Mass-preserving: sum(nk) is rescaled after blur.
+ * When nkOnly is true (k-space occupation mode), only blurs the nk channel,
+ * skipping the kNorm/omegaNorm weighted channels entirely (saves ~67% work).
  *
  * @param grid - Display grid to modify in-place
  * @param config - Visualization config
+ * @param latticeDim - Number of active lattice dimensions
+ * @param nkOnly - If true, only blur nk (skip aux channels)
  */
-export function applyBroadening(grid: KSpaceDisplayGrid, config: KSpaceVizConfig, latticeDim: number = 3): void {
+export function applyBroadening(
+  grid: KSpaceDisplayGrid,
+  config: KSpaceVizConfig,
+  latticeDim: number = 3,
+  nkOnly: boolean = false
+): void {
   if (!config.broadeningEnabled) return
 
   const G = OUTPUT_GRID_SIZE
@@ -322,56 +402,73 @@ export function applyBroadening(grid: KSpaceDisplayGrid, config: KSpaceVizConfig
   }
 
   // Sum before blur for mass preservation
+  const total = G ** 3
   let sumBefore = 0
-  for (let i = 0; i < G ** 3; i++) {
+  for (let i = 0; i < total; i++) {
     sumBefore += grid.nk[i]!
-  }
-
-  // Prepare weighted channels: K = nk*kNorm, O = nk*omegaNorm
-  const nkW = new Float64Array(G ** 3)
-  const kW = new Float64Array(G ** 3)
-  const oW = new Float64Array(G ** 3)
-  for (let i = 0; i < G ** 3; i++) {
-    nkW[i] = grid.nk[i]!
-    kW[i] = grid.nk[i]! * grid.kNorm[i]!
-    oW[i] = grid.nk[i]! * grid.omegaNorm[i]!
   }
 
   // Separable blur: only blur axes that correspond to physical lattice dimensions.
   // For latticeDim < 3, blurring unused axes would create non-physical spread.
   const blurDims = Math.min(latticeDim, 3)
-  for (let axis = 0; axis < blurDims; axis++) {
-    blurAxis(nkW, kernel, radius, G, axis)
-    blurAxis(kW, kernel, radius, G, axis)
-    blurAxis(oW, kernel, radius, G, axis)
-  }
 
-  // Recover ratios and write back
-  const eps = 1e-20
-  for (let i = 0; i < G ** 3; i++) {
-    const n = nkW[i]!
-    grid.nk[i] = n
-    grid.kNorm[i] = n > eps ? kW[i]! / n : 0
-    grid.omegaNorm[i] = n > eps ? oW[i]! / n : 0
-    grid.nkOmega[i] = n * grid.omegaNorm[i]!
+  if (nkOnly) {
+    // k-Space occupation mode: only blur nk, skip aux channels
+    const nkW = new Float64Array(total)
+    for (let i = 0; i < total; i++) {
+      nkW[i] = grid.nk[i]!
+    }
+    for (let axis = 0; axis < blurDims; axis++) {
+      blurAxis(nkW, kernel, radius, G, axis)
+    }
+    for (let i = 0; i < total; i++) {
+      grid.nk[i] = nkW[i]!
+    }
+  } else {
+    // Full mode: blur all 3 weighted channels
+    const nkW = new Float64Array(total)
+    const kW = new Float64Array(total)
+    const oW = new Float64Array(total)
+    for (let i = 0; i < total; i++) {
+      nkW[i] = grid.nk[i]!
+      kW[i] = grid.nk[i]! * grid.kNorm[i]!
+      oW[i] = grid.nk[i]! * grid.omegaNorm[i]!
+    }
+
+    for (let axis = 0; axis < blurDims; axis++) {
+      blurAxis(nkW, kernel, radius, G, axis)
+      blurAxis(kW, kernel, radius, G, axis)
+      blurAxis(oW, kernel, radius, G, axis)
+    }
+
+    // Recover ratios and write back
+    const eps = 1e-20
+    for (let i = 0; i < total; i++) {
+      const n = nkW[i]!
+      grid.nk[i] = n
+      grid.kNorm[i] = n > eps ? kW[i]! / n : 0
+      grid.omegaNorm[i] = n > eps ? oW[i]! / n : 0
+      grid.nkOmega[i] = n * grid.omegaNorm[i]!
+    }
   }
 
   // Mass-preserving rescale
+  const epsScale = 1e-20
   let sumAfter = 0
-  for (let i = 0; i < G ** 3; i++) {
+  for (let i = 0; i < total; i++) {
     sumAfter += grid.nk[i]!
   }
-  if (sumAfter > eps && sumBefore > eps) {
+  if (sumAfter > epsScale && sumBefore > epsScale) {
     const scale = sumBefore / sumAfter
-    for (let i = 0; i < G ** 3; i++) {
+    for (let i = 0; i < total; i++) {
       grid.nk[i]! *= scale
-      grid.nkOmega[i]! *= scale
+      if (!nkOnly) grid.nkOmega[i]! *= scale
     }
   }
 
   // Recompute nkMax
   let newMax = 0
-  for (let i = 0; i < G ** 3; i++) {
+  for (let i = 0; i < total; i++) {
     if (grid.nk[i]! > newMax) newMax = grid.nk[i]!
   }
   grid.nkMax = newMax
@@ -452,13 +549,20 @@ function blurAxis(data: Float64Array, kernel: Float64Array, radius: number, G: n
 /**
  * Pack display grid into rgba16float texture data.
  *
+ * When nkOnly is true (k-space occupation mode), packs zeros for analysis .g/.b/.a
+ * channels, saving ~75% of float16 conversion calls for the analysis texture.
+ *
  * Density texture: R=nk/nkMax, G=log(nk+eps), B=0, A=0
- * Analysis texture: R=nk/nkMax, G=kNorm, B=omegaNorm, A=nkOmega
+ * Analysis texture: R=nk/nkMax, G=kNorm, B=omegaNorm, A=nkOmega (or zeros if nkOnly)
  *
  * @param grid - Display grid with final values
+ * @param nkOnly - If true, skip aux channel packing in analysis texture
  * @returns Packed density and analysis Uint16Arrays
  */
-export function packDisplayTextures(grid: KSpaceDisplayGrid): { density: Uint16Array; analysis: Uint16Array } {
+export function packDisplayTextures(
+  grid: KSpaceDisplayGrid,
+  nkOnly: boolean = false
+): { density: Uint16Array; analysis: Uint16Array } {
   const G = OUTPUT_GRID_SIZE
   const outputTotal = G ** 3
   const density = new Uint16Array(outputTotal * 4)
@@ -466,18 +570,24 @@ export function packDisplayTextures(grid: KSpaceDisplayGrid): { density: Uint16A
 
   const nkNorm = Math.max(grid.nkMax, 1e-10)
 
-  for (let i = 0; i < outputTotal; i++) {
-    const n = grid.nk[i]!
-    if (n <= 0) {
-      // Empty voxels: write all zeros
-      packRGBA16F(density, i, 0, 0, 0, 0)
-      packRGBA16F(analysis, i, 0, 0, 0, 0)
-      continue
+  if (nkOnly) {
+    // Fast path: 3 float16 conversions per occupied voxel (density RG + analysis R)
+    for (let i = 0; i < outputTotal; i++) {
+      const n = grid.nk[i]!
+      if (n <= 0) continue
+      const nNorm = n / nkNorm
+      packRG16F(density, i, nNorm, Math.log(n + 1e-10))
+      packR16F(analysis, i, nNorm)
     }
-    const logN = Math.log(n + 1e-10)
-
-    packRGBA16F(density, i, n / nkNorm, logN, 0, 0)
-    packRGBA16F(analysis, i, n / nkNorm, grid.kNorm[i]!, grid.omegaNorm[i]!, grid.nkOmega[i]!)
+  } else {
+    // Full path: 8 float16 conversions per occupied voxel
+    for (let i = 0; i < outputTotal; i++) {
+      const n = grid.nk[i]!
+      if (n <= 0) continue
+      const nNorm = n / nkNorm
+      packRG16F(density, i, nNorm, Math.log(n + 1e-10))
+      packRGBA16F(analysis, i, nNorm, grid.kNorm[i]!, grid.omegaNorm[i]!, grid.nkOmega[i]!)
+    }
   }
 
   return { density, analysis }
@@ -494,11 +604,13 @@ export function packDisplayTextures(grid: KSpaceDisplayGrid): { density: Uint16A
  *
  * @param raw - Raw k-space physics data from computeRawKSpaceData
  * @param config - Display transform configuration
+ * @param nkOnly - If true, skip auxiliary channel computation (for k-space occupation map)
  * @returns Packed density and analysis textures
  */
 export function buildKSpaceDisplayTextures(
   raw: KSpaceRawData,
-  config: KSpaceVizConfig
+  config: KSpaceVizConfig,
+  nkOnly: boolean = false
 ): { density: Uint16Array; analysis: Uint16Array } {
   // Choose projection method
   let grid: KSpaceDisplayGrid
@@ -512,8 +624,8 @@ export function buildKSpaceDisplayTextures(
   applyExposureTransfer(grid, config)
 
   // Apply broadening (only blur axes with physical lattice dimensions)
-  applyBroadening(grid, config, raw.latticeDim)
+  applyBroadening(grid, config, raw.latticeDim, nkOnly)
 
   // Pack to textures
-  return packDisplayTextures(grid)
+  return packDisplayTextures(grid, nkOnly)
 }

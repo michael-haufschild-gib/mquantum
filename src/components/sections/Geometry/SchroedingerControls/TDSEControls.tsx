@@ -21,6 +21,7 @@ import type {
   TdseFieldView,
 } from '@/lib/geometry/extended/types'
 import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
+import type { TdseConfig } from '@/lib/geometry/extended/types'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 
@@ -69,6 +70,28 @@ const SCENARIO_PRESET_OPTIONS = [
   ...TDSE_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
 ]
 
+/** Compare current config against all presets to find a match. */
+function detectActivePreset(config: TdseConfig): string {
+  for (const preset of TDSE_SCENARIO_PRESETS) {
+    let matches = true
+    for (const [key, expected] of Object.entries(preset.overrides)) {
+      const actual = config[key as keyof TdseConfig]
+      if (Array.isArray(expected)) {
+        if (!Array.isArray(actual) || expected.length !== actual.length ||
+            expected.some((v, i) => v !== (actual as number[])[i])) {
+          matches = false
+          break
+        }
+      } else if (actual !== expected) {
+        matches = false
+        break
+      }
+    }
+    if (matches) return preset.id
+  }
+  return ''
+}
+
 /**
  * TDSE Dynamics configuration panel.
  *
@@ -81,6 +104,7 @@ const SCENARIO_PRESET_OPTIONS = [
 export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
   ({ config, dimension, actions }) => {
     const td = config.tdse
+    const activePreset = useMemo(() => detectActivePreset(td), [td])
 
     const handleGridSizeChange = useCallback(
       (dimIdx: number, value: number) => {
@@ -143,7 +167,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           <Select
             label="Scenario"
             options={SCENARIO_PRESET_OPTIONS}
-            value=""
+            value={activePreset}
             onChange={handlePresetChange}
             data-testid="tdse-scenario-preset"
           />
@@ -578,7 +602,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           <Slider
             label="dt"
             min={0.0001}
-            max={0.1}
+            max={0.02}
             step={0.0001}
             value={td.dt}
             onChange={actions.setDt}
@@ -595,28 +619,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             showValue
             data-testid="tdse-steps-per-frame"
           />
-        </div>
-
-        {/* Diagnostics */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
-          <Switch
-            label="Diagnostics"
-            checked={td.diagnosticsEnabled}
-            onCheckedChange={actions.setDiagnosticsEnabled}
-            data-testid="tdse-diagnostics-enabled"
-          />
-          {td.diagnosticsEnabled && (
-            <Slider
-              label="Diagnostics Interval (frames)"
-              min={1}
-              max={60}
-              step={1}
-              value={td.diagnosticsInterval}
-              onChange={actions.setDiagnosticsInterval}
-              showValue
-              data-testid="tdse-diagnostics-interval"
-            />
-          )}
         </div>
 
         {/* Slice positions for dims > 3 */}

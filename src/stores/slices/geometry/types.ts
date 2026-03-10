@@ -1,4 +1,6 @@
 import {
+  type BecFieldView,
+  type BecInitialCondition,
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
   type OpenQuantumVisualizationMode,
@@ -303,6 +305,33 @@ export interface SchroedingerSliceActions {
   applyTdsePreset: (presetId: string) => void
   resetTdseField: () => void
   clearTdseNeedsReset: () => void
+
+  // BEC (Gross-Pitaevskii Equation) Configuration
+  setBecInteractionStrength: (g: number) => void
+  setBecTrapOmega: (omega: number) => void
+  setBecTrapAnisotropy: (dimIndex: number, ratio: number) => void
+  setBecInitialCondition: (condition: BecInitialCondition) => void
+  setBecFieldView: (view: BecFieldView) => void
+  setBecVortexCharge: (charge: number) => void
+  setBecVortexLatticeCount: (count: number) => void
+  setBecSolitonDepth: (depth: number) => void
+  setBecSolitonVelocity: (velocity: number) => void
+  setBecAutoScale: (autoScale: boolean) => void
+  setBecAbsorberEnabled: (enabled: boolean) => void
+  setBecAbsorberWidth: (width: number) => void
+  setBecAbsorberStrength: (strength: number) => void
+  setBecDiagnosticsEnabled: (enabled: boolean) => void
+  setBecDiagnosticsInterval: (interval: number) => void
+  setBecDt: (dt: number) => void
+  setBecStepsPerFrame: (steps: number) => void
+  setBecMass: (mass: number) => void
+  setBecHbar: (hbar: number) => void
+  setBecGridSize: (size: number[]) => void
+  setBecSpacing: (spacing: number[]) => void
+  setBecSlicePosition: (dimIndex: number, value: number) => void
+  applyBecPreset: (presetId: string) => void
+  resetBecField: () => void
+  clearBecNeedsReset: () => void
 
   // Open Quantum System
   setOpenQuantumEnabled: (enabled: boolean) => void

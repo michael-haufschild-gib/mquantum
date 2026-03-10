@@ -25,13 +25,14 @@ import {
   flattenPresetForUniforms,
   type QuantumPreset,
 } from '@/lib/geometry/extended/schroedinger/presets'
-import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import type { SchroedingerConfig, TdseInitialCondition } from '@/lib/geometry/extended/types'
 import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
 import { computeRadialProbabilityNorm } from '@/lib/math/hydrogenRadialProbability'
 import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
 import { FreeScalarFieldComputePass } from '../passes/FreeScalarFieldComputePass'
 import { TDSEComputePass } from '../passes/TDSEComputePass'
+import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
@@ -77,6 +78,7 @@ const QUANTUM_MODE_MAP: Record<string, number> = {
   hydrogenND: 1,
   freeScalarField: 2,
   tdseDynamics: 3,
+  becDynamics: 4,
 }
 const COLOR_ALGORITHM_MAP: Record<string, number> = {
   lch: 0,
@@ -203,6 +205,7 @@ interface ExtendedStoreSnapshot {
   schroedingerVersion?: number
   clearFreeScalarNeedsReset?: () => void
   clearTdseNeedsReset?: () => void
+  clearBecNeedsReset?: () => void
 }
 
 interface TransformSnapshot {
@@ -230,7 +233,7 @@ function getStoreSnapshot<T>(ctx: WebGPURenderContext, key: string): T | undefin
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
-  quantumMode?: QuantumModeForShader | 'freeScalarField' | 'tdseDynamics'
+  quantumMode?: QuantumModeForShader | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color module selection (0-11) */
   colorAlgorithm?: WGSLColorAlgorithm
@@ -489,8 +492,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isWigner = config?.representation === 'wigner'
     // Free scalar field requires volumetric 3D rendering — override 2D pipeline even if dimension=2
     const isFreeScalarEarly = config?.quantumMode === 'freeScalarField'
-    // TDSE dynamics also requires volumetric 3D rendering via density grid
-    const isTdseEarly = config?.quantumMode === 'tdseDynamics'
+    // TDSE / BEC dynamics also requires volumetric 3D rendering via density grid
+    const isTdseEarly = config?.quantumMode === 'tdseDynamics' || config?.quantumMode === 'becDynamics'
     // Free scalar / TDSE do not support temporal reprojection (no world position output)
     const isTemporal = (config?.temporal ?? false) && !isFreeScalarEarly && !isTdseEarly
     const is2D = !isFreeScalarEarly && !isTdseEarly && (config?.dimension ?? 3) === 2
@@ -545,8 +548,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     // Free scalar field mode: uses density grid exclusively, no eigencache or wigner
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
-    // TDSE dynamics mode: also uses density grid exclusively via compute pass
-    const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics'
+    // TDSE / BEC dynamics mode: also uses density grid exclusively via compute pass
+    const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics' || this.rendererConfig.quantumMode === 'becDynamics'
 
     // Free scalar field: temporal reprojection is unsupported (no world position output).
     // Must be set here (not just in shaderConfig) so pipeline targets and render pass
@@ -695,9 +698,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     const dim = this.rendererConfig.dimension ?? 3
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
-    const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics'
+    const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics' || this.rendererConfig.quantumMode === 'becDynamics'
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
-    // Free scalar / TDSE require volumetric 3D rendering — override 2D pipeline
+    // Free scalar / TDSE / BEC require volumetric 3D rendering — override 2D pipeline
     const pipelineIs2D = !isFreeScalar && !isTdse && (dim === 2 || this.rendererConfig.representation === 'wigner')
     const openQuantumEnabled = this.rendererConfig.openQuantumEnabled ?? false
     const forceRgba = dim > 3 || openQuantumEnabled || isHydrogen
@@ -1646,7 +1649,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const quantumModeInt = QUANTUM_MODE_MAP[quantumModeStr] ?? 0
     // Compute modes (FSF/TDSE) use density grids; analytic-only features must be disabled
     // even if stale store state still holds incompatible values (e.g. from preset loading).
-    const isUniformComputeMode = quantumModeStr === 'freeScalarField' || quantumModeStr === 'tdseDynamics'
+    const isUniformComputeMode = quantumModeStr === 'freeScalarField' || quantumModeStr === 'tdseDynamics' || quantumModeStr === 'becDynamics'
 
     // --- Quantum preset generation (like WebGL SchroedingerMesh.tsx lines 598-638) ---
     // Read config values from store
@@ -1744,8 +1747,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Compute bounding radius for TDSE dynamics mode (lattice extent + margin)
     // 15% margin ensures the writeGrid writes zeros at edges, giving smooth
     // density falloff instead of hard cutoff at the lattice boundary.
-    if (schroedinger?.quantumMode === 'tdseDynamics' && schroedinger?.tdse) {
-      const td = schroedinger.tdse
+    const isTdseBound = schroedinger?.quantumMode === 'tdseDynamics' || schroedinger?.quantumMode === 'becDynamics'
+    const latticeConfig = schroedinger?.quantumMode === 'becDynamics' ? schroedinger?.bec : schroedinger?.tdse
+    if (isTdseBound && latticeConfig) {
+      const td = latticeConfig
       const Lx = (td.gridSize?.[0] ?? 32) * (td.spacing?.[0] ?? 0.1)
       const Ly = (td.gridSize?.[1] ?? 32) * (td.spacing?.[1] ?? 0.1)
       const Lz = (td.gridSize?.[2] ?? 32) * (td.spacing?.[2] ?? 0.1)
@@ -1771,7 +1776,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Compute physics-based bounding radius for this state.
     // Must run on EVERY full update (not just preset regen) because hydrogen n/l/m
     // changes affect bounding radius but don't trigger HO preset regeneration.
-    if (this.cachedPreset && schroedinger?.quantumMode !== 'freeScalarField' && schroedinger?.quantumMode !== 'tdseDynamics') {
+    if (this.cachedPreset && schroedinger?.quantumMode !== 'freeScalarField' && schroedinger?.quantumMode !== 'tdseDynamics' && schroedinger?.quantumMode !== 'becDynamics') {
       const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
       const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
       const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
@@ -1815,7 +1820,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // canonical compensation factor is irrelevant and must remain 1.0.
     // This guard runs unconditionally for grid-based modes to prevent stale compensation
     // from a previous mode (e.g., HO) carrying over after a mode switch.
-    if (schroedinger?.quantumMode === 'freeScalarField' || schroedinger?.quantumMode === 'tdseDynamics') {
+    if (schroedinger?.quantumMode === 'freeScalarField' || schroedinger?.quantumMode === 'tdseDynamics' || schroedinger?.quantumMode === 'becDynamics') {
       this.canonicalDensityCompensation = 1.0
       this.cachedPeakDensity = 1.0
     } else if (needsPresetRegen && this.cachedPreset) {
@@ -2856,6 +2861,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
       const freeScalarConfig = extended?.schroedinger?.freeScalar
       const isPlaying = animation?.isPlaying ?? false
+      const fsfSpeed = animation?.speed ?? 1.0
 
       if (freeScalarConfig) {
         const schroedinger = extended?.schroedinger
@@ -2863,6 +2869,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           ctx,
           freeScalarConfig,
           isPlaying,
+          fsfSpeed,
           schroedinger?.basisX as Float32Array | undefined,
           schroedinger?.basisY as Float32Array | undefined,
           schroedinger?.basisZ as Float32Array | undefined,
@@ -2909,14 +2916,91 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // ============================================
-    // TDSE DYNAMICS COMPUTE PASS (if in tdseDynamics mode)
+    // TDSE / BEC DYNAMICS COMPUTE PASS
     // ============================================
     const tdsePass = this.tdsePass
     if (tdsePass) {
       const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
       const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
-      const tdseConfig = extended?.schroedinger?.tdse
+      const quantumMode = extended?.schroedinger?.quantumMode
+      const isBecMode = quantumMode === 'becDynamics'
       const isPlaying = animation?.isPlaying ?? false
+      const speed = animation?.speed ?? 1.0
+
+      // Build the config for the shared TDSE compute pass
+      let tdseConfig = extended?.schroedinger?.tdse
+      let clearReset: (() => void) | undefined = extended?.clearTdseNeedsReset
+
+      if (isBecMode && extended?.schroedinger?.bec) {
+        const bec = extended.schroedinger.bec
+        const initCond = bec.initialCondition ?? 'thomasFermi'
+        // Map vortexLattice to vortexImprint (same shader, different count)
+        const mappedInit = initCond === 'vortexLattice' ? 'vortexImprint' : initCond
+        // Compute Thomas-Fermi chemical potential for init shader
+        const g = bec.interactionStrength ?? 500
+        const omega = bec.trapOmega ?? 1.0
+        const mu = g > 0 ? 0.5 * Math.pow((15 * g) / (4 * Math.PI), 2 / 5) * Math.pow(omega, 6 / 5) : 1.0
+
+        // Build momentum vector — encode BEC-specific params:
+        // [0] = vortex charge (for vortex inits)
+        // [1] = soliton depth 0-1 (for darkSoliton)
+        // [2] = soliton velocity fraction of c_s (for darkSoliton)
+        // [3] = vortex lattice count (for vortexLattice → multi-vortex init)
+        const latDim = bec.latticeDim ?? 3
+        const mom = new Array(Math.max(latDim, 4)).fill(0) as number[]
+        if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
+          mom[0] = bec.vortexCharge ?? 1
+          if (initCond === 'vortexLattice') {
+            mom[3] = bec.vortexLatticeCount ?? 4
+          }
+        }
+        if (initCond === 'darkSoliton') {
+          mom[1] = bec.solitonDepth ?? 1.0
+          mom[2] = bec.solitonVelocity ?? 0.0
+        }
+
+        // Use anisotropic BEC trap (type 9) — reads trap ratios from trapAnisotropy uniform
+        const anisotropy = bec.trapAnisotropy ?? new Array(latDim).fill(1.0)
+
+        tdseConfig = {
+          latticeDim: latDim,
+          gridSize: bec.gridSize ?? [64, 64, 64],
+          spacing: bec.spacing ?? [0.15, 0.15, 0.15],
+          mass: bec.mass ?? 1.0,
+          hbar: bec.hbar ?? 1.0,
+          dt: bec.dt ?? 0.002,
+          stepsPerFrame: bec.stepsPerFrame ?? 4,
+          // BEC init names map to TDSE initMap integers (thomasFermi→3, vortexImprint→4, darkSoliton→5)
+          initialCondition: mappedInit as TdseInitialCondition,
+          packetCenter: new Array(latDim).fill(0),
+          packetWidth: 1.0,
+          packetAmplitude: mu,
+          packetMomentum: mom,
+          potentialType: 'becTrap',
+          barrierHeight: 0, barrierWidth: 0, barrierCenter: 0,
+          wellDepth: 0, wellWidth: 0, stepHeight: 0,
+          harmonicOmega: omega,
+          slitSeparation: 0, slitWidth: 0, wallThickness: 0, wallHeight: 0,
+          latticeDepth: 0, latticePeriod: 1,
+          doubleWellLambda: 0, doubleWellSeparation: 1, doubleWellAsymmetry: 0,
+          driveEnabled: false, driveWaveform: 'sine',
+          driveFrequency: 0, driveAmplitude: 0,
+          trapAnisotropy: anisotropy,
+          absorberEnabled: bec.absorberEnabled ?? false,
+          absorberWidth: bec.absorberWidth ?? 0.1,
+          absorberStrength: bec.absorberStrength ?? 5.0,
+          fieldView: bec.fieldView ?? 'density',
+          autoScale: bec.autoScale ?? true,
+          showPotential: false,
+          autoLoop: false,
+          diagnosticsEnabled: bec.diagnosticsEnabled ?? true,
+          diagnosticsInterval: bec.diagnosticsInterval ?? 5,
+          needsReset: bec.needsReset ?? false,
+          slicePositions: bec.slicePositions ?? [],
+          interactionStrength: g,
+        }
+        clearReset = extended?.clearBecNeedsReset
+      }
 
       if (tdseConfig) {
         const schroedinger = extended?.schroedinger
@@ -2924,6 +3008,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           ctx,
           tdseConfig,
           isPlaying,
+          speed,
           schroedinger?.basisX as Float32Array | undefined,
           schroedinger?.basisY as Float32Array | undefined,
           schroedinger?.basisZ as Float32Array | undefined,
@@ -2931,7 +3016,37 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         )
         // Clear needsReset after processing (targeted mutation, no version bump)
         if (tdseConfig.needsReset) {
-          extended?.clearTdseNeedsReset?.()
+          clearReset?.()
+        }
+
+        // BEC diagnostics: compute derived quantities from TDSE readback
+        if (isBecMode) {
+          const diag = tdsePass.getDiagnostics()
+          if (diag) {
+            const bec = extended?.schroedinger?.bec
+            const g = bec?.interactionStrength ?? 500
+            const mass = bec?.mass ?? 1.0
+            const hbar = bec?.hbar ?? 1.0
+            const omega = bec?.trapOmega ?? 1.0
+            const peakN = diag.maxDensity
+            const mu = g * peakN
+            const xiDenom = 2 * mass * g * peakN
+            const xi = xiDenom > 0 ? hbar / Math.sqrt(xiDenom) : Infinity
+            const csVal = (g * peakN) / mass
+            const cs = csVal > 0 ? Math.sqrt(csVal) : 0
+            const rtfDenom = mass * omega * omega
+            const rtf = rtfDenom > 0 && mu > 0 ? Math.sqrt((2 * mu) / rtfDenom) : 0
+
+            useBecDiagnosticsStore.getState().update({
+              totalNorm: diag.totalNorm,
+              maxDensity: peakN,
+              normDrift: diag.normDrift,
+              chemicalPotential: mu,
+              healingLength: xi,
+              soundSpeed: cs,
+              thomasFermiRadius: rtf,
+            })
+          }
         }
       }
     }

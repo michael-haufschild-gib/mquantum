@@ -2,7 +2,7 @@
  * Radix-2 Cooley-Tukey FFT for complex data in interleaved format.
  *
  * Data layout: `[re0, im0, re1, im1, ..., re_{N-1}, im_{N-1}]`
- * All operations are in-place on `Float64Array` for precision.
+ * Supports both `Float64Array` (full precision) and `Float32Array` (faster, less memory).
  * Only power-of-2 lengths are supported.
  *
  * Convention: forward DFT uses `exp(-i * 2pi * k * n / N)` (signal processing standard).
@@ -10,6 +10,9 @@
  *
  * @module
  */
+
+/** Typed array types accepted by FFT functions. */
+type FFTArray = Float64Array | Float32Array
 
 /**
  * Checks that n is a positive power of 2.
@@ -30,7 +33,7 @@ function assertPowerOf2(n: number): void {
  * @param n - Number of complex samples required
  * @throws If data.length < 2 * n
  */
-function assertComplexDataLength(data: Float64Array, n: number): void {
+function assertComplexDataLength(data: FFTArray, n: number): void {
   const expected = 2 * n
   if (data.length < expected) {
     throw new Error(`FFT data length too small: expected at least ${expected}, got ${data.length}`)
@@ -58,7 +61,7 @@ function assertValidGridSize(gridSize: readonly number[]): void {
  * @param data - Interleaved complex array (length 2*n)
  * @param n - Number of complex elements
  */
-function bitReverse(data: Float64Array, n: number): void {
+function bitReverse(data: FFTArray, n: number): void {
   let j = 0
   for (let i = 0; i < n - 1; i++) {
     if (i < j) {
@@ -81,10 +84,49 @@ function bitReverse(data: Float64Array, n: number): void {
   }
 }
 
+// ============================================================================
+// Twiddle Factor Cache
+// ============================================================================
+
+/**
+ * Cached twiddle factors for forward FFT, keyed by FFT size.
+ * Each entry stores interleaved [re, im] pairs for all butterfly stages.
+ * Layout per stage of length L: halfL twiddle factors = cos/sin of -2π*j/L.
+ */
+const twiddleCache = new Map<number, Float64Array>()
+
+/**
+ * Get or compute cached twiddle factors for a given FFT size.
+ * Returns a flat Float64Array containing twiddle factors for all stages:
+ *   stage L=2: 1 factor, stage L=4: 2 factors, ..., stage L=N: N/2 factors
+ * Total entries: N-1 complex pairs = 2*(N-1) floats.
+ */
+function getTwiddleFactors(n: number): Float64Array {
+  let table = twiddleCache.get(n)
+  if (table) return table
+
+  // Total twiddle entries: sum(L/2 for L=2,4,...,N) = N-1
+  table = new Float64Array((n - 1) * 2)
+  let offset = 0
+  for (let len = 2; len <= n; len *= 2) {
+    const halfLen = len / 2
+    const angle = (-2 * Math.PI) / len
+    for (let j = 0; j < halfLen; j++) {
+      const theta = angle * j
+      table[offset++] = Math.cos(theta)
+      table[offset++] = Math.sin(theta)
+    }
+  }
+  twiddleCache.set(n, table)
+  return table
+}
+
 /**
  * In-place radix-2 decimation-in-time FFT (forward transform).
  *
  * Computes `X[k] = sum_{n=0}^{N-1} x[n] * exp(-i * 2pi * k * n / N)`.
+ * Uses precomputed twiddle factors (cached per FFT size) to avoid
+ * per-butterfly trigonometric calls.
  *
  * @param data - Interleaved complex array `[re0, im0, re1, im1, ...]` of length `2*n`
  * @param n - Number of complex elements (must be a power of 2)
@@ -95,44 +137,40 @@ function bitReverse(data: Float64Array, n: number): void {
  * fft(data, 4) // transforms to constant [1, 0, 1, 0, 1, 0, 1, 0]
  * ```
  */
-export function fft(data: Float64Array, n: number): void {
+export function fft(data: FFTArray, n: number): void {
   assertPowerOf2(n)
   assertComplexDataLength(data, n)
   if (n <= 1) return
 
   bitReverse(data, n)
 
+  const twiddle = getTwiddleFactors(n)
+  let twiddleOffset = 0
+
   for (let len = 2; len <= n; len *= 2) {
     const halfLen = len / 2
-    const angle = (-2 * Math.PI) / len
-    const wRe = Math.cos(angle)
-    const wIm = Math.sin(angle)
 
     for (let i = 0; i < n; i += len) {
-      let curRe = 1
-      let curIm = 0
-
       for (let j = 0; j < halfLen; j++) {
         const evenIdx = (i + j) * 2
         const oddIdx = (i + j + halfLen) * 2
 
-        // Twiddle: cur * data[odd]
-        const tRe = curRe * data[oddIdx]! - curIm * data[oddIdx + 1]!
-        const tIm = curRe * data[oddIdx + 1]! + curIm * data[oddIdx]!
+        const wRe = twiddle[twiddleOffset + j * 2]!
+        const wIm = twiddle[twiddleOffset + j * 2 + 1]!
+
+        // Twiddle: w * data[odd]
+        const tRe = wRe * data[oddIdx]! - wIm * data[oddIdx + 1]!
+        const tIm = wRe * data[oddIdx + 1]! + wIm * data[oddIdx]!
 
         // Butterfly
         data[oddIdx] = data[evenIdx]! - tRe
         data[oddIdx + 1] = data[evenIdx + 1]! - tIm
         data[evenIdx] = data[evenIdx]! + tRe
         data[evenIdx + 1] = data[evenIdx + 1]! + tIm
-
-        // Advance twiddle factor
-        const nextRe = curRe * wRe - curIm * wIm
-        const nextIm = curRe * wIm + curIm * wRe
-        curRe = nextRe
-        curIm = nextIm
       }
     }
+
+    twiddleOffset += halfLen * 2
   }
 }
 
@@ -150,7 +188,7 @@ export function fft(data: Float64Array, n: number): void {
  * ifft(data, 4) // transforms to delta [1, 0, 0, 0, 0, 0, 0, 0]
  * ```
  */
-export function ifft(data: Float64Array, n: number): void {
+export function ifft(data: FFTArray, n: number): void {
   assertPowerOf2(n)
   assertComplexDataLength(data, n)
 
@@ -189,7 +227,7 @@ export function ifft(data: Float64Array, n: number): void {
  * ifft3d(data, 4, 4, 4)
  * ```
  */
-export function ifft3d(data: Float64Array, nx: number, ny: number, nz: number): void {
+export function ifft3d(data: FFTArray, nx: number, ny: number, nz: number): void {
   ifftNd(data, [nx, ny, nz])
 }
 
@@ -212,7 +250,7 @@ export function ifft3d(data: Float64Array, nx: number, ny: number, nz: number): 
  * ifftNd(data, [4, 4, 4, 4])
  * ```
  */
-export function ifftNd(data: Float64Array, gridSize: readonly number[]): void {
+export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
   const dim = gridSize.length
   if (dim === 0) return
 
@@ -237,7 +275,7 @@ export function ifftNd(data: Float64Array, gridSize: readonly number[]): void {
 
     const fiberStride = strides[d]!
     const fiberCount = totalSites / n
-    const fiber = new Float64Array(2 * n)
+    const fiber = new (data.constructor as { new(length: number): FFTArray })(2 * n)
 
     // Collect dimensions to iterate (all except d), in reverse for decomposition
     const otherDims: number[] = []
@@ -280,7 +318,7 @@ export function ifftNd(data: Float64Array, gridSize: readonly number[]): void {
  * Applies 1D forward FFT along each dimension using row decomposition.
  * Symmetric to ifftNd — same fiber extraction, but calls fft() instead of ifft().
  */
-export function fftNd(data: Float64Array, gridSize: readonly number[]): void {
+export function fftNd(data: FFTArray, gridSize: readonly number[]): void {
   const dim = gridSize.length
   if (dim === 0) return
 
@@ -305,7 +343,7 @@ export function fftNd(data: Float64Array, gridSize: readonly number[]): void {
 
     const fiberStride = strides[d]!
     const fiberCount = totalSites / n
-    const fiber = new Float64Array(2 * n)
+    const fiber = new (data.constructor as { new(length: number): FFTArray })(2 * n)
 
     // Collect dimensions to iterate (all except d), in reverse for decomposition
     const otherDims: number[] = []

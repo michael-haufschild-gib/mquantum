@@ -158,15 +158,16 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdse = config.quantumMode === 'tdseDynamics'
-    // Compute modes (FSF/TDSE) use GPU density grids, not inline evalPsi().
+    const isBec = config.quantumMode === 'becDynamics'
+    // Compute modes (FSF/TDSE/BEC) use GPU density grids, not inline evalPsi().
     // Shader features that depend on inline wavefunction evaluation (interference,
     // probability flow, probability current) are forcibly disabled in extractSchrodingerConfig.
-    const isComputeMode = isFreeScalarField || isTdse
+    const isComputeMode = isFreeScalarField || isTdse || isBec
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
         {/* Time Evolution — not applicable for free scalar field or TDSE (uses its own dt/stepsPerFrame) */}
-        {!isFreeScalarField && !isTdse && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
+        {!isFreeScalarField && !isTdse && !isBec && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
               Time Evolution

@@ -38,8 +38,8 @@ import { tdseDiagNormReduceBlock, tdseDiagNormFinalizeBlock } from '../shaders/s
 import { TdseDiagnosticsHistory, computeReflectionTransmission, type TdseDiagnosticsSnapshot } from '@/lib/physics/tdse/diagnostics'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
-/** TDSEUniforms struct size in bytes */
-const UNIFORM_SIZE = 640
+/** TDSEUniforms struct size in bytes (688 = 636 + 48 trapAnisotropy + 4 pad) */
+const UNIFORM_SIZE = 688
 /** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
 const LINEAR_WG = 64
 /** 3D dispatch workgroup size for write-grid pass */
@@ -152,6 +152,9 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
 
   // Auto-loop: reinitialize when norm decays below threshold
   private initialNorm = 1.0
+
+  /** Fractional step accumulator for sub-integer speed scaling */
+  private stepAccumulator = 0
   private pendingAutoReset = false
 
   // Pre-allocated uniform views
@@ -597,9 +600,9 @@ struct PackUniforms {
 
     const strides = this.computeStrides(config)
 
-    const initMap: Record<string, number> = { gaussianPacket: 0, planeWave: 1, superposition: 2 }
-    const potMap: Record<string, number> = { free: 0, barrier: 1, step: 2, finiteWell: 3, harmonicTrap: 4, driven: 5, doubleSlit: 6, periodicLattice: 7, doubleWell: 8 }
-    const viewMap: Record<string, number> = { density: 0, phase: 1, current: 2, potential: 3 }
+    const initMap: Record<string, number> = { gaussianPacket: 0, planeWave: 1, superposition: 2, thomasFermi: 3, vortexImprint: 4, darkSoliton: 5 }
+    const potMap: Record<string, number> = { free: 0, barrier: 1, step: 2, finiteWell: 3, harmonicTrap: 4, driven: 5, doubleSlit: 6, periodicLattice: 7, doubleWell: 8, becTrap: 9 }
+    const viewMap: Record<string, number> = { density: 0, phase: 1, current: 2, potential: 3, superfluidVelocity: 4, healingLength: 5 }
     const waveformMap: Record<string, number> = { sine: 0, pulse: 1, chirp: 2 }
 
     // Lattice params (0-15)
@@ -689,6 +692,15 @@ struct PackUniforms {
     f32[155] = config.doubleWellLambda
     f32[156] = config.doubleWellSeparation
     f32[157] = config.doubleWellAsymmetry
+
+    // BEC interaction strength (632, index 158)
+    f32[158] = config.interactionStrength ?? 0.0
+
+    // BEC trap anisotropy ratios (636, indices 159-170)
+    const anisotropy = config.trapAnisotropy
+    for (let d = 0; d < MAX_DIM; d++) {
+      f32[159 + d] = anisotropy?.[d] ?? 1.0
+    }
 
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
   }
@@ -788,6 +800,7 @@ struct PackUniforms {
     ctx: WebGPURenderContext,
     rawConfig: TdseConfig,
     isPlaying: boolean,
+    speed: number,
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
@@ -826,13 +839,27 @@ struct PackUniforms {
         pass.end()
       }
 
-      // Superposition mode sums two packets each scaled by 1/√2,
-      // so peak |ψ|² = (A/√2)² = A²/2 when packets don't overlap.
-      this.maxDensity = config.initialCondition === 'superposition'
-        ? config.packetAmplitude * config.packetAmplitude * 0.5
-        : config.packetAmplitude * config.packetAmplitude
+      // Estimate initial peak |ψ|² for display normalization.
+      // - superposition: two packets each scaled by 1/√2 → peak A²/2
+      // - BEC (Thomas-Fermi, vortex, soliton): ψ = √(n), peak n = μ/g
+      //   where μ = packetAmplitude, g = interactionStrength
+      // - standard TDSE: peak = A²
+      const initStr = config.initialCondition as string
+      const isBecInit = initStr === 'thomasFermi'
+        || initStr === 'vortexImprint'
+        || initStr === 'darkSoliton'
+      if (isBecInit) {
+        const mu = config.packetAmplitude
+        const g = Math.abs(config.interactionStrength ?? 1)
+        this.maxDensity = g > 1e-10 ? mu / g : mu * mu
+      } else if (config.initialCondition === 'superposition') {
+        this.maxDensity = config.packetAmplitude * config.packetAmplitude * 0.5
+      } else {
+        this.maxDensity = config.packetAmplitude * config.packetAmplitude
+      }
       this.initialNorm = -1.0  // Will be captured from first diagnostics readback
       this.simTime = 0
+      this.stepAccumulator = 0
       this.pendingAutoReset = false
       this.initialized = true
       this.diagHistory.clear()
@@ -842,15 +869,23 @@ struct PackUniforms {
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
     if (isPlaying) {
+      // Compute speed-scaled step count using fractional accumulator.
+      // This preserves dt (critical for numerical stability) while allowing
+      // the user to control evolution rate via the timeline speed slider.
+      const scaledSteps = config.stepsPerFrame * speed
+      this.stepAccumulator += scaledSteps
+      const stepsThisFrame = Math.floor(this.stepAccumulator)
+      this.stepAccumulator -= stepsThisFrame
+
       // Refresh potential BEFORE Strang steps for driven systems so the current
       // frame uses V(t) at the current simTime rather than lagging by one frame.
-      if (config.driveEnabled && this.potentialPipeline && this.potentialBG) {
+      if (stepsThisFrame > 0 && config.driveEnabled && this.potentialPipeline && this.potentialBG) {
         const p = encoder.beginComputePass({ label: 'tdse-potential-drive-update' })
         this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
         p.end()
       }
 
-      for (let step = 0; step < config.stepsPerFrame; step++) {
+      for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential
         if (this.potentialHalfPipeline && this.potentialHalfBG) {
           const p = encoder.beginComputePass({ label: `tdse-V-half-1-${step}` })
@@ -964,15 +999,16 @@ struct PackUniforms {
     this.dispatchCompute(finalizePass, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
     finalizePass.end()
 
-    // Copy result to staging for async readback
-    encoder.copyBufferToBuffer(
-      this.diagResultBuffer, 0,
-      this.diagStagingBuffer, 0,
-      DIAG_RESULT_COUNT * 4,
-    )
-
     // Schedule async readback (fire-and-forget, skip if previous is still in flight)
+    // The copyBufferToBuffer must be guarded too — submitting a command that
+    // writes to a mapped buffer is a WebGPU validation error.
     if (!this.diagMappingInFlight) {
+      // Copy result to staging for async readback
+      encoder.copyBufferToBuffer(
+        this.diagResultBuffer, 0,
+        this.diagStagingBuffer, 0,
+        DIAG_RESULT_COUNT * 4,
+      )
       this.diagMappingInFlight = true
       const staging = this.diagStagingBuffer
       const simTime = this.simTime
@@ -1002,11 +1038,18 @@ struct PackUniforms {
             }
           }
 
-          // Auto-loop: capture initial norm after first readback, then check decay
+          // Auto-loop: capture initial norm after first readback, then check decay/divergence
           if (this.initialNorm < 0) {
             this.initialNorm = totalNorm
-          } else if (autoLoop && this.initialNorm > 0 && totalNorm < this.initialNorm * 0.15) {
-            this.pendingAutoReset = true
+          } else if (this.initialNorm > 0) {
+            // Reset on norm decay (wavepacket left the domain)
+            if (autoLoop && totalNorm < this.initialNorm * 0.15) {
+              this.pendingAutoReset = true
+            }
+            // Reset on norm divergence (numerical instability — dt too large or GPE blowup)
+            if (totalNorm > this.initialNorm * 5.0 || !isFinite(totalNorm)) {
+              this.pendingAutoReset = true
+            }
           }
 
           if (recordHistory) {

@@ -2,6 +2,7 @@ import {
   DEFAULT_SCHROEDINGER_CONFIG,
   DEFAULT_OPEN_QUANTUM_CONFIG,
   DEFAULT_TDSE_CONFIG,
+  type BecConfig,
   type FreeScalarConfig,
   type SchroedingerConfig,
   type TdseConfig,
@@ -212,6 +213,31 @@ export const createSchroedingerSlice: StateCreator<
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
     return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions }
+  }
+
+  const resizeBecArrays = (
+    prev: BecConfig,
+    newDim: number
+  ): Partial<BecConfig> => {
+    const gridDefault = defaultTdseGridPerDim(newDim)
+    const snapToPow2 = (v: number): number => {
+      const log2 = Math.round(Math.log2(Math.max(4, v)))
+      return Math.max(4, Math.min(gridDefault, 2 ** log2))
+    }
+    const gridSize = Array.from({ length: newDim }, (_, i) => {
+      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
+      return snapToPow2(raw)
+    })
+    const spacing = Array.from({ length: newDim }, (_, i) =>
+      i < prev.spacing.length ? prev.spacing[i]! : 0.15
+    )
+    const trapAnisotropy = Array.from({ length: newDim }, (_, i) =>
+      i < prev.trapAnisotropy.length ? prev.trapAnisotropy[i]! : 1.0
+    )
+    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
+      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
+    )
+    return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions }
   }
 
   /**
@@ -516,6 +542,23 @@ export const createSchroedingerSlice: StateCreator<
           if (prev.latticeDim !== dim) {
             const resized = resizeTdseArrays(prev, dim)
             updates.tdse = { ...prev, ...resized, needsReset: true }
+          }
+        }
+        if (mode === 'becDynamics') {
+          // BEC doesn't support Wigner or momentum representation
+          if (state.schroedinger.representation !== 'position') {
+            updates.representation = 'position'
+          }
+          // Cross-section uses analytic wavefunctions, not density grid
+          if (state.schroedinger.crossSectionEnabled) {
+            updates.crossSectionEnabled = false
+          }
+          // Sync latticeDim to current global dimension and resize arrays
+          const dim = useGeometryStore.getState().dimension
+          const prev = state.schroedinger.bec
+          if (prev.latticeDim !== dim) {
+            const resized = resizeBecArrays(prev, dim)
+            updates.bec = { ...prev, ...resized, needsReset: true }
           }
         }
         return { schroedinger: { ...state.schroedinger, ...updates } }
@@ -1454,11 +1497,11 @@ export const createSchroedingerSlice: StateCreator<
         warnNonFiniteSchroedingerInput('tdse.dt', dt)
         return
       }
-      const clamped = Math.max(0.0001, Math.min(0.1, dt))
+      const clamped = Math.max(0.0001, Math.min(0.05, dt))
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, dt: clamped },
+          tdse: { ...state.schroedinger.tdse, dt: clamped, needsReset: true },
         },
       }))
     },
@@ -1922,6 +1965,287 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
 
+    // === BEC (Gross-Pitaevskii) ===
+    setBecInteractionStrength: (g) => {
+      if (!isFiniteSchroedingerInput(g)) {
+        warnNonFiniteSchroedingerInput('bec.interactionStrength', g)
+        return
+      }
+      const clamped = Math.max(-1000, Math.min(10000, g))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, interactionStrength: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecTrapOmega: (omega) => {
+      if (!isFiniteSchroedingerInput(omega)) {
+        warnNonFiniteSchroedingerInput('bec.trapOmega', omega)
+        return
+      }
+      const clamped = Math.max(0.01, Math.min(10.0, omega))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, trapOmega: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecTrapAnisotropy: (dimIndex, ratio) => {
+      if (!isFiniteSchroedingerInput(ratio)) {
+        warnNonFiniteSchroedingerInput('bec.trapAnisotropy', ratio)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(10.0, ratio))
+      setWithVersion((state) => {
+        const arr = [...state.schroedinger.bec.trapAnisotropy]
+        if (dimIndex >= 0 && dimIndex < arr.length) {
+          arr[dimIndex] = clamped
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, trapAnisotropy: arr, needsReset: true },
+          },
+        }
+      })
+    },
+    setBecInitialCondition: (condition) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, initialCondition: condition, needsReset: true },
+        },
+      }))
+    },
+    setBecFieldView: (view) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, fieldView: view },
+        },
+      }))
+    },
+    setBecVortexCharge: (charge) => {
+      const clamped = Math.max(-4, Math.min(4, Math.round(charge)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, vortexCharge: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecVortexLatticeCount: (count) => {
+      const clamped = Math.max(1, Math.min(16, Math.round(count)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, vortexLatticeCount: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecSolitonDepth: (depth) => {
+      if (!isFiniteSchroedingerInput(depth)) return
+      const clamped = Math.max(0, Math.min(1, depth))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, solitonDepth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecSolitonVelocity: (velocity) => {
+      if (!isFiniteSchroedingerInput(velocity)) return
+      const clamped = Math.max(-1, Math.min(1, velocity))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, solitonVelocity: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecAutoScale: (autoScale) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, autoScale },
+        },
+      }))
+    },
+    setBecAbsorberEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, absorberEnabled: enabled, needsReset: true },
+        },
+      }))
+    },
+    setBecAbsorberWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) return
+      const clamped = Math.max(0.05, Math.min(0.3, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, absorberWidth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecAbsorberStrength: (strength) => {
+      if (!isFiniteSchroedingerInput(strength)) return
+      const clamped = Math.max(0.1, Math.min(50, strength))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, absorberStrength: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecDiagnosticsEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, diagnosticsEnabled: enabled },
+        },
+      }))
+    },
+    setBecDiagnosticsInterval: (interval) => {
+      const clamped = Math.max(1, Math.min(60, Math.round(interval)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, diagnosticsInterval: clamped },
+        },
+      }))
+    },
+    setBecDt: (dt) => {
+      if (!isFiniteSchroedingerInput(dt)) {
+        warnNonFiniteSchroedingerInput('bec.dt', dt)
+        return
+      }
+      const clamped = Math.max(0.0001, Math.min(0.05, dt))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, dt: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecStepsPerFrame: (steps) => {
+      const clamped = Math.max(1, Math.min(16, Math.round(steps)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, stepsPerFrame: clamped },
+        },
+      }))
+    },
+    setBecMass: (mass) => {
+      if (!isFiniteSchroedingerInput(mass)) return
+      const clamped = Math.max(0.1, Math.min(10, mass))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, mass: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecHbar: (hbar) => {
+      if (!isFiniteSchroedingerInput(hbar)) return
+      const clamped = Math.max(0.1, Math.min(10, hbar))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, hbar: clamped, needsReset: true },
+        },
+      }))
+    },
+    setBecGridSize: (size) => {
+      if (!hasOnlyFiniteNumbers(size)) {
+        warnNonFiniteSchroedingerInput('bec.gridSize', size)
+        return
+      }
+      setWithVersion((state) => {
+        const { latticeDim } = state.schroedinger.bec
+        const gridDefault = defaultTdseGridPerDim(latticeDim)
+        const snapped = Array.from({ length: latticeDim }, (_, i) => {
+          const s = i < size.length ? size[i]! : 4
+          const val = Math.max(4, Math.min(128, Math.round(s)))
+          const log2 = Math.round(Math.log2(val))
+          return Math.max(4, Math.min(gridDefault, 2 ** log2))
+        })
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, gridSize: snapped, needsReset: true },
+          },
+        }
+      })
+    },
+    setBecSpacing: (spacing) => {
+      if (!hasOnlyFiniteNumbers(spacing)) {
+        warnNonFiniteSchroedingerInput('bec.spacing', spacing)
+        return
+      }
+      setWithVersion((state) => {
+        const { latticeDim } = state.schroedinger.bec
+        const clamped = Array.from({ length: latticeDim }, (_, i) => {
+          const s = i < spacing.length ? spacing[i]! : 0.15
+          return Math.max(0.01, Math.min(1.0, s))
+        })
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, spacing: clamped, needsReset: true },
+          },
+        }
+      })
+    },
+    setBecSlicePosition: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) return
+      setWithVersion((state) => {
+        const arr = [...state.schroedinger.bec.slicePositions]
+        if (dimIndex >= 0 && dimIndex < arr.length) {
+          arr[dimIndex] = value
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, slicePositions: arr, needsReset: true },
+          },
+        }
+      })
+    },
+    applyBecPreset: (presetId) => {
+      // Dynamically import to avoid circular dependency
+      import('@/lib/physics/bec/presets').then(({ BEC_SCENARIO_PRESETS }) => {
+        const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === presetId)
+        if (!preset) return
+        setWithVersion((state) => ({
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, ...preset.overrides, needsReset: true },
+          },
+        }))
+      })
+    },
+    resetBecField: () => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, needsReset: true },
+        },
+      }))
+    },
+    clearBecNeedsReset: () => {
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          bec: { ...state.schroedinger.bec, needsReset: false },
+        },
+      }))
+    },
+
     // === Open Quantum System ===
     setOpenQuantumEnabled: (enabled) => {
       setWithVersion((state) => ({
@@ -2155,6 +2479,15 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
+      // Sync BEC latticeDim to global dimension when in BEC mode
+      let becUpdate: Partial<BecConfig> | undefined
+      if (currentState.quantumMode === 'becDynamics') {
+        const prev = currentState.bec
+        if (prev.latticeDim !== dimension) {
+          becUpdate = { ...resizeBecArrays(prev, dimension), needsReset: true }
+        }
+      }
+
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -2175,6 +2508,9 @@ export const createSchroedingerSlice: StateCreator<
             : {}),
           ...(tdseUpdate
             ? { tdse: { ...state.schroedinger.tdse, ...tdseUpdate } }
+            : {}),
+          ...(becUpdate
+            ? { bec: { ...state.schroedinger.bec, ...becUpdate } }
             : {}),
         },
       }))
