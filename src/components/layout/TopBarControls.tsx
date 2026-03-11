@@ -28,13 +28,15 @@ interface IconButtonProps {
   label: string
   small?: boolean
   className?: string
+  disabled?: boolean
 }
 
 /** Reusable icon button - extracted for memoization stability */
 const IconButton: React.FC<IconButtonProps> = React.memo(
-  ({ icon: IconComponent, active, onClick, label, small = false, className = '' }) => (
+  ({ icon: IconComponent, active, onClick, label, small = false, className = '', disabled = false }) => (
     <Button
       onClick={onClick}
+      disabled={disabled}
       onMouseEnter={() => soundManager.playHover()}
       aria-label={label}
       aria-pressed={active}
