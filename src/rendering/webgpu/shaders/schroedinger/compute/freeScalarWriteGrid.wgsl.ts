@@ -80,6 +80,20 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
+  // Perpendicular falloff for low-dimensional lattices (1D → tube, 2D → sheet)
+  var perpFalloff: f32 = 1.0;
+  if (params.latticeDim < 3u) {
+    var projSq: f32 = 0.0;
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      let v = vec3f(params.basisX[d], params.basisY[d], params.basisZ[d]);
+      let proj = dot(modelPos, v);
+      projSq += proj * proj;
+    }
+    let perpDist2 = max(dot(modelPos, modelPos) - projSq, 0.0);
+    let perpSigma = bound * 0.06;
+    perpFalloff = exp(-perpDist2 / (2.0 * perpSigma * perpSigma));
+  }
+
   let idx = ndToLinear(coords, params.strides, params.latticeDim);
   let phiVal = phi[idx];
   let piVal = pi[idx];
@@ -126,7 +140,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   // B: phase encoding (0.0 = positive, PI = negative) for color algorithms
   // A: unused
   let rho = abs(fieldValue);
-  let normRho = select(rho / params.maxFieldValue, rho, params.maxFieldValue <= 0.0);
+  let normRho = select(rho / params.maxFieldValue, rho, params.maxFieldValue <= 0.0) * perpFalloff;
   let logRho = log(normRho + 1e-10);
   let phase = select(0.0, 3.14159265, fieldValue < 0.0);
 

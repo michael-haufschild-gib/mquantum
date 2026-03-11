@@ -47,17 +47,19 @@ export const HydrogenNDControls: React.FC<HydrogenNDControlsProps> = React.memo(
     const maxL = maxAzimuthalForPrincipal(config.principalQuantumNumber)
     const maxM = config.azimuthalQuantumNumber
 
-    // Build preset options grouped by dimension
+    // Build preset options filtered to current dimension and below
     const presetOptions = useMemo(() => {
       const groups = getHydrogenNDPresetsWithKeysByDimension()
       return [
-        ...Object.entries(groups).map(([dim, presets]) => ({
-          label: `${dim}D Orbitals`,
-          options: presets.map(([key, preset]) => ({ value: key, label: preset.name })),
-        })),
+        ...Object.entries(groups)
+          .filter(([dim]) => Number(dim) <= dimension)
+          .map(([dim, presets]) => ({
+            label: `${dim}D Orbitals`,
+            options: presets.map(([key, preset]) => ({ value: key, label: preset.name })),
+          })),
         { label: 'Custom', options: [{ value: 'custom', label: 'Custom Configuration' }] },
       ]
-    }, [])
+    }, [dimension])
 
     // Flatten for Select component
     const flatOptions = useMemo(

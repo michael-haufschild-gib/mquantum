@@ -1,6 +1,16 @@
 /**
  * URL State Serializer
- * Serializes and deserializes scene name or object type params to/from URL.
+ *
+ * Serializes and deserializes a minimal set of scene params to/from URL.
+ *
+ * INTENTIONAL SCOPE LIMIT: The URL format only supports:
+ *   - Scene preset name (`?scene=...`)
+ *   - Object type + dimension + quantum mode (`?t=...&d=...&qm=...`)
+ *   - Open quantum on/off and basic rates
+ *
+ * Detailed state (quantum numbers, orbital config, visual settings, etc.)
+ * is NOT included by design. Full state persistence uses scene presets
+ * (IndexedDB). Do NOT extend the URL serializer with additional parameters.
  */
 
 import { isValidObjectType } from '@/lib/geometry/registry'
@@ -14,6 +24,8 @@ const VALID_QUANTUM_MODES: SchroedingerQuantumMode[] = [
   'hydrogenND',
   'freeScalarField',
   'tdseDynamics',
+  'becDynamics',
+  'diracEquation',
 ]
 
 /**

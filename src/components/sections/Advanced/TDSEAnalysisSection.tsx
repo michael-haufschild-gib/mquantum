@@ -120,7 +120,11 @@ interface EnergyDiagramInlineProps {
   tdse: ReturnType<typeof useExtendedObjectStore.getState>['schroedinger']['tdse']
 }
 
+/** Potential types where left/right norm split is physically interpretable as R/T */
+const SCATTERING_POTENTIALS = new Set(['barrier', 'step', 'driven'])
+
 const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ tdse }) => {
+  const isScattering = SCATTERING_POTENTIALS.has(tdse.potentialType)
   const { R, T, totalNorm, normDrift, hasData } = useTdseDiagnosticsStore(
     useShallow((s) => ({
       R: s.R,
@@ -265,7 +269,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
         <div className="px-2 pb-1.5 flex gap-3 text-[9px] font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
-              <span>R={R.toFixed(3)} T={T.toFixed(3)}</span>
+              <span>{isScattering ? `R=${R.toFixed(3)} T=${T.toFixed(3)}` : `P(L)=${R.toFixed(3)} P(R)=${T.toFixed(3)}`}</span>
               <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
               <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
                 Δ={normDrift >= 0 ? '+' : ''}{(normDrift * 100).toFixed(2)}%

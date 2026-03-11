@@ -1,6 +1,9 @@
 import {
   type BecFieldView,
   type BecInitialCondition,
+  type DiracFieldView,
+  type DiracInitialCondition,
+  type DiracPotentialType,
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
   type OpenQuantumVisualizationMode,
@@ -332,6 +335,41 @@ export interface SchroedingerSliceActions {
   applyBecPreset: (presetId: string) => void
   resetBecField: () => void
   clearBecNeedsReset: () => void
+
+  // Dirac Equation Configuration
+  setDiracMass: (mass: number) => void
+  setDiracSpeedOfLight: (c: number) => void
+  setDiracHbar: (hbar: number) => void
+  setDiracDt: (dt: number) => void
+  setDiracStepsPerFrame: (steps: number) => void
+  setDiracPotentialType: (type: DiracPotentialType) => void
+  setDiracPotentialStrength: (strength: number) => void
+  setDiracPotentialWidth: (width: number) => void
+  setDiracPotentialCenter: (center: number) => void
+  setDiracHarmonicOmega: (omega: number) => void
+  setDiracCoulombZ: (z: number) => void
+  setDiracInitialCondition: (condition: DiracInitialCondition) => void
+  setDiracPacketWidth: (width: number) => void
+  setDiracPositiveEnergyFraction: (fraction: number) => void
+  setDiracFieldView: (view: DiracFieldView) => void
+  setDiracAutoScale: (autoScale: boolean) => void
+  setDiracShowPotential: (showPotential: boolean) => void
+  setDiracAbsorberEnabled: (enabled: boolean) => void
+  setDiracAbsorberWidth: (width: number) => void
+  setDiracAbsorberStrength: (strength: number) => void
+  setDiracGridSize: (size: number[]) => void
+  setDiracSpacing: (spacing: number[]) => void
+  setDiracPacketCenter: (dimIndex: number, value: number) => void
+  setDiracPacketMomentum: (dimIndex: number, value: number) => void
+  setDiracSpinDirection: (dimIndex: number, value: number) => void
+  setDiracParticleColor: (color: [number, number, number]) => void
+  setDiracAntiparticleColor: (color: [number, number, number]) => void
+  setDiracDiagnosticsEnabled: (enabled: boolean) => void
+  setDiracDiagnosticsInterval: (interval: number) => void
+  setDiracNeedsReset: () => void
+  clearDiracNeedsReset: () => void
+  setDiracSlicePosition: (dimIndex: number, value: number) => void
+  applyDiracPreset: (presetId: string) => void
 
   // Open Quantum System
   setOpenQuantumEnabled: (enabled: boolean) => void

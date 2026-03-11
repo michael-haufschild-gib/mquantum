@@ -11,8 +11,6 @@ export {
   isAnimationWasmReady,
   // Phase 1: Animation functions
   composeRotationsIndexedWasm,
-  composeRotationsWasm,
-  projectVerticesWasm,
   multiplyMatrixVectorWasm,
   // Phase 2: Matrix and vector functions
   multiplyMatricesWasm,

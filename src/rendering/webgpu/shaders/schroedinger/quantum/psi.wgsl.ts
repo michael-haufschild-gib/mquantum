@@ -429,9 +429,10 @@ fn evalHydrogenNDMomentumSpatial(
     if (abs(extraProduct) < 1e-10) { return vec2f(0.0, 0.0); }
   }
 
-  let amplitude = radial * angular * extraProduct * representationNorm;
+  let realScale = radial * extraProduct * representationNorm;
+  let psiSpatialMom = realScale * angular;
   let momentumPhase = phaseNegI(uniforms.azimuthalL + extraQuantumSum);
-  return cscale(amplitude, momentumPhase);
+  return cmul(psiSpatialMom, momentumPhase);
 }
 
 fn evalHydrogenNDMomentumPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {

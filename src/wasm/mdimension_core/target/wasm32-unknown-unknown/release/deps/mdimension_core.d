@@ -1,8 +1,9 @@
-/Users/Spare/Documents/code/mquantum/src/wasm/mdimension_core/target/wasm32-unknown-unknown/release/deps/mdimension_core.d: src/lib.rs src/animation.rs
+/Users/Spare/Documents/code/mquantum/src/wasm/mdimension_core/target/wasm32-unknown-unknown/release/deps/mdimension_core.d: src/lib.rs src/animation.rs src/clifford.rs
 
-/Users/Spare/Documents/code/mquantum/src/wasm/mdimension_core/target/wasm32-unknown-unknown/release/deps/mdimension_core.wasm: src/lib.rs src/animation.rs
+/Users/Spare/Documents/code/mquantum/src/wasm/mdimension_core/target/wasm32-unknown-unknown/release/deps/mdimension_core.wasm: src/lib.rs src/animation.rs src/clifford.rs
 
-/Users/Spare/Documents/code/mquantum/src/wasm/mdimension_core/target/wasm32-unknown-unknown/release/deps/libmdimension_core.rlib: src/lib.rs src/animation.rs
+/Users/Spare/Documents/code/mquantum/src/wasm/mdimension_core/target/wasm32-unknown-unknown/release/deps/libmdimension_core.rlib: src/lib.rs src/animation.rs src/clifford.rs
 
 src/lib.rs:
 src/animation.rs:
+src/clifford.rs:

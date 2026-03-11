@@ -38,15 +38,18 @@ export interface HydrogenBasisState {
 // ---------------------------------------------------------------------------
 
 /**
- * 3D hydrogen energy in Rydberg units (natural units where E_1 = -1).
+ * 3D hydrogen energy in atomic units (Hartree).
  *
- * E_n = -1 / n²
+ * E_n = -0.5 / n²
+ *
+ * Consistent with the shader time evolution in hydrogenNDCommon.wgsl.ts
+ * and the atomic-unit rates in hydrogenRates.ts.
  *
  * @param n - Principal quantum number (≥ 1)
- * @returns Energy in natural units
+ * @returns Energy in Hartree atomic units
  */
 export function hydrogenEnergy(n: number): number {
-  return -1 / (n * n)
+  return -0.5 / (n * n)
 }
 
 /**
@@ -97,7 +100,12 @@ export function buildHydrogenBasis(
 ): HydrogenBasisState[] {
   const states: HydrogenBasisState[] = []
 
-  // Ground-state extra-dimension quantum numbers (all zeros)
+  // Extra-dimension quantum numbers are ground-state (all zeros) in the
+  // truncated OQ basis. Enumerating excited extra-dim states would be
+  // combinatorially explosive (8 extra dims × multiple excitation levels).
+  // The OQ dynamics therefore model decoherence/transitions within the 3D
+  // hydrogen subspace only. Users with excited extra-dim states will see
+  // the 3D (n,l,m) part of their orbital in the density matrix path.
   const numExtra = Math.max(0, dimension - 3)
   const extraN = new Array<number>(numExtra).fill(0)
 

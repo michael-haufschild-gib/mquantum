@@ -16,20 +16,20 @@ import {
 // ---------------------------------------------------------------------------
 
 describe('hydrogenEnergy', () => {
-  it('returns -1 for n=1 (ground state)', () => {
-    expect(hydrogenEnergy(1)).toBe(-1)
+  it('returns -0.5 for n=1 (ground state, Hartree units)', () => {
+    expect(hydrogenEnergy(1)).toBe(-0.5)
   })
 
-  it('returns -0.25 for n=2', () => {
-    expect(hydrogenEnergy(2)).toBe(-0.25)
+  it('returns -0.125 for n=2', () => {
+    expect(hydrogenEnergy(2)).toBe(-0.125)
   })
 
-  it('returns -1/9 for n=3', () => {
-    expect(hydrogenEnergy(3)).toBeCloseTo(-1 / 9, 10)
+  it('returns -0.5/9 for n=3', () => {
+    expect(hydrogenEnergy(3)).toBeCloseTo(-0.5 / 9, 10)
   })
 
-  it('scales as -1/n² for large n', () => {
-    expect(hydrogenEnergy(10)).toBeCloseTo(-0.01, 10)
+  it('scales as -0.5/n² for large n', () => {
+    expect(hydrogenEnergy(10)).toBeCloseTo(-0.005, 10)
   })
 })
 
@@ -211,8 +211,8 @@ describe('buildHydrogenBasis', () => {
     it('5D energy includes extra-dimension zero-point contribution', () => {
       const omega = [2, 3]
       const basis = buildHydrogenBasis(1, 5, omega)
-      // E = -1/1² + 2*(0+0.5) + 3*(0+0.5) = -1 + 1 + 1.5 = 1.5
-      expect(basis[0]!.energy).toBeCloseTo(1.5, 10)
+      // E = -0.5/1² + 2*(0+0.5) + 3*(0+0.5) = -0.5 + 1 + 1.5 = 2.0
+      expect(basis[0]!.energy).toBeCloseTo(2.0, 10)
     })
 
     it('7D states have extraDimN of length 4', () => {
@@ -277,16 +277,16 @@ describe('basisEnergies', () => {
     }
   })
 
-  it('first energy is -1 (ground state) for 3D hydrogen', () => {
+  it('first energy is -0.5 (ground state, Hartree) for 3D hydrogen', () => {
     const basis = buildHydrogenBasis(2, 3)
     const energies = basisEnergies(basis)
-    expect(energies[0]).toBe(-1)
+    expect(energies[0]).toBe(-0.5)
   })
 
-  it('second energy is -0.25 (n=2) for 3D hydrogen', () => {
+  it('second energy is -0.125 (n=2, Hartree) for 3D hydrogen', () => {
     const basis = buildHydrogenBasis(2, 3)
     const energies = basisEnergies(basis)
-    // States 1-4 are all n=2 with energy -0.25
-    expect(energies[1]).toBe(-0.25)
+    // States 1-4 are all n=2 with energy -0.125
+    expect(energies[1]).toBe(-0.125)
   })
 })

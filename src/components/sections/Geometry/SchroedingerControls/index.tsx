@@ -26,9 +26,11 @@ import { HarmonicOscillatorControls } from './HarmonicOscillatorControls'
 import { HydrogenNDControls } from './HydrogenNDControls'
 import { TDSEControls } from './TDSEControls'
 import { BECControls } from './BECControls'
+import { DiracControls } from './DiracControls'
 import { WignerControls } from './WignerControls'
 import type {
   BecActions,
+  DiracActions,
   FreeScalarFieldActions,
   HarmonicOscillatorActions,
   HydrogenNDActions,
@@ -184,6 +186,36 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setBecSlicePosition: state.setBecSlicePosition,
       applyBecPreset: state.applyBecPreset,
       resetBecField: state.resetBecField,
+      // Dirac equation actions
+      setDiracInitialCondition: state.setDiracInitialCondition,
+      setDiracFieldView: state.setDiracFieldView,
+      setDiracPotentialType: state.setDiracPotentialType,
+      setDiracPotentialStrength: state.setDiracPotentialStrength,
+      setDiracPotentialWidth: state.setDiracPotentialWidth,
+      setDiracPotentialCenter: state.setDiracPotentialCenter,
+      setDiracHarmonicOmega: state.setDiracHarmonicOmega,
+      setDiracCoulombZ: state.setDiracCoulombZ,
+      setDiracMass: state.setDiracMass,
+      setDiracSpeedOfLight: state.setDiracSpeedOfLight,
+      setDiracHbar: state.setDiracHbar,
+      setDiracDt: state.setDiracDt,
+      setDiracStepsPerFrame: state.setDiracStepsPerFrame,
+      setDiracGridSize: state.setDiracGridSize,
+      setDiracSpacing: state.setDiracSpacing,
+      setDiracPacketCenter: state.setDiracPacketCenter,
+      setDiracPacketWidth: state.setDiracPacketWidth,
+      setDiracPacketMomentum: state.setDiracPacketMomentum,
+      setDiracPositiveEnergyFraction: state.setDiracPositiveEnergyFraction,
+      setDiracAutoScale: state.setDiracAutoScale,
+      setDiracShowPotential: state.setDiracShowPotential,
+      setDiracAbsorberEnabled: state.setDiracAbsorberEnabled,
+      setDiracAbsorberWidth: state.setDiracAbsorberWidth,
+      setDiracAbsorberStrength: state.setDiracAbsorberStrength,
+      setDiracDiagnosticsEnabled: state.setDiracDiagnosticsEnabled,
+      setDiracDiagnosticsInterval: state.setDiracDiagnosticsInterval,
+      setDiracSlicePosition: state.setDiracSlicePosition,
+      setDiracNeedsReset: state.setDiracNeedsReset,
+      applyDiracPreset: state.applyDiracPreset,
     }))
     const {
       config,
@@ -307,6 +339,36 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       setBecSlicePosition,
       applyBecPreset,
       resetBecField,
+      // Dirac equation actions
+      setDiracInitialCondition,
+      setDiracFieldView,
+      setDiracPotentialType,
+      setDiracPotentialStrength,
+      setDiracPotentialWidth,
+      setDiracPotentialCenter,
+      setDiracHarmonicOmega,
+      setDiracCoulombZ,
+      setDiracMass,
+      setDiracSpeedOfLight,
+      setDiracHbar,
+      setDiracDt,
+      setDiracStepsPerFrame,
+      setDiracGridSize,
+      setDiracSpacing,
+      setDiracPacketCenter,
+      setDiracPacketWidth,
+      setDiracPacketMomentum,
+      setDiracPositiveEnergyFraction,
+      setDiracAutoScale,
+      setDiracShowPotential,
+      setDiracAbsorberEnabled,
+      setDiracAbsorberWidth,
+      setDiracAbsorberStrength,
+      setDiracDiagnosticsEnabled,
+      setDiracDiagnosticsInterval,
+      setDiracSlicePosition,
+      setDiracNeedsReset,
+      applyDiracPreset,
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Get current dimension to show/hide dimension-specific controls
@@ -317,6 +379,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdseDynamics = config.quantumMode === 'tdseDynamics'
     const isBecDynamics = config.quantumMode === 'becDynamics'
+    const isDiracEquation = config.quantumMode === 'diracEquation'
 
     // Build action objects for child components
     const harmonicActions: HarmonicOscillatorActions = {
@@ -446,10 +509,42 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
       resetField: resetBecField,
     }
 
+    const diracActions: DiracActions = {
+      setInitialCondition: setDiracInitialCondition,
+      setFieldView: setDiracFieldView,
+      setPotentialType: setDiracPotentialType,
+      setPotentialStrength: setDiracPotentialStrength,
+      setPotentialWidth: setDiracPotentialWidth,
+      setPotentialCenter: setDiracPotentialCenter,
+      setHarmonicOmega: setDiracHarmonicOmega,
+      setCoulombZ: setDiracCoulombZ,
+      setMass: setDiracMass,
+      setSpeedOfLight: setDiracSpeedOfLight,
+      setHbar: setDiracHbar,
+      setDt: setDiracDt,
+      setStepsPerFrame: setDiracStepsPerFrame,
+      setGridSize: setDiracGridSize,
+      setSpacing: setDiracSpacing,
+      setPacketCenter: setDiracPacketCenter,
+      setPacketWidth: setDiracPacketWidth,
+      setPacketMomentum: setDiracPacketMomentum,
+      setPositiveEnergyFraction: setDiracPositiveEnergyFraction,
+      setAutoScale: setDiracAutoScale,
+      setShowPotential: setDiracShowPotential,
+      setAbsorberEnabled: setDiracAbsorberEnabled,
+      setAbsorberWidth: setDiracAbsorberWidth,
+      setAbsorberStrength: setDiracAbsorberStrength,
+      setDiagnosticsEnabled: setDiracDiagnosticsEnabled,
+      setDiagnosticsInterval: setDiracDiagnosticsInterval,
+      setSlicePosition: setDiracSlicePosition,
+      setNeedsReset: setDiracNeedsReset,
+      applyPreset: applyDiracPreset,
+    }
+
     return (
       <div className={className} data-testid="schroedinger-controls">
         {/* Representation Selection — hidden for compute modes (free scalar / TDSE) */}
-        {!isFreeScalarField && !isTdseDynamics && !isBecDynamics && (
+        {!isFreeScalarField && !isTdseDynamics && !isBecDynamics && !isDiracEquation && (
           <Section title="Representation" defaultOpen={true}>
             <div className="space-y-3">
               <ToggleGroup
@@ -515,8 +610,10 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         )}
 
         {/* Quantum State / Field Config Section - content depends on mode */}
-        <Section title={isFreeScalarField || isTdseDynamics || isBecDynamics ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
-          {isBecDynamics ? (
+        <Section title={isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
+          {isDiracEquation ? (
+            <DiracControls config={config} dimension={dimension} actions={diracActions} />
+          ) : isBecDynamics ? (
             <BECControls config={config} dimension={dimension} actions={becActions} />
           ) : isTdseDynamics ? (
             <TDSEControls config={config} dimension={dimension} actions={tdseActions} />
@@ -552,6 +649,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           {isBecDynamics && (
             <p className="text-text-tertiary mt-1">
               {config.bec.latticeDim}D BEC (GPE), {config.bec.gridSize.slice(0, config.bec.latticeDim).join('\u00D7')} sites
+            </p>
+          )}
+          {isDiracEquation && (
+            <p className="text-text-tertiary mt-1">
+              {config.dirac.latticeDim}D Dirac, {config.dirac.gridSize.slice(0, config.dirac.latticeDim).join('\u00D7')} sites, S={Math.pow(2, Math.floor((config.dirac.latticeDim + 1) / 2))} spinor
             </p>
           )}
         </div>

@@ -52,6 +52,7 @@ export type ColorAlgorithm =
   | 'inferno'
   | 'densityContours'
   | 'phaseDensity'
+  | 'particleAntiparticle'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -80,6 +81,7 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'inferno' as const, label: 'Inferno' },
   { value: 'densityContours' as const, label: 'Density Contours' },
   { value: 'phaseDensity' as const, label: 'Phase-Density Composite' },
+  { value: 'particleAntiparticle' as const, label: 'Upper / Lower Spinor' },
 ] as const
 
 /**
@@ -109,6 +111,7 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   inferno: 20,
   densityContours: 21,
   phaseDensity: 22,
+  particleAntiparticle: 23,
 }
 
 /**
@@ -290,6 +293,24 @@ export function getAvailableColorAlgorithms(
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
   }
 
+  // Dirac equation: same density grid channels as TDSE, plus particleAntiparticle
+  // which reads R=upper spinor, G=lower spinor from the dual-channel field view.
+  if (quantumMode === 'diracEquation') {
+    const computeValidAlgos = new Set<string>([
+      'blackbody',
+      'phaseCyclicUniform',
+      'phaseDiverging',
+      'diverging',
+      'domainColoringPsi',
+      'viridis',
+      'inferno',
+      'densityContours',
+      'phaseDensity',
+      'particleAntiparticle',
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
+  }
+
   if (quantumMode === 'freeScalarField') {
     // Free scalar has sign-proxy phase (0 or π) — exclude continuous-phase algorithms.
     // Also include educational analysis algorithms unique to this mode.
@@ -321,11 +342,15 @@ export function getAvailableColorAlgorithms(
     'relativePhase',
   ])
 
-  // Non-freeScalar modes: exclude educational analysis algorithms and
+  // Dirac-only algorithms — require spinor field data not present in other modes
+  const diracOnlyAlgos = new Set<string>(['particleAntiparticle'])
+
+  // Non-freeScalar modes: exclude educational analysis algorithms, Dirac-only, and
   // conditionally include/exclude open quantum and phase-dependent algorithms
   return COLOR_ALGORITHM_OPTIONS.filter(
     (opt) =>
       !educationalAlgos.has(opt.value) &&
+      !diracOnlyAlgos.has(opt.value) &&
       (!openQuantumAlgos.has(opt.value) || openQuantumEnabled) &&
       (!phaseDependentAlgos.has(opt.value) || !openQuantumEnabled)
   )

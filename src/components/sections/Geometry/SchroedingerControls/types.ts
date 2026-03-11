@@ -235,3 +235,47 @@ export interface BecControlsProps {
   dimension: number
   actions: BecActions
 }
+
+/**
+ * Actions interface for Dirac controls
+ */
+export interface DiracActions {
+  setInitialCondition: ExtendedObjectState['setDiracInitialCondition']
+  setFieldView: ExtendedObjectState['setDiracFieldView']
+  setPotentialType: ExtendedObjectState['setDiracPotentialType']
+  setPotentialStrength: ExtendedObjectState['setDiracPotentialStrength']
+  setPotentialWidth: ExtendedObjectState['setDiracPotentialWidth']
+  setPotentialCenter: ExtendedObjectState['setDiracPotentialCenter']
+  setHarmonicOmega: ExtendedObjectState['setDiracHarmonicOmega']
+  setCoulombZ: ExtendedObjectState['setDiracCoulombZ']
+  setMass: ExtendedObjectState['setDiracMass']
+  setSpeedOfLight: ExtendedObjectState['setDiracSpeedOfLight']
+  setHbar: ExtendedObjectState['setDiracHbar']
+  setDt: ExtendedObjectState['setDiracDt']
+  setStepsPerFrame: ExtendedObjectState['setDiracStepsPerFrame']
+  setGridSize: ExtendedObjectState['setDiracGridSize']
+  setSpacing: ExtendedObjectState['setDiracSpacing']
+  setPacketCenter: ExtendedObjectState['setDiracPacketCenter']
+  setPacketWidth: ExtendedObjectState['setDiracPacketWidth']
+  setPacketMomentum: ExtendedObjectState['setDiracPacketMomentum']
+  setPositiveEnergyFraction: ExtendedObjectState['setDiracPositiveEnergyFraction']
+  setAutoScale: ExtendedObjectState['setDiracAutoScale']
+  setShowPotential: ExtendedObjectState['setDiracShowPotential']
+  setAbsorberEnabled: ExtendedObjectState['setDiracAbsorberEnabled']
+  setAbsorberWidth: ExtendedObjectState['setDiracAbsorberWidth']
+  setAbsorberStrength: ExtendedObjectState['setDiracAbsorberStrength']
+  setDiagnosticsEnabled: ExtendedObjectState['setDiracDiagnosticsEnabled']
+  setDiagnosticsInterval: ExtendedObjectState['setDiracDiagnosticsInterval']
+  setSlicePosition: ExtendedObjectState['setDiracSlicePosition']
+  setNeedsReset: ExtendedObjectState['setDiracNeedsReset']
+  applyPreset: ExtendedObjectState['applyDiracPreset']
+}
+
+/**
+ * Props for Dirac Controls
+ */
+export interface DiracControlsProps {
+  config: SchroedingerConfig
+  dimension: number
+  actions: DiracActions
+}

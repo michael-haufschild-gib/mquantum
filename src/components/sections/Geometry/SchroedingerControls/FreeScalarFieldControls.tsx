@@ -191,9 +191,14 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
           <div className="text-xs text-text-secondary">
             Lattice: {latticeDim}D (set via dimension selector)
           </div>
-          {latticeDim <= 2 && (
+          {latticeDim === 1 && (
             <div className="text-xs text-text-secondary/70 italic">
-              Rendered as 3D volume (2D data extruded along z-axis)
+              1D field rendered as glowing tube with Gaussian falloff
+            </div>
+          )}
+          {latticeDim === 2 && (
+            <div className="text-xs text-text-secondary/70 italic">
+              2D field rendered as glowing sheet with Gaussian falloff
             </div>
           )}
 

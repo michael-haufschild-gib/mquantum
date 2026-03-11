@@ -73,6 +73,10 @@ export default defineConfig((_env) => ({
     },
   },
   assetsInclude: ['**/*.ktx2'],
+  worker: {
+    format: 'es',
+    plugins: () => [wasm()],
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,

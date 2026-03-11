@@ -135,9 +135,9 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
     })),
   )
 
-  // Compute trap potential profile for SVG
+  // Compute trap potential profile for SVG (x-axis cross-section with anisotropy)
   const profile = useMemo(() => {
-    const omega = bec.trapOmega
+    const omegaX = bec.trapOmega * (bec.trapAnisotropy[0] ?? 1.0)
     const mass = bec.mass
     const spacing = bec.spacing[0] ?? 0.15
     const gridN = bec.gridSize[0] ?? 64
@@ -148,10 +148,10 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
     for (let i = 0; i < nSamples; i++) {
       const x = -L + (2 * L * i) / (nSamples - 1)
       xs.push(x)
-      vs.push(0.5 * mass * omega * omega * x * x)
+      vs.push(0.5 * mass * omegaX * omegaX * x * x)
     }
     return { xs, vs, vMax: vs[0]!, vMin: 0 }
-  }, [bec.trapOmega, bec.mass, bec.spacing, bec.gridSize])
+  }, [bec.trapOmega, bec.trapAnisotropy, bec.mass, bec.spacing, bec.gridSize])
 
   const muLevel = hasData ? chemicalPotential : 0
   const vMax = Math.max(profile.vMax, muLevel * 1.3, 1)
@@ -246,7 +246,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
             fontSize={8} fontFamily="monospace"
             transform={`rotate(-90, 4, ${PADDING_Y + PLOT_H / 2})`}
           >
-            V(x)
+            V(x){(bec.trapAnisotropy[0] ?? 1.0) !== 1.0 ? ` [ω×${(bec.trapAnisotropy[0] ?? 1.0).toFixed(1)}]` : ''}
           </text>
         </svg>
 

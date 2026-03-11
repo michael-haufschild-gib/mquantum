@@ -12,30 +12,7 @@ export default function init(): Promise<void> {
   return Promise.resolve()
 }
 
-// Mock start function
-/**
- * Start mock (no-op)
- */
-export function start(): void {
-  // no-op in tests
-}
-
 // Phase 1: Animation functions
-/**
- * Compose rotation matrices mock
- * @param _dimension - Dimension
- * @param _plane_names - Plane names
- * @param _angles - Rotation angles
- * @returns Identity matrix
- */
-export function compose_rotations_wasm(
-  _dimension: number,
-  _plane_names: string[],
-  _angles: number[]
-): Float64Array {
-  // Return identity matrix for 4D case (most common)
-  return new Float64Array(16).fill(0).map((_, i) => (i % 5 === 0 ? 1 : 0))
-}
 
 /**
  * Compose rotation matrices from index pairs mock
@@ -53,21 +30,6 @@ export function compose_rotations_indexed_wasm(
 ): Float64Array {
   // Return identity matrix for 4D case (most common)
   return new Float64Array(16).fill(0).map((_, i) => (i % 5 === 0 ? 1 : 0))
-}
-
-/**
- * Project vertices mock
- * @param _flat_vertices - Flat vertex array
- * @param _dimension - Dimension
- * @param _projection_distance - Projection distance
- * @returns Empty array
- */
-export function project_vertices_wasm(
-  _flat_vertices: Float64Array,
-  _dimension: number,
-  _projection_distance: number
-): Float32Array {
-  return new Float32Array(0)
 }
 
 /**
@@ -137,4 +99,31 @@ export function normalize_vector_wasm(_v: Float64Array): Float64Array {
  */
 export function subtract_vectors_wasm(_a: Float64Array, _b: Float64Array): Float64Array {
   return new Float64Array(0)
+}
+
+// Phase 3: Dirac Clifford algebra functions
+
+/**
+ * Generate Dirac gamma matrices mock
+ * @param spatial_dim - Number of spatial dimensions
+ * @returns Packed gamma matrix data with leading spinor size
+ */
+export function generate_dirac_matrices_wasm(spatial_dim: number): Float32Array {
+  const s = dirac_spinor_size_wasm(spatial_dim)
+  const matrixSize = s * s * 2
+  const total = 1 + spatial_dim * matrixSize + matrixSize
+  const result = new Float32Array(total)
+  // Pack spinor size as f32 bits in first element
+  const view = new DataView(result.buffer)
+  view.setUint32(0, s, true)
+  return result
+}
+
+/**
+ * Dirac spinor size mock
+ * @param spatial_dim - Number of spatial dimensions
+ * @returns Spinor component count
+ */
+export function dirac_spinor_size_wasm(spatial_dim: number): number {
+  return Math.max(2, 1 << Math.floor((spatial_dim + 1) / 2))
 }

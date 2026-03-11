@@ -52,6 +52,11 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         label: 'Bose-Einstein Condensate',
         description: 'Gross-Pitaevskii equation: superfluid dynamics, vortices, solitons.',
       },
+      {
+        value: 'diracEquation' as SchroedingerQuantumMode,
+        label: 'Dirac',
+        description: 'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
+      },
     ],
     []
   )
@@ -59,14 +64,10 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const handleSelect = useCallback(
     (value: SchroedingerQuantumMode) => {
       soundManager.playClick()
-      // Free scalar field and TDSE require volumetric 3D rendering (no 2D pipeline support).
-      // Force dimension to 3 if currently at 2.
-      if ((value === 'freeScalarField' || value === 'tdseDynamics' || value === 'becDynamics') && dimension < 3) {
-        useGeometryStore.getState().setDimension(3)
-      }
+      // Dimension enforcement is handled by setSchroedingerQuantumMode in the store
       setQuantumMode(value)
     },
-    [dimension, setQuantumMode]
+    [setQuantumMode]
   )
 
   const containerVariants = {

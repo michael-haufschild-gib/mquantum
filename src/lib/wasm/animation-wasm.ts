@@ -7,8 +7,6 @@
  *
  * Functions:
  * - composeRotationsIndexedWasm: Compose rotation matrices from precomputed axis index pairs
- * - composeRotationsWasm: Compose rotation matrices from plane names and angles
- * - projectVerticesWasm: Project nD vertices to 3D positions
  * - multiplyMatrixVectorWasm: Matrix-vector multiplication
  * - multiplyMatricesWasm: Matrix-matrix multiplication
  * - dotProductWasm: Vector dot product
@@ -28,16 +26,6 @@ interface WasmModule {
     angles: Float64Array,
     rotation_count: number
   ) => Float64Array
-  compose_rotations_wasm: (
-    dimension: number,
-    plane_names: string[],
-    angles: Float64Array | number[]
-  ) => Float64Array
-  project_vertices_wasm: (
-    flat_vertices: Float64Array,
-    dimension: number,
-    projection_distance: number
-  ) => Float32Array
   multiply_matrix_vector_wasm: (
     matrix: Float64Array,
     vector: Float64Array,
@@ -88,7 +76,6 @@ export async function initAnimationWasm(): Promise<void> {
       const wasm = await import('@/wasm/mdimension_core/pkg/mdimension_core.js')
 
       await wasm.default()
-      wasm.start()
 
       // Store the module for synchronous access
       wasmModule = wasm as unknown as WasmModule
@@ -99,9 +86,7 @@ export async function initAnimationWasm(): Promise<void> {
       }
     } catch (err) {
       const wasmError = err instanceof Error ? err : new Error(String(err))
-      if (import.meta.env.DEV) {
-        console.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
-      }
+      console.warn('[AnimationWASM] Initialization failed, using JS fallback:', wasmError.message)
     }
   })()
 
@@ -119,45 +104,6 @@ export function isAnimationWasmReady(): boolean {
 // ============================================================================
 // WASM-Accelerated Functions
 // ============================================================================
-
-/**
- * Compose multiple rotations using WASM if available.
- * Falls back to null if WASM is not ready (caller should use JS fallback).
- *
- * @param dimension - The dimensionality of the space (must be >= 2)
- * @param planeNames - Array of plane names (e.g., ["XY", "XW", "ZW"])
- * @param angles - Array of rotation angles in radians (must match planeNames length)
- * @returns Flat rotation matrix as Float64Array, or null if WASM not ready or invalid input
- */
-export function composeRotationsWasm(
-  dimension: number,
-  planeNames: string[],
-  angles: number[]
-): Float64Array | null {
-  if (!wasmReady || !wasmModule) {
-    return null
-  }
-
-  // Input validation
-  if (!Number.isInteger(dimension) || dimension < 2) {
-    return null
-  }
-  if (planeNames.length !== angles.length) {
-    return null
-  }
-  if (!angles.every(Number.isFinite)) {
-    return null
-  }
-
-  try {
-    return wasmModule.compose_rotations_wasm(dimension, planeNames, angles)
-  } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] compose_rotations_wasm failed:', err)
-    }
-    return null
-  }
-}
 
 /**
  * Compose multiple rotations using index pairs and preallocated typed arrays.
@@ -199,44 +145,6 @@ export function composeRotationsIndexedWasm(
   } catch (err) {
     if (import.meta.env.DEV) {
       console.warn('[AnimationWASM] compose_rotations_indexed_wasm failed:', err)
-    }
-    return null
-  }
-}
-
-/**
- * Project nD vertices to 3D using WASM if available.
- *
- * @param flatVertices - Flat array of vertex coordinates
- * @param dimension - Dimensionality of each vertex (must be >= 3)
- * @param projectionDistance - Distance from projection plane (must be positive)
- * @returns Float32Array of 3D positions, or null if WASM not ready or invalid input
- */
-export function projectVerticesWasm(
-  flatVertices: Float64Array,
-  dimension: number,
-  projectionDistance: number
-): Float32Array | null {
-  if (!wasmReady || !wasmModule) {
-    return null
-  }
-
-  // Input validation
-  if (!Number.isInteger(dimension) || dimension < 3) {
-    return null
-  }
-  if (flatVertices.length === 0 || flatVertices.length % dimension !== 0) {
-    return null
-  }
-  if (!Number.isFinite(projectionDistance) || projectionDistance <= 0) {
-    return null
-  }
-
-  try {
-    return wasmModule.project_vertices_wasm(flatVertices, dimension, projectionDistance)
-  } catch (err) {
-    if (import.meta.env.DEV) {
-      console.warn('[AnimationWASM] project_vertices_wasm failed:', err)
     }
     return null
   }

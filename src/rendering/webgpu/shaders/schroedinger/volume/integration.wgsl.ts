@@ -205,13 +205,15 @@ fn evalHydrogenNodeFactorsAtXND(xND: array<f32, 11>, uniforms: SchroedingerUnifo
   let nz = x2 * invR;
   // For node-family decomposition, radial nodes are defined by the 3D hydrogen core.
   let radial = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
-  let angular = evalHydrogenNDAngularCartesian(
+  let angularComplex = evalHydrogenNDAngularCartesian(
     uniforms.azimuthalL,
     uniforms.magneticM,
     nx, ny, nz,
     uniforms.useRealOrbitals != 0u
   );
-  return vec2f(radial, angular);
+  // Node decomposition uses real part for sign-change detection.
+  // For real orbitals, .x is the full real Y_lm; for complex, .x = Re(Y_lm).
+  return vec2f(radial, angularComplex.x);
 }
 
 // Sample hydrogen radial/angular factors at world position.
@@ -1182,12 +1184,26 @@ fn volumeRaymarchGrid(
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     var rho = gridSample.r;
 
-    // Compute logRho: use grid value if available (rgba16float), else compute from rho
+    // For particle/antiparticle split mode (COLOR_ALGORITHM == 23):
+    //   R = particle density, G = antiparticle density (NOT logRho)
+    //   Opacity/absorption must use total density (R + G) so that
+    //   antiparticle-only regions remain visible.
+    //   colorRho/colorS preserve the raw channels for computeBaseColor.
+    // For all other modes: G = logRho as usual.
     var sCenter: f32;
-    if (DENSITY_GRID_HAS_PHASE) {
+    var colorRho: f32 = rho;
+    var colorS: f32 = 0.0;
+    if (COLOR_ALGORITHM == 23) {
+      colorS = gridSample.g;        // antiparticle density for computeBaseColor 's'
+      sCenter = gridSample.g;       // (also kept in sCenter for backward compat)
+      rho = rho + gridSample.g;     // total density for alpha/skip/adaptive stepping
+      colorRho = gridSample.r;      // particle density for computeBaseColor 'rho'
+    } else if (DENSITY_GRID_HAS_PHASE) {
       sCenter = gridSample.g; // logRho from grid
+      colorS = sCenter;
     } else {
       sCenter = select(-20.0, log(rho), rho > 1e-9);
+      colorS = sCenter;
     }
 
     // Phase: choose spatial (B) or relative (A) based on compile-time color algorithm.
@@ -1200,11 +1216,14 @@ fn volumeRaymarchGrid(
 
     // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
     // PERF: Only recompute log(rho) when emphasis actually modifies rho
-    if (FEATURE_UNCERTAINTY_BOUNDARY) {
+    // Skip for algo 23 since sCenter is antiparticle density, not logRho.
+    if (FEATURE_UNCERTAINTY_BOUNDARY && COLOR_ALGORITHM != 23) {
       rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
       // Update logRho to reflect emphasis so emission color/brightness matches inline path
       // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
       sCenter = select(-20.0, log(rho), rho > 1e-9);
+      colorRho = rho;
+      colorS = sCenter;
     }
 
     // Skip near-zero density regions (but not potential overlay regions)
@@ -1216,7 +1235,10 @@ fn volumeRaymarchGrid(
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
         let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
         let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
-        if (probeMid.r < EMPTY_SKIP_THRESHOLD && probeFar.r < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
+        // For algo 23, include antiparticle density (G channel) in skip check
+        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, COLOR_ALGORITHM == 23);
+        let farTotal = select(probeFar.r, probeFar.r + probeFar.g, COLOR_ALGORITHM == 23);
+        if (midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
           t += skipDistance;
           continue;
         }
@@ -1224,11 +1246,14 @@ fn volumeRaymarchGrid(
     }
 
     // Adaptive step size based on density (keep fine steps in potential regions)
+    // For algo 23, sCenter is antiparticle density [0,1], not logRho [-20,0].
+    // Use logRho of total density for adaptive stepping.
     var stepMultiplier = 1.0;
     if (!hasPotOverlay) {
-      if (sCenter < -12.0) {
+      let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), COLOR_ALGORITHM == 23);
+      if (logRhoForStep < -12.0) {
         stepMultiplier = 4.0;
-      } else if (sCenter < -8.0) {
+      } else if (logRhoForStep < -8.0) {
         stepMultiplier = 2.0;
       }
     }
@@ -1334,7 +1359,9 @@ fn volumeRaymarchGrid(
       let gradient = computeGradientFromGrid(pos, uniforms);
 
       // Compute emission with lighting
-      let emission = computeEmissionLit(rho, sCenter, phase, pos, gradient, viewDir, uniforms);
+      // For algo 23: pass particle (colorRho) and antiparticle (colorS) to color function.
+      // For other algos: colorRho == rho and colorS == sCenter (no difference).
+      let emission = computeEmissionLit(colorRho, colorS, phase, pos, gradient, viewDir, uniforms);
 
       // Front-to-back compositing
       accColor += transmittance * alpha * emission;

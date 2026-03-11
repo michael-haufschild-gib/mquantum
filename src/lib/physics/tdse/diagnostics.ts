@@ -45,23 +45,26 @@ export function normDriftFromHistory(history: TdseDiagnosticsSnapshot[]): number
 /**
  * Estimates reflection and transmission coefficients from spatial norm partitioning.
  *
- * For a 1D barrier problem, R + T should be approximately 1 (minus absorber losses).
- * This requires the wavefunction data itself (not just the norm scalar), so it takes
- * pre-computed left/right norm fractions as inputs.
+ * Divides by initialNorm (norm at t=0) so that absorber loss and numerical
+ * dissipation are visible: R + T < 1 when probability has been absorbed.
  *
  * @param normLeft - Norm of psi in the region x < barrierCenter
  * @param normRight - Norm of psi in the region x >= barrierCenter
+ * @param initialNorm - Total norm at simulation start (defaults to normLeft + normRight for backward compat)
  * @returns Object with R (reflection) and T (transmission) coefficients
  */
 export function computeReflectionTransmission(
   normLeft: number,
   normRight: number,
+  initialNorm?: number,
 ): { R: number; T: number } {
-  const total = normLeft + normRight
-  if (total === 0) return { R: 0, T: 0 }
+  const denom = initialNorm != null && initialNorm > 0
+    ? initialNorm
+    : normLeft + normRight
+  if (denom === 0) return { R: 0, T: 0 }
   return {
-    R: normLeft / total,
-    T: normRight / total,
+    R: normLeft / denom,
+    T: normRight / denom,
   }
 }
 

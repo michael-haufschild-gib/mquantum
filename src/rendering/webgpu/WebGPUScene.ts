@@ -150,6 +150,12 @@ const schroedingerCompileSelector = (
   const openQuantumEnabled = state.schroedinger?.openQuantum?.enabled ?? false
   const openQuantumSupported = (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') && representation !== 'wigner'
 
+  // Dirac particleAntiparticleSplit field view uses dual-channel grid encoding
+  // (R=particle, G=antiparticle) which requires color algorithm 23 at compile time.
+  const diracFieldView = quantumMode === 'diracEquation'
+    ? (state.schroedinger?.dirac?.fieldView ?? 'totalDensity')
+    : undefined
+
   return {
     quantumMode,
     termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
@@ -159,6 +165,7 @@ const schroedingerCompileSelector = (
     uncertaintyBoundaryEnabled: state.schroedinger?.uncertaintyBoundaryEnabled ?? false,
     representation,
     openQuantumEnabled: openQuantumEnabled && openQuantumSupported,
+    diracFieldView,
   }
 }
 
@@ -555,13 +562,15 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       temporalReprojectionEnabled: (
         schroedingerCompile.quantumMode === 'freeScalarField' ||
         schroedingerCompile.quantumMode === 'tdseDynamics' ||
-        schroedingerCompile.quantumMode === 'becDynamics'
+        schroedingerCompile.quantumMode === 'becDynamics' ||
+        schroedingerCompile.quantumMode === 'diracEquation'
       ) ? false : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
       analyticalGradientEnabled: performance_.analyticalGradientEnabled,
       fastEigenInterpolationEnabled: performance_.fastEigenInterpolationEnabled,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
+      diracFieldView: schroedingerCompile.diracFieldView,
       representation: schroedingerCompile.representation,
       openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
       skyboxEnabled: environment.skyboxEnabled,
@@ -739,6 +748,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.interferenceEnabled,
     schroedingerCompile.uncertaintyBoundaryEnabled,
     schroedingerCompile.representation,
+    schroedingerCompile.diracFieldView,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
     performance_.analyticalGradientEnabled,
@@ -1745,7 +1755,7 @@ export interface PassConfig {
   frameBlendingEnabled: boolean
   // Schrodinger isosurface mode (compile-time shader selection)
   isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics' | 'diracEquation'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   nodalEnabled: boolean
   phaseMaterialityEnabled: boolean
@@ -1757,6 +1767,8 @@ export interface PassConfig {
   fastEigenInterpolationEnabled: boolean
   renderResolutionScale?: number
   colorAlgorithm: PaletteColorAlgorithm
+  // Dirac field view — drives compile-time color algorithm override for dual-channel encoding
+  diracFieldView?: string
   // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
   representation: 'position' | 'momentum' | 'wigner'
   // Open quantum system (density matrix + Lindblad) — requires shader recompilation
@@ -1775,7 +1787,7 @@ export interface PassConfig {
 interface SchrodingerPassConfig {
   objectType: ObjectType
   dimension: number
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
+  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics' | 'diracEquation'
   termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   colorAlgorithm: PaletteColorAlgorithm
   isosurface: boolean
@@ -1806,28 +1818,44 @@ function normalizeColorAlgorithmForQuantumMode(
   quantumMode: PassConfig['quantumMode'],
   colorAlgorithm: PaletteColorAlgorithm,
   openQuantumEnabled: boolean = false,
+  diracFieldView?: string,
 ): PaletteColorAlgorithm {
+  // Dirac particleAntiparticleSplit uses dual-channel encoding (R=particle, G=antiparticle)
+  // that ONLY algorithm 23 (particleAntiparticle) can render correctly.
+  if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
+    return 'particleAntiparticle'
+  }
+
   const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled).some(
     (option) => option.value === colorAlgorithm
   )
   if (isAvailable) return colorAlgorithm
 
-  // Fallback: in open quantum mode, use 'purityMap' (designed for density matrix);
-  // otherwise fall back to 'radialDistance' (position-based, no phase dependency).
-  return openQuantumEnabled ? 'purityMap' : 'radialDistance'
+  // Fallback: pick a sensible default for the current mode.
+  if (openQuantumEnabled) return 'purityMap'
+  // Compute modes (TDSE, BEC, Dirac, free scalar) render into density grids —
+  // 'radialDistance' is position-based and invalid. Use 'phaseDensity' which reads
+  // R (density) + B (phase) from the grid and works for all compute modes.
+  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' ||
+      quantumMode === 'freeScalarField' || quantumMode === 'diracEquation') {
+    return 'phaseDensity'
+  }
+  return 'radialDistance'
 }
 
 function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isFreeScalar = config.quantumMode === 'freeScalarField'
   const isTdse = config.quantumMode === 'tdseDynamics'
   const isBec = config.quantumMode === 'becDynamics'
-  // Free scalar, TDSE, and BEC use GPU compute pipelines with density grid output,
+  const isDirac = config.quantumMode === 'diracEquation'
+  // Free scalar, TDSE, BEC, and Dirac use GPU compute pipelines with density grid output,
   // so they disable analytic-only features and force position representation.
-  const isComputeMode = isFreeScalar || isTdse || isBec
+  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,
     config.openQuantumEnabled,
+    config.diracFieldView,
   )
   return {
     objectType: config.objectType,
@@ -1886,7 +1914,7 @@ export function shouldForceFullRebuildForQuantumModeTransition(
   if (!previous) return false
   if (previous.quantumMode === next.quantumMode) return false
 
-  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics'])
+  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
   return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
 }
 
@@ -2502,6 +2530,7 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     quantumMode,
     config.colorAlgorithm,
     config.openQuantumEnabled,
+    config.diracFieldView,
   )
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as
     | WGSLColorAlgorithm

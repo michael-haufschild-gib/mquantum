@@ -242,18 +242,38 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const rhoNorm = t
           ;[r, g, b] = hslToRgb(phaseNorm, 0.85, rhoNorm)
         } else if (colorAlgorithm === 'blackbody') {
-          // Blackbody: analytic temperature ramp (t = normalized density)
-          // Matches shader: temp = normalized * 12000, blackbody(temp)
+          // Blackbody: Tanner Helland approximation (matches shader)
+          // temp = normalized * 12000 → 0..12000 K
           const temp = t * 12000
           if (temp < 500) {
             r = 0
             g = 0
             b = 0
           } else {
-            const invTemp = Math.pow(temp, -1.5)
-            r = Math.min(1, Math.max(0, (56100000 * invTemp + 148) / 255))
-            g = Math.min(1, Math.max(0, (100040000 * invTemp + 66) / 255))
-            b = Math.min(1, Math.max(0, (194180000 * invTemp + 30) / 255))
+            const tk = temp / 100
+            // Red
+            if (tk <= 66) {
+              r = 1.0
+            } else {
+              r = 329.698727446 * Math.pow(tk - 60, -0.1332047592) / 255
+            }
+            // Green
+            if (tk <= 66) {
+              g = (99.4708025861 * Math.log(tk) - 161.1195681661) / 255
+            } else {
+              g = 288.1221695283 * Math.pow(tk - 60, -0.0755148492) / 255
+            }
+            // Blue
+            if (tk >= 66) {
+              b = 1.0
+            } else if (tk <= 19) {
+              b = 0
+            } else {
+              b = (138.5177312231 * Math.log(tk - 10) - 305.0447927307) / 255
+            }
+            r = Math.min(1, Math.max(0, r))
+            g = Math.min(1, Math.max(0, g))
+            b = Math.min(1, Math.max(0, b))
           }
         } else if (colorAlgorithm === 'radialDistance') {
           // Radial Distance (spectral): mirror WGSL algo 11 in emission.wgsl.ts.
@@ -323,6 +343,14 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             const u = (t - 0.75) / 0.25
             r = 0.987 + (0.988 - 0.987) * u; g = 0.645 + (0.998 - 0.645) * u; b = 0.040 + (0.645 - 0.040) * u
           }
+        } else if (colorAlgorithm === 'particleAntiparticle') {
+          // Upper/Lower spinor: particle (blue-cyan) → antiparticle (red-magenta)
+          // Matches shader: pColor = (0.1, 0.55, 0.95), aColor = (0.95, 0.15, 0.45)
+          const particleDensity = 1 - t
+          const antiparticleDensity = t
+          r = 0.1 * particleDensity + 0.95 * antiparticleDensity
+          g = 0.55 * particleDensity + 0.15 * antiparticleDensity
+          b = 0.95 * particleDensity + 0.45 * antiparticleDensity
         } else if (colorAlgorithm === 'phaseDensity') {
           // Phase-density composite: hue sweeps through phase, brightness = density
           // Preview: t drives both phase (hue) and density (brightness) together

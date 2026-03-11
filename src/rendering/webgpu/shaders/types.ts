@@ -30,6 +30,11 @@ export type ColorAlgorithm =
   | 16 // Purity map (global purity → saturation)
   | 17 // Entropy map (global von Neumann entropy → diverging scale)
   | 18 // Coherence map (spatial coherence fraction → color)
+  | 19 // Viridis (perceptually uniform scientific colormap)
+  | 20 // Inferno (high-contrast scientific colormap)
+  | 21 // Density contours (isodensity lines on viridis ramp)
+  | 22 // Phase-density composite (hue=phase, brightness=density)
+  | 23 // Particle/antiparticle split (Dirac dual-channel)
 
 /**
  * Lighting mode for compile-time optimization
@@ -63,6 +68,7 @@ export interface WGSLShaderConfig {
    * - 3,4,7,8,9,10,11: HSL + phase-aware logic
    * - 6: Oklab phase-aware cyclic map
    * - 5: No color modules (blackbody)
+   * - 23: HSL (Dirac particle/antiparticle dual-channel)
    * If undefined, all color modules included for runtime switching
    */
   colorAlgorithm?: ColorAlgorithm

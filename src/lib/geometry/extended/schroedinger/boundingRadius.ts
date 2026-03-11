@@ -16,6 +16,7 @@
  * so the required bounding radius in coordinate space is R_k / momentumScale.
  */
 
+import type { DiracConfig } from '../types'
 import type { QuantumPreset } from './presets'
 
 /**
@@ -179,6 +180,29 @@ export function computeHydrogenMomentumBoundingRadius(
 }
 
 /**
+ * Compute bounding radius for a Dirac equation lattice.
+ *
+ * Uses the same lattice-extent approach as TDSE/BEC: half the maximum
+ * physical lattice extent across the first min(dimension, 3) axes,
+ * with a 10% margin for smooth boundary falloff.
+ *
+ * @param dimension - Number of spatial dimensions
+ * @param diracConfig - Dirac lattice configuration
+ * @returns Bounding radius in object-space units
+ */
+export function computeDiracBoundingRadius(
+  dimension: number,
+  diracConfig: DiracConfig
+): number {
+  const maxExtent = Math.max(
+    ...Array.from({ length: Math.min(dimension, 3) }, (_, d) =>
+      (diracConfig.gridSize[d] ?? 64) * (diracConfig.spacing[d] ?? 0.15) * 0.5
+    )
+  )
+  return Math.max(maxExtent * 1.1, MIN_BOUND_R)
+}
+
+/**
  * Compute bounding radius for the current quantum state.
  * Dispatches to the appropriate function based on quantum mode and representation.
  *
@@ -191,6 +215,7 @@ export function computeHydrogenMomentumBoundingRadius(
  * @param extraDimOmega - Extra dimension frequencies (hydrogen ND mode)
  * @param representation - 'position' (default) or 'momentum'
  * @param momentumScale - Reciprocal-space zoom factor (only for momentum); default 1.0
+ * @param diracConfig - Dirac lattice config (only for diracEquation mode)
  * @returns Bounding radius in object-space units
  */
 export function computeBoundingRadius(
@@ -202,10 +227,16 @@ export function computeBoundingRadius(
   extraDimN?: number[],
   extraDimOmega?: number[],
   representation: 'position' | 'momentum' = 'position',
-  momentumScale: number = 1.0
+  momentumScale: number = 1.0,
+  diracConfig?: DiracConfig
 ): number {
   // Only dimensions 4..11 contribute hydrogen extra-dimension factors.
   // Ignore stale hidden slots when current dimension is lower.
+  // Dirac equation: lattice-based bounding radius (like TDSE/BEC)
+  if (quantumMode === 'diracEquation' && diracConfig) {
+    return computeDiracBoundingRadius(dimension, diracConfig)
+  }
+
   const activeExtraDimCount = Math.max(0, Math.min(dimension - 3, 8))
   const activeExtraDimN = extraDimN?.slice(0, activeExtraDimCount)
   const activeExtraDimOmega = extraDimOmega?.slice(0, activeExtraDimCount)

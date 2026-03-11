@@ -91,6 +91,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Vortex imprint: Thomas-Fermi background × product of vortex phase windings.
     // packetMomentum[0] = vortex charge (integer winding number)
     // packetMomentum[3] = vortex lattice count (0 or 1 = single vortex)
+    // packetMomentum[4] = alternate charge flag (1.0 = dipole ±charge pattern)
     let mu = params.packetAmplitude;
     let g = params.interactionStrength;
     var Vv: f32 = 0.0;
@@ -108,6 +109,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let charge = params.packetMomentum[0];
     let latticeCount = i32(params.packetMomentum[3]);
     let nVortices = max(latticeCount, 1);
+    let alternateCharge = params.packetMomentum[4] > 0.5;
     let xi_bg = params.hbar / sqrt(2.0 * params.mass * max(abs(g) * max(nv, 1e-10), 1e-10));
 
     if (nVortices <= 1) {
@@ -134,7 +136,9 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
         let dy = pos1v - cy;
         let r_perp_i = sqrt(dx * dx + dy * dy);
         let theta_i = atan2(dy, dx);
-        let vPhase = charge * theta_i;
+        // Alternate charge sign for dipole: even vortices +charge, odd -charge
+        let viCharge = select(charge, charge * select(1.0, -1.0, vi % 2 == 1), alternateCharge);
+        let vPhase = viCharge * theta_i;
         let coreFactor = r_perp_i / sqrt(r_perp_i * r_perp_i + xi_bg * xi_bg);
         // Multiply total wavefunction by this vortex's contribution
         let nextRe = totalRe * coreFactor * cos(vPhase) - totalIm * coreFactor * sin(vPhase);

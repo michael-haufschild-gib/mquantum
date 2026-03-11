@@ -69,33 +69,29 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
     V = 0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r2;
   } else if (params.potentialType == 5u) {
-    // Driven: barrier with time-dependent modulation
+    // Driven: barrier with time-dependent height modulation
     let dist = abs(pos0 - params.barrierCenter);
-    var baseV: f32 = 0.0;
     if (dist < params.barrierWidth * 0.5) {
-      baseV = params.barrierHeight;
-    }
-
-    var drive: f32 = 0.0;
-    if (params.driveEnabled == 1u) {
-      let t = params.simTime;
-      let w = params.driveFrequency;
-      let A = params.driveAmplitude;
-      if (params.driveWaveform == 0u) {
-        // Sine
-        drive = A * sin(2.0 * 3.14159265 * w * t);
-      } else if (params.driveWaveform == 1u) {
-        // Gaussian pulse
-        let tau = 1.0 / (w + 0.001);
-        drive = A * exp(-t * t / (2.0 * tau * tau));
-      } else {
-        // Chirp: linearly increasing frequency
-        let phase = 2.0 * 3.14159265 * w * t * (1.0 + 0.5 * w * t);
-        drive = A * sin(phase);
+      var drive: f32 = 0.0;
+      if (params.driveEnabled == 1u) {
+        let t = params.simTime;
+        let w = params.driveFrequency;
+        let A = params.driveAmplitude;
+        if (params.driveWaveform == 0u) {
+          // Sine
+          drive = A * sin(2.0 * 3.14159265 * w * t);
+        } else if (params.driveWaveform == 1u) {
+          // Gaussian pulse
+          let tau = 1.0 / (w + 0.001);
+          drive = A * exp(-t * t / (2.0 * tau * tau));
+        } else {
+          // Chirp: linearly increasing frequency
+          let phase = 2.0 * 3.14159265 * w * t * (1.0 + 0.5 * w * t);
+          drive = A * sin(phase);
+        }
       }
+      V = params.barrierHeight + drive;
     }
-
-    V = baseV + drive;
   } else if (params.potentialType == 6u) {
     // Double slit: barrier wall perpendicular to axis 0 with two slit openings along axis 1
     let wallDist = abs(pos0 - params.barrierCenter);

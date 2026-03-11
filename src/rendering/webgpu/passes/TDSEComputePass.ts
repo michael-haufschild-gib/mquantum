@@ -667,7 +667,7 @@ struct PackUniforms {
     f32[84] = config.driveFrequency
     f32[85] = config.driveAmplitude
     f32[86] = this.simTime
-    f32[87] = this.maxDensity
+    f32[87] = config.autoScale ? this.maxDensity : 1.0
 
     // slicePositions (352, indices 88-99)
     for (let i = 0; i < config.slicePositions.length; i++) f32[88 + 3 + i] = config.slicePositions[i]!
@@ -1045,7 +1045,7 @@ struct PackUniforms {
 
       // Submit current commands, then map
       device.queue.onSubmittedWorkDone().then(() => {
-        if (!staging || staging.mapState !== 'unmapped') {
+        if (!staging || staging.mapState !== 'unmapped' || this.diagStagingBuffer !== staging) {
           this.diagMappingInFlight = false
           return
         }
@@ -1086,7 +1086,7 @@ struct PackUniforms {
             const norm0 = this.diagHistory.length > 0
               ? this.diagHistory.getHistory()[0]!.totalNorm
               : totalNorm
-            const { R, T } = computeReflectionTransmission(normLeft, normRight)
+            const { R, T } = computeReflectionTransmission(normLeft, normRight, norm0)
             const snapshot: TdseDiagnosticsSnapshot = {
               simTime,
               totalNorm,

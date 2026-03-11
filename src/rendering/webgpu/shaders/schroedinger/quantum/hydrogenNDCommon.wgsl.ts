@@ -43,108 +43,115 @@ fn sphericalAngles3D(x: f32, y: f32, z: f32, r3d: f32) -> vec2f {
 }
 
 /**
- * Evaluate angular part Y_lm for hydrogen ND
+ * Evaluate angular part Y_lm for hydrogen ND as complex vec2f(re, im).
  *
- * Uses the existing spherical harmonic functions.
+ * Real orbitals: returns (realY, 0).
+ * Complex orbitals: returns full Y_lm = K·P·(cos(mφ), sin(mφ)).
  *
  * @param l - Azimuthal quantum number
  * @param m - Magnetic quantum number
  * @param theta - Polar angle
  * @param phi - Azimuthal angle
  * @param useReal - Use real orbital representation
- * @return Angular factor value
+ * @return vec2f(re, im) of angular factor
  */
-fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) -> f32 {
+fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) -> vec2f {
   if (useReal) {
-    // Use fast path for l <= 2, general path otherwise
     if (l <= 2) {
-      return fastRealSphericalHarmonic(l, m, theta, phi);
+      return vec2f(fastRealSphericalHarmonic(l, m, theta, phi), 0.0);
     } else {
-      return realSphericalHarmonic(l, m, theta, phi, true);
+      return vec2f(realSphericalHarmonic(l, m, theta, phi, true), 0.0);
     }
   } else {
-    // Complex: |Y_lm| = K * |P|
-    // Skip trig (cos/sin of mφ) and sqrt — they cancel out since
-    // |K·P·e^{imφ}| = |K·P|·|e^{imφ}| = |K·P|·1
+    // Full complex Y_lm = K · P_l^|m|(cosθ) · e^{imφ}
     let K = sphericalHarmonicNorm(l, m);
     let P = legendre(l, m, cos(theta));
-    return K * abs(P);
+    let KP = K * P;
+    let mf = f32(m);
+    return vec2f(KP * cos(mf * phi), KP * sin(mf * phi));
   }
 }
 
 /**
  * PERF: Evaluate angular part from pre-computed cos/sin theta.
  * Eliminates acos + cos round-trip (~50 GPU cycles per sample).
- * Used by the hot-path generated hydrogen ND variants.
+ * Returns vec2f(re, im).
  */
-fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi: f32, useReal: bool) -> f32 {
+fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi: f32, useReal: bool) -> vec2f {
   if (useReal) {
     if (l <= 2) {
-      return fastRealSphericalHarmonicDirect(l, m, cosTheta, sinTheta, phi);
+      return vec2f(fastRealSphericalHarmonicDirect(l, m, cosTheta, sinTheta, phi), 0.0);
     } else {
-      // General path needs theta for Legendre recurrence
       let theta = acos(clamp(cosTheta, -1.0, 1.0));
-      return realSphericalHarmonic(l, m, theta, phi, true);
+      return vec2f(realSphericalHarmonic(l, m, theta, phi, true), 0.0);
     }
   } else {
-    // Complex: |Y_lm| = K * |P|
     let K = sphericalHarmonicNorm(l, m);
     let P = legendre(l, m, cosTheta);
-    return K * abs(P);
+    let KP = K * P;
+    let mf = f32(m);
+    return vec2f(KP * cos(mf * phi), KP * sin(mf * phi));
   }
 }
 
 /**
  * Evaluate angular part Y_lm from Cartesian unit direction (nx, ny, nz) = (x/r, y/r, z/r).
- * Eliminates the atan2 singularity on the z-axis by using polynomial Cartesian form
- * for l <= 2 and a guarded fallback for l > 2.
+ * Returns vec2f(re, im). Eliminates atan2 singularity for real orbitals at l <= 2.
  */
-fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, useReal: bool) -> f32 {
+fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, useReal: bool) -> vec2f {
   if (useReal) {
     if (l <= 2) {
-      // Cartesian form: no atan2, no singularity
-      return fastRealSphericalHarmonicCartesian(l, m, nx, ny, nz);
+      return vec2f(fastRealSphericalHarmonicCartesian(l, m, nx, ny, nz), 0.0);
     } else {
-      // General path: recover spherical coords with z-axis guard.
-      // For m != 0, Y_lm vanishes on the z-axis (P_l^|m|(±1) = 0 for m != 0),
-      // so returning 0 when sin²θ is tiny is mathematically exact.
       let rxy2 = nx * nx + ny * ny;
       if (m != 0 && rxy2 < 1e-8) {
-        return 0.0;
+        return vec2f(0.0, 0.0);
       }
       let theta = acos(clamp(nz, -1.0, 1.0));
       let phi = atan2(ny, nx);
-      return realSphericalHarmonic(l, m, theta, phi, true);
+      return vec2f(realSphericalHarmonic(l, m, theta, phi, true), 0.0);
     }
   } else {
-    // Complex: |Y_lm| = K * |P| — no phi dependency, no singularity
+    // Complex: Y_lm = K·P·e^{imφ}; recover phi from Cartesian direction
+    let rxy2 = nx * nx + ny * ny;
+    if (m != 0 && rxy2 < 1e-8) {
+      return vec2f(0.0, 0.0);
+    }
     let K = sphericalHarmonicNorm(l, m);
     let P = legendre(l, m, nz);
-    return K * abs(P);
+    let KP = K * P;
+    let phi = atan2(ny, nx);
+    let mf = f32(m);
+    return vec2f(KP * cos(mf * phi), KP * sin(mf * phi));
   }
 }
 
 /**
- * Apply time evolution to hydrogen ND wavefunction
+ * Apply time evolution to hydrogen ND wavefunction (complex input).
  *
- * ψ(t) = ψ(0) * exp(-i * E * t)
+ * ψ(t) = ψ(0) · exp(-i · E_total · t)
  *
- * Energy E_n = -1/(2n²) in atomic units (Hartree).
+ * E_total = E_3D + E_extra where:
+ *   E_3D = -0.5 / n² (Hartree atomic units)
+ *   E_extra = Σ ω_j(n_j + 0.5) for extra dimensions
  *
- * @param psiReal - Real part of wavefunction at t=0
+ * @param psi0 - Complex wavefunction at t=0 as vec2f(re, im)
  * @param n - Principal quantum number
+ * @param extraEnergy - Extra-dimensional HO energy contribution
  * @param t - Time
  * @return vec2f(re, im) of time-evolved wavefunction
  */
-fn hydrogenNDTimeEvolution(psiReal: f32, n: i32, t: f32) -> vec2f {
+fn hydrogenNDTimeEvolution(psi0: vec2f, n: i32, extraEnergy: f32, t: f32) -> vec2f {
   // Guard: n must be >= 1 (principal quantum number)
   if (n < 1) {
-    return vec2f(psiReal, 0.0);
+    return psi0;
   }
   let nf = f32(n);
-  let E = -0.5 / (nf * nf);
+  let E = -0.5 / (nf * nf) + extraEnergy;
   let phase = -E * t;
-  let timeFactor = vec2f(cos(phase), sin(phase));
-  return vec2f(psiReal * timeFactor.x, psiReal * timeFactor.y);
+  // Complex multiplication: psi0 * exp(-iEt) = psi0 * (cos(phase) + i·sin(phase))
+  let c = cos(phase);
+  let s = sin(phase);
+  return vec2f(psi0.x * c - psi0.y * s, psi0.x * s + psi0.y * c);
 }
 `

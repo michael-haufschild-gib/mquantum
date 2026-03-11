@@ -274,13 +274,6 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(({ config, dim
         min={1} max={16} step={1}
       />
 
-      {/* Diagnostics */}
-      <Switch
-        label="Diagnostics"
-        checked={bec.diagnosticsEnabled}
-        onCheckedChange={actions.setDiagnosticsEnabled}
-      />
-
       {/* Slice positions for dims > 3 */}
       {activeDims > 3 && bec.slicePositions.length > 0 && (
         <>

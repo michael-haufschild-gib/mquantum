@@ -96,7 +96,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
   // Quantum effects are 3D volumetric shader features — hide for 2D, Wigner, and freeScalar modes.
   // Free scalar field uses density-grid raymarching; these shader features are disabled in
   // extractSchrodingerConfig and would have no visual effect.
-  if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics') return null
+  if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') return null
 
   return (
     <Section title="Quantum Effects" defaultOpen={defaultOpen} data-testid="quantum-effects-section">

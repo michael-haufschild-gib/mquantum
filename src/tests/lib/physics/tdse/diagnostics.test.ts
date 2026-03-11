@@ -46,26 +46,35 @@ describe('normDriftFromHistory', () => {
 
 describe('computeReflectionTransmission', () => {
   it('returns R=0, T=0 for zero norm', () => {
-    const { R, T } = computeReflectionTransmission(0, 0)
+    const { R, T } = computeReflectionTransmission(0, 0, 1.0)
     expect(R).toBe(0)
     expect(T).toBe(0)
   })
 
-  it('computes correct R and T for symmetric case', () => {
-    const { R, T } = computeReflectionTransmission(0.5, 0.5)
+  it('computes correct R and T for symmetric case with no loss', () => {
+    const { R, T } = computeReflectionTransmission(0.5, 0.5, 1.0)
     expect(R).toBeCloseTo(0.5)
     expect(T).toBeCloseTo(0.5)
   })
 
-  it('R + T equals 1 for arbitrary case', () => {
+  it('R + T < 1 when absorber has removed probability', () => {
+    // Initial norm was 1.0, but absorber ate 0.1
+    const { R, T } = computeReflectionTransmission(0.6, 0.3, 1.0)
+    expect(R).toBeCloseTo(0.6)
+    expect(T).toBeCloseTo(0.3)
+    expect(R + T).toBeCloseTo(0.9) // 10% absorbed
+  })
+
+  it('falls back to normLeft + normRight when initialNorm omitted', () => {
     const { R, T } = computeReflectionTransmission(0.3, 0.7)
     expect(R + T).toBeCloseTo(1.0)
   })
 
-  it('computes correct coefficients for tunneling scenario', () => {
-    const { R, T } = computeReflectionTransmission(0.8, 0.15)
-    expect(R).toBeCloseTo(0.8 / 0.95)
-    expect(T).toBeCloseTo(0.15 / 0.95)
+  it('computes correct coefficients for tunneling with loss', () => {
+    const { R, T } = computeReflectionTransmission(0.8, 0.15, 1.0)
+    expect(R).toBeCloseTo(0.8)
+    expect(T).toBeCloseTo(0.15)
+    expect(R + T).toBeCloseTo(0.95) // 5% absorbed
   })
 })
 

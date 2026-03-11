@@ -2,7 +2,9 @@ import {
   DEFAULT_SCHROEDINGER_CONFIG,
   DEFAULT_OPEN_QUANTUM_CONFIG,
   DEFAULT_TDSE_CONFIG,
+  DEFAULT_BEC_CONFIG,
   type BecConfig,
+  type DiracConfig,
   type FreeScalarConfig,
   type SchroedingerConfig,
   type TdseConfig,
@@ -18,8 +20,10 @@ import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { getTdsePreset } from '@/lib/physics/tdse/presets'
 import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
+import { maxStableDt } from '@/lib/physics/dirac/scales'
 import { StateCreator } from 'zustand'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
 
 export const createSchroedingerSlice: StateCreator<
@@ -43,6 +47,11 @@ export const createSchroedingerSlice: StateCreator<
       return update
     })
   }
+
+  /** Quantum modes that use GPU compute pipelines and require position representation */
+  const COMPUTE_MODES = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
+  /** Subset of compute modes that require dim >= 3 (free scalar field supports 1D+) */
+  const COMPUTE_MODES_3D = new Set(['tdseDynamics', 'becDynamics', 'diracEquation'])
 
   // === Setter Factories ===
   // Reduce boilerplate for common setter patterns
@@ -227,28 +236,74 @@ export const createSchroedingerSlice: StateCreator<
     // meaningless when the site budget changes (e.g. 64→8 at D=5, 8→64 at D=3).
     const gridSize = Array.from({ length: newDim }, () => gridDefault)
 
-    // Compute spacing so the grid covers the Thomas-Fermi condensate with margin.
-    // R_TF depends on dimension, interaction strength, and trap frequency.
+    const trapAnisotropy = Array.from({ length: newDim }, (_, i) =>
+      i < prev.trapAnisotropy.length ? prev.trapAnisotropy[i]! : 1.0
+    )
+
+    // Compute per-axis spacing so the grid covers the Thomas-Fermi condensate.
+    // Each axis has effective ω_d = ω * anisotropy[d], giving per-axis R_TF.
     const g = prev.interactionStrength ?? 500
     const omega = prev.trapOmega ?? 1.0
     const mass = prev.mass ?? 1.0
     const mu = g > 0 ? thomasFermiMuND(newDim, g, omega) : 0
-    const Rtf = mu > 0 ? thomasFermiRadius(mu, mass, omega) : 2.0
-    // Grid half-extent = gridDefault * spacing / 2 should be ≥ 1.3 × R_TF
-    // so the condensate occupies ~77% of the grid (with room for falloff + absorber).
     const COVERAGE = 1.3
-    const newSpacing = Math.max(0.05, (2 * Rtf * COVERAGE) / gridDefault)
-    const spacing = Array.from({ length: newDim }, () => newSpacing)
+    const spacing = Array.from({ length: newDim }, (_, i) => {
+      const effectiveOmega = omega * (trapAnisotropy[i] ?? 1.0)
+      const Rtf = mu > 0 ? thomasFermiRadius(mu, mass, effectiveOmega) : 2.0
+      return Math.max(0.05, (2 * Rtf * COVERAGE) / gridDefault)
+    })
 
-    const trapAnisotropy = Array.from({ length: newDim }, (_, i) =>
-      i < prev.trapAnisotropy.length ? prev.trapAnisotropy[i]! : 1.0
+    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
+      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
+    )
+    // Clamp dt to CFL limit for the new spacing/dimension (use smallest spacing)
+    const newDt = clampDtWithCfl(prev.dt, spacing, newDim, mass)
+    return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions, dt: newDt }
+  }
+
+  /** Maximum total Dirac lattice sites — FFT needs power-of-2 per axis */
+  const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
+
+  /**
+   * Compute default per-dimension grid size for a given Dirac dimensionality.
+   * Dirac requires power-of-2 per axis for FFT. Ensures total sites within budget.
+   */
+  const defaultDiracGridPerDim = (d: number): number => {
+    const raw = Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / d))
+    let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
+    pow2 = Math.max(2, Math.min(128, pow2))
+    while (pow2 > 2 && Math.pow(pow2, d) > DIRAC_MAX_TOTAL_SITES) {
+      pow2 = pow2 / 2
+    }
+    return pow2
+  }
+
+  /**
+   * Resize Dirac arrays to match a new latticeDim, preserving existing values
+   * where possible and filling new dimensions with defaults.
+   */
+  const resizeDiracArrays = (
+    prev: DiracConfig,
+    newDim: number
+  ): Partial<DiracConfig> => {
+    const gridDefault = defaultDiracGridPerDim(newDim)
+    const gridSize = Array.from({ length: newDim }, () => gridDefault)
+    const spacing = Array.from({ length: newDim }, (_, i) =>
+      i < prev.spacing.length ? prev.spacing[i]! : 0.15
+    )
+    const packetCenter = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
+    )
+    const packetMomentum = Array.from({ length: newDim }, (_, i) =>
+      i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
     )
     const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
-    // Clamp dt to CFL limit for the new spacing/dimension
-    const newDt = clampDtWithCfl(prev.dt, spacing, newDim, mass)
-    return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions, dt: newDt }
+    // Clamp dt to Dirac CFL limit for the new spacing
+    const dtMax = maxStableDt(spacing, prev.speedOfLight)
+    const newDt = Math.max(0.0001, Math.min(dtMax * 0.9, prev.dt))
+    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions, dt: newDt }
   }
 
   /**
@@ -517,6 +572,11 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quantum Mode Selection ===
     setSchroedingerQuantumMode: (mode) => {
+      // Most compute modes require volumetric 3D rendering — enforce dimension >= 3
+      // Free scalar field supports 1D+ (1D→tube, 2D→sheet via perpendicular falloff)
+      if (COMPUTE_MODES_3D.has(mode) && useGeometryStore.getState().dimension < 3) {
+        useGeometryStore.getState().setDimension(3)
+      }
       setWithVersion((state) => {
         const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
         if (mode === 'freeScalarField') {
@@ -567,18 +627,48 @@ export const createSchroedingerSlice: StateCreator<
           if (state.schroedinger.crossSectionEnabled) {
             updates.crossSectionEnabled = false
           }
+          // BEC requires volumetric 3D rendering — enforce minimum dimension
+          let dim = useGeometryStore.getState().dimension
+          if (dim < 3) {
+            useGeometryStore.getState().setDimension(3)
+            dim = 3
+          }
           // Sync latticeDim to current global dimension and resize arrays
-          const dim = useGeometryStore.getState().dimension
           const prev = state.schroedinger.bec
           if (prev.latticeDim !== dim) {
             const resized = resizeBecArrays(prev, dim)
             updates.bec = { ...prev, ...resized, needsReset: true }
           }
         }
+        if (mode === 'diracEquation') {
+          // Dirac doesn't support Wigner or momentum representation
+          if (state.schroedinger.representation !== 'position') {
+            updates.representation = 'position'
+          }
+          // Cross-section uses analytic wavefunctions, not Dirac spinor grid
+          if (state.schroedinger.crossSectionEnabled) {
+            updates.crossSectionEnabled = false
+          }
+          // Sync latticeDim to current global dimension and resize arrays
+          const dim = useGeometryStore.getState().dimension
+          const prev = state.schroedinger.dirac
+          if (prev.latticeDim !== dim) {
+            const resized = resizeDiracArrays(prev, dim)
+            updates.dirac = { ...prev, ...resized, needsReset: true }
+          }
+        }
         return { schroedinger: { ...state.schroedinger, ...updates } }
       })
     },
-    setSchroedingerRepresentation: valueSetter('representation'),
+    setSchroedingerRepresentation: (value: 'position' | 'momentum' | 'wigner') => {
+      // Compute modes only support position representation — reject silently
+      if (value !== 'position' && COMPUTE_MODES.has(get().schroedinger.quantumMode)) {
+        return
+      }
+      setWithVersion((state) => ({
+        schroedinger: { ...state.schroedinger, representation: value },
+      }))
+    },
     setSchroedingerMomentumDisplayUnits: valueSetter('momentumDisplayUnits'),
     setSchroedingerMomentumScale: clampedSetter('momentumScale', 0.1, 4.0),
     setSchroedingerMomentumHbar: clampedSetter('momentumHbar', 0.01, 10.0),
@@ -759,7 +849,7 @@ export const createSchroedingerSlice: StateCreator<
       const clamped = omegas.slice(0, 8).map((o) => Math.max(0.1, Math.min(2.0, o)))
       while (clamped.length < 8) clamped.push(1.0)
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, extraDimOmega: clamped },
+        schroedinger: { ...state.schroedinger, extraDimOmega: clamped, presetName: 'custom' },
       }))
     },
 
@@ -770,7 +860,7 @@ export const createSchroedingerSlice: StateCreator<
       }
       const clamped = Math.max(0, Math.min(0.5, spread))
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, extraDimFrequencySpread: clamped },
+        schroedinger: { ...state.schroedinger, extraDimFrequencySpread: clamped, presetName: 'custom' },
       }))
     },
 
@@ -2186,12 +2276,16 @@ export const createSchroedingerSlice: StateCreator<
     setBecMass: (mass) => {
       if (!isFiniteSchroedingerInput(mass)) return
       const clamped = Math.max(0.1, Math.min(10, mass))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, mass: clamped },
-        },
-      }))
+      setWithVersion((state) => {
+        const { spacing, latticeDim, dt } = state.schroedinger.bec
+        const newDt = clampDtWithCfl(dt, spacing, latticeDim, clamped)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, mass: clamped, dt: newDt },
+          },
+        }
+      })
     },
     setBecHbar: (hbar) => {
       if (!isFiniteSchroedingerInput(hbar)) return
@@ -2241,15 +2335,16 @@ export const createSchroedingerSlice: StateCreator<
         return
       }
       setWithVersion((state) => {
-        const { latticeDim } = state.schroedinger.bec
+        const { latticeDim, mass, dt } = state.schroedinger.bec
         const clamped = Array.from({ length: latticeDim }, (_, i) => {
           const s = i < spacing.length ? spacing[i]! : 0.15
           return Math.max(0.01, Math.min(1.0, s))
         })
+        const newDt = clampDtWithCfl(dt, clamped, latticeDim, mass)
         return {
           schroedinger: {
             ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, spacing: clamped, needsReset: true },
+            bec: { ...state.schroedinger.bec, spacing: clamped, dt: newDt, needsReset: true },
           },
         }
       })
@@ -2286,7 +2381,7 @@ export const createSchroedingerSlice: StateCreator<
             slicePositions: _presetSlice,
             ...safeOverrides
           } = preset.overrides
-          const merged = { ...state.schroedinger.bec, ...safeOverrides, needsReset: true }
+          const merged = { ...DEFAULT_BEC_CONFIG, ...safeOverrides, needsReset: true }
           // Always resize arrays to match global dimension — preset scalar physics
           // params (interactionStrength, trapOmega, etc.) feed into resizeBecArrays
           // which computes dimension-appropriate grid sizes and TF-aware spacing.
@@ -2298,9 +2393,11 @@ export const createSchroedingerSlice: StateCreator<
             },
           }
         })
+        useBecDiagnosticsStore.getState().reset()
       })
     },
     resetBecField: () => {
+      useBecDiagnosticsStore.getState().reset()
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -2315,6 +2412,411 @@ export const createSchroedingerSlice: StateCreator<
           bec: { ...state.schroedinger.bec, needsReset: false },
         },
       }))
+    },
+
+    // === Dirac Equation ===
+    setDiracMass: (mass) => {
+      if (!isFiniteSchroedingerInput(mass)) return
+      const clamped = Math.max(0.01, Math.min(10, mass))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, mass: clamped },
+        },
+      }))
+    },
+    setDiracSpeedOfLight: (c) => {
+      if (!isFiniteSchroedingerInput(c)) return
+      const clamped = Math.max(0.01, Math.min(10, c))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, speedOfLight: clamped },
+        },
+      }))
+    },
+    setDiracHbar: (hbar) => {
+      if (!isFiniteSchroedingerInput(hbar)) return
+      const clamped = Math.max(0.01, Math.min(10, hbar))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, hbar: clamped },
+        },
+      }))
+    },
+    setDiracDt: (dt) => {
+      if (!isFiniteSchroedingerInput(dt)) {
+        warnNonFiniteSchroedingerInput('dirac.dt', dt)
+        return
+      }
+      setWithVersion((state) => {
+        const { spacing, speedOfLight } = state.schroedinger.dirac
+        const dtMax = maxStableDt(spacing, speedOfLight)
+        const clamped = Math.max(0.0001, Math.min(dtMax * 0.9, dt))
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, dt: clamped },
+          },
+        }
+      })
+    },
+    setDiracStepsPerFrame: (steps) => {
+      const clamped = Math.max(1, Math.min(16, Math.round(steps)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, stepsPerFrame: clamped },
+        },
+      }))
+    },
+    setDiracPotentialType: (type) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, potentialType: type, needsReset: true },
+        },
+      }))
+    },
+    setDiracPotentialStrength: (strength) => {
+      if (!isFiniteSchroedingerInput(strength)) return
+      const clamped = Math.max(-100, Math.min(100, strength))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, potentialStrength: clamped },
+        },
+      }))
+    },
+    setDiracPotentialWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) return
+      const clamped = Math.max(0.01, Math.min(10, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, potentialWidth: clamped },
+        },
+      }))
+    },
+    setDiracPotentialCenter: (center) => {
+      if (!isFiniteSchroedingerInput(center)) return
+      const clamped = Math.max(-10, Math.min(10, center))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, potentialCenter: clamped },
+        },
+      }))
+    },
+    setDiracHarmonicOmega: (omega) => {
+      if (!isFiniteSchroedingerInput(omega)) return
+      const clamped = Math.max(0.01, Math.min(10, omega))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, harmonicOmega: clamped },
+        },
+      }))
+    },
+    setDiracCoulombZ: (z) => {
+      if (!isFiniteSchroedingerInput(z)) return
+      const clamped = Math.max(1, Math.min(137, Math.round(z)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, coulombZ: clamped },
+        },
+      }))
+    },
+    setDiracInitialCondition: (condition) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, initialCondition: condition, needsReset: true },
+        },
+      }))
+    },
+    setDiracPacketWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) return
+      const clamped = Math.max(0.05, Math.min(5, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, packetWidth: clamped, needsReset: true },
+        },
+      }))
+    },
+    setDiracPositiveEnergyFraction: (fraction) => {
+      if (!isFiniteSchroedingerInput(fraction)) return
+      const clamped = Math.max(0, Math.min(1, fraction))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, positiveEnergyFraction: clamped, needsReset: true },
+        },
+      }))
+    },
+    setDiracFieldView: (view) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, fieldView: view },
+        },
+      }))
+    },
+    setDiracAutoScale: (autoScale) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, autoScale },
+        },
+      }))
+    },
+    setDiracShowPotential: (showPotential) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, showPotential },
+        },
+      }))
+    },
+    setDiracAbsorberEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, absorberEnabled: enabled },
+        },
+      }))
+    },
+    setDiracAbsorberWidth: (width) => {
+      if (!isFiniteSchroedingerInput(width)) return
+      const clamped = Math.max(0.05, Math.min(0.3, width))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, absorberWidth: clamped },
+        },
+      }))
+    },
+    setDiracAbsorberStrength: (strength) => {
+      if (!isFiniteSchroedingerInput(strength)) return
+      const clamped = Math.max(0.1, Math.min(50, strength))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, absorberStrength: clamped },
+        },
+      }))
+    },
+    setDiracGridSize: (size) => {
+      if (!hasOnlyFiniteNumbers(size)) {
+        warnNonFiniteSchroedingerInput('dirac.gridSize', size)
+        return
+      }
+      setWithVersion((state) => {
+        const { latticeDim } = state.schroedinger.dirac
+        const gridDefault = defaultDiracGridPerDim(latticeDim)
+        const snapped = Array.from({ length: latticeDim }, (_, i) => {
+          const s = i < size.length ? size[i]! : gridDefault
+          const val = Math.max(2, Math.min(128, Math.round(s)))
+          const log2 = Math.round(Math.log2(val))
+          return Math.max(2, Math.min(gridDefault, 2 ** log2))
+        })
+        // Enforce total site budget
+        while (snapped.reduce((a, b) => a * b, 1) > DIRAC_MAX_TOTAL_SITES) {
+          let maxIdx = 0
+          for (let i = 1; i < snapped.length; i++) {
+            if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
+          }
+          if (snapped[maxIdx]! <= 2) break
+          snapped[maxIdx] = snapped[maxIdx]! / 2
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, gridSize: snapped, needsReset: true },
+          },
+        }
+      })
+    },
+    setDiracSpacing: (spacing) => {
+      if (!hasOnlyFiniteNumbers(spacing)) {
+        warnNonFiniteSchroedingerInput('dirac.spacing', spacing)
+        return
+      }
+      setWithVersion((state) => {
+        const { latticeDim } = state.schroedinger.dirac
+        const clamped = Array.from({ length: latticeDim }, (_, i) => {
+          const s = i < spacing.length ? spacing[i]! : 0.15
+          return Math.max(0.01, Math.min(1.0, s))
+        })
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, spacing: clamped, needsReset: true },
+          },
+        }
+      })
+    },
+    setDiracPacketCenter: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) return
+      setWithVersion((state) => {
+        const arr = [...state.schroedinger.dirac.packetCenter]
+        if (dimIndex >= 0 && dimIndex < arr.length) {
+          arr[dimIndex] = value
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, packetCenter: arr, needsReset: true },
+          },
+        }
+      })
+    },
+    setDiracPacketMomentum: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) return
+      setWithVersion((state) => {
+        const arr = [...state.schroedinger.dirac.packetMomentum]
+        if (dimIndex >= 0 && dimIndex < arr.length) {
+          arr[dimIndex] = value
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, packetMomentum: arr, needsReset: true },
+          },
+        }
+      })
+    },
+    setDiracSpinDirection: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) return
+      setWithVersion((state) => {
+        const arr = [...state.schroedinger.dirac.spinDirection]
+        if (dimIndex >= 0 && dimIndex < arr.length) {
+          arr[dimIndex] = value
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, spinDirection: arr, needsReset: true },
+          },
+        }
+      })
+    },
+    setDiracParticleColor: (color) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, particleColor: color },
+        },
+      }))
+    },
+    setDiracAntiparticleColor: (color) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, antiparticleColor: color },
+        },
+      }))
+    },
+    setDiracDiagnosticsEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, diagnosticsEnabled: enabled },
+        },
+      }))
+    },
+    setDiracDiagnosticsInterval: (interval) => {
+      const clamped = Math.max(1, Math.min(60, Math.round(interval)))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, diagnosticsInterval: clamped },
+        },
+      }))
+    },
+    setDiracNeedsReset: () => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, needsReset: true },
+        },
+      }))
+    },
+    clearDiracNeedsReset: () => {
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          dirac: { ...state.schroedinger.dirac, needsReset: false },
+        },
+      }))
+    },
+    setDiracSlicePosition: (dimIndex, value) => {
+      if (!isFiniteSchroedingerInput(value)) return
+      setWithVersion((state) => {
+        const arr = [...state.schroedinger.dirac.slicePositions]
+        if (dimIndex >= 0 && dimIndex < arr.length) {
+          arr[dimIndex] = value
+        }
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            dirac: { ...state.schroedinger.dirac, slicePositions: arr },
+          },
+        }
+      })
+    },
+
+    applyDiracPreset: (presetId) => {
+      import('@/lib/physics/dirac/presets').then(({ DIRAC_SCENARIO_PRESETS }) => {
+        const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
+        if (!preset) return
+        setWithVersion((state) => {
+          const prev = state.schroedinger.dirac
+          const dim = prev.latticeDim
+
+          // Strip dimension-dependent fields — presets must not override dimension
+          const { latticeDim: _ld, gridSize: _gs, ...safeOverrides } = preset.overrides
+
+          const merged = { ...prev, ...safeOverrides, needsReset: true }
+
+          // Pad/replicate spacing to match current latticeDim.
+          // If preset provides a shorter spacing array, replicate the first element.
+          if (safeOverrides.spacing) {
+            const srcSpacing = safeOverrides.spacing
+            merged.spacing = Array.from({ length: dim }, (_, i) =>
+              i < srcSpacing.length ? srcSpacing[i]! : srcSpacing[0]!
+            )
+          }
+
+          // Pad packetCenter / packetMomentum to match latticeDim
+          if (safeOverrides.packetCenter) {
+            const src = safeOverrides.packetCenter
+            merged.packetCenter = Array.from({ length: dim }, (_, i) =>
+              i < src.length ? src[i]! : 0
+            )
+          }
+          if (safeOverrides.packetMomentum) {
+            const src = safeOverrides.packetMomentum
+            merged.packetMomentum = Array.from({ length: dim }, (_, i) =>
+              i < src.length ? src[i]! : 0
+            )
+          }
+
+          // Clamp dt to CFL limit for the new spacing
+          const dtMax = maxStableDt(merged.spacing, merged.speedOfLight)
+          merged.dt = Math.max(0.0001, Math.min(dtMax * 0.9, merged.dt))
+
+          return {
+            schroedinger: {
+              ...state.schroedinger,
+              dirac: merged,
+            },
+          }
+        })
+      })
     },
 
     // === Open Quantum System ===
@@ -2566,6 +3068,15 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
+      // Sync Dirac latticeDim to global dimension when in Dirac mode
+      let diracUpdate: Partial<DiracConfig> | undefined
+      if (currentState.quantumMode === 'diracEquation') {
+        const prev = currentState.dirac
+        if (prev.latticeDim !== dimension) {
+          diracUpdate = { ...resizeDiracArrays(prev, dimension), needsReset: true }
+        }
+      }
+
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
@@ -2589,6 +3100,9 @@ export const createSchroedingerSlice: StateCreator<
             : {}),
           ...(becUpdate
             ? { bec: { ...state.schroedinger.bec, ...becUpdate } }
+            : {}),
+          ...(diracUpdate
+            ? { dirac: { ...state.schroedinger.dirac, ...diracUpdate } }
             : {}),
         },
       }))

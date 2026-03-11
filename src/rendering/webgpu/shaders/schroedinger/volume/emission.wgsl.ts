@@ -48,18 +48,38 @@ const PHASE_HUE_INFLUENCE: f32 = 0.4;`)
   // phase materiality blocks in emissionPostBlock, main.wgsl.ts, and main2D.wgsl.ts
   // (WGSL requires symbol resolution even in dead branches behind compile-time const guards)
   parts.push(/* wgsl */ `
-// Analytic approximation of blackbody color (rgb)
+// Blackbody color from temperature in Kelvin (Tanner Helland approximation)
+// Based on CIE 1964 color matching data. Produces physically plausible
+// dim-red → orange → white → blue-white ramp across 1000–40000 K.
 fn blackbody(Temp: f32) -> vec3f {
   if (Temp <= 0.0) { return vec3f(0.0); }
-  var col = vec3f(255.0);
-  // PERF: pow(x, -1.5) = 1/(x*sqrt(x)), avoids exp(-1.5*log(x)) ~8 cycle savings
-  let sqrtTemp = sqrt(Temp);
-  let invTemp = 1.0 / (Temp * sqrtTemp);
-  col.x = 56100000.0 * invTemp + 148.0;
-  col.y = 100040000.0 * invTemp + 66.0;
-  col.z = 194180000.0 * invTemp + 30.0;
-  col = col / 255.0;
-  return clamp(col, vec3f(0.0), vec3f(1.0));
+  let t = Temp / 100.0;
+  var r: f32; var g: f32; var b: f32;
+
+  // Red
+  if (t <= 66.0) {
+    r = 255.0;
+  } else {
+    r = 329.698727446 * pow(t - 60.0, -0.1332047592);
+  }
+
+  // Green
+  if (t <= 66.0) {
+    g = 99.4708025861 * log(t) - 161.1195681661;
+  } else {
+    g = 288.1221695283 * pow(t - 60.0, -0.0755148492);
+  }
+
+  // Blue
+  if (t >= 66.0) {
+    b = 255.0;
+  } else if (t <= 19.0) {
+    b = 0.0;
+  } else {
+    b = 138.5177312231 * log(t - 10.0) - 305.0447927307;
+  }
+
+  return clamp(vec3f(r, g, b) / 255.0, vec3f(0.0), vec3f(1.0));
 }`)
 
   // henyeyGreenstein(): only 3D volumetric (used by computeEmissionLit in post-block)
@@ -390,6 +410,25 @@ const ALGO_BRANCH: Record<number, string> = {
     let saturation = mix(0.3, 0.95, brightness);
     let lightness = brightness * 0.55;
     col = hsl2rgb(phaseNorm, saturation, lightness);`,
+
+  // ===== DIRAC EQUATION COLOR ALGORITHMS =====
+
+  23: /* wgsl */ `
+    // 23: Particle / Antiparticle Split (Dirac dual-channel)
+    // Density grid encoding: R = particle density, G = antiparticle density, B = phase.
+    // In computeBaseColor: rho = R, s = G, phase = B.
+    // Maps particle → blue-cyan, antiparticle → red-magenta with additive blending.
+    let particleDensity = clamp(rho, 0.0, 1.0);
+    let antiparticleDensity = clamp(s, 0.0, 1.0);
+    // Blue-cyan for particle component
+    let pColor = vec3f(0.1, 0.55, 0.95) * particleDensity;
+    // Red-magenta for antiparticle component
+    let aColor = vec3f(0.95, 0.15, 0.45) * antiparticleDensity;
+    // Additive blending of both components
+    col = pColor + aColor;
+    // Phase (B channel) modulates brightness (subtle variation)
+    let phaseBrightness = 0.7 + 0.3 * cos(phase);
+    col *= phaseBrightness;`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -417,6 +456,7 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   20: 'Inferno',
   21: 'Density Contours',
   22: 'Phase-Density',
+  23: 'Particle/Antiparticle',
 }
 
 export { ALGO_BRANCH, COLOR_ALG_NAMES }

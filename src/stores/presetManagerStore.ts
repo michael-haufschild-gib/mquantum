@@ -1671,13 +1671,14 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           }
         }
 
-        // Post-load invariants for compute modes (FSF/TDSE).
+        // Post-load invariants for compute modes.
         // loadGeometry + setState bypass setSchroedingerQuantumMode's enforcement,
         // so we must normalize here to prevent stale/incompatible state from leaking
         // into the renderer (e.g. representation='momentum' or crossSectionEnabled=true
         // would corrupt the GPU uniform buffer for density-grid-based pipelines).
         const qm = useExtendedObjectStore.getState().schroedinger?.quantumMode
-        if (qm === 'freeScalarField' || qm === 'tdseDynamics') {
+        const isComputeQm = qm === 'freeScalarField' || qm === 'tdseDynamics' || qm === 'becDynamics' || qm === 'diracEquation'
+        if (isComputeQm) {
           if (useGeometryStore.getState().dimension < 3) {
             useGeometryStore.getState().setDimension(3)
           }

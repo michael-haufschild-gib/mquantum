@@ -1,5 +1,6 @@
 export { AdvancedObjectControls } from './AdvancedObjectControls'
 export { BECAnalysisSection } from './BECAnalysisSection'
+export { DiracAnalysisSection } from './DiracAnalysisSection'
 export { SchroedingerAdvanced } from './SchroedingerAdvanced'
 export { SchroedingerCrossSectionSection } from './SchroedingerCrossSectionSection'
 export { SchroedingerQuantumEffectsSection } from './SchroedingerQuantumEffectsSection'

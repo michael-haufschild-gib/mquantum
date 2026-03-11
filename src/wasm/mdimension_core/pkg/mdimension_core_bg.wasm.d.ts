@@ -3,7 +3,9 @@
 export const memory: WebAssembly.Memory;
 export const compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
 export const compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const dirac_spinor_size_wasm: (a: number) => number;
 export const dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
+export const generate_dirac_matrices_wasm: (a: number, b: number) => void;
 export const magnitude_wasm: (a: number, b: number) => number;
 export const multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;

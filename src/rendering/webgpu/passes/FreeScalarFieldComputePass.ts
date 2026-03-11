@@ -75,6 +75,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private initialized = false
   private stepAccumulator = 0
   private lastConfigHash = ''
+  private lastInitHash = ''
+  private lastAutoScale = true
+  private lastAnalysisMode = 0
   private totalSites = 0
   private maxFieldValue = 1.0
   private maxPhiEstimate = 1.0
@@ -197,11 +200,21 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
-   * Compute a hash of the config fields that require buffer rebuild.
+   * Compute a hash of the config fields that require buffer rebuild (grid shape changes).
    * @param config - Free scalar field configuration
    */
   private computeConfigHash(config: FreeScalarConfig): string {
     return `${config.gridSize.join('x')}_d${config.latticeDim}`
+  }
+
+  /**
+   * Compute a hash of the config fields that require field reinitialization
+   * without buffer rebuild. Covers physics params that change the initial
+   * condition but not the grid shape.
+   * @param config - Free scalar field configuration
+   */
+  private computeInitHash(config: FreeScalarConfig): string {
+    return `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
   }
 
   /**
@@ -708,9 +721,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       this.initialized = false
     }
 
+    // Check if physics params changed (requires reinit but not buffer rebuild)
+    const initHash = this.computeInitHash(config)
+    if (initHash !== this.lastInitHash && this.lastInitHash !== '') {
+      this.initialized = false
+    }
+    this.lastInitHash = initHash
+
+    // Recompute maxPhiEstimate when autoScale transitions off→on
+    const autoScaleTransition = config.autoScale && !this.lastAutoScale
+    this.lastAutoScale = config.autoScale
+
     // Pre-compute maxPhiEstimate before updateUniforms so the first frame
     // after a reset uses the correct normalization (not the stale value).
-    if (!this.initialized || config.needsReset) {
+    if (!this.initialized || config.needsReset || autoScaleTransition) {
       if (config.autoScale) {
         this.maxPhiEstimate =
           config.initialCondition === 'vacuumNoise'
@@ -854,6 +878,20 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     // k-Space occupation: async CPU readback → FFT → texture upload
     const analysisMode = this.uniformU32[47]!
+
+    // Clear textures on transition into k-space mode to avoid showing stale position-space data
+    if (analysisMode === 3 && this.lastAnalysisMode !== 3 && this.densityTexture && this.analysisTexture) {
+      const bytesPerTexel = 8 // rgba16float = 4 × 2
+      const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
+      const rowsPerImage = DENSITY_GRID_SIZE
+      const totalBytes = bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE
+      const zeros = new Uint8Array(totalBytes)
+      const texSize = { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE }
+      device.queue.writeTexture({ texture: this.densityTexture }, zeros, { bytesPerRow, rowsPerImage }, texSize)
+      device.queue.writeTexture({ texture: this.analysisTexture }, zeros, { bytesPerRow, rowsPerImage }, texSize)
+    }
+    this.lastAnalysisMode = analysisMode
+
     if (analysisMode === 3 && this.initialized) {
       this.kSpaceFrameCounter++
       if (

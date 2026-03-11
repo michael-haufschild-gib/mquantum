@@ -246,6 +246,16 @@ export function compose_rotations_wasm(dimension, plane_names, angles) {
 }
 
 /**
+ * Returns the spinor size for a given spatial dimension.
+ * @param {number} spatial_dim
+ * @returns {number}
+ */
+export function dirac_spinor_size_wasm(spatial_dim) {
+    const ret = wasm.dirac_spinor_size_wasm(spatial_dim);
+    return ret >>> 0;
+}
+
+/**
  * Computes the dot product of two vectors
  *
  * # Arguments
@@ -265,6 +275,33 @@ export function dot_product_wasm(a, b) {
     const len1 = WASM_VECTOR_LEN;
     const ret = wasm.dot_product_wasm(ptr0, len0, ptr1, len1);
     return ret;
+}
+
+/**
+ * Generates Dirac gamma matrices for N spatial dimensions.
+ *
+ * # Arguments
+ * * `spatial_dim` - Number of spatial dimensions (1-11)
+ *
+ * # Returns
+ * Flat f32 buffer containing all matrices packed sequentially:
+ *   [spinorSize_as_f32, alpha_1 | alpha_2 | ... | alpha_N | beta]
+ * Each matrix is S×S×2 floats (complex, row-major, re/im interleaved).
+ * @param {number} spatial_dim
+ * @returns {Float32Array}
+ */
+export function generate_dirac_matrices_wasm(spatial_dim) {
+    try {
+        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+        wasm.generate_dirac_matrices_wasm(retptr, spatial_dim);
+        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+        var v1 = getArrayF32FromWasm0(r0, r1).slice();
+        wasm.__wbindgen_export3(r0, r1 * 4, 4);
+        return v1;
+    } finally {
+        wasm.__wbindgen_add_to_stack_pointer(16);
+    }
 }
 
 /**

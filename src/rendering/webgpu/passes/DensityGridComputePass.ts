@@ -123,6 +123,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   private needsRecompute = true
   private lastDimension = -1
   private lastQuantumMode: string | undefined
+  private lastTimeBucket = -1
   // Version tracking for uniform buffers - prevents unnecessary recomputation
   private lastSchroedingerVersion = -1
   private lastBasisVersion = -1
@@ -665,7 +666,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
   /**
    * Check if recomputation is needed based on current state.
    */
-  needsUpdate(_time: number, dimension: number, quantumMode?: string): boolean {
+  needsUpdate(time: number, dimension: number, quantumMode?: string): boolean {
     // Always recompute if marked dirty (quantum parameters changed)
     if (this.needsRecompute) return true
 
@@ -675,10 +676,15 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     // Recompute if quantum mode changed
     if (quantumMode !== this.lastQuantumMode) return true
 
-    // NOTE: Time does NOT trigger recomputation!
-    // Density |ψ|² is time-independent for stationary quantum states.
-    // Phase animation is handled separately in the fragment shader.
-    // The density grid caches spatial structure only.
+    // Time-dependent density for multi-term superpositions:
+    // |ψ(x,t)|² has cross-term interference fringes that evolve in time.
+    // Single eigenstates (termCount=1) are stationary — skip time check.
+    // Use a time bucket at ~60 Hz to avoid recomputing every frame.
+    const termCount = this.passConfig.termCount ?? 1
+    if (termCount > 1) {
+      const bucket = Math.floor(time * 60.0)
+      if (bucket !== this.lastTimeBucket) return true
+    }
 
     return false
   }
@@ -721,6 +727,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     this.needsRecompute = false
     this.lastDimension = this.passConfig.dimension
     this.lastQuantumMode = this.passConfig.quantumMode
+    const timeNow = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+    this.lastTimeBucket = Math.floor(timeNow * 60.0)
   }
 
   postFrame(): void {

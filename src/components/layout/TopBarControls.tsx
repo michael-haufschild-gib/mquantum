@@ -79,8 +79,10 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
   const representationSelector = useShallow((state: ExtendedObjectState) => ({
     representation: state.schroedinger.representation,
     setRepresentation: state.setSchroedingerRepresentation,
+    quantumMode: state.schroedinger.quantumMode,
   }))
-  const { representation, setRepresentation } = useExtendedObjectStore(representationSelector)
+  const { representation, setRepresentation, quantumMode } = useExtendedObjectStore(representationSelector)
+  const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
 
   // Local State
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -143,7 +145,8 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             icon={representation === 'position' ? TargetIcon : WaveIcon}
             active={representation === 'wigner'}
             onClick={toggleRepresentation}
-            label={`Representation: ${representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}`}
+            disabled={isComputeMode}
+            label={isComputeMode ? 'Position only (compute mode)' : `Representation: ${representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}`}
             small
           />
           <IconButton
@@ -170,13 +173,15 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
           <Button
             onClick={toggleRepresentation}
             onMouseEnter={() => soundManager.playHover()}
+            disabled={isComputeMode}
             aria-label="Switch Representation Space"
-            title="Switch representation (Position → Momentum → Wigner)"
+            title={isComputeMode ? 'Position only (compute mode)' : 'Switch representation (Position → Momentum → Wigner)'}
             data-testid="control-representation-toggle"
             className={`
               rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
               px-3 py-1.5
               bg-[var(--bg-hover)] text-text-secondary border-border-default hover:text-text-primary hover:bg-[var(--bg-active)]
+              ${isComputeMode ? 'opacity-40 pointer-events-none' : ''}
             `}
             variant="ghost"
             size="md"

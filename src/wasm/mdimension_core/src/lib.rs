@@ -19,6 +19,7 @@ pub fn start() {
 }
 
 mod animation;
+mod clifford;
 
 // ============================================================================
 // Animation Operations (Hot Path - 60 FPS)
@@ -160,4 +161,46 @@ pub fn normalize_vector_wasm(v: &[f64]) -> Vec<f64> {
 #[wasm_bindgen]
 pub fn subtract_vectors_wasm(a: &[f64], b: &[f64]) -> Vec<f64> {
     animation::subtract_vectors(a, b)
+}
+
+// ============================================================================
+// Phase 3: Dirac Equation — Clifford Algebra
+// ============================================================================
+
+/// Generates Dirac gamma matrices for N spatial dimensions.
+///
+/// # Arguments
+/// * `spatial_dim` - Number of spatial dimensions (1-11)
+///
+/// # Returns
+/// Flat f32 buffer containing all matrices packed sequentially:
+///   [spinorSize_as_f32, alpha_1 | alpha_2 | ... | alpha_N | beta]
+/// Each matrix is S×S×2 floats (complex, row-major, re/im interleaved).
+#[wasm_bindgen]
+pub fn generate_dirac_matrices_wasm(spatial_dim: usize) -> Vec<f32> {
+    let s = clifford::spinor_size(spatial_dim);
+    let (alphas, beta) = clifford::generate_dirac_matrices(spatial_dim);
+    let matrix_size = s * s * 2; // complex entries per matrix
+
+    // Pack: [spinor_size_bits, alpha_1..., alpha_N..., beta...]
+    let total = 1 + spatial_dim * matrix_size + matrix_size;
+    let mut result = Vec::with_capacity(total);
+    result.push(f32::from_bits(s as u32));
+    for alpha in &alphas {
+        result.extend_from_slice(alpha);
+    }
+    result.extend_from_slice(&beta);
+
+    #[cfg(debug_assertions)]
+    {
+        assert!(clifford::verify_clifford_algebra(&alphas, &beta, s));
+    }
+
+    result
+}
+
+/// Returns the spinor size for a given spatial dimension.
+#[wasm_bindgen]
+pub fn dirac_spinor_size_wasm(spatial_dim: usize) -> usize {
+    clifford::spinor_size(spatial_dim)
 }

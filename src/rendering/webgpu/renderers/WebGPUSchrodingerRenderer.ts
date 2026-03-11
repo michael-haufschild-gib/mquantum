@@ -32,6 +32,7 @@ import { DensityGridComputePass } from '../passes/DensityGridComputePass'
 import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheComputePass'
 import { FreeScalarFieldComputePass } from '../passes/FreeScalarFieldComputePass'
 import { TDSEComputePass } from '../passes/TDSEComputePass'
+import { DiracComputePass } from '../passes/DiracComputePass'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
@@ -80,6 +81,7 @@ const QUANTUM_MODE_MAP: Record<string, number> = {
   freeScalarField: 2,
   tdseDynamics: 3,
   becDynamics: 4,
+  diracEquation: 5,
 }
 const COLOR_ALGORITHM_MAP: Record<string, number> = {
   lch: 0,
@@ -101,6 +103,11 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   purityMap: 16,
   entropyMap: 17,
   coherenceMap: 18,
+  viridis: 19,
+  inferno: 20,
+  densityContours: 21,
+  phaseDensity: 22,
+  particleAntiparticle: 23,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -207,6 +214,7 @@ interface ExtendedStoreSnapshot {
   clearFreeScalarNeedsReset?: () => void
   clearTdseNeedsReset?: () => void
   clearBecNeedsReset?: () => void
+  clearDiracNeedsReset?: () => void
 }
 
 interface TransformSnapshot {
@@ -234,7 +242,7 @@ function getStoreSnapshot<T>(ctx: WebGPURenderContext, key: string): T | undefin
 export interface SchrodingerRendererConfig {
   dimension?: number
   isosurface?: boolean
-  quantumMode?: QuantumModeForShader | 'freeScalarField' | 'tdseDynamics' | 'becDynamics'
+  quantumMode?: QuantumModeForShader | 'freeScalarField' | 'tdseDynamics' | 'becDynamics' | 'diracEquation'
   termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
   /** Compile-time color module selection (0-11) */
   colorAlgorithm?: WGSLColorAlgorithm
@@ -367,6 +375,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
   // TDSE Compute Pass (time-dependent Schroedinger equation dynamics)
   private tdsePass: TDSEComputePass | null = null
+  private diracPass: DiracComputePass | null = null
 
   // Eigenfunction Cache Compute Pass (HO mode acceleration)
   private eigenCachePass: EigenfunctionCacheComputePass | null = null
@@ -493,12 +502,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isWigner = config?.representation === 'wigner'
     // Free scalar field requires volumetric 3D rendering — override 2D pipeline even if dimension=2
     const isFreeScalarEarly = config?.quantumMode === 'freeScalarField'
-    // TDSE / BEC dynamics also requires volumetric 3D rendering via density grid
+    // TDSE / BEC / Dirac dynamics also require volumetric 3D rendering via density grid
     const isTdseEarly = config?.quantumMode === 'tdseDynamics' || config?.quantumMode === 'becDynamics'
-    // Free scalar / TDSE do not support temporal reprojection (no world position output)
-    const isTemporal = (config?.temporal ?? false) && !isFreeScalarEarly && !isTdseEarly
-    const is2D = !isFreeScalarEarly && !isTdseEarly && (config?.dimension ?? 3) === 2
-    const pipelineIs2D = is2D || (isWigner && !isFreeScalarEarly && !isTdseEarly)
+    const isDiracEarly = config?.quantumMode === 'diracEquation'
+    const isComputeEarly = isFreeScalarEarly || isTdseEarly || isDiracEarly
+    // Compute modes do not support temporal reprojection (no world position output)
+    const isTemporal = (config?.temporal ?? false) && !isComputeEarly
+    const is2D = !isComputeEarly && (config?.dimension ?? 3) === 2
+    const pipelineIs2D = is2D || (isWigner && !isComputeEarly)
     const outputs = pipelineIs2D
       ? [
           // 2D mode: only color output (no depth, no normal, no temporal)
@@ -551,6 +562,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
     // TDSE / BEC dynamics mode: also uses density grid exclusively via compute pass
     const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics' || this.rendererConfig.quantumMode === 'becDynamics'
+    // Dirac equation mode: spinor field evolution via split-operator, density grid only
+    const isDirac = this.rendererConfig.quantumMode === 'diracEquation'
+    // Unified flag for all compute-based modes (density grid, no eigencache)
+    const isComputeMode = isFreeScalar || isTdse || isDirac
 
     // Free scalar field: temporal reprojection is unsupported (no world position output).
     // Must be set here (not just in shaderConfig) so pipeline targets and render pass
@@ -563,8 +578,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // TDSE dynamics: same constraints as free scalar — no temporal, force 3D minimum.
-    if (isTdse) {
+    // TDSE / Dirac dynamics: same constraints as free scalar — no temporal, force 3D minimum.
+    if (isTdse || isDirac) {
       this.rendererConfig.temporal = false
       if ((this.rendererConfig.dimension ?? 3) < 3) {
         this.rendererConfig.dimension = 3
@@ -582,8 +597,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
     const dim = this.rendererConfig.dimension ?? 3
     const isosurface = this.rendererConfig.isosurface ?? false
-    const useDensityGrid = isFreeScalar || isTdse || (isHydrogen && !isosurface)
-    const baseDensityGridSize = (isFreeScalar || isTdse)
+    const openQuantumEnabled = this.rendererConfig.openQuantumEnabled ?? false
+    // Use density grid for: compute modes (TDSE/BEC/Dirac/freeScalar), hydrogen volumetric,
+    // or open-quantum HO (mixed-state density must come from the density matrix grid, not pure evalPsi)
+    const useDensityGrid = isComputeMode || (isHydrogen && !isosurface) || (openQuantumEnabled && !isosurface)
+    const baseDensityGridSize = isComputeMode
       ? 64
       : !useDensityGrid
         ? 64
@@ -595,31 +613,30 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Open quantum mode: reduce grid when K is large to control O(K²) per-voxel cost.
     // For HO, K = termCount (known at construction). For hydrogen, K depends on runtime
     // maxN — use termCount as conservative fallback (typically 1-8 vs hydrogen K up to 14).
-    const openQuantumEnabled_ = this.rendererConfig.openQuantumEnabled ?? false
-    const estimatedK = openQuantumEnabled_
+    const estimatedK = openQuantumEnabled
       ? (isHydrogen ? 10 : (this.rendererConfig.termCount ?? 4))
       : 0
-    const densityGridSize = openQuantumEnabled_
+    const densityGridSize = openQuantumEnabled
       ? WebGPUSchrodingerRenderer.computeOpenQuantumGridSize(baseDensityGridSize, estimatedK)
       : baseDensityGridSize
 
     // Eigenfunction cache is only supported on 3D pipelines.
     // 2D/Wigner reuses group(2) bindings 2/3 for the Wigner cache texture + sampler.
     // For HO momentum (3D), the uniform buffer contains 1/ω → cache produces k-space functions automatically.
-    const useEigenfunctionCache = (isFreeScalar || isTdse || pipelineIs2D) ? false : enableCache
-    const useAnalyticalGradient = (isFreeScalar || isTdse)
+    const useEigenfunctionCache = (isComputeMode || pipelineIs2D) ? false : enableCache
+    const useAnalyticalGradient = isComputeMode
       ? false
       : (this.rendererConfig.analyticalGradientEnabled ?? true)
     // Fast toggle semantics:
     // - ON  => fast legacy interpolation (robust mode OFF)
     // - OFF => robust interpolation/extrapolation (higher quality, slower)
-    const useRobustEigenInterpolation = (isFreeScalar || isTdse)
+    const useRobustEigenInterpolation = isComputeMode
       ? false
       : !(this.rendererConfig.fastEigenInterpolationEnabled ?? true)
 
-    // For shader composition, free scalar field maps to 'harmonicOscillator' since
-    // it only uses the density grid sampling path (no inline wavefunction evaluation).
-    const shaderQuantumMode: QuantumModeForShader = (isFreeScalar || isTdse)
+    // For shader composition, compute-based modes map to 'harmonicOscillator' since
+    // they only use the density grid sampling path (no inline wavefunction evaluation).
+    const shaderQuantumMode: QuantumModeForShader = isComputeMode
       ? 'harmonicOscillator'
       : (this.rendererConfig.quantumMode as QuantumModeForShader)
 
@@ -627,15 +644,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       dimension: this.rendererConfig.dimension!,
       isosurface: this.rendererConfig.isosurface,
       quantumMode: shaderQuantumMode,
-      termCount: (isFreeScalar || isTdse) ? 1 : this.rendererConfig.termCount,
-      nodal: (isFreeScalar || isTdse) ? false : (this.rendererConfig.nodalEnabled ?? true),
+      termCount: isComputeMode ? 1 : this.rendererConfig.termCount,
+      nodal: isComputeMode ? false : (this.rendererConfig.nodalEnabled ?? true),
       colorAlgorithm: this.rendererConfig.colorAlgorithm,
-      temporalAccumulation: (isFreeScalar || isTdse) ? false : this.rendererConfig.temporal,
-      phaseMateriality: (isFreeScalar || isTdse)
+      temporalAccumulation: isComputeMode ? false : this.rendererConfig.temporal,
+      phaseMateriality: isComputeMode
         ? false
         : (this.rendererConfig.phaseMaterialityEnabled ?? true),
-      interference: (isFreeScalar || isTdse) ? false : (this.rendererConfig.interferenceEnabled ?? true),
-      uncertaintyBoundary: (isFreeScalar || isTdse)
+      interference: isComputeMode ? false : (this.rendererConfig.interferenceEnabled ?? true),
+      uncertaintyBoundary: isComputeMode
         ? false
         : (this.rendererConfig.uncertaintyBoundaryEnabled ?? true),
       useEigenfunctionCache,
@@ -643,10 +660,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       useRobustEigenInterpolation,
       useDensityGrid,
       densityGridSize,
-      densityGridHasPhase: (isFreeScalar || isTdse) ? true : undefined,
-      isWigner: (isFreeScalar || isTdse) ? false : isWigner,
-      useWignerCache: (isFreeScalar || isTdse) ? false : isWigner,
-      isFreeScalar: isFreeScalar || isTdse,
+      densityGridHasPhase: isComputeMode ? true : undefined,
+      isWigner: isComputeMode ? false : isWigner,
+      useWignerCache: isComputeMode ? false : isWigner,
+      isFreeScalar: isComputeMode,
       freeScalarAnalysis:
         isFreeScalar &&
         this.rendererConfig.colorAlgorithm !== undefined &&
@@ -700,10 +717,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const dim = this.rendererConfig.dimension ?? 3
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
     const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics' || this.rendererConfig.quantumMode === 'becDynamics'
+    const isDirac = this.rendererConfig.quantumMode === 'diracEquation'
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
-    // Free scalar / TDSE / BEC require volumetric 3D rendering — override 2D pipeline
-    const pipelineIs2D = !isFreeScalar && !isTdse && (dim === 2 || this.rendererConfig.representation === 'wigner')
     const openQuantumEnabled = this.rendererConfig.openQuantumEnabled ?? false
+    const isComputeMode = isFreeScalar || isTdse || isDirac
+    // Compute-based modes require volumetric 3D rendering — override 2D pipeline
+    const pipelineIs2D = !isComputeMode && (dim === 2 || this.rendererConfig.representation === 'wigner')
     const forceRgba = dim > 3 || openQuantumEnabled || isHydrogen
 
     // =====================================================================
@@ -720,6 +739,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.freeScalarFieldPass = null
     this.tdsePass?.dispose()
     this.tdsePass = null
+    this.diracPass?.dispose()
+    this.diracPass = null
 
     // Reset open quantum state on pipeline rebuild (new shader variant)
     this.openQuantumState = null
@@ -742,7 +763,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.hydrogenOQConfigHash = ''
 
     let densityPromise: Promise<void> | null = null
-    if (!pipelineIs2D && !isFreeScalar && !isTdse) {
+    if (!pipelineIs2D && !isComputeMode) {
       const isHydrogenOQ = openQuantumEnabled && isHydrogen
       this.densityGridPass = new DensityGridComputePass({
         dimension: dim,
@@ -768,6 +789,12 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (isTdse) {
       this.tdsePass = new TDSEComputePass()
       this.tdsePass.initializeDensityTexture(device)
+    }
+
+    // Dirac equation: create its own compute pass
+    if (isDirac) {
+      this.diracPass = new DiracComputePass()
+      this.diracPass.initializeDensityTexture(device)
     }
 
     // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
@@ -880,8 +907,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         } // wignerCacheSampler
       )
     }
-    // Density grid texture + sampler for grid-based raymarching (hydrogen, free scalar, or TDSE)
-    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass || this.tdsePass)) {
+    // Density grid texture + sampler for grid-based raymarching (hydrogen, free scalar, TDSE, or Dirac)
+    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass || this.tdsePass || this.diracPass)) {
       objectBindGroupEntries.push(
         {
           binding: 4,
@@ -1174,7 +1201,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ? this.freeScalarFieldPass.getDensityTextureView()
       : this.tdsePass
         ? this.tdsePass.getDensityTextureView()
-        : (this.densityGridPass?.getDensityTextureView() ?? null)
+        : this.diracPass
+          ? this.diracPass.getDensityTextureView()
+          : (this.densityGridPass?.getDensityTextureView() ?? null)
     if (this.shaderConfig.useDensityGrid && densityView) {
       // Create trilinear-filtering sampler for smooth grid interpolation
       this.densityGridSampler = device.createSampler({
@@ -1782,10 +1811,32 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
+    // Compute bounding radius for Dirac mode (same lattice extent logic as TDSE)
+    const isDiracBound = schroedinger?.quantumMode === 'diracEquation'
+    const diracConfig = schroedinger?.dirac
+    if (isDiracBound && diracConfig) {
+      let maxExtent = 3.2
+      for (let d = 0; d < (diracConfig.latticeDim ?? 3); d++) {
+        const Ld = (diracConfig.gridSize?.[d] ?? 32) * (diracConfig.spacing?.[d] ?? 0.15)
+        if (Ld > maxExtent) maxExtent = Ld
+      }
+      const newBoundR = maxExtent / 2 * 1.15
+      const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
+      const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
+      if (
+        Math.abs(quantizedBoundR - this.boundingRadius) >=
+          WebGPUSchrodingerRenderer.BOUND_RADIUS_REBUILD_THRESHOLD &&
+        this.device
+      ) {
+        this.boundingRadius = quantizedBoundR
+        this.createBoundingGeometry(this.device)
+      }
+    }
+
     // Compute physics-based bounding radius for this state.
     // Must run on EVERY full update (not just preset regen) because hydrogen n/l/m
     // changes affect bounding radius but don't trigger HO preset regeneration.
-    if (this.cachedPreset && schroedinger?.quantumMode !== 'freeScalarField' && schroedinger?.quantumMode !== 'tdseDynamics' && schroedinger?.quantumMode !== 'becDynamics') {
+    if (this.cachedPreset && schroedinger?.quantumMode !== 'freeScalarField' && schroedinger?.quantumMode !== 'tdseDynamics' && schroedinger?.quantumMode !== 'becDynamics' && schroedinger?.quantumMode !== 'diracEquation') {
       const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
       const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
       const extraDimOmega = schroedinger?.extraDimOmega as number[] | undefined
@@ -1829,7 +1880,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // canonical compensation factor is irrelevant and must remain 1.0.
     // This guard runs unconditionally for grid-based modes to prevent stale compensation
     // from a previous mode (e.g., HO) carrying over after a mode switch.
-    if (schroedinger?.quantumMode === 'freeScalarField' || schroedinger?.quantumMode === 'tdseDynamics' || schroedinger?.quantumMode === 'becDynamics') {
+    if (schroedinger?.quantumMode === 'freeScalarField' || schroedinger?.quantumMode === 'tdseDynamics' || schroedinger?.quantumMode === 'becDynamics' || schroedinger?.quantumMode === 'diracEquation') {
       this.canonicalDensityCompensation = 1.0
       this.cachedPeakDensity = 1.0
     } else if (needsPresetRegen && this.cachedPreset) {
@@ -2230,13 +2281,18 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Representation + momentum controls (offset 1328-1344)
     // effectiveMomentumScale already incorporates ħ for p-space (computed above).
     // The shader reads momentumScale and applies it directly as kScale.
-    intView[1328 / 4] = isUniformComputeMode ? 0 : (REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0)
+    // Force position-space in density matrix mode: the OQ basis evaluator (singleBasis)
+    // only implements position-space hydrogen radial functions.
+    const forcePosition = isUniformComputeMode || (isDensityMatrixMode && quantumModeStr === 'hydrogenND')
+    intView[1328 / 4] = forcePosition ? 0 : (REPRESENTATION_MODE_MAP[schroedinger?.representation ?? 'position'] ?? 0)
     intView[1332 / 4] = MOMENTUM_DISPLAY_MODE_MAP[schroedinger?.momentumDisplayUnits ?? 'k'] ?? 0
     floatView[1336 / 4] = effectiveMomentumScale
     floatView[1340 / 4] = schroedinger?.momentumHbar ?? 1.0
 
     // Radial probability overlay (offset 1344-1376)
-    const radialProbEnabled = schroedinger?.radialProbabilityEnabled ?? false
+    // Disabled in momentum representation: the overlay evaluates position-space R_nl(r)
+    const isMomentumRep = !isUniformComputeMode && schroedinger?.representation === 'momentum'
+    const radialProbEnabled = (schroedinger?.radialProbabilityEnabled ?? false) && !isMomentumRep
     intView[1344 / 4] = radialProbEnabled ? 1 : 0
     floatView[1348 / 4] = schroedinger?.radialProbabilityOpacity ?? 0.6
     floatView[1352 / 4] =
@@ -2987,11 +3043,13 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         // [1] = soliton depth 0-1 (for darkSoliton)
         // [2] = soliton velocity fraction of c_s (for darkSoliton)
         // [3] = vortex lattice count (for vortexLattice → multi-vortex init)
-        const mom = new Array(Math.max(latDim, 4)).fill(0) as number[]
+        // [4] = vortex alternate charge flag (1.0 = dipole ±charge pattern)
+        const mom = new Array(Math.max(latDim, 5)).fill(0) as number[]
         if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
           mom[0] = bec.vortexCharge ?? 1
           if (initCond === 'vortexLattice') {
             mom[3] = bec.vortexLatticeCount ?? 4
+            mom[4] = bec.vortexAlternateCharge ? 1.0 : 0.0
           }
         }
         if (initCond === 'darkSoliton') {
@@ -3066,13 +3124,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
             const mass = bec?.mass ?? 1.0
             const hbar = bec?.hbar ?? 1.0
             const omega = bec?.trapOmega ?? 1.0
+            const aniso = bec?.trapAnisotropy ?? []
+            const latDim = bec?.latticeDim ?? 3
+            // Geometric mean of effective trap frequencies for anisotropic R_TF
+            let omegaProd = 1.0
+            for (let d = 0; d < latDim; d++) {
+              omegaProd *= omega * (aniso[d] ?? 1.0)
+            }
+            const omegaEff = Math.pow(omegaProd, 1 / latDim)
             const peakN = diag.maxDensity
             const mu = g * peakN
             const xiDenom = 2 * mass * g * peakN
             const xi = xiDenom > 0 ? hbar / Math.sqrt(xiDenom) : Infinity
             const csVal = (g * peakN) / mass
             const cs = csVal > 0 ? Math.sqrt(csVal) : 0
-            const rtfDenom = mass * omega * omega
+            const rtfDenom = mass * omegaEff * omegaEff
             const rtf = rtfDenom > 0 && mu > 0 ? Math.sqrt((2 * mu) / rtfDenom) : 0
 
             useBecDiagnosticsStore.getState().update({
@@ -3086,6 +3152,37 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
             })
           }
         }
+      }
+    }
+
+    // ============================================
+    // DIRAC EQUATION COMPUTE PASS
+    // ============================================
+    const diracPass = this.diracPass
+    if (diracPass) {
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+      const isPlaying = animation?.isPlaying ?? false
+      const speed = animation?.speed ?? 1.0
+      const diracConfig = extended?.schroedinger?.dirac
+
+      if (diracConfig) {
+        const schroedinger = extended?.schroedinger
+        diracPass.executeDirac(
+          ctx,
+          diracConfig as import('@/lib/geometry/extended/types').DiracConfig,
+          isPlaying,
+          speed,
+          schroedinger?.basisX as Float32Array | undefined,
+          schroedinger?.basisY as Float32Array | undefined,
+          schroedinger?.basisZ as Float32Array | undefined,
+          this.boundingRadius,
+        )
+        // Clear needsReset after processing (targeted mutation, no version bump)
+        if (diracConfig.needsReset) {
+          extended?.clearDiracNeedsReset?.()
+        }
+        // Diagnostics are updated internally by DiracComputePass.dispatchDiagnostics()
       }
     }
 
@@ -3426,8 +3523,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         schroedingerVersion
       )
 
-      // Sync basis uniforms (version-tracked)
-      wignerPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, rotationVersion)
+      // Sync basis uniforms (version-tracked, include slice animation time for 4D+)
+      const wignerGeometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+      const wignerDimension = wignerGeometry?.dimension ?? this.rendererConfig.dimension ?? 3
+      const wignerSliceAnimEnabled = extended?.schroedinger?.sliceAnimationEnabled ?? false
+      const wignerAccTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+      const wignerBasisTimeBucket =
+        wignerSliceAnimEnabled && wignerDimension > 3 ? Math.floor(wignerAccTime * 120.0) : 0
+      const wignerBasisVersion = rotationVersion * 1000003 + wignerBasisTimeBucket
+      wignerPass.updateBasisUniforms(ctx.device, this.basisUniformData.buffer, wignerBasisVersion)
 
       // Determine mode for grid range and update logic
       const schroedinger = extended?.schroedinger
@@ -3675,6 +3779,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     this.tdsePass?.dispose()
     this.tdsePass = null
+
+    this.diracPass?.dispose()
+    this.diracPass = null
 
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null

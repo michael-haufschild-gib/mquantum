@@ -29,6 +29,11 @@ export function compose_rotations_indexed_wasm(dimension: number, plane_indices:
 export function compose_rotations_wasm(dimension: number, plane_names: string[], angles: Float64Array): Float64Array;
 
 /**
+ * Returns the spinor size for a given spatial dimension.
+ */
+export function dirac_spinor_size_wasm(spatial_dim: number): number;
+
+/**
  * Computes the dot product of two vectors
  *
  * # Arguments
@@ -39,6 +44,19 @@ export function compose_rotations_wasm(dimension: number, plane_names: string[],
  * The scalar dot product
  */
 export function dot_product_wasm(a: Float64Array, b: Float64Array): number;
+
+/**
+ * Generates Dirac gamma matrices for N spatial dimensions.
+ *
+ * # Arguments
+ * * `spatial_dim` - Number of spatial dimensions (1-11)
+ *
+ * # Returns
+ * Flat f32 buffer containing all matrices packed sequentially:
+ *   [spinorSize_as_f32, alpha_1 | alpha_2 | ... | alpha_N | beta]
+ * Each matrix is S×S×2 floats (complex, row-major, re/im interleaved).
+ */
+export function generate_dirac_matrices_wasm(spatial_dim: number): Float32Array;
 
 /**
  * Computes the magnitude (length) of a vector
@@ -125,7 +143,9 @@ export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly compose_rotations_indexed_wasm: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly compose_rotations_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly dirac_spinor_size_wasm: (a: number) => number;
   readonly dot_product_wasm: (a: number, b: number, c: number, d: number) => number;
+  readonly generate_dirac_matrices_wasm: (a: number, b: number) => void;
   readonly magnitude_wasm: (a: number, b: number) => number;
   readonly multiply_matrices_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly multiply_matrix_vector_wasm: (a: number, b: number, c: number, d: number, e: number, f: number) => void;

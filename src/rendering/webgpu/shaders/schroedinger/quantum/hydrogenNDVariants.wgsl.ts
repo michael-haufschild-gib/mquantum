@@ -132,6 +132,27 @@ ${hoCallsWithEarlyExit}
 }
 
 /**
+ * Generate extra-dimensional HO energy: E_extra = Σ ω_j(n_j + 0.5)
+ * @param dimension
+ */
+function generateExtraDimEnergy(dimension: number): string {
+  const extraDimCount = dimension - 3
+  if (extraDimCount <= 0) {
+    return `
+  let extraEnergy: f32 = 0.0;
+`
+  }
+  const terms = Array.from(
+    { length: extraDimCount },
+    (_, i) => `getExtraDimOmega(uniforms, ${i}) * (f32(getExtraDimN(uniforms, ${i})) + 0.5)`,
+  )
+  return `
+  // Extra-dimensional HO energy: Σ ω_j(n_j + 0.5)
+  let extraEnergy: f32 = ${terms.join(' + ')};
+`
+}
+
+/**
  * Generate a complete dimension-specific hydrogenND function.
  *
  * @param dimension - The dimension (3-11)
@@ -144,6 +165,7 @@ function generateHydrogenNDBlock(dimension: number): string {
   const extraDimEarlyExit = generateExtraDimEarlyExit(dimension)
   const radiusCalc = generateRadiusCalculation(dimension)
   const extraDimProduct = generateExtraDimProduct(dimension)
+  const extraDimEnergy = generateExtraDimEnergy(dimension)
 
   return `
 // ============================================
@@ -170,14 +192,15 @@ ${extraDimEarlyExit}${radiusCalc}
   // Radial part: R_nl(r_3D) from the 3D hydrogen core
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm from Cartesian direction (avoids atan2 z-axis singularity)
+  // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
-  // Combine: psi = R * Y * extraProduct
-  let psiReal = R * Y * extraProduct;
-
-  // Time evolution
-  return hydrogenNDTimeEvolution(psiReal, uniforms.principalN, t);
+  // Combine: psi0 = R * extraProduct * Y (complex)
+  let scale = R * extraProduct;
+  let psi0 = vec2f(scale * Y.x, scale * Y.y);
+${extraDimEnergy}
+  // Time evolution (includes extra-dimensional energy)
+  return hydrogenNDTimeEvolution(psi0, uniforms.principalN, extraEnergy, t);
 }
 `
 }
@@ -267,6 +290,7 @@ export function generateHydrogenNDCachedBlock(dimension: number): string {
   const extraDimProduct = extraDimCount > 0
     ? generateExtraDimProductCached(dimension)
     : generateExtraDimProduct(dimension)
+  const extraDimEnergy = generateExtraDimEnergy(dimension)
 
   return `
 // ============================================
@@ -293,14 +317,15 @@ ${extraDimEarlyExit}${radiusCalc}
   // Radial part: R_nl(r_3D) from the 3D hydrogen core
   let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
 
-  // Angular part: Y_lm from Cartesian direction (avoids atan2 z-axis singularity)
+  // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
 ${extraDimProduct}
-  // Combine: psi = R * Y * extraProduct
-  let psiReal = R * Y * extraProduct;
-
-  // Time evolution
-  return hydrogenNDTimeEvolution(psiReal, uniforms.principalN, t);
+  // Combine: psi0 = R * extraProduct * Y (complex)
+  let scale = R * extraProduct;
+  let psi0 = vec2f(scale * Y.x, scale * Y.y);
+${extraDimEnergy}
+  // Time evolution (includes extra-dimensional energy)
+  return hydrogenNDTimeEvolution(psi0, uniforms.principalN, extraEnergy, t);
 }
 `
 }

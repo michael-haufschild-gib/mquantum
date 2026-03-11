@@ -86,22 +86,9 @@ fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniform
   let R = hydrogenRadial(n_k, l_k, r3D, uniforms.bohrRadius);
 
   // Angular part: Y_lm as vec2f(re, im) — parameterized by per-basis (l, m)
-  // For real orbitals (tesseral harmonics), the imaginary part is zero.
-  // For complex orbitals, we need the full complex Y_lm = K·P·e^{imφ}
-  // so the density matrix cross-terms ψ_k·ψ_l* capture angular interference.
-  var Y_complex: vec2f;
-  if (uniforms.useRealOrbitals != 0u) {
-    Y_complex = vec2f(evalHydrogenNDAngularCartesian(l_k, m_k, nx, ny, nz, true), 0.0);
-  } else {
-    // Z-axis guard: for m≠0, Y_lm vanishes on the z-axis (sinθ = 0)
-    let rxy2 = nx * nx + ny * ny;
-    if (m_k != 0 && rxy2 < 1e-8) {
-      return vec2f(0.0, 0.0);
-    }
-    let theta = acos(clamp(nz, -1.0, 1.0));
-    let phi_angle = atan2(ny, nx);
-    Y_complex = sphericalHarmonic(l_k, m_k, theta, phi_angle);
-  }
+  // evalHydrogenNDAngularCartesian now returns full complex Y_lm for both real
+  // and complex orbital modes, preserving azimuthal phase for cross-term interference.
+  let Y_complex = evalHydrogenNDAngularCartesian(l_k, m_k, nx, ny, nz, uniforms.useRealOrbitals != 0u);
 
 ${extraDimCode}
 

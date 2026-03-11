@@ -8,6 +8,7 @@ import { OpenQuantumDiagnosticsSection } from '@/components/sections/Advanced/Op
 import { SchroedingerCrossSectionSection } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { BECAnalysisSection } from '@/components/sections/Advanced/BECAnalysisSection'
+import { DiracAnalysisSection } from '@/components/sections/Advanced/DiracAnalysisSection'
 import { TDSEAnalysisSection } from '@/components/sections/Advanced/TDSEAnalysisSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
@@ -37,6 +38,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
             <SchroedingerCrossSectionSection defaultOpen={true} />
             <TDSEAnalysisSection defaultOpen={true} />
             <BECAnalysisSection defaultOpen={true} />
+            <DiracAnalysisSection defaultOpen={true} />
             <SchroedingerQuantumEffectsSection defaultOpen={true} />
             <AdvancedObjectControls />
             <OpenQuantumDiagnosticsSection />

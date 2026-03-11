@@ -4,6 +4,10 @@
  * Initializes app state from URL parameters on mount.
  * Supports loading scene presets via `?scene=<name>` or
  * object type via `?t=schroedinger&d=5&qm=hydrogenND`.
+ *
+ * INTENTIONAL SCOPE LIMIT: Only basic scene identification params are
+ * restored from URLs. Detailed state (quantum numbers, visual settings,
+ * etc.) requires scene presets. See state-serializer.ts for rationale.
  */
 
 import { applySceneExample, findSceneByName } from '@/lib/sceneExamples'
@@ -27,14 +31,22 @@ function applyUrlStateParams(urlState: ParsedShareableState): void {
       useGeometryStore.getState().setObjectType(urlState.objectType)
     }
     if (urlState.quantumMode !== undefined) {
-      // Compute-driven quantum modes require volumetric 3D rendering.
-      if (
-        (urlState.quantumMode === 'freeScalarField' || urlState.quantumMode === 'tdseDynamics') &&
-        useGeometryStore.getState().dimension < 3
-      ) {
-        useGeometryStore.getState().setDimension(3)
-      }
+      // Dimension enforcement is handled by setSchroedingerQuantumMode in the store
       useExtendedObjectStore.getState().setSchroedingerQuantumMode(urlState.quantumMode)
+    }
+    // Apply open-quantum settings if present in URL
+    if (urlState.openQuantumEnabled !== undefined) {
+      const ext = useExtendedObjectStore.getState()
+      ext.setOpenQuantumEnabled(urlState.openQuantumEnabled)
+      if (urlState.openQuantumDephasingRate !== undefined) {
+        ext.setOpenQuantumDephasingRate(urlState.openQuantumDephasingRate)
+      }
+      if (urlState.openQuantumRelaxationRate !== undefined) {
+        ext.setOpenQuantumRelaxationRate(urlState.openQuantumRelaxationRate)
+      }
+      if (urlState.openQuantumThermalUpRate !== undefined) {
+        ext.setOpenQuantumThermalUpRate(urlState.openQuantumThermalUpRate)
+      }
     }
   } catch (error) {
     if (import.meta.env.DEV) {

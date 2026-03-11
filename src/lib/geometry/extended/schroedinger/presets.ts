@@ -145,6 +145,16 @@ export function generateQuantumPreset(
     coefficients.push([amplitude * Math.cos(phase), amplitude * Math.sin(phase)])
   }
 
+  // Normalize coefficients so Σ|c_k|² = 1 (valid quantum state)
+  const normSq = coefficients.reduce((sum, [re, im]) => sum + re * re + im * im, 0)
+  if (normSq > 0) {
+    const invNorm = 1.0 / Math.sqrt(normSq)
+    for (let k = 0; k < coefficients.length; k++) {
+      coefficients[k]![0] *= invNorm
+      coefficients[k]![1] *= invNorm
+    }
+  }
+
   return {
     termCount: terms,
     omega,
