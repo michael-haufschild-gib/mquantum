@@ -81,7 +81,7 @@ fn sphericalHarmonic(l: i32, m: i32, theta: f32, phi: f32) -> vec2f {
   var P = legendre(l, m, cos(theta));
 
   // For m >= 0, the CS phase gives the standard physicist convention directly:
-  //   Y_l^m = K · P_CS · e^{imφ} = (-1)^m · K · P · e^{imφ}  ✓
+  //   Y_l^m = K · P_CS · e^{imφ} = (-1)^m · K · P · e^{imφ}  [correct]
   // For m < 0, the standard relation is Y_l^{-|m|} = K · P · e^{-i|m|φ}
   // (without the extra (-1)^|m| from CS). Undo it for odd |m|.
   if (m < 0 && (abs(m) & 1) == 1) { P = -P; }

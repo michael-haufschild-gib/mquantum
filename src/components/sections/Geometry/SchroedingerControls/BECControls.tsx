@@ -19,7 +19,12 @@ import { BEC_SCENARIO_PRESETS } from '@/lib/physics/bec/presets'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
 
-const GRID_SIZE_OPTIONS = [
+/** TDSE/BEC max total sites — must match store constant */
+const TDSE_MAX_TOTAL_SITES = 262144
+
+const ALL_GRID_SIZE_OPTIONS = [
+  { value: '2', label: '2' },
+  { value: '4', label: '4' },
   { value: '8', label: '8' },
   { value: '16', label: '16' },
   { value: '32', label: '32' },
@@ -80,6 +85,16 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(({ config, dim
   }, [])
 
   const activePreset = useMemo(() => detectActivePreset(bec), [detectActivePreset, bec])
+
+  // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES
+  const maxGridPerDim = useMemo(
+    () => Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
+    [activeDims]
+  )
+  const gridSizeOptions = useMemo(
+    () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
+    [maxGridPerDim]
+  )
 
   const showVortexControls = bec.initialCondition === 'vortexImprint' || bec.initialCondition === 'vortexLattice'
   const showSolitonControls = bec.initialCondition === 'darkSoliton'
@@ -212,7 +227,7 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(({ config, dim
             arr[i] = parseInt(v, 10)
             actions.setGridSize(arr)
           }}
-          options={GRID_SIZE_OPTIONS}
+          options={gridSizeOptions}
         />
       ))}
 
@@ -230,6 +245,20 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(({ config, dim
           min={0.01} max={1.0} step={0.01}
         />
       ))}
+
+      {/* Numerics: Particle */}
+      <Slider
+        label="Mass"
+        value={bec.mass}
+        onChange={actions.setMass}
+        min={0.1} max={10} step={0.1}
+      />
+      <Slider
+        label="ℏ"
+        value={bec.hbar}
+        onChange={actions.setHbar}
+        min={0.1} max={10} step={0.1}
+      />
 
       {/* Numerics: Time */}
       <Slider
@@ -255,15 +284,20 @@ export const BECControls: React.FC<BecControlsProps> = React.memo(({ config, dim
       {/* Slice positions for dims > 3 */}
       {activeDims > 3 && bec.slicePositions.length > 0 && (
         <>
-          {Array.from({ length: Math.min(activeDims - 3, bec.slicePositions.length) }, (_, i) => (
-            <Slider
-              key={`slice-${i}`}
-              label={`Slice ${AXIS_LABELS[i + 3]}`}
-              value={bec.slicePositions[i] ?? 0}
-              onChange={(v) => actions.setSlicePosition(i, v)}
-              min={-1} max={1} step={0.01}
-            />
-          ))}
+          {Array.from({ length: Math.min(activeDims - 3, bec.slicePositions.length) }, (_, i) => {
+            const dimIdx = i + 3
+            const halfExtent =
+              ((bec.gridSize[dimIdx] ?? 8) * (bec.spacing[dimIdx] ?? bec.spacing[0] ?? 0.15)) / 2
+            return (
+              <Slider
+                key={`slice-${dimIdx}`}
+                label={`Slice ${AXIS_LABELS[dimIdx]}`}
+                value={bec.slicePositions[i] ?? 0}
+                onChange={(v) => actions.setSlicePosition(i, v)}
+                min={-halfExtent} max={halfExtent} step={halfExtent / 20}
+              />
+            )
+          })}
         </>
       )}
 

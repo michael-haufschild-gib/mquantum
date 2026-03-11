@@ -105,7 +105,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let dPhi = phi[fwdIdx] - phiVal;
       let invA = 1.0 / params.spacing[d];
       gradPhi[d] = dPhi * invA;
-      gradEnergy += dPhi * dPhi * invA * invA;
+      gradEnergy += gradPhi[d] * gradPhi[d];
     }
   }
 

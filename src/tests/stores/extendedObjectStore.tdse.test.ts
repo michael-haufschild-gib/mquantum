@@ -137,13 +137,13 @@ describe('TDSE store slice', () => {
     expect(after.slicePositions).toEqual(before.slicePositions)
   })
 
-  it('setTdseDt clamps to [0.0001, 0.1]', () => {
+  it('setTdseDt clamps to [0.0001, 0.05]', () => {
     const store = useExtendedObjectStore.getState()
     store.setTdseDt(0)
     expect(useExtendedObjectStore.getState().schroedinger.tdse.dt).toBe(0.0001)
 
     store.setTdseDt(5)
-    expect(useExtendedObjectStore.getState().schroedinger.tdse.dt).toBe(0.1)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.dt).toBe(0.05)
   })
 
   it('setTdseStepsPerFrame clamps to [1, 16]', () => {
@@ -161,12 +161,26 @@ describe('TDSE store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.tdse.packetWidth).toBe(0.01)
   })
 
-  it('setting a physics parameter sets needsReset to true', () => {
+  it('setting an initial-condition parameter sets needsReset to true', () => {
+    const store = useExtendedObjectStore.getState()
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
+
+    store.setTdseInitialCondition('planeWave')
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(true)
+  })
+
+  it('setting a potential parameter does NOT set needsReset (live update)', () => {
     const store = useExtendedObjectStore.getState()
     expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
 
     store.setTdsePotentialType('step')
-    expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(true)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
+
+    store.setTdseBarrierHeight(20)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
+
+    store.setTdseHarmonicOmega(2.0)
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)
   })
 
   it('resetTdseField sets needsReset to true', () => {
@@ -177,7 +191,7 @@ describe('TDSE store slice', () => {
 
   it('clearTdseNeedsReset clears needsReset without version bump', () => {
     const store = useExtendedObjectStore.getState()
-    store.setTdsePotentialType('step') // sets needsReset = true
+    store.setTdseInitialCondition('planeWave') // sets needsReset = true
     const versionBefore = useExtendedObjectStore.getState().schroedingerVersion
     store.clearTdseNeedsReset()
     expect(useExtendedObjectStore.getState().schroedinger.tdse.needsReset).toBe(false)

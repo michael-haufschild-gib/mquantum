@@ -421,6 +421,12 @@ export interface TdseConfig {
    *  Each entry scales harmonicOmega along that axis: ω_d = trapAnisotropy[d] * harmonicOmega.
    *  Defaults to 1.0 for all dimensions when not specified. */
   trapAnisotropy?: number[]
+
+  /** Trap omega used ONLY during initialization (quench scenarios).
+   *  When set and different from harmonicOmega, the init pass creates the TF profile
+   *  for this omega, then the potential is filled with harmonicOmega for evolution.
+   *  This enables breathing-mode excitations via trap-frequency quench. */
+  harmonicOmegaInit?: number
 }
 
 /**
@@ -539,6 +545,9 @@ export interface BecConfig {
   trapOmega: number
   /** Anisotropy ratios per dimension (ω_d / ω_0) — length matches latticeDim */
   trapAnisotropy: number[]
+  /** Initial trap frequency for quench scenarios (TF init uses this ω, evolution uses trapOmega).
+   *  When undefined or equal to trapOmega, no quench — standard equilibrium init. */
+  initTrapOmega?: number
 
   // === Initial condition ===
   initialCondition: BecInitialCondition

@@ -91,7 +91,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   var inBounds: bool = true;
   for (var d: u32 = 0u; d < params.latticeDim; d++) {
     let halfExtent = f32(params.gridSize[d]) * params.spacing[d] * 0.5;
-    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d];
+    // Subtract 0.5 to match TDSE cell-center convention: pos = (coord - N/2 + 0.5) * spacing
+    let coordF = (ndWorldPos[d] + halfExtent) / params.spacing[d] - 0.5;
     let coordI = i32(round(coordF));
     if (coordI < 0 || coordI >= i32(params.gridSize[d])) {
       inBounds = false;
@@ -172,7 +173,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // Normalize by peak sound speed (at maxDensity) for stable mapping across the condensate.
     // Using local c_s diverges in vacuum; using peak c_s gives uniform reference scale.
     let cs2Peak = max(abs(params.interactionStrength) * params.maxDensity / max(params.mass, 1e-6), 1e-10);
-    displayScalar = clamp(sqrt(vsqMag) / sqrt(cs2Peak), 0.0, 1.0) * densityGate;
+    displayScalar = clamp(sqrt(vsqMag / cs2Peak), 0.0, 1.0) * densityGate;
   } else if (params.fieldView == 5u) {
     // healing length: ξ(x) = hbar / sqrt(2 * m * g * |ψ|²)
     // Map: small ξ (dense core) → high value, large ξ (edge) → low value

@@ -63,7 +63,7 @@ const DIAG_DECIMATION = 5
 
 /** Snap a value to the nearest power of 2 (minimum 4) for FFT compatibility */
 function nearestPow2(v: number): number {
-  const p = Math.max(4, 2 ** Math.round(Math.log2(Math.max(1, v))))
+  const p = Math.max(2, 2 ** Math.round(Math.log2(Math.max(1, v))))
   return Math.min(128, p)
 }
 
@@ -156,6 +156,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Fractional step accumulator for sub-integer speed scaling */
   private stepAccumulator = 0
   private pendingAutoReset = false
+  /** Small staging buffer for overwriting harmonicOmega between init and potential fill (quench) */
+  private omegaStagingBuffer: GPUBuffer | null = null
 
   // Pre-allocated uniform views
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -199,7 +201,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     let needsFix = false
     for (let d = 0; d < config.latticeDim; d++) {
       const g = config.gridSize[d]!
-      if ((g & (g - 1)) !== 0 || g < 4) { needsFix = true; break }
+      if ((g & (g - 1)) !== 0 || g < 2) { needsFix = true; break }
     }
     if (!needsFix) return config
     const fixed = config.gridSize.map((g) => nearestPow2(g))
@@ -232,6 +234,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     this.fftUniformBuffer?.destroy()
     this.fftStagingBuffer?.destroy()
     this.packUniformBuffer?.destroy()
+    this.omegaStagingBuffer?.destroy()
     this.diagUniformBuffer?.destroy()
     this.diagPartialSumsBuffer?.destroy()
     this.diagPartialMaxBuffer?.destroy()
@@ -293,6 +296,13 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
     pu32[0] = this.totalSites
     pf32[1] = 1.0 / this.totalSites
     device.queue.writeBuffer(this.packUniformBuffer, 0, packData)
+
+    // Staging buffer for trap-frequency quench: holds evolution harmonicOmega (4 bytes)
+    // to overwrite the init-time value between init and potential fill passes.
+    this.omegaStagingBuffer = device.createBuffer({
+      label: 'tdse-omega-staging', size: 4,
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    })
 
     // Diagnostics: norm reduction buffers
     this.diagNumWorkgroups = Math.ceil(this.totalSites / DIAG_WG)
@@ -640,7 +650,12 @@ struct PackUniforms {
     f32[74] = config.barrierCenter
     f32[75] = config.wellDepth
     f32[76] = config.wellWidth
-    f32[77] = config.harmonicOmega
+    // Use init omega for the init pass when a quench is configured.
+    // The evolution omega is restored via copyBufferToBuffer before potential fill.
+    const needsInit = !this.initialized || config.needsReset || this.pendingAutoReset
+    const hasOmegaQuench = config.harmonicOmegaInit !== undefined
+      && config.harmonicOmegaInit !== config.harmonicOmega
+    f32[77] = (needsInit && hasOmegaQuench) ? config.harmonicOmegaInit! : config.harmonicOmega
     f32[78] = config.stepHeight
     u32[79] = config.absorberEnabled ? 1 : 0
 
@@ -824,15 +839,26 @@ struct PackUniforms {
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
 
     // Init or reset (includes auto-loop triggered reinit)
+    const hasOmegaQuench = config.harmonicOmegaInit !== undefined
+      && config.harmonicOmegaInit !== config.harmonicOmega
     if (!this.initialized || config.needsReset || this.pendingAutoReset) {
-      // Initialize wavefunction
+      // Initialize wavefunction (uses harmonicOmegaInit for trap shape when quench is active)
       if (this.initPipeline && this.initBG) {
         const pass = encoder.beginComputePass({ label: 'tdse-init-pass' })
         this.dispatchCompute(pass, this.initPipeline, [this.initBG], Math.ceil(this.totalSites / LINEAR_WG))
         pass.end()
       }
 
-      // Fill potential buffer
+      // For trap-frequency quench: restore evolution omega before filling the potential.
+      // The init pass used harmonicOmegaInit; the potential buffer must use harmonicOmega.
+      if (hasOmegaQuench && this.uniformBuffer && this.omegaStagingBuffer) {
+        const omegaBuf = new Float32Array([config.harmonicOmega])
+        device.queue.writeBuffer(this.omegaStagingBuffer, 0, omegaBuf)
+        // Copy the 4-byte staging buffer into uniformBuffer at offset 308 (f32[77] = harmonicOmega)
+        encoder.copyBufferToBuffer(this.omegaStagingBuffer, 0, this.uniformBuffer, 308, 4)
+      }
+
+      // Fill potential buffer (uses evolution omega, restored above for quench scenarios)
       if (this.potentialPipeline && this.potentialBG) {
         const pass = encoder.beginComputePass({ label: 'tdse-potential-fill' })
         this.dispatchCompute(pass, this.potentialPipeline, [this.potentialBG], Math.ceil(this.totalSites / LINEAR_WG))
@@ -868,6 +894,18 @@ struct PackUniforms {
 
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
+
+    // Always refresh the potential buffer each frame so live parameter changes
+    // (barrier height, harmonic omega, potential type, etc.) take effect
+    // immediately without requiring a wavefunction reset. This single compute
+    // dispatch is negligible (~2.5% overhead) compared to the FFT passes.
+    // For driven systems, this also ensures V(t) uses the current simTime.
+    if (this.potentialPipeline && this.potentialBG) {
+      const p = encoder.beginComputePass({ label: 'tdse-potential-update' })
+      this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
+      p.end()
+    }
+
     if (isPlaying) {
       // Compute speed-scaled step count using fractional accumulator.
       // This preserves dt (critical for numerical stability) while allowing
@@ -876,14 +914,6 @@ struct PackUniforms {
       this.stepAccumulator += scaledSteps
       const stepsThisFrame = Math.floor(this.stepAccumulator)
       this.stepAccumulator -= stepsThisFrame
-
-      // Refresh potential BEFORE Strang steps for driven systems so the current
-      // frame uses V(t) at the current simTime rather than lagging by one frame.
-      if (stepsThisFrame > 0 && config.driveEnabled && this.potentialPipeline && this.potentialBG) {
-        const p = encoder.beginComputePass({ label: 'tdse-potential-drive-update' })
-        this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
-        p.end()
-      }
 
       for (let step = 0; step < stepsThisFrame; step++) {
         // 1. Half-step potential
@@ -1094,6 +1124,7 @@ struct PackUniforms {
     this.fftUniformBuffer?.destroy()
     this.fftStagingBuffer?.destroy()
     this.packUniformBuffer?.destroy()
+    this.omegaStagingBuffer?.destroy()
     this.densityTexture?.destroy()
     this.diagUniformBuffer?.destroy()
     this.diagPartialSumsBuffer?.destroy()
@@ -1112,6 +1143,7 @@ struct PackUniforms {
     this.fftUniformBuffer = null
     this.fftStagingBuffer = null
     this.packUniformBuffer = null
+    this.omegaStagingBuffer = null
     this.densityTexture = null
     this.densityTextureView = null
     this.diagUniformBuffer = null

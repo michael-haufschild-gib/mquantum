@@ -222,11 +222,11 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
           <line
             x1={PADDING_X} y1={eLineY}
             x2={PADDING_X + PLOT_W} y2={eLineY}
-            stroke="#f59e0b" strokeWidth={1} strokeDasharray="4,3"
+            stroke="var(--color-warning)" strokeWidth={1} strokeDasharray="4,3"
           />
           <text
             x={PADDING_X + PLOT_W + 2} y={eLineY + 3}
-            fill="#f59e0b" fontSize={8} fontFamily="monospace"
+            fill="var(--color-warning)" fontSize={8} fontFamily="monospace"
           >
             E
           </text>

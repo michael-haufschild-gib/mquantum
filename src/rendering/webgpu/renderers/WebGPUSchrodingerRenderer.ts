@@ -33,6 +33,7 @@ import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheCompu
 import { FreeScalarFieldComputePass } from '../passes/FreeScalarFieldComputePass'
 import { TDSEComputePass } from '../passes/TDSEComputePass'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
+import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
 import { parseHexColorToLinearRgb } from '../utils/color'
 import { packLightingUniforms } from '../utils/lighting'
@@ -1722,10 +1723,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Compute bounding radius for free scalar field mode (lattice extent)
     if (schroedinger?.quantumMode === 'freeScalarField' && schroedinger?.freeScalar) {
       const fs = schroedinger.freeScalar
-      const Lx = (fs.gridSize?.[0] ?? 32) * (fs.spacing?.[0] ?? 0.1)
-      const Ly = (fs.gridSize?.[1] ?? 32) * (fs.spacing?.[1] ?? 0.1)
-      const Lz = (fs.gridSize?.[2] ?? 32) * (fs.spacing?.[2] ?? 0.1)
-      const newBoundR = Math.max(Lx, Ly, Lz) / 2
+      // Use max extent over ALL active dimensions (not just 0..2) so that
+      // after N-D rotation, the density texture covers the full lattice.
+      let maxExtent = 3.2 // fallback: 32 * 0.1
+      for (let d = 0; d < (fs.latticeDim ?? 3); d++) {
+        const Ld = (fs.gridSize?.[d] ?? 32) * (fs.spacing?.[d] ?? 0.1)
+        if (Ld > maxExtent) maxExtent = Ld
+      }
+      const newBoundR = maxExtent / 2
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
       if (
@@ -1736,7 +1741,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         if (import.meta.env.DEV) {
           console.log(
             `[FSF-DIAG] boundingRadius: ${this.boundingRadius.toFixed(3)} → ${quantizedBoundR.toFixed(3)}` +
-              ` (L=${Lx.toFixed(2)},${Ly.toFixed(2)},${Lz.toFixed(2)})`
+              ` (maxExtent=${maxExtent.toFixed(2)}, dim=${fs.latticeDim})`
           )
         }
         this.boundingRadius = quantizedBoundR
@@ -1751,10 +1756,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const latticeConfig = schroedinger?.quantumMode === 'becDynamics' ? schroedinger?.bec : schroedinger?.tdse
     if (isTdseBound && latticeConfig) {
       const td = latticeConfig
-      const Lx = (td.gridSize?.[0] ?? 32) * (td.spacing?.[0] ?? 0.1)
-      const Ly = (td.gridSize?.[1] ?? 32) * (td.spacing?.[1] ?? 0.1)
-      const Lz = (td.gridSize?.[2] ?? 32) * (td.spacing?.[2] ?? 0.1)
-      const newBoundR = Math.max(Lx, Ly, Lz) / 2 * 1.15
+      // Use max extent over ALL active dimensions (not just 0..2) so that
+      // after N-D rotation, the density texture covers the full lattice.
+      let maxExtent = 3.2 // fallback: 32 * 0.1
+      for (let d = 0; d < (td.latticeDim ?? 3); d++) {
+        const Ld = (td.gridSize?.[d] ?? 32) * (td.spacing?.[d] ?? 0.1)
+        if (Ld > maxExtent) maxExtent = Ld
+      }
+      const newBoundR = maxExtent / 2 * 1.15
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
       if (
@@ -1765,7 +1774,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         if (import.meta.env.DEV) {
           console.log(
             `[TDSE-DIAG] boundingRadius: ${this.boundingRadius.toFixed(3)} → ${quantizedBoundR.toFixed(3)}` +
-              ` (L=${Lx.toFixed(2)},${Ly.toFixed(2)},${Lz.toFixed(2)})`
+              ` (maxExtent=${maxExtent.toFixed(2)}, dim=${td.latticeDim})`
           )
         }
         this.boundingRadius = quantizedBoundR
@@ -2933,20 +2942,51 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
       if (isBecMode && extended?.schroedinger?.bec) {
         const bec = extended.schroedinger.bec
-        const initCond = bec.initialCondition ?? 'thomasFermi'
-        // Map vortexLattice to vortexImprint (same shader, different count)
-        const mappedInit = initCond === 'vortexLattice' ? 'vortexImprint' : initCond
-        // Compute Thomas-Fermi chemical potential for init shader
+        let initCond = bec.initialCondition ?? 'thomasFermi'
         const g = bec.interactionStrength ?? 500
         const omega = bec.trapOmega ?? 1.0
-        const mu = g > 0 ? 0.5 * Math.pow((15 * g) / (4 * Math.PI), 2 / 5) * Math.pow(omega, 6 / 5) : 1.0
+        const latDim = bec.latticeDim ?? 3
+        // initTrapOmega enables quench scenarios: init TF at one ω, evolve at another
+        const initOmega = bec.initTrapOmega ?? omega
+
+        // For attractive BEC (g < 0), Thomas-Fermi doesn't apply — force Gaussian init.
+        // The condensate will collapse dynamically, which is the desired behavior.
+        if (g < 0 && (initCond === 'thomasFermi' || initCond === 'vortexImprint'
+          || initCond === 'vortexLattice' || initCond === 'darkSoliton')) {
+          initCond = 'gaussianPacket'
+        }
+
+        // Map vortexLattice to vortexImprint (same shader, different count)
+        const mappedInit = initCond === 'vortexLattice' ? 'vortexImprint' : initCond
+
+        // Use anisotropic BEC trap (type 9) — reads trap ratios from trapAnisotropy uniform
+        const anisotropy = bec.trapAnisotropy ?? new Array(latDim).fill(1.0)
+
+        // Compute chemical potential for init shader (dimension-dependent TF formula).
+        // Uses initOmega for the TF profile — when different from omega, this creates a
+        // quench: the condensate starts at equilibrium for initOmega, then evolves under omega.
+        // For anisotropic traps, thomasFermiMuND needs the geometric mean frequency
+        // ω̄ = ω₀ · (Π anisotropy_d)^(1/D) to account for the volume distortion.
+        // For g > 0: proper D-dimensional Thomas-Fermi μ
+        // For g < 0: Gaussian amplitude = (2πσ²)^(-D/4) (unit-normalized, σ=packetWidth=1)
+        //   ∫|ψ|² d^Dx = A² · (2πσ²)^(D/2) = 1  ⟹  A = (2π)^(-D/4)
+        let effectiveInitOmega = initOmega
+        if (g > 0 && anisotropy.length > 0) {
+          let anisotropyProduct = 1.0
+          for (let d = 0; d < latDim; d++) {
+            anisotropyProduct *= anisotropy[d] ?? 1.0
+          }
+          effectiveInitOmega = initOmega * Math.pow(anisotropyProduct, 1 / latDim)
+        }
+        const mu = g > 0
+          ? thomasFermiMuND(latDim, g, effectiveInitOmega)
+          : Math.pow(1 / (2 * Math.PI), latDim / 4)
 
         // Build momentum vector — encode BEC-specific params:
         // [0] = vortex charge (for vortex inits)
         // [1] = soliton depth 0-1 (for darkSoliton)
         // [2] = soliton velocity fraction of c_s (for darkSoliton)
         // [3] = vortex lattice count (for vortexLattice → multi-vortex init)
-        const latDim = bec.latticeDim ?? 3
         const mom = new Array(Math.max(latDim, 4)).fill(0) as number[]
         if (initCond === 'vortexImprint' || initCond === 'vortexLattice') {
           mom[0] = bec.vortexCharge ?? 1
@@ -2959,13 +2999,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           mom[2] = bec.solitonVelocity ?? 0.0
         }
 
-        // Use anisotropic BEC trap (type 9) — reads trap ratios from trapAnisotropy uniform
-        const anisotropy = bec.trapAnisotropy ?? new Array(latDim).fill(1.0)
-
         tdseConfig = {
           latticeDim: latDim,
-          gridSize: bec.gridSize ?? [64, 64, 64],
-          spacing: bec.spacing ?? [0.15, 0.15, 0.15],
+          gridSize: bec.gridSize ?? new Array(latDim).fill(8),
+          spacing: bec.spacing ?? new Array(latDim).fill(0.15),
           mass: bec.mass ?? 1.0,
           hbar: bec.hbar ?? 1.0,
           dt: bec.dt ?? 0.002,
@@ -2980,6 +3017,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           barrierHeight: 0, barrierWidth: 0, barrierCenter: 0,
           wellDepth: 0, wellWidth: 0, stepHeight: 0,
           harmonicOmega: omega,
+          harmonicOmegaInit: initOmega !== omega ? initOmega : undefined,
           slitSeparation: 0, slitWidth: 0, wallThickness: 0, wallHeight: 0,
           latticeDepth: 0, latticePeriod: 1,
           doubleWellLambda: 0, doubleWellSeparation: 1, doubleWellAsymmetry: 0,

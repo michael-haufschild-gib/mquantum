@@ -17,6 +17,7 @@ import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroe
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
 import { getTdsePreset } from '@/lib/physics/tdse/presets'
+import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
 import { StateCreator } from 'zustand'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
@@ -133,8 +134,13 @@ export const createSchroedingerSlice: StateCreator<
   const defaultGridPerDim = (d: number): number => {
     const raw = Math.round(Math.pow(MAX_TOTAL_SITES, 1 / d))
     // Round down to nearest power-of-2 so exact vacuum always has a valid grid size
-    const pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-    return Math.max(2, Math.min(128, pow2))
+    let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
+    pow2 = Math.max(2, Math.min(128, pow2))
+    // Verify total budget: if pow2^d exceeds budget, halve until it fits
+    while (pow2 > 2 && Math.pow(pow2, d) > MAX_TOTAL_SITES) {
+      pow2 = pow2 / 2
+    }
+    return pow2
   }
 
   /**
@@ -146,15 +152,9 @@ export const createSchroedingerSlice: StateCreator<
     newDim: number
   ): Partial<FreeScalarConfig> => {
     const gridDefault = defaultGridPerDim(newDim)
-    const needsPow2 = prev.initialCondition === 'vacuumNoise'
-    const snapToPow2 = (v: number): number => {
-      const log2 = Math.round(Math.log2(v))
-      return Math.max(2, Math.min(gridDefault, 2 ** log2))
-    }
-    const gridSize = Array.from({ length: newDim }, (_, i) => {
-      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
-      return needsPow2 ? snapToPow2(raw) : raw
-    })
+    // Always use dimension-appropriate grid size. When dimension decreases,
+    // the per-axis budget increases and old shrunken values should not persist.
+    const gridSize = Array.from({ length: newDim }, () => gridDefault)
     const spacing = Array.from({ length: newDim }, (_, i) =>
       i < prev.spacing.length ? prev.spacing[i]! : 0.1
     )
@@ -179,8 +179,14 @@ export const createSchroedingerSlice: StateCreator<
    */
   const defaultTdseGridPerDim = (d: number): number => {
     const raw = Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
-    const pow2 = 2 ** Math.floor(Math.log2(Math.max(4, raw)))
-    return Math.max(4, Math.min(128, pow2))
+    // Round down to nearest power-of-2 (min 2 for valid FFT)
+    let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
+    pow2 = Math.max(2, Math.min(128, pow2))
+    // Verify total budget: if pow2^d exceeds budget, halve until it fits
+    while (pow2 > 2 && Math.pow(pow2, d) > TDSE_MAX_TOTAL_SITES) {
+      pow2 = pow2 / 2
+    }
+    return pow2
   }
 
   /**
@@ -192,14 +198,9 @@ export const createSchroedingerSlice: StateCreator<
     newDim: number
   ): Partial<TdseConfig> => {
     const gridDefault = defaultTdseGridPerDim(newDim)
-    const snapToPow2 = (v: number): number => {
-      const log2 = Math.round(Math.log2(Math.max(4, v)))
-      return Math.max(4, Math.min(gridDefault, 2 ** log2))
-    }
-    const gridSize = Array.from({ length: newDim }, (_, i) => {
-      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
-      return snapToPow2(raw)
-    })
+    // Always use dimension-appropriate grid size. When dimension decreases,
+    // the per-axis budget increases and old shrunken values should not persist.
+    const gridSize = Array.from({ length: newDim }, () => gridDefault)
     const spacing = Array.from({ length: newDim }, (_, i) =>
       i < prev.spacing.length ? prev.spacing[i]! : 0.1
     )
@@ -212,7 +213,9 @@ export const createSchroedingerSlice: StateCreator<
     const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
-    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions }
+    // Clamp dt to CFL limit for the new spacing/dimension
+    const newDt = clampDtWithCfl(prev.dt, spacing, newDim, prev.mass)
+    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions, dt: newDt }
   }
 
   const resizeBecArrays = (
@@ -220,24 +223,32 @@ export const createSchroedingerSlice: StateCreator<
     newDim: number
   ): Partial<BecConfig> => {
     const gridDefault = defaultTdseGridPerDim(newDim)
-    const snapToPow2 = (v: number): number => {
-      const log2 = Math.round(Math.log2(Math.max(4, v)))
-      return Math.max(4, Math.min(gridDefault, 2 ** log2))
-    }
-    const gridSize = Array.from({ length: newDim }, (_, i) => {
-      const raw = i < prev.gridSize.length ? Math.min(prev.gridSize[i]!, gridDefault) : gridDefault
-      return snapToPow2(raw)
-    })
-    const spacing = Array.from({ length: newDim }, (_, i) =>
-      i < prev.spacing.length ? prev.spacing[i]! : 0.15
-    )
+    // Always use the dimension-appropriate grid size. Old per-axis values become
+    // meaningless when the site budget changes (e.g. 64→8 at D=5, 8→64 at D=3).
+    const gridSize = Array.from({ length: newDim }, () => gridDefault)
+
+    // Compute spacing so the grid covers the Thomas-Fermi condensate with margin.
+    // R_TF depends on dimension, interaction strength, and trap frequency.
+    const g = prev.interactionStrength ?? 500
+    const omega = prev.trapOmega ?? 1.0
+    const mass = prev.mass ?? 1.0
+    const mu = g > 0 ? thomasFermiMuND(newDim, g, omega) : 0
+    const Rtf = mu > 0 ? thomasFermiRadius(mu, mass, omega) : 2.0
+    // Grid half-extent = gridDefault * spacing / 2 should be ≥ 1.3 × R_TF
+    // so the condensate occupies ~77% of the grid (with room for falloff + absorber).
+    const COVERAGE = 1.3
+    const newSpacing = Math.max(0.05, (2 * Rtf * COVERAGE) / gridDefault)
+    const spacing = Array.from({ length: newDim }, () => newSpacing)
+
     const trapAnisotropy = Array.from({ length: newDim }, (_, i) =>
       i < prev.trapAnisotropy.length ? prev.trapAnisotropy[i]! : 1.0
     )
     const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
-    return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions }
+    // Clamp dt to CFL limit for the new spacing/dimension
+    const newDt = clampDtWithCfl(prev.dt, spacing, newDim, mass)
+    return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions, dt: newDt }
   }
 
   /**
@@ -541,7 +552,10 @@ export const createSchroedingerSlice: StateCreator<
           const prev = state.schroedinger.tdse
           if (prev.latticeDim !== dim) {
             const resized = resizeTdseArrays(prev, dim)
-            updates.tdse = { ...prev, ...resized, needsReset: true }
+            // Downgrade doubleSlit to barrier at D=1 (slits require axis 1)
+            const potentialType =
+              dim < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
+            updates.tdse = { ...prev, ...resized, potentialType, needsReset: true }
           }
         }
         if (mode === 'becDynamics') {
@@ -1036,6 +1050,15 @@ export const createSchroedingerSlice: StateCreator<
           const s = i < size.length ? size[i]! : 1
           return i < latticeDim ? snap(s, 2, maxPerDim) : 1
         })
+        // Enforce total site budget — halve the largest axis until within budget
+        while (clamped.reduce((a, b) => a * b, 1) > MAX_TOTAL_SITES) {
+          let maxIdx = 0
+          for (let j = 1; j < clamped.length; j++) {
+            if (clamped[j]! > clamped[maxIdx]!) maxIdx = j
+          }
+          if (clamped[maxIdx]! <= 2) break
+          clamped[maxIdx] = needsPow2 ? clamped[maxIdx]! / 2 : Math.max(2, clamped[maxIdx]! - 1)
+        }
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -1404,10 +1427,13 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => {
         const prev = state.schroedinger.tdse
         const resized = resizeTdseArrays(prev, clamped)
+        // Downgrade doubleSlit to barrier at D=1 (slits require axis 1)
+        const potentialType =
+          clamped < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
         return {
           schroedinger: {
             ...state.schroedinger,
-            tdse: { ...prev, ...resized, needsReset: true },
+            tdse: { ...prev, ...resized, potentialType, needsReset: true },
           },
         }
       })
@@ -1419,23 +1445,24 @@ export const createSchroedingerSlice: StateCreator<
       }
       setWithVersion((state) => {
         const { latticeDim } = state.schroedinger.tdse
-        // Snap each axis to power-of-2 within [4, 128], then check total budget
+        const minGrid = Math.max(2, defaultTdseGridPerDim(latticeDim))
+        // Snap each axis to power-of-2 within [2, 128], then check total budget
         const snapped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < size.length ? size[i]! : 4
-          const val = Math.max(4, Math.min(128, Math.round(s)))
+          const s = i < size.length ? size[i]! : minGrid
+          const val = Math.max(2, Math.min(128, Math.round(s)))
           const log2 = Math.round(Math.log2(val))
-          return Math.max(4, Math.min(128, 2 ** log2))
+          return Math.max(2, Math.min(128, 2 ** log2))
         })
         // Verify total sites within budget; if over, reduce the largest axes first
         const reduceToFit = (grid: number[]): number[] => {
           const result = [...grid]
           while (result.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
-            // Find the largest axis and halve it
             let maxIdx = 0
             for (let i = 1; i < result.length; i++) {
               if (result[i]! > result[maxIdx]!) maxIdx = i
             }
-            result[maxIdx] = Math.max(4, result[maxIdx]! / 2)
+            if (result[maxIdx]! <= 2) break
+            result[maxIdx] = result[maxIdx]! / 2
           }
           return result
         }
@@ -1475,7 +1502,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, mass: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, mass: clamped },
         },
       }))
     },
@@ -1488,7 +1515,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, hbar: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, hbar: clamped },
         },
       }))
     },
@@ -1501,7 +1528,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, dt: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, dt: clamped },
         },
       }))
     },
@@ -1572,7 +1599,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, potentialType: type, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, potentialType: type },
         },
       }))
     },
@@ -1585,7 +1612,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierHeight: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, barrierHeight: clamped },
         },
       }))
     },
@@ -1598,7 +1625,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierWidth: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, barrierWidth: clamped },
         },
       }))
     },
@@ -1611,7 +1638,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierCenter: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, barrierCenter: clamped },
         },
       }))
     },
@@ -1624,7 +1651,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wellDepth: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, wellDepth: clamped },
         },
       }))
     },
@@ -1637,7 +1664,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wellWidth: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, wellWidth: clamped },
         },
       }))
     },
@@ -1650,7 +1677,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, harmonicOmega: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, harmonicOmega: clamped },
         },
       }))
     },
@@ -1663,7 +1690,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stepHeight: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, stepHeight: clamped },
         },
       }))
     },
@@ -1676,7 +1703,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, slitSeparation: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, slitSeparation: clamped },
         },
       }))
     },
@@ -1689,7 +1716,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, slitWidth: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, slitWidth: clamped },
         },
       }))
     },
@@ -1702,7 +1729,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wallThickness: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, wallThickness: clamped },
         },
       }))
     },
@@ -1715,7 +1742,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wallHeight: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, wallHeight: clamped },
         },
       }))
     },
@@ -1728,7 +1755,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, latticeDepth: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, latticeDepth: clamped },
         },
       }))
     },
@@ -1741,7 +1768,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, latticePeriod: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, latticePeriod: clamped },
         },
       }))
     },
@@ -1754,7 +1781,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellLambda: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, doubleWellLambda: clamped },
         },
       }))
     },
@@ -1767,7 +1794,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellSeparation: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, doubleWellSeparation: clamped },
         },
       }))
     },
@@ -1780,7 +1807,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellAsymmetry: clamped, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, doubleWellAsymmetry: clamped },
         },
       }))
     },
@@ -1788,7 +1815,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled, needsReset: true },
+          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled },
         },
       }))
     },
@@ -1936,17 +1963,28 @@ export const createSchroedingerSlice: StateCreator<
     applyTdsePreset: (presetId) => {
       const preset = getTdsePreset(presetId)
       if (!preset) return
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: {
-            ...DEFAULT_TDSE_CONFIG,
-            ...preset.overrides,
-            slicePositions: state.schroedinger.tdse.slicePositions,
-            needsReset: true,
+      setWithVersion((state) => {
+        const globalDim = useGeometryStore.getState().dimension
+        // Strip latticeDim — always use global dimension.
+        // Keep array overrides (packetCenter, packetMomentum, spacing) as they carry
+        // preset physics; resizeTdseArrays preserves existing values and extends for D>3.
+        const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
+        const base = {
+          ...DEFAULT_TDSE_CONFIG,
+          ...safeOverrides,
+          slicePositions: state.schroedinger.tdse.slicePositions,
+          needsReset: true,
+        }
+        // Always resize arrays to match global dimension — gridSize is recomputed
+        // for the dimension's site budget, while packetCenter/momentum are extended.
+        const resized = resizeTdseArrays(base, globalDim)
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            tdse: { ...base, ...resized, needsReset: true },
           },
-        },
-      }))
+        }
+      })
     },
     resetTdseField: () => {
       setWithVersion((state) => ({
@@ -1975,7 +2013,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, interactionStrength: clamped, needsReset: true },
+          bec: { ...state.schroedinger.bec, interactionStrength: clamped },
         },
       }))
     },
@@ -1988,7 +2026,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, trapOmega: clamped, needsReset: true },
+          bec: { ...state.schroedinger.bec, trapOmega: clamped },
         },
       }))
     },
@@ -2006,7 +2044,7 @@ export const createSchroedingerSlice: StateCreator<
         return {
           schroedinger: {
             ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, trapAnisotropy: arr, needsReset: true },
+            bec: { ...state.schroedinger.bec, trapAnisotropy: arr },
           },
         }
       })
@@ -2077,7 +2115,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberEnabled: enabled, needsReset: true },
+          bec: { ...state.schroedinger.bec, absorberEnabled: enabled },
         },
       }))
     },
@@ -2087,7 +2125,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberWidth: clamped, needsReset: true },
+          bec: { ...state.schroedinger.bec, absorberWidth: clamped },
         },
       }))
     },
@@ -2097,7 +2135,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberStrength: clamped, needsReset: true },
+          bec: { ...state.schroedinger.bec, absorberStrength: clamped },
         },
       }))
     },
@@ -2123,13 +2161,18 @@ export const createSchroedingerSlice: StateCreator<
         warnNonFiniteSchroedingerInput('bec.dt', dt)
         return
       }
-      const clamped = Math.max(0.0001, Math.min(0.05, dt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, dt: clamped, needsReset: true },
-        },
-      }))
+      setWithVersion((state) => {
+        const { spacing, latticeDim, mass } = state.schroedinger.bec
+        const cflLimit = computeCflLimit(spacing, latticeDim, mass)
+        const maxDt = Math.min(0.05, cflLimit * 0.9)
+        const clamped = Math.max(0.0001, Math.min(maxDt, dt))
+        return {
+          schroedinger: {
+            ...state.schroedinger,
+            bec: { ...state.schroedinger.bec, dt: clamped },
+          },
+        }
+      })
     },
     setBecStepsPerFrame: (steps) => {
       const clamped = Math.max(1, Math.min(16, Math.round(steps)))
@@ -2146,7 +2189,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, mass: clamped, needsReset: true },
+          bec: { ...state.schroedinger.bec, mass: clamped },
         },
       }))
     },
@@ -2156,7 +2199,7 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, hbar: clamped, needsReset: true },
+          bec: { ...state.schroedinger.bec, hbar: clamped },
         },
       }))
     },
@@ -2168,12 +2211,22 @@ export const createSchroedingerSlice: StateCreator<
       setWithVersion((state) => {
         const { latticeDim } = state.schroedinger.bec
         const gridDefault = defaultTdseGridPerDim(latticeDim)
+        const minGrid = Math.max(2, gridDefault)
         const snapped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < size.length ? size[i]! : 4
-          const val = Math.max(4, Math.min(128, Math.round(s)))
+          const s = i < size.length ? size[i]! : minGrid
+          const val = Math.max(2, Math.min(128, Math.round(s)))
           const log2 = Math.round(Math.log2(val))
-          return Math.max(4, Math.min(gridDefault, 2 ** log2))
+          return Math.max(2, Math.min(gridDefault, 2 ** log2))
         })
+        // Enforce total site budget — halve the largest axis until within budget
+        while (snapped.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
+          let maxIdx = 0
+          for (let i = 1; i < snapped.length; i++) {
+            if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
+          }
+          if (snapped[maxIdx]! <= 2) break
+          snapped[maxIdx] = snapped[maxIdx]! / 2
+        }
         return {
           schroedinger: {
             ...state.schroedinger,
@@ -2211,7 +2264,7 @@ export const createSchroedingerSlice: StateCreator<
         return {
           schroedinger: {
             ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, slicePositions: arr, needsReset: true },
+            bec: { ...state.schroedinger.bec, slicePositions: arr },
           },
         }
       })
@@ -2221,12 +2274,30 @@ export const createSchroedingerSlice: StateCreator<
       import('@/lib/physics/bec/presets').then(({ BEC_SCENARIO_PRESETS }) => {
         const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === presetId)
         if (!preset) return
-        setWithVersion((state) => ({
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, ...preset.overrides, needsReset: true },
-          },
-        }))
+        setWithVersion((state) => {
+          const globalDim = useGeometryStore.getState().dimension
+          // Apply preset overrides but strip latticeDim and array-valued fields —
+          // these are dimension-dependent and resizeBecArrays will recompute them.
+          const {
+            latticeDim: _presetDim,
+            gridSize: _presetGrid,
+            spacing: _presetSpacing,
+            trapAnisotropy: _presetAniso,
+            slicePositions: _presetSlice,
+            ...safeOverrides
+          } = preset.overrides
+          const merged = { ...state.schroedinger.bec, ...safeOverrides, needsReset: true }
+          // Always resize arrays to match global dimension — preset scalar physics
+          // params (interactionStrength, trapOmega, etc.) feed into resizeBecArrays
+          // which computes dimension-appropriate grid sizes and TF-aware spacing.
+          const resized = resizeBecArrays(merged, globalDim)
+          return {
+            schroedinger: {
+              ...state.schroedinger,
+              bec: { ...merged, ...resized, needsReset: true },
+            },
+          }
+        })
       })
     },
     resetBecField: () => {
@@ -2475,7 +2546,14 @@ export const createSchroedingerSlice: StateCreator<
       if (currentState.quantumMode === 'tdseDynamics') {
         const prev = currentState.tdse
         if (prev.latticeDim !== dimension) {
-          tdseUpdate = { ...resizeTdseArrays(prev, dimension), needsReset: true }
+          // Downgrade doubleSlit to barrier at D=1 (slits require axis 1)
+          const potentialType =
+            dimension < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : undefined
+          tdseUpdate = {
+            ...resizeTdseArrays(prev, dimension),
+            ...(potentialType ? { potentialType } : {}),
+            needsReset: true,
+          }
         }
       }
 

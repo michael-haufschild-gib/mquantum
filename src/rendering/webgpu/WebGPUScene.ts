@@ -554,7 +554,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
       temporalReprojectionEnabled: (
         schroedingerCompile.quantumMode === 'freeScalarField' ||
-        schroedingerCompile.quantumMode === 'tdseDynamics'
+        schroedingerCompile.quantumMode === 'tdseDynamics' ||
+        schroedingerCompile.quantumMode === 'becDynamics'
       ) ? false : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
       analyticalGradientEnabled: performance_.analyticalGradientEnabled,
@@ -1885,7 +1886,7 @@ export function shouldForceFullRebuildForQuantumModeTransition(
   if (!previous) return false
   if (previous.quantumMode === next.quantumMode) return false
 
-  const computeModes = new Set(['freeScalarField', 'tdseDynamics'])
+  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics'])
   return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
 }
 

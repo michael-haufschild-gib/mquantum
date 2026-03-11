@@ -13,6 +13,7 @@ import { computeRawKSpaceDataFromComplex } from '@/lib/physics/freeScalar/kSpace
 import { buildKSpaceDisplayTextures } from '@/lib/physics/freeScalar/kSpaceDisplayTransforms'
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 
+/** Inbound message to the k-space web worker requesting a texture computation. */
 export interface KSpaceWorkerRequest {
   type: 'compute'
   epoch: number
@@ -25,6 +26,7 @@ export interface KSpaceWorkerRequest {
   kSpaceViz: KSpaceVizConfig
 }
 
+/** Outbound result from the k-space web worker with computed display textures. */
 export interface KSpaceWorkerResponse {
   type: 'result'
   epoch: number
@@ -56,5 +58,5 @@ self.onmessage = (e: MessageEvent<KSpaceWorkerRequest>) => {
   }
 
   // Transfer ownership of the typed array buffers back to main thread
-  self.postMessage(response, [density.buffer, analysis.buffer])
+  self.postMessage(response, { transfer: [density.buffer, analysis.buffer] })
 }

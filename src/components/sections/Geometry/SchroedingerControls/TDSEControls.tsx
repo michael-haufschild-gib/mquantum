@@ -14,83 +14,17 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { Button } from '@/components/ui/Button'
 import type { TdseControlsProps } from './types'
-import type {
-  TdseInitialCondition,
-  TdsePotentialType,
-  TdseDriveWaveform,
-  TdseFieldView,
-} from '@/lib/geometry/extended/types'
-import { TDSE_SCENARIO_PRESETS } from '@/lib/physics/tdse/presets'
-import type { TdseConfig } from '@/lib/geometry/extended/types'
-
-const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p', 'o']
-
-/** Power-of-2 grid sizes required by Stockham FFT */
-const GRID_SIZE_OPTIONS = [
-  { value: '8', label: '8' },
-  { value: '16', label: '16' },
-  { value: '32', label: '32' },
-  { value: '64', label: '64' },
-  { value: '128', label: '128' },
-]
-
-const INITIAL_CONDITION_OPTIONS = [
-  { value: 'gaussianPacket', label: 'Gaussian Packet' },
-  { value: 'planeWave', label: 'Plane Wave' },
-  { value: 'superposition', label: 'Superposition' },
-]
-
-const POTENTIAL_TYPE_OPTIONS = [
-  { value: 'free', label: 'Free (V=0)' },
-  { value: 'barrier', label: 'Barrier' },
-  { value: 'step', label: 'Step' },
-  { value: 'finiteWell', label: 'Finite Well' },
-  { value: 'harmonicTrap', label: 'Harmonic Trap' },
-  { value: 'driven', label: 'Driven' },
-  { value: 'doubleSlit', label: 'Double Slit' },
-  { value: 'periodicLattice', label: 'Periodic Lattice' },
-  { value: 'doubleWell', label: 'Double Well' },
-]
-
-const DRIVE_WAVEFORM_OPTIONS = [
-  { value: 'sine', label: 'Sine' },
-  { value: 'pulse', label: 'Gaussian Pulse' },
-  { value: 'chirp', label: 'Chirp' },
-]
-
-const FIELD_VIEW_OPTIONS = [
-  { value: 'density', label: 'Density |ψ|²' },
-  { value: 'phase', label: 'Phase arg(ψ)' },
-  { value: 'current', label: 'Current |j|' },
-  { value: 'potential', label: 'Potential V(x)' },
-]
-
-const SCENARIO_PRESET_OPTIONS = [
-  { value: '', label: 'Custom' },
-  ...TDSE_SCENARIO_PRESETS.map((p) => ({ value: p.id, label: p.name })),
-]
-
-/** Compare current config against all presets to find a match. */
-function detectActivePreset(config: TdseConfig): string {
-  for (const preset of TDSE_SCENARIO_PRESETS) {
-    let matches = true
-    for (const [key, expected] of Object.entries(preset.overrides)) {
-      const actual = config[key as keyof TdseConfig]
-      if (Array.isArray(expected)) {
-        if (!Array.isArray(actual) || expected.length !== actual.length ||
-            expected.some((v, i) => v !== (actual as number[])[i])) {
-          matches = false
-          break
-        }
-      } else if (actual !== expected) {
-        matches = false
-        break
-      }
-    }
-    if (matches) return preset.id
-  }
-  return ''
-}
+import type { TdseInitialCondition, TdseFieldView } from '@/lib/geometry/extended/types'
+import { TDSEPotentialControls } from './TDSEPotentialControls'
+import {
+  AXIS_LABELS,
+  TDSE_MAX_TOTAL_SITES,
+  ALL_GRID_SIZE_OPTIONS,
+  INITIAL_CONDITION_OPTIONS,
+  FIELD_VIEW_OPTIONS,
+  SCENARIO_PRESET_OPTIONS,
+  detectActivePreset,
+} from './tdseControlsConstants'
 
 /**
  * TDSE Dynamics configuration panel.
@@ -144,14 +78,15 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
 
     const activeDims = useMemo(() => td.latticeDim, [td.latticeDim])
 
-    const showBarrierControls = td.potentialType === 'barrier' || td.potentialType === 'driven'
-    const showWellControls = td.potentialType === 'finiteWell'
-    const showHarmonicControls = td.potentialType === 'harmonicTrap'
-    const showStepControls = td.potentialType === 'step'
-    const showDriveControls = td.potentialType === 'driven'
-    const showSlitControls = td.potentialType === 'doubleSlit'
-    const showLatticeControls = td.potentialType === 'periodicLattice'
-    const showDoubleWellControls = td.potentialType === 'doubleWell'
+    // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES
+    const maxGridPerDim = useMemo(
+      () => Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
+      [activeDims],
+    )
+    const gridSizeOptions = useMemo(
+      () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
+      [maxGridPerDim],
+    )
 
     const handlePresetChange = useCallback(
       (value: string) => {
@@ -232,260 +167,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           ))}
         </div>
 
-        {/* Potential */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
-          <Select
-            label="Potential"
-            options={POTENTIAL_TYPE_OPTIONS}
-            value={td.potentialType}
-            onChange={(v) => actions.setPotentialType(v as TdsePotentialType)}
-            data-testid="tdse-potential-type"
-          />
-
-          {showBarrierControls && (
-            <>
-              <Slider
-                label="Barrier Height"
-                min={0}
-                max={100}
-                step={0.5}
-                value={td.barrierHeight}
-                onChange={actions.setBarrierHeight}
-                showValue
-                data-testid="tdse-barrier-height"
-              />
-              <Slider
-                label="Barrier Width"
-                min={0.01}
-                max={5}
-                step={0.01}
-                value={td.barrierWidth}
-                onChange={actions.setBarrierWidth}
-                showValue
-                data-testid="tdse-barrier-width"
-              />
-              <Slider
-                label="Barrier Center"
-                min={-10}
-                max={10}
-                step={0.1}
-                value={td.barrierCenter}
-                onChange={actions.setBarrierCenter}
-                showValue
-                data-testid="tdse-barrier-center"
-              />
-            </>
-          )}
-
-          {showStepControls && (
-            <Slider
-              label="Step Height"
-              min={0}
-              max={100}
-              step={0.5}
-              value={td.stepHeight}
-              onChange={actions.setStepHeight}
-              showValue
-              data-testid="tdse-step-height"
-            />
-          )}
-
-          {showWellControls && (
-            <>
-              <Slider
-                label="Well Depth"
-                min={0}
-                max={100}
-                step={0.5}
-                value={td.wellDepth}
-                onChange={actions.setWellDepth}
-                showValue
-                data-testid="tdse-well-depth"
-              />
-              <Slider
-                label="Well Width"
-                min={0.1}
-                max={10}
-                step={0.1}
-                value={td.wellWidth}
-                onChange={actions.setWellWidth}
-                showValue
-                data-testid="tdse-well-width"
-              />
-            </>
-          )}
-
-          {showHarmonicControls && (
-            <Slider
-              label="Omega"
-              min={0.01}
-              max={10}
-              step={0.01}
-              value={td.harmonicOmega}
-              onChange={actions.setHarmonicOmega}
-              showValue
-              data-testid="tdse-harmonic-omega"
-            />
-          )}
-
-          {showSlitControls && (
-            <>
-              <Slider
-                label="Wall Position"
-                min={-10}
-                max={10}
-                step={0.1}
-                value={td.barrierCenter}
-                onChange={actions.setBarrierCenter}
-                showValue
-                data-testid="tdse-slit-wall-position"
-              />
-              <Slider
-                label="Slit Separation"
-                min={0.1}
-                max={10}
-                step={0.1}
-                value={td.slitSeparation}
-                onChange={actions.setSlitSeparation}
-                showValue
-                data-testid="tdse-slit-separation"
-              />
-              <Slider
-                label="Slit Width"
-                min={0.05}
-                max={5}
-                step={0.05}
-                value={td.slitWidth}
-                onChange={actions.setSlitWidth}
-                showValue
-                data-testid="tdse-slit-width"
-              />
-              <Slider
-                label="Wall Thickness"
-                min={0.05}
-                max={3}
-                step={0.05}
-                value={td.wallThickness}
-                onChange={actions.setWallThickness}
-                showValue
-                data-testid="tdse-wall-thickness"
-              />
-              <Slider
-                label="Wall Height"
-                min={1}
-                max={500}
-                step={1}
-                value={td.wallHeight}
-                onChange={actions.setWallHeight}
-                showValue
-                data-testid="tdse-wall-height"
-              />
-            </>
-          )}
-
-          {showLatticeControls && (
-            <>
-              <Slider
-                label="Lattice Depth"
-                min={0.1}
-                max={100}
-                step={0.1}
-                value={td.latticeDepth}
-                onChange={actions.setLatticeDepth}
-                showValue
-                data-testid="tdse-lattice-depth"
-              />
-              <Slider
-                label="Lattice Period"
-                min={0.1}
-                max={10}
-                step={0.1}
-                value={td.latticePeriod}
-                onChange={actions.setLatticePeriod}
-                showValue
-                data-testid="tdse-lattice-period"
-              />
-            </>
-          )}
-
-          {showDoubleWellControls && (
-            <>
-              <Slider
-                label="Coupling (λ)"
-                min={0.1}
-                max={100}
-                step={0.1}
-                value={td.doubleWellLambda}
-                onChange={actions.setDoubleWellLambda}
-                showValue
-                data-testid="tdse-double-well-lambda"
-              />
-              <Slider
-                label="Well Separation (a)"
-                min={0.1}
-                max={5}
-                step={0.05}
-                value={td.doubleWellSeparation}
-                onChange={actions.setDoubleWellSeparation}
-                showValue
-                data-testid="tdse-double-well-separation"
-              />
-              <Slider
-                label="Asymmetry (ε)"
-                min={0}
-                max={50}
-                step={0.1}
-                value={td.doubleWellAsymmetry}
-                onChange={actions.setDoubleWellAsymmetry}
-                showValue
-                data-testid="tdse-double-well-asymmetry"
-              />
-            </>
-          )}
-        </div>
-
-        {/* Drive (only for driven potential) */}
-        {showDriveControls && (
-          <div className="border-t border-border-subtle pt-3 space-y-3">
-            <Switch
-              label="Drive"
-              checked={td.driveEnabled}
-              onCheckedChange={actions.setDriveEnabled}
-              data-testid="tdse-drive-enabled"
-            />
-            {td.driveEnabled && (
-              <>
-                <Select
-                  label="Waveform"
-                  options={DRIVE_WAVEFORM_OPTIONS}
-                  value={td.driveWaveform}
-                  onChange={(v) => actions.setDriveWaveform(v as TdseDriveWaveform)}
-                  data-testid="tdse-drive-waveform"
-                />
-                <Slider
-                  label="Frequency"
-                  min={0.01}
-                  max={10}
-                  step={0.01}
-                  value={td.driveFrequency}
-                  onChange={actions.setDriveFrequency}
-                  showValue
-                  data-testid="tdse-drive-frequency"
-                />
-                <Slider
-                  label="Amplitude"
-                  min={0}
-                  max={50}
-                  step={0.1}
-                  value={td.driveAmplitude}
-                  onChange={actions.setDriveAmplitude}
-                  showValue
-                  data-testid="tdse-drive-amplitude"
-                />
-              </>
-            )}
-          </div>
-        )}
+        <TDSEPotentialControls td={td} activeDims={activeDims} actions={actions} />
 
         {/* Absorber */}
         <div className="border-t border-border-subtle pt-3 space-y-3">
@@ -560,7 +242,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             <Select
               key={`grid-${d}`}
               label={`Grid ${AXIS_LABELS[d]}`}
-              options={GRID_SIZE_OPTIONS}
+              options={gridSizeOptions}
               value={String(td.gridSize[d] ?? 32)}
               onChange={(v) => handleGridSizeChange(d, Number(v))}
               data-testid={`tdse-grid-${d}`}
@@ -626,13 +308,15 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
           <div className="border-t border-border-subtle pt-3 space-y-3">
             {Array.from({ length: activeDims - 3 }, (_, i) => {
               const dimIdx = i + 3
+              const halfExtent =
+                ((td.gridSize[dimIdx] ?? 64) * (td.spacing[dimIdx] ?? td.spacing[0] ?? 0.1)) / 2
               return (
                 <Slider
                   key={`slice-${dimIdx}`}
                   label={`Slice ${AXIS_LABELS[dimIdx]}`}
-                  min={-5}
-                  max={5}
-                  step={0.1}
+                  min={-halfExtent}
+                  max={halfExtent}
+                  step={halfExtent / 20}
                   value={td.slicePositions[i] ?? 0}
                   onChange={(v) => actions.setSlicePosition(i, v)}
                   showValue

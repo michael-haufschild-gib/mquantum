@@ -94,10 +94,10 @@ export const BEC_SCENARIO_PRESETS: BecScenarioPreset[] = [
     description: 'Condensate oscillates radially — collective excitation at 2ω (2D) or √5 ω (3D)',
     overrides: {
       interactionStrength: 500,
-      // Quench the trap frequency to trigger radial breathing:
-      // start with TF ground state for ω=1, then evolve under ω=0.7
-      // → condensate is wider than new equilibrium → oscillates
+      // Quench: initialize TF ground state for ω=1, then evolve under ω=0.7.
+      // The condensate is narrower than the new equilibrium → expands → oscillates.
       trapOmega: 0.7,
+      initTrapOmega: 1.0,
       initialCondition: 'thomasFermi',
       fieldView: 'density',
     },

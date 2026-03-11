@@ -13,8 +13,6 @@ import {
   packRGBA16F,
   packRG16F,
   packR16F,
-  linearToNDCoords,
-  ndToLinearIdx,
 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { buildRadialDisplayGrid } from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
 
@@ -211,11 +209,19 @@ function projectMarginalize(
   const kMagWeightedSum = new Float64Array(G ** 3)
   const omegaWeightedSum = new Float64Array(G ** 3)
 
+  // Pre-allocate reusable coordinate arrays (avoid per-iteration heap allocation)
+  const coords = new Array<number>(activeDims.length).fill(0)
+  const outCoords = [0, 0, 0]
+
   for (let i = 0; i < raw.totalSites; i++) {
-    const coords = linearToNDCoords(i, activeDims)
+    // Inline C-order coordinate extraction into pre-allocated array
+    let remaining = i
+    for (let d = activeDims.length - 1; d >= 0; d--) {
+      coords[d] = remaining % activeDims[d]!
+      remaining = Math.floor(remaining / activeDims[d]!)
+    }
 
     let valid = true
-    const outCoords = [0, 0, 0]
     for (let d = 0; d < 3; d++) {
       const N = activeDims[d]!
       let kIdx = coords[d]!

@@ -13,6 +13,7 @@ import type { TdseConfig } from '@/lib/geometry/extended/types'
 /** Subset of TdseConfig fields that a scenario preset can override */
 export type TdsePresetOverride = Partial<Omit<TdseConfig, 'needsReset' | 'slicePositions'>>
 
+/** A named TDSE scenario preset with config overrides applied on selection. */
 export interface TdseScenarioPreset {
   /** Machine-readable key */
   id: string
