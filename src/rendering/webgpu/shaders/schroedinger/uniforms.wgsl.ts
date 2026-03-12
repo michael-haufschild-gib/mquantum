@@ -138,13 +138,13 @@ struct SchroedingerUniforms {
   // Material properties
   roughness: f32,                // GGX roughness (0.0-1.0)
 
-  // SSS
-  sssEnabled: u32,               // Enable subsurface scattering
-  sssIntensity: f32,             // SSS intensity (0.0-2.0)
-  sssColor: vec3f,               // SSS tint color
+  // Reserved (formerly SSS in Schroedinger uniforms — shader reads from MaterialUniforms)
+  _reservedSSS0: u32,
+  _reservedSSS1: f32,
+  _reservedSSS2: vec3f,
   _pad1: f32,
-  sssThickness: f32,             // SSS thickness factor (0.1-5.0)
-  sssJitter: f32,                // SSS jitter amount (0.0-1.0)
+  _reservedSSS3: f32,
+  _reservedSSS4: f32,
 
   // Reserved (formerly erosion, removed)
   _reservedErosion0: f32,
@@ -197,14 +197,14 @@ struct SchroedingerUniforms {
   // Sample count (LOD)
   sampleCount: i32,              // Sample count for loop control
 
-  // Phase shift for isosurface SDF (Mandelbulb-style fractals)
-  phaseEnabled: u32,             // Enable phase shift
-  phaseTheta: f32,               // Phase offset for theta angle
-  phasePhi: f32,                 // Phase offset for phi angle
-  _pad3: f32,                    // Alignment padding
+  // Reserved padding (formerly phase shift, removed)
+  _reserved924: u32,
+  _reserved928: f32,
+  _reserved932: f32,
+  _reserved936: f32,
 
   // Color algorithm system (matches WebGL uniform system)
-  colorAlgorithm: i32,           // Color algorithm selector (0-18)
+  colorAlgorithm: i32,           // Color algorithm selector (0-23)
   distPower: f32,                // Distribution power for distance-based coloring
   distCycles: f32,               // Distribution cycles
   distOffset: f32,               // Distribution offset
@@ -215,11 +215,11 @@ struct SchroedingerUniforms {
   cosineC: vec4f,                // Cosine palette C coefficient
   cosineD: vec4f,                // Cosine palette D coefficient
 
-  // Volumetric fog controls
-  fogIntegrationEnabled: u32,    // Enable internal fog integration
-  fogContribution: f32,          // Fog contribution strength
-  internalFogDensity: f32,       // Internal object-space fog density
-  _reservedErosionHQ: u32,       // Reserved (formerly erosionHQ, removed)
+  // Reserved padding (formerly fog + erosionHQ, removed)
+  _reserved1024: u32,
+  _reserved1028: f32,
+  _reserved1032: f32,
+  _reserved1036: u32,
 
   // Dynamic bounding radius (replaces fixed BOUND_R constant)
   boundingRadius: f32,           // Bounding sphere radius (physics-based, ≥ 2.0)

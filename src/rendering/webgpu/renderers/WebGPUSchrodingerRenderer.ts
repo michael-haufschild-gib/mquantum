@@ -2022,17 +2022,15 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[712 / 4] = schroedinger?.scatteringAnisotropy ?? 0.0
     floatView[716 / 4] = pbr?.face?.roughness ?? 0.3 // WebGL uses 'pbr-face' source
 
-    // SSS fields in SchroedingerUniforms are DEAD — shader reads from MaterialUniforms
-    // (material.sss* in bind group 1). Keep struct layout stable by zero-filling.
-    intView[720 / 4] = 0 // sssEnabled (dead)
-    floatView[724 / 4] = 0.0 // sssIntensity (dead)
-    // bytes 728-735: implicit padding before vec3f
-    floatView[736 / 4] = 0.0 // sssColor.r (dead)
-    floatView[740 / 4] = 0.0 // sssColor.g (dead)
-    floatView[744 / 4] = 0.0 // sssColor.b (dead)
-    floatView[748 / 4] = 0.0 // _pad1
-    floatView[752 / 4] = 0.0 // sssThickness (dead)
-    floatView[756 / 4] = 0.0 // sssJitter (dead)
+    // Reserved padding at offset 720-756 (formerly SSS — shader reads from MaterialUniforms)
+    intView[720 / 4] = 0
+    floatView[724 / 4] = 0.0
+    floatView[736 / 4] = 0.0
+    floatView[740 / 4] = 0.0
+    floatView[744 / 4] = 0.0
+    floatView[748 / 4] = 0.0
+    floatView[752 / 4] = 0.0
+    floatView[756 / 4] = 0.0
 
     // Reserved (formerly erosion, removed)
     floatView[760 / 4] = 0.0
@@ -2094,11 +2092,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const effectiveSampleCount = Math.min(Math.max(8, Math.ceil(baseSampleCount * radiusScale)), 96)
     intView[920 / 4] = effectiveSampleCount
 
-    // Phase shift fields
-    intView[924 / 4] = schroedinger?.phaseAnimationEnabled ? 1 : 0
-    floatView[928 / 4] = schroedinger?.phaseTheta ?? 0.0
-    floatView[932 / 4] = schroedinger?.phasePhi ?? 0.0
-    floatView[936 / 4] = 0.0 // _pad3
+    // Reserved padding at offset 924-936 (formerly phase shift, removed)
+    intView[924 / 4] = 0
+    floatView[928 / 4] = 0.0
+    floatView[932 / 4] = 0.0
+    floatView[936 / 4] = 0.0
 
     // Color algorithm system (offset 940+)
     // Use canonical mapping shared with WebGL (palette/types.ts COLOR_ALGORITHM_TO_INT)
@@ -2141,11 +2139,11 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     floatView[1016 / 4] = cosineCoeffs.d?.[2] ?? 0.67
     floatView[1020 / 4] = 0.0 // w unused
 
-    // Fog controls (offset 1024+)
-    intView[1024 / 4] = schroedinger?.fogIntegrationEnabled ? 1 : 0
-    floatView[1028 / 4] = schroedinger?.fogContribution ?? 1.0
-    floatView[1032 / 4] = schroedinger?.internalFogDensity ?? 0.0
-    intView[1036 / 4] = 0 // Reserved (formerly erosionHQ)
+    // Reserved padding at offset 1024-1036 (formerly fog + erosionHQ, removed)
+    intView[1024 / 4] = 0
+    floatView[1028 / 4] = 0.0
+    floatView[1032 / 4] = 0.0
+    intView[1036 / 4] = 0
 
     // Dynamic bounding radius (offset 1040+)
     floatView[1040 / 4] = this.boundingRadius

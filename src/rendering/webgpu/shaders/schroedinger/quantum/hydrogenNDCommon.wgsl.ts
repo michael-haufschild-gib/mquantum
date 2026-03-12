@@ -65,7 +65,11 @@ fn evalHydrogenNDAngular(l: i32, m: i32, theta: f32, phi: f32, useReal: bool) ->
   } else {
     // Full complex Y_lm = K · P_l^|m|(cosθ) · e^{imφ}
     let K = sphericalHarmonicNorm(l, m);
-    let P = legendre(l, m, cos(theta));
+    var P = legendre(l, m, cos(theta));
+    // legendre() includes Condon-Shortley phase (-1)^|m|. For m >= 0 this gives
+    // the standard Y_l^m directly. For m < 0, Y_l^{-|m|} = K·P_bare·e^{-i|m|φ}
+    // (no CS), so undo the phase for odd |m|.
+    if (m < 0 && (abs(m) & 1) == 1) { P = -P; }
     let KP = K * P;
     let mf = f32(m);
     return vec2f(KP * cos(mf * phi), KP * sin(mf * phi));
@@ -87,7 +91,9 @@ fn evalHydrogenNDAngularDirect(l: i32, m: i32, cosTheta: f32, sinTheta: f32, phi
     }
   } else {
     let K = sphericalHarmonicNorm(l, m);
-    let P = legendre(l, m, cosTheta);
+    var P = legendre(l, m, cosTheta);
+    // Undo Condon-Shortley phase for m < 0 (see evalHydrogenNDAngular)
+    if (m < 0 && (abs(m) & 1) == 1) { P = -P; }
     let KP = K * P;
     let mf = f32(m);
     return vec2f(KP * cos(mf * phi), KP * sin(mf * phi));
@@ -118,7 +124,9 @@ fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, use
       return vec2f(0.0, 0.0);
     }
     let K = sphericalHarmonicNorm(l, m);
-    let P = legendre(l, m, nz);
+    var P = legendre(l, m, nz);
+    // Undo Condon-Shortley phase for m < 0 (see evalHydrogenNDAngular)
+    if (m < 0 && (abs(m) & 1) == 1) { P = -P; }
     let KP = K * P;
     let phi = atan2(ny, nx);
     let mf = f32(m);

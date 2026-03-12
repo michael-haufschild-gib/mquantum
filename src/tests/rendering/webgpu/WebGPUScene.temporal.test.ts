@@ -230,7 +230,7 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     expect(renderer.rendererConfig?.colorAlgorithm).toBe(11)
   })
 
-  it('falls back relativePhase to radialDistance in free scalar mode', async () => {
+  it('falls back relativePhase to phaseDensity in free scalar mode', async () => {
     ensureGpuTextureUsageConstants()
     const { createObjectRenderer } = await import('@/rendering/webgpu/WebGPUScene')
     const renderer = createObjectRenderer(
@@ -245,7 +245,9 @@ describe('WebGPUScene temporal reprojection wiring', () => {
       throw new Error('Expected Schrödinger renderer to be created')
     }
 
-    expect(renderer.rendererConfig?.colorAlgorithm).toBe(11)
+    // Free scalar mode falls back to phaseDensity (22) because radialDistance
+    // doesn't read from the density grid used by compute modes.
+    expect(renderer.rendererConfig?.colorAlgorithm).toBe(22)
   })
 
   it('keeps kSpaceOccupation in free scalar mode', async () => {

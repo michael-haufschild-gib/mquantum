@@ -112,11 +112,6 @@ export interface SchroedingerSliceActions {
   setSchroedingerScatteringAnisotropy: (anisotropy: number) => void
   setSchroedingerRoughness: (roughness: number) => void
 
-  // Fog Settings
-  setSchroedingerFogIntegrationEnabled: (enabled: boolean) => void
-  setSchroedingerFogContribution: (contribution: number) => void
-  setSchroedingerInternalFogDensity: (density: number) => void
-
   // Raymarching Quality
   setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => void
 

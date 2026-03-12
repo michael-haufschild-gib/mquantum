@@ -1001,14 +1001,6 @@ export interface SchroedingerConfig {
   /** Surface roughness for specular highlights (0.0-1.0) */
   roughness: number
 
-  // === Fog / Atmosphere ===
-  /** Enable scene fog integration */
-  fogIntegrationEnabled: boolean
-  /** Fog contribution strength (0.0-2.0) */
-  fogContribution: number
-  /** Internal object-space fog density (0.0-1.0) */
-  internalFogDensity: number
-
   // === Raymarching Quality ===
   /** Unified raymarching quality preset (affects sample count) */
   raymarchQuality: RaymarchQuality
@@ -1225,12 +1217,6 @@ export interface SchroedingerConfig {
   /** Origin point in N-dimensional space */
   origin: Float32Array
 
-  // === Phase Shift (Hydrogen ND phase animation) ===
-  /** Phase rotation angle theta (set by phase animation) */
-  phaseTheta: number
-  /** Phase rotation angle phi (set by phase animation) */
-  phasePhi: number
-
   // === Open Quantum System Configuration ===
   /** Density matrix + Lindblad decoherence configuration */
   openQuantum: OpenQuantumConfig
@@ -1324,11 +1310,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   emissionColorShift: 0.0,
   scatteringAnisotropy: 0.0,
   roughness: 0.3,
-
-  // Fog
-  fogIntegrationEnabled: true,
-  fogContribution: 1.0,
-  internalFogDensity: 0.0,
 
   // Raymarching Quality
   raymarchQuality: 'balanced',
@@ -1454,10 +1435,6 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   basisY: new Float32Array([0, 1, 0]),
   basisZ: new Float32Array([0, 0, 1]),
   origin: new Float32Array([0, 0, 0]),
-
-  // Phase Shift
-  phaseTheta: 0.0,
-  phasePhi: 0.0,
 
   // Open Quantum System
   openQuantum: DEFAULT_OPEN_QUANTUM_CONFIG,

@@ -147,17 +147,6 @@ fn applyDensityContrast(rho: f32, uniforms: SchroedingerUniforms) -> f32 {
   return smoothstep(0.0, width, normalized) * uniforms.peakDensity;
 }
 
-/**
- * Compute per-step internal fog alpha for volumetric integration.
- */
-fn computeInternalFogAlpha(stepLen: f32, uniforms: SchroedingerUniforms) -> f32 {
-  if (uniforms.fogIntegrationEnabled == 0u) { return 0.0; }
-  if (uniforms.fogContribution <= 0.0 || uniforms.internalFogDensity <= 0.0) { return 0.0; }
-
-  let fogDensity = uniforms.internalFogDensity * uniforms.fogContribution;
-  return 1.0 - exp(-fogDensity * stepLen);
-}
-
 // ============================================
 // Physical Nodal Classification
 // ============================================
@@ -707,7 +696,7 @@ fn volumeRaymarch(
   // Time for animation
   let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
-  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
+  let ambientLight = lighting.ambientColor * lighting.ambientIntensity;
 
   // Transmittance
   var transmittance: f32 = 1.0;
@@ -789,7 +778,7 @@ fn volumeRaymarch(
           1.0
         );
         if (nodalAlpha > 1e-5) {
-          let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);
+          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
           accColor += transmittance * nodalAlpha * nodalScattered;
           transmittance *= (1.0 - nodalAlpha * 0.6);
         }
@@ -879,13 +868,6 @@ fn volumeRaymarch(
       transmittance *= (1.0 - alpha);
     }
 
-    // Internal fog integration (scene atmosphere inside volume)
-    let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
-    if (fogAlpha > 0.0001) {
-      accColor += transmittance * fogAlpha * fogColor;
-      transmittance *= (1.0 - fogAlpha);
-    }
-
     t += adaptiveStep;
   }
 
@@ -929,7 +911,7 @@ fn volumeRaymarchHQ(
 
   let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
-  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
+  let ambientLight = lighting.ambientColor * lighting.ambientIntensity;
 
   // PERF: Hoist loop-invariant bounding radius computation
   let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
@@ -1031,7 +1013,7 @@ fn volumeRaymarchHQ(
           1.0
         );
         if (nodalAlpha > 1e-5) {
-          let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);
+          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
           accColor += transmittance * nodalAlpha * nodalScattered;
           transmittance *= (1.0 - nodalAlpha * 0.6);
         }
@@ -1107,13 +1089,6 @@ fn volumeRaymarchHQ(
       transmittance *= (1.0 - alpha);
     }
 
-    // Internal fog integration (scene atmosphere inside volume)
-    let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
-    if (fogAlpha > 0.0001) {
-      accColor += transmittance * fogAlpha * fogColor;
-      transmittance *= (1.0 - fogAlpha);
-    }
-
     t += adaptiveStep;
   }
 
@@ -1162,7 +1137,7 @@ fn volumeRaymarchGrid(
 
   let animTime = getVolumeTime(uniforms);
   let viewDir = -rayDir;
-  let fogColor = lighting.ambientColor * lighting.ambientIntensity;
+  let ambientLight = lighting.ambientColor * lighting.ambientIntensity;
 
   var transmittance: f32 = 1.0;
 
@@ -1287,7 +1262,7 @@ fn volumeRaymarchGrid(
           1.0
         );
         if (nodalAlpha > 1e-5) {
-          let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);
+          let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);
           accColor += transmittance * nodalAlpha * nodalScattered;
           transmittance *= (1.0 - nodalAlpha * 0.6);
         }
@@ -1366,13 +1341,6 @@ fn volumeRaymarchGrid(
       // Front-to-back compositing
       accColor += transmittance * alpha * emission;
       transmittance *= (1.0 - alpha);
-    }
-
-    // Internal fog integration
-    let fogAlpha = computeInternalFogAlpha(adaptiveStep, uniforms);
-    if (fogAlpha > 0.0001) {
-      accColor += transmittance * fogAlpha * fogColor;
-      transmittance *= (1.0 - fogAlpha);
     }
 
     t += adaptiveStep;

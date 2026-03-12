@@ -876,10 +876,6 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerEmissionColorShift: clampedSetter('emissionColorShift', -1.0, 1.0),
     setSchroedingerScatteringAnisotropy: clampedSetter('scatteringAnisotropy', -0.9, 0.9),
     setSchroedingerRoughness: clampedSetter('roughness', 0.0, 1.0),
-    setSchroedingerFogIntegrationEnabled: valueSetter('fogIntegrationEnabled'),
-    setSchroedingerFogContribution: clampedSetter('fogContribution', 0.0, 2.0),
-    setSchroedingerInternalFogDensity: clampedSetter('internalFogDensity', 0.0, 1.0),
-
     setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => {
       // Update both raymarchQuality and sampleCount for consistency.
       // Note: The mesh reads raymarchQuality directly via RAYMARCH_QUALITY_TO_SAMPLES mapping.

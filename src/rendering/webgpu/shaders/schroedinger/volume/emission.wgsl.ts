@@ -242,7 +242,7 @@ const ALGO_BRANCH: Record<number, string> = {
   11: /* wgsl */ `
     // 11: Radial Distance (spectral)
     let r = length(pos);
-    let distanceNorm = clamp(r * 0.5, 0.0, 1.0);
+    let distanceNorm = clamp(r / uniforms.boundingRadius, 0.0, 1.0);
     let hue = 0.8 * distanceNorm;
     col = hsl2rgb(hue, 1.0, 0.5);`,
 
@@ -466,16 +466,15 @@ export { ALGO_BRANCH, COLOR_ALG_NAMES }
  * Emits only that algorithm's branch (no if/else chain) for compile-time specialization.
  */
 export function generateComputeBaseColor(colorAlgorithm: ColorAlgorithm): string {
+  // Only algorithms 3 (Phase) and 4 (Mixed) use baseHSL from material color
+  const needsBaseHSL = colorAlgorithm === 3 || colorAlgorithm === 4
   const header = /* wgsl */ `
 // Compute base surface color (no lighting applied)
 // PERF: accepts pre-computed log-density s to avoid redundant log() call
 fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   // Normalize log-density to [0, 1] range for color mapping
   let normalized = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-
-  // Get base color from material's base color
-  var baseHSL = rgb2hsl(material.baseColor.rgb);
-
+${needsBaseHSL ? '\n  // Get base color from material\'s base color\n  var baseHSL = rgb2hsl(material.baseColor.rgb);\n' : ''}
   var col = vec3f(0.0);
 `
 

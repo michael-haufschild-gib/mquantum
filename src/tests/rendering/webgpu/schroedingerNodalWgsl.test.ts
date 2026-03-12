@@ -36,7 +36,7 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('fn nodalCrossingMask(')
     expect(wgsl).toContain('hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);')
     expect(wgsl).toContain('let signedDistance = abs(value) / gradMag;')
-    expect(wgsl).toContain('let nodalScattered = mix(nodalColor, nodalColor * fogColor, 0.35);')
+    expect(wgsl).toContain('let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);')
     expect(wgsl).toContain('transmittance *= (1.0 - nodalAlpha * 0.6);')
     expect(wgsl).toContain('if (minAbs <= epsSafe && span >= epsSafe * 0.5)')
     expect(wgsl).toContain('intensity = nodalBandMask(psiCenter.x, gradRe, eps) * crossingRe;')

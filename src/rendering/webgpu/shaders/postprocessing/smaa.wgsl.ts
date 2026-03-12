@@ -310,8 +310,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     let e2 = textureSampleLevel(tEdges, linearSampler, input.uv + vec2f((d.y + 0.5) * texelSize.x, 0.0), 0.0).g;
 
     // Calculate area
-    weights.r = area(abs(d), e1, e2).x;
-    weights.g = area(abs(d), e1, e2).y;
+    let hArea = area(abs(d), e1, e2);
+    weights.r = hArea.x;
+    weights.g = hArea.y;
   }
 
   // Process vertical edges (edge.r = |L - Lleft| > threshold).
@@ -331,8 +332,9 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
     let e2 = textureSampleLevel(tEdges, linearSampler, input.uv + vec2f(0.0, (d.y + 0.5) * texelSize.y), 0.0).r;
 
     // Calculate area
-    weights.b = area(abs(d), e1, e2).x;
-    weights.a = area(abs(d), e1, e2).y;
+    let vArea = area(abs(d), e1, e2);
+    weights.b = vArea.x;
+    weights.a = vArea.y;
   }
 
   return weights;
