@@ -331,25 +331,13 @@ struct SchroedingerUniforms {
 
 // Get omega[i] from packed array<vec4f, 3>
 fn getOmega(uniforms: SchroedingerUniforms, i: i32) -> f32 {
-  let vecIdx = i / 4;
-  let compIdx = i % 4;
-  let v = uniforms.omega[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return uniforms.omega[i / 4][i % 4];
 }
 
 // Get quantum[k * MAX_DIM + j] from packed array<vec4i, 22>
 // quantum numbers are stored as n[k][j] where k is term index, j is dimension
 fn getQuantum(uniforms: SchroedingerUniforms, idx: i32) -> i32 {
-  let vecIdx = idx / 4;
-  let compIdx = idx % 4;
-  let v = uniforms.quantum[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return uniforms.quantum[idx / 4][idx % 4];
 }
 
 // Get quantum number n[k][j] for term k, dimension j
@@ -364,35 +352,17 @@ fn getCoeff(uniforms: SchroedingerUniforms, k: i32) -> vec2f {
 
 // Get energy[k] from packed array<vec4f, 2>
 fn getEnergy(uniforms: SchroedingerUniforms, k: i32) -> f32 {
-  let vecIdx = k / 4;
-  let compIdx = k % 4;
-  let v = uniforms.energy[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return uniforms.energy[k / 4][k % 4];
 }
 
 // Get extraDimN[i] from packed array<vec4i, 2>
 fn getExtraDimN(uniforms: SchroedingerUniforms, i: i32) -> i32 {
-  let vecIdx = i / 4;
-  let compIdx = i % 4;
-  let v = uniforms.extraDimN[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return uniforms.extraDimN[i / 4][i % 4];
 }
 
 // Get extraDimOmega[i] from packed array<vec4f, 2>
 fn getExtraDimOmega(uniforms: SchroedingerUniforms, i: i32) -> f32 {
-  let vecIdx = i / 4;
-  let compIdx = i % 4;
-  let v = uniforms.extraDimOmega[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return uniforms.extraDimOmega[i / 4][i % 4];
 }
 
 // ============================================
@@ -416,16 +386,7 @@ struct BasisVectors {
  * Get component i from a basis vector array.
  */
 fn getBasisComponent(basis: array<vec4f, 3>, i: i32) -> f32 {
-  let vecIdx = i / 4;
-  let compIdx = i % 4;
-
-  if (vecIdx == 0) {
-    return basis[0][compIdx];
-  } else if (vecIdx == 1) {
-    return basis[1][compIdx];
-  } else {
-    return basis[2][compIdx];
-  }
+  return basis[i / 4][i % 4];
 }
 
 /**
@@ -562,25 +523,13 @@ struct HydrogenBasisUniforms {
  */
 fn getHydrogenBasisQN(hb: HydrogenBasisUniforms, stateIdx: i32, dimIdx: i32) -> i32 {
   let flatIdx = stateIdx * 11 + dimIdx;
-  let vecIdx = flatIdx / 4;
-  let compIdx = flatIdx % 4;
-  let v = hb.quantumNumbers[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return hb.quantumNumbers[flatIdx / 4][flatIdx % 4];
 }
 
 /**
  * Get energy for basis state stateIdx.
  */
 fn getHydrogenBasisEnergy(hb: HydrogenBasisUniforms, stateIdx: i32) -> f32 {
-  let vecIdx = stateIdx / 4;
-  let compIdx = stateIdx % 4;
-  let v = hb.energies[vecIdx];
-  if (compIdx == 0) { return v.x; }
-  else if (compIdx == 1) { return v.y; }
-  else if (compIdx == 2) { return v.z; }
-  else { return v.w; }
+  return hb.energies[stateIdx / 4][stateIdx % 4];
 }
 `

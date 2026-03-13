@@ -5,7 +5,7 @@
  * drive parameters, absorber settings, display options, basis vectors
  * for N-D to 3D projection, and BEC trap anisotropy ratios.
  *
- * Total size: 688 bytes (aligned to 16-byte boundaries).
+ * Total size: 704 bytes (aligned to 16-byte boundaries).
  *
  * @module
  */
@@ -22,7 +22,7 @@ struct TDSEUniforms {
   mass: f32,                 // offset 16
   stepsPerFrame: u32,        // offset 20
   initCondition: u32,        // offset 24 (0=gaussian, 1=planeWave, 2=superposition, 3=thomasFermi, 4=vortexImprint, 5=darkSoliton)
-  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap)
+  potentialType: u32,        // offset 28 (0=free, 1=barrier, 2=step, 3=well, 4=harmonic, 5=driven, 6=doubleSlit, 7=periodicLattice, 8=doubleWell, 9=becTrap, 10=radialDoubleWell)
 
   // Per-dimension arrays (48 bytes each)
   gridSize: array<u32, 12>,  // offset 32
@@ -87,8 +87,15 @@ struct TDSEUniforms {
   doubleWellAsymmetry: f32,  // offset 628
   interactionStrength: f32,  // offset 632 (BEC: g|ψ|², 0 = linear TDSE)
 
-  // BEC trap anisotropy ratios ω_d/ω_0 per dimension (48 bytes + 4 bytes padding)
+  // BEC trap anisotropy ratios ω_d/ω_0 per dimension (48 bytes)
   trapAnisotropy: array<f32, 12>, // offset 636 (used by becTrap potential type 9)
-  _pad: f32,                 // offset 684 (pad to 688 bytes)
+
+  // Radial double well: V(r) = λ(r−r₁)²(r−r₂)² − ε·r (16 bytes)
+  radialWellInner: f32,      // offset 684 — inner minimum radius r₁
+  radialWellOuter: f32,      // offset 688 — outer minimum radius r₂
+  radialWellDepth: f32,      // offset 692 — well depth scale λ
+  radialWellTilt: f32,       // offset 696 — asymmetry tilt ε
+
+  _pad: f32,                 // offset 700 (pad to 704 bytes, 16-byte aligned)
 }
 `

@@ -45,7 +45,7 @@ const LINEAR_WG = 64
 /** 3D dispatch workgroup size for write-grid pass */
 const GRID_WG = 4
 /** Density grid texture resolution */
-const DENSITY_GRID_SIZE = 64
+const DENSITY_GRID_SIZE = 96
 /** Maximum supported dimensions */
 const MAX_DIM = 12
 /** FFTStageUniforms struct size (32 bytes) */
@@ -135,6 +135,11 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private kineticBG: GPUBindGroup | null = null
   private writeGridBG: GPUBindGroup | null = null
 
+  // Cached per-component bind groups (avoid recreation every frame)
+  private cachedPackBGs: GPUBindGroup[] = []
+  private cachedUnpackBGs: GPUBindGroup[] = []
+  private cachedUnpackBGsNoNorm: GPUBindGroup[] = []
+
   // Diagnostics
   private diagUniformBuffer: GPUBuffer | null = null
   private diagPartialNormBuffer: GPUBuffer | null = null
@@ -156,6 +161,7 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   // State
   private initialized = false
   private lastConfigHash = ''
+  private lastPotentialHash = ''
   private totalSites = 0
   private simTime = 0
   private maxDensity = 1.0
@@ -244,6 +250,11 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     this.diagPartialAntiBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
+
+    // Clear cached per-component bind groups
+    this.cachedPackBGs = []
+    this.cachedUnpackBGs = []
+    this.cachedUnpackBGsNoNorm = []
 
     // Compute dimensions
     this.totalSites = 1
@@ -622,6 +633,22 @@ struct PackUniforms {
         { binding: 5, resource: { buffer: this.diagPartialAntiBuffer } },
       ] })
     }
+
+    // Build cached per-component pack/unpack bind groups
+    this.cachedPackBGs = []
+    this.cachedUnpackBGs = []
+    this.cachedUnpackBGsNoNorm = []
+    const S = this.currentSpinorSize
+    for (let c = 0; c < S; c++) {
+      const bg = this.createComponentPackBG(device, c)
+      if (bg) this.cachedPackBGs.push(bg)
+
+      const ubg = this.createComponentUnpackBG(device, c)
+      if (ubg) this.cachedUnpackBGs.push(ubg)
+
+      const unbg = this.createComponentUnpackBGNoNorm(device, c)
+      if (unbg) this.cachedUnpackBGsNoNorm.push(unbg)
+    }
   }
 
   private updateUniforms(
@@ -873,6 +900,7 @@ struct PackUniforms {
       this.rebuildBindGroups(device)
       this.initialized = false
       this.simTime = 0
+      this.lastPotentialHash = ''
     }
 
     // Upload gamma matrices if ready
@@ -911,11 +939,15 @@ struct PackUniforms {
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
     const S = this.currentSpinorSize
 
-    // Refresh potential each frame for live parameter changes
-    if (this.potentialPipeline && this.potentialBG) {
-      const p = encoder.beginComputePass({ label: 'dirac-potential-update' })
-      this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
-      p.end()
+    // Refresh potential only when parameters change (dirty tracking)
+    const potHash = `${config.potentialType}|${config.potentialStrength}|${config.potentialWidth}|${config.potentialCenter}|${config.harmonicOmega}|${config.coulombZ}|${config.mass}|${config.spacing.join(',')}`
+    if (potHash !== this.lastPotentialHash) {
+      this.lastPotentialHash = potHash
+      if (this.potentialPipeline && this.potentialBG) {
+        const p = encoder.beginComputePass({ label: 'dirac-potential-update' })
+        this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
+        p.end()
+      }
     }
 
     // Time evolution (Strang splitting)
@@ -935,8 +967,8 @@ struct PackUniforms {
 
         // 2-3. Forward FFT for each spinor component
         for (let c = 0; c < S; c++) {
-          // Pack component c into FFT scratch
-          const packBG = this.createComponentPackBG(device, c)
+          // Pack component c into FFT scratch (use cached bind group)
+          const packBG = this.cachedPackBGs[c]
           if (packBG && this.packPipeline) {
             const p = encoder.beginComputePass({ label: `dirac-pack-c${c}-${step}` })
             this.dispatchCompute(p, this.packPipeline, [packBG], linearWG)
@@ -949,16 +981,8 @@ struct PackUniforms {
             fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
           }
 
-          // Inverse FFT (will be done after kinetic step below)
-          // Actually, we need to stay in k-space for the kinetic step.
-          // But the kinetic step operates on ALL components simultaneously
-          // at each k-point. So we need ALL components in k-space first.
-          // Strategy: FFT all components forward, then kinetic, then IFFT all.
-
-          // After forward FFT, unpack k-space data back to spinor buffer
-          // (so the kinetic shader can read all components at each k-point)
-          // NO normalization on forward FFT — 1/N only on inverse
-          const unpackBG = this.createComponentUnpackBGNoNorm(device, c)
+          // Unpack k-space data back to spinor buffer (no normalization)
+          const unpackBG = this.cachedUnpackBGsNoNorm[c]
           if (unpackBG && this.unpackPipeline) {
             const p = encoder.beginComputePass({ label: `dirac-fft-unpack-c${c}-${step}` })
             this.dispatchCompute(p, this.unpackPipeline, [unpackBG], linearWG)
@@ -977,8 +1001,8 @@ struct PackUniforms {
 
         // 5. Inverse FFT for each spinor component
         for (let c = 0; c < S; c++) {
-          // Pack component c for IFFT
-          const packBG = this.createComponentPackBG(device, c)
+          // Pack component c for IFFT (use cached bind group)
+          const packBG = this.cachedPackBGs[c]
           if (packBG && this.packPipeline) {
             const p = encoder.beginComputePass({ label: `dirac-ifft-pack-c${c}-${step}` })
             this.dispatchCompute(p, this.packPipeline, [packBG], linearWG)
@@ -991,8 +1015,8 @@ struct PackUniforms {
             fftSlot = this.dispatchFFTAxis(encoder, config.gridSize[d]!, fftSlot)
           }
 
-          // Unpack with 1/N normalization
-          const unpackBG = this.createComponentUnpackBG(device, c)
+          // Unpack with 1/N normalization (use cached bind group)
+          const unpackBG = this.cachedUnpackBGs[c]
           if (unpackBG && this.unpackPipeline) {
             const p = encoder.beginComputePass({ label: `dirac-ifft-unpack-c${c}-${step}` })
             this.dispatchCompute(p, this.unpackPipeline, [unpackBG], linearWG)

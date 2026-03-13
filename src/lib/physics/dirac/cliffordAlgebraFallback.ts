@@ -1,6 +1,9 @@
 /**
  * Pure JS fallback for Clifford algebra generation.
  * Used when WASM is unavailable. Same algorithm as clifford.rs, same output format.
+ *
+ * Produces matrices in standard Dirac form: β = diag(I_{S/2}, −I_{S/2}),
+ * so components 0..S/2−1 are particle and S/2..S−1 are antiparticle.
  */
 
 /**
@@ -78,6 +81,60 @@ function sigma3(): Float32Array {
   return m
 }
 
+/**
+ * Count set bits (popcount) of a non-negative integer.
+ */
+function popcount(n: number): number {
+  let count = 0
+  let v = n
+  while (v > 0) {
+    count += v & 1
+    v >>= 1
+  }
+  return count
+}
+
+/**
+ * Compute the permutation that reorders the tensor-product basis into
+ * standard Dirac form where β = diag(I_{S/2}, −I_{S/2}).
+ *
+ * In the tensor-product construction, β = σ₃^{⊗k} is diagonal with
+ * eigenvalue (−1)^popcount(i) at index i. The permutation places all
+ * even-popcount indices (β = +1, particle) first, then odd-popcount
+ * (β = −1, antiparticle).
+ *
+ * Returns perm where perm[newIndex] = oldIndex.
+ */
+function standardFormPermutation(s: number): number[] {
+  const evenPop: number[] = []
+  const oddPop: number[] = []
+  for (let i = 0; i < s; i++) {
+    if (popcount(i) % 2 === 0) {
+      evenPop.push(i)
+    } else {
+      oddPop.push(i)
+    }
+  }
+  return evenPop.concat(oddPop)
+}
+
+/**
+ * Apply a permutation P to a complex matrix: M_new = P · M · P^T.
+ * perm[newIndex] = oldIndex.
+ */
+function permuteMatrix(m: Float32Array, s: number, perm: number[]): Float32Array {
+  const result = complexZeros(s)
+  for (let newRow = 0; newRow < s; newRow++) {
+    const oldRow = perm[newRow]!
+    for (let newCol = 0; newCol < s; newCol++) {
+      const oldCol = perm[newCol]!
+      const [re, im] = getEntry(m, s, oldRow, oldCol)
+      setEntry(result, s, newRow, newCol, re, im)
+    }
+  }
+  return result
+}
+
 function generateDiracMatricesInternal(spatialDim: number): { alphas: Float32Array[]; beta: Float32Array } {
   if (spatialDim === 1) {
     return { alphas: [sigma1()], beta: sigma3() }
@@ -121,6 +178,14 @@ function generateDiracMatricesInternal(spatialDim: number): { alphas: Float32Arr
   // Use first spatialDim alphas
   allAlphas.length = spatialDim
 
+  // Permute to standard Dirac form: β = diag(I_{S/2}, −I_{S/2}).
+  // The tensor-product construction produces β = σ₃^{⊗k} = diag((-1)^popcount(i)),
+  // which interleaves +1 and -1 eigenvalues. The permutation groups all +1
+  // eigenvalues (even popcount) into the first S/2 indices.
+  const perm = standardFormPermutation(currentS)
+  allAlphas = allAlphas.map(alpha => permuteMatrix(alpha, currentS, perm))
+  beta = permuteMatrix(beta, currentS, perm)
+
   return { alphas: allAlphas, beta }
 }
 
@@ -128,6 +193,8 @@ function generateDiracMatricesInternal(spatialDim: number): { alphas: Float32Arr
  * Generate Dirac matrices for N spatial dimensions.
  * Returns packed Float32Array matching WASM output format:
  * [spinorSize_as_f32_bits, alpha_1..., alpha_N..., beta...]
+ *
+ * Matrices are in standard Dirac form: β = diag(I_{S/2}, −I_{S/2}).
  *
  * @param spatialDim - Number of spatial dimensions (1-11)
  * @returns Packed gamma matrix data and spinor size

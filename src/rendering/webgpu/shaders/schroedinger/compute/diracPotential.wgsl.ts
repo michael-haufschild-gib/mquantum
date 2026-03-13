@@ -66,7 +66,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       r2 += pos[d] * pos[d];
     }
-    V = 0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r2;
+    let omega2 = params.harmonicOmega * params.harmonicOmega;
+    V = 0.5 * params.mass * omega2 * r2;
 
   } else if (params.potentialType == 5u) {
     // Coulomb: V = -Z/r (soft-core regularized to avoid singularity)

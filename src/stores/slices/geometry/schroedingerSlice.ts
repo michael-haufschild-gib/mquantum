@@ -210,9 +210,15 @@ export const createSchroedingerSlice: StateCreator<
     // Always use dimension-appropriate grid size. When dimension decreases,
     // the per-axis budget increases and old shrunken values should not persist.
     const gridSize = Array.from({ length: newDim }, () => gridDefault)
-    const spacing = Array.from({ length: newDim }, (_, i) =>
-      i < prev.spacing.length ? prev.spacing[i]! : 0.1
-    )
+    // Scale spacing to preserve the physical domain extent when grid shrinks/grows.
+    // oldExtent = oldGrid * oldSpacing; newSpacing = oldExtent / newGrid
+    const spacing = Array.from({ length: newDim }, (_, i) => {
+      if (i < prev.spacing.length && i < prev.gridSize.length) {
+        const oldExtent = prev.gridSize[i]! * prev.spacing[i]!
+        return Math.max(0.01, Math.min(1.0, oldExtent / gridDefault))
+      }
+      return 0.1
+    })
     const packetCenter = Array.from({ length: newDim }, (_, i) =>
       i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
     )
@@ -222,9 +228,23 @@ export const createSchroedingerSlice: StateCreator<
     const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
+    // Scale potential geometry so features stay resolved on the (possibly coarser) grid.
+    // Minimum feature size = 2 grid cells so the potential is never sub-grid.
+    const minFeature0 = 2 * spacing[0]!
+    const minFeature1 = newDim >= 2 ? 2 * spacing[1]! : minFeature0
+    const wallThickness = Math.max(prev.wallThickness, minFeature0)
+    const barrierWidth = Math.max(prev.barrierWidth, minFeature0)
+    const slitWidth = Math.max(prev.slitWidth, minFeature1)
+    const packetWidth = Math.max(prev.packetWidth, minFeature0)
+    // Ensure slits don't merge: separation must exceed slitWidth + 1 grid cell gap
+    const slitSeparation = Math.max(prev.slitSeparation, slitWidth + minFeature1)
+
     // Clamp dt to CFL limit for the new spacing/dimension
     const newDt = clampDtWithCfl(prev.dt, spacing, newDim, prev.mass)
-    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions, dt: newDt }
+    return {
+      latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions,
+      dt: newDt, wallThickness, barrierWidth, slitWidth, slitSeparation, packetWidth,
+    }
   }
 
   const resizeBecArrays = (
@@ -291,19 +311,38 @@ export const createSchroedingerSlice: StateCreator<
     const spacing = Array.from({ length: newDim }, (_, i) =>
       i < prev.spacing.length ? prev.spacing[i]! : 0.15
     )
-    const packetCenter = Array.from({ length: newDim }, (_, i) =>
-      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
-    )
-    const packetMomentum = Array.from({ length: newDim }, (_, i) =>
-      i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
-    )
+
+    // Compute lattice half-extent per dimension for clamping
+    const halfExtent = (d: number) => gridSize[d]! * spacing[d]! * 0.5
+
+    // Clamp packetCenter to lie within lattice bounds (with 10% margin)
+    const packetCenter = Array.from({ length: newDim }, (_, i) => {
+      const raw = i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
+      const limit = halfExtent(i) * 0.9
+      return Math.max(-limit, Math.min(limit, raw))
+    })
+
+    // Clamp packetMomentum to Nyquist limit: |k| ≤ π/spacing
+    const packetMomentum = Array.from({ length: newDim }, (_, i) => {
+      const raw = i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
+      const kMax = Math.PI / spacing[i]!
+      return Math.max(-kMax, Math.min(kMax, raw))
+    })
+
+    // Scale packetWidth to fit within the new lattice: at most 40% of
+    // the smallest lattice half-extent, at least one grid spacing (but
+    // never larger than the max sigma to avoid exceeding the lattice)
+    const minHalfExtent = Math.min(...gridSize.map((g, i) => g * spacing[i]! * 0.5))
+    const maxSigma = minHalfExtent * 0.4
+    const newPacketWidth = Math.min(maxSigma, prev.packetWidth)
+
     const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
       i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
     )
     // Clamp dt to Dirac CFL limit for the new spacing
     const dtMax = maxStableDt(spacing, prev.speedOfLight)
     const newDt = Math.max(0.0001, Math.min(dtMax * 0.9, prev.dt))
-    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions, dt: newDt }
+    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions, dt: newDt, packetWidth: newPacketWidth }
   }
 
   /**
@@ -1325,6 +1364,40 @@ export const createSchroedingerSlice: StateCreator<
         },
       }))
     },
+    setFreeScalarSelfInteractionEnabled: (enabled) => {
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionEnabled: enabled },
+        },
+      }))
+    },
+    setFreeScalarSelfInteractionLambda: (lambda) => {
+      if (!isFiniteSchroedingerInput(lambda)) {
+        warnNonFiniteSchroedingerInput('freeScalar.selfInteractionLambda', lambda)
+        return
+      }
+      const clamped = Math.max(0.01, Math.min(10.0, lambda))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionLambda: clamped },
+        },
+      }))
+    },
+    setFreeScalarSelfInteractionVev: (vev) => {
+      if (!isFiniteSchroedingerInput(vev)) {
+        warnNonFiniteSchroedingerInput('freeScalar.selfInteractionVev', vev)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(5.0, vev))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionVev: clamped },
+        },
+      }))
+    },
     setFreeScalarSlicePosition: (dimIndex, value) => {
       if (!isFiniteSchroedingerInput(value)) {
         warnNonFiniteSchroedingerInput('freeScalar.slicePositions', value)
@@ -1894,6 +1967,58 @@ export const createSchroedingerSlice: StateCreator<
         schroedinger: {
           ...state.schroedinger,
           tdse: { ...state.schroedinger.tdse, doubleWellAsymmetry: clamped },
+        },
+      }))
+    },
+    setTdseRadialWellInner: (r) => {
+      if (!isFiniteSchroedingerInput(r)) {
+        warnNonFiniteSchroedingerInput('tdse.radialWellInner', r)
+        return
+      }
+      const clamped = Math.max(0.01, Math.min(5.0, r))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, radialWellInner: clamped },
+        },
+      }))
+    },
+    setTdseRadialWellOuter: (r) => {
+      if (!isFiniteSchroedingerInput(r)) {
+        warnNonFiniteSchroedingerInput('tdse.radialWellOuter', r)
+        return
+      }
+      const clamped = Math.max(0.01, Math.min(10.0, r))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, radialWellOuter: clamped },
+        },
+      }))
+    },
+    setTdseRadialWellDepth: (depth) => {
+      if (!isFiniteSchroedingerInput(depth)) {
+        warnNonFiniteSchroedingerInput('tdse.radialWellDepth', depth)
+        return
+      }
+      const clamped = Math.max(0.1, Math.min(500.0, depth))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, radialWellDepth: clamped },
+        },
+      }))
+    },
+    setTdseRadialWellTilt: (tilt) => {
+      if (!isFiniteSchroedingerInput(tilt)) {
+        warnNonFiniteSchroedingerInput('tdse.radialWellTilt', tilt)
+        return
+      }
+      const clamped = Math.max(0, Math.min(50.0, tilt))
+      setWithVersion((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          tdse: { ...state.schroedinger.tdse, radialWellTilt: clamped },
         },
       }))
     },
@@ -2787,19 +2912,29 @@ export const createSchroedingerSlice: StateCreator<
             )
           }
 
-          // Pad packetCenter / packetMomentum to match latticeDim
+          // Pad packetCenter / packetMomentum to match latticeDim, clamped to lattice bounds
+          const gs = merged.gridSize
+          const sp = merged.spacing
           if (safeOverrides.packetCenter) {
             const src = safeOverrides.packetCenter
-            merged.packetCenter = Array.from({ length: dim }, (_, i) =>
-              i < src.length ? src[i]! : 0
-            )
+            merged.packetCenter = Array.from({ length: dim }, (_, i) => {
+              const raw = i < src.length ? src[i]! : 0
+              const limit = (gs[i] ?? 4) * (sp[i] ?? 0.15) * 0.5 * 0.9
+              return Math.max(-limit, Math.min(limit, raw))
+            })
           }
           if (safeOverrides.packetMomentum) {
             const src = safeOverrides.packetMomentum
-            merged.packetMomentum = Array.from({ length: dim }, (_, i) =>
-              i < src.length ? src[i]! : 0
-            )
+            merged.packetMomentum = Array.from({ length: dim }, (_, i) => {
+              const raw = i < src.length ? src[i]! : 0
+              const kMax = Math.PI / (sp[i] ?? 0.15)
+              return Math.max(-kMax, Math.min(kMax, raw))
+            })
           }
+
+          // Clamp packetWidth to lattice extent
+          const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
+          merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
 
           // Clamp dt to CFL limit for the new spacing
           const dtMax = maxStableDt(merged.spacing, merged.speedOfLight)

@@ -49,14 +49,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let sigma = params.packetWidth;
-  let envelope = exp(-r2 / (4.0 * sigma * sigma));
+  let invFourSigma2 = 1.0 / (4.0 * sigma * sigma);
+  let envelope = exp(-r2 * invFourSigma2);
   let phase = kdotx / params.hbar;
   let cosP = cos(phase);
   let sinP = sin(phase);
 
+  let S = params.spinorSize;
+  let T = params.totalSites;
+
   // Zero all spinor components first
-  for (var c: u32 = 0u; c < params.spinorSize; c++) {
-    let bufIdx = c * params.totalSites + idx;
+  for (var c: u32 = 0u; c < S; c++) {
+    let bufIdx = c * T + idx;
     spinorRe[bufIdx] = 0.0;
     spinorIm[bufIdx] = 0.0;
   }
@@ -71,7 +75,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let pef = clamp(params.positiveEnergyFraction, 0.0, 1.0);
   let pAmp = sqrt(pef);
   let aAmp = sqrt(1.0 - pef);
-  let S = params.spinorSize;
   let halfS = S / 2u;
 
   if (params.initCondition == 0u || params.initCondition == 1u) {
@@ -80,17 +83,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     spinorRe[idx] = pAmp * cosHalf * envelope * cosP;
     spinorIm[idx] = pAmp * cosHalf * envelope * sinP;
     if (S > 1u) {
-      let bufIdx1 = 1u * params.totalSites + idx;
+      let bufIdx1 = 1u * T + idx;
       spinorRe[bufIdx1] = pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
       spinorIm[bufIdx1] = pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
     }
     // Lower (antiparticle) spinor: aAmp · u · envelope · e^{ikx}
     if (aAmp > 1e-10 && halfS > 0u) {
-      let bufIdxH0 = halfS * params.totalSites + idx;
+      let bufIdxH0 = halfS * T + idx;
       spinorRe[bufIdxH0] = aAmp * cosHalf * envelope * cosP;
       spinorIm[bufIdxH0] = aAmp * cosHalf * envelope * sinP;
       if (S > halfS + 1u) {
-        let bufIdxH1 = (halfS + 1u) * params.totalSites + idx;
+        let bufIdxH1 = (halfS + 1u) * T + idx;
         spinorRe[bufIdxH1] = aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
         spinorIm[bufIdxH1] = aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
       }
@@ -107,7 +110,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       r2b += dx2 * dx2;
       kdotx2 += -params.packetMomentum[d2] * pos2;
     }
-    let env2 = 0.7071 * exp(-r2b / (4.0 * sigma * sigma));
+    let env2 = 0.7071 * exp(-r2b * invFourSigma2);
     let phase2 = kdotx2 / params.hbar;
     let cosP2 = cos(phase2);
     let sinP2 = sin(phase2);
@@ -119,7 +122,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     spinorIm[idx] = im0;
     // Component 1: spin-down
     if (S > 1u) {
-      let bufIdx1 = 1u * params.totalSites + idx;
+      let bufIdx1 = 1u * T + idx;
       spinorRe[bufIdx1] = pAmp * sinHalf * ((env1 * cosP + env2 * cosP2) * phiCos - (env1 * sinP + env2 * sinP2) * phiSin);
       spinorIm[bufIdx1] = pAmp * sinHalf * ((env1 * sinP + env2 * sinP2) * phiCos + (env1 * cosP + env2 * cosP2) * phiSin);
     }
@@ -131,17 +134,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     spinorRe[idx] = pAmp * cosHalf * envelope * cosP;
     spinorIm[idx] = pAmp * cosHalf * envelope * sinP;
     if (S > 1u) {
-      let bufIdx1 = 1u * params.totalSites + idx;
+      let bufIdx1 = 1u * T + idx;
       spinorRe[bufIdx1] = pAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
       spinorIm[bufIdx1] = pAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
     }
     // Lower spinor
     if (halfS > 0u) {
-      let bufIdxH0 = halfS * params.totalSites + idx;
+      let bufIdxH0 = halfS * T + idx;
       spinorRe[bufIdxH0] = aAmp * cosHalf * envelope * cosP;
       spinorIm[bufIdxH0] = aAmp * cosHalf * envelope * sinP;
       if (S > halfS + 1u) {
-        let bufIdxH1 = (halfS + 1u) * params.totalSites + idx;
+        let bufIdxH1 = (halfS + 1u) * T + idx;
         spinorRe[bufIdxH1] = aAmp * sinHalf * envelope * (cosP * phiCos - sinP * phiSin);
         spinorIm[bufIdxH1] = aAmp * sinHalf * envelope * (sinP * phiCos + cosP * phiSin);
       }

@@ -116,6 +116,13 @@
     --health-low-stroke: var(--token-red-400);
 
     /* ═══════════════════════════════════════════════════════════════════
+       PHYSICS: DIRAC DISPERSION
+       Particle and antiparticle branch colors for dispersion diagrams.
+       ═══════════════════════════════════════════════════════════════════ */
+    --dirac-particle: oklch(0.7 0.15 220);
+    --dirac-antiparticle: oklch(0.7 0.15 0);
+
+    /* ═══════════════════════════════════════════════════════════════════
        LEGACY COMPATIBILITY
        Old variable names that may still be referenced.
        ═══════════════════════════════════════════════════════════════════ */

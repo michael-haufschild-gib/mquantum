@@ -13,6 +13,7 @@
 import type { DiracAlgebraRequest, DiracAlgebraResponse } from './diracAlgebraWorker'
 import { generateDiracMatricesFallback, spinorSize as computeSpinorSize } from './cliffordAlgebraFallback'
 
+/** Main-thread bridge to the Dirac algebra web worker for gamma matrix generation. */
 export class DiracAlgebraBridge {
   private worker: Worker | null = null
   private epoch = 0

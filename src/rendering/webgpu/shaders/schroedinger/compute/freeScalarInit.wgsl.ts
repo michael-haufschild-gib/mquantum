@@ -13,7 +13,7 @@
 /**
  * Uniform struct for free scalar field parameters.
  * N-D capable layout with per-dimension arrays of 12 elements each.
- * WGSL alignment: total 480 bytes.
+ * WGSL alignment: total 496 bytes.
  */
 export const freeScalarUniformsBlock = /* wgsl */ `
 struct FreeScalarUniforms {
@@ -47,6 +47,12 @@ struct FreeScalarUniforms {
   basisX: array<f32, 12>,    // offset 336
   basisY: array<f32, 12>,    // offset 384
   basisZ: array<f32, 12>,    // offset 432
+
+  // Self-interaction parameters (16 bytes)
+  selfInteractionEnabled: u32,  // offset 480
+  selfInteractionLambda: f32,   // offset 484
+  selfInteractionVev: f32,      // offset 488
+  _padSI: u32,                  // offset 492 (pad to 16-byte boundary)
 }
 `
 
@@ -130,6 +136,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let envelope = params.packetAmplitude * exp(-r2 / (2.0 * sigma2));
     phiVal = envelope * cos(phase);
     piVal = envelope * omega * sin(phase);
+  } else if (params.initCondition == 3u) {
+    // Kink profile: phi = v * tanh((x0 - center0) / width), pi = 0
+    // Domain wall interpolating between -v and +v along axis 0
+    let v = params.selfInteractionVev;
+    let dx = worldPos[0] - params.packetCenter[0];
+    let w = select(params.packetWidth, 0.3, params.packetWidth <= 0.0);
+    phiVal = v * tanh(dx / w);
+    piVal = 0.0;
   }
   // initCondition == 0u (vacuumNoise): no-op, data written by CPU
 

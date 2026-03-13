@@ -244,6 +244,11 @@ export interface SchroedingerSliceActions {
   resetFreeScalarField: () => void
   clearFreeScalarNeedsReset: () => void
 
+  // Self-Interaction
+  setFreeScalarSelfInteractionEnabled: (enabled: boolean) => void
+  setFreeScalarSelfInteractionLambda: (lambda: number) => void
+  setFreeScalarSelfInteractionVev: (vev: number) => void
+
   // k-Space Visualization Display Transforms
   setFreeScalarKSpaceDisplayMode: (mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode) => void
   setFreeScalarKSpaceFftShift: (enabled: boolean) => void
@@ -286,6 +291,10 @@ export interface SchroedingerSliceActions {
   setTdseDoubleWellLambda: (lambda: number) => void
   setTdseDoubleWellSeparation: (separation: number) => void
   setTdseDoubleWellAsymmetry: (asymmetry: number) => void
+  setTdseRadialWellInner: (r: number) => void
+  setTdseRadialWellOuter: (r: number) => void
+  setTdseRadialWellDepth: (depth: number) => void
+  setTdseRadialWellTilt: (tilt: number) => void
   setTdseDriveEnabled: (enabled: boolean) => void
   setTdseDriveWaveform: (waveform: TdseDriveWaveform) => void
   setTdseDriveFrequency: (frequency: number) => void

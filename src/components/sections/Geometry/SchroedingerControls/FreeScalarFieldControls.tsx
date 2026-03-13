@@ -74,6 +74,9 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setVacuumSeed,
       setSlicePosition,
       resetField,
+      setSelfInteractionEnabled,
+      setSelfInteractionLambda,
+      setSelfInteractionVev,
     } = actions
 
     const isVacuum = fs.initialCondition === 'vacuumNoise'
@@ -81,22 +84,34 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
 
     // Initial condition options
     const initConditionOptions = useMemo(
-      () => [
-        { value: 'vacuumNoise', label: 'Exact Vacuum' },
-        { value: 'singleMode', label: 'Single Mode' },
-        { value: 'gaussianPacket', label: 'Gaussian Packet' },
-      ],
-      []
+      () => {
+        const opts = [
+          { value: 'vacuumNoise', label: 'Exact Vacuum' },
+          { value: 'singleMode', label: 'Single Mode' },
+          { value: 'gaussianPacket', label: 'Gaussian Packet' },
+        ]
+        if (fs.selfInteractionEnabled) {
+          opts.push({ value: 'kinkProfile', label: 'Kink (tanh)' })
+        }
+        return opts
+      },
+      [fs.selfInteractionEnabled]
     )
 
     // Field view options
     const fieldViewOptions = useMemo(
-      () => [
-        { value: 'phi', label: '\u03C6' },
-        { value: 'pi', label: '\u03C0' },
-        { value: 'energyDensity', label: '\u03B5' },
-      ],
-      []
+      () => {
+        const opts = [
+          { value: 'phi', label: '\u03C6' },
+          { value: 'pi', label: '\u03C0' },
+          { value: 'energyDensity', label: '\u03B5' },
+        ]
+        if (fs.selfInteractionEnabled) {
+          opts.push({ value: 'wallDensity', label: 'V(\u03C6)' })
+        }
+        return opts
+      },
+      [fs.selfInteractionEnabled]
     )
 
     // Power-of-2 grid size handler (from Select)
@@ -281,6 +296,40 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
             })}
           </div>
         )}
+
+        {/* Self-Interaction Potential */}
+        <div className="space-y-3 border-t border-border-subtle pt-3">
+          <Switch
+            label="Self-Interaction V(φ)"
+            checked={fs.selfInteractionEnabled}
+            onCheckedChange={setSelfInteractionEnabled}
+          />
+          {fs.selfInteractionEnabled && (
+            <>
+              <Slider
+                label="λ"
+                min={0.01}
+                max={10.0}
+                step={0.01}
+                value={fs.selfInteractionLambda}
+                onChange={setSelfInteractionLambda}
+                showValue
+              />
+              <Slider
+                label="v (VEV)"
+                min={0.1}
+                max={5.0}
+                step={0.01}
+                value={fs.selfInteractionVev}
+                onChange={setSelfInteractionVev}
+                showValue
+              />
+              <div className="text-xs text-text-tertiary">
+                V(φ) = λ(φ² − v²)², minima at φ = ±v
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Initial Condition */}
         <div className="space-y-3 border-t border-border-subtle pt-3">

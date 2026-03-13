@@ -127,6 +127,9 @@ export interface FreeScalarFieldActions {
   setVacuumSeed: ExtendedObjectState['setFreeScalarVacuumSeed']
   setSlicePosition: ExtendedObjectState['setFreeScalarSlicePosition']
   resetField: ExtendedObjectState['resetFreeScalarField']
+  setSelfInteractionEnabled: ExtendedObjectState['setFreeScalarSelfInteractionEnabled']
+  setSelfInteractionLambda: ExtendedObjectState['setFreeScalarSelfInteractionLambda']
+  setSelfInteractionVev: ExtendedObjectState['setFreeScalarSelfInteractionVev']
 }
 
 /**
@@ -171,6 +174,10 @@ export interface TdseActions {
   setDoubleWellLambda: ExtendedObjectState['setTdseDoubleWellLambda']
   setDoubleWellSeparation: ExtendedObjectState['setTdseDoubleWellSeparation']
   setDoubleWellAsymmetry: ExtendedObjectState['setTdseDoubleWellAsymmetry']
+  setRadialWellInner: ExtendedObjectState['setTdseRadialWellInner']
+  setRadialWellOuter: ExtendedObjectState['setTdseRadialWellOuter']
+  setRadialWellDepth: ExtendedObjectState['setTdseRadialWellDepth']
+  setRadialWellTilt: ExtendedObjectState['setTdseRadialWellTilt']
   setDriveEnabled: ExtendedObjectState['setTdseDriveEnabled']
   setDriveWaveform: ExtendedObjectState['setTdseDriveWaveform']
   setDriveFrequency: ExtendedObjectState['setTdseDriveFrequency']

@@ -28,14 +28,14 @@ import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeSca
 import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
 import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
 
-/** Uniform buffer size: FreeScalarUniforms struct = 480 bytes */
-const UNIFORM_SIZE = 480
+/** Uniform buffer size: FreeScalarUniforms struct = 496 bytes */
+const UNIFORM_SIZE = 496
 /** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
 const LINEAR_WORKGROUP_SIZE = 64
 /** 3D dispatch workgroup size for write-grid pass (must match WGSL @workgroup_size) */
 const GRID_WORKGROUP_SIZE = 4
 /** Density grid texture resolution (matches existing density grid) */
-const DENSITY_GRID_SIZE = 64
+const DENSITY_GRID_SIZE = 96
 /** Maximum number of dimensions in uniform arrays */
 const MAX_DIM = 12
 /** Byte offset of the `dt` field in the uniform buffer */
@@ -214,7 +214,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param config - Free scalar field configuration
    */
   private computeInitHash(config: FreeScalarConfig): string {
-    return `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
+    const base = `${config.initialCondition}_m${config.mass}_k${config.modeK.join(',')}_c${config.packetCenter.join(',')}_w${config.packetWidth}_a${config.packetAmplitude}_s${config.vacuumSeed}`
+    if (config.selfInteractionEnabled) {
+      return `${base}_si${config.selfInteractionLambda}_v${config.selfInteractionVev}`
+    }
+    return base
   }
 
   /**
@@ -508,11 +512,13 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       vacuumNoise: 0,
       singleMode: 1,
       gaussianPacket: 2,
+      kinkProfile: 3,
     }
     const fieldViewMap: Record<string, number> = {
       phi: 0,
       pi: 1,
       energyDensity: 2,
+      wallDensity: 3,
     }
 
     const u32 = this.uniformU32
@@ -605,6 +611,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       f32[110] = 1.0
     }
 
+    // Self-interaction params (offset 480, indices 120-123)
+    u32[120] = config.selfInteractionEnabled ? 1 : 0  // offset 480
+    f32[121] = config.selfInteractionLambda            // offset 484
+    f32[122] = config.selfInteractionVev               // offset 488
+    u32[123] = 0                                        // offset 492 (padding)
+
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
   }
 
@@ -621,6 +633,15 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     if (config.fieldView === 'phi') {
       return phi0
+    }
+
+    // wallDensity: V(phi) = lambda * (phi² - v²)², max at phi=0 → lambda * v^4
+    if (config.fieldView === 'wallDensity') {
+      if (config.selfInteractionEnabled) {
+        const v = config.selfInteractionVev
+        return config.selfInteractionLambda * v * v * v * v
+      }
+      return 1.0
     }
 
     // Compute omega from lattice dispersion relation.
@@ -652,8 +673,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       return phi0 * omega
     }
 
-    // energyDensity: E ~ 0.5 * (pi² + (grad phi)² + m² phi²) ~ phi0² * omega²
-    return phi0 * phi0 * omegaSq * 0.5
+    // energyDensity: E ~ 0.5 * (pi² + (grad phi)² + m² phi²) + V(phi)
+    let energy = phi0 * phi0 * omegaSq * 0.5
+    if (config.selfInteractionEnabled) {
+      // Max potential energy at phi=0: V(0) = lambda * v^4
+      const v = config.selfInteractionVev
+      energy += config.selfInteractionLambda * v * v * v * v
+    }
+    return energy
   }
 
   /**
@@ -739,7 +766,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         this.maxPhiEstimate =
           config.initialCondition === 'vacuumNoise'
             ? estimateVacuumMaxPhi(config)
-            : config.packetAmplitude
+            : config.initialCondition === 'kinkProfile'
+              ? config.selfInteractionVev
+              : config.packetAmplitude
       } else {
         this.maxPhiEstimate = 1.0
       }

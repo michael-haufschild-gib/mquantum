@@ -32,8 +32,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let sinP = sin(phase);
 
   // Apply phase rotation to each spinor component
-  for (var c: u32 = 0u; c < params.spinorSize; c++) {
-    let bufIdx = c * params.totalSites + idx;
+  let S = params.spinorSize;
+  let T = params.totalSites;
+  for (var c: u32 = 0u; c < S; c++) {
+    let bufIdx = c * T + idx;
     let re = spinorRe[bufIdx];
     let im = spinorIm[bufIdx];
     spinorRe[bufIdx] = re * cosP - im * sinP;

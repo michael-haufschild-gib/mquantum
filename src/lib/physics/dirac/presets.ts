@@ -9,6 +9,7 @@
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
 
+/** A curated Dirac equation scenario with dimension-agnostic config overrides. */
 export interface DiracScenarioPreset {
   id: string
   name: string

@@ -167,7 +167,7 @@ const projectRulesPlugin = {
 
 export default [
   {
-    ignores: ['dist', 'node_modules', 'scripts/**', 'playwright.config.ts'],
+    ignores: ['dist', 'node_modules', 'scripts/**', 'playwright.config.ts', 'src/wasm/**/pkg/**'],
   },
   {
     files: ['**/*.{ts,tsx}'],

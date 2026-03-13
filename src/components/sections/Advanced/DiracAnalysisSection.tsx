@@ -185,13 +185,13 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
             {/* Positive energy branch (particle) */}
             <polyline
               points={posPoints}
-              fill="none" stroke="oklch(0.7 0.15 220)" strokeWidth={2} strokeLinejoin="round"
+              fill="none" stroke="var(--dirac-particle)" strokeWidth={2} strokeLinejoin="round"
             />
 
             {/* Negative energy branch (antiparticle) */}
             <polyline
               points={negPoints}
-              fill="none" stroke="oklch(0.7 0.15 0)" strokeWidth={2} strokeLinejoin="round"
+              fill="none" stroke="var(--dirac-antiparticle)" strokeWidth={2} strokeLinejoin="round"
             />
 
             {/* Mass gap label */}

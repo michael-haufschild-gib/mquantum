@@ -41,7 +41,8 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   if (n < 0 || n > 6) { return 0.0; }
 
   // α = √ω (in dimensionless units with ℏ=m=1)
-  let alpha = sqrt(max(omega, 0.01));
+  let omegaClamped = max(omega, 0.01);
+  let alpha = sqrt(omegaClamped);
   let u = alpha * x;
 
   // Gaussian envelope: e^{-½u²}
@@ -53,7 +54,8 @@ fn ho1D(n: i32, x: f32, omega: f32) -> f32 {
   let H = hermite(n, u);
 
   // Canonical normalization factor: (α²/π)^{1/4} = (ω/π)^{1/4}
-  let alphaNorm = sqrt(sqrt(alpha * alpha * INV_PI));
+  // Note: α² = ω (clamped), so we use omegaClamped directly
+  let alphaNorm = sqrt(sqrt(omegaClamped * INV_PI));
   let norm = HO_NORM[n];
 
   return alphaNorm * norm * H * gauss;

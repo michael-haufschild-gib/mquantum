@@ -49,6 +49,9 @@ function makeConfig(): FreeScalarConfig {
     autoScale: true,
     needsReset: false,
     vacuumSeed: 1,
+    selfInteractionEnabled: false,
+    selfInteractionLambda: 0.5,
+    selfInteractionVev: 1.0,
     slicePositions: [],
     kSpaceViz: {
       displayMode: 'raw3d',

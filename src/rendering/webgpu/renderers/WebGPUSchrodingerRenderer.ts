@@ -311,6 +311,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       config.useWignerCache ? 1 : 0,
       pipelineIs2D ? 1 : 0,
       config.isFreeScalar ? 1 : 0,
+      config.freeScalarAnalysis ? 1 : 0,
+      config.useDensityMatrix ? 1 : 0,
     ].join(':')
   }
 
@@ -586,27 +588,26 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // Density grid raymarching: for hydrogen VOLUMETRIC mode at all dimensions (3-11D),
-    // AND for free scalar field mode (writes to density grid via compute pass).
-    // Adaptive grid resolution: 64^3 for 3D, 96^3 for 4-5D, 128^3 for 6-11D.
-    // Extra-dim HO quantum numbers are clamped to max 6 → at 96^3 we get ~16 samples/period.
-    // HO mode uses eigencache + analytical gradient in both position and momentum representations.
-    // Isosurface mode must NOT use the density grid: the 64^3 resolution causes visible
-    // voxel-aligned rectangle artifacts at threshold crossings between lobes/nodal surfaces.
-    // Volumetric mode averages out grid discontinuities over many integration steps.
+    // Density grid raymarching: ALL 3D+ volumetric modes sample from a precomputed 3D texture
+    // instead of evaluating evalPsi inline per raymarch step. This includes standard HO, hydrogen,
+    // open-quantum, and compute-based modes (TDSE/BEC/Dirac/freeScalar).
+    // Adaptive grid resolution: 96^3 for 3D, 96^3 for 4-5D, 128^3 for 6-11D.
+    // Isosurface mode must NOT use the density grid: voxel-aligned rectangle artifacts
+    // at threshold crossings between lobes/nodal surfaces.
+    // 2D/Wigner excluded: no volumetric raymarching.
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
     const dim = this.rendererConfig.dimension ?? 3
     const isosurface = this.rendererConfig.isosurface ?? false
     const openQuantumEnabled = this.rendererConfig.openQuantumEnabled ?? false
-    // Use density grid for: compute modes (TDSE/BEC/Dirac/freeScalar), hydrogen volumetric,
-    // or open-quantum HO (mixed-state density must come from the density matrix grid, not pure evalPsi)
-    const useDensityGrid = isComputeMode || (isHydrogen && !isosurface) || (openQuantumEnabled && !isosurface)
+    // Use density grid for: all 3D+ volumetric modes (compute, HO, hydrogen, open-quantum).
+    // Excluded: isosurface (voxel artifacts), 2D/Wigner (no volumetric raymarching).
+    const useDensityGrid = isComputeMode || (!isosurface && !pipelineIs2D)
     const baseDensityGridSize = isComputeMode
-      ? 64
+      ? 96
       : !useDensityGrid
         ? 64
         : dim <= 3
-          ? 64
+          ? 96
           : dim <= 5
             ? 96
             : 128
@@ -623,7 +624,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // Eigenfunction cache is only supported on 3D pipelines.
     // 2D/Wigner reuses group(2) bindings 2/3 for the Wigner cache texture + sampler.
     // For HO momentum (3D), the uniform buffer contains 1/ω → cache produces k-space functions automatically.
-    const useEigenfunctionCache = (isComputeMode || pipelineIs2D) ? false : enableCache
+    const useEigenfunctionCache = (useDensityGrid || pipelineIs2D) ? false : enableCache
     const useAnalyticalGradient = isComputeMode
       ? false
       : (this.rendererConfig.analyticalGradientEnabled ?? true)
@@ -667,7 +668,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       freeScalarAnalysis:
         isFreeScalar &&
         this.rendererConfig.colorAlgorithm !== undefined &&
-        this.rendererConfig.colorAlgorithm >= 12,
+        this.rendererConfig.colorAlgorithm >= 12 &&
+        this.rendererConfig.colorAlgorithm <= 15,
       useDensityMatrix: this.rendererConfig.openQuantumEnabled ?? false,
     }
   }
@@ -723,7 +725,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isComputeMode = isFreeScalar || isTdse || isDirac
     // Compute-based modes require volumetric 3D rendering — override 2D pipeline
     const pipelineIs2D = !isComputeMode && (dim === 2 || this.rendererConfig.representation === 'wigner')
-    const forceRgba = dim > 3 || openQuantumEnabled || isHydrogen
+    const forceRgba = this.shaderConfig.useDensityGrid || dim > 3 || openQuantumEnabled || isHydrogen
 
     // =====================================================================
     // Phase 1: Construct compute passes and start parallel initialization
@@ -1754,12 +1756,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       const fs = schroedinger.freeScalar
       // Use max extent over ALL active dimensions (not just 0..2) so that
       // after N-D rotation, the density texture covers the full lattice.
-      let maxExtent = 3.2 // fallback: 32 * 0.1
+      let maxExtent = 0
       for (let d = 0; d < (fs.latticeDim ?? 3); d++) {
         const Ld = (fs.gridSize?.[d] ?? 32) * (fs.spacing?.[d] ?? 0.1)
         if (Ld > maxExtent) maxExtent = Ld
       }
-      const newBoundR = maxExtent / 2
+      if (maxExtent <= 0) maxExtent = 3.2
+      // 1.15x margin so the field doesn't fill the entire cube edge-to-edge
+      const newBoundR = maxExtent / 2 * 1.15
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
       if (
@@ -1779,20 +1783,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // Compute bounding radius for TDSE dynamics mode (lattice extent + margin)
-    // 15% margin ensures the writeGrid writes zeros at edges, giving smooth
-    // density falloff instead of hard cutoff at the lattice boundary.
+    // 2x multiplier gives the wavepacket ample room to propagate outward
+    // from the lattice centre without clipping at the render volume boundary.
     const isTdseBound = schroedinger?.quantumMode === 'tdseDynamics' || schroedinger?.quantumMode === 'becDynamics'
     const latticeConfig = schroedinger?.quantumMode === 'becDynamics' ? schroedinger?.bec : schroedinger?.tdse
     if (isTdseBound && latticeConfig) {
       const td = latticeConfig
       // Use max extent over ALL active dimensions (not just 0..2) so that
       // after N-D rotation, the density texture covers the full lattice.
-      let maxExtent = 3.2 // fallback: 32 * 0.1
+      let maxExtent = 0
       for (let d = 0; d < (td.latticeDim ?? 3); d++) {
         const Ld = (td.gridSize?.[d] ?? 32) * (td.spacing?.[d] ?? 0.1)
         if (Ld > maxExtent) maxExtent = Ld
       }
-      const newBoundR = maxExtent / 2 * 1.15
+      if (maxExtent <= 0) maxExtent = 3.2
+      const newBoundR = maxExtent / 2 * 2.0
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
       if (
@@ -1811,15 +1816,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // Compute bounding radius for Dirac mode (same lattice extent logic as TDSE)
+    // Compute bounding radius for Dirac mode from actual lattice extent
     const isDiracBound = schroedinger?.quantumMode === 'diracEquation'
     const diracConfig = schroedinger?.dirac
     if (isDiracBound && diracConfig) {
-      let maxExtent = 3.2
+      let maxExtent = 0
       for (let d = 0; d < (diracConfig.latticeDim ?? 3); d++) {
         const Ld = (diracConfig.gridSize?.[d] ?? 32) * (diracConfig.spacing?.[d] ?? 0.15)
         if (Ld > maxExtent) maxExtent = Ld
       }
+      if (maxExtent <= 0) maxExtent = 3.2
       const newBoundR = maxExtent / 2 * 1.15
       const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
       const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
@@ -3077,6 +3083,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
           slitSeparation: 0, slitWidth: 0, wallThickness: 0, wallHeight: 0,
           latticeDepth: 0, latticePeriod: 1,
           doubleWellLambda: 0, doubleWellSeparation: 1, doubleWellAsymmetry: 0,
+          radialWellInner: 0.6, radialWellOuter: 1.8, radialWellDepth: 50, radialWellTilt: 0.5,
           driveEnabled: false, driveWaveform: 'sine',
           driveFrequency: 0, driveAmplitude: 0,
           trapAnisotropy: anisotropy,

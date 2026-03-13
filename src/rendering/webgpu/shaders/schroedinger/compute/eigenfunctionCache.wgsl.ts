@@ -72,12 +72,14 @@ const HO_NORM_C: array<f32, 7> = array<f32, 7>(
 // Evaluate φ_n(x, ω) inline (same as ho1D but without external dependencies)
 fn computeHo1D(n: i32, x: f32, omega: f32) -> f32 {
   if (n < 0 || n > 6) { return 0.0; }
-  let alpha = sqrt(max(omega, 0.01));
+  let omegaClamped = max(omega, 0.01);
+  let alpha = sqrt(omegaClamped);
   let u = alpha * x;
   let u2 = min(u * u, 40.0);
   let gauss = exp(-0.5 * u2);
   let H = hermite(n, u);
-  let alphaNorm = sqrt(sqrt(alpha * alpha * INV_PI));
+  // α² = ω (clamped), so use omegaClamped directly
+  let alphaNorm = sqrt(sqrt(omegaClamped * INV_PI));
   return alphaNorm * HO_NORM_C[n] * H * gauss;
 }
 
@@ -89,10 +91,11 @@ fn computeHo1D(n: i32, x: f32, omega: f32) -> f32 {
 //   = α [2n · (N_n/N_{n-1}) · φ_{n-1}(x) - αx · φ_n(x)]
 //   = sqrt(ω) [sqrt(2n) · φ_{n-1}(x) - sqrt(ω) · x · φ_n(x)]
 fn computeHo1DDeriv(n: i32, x: f32, omega: f32, phi_n: f32) -> f32 {
-  let sqrtOmega = sqrt(max(omega, 0.01));
+  let omegaClamped = max(omega, 0.01);
+  let sqrtOmega = sqrt(omegaClamped);
   if (n == 0) {
-    // φ'_0(x) = -ωx · φ_0(x)
-    return -sqrtOmega * sqrtOmega * x * phi_n;
+    // φ'_0(x) = -ωx · φ_0(x); sqrtOmega² = omegaClamped
+    return -omegaClamped * x * phi_n;
   }
   let phi_nm1 = computeHo1D(n - 1, x, omega);
   return sqrtOmega * (sqrt(2.0 * f32(n)) * phi_nm1 - sqrtOmega * x * phi_n);

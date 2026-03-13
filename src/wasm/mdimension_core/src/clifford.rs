@@ -82,6 +82,8 @@ fn kronecker_product(a: &[f32], a_size: usize, b: &[f32], b_size: usize) -> Comp
     result
 }
 
+// These matrix arithmetic utilities are used only in test/debug verification.
+#[cfg(any(test, debug_assertions))]
 /// Complex matrix multiplication C = A × B (both S×S).
 fn complex_mat_mul(a: &[f32], b: &[f32], s: usize) -> ComplexMatrix {
     let mut c = complex_zeros(s);
@@ -103,11 +105,13 @@ fn complex_mat_mul(a: &[f32], b: &[f32], s: usize) -> ComplexMatrix {
     c
 }
 
+#[cfg(any(test, debug_assertions))]
 /// Add two complex matrices: C = A + B.
 fn complex_mat_add(a: &[f32], b: &[f32]) -> ComplexMatrix {
     a.iter().zip(b.iter()).map(|(x, y)| x + y).collect()
 }
 
+#[cfg(any(test, debug_assertions))]
 /// Scale a complex matrix by a real scalar.
 fn complex_mat_scale(m: &[f32], s: f32) -> ComplexMatrix {
     m.iter().map(|x| x * s).collect()
@@ -142,6 +146,46 @@ fn sigma3() -> ComplexMatrix {
 }
 
 // ============================================================================
+// Standard-form permutation
+// ============================================================================
+
+/// Compute the permutation that reorders the tensor-product basis into
+/// standard Dirac form where β = diag(I_{S/2}, −I_{S/2}).
+///
+/// In the tensor-product construction, β = σ₃^{⊗k} is diagonal with
+/// eigenvalue (−1)^popcount(i) at index i. The permutation places all
+/// even-popcount indices (β = +1, particle) first, then odd-popcount
+/// (β = −1, antiparticle).
+fn standard_form_permutation(s: usize) -> Vec<usize> {
+    let mut even_pop: Vec<usize> = Vec::with_capacity(s / 2);
+    let mut odd_pop: Vec<usize> = Vec::with_capacity(s / 2);
+    for i in 0..s {
+        if (i.count_ones() % 2) == 0 {
+            even_pop.push(i);
+        } else {
+            odd_pop.push(i);
+        }
+    }
+    even_pop.extend(odd_pop);
+    even_pop
+}
+
+/// Apply a permutation P to a complex matrix: M_new = P · M · P^T.
+/// `perm[new_index] = old_index`.
+fn permute_matrix(m: &[f32], s: usize, perm: &[usize]) -> ComplexMatrix {
+    let mut result = complex_zeros(s);
+    for new_row in 0..s {
+        let old_row = perm[new_row];
+        for new_col in 0..s {
+            let old_col = perm[new_col];
+            let (re, im) = get_entry(m, s, old_row, old_col);
+            set_entry(&mut result, s, new_row, new_col, re, im);
+        }
+    }
+    result
+}
+
+// ============================================================================
 // Dirac matrix generation
 // ============================================================================
 
@@ -151,28 +195,27 @@ fn sigma3() -> ComplexMatrix {
 ///   alphas: Vec of N complex matrices, each S×S
 ///   beta: one S×S complex matrix
 ///
-/// Construction:
-///   1D (S=2): α₁ = σ₁, β = σ₃
-///   2D (S=2): α₁ = σ₁, α₂ = σ₂, β = σ₃
-///   3D (S=4): αⱼ = [[0, σⱼ], [σⱼ, 0]], β = [[I₂, 0], [0, -I₂]]
-///   4D (S=4): adds α₄ = [[0, -iI₂], [iI₂, 0]]
-///   5D (S=4): adds α₅ = chirality matrix = i·α₁·α₂·α₃·α₄·β
-///   6D+ (S doubles): recursive tensor products
+/// The matrices are in standard Dirac form: β = diag(I_{S/2}, −I_{S/2}),
+/// so components 0..S/2−1 are particle (positive energy at rest) and
+/// components S/2..S−1 are antiparticle (negative energy at rest).
+///
+/// Construction uses recursive tensor products followed by a basis
+/// permutation to achieve the standard block-diagonal β.
 pub fn generate_dirac_matrices(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix) {
     assert!(spatial_dim >= 1 && spatial_dim <= 11, "spatial_dim must be 1..=11");
 
     match spatial_dim {
         1 => {
-            // S=2: α₁ = σ₁, β = σ₃
+            // S=2: α₁ = σ₁, β = σ₃ = diag(1, -1) — already standard form
             (vec![sigma1()], sigma3())
         }
         2 => {
-            // S=2: α₁ = σ₁, α₂ = σ₂, β = σ₃
+            // S=2: α₁ = σ₁, α₂ = σ₂, β = σ₃ — already standard form
             (vec![sigma1(), sigma2()], sigma3())
         }
         _ => {
             // For dim >= 3, build from the even-dimensional base case
-            // and extend with odd dimensions using chirality
+            // then permute to standard form
             generate_higher_dim(spatial_dim)
         }
     }
@@ -228,9 +271,20 @@ fn generate_higher_dim(spatial_dim: usize) -> (Vec<ComplexMatrix>, ComplexMatrix
         "spatial_dim={spatial_dim} exceeds base_even={base_even}");
     all_alphas.truncate(spatial_dim);
 
+    // Permute to standard Dirac form: β = diag(I_{S/2}, −I_{S/2}).
+    // The tensor-product construction produces β = σ₃^{⊗k} = diag((-1)^popcount(i)),
+    // which interleaves +1 and -1 eigenvalues. The permutation groups all +1
+    // eigenvalues (even popcount) into the first S/2 indices.
+    let perm = standard_form_permutation(current_s);
+    for alpha in all_alphas.iter_mut() {
+        *alpha = permute_matrix(alpha, current_s, &perm);
+    }
+    beta = permute_matrix(&beta, current_s, &perm);
+
     (all_alphas, beta)
 }
 
+#[cfg(any(test, debug_assertions))]
 /// Verify anticommutation relations (for testing).
 ///
 /// Checks:
@@ -288,6 +342,7 @@ pub fn verify_clifford_algebra(
     true
 }
 
+#[cfg(any(test, debug_assertions))]
 /// Check if two complex matrices are close within tolerance.
 fn matrices_close(a: &[f32], b: &[f32], tol: f32) -> bool {
     if a.len() != b.len() {
@@ -380,5 +435,49 @@ mod tests {
         // β = σ₃ = [[1,0],[0,-1]]
         assert!((get_entry(&beta, 2, 0, 0).0 - 1.0).abs() < 1e-6);
         assert!((get_entry(&beta, 2, 1, 1).0 - (-1.0)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_beta_standard_form_all_dims() {
+        // After permutation, β must be diag(I_{S/2}, −I_{S/2}) for all dimensions.
+        // This is the property that the init and visualization shaders rely on.
+        for dim in 1..=11 {
+            let s = spinor_size(dim);
+            let (_alphas, beta) = generate_dirac_matrices(dim);
+            let half = s / 2;
+
+            // Check β is diagonal with +1 for first S/2 and -1 for last S/2
+            for i in 0..s {
+                for j in 0..s {
+                    let (re, im) = get_entry(&beta, s, i, j);
+                    if i == j {
+                        let expected = if i < half { 1.0 } else { -1.0 };
+                        assert!(
+                            (re - expected).abs() < 1e-6 && im.abs() < 1e-6,
+                            "β[{i},{j}] = ({re},{im}), expected {expected} for dim={dim}"
+                        );
+                    } else {
+                        assert!(
+                            re.abs() < 1e-6 && im.abs() < 1e-6,
+                            "β[{i},{j}] = ({re},{im}), expected 0 for dim={dim}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_permutation_preserves_algebra() {
+        // Verify that the permuted matrices still satisfy the Clifford algebra
+        // AND produce the correct H² = E²I. This catches any permutation errors.
+        for dim in 3..=11 {
+            let s = spinor_size(dim);
+            let (alphas, beta) = generate_dirac_matrices(dim);
+            assert!(
+                verify_clifford_algebra(&alphas, &beta, s),
+                "Clifford algebra failed after permutation for dim={dim}"
+            );
+        }
     }
 }

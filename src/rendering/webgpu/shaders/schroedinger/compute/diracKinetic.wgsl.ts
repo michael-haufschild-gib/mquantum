@@ -51,20 +51,22 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let S = params.spinorSize;
   let c_light = params.speedOfLight;
   let mc2 = params.mass * c_light * c_light;
+  let c_hbar = c_light * params.hbar;
+  let latDim = params.latticeDim;
 
   // Decode k-space coordinates using N-D index helper
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.gridSize, latDim);
 
   // Compute k-vector components with FFT frequency ordering
   var kVec: array<f32, 12>;
   var ck2: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+  let TWO_PI: f32 = 6.28318530;
+  for (var d: u32 = 0u; d < latDim; d++) {
     let gd = params.gridSize[d];
     let halfN = gd / 2u;
     let kIdx = select(i32(coords[d]) - i32(gd), i32(coords[d]), coords[d] < halfN);
-    // k_d = 2π·kIdx / (N_d · Δx_d)
-    kVec[d] = f32(kIdx) * 2.0 * 3.14159265 / (f32(gd) * params.spacing[d]);
-    let ck = c_light * params.hbar * kVec[d];
+    kVec[d] = f32(kIdx) * TWO_PI / (f32(gd) * params.spacing[d]);
+    let ck = c_hbar * kVec[d];
     ck2 += ck * ck;
   }
 
@@ -94,18 +96,22 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Add contributions from each alpha matrix: c·ℏk_d · α_d · ψ
   // Alpha matrices are stored at indices 0..latticeDim-1 in gammaMatrices
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let coeff = c_light * params.hbar * kVec[d];
+  let matStride = S * S * 2u; // stride between matrices in gammaMatrices array
+  for (var d: u32 = 0u; d < latDim; d++) {
+    let coeff = c_hbar * kVec[d];
     if (abs(coeff) < 1e-20) {
       continue;
     }
+    // Precompute base offset for this matrix
+    let matBase = d * matStride;
     // Matrix-vector multiply: Hψ += coeff · α_d · ψ
     for (var row: u32 = 0u; row < S; row++) {
       var accRe: f32 = 0.0;
       var accIm: f32 = 0.0;
+      let rowBase = matBase + row * S * 2u;
       for (var col: u32 = 0u; col < S; col++) {
-        let gRe = gammaRe(d, row, col);
-        let gIm = gammaIm(d, row, col);
+        let gRe = gammaMatrices[rowBase + col * 2u];
+        let gIm = gammaMatrices[rowBase + col * 2u + 1u];
         // Complex multiply: (gRe + i·gIm) · (psiRe + i·psiIm)
         accRe += gRe * psiRe_local[col] - gIm * psiIm_local[col];
         accIm += gRe * psiIm_local[col] + gIm * psiRe_local[col];
@@ -117,13 +123,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Add beta matrix contribution: mc² · β · ψ
   // Beta is stored at index latticeDim in gammaMatrices
-  let betaIdx = params.latticeDim;
+  let betaBase = latDim * matStride;
   for (var row: u32 = 0u; row < S; row++) {
     var accRe: f32 = 0.0;
     var accIm: f32 = 0.0;
+    let rowBase = betaBase + row * S * 2u;
     for (var col: u32 = 0u; col < S; col++) {
-      let gRe = gammaRe(betaIdx, row, col);
-      let gIm = gammaIm(betaIdx, row, col);
+      let gRe = gammaMatrices[rowBase + col * 2u];
+      let gIm = gammaMatrices[rowBase + col * 2u + 1u];
       accRe += gRe * psiRe_local[col] - gIm * psiIm_local[col];
       accIm += gRe * psiIm_local[col] + gIm * psiRe_local[col];
     }
@@ -136,18 +143,19 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let arg = E * params.dt / params.hbar;
   let cosArg = cos(arg);
   let sinArg = sin(arg);
-  let invE = select(1.0 / E, 0.0, E < 1e-20);
+  // Precompute sin(arg)/E to avoid per-component multiply
+  let sinOverE = select(sinArg / E, 0.0, E < 1e-20);
 
+  let T = params.totalSites;
   for (var sc: u32 = 0u; sc < S; sc++) {
     // cos(Et/ℏ) · ψ_c
     let reCos = cosArg * psiRe_local[sc];
     let imCos = cosArg * psiIm_local[sc];
-    // -i · sin(Et/ℏ) · (Hψ)_c / E
-    // = sin(Et/ℏ)/E · (Hψ_im_c, -Hψ_re_c)
-    let reKin = sinArg * invE * HpsiIm[sc];
-    let imKin = -sinArg * invE * HpsiRe[sc];
+    // -i · sin(Et/ℏ) · (Hψ)_c / E = sinOverE · (Hψ_im_c, -Hψ_re_c)
+    let reKin = sinOverE * HpsiIm[sc];
+    let imKin = -sinOverE * HpsiRe[sc];
 
-    let bufIdx = sc * params.totalSites + idx;
+    let bufIdx = sc * T + idx;
     spinorRe[bufIdx] = reCos + reKin;
     spinorIm[bufIdx] = imCos + imKin;
   }

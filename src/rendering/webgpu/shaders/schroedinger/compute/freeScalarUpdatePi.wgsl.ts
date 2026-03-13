@@ -38,8 +38,17 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     laplacian += (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;
   }
 
-  // Klein-Gordon equation: d²phi/dt² = laplacian(phi) - m² * phi
-  // In Hamiltonian form: dpi/dt = laplacian(phi) - m² * phi
-  pi[idx] = pi[idx] + params.dt * (laplacian - params.mass * params.mass * phiCenter);
+  // Klein-Gordon equation: d²phi/dt² = laplacian(phi) - m² * phi - dV/dphi
+  // In Hamiltonian form: dpi/dt = laplacian(phi) - m² * phi - dV/dphi
+  var force = laplacian - params.mass * params.mass * phiCenter;
+
+  // Self-interaction: V(phi) = lambda*(phi²-v²)², dV/dphi = 4*lambda*phi*(phi²-v²)
+  if (params.selfInteractionEnabled != 0u) {
+    let v2 = params.selfInteractionVev * params.selfInteractionVev;
+    let phi2 = phiCenter * phiCenter;
+    force -= 4.0 * params.selfInteractionLambda * phiCenter * (phi2 - v2);
+  }
+
+  pi[idx] = pi[idx] + params.dt * force;
 }
 `

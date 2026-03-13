@@ -38,14 +38,14 @@ import { tdseDiagNormReduceBlock, tdseDiagNormFinalizeBlock } from '../shaders/s
 import { TdseDiagnosticsHistory, computeReflectionTransmission, type TdseDiagnosticsSnapshot } from '@/lib/physics/tdse/diagnostics'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 
-/** TDSEUniforms struct size in bytes (688 = 636 + 48 trapAnisotropy + 4 pad) */
-const UNIFORM_SIZE = 688
+/** TDSEUniforms struct size in bytes (704 = 636 + 48 trapAnisotropy + 16 radialWell + 4 pad) */
+const UNIFORM_SIZE = 704
 /** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
 const LINEAR_WG = 64
 /** 3D dispatch workgroup size for write-grid pass */
 const GRID_WG = 4
 /** Density grid texture resolution */
-const DENSITY_GRID_SIZE = 64
+const DENSITY_GRID_SIZE = 96
 /** Maximum supported dimensions */
 const MAX_DIM = 12
 /** FFTStageUniforms struct size (32 bytes) */
@@ -145,6 +145,7 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   // State
   private initialized = false
   private lastConfigHash = ''
+  private lastPotentialHash = ''
   private totalSites = 0
   private simTime = 0
   private maxDensity = 1.0
@@ -156,6 +157,8 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   /** Fractional step accumulator for sub-integer speed scaling */
   private stepAccumulator = 0
   private pendingAutoReset = false
+  /** Generation counter to discard stale async readbacks after init/reset */
+  private diagGeneration = 0
   /** Small staging buffer for overwriting harmonicOmega between init and potential fill (quench) */
   private omegaStagingBuffer: GPUBuffer | null = null
 
@@ -611,7 +614,7 @@ struct PackUniforms {
     const strides = this.computeStrides(config)
 
     const initMap: Record<string, number> = { gaussianPacket: 0, planeWave: 1, superposition: 2, thomasFermi: 3, vortexImprint: 4, darkSoliton: 5 }
-    const potMap: Record<string, number> = { free: 0, barrier: 1, step: 2, finiteWell: 3, harmonicTrap: 4, driven: 5, doubleSlit: 6, periodicLattice: 7, doubleWell: 8, becTrap: 9 }
+    const potMap: Record<string, number> = { free: 0, barrier: 1, step: 2, finiteWell: 3, harmonicTrap: 4, driven: 5, doubleSlit: 6, periodicLattice: 7, doubleWell: 8, becTrap: 9, radialDoubleWell: 10 }
     const viewMap: Record<string, number> = { density: 0, phase: 1, current: 2, potential: 3, superfluidVelocity: 4, healingLength: 5 }
     const waveformMap: Record<string, number> = { sine: 0, pulse: 1, chirp: 2 }
 
@@ -716,6 +719,12 @@ struct PackUniforms {
     for (let d = 0; d < MAX_DIM; d++) {
       f32[159 + d] = anisotropy?.[d] ?? 1.0
     }
+
+    // Radial double well params (684-699, indices 171-174)
+    f32[171] = config.radialWellInner
+    f32[172] = config.radialWellOuter
+    f32[173] = config.radialWellDepth
+    f32[174] = config.radialWellTilt
 
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
   }
@@ -834,6 +843,7 @@ struct PackUniforms {
       this.rebuildBindGroups(device)
       this.initialized = false
       this.simTime = 0
+      this.lastPotentialHash = ''
     }
 
     this.updateUniforms(device, config, basisX, basisY, basisZ, boundingRadius)
@@ -887,6 +897,7 @@ struct PackUniforms {
       this.simTime = 0
       this.stepAccumulator = 0
       this.pendingAutoReset = false
+      this.diagGeneration++  // Invalidate any in-flight readbacks from before reset
       this.initialized = true
       this.diagHistory.clear()
     useTdseDiagnosticsStore.getState().reset()
@@ -895,15 +906,19 @@ struct PackUniforms {
     // Strang splitting time steps (only when playing)
     const linearWG = Math.ceil(this.totalSites / LINEAR_WG)
 
-    // Always refresh the potential buffer each frame so live parameter changes
-    // (barrier height, harmonic omega, potential type, etc.) take effect
-    // immediately without requiring a wavefunction reset. This single compute
-    // dispatch is negligible (~2.5% overhead) compared to the FFT passes.
-    // For driven systems, this also ensures V(t) uses the current simTime.
-    if (this.potentialPipeline && this.potentialBG) {
-      const p = encoder.beginComputePass({ label: 'tdse-potential-update' })
-      this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
-      p.end()
+    // Refresh potential only when parameters change (dirty tracking).
+    // Driven potentials (type 5) depend on simTime, so always refresh those.
+    const isDriven = config.potentialType === 'driven' || config.driveEnabled
+    const potHash = isDriven
+      ? '' // force refresh every frame for time-dependent potentials
+      : `${config.potentialType}|${config.barrierHeight}|${config.barrierWidth}|${config.barrierCenter}|${config.harmonicOmega}|${config.wellDepth}|${config.wellWidth}|${config.stepHeight}|${config.mass}|${config.interactionStrength}|${config.slitSeparation}|${config.slitWidth}|${config.wallThickness}|${config.wallHeight}|${config.latticeDepth}|${config.latticePeriod}|${config.doubleWellLambda}|${config.doubleWellSeparation}|${config.doubleWellAsymmetry}|${config.radialWellInner}|${config.radialWellOuter}|${config.radialWellDepth}|${config.radialWellTilt}|${(config.trapAnisotropy ?? []).join(',')}|${config.spacing.join(',')}`
+    if (potHash !== this.lastPotentialHash) {
+      this.lastPotentialHash = potHash
+      if (this.potentialPipeline && this.potentialBG) {
+        const p = encoder.beginComputePass({ label: 'tdse-potential-update' })
+        this.dispatchCompute(p, this.potentialPipeline, [this.potentialBG], linearWG)
+        p.end()
+      }
     }
 
     if (isPlaying) {
@@ -1042,10 +1057,11 @@ struct PackUniforms {
       this.diagMappingInFlight = true
       const staging = this.diagStagingBuffer
       const simTime = this.simTime
+      const gen = this.diagGeneration
 
       // Submit current commands, then map
       device.queue.onSubmittedWorkDone().then(() => {
-        if (!staging || staging.mapState !== 'unmapped' || this.diagStagingBuffer !== staging) {
+        if (!staging || staging.mapState !== 'unmapped' || this.diagStagingBuffer !== staging || gen !== this.diagGeneration) {
           this.diagMappingInFlight = false
           return
         }
@@ -1072,8 +1088,8 @@ struct PackUniforms {
           if (this.initialNorm < 0) {
             this.initialNorm = totalNorm
           } else if (this.initialNorm > 0) {
-            // Reset on norm decay (wavepacket left the domain)
-            if (autoLoop && totalNorm < this.initialNorm * 0.15) {
+            // Reset on norm decay (wavepacket absorbed / left the domain)
+            if (autoLoop && totalNorm < this.initialNorm * 0.001) {
               this.pendingAutoReset = true
             }
             // Reset on norm divergence (numerical instability — dt too large or GPE blowup)

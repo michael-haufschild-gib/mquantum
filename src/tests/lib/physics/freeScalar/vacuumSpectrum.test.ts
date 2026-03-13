@@ -28,6 +28,9 @@ function makeConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig
     vacuumSeed: 42,
     slicePositions: [],
     kSpaceViz: { ...DEFAULT_KSPACE_VIZ },
+    selfInteractionEnabled: false,
+    selfInteractionLambda: 0.5,
+    selfInteractionVev: 1.0,
     ...overrides,
   }
 }

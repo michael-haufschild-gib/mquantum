@@ -49,6 +49,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
     const showSlitControls = td.potentialType === 'doubleSlit'
     const showLatticeControls = td.potentialType === 'periodicLattice'
     const showDoubleWellControls = td.potentialType === 'doubleWell'
+    const showRadialDoubleWellControls = td.potentialType === 'radialDoubleWell'
 
     return (
       <>
@@ -174,6 +175,31 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                 label="Asymmetry (\u03B5)" min={0} max={50} step={0.1}
                 value={td.doubleWellAsymmetry} onChange={actions.setDoubleWellAsymmetry}
                 showValue data-testid="tdse-double-well-asymmetry"
+              />
+            </>
+          )}
+
+          {showRadialDoubleWellControls && (
+            <>
+              <Slider
+                label="Inner Radius (r\u2081)" min={0.01} max={5} step={0.01}
+                value={td.radialWellInner} onChange={actions.setRadialWellInner}
+                showValue data-testid="tdse-radial-well-inner"
+              />
+              <Slider
+                label="Outer Radius (r\u2082)" min={0.01} max={10} step={0.01}
+                value={td.radialWellOuter} onChange={actions.setRadialWellOuter}
+                showValue data-testid="tdse-radial-well-outer"
+              />
+              <Slider
+                label="Well Depth (\u03BB)" min={0.1} max={500} step={0.5}
+                value={td.radialWellDepth} onChange={actions.setRadialWellDepth}
+                showValue data-testid="tdse-radial-well-depth"
+              />
+              <Slider
+                label="Tilt (\u03B5)" min={0} max={50} step={0.1}
+                value={td.radialWellTilt} onChange={actions.setRadialWellTilt}
+                showValue data-testid="tdse-radial-well-tilt"
               />
             </>
           )}

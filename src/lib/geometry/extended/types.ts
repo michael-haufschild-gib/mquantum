@@ -113,8 +113,9 @@ export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'fre
  * - phi: Field amplitude
  * - pi: Conjugate momentum (time derivative of phi)
  * - energyDensity: Local energy density (kinetic + gradient + mass)
+ * - wallDensity: Self-interaction potential V(phi) — highlights domain walls (zero at vacua)
  */
-export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity'
+export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity' | 'wallDensity'
 
 
 /**
@@ -122,8 +123,9 @@ export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity'
  * - vacuumNoise: Hash-based pseudo-random Gaussian noise
  * - singleMode: Single plane-wave mode A*cos(k.x)
  * - gaussianPacket: Gaussian wave packet A*exp(-|x-x0|^2/(2*sigma^2))*cos(k.x)
+ * - kinkProfile: Domain wall kink phi = v*tanh((x-x0)/w) for self-interaction potential
  */
-export type FreeScalarInitialCondition = 'vacuumNoise' | 'singleMode' | 'gaussianPacket'
+export type FreeScalarInitialCondition = 'vacuumNoise' | 'singleMode' | 'gaussianPacket' | 'kinkProfile'
 
 // ============================================================================
 // k-Space Visualization Config
@@ -233,6 +235,14 @@ export interface FreeScalarConfig {
 
   /** Display-only transforms for k-space occupation visualization */
   kSpaceViz: KSpaceVizConfig
+
+  // === Self-Interaction Potential (Mexican hat: V(phi) = lambda*(phi^2 - v^2)^2) ===
+  /** Enable self-interaction potential V(phi) = lambda*(phi^2 - v^2)^2 */
+  selfInteractionEnabled: boolean
+  /** Self-interaction coupling constant lambda */
+  selfInteractionLambda: number
+  /** Vacuum expectation value v (field minima at phi = +/-v) */
+  selfInteractionVev: number
 }
 
 /**
@@ -258,6 +268,9 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   needsReset: false,
   slicePositions: [],
   kSpaceViz: { ...DEFAULT_KSPACE_VIZ },
+  selfInteractionEnabled: false,
+  selfInteractionLambda: 0.5,
+  selfInteractionVev: 1.0,
 }
 
 // ============================================================================
@@ -293,8 +306,9 @@ export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superpositi
  * - periodicLattice: Cosine lattice V₀cos²(πx/a)
  * - doubleWell: Quartic double-well V(x) = λ(x²−a²)² − εx
  * - becTrap: BEC anisotropic harmonic trap (per-dimension ω ratios via trapAnisotropy)
+ * - radialDoubleWell: Radial double well V(r) = λ(r−r₁)²(r−r₂)² − εr (bubble nucleation)
  */
-export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven' | 'doubleSlit' | 'periodicLattice' | 'doubleWell' | 'becTrap'
+export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven' | 'doubleSlit' | 'periodicLattice' | 'doubleWell' | 'becTrap' | 'radialDoubleWell'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -376,6 +390,16 @@ export interface TdseConfig {
   doubleWellSeparation: number
   /** Asymmetry tilt ε (0 = symmetric, >0 = right well deeper / false vacuum left) */
   doubleWellAsymmetry: number
+
+  // === Radial Double Well Configuration (when potentialType === 'radialDoubleWell') ===
+  /** Inner minimum radius r₁ in V(r) = λ(r−r₁)²(r−r₂)² − εr */
+  radialWellInner: number
+  /** Outer minimum radius r₂ */
+  radialWellOuter: number
+  /** Well depth scale λ */
+  radialWellDepth: number
+  /** Asymmetry tilt ε (>0 = outer well deeper, drives bubble nucleation) */
+  radialWellTilt: number
 
   /** Enable time-dependent drive */
   driveEnabled: boolean
@@ -468,6 +492,11 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   doubleWellLambda: 8.0,
   doubleWellSeparation: 1.0,
   doubleWellAsymmetry: 0.0,
+
+  radialWellInner: 0.6,
+  radialWellOuter: 1.8,
+  radialWellDepth: 50.0,
+  radialWellTilt: 0.5,
 
   driveEnabled: false,
   driveWaveform: 'sine',
