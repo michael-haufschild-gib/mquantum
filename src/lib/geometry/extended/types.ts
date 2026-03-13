@@ -243,6 +243,12 @@ export interface FreeScalarConfig {
   selfInteractionLambda: number
   /** Vacuum expectation value v (field minima at phi = +/-v) */
   selfInteractionVev: number
+
+  // === Diagnostics ===
+  /** Enable diagnostic readback (norm, energy, field statistics) */
+  diagnosticsEnabled: boolean
+  /** Diagnostic computation interval in frames */
+  diagnosticsInterval: number
 }
 
 /**
@@ -271,6 +277,8 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   selfInteractionEnabled: false,
   selfInteractionLambda: 0.5,
   selfInteractionVev: 1.0,
+  diagnosticsEnabled: false,
+  diagnosticsInterval: 10,
 }
 
 // ============================================================================

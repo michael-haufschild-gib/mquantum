@@ -7,8 +7,8 @@ export const classicBlock = `
 // Samples from a pre-loaded KTX2 cube texture
 
 fn getClassic(dir: vec3<f32>, time: f32) -> vec3<f32> {
-  // Sample cube texture at full quality (LOD 0)
-  var color = textureSampleLevel(skyboxTexture, skyboxSampler, dir, 0.0).rgb;
+  // Sample cube texture with automatic mip level selection
+  var color = textureSample(skyboxTexture, skyboxSampler, dir).rgb;
 
   // Apply intensity
   color *= uniforms.intensity;

@@ -167,6 +167,17 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">
+        {/* Empty state for compute modes with no animation content */}
+        {isComputeMode && !isTdse && (
+          <div className="px-4 py-6 text-center">
+            <p className="text-xs text-text-tertiary italic">
+              Animation effects are not available in this mode.
+            </p>
+            <p className="text-[10px] text-text-tertiary mt-1">
+              These effects use inline wavefunction evaluation, which requires Harmonic Oscillator or Hydrogen mode.
+            </p>
+          </div>
+        )}
         {/* Time Evolution — not applicable for free scalar field or TDSE (uses its own dt/stepsPerFrame) */}
         {!isFreeScalarField && !isTdse && !isBec && !isDirac && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
           <div className="flex items-center justify-between">

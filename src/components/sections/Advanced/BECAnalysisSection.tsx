@@ -12,6 +12,7 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
@@ -60,7 +61,12 @@ export const BECAnalysisSection: React.FC<BECAnalysisSectionProps> = React.memo(
         })),
       )
 
-    if (objectType !== 'schroedinger' || quantumMode !== 'becDynamics') return null
+    if (objectType !== 'schroedinger') return null
+    if (quantumMode !== 'becDynamics') {
+      const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'diracEquation'
+      if (!isComputeMode) return null
+      return <UnavailableSection title="BEC Analysis" reason="Switch to BEC Dynamics mode" />
+    }
 
     return (
       <Section

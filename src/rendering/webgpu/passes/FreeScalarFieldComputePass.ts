@@ -15,6 +15,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { estimateVacuumMaxPhi, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
@@ -95,6 +96,12 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null = null
   /** Web Worker for offloading FFT + k-space CPU work from the main thread */
   private kSpaceWorker: Worker | null = null
+
+  // Diagnostics readback state
+  private diagFrameCounter = 0
+  private diagMappingInFlight = false
+  private diagPhiReadbackBuffer: GPUBuffer | null = null
+  private diagPiReadbackBuffer: GPUBuffer | null = null
 
   // Pre-allocated uniform data views (reused each frame to avoid GC pressure)
   private readonly uniformData = new ArrayBuffer(UNIFORM_SIZE)
@@ -232,6 +239,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     // Invalidate in-flight async readback jobs before replacing buffers.
     this.kSpaceReadbackEpoch++
     this.pendingKSpaceData = null
+    this.diagMappingInFlight = false
 
     // Destroy old field buffers
     this.phiBuffer?.destroy()
@@ -239,6 +247,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.uniformBuffer?.destroy()
     this.phiReadbackBuffer?.destroy()
     this.piReadbackBuffer?.destroy()
+    this.diagPhiReadbackBuffer?.destroy()
+    this.diagPiReadbackBuffer?.destroy()
 
     // Compute total sites as product of all active dimensions
     this.totalSites = 1
@@ -269,6 +279,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     this.piReadbackBuffer = device.createBuffer({
       label: 'free-scalar-pi-readback',
+      size: bufferSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+
+    // Separate staging buffers for diagnostics readback (independent of k-space)
+    this.diagPhiReadbackBuffer = device.createBuffer({
+      label: 'free-scalar-diag-phi-readback',
+      size: bufferSize,
+      usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    })
+    this.diagPiReadbackBuffer = device.createBuffer({
+      label: 'free-scalar-diag-pi-readback',
       size: bufferSize,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     })
@@ -843,6 +865,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
       this.initialized = true
       this.stepAccumulator = 0
+      // Reset diagnostics store so energy drift is recalculated from new initial state
+      useFsfDiagnosticsStore.getState().reset()
     }
 
     // Leapfrog time steps (only when playing)
@@ -938,6 +962,26 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       }
     } else {
       this.kSpaceFrameCounter = 0
+    }
+
+    // Diagnostics readback (independent of k-space, throttled by interval)
+    if (
+      config.diagnosticsEnabled &&
+      this.initialized &&
+      !this.diagMappingInFlight &&
+      this.phiBuffer &&
+      this.piBuffer &&
+      this.diagPhiReadbackBuffer &&
+      this.diagPiReadbackBuffer
+    ) {
+      this.diagFrameCounter++
+      if (this.diagFrameCounter >= config.diagnosticsInterval) {
+        this.diagFrameCounter = 0
+        const bufferSize = this.totalSites * 4
+        encoder.copyBufferToBuffer(this.phiBuffer, 0, this.diagPhiReadbackBuffer, 0, bufferSize)
+        encoder.copyBufferToBuffer(this.piBuffer, 0, this.diagPiReadbackBuffer, 0, bufferSize)
+        this.readbackDiagnostics(device, config)
+      }
     }
   }
 
@@ -1038,6 +1082,109 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   }
 
   /**
+   * Async CPU-side diagnostics readback.
+   * Maps the diagnostics staging buffers, computes field statistics, and pushes to the store.
+   */
+  private async readbackDiagnostics(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
+    const phiBuf = this.diagPhiReadbackBuffer
+    const piBuf = this.diagPiReadbackBuffer
+    if (!phiBuf || !piBuf) return
+
+    this.diagMappingInFlight = true
+    const epoch = this.kSpaceReadbackEpoch
+
+    try {
+      await device.queue.onSubmittedWorkDone()
+      if (epoch !== this.kSpaceReadbackEpoch) { this.diagMappingInFlight = false; return }
+
+      await phiBuf.mapAsync(GPUMapMode.READ)
+      await piBuf.mapAsync(GPUMapMode.READ)
+
+      const phi = new Float32Array(phiBuf.getMappedRange())
+      const pi = new Float32Array(piBuf.getMappedRange())
+      const N = phi.length
+
+      // Compute cell volume (product of spacings)
+      let dV = 1
+      for (let d = 0; d < config.latticeDim; d++) dV *= config.spacing[d]!
+
+      // Single pass: accumulate all statistics
+      let sumPhi = 0, sumPhi2 = 0, sumPi2 = 0, maxPhi = 0, maxPi = 0
+
+      for (let i = 0; i < N; i++) {
+        const p = phi[i]!
+        const q = pi[i]!
+        sumPhi += p
+        sumPhi2 += p * p
+        sumPi2 += q * q
+        const ap = Math.abs(p)
+        const aq = Math.abs(q)
+        if (ap > maxPhi) maxPhi = ap
+        if (aq > maxPi) maxPi = aq
+      }
+
+      // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * dV
+      // Compute for first 3 dims only (higher dims use slice positions)
+      let gradEnergy = 0
+      const dimsForGrad = Math.min(config.latticeDim, 3)
+      const strides = this.computeStrides(config)
+      for (let d = 0; d < dimsForGrad; d++) {
+        const stride = strides[d]!
+        const Nd = config.gridSize[d]!
+        const a = config.spacing[d]!
+        const invA2 = 1 / (a * a)
+        for (let i = 0; i < N; i++) {
+          const iNext = i + stride
+          // Periodic boundary: wrap around
+          const dimPos = Math.floor((i / stride) % Nd)
+          const jNext = dimPos === Nd - 1 ? i - stride * (Nd - 1) : iNext
+          if (jNext >= 0 && jNext < N) {
+            const diff = phi[jNext]! - phi[i]!
+            gradEnergy += diff * diff * invA2
+          }
+        }
+      }
+      gradEnergy *= 0.5 * dV
+
+      const totalNorm = sumPhi2 * dV
+      const kineticEnergy = 0.5 * sumPi2 * dV
+      const massEnergy = 0.5 * config.mass * config.mass * sumPhi2 * dV
+      let potentialEnergy = 0
+      if (config.selfInteractionEnabled) {
+        const lambda = config.selfInteractionLambda
+        const v2 = config.selfInteractionVev * config.selfInteractionVev
+        for (let i = 0; i < N; i++) {
+          const p = phi[i]!
+          const diff = p * p - v2
+          potentialEnergy += lambda * diff * diff
+        }
+        potentialEnergy *= dV
+      }
+
+      const totalEnergy = kineticEnergy + gradEnergy + massEnergy + potentialEnergy
+      const meanPhi = sumPhi / N
+      const variancePhi = sumPhi2 / N - meanPhi * meanPhi
+
+      phiBuf.unmap()
+      piBuf.unmap()
+
+      useFsfDiagnosticsStore.getState().pushSnapshot({
+        totalEnergy,
+        totalNorm,
+        maxPhi,
+        maxPi,
+        energyDrift: 0, // computed by store
+        meanPhi,
+        variancePhi,
+      })
+
+      this.diagMappingInFlight = false
+    } catch {
+      this.diagMappingInFlight = false
+    }
+  }
+
+  /**
    * Standard execute method (required by base class but we use executeField instead).
    * @param _ctx - Render context (unused)
    */
@@ -1056,6 +1203,8 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.analysisTexture?.destroy()
     this.phiReadbackBuffer?.destroy()
     this.piReadbackBuffer?.destroy()
+    this.diagPhiReadbackBuffer?.destroy()
+    this.diagPiReadbackBuffer?.destroy()
     for (const buf of this.pendingStagingBuffers) buf.destroy()
     this.pendingStagingBuffers.length = 0
 

@@ -6,11 +6,9 @@
 import { Section } from '@/components/sections/Section'
 import { Button } from '@/components/ui/Button'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
-import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/hooks/useToast'
 import { useDismissedDialogsStore } from '@/stores/dismissedDialogsStore'
-import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
 import React, { useState, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
@@ -48,16 +46,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
         setShowAxisHelper: state.setShowAxisHelper,
       }))
     )
-    const { renderResolutionScale, setRenderResolutionScale, maxFps, setMaxFps } =
-      usePerformanceStore(
-        useShallow((state) => ({
-          renderResolutionScale: state.renderResolutionScale,
-          setRenderResolutionScale: state.setRenderResolutionScale,
-          maxFps: state.maxFps,
-          setMaxFps: state.setMaxFps,
-        }))
-      )
-
     const handleClearLocalStorage = useCallback(() => {
       try {
         localStorage.clear()
@@ -87,32 +75,6 @@ export const SettingsSection: React.FC<SettingsSectionProps> = React.memo(
             checked={showAxisHelper}
             onCheckedChange={setShowAxisHelper}
             label="Show Axis Helper"
-          />
-        </div>
-        <div className="mt-3 pt-3 border-t border-panel-border">
-          <Slider
-            label="Max FPS"
-            value={maxFps}
-            min={15}
-            max={120}
-            step={1}
-            onChange={setMaxFps}
-            unit=" fps"
-            tooltip="Limit frame rate to reduce power consumption"
-            data-testid="max-fps-slider"
-          />
-        </div>
-        <div className="mt-3 pt-3 border-t border-panel-border">
-          <Slider
-            label="Render Resolution"
-            value={renderResolutionScale}
-            min={0.1}
-            max={1.0}
-            step={0.05}
-            onChange={setRenderResolutionScale}
-            formatValue={(v) => `${Math.round(v * 100)}%`}
-            tooltip="100% = native resolution. Lower values reduce GPU load for mobile/low-end devices."
-            data-testid="render-resolution-slider"
           />
         </div>
         <div className="mt-3 pt-3 border-t border-panel-border flex flex-col gap-2">

@@ -16,7 +16,6 @@ import { HorizonControls } from './skybox/HorizonControls'
 import { OceanControls } from './skybox/OceanControls'
 import { SkyboxSharedClassicControls } from './skybox/SkyboxSharedClassicControls'
 import { SkyboxSharedProceduralControls } from './skybox/SkyboxSharedProceduralControls'
-import { Button } from '@/components/ui/Button'
 
 interface SkyboxOption {
   id: SkyboxSelection
@@ -179,26 +178,25 @@ export const SkyboxControls: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-6">
-      {/* Unified thumbnail grid */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Unified thumbnail grid — p-1 gives room for ring/scale on selected items */}
+      <div className="grid grid-cols-3 gap-2 p-1">
         {ALL_SKYBOX_OPTIONS.map((option) => {
           const isSelected = skyboxSelection === option.id
           return (
-            <Button
+            <button
               key={option.id}
               data-testid={`skybox-option-${option.id}`}
               onClick={() => handleSkyboxSelect(option.id)}
               className={`
-                group relative aspect-square rounded-xl overflow-hidden border-2 p-0 transition-[transform,border-color] duration-200 ease-out
+                group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer
+                transition-[transform,border-color,box-shadow] duration-200 ease-out
                 hover:scale-105 hover:shadow-lg
                 ${
                   isSelected
-                    ? 'border-accent-primary ring-1 ring-accent-primary/50 shadow-md'
+                    ? 'border-accent ring-1 ring-accent/50 shadow-md'
                     : 'border-panel-border hover:border-text-primary/30'
                 }
               `}
-              variant="ghost"
-              size="icon"
               title={option.description}
             >
               {/* Thumbnail content - either image or gradient */}
@@ -206,11 +204,11 @@ export const SkyboxControls: React.FC = React.memo(() => {
                 <img
                   src={option.thumbnail}
                   alt={option.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
               ) : (
                 <div
-                  className={`w-full h-full ${option.gradientClass} transition-transform duration-500 group-hover:scale-110`}
+                  className={`absolute inset-0 w-full h-full ${option.gradientClass} transition-transform duration-500 group-hover:scale-110`}
                 />
               )}
 
@@ -218,7 +216,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
               <div className="absolute bottom-0 left-0 right-0 p-1 bg-[var(--bg-overlay)] text-center backdrop-blur-sm">
                 <span className="text-[10px] font-medium text-white block">{option.name}</span>
               </div>
-            </Button>
+            </button>
           )
         })}
       </div>

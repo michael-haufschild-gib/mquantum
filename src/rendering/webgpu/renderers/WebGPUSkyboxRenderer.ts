@@ -133,6 +133,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   // Classic cube texture loading state
   private loadedTextureName: string | null = null
+  private loadedHighQuality = false
   private cubeTextureLoading = false
   private loadedCubeTexture: GPUTexture | null = null
 
@@ -331,11 +332,12 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
   /**
    * Load a classic cube texture from PNG face images and bind it.
-   * Replaces the placeholder with a real cubemap loaded from the asset folder.
+   * When highQuality is true, generates mipmaps for smoother filtering.
    * @param device - GPU device
    * @param textureName - Skybox texture identifier (e.g. 'space_blue')
+   * @param highQuality - Whether to generate mipmaps for higher quality rendering
    */
-  private async loadCubeTexture(device: GPUDevice, textureName: string): Promise<void> {
+  private async loadCubeTexture(device: GPUDevice, textureName: string, highQuality: boolean): Promise<void> {
     // Face names in WebGPU cubemap layer order: +X, -X, +Y, -Y, +Z, -Z
     const faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'] as const
 
@@ -362,19 +364,23 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
 
     const width = bitmaps[0]!.width
     const height = bitmaps[0]!.height
+    const mipLevelCount = highQuality
+      ? Math.floor(Math.log2(Math.max(width, height))) + 1
+      : 1
 
-    // Create cube texture (sRGB for correct color space from PNG sources)
+    // Create cube texture
     const cubeTexture = device.createTexture({
       label: `skybox-cube-${textureName}`,
       size: { width, height, depthOrArrayLayers: 6 },
       format: 'rgba8unorm',
+      mipLevelCount,
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.COPY_DST |
         GPUTextureUsage.RENDER_ATTACHMENT,
     })
 
-    // Upload each face
+    // Upload base level for each face
     for (let i = 0; i < 6; i++) {
       device.queue.copyExternalImageToTexture(
         { source: bitmaps[i]! },
@@ -383,7 +389,31 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       )
     }
 
-    // Clean up ImageBitmaps
+    // Generate mipmaps by progressively downscaling with createImageBitmap
+    if (highQuality && mipLevelCount > 1) {
+      for (let face = 0; face < 6; face++) {
+        let mipW = width
+        let mipH = height
+        for (let level = 1; level < mipLevelCount; level++) {
+          mipW = Math.max(1, mipW >> 1)
+          mipH = Math.max(1, mipH >> 1)
+          const mipBitmap = await createImageBitmap(bitmaps[face]!, {
+            resizeWidth: mipW,
+            resizeHeight: mipH,
+            resizeQuality: 'high',
+            colorSpaceConversion: 'none',
+          })
+          device.queue.copyExternalImageToTexture(
+            { source: mipBitmap },
+            { texture: cubeTexture, origin: { x: 0, y: 0, z: face }, mipLevel: level },
+            { width: mipW, height: mipH },
+          )
+          mipBitmap.close()
+        }
+      }
+    }
+
+    // Clean up source ImageBitmaps
     for (const bm of bitmaps) bm.close()
 
     // Destroy previous loaded texture (not the placeholder — keep it for fallback)
@@ -403,7 +433,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     }
 
     if (import.meta.env.DEV) {
-      console.log(`[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height})`)
+      console.log(`[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height}, mips: ${mipLevelCount})`)
     }
   }
 
@@ -496,6 +526,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       skyboxRotation?: number
       skyboxAnimationMode?: string
       skyboxAnimationSpeed?: number
+      skyboxHighQuality?: boolean
       proceduralSettings?: SkyboxProceduralSettings
     } | undefined
 
@@ -512,13 +543,19 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       this.pipelineNeedsRecreation = true
     }
 
-    // Load classic cube texture when mode is 'classic' and texture name changes
+    // Load classic cube texture when mode is 'classic' and texture name or quality changes
     if (shaderMode === 'classic' && this.device) {
       const textureName = env?.skyboxTexture ?? 'space_blue'
-      if (textureName !== 'none' && textureName !== this.loadedTextureName && !this.cubeTextureLoading) {
+      const highQuality = env?.skyboxHighQuality ?? false
+      const needsReload =
+        textureName !== 'none' &&
+        (textureName !== this.loadedTextureName || highQuality !== this.loadedHighQuality) &&
+        !this.cubeTextureLoading
+      if (needsReload) {
         this.cubeTextureLoading = true
         this.loadedTextureName = textureName
-        this.loadCubeTexture(this.device, textureName)
+        this.loadedHighQuality = highQuality
+        this.loadCubeTexture(this.device, textureName, highQuality)
           .catch((err) => {
             console.error('[WebGPU Skybox] Failed to load cube texture:', err)
             this.loadedTextureName = null // Allow retry
@@ -873,6 +910,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     this.placeholderCubeSampler = null
     this.loadedCubeTexture = null
     this.loadedTextureName = null
+    this.loadedHighQuality = false
     this.cubeTextureLoading = false
     this.uniformBindGroup = null
     this.textureBindGroup = null

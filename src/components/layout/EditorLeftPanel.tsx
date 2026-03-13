@@ -40,7 +40,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
         id: 'type',
         label: (
           <div className="flex items-center gap-2">
-            <Icon name="sphere" size={14} />
+            <Icon name="sparkles" size={14} />
             <span>Type</span>
           </div>
         ),
@@ -54,7 +54,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
         id: 'geometry',
         label: (
           <div className="flex items-center gap-2">
-            <Icon name="cog" size={14} />
+            <Icon name="layers" size={14} />
             <span>Geometry</span>
           </div>
         ),
@@ -72,9 +72,8 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
-        <Icon name="menu" className="text-[var(--text-secondary)]" />
         <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
-          Geometry
+          Explorer
         </h2>
       </div>
 

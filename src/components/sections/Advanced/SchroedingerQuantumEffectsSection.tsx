@@ -1,8 +1,9 @@
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
-import { ToggleButton } from '@/components/ui/ToggleButton'
+import { Switch } from '@/components/ui/Switch'
 import type {
   SchroedingerNodalDefinition,
   SchroedingerNodalFamilyFilter,
@@ -96,24 +97,25 @@ export const SchroedingerQuantumEffectsSection: React.FC<
   // Quantum effects are 3D volumetric shader features — hide for 2D, Wigner, and freeScalar modes.
   // Free scalar field uses density-grid raymarching; these shader features are disabled in
   // extractSchrodingerConfig and would have no visual effect.
-  if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') return null
+  if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') {
+    const reason = dimension <= 2
+      ? 'Requires 3D or higher'
+      : config.representation === 'wigner'
+        ? 'Not available in Wigner representation'
+        : 'Available in Harmonic Oscillator and Hydrogen modes'
+    return <UnavailableSection title="Quantum Effects" reason={reason} />
+  }
 
   return (
     <Section title="Quantum Effects" defaultOpen={defaultOpen} data-testid="quantum-effects-section">
       <div className="space-y-2">
         <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Nodal Surfaces</label>
-            <ToggleButton
-              pressed={config.nodalEnabled ?? false}
-              onToggle={() => setNodalEnabled(!(config.nodalEnabled ?? false))}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle nodal surfaces"
-              data-testid="schroedinger-nodal-toggle"
-            >
-              {config.nodalEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
+          <Switch
+            label="Nodal Surfaces"
+            checked={config.nodalEnabled ?? false}
+            onChange={() => setNodalEnabled(!(config.nodalEnabled ?? false))}
+            data-testid="schroedinger-nodal-toggle"
+          />
           {config.nodalEnabled && (
             <div className="ps-2 border-s border-border-default space-y-2">
               <Slider
@@ -169,18 +171,12 @@ export const SchroedingerQuantumEffectsSection: React.FC<
                 </p>
               )}
 
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-text-secondary">Lobe Sign Colors</label>
-                <ToggleButton
-                  pressed={config.nodalLobeColoringEnabled ?? false}
-                  onToggle={() => setNodalLobeColoringEnabled(!(config.nodalLobeColoringEnabled ?? false))}
-                  className="text-xs px-2 py-1 h-auto"
-                  ariaLabel="Toggle lobe sign coloring"
-                  data-testid="schroedinger-nodal-lobe-toggle"
-                >
-                  {config.nodalLobeColoringEnabled ? 'ON' : 'OFF'}
-                </ToggleButton>
-              </div>
+              <Switch
+                label="Lobe Sign Colors"
+                checked={config.nodalLobeColoringEnabled ?? false}
+                onChange={() => setNodalLobeColoringEnabled(!(config.nodalLobeColoringEnabled ?? false))}
+                data-testid="schroedinger-nodal-lobe-toggle"
+              />
 
               {config.nodalLobeColoringEnabled ? (
                 <>
@@ -260,20 +256,12 @@ export const SchroedingerQuantumEffectsSection: React.FC<
         </div>
 
         <div className="space-y-1 mt-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Uncertainty Boundary</label>
-            <ToggleButton
-              pressed={config.uncertaintyBoundaryEnabled ?? false}
-              onToggle={() => {
-                setUncertaintyBoundaryEnabled(!(config.uncertaintyBoundaryEnabled ?? false))
-              }}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle uncertainty boundary"
-              data-testid="schroedinger-uncertainty-boundary-toggle"
-            >
-              {config.uncertaintyBoundaryEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
+          <Switch
+            label="Uncertainty Boundary"
+            checked={config.uncertaintyBoundaryEnabled ?? false}
+            onChange={() => setUncertaintyBoundaryEnabled(!(config.uncertaintyBoundaryEnabled ?? false))}
+            data-testid="schroedinger-uncertainty-boundary-toggle"
+          />
           {config.uncertaintyBoundaryEnabled && (
             <div className="ps-2 border-s border-border-default space-y-2">
               <Slider
@@ -311,18 +299,12 @@ export const SchroedingerQuantumEffectsSection: React.FC<
         </div>
 
         <div className="space-y-1 mt-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs text-text-secondary">Phase Materiality</label>
-            <ToggleButton
-              pressed={config.phaseMaterialityEnabled ?? false}
-              onToggle={() => setPhaseMaterialityEnabled(!(config.phaseMaterialityEnabled ?? false))}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle phase materiality"
-              data-testid="schroedinger-phase-materiality-toggle"
-            >
-              {config.phaseMaterialityEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
+          <Switch
+            label="Phase Materiality"
+            checked={config.phaseMaterialityEnabled ?? false}
+            onChange={() => setPhaseMaterialityEnabled(!(config.phaseMaterialityEnabled ?? false))}
+            data-testid="schroedinger-phase-materiality-toggle"
+          />
           {config.phaseMaterialityEnabled && (
             <Slider
               label="Strength"

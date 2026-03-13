@@ -1428,6 +1428,25 @@ export const createSchroedingerSlice: StateCreator<
       }))
     },
 
+    // === Diagnostics ===
+    setFreeScalarDiagnosticsEnabled: (enabled) => {
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, diagnosticsEnabled: enabled },
+        },
+      }))
+    },
+    setFreeScalarDiagnosticsInterval: (interval) => {
+      const clamped = Math.max(1, Math.min(120, Math.round(interval)))
+      set((state) => ({
+        schroedinger: {
+          ...state.schroedinger,
+          freeScalar: { ...state.schroedinger.freeScalar, diagnosticsInterval: clamped },
+        },
+      }))
+    },
+
     // === k-Space Visualization Display Transforms ===
     setFreeScalarKSpaceDisplayMode: (mode) => {
       setWithVersion((state) => ({

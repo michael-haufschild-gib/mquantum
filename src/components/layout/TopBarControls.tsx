@@ -4,7 +4,7 @@ import { useAnimationStore } from '@/stores/animationStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { useUIStore, type UISlice } from '@/stores/uiStore'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useSyncExternalStore } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/Button'
 
@@ -87,8 +87,8 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
   const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
 
   // Local State
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [isSoundEnabled, setIsSoundEnabled] = useState(soundManager.isEnabled)
+  const [isFullscreen, setIsFullscreen] = React.useState(false)
+  const isSoundEnabled = useSyncExternalStore(soundManager.subscribe, soundManager.getSnapshot)
 
   // Effects
   useEffect(() => {
@@ -102,7 +102,6 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
   const toggleSound = () => {
     const newState = !isSoundEnabled
     soundManager.toggle(newState)
-    setIsSoundEnabled(newState)
     if (newState) {
       soundManager.playClick()
       addToast('Sound Enabled', 'info')
@@ -162,6 +161,20 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             small
           />
           <IconButton
+            icon={isSoundEnabled ? SoundOnIcon : SoundOffIcon}
+            active={isSoundEnabled}
+            onClick={toggleSound}
+            label={isSoundEnabled ? 'Mute Sound' : 'Enable Sound'}
+            small
+          />
+          <IconButton
+            icon={CinematicIcon}
+            active={isCinematicMode}
+            onClick={toggleCinematic}
+            label="Cinematic Mode"
+            small
+          />
+          <IconButton
             icon={FullscreenIcon}
             active={isFullscreen}
             onClick={toggleFullscreen}
@@ -188,7 +201,7 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             variant="ghost"
             size="md"
           >
-            {representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}
+            {isComputeMode ? 'Position (locked)' : representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}
           </Button>
 
           <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />

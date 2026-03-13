@@ -48,7 +48,7 @@ export const SkyboxSharedClassicControls: React.FC<SkyboxSharedClassicControlsPr
         data-testid="skybox-hq-toggle"
         checked={skyboxHighQuality}
         onCheckedChange={setSkyboxHighQuality}
-        label="High Quality Textures (KTX2)"
+        label="High Quality (Mipmaps)"
       />
 
       <Select

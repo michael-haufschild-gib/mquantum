@@ -249,6 +249,10 @@ export interface SchroedingerSliceActions {
   setFreeScalarSelfInteractionLambda: (lambda: number) => void
   setFreeScalarSelfInteractionVev: (vev: number) => void
 
+  // Diagnostics
+  setFreeScalarDiagnosticsEnabled: (enabled: boolean) => void
+  setFreeScalarDiagnosticsInterval: (interval: number) => void
+
   // k-Space Visualization Display Transforms
   setFreeScalarKSpaceDisplayMode: (mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode) => void
   setFreeScalarKSpaceFftShift: (enabled: boolean) => void

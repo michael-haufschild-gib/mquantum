@@ -15,7 +15,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 import { AnimatePresence, m } from 'motion/react'
-import { useMemo, useState, type FC } from 'react'
+import { useEffect, useMemo, useState, type FC } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
@@ -79,6 +79,7 @@ export const TimelineControls: FC = () => {
         schroedingerConfig.interferenceEnabled,
         schroedingerConfig.probabilityFlowEnabled,
         schroedingerConfig.probabilityCurrentEnabled,
+        schroedingerConfig.phaseAnimationEnabled,
       ].filter(Boolean).length
     }
 
@@ -89,6 +90,7 @@ export const TimelineControls: FC = () => {
     schroedingerConfig.interferenceEnabled,
     schroedingerConfig.probabilityFlowEnabled,
     schroedingerConfig.probabilityCurrentEnabled,
+    schroedingerConfig.phaseAnimationEnabled,
   ])
 
   const isSchroedinger = getConfigStoreKey(objectType) === 'schroedinger'
@@ -103,9 +105,11 @@ export const TimelineControls: FC = () => {
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
 
   // Close open quantum drawer when controls become unavailable
-  if (showOpenQDrawer && !supportsOpenQuantumControls) {
-    setShowOpenQDrawer(false)
-  }
+  useEffect(() => {
+    if (showOpenQDrawer && !supportsOpenQuantumControls) {
+      setShowOpenQDrawer(false)
+    }
+  }, [showOpenQDrawer, supportsOpenQuantumControls])
 
   return (
     <div className="flex flex-col w-full h-full relative">
@@ -226,7 +230,7 @@ export const TimelineControls: FC = () => {
         </div>
 
         {/* Speed Slider */}
-        <div className="w-44 pt-2.5 pl-3 border-l border-border-subtle">
+        <div className="w-28 sm:w-44 pt-2.5 pl-3 border-l border-border-subtle shrink-0">
           <Slider
             label="SPEED"
             min={MIN_SPEED}
@@ -240,9 +244,10 @@ export const TimelineControls: FC = () => {
         </div>
 
         {/* Bias Slider */}
-        <div className="w-44 pt-2.5 pl-3 border-l border-border-subtle">
+        <div className="w-28 sm:w-44 pt-2.5 pl-3 border-l border-border-subtle shrink-0">
           <Slider
             label="BIAS"
+            tooltip="Controls how animation time is distributed across dimensions"
             min={MIN_ANIMATION_BIAS}
             max={MAX_ANIMATION_BIAS}
             step={0.05}
@@ -266,9 +271,9 @@ export const TimelineControls: FC = () => {
               }}
               sound="swish"
               ariaLabel="Toggle animations drawer"
-              className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+              className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
-              Anim
+              Effects
               <span
                 className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${showAnimDrawer ? 'bg-accent text-text-inverse' : 'bg-accent-subtle text-text-primary'}`}
               >
@@ -287,7 +292,7 @@ export const TimelineControls: FC = () => {
               }}
               sound="swish"
               ariaLabel="Toggle open quantum drawer"
-              className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+              className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
             >
               Open Q
             </ToggleButton>
@@ -302,7 +307,7 @@ export const TimelineControls: FC = () => {
             }}
             sound="swish"
             ariaLabel="Toggle rotation drawer"
-            className="text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-full"
+            className="text-[10px] font-bold uppercase tracking-wider px-3 py-2.5 rounded-full"
           >
             Rotate
             <span

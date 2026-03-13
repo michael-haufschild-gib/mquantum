@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { DropdownMenu } from '@/components/ui/DropdownMenu'
 import { InputModal } from '@/components/ui/InputModal'
 import { Modal } from '@/components/ui/Modal'
-import { BREAKPOINTS, useIsMobile, useMediaQuery } from '@/hooks/useMediaQuery'
+import { useIsDesktop, useIsMobile } from '@/hooks/useMediaQuery'
 import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { exportSceneToPNG, generateTimestampFilename } from '@/lib/export'
@@ -25,7 +25,7 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { usePresetManagerStore, type PresetManagerState } from '@/stores/presetManagerStore'
 import { useThemeStore } from '@/stores/themeStore'
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import {
   useFileMenuItems,
@@ -103,7 +103,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
 
     const quantumMode = useExtendedObjectStore((state) => state.schroedinger.quantumMode)
 
-    const isDesktop = useMediaQuery(BREAKPOINTS.sm)
+    const isDesktop = useIsDesktop()
     const isMobile = useIsMobile()
 
     // Refs for measuring sections to determine center positioning
@@ -135,7 +135,7 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
     }, [])
 
     // Sync sound state for menu toggle
-    const [isSoundEnabled, setIsSoundEnabled] = useState(soundManager.isEnabled)
+    const isSoundEnabled = useSyncExternalStore(soundManager.subscribe, soundManager.getSnapshot)
 
     // --- Handlers ---
 
@@ -165,14 +165,14 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
 
       let defaultText = ''
       if (objectType === 'schroedinger') {
-        const modeName =
-          quantumMode === 'freeScalarField'
-            ? 'Free Scalar Field'
-            : quantumMode === 'tdseDynamics'
-              ? 'TDSE Dynamics'
-              : quantumMode === 'hydrogenND'
-                ? 'Hydrogen ND'
-                : 'Harmonic Oscillator'
+        const modeNames: Record<string, string> = {
+          freeScalarField: 'Free Scalar Field',
+          tdseDynamics: 'TDSE Dynamics',
+          hydrogenND: 'Hydrogen ND',
+          becDynamics: 'BEC Dynamics',
+          diracEquation: 'Dirac Equation',
+        }
+        const modeName = modeNames[quantumMode] ?? 'Harmonic Oscillator'
         defaultText = `${dimension}D ${modeName}`
       } else {
         const entry = OBJECT_TYPE_REGISTRY.get(objectType)
@@ -198,7 +198,6 @@ export const EditorTopBar: React.FC<EditorTopBarProps> = React.memo(
     const toggleSound = useCallback(() => {
       const newState = !isSoundEnabled
       soundManager.toggle(newState)
-      setIsSoundEnabled(newState)
       if (newState) {
         soundManager.playClick()
         addToast('Sound Enabled', 'info')

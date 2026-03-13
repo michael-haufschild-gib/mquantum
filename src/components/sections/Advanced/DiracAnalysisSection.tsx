@@ -12,6 +12,7 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
@@ -52,7 +53,12 @@ export const DiracAnalysisSection: React.FC<DiracAnalysisSectionProps> = React.m
         })),
       )
 
-    if (objectType !== 'schroedinger' || quantumMode !== 'diracEquation') return null
+    if (objectType !== 'schroedinger') return null
+    if (quantumMode !== 'diracEquation') {
+      const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics'
+      if (!isComputeMode) return null
+      return <UnavailableSection title="Dirac Analysis" reason="Switch to Dirac Equation mode" />
+    }
 
     return (
       <Section

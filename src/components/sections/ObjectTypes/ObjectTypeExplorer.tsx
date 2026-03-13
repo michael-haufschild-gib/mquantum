@@ -1,11 +1,22 @@
 import { soundManager } from '@/lib/audio/SoundManager'
 import type { SchroedingerQuantumMode } from '@/lib/geometry/extended/types'
 import { useObjectTypeInitialization } from '@/hooks/useObjectTypeInitialization'
+import { useToast } from '@/hooks/useToast'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
 import { m } from 'motion/react'
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+
+/** Per-mode metadata */
+const MODE_FEATURES: Record<SchroedingerQuantumMode, { minDim: number; category: 'analytic' | 'compute' }> = {
+  harmonicOscillator: { minDim: 1, category: 'analytic' },
+  hydrogenND: { minDim: 3, category: 'analytic' },
+  freeScalarField: { minDim: 1, category: 'compute' },
+  tdseDynamics: { minDim: 3, category: 'compute' },
+  becDynamics: { minDim: 3, category: 'compute' },
+  diracEquation: { minDim: 3, category: 'compute' },
+}
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
   const { objectType, dimension } = useGeometryStore(
@@ -61,13 +72,25 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     []
   )
 
+  const { addToast } = useToast()
+
   const handleSelect = useCallback(
     (value: SchroedingerQuantumMode) => {
       soundManager.playClick()
-      // Dimension enforcement is handled by setSchroedingerQuantumMode in the store
+      const features = MODE_FEATURES[value]
+      const prevDim = useGeometryStore.getState().dimension
       setQuantumMode(value)
+      // Show feedback toast for mode switch side effects
+      const newDim = useGeometryStore.getState().dimension
+      const changes: string[] = []
+      if (newDim !== prevDim) changes.push(`Dimension → ${newDim}D`)
+      if (features.category === 'compute') changes.push('Representation → Position')
+      const modeLabel = modeOptions.find((m) => m.value === value)?.label ?? value
+      if (changes.length > 0) {
+        addToast(`${modeLabel}: ${changes.join(', ')}`, 'info')
+      }
     },
-    [setQuantumMode]
+    [setQuantumMode, addToast, modeOptions]
   )
 
   const containerVariants = {
@@ -85,6 +108,51 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     show: { opacity: 1, x: 0 },
   }
 
+  const analyticModes = modeOptions.filter((m) => MODE_FEATURES[m.value].category === 'analytic')
+  const computeModes = modeOptions.filter((m) => MODE_FEATURES[m.value].category === 'compute')
+
+  const renderCard = (mode: (typeof modeOptions)[number]) => {
+    const isSelected = quantumMode === mode.value
+    const features = MODE_FEATURES[mode.value]
+
+    return (
+      <m.button
+        key={mode.value}
+        variants={itemVariants}
+        onClick={() => handleSelect(mode.value)}
+        onMouseEnter={() => soundManager.playHover()}
+        className={`
+          relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
+          ${
+            isSelected
+              ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
+              : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
+          }
+          cursor-pointer
+        `}
+        whileHover={{ scale: 1.01, x: 2 }}
+        whileTap={{ scale: 0.98 }}
+        data-testid={`object-type-${mode.value}`}
+      >
+        <div className="flex items-center justify-between w-full mb-1">
+          <span className="font-medium text-sm">{mode.label}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-text-tertiary font-mono">{features.minDim}D+</span>
+            {isSelected && (
+              <div className="relative w-2 h-2">
+                <div className="absolute inset-0 rounded-full bg-accent led-glow" />
+                <div className="absolute inset-0 rounded-full bg-accent" />
+              </div>
+            )}
+          </div>
+        </div>
+        <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
+          {mode.description}
+        </span>
+      </m.button>
+    )
+  }
+
   return (
     <m.div
       className="grid grid-cols-1 gap-2"
@@ -92,45 +160,10 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       initial="hidden"
       animate="show"
     >
-      {modeOptions.map((mode) => {
-        const isSelected = quantumMode === mode.value
-
-        return (
-          <m.button
-            key={mode.value}
-            variants={itemVariants}
-            onClick={() => handleSelect(mode.value)}
-            onMouseEnter={() => soundManager.playHover()}
-            className={`
-                        relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
-                        ${
-                          isSelected
-                            ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
-                            : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
-                        }
-                        cursor-pointer
-                      `}
-            whileHover={{ scale: 1.01, x: 2 }}
-            whileTap={{ scale: 0.98 }}
-            data-testid={`object-type-${mode.value}`}
-          >
-            <div className="flex items-center justify-between w-full mb-1">
-              <span className="font-medium text-sm">{mode.label}</span>
-              {isSelected && (
-                <div className="relative w-2 h-2">
-                  {/* Glow layer - static blur, no animation = 0 style recalcs */}
-                  <div className="absolute inset-0 rounded-full bg-accent led-glow" />
-                  {/* Solid LED core */}
-                  <div className="absolute inset-0 rounded-full bg-accent" />
-                </div>
-              )}
-            </div>
-            <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
-              {mode.description}
-            </span>
-          </m.button>
-        )
-      })}
+      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1">Analytic</div>
+      {analyticModes.map(renderCard)}
+      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">Compute (GPU)</div>
+      {computeModes.map(renderCard)}
     </m.div>
   )
 })

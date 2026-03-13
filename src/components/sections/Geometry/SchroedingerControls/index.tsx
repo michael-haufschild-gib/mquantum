@@ -9,6 +9,7 @@
 import { Slider } from '@/components/ui/Slider'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
 import { Section } from '@/components/sections/Section'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import React from 'react'
 import { FreeScalarFieldControls } from './FreeScalarFieldControls'
@@ -53,6 +54,9 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     } = useSchroedingerActions()
 
     const dimension = useGeometryStore((state) => state.dimension)
+    const isoEnabled = useExtendedObjectStore(
+      (state) => state.schroedinger?.isoEnabled ?? false
+    )
 
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
@@ -151,7 +155,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
         {/* Render Mode Info */}
         <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
-          <p>Rendering: Volumetric (Beer-Lambert)</p>
+          <p>Rendering: {isoEnabled ? 'Isosurface (Marching Cubes)' : 'Volumetric (Beer-Lambert)'}</p>
           {isHydrogenNDMode && (
             <p className="text-text-tertiary mt-1">{dimension}D hydrogen atom viewed in 3D space</p>
           )}

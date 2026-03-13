@@ -12,6 +12,7 @@ export interface MenuItem {
   onClick?: () => void
   shortcut?: string
   disabled?: boolean
+  checked?: boolean
   items?: MenuItem[]
   'data-testid'?: string
 }

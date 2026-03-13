@@ -30,6 +30,7 @@ export interface DropdownMenuItem {
   onClick?: () => void
   disabled?: boolean
   shortcut?: string
+  checked?: boolean
   'data-testid'?: string
   items?: DropdownMenuItem[] // Submenu support
 }
@@ -178,7 +179,12 @@ const MenuItemButton = React.memo(
       `}
         data-testid={item['data-testid']}
       >
-        <span>{item.label}</span>
+        <span className="flex items-center gap-2">
+          {item.checked !== undefined && (
+            <span className={`text-[10px] ${item.checked ? 'text-accent' : 'opacity-0'}`}>✓</span>
+          )}
+          {item.label}
+        </span>
         {hasSubmenu ? (
           <span className="ml-2 opacity-50 text-xs">›</span>
         ) : !isMobile && item.shortcut ? (

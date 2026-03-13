@@ -14,6 +14,7 @@ class SoundManager {
   private enabled: boolean = true
   private masterGain: GainNode | null = null
   private initialized: boolean = false
+  private listeners: Set<() => void> = new Set()
 
   constructor() {
     // Lazy init on first interaction
@@ -233,9 +234,21 @@ class SoundManager {
 
   public toggle(enabled: boolean) {
     this.enabled = enabled
+    this.listeners.forEach((l) => l())
   }
 
   public get isEnabled() {
+    return this.enabled
+  }
+
+  /** Subscribe to enabled state changes (for useSyncExternalStore). */
+  public subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  /** Get current enabled snapshot (for useSyncExternalStore). */
+  public getSnapshot = (): boolean => {
     return this.enabled
   }
 }

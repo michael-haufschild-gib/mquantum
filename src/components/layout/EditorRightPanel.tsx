@@ -1,5 +1,6 @@
 import { Icon } from '@/components/ui/Icon'
 import { Tab, Tabs } from '@/components/ui/Tabs'
+import { AnimatePresence, m } from 'motion/react'
 import React, { useMemo, useState } from 'react'
 
 // Import existing sidebar sections
@@ -9,6 +10,7 @@ import { SchroedingerCrossSectionSection } from '@/components/sections/Advanced/
 import { SchroedingerQuantumEffectsSection } from '@/components/sections/Advanced/SchroedingerQuantumEffectsSection'
 import { BECAnalysisSection } from '@/components/sections/Advanced/BECAnalysisSection'
 import { DiracAnalysisSection } from '@/components/sections/Advanced/DiracAnalysisSection'
+import { FSFAnalysisSection } from '@/components/sections/Advanced/FSFAnalysisSection'
 import { TDSEAnalysisSection } from '@/components/sections/Advanced/TDSEAnalysisSection'
 import { EnvironmentSection } from '@/components/sections/Environment/EnvironmentSection'
 import { FacesSection } from '@/components/sections/Faces/FacesSection'
@@ -16,6 +18,53 @@ import { LightsSection } from '@/components/sections/Lights/LightsSection'
 import { PerformanceSection } from '@/components/sections/Performance/PerformanceSection'
 import { PostProcessingSection } from '@/components/sections/PostProcessing/PostProcessingSection'
 import { SettingsSection } from '@/components/sections/Settings/SettingsSection'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+
+const sectionTransition = { duration: 0.2, ease: 'easeInOut' as const }
+const sectionVariants = {
+  initial: { opacity: 0, height: 0, overflow: 'hidden' as const },
+  animate: { opacity: 1, height: 'auto', overflow: 'visible' as const },
+  exit: { opacity: 0, height: 0, overflow: 'hidden' as const },
+}
+
+/** Object tab content — extracted so it can subscribe to quantum mode */
+const ObjectTabContent: React.FC = React.memo(() => {
+  const quantumMode = useExtendedObjectStore((s) => s.schroedinger.quantumMode)
+  const isCompute =
+    quantumMode === 'freeScalarField' ||
+    quantumMode === 'tdseDynamics' ||
+    quantumMode === 'becDynamics' ||
+    quantumMode === 'diracEquation'
+
+  return (
+    <div>
+      <FacesSection defaultOpen={true} />
+      <SchroedingerCrossSectionSection defaultOpen={true} />
+      <AnimatePresence initial={false}>
+        {/* Compute-mode analysis sections — animate in/out when switching between analytic and compute */}
+        {isCompute && (
+          <m.div
+            key="compute-analysis-group"
+            variants={sectionVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={sectionTransition}
+          >
+            <FSFAnalysisSection defaultOpen={true} />
+            <TDSEAnalysisSection defaultOpen={true} />
+            <BECAnalysisSection defaultOpen={true} />
+            <DiracAnalysisSection defaultOpen={true} />
+          </m.div>
+        )}
+      </AnimatePresence>
+      <SchroedingerQuantumEffectsSection defaultOpen={true} />
+      <AdvancedObjectControls />
+      <OpenQuantumDiagnosticsSection />
+    </div>
+  )
+})
+ObjectTabContent.displayName = 'ObjectTabContent'
 
 export const EditorRightPanel: React.FC = React.memo(() => {
   // Default to 'object' tab as per user feedback (primary creative focus)
@@ -31,19 +80,7 @@ export const EditorRightPanel: React.FC = React.memo(() => {
             <span>Object</span>
           </div>
         ),
-        content: (
-          <div>
-            {/* The "Subject" - Materials, Colors, Advanced */}
-            <FacesSection defaultOpen={true} />
-            <SchroedingerCrossSectionSection defaultOpen={true} />
-            <TDSEAnalysisSection defaultOpen={true} />
-            <BECAnalysisSection defaultOpen={true} />
-            <DiracAnalysisSection defaultOpen={true} />
-            <SchroedingerQuantumEffectsSection defaultOpen={true} />
-            <AdvancedObjectControls />
-            <OpenQuantumDiagnosticsSection />
-          </div>
-        ),
+        content: <ObjectTabContent />,
       },
       {
         id: 'scene',
@@ -86,9 +123,8 @@ export const EditorRightPanel: React.FC = React.memo(() => {
     <div className="h-full flex flex-col w-full shrink-0 overflow-hidden">
       {/* Header Section */}
       <div className="p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-panel)] backdrop-blur-sm z-10 shrink-0 flex items-center gap-2">
-        <Icon name="menu" className="text-[var(--text-secondary)]" />
         <h2 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">
-          Visuals
+          Inspector
         </h2>
       </div>
 

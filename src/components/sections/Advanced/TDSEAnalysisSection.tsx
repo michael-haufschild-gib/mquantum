@@ -15,6 +15,7 @@
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
@@ -68,11 +69,16 @@ export const TDSEAnalysisSection: React.FC<TDSEAnalysisSectionProps> = React.mem
         })),
       )
 
-    if (objectType !== 'schroedinger' || quantumMode !== 'tdseDynamics') return null
+    if (objectType !== 'schroedinger') return null
+    if (quantumMode !== 'tdseDynamics') {
+      const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
+      if (!isComputeMode) return null
+      return <UnavailableSection title="TDSE Analysis" reason="Switch to TDSE Dynamics mode" />
+    }
 
     return (
       <Section
-        title="Analysis"
+        title="TDSE Analysis"
         defaultOpen={defaultOpen}
         data-testid="tdse-analysis-section"
       >

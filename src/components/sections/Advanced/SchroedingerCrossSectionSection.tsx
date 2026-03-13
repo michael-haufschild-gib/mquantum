@@ -1,10 +1,10 @@
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Section } from '@/components/sections/Section'
+import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
-import { ToggleButton } from '@/components/ui/ToggleButton'
 import type {
   SchroedingerCrossSectionAxis,
   SchroedingerCrossSectionCompositeMode,
@@ -125,7 +125,14 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
     }
     // Free scalar field: cross-section calls evalPsi() (HO, not the actual scalar field),
     // and radial probability + SQ are already hidden for non-HO/hydrogen modes.
-    if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') return null
+    if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') {
+      const reason = dimension <= 2
+        ? 'Requires 3D or higher'
+        : config.representation === 'wigner'
+          ? 'Not available in Wigner representation'
+          : 'Available in Harmonic Oscillator and Hydrogen modes'
+      return <UnavailableSection title="Cross Section" reason={reason} />
+    }
 
     const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 
@@ -146,7 +153,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
 
     return (
       <Section
-        title="Analysis"
+        title="Cross Section"
         defaultOpen={defaultOpen}
         data-testid="cross-section-slice-section"
       >
@@ -281,18 +288,12 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
                 />
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-text-secondary">Auto Window</label>
-                <ToggleButton
-                  pressed={config.crossSectionAutoWindow ?? true}
-                  onToggle={() => setCrossSectionAutoWindow(!(config.crossSectionAutoWindow ?? true))}
-                  className="text-xs px-2 py-1 h-auto"
-                  ariaLabel="Toggle cross-section auto window"
-                  data-testid="schroedinger-cross-section-auto-window-toggle"
-                >
-                  {config.crossSectionAutoWindow ? 'ON' : 'OFF'}
-                </ToggleButton>
-              </div>
+              <Switch
+                label="Auto Window"
+                checked={config.crossSectionAutoWindow ?? true}
+                onChange={() => setCrossSectionAutoWindow(!(config.crossSectionAutoWindow ?? true))}
+                data-testid="schroedinger-cross-section-auto-window-toggle"
+              />
 
               {!config.crossSectionAutoWindow && (
                 <>
