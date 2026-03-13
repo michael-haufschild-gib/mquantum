@@ -237,6 +237,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
                   onBlur={handleInputBlurWrapper}
                   onKeyDown={handleKeyDown}
                   disabled={disabled}
+                  aria-label={`${label} value`}
                   className={`
                     w-full h-full ps-1.5 text-right font-mono text-[10px]
                     bg-[var(--bg-hover)] border border-border-subtle rounded
@@ -291,7 +292,7 @@ export const Slider: React.FC<SliderProps> = React.memo(
             onTouchStart={handleRangeTouchStart}
             onTouchEnd={handleRangeTouchEnd}
             disabled={disabled}
-            className="absolute w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-20"
+            className="peer absolute w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-20"
             style={{ WebkitAppearance: 'none' }}
             aria-label={label}
           />
@@ -303,8 +304,9 @@ export const Slider: React.FC<SliderProps> = React.memo(
             bg-background border border-accent
             shadow-[0_0_12px_var(--color-accent-glow)]
             pointer-events-none z-10
-            transition-transform duration-100 ease-out
+            transition-all duration-100 ease-out
             flex items-center justify-center
+            peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-background
             ${isDragging || isLabelDragging ? 'scale-125 bg-accent' : 'scale-100 group-hover/slider:scale-110'}
           `}
             style={{ left: `calc(${percentage}% - 7px)` }}

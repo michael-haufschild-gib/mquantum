@@ -56,7 +56,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
         <div className="relative isolate w-11 h-6">
           <input
             type="checkbox"
-            className="sr-only"
+            className="peer sr-only"
             checked={checked}
             onChange={handleChange}
             disabled={disabled}
@@ -68,6 +68,7 @@ export const Switch: React.FC<SwitchProps> = React.memo(
           <div
             className={`
             absolute inset-0 rounded-full border transition-colors duration-300 ease-out
+            peer-focus-visible:border-accent peer-focus-visible:ring-1 peer-focus-visible:ring-accent/50
             ${
               checked
                 ? 'bg-accent/80 border-accent/50 shadow-[0_0_15px_var(--color-accent-glow)]'

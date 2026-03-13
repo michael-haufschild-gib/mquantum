@@ -51,7 +51,8 @@ export const ToggleButton = React.memo(
         onClick={handleClick}
         onMouseEnter={handleMouseEnter}
         className={`
-        px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-300 border
+        px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-300 border outline-none
+        focus-visible:border-accent focus-visible:ring-1 focus-visible:ring-accent/50
         ${
           pressed
             ? 'bg-accent/20 text-accent border-accent/50 shadow-[0_0_10px_color-mix(in_oklch,var(--color-accent)_20%,transparent)]'

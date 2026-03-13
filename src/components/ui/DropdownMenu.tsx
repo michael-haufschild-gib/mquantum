@@ -169,11 +169,14 @@ const MenuItemButton = React.memo(
     return (
       <button
         ref={itemRef}
+        role="menuitem"
+        tabIndex={-1}
         onClick={onItemClick}
         onMouseEnter={onMouseEnter}
         disabled={item.disabled}
         className={`
         w-full text-left px-3 py-1.5 text-sm flex items-center justify-between group
+        outline-none focus-visible:bg-[var(--bg-hover)] focus-visible:text-[var(--text-primary)]
         ${item.disabled ? 'text-[var(--text-tertiary)] cursor-not-allowed' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer'}
         ${isSubmenuOpen ? 'bg-[var(--bg-hover)] text-[var(--text-primary)]' : ''}
       `}
@@ -481,6 +484,62 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
       e.stopPropagation()
     }, [])
 
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    // Focus first menu item when dropdown opens
+    useEffect(() => {
+      if (isOpen && menuRef.current) {
+        const timer = requestAnimationFrame(() => {
+          const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
+          firstItem?.focus()
+        })
+        return () => cancelAnimationFrame(timer)
+      }
+    }, [isOpen])
+
+    // Keyboard navigation for menu items
+    const handleMenuKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        const menu = menuRef.current
+        if (!menu) return
+
+        const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)'))
+        const currentIndex = items.indexOf(document.activeElement as HTMLElement)
+
+        switch (e.key) {
+          case 'ArrowDown': {
+            e.preventDefault()
+            const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0
+            items[next]?.focus()
+            break
+          }
+          case 'ArrowUp': {
+            e.preventDefault()
+            const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1
+            items[prev]?.focus()
+            break
+          }
+          case 'Home': {
+            e.preventDefault()
+            items[0]?.focus()
+            break
+          }
+          case 'End': {
+            e.preventDefault()
+            items[items.length - 1]?.focus()
+            break
+          }
+          case 'Escape': {
+            e.preventDefault()
+            closeMenu()
+            triggerRef.current?.querySelector<HTMLElement>('button')?.focus()
+            break
+          }
+        }
+      },
+      [closeMenu]
+    )
+
     return (
       <>
         <div
@@ -512,6 +571,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
             <AnimatePresence>
               {isOpen && (
                 <m.div
+                  ref={menuRef}
+                  role="menu"
                   initial="closed"
                   animate="open"
                   exit="closed"
@@ -523,6 +584,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
                     backdropFilter: 'blur(16px)',
                   }}
                   onClick={handleContentClick}
+                  onKeyDown={handleMenuKeyDown}
                 >
                   <MenuItems items={items} onClose={closeMenu} />
                 </m.div>

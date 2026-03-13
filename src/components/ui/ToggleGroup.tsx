@@ -60,7 +60,8 @@ const ToggleGroupButton = React.memo(
         onMouseEnter={handleMouseEnter}
         disabled={isDisabled}
         className={`
-        flex-1 relative px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 z-10
+        flex-1 relative px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 z-10 outline-none
+        focus-visible:ring-1 focus-visible:ring-accent/50
         disabled:opacity-50 disabled:cursor-not-allowed
         ${isSelected ? 'text-accent' : 'text-text-secondary hover:text-text-primary'}
       `}

@@ -90,7 +90,7 @@ export const Section: React.FC<SectionProps> = React.memo(
         <div className="flex items-center justify-between bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-active)] transition-colors duration-200">
           <Button
             onClick={handleToggle}
-            className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none focus:outline-none focus-visible:outline-none border-none focus:ring-0 z-10"
+            className="flex-1 flex items-center justify-between py-3 px-4 text-left outline-none border-none focus-visible:ring-1 focus-visible:ring-accent/50 focus-visible:ring-inset z-10"
             aria-expanded={isOpen}
             data-testid={dataTestId ? `${dataTestId}-header` : undefined}
             variant="ghost"

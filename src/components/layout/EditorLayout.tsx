@@ -3,6 +3,7 @@ import { CommandPalette } from '@/components/layout/CommandPalette'
 import { ShortcutsOverlay } from '@/components/layout/ShortcutsOverlay'
 import { CropEditor } from '@/components/overlays/CropEditor'
 import { ExportModal } from '@/components/overlays/ExportModal'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { GlobalProgress } from '@/components/ui/GlobalProgress'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { soundManager } from '@/lib/audio/SoundManager'
@@ -150,6 +151,14 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
 
   return (
     <div className="relative h-screen supports-[height:100dvh]:h-[100dvh] w-full bg-background overflow-hidden selection:bg-accent selection:text-white font-sans text-text-primary group/app">
+      {/* Skip Navigation */}
+      <a
+        href="#inspector-panel"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-2 focus:left-1/2 focus:-translate-x-1/2 focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm focus:font-medium focus:shadow-lg pointer-events-auto"
+      >
+        Skip to Inspector
+      </a>
+
       {/* 1. Full-screen Canvas Layer (The Curtain) */}
       <div className="absolute inset-0 z-0">{children}</div>
 
@@ -233,9 +242,11 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                             ${!isDesktop ? 'absolute left-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
               >
-                <div className="w-full h-full overflow-hidden">
-                  <EditorLeftPanel />
-                </div>
+                <ErrorBoundary fallback={<div className="p-4 text-sm text-danger">Explorer panel error. Reload to recover.</div>}>
+                  <div className="w-full h-full overflow-hidden">
+                    <EditorLeftPanel />
+                  </div>
+                </ErrorBoundary>
               </m.div>
             )}
           </AnimatePresence>
@@ -279,9 +290,11 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                             ${!isDesktop ? 'absolute right-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
               >
-                <div className="w-full h-full overflow-hidden">
-                  <EditorRightPanel />
-                </div>
+                <ErrorBoundary fallback={<div className="p-4 text-sm text-danger">Inspector panel error. Reload to recover.</div>}>
+                  <div id="inspector-panel" className="w-full h-full overflow-hidden">
+                    <EditorRightPanel />
+                  </div>
+                </ErrorBoundary>
               </m.div>
             )}
           </AnimatePresence>

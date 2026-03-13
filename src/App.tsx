@@ -24,7 +24,7 @@ import { useAppearanceStore } from '@/stores/appearanceStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
 import { useUIStore } from '@/stores/uiStore'
-import { domMax, LazyMotion } from 'motion/react'
+import { domMax, LazyMotion, MotionConfig } from 'motion/react'
 import { useCallback, useMemo } from 'react'
 
 /**
@@ -131,9 +131,11 @@ function AppContent() {
 function App() {
   return (
     <LazyMotion features={domMax} strict>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
+      <MotionConfig reducedMotion="user">
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </MotionConfig>
     </LazyMotion>
   )
 }
