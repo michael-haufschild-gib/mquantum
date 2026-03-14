@@ -488,13 +488,12 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
 
     // Focus first menu item when dropdown opens
     useEffect(() => {
-      if (isOpen && menuRef.current) {
-        const timer = requestAnimationFrame(() => {
-          const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
-          firstItem?.focus()
-        })
-        return () => cancelAnimationFrame(timer)
-      }
+      if (!isOpen || !menuRef.current) return
+      const timer = requestAnimationFrame(() => {
+        const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
+        firstItem?.focus()
+      })
+      return () => cancelAnimationFrame(timer)
     }, [isOpen])
 
     // Keyboard navigation for menu items

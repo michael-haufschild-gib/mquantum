@@ -113,7 +113,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
           <Switch
             label="Nodal Surfaces"
             checked={config.nodalEnabled ?? false}
-            onChange={() => setNodalEnabled(!(config.nodalEnabled ?? false))}
+            onCheckedChange={(checked) => setNodalEnabled(checked)}
             data-testid="schroedinger-nodal-toggle"
           />
           {config.nodalEnabled && (
@@ -174,7 +174,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
               <Switch
                 label="Lobe Sign Colors"
                 checked={config.nodalLobeColoringEnabled ?? false}
-                onChange={() => setNodalLobeColoringEnabled(!(config.nodalLobeColoringEnabled ?? false))}
+                onCheckedChange={(checked) => setNodalLobeColoringEnabled(checked)}
                 data-testid="schroedinger-nodal-lobe-toggle"
               />
 
@@ -259,7 +259,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
           <Switch
             label="Uncertainty Boundary"
             checked={config.uncertaintyBoundaryEnabled ?? false}
-            onChange={() => setUncertaintyBoundaryEnabled(!(config.uncertaintyBoundaryEnabled ?? false))}
+            onCheckedChange={(checked) => setUncertaintyBoundaryEnabled(checked)}
             data-testid="schroedinger-uncertainty-boundary-toggle"
           />
           {config.uncertaintyBoundaryEnabled && (
@@ -302,7 +302,7 @@ export const SchroedingerQuantumEffectsSection: React.FC<
           <Switch
             label="Phase Materiality"
             checked={config.phaseMaterialityEnabled ?? false}
-            onChange={() => setPhaseMaterialityEnabled(!(config.phaseMaterialityEnabled ?? false))}
+            onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
             data-testid="schroedinger-phase-materiality-toggle"
           />
           {config.phaseMaterialityEnabled && (

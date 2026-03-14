@@ -590,10 +590,14 @@ describe('presetManagerStore', () => {
       usePresetManagerStore.getState().loadStyle(saved!.id)
 
       const appearance = useAppearanceStore.getState()
-      expect(appearance.colorAlgorithm).toBe('phase')
-      expect(appearance.perDimensionColorEnabled).toBe(true)
-      expect(appearance.shaderType).toBe('wireframe')
+      // Invalid values ('invalid', 'yes', 'toon') are stripped by normalizer.
+      // Store resets to defaults before applying loaded data, so stripped fields
+      // fall back to defaults — not to the pre-load current state.
+      expect(appearance.colorAlgorithm).toBe('radialDistance') // default, not 'phase'
+      expect(appearance.perDimensionColorEnabled).toBe(false) // default, not true
+      expect(appearance.shaderType).toBe('surface') // default, not 'wireframe'
 
+      // Clamped values: these ARE present in loaded data, just clamped to range
       expect(appearance.lchLightness).toBe(0.1)
       expect(appearance.lchChroma).toBe(0.4)
       expect(appearance.faceEmission).toBe(0)
@@ -617,6 +621,8 @@ describe('presetManagerStore', () => {
       expect(appearance.domainColoring.contourWidth).toBe(0.25)
       expect(appearance.domainColoring.contourStrength).toBe(1)
 
+      // neutralColor: loaded value 42 (not string) → normalizer uses current
+      // store state as fallback for individual invalid fields in nested objects
       expect(appearance.phaseDiverging.neutralColor).toBe('#111111')
       expect(appearance.phaseDiverging.positiveColor).toBe('#00ff00')
       expect(appearance.phaseDiverging.negativeColor).toBe('#0000ff')
@@ -625,11 +631,14 @@ describe('presetManagerStore', () => {
       expect(appearance.divergingPsi.positiveColor).toBe('#202020')
       expect(appearance.divergingPsi.negativeColor).toBe('#303030')
       expect(appearance.divergingPsi.intensityFloor).toBe(1)
+      // component: loaded value 'phase' not in valid set → normalizer uses
+      // current store state as fallback ('imag' was set before import)
       expect(appearance.divergingPsi.component).toBe('imag')
 
       expect(appearance.shaderSettings.wireframe.lineThickness).toBe(5)
       expect(appearance.shaderSettings.surface.specularIntensity).toBe(0)
 
+      // sssEnabled: loaded value 'true' (string, not boolean) → stripped → default false
       expect(appearance.sssEnabled).toBe(false)
       expect(appearance.sssIntensity).toBe(2)
       expect(appearance.sssThickness).toBe(0.1)
@@ -997,8 +1006,13 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
-      expect(useEnvironmentStore.getState().skyboxIntensity).toBe(1.25)
-      expect(useAnimationStore.getState().speed).toBe(0.75)
+      // Non-finite skyboxIntensity (Infinity) is stripped by sanitizeLoadedState.
+      // Store resets to defaults before applying loaded data, so skyboxIntensity
+      // falls back to default (1), not to the pre-load current value (1.25).
+      expect(useEnvironmentStore.getState().skyboxIntensity).toBe(1)
+      // Animation speed (Infinity) is also stripped; falls back to default (0.4),
+      // not to the pre-load current value (0.75).
+      expect(useAnimationStore.getState().speed).toBe(0.4)
     })
 
     it('keeps transform dimension aligned with loaded geometry when importing scenes', () => {

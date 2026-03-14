@@ -162,7 +162,7 @@ fn hydrogenRadialMomentum(n: i32, l: i32, k: f32, a0: f32) -> f32 {
   // Dimensional normalization for q = (n a0) k substitution:
   // k-space radial amplitudes scale with (n a0)^(3/2) to preserve ∫|R̃|² k² dk.
   let naNorm = na * sqrt(na);
-  return naNorm * pow(2.0, f32(l) + 2.0) * norm * qPow * gegen / max(denom, 1e-8);
+  return naNorm * exp2(f32(l) + 2.0) * norm * qPow * gegen / max(denom, 1e-8);
 }
 
 `

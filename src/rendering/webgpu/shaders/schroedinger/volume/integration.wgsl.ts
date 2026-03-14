@@ -1201,15 +1201,17 @@ fn volumeRaymarchGrid(
       colorS = sCenter;
     }
 
-    // Skip near-zero density regions (but not potential overlay regions)
-    let hasPotOverlay = DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
+    // Skip near-zero density regions (but not potential overlay regions).
+    // Potential overlay only applies to compute modes (TDSE/BEC/Dirac/FSF) where the
+    // alpha channel encodes |V|/Vmax. For HO/hydrogen modes, alpha is relativePhase.
+    let hasPotOverlay = IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
     if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
-        let midHasPot = DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
-        let farHasPot = DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
+        let midHasPot = IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+        let farHasPot = IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
         // For algo 23, include antiparticle density (G channel) in skip check
         let midTotal = select(probeMid.r, probeMid.r + probeMid.g, COLOR_ALGORITHM == 23);
         let farTotal = select(probeFar.r, probeFar.r + probeFar.g, COLOR_ALGORITHM == 23);
@@ -1236,8 +1238,9 @@ fn volumeRaymarchGrid(
 
     // Potential overlay: render V(x) as a solid semi-transparent wall.
     // Alpha channel encodes normalized |V|/Vmax from the write-grid shader.
-    // Fixed neutral color, independent of the wavefunction color algorithm.
-    if (DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
+    // Only active for compute modes (IS_FREE_SCALAR) where alpha IS potential.
+    // For HO/hydrogen modes, alpha is relativePhase — must NOT be rendered as potential.
+    if (IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potOpacity = clamp(gridSample.a * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
       accColor += transmittance * potOpacity * potColor;

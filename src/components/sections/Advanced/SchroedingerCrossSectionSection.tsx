@@ -1,6 +1,4 @@
 import { ControlGroup } from '@/components/ui/ControlGroup'
-import { Section } from '@/components/sections/Section'
-import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ColorPicker } from '@/components/ui/ColorPicker'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
@@ -48,15 +46,17 @@ const CROSS_SECTION_AXIS_OPTIONS: { value: SchroedingerCrossSectionAxis; label: 
 ]
 
 /**
+ * Analysis content for harmonicOscillator and hydrogenND modes.
+ * Renders cross-section slice plane, radial probability, and second quantization controls.
  *
+ * @returns Cross-section controls and related analysis features
+ *
+ * @example
+ * ```tsx
+ * <CrossSectionAnalysisContent />
+ * ```
  */
-export interface SchroedingerCrossSectionSectionProps {
-  defaultOpen?: boolean
-}
-
-export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionSectionProps> =
-  React.memo(({ defaultOpen = true }) => {
-    const objectType = useGeometryStore((state) => state.objectType)
+export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
     const dimension = useGeometryStore((state) => state.dimension)
     const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
       config: state.schroedinger,
@@ -120,20 +120,6 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
       setSqLayerSqueezeTheta,
     } = useExtendedObjectStore(extendedObjectSelector)
 
-    if (objectType !== 'schroedinger') {
-      return null
-    }
-    // Free scalar field: cross-section calls evalPsi() (HO, not the actual scalar field),
-    // and radial probability + SQ are already hidden for non-HO/hydrogen modes.
-    if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') {
-      const reason = dimension <= 2
-        ? 'Requires 3D or higher'
-        : config.representation === 'wigner'
-          ? 'Not available in Wigner representation'
-          : 'Available in Harmonic Oscillator and Hydrogen modes'
-      return <UnavailableSection title="Cross Section" reason={reason} />
-    }
-
     const crossSectionNormal = config.crossSectionPlaneNormal ?? [0, 0, 1]
 
     const isHarmonicOscillatorMode = config.quantumMode === 'harmonicOscillator'
@@ -152,11 +138,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
     }
 
     return (
-      <Section
-        title="Cross Section"
-        defaultOpen={defaultOpen}
-        data-testid="cross-section-slice-section"
-      >
+      <>
         {/* Slice Plane */}
         <ControlGroup
           title="Slice Plane"
@@ -291,7 +273,7 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
               <Switch
                 label="Auto Window"
                 checked={config.crossSectionAutoWindow ?? true}
-                onChange={() => setCrossSectionAutoWindow(!(config.crossSectionAutoWindow ?? true))}
+                onCheckedChange={(checked) => setCrossSectionAutoWindow(checked)}
                 data-testid="schroedinger-cross-section-auto-window-toggle"
               />
 
@@ -376,8 +358,8 @@ export const SchroedingerCrossSectionSection: React.FC<SchroedingerCrossSectionS
         {isHarmonicOscillatorMode && (
           <SecondQuantizationSection config={config} dimension={dimension} actions={sqActions} />
         )}
-      </Section>
+      </>
     )
   })
 
-SchroedingerCrossSectionSection.displayName = 'SchroedingerCrossSectionSection'
+CrossSectionAnalysisContent.displayName = 'CrossSectionAnalysisContent'

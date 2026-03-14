@@ -1,26 +1,22 @@
 /**
- * TDSE Analysis Section
+ * TDSE Analysis Content
  *
- * Right-editor section for tdseDynamics mode. Contains:
+ * Content component for tdseDynamics mode analysis. Contains:
  * - Diagnostics enable toggle + interval slider
  * - Inline energy diagram (V(x) plot with kinetic energy level)
  * - Live R/T coefficients and norm readout
  *
- * Mirrors the Analysis section pattern used by harmonicOscillator
- * (SchroedingerCrossSectionSection).
+ * Used inside the unified AnalysisSection.
  *
  * @module components/sections/Advanced/TDSEAnalysisSection
  */
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Section } from '@/components/sections/Section'
-import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
 import {
   samplePotentialProfile,
@@ -37,86 +33,62 @@ const PLOT_W = WIDTH - 2 * PADDING_X
 const PLOT_H = HEIGHT - 2 * PADDING_Y
 
 /**
- * Props for TDSEAnalysisSection.
+ * Analysis content for tdseDynamics mode.
+ * Renders diagnostics controls and inline energy diagram.
  *
- * @param defaultOpen - Whether the section starts expanded
- */
-export interface TDSEAnalysisSectionProps {
-  defaultOpen?: boolean
-}
-
-/**
- * Analysis section shown in the right editor panel when quantumMode === 'tdseDynamics'.
- *
- * @param props - Component props
- * @returns The analysis section or null when not in TDSE mode
+ * @returns Diagnostics controls and energy diagram
  *
  * @example
  * ```tsx
- * <TDSEAnalysisSection defaultOpen={true} />
+ * <TDSEAnalysisContent />
  * ```
  */
-export const TDSEAnalysisSection: React.FC<TDSEAnalysisSectionProps> = React.memo(
-  ({ defaultOpen = true }) => {
-    const objectType = useGeometryStore((s) => s.objectType)
-    const { tdse, quantumMode, setDiagnosticsEnabled, setDiagnosticsInterval } =
-      useExtendedObjectStore(
-        useShallow((s) => ({
-          tdse: s.schroedinger.tdse,
-          quantumMode: s.schroedinger.quantumMode,
-          setDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
-          setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
-        })),
-      )
-
-    if (objectType !== 'schroedinger') return null
-    if (quantumMode !== 'tdseDynamics') {
-      const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
-      if (!isComputeMode) return null
-      return <UnavailableSection title="TDSE Analysis" reason="Switch to TDSE Dynamics mode" />
-    }
-
-    return (
-      <Section
-        title="TDSE Analysis"
-        defaultOpen={defaultOpen}
-        data-testid="tdse-analysis-section"
-      >
-        {/* Diagnostics toggle + interval */}
-        <ControlGroup
-          title="Diagnostics"
-          collapsible
-          defaultOpen
-          rightElement={
-            <Switch
-              checked={tdse.diagnosticsEnabled}
-              onCheckedChange={setDiagnosticsEnabled}
-              data-testid="tdse-diagnostics-enabled"
-            />
-          }
-        >
-          {tdse.diagnosticsEnabled && (
-            <Slider
-              label="Interval (frames)"
-              min={1}
-              max={60}
-              step={1}
-              value={tdse.diagnosticsInterval}
-              onChange={setDiagnosticsInterval}
-              showValue
-              data-testid="tdse-diagnostics-interval"
-            />
-          )}
-        </ControlGroup>
-
-        {/* Inline energy diagram */}
-        {tdse.diagnosticsEnabled && <EnergyDiagramInline tdse={tdse} />}
-      </Section>
+export const TDSEAnalysisContent: React.FC = React.memo(() => {
+  const { tdse, setDiagnosticsEnabled, setDiagnosticsInterval } =
+    useExtendedObjectStore(
+      useShallow((s) => ({
+        tdse: s.schroedinger.tdse,
+        setDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
+        setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
+      })),
     )
-  },
-)
 
-TDSEAnalysisSection.displayName = 'TDSEAnalysisSection'
+  return (
+    <>
+      {/* Diagnostics toggle + interval */}
+      <ControlGroup
+        title="Diagnostics"
+        collapsible
+        defaultOpen
+        rightElement={
+          <Switch
+            checked={tdse.diagnosticsEnabled}
+            onCheckedChange={setDiagnosticsEnabled}
+            data-testid="tdse-diagnostics-enabled"
+          />
+        }
+      >
+        {tdse.diagnosticsEnabled && (
+          <Slider
+            label="Interval (frames)"
+            min={1}
+            max={60}
+            step={1}
+            value={tdse.diagnosticsInterval}
+            onChange={setDiagnosticsInterval}
+            showValue
+            data-testid="tdse-diagnostics-interval"
+          />
+        )}
+      </ControlGroup>
+
+      {/* Inline energy diagram */}
+      {tdse.diagnosticsEnabled && <EnergyDiagramInline tdse={tdse} />}
+    </>
+  )
+})
+
+TDSEAnalysisContent.displayName = 'TDSEAnalysisContent'
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Inline energy diagram (was EnergyDiagramHUD portal overlay)  */

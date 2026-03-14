@@ -1,109 +1,84 @@
 /**
- * Dirac Analysis Section
+ * Dirac Analysis Content
  *
- * Right-editor section for diracEquation mode. Displays:
+ * Content component for diracEquation mode analysis. Displays:
  * - Diagnostics toggle + interval
  * - Live Dirac observables (upper/lower spinor fractions, norm, drift)
  * - Characteristic scales (Compton wavelength, ZBW frequency, Klein threshold)
+ *
+ * Used inside the unified AnalysisSection.
  *
  * @module components/sections/Advanced/DiracAnalysisSection
  */
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Section } from '@/components/sections/Section'
-import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
 
 /**
- * Props for DiracAnalysisSection.
+ * Analysis content for diracEquation mode.
+ * Renders diagnostics controls, dispersion diagram, and observables.
  *
- * @param defaultOpen - Whether the section starts expanded
- */
-export interface DiracAnalysisSectionProps {
-  defaultOpen?: boolean
-}
-
-/**
- * Analysis section shown in the right editor panel when quantumMode === 'diracEquation'.
- *
- * @param props - Component props
- * @returns The analysis section or null when not in Dirac mode
+ * @returns Diagnostics controls, E(k) diagram, and Dirac observables
  *
  * @example
  * ```tsx
- * <DiracAnalysisSection defaultOpen={true} />
+ * <DiracAnalysisContent />
  * ```
  */
-export const DiracAnalysisSection: React.FC<DiracAnalysisSectionProps> = React.memo(
-  ({ defaultOpen = true }) => {
-    const objectType = useGeometryStore((s) => s.objectType)
-    const { dirac, quantumMode, setDiagnosticsEnabled, setDiagnosticsInterval } =
-      useExtendedObjectStore(
-        useShallow((s) => ({
-          dirac: s.schroedinger.dirac,
-          quantumMode: s.schroedinger.quantumMode,
-          setDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
-          setDiagnosticsInterval: s.setDiracDiagnosticsInterval,
-        })),
-      )
-
-    if (objectType !== 'schroedinger') return null
-    if (quantumMode !== 'diracEquation') {
-      const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics'
-      if (!isComputeMode) return null
-      return <UnavailableSection title="Dirac Analysis" reason="Switch to Dirac Equation mode" />
-    }
-
-    return (
-      <Section
-        title="Dirac Analysis"
-        defaultOpen={defaultOpen}
-        data-testid="dirac-analysis-section"
-      >
-        {/* Diagnostics toggle + interval */}
-        <ControlGroup
-          title="Diagnostics"
-          collapsible
-          defaultOpen
-          rightElement={
-            <Switch
-              checked={dirac.diagnosticsEnabled}
-              onCheckedChange={setDiagnosticsEnabled}
-              data-testid="dirac-diagnostics-enabled"
-            />
-          }
-        >
-          {dirac.diagnosticsEnabled && (
-            <Slider
-              label="Interval (frames)"
-              min={1}
-              max={60}
-              step={1}
-              value={dirac.diagnosticsInterval}
-              onChange={setDiagnosticsInterval}
-              showValue
-              data-testid="dirac-diagnostics-interval"
-            />
-          )}
-        </ControlGroup>
-
-        {/* E(k) dispersion diagram */}
-        <DiracDispersionDiagram mass={dirac.mass} speedOfLight={dirac.speedOfLight} />
-
-        {/* Diagnostics readout */}
-        {dirac.diagnosticsEnabled && <DiracDiagnosticsInline />}
-      </Section>
+export const DiracAnalysisContent: React.FC = React.memo(() => {
+  const { dirac, setDiagnosticsEnabled, setDiagnosticsInterval } =
+    useExtendedObjectStore(
+      useShallow((s) => ({
+        dirac: s.schroedinger.dirac,
+        setDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
+        setDiagnosticsInterval: s.setDiracDiagnosticsInterval,
+      })),
     )
-  },
-)
 
-DiracAnalysisSection.displayName = 'DiracAnalysisSection'
+  return (
+    <>
+      {/* Diagnostics toggle + interval */}
+      <ControlGroup
+        title="Diagnostics"
+        collapsible
+        defaultOpen
+        rightElement={
+          <Switch
+            checked={dirac.diagnosticsEnabled}
+            onCheckedChange={setDiagnosticsEnabled}
+            data-testid="dirac-diagnostics-enabled"
+          />
+        }
+      >
+        {dirac.diagnosticsEnabled && (
+          <Slider
+            label="Interval (frames)"
+            min={1}
+            max={60}
+            step={1}
+            value={dirac.diagnosticsInterval}
+            onChange={setDiagnosticsInterval}
+            showValue
+            data-testid="dirac-diagnostics-interval"
+          />
+        )}
+      </ControlGroup>
+
+      {/* E(k) dispersion diagram */}
+      <DiracDispersionDiagram mass={dirac.mass} speedOfLight={dirac.speedOfLight} />
+
+      {/* Diagnostics readout */}
+      {dirac.diagnosticsEnabled && <DiracDiagnosticsInline />}
+    </>
+  )
+})
+
+DiracAnalysisContent.displayName = 'DiracAnalysisContent'
 
 /* ────────────────────────────────────────────────────────────── */
 /*  E(k) dispersion diagram                                       */

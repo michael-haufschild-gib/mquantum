@@ -133,6 +133,12 @@ export const TRANSIENT_FIELDS = new Set([
   'sqLayerCoherentAlphaIm',
   'sqLayerSqueezeR',
   'sqLayerSqueezeTheta',
+
+  // N-D basis vectors — runtime-computed by the renderer, not user-configurable scene state
+  'basisX',
+  'basisY',
+  'basisZ',
+  'origin',
 ])
 
 function warnDroppedNonFinitePresetValue(path: string, value: number): void {

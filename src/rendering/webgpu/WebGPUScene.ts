@@ -43,6 +43,8 @@ import { PaperTexturePass } from './passes/PaperTexturePass'
 import { FrameBlendingPass } from './passes/FrameBlendingPass'
 // CinematicPass merged into ToneMappingCinematicPass
 import { BufferPreviewPass } from './passes/BufferPreviewPass'
+import { LightGizmoPass } from './passes/LightGizmoPass'
+import { DebugOverlayPass } from './passes/DebugOverlayPass'
 import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
 import { parseHexColorToLinearRgb } from './utils/color'
 import { evaluateFpsLimit } from './utils/fpsLimiter'
@@ -84,9 +86,340 @@ import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
 // Rotation hooks for Schroedinger basis vectors
 import { useRotationUpdates } from '@/rendering/renderers/base'
 
+// Light direction utilities for gizmo interaction
+import {
+  rotationToDirection,
+  directionToRotation,
+} from '@/rendering/lights/types'
+import {
+  calculateGroundIntersection,
+  calculateSphereGroundIntersection,
+} from './passes/gizmoGeometry'
+
 // Animation bias
 import { getRotationPlanes } from '@/lib/math/rotation'
 import { getPlaneMultiplier } from '@/lib/animation/biasCalculation'
+
+// ============================================================================
+// Gizmo Click-to-Select Math Utilities
+// ============================================================================
+
+/**
+ * Multiply two column-major 4x4 matrices.
+ */
+function multiplyMat4(a: Float32Array, b: Float32Array): Float32Array {
+  const r = new Float32Array(16)
+  for (let col = 0; col < 4; col++) {
+    for (let row = 0; row < 4; row++) {
+      let sum = 0
+      for (let k = 0; k < 4; k++) {
+        sum += (a[row + k * 4] ?? 0) * (b[k + col * 4] ?? 0)
+      }
+      r[row + col * 4] = sum
+    }
+  }
+  return r
+}
+
+/**
+ * Invert a column-major 4x4 matrix. Returns null if singular.
+ */
+function invertMat4(m: Float32Array): Float32Array | null {
+  const inv = new Float32Array(16)
+  const m0 = m[0]!, m1 = m[1]!, m2 = m[2]!, m3 = m[3]!
+  const m4 = m[4]!, m5 = m[5]!, m6 = m[6]!, m7 = m[7]!
+  const m8 = m[8]!, m9 = m[9]!, m10 = m[10]!, m11 = m[11]!
+  const m12 = m[12]!, m13 = m[13]!, m14 = m[14]!, m15 = m[15]!
+
+  inv[0] = m5*m10*m15 - m5*m11*m14 - m9*m6*m15 + m9*m7*m14 + m13*m6*m11 - m13*m7*m10
+  inv[4] = -m4*m10*m15 + m4*m11*m14 + m8*m6*m15 - m8*m7*m14 - m12*m6*m11 + m12*m7*m10
+  inv[8] = m4*m9*m15 - m4*m11*m13 - m8*m5*m15 + m8*m7*m13 + m12*m5*m11 - m12*m7*m9
+  inv[12] = -m4*m9*m14 + m4*m10*m13 + m8*m5*m14 - m8*m6*m13 - m12*m5*m10 + m12*m6*m9
+  inv[1] = -m1*m10*m15 + m1*m11*m14 + m9*m2*m15 - m9*m3*m14 - m13*m2*m11 + m13*m3*m10
+  inv[5] = m0*m10*m15 - m0*m11*m14 - m8*m2*m15 + m8*m3*m14 + m12*m2*m11 - m12*m3*m10
+  inv[9] = -m0*m9*m15 + m0*m11*m13 + m8*m1*m15 - m8*m3*m13 - m12*m1*m11 + m12*m3*m9
+  inv[13] = m0*m9*m14 - m0*m10*m13 - m8*m1*m14 + m8*m2*m13 + m12*m1*m10 - m12*m2*m9
+  inv[2] = m1*m6*m15 - m1*m7*m14 - m5*m2*m15 + m5*m3*m14 + m13*m2*m7 - m13*m3*m6
+  inv[6] = -m0*m6*m15 + m0*m7*m14 + m4*m2*m15 - m4*m3*m14 - m12*m2*m7 + m12*m3*m6
+  inv[10] = m0*m5*m15 - m0*m7*m13 - m4*m1*m15 + m4*m3*m13 + m12*m1*m7 - m12*m3*m5
+  inv[14] = -m0*m5*m14 + m0*m6*m13 + m4*m1*m14 - m4*m2*m13 - m12*m1*m6 + m12*m2*m5
+  inv[3] = -m1*m6*m11 + m1*m7*m10 + m5*m2*m11 - m5*m3*m10 - m9*m2*m7 + m9*m3*m6
+  inv[7] = m0*m6*m11 - m0*m7*m10 - m4*m2*m11 + m4*m3*m10 + m8*m2*m7 - m8*m3*m6
+  inv[11] = -m0*m5*m11 + m0*m7*m9 + m4*m1*m11 - m4*m3*m9 - m8*m1*m7 + m8*m3*m5
+  inv[15] = m0*m5*m10 - m0*m6*m9 - m4*m1*m10 + m4*m2*m9 + m8*m1*m6 - m8*m2*m5
+
+  const det = m0 * inv[0]! + m1 * inv[4]! + m2 * inv[8]! + m3 * inv[12]!
+  if (Math.abs(det) < 1e-10) return null
+
+  const invDet = 1.0 / det
+  const result = new Float32Array(16)
+  for (let i = 0; i < 16; i++) result[i] = inv[i]! * invDet
+  return result
+}
+
+/**
+ * Transform a 3D point by a column-major 4x4 matrix (perspective divide).
+ */
+function transformPoint(m: Float32Array, p: [number, number, number]): [number, number, number] {
+  const x = m[0]!*p[0] + m[4]!*p[1] + m[8]!*p[2] + m[12]!
+  const y = m[1]!*p[0] + m[5]!*p[1] + m[9]!*p[2] + m[13]!
+  const z = m[2]!*p[0] + m[6]!*p[1] + m[10]!*p[2] + m[14]!
+  const w = m[3]!*p[0] + m[7]!*p[1] + m[11]!*p[2] + m[15]!
+  const invW = w !== 0 ? 1 / w : 1
+  return [x * invW, y * invW, z * invW]
+}
+
+// ============================================================================
+// Gizmo Interaction Helpers
+// ============================================================================
+
+/** Gizmo scale formula (matches LightGizmoPass) */
+const GIZMO_BASE_SIZE = 0.3
+function gizmoScale(lightPos: [number, number, number], camPos: [number, number, number]): number {
+  const dx = lightPos[0] - camPos[0]
+  const dy = lightPos[1] - camPos[1]
+  const dz = lightPos[2] - camPos[2]
+  return Math.max(0.1, Math.min(2.0, Math.sqrt(dx * dx + dy * dy + dz * dz) * 0.1)) * GIZMO_BASE_SIZE
+}
+
+/** Translate gizmo shaft length (matches generateTranslateGizmo default) */
+const TRANSLATE_SHAFT = 3.0
+/** Rotate gizmo ring radius (matches generateRotateGizmo default) */
+const ROTATE_RING_RADIUS = 2.5
+/** Hit threshold in world units (before scaling) */
+const AXIS_HIT_THRESHOLD = 0.4
+/** Ground target hit radius */
+const GROUND_TARGET_RADIUS = 0.5
+
+type GizmoDragKind =
+  | 'translate-x' | 'translate-y' | 'translate-z'
+  | 'rotate-x' | 'rotate-y' | 'rotate-z'
+  | 'ground-target'
+
+interface GizmoDragState {
+  kind: GizmoDragKind
+  lightId: string
+  startLightPos: [number, number, number]
+  startLightRot: [number, number, number]
+  /** For translate: initial parameter along grabbed axis */
+  startAxisT: number
+  /** For rotate: initial angle on the ring */
+  startAngle: number
+  /** For ground-target: initial ground intersection pos */
+  startGroundPos: [number, number, number]
+  /** Light type, needed for ground target behavior */
+  lightType: 'point' | 'directional' | 'spot'
+}
+
+/**
+ * Compute a world-space mouse ray from screen coordinates.
+ */
+function computeMouseRay(
+  clientX: number,
+  clientY: number,
+  rect: DOMRect,
+  matrices: {
+    projectionMatrix: Float32Array
+    viewMatrix: Float32Array
+    cameraPosition: { x: number; y: number; z: number }
+  }
+): { origin: [number, number, number]; dir: [number, number, number] } | null {
+  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
+  const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
+
+  const invVP = invertMat4(multiplyMat4(matrices.projectionMatrix, matrices.viewMatrix))
+  if (!invVP) return null
+
+  // WebGPU clip z is [0, 1] (not [-1, 1] like OpenGL)
+  const near = transformPoint(invVP, [ndcX, ndcY, 0])
+  const far = transformPoint(invVP, [ndcX, ndcY, 1])
+
+  const dx = far[0] - near[0]
+  const dy = far[1] - near[1]
+  const dz = far[2] - near[2]
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz)
+  if (len < 0.0001) return null
+
+  const cp = matrices.cameraPosition
+  return {
+    origin: [cp.x, cp.y, cp.z],
+    dir: [dx / len, dy / len, dz / len],
+  }
+}
+
+/**
+ * Find the closest parameter t on an axis line to a ray, and the minimum distance.
+ * Axis: P + t * A, Ray: O + s * D
+ * @returns [t, minDist]
+ */
+function rayAxisClosest(
+  rayO: [number, number, number],
+  rayD: [number, number, number],
+  axisP: [number, number, number],
+  axisA: [number, number, number]
+): [number, number] {
+  const wx = rayO[0] - axisP[0]
+  const wy = rayO[1] - axisP[1]
+  const wz = rayO[2] - axisP[2]
+
+  const a = rayD[0] * rayD[0] + rayD[1] * rayD[1] + rayD[2] * rayD[2]
+  const b = rayD[0] * axisA[0] + rayD[1] * axisA[1] + rayD[2] * axisA[2]
+  const c = axisA[0] * axisA[0] + axisA[1] * axisA[1] + axisA[2] * axisA[2]
+  const d = rayD[0] * wx + rayD[1] * wy + rayD[2] * wz
+  const e = axisA[0] * wx + axisA[1] * wy + axisA[2] * wz
+
+  const denom = a * c - b * b
+  if (Math.abs(denom) < 1e-10) return [0, Infinity]
+
+  const t = (a * e - b * d) / denom
+  const s = (b * e - c * d) / denom
+
+  // Closest point on axis: axisP + t * axisA
+  // Closest point on ray: rayO + s * rayD
+  const cpx = axisP[0] + t * axisA[0] - (rayO[0] + s * rayD[0])
+  const cpy = axisP[1] + t * axisA[1] - (rayO[1] + s * rayD[1])
+  const cpz = axisP[2] + t * axisA[2] - (rayO[2] + s * rayD[2])
+  const dist = Math.sqrt(cpx * cpx + cpy * cpy + cpz * cpz)
+
+  return [t, dist]
+}
+
+/**
+ * Intersect ray with a plane. Returns the intersection point or null.
+ * Plane defined by a normal and a point on the plane.
+ */
+function rayPlaneIntersect(
+  rayO: [number, number, number],
+  rayD: [number, number, number],
+  planeN: [number, number, number],
+  planeP: [number, number, number]
+): [number, number, number] | null {
+  const denom = planeN[0] * rayD[0] + planeN[1] * rayD[1] + planeN[2] * rayD[2]
+  if (Math.abs(denom) < 1e-10) return null
+
+  const px = planeP[0] - rayO[0]
+  const py = planeP[1] - rayO[1]
+  const pz = planeP[2] - rayO[2]
+  const t = (planeN[0] * px + planeN[1] * py + planeN[2] * pz) / denom
+  if (t < 0) return null
+
+  return [rayO[0] + t * rayD[0], rayO[1] + t * rayD[1], rayO[2] + t * rayD[2]]
+}
+
+/**
+ * Test if a mouse ray hits any transform gizmo axis or ring for the selected light.
+ * Returns the drag kind and initial parameters, or null if no hit.
+ */
+function testGizmoHit(
+  ray: { origin: [number, number, number]; dir: [number, number, number] },
+  lightPos: [number, number, number],
+  scale: number,
+  mode: 'translate' | 'rotate'
+): { kind: GizmoDragKind; axisT: number; angle: number } | null {
+  const axes: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+  const axisNames: GizmoDragKind[] =
+    mode === 'translate'
+      ? ['translate-x', 'translate-y', 'translate-z']
+      : ['rotate-x', 'rotate-y', 'rotate-z']
+
+  if (mode === 'translate') {
+    let bestDist = Infinity
+    let bestKind: GizmoDragKind | null = null
+    let bestT = 0
+
+    for (let i = 0; i < 3; i++) {
+      const [t, dist] = rayAxisClosest(ray.origin, ray.dir, lightPos, axes[i]!)
+      // Only hit if within the shaft length and close enough
+      if (t > 0 && t < TRANSLATE_SHAFT * scale && dist < AXIS_HIT_THRESHOLD * scale && dist < bestDist) {
+        bestDist = dist
+        bestKind = axisNames[i]!
+        bestT = t
+      }
+    }
+    if (bestKind) return { kind: bestKind, axisT: bestT, angle: 0 }
+  } else {
+    // Rotate mode: test ray against each ring's plane
+    const ringRadius = ROTATE_RING_RADIUS * scale
+    const tolerance = AXIS_HIT_THRESHOLD * scale
+    let bestDist = Infinity
+    let bestKind: GizmoDragKind | null = null
+    let bestAngle = 0
+
+    const normals: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+
+    for (let i = 0; i < 3; i++) {
+      const hit = rayPlaneIntersect(ray.origin, ray.dir, normals[i]!, lightPos)
+      if (!hit) continue
+
+      const dx = hit[0] - lightPos[0]
+      const dy = hit[1] - lightPos[1]
+      const dz = hit[2] - lightPos[2]
+      const distFromCenter = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+      const ringError = Math.abs(distFromCenter - ringRadius)
+      if (ringError < tolerance && ringError < bestDist) {
+        bestDist = ringError
+        bestKind = axisNames[i]!
+        // Compute angle on the ring
+        if (i === 0) bestAngle = Math.atan2(dz, dy) // X ring: YZ plane
+        else if (i === 1) bestAngle = Math.atan2(dx, dz) // Y ring: XZ plane
+        else bestAngle = Math.atan2(dy, dx) // Z ring: XY plane
+      }
+    }
+    if (bestKind) return { kind: bestKind, axisT: 0, angle: bestAngle }
+  }
+
+  return null
+}
+
+/**
+ * Test if a mouse ray hits any ground target.
+ * Returns the light ID if hit, null otherwise.
+ */
+function testGroundTargetHit(
+  ray: { origin: [number, number, number]; dir: [number, number, number] },
+  lights: Array<{ id: string; type: string; position: [number, number, number]; rotation: [number, number, number]; range: number }>
+): string | null {
+  // Intersect ray with ground plane
+  const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
+  if (!groundHit) return null
+
+  let closestDist = Infinity
+  let closestId: string | null = null
+
+  for (const light of lights) {
+    let targetX: number | undefined
+    let targetZ: number | undefined
+
+    if (light.type === 'spot' || light.type === 'directional') {
+      const dir = rotationToDirection(light.rotation as [number, number, number])
+      const gi = calculateGroundIntersection(light.position, dir)
+      if (gi) {
+        targetX = gi[0]
+        targetZ = gi[2]
+      }
+    } else if (light.type === 'point') {
+      const si = calculateSphereGroundIntersection(light.position, light.range)
+      if (si) {
+        targetX = si.center[0]
+        targetZ = si.center[2]
+      }
+    }
+
+    if (targetX === undefined || targetZ === undefined) continue
+
+    const dx = groundHit[0] - targetX
+    const dz = groundHit[2] - targetZ
+    const dist = Math.sqrt(dx * dx + dz * dz)
+
+    if (dist < GROUND_TARGET_RADIUS && dist < closestDist) {
+      closestDist = dist
+      closestId = light.id
+    }
+  }
+
+  return closestId
+}
 
 // ============================================================================
 // Types
@@ -368,6 +701,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   // Camera control state
   const isDraggingRef = useRef(false)
   const lastMouseRef = useRef({ x: 0, y: 0 })
+  const mouseDownPosRef = useRef({ x: 0, y: 0 })
+  const gizmoDragRef = useRef<GizmoDragState | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   // Dimension ref for mouse handlers (avoids stale closure over prop)
   const dimensionRef = useRef(dimension)
@@ -397,17 +732,253 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
   // Camera control handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    isDraggingRef.current = true
+    mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
     lastMouseRef.current = { x: e.clientX, y: e.clientY }
+
+    // Test gizmo hit before entering camera drag
+    if (cameraRef.current && overlayRef.current) {
+      const lighting = useLightingStore.getState()
+      if (lighting.showLightGizmos && lighting.lights.length) {
+        const rect = overlayRef.current.getBoundingClientRect()
+        const matrices = cameraRef.current.getMatrices()
+        const ray = computeMouseRay(e.clientX, e.clientY, rect, matrices)
+
+        if (ray) {
+          const cp = matrices.cameraPosition
+          const camPos: [number, number, number] = [cp.x, cp.y, cp.z]
+
+          // Test transform gizmo on selected light
+          if (lighting.selectedLightId) {
+            const selLight = lighting.lights.find((l) => l.id === lighting.selectedLightId)
+            if (selLight) {
+              const scale = gizmoScale(selLight.position, camPos)
+              const mode = lighting.transformMode || 'translate'
+              const hit = testGizmoHit(ray, selLight.position, scale, mode)
+
+              if (hit) {
+                gizmoDragRef.current = {
+                  kind: hit.kind,
+                  lightId: selLight.id,
+                  startLightPos: [...selLight.position],
+                  startLightRot: [...selLight.rotation],
+                  startAxisT: hit.axisT,
+                  startAngle: hit.angle,
+                  startGroundPos: [0, 0, 0],
+                  lightType: selLight.type,
+                }
+                lighting.setIsDraggingLight(true)
+                startInteraction()
+                return // Don't enter camera drag mode
+              }
+            }
+          }
+
+          // Test ground target hit
+          const groundHitId = testGroundTargetHit(ray, lighting.lights)
+          if (groundHitId) {
+            const hitLight = lighting.lights.find((l) => l.id === groundHitId)
+            if (hitLight) {
+              // Select the light if not already selected
+              if (lighting.selectedLightId !== groundHitId) {
+                lighting.selectLight(groundHitId)
+              }
+
+              // Compute initial ground intersection
+              const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
+
+              gizmoDragRef.current = {
+                kind: 'ground-target',
+                lightId: groundHitId,
+                startLightPos: [...hitLight.position],
+                startLightRot: [...hitLight.rotation],
+                startAxisT: 0,
+                startAngle: 0,
+                startGroundPos: groundHit ?? [0, 0, 0],
+                lightType: hitLight.type,
+              }
+              lighting.setIsDraggingLight(true)
+              startInteraction()
+              return // Don't enter camera drag mode
+            }
+          }
+        }
+      }
+    }
+
+    isDraggingRef.current = true
     startInteraction()
   }, [startInteraction])
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // End gizmo drag if active
+    if (gizmoDragRef.current) {
+      const wasGizmoClick =
+        Math.abs(e.clientX - mouseDownPosRef.current.x) < 5 &&
+        Math.abs(e.clientY - mouseDownPosRef.current.y) < 5
+
+      // If it was just a click on a ground target, select the light
+      if (wasGizmoClick && gizmoDragRef.current.kind === 'ground-target') {
+        useLightingStore.getState().selectLight(gizmoDragRef.current.lightId)
+      }
+
+      gizmoDragRef.current = null
+      useLightingStore.getState().setIsDraggingLight(false)
+      scheduleEndInteraction()
+      return
+    }
+
+    const wasClick =
+      Math.abs(e.clientX - mouseDownPosRef.current.x) < 5 &&
+      Math.abs(e.clientY - mouseDownPosRef.current.y) < 5
+
     isDraggingRef.current = false
     scheduleEndInteraction()
+
+    // Click-to-select light gizmo
+    if (wasClick && cameraRef.current && overlayRef.current) {
+      const lighting = useLightingStore.getState()
+      if (!lighting.showLightGizmos || !lighting.lights.length) return
+
+      const rect = overlayRef.current.getBoundingClientRect()
+      const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
+
+      const matrices = cameraRef.current.getMatrices()
+      const invVP = invertMat4(multiplyMat4(matrices.projectionMatrix, matrices.viewMatrix))
+      if (!invVP) return
+
+      // Unproject near and far points to world space (WebGPU clip z = [0, 1])
+      const nearWorld = transformPoint(invVP, [ndcX, ndcY, 0])
+      const farWorld = transformPoint(invVP, [ndcX, ndcY, 1])
+
+      const rayDir: [number, number, number] = [
+        farWorld[0] - nearWorld[0],
+        farWorld[1] - nearWorld[1],
+        farWorld[2] - nearWorld[2],
+      ]
+      const rayLen = Math.sqrt(rayDir[0] ** 2 + rayDir[1] ** 2 + rayDir[2] ** 2)
+      if (rayLen < 0.0001) return
+      rayDir[0] /= rayLen
+      rayDir[1] /= rayLen
+      rayDir[2] /= rayLen
+
+      const cp = matrices.cameraPosition
+      const camPosX = cp.x, camPosY = cp.y, camPosZ = cp.z
+
+      // Test ray-sphere intersection against each light
+      let closestDist = Infinity
+      let closestId: string | null = null
+      const hitRadius = 0.5 // World-space hit radius (generous for easy clicking)
+
+      for (const light of lighting.lights) {
+        const lp = light.position
+        // Vector from ray origin to sphere center
+        const ocX = lp[0] - camPosX
+        const ocY = lp[1] - camPosY
+        const ocZ = lp[2] - camPosZ
+        // Project onto ray direction
+        const tca = ocX * rayDir[0] + ocY * rayDir[1] + ocZ * rayDir[2]
+        if (tca < 0) continue // Behind camera
+        // Perpendicular distance squared
+        const ocLenSq = ocX ** 2 + ocY ** 2 + ocZ ** 2
+        const d2 = ocLenSq - tca * tca
+        // Scale hit radius by camera distance
+        const dist = Math.sqrt(ocLenSq)
+        const scaledRadius = Math.max(hitRadius, dist * 0.05)
+        if (d2 > scaledRadius * scaledRadius) continue // Miss
+        if (tca < closestDist) {
+          closestDist = tca
+          closestId = light.id
+        }
+      }
+
+      if (closestId) {
+        lighting.selectLight(closestId)
+      } else {
+        // Click on empty space deselects
+        lighting.selectLight(null)
+      }
+    }
   }, [scheduleEndInteraction])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    // Handle gizmo dragging
+    const drag = gizmoDragRef.current
+    if (drag && cameraRef.current && overlayRef.current) {
+      // Require minimum mouse movement before actually dragging (prevents accidental drags)
+      const movedX = Math.abs(e.clientX - mouseDownPosRef.current.x)
+      const movedY = Math.abs(e.clientY - mouseDownPosRef.current.y)
+      if (movedX < 3 && movedY < 3) return
+
+      const rect = overlayRef.current.getBoundingClientRect()
+      const matrices = cameraRef.current.getMatrices()
+      const ray = computeMouseRay(e.clientX, e.clientY, rect, matrices)
+      if (!ray) return
+
+      const lighting = useLightingStore.getState()
+      if (drag.kind.startsWith('translate-')) {
+        // Translate axis drag
+        const axisIdx = drag.kind === 'translate-x' ? 0 : drag.kind === 'translate-y' ? 1 : 2
+        const axisDir: [number, number, number] = [0, 0, 0]
+        axisDir[axisIdx] = 1
+
+        const [currentT] = rayAxisClosest(ray.origin, ray.dir, drag.startLightPos, axisDir)
+        const delta = currentT - drag.startAxisT
+
+        const newPos: [number, number, number] = [...drag.startLightPos]
+        newPos[axisIdx] += delta
+        lighting.updateLight(drag.lightId, { position: newPos })
+      } else if (drag.kind.startsWith('rotate-')) {
+        // Rotate ring drag
+        const axisIdx = drag.kind === 'rotate-x' ? 0 : drag.kind === 'rotate-y' ? 1 : 2
+        const normal: [number, number, number] = [0, 0, 0]
+        normal[axisIdx] = 1
+
+        const hit = rayPlaneIntersect(ray.origin, ray.dir, normal, drag.startLightPos)
+        if (hit) {
+          const dx = hit[0] - drag.startLightPos[0]
+          const dy = hit[1] - drag.startLightPos[1]
+          const dz = hit[2] - drag.startLightPos[2]
+
+          let currentAngle: number
+          if (axisIdx === 0) currentAngle = Math.atan2(dz, dy)
+          else if (axisIdx === 1) currentAngle = Math.atan2(dx, dz)
+          else currentAngle = Math.atan2(dy, dx)
+
+          // Normalize to [-PI, PI] to avoid discontinuity at atan2 boundary
+          const rawDelta = currentAngle - drag.startAngle
+          const deltaAngle = Math.atan2(Math.sin(rawDelta), Math.cos(rawDelta))
+
+          const newRot: [number, number, number] = [...drag.startLightRot]
+          newRot[axisIdx] += deltaAngle
+          lighting.updateLight(drag.lightId, { rotation: newRot })
+        }
+      } else if (drag.kind === 'ground-target') {
+        // Ground target drag
+        const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
+        if (!groundHit) return
+
+        if (drag.lightType === 'point') {
+          // Point light: update X,Z position, keep Y
+          lighting.updateLight(drag.lightId, {
+            position: [groundHit[0], drag.startLightPos[1], groundHit[2]],
+          })
+        } else {
+          // Spot/directional: compute direction from light to ground point, convert to rotation
+          const lp = drag.startLightPos
+          const dirX = groundHit[0] - lp[0]
+          const dirY = groundHit[1] - lp[1]
+          const dirZ = groundHit[2] - lp[2]
+          const dirLen = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ)
+          if (dirLen > 0.01) {
+            const newRot = directionToRotation([dirX / dirLen, dirY / dirLen, dirZ / dirLen])
+            lighting.updateLight(drag.lightId, { rotation: newRot })
+          }
+        }
+      }
+      return
+    }
+
     if (!isDraggingRef.current || !cameraRef.current) return
 
     const dx = e.clientX - lastMouseRef.current.x
@@ -508,13 +1079,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     parameterValues: schroedingerParamValues,
   })
 
-  // Cache for computed Schrodinger basis vectors - updated in render loop, read by store getter
+  // Cache for computed Schrodinger basis vectors and origin - updated in render loop, read by store getter
   // Using Float32Array to avoid creating new arrays every frame
   const schroedingerBasisCacheRef = useRef({
     basisX: new Float32Array(11), // MAX_DIM = 11
     basisY: new Float32Array(11),
     basisZ: new Float32Array(11),
+    origin: new Float32Array(11),
   })
+  // Pre-allocated work array for origin computation to avoid per-frame allocation
+  const originValuesWorkRef = useRef(new Array<number>(11).fill(0))
   const cameraStoreCacheRef = useRef({
     viewMatrix: { elements: new Float32Array(16) },
     projectionMatrix: { elements: new Float32Array(16) },
@@ -847,6 +1421,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
             basisX: schroedingerBasisCacheRef.current.basisX,
             basisY: schroedingerBasisCacheRef.current.basisY,
             basisZ: schroedingerBasisCacheRef.current.basisZ,
+            origin: schroedingerBasisCacheRef.current.origin,
           },
         }
       }
@@ -986,6 +1561,19 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           schroedingerBasisCacheRef.current.basisX.set(basisX)
           schroedingerBasisCacheRef.current.basisY.set(basisY)
           schroedingerBasisCacheRef.current.basisZ.set(basisZ)
+        }
+
+        // Compute rotated origin from parameterValues (extra-dimension slice positions)
+        // parameterValues[i] maps to dimension i+3 (dimensions 4+)
+        const paramValues = useExtendedObjectStore.getState().schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
+        const originValues = originValuesWorkRef.current
+        originValues.fill(0)
+        for (let i = 3; i < dimension; i++) {
+          originValues[i] = paramValues[i - 3] ?? 0
+        }
+        const { origin, changed: originChanged } = schroedingerRotation.getOrigin(originValues)
+        if (originChanged || changed) {
+          schroedingerBasisCacheRef.current.origin.set(origin)
         }
       }
     },
@@ -2394,6 +2982,27 @@ async function setupPPPasses(
       depthMode: 'linear',
     }),
     'buffer-preview',
+    shouldAbort
+  )
+
+  // 12. Light gizmos → debug overlay (renders after all post-processing)
+  graph.addResource('gizmo-texture', {
+    type: 'texture',
+    format: 'rgba8unorm',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+  })
+
+  await safeAddPass(
+    graph,
+    new LightGizmoPass({ outputResource: 'gizmo-texture' }),
+    'light-gizmo',
+    shouldAbort
+  )
+
+  await safeAddPass(
+    graph,
+    new DebugOverlayPass({ debugInput: 'gizmo-texture' }),
+    'debug-overlay',
     shouldAbort
   )
 }

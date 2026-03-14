@@ -49,6 +49,9 @@ export type { BufferPreviewPassConfig, BufferPreviewStoreConfig, BufferType, Dep
 export { DebugOverlayPass } from './DebugOverlayPass'
 export type { DebugOverlayPassConfig } from './DebugOverlayPass'
 
+export { LightGizmoPass } from './LightGizmoPass'
+export type { LightGizmoPassConfig } from './LightGizmoPass'
+
 export { CubemapCapturePass } from './CubemapCapturePass'
 export type { CubemapCapturePassConfig } from './CubemapCapturePass'
 

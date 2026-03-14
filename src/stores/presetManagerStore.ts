@@ -13,8 +13,13 @@ import {
 } from '@/rendering/lights/types'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { MAX_SPEED, MIN_SPEED, useAnimationStore } from './animationStore'
+import { DEFAULT_SPEED, MAX_SPEED, MIN_SPEED, useAnimationStore } from './animationStore'
 import { useAppearanceStore } from './appearanceStore'
+import { APPEARANCE_INITIAL_STATE } from './slices/appearanceSlice'
+import { LIGHTING_INITIAL_STATE } from './slices/lightingSlice'
+import { POST_PROCESSING_INITIAL_STATE } from './slices/postProcessingSlice'
+import { SKYBOX_INITIAL_STATE } from './slices/skyboxSlice'
+import { PBR_INITIAL_STATE } from './slices/visual/pbrSlice'
 import { useCameraStore } from './cameraStore'
 import { DIALOG_IDS } from './dismissedDialogsStore'
 import { useEnvironmentStore } from './environmentStore'
@@ -1313,28 +1318,34 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         // Signal scene transition start
         usePerformanceStore.getState().setSceneTransitioning(true)
 
-        // Restore states with transient fields stripped
-        // This ensures legacy presets with version fields don't corrupt current counters
-        useAppearanceStore.setState(
-          normalizeAppearanceLoadData(sanitizeLoadedState(style.data.appearance))
-        )
-        useLightingStore.setState(normalizeLightingLoadData(sanitizeLoadedState(style.data.lighting)))
-        usePostProcessingStore.setState(
-          normalizePostProcessingLoadData(sanitizeLoadedState(style.data.postProcessing))
-        )
+        // Restore states: spread defaults first, then override with loaded data.
+        // This ensures fields missing from older presets reset to defaults instead
+        // of retaining whatever the current store value happens to be.
+        useAppearanceStore.setState({
+          ...APPEARANCE_INITIAL_STATE,
+          ...normalizeAppearanceLoadData(sanitizeLoadedState(style.data.appearance)),
+        })
+        useLightingStore.setState({
+          ...LIGHTING_INITIAL_STATE,
+          ...normalizeLightingLoadData(sanitizeLoadedState(style.data.lighting)),
+        })
+        usePostProcessingStore.setState({
+          ...POST_PROCESSING_INITIAL_STATE,
+          ...normalizePostProcessingLoadData(sanitizeLoadedState(style.data.postProcessing)),
+        })
 
         // Handle legacy environment data and keep unified skybox fields canonical.
         const envData = normalizeEnvironmentLoadData(
           sanitizeLoadedState({ ...style.data.environment })
         )
-        useEnvironmentStore.setState(envData)
+        useEnvironmentStore.setState({ ...SKYBOX_INITIAL_STATE, ...envData })
 
         // Restore PBR settings (legacy imports without pbr should reset to defaults)
         const stylePbrData = style.data.pbr
           ? sanitizeLoadedState(style.data.pbr)
           : ({} as Record<string, unknown>)
         if (Object.keys(stylePbrData).length > 0) {
-          usePBRStore.setState(normalizePbrLoadData(stylePbrData))
+          usePBRStore.setState({ ...PBR_INITIAL_STATE, ...normalizePbrLoadData(stylePbrData) })
         } else {
           usePBRStore.getState().resetPBR()
         }
@@ -1526,28 +1537,34 @@ export const usePresetManagerStore = create<PresetManagerState>()(
         usePerformanceStore.getState().setIsLoadingScene(true)
         usePerformanceStore.getState().setSceneTransitioning(true)
 
-        // Restore Style components with transient fields stripped
-        // This ensures legacy presets with version fields don't corrupt current counters
-        useAppearanceStore.setState(
-          normalizeAppearanceLoadData(sanitizeLoadedState(scene.data.appearance))
-        )
-        useLightingStore.setState(normalizeLightingLoadData(sanitizeLoadedState(scene.data.lighting)))
-        usePostProcessingStore.setState(
-          normalizePostProcessingLoadData(sanitizeLoadedState(scene.data.postProcessing))
-        )
+        // Restore style components: spread defaults first, then override with loaded data.
+        // This ensures fields missing from older presets reset to defaults instead
+        // of retaining whatever the current store value happens to be.
+        useAppearanceStore.setState({
+          ...APPEARANCE_INITIAL_STATE,
+          ...normalizeAppearanceLoadData(sanitizeLoadedState(scene.data.appearance)),
+        })
+        useLightingStore.setState({
+          ...LIGHTING_INITIAL_STATE,
+          ...normalizeLightingLoadData(sanitizeLoadedState(scene.data.lighting)),
+        })
+        usePostProcessingStore.setState({
+          ...POST_PROCESSING_INITIAL_STATE,
+          ...normalizePostProcessingLoadData(sanitizeLoadedState(scene.data.postProcessing)),
+        })
 
         // Handle legacy environment data and keep unified skybox fields canonical.
         const envData = normalizeEnvironmentLoadData(
           sanitizeLoadedState({ ...scene.data.environment })
         )
-        useEnvironmentStore.setState(envData)
+        useEnvironmentStore.setState({ ...SKYBOX_INITIAL_STATE, ...envData })
 
         // Restore PBR settings (legacy imports without pbr should reset to defaults)
         const scenePbrData = scene.data.pbr
           ? sanitizeLoadedState(scene.data.pbr)
           : ({} as Record<string, unknown>)
         if (Object.keys(scenePbrData).length > 0) {
-          usePBRStore.setState(normalizePbrLoadData(scenePbrData))
+          usePBRStore.setState({ ...PBR_INITIAL_STATE, ...normalizePbrLoadData(scenePbrData) })
         } else {
           usePBRStore.getState().resetPBR()
         }
@@ -1652,7 +1669,16 @@ export const usePresetManagerStore = create<PresetManagerState>()(
           if (Array.isArray(animState.animatingPlanes)) {
             animState.animatingPlanes = new Set(animState.animatingPlanes)
           }
-          useAnimationStore.setState(animState)
+          // Spread animation defaults first so missing/stripped fields reset to
+          // defaults instead of retaining the current store value.
+          useAnimationStore.setState({
+            isPlaying: true,
+            speed: DEFAULT_SPEED,
+            direction: 1 as const,
+            animatingPlanes: new Set(['XY', 'YZ', 'XZ']),
+            accumulatedTime: 0,
+            ...animState,
+          })
           // Enforce dimension-dependent plane validity after direct hydration.
           useAnimationStore.getState().setDimension(useGeometryStore.getState().dimension)
         }

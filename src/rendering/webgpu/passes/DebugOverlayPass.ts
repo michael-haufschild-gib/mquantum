@@ -114,6 +114,10 @@ export class DebugOverlayPass extends WebGPUBasePass {
         ? [{ resourceId: config.debugInput, access: 'read' as const, binding: 0 }]
         : [],
       outputs: [], // Renders directly to canvas (no render target output)
+      enabled: (frame) => {
+        const lighting = frame?.stores?.['lighting'] as { showLightGizmos?: boolean } | undefined
+        return lighting?.showLightGizmos === true
+      },
     })
 
     this.passConfig = config

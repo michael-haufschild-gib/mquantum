@@ -2505,7 +2505,6 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const sliceAnimationEnabled = schroedinger?.sliceAnimationEnabled ?? false
     const sliceSpeed = schroedinger?.sliceSpeed ?? 0.02
     const sliceAmplitude = schroedinger?.sliceAmplitude ?? 0.3
-    const parameterValues = schroedinger?.parameterValues as number[] | undefined
     const requiresTimeDrivenBasis = sliceAnimationEnabled && dimension > 3
     const basisStaticInputsUnchanged =
       rotationVersion === this.lastBasisRotationVersion &&
@@ -2556,19 +2555,21 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // Origin with slice animation support (4D+ only)
-    // Like WebGL SchroedingerMesh.tsx lines 947-965
+    // Origin: the rotated N-D origin point (parameterValues mapped to dims 3+ and rotated)
+    // is provided via the store merge from WebGPUScene's render loop (getOrigin).
+    // Slice animation adds a time-varying offset on top.
     const PHI = 1.618033988749895 // Golden ratio for phase offsets
     const originOffset = STRIDE * 3
 
-    if (sliceAnimationEnabled && dimension > 3) {
-      // Apply slice animation to dimensions >= 3
-      // First 3 dimensions (x, y, z) stay at 0
-      for (let i = 0; i < 3; i++) {
-        basisData[originOffset + i] = origin?.[i] ?? 0
+    // Copy rotated origin from store (populated by getOrigin in render loop)
+    if (origin) {
+      for (let i = 0; i < Math.min(origin.length, MAX_DIM); i++) {
+        basisData[originOffset + i] = origin[i] ?? 0
       }
+    }
 
-      // Animate extra dimensions (4D+)
+    // Slice animation: add time-varying offset to extra dimensions (4D+)
+    if (sliceAnimationEnabled && dimension > 3) {
       for (let i = 3; i < Math.min(dimension, MAX_DIM); i++) {
         const extraDimIndex = i - 3
         const phase = extraDimIndex * PHI
@@ -2579,15 +2580,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
         // Combined offset with weighted sine waves
         const offset = sliceAmplitude * (0.7 * Math.sin(t1) + 0.3 * Math.sin(t2))
-
-        // Base value from parameter values (or 0 if not available)
-        const baseValue = parameterValues?.[extraDimIndex] ?? 0
-        basisData[originOffset + i] = baseValue + offset
-      }
-    } else if (origin) {
-      // No slice animation - use stored origin values directly
-      for (let i = 0; i < Math.min(origin.length, MAX_DIM); i++) {
-        basisData[originOffset + i] = origin[i] ?? 0
+        basisData[originOffset + i] = (basisData[originOffset + i] ?? 0) + offset
       }
     }
 

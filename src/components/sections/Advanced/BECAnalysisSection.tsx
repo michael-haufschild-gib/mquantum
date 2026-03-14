@@ -1,23 +1,22 @@
 /**
- * BEC Analysis Section
+ * BEC Analysis Content
  *
- * Right-editor section for becDynamics mode. Displays:
+ * Content component for becDynamics mode analysis. Displays:
  * - Diagnostics toggle + interval
  * - Live BEC observables (μ, ξ, c_s, R_TF, norm drift)
  * - Inline energy diagram (harmonic trap V(x) with chemical potential level)
+ *
+ * Used inside the unified AnalysisSection.
  *
  * @module components/sections/Advanced/BECAnalysisSection
  */
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { Section } from '@/components/sections/Section'
-import { UnavailableSection } from '@/components/sections/UnavailableSection'
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
-import { useGeometryStore } from '@/stores/geometryStore'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 
 /* ── SVG layout constants ── */
@@ -29,86 +28,62 @@ const PLOT_W = WIDTH - 2 * PADDING_X
 const PLOT_H = HEIGHT - 2 * PADDING_Y
 
 /**
- * Props for BECAnalysisSection.
+ * Analysis content for becDynamics mode.
+ * Renders diagnostics controls and inline trap diagram.
  *
- * @param defaultOpen - Whether the section starts expanded
- */
-export interface BECAnalysisSectionProps {
-  defaultOpen?: boolean
-}
-
-/**
- * Analysis section shown in the right editor panel when quantumMode === 'becDynamics'.
- *
- * @param props - Component props
- * @returns The analysis section or null when not in BEC mode
+ * @returns Diagnostics controls and BEC observables display
  *
  * @example
  * ```tsx
- * <BECAnalysisSection defaultOpen={true} />
+ * <BECAnalysisContent />
  * ```
  */
-export const BECAnalysisSection: React.FC<BECAnalysisSectionProps> = React.memo(
-  ({ defaultOpen = true }) => {
-    const objectType = useGeometryStore((s) => s.objectType)
-    const { bec, quantumMode, setDiagnosticsEnabled, setDiagnosticsInterval } =
-      useExtendedObjectStore(
-        useShallow((s) => ({
-          bec: s.schroedinger.bec,
-          quantumMode: s.schroedinger.quantumMode,
-          setDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
-          setDiagnosticsInterval: s.setBecDiagnosticsInterval,
-        })),
-      )
-
-    if (objectType !== 'schroedinger') return null
-    if (quantumMode !== 'becDynamics') {
-      const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'diracEquation'
-      if (!isComputeMode) return null
-      return <UnavailableSection title="BEC Analysis" reason="Switch to BEC Dynamics mode" />
-    }
-
-    return (
-      <Section
-        title="BEC Analysis"
-        defaultOpen={defaultOpen}
-        data-testid="bec-analysis-section"
-      >
-        {/* Diagnostics toggle + interval */}
-        <ControlGroup
-          title="Diagnostics"
-          collapsible
-          defaultOpen
-          rightElement={
-            <Switch
-              checked={bec.diagnosticsEnabled}
-              onCheckedChange={setDiagnosticsEnabled}
-              data-testid="bec-diagnostics-enabled"
-            />
-          }
-        >
-          {bec.diagnosticsEnabled && (
-            <Slider
-              label="Interval (frames)"
-              min={1}
-              max={60}
-              step={1}
-              value={bec.diagnosticsInterval}
-              onChange={setDiagnosticsInterval}
-              showValue
-              data-testid="bec-diagnostics-interval"
-            />
-          )}
-        </ControlGroup>
-
-        {/* Inline trap diagram + diagnostics readout */}
-        {bec.diagnosticsEnabled && <BECDiagnosticsInline bec={bec} />}
-      </Section>
+export const BECAnalysisContent: React.FC = React.memo(() => {
+  const { bec, setDiagnosticsEnabled, setDiagnosticsInterval } =
+    useExtendedObjectStore(
+      useShallow((s) => ({
+        bec: s.schroedinger.bec,
+        setDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
+        setDiagnosticsInterval: s.setBecDiagnosticsInterval,
+      })),
     )
-  },
-)
 
-BECAnalysisSection.displayName = 'BECAnalysisSection'
+  return (
+    <>
+      {/* Diagnostics toggle + interval */}
+      <ControlGroup
+        title="Diagnostics"
+        collapsible
+        defaultOpen
+        rightElement={
+          <Switch
+            checked={bec.diagnosticsEnabled}
+            onCheckedChange={setDiagnosticsEnabled}
+            data-testid="bec-diagnostics-enabled"
+          />
+        }
+      >
+        {bec.diagnosticsEnabled && (
+          <Slider
+            label="Interval (frames)"
+            min={1}
+            max={60}
+            step={1}
+            value={bec.diagnosticsInterval}
+            onChange={setDiagnosticsInterval}
+            showValue
+            data-testid="bec-diagnostics-interval"
+          />
+        )}
+      </ControlGroup>
+
+      {/* Inline trap diagram + diagnostics readout */}
+      {bec.diagnosticsEnabled && <BECDiagnosticsInline bec={bec} />}
+    </>
+  )
+})
+
+BECAnalysisContent.displayName = 'BECAnalysisContent'
 
 /* ────────────────────────────────────────────────────────────── */
 /*  Inline BEC diagnostics display                                */

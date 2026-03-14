@@ -1,15 +1,15 @@
-import { SchroedingerCrossSectionSection } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
+import { CrossSectionAnalysisContent } from '@/components/sections/Advanced/SchroedingerCrossSectionSection'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-describe('SchroedingerCrossSectionSection controls', () => {
+describe('CrossSectionAnalysisContent controls', () => {
   beforeEach(() => {
     useExtendedObjectStore.getState().reset()
   })
 
   it('reveals cross-section controls only when enabled', () => {
-    render(<SchroedingerCrossSectionSection />)
+    render(<CrossSectionAnalysisContent />)
 
     expect(screen.queryByTestId('schroedinger-cross-section-scalar')).not.toBeInTheDocument()
 
@@ -21,7 +21,7 @@ describe('SchroedingerCrossSectionSection controls', () => {
   })
 
   it('updates scalar and compositing mode in store', () => {
-    render(<SchroedingerCrossSectionSection />)
+    render(<CrossSectionAnalysisContent />)
     fireEvent.click(screen.getByTestId('schroedinger-cross-section-toggle'))
 
     fireEvent.change(screen.getByTestId('schroedinger-cross-section-composite-mode'), {
@@ -37,7 +37,7 @@ describe('SchroedingerCrossSectionSection controls', () => {
   })
 
   it('switches between axis-aligned and free-plane controls', () => {
-    render(<SchroedingerCrossSectionSection />)
+    render(<CrossSectionAnalysisContent />)
     fireEvent.click(screen.getByTestId('schroedinger-cross-section-toggle'))
 
     expect(screen.getByTestId('schroedinger-cross-section-axis')).toBeInTheDocument()
@@ -54,7 +54,7 @@ describe('SchroedingerCrossSectionSection controls', () => {
   })
 
   it('shows manual window controls only when auto window is off', () => {
-    render(<SchroedingerCrossSectionSection />)
+    render(<CrossSectionAnalysisContent />)
     fireEvent.click(screen.getByTestId('schroedinger-cross-section-toggle'))
 
     expect(screen.queryByTestId('schroedinger-cross-section-window-min')).not.toBeInTheDocument()
@@ -67,7 +67,7 @@ describe('SchroedingerCrossSectionSection controls', () => {
   })
 
   it('shows plane color picker while Faces controls remain the scalar color source', () => {
-    render(<SchroedingerCrossSectionSection />)
+    render(<CrossSectionAnalysisContent />)
     fireEvent.click(screen.getByTestId('schroedinger-cross-section-toggle'))
 
     expect(screen.getByTestId('schroedinger-cross-section-plane-color')).toBeInTheDocument()
