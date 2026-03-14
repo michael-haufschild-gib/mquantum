@@ -118,15 +118,38 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
-        { quantumMode: 'freeScalarField' },
-        { quantumMode: 'hydrogenND' }
+        { quantumMode: 'freeScalarField', objectType: 'schroedinger' },
+        { quantumMode: 'hydrogenND', objectType: 'schroedinger' }
       )
     ).toBe(true)
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
-        { quantumMode: 'harmonicOscillator' },
-        { quantumMode: 'freeScalarField' }
+        { quantumMode: 'harmonicOscillator', objectType: 'schroedinger' },
+        { quantumMode: 'freeScalarField', objectType: 'schroedinger' }
+      )
+    ).toBe(true)
+  })
+
+  it('forces full rebuild when switching objectType between schroedinger and pauliSpinor', async () => {
+    ensureGpuTextureUsageConstants()
+    const { shouldForceFullRebuildForQuantumModeTransition } = await import(
+      '@/rendering/webgpu/WebGPUScene'
+    )
+
+    // schroedinger → pauliSpinor
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        { quantumMode: 'harmonicOscillator', objectType: 'schroedinger' },
+        { quantumMode: 'harmonicOscillator', objectType: 'pauliSpinor' as never }
+      )
+    ).toBe(true)
+
+    // pauliSpinor → schroedinger
+    expect(
+      shouldForceFullRebuildForQuantumModeTransition(
+        { quantumMode: 'harmonicOscillator', objectType: 'pauliSpinor' as never },
+        { quantumMode: 'harmonicOscillator', objectType: 'schroedinger' }
       )
     ).toBe(true)
   })
@@ -139,22 +162,22 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
-        { quantumMode: 'harmonicOscillator' },
-        { quantumMode: 'hydrogenND' }
+        { quantumMode: 'harmonicOscillator', objectType: 'schroedinger' },
+        { quantumMode: 'hydrogenND', objectType: 'schroedinger' }
       )
     ).toBe(false)
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
-        { quantumMode: 'hydrogenND' },
-        { quantumMode: 'hydrogenND' }
+        { quantumMode: 'hydrogenND', objectType: 'schroedinger' },
+        { quantumMode: 'hydrogenND', objectType: 'schroedinger' }
       )
     ).toBe(false)
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
         null,
-        { quantumMode: 'freeScalarField' }
+        { quantumMode: 'freeScalarField', objectType: 'schroedinger' }
       )
     ).toBe(false)
   })

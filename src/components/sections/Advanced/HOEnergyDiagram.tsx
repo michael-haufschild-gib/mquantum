@@ -19,7 +19,7 @@ import { getNamedPreset } from '@/lib/geometry/extended/schroedinger/presets'
 const WIDTH = 260
 const HEIGHT = 150
 const PX_L = 28
-const PX_R = 24
+const PX_R = 36
 const PY = 14
 const PB = 16
 const PW = WIDTH - PX_L - PX_R

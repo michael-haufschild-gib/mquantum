@@ -1,11 +1,12 @@
 /**
  * useObjectTypeInitialization Hook
  *
- * Handles initialization of Schroedinger-specific settings when the
- * dimension changes.
+ * Handles initialization of object type-specific settings when the
+ * dimension or object type changes.
  *
  * Responsibilities:
  * - Initialize Schroedinger settings for the current dimension
+ * - Initialize Pauli Spinor settings for the current dimension
  */
 
 import { useEffect } from 'react'
@@ -23,14 +24,20 @@ export function useObjectTypeInitialization(objectType: ObjectType, dimension: n
   const initializeSchroedingerForDimension = useExtendedObjectStore(
     (state) => state.initializeSchroedingerForDimension
   )
+  const initializePauliForDimension = useExtendedObjectStore(
+    (state) => state.initializePauliForDimension
+  )
 
-  // Initialize Schroedinger settings when dimension changes.
+  // Initialize object type settings when dimension changes.
   // Skip during scene load — loadScene restores extended state after geometry,
   // and this effect would clobber the just-loaded parameterValues/center/densityGain.
   useEffect(() => {
+    if (usePerformanceStore.getState().isLoadingScene) return
+
     if (objectType === 'schroedinger') {
-      if (usePerformanceStore.getState().isLoadingScene) return
       initializeSchroedingerForDimension(dimension)
+    } else if (objectType === 'pauliSpinor') {
+      initializePauliForDimension(dimension)
     }
-  }, [objectType, dimension, initializeSchroedingerForDimension])
+  }, [objectType, dimension, initializeSchroedingerForDimension, initializePauliForDimension])
 }

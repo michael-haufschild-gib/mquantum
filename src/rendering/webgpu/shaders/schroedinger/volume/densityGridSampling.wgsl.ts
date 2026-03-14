@@ -153,7 +153,23 @@ fn computeGradientFromGrid(pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f 
   let dy = vec3f(0.0, eps, 0.0);
   let dz = vec3f(0.0, 0.0, eps);
 
-  if (DENSITY_GRID_HAS_PHASE) {
+  if (IS_DUAL_CHANNEL) {
+    // Dual-channel (Dirac/Pauli): .r = primary, .g = secondary density
+    // Compute gradient of total density (R + G) then convert to ∇s = ∇ρ/(ρ+ε)
+    let sxp = sampleDensityFromGrid(pos + dx, uniforms);
+    let sxn = sampleDensityFromGrid(pos - dx, uniforms);
+    let syp = sampleDensityFromGrid(pos + dy, uniforms);
+    let syn = sampleDensityFromGrid(pos - dy, uniforms);
+    let szp = sampleDensityFromGrid(pos + dz, uniforms);
+    let szn = sampleDensityFromGrid(pos - dz, uniforms);
+    let gradX = (sxp.r + sxp.g) - (sxn.r + sxn.g);
+    let gradY = (syp.r + syp.g) - (syn.r + syn.g);
+    let gradZ = (szp.r + szp.g) - (szn.r + szn.g);
+    let gradRho = vec3f(gradX, gradY, gradZ) / (2.0 * eps);
+    let rhoCenter = sampleDensityFromGrid(pos, uniforms);
+    let rhoTotal = rhoCenter.r + rhoCenter.g;
+    return gradRho / max(rhoTotal + 1e-8, 1e-8);
+  } else if (DENSITY_GRID_HAS_PHASE) {
     // rgba16float grid: logRho stored in .g channel — central-difference directly on s
     let gradX = sampleDensityFromGrid(pos + dx, uniforms).g - sampleDensityFromGrid(pos - dx, uniforms).g;
     let gradY = sampleDensityFromGrid(pos + dy, uniforms).g - sampleDensityFromGrid(pos - dy, uniforms).g;

@@ -27,6 +27,10 @@ const componentLoaders: Record<string, () => Promise<{ default: ComponentType<un
     import('@/components/sections/Geometry/SchroedingerControls').then((m) => ({
       default: m.SchroedingerControls as ComponentType<unknown>,
     })),
+  PauliSpinorControls: () =>
+    import('@/components/sections/Geometry/PauliSpinorControls').then((m) => ({
+      default: m.PauliSpinorControls as ComponentType<unknown>,
+    })),
 }
 
 /**

@@ -33,6 +33,7 @@ import { EigenfunctionCacheComputePass } from '../passes/EigenfunctionCacheCompu
 import { FreeScalarFieldComputePass } from '../passes/FreeScalarFieldComputePass'
 import { TDSEComputePass } from '../passes/TDSEComputePass'
 import { DiracComputePass } from '../passes/DiracComputePass'
+import { PauliComputePass } from '../passes/PauliComputePass'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { thomasFermiMuND } from '@/lib/physics/bec/chemicalPotential'
 import { WignerCacheComputePass } from '../passes/WignerCacheComputePass'
@@ -72,7 +73,7 @@ const BAYER_OFFSETS: [number, number][] = [
   [0, 1],
 ]
 
-const SCHROEDINGER_UNIFORM_SIZE = 1488
+const SCHROEDINGER_UNIFORM_SIZE = 1520
 
 // PERF: Module-level string→int lookup maps (avoids recreating per-update)
 const QUANTUM_MODE_MAP: Record<string, number> = {
@@ -108,6 +109,9 @@ const COLOR_ALGORITHM_MAP: Record<string, number> = {
   densityContours: 21,
   phaseDensity: 22,
   particleAntiparticle: 23,
+  pauliSpinDensity: 24,
+  pauliSpinExpectation: 25,
+  pauliCoherence: 26,
 }
 const NODAL_DEFINITION_MAP: Record<string, number> = {
   psiAbs: 0,
@@ -215,6 +219,9 @@ interface ExtendedStoreSnapshot {
   clearTdseNeedsReset?: () => void
   clearBecNeedsReset?: () => void
   clearDiracNeedsReset?: () => void
+  pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
+  pauliSpinorVersion?: number
+  clearPauliNeedsReset?: () => void
 }
 
 interface TransformSnapshot {
@@ -268,6 +275,8 @@ export interface SchrodingerRendererConfig {
   representation?: 'position' | 'momentum' | 'wigner'
   /** Open quantum system — density matrix + Lindblad evolution (compile-time shader selection). */
   openQuantumEnabled?: boolean
+  /** Whether this renderer is configured for Pauli Spinor mode. */
+  isPauli?: boolean
 }
 
 /**
@@ -378,6 +387,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // TDSE Compute Pass (time-dependent Schroedinger equation dynamics)
   private tdsePass: TDSEComputePass | null = null
   private diracPass: DiracComputePass | null = null
+  private pauliPass: PauliComputePass | null = null
 
   // Eigenfunction Cache Compute Pass (HO mode acceleration)
   private eigenCachePass: EigenfunctionCacheComputePass | null = null
@@ -462,6 +472,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
   // Dirty-flag version tracking - skip uniform updates when unchanged
   // Schroedinger uses partial buffer writes: only time field (4 bytes) when settings unchanged
   private lastSchroedingerVersion = -1
+  private lastPauliSpinorVersion = -1
   private lastLightingVersion = -1
   private lastAppearanceVersion = -1
   private lastQualitySignature = ''
@@ -507,7 +518,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // TDSE / BEC / Dirac dynamics also require volumetric 3D rendering via density grid
     const isTdseEarly = config?.quantumMode === 'tdseDynamics' || config?.quantumMode === 'becDynamics'
     const isDiracEarly = config?.quantumMode === 'diracEquation'
-    const isComputeEarly = isFreeScalarEarly || isTdseEarly || isDiracEarly
+    const isPauliEarly = config?.isPauli === true
+    const isComputeEarly = isFreeScalarEarly || isTdseEarly || isDiracEarly || isPauliEarly
     // Compute modes do not support temporal reprojection (no world position output)
     const isTemporal = (config?.temporal ?? false) && !isComputeEarly
     const is2D = !isComputeEarly && (config?.dimension ?? 3) === 2
@@ -566,8 +578,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics' || this.rendererConfig.quantumMode === 'becDynamics'
     // Dirac equation mode: spinor field evolution via split-operator, density grid only
     const isDirac = this.rendererConfig.quantumMode === 'diracEquation'
+    // Pauli spinor: separate objectType, density grid only
+    const isPauli = this.rendererConfig.isPauli === true
     // Unified flag for all compute-based modes (density grid, no eigencache)
-    const isComputeMode = isFreeScalar || isTdse || isDirac
+    const isComputeMode = isFreeScalar || isTdse || isDirac || isPauli
 
     // Free scalar field: temporal reprojection is unsupported (no world position output).
     // Must be set here (not just in shaderConfig) so pipeline targets and render pass
@@ -580,8 +594,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       }
     }
 
-    // TDSE / Dirac dynamics: same constraints as free scalar — no temporal, force 3D minimum.
-    if (isTdse || isDirac) {
+    // TDSE / Dirac / Pauli dynamics: same constraints as free scalar — no temporal, force 3D minimum.
+    if (isTdse || isDirac || isPauli) {
       this.rendererConfig.temporal = false
       if ((this.rendererConfig.dimension ?? 3) < 3) {
         this.rendererConfig.dimension = 3
@@ -665,6 +679,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       isWigner: isComputeMode ? false : isWigner,
       useWignerCache: isComputeMode ? false : isWigner,
       isFreeScalar: isComputeMode,
+      isPauli,
       freeScalarAnalysis:
         isFreeScalar &&
         this.rendererConfig.colorAlgorithm !== undefined &&
@@ -713,6 +728,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastPbrVersion = -1
     this.lastSchrodingerPbrVersion = -1
     this.lastSchroedingerVersion = -1
+    this.lastPauliSpinorVersion = -1
     this.lastSchrodingerAppearanceVersion = -1
     this.lastAppearanceVersion = -1
 
@@ -720,9 +736,10 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     const isFreeScalar = this.rendererConfig.quantumMode === 'freeScalarField'
     const isTdse = this.rendererConfig.quantumMode === 'tdseDynamics' || this.rendererConfig.quantumMode === 'becDynamics'
     const isDirac = this.rendererConfig.quantumMode === 'diracEquation'
+    const isPauli = this.rendererConfig.isPauli === true
     const isHydrogen = this.rendererConfig.quantumMode === 'hydrogenND'
     const openQuantumEnabled = this.rendererConfig.openQuantumEnabled ?? false
-    const isComputeMode = isFreeScalar || isTdse || isDirac
+    const isComputeMode = isFreeScalar || isTdse || isDirac || isPauli
     // Compute-based modes require volumetric 3D rendering — override 2D pipeline
     const pipelineIs2D = !isComputeMode && (dim === 2 || this.rendererConfig.representation === 'wigner')
     const forceRgba = this.shaderConfig.useDensityGrid || dim > 3 || openQuantumEnabled || isHydrogen
@@ -743,6 +760,8 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.tdsePass = null
     this.diracPass?.dispose()
     this.diracPass = null
+    this.pauliPass?.dispose()
+    this.pauliPass = null
 
     // Reset open quantum state on pipeline rebuild (new shader variant)
     this.openQuantumState = null
@@ -797,6 +816,14 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     if (isDirac) {
       this.diracPass = new DiracComputePass()
       this.diracPass.initializeDensityTexture(device)
+    }
+
+    // Pauli spinor: create its own compute pass (replaces TDSE pass if isPauli)
+    if (this.rendererConfig.isPauli) {
+      this.tdsePass?.dispose()
+      this.tdsePass = null
+      this.pauliPass = new PauliComputePass()
+      this.pauliPass.initializeDensityTexture(device)
     }
 
     // Eigenfunction cache compute pass (HO mode + hydrogen ND extra dims)
@@ -910,7 +937,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       )
     }
     // Density grid texture + sampler for grid-based raymarching (hydrogen, free scalar, TDSE, or Dirac)
-    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass || this.tdsePass || this.diracPass)) {
+    if (this.shaderConfig.useDensityGrid && (this.densityGridPass || this.freeScalarFieldPass || this.tdsePass || this.diracPass || this.pauliPass)) {
       objectBindGroupEntries.push(
         {
           binding: 4,
@@ -1205,7 +1232,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
         ? this.tdsePass.getDensityTextureView()
         : this.diracPass
           ? this.diracPass.getDensityTextureView()
-          : (this.densityGridPass?.getDensityTextureView() ?? null)
+          : this.pauliPass
+            ? this.pauliPass.getDensityTextureView()
+            : (this.densityGridPass?.getDensityTextureView() ?? null)
     if (this.shaderConfig.useDensityGrid && densityView) {
       // Create trilinear-filtering sampler for smooth grid interpolation
       this.densityGridSampler = device.createSampler({
@@ -1607,13 +1636,16 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     // so we must also check appearanceVersion to detect those changes.
     const appearanceVersion = appearance?.appearanceVersion ?? 0
     const pbrVersion = pbr?.pbrVersion ?? 0
+    const pauliSpinorVersion = extended?.pauliSpinorVersion ?? 0
     const versionChanged = schroedingerVersion !== this.lastSchroedingerVersion
     const appearanceChanged = appearanceVersion !== this.lastSchrodingerAppearanceVersion
     const pbrChanged = pbrVersion !== this.lastSchrodingerPbrVersion
+    const pauliChanged = pauliSpinorVersion !== this.lastPauliSpinorVersion
     if (
       !versionChanged &&
       !appearanceChanged &&
       !pbrChanged &&
+      !pauliChanged &&
       this.lastSchroedingerVersion !== -1
     ) {
       // Partial buffer write: update time and uncertainty threshold scalars
@@ -1635,6 +1667,7 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     this.lastSchroedingerVersion = schroedingerVersion
     this.lastSchrodingerAppearanceVersion = appearanceVersion
     this.lastSchrodingerPbrVersion = pbrVersion
+    this.lastPauliSpinorVersion = pauliSpinorVersion
 
     // Reuse pre-allocated staging buffer to avoid per-frame GC pressure
     // See uniforms.wgsl.ts for the exact layout with packed arrays
@@ -1836,6 +1869,30 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
       ) {
         this.boundingRadius = quantizedBoundR
         this.createBoundingGeometry(this.device)
+      }
+    }
+
+    // Compute bounding radius for Pauli mode from actual lattice extent
+    if (this.rendererConfig.isPauli) {
+      const pauliCfg = extended?.pauliSpinor
+      if (pauliCfg) {
+        let maxExtent = 0
+        for (let d = 0; d < (pauliCfg.latticeDim ?? 3); d++) {
+          const Ld = (pauliCfg.gridSize?.[d] ?? 64) * (pauliCfg.spacing?.[d] ?? 0.15)
+          if (Ld > maxExtent) maxExtent = Ld
+        }
+        if (maxExtent <= 0) maxExtent = 9.6
+        const newBoundR = maxExtent / 2 * 1.15
+        const quantStep = WebGPUSchrodingerRenderer.BOUND_RADIUS_QUANT_STEP
+        const quantizedBoundR = Math.ceil(newBoundR / quantStep) * quantStep
+        if (
+          Math.abs(quantizedBoundR - this.boundingRadius) >=
+            WebGPUSchrodingerRenderer.BOUND_RADIUS_REBUILD_THRESHOLD &&
+          this.device
+        ) {
+          this.boundingRadius = quantizedBoundR
+          this.createBoundingGeometry(this.device)
+        }
       }
     }
 
@@ -2482,6 +2539,19 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     intView[1476 / 4] = schroedinger?.wignerClassicalOverlay ? 1 : 0
     floatView[1480 / 4] = 0.0 // padding
     floatView[1484 / 4] = 0.0 // padding
+
+    // Pauli spinor colors for spin-resolved color algorithms (24/25)
+    const pauliConfig = extended?.pauliSpinor
+    const spinUp = pauliConfig?.spinUpColor ?? [0.0, 0.898, 1.0]
+    const spinDown = pauliConfig?.spinDownColor ?? [1.0, 0.0, 0.898]
+    floatView[1488 / 4] = spinUp[0]
+    floatView[1492 / 4] = spinUp[1]
+    floatView[1496 / 4] = spinUp[2]
+    floatView[1500 / 4] = 0.0 // padding
+    floatView[1504 / 4] = spinDown[0]
+    floatView[1508 / 4] = spinDown[1]
+    floatView[1512 / 4] = spinDown[2]
+    floatView[1516 / 4] = 0.0 // padding
 
     this.writeUniformBuffer(this.device, this.schroedingerUniformBuffer, floatView)
   }
@@ -3185,6 +3255,45 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
     }
 
     // ============================================
+    // PAULI SPINOR COMPUTE PASS
+    // ============================================
+    const pauliPass = this.pauliPass
+    if (pauliPass) {
+      const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+      const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+      const isPlaying = animation?.isPlaying ?? false
+      const speed = animation?.speed ?? 1.0
+      const pauliConfig = extended?.pauliSpinor
+
+      if (pauliConfig) {
+        const schroedinger = extended?.schroedinger
+        // Derive fieldView from the color algorithm so the writeGrid shader
+        // encodes density channels matching the selected emission algorithm.
+        const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+        const algo = appearance?.colorAlgorithm ?? 'pauliSpinDensity'
+        const pauliFieldView =
+          algo === 'pauliSpinDensity' ? 'spinDensity' :
+          algo === 'pauliSpinExpectation' ? 'spinExpectation' :
+          algo === 'pauliCoherence' ? 'coherence' : 'totalDensity'
+        const effectiveConfig = { ...pauliConfig, fieldView: pauliFieldView } as import('@/lib/geometry/extended/types').PauliConfig
+        pauliPass.executePauli(
+          ctx,
+          effectiveConfig,
+          isPlaying,
+          speed,
+          schroedinger?.basisX as Float32Array | undefined,
+          schroedinger?.basisY as Float32Array | undefined,
+          schroedinger?.basisZ as Float32Array | undefined,
+          this.boundingRadius,
+        )
+        // Clear needsReset after processing
+        if (pauliConfig.needsReset) {
+          extended?.clearPauliNeedsReset?.()
+        }
+      }
+    }
+
+    // ============================================
     // DENSITY GRID COMPUTE PASS (if enabled)
     // ============================================
     // Run compute shader to pre-compute density texture before rendering
@@ -3780,6 +3889,9 @@ export class WebGPUSchrodingerRenderer extends WebGPUBasePass {
 
     this.diracPass?.dispose()
     this.diracPass = null
+
+    this.pauliPass?.dispose()
+    this.pauliPass = null
 
     this.eigenCachePass?.dispose()
     this.eigenCachePass = null

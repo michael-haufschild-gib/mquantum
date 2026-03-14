@@ -19,10 +19,11 @@ const MODE_FEATURES: Record<SchroedingerQuantumMode, { minDim: number; category:
 }
 
 export const ObjectTypeExplorer: React.FC = React.memo(() => {
-  const { objectType, dimension } = useGeometryStore(
+  const { objectType, dimension, setObjectType } = useGeometryStore(
     useShallow((state: GeometryState) => ({
       objectType: state.objectType,
       dimension: state.dimension,
+      setObjectType: state.setObjectType,
     }))
   )
 
@@ -74,11 +75,15 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
 
   const { addToast } = useToast()
 
-  const handleSelect = useCallback(
+  const handleSelectMode = useCallback(
     (value: SchroedingerQuantumMode) => {
       soundManager.playClick()
       const features = MODE_FEATURES[value]
       const prevDim = useGeometryStore.getState().dimension
+      // If switching from pauliSpinor, change objectType back to schroedinger
+      if (useGeometryStore.getState().objectType !== 'schroedinger') {
+        setObjectType('schroedinger')
+      }
       setQuantumMode(value)
       // Show feedback toast for mode switch side effects
       const newDim = useGeometryStore.getState().dimension
@@ -90,8 +95,14 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
         addToast(`${modeLabel}: ${changes.join(', ')}`, 'info')
       }
     },
-    [setQuantumMode, addToast, modeOptions]
+    [setObjectType, setQuantumMode, addToast, modeOptions]
   )
+
+  const handleSelectPauli = useCallback(() => {
+    soundManager.playClick()
+    setObjectType('pauliSpinor')
+    addToast('Pauli Spinor: 2-component spinor with magnetic field', 'info')
+  }, [setObjectType, addToast])
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -108,18 +119,20 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
     show: { opacity: 1, x: 0 },
   }
 
+  const isPauliSelected = objectType === 'pauliSpinor'
+
   const analyticModes = modeOptions.filter((m) => MODE_FEATURES[m.value].category === 'analytic')
   const computeModes = modeOptions.filter((m) => MODE_FEATURES[m.value].category === 'compute')
 
   const renderCard = (mode: (typeof modeOptions)[number]) => {
-    const isSelected = quantumMode === mode.value
+    const isSelected = !isPauliSelected && quantumMode === mode.value
     const features = MODE_FEATURES[mode.value]
 
     return (
       <m.button
         key={mode.value}
         variants={itemVariants}
-        onClick={() => handleSelect(mode.value)}
+        onClick={() => handleSelectMode(mode.value)}
         onMouseEnter={() => soundManager.playHover()}
         className={`
           relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
@@ -164,6 +177,41 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       {analyticModes.map(renderCard)}
       <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">Compute (GPU)</div>
       {computeModes.map(renderCard)}
+
+      {/* Pauli Spinor — separate object type */}
+      <m.button
+        variants={itemVariants}
+        onClick={handleSelectPauli}
+        onMouseEnter={() => soundManager.playHover()}
+        className={`
+          relative group flex flex-col p-3 rounded-lg border text-left transition-colors duration-200
+          ${
+            isPauliSelected
+              ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_color-mix(in_oklch,var(--color-accent)_10%,transparent)]'
+              : 'bg-[var(--bg-panel)]/30 border-panel-border hover:border-text-secondary/50 text-text-secondary hover:text-text-primary hover:bg-[var(--bg-panel)]/50'
+          }
+          cursor-pointer
+        `}
+        whileHover={{ scale: 1.01, x: 2 }}
+        whileTap={{ scale: 0.98 }}
+        data-testid="object-type-pauliSpinor"
+      >
+        <div className="flex items-center justify-between w-full mb-1">
+          <span className="font-medium text-sm">Pauli Spinor</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-text-tertiary font-mono">2D+</span>
+            {isPauliSelected && (
+              <div className="relative w-2 h-2">
+                <div className="absolute inset-0 rounded-full bg-accent led-glow" />
+                <div className="absolute inset-0 rounded-full bg-accent" />
+              </div>
+            )}
+          </div>
+        </div>
+        <span className="text-xs text-text-secondary/80 line-clamp-2 leading-relaxed">
+          Two-component spinor in a magnetic field: spin precession, Stern-Gerlach splitting.
+        </span>
+      </m.button>
     </m.div>
   )
 })

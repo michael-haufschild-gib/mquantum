@@ -11,7 +11,9 @@
 
 import { getCosinePaletteColorTS, applyDistributionTS } from '@/rendering/shaders/palette'
 import { rgbToHex } from '@/lib/colors/colorUtils'
+import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
+import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import React, { useEffect, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -50,6 +52,13 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
       phaseDiverging,
       divergingPsi,
     } = useAppearanceStore(appearanceSelector)
+
+    const { pauliSpinUpColor, pauliSpinDownColor } = useExtendedObjectStore(
+      useShallow((s) => ({
+        pauliSpinUpColor: s.pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor,
+        pauliSpinDownColor: s.pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor,
+      }))
+    )
 
     useEffect(() => {
       const canvas = canvasRef.current
@@ -359,6 +368,34 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const saturation = 0.3 + 0.65 * brightness
           const lightness = brightness * 0.55
           ;[r, g, b] = hslToRgb(phaseNorm, saturation, lightness)
+        } else if (colorAlgorithm === 'pauliSpinDensity') {
+          // Pauli Spin Density: additive blend of spin-up (cyan) and spin-down (magenta)
+          // Preview sweeps from pure spin-up (left) through overlap (center) to pure spin-down (right)
+          const upDensity = Math.max(0, 1 - 2 * t)
+          const downDensity = Math.max(0, 2 * t - 1)
+          const overlap = 1 - Math.abs(2 * t - 1)
+          r = pauliSpinUpColor[0] * (upDensity + 0.5 * overlap) + pauliSpinDownColor[0] * (downDensity + 0.5 * overlap)
+          g = pauliSpinUpColor[1] * (upDensity + 0.5 * overlap) + pauliSpinDownColor[1] * (downDensity + 0.5 * overlap)
+          b = pauliSpinUpColor[2] * (upDensity + 0.5 * overlap) + pauliSpinDownColor[2] * (downDensity + 0.5 * overlap)
+        } else if (colorAlgorithm === 'pauliSpinExpectation') {
+          // Pauli Spin Expectation ⟨σ_z⟩: diverging blue → neutral → red
+          // t=0 → full spin-down (red), t=0.5 → neutral, t=1 → full spin-up (blue)
+          const blueWing: [number, number, number] = [0.15, 0.35, 0.95]
+          const redWing: [number, number, number] = [0.95, 0.20, 0.15]
+          const neutral: [number, number, number] = [0.85, 0.85, 0.85]
+          const sigmaZ = 2 * t - 1 // -1 to +1
+          const wing = sigmaZ >= 0 ? blueWing : redWing
+          const strength = Math.abs(sigmaZ)
+          const brightness = 0.3 + 0.7 * (0.5 + 0.5 * strength)
+          r = (neutral[0] * (1 - strength) + wing[0] * strength) * brightness
+          g = (neutral[1] * (1 - strength) + wing[1] * strength) * brightness
+          b = (neutral[2] * (1 - strength) + wing[2] * strength) * brightness
+        } else if (colorAlgorithm === 'pauliCoherence') {
+          // Pauli Coherence: dim → vivid cyan-teal ramp (matches shader algo 26)
+          const hue = 0.48 + 0.04 * t       // 0.48 → 0.52
+          const sat = 0.4 + 0.55 * t         // 0.4  → 0.95
+          const lit = 0.08 + 0.42 * t         // 0.08 → 0.50
+          ;[r, g, b] = hslToRgb(hue, sat, lit)
         } else {
           // Cosine palette (multiSource, radial)
           // Shows the underlying palette that will be sampled by position/density.
@@ -395,6 +432,8 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
       domainColoring,
       phaseDiverging,
       divergingPsi,
+      pauliSpinUpColor,
+      pauliSpinDownColor,
     ])
 
     return (

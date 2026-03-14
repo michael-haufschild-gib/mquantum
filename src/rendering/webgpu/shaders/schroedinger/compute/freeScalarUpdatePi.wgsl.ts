@@ -21,7 +21,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let idx = gid.x;
   if (idx >= params.totalSites) { return; }
 
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
   let phiCenter = phi[idx];
   var laplacian: f32 = 0.0;
 

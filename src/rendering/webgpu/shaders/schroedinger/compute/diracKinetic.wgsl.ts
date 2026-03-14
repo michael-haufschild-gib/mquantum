@@ -55,7 +55,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let latDim = params.latticeDim;
 
   // Decode k-space coordinates using N-D index helper
-  let coords = linearToND(idx, params.gridSize, latDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, latDim);
 
   // Compute k-vector components with FFT frequency ordering
   var kVec: array<f32, 12>;

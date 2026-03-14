@@ -34,7 +34,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
   // Axis-0 position (used by directional potentials)
   let pos0 = (f32(coords[0]) - f32(params.gridSize[0]) * 0.5 + 0.5) * params.spacing[0];

@@ -7,7 +7,11 @@ import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
-  const dimension = useGeometryStore((state) => state.dimension)
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
+  )
+  // Pauli spinor is always volumetric 3D — bypass schroedinger iso/representation checks
+  const isPauli = objectType === 'pauliSpinor'
   const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
     config: state.schroedinger,
     setDensityGain: state.setSchroedingerDensityGain,
@@ -89,7 +93,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-gain"
         />
-        {!config.isoEnabled && dimension > 2 && config.representation !== 'wigner' && (
+        {(isPauli || (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
           <Slider
             label="Powder Effect"
             min={0.0}
@@ -101,7 +105,7 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             data-testid="schroedinger-powder-scale"
           />
         )}
-        {!config.isoEnabled && dimension > 2 && config.representation !== 'wigner' && (
+        {(isPauli || (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
           <Slider
             label="Anisotropy (Phase)"
             min={-0.9}

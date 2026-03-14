@@ -28,10 +28,11 @@ import {
 
 describe('Object Type Registry', () => {
   describe('Registry Structure', () => {
-    it('contains only schroedinger object type', () => {
+    it('contains schroedinger and pauliSpinor object types', () => {
       const types = Array.from(OBJECT_TYPE_REGISTRY.keys())
-      expect(types).toHaveLength(1)
+      expect(types).toHaveLength(2)
       expect(types).toContain('schroedinger')
+      expect(types).toContain('pauliSpinor')
     })
 
     it('returns valid entry for schroedinger', () => {
@@ -48,9 +49,42 @@ describe('Object Type Registry', () => {
     })
   })
 
+  describe('pauliSpinor entry', () => {
+    it('returns valid entry for pauliSpinor', () => {
+      const entry = getObjectTypeEntry('pauliSpinor')
+      expect(entry).toBeDefined()
+      expect(entry?.type).toBe('pauliSpinor')
+      expect(entry?.configStoreKey).toBe('pauliSpinor')
+    })
+
+    it('pauliSpinor recommends 3D', () => {
+      expect(getRecommendedDimension('pauliSpinor')).toBe(3)
+    })
+
+    it('pauliSpinor controls component key is PauliSpinorControls', () => {
+      expect(getControlsComponentKey('pauliSpinor')).toBe('PauliSpinorControls')
+    })
+
+    it('pauliSpinor has timeline controls', () => {
+      expect(hasTimelineControls('pauliSpinor')).toBe(true)
+    })
+
+    it('pauliSpinor config store key is pauliSpinor', () => {
+      expect(getConfigStoreKey('pauliSpinor')).toBe('pauliSpinor')
+    })
+
+    it('isValidObjectType accepts pauliSpinor', () => {
+      expect(isValidObjectType('pauliSpinor')).toBe(true)
+    })
+  })
+
   describe('Rendering Capabilities', () => {
     it('isRaymarchingType identifies schroedinger as raymarched', () => {
       expect(isRaymarchingType('schroedinger')).toBe(true)
+    })
+
+    it('isRaymarchingType identifies pauliSpinor as raymarched', () => {
+      expect(isRaymarchingType('pauliSpinor')).toBe(true)
     })
   })
 
@@ -69,9 +103,11 @@ describe('Object Type Registry', () => {
 
     it('getAvailableTypesForDimension returns filtered list', () => {
       const typesAt4D = getAvailableTypesForDimension(4)
-      expect(typesAt4D.length).toBe(1)
-      expect(typesAt4D[0]?.type).toBe('schroedinger')
-      expect(typesAt4D[0]?.available).toBe(true)
+      expect(typesAt4D.length).toBe(2)
+      const types = typesAt4D.map((t) => t.type)
+      expect(types).toContain('schroedinger')
+      expect(types).toContain('pauliSpinor')
+      expect(typesAt4D.every((t) => t.available)).toBe(true)
     })
 
     it('getRecommendedDimension returns value for schroedinger', () => {

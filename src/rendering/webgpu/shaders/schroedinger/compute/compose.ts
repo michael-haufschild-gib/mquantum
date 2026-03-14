@@ -168,6 +168,7 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
   // Compute shaders include shared density helpers that reference COLOR_ALGORITHM.
   // Grid baking is algorithm-agnostic, so keep the default mixed mode value.
   defines.push('const COLOR_ALGORITHM: i32 = 4;')
+  defines.push('const IS_DUAL_CHANNEL: bool = false;')
   // Density modules reference FEATURE_INTERFERENCE; keep it defined in compute shaders.
   // Set to true so runtime uniform toggles still control the effect in compute mode.
   defines.push('const FEATURE_INTERFERENCE: bool = true;')

@@ -323,6 +323,12 @@ struct SchroedingerUniforms {
   wignerClassicalOverlay: u32,      // offset 1476: show classical trajectory
   _padWigner0: f32,                 // offset 1480: padding
   _padWigner1: f32,                 // offset 1484: padding
+
+  // Pauli spinor colors (used by spin-resolved color algorithms 24/25)
+  pauliSpinUpColor: vec3f,          // offset 1488
+  _padPauliUp: f32,                 // offset 1500
+  pauliSpinDownColor: vec3f,        // offset 1504
+  _padPauliDown: f32,               // offset 1516
 }
 
 // ============================================

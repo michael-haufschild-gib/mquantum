@@ -5,8 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { mergeExtendedObjectState } from '@/stores/utils/mergeWithDefaults'
-import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+import {
+  mergeExtendedObjectState,
+  mergeExtendedObjectStateForType,
+} from '@/stores/utils/mergeWithDefaults'
+import { DEFAULT_SCHROEDINGER_CONFIG, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 
 describe('mergeExtendedObjectState', () => {
   describe('handles missing config properties', () => {
@@ -165,5 +168,55 @@ describe('mergeExtendedObjectState', () => {
 
       expect(schroedinger.sampleCount).toBe(DEFAULT_SCHROEDINGER_CONFIG.sampleCount)
     })
+  })
+})
+
+describe('mergeExtendedObjectStateForType — pauliSpinor', () => {
+  it('fills missing Pauli fields with defaults', () => {
+    const loaded = {
+      pauliSpinor: {
+        fieldStrength: 5.0,
+        spinUpColor: [1, 0, 0] as [number, number, number],
+      },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'pauliSpinor')
+    const pauli = merged.pauliSpinor as typeof DEFAULT_PAULI_CONFIG
+
+    // Saved value preserved
+    expect(pauli.fieldStrength).toBe(5.0)
+    expect(pauli.spinUpColor).toEqual([1, 0, 0])
+
+    // Missing values filled from defaults
+    expect(pauli.latticeDim).toBe(DEFAULT_PAULI_CONFIG.latticeDim)
+    expect(pauli.gridSize).toEqual(DEFAULT_PAULI_CONFIG.gridSize)
+    expect(pauli.dt).toBe(DEFAULT_PAULI_CONFIG.dt)
+    expect(pauli.mass).toBe(DEFAULT_PAULI_CONFIG.mass)
+    expect(pauli.fieldView).toBe(DEFAULT_PAULI_CONFIG.fieldView)
+    expect(pauli.spinDownColor).toEqual(DEFAULT_PAULI_CONFIG.spinDownColor)
+    expect(pauli.absorberEnabled).toBe(DEFAULT_PAULI_CONFIG.absorberEnabled)
+  })
+
+  it('uses full Pauli defaults when config is missing', () => {
+    const loaded = {}
+    const merged = mergeExtendedObjectStateForType(loaded, 'pauliSpinor')
+    const pauli = merged.pauliSpinor as typeof DEFAULT_PAULI_CONFIG
+
+    expect(pauli.latticeDim).toBe(DEFAULT_PAULI_CONFIG.latticeDim)
+    expect(pauli.fieldType).toBe(DEFAULT_PAULI_CONFIG.fieldType)
+    expect(pauli.spinUpColor).toEqual(DEFAULT_PAULI_CONFIG.spinUpColor)
+    expect(pauli.spinDownColor).toEqual(DEFAULT_PAULI_CONFIG.spinDownColor)
+  })
+
+  it('does not touch schroedinger config when merging pauliSpinor', () => {
+    const loaded = {
+      pauliSpinor: { fieldStrength: 3.0 },
+    }
+
+    const merged = mergeExtendedObjectStateForType(loaded, 'pauliSpinor')
+
+    // Only pauliSpinor key should be present
+    expect('schroedinger' in merged).toBe(false)
+    expect('pauliSpinor' in merged).toBe(true)
   })
 })

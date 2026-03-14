@@ -30,6 +30,7 @@ import { LchPresetSelector } from './LchPresetSelector'
 import { PresetSelector } from './PresetSelector'
 import { RealImagDivergingControls } from './RealImagDivergingControls'
 import { KSpaceVizControls } from './KSpaceVizControls'
+import { PauliSpinColorPickers } from './PauliSpinColorPickers'
 import { SignedPhaseDivergingControls } from './SignedPhaseDivergingControls'
 
 /** Algorithms that use the cosine palette (preset selector + advanced editor) */
@@ -56,7 +57,9 @@ type FacesTabId = 'colors' | 'material'
 
 export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOpen = false }) => {
   const [activeTab, setActiveTab] = React.useState<FacesTabId>('colors')
-  const dimension = useGeometryStore((state) => state.dimension)
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
+  )
 
   // Isosurface mode controls (drives material tab availability and rendering mode)
   const schroedingerIsoSelector = useShallow((state: ExtendedObjectState) => ({
@@ -122,8 +125,9 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
     setActiveTab(id as FacesTabId)
   }, [])
 
-  // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds, 2D, or Wigner)
-  const materialTabEnabled = isoEnabled && dimension > 2 && representation !== 'wigner'
+  // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds, 2D, or Wigner).
+  // Pauli spinor always uses volumetric rendering — no isosurface, no material tab.
+  const materialTabEnabled = objectType !== 'pauliSpinor' && isoEnabled && dimension > 2 && representation !== 'wigner'
 
   // Reset to colors tab if material tab becomes disabled while selected
   React.useEffect(() => {
@@ -237,6 +241,11 @@ const ColorsTabContent: React.FC<ColorsTabContentProps> = React.memo(
 
         {/* Live Preview */}
         <ColorPreview />
+
+        {/* Pauli spin-up / spin-down color pickers */}
+        {(colorAlgorithm === 'pauliSpinDensity' || colorAlgorithm === 'pauliSpinExpectation') && (
+          <PauliSpinColorPickers />
+        )}
 
         {/* Base color picker (HSL-based algorithms) */}
         {USES_BASE_COLOR.has(colorAlgorithm) && (

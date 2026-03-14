@@ -35,6 +35,9 @@ export type ColorAlgorithm =
   | 21 // Density contours (isodensity lines on viridis ramp)
   | 22 // Phase-density composite (hue=phase, brightness=density)
   | 23 // Particle/antiparticle split (Dirac dual-channel)
+  | 24 // Pauli spin density (cyan=spin-up, magenta=spin-down)
+  | 25 // Pauli spin expectation (diverging blue/red for ⟨σ_z⟩)
+  | 26 // Pauli coherence (off-diagonal spinor coherence)
 
 /**
  * Lighting mode for compile-time optimization

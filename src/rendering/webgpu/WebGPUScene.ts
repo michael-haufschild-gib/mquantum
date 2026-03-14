@@ -489,6 +489,10 @@ const schroedingerCompileSelector = (
     ? (state.schroedinger?.dirac?.fieldView ?? 'totalDensity')
     : undefined
 
+  // Pauli field view is now derived from the color algorithm at config build time
+  // (kept here for backwards compat but overridden in fullConfig construction)
+  const pauliFieldView = state.pauliSpinor?.fieldView ?? 'spinDensity'
+
   return {
     quantumMode,
     termCount: (state.schroedinger?.termCount ?? 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8,
@@ -499,6 +503,7 @@ const schroedingerCompileSelector = (
     representation,
     openQuantumEnabled: openQuantumEnabled && openQuantumSupported,
     diracFieldView,
+    pauliFieldView,
   }
 }
 
@@ -1145,6 +1150,11 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       renderResolutionScale: usePerformanceStore.getState().renderResolutionScale,
       colorAlgorithm: appearance.colorAlgorithm,
       diracFieldView: schroedingerCompile.diracFieldView,
+      // Derive Pauli fieldView from the color algorithm so the writeGrid shader
+      // encodes density channels to match the selected emission algorithm.
+      pauliFieldView: objectType === 'pauliSpinor'
+        ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
+        : schroedingerCompile.pauliFieldView,
       representation: schroedingerCompile.representation,
       openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
       skyboxEnabled: environment.skyboxEnabled,
@@ -1323,6 +1333,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     schroedingerCompile.uncertaintyBoundaryEnabled,
     schroedingerCompile.representation,
     schroedingerCompile.diracFieldView,
+    schroedingerCompile.pauliFieldView,
     performance_.temporalReprojectionEnabled,
     performance_.eigenfunctionCacheEnabled,
     performance_.analyticalGradientEnabled,
@@ -1407,7 +1418,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     // Cache merged object and only rebuild when source store reference changes.
     graph.setStoreGetter('extended', () => {
       const state = useExtendedObjectStore.getState()
-      if (objectType !== 'schroedinger') {
+      if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
         return state
       }
 
@@ -1555,7 +1566,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         }
       }
 
-      if (objectType === 'schroedinger') {
+      if (objectType === 'schroedinger' || objectType === 'pauliSpinor') {
         const { basisX, basisY, basisZ, changed } = schroedingerRotation.getBasisVectors(false)
         if (changed) {
           schroedingerBasisCacheRef.current.basisX.set(basisX)
@@ -2357,6 +2368,8 @@ export interface PassConfig {
   colorAlgorithm: PaletteColorAlgorithm
   // Dirac field view — drives compile-time color algorithm override for dual-channel encoding
   diracFieldView?: string
+  // Pauli field view — drives compile-time color algorithm for spin-resolved rendering
+  pauliFieldView?: string
   // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
   representation: 'position' | 'momentum' | 'wigner'
   // Open quantum system (density matrix + Lindblad) — requires shader recompilation
@@ -2402,11 +2415,23 @@ interface PPPassConfig {
   temporalReprojectionEnabled: boolean
 }
 
+/** Map a color algorithm to the Pauli writeGrid fieldView that encodes matching channels. */
+function pauliFieldViewForColorAlgorithm(algo: string): string {
+  switch (algo) {
+    case 'pauliSpinDensity': return 'spinDensity'
+    case 'pauliSpinExpectation': return 'spinExpectation'
+    case 'pauliCoherence': return 'coherence'
+    default: return 'totalDensity' // blackbody, viridis, inferno, densityContours, etc.
+  }
+}
+
 function normalizeColorAlgorithmForQuantumMode(
   quantumMode: PassConfig['quantumMode'],
   colorAlgorithm: PaletteColorAlgorithm,
   openQuantumEnabled: boolean = false,
   diracFieldView?: string,
+  pauliFieldView?: string,
+  objectType: string = 'schroedinger',
 ): PaletteColorAlgorithm {
   // Dirac particleAntiparticleSplit uses dual-channel encoding (R=particle, G=antiparticle)
   // that ONLY algorithm 23 (particleAntiparticle) can render correctly.
@@ -2414,13 +2439,18 @@ function normalizeColorAlgorithmForQuantumMode(
     return 'particleAntiparticle'
   }
 
-  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled).some(
+  // Pauli: the user's color algorithm selection drives both the emission shader
+  // and the writeGrid fieldView. No override needed — the dropdown already
+  // restricts to Pauli-compatible algorithms.
+
+  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled, objectType).some(
     (option) => option.value === colorAlgorithm
   )
   if (isAvailable) return colorAlgorithm
 
   // Fallback: pick a sensible default for the current mode.
   if (openQuantumEnabled) return 'purityMap'
+  if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
   // Compute modes (TDSE, BEC, Dirac, free scalar) render into density grids —
   // 'radialDistance' is position-based and invalid. Use 'phaseDensity' which reads
   // R (density) + B (phase) from the grid and works for all compute modes.
@@ -2438,12 +2468,15 @@ function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
   const isDirac = config.quantumMode === 'diracEquation'
   // Free scalar, TDSE, BEC, and Dirac use GPU compute pipelines with density grid output,
   // so they disable analytic-only features and force position representation.
-  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac
+  const isPauli = config.objectType === 'pauliSpinor'
+  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isPauli
   const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
     config.quantumMode,
     config.colorAlgorithm,
     config.openQuantumEnabled,
     config.diracFieldView,
+    isPauli ? config.pauliFieldView : undefined,
+    config.objectType,
   )
   return {
     objectType: config.objectType,
@@ -2496,10 +2529,14 @@ function shallowEqual<T extends object>(a: T | null, b: T): boolean {
  * during async compilation, so these transitions should force a cold rebuild.
  */
 export function shouldForceFullRebuildForQuantumModeTransition(
-  previous: Pick<SchrodingerPassConfig, 'quantumMode'> | null,
-  next: Pick<SchrodingerPassConfig, 'quantumMode'>
+  previous: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'> | null,
+  next: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'>
 ): boolean {
   if (!previous) return false
+
+  // objectType change (e.g. schroedinger ↔ pauliSpinor) changes render graph outputs
+  if (previous.objectType !== next.objectType) return true
+
   if (previous.quantumMode === next.quantumMode) return false
 
   const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
@@ -3009,7 +3046,9 @@ async function setupPPPasses(
 
 /** Remove Schrodinger-group passes that should no longer exist */
 function cleanupSchrodingerPasses(graph: WebGPURenderGraph, config: PassConfig): void {
-  if (!config.temporalReprojectionEnabled) {
+  // Temporal cloud is only used for schroedinger + temporal enabled
+  const useTemporalCloud = config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
+  if (!useTemporalCloud) {
     if (graph.getPass('temporal-cloud')) graph.removePass('temporal-cloud')
   }
 }
@@ -3140,6 +3179,8 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
     config.colorAlgorithm,
     config.openQuantumEnabled,
     config.diracFieldView,
+    config.objectType === 'pauliSpinor' ? config.pauliFieldView : undefined,
+    config.objectType,
   )
   const colorAlgorithm = COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as
     | WGSLColorAlgorithm
@@ -3169,9 +3210,31 @@ export function createObjectRenderer(objectType: ObjectType, config: PassConfig)
         openQuantumEnabled: config.openQuantumEnabled,
       })
 
+    case 'pauliSpinor':
+      // Pauli Spinor reuses the Schrodinger volume renderer with spin-density color mode.
+      // Compute pass (PauliComputePass) handles the physics; rendering uses the same pipeline.
+      return new WebGPUSchrodingerRenderer({
+        dimension,
+        isosurface: false,
+        quantumMode: 'tdseDynamics', // Use TDSE-like rendering path (compute-driven density grid)
+        termCount: 1,
+        colorAlgorithm,
+        nodalEnabled: false,
+        phaseMaterialityEnabled: false,
+        interferenceEnabled: false,
+        uncertaintyBoundaryEnabled: false,
+        temporal: false,
+        eigenfunctionCacheEnabled: false,
+        analyticalGradientEnabled: false,
+        fastEigenInterpolationEnabled: false,
+        representation: 'position',
+        openQuantumEnabled: false,
+        isPauli: true,
+      })
+
     default:
       console.warn(
-        `WebGPU: No renderer for object type '${objectType}', only 'schroedinger' is supported`
+        `WebGPU: No renderer for object type '${objectType}'`
       )
       return null
   }

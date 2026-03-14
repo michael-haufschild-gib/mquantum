@@ -19,7 +19,9 @@ const SURFACE_MODE_OPTIONS = [
 
 export const EditorLeftPanel: React.FC = React.memo(() => {
   const [activeTab, setActiveTab] = useState('type')
-  const dimension = useGeometryStore((state) => state.dimension)
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
+  )
   const isoSelector = useShallow((state: ExtendedObjectState) => ({
     isoEnabled: state.schroedinger?.isoEnabled ?? false,
     isoThreshold: state.schroedinger?.isoThreshold ?? -3,
@@ -84,7 +86,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           <div className="px-4 py-2">
             <DimensionSelector />
           </div>
-          {dimension > 2 && representation !== 'wigner' && (
+          {dimension > 2 && representation !== 'wigner' && objectType !== 'pauliSpinor' && (
             <div className="px-4 pb-2">
               <div className="space-y-1">
                 <ToggleGroup

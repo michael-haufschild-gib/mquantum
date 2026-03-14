@@ -90,7 +90,7 @@
   The dot overlay is a simple particle buffer rendered as a point cloud pass.
 
   ---
-  5. Spinor Wavefunctions (Pauli Equation)
+[done]  5. Spinor Wavefunctions (Pauli Equation)
 
   Extend from scalar ψ to two-component spinor (ψ↑, ψ↓). Add a magnetic field. The spin precesses — visible as
   the two components exchanging amplitude in a rotating pattern through the N-D volume.
@@ -113,7 +113,7 @@
 
 New Quantum Modes
 
-  1. Bose-Einstein Condensate (Gross-Pitaevskii Equation)
+[done]  1. Bose-Einstein Condensate (Gross-Pitaevskii Equation)
 
   A macroscopic quantum state with self-interaction. The GPE is the Schrödinger equation with one extra term:
   g|ψ|²ψ. That nonlinearity changes everything.

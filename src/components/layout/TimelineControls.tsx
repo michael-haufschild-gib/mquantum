@@ -17,6 +17,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { AnimatePresence, m } from 'motion/react'
 import { useEffect, useMemo, useState, type FC } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { PauliAnimationDrawer } from './TimelineControls/PauliAnimationDrawer'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
 import { SchroedingerOpenQuantumDrawer } from './TimelineControls/SchroedingerOpenQuantumDrawer'
 
@@ -93,7 +94,9 @@ export const TimelineControls: FC = () => {
     schroedingerConfig.phaseAnimationEnabled,
   ])
 
-  const isSchroedinger = getConfigStoreKey(objectType) === 'schroedinger'
+  const configStoreKey = getConfigStoreKey(objectType)
+  const isSchroedinger = configStoreKey === 'schroedinger'
+  const isPauliSpinor = configStoreKey === 'pauliSpinor'
   const supportsOpenQuantumControls =
     isSchroedinger &&
     (schroedingerConfig.quantumMode === 'harmonicOscillator' ||
@@ -192,6 +195,11 @@ export const TimelineControls: FC = () => {
         {/* Schroedinger Animation Drawer */}
         {showAnimDrawer && isSchroedinger && (
           <SchroedingerAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
+        )}
+
+        {/* Pauli Animation Drawer */}
+        {showAnimDrawer && isPauliSpinor && (
+          <PauliAnimationDrawer onClose={() => setShowAnimDrawer(false)} />
         )}
 
         {/* Schroedinger Open Quantum Drawer */}

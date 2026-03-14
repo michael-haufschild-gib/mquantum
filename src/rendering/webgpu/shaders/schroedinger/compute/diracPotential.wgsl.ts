@@ -30,7 +30,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
   // Compute physical positions
   var pos: array<f32, 12>;

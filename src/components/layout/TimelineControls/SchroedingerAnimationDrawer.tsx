@@ -155,15 +155,17 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
     } = useExtendedObjectStore(extendedObjectSelector)
 
     // Check quantum mode for UI visibility
+    const objectType = useGeometryStore((state) => state.objectType)
+    const isPauliSpinor = objectType === 'pauliSpinor'
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
     const isTdse = config.quantumMode === 'tdseDynamics'
     const isBec = config.quantumMode === 'becDynamics'
     const isDirac = config.quantumMode === 'diracEquation'
-    // Compute modes (FSF/TDSE/BEC/Dirac) use GPU density grids, not inline evalPsi().
+    // Compute modes (FSF/TDSE/BEC/Dirac/Pauli) use GPU density grids, not inline evalPsi().
     // Shader features that depend on inline wavefunction evaluation (interference,
     // probability flow, probability current) are forcibly disabled in extractSchrodingerConfig.
-    const isComputeMode = isFreeScalarField || isTdse || isBec || isDirac
+    const isComputeMode = isPauliSpinor || isFreeScalarField || isTdse || isBec || isDirac
 
     return (
       <AnimationDrawerContainer onClose={onClose} data-testid="schroedinger-animation-drawer">

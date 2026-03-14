@@ -104,6 +104,7 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   // Compile-time constants required by shared modules
   defines.push('const TEMPORAL_ENABLED: bool = false;')
   defines.push('const COLOR_ALGORITHM: i32 = 4;')
+  defines.push('const IS_DUAL_CHANNEL: bool = false;')
   defines.push('const FEATURE_INTERFERENCE: bool = false;')
   defines.push('const FEATURE_UNCERTAINTY_BOUNDARY: bool = false;')
   defines.push('const SKIP_DENSITY_EMPHASIS: bool = true;')

@@ -429,6 +429,49 @@ const ALGO_BRANCH: Record<number, string> = {
     // Phase (B channel) modulates brightness (subtle variation)
     let phaseBrightness = 0.7 + 0.3 * cos(phase);
     col *= phaseBrightness;`,
+
+  // ===== PAULI SPINOR COLOR ALGORITHMS =====
+  // Density grid encoding: R = spin-up |ψ↑|², G = spin-down |ψ↓|², B = phase, A = total.
+  // Raymarcher passes rho = R (spin-up), s = G (spin-down) via IS_DUAL_CHANNEL path.
+
+  24: /* wgsl */ `
+    // 24: Pauli Spin Density — user-configurable spin-up/down colors
+    // Additive blend produces mixed hue where both components overlap.
+    let upDensity = clamp(rho, 0.0, 1.0);
+    let downDensity = clamp(s, 0.0, 1.0);
+    let upColor = uniforms.pauliSpinUpColor * upDensity;
+    let downColor = uniforms.pauliSpinDownColor * downDensity;
+    col = upColor + downColor;
+    // Subtle phase modulation on brightness
+    let spinPhaseBrightness = 0.75 + 0.25 * cos(phase);
+    col *= spinPhaseBrightness;`,
+
+  25: /* wgsl */ `
+    // 25: Pauli Spin Expectation — diverging blue/red for ⟨σ_z⟩
+    // R channel = σ_z⁺ (spin-up bias), G channel = σ_z⁻ (spin-down bias)
+    // Total density = R + G gates overall brightness.
+    let upBias = clamp(rho, 0.0, 1.0);
+    let downBias = clamp(s, 0.0, 1.0);
+    let totalGate = clamp(upBias + downBias, 0.0, 1.0);
+    // Blue for spin-up dominant, red for spin-down dominant
+    let blueWing = vec3f(0.15, 0.35, 0.95);
+    let redWing = vec3f(0.95, 0.20, 0.15);
+    let neutral = vec3f(0.85, 0.85, 0.85);
+    // sigmaZ in [-1, 1] from the dual channels
+    let sigmaZ = select((upBias - downBias) / totalGate, 0.0, totalGate < 1e-6);
+    let wing = select(redWing, blueWing, sigmaZ >= 0.0);
+    let strength = abs(sigmaZ);
+    col = mix(neutral, wing, strength) * (0.3 + 0.7 * totalGate);`,
+
+  26: /* wgsl */ `
+    // 26: Pauli Coherence — cyan/teal for off-diagonal spinor coherence
+    // Single-channel: R = |ψ↑* ψ↓|, G = log(coh), standard density path.
+    // High coherence → vivid cyan-teal, low → dim.
+    let cohValue = clamp(normalized, 0.0, 1.0);
+    let hue = mix(0.48, 0.52, cohValue);
+    let saturation = mix(0.4, 0.95, cohValue);
+    let lightness = mix(0.08, 0.50, cohValue);
+    col = hsl2rgb(hue, saturation, lightness);`,
 }
 
 /** Human-readable names for color algorithms (indexed by ColorAlgorithm value) */
@@ -457,6 +500,9 @@ const COLOR_ALG_NAMES: Record<number, string> = {
   21: 'Density Contours',
   22: 'Phase-Density',
   23: 'Particle/Antiparticle',
+  24: 'Pauli Spin Density',
+  25: 'Pauli Spin Expectation',
+  26: 'Pauli Coherence',
 }
 
 export { ALGO_BRANCH, COLOR_ALG_NAMES }

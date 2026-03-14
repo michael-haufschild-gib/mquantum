@@ -7,6 +7,11 @@ import {
   type FreeScalarFieldView,
   type FreeScalarInitialCondition,
   type OpenQuantumVisualizationMode,
+  type PauliConfig,
+  type PauliFieldType,
+  type PauliFieldView,
+  type PauliInitialCondition,
+  type PauliPotentialType,
   type TdseDriveWaveform,
   type TdseFieldView,
   type TdseInitialCondition,
@@ -410,14 +415,88 @@ export interface SchroedingerSliceActions {
 export type SchroedingerSlice = SchroedingerSliceState & SchroedingerSliceActions
 
 // ============================================================================
+// Pauli Spinor Slice
+// ============================================================================
+
+export interface PauliSpinorSliceState {
+  pauliSpinor: PauliConfig
+}
+
+export interface PauliSpinorSliceActions {
+  // Physics
+  setPauliDt: (dt: number) => void
+  setPauliStepsPerFrame: (steps: number) => void
+  setPauliHbar: (hbar: number) => void
+  setPauliMass: (mass: number) => void
+
+  // Magnetic Field
+  setPauliFieldType: (type: PauliFieldType) => void
+  setPauliFieldStrength: (strength: number) => void
+  setPauliFieldDirection: (direction: [number, number]) => void
+  setPauliGradientStrength: (strength: number) => void
+  setPauliRotatingFrequency: (frequency: number) => void
+
+  // Initial Spin State
+  setPauliInitialSpinDirection: (direction: [number, number]) => void
+
+  // Initial Wavepacket
+  setPauliInitialCondition: (condition: PauliInitialCondition) => void
+  setPauliPacketCenter: (dimIndex: number, value: number) => void
+  setPauliPacketWidth: (width: number) => void
+  setPauliPacketMomentum: (dimIndex: number, value: number) => void
+
+  // Scalar Potential
+  setPauliPotentialType: (type: PauliPotentialType) => void
+  setPauliHarmonicOmega: (omega: number) => void
+  setPauliWellDepth: (depth: number) => void
+  setPauliWellWidth: (width: number) => void
+  setPauliShowPotential: (show: boolean) => void
+
+  // Visualization
+  setPauliFieldView: (view: PauliFieldView) => void
+  setPauliSpinUpColor: (color: [number, number, number]) => void
+  setPauliSpinDownColor: (color: [number, number, number]) => void
+  setPauliAutoScale: (autoScale: boolean) => void
+
+  // Grid
+  setPauliGridSize: (size: number[]) => void
+  setPauliSpacing: (spacing: number[]) => void
+  setPauliSlicePosition: (dimIndex: number, value: number) => void
+
+  // Absorber
+  setPauliAbsorberEnabled: (enabled: boolean) => void
+  setPauliAbsorberWidth: (width: number) => void
+  setPauliAbsorberStrength: (strength: number) => void
+
+  // Diagnostics
+  setPauliDiagnosticsEnabled: (enabled: boolean) => void
+  setPauliDiagnosticsInterval: (interval: number) => void
+
+  // Slice Animation
+  setPauliSliceAnimationEnabled: (enabled: boolean) => void
+  setPauliSliceSpeed: (speed: number) => void
+  setPauliSliceAmplitude: (amplitude: number) => void
+
+  // Lifecycle
+  setPauliNeedsReset: () => void
+  clearPauliNeedsReset: () => void
+  resetPauliField: () => void
+  setPauliConfig: (config: Partial<PauliConfig>) => void
+  initializePauliForDimension: (dimension: number) => void
+  getPauliConfig: () => PauliConfig
+}
+
+export type PauliSpinorSlice = PauliSpinorSliceState & PauliSpinorSliceActions
+
+// ============================================================================
 // Combined Extended Object Slice
 // ============================================================================
-/**
- *
- */
-export type ExtendedObjectSlice = SchroedingerSlice & {
+
+export type ExtendedObjectSlice = SchroedingerSlice & PauliSpinorSlice & {
   /** Version counter for schroedinger state changes (dirty-flag tracking) */
   schroedingerVersion: number
+  /** Version counter for pauli spinor state changes (dirty-flag tracking) */
+  pauliSpinorVersion: number
   /** Manually bump all version counters (used after direct setState calls) */
   bumpAllVersions: () => void
   reset: () => void

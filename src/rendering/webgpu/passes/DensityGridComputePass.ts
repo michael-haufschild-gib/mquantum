@@ -203,8 +203,8 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     })
 
     // Create uniform buffers
-    // SchroedingerUniforms: 1488 bytes (matches SCHROEDINGER_UNIFORM_SIZE in renderer)
-    this.schroedingerBuffer = this.createUniformBuffer(device, 1488, 'density-schroedinger')
+    // SchroedingerUniforms: 1520 bytes (matches SCHROEDINGER_UNIFORM_SIZE in renderer)
+    this.schroedingerBuffer = this.createUniformBuffer(device, 1520, 'density-schroedinger')
     // BasisVectors: 192 bytes (4 × 3 × vec4f)
     this.basisBuffer = this.createUniformBuffer(device, 192, 'density-basis')
     // GridParams: 48 bytes

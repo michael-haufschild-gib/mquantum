@@ -7,7 +7,7 @@ import { SharedAdvancedControls } from './SharedAdvancedControls'
 export const AdvancedObjectControls: React.FC = React.memo(() => {
   const objectType = useGeometryStore((state) => state.objectType)
 
-  if (objectType !== 'schroedinger') {
+  if (objectType !== 'schroedinger' && objectType !== 'pauliSpinor') {
     return null
   }
 

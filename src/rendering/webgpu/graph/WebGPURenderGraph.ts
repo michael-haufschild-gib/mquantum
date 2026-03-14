@@ -907,7 +907,7 @@ export class WebGPURenderGraph {
         }
 
         passTimings.set(passId, 0)
-        if (shouldLog) console.log(`[WebGPU RenderGraph] Pass '${passId}' is disabled`)
+
         continue
       }
 

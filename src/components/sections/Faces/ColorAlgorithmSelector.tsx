@@ -11,6 +11,7 @@ import {
 } from '@/rendering/shaders/palette'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import React, { useMemo, useCallback, useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -23,6 +24,8 @@ export interface ColorAlgorithmSelectorProps {
 
 export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = React.memo(
   ({ className = '' }) => {
+    const objectType = useGeometryStore((s) => s.objectType)
+
     const { colorAlgorithm, setColorAlgorithm } = useAppearanceStore(
       useShallow((state: AppearanceSlice) => ({
         colorAlgorithm: state.colorAlgorithm,
@@ -41,8 +44,8 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       openQuantumEnabled && (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') && representation !== 'wigner'
 
     const availableOptions = useMemo(
-      () => getAvailableColorAlgorithms(quantumMode, effectiveOpenQuantumEnabled),
-      [quantumMode, effectiveOpenQuantumEnabled]
+      () => getAvailableColorAlgorithms(quantumMode, effectiveOpenQuantumEnabled, objectType),
+      [quantumMode, effectiveOpenQuantumEnabled, objectType]
     )
 
     const selectOptions = useMemo(
@@ -54,27 +57,29 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       [availableOptions]
     )
 
+    const isComputeMode = objectType === 'pauliSpinor' || quantumMode === 'tdseDynamics' || quantumMode === 'freeScalarField' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
+
     // Auto-switch away from unavailable algorithm when mode changes
     useEffect(() => {
       const isAvailable = availableOptions.some((opt) => opt.value === colorAlgorithm)
       if (!isAvailable) {
-        const fallback = quantumMode === 'tdseDynamics' || quantumMode === 'freeScalarField' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
-          ? 'blackbody'
-          : 'radialDistance'
-        setColorAlgorithm(fallback)
+        if (objectType === 'pauliSpinor') {
+          setColorAlgorithm('pauliSpinDensity')
+        } else {
+          setColorAlgorithm(isComputeMode ? 'blackbody' : 'radialDistance')
+        }
       }
-    }, [availableOptions, colorAlgorithm, setColorAlgorithm, quantumMode])
+    }, [availableOptions, colorAlgorithm, setColorAlgorithm, isComputeMode, objectType])
 
-    // Auto-switch to blackbody when entering compute modes (TDSE/free scalar)
+    // Auto-switch to a mode-appropriate algorithm when entering compute modes
     // if the current algorithm is spatially misleading (radialDistance, radial, lch).
     // These color by geometric position, not by field value, producing false structure.
     useEffect(() => {
-      const isComputeMode = quantumMode === 'tdseDynamics' || quantumMode === 'freeScalarField' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
       const misleadingForCompute = new Set<string>(['radialDistance', 'radial', 'lch', 'multiSource'])
       if (isComputeMode && misleadingForCompute.has(colorAlgorithm)) {
-        setColorAlgorithm('blackbody')
+        setColorAlgorithm(objectType === 'pauliSpinor' ? 'pauliSpinDensity' : 'blackbody')
       }
-    }, [quantumMode, colorAlgorithm, setColorAlgorithm])
+    }, [isComputeMode, colorAlgorithm, setColorAlgorithm, objectType])
 
     const handleChange = useCallback(
       (v: string) => {

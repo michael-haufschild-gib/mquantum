@@ -182,6 +182,8 @@ export interface SchroedingerWGSLShaderConfig extends WGSLShaderConfig {
   useWignerCache?: boolean
   /** Free scalar field mode — cubic lattice, no Gaussian envelope. */
   isFreeScalar?: boolean
+  /** Pauli spinor mode — alpha encodes density, not potential. */
+  isPauli?: boolean
   /** Include analysis texture bindings for free-scalar educational color modes. */
   freeScalarAnalysis?: boolean
   /** Density matrix mode (open quantum) — disables inline wavefunction fallback. */
@@ -217,6 +219,7 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
     isWigner = false,
     useWignerCache = false,
     isFreeScalar = false,
+    isPauli = false,
     freeScalarAnalysis = false,
     useDensityMatrix = false,
     overrides = [],
@@ -336,6 +339,10 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const FEATURE_UNCERTAINTY_BOUNDARY: bool = ${uncertaintyBoundary};`)
   // Compile-time color algorithm selection used by phase channel routing.
   defines.push(`const COLOR_ALGORITHM: i32 = ${colorAlgorithm};`)
+  // Dual-channel density: R and G carry separate densities (Dirac particle/antiparticle,
+  // Pauli spin-up/down, Pauli spin-expectation). Raymarcher sums R+G for opacity.
+  const isDualChannel = [23, 24, 25].includes(colorAlgorithm)
+  defines.push(`const IS_DUAL_CHANNEL: bool = ${isDualChannel};`)
 
   // Density grid defines: use 3D texture for hydrogen raymarching
   defines.push(`const USE_DENSITY_GRID: bool = ${useDensityGrid};`)
@@ -346,6 +353,8 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   defines.push(`const DENSITY_GRID_SIZE: f32 = ${densityGridSize}.0;`)
   // Free scalar field: cubic lattice geometry, no Gaussian envelope optimization
   defines.push(`const IS_FREE_SCALAR: bool = ${isFreeScalar};`)
+  // Pauli spinor: alpha channel is total density, not potential overlay
+  defines.push(`const IS_PAULI: bool = ${isPauli};`)
   if (useDensityGrid) {
     features.push('Density Grid Raymarching')
   }

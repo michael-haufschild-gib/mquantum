@@ -10,13 +10,17 @@ import { useShallow } from 'zustand/react/shallow'
 
 
 export const SharedAdvancedControls: React.FC = React.memo(() => {
-  const dimension = useGeometryStore((state) => state.dimension)
+  const { dimension, objectType } = useGeometryStore(
+    useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
+  )
   const isoEnabled = useExtendedObjectStore(
     (state: ExtendedObjectState) => state.schroedinger?.isoEnabled ?? false
   )
   const representation = useExtendedObjectStore(
     (state: ExtendedObjectState) => state.schroedinger?.representation ?? 'position'
   )
+  // Pauli spinor is always volumetric 3D — bypass schroedinger iso/representation checks
+  const isPauli = objectType === 'pauliSpinor'
   const appearanceSelector = useShallow((state: AppearanceSlice) => ({
     sssEnabled: state.sssEnabled,
     setSssEnabled: state.setSssEnabled,
@@ -52,7 +56,7 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
   return (
     <div className="space-y-4 mb-4 pb-4">
       {/* Subsurface Scattering (volumetric only, 3D+) */}
-      {!isoEnabled && dimension > 2 && representation !== 'wigner' && (
+      {(isPauli || (!isoEnabled && dimension > 2 && representation !== 'wigner')) && (
       <ControlGroup
         title="Subsurface Scattering"
         collapsible

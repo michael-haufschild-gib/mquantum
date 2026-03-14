@@ -76,7 +76,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (idx >= params.totalSites) { return; }
 
   // Map 1D index to N-D lattice coordinates
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
   // Compute world-space position per dimension (centered on origin)
   var worldPos: array<f32, 12>;

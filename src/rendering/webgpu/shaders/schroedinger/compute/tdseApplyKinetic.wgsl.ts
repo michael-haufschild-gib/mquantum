@@ -25,7 +25,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Convert linear index to N-D k-space coordinates
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
   // Compute |k|^2 from lattice k-indices
   // k_d = kGridScale[d] * (coord_d < N_d/2 ? coord_d : coord_d - N_d)

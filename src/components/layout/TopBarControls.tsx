@@ -2,6 +2,7 @@ import { useToast } from '@/hooks/useToast'
 import { soundManager } from '@/lib/audio/SoundManager'
 import { useAnimationStore } from '@/stores/animationStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 import { useLayoutStore, type LayoutStore } from '@/stores/layoutStore'
 import { useUIStore, type UISlice } from '@/stores/uiStore'
 import React, { useEffect, useSyncExternalStore } from 'react'
@@ -84,7 +85,8 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
     quantumMode: state.schroedinger.quantumMode,
   }))
   const { representation, setRepresentation, quantumMode } = useExtendedObjectStore(representationSelector)
-  const isComputeMode = quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
+  const objectType = useGeometryStore((s) => s.objectType)
+  const isComputeMode = objectType === 'pauliSpinor' || quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
 
   // Local State
   const [isFullscreen, setIsFullscreen] = React.useState(false)

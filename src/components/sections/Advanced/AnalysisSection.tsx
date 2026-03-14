@@ -21,6 +21,7 @@ import { FSFAnalysisContent } from '@/components/sections/Advanced/FSFAnalysisSe
 import { TDSEAnalysisContent } from '@/components/sections/Advanced/TDSEAnalysisSection'
 import { BECAnalysisContent } from '@/components/sections/Advanced/BECAnalysisSection'
 import { DiracAnalysisContent } from '@/components/sections/Advanced/DiracAnalysisSection'
+import { PauliAnalysisContent } from '@/components/sections/Advanced/PauliAnalysisSection'
 
 /**
  * Props for AnalysisSection.
@@ -59,6 +60,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       quantumMode, representation,
       setFsfDiagnosticsEnabled, setTdseDiagnosticsEnabled,
       setBecDiagnosticsEnabled, setDiracDiagnosticsEnabled,
+      setPauliDiagnosticsEnabled,
     } = useExtendedObjectStore(
       useShallow((s) => ({
         quantumMode: s.schroedinger.quantumMode,
@@ -67,17 +69,11 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         setTdseDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
         setBecDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
         setDiracDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
+        setPauliDiagnosticsEnabled: s.setPauliDiagnosticsEnabled,
       })),
     )
+    const objectType = useGeometryStore((s) => s.objectType)
     const dimension = useGeometryStore((s) => s.dimension)
-
-    const isAnalytic = quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND'
-
-    // Analytic modes require 3D+ and non-Wigner representation for cross-section
-    if (isAnalytic && (dimension <= 2 || representation === 'wigner')) return null
-
-    const label = MODE_LABELS[quantumMode]
-    if (!label) return null
 
     // Wire diagnosticsEnabled to section open/close state for all dynamic modes
     const handleOpenChange = useCallback(
@@ -91,6 +87,30 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
       },
       [quantumMode, setFsfDiagnosticsEnabled, setTdseDiagnosticsEnabled, setBecDiagnosticsEnabled, setDiracDiagnosticsEnabled],
     )
+
+    const isPauli = objectType === 'pauliSpinor'
+
+    // Pauli spinor has its own analysis path
+    if (isPauli) {
+      return (
+        <Section
+          title="Pauli Analysis"
+          defaultOpen={defaultOpen}
+          onOpenChange={setPauliDiagnosticsEnabled}
+          data-testid="analysis-section"
+        >
+          <PauliAnalysisContent />
+        </Section>
+      )
+    }
+
+    const isAnalytic = quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND'
+
+    // Analytic modes require 3D+ and non-Wigner representation for cross-section
+    if (isAnalytic && (dimension <= 2 || representation === 'wigner')) return null
+
+    const label = MODE_LABELS[quantumMode]
+    if (!label) return null
 
     return (
       <Section

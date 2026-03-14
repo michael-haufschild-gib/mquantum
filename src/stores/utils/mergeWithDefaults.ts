@@ -11,7 +11,7 @@
  */
 
 import type { ObjectType } from '@/lib/geometry/types'
-import { DEFAULT_SCHROEDINGER_CONFIG } from '@/lib/geometry/extended/types'
+import { DEFAULT_SCHROEDINGER_CONFIG, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
 
 /**
@@ -19,6 +19,7 @@ import { OBJECT_TYPE_TO_CONFIG_KEY } from './presetSerialization'
  */
 const CONFIG_KEY_TO_DEFAULT: Record<string, object> = {
   schroedinger: DEFAULT_SCHROEDINGER_CONFIG,
+  pauliSpinor: DEFAULT_PAULI_CONFIG,
 }
 
 /**

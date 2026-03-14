@@ -31,7 +31,7 @@ import { WIGNER_RECONSTRUCT_PARAMS_SIZE } from '../shaders/schroedinger/compute/
 const WORKGROUP_SIZE = 16
 
 /** Schroedinger uniform buffer size (must match renderer constant) */
-const SCHROEDINGER_UNIFORM_SIZE = 1488
+const SCHROEDINGER_UNIFORM_SIZE = 1520
 
 /** BasisVectors uniform size: 4 vec3f padded to vec4f = 4 × 48 = 192 bytes */
 const BASIS_UNIFORM_SIZE = 192

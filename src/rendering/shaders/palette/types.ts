@@ -53,6 +53,9 @@ export type ColorAlgorithm =
   | 'densityContours'
   | 'phaseDensity'
   | 'particleAntiparticle'
+  | 'pauliSpinDensity'
+  | 'pauliSpinExpectation'
+  | 'pauliCoherence'
 
 /**
  * Options for the Color Algorithm dropdown in the UI.
@@ -82,6 +85,9 @@ export const COLOR_ALGORITHM_OPTIONS = [
   { value: 'densityContours' as const, label: 'Density Contours' },
   { value: 'phaseDensity' as const, label: 'Phase-Density Composite' },
   { value: 'particleAntiparticle' as const, label: 'Upper / Lower Spinor' },
+  { value: 'pauliSpinDensity' as const, label: 'Spin Density (↑ Cyan / ↓ Magenta)' },
+  { value: 'pauliSpinExpectation' as const, label: 'Spin Expectation ⟨σ_z⟩' },
+  { value: 'pauliCoherence' as const, label: 'Spinor Coherence' },
 ] as const
 
 /**
@@ -112,6 +118,9 @@ export const COLOR_ALGORITHM_TO_INT: Record<ColorAlgorithm, number> = {
   densityContours: 21,
   phaseDensity: 22,
   particleAntiparticle: 23,
+  pauliSpinDensity: 24,
+  pauliSpinExpectation: 25,
+  pauliCoherence: 26,
 }
 
 /**
@@ -257,7 +266,24 @@ export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 export function getAvailableColorAlgorithms(
   quantumMode: string,
   openQuantumEnabled: boolean = false,
+  objectType: string = 'schroedinger',
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
+  // Pauli spinor: the density grid encodes spin-channel data differently per
+  // field view. Expose the Pauli-specific algorithms (which match the grid layout)
+  // plus standard density-only algorithms for the totalDensity field view.
+  if (objectType === 'pauliSpinor') {
+    const pauliValidAlgos = new Set<string>([
+      'pauliSpinDensity',
+      'pauliSpinExpectation',
+      'pauliCoherence',
+      'blackbody',
+      'viridis',
+      'inferno',
+      'densityContours',
+    ])
+    return COLOR_ALGORITHM_OPTIONS.filter((opt) => pauliValidAlgos.has(opt.value))
+  }
+
   // Educational analysis algorithms — only available for free scalar field
   const educationalAlgos = new Set<string>([
     'hamiltonianDecomposition',
@@ -345,12 +371,16 @@ export function getAvailableColorAlgorithms(
   // Dirac-only algorithms — require spinor field data not present in other modes
   const diracOnlyAlgos = new Set<string>(['particleAntiparticle'])
 
+  // Pauli-only algorithms — require spin-resolved density grid, only valid for pauliSpinor object type
+  const pauliOnlyAlgos = new Set<string>(['pauliSpinDensity', 'pauliSpinExpectation', 'pauliCoherence'])
+
   // Non-freeScalar modes: exclude educational analysis algorithms, Dirac-only, and
   // conditionally include/exclude open quantum and phase-dependent algorithms
   return COLOR_ALGORITHM_OPTIONS.filter(
     (opt) =>
       !educationalAlgos.has(opt.value) &&
       !diracOnlyAlgos.has(opt.value) &&
+      !pauliOnlyAlgos.has(opt.value) &&
       (!openQuantumAlgos.has(opt.value) || openQuantumEnabled) &&
       (!phaseDependentAlgos.has(opt.value) || !openQuantumEnabled)
   )

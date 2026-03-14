@@ -1,13 +1,13 @@
 /**
  * Type definitions for n-dimensional geometry
  *
- * Supports Schroedinger quantum objects rendered via WebGPU.
+ * Supports Schroedinger and Pauli Spinor quantum objects rendered via WebGPU.
  */
 
 /**
  * All supported object types
  */
-export type ObjectType = 'schroedinger'
+export type ObjectType = 'schroedinger' | 'pauliSpinor'
 
 /**
  * Type guard for extended object types
@@ -15,5 +15,5 @@ export type ObjectType = 'schroedinger'
  * @returns True if type is an extended object type
  */
 export function isExtendedObjectType(type: string): type is ObjectType {
-  return type === 'schroedinger'
+  return type === 'schroedinger' || type === 'pauliSpinor'
 }

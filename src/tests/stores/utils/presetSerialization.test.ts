@@ -91,6 +91,81 @@ describe('sanitizeExtendedLoadedState', () => {
   })
 })
 
+describe('serializeExtendedState — pauliSpinor', () => {
+  it('round-trips pauliSpinor config through serialize → sanitize → merge', () => {
+    const state = {
+      pauliSpinor: {
+        latticeDim: 3,
+        gridSize: [64, 64, 64],
+        spacing: [0.15, 0.15, 0.15],
+        dt: 0.005,
+        stepsPerFrame: 4,
+        hbar: 1.0,
+        mass: 1.0,
+        fieldType: 'uniform',
+        fieldStrength: 3.5,
+        fieldDirection: [0.5, 1.2],
+        gradientStrength: 1.0,
+        rotatingFrequency: 1.0,
+        initialSpinDirection: [Math.PI / 4, 0],
+        initialCondition: 'gaussianSuperposition',
+        packetCenter: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        packetWidth: 0.8,
+        packetMomentum: [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        potentialType: 'harmonicTrap',
+        harmonicOmega: 2.0,
+        wellDepth: 5.0,
+        wellWidth: 1.0,
+        showPotential: true,
+        fieldView: 'spinExpectation',
+        spinUpColor: [0.0, 1.0, 0.5],
+        spinDownColor: [1.0, 0.0, 0.5],
+        autoScale: false,
+        absorberEnabled: true,
+        absorberWidth: 0.1,
+        absorberStrength: 5.0,
+        diagnosticsEnabled: true,
+        diagnosticsInterval: 5,
+        needsReset: true,
+        slicePositions: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      },
+    }
+
+    const serialized = serializeExtendedState(state, 'pauliSpinor')
+    const config = serialized.pauliSpinor as Record<string, unknown>
+
+    // Transient field stripped
+    expect('needsReset' in config).toBe(false)
+
+    // Physics fields preserved
+    expect(config.fieldStrength).toBe(3.5)
+    expect(config.fieldDirection).toEqual([0.5, 1.2])
+    expect(config.potentialType).toBe('harmonicTrap')
+    expect(config.harmonicOmega).toBe(2.0)
+    expect(config.fieldView).toBe('spinExpectation')
+    expect(config.spinUpColor).toEqual([0.0, 1.0, 0.5])
+    expect(config.spinDownColor).toEqual([1.0, 0.0, 0.5])
+    expect(config.autoScale).toBe(false)
+    expect(config.packetMomentum).toEqual([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+  })
+
+  it('sanitize strips needsReset from nested pauliSpinor config', () => {
+    const loaded = {
+      pauliSpinor: {
+        fieldStrength: 4.0,
+        needsReset: true,
+        pauliSpinorVersion: 7,
+      },
+    }
+    const sanitized = sanitizeExtendedLoadedState(loaded)
+    const config = sanitized.pauliSpinor as Record<string, unknown>
+
+    expect(config.fieldStrength).toBe(4.0)
+    expect('needsReset' in config).toBe(false)
+    expect('pauliSpinorVersion' in config).toBe(false)
+  })
+})
+
 describe('serializeExtendedState', () => {
   it('excludes sqLayer transient fields from serialized schroedinger config', () => {
     const state = {

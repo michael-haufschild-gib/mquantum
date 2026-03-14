@@ -54,6 +54,7 @@ const ControlsError: React.FC = () => (
 
 const CONTROLS_COMPONENTS: Record<string, React.ComponentType<unknown> | null> = {
   SchroedingerControls: getControlsComponent('SchroedingerControls'),
+  PauliSpinorControls: getControlsComponent('PauliSpinorControls'),
 }
 
 /**

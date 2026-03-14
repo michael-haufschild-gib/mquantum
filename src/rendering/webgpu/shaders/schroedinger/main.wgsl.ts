@@ -417,10 +417,11 @@ fn fragmentMain(input: VertexOutput) -> FragmentOutput {
   // (or the full ray if no hit). Renders as a solid wall in front of the wavefunction.
   // Only for compute modes (IS_FREE_SCALAR) where alpha encodes |V|/Vmax.
   // For HO/hydrogen, alpha is relativePhase — must NOT be rendered as potential.
+  // For Pauli spinor, alpha is total density — must NOT be rendered as potential.
   let potEnd = select(tFar, hitT, hitT >= 0.0);
   var potAccColor = vec3f(0.0);
   var potAccAlpha: f32 = 0.0;
-  if (IS_FREE_SCALAR && USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
+  if (IS_FREE_SCALAR && !IS_PAULI && USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
     let potStepLen = stepLen * 0.5;
     var potT = tNear;
     var potTransmittance: f32 = 1.0;
@@ -910,10 +911,11 @@ ${bayerJitterSection}
 
   // Potential overlay: accumulate up to hit point (or full ray if no hit).
   // Only for compute modes (IS_FREE_SCALAR) where alpha encodes |V|/Vmax.
+  // Pauli spinor: alpha is total density — skip potential overlay.
   let potEndT = select(tFar, hitT, hitT >= 0.0);
   var potAccColor = vec3f(0.0);
   var potAccAlpha: f32 = 0.0;
-  if (IS_FREE_SCALAR && USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
+  if (IS_FREE_SCALAR && !IS_PAULI && USE_DENSITY_GRID && DENSITY_GRID_HAS_PHASE) {
     let potStepLen = stepLen * 0.5;
     var potT = tNear;
     var potTransmittance: f32 = 1.0;

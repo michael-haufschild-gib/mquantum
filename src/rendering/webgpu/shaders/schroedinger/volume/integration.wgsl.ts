@@ -1159,20 +1159,20 @@ fn volumeRaymarchGrid(
     let gridSample = sampleDensityFromGrid(pos, uniforms);
     var rho = gridSample.r;
 
-    // For particle/antiparticle split mode (COLOR_ALGORITHM == 23):
-    //   R = particle density, G = antiparticle density (NOT logRho)
+    // For dual-channel modes (Dirac particle/antiparticle, Pauli spin-up/down):
+    //   R = primary density, G = secondary density (NOT logRho)
     //   Opacity/absorption must use total density (R + G) so that
-    //   antiparticle-only regions remain visible.
+    //   secondary-only regions remain visible.
     //   colorRho/colorS preserve the raw channels for computeBaseColor.
     // For all other modes: G = logRho as usual.
     var sCenter: f32;
     var colorRho: f32 = rho;
     var colorS: f32 = 0.0;
-    if (COLOR_ALGORITHM == 23) {
-      colorS = gridSample.g;        // antiparticle density for computeBaseColor 's'
+    if (IS_DUAL_CHANNEL) {
+      colorS = gridSample.g;        // secondary density for computeBaseColor 's'
       sCenter = gridSample.g;       // (also kept in sCenter for backward compat)
       rho = rho + gridSample.g;     // total density for alpha/skip/adaptive stepping
-      colorRho = gridSample.r;      // particle density for computeBaseColor 'rho'
+      colorRho = gridSample.r;      // primary density for computeBaseColor 'rho'
     } else if (DENSITY_GRID_HAS_PHASE) {
       sCenter = gridSample.g; // logRho from grid
       colorS = sCenter;
@@ -1191,8 +1191,8 @@ fn volumeRaymarchGrid(
 
     // Apply uncertainty boundary emphasis (matches inline sampleDensityWithPhase path)
     // PERF: Only recompute log(rho) when emphasis actually modifies rho
-    // Skip for algo 23 since sCenter is antiparticle density, not logRho.
-    if (FEATURE_UNCERTAINTY_BOUNDARY && COLOR_ALGORITHM != 23) {
+    // Skip for dual-channel modes since sCenter is secondary density, not logRho.
+    if (FEATURE_UNCERTAINTY_BOUNDARY && !IS_DUAL_CHANNEL) {
       rho = applyUncertaintyBoundaryEmphasis(rho, sCenter, uniforms);
       // Update logRho to reflect emphasis so emission color/brightness matches inline path
       // (computeBaseColor uses s for color mapping: normalized = clamp((s+8)/8, 0, 1))
@@ -1204,17 +1204,18 @@ fn volumeRaymarchGrid(
     // Skip near-zero density regions (but not potential overlay regions).
     // Potential overlay only applies to compute modes (TDSE/BEC/Dirac/FSF) where the
     // alpha channel encodes |V|/Vmax. For HO/hydrogen modes, alpha is relativePhase.
-    let hasPotOverlay = IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
+    // Pauli spinor: alpha is total density, not potential — skip potential check.
+    let hasPotOverlay = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01;
     if (rho < EMPTY_SKIP_THRESHOLD && !hasPotOverlay) {
       let skipDistance = min(stepLen * EMPTY_SKIP_FACTOR, max(tFar - t, 0.0));
       if (skipDistance > stepLen) {
         let probeMid = sampleDensityFromGrid(pos + rayDir * (skipDistance * 0.5), uniforms);
         let probeFar = sampleDensityFromGrid(pos + rayDir * skipDistance, uniforms);
-        let midHasPot = IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
-        let farHasPot = IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
-        // For algo 23, include antiparticle density (G channel) in skip check
-        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, COLOR_ALGORITHM == 23);
-        let farTotal = select(probeFar.r, probeFar.r + probeFar.g, COLOR_ALGORITHM == 23);
+        let midHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeMid.a > 0.01;
+        let farHasPot = IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && probeFar.a > 0.01;
+        // For dual-channel modes, include secondary density (G channel) in skip check
+        let midTotal = select(probeMid.r, probeMid.r + probeMid.g, IS_DUAL_CHANNEL);
+        let farTotal = select(probeFar.r, probeFar.r + probeFar.g, IS_DUAL_CHANNEL);
         if (midTotal < EMPTY_SKIP_THRESHOLD && farTotal < EMPTY_SKIP_THRESHOLD && !midHasPot && !farHasPot) {
           t += skipDistance;
           continue;
@@ -1223,11 +1224,11 @@ fn volumeRaymarchGrid(
     }
 
     // Adaptive step size based on density (keep fine steps in potential regions)
-    // For algo 23, sCenter is antiparticle density [0,1], not logRho [-20,0].
+    // For dual-channel modes, sCenter is secondary density [0,1], not logRho [-20,0].
     // Use logRho of total density for adaptive stepping.
     var stepMultiplier = 1.0;
     if (!hasPotOverlay) {
-      let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), COLOR_ALGORITHM == 23);
+      let logRhoForStep = select(sCenter, select(-20.0, log(rho), rho > 1e-9), IS_DUAL_CHANNEL);
       if (logRhoForStep < -12.0) {
         stepMultiplier = 4.0;
       } else if (logRhoForStep < -8.0) {
@@ -1240,7 +1241,8 @@ fn volumeRaymarchGrid(
     // Alpha channel encodes normalized |V|/Vmax from the write-grid shader.
     // Only active for compute modes (IS_FREE_SCALAR) where alpha IS potential.
     // For HO/hydrogen modes, alpha is relativePhase — must NOT be rendered as potential.
-    if (IS_FREE_SCALAR && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
+    // For Pauli spinor mode, alpha encodes total density — must NOT be rendered as potential.
+    if (IS_FREE_SCALAR && !IS_PAULI && DENSITY_GRID_HAS_PHASE && gridSample.a > 0.01) {
       let potColor = vec3f(0.35, 0.45, 0.55);
       let potOpacity = clamp(gridSample.a * 0.6 * min(adaptiveStep / max(stepLen, 1e-5), 2.0), 0.0, 0.8);
       accColor += transmittance * potOpacity * potColor;

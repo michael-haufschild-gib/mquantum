@@ -36,7 +36,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Convert linear index to N-D coordinates
-  let coords = linearToND(idx, params.gridSize, params.latticeDim);
+  let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
 
   // Compute physical position, Gaussian envelope, and plane-wave phase
   var r2: f32 = 0.0;

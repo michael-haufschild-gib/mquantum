@@ -8,6 +8,7 @@ import type { SavedScene, SavedStyle } from '../presetManagerStore'
  */
 export const OBJECT_TYPE_TO_CONFIG_KEY: Record<ObjectType, string> = {
   schroedinger: 'schroedinger',
+  pauliSpinor: 'pauliSpinor',
 }
 
 /**
@@ -47,6 +48,7 @@ export const TRANSIENT_FIELDS = new Set([
   'version', // Used by rotationStore and lightingSlice
   'pbrVersion',
   'schroedingerVersion',
+  'pauliSpinorVersion',
 
   // Legacy version counters from removed object types - strip from imported presets
   'gravityVersion',
