@@ -13,8 +13,6 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { ControlGroup } from '@/components/ui/ControlGroup'
-import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useTdseDiagnosticsStore } from '@/stores/tdseDiagnosticsStore'
@@ -44,46 +42,29 @@ const PLOT_H = HEIGHT - 2 * PADDING_Y
  * ```
  */
 export const TDSEAnalysisContent: React.FC = React.memo(() => {
-  const { tdse, setDiagnosticsEnabled, setDiagnosticsInterval } =
+  const { tdse, setDiagnosticsInterval } =
     useExtendedObjectStore(
       useShallow((s) => ({
         tdse: s.schroedinger.tdse,
-        setDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
         setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
       })),
     )
 
   return (
     <>
-      {/* Diagnostics toggle + interval */}
-      <ControlGroup
-        title="Diagnostics"
-        collapsible
-        defaultOpen
-        rightElement={
-          <Switch
-            checked={tdse.diagnosticsEnabled}
-            onCheckedChange={setDiagnosticsEnabled}
-            data-testid="tdse-diagnostics-enabled"
-          />
-        }
-      >
-        {tdse.diagnosticsEnabled && (
-          <Slider
-            label="Interval (frames)"
-            min={1}
-            max={60}
-            step={1}
-            value={tdse.diagnosticsInterval}
-            onChange={setDiagnosticsInterval}
-            showValue
-            data-testid="tdse-diagnostics-interval"
-          />
-        )}
-      </ControlGroup>
+      <Slider
+        label="Diagnostics Interval (frames)"
+        min={1}
+        max={60}
+        step={1}
+        value={tdse.diagnosticsInterval}
+        onChange={setDiagnosticsInterval}
+        showValue
+        data-testid="tdse-diagnostics-interval"
+      />
 
       {/* Inline energy diagram */}
-      {tdse.diagnosticsEnabled && <EnergyDiagramInline tdse={tdse} />}
+      <EnergyDiagramInline tdse={tdse} />
     </>
   )
 })
@@ -153,6 +134,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
 
   return (
     <div className="mt-2" data-testid="tdse-energy-diagram-inline">
+      <p className="text-[10px] text-text-secondary mb-1">Potential V(x) & Kinetic Energy</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Zero line */}

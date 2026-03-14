@@ -13,8 +13,6 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { ControlGroup } from '@/components/ui/ControlGroup'
-import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
@@ -31,49 +29,32 @@ import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
  * ```
  */
 export const DiracAnalysisContent: React.FC = React.memo(() => {
-  const { dirac, setDiagnosticsEnabled, setDiagnosticsInterval } =
+  const { dirac, setDiagnosticsInterval } =
     useExtendedObjectStore(
       useShallow((s) => ({
         dirac: s.schroedinger.dirac,
-        setDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
         setDiagnosticsInterval: s.setDiracDiagnosticsInterval,
       })),
     )
 
   return (
     <>
-      {/* Diagnostics toggle + interval */}
-      <ControlGroup
-        title="Diagnostics"
-        collapsible
-        defaultOpen
-        rightElement={
-          <Switch
-            checked={dirac.diagnosticsEnabled}
-            onCheckedChange={setDiagnosticsEnabled}
-            data-testid="dirac-diagnostics-enabled"
-          />
-        }
-      >
-        {dirac.diagnosticsEnabled && (
-          <Slider
-            label="Interval (frames)"
-            min={1}
-            max={60}
-            step={1}
-            value={dirac.diagnosticsInterval}
-            onChange={setDiagnosticsInterval}
-            showValue
-            data-testid="dirac-diagnostics-interval"
-          />
-        )}
-      </ControlGroup>
+      <Slider
+        label="Diagnostics Interval (frames)"
+        min={1}
+        max={60}
+        step={1}
+        value={dirac.diagnosticsInterval}
+        onChange={setDiagnosticsInterval}
+        showValue
+        data-testid="dirac-diagnostics-interval"
+      />
 
       {/* E(k) dispersion diagram */}
       <DiracDispersionDiagram mass={dirac.mass} speedOfLight={dirac.speedOfLight} />
 
       {/* Diagnostics readout */}
-      {dirac.diagnosticsEnabled && <DiracDiagnosticsInline />}
+      <DiracDiagnosticsInline />
     </>
   )
 })
@@ -133,6 +114,7 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
 
     return (
       <div className="mt-2" data-testid="dirac-dispersion">
+        <p className="text-[10px] text-text-secondary mb-1">Dirac Dispersion E(k) = ±√((ck)² + (mc²)²)</p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
           <svg width="100%" viewBox={`0 0 ${DISP_WIDTH} ${DISP_HEIGHT}`} className="block">
             {/* Zero energy line */}

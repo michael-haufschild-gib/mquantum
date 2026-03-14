@@ -13,8 +13,6 @@
 
 import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { ControlGroup } from '@/components/ui/ControlGroup'
-import { Switch } from '@/components/ui/Switch'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
@@ -39,46 +37,29 @@ const PLOT_H = HEIGHT - 2 * PADDING_Y
  * ```
  */
 export const BECAnalysisContent: React.FC = React.memo(() => {
-  const { bec, setDiagnosticsEnabled, setDiagnosticsInterval } =
+  const { bec, setDiagnosticsInterval } =
     useExtendedObjectStore(
       useShallow((s) => ({
         bec: s.schroedinger.bec,
-        setDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
         setDiagnosticsInterval: s.setBecDiagnosticsInterval,
       })),
     )
 
   return (
     <>
-      {/* Diagnostics toggle + interval */}
-      <ControlGroup
-        title="Diagnostics"
-        collapsible
-        defaultOpen
-        rightElement={
-          <Switch
-            checked={bec.diagnosticsEnabled}
-            onCheckedChange={setDiagnosticsEnabled}
-            data-testid="bec-diagnostics-enabled"
-          />
-        }
-      >
-        {bec.diagnosticsEnabled && (
-          <Slider
-            label="Interval (frames)"
-            min={1}
-            max={60}
-            step={1}
-            value={bec.diagnosticsInterval}
-            onChange={setDiagnosticsInterval}
-            showValue
-            data-testid="bec-diagnostics-interval"
-          />
-        )}
-      </ControlGroup>
+      <Slider
+        label="Diagnostics Interval (frames)"
+        min={1}
+        max={60}
+        step={1}
+        value={bec.diagnosticsInterval}
+        onChange={setDiagnosticsInterval}
+        showValue
+        data-testid="bec-diagnostics-interval"
+      />
 
       {/* Inline trap diagram + diagnostics readout */}
-      {bec.diagnosticsEnabled && <BECDiagnosticsInline bec={bec} />}
+      <BECDiagnosticsInline bec={bec} />
     </>
   )
 })
@@ -155,6 +136,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
 
   return (
     <div className="mt-2" data-testid="bec-analysis-inline">
+      <p className="text-[10px] text-text-secondary mb-1">Harmonic Trap V(x) & Chemical Potential</p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Zero line */}

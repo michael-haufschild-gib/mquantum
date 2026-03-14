@@ -1,4 +1,5 @@
 import { soundManager } from '@/lib/audio/SoundManager'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { AnimatePresence, m } from 'motion/react'
 import React, { useState, useCallback } from 'react'
 
@@ -12,7 +13,9 @@ export interface ControlGroupProps {
   collapsible?: boolean
   className?: string
   rightElement?: React.ReactNode
-  variant?: 'default' | 'card' // Added variant
+  variant?: 'default' | 'card'
+  /** Tooltip text shown on hover over the title */
+  tooltip?: string
 }
 
 export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
@@ -24,6 +27,7 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
     className = '',
     rightElement,
     variant = 'default',
+    tooltip,
   }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen)
 
@@ -103,11 +107,21 @@ export const ControlGroup: React.FC<ControlGroupProps> = React.memo(
                   </svg>
                 </m.div>
               )}
-              <span
-                className={`text-xs font-semibold uppercase tracking-wider ${collapsible ? 'text-text-secondary group-hover:text-text-primary' : 'text-text-secondary'}`}
-              >
-                {title}
-              </span>
+              {tooltip ? (
+                <Tooltip content={tooltip} position="top">
+                  <span
+                    className={`text-xs font-semibold uppercase tracking-wider ${collapsible ? 'text-text-secondary group-hover:text-text-primary' : 'text-text-secondary'}`}
+                  >
+                    {title}
+                  </span>
+                </Tooltip>
+              ) : (
+                <span
+                  className={`text-xs font-semibold uppercase tracking-wider ${collapsible ? 'text-text-secondary group-hover:text-text-primary' : 'text-text-secondary'}`}
+                >
+                  {title}
+                </span>
+              )}
             </div>
 
             {rightElement && <div onClick={handleRightElementClick}>{rightElement}</div>}

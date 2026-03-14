@@ -14,6 +14,8 @@ import { SecondQuantizationSection } from '@/components/sections/Geometry/Schroe
 import type { SecondQuantizationActions } from '@/components/sections/Geometry/SchroedingerControls/types'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
+import { HOEnergyDiagram } from '@/components/sections/Advanced/HOEnergyDiagram'
+import { HydrogenEnergyDiagram } from '@/components/sections/Advanced/HydrogenEnergyDiagram'
 import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
@@ -139,6 +141,10 @@ export const CrossSectionAnalysisContent: React.FC = React.memo(() => {
 
     return (
       <>
+        {/* Energy level + wavefunction diagrams */}
+        {isHarmonicOscillatorMode && <HOEnergyDiagram />}
+        {config.quantumMode === 'hydrogenND' && <HydrogenEnergyDiagram />}
+
         {/* Slice Plane */}
         <ControlGroup
           title="Slice Plane"

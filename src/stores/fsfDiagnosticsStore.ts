@@ -10,6 +10,9 @@
 
 import { create } from 'zustand'
 
+/** Ring buffer length — ~2s at 60fps */
+const HISTORY_LENGTH = 120
+
 /**
  * FSF diagnostic snapshot pushed from GPU readback.
  */
@@ -36,6 +39,15 @@ interface FsfDiagnosticsState extends FsfDiagnosticsSnapshot {
   /** Initial energy for drift tracking */
   initialEnergy: number
 
+  /** Energy time-series ring buffer */
+  historyEnergy: Float32Array
+  /** Norm time-series ring buffer */
+  historyNorm: Float32Array
+  /** Current write head in ring buffer */
+  historyHead: number
+  /** Number of valid entries (up to HISTORY_LENGTH) */
+  historyCount: number
+
   /** Push a new diagnostics snapshot */
   pushSnapshot: (snapshot: FsfDiagnosticsSnapshot) => void
   /** Reset to initial state */
@@ -52,6 +64,10 @@ const INITIAL_STATE: Omit<FsfDiagnosticsState, 'pushSnapshot' | 'reset'> = {
   meanPhi: 0,
   variancePhi: 0,
   initialEnergy: 0,
+  historyEnergy: new Float32Array(HISTORY_LENGTH),
+  historyNorm: new Float32Array(HISTORY_LENGTH),
+  historyHead: 0,
+  historyCount: 0,
 }
 
 /**
@@ -62,23 +78,35 @@ const INITIAL_STATE: Omit<FsfDiagnosticsState, 'pushSnapshot' | 'reset'> = {
  * const energy = useFsfDiagnosticsStore((s) => s.totalEnergy)
  * ```
  */
-export const useFsfDiagnosticsStore = create<FsfDiagnosticsState>((set, get) => ({
+export const useFsfDiagnosticsStore = create<FsfDiagnosticsState>((set) => ({
   ...INITIAL_STATE,
 
   pushSnapshot: (snapshot) => {
-    const state = get()
-    const initialEnergy = state.hasData ? state.initialEnergy : snapshot.totalEnergy
-    const energyDrift =
-      initialEnergy !== 0
-        ? (snapshot.totalEnergy - initialEnergy) / Math.abs(initialEnergy)
-        : 0
-    set({
-      ...snapshot,
-      energyDrift,
-      initialEnergy,
-      hasData: true,
+    set((state) => {
+      const initialEnergy = state.hasData ? state.initialEnergy : snapshot.totalEnergy
+      const energyDrift =
+        initialEnergy !== 0
+          ? (snapshot.totalEnergy - initialEnergy) / Math.abs(initialEnergy)
+          : 0
+
+      const head = state.historyHead
+      state.historyEnergy[head] = snapshot.totalEnergy
+      state.historyNorm[head] = snapshot.totalNorm
+
+      return {
+        ...snapshot,
+        energyDrift,
+        initialEnergy,
+        hasData: true,
+        historyHead: (head + 1) % HISTORY_LENGTH,
+        historyCount: Math.min(state.historyCount + 1, HISTORY_LENGTH),
+      }
     })
   },
 
-  reset: () => set(INITIAL_STATE),
+  reset: () => set({
+    ...INITIAL_STATE,
+    historyEnergy: new Float32Array(HISTORY_LENGTH),
+    historyNorm: new Float32Array(HISTORY_LENGTH),
+  }),
 }))

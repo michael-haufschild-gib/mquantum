@@ -11,7 +11,7 @@
  * @module components/sections/Advanced/AnalysisSection
  */
 
-import React from 'react'
+import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -55,10 +55,18 @@ const MODE_LABELS: Record<string, string> = {
  */
 export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
   ({ defaultOpen = true }) => {
-    const { quantumMode, representation } = useExtendedObjectStore(
+    const {
+      quantumMode, representation,
+      setFsfDiagnosticsEnabled, setTdseDiagnosticsEnabled,
+      setBecDiagnosticsEnabled, setDiracDiagnosticsEnabled,
+    } = useExtendedObjectStore(
       useShallow((s) => ({
         quantumMode: s.schroedinger.quantumMode,
         representation: s.schroedinger.representation,
+        setFsfDiagnosticsEnabled: s.setFreeScalarDiagnosticsEnabled,
+        setTdseDiagnosticsEnabled: s.setTdseDiagnosticsEnabled,
+        setBecDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
+        setDiracDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
       })),
     )
     const dimension = useGeometryStore((s) => s.dimension)
@@ -71,10 +79,24 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     const label = MODE_LABELS[quantumMode]
     if (!label) return null
 
+    // Wire diagnosticsEnabled to section open/close state for all dynamic modes
+    const handleOpenChange = useCallback(
+      (isOpen: boolean) => {
+        switch (quantumMode) {
+          case 'freeScalarField': setFsfDiagnosticsEnabled(isOpen); break
+          case 'tdseDynamics': setTdseDiagnosticsEnabled(isOpen); break
+          case 'becDynamics': setBecDiagnosticsEnabled(isOpen); break
+          case 'diracEquation': setDiracDiagnosticsEnabled(isOpen); break
+        }
+      },
+      [quantumMode, setFsfDiagnosticsEnabled, setTdseDiagnosticsEnabled, setBecDiagnosticsEnabled, setDiracDiagnosticsEnabled],
+    )
+
     return (
       <Section
         title={`${label} Analysis`}
         defaultOpen={defaultOpen}
+        onOpenChange={handleOpenChange}
         data-testid="analysis-section"
       >
         {isAnalytic && <CrossSectionAnalysisContent />}

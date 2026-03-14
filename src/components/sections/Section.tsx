@@ -11,6 +11,8 @@ export interface SectionProps {
   children: React.ReactNode
   className?: string
   onReset?: () => void
+  /** Called when the section is opened or closed */
+  onOpenChange?: (isOpen: boolean) => void
   'data-testid'?: string
 }
 
@@ -21,6 +23,7 @@ export const Section: React.FC<SectionProps> = React.memo(
     children,
     className = '',
     onReset,
+    onOpenChange,
     'data-testid': dataTestId,
   }) => {
     // Persistence logic
@@ -54,9 +57,17 @@ export const Section: React.FC<SectionProps> = React.memo(
       localStorage.setItem(storageKey, JSON.stringify(isOpen))
     }, [isOpen, storageKey])
 
+    // Sync open state to parent when callback identity changes
+    // (covers initial mount AND quantum mode switches)
+    useEffect(() => {
+      onOpenChange?.(isOpen)
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onOpenChange])
+
     const handleToggle = useCallback(() => {
       const willOpen = !isOpen
       setIsOpen(willOpen)
+      onOpenChange?.(willOpen)
       if (willOpen && sectionRef.current) {
         // Clear any pending scroll timer
         if (scrollTimerRef.current !== null) {
@@ -68,7 +79,7 @@ export const Section: React.FC<SectionProps> = React.memo(
           scrollTimerRef.current = null
         }, 100)
       }
-    }, [isOpen])
+    }, [isOpen, onOpenChange])
 
     const handleResetClick = useCallback(
       (e: React.MouseEvent) => {

@@ -122,8 +122,8 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent-cyan)" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="var(--color-accent-cyan)" stopOpacity="0.02" />
+            <stop offset="0%" stopColor="var(--theme-accent)" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="var(--theme-accent)" stopOpacity="0.05" />
           </linearGradient>
         </defs>
         {count >= 2 && (
@@ -132,7 +132,7 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
             <polyline
               points={polyline}
               fill="none"
-              stroke="var(--color-accent-cyan)"
+              stroke="var(--theme-accent)"
               strokeWidth="1.5"
               vectorEffect="non-scaling-stroke"
             />

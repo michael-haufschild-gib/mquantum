@@ -32,7 +32,7 @@
        ═══════════════════════════════════════════════════════════════════ */
     --text-primary: var(--token-slate-50);
     --text-secondary: var(--token-slate-400);
-    --text-tertiary: var(--token-slate-600);
+    --text-tertiary: var(--token-slate-500);
     --text-muted: var(--token-slate-500);
     --text-inverse: var(--token-slate-950);
 
