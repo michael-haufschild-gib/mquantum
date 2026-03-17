@@ -39,8 +39,14 @@ vi.mock('@/rendering/webgpu/graph/WebGPURenderGraph', () => ({
 }))
 
 describe('WebGPUCanvas', () => {
-  const clientWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
-  const clientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+  const clientWidthDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientWidth'
+  )
+  const clientHeightDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientHeight'
+  )
 
   beforeEach(() => {
     initializeMock.mockReset()

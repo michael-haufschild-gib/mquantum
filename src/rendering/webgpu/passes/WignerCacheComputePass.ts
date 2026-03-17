@@ -1,4 +1,3 @@
-/* global GPUTextureFormat, GPUTextureViewDimension */
 /**
  * Wigner Cache Compute Pass — Two-Phase Pipeline
  *
@@ -38,7 +37,6 @@ const BASIS_UNIFORM_SIZE = 192
 
 /** Offset of the `time` field in SchroedingerUniforms (f32 at offset 908) */
 const TIME_FIELD_OFFSET = 908
-
 
 /**
  * Configuration for the Wigner cache compute pass.
@@ -226,8 +224,8 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       format: 'rgba16float',
       dimension: '2d',
       usage:
-        GPUTextureUsage.STORAGE_BINDING |  // For compute shader write
-        GPUTextureUsage.TEXTURE_BINDING,   // For fragment shader sampling
+        GPUTextureUsage.STORAGE_BINDING | // For compute shader write
+        GPUTextureUsage.TEXTURE_BINDING, // For fragment shader sampling
     })
     this.cacheTextureView = this.cacheTexture.createView({ label: 'wigner-cache-final-view' })
 
@@ -241,9 +239,17 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     })
 
     // Uniform buffers
-    this.schroedingerBuffer = this.createUniformBuffer(device, SCHROEDINGER_UNIFORM_SIZE, 'wigner-schroedinger')
+    this.schroedingerBuffer = this.createUniformBuffer(
+      device,
+      SCHROEDINGER_UNIFORM_SIZE,
+      'wigner-schroedinger'
+    )
     this.basisBuffer = this.createUniformBuffer(device, BASIS_UNIFORM_SIZE, 'wigner-basis')
-    this.gridParamsBuffer = this.createUniformBuffer(device, WIGNER_GRID_PARAMS_SIZE, 'wigner-grid-params')
+    this.gridParamsBuffer = this.createUniformBuffer(
+      device,
+      WIGNER_GRID_PARAMS_SIZE,
+      'wigner-grid-params'
+    )
   }
 
   /**
@@ -289,7 +295,10 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     })
 
     this.legacyPipeline = await this.createComputePipelineAsync(
-      device, shaderModule, [this.legacyBindGroupLayout], 'wigner-legacy'
+      device,
+      shaderModule,
+      [this.legacyBindGroupLayout],
+      'wigner-legacy'
     )
 
     // Also store as computePipeline for base class compatibility
@@ -315,21 +324,21 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       format: 'rgba16float',
       dimension: '2d',
       usage:
-        GPUTextureUsage.STORAGE_BINDING |  // For spatial write
-        GPUTextureUsage.TEXTURE_BINDING,   // For reconstruction read
+        GPUTextureUsage.STORAGE_BINDING | // For spatial write
+        GPUTextureUsage.TEXTURE_BINDING, // For reconstruction read
     })
     this.diagTextureView = this.diagTexture.createView({ label: 'wigner-diag-view' })
 
     // Cross-term texture array (only if there are cross pairs)
-    const numLayers = Math.max(this.numCrossLayers, 1)  // Minimum 1 layer for texture array
+    const numLayers = Math.max(this.numCrossLayers, 1) // Minimum 1 layer for texture array
     this.crossTexArray = device.createTexture({
       label: 'wigner-cross-tex-array',
       size: { width: this.gridSize, height: this.gridSize, depthOrArrayLayers: numLayers },
       format: 'rgba16float',
       dimension: '2d',
       usage:
-        GPUTextureUsage.STORAGE_BINDING |  // For spatial write
-        GPUTextureUsage.TEXTURE_BINDING,   // For reconstruction read
+        GPUTextureUsage.STORAGE_BINDING | // For spatial write
+        GPUTextureUsage.TEXTURE_BINDING, // For reconstruction read
     })
     this.crossTexArrayView = this.crossTexArray.createView({
       label: 'wigner-cross-array-view',
@@ -338,7 +347,9 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
     // Spatial params buffer
     this.spatialParamsBuffer = this.createUniformBuffer(
-      device, WIGNER_SPATIAL_PARAMS_SIZE, 'wigner-spatial-params'
+      device,
+      WIGNER_SPATIAL_PARAMS_SIZE,
+      'wigner-spatial-params'
     )
 
     // Upload spatial params (pair mapping is static once built)
@@ -387,7 +398,10 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     })
 
     this.spatialPipeline = await this.createComputePipelineAsync(
-      device, shaderModule, [this.spatialBindGroupLayout], 'wigner-spatial'
+      device,
+      shaderModule,
+      [this.spatialBindGroupLayout],
+      'wigner-spatial'
     )
   }
 
@@ -400,7 +414,9 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
     // Reconstruct params buffer (phased coefficients uploaded every frame)
     this.reconstructParamsBuffer = this.createUniformBuffer(
-      device, WIGNER_RECONSTRUCT_PARAMS_SIZE, 'wigner-reconstruct-params'
+      device,
+      WIGNER_RECONSTRUCT_PARAMS_SIZE,
+      'wigner-reconstruct-params'
     )
 
     // Bind group layout: 4 bindings (diagTex read, crossArray read, params, cacheOut write)
@@ -442,7 +458,10 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     })
 
     this.reconstructPipeline = await this.createComputePipelineAsync(
-      device, shaderModule, [this.reconstructBindGroupLayout], 'wigner-reconstruct'
+      device,
+      shaderModule,
+      [this.reconstructBindGroupLayout],
+      'wigner-reconstruct'
     )
   }
 
@@ -463,12 +482,12 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
     // layerPairs: group pairs by layer, 2 per layer
     // offset 16 = index 4 in i32 view
-    const baseOffset = 4  // 16 bytes / 4 = index 4
+    const baseOffset = 4 // 16 bytes / 4 = index 4
 
     for (let layerIdx = 0; layerIdx < this.numCrossLayers; layerIdx++) {
       const pairIdx0 = layerIdx * 2
       const pairIdx1 = layerIdx * 2 + 1
-      const layerOffset = baseOffset + layerIdx * 4  // Each vec4i = 4 ints
+      const layerOffset = baseOffset + layerIdx * 4 // Each vec4i = 4 ints
 
       // First pair (always exists for this layer)
       const pair0 = this.crossPairs[pairIdx0]!
@@ -536,11 +555,21 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
    * Update grid parameters (physical x/p ranges).
    * Only triggers recompute if ranges actually changed.
    */
-  updateGridParams(device: GPUDevice, xMin: number, xMax: number, pMin: number, pMax: number): void {
+  updateGridParams(
+    device: GPUDevice,
+    xMin: number,
+    xMax: number,
+    pMin: number,
+    pMax: number
+  ): void {
     if (!this.gridParamsBuffer) return
 
-    if (xMin === this.lastXMin && xMax === this.lastXMax &&
-        pMin === this.lastPMin && pMax === this.lastPMax) {
+    if (
+      xMin === this.lastXMin &&
+      xMax === this.lastXMax &&
+      pMin === this.lastPMin &&
+      pMax === this.lastPMax
+    ) {
       return
     }
 
@@ -582,7 +611,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
     device: GPUDevice,
     schroedingerData: ArrayBuffer,
     time: number,
-    timeScale: number,
+    timeScale: number
   ): void {
     if (!this.reconstructParamsBuffer || !this.twoPhaseActive) return
 
@@ -630,7 +659,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
       // Store with factor of 2 baked in
       // pairData[i] = vec4f(2*phasedRe, 2*phasedIm, layerIndex, channelOffset)
-      const offset = 4 + i * 4  // Skip header (16 bytes = 4 floats)
+      const offset = 4 + i * 4 // Skip header (16 bytes = 4 floats)
       this.reconstructParamsF32View[offset + 0] = 2.0 * phasedRe
       this.reconstructParamsF32View[offset + 1] = 2.0 * phasedIm
       this.reconstructParamsF32View[offset + 2] = layerIndex
@@ -727,8 +756,12 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
     const computePass = ctx.beginComputePass({ label: 'wigner-cache-legacy-pass' })
     this.dispatchCompute(
-      computePass, this.legacyPipeline, [this.legacyBindGroup],
-      this.workgroupCountX, this.workgroupCountY, 1
+      computePass,
+      this.legacyPipeline,
+      [this.legacyBindGroup],
+      this.workgroupCountX,
+      this.workgroupCountY,
+      1
     )
     computePass.end()
 
@@ -745,8 +778,12 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
     const computePass = ctx.beginComputePass({ label: 'wigner-spatial-pass' })
     this.dispatchCompute(
-      computePass, this.spatialPipeline, [this.spatialBindGroup],
-      this.workgroupCountX, this.workgroupCountY, 1
+      computePass,
+      this.spatialPipeline,
+      [this.spatialBindGroup],
+      this.workgroupCountX,
+      this.workgroupCountY,
+      1
     )
     computePass.end()
 
@@ -762,8 +799,12 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
 
     const computePass = ctx.beginComputePass({ label: 'wigner-reconstruct-pass' })
     this.dispatchCompute(
-      computePass, this.reconstructPipeline, [this.reconstructBindGroup],
-      this.workgroupCountX, this.workgroupCountY, 1
+      computePass,
+      this.reconstructPipeline,
+      [this.reconstructBindGroup],
+      this.workgroupCountX,
+      this.workgroupCountY,
+      1
     )
     computePass.end()
 
@@ -820,9 +861,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
       size: { width: this.gridSize, height: this.gridSize },
       format: 'rgba16float',
       dimension: '2d',
-      usage:
-        GPUTextureUsage.STORAGE_BINDING |
-        GPUTextureUsage.TEXTURE_BINDING,
+      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
     })
     this.cacheTextureView = this.cacheTexture.createView({ label: 'wigner-cache-final-view' })
 
@@ -833,9 +872,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
         size: { width: this.gridSize, height: this.gridSize },
         format: 'rgba16float',
         dimension: '2d',
-        usage:
-          GPUTextureUsage.STORAGE_BINDING |
-          GPUTextureUsage.TEXTURE_BINDING,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       })
       this.diagTextureView = this.diagTexture.createView({ label: 'wigner-diag-view' })
 
@@ -845,9 +882,7 @@ export class WignerCacheComputePass extends WebGPUBaseComputePass {
         size: { width: this.gridSize, height: this.gridSize, depthOrArrayLayers: numLayers },
         format: 'rgba16float',
         dimension: '2d',
-        usage:
-          GPUTextureUsage.STORAGE_BINDING |
-          GPUTextureUsage.TEXTURE_BINDING,
+        usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
       })
       this.crossTexArrayView = this.crossTexArray.createView({
         label: 'wigner-cross-array-view',

@@ -85,9 +85,7 @@ export const useFsfDiagnosticsStore = create<FsfDiagnosticsState>((set) => ({
     set((state) => {
       const initialEnergy = state.hasData ? state.initialEnergy : snapshot.totalEnergy
       const energyDrift =
-        initialEnergy !== 0
-          ? (snapshot.totalEnergy - initialEnergy) / Math.abs(initialEnergy)
-          : 0
+        initialEnergy !== 0 ? (snapshot.totalEnergy - initialEnergy) / Math.abs(initialEnergy) : 0
 
       const head = state.historyHead
       state.historyEnergy[head] = snapshot.totalEnergy
@@ -104,9 +102,10 @@ export const useFsfDiagnosticsStore = create<FsfDiagnosticsState>((set) => ({
     })
   },
 
-  reset: () => set({
-    ...INITIAL_STATE,
-    historyEnergy: new Float32Array(HISTORY_LENGTH),
-    historyNorm: new Float32Array(HISTORY_LENGTH),
-  }),
+  reset: () =>
+    set({
+      ...INITIAL_STATE,
+      historyEnergy: new Float32Array(HISTORY_LENGTH),
+      historyNorm: new Float32Array(HISTORY_LENGTH),
+    }),
 }))

@@ -1,4 +1,3 @@
-/* global GPURenderPipelineDescriptor */
 import { describe, expect, it, vi } from 'vitest'
 import type { WebGPUSetupContext } from '@/rendering/webgpu/core/types'
 import { CubemapCapturePass } from '@/rendering/webgpu/passes/CubemapCapturePass'
@@ -28,15 +27,15 @@ describe('CubemapCapturePass', () => {
     })
 
     const device = {
-      createBindGroupLayout: vi.fn(() => ({} as GPUBindGroupLayout)),
-      createPipelineLayout: vi.fn(() => ({} as GPUPipelineLayout)),
+      createBindGroupLayout: vi.fn(() => ({}) as GPUBindGroupLayout),
+      createPipelineLayout: vi.fn(() => ({}) as GPUPipelineLayout),
       createRenderPipeline,
     } as unknown as GPUDevice
 
     const pass = new CubemapCapturePass()
     const internals = pass as unknown as Record<string, unknown>
-    internals['createShaderModule'] = vi.fn(() => ({} as GPUShaderModule))
-    internals['createUniformBuffer'] = vi.fn(() => ({} as GPUBuffer))
+    internals['createShaderModule'] = vi.fn(() => ({}) as GPUShaderModule)
+    internals['createUniformBuffer'] = vi.fn(() => ({}) as GPUBuffer)
     internals['initializeCubemapHistory'] = vi.fn()
 
     await (

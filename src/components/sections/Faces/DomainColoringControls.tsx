@@ -56,8 +56,6 @@ export const DomainColoringControls: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-4">
-
-
       <Select
         label="Modulus Mapping"
         options={MODULUS_MODE_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}

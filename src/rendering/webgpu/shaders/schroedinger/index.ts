@@ -101,7 +101,6 @@ export {
   densityBlock,
 } from './quantum'
 
-
 // Compute shader modules for density grid pre-computation (uncertainty boundary)
 export {
   gridParamsBlock,

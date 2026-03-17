@@ -1,9 +1,10 @@
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
+import { Switch } from '@/components/ui/Switch'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
-import React from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 export const SchroedingerAdvanced: React.FC = React.memo(() => {
@@ -18,6 +19,9 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setDensityContrast: state.setSchroedingerDensityContrast,
     setPowderScale: state.setSchroedingerPowderScale,
     setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
+    setAbsorberEnabled: state.setSchroedingerAbsorberEnabled,
+    setAbsorberWidth: state.setSchroedingerAbsorberWidth,
+    setPmlTargetReflection: state.setSchroedingerPmlTargetReflection,
   }))
   const {
     config,
@@ -25,7 +29,20 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setDensityContrast,
     setPowderScale,
     setScatteringAnisotropy,
+    setAbsorberEnabled,
+    setAbsorberWidth,
+    setPmlTargetReflection,
   } = useExtendedObjectStore(extendedObjectSelector)
+
+  // Log-scale slider for PML target reflection: slider operates on -log10(R)
+  const logReflection = useMemo(
+    () => -Math.log10(Math.max(1e-12, config.pmlTargetReflection)),
+    [config.pmlTargetReflection]
+  )
+  const handleLogReflectionChange = useCallback(
+    (v: number) => setPmlTargetReflection(Math.pow(10, -v)),
+    [setPmlTargetReflection]
+  )
 
   // Emission settings from appearance store
   const emissionSelector = useShallow((state: AppearanceSlice) => ({
@@ -93,7 +110,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-gain"
         />
-        {(isPauli || (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
+        {(isPauli ||
+          (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
           <Slider
             label="Powder Effect"
             min={0.0}
@@ -105,7 +123,8 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
             data-testid="schroedinger-powder-scale"
           />
         )}
-        {(isPauli || (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
+        {(isPauli ||
+          (!config.isoEnabled && dimension > 2 && config.representation !== 'wigner')) && (
           <Slider
             label="Anisotropy (Phase)"
             min={-0.9}
@@ -127,6 +146,39 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-contrast"
         />
+      </ControlGroup>
+
+      {/* Boundary Absorption */}
+      <ControlGroup title="Boundary Absorption" collapsible defaultOpen>
+        <Switch
+          label="PML Boundary"
+          checked={config.absorberEnabled}
+          onCheckedChange={setAbsorberEnabled}
+        />
+        {config.absorberEnabled && (
+          <>
+            <Slider
+              label="PML Width"
+              value={config.absorberWidth}
+              onChange={setAbsorberWidth}
+              min={0.05}
+              max={0.5}
+              step={0.01}
+              showValue
+              data-testid="schroedinger-pml-width"
+            />
+            <Slider
+              label={`Reflection 10⁻${Math.round(logReflection)}`}
+              value={logReflection}
+              onChange={handleLogReflectionChange}
+              min={3}
+              max={10}
+              step={1}
+              showValue
+              data-testid="schroedinger-pml-reflection"
+            />
+          </>
+        )}
       </ControlGroup>
     </div>
   )

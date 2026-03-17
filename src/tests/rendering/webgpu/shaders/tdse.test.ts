@@ -4,11 +4,19 @@ import { tdseInitBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/t
 import { tdseApplyPotentialHalfBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
 import { tdseApplyKineticBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
 import { tdsePotentialBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdsePotential.wgsl'
-import { tdseAbsorberBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseAbsorber.wgsl'
 import { tdseWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseWriteGrid.wgsl'
-import { tdseComplexPackBlock, tdseComplexUnpackBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import { tdseFFTStageUniformsBlock, tdseStockhamFFTBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
-import { tdseDiagNormReduceBlock, tdseDiagNormFinalizeBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/tdseDiagnostics.wgsl'
+import {
+  tdseComplexPackBlock,
+  tdseComplexUnpackBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import {
+  tdseFFTStageUniformsBlock,
+  tdseStockhamFFTBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import {
+  tdseDiagNormReduceBlock,
+  tdseDiagNormFinalizeBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/tdseDiagnostics.wgsl'
 
 describe('TDSE uniform struct', () => {
   it('declares TDSEUniforms struct', () => {
@@ -104,19 +112,19 @@ describe('TDSE potential shader', () => {
   })
 })
 
-describe('TDSE absorber shader', () => {
+describe('TDSE potential half-step (V-only)', () => {
   it('declares entry point', () => {
-    expect(tdseAbsorberBlock).toContain('@compute @workgroup_size(64)')
+    expect(tdseApplyPotentialHalfBlock).toContain('@compute @workgroup_size(64)')
   })
 
-  it('applies exponential damping near boundaries', () => {
-    expect(tdseAbsorberBlock).toContain('absorberWidth')
-    expect(tdseAbsorberBlock).toContain('absorberStrength')
-    expect(tdseAbsorberBlock).toContain('exp(-')
-  })
-
-  it('checks absorberEnabled flag', () => {
-    expect(tdseAbsorberBlock).toContain('absorberEnabled')
+  it('applies potential phase rotation without absorber', () => {
+    // Absorber is a separate pass — NOT merged into the potential half-step.
+    // This prevents the FFT kinetic step from scattering the absorber's
+    // spatial modulation across k-space.
+    expect(tdseApplyPotentialHalfBlock).toContain('potential[idx]')
+    expect(tdseApplyPotentialHalfBlock).toContain('cosP')
+    expect(tdseApplyPotentialHalfBlock).not.toContain('absorberEnabled')
+    expect(tdseApplyPotentialHalfBlock).not.toContain('computePMLSigma')
   })
 })
 

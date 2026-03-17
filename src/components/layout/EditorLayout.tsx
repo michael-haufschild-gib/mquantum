@@ -242,7 +242,13 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                             ${!isDesktop ? 'absolute left-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
               >
-                <ErrorBoundary fallback={<div className="p-4 text-sm text-danger">Explorer panel error. Reload to recover.</div>}>
+                <ErrorBoundary
+                  fallback={
+                    <div className="p-4 text-sm text-danger">
+                      Explorer panel error. Reload to recover.
+                    </div>
+                  }
+                >
                   <div className="w-full h-full overflow-hidden">
                     <EditorLeftPanel />
                   </div>
@@ -290,7 +296,13 @@ export const EditorLayout: React.FC<EditorLayoutProps> = React.memo(({ children 
                             ${!isDesktop ? 'absolute right-2 top-0 bottom-2 z-30 shadow-2xl' : 'relative z-20'}
                         `}
               >
-                <ErrorBoundary fallback={<div className="p-4 text-sm text-danger">Inspector panel error. Reload to recover.</div>}>
+                <ErrorBoundary
+                  fallback={
+                    <div className="p-4 text-sm text-danger">
+                      Inspector panel error. Reload to recover.
+                    </div>
+                  }
+                >
                   <div id="inspector-panel" className="w-full h-full overflow-hidden">
                     <EditorRightPanel />
                   </div>

@@ -7,7 +7,6 @@
  * Export as TypeScript string for concatenation with other shaders.
  * Three.js doesn't support native GLSL #include, so we use string concatenation.
  *
- * @see docs/prd/enhanced-visuals-rendering-pipeline.md
  */
 
 /**

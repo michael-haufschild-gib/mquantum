@@ -693,7 +693,7 @@ export interface IsosurfaceTemporalMainBlockConfig {
  * @param config
  */
 export function generateMainBlockIsosurfaceTemporal(
-  config: IsosurfaceTemporalMainBlockConfig = {},
+  config: IsosurfaceTemporalMainBlockConfig = {}
 ): string {
   const { bayerJitter = true, useDensityGrid = false } = config
 

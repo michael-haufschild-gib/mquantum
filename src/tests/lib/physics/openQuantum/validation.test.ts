@@ -95,9 +95,7 @@ describe('validateDensityMatrix', () => {
 
     expect(result.valid).toBe(false)
     expect(result.hermitianResidual).toBeGreaterThan(1e-6)
-    const hasHermViolation = result.violations.some((v) =>
-      v.toLowerCase().includes('hermiticity'),
-    )
+    const hasHermViolation = result.violations.some((v) => v.toLowerCase().includes('hermiticity'))
     expect(hasHermViolation).toBe(true)
   })
 
@@ -113,9 +111,7 @@ describe('validateDensityMatrix', () => {
 
     expect(result.valid).toBe(false)
     expect(result.traceDrift).toBeCloseTo(0.3, 5)
-    const hasTraceViolation = result.violations.some((v) =>
-      v.toLowerCase().includes('trace'),
-    )
+    const hasTraceViolation = result.violations.some((v) => v.toLowerCase().includes('trace'))
     expect(hasTraceViolation).toBe(true)
   })
 
@@ -135,9 +131,7 @@ describe('validateDensityMatrix', () => {
 
     expect(result.valid).toBe(false)
     expect(result.minEigenvalue).toBeLessThan(-1e-6)
-    const hasEigenViolation = result.violations.some((v) =>
-      v.toLowerCase().includes('eigenvalue'),
-    )
+    const hasEigenViolation = result.violations.some((v) => v.toLowerCase().includes('eigenvalue'))
     expect(hasEigenViolation).toBe(true)
   })
 

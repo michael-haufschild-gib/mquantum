@@ -6,9 +6,15 @@ function createMockCamera(
   position: [number, number, number] = [0, 0, 5],
   target: [number, number, number] = [0, 0, 0]
 ) {
-  const state = { position: [...position] as [number, number, number], target: [...target] as [number, number, number] }
+  const state = {
+    position: [...position] as [number, number, number],
+    target: [...target] as [number, number, number],
+  }
   return {
-    getState: vi.fn(() => ({ position: [...state.position] as [number, number, number], target: [...state.target] as [number, number, number] })),
+    getState: vi.fn(() => ({
+      position: [...state.position] as [number, number, number],
+      target: [...state.target] as [number, number, number],
+    })),
     setPosition: vi.fn((x: number, y: number, z: number) => {
       state.position = [x, y, z]
     }),
@@ -38,7 +44,10 @@ describe('useCameraStore', () => {
     })
 
     it('flushes pending state when camera becomes available', () => {
-      const pending = { position: [1, 2, 3] as [number, number, number], target: [4, 5, 6] as [number, number, number] }
+      const pending = {
+        position: [1, 2, 3] as [number, number, number],
+        target: [4, 5, 6] as [number, number, number],
+      }
       useCameraStore.getState().applyState(pending)
       expect(useCameraStore.getState().pendingState).toEqual(pending)
 
@@ -104,7 +113,10 @@ describe('useCameraStore', () => {
 
   describe('applyState', () => {
     it('queues as pending when camera not registered', () => {
-      const state = { position: [1, 2, 3] as [number, number, number], target: [4, 5, 6] as [number, number, number] }
+      const state = {
+        position: [1, 2, 3] as [number, number, number],
+        target: [4, 5, 6] as [number, number, number],
+      }
       useCameraStore.getState().applyState(state)
       expect(useCameraStore.getState().pendingState).toEqual(state)
     })

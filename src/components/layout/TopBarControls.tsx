@@ -34,7 +34,15 @@ interface IconButtonProps {
 
 /** Reusable icon button - extracted for memoization stability */
 const IconButton: React.FC<IconButtonProps> = React.memo(
-  ({ icon: IconComponent, active, onClick, label, small = false, className = '', disabled = false }) => (
+  ({
+    icon: IconComponent,
+    active,
+    onClick,
+    label,
+    small = false,
+    className = '',
+    disabled = false,
+  }) => (
     <Button
       onClick={onClick}
       disabled={disabled}
@@ -84,9 +92,15 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
     setRepresentation: state.setSchroedingerRepresentation,
     quantumMode: state.schroedinger.quantumMode,
   }))
-  const { representation, setRepresentation, quantumMode } = useExtendedObjectStore(representationSelector)
+  const { representation, setRepresentation, quantumMode } =
+    useExtendedObjectStore(representationSelector)
   const objectType = useGeometryStore((s) => s.objectType)
-  const isComputeMode = objectType === 'pauliSpinor' || quantumMode === 'freeScalarField' || quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
+  const isComputeMode =
+    objectType === 'pauliSpinor' ||
+    quantumMode === 'freeScalarField' ||
+    quantumMode === 'tdseDynamics' ||
+    quantumMode === 'becDynamics' ||
+    quantumMode === 'diracEquation'
 
   // Local State
   const [isFullscreen, setIsFullscreen] = React.useState(false)
@@ -149,7 +163,11 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             active={representation === 'wigner'}
             onClick={toggleRepresentation}
             disabled={isComputeMode}
-            label={isComputeMode ? 'Position only (compute mode)' : `Representation: ${representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}`}
+            label={
+              isComputeMode
+                ? 'Position only (compute mode)'
+                : `Representation: ${representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}`
+            }
             small
           />
           <IconButton
@@ -192,7 +210,11 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             onMouseEnter={() => soundManager.playHover()}
             disabled={isComputeMode}
             aria-label="Switch Representation Space"
-            title={isComputeMode ? 'Position only (compute mode)' : 'Switch representation (Position → Momentum → Wigner)'}
+            title={
+              isComputeMode
+                ? 'Position only (compute mode)'
+                : 'Switch representation (Position → Momentum → Wigner)'
+            }
             data-testid="control-representation-toggle"
             className={`
               rounded-md text-sm font-medium transition-colors duration-300 border cursor-pointer
@@ -203,7 +225,13 @@ export const TopBarControls: React.FC<TopBarControlsProps> = React.memo(({ compa
             variant="ghost"
             size="md"
           >
-            {isComputeMode ? 'Position (locked)' : representation === 'position' ? 'Position' : representation === 'momentum' ? 'Momentum' : 'Wigner'}
+            {isComputeMode
+              ? 'Position (locked)'
+              : representation === 'position'
+                ? 'Position'
+                : representation === 'momentum'
+                  ? 'Momentum'
+                  : 'Wigner'}
           </Button>
 
           <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />

@@ -1,4 +1,3 @@
-/* global GPUFeatureName, GPUTextureFormat */
 /**
  * WebGPU Device Manager
  *
@@ -172,11 +171,13 @@ export class WebGPUDevice {
     this.format = format
     this.capabilities = capabilities
 
-    console.log('[WebGPU] Initialized:', {
-      adapter: adapterInfoString,
-      format,
-      timestampQuery: supportsTimestamp,
-    })
+    if (import.meta.env.DEV) {
+      console.log('[WebGPU] Initialized:', {
+        adapter: adapterInfoString,
+        format,
+        timestampQuery: supportsTimestamp,
+      })
+    }
 
     return { adapter, device, context, format, capabilities }
   }
@@ -197,7 +198,7 @@ export class WebGPUDevice {
 
     // Attempt automatic recovery
     if (this.canvas && reason !== 'destroyed') {
-      console.log('[WebGPU] Attempting device recovery...')
+      if (import.meta.env.DEV) console.log('[WebGPU] Attempting device recovery...')
       this.initialize(this.canvas).catch((err) => {
         console.error('[WebGPU] Recovery failed:', err)
       })
@@ -295,4 +296,3 @@ export class WebGPUDevice {
     WebGPUDevice.instance = null
   }
 }
-

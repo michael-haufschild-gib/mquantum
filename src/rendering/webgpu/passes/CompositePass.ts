@@ -430,7 +430,8 @@ export class CompositePass extends WebGPUBasePass {
     this.writeUniformBuffer(this.device, this.uniformBuffer, this.uniformArrayBuffer)
 
     // PERF: Cache bind group, invalidate only when input texture views change
-    const viewsChanged = textureViews.length !== this.cachedTextureViews.length ||
+    const viewsChanged =
+      textureViews.length !== this.cachedTextureViews.length ||
       textureViews.some((v, i) => v !== this.cachedTextureViews[i])
     if (!this.cachedBindGroup || viewsChanged) {
       this.cachedBindGroup = this.device.createBindGroup({

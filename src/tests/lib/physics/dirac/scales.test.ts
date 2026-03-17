@@ -67,7 +67,9 @@ describe('relativisticEnergy', () => {
   })
 
   it('satisfies E² = (pc)² + (mc²)² for arbitrary inputs', () => {
-    const p = 3, m = 4, c = 2
+    const p = 3,
+      m = 4,
+      c = 2
     const E = relativisticEnergy(p, m, c)
     expect(E * E).toBeCloseTo((p * c) ** 2 + (m * c * c) ** 2, 8)
   })

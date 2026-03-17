@@ -10,11 +10,7 @@
 // ---------------------------------------------------------------------------
 
 /** Available density-matrix-aware color algorithms */
-export type OpenQuantumVisualizationMode =
-  | 'density'
-  | 'purityMap'
-  | 'entropyMap'
-  | 'coherenceMap'
+export type OpenQuantumVisualizationMode = 'density' | 'purityMap' | 'entropyMap' | 'coherenceMap'
 
 // ---------------------------------------------------------------------------
 // Density matrix

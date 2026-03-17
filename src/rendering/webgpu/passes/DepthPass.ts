@@ -42,7 +42,7 @@ export interface DepthPassConfig {
  * Supports multiple depth output formats:
  * - raw: Direct depth value (0-1 range)
  * - linear: Linearized depth normalized to near/far range
- * - rgba: RGBA-packed depth (compatible with Three.js RGBADepthPacking)
+ * - rgba: RGBA-packed depth (standard RGBA depth packing)
  * - linearRgba: RGBA-packed linear depth
  */
 const DEPTH_SHADER = /* wgsl */ `
@@ -80,7 +80,7 @@ fn linearizeDepth(depth: f32, near: f32, far: f32) -> f32 {
   return (viewZ - near) / (far - near);
 }
 
-// Pack depth into RGBA (compatible with Three.js RGBADepthPacking)
+// Pack depth into RGBA (standard RGBA depth packing)
 // Uses bit-shifting approach for 32-bit precision across 4 channels
 fn packDepthToRGBA(depth: f32) -> vec4f {
   let bitShift = vec4f(

@@ -13,12 +13,7 @@ import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis
 // ---------------------------------------------------------------------------
 
 /** Create a minimal HydrogenBasisState for testing */
-function makeState(
-  index: number,
-  n: number,
-  l: number,
-  m: number,
-): HydrogenBasisState {
+function makeState(index: number, n: number, l: number, m: number): HydrogenBasisState {
   return { index, n, l, m, extraDimN: [], energy: -1 / (n * n) }
 }
 

@@ -4,7 +4,6 @@
  * Shared types for the unified color palette system.
  * Used by both shaders and UI components.
  *
- * @see docs/prd/enhanced-visuals-rendering-pipeline.md
  */
 
 // ============================================================================
@@ -266,7 +265,7 @@ export const DEFAULT_COLOR_ALGORITHM: ColorAlgorithm = 'radialDistance'
 export function getAvailableColorAlgorithms(
   quantumMode: string,
   openQuantumEnabled: boolean = false,
-  objectType: string = 'schroedinger',
+  objectType: string = 'schroedinger'
 ): readonly (typeof COLOR_ALGORITHM_OPTIONS)[number][] {
   // Pauli spinor: the density grid encodes spin-channel data differently per
   // field view. Expose the Pauli-specific algorithms (which match the grid layout)
@@ -293,11 +292,7 @@ export function getAvailableColorAlgorithms(
   ])
 
   // Open quantum algorithms — only available when density matrix mode is active
-  const openQuantumAlgos = new Set<string>([
-    'purityMap',
-    'entropyMap',
-    'coherenceMap',
-  ])
+  const openQuantumAlgos = new Set<string>(['purityMap', 'entropyMap', 'coherenceMap'])
 
   // TDSE / BEC compute modes render into a density grid texture
   // (R=density, G=logDensity, B=phase, A=potOverlay). Only algorithms that read
@@ -306,15 +301,15 @@ export function getAvailableColorAlgorithms(
   // position and silently fall back to blackbody — remove them from the dropdown.
   if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics') {
     const computeValidAlgos = new Set<string>([
-      'blackbody',          // R (density) → heat ramp
+      'blackbody', // R (density) → heat ramp
       'phaseCyclicUniform', // B (phase) → perceptual cyclic hue
-      'phaseDiverging',     // B (phase) → signed diverging
-      'diverging',          // B (phase) → zero-centered Re/Im
-      'domainColoringPsi',  // R+B (density + phase) → domain coloring
-      'viridis',            // R (density) → perceptually uniform scientific ramp
-      'inferno',            // R (density) → high-contrast scientific ramp
-      'densityContours',    // R (density) → viridis + isodensity contour lines
-      'phaseDensity',       // R+B (density + phase) → hue=phase, brightness=density
+      'phaseDiverging', // B (phase) → signed diverging
+      'diverging', // B (phase) → zero-centered Re/Im
+      'domainColoringPsi', // R+B (density + phase) → domain coloring
+      'viridis', // R (density) → perceptually uniform scientific ramp
+      'inferno', // R (density) → high-contrast scientific ramp
+      'densityContours', // R (density) → viridis + isodensity contour lines
+      'phaseDensity', // R+B (density + phase) → hue=phase, brightness=density
     ])
     return COLOR_ALGORITHM_OPTIONS.filter((opt) => computeValidAlgos.has(opt.value))
   }
@@ -372,7 +367,11 @@ export function getAvailableColorAlgorithms(
   const diracOnlyAlgos = new Set<string>(['particleAntiparticle'])
 
   // Pauli-only algorithms — require spin-resolved density grid, only valid for pauliSpinor object type
-  const pauliOnlyAlgos = new Set<string>(['pauliSpinDensity', 'pauliSpinExpectation', 'pauliCoherence'])
+  const pauliOnlyAlgos = new Set<string>([
+    'pauliSpinDensity',
+    'pauliSpinExpectation',
+    'pauliCoherence',
+  ])
 
   // Non-freeScalar modes: exclude educational analysis algorithms, Dirac-only, and
   // conditionally include/exclude open quantum and phase-dependent algorithms

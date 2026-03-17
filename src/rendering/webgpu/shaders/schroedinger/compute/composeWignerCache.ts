@@ -68,10 +68,7 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
   modules: string[]
   features: string[]
 } {
-  const {
-    dimension,
-    quantumMode = 'harmonicOscillator',
-  } = config
+  const { dimension, quantumMode = 'harmonicOscillator' } = config
 
   const defines: string[] = []
   const features: string[] = []
@@ -164,7 +161,8 @@ export function composeWignerCacheComputeShader(config: WignerCacheComputeConfig
     },
     {
       name: 'Wigner Hydrogen Stub',
-      content: '// Stub: hydrogen Wigner unavailable in HO mode\nfn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> f32 { return 0.0; }',
+      content:
+        '// Stub: hydrogen Wigner unavailable in HO mode\nfn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> f32 { return 0.0; }',
       condition: !includeHydrogen,
     },
 

@@ -60,7 +60,7 @@ export function createDensityMatrix(K: number): DensityMatrix {
 export function densityMatrixFromCoefficients(
   coeffsRe: ArrayLike<number>,
   coeffsIm: ArrayLike<number>,
-  K: number,
+  K: number
 ): DensityMatrix {
   const rho = createDensityMatrix(K)
   const el = rho.elements
@@ -122,7 +122,7 @@ function unitaryStep(rho: DensityMatrix, energies: Float64Array, dt: number): vo
 function dissipativeStep(
   rho: DensityMatrix,
   channels: readonly LindbladChannel[],
-  dt: number,
+  dt: number
 ): void {
   if (channels.length === 0) return
 
@@ -130,9 +130,10 @@ function dissipativeStep(
   const size = K * K * 2
 
   // Zero the scratch buffer
-  for (let i = 0; i < size; i++) dRhoBuffer[i] = 0
+  for (let i = 0; i < size; i++)
+    dRhoBuffer[i] = 0
 
-  // Temporarily adjust dRhoMatrix.K
+    // Temporarily adjust dRhoMatrix.K
   ;(dRhoMatrix as { K: number }).K = K
 
   // Accumulate all dissipator contributions
@@ -207,7 +208,7 @@ function traceNormalize(rho: DensityMatrix): void {
 export function hermitianEigendecompose(
   rho: DensityMatrix,
   outEigenvalues: Float64Array,
-  outEigenvectors: Float64Array,
+  outEigenvectors: Float64Array
 ): void {
   const K = rho.K
 
@@ -239,7 +240,7 @@ export function hermitianEigendecompose(
         const idx = 2 * (i * K + j)
         const mag = Math.sqrt(
           scratchMatrix[idx]! * scratchMatrix[idx]! +
-            scratchMatrix[idx + 1]! * scratchMatrix[idx + 1]!,
+            scratchMatrix[idx + 1]! * scratchMatrix[idx + 1]!
         )
         if (mag > maxOffDiag) {
           maxOffDiag = mag
@@ -266,9 +267,7 @@ export function hermitianEigendecompose(
     // Now solve 2×2 real symmetric problem with diagonal (aii, ajj) and off-diag aijMag
     const tau = (ajj - aii) / (2 * aijMag)
     const t =
-      tau >= 0
-        ? 1 / (tau + Math.sqrt(1 + tau * tau))
-        : -1 / (-tau + Math.sqrt(1 + tau * tau))
+      tau >= 0 ? 1 / (tau + Math.sqrt(1 + tau * tau)) : -1 / (-tau + Math.sqrt(1 + tau * tau))
     const c = 1 / Math.sqrt(1 + t * t)
     const s = t * c
 
@@ -461,7 +460,7 @@ export function evolveStep(
   rho: DensityMatrix,
   energies: Float64Array,
   channels: readonly LindbladChannel[],
-  dt: number,
+  dt: number
 ): void {
   // 1. Unitary step
   unitaryStep(rho, energies, dt)
@@ -493,7 +492,7 @@ export function evolveMultiStep(
   energies: Float64Array,
   channels: readonly LindbladChannel[],
   dt: number,
-  substeps: number,
+  substeps: number
 ): void {
   for (let s = 0; s < substeps; s++) {
     evolveStep(rho, energies, channels, dt)

@@ -423,8 +423,14 @@ describe('VideoRecorder', () => {
 
       await recorderWithInvalidRotation.initialize()
 
-      const output = (recorderWithInvalidRotation as unknown as { output: { addVideoTrack: ReturnType<typeof vi.fn> } }).output
-      const trackOptions = output.addVideoTrack.mock.calls[0]?.[1] as { rotation?: number } | undefined
+      const output = (
+        recorderWithInvalidRotation as unknown as {
+          output: { addVideoTrack: ReturnType<typeof vi.fn> }
+        }
+      ).output
+      const trackOptions = output.addVideoTrack.mock.calls[0]?.[1] as
+        | { rotation?: number }
+        | undefined
       expect(trackOptions?.rotation).toBe(0)
     })
   })

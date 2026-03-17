@@ -1,12 +1,20 @@
 /**
- * TDSE Half-Step Potential Phase Rotation Compute Shader
+ * TDSE Half-Step Potential Compute Shader
  *
- * Applies the half-step potential propagator in the Strang splitting:
- *   psi(x) *= exp(-i * V(x) * dt / (2 * hbar))
+ * Applies only the potential propagator in a half-step of the Strang splitting:
  *
- * The potential V(x) is read from a precomputed buffer (computed by tdsePotential shader).
+ *   ψ(x) → exp(-iV_eff(x)·dt/(2ℏ)) · ψ(x)
  *
- * Requires tdseUniformsBlock to be prepended.
+ * Absorbing boundary conditions are applied in a SEPARATE pass after the
+ * full Strang step (potential → kinetic → potential). This prevents the FFT
+ * kinetic step from seeing spatially-modulated amplitudes from the absorber,
+ * which it would scatter across k-space and inject as spurious amplitude at
+ * barriers and slits.
+ *
+ * The effective potential includes the GPE nonlinear term when g ≠ 0:
+ *   V_eff(x) = V(x) + g|ψ|²
+ *
+ * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
  *
  * @workgroup_size(64)
  * @module
@@ -32,7 +40,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let density = re * re + im * im;
   let effectiveV = potential[idx] + params.interactionStrength * density;
 
-  let phase = -effectiveV * params.dt / (2.0 * params.hbar);
+  let phase = -effectiveV * params.dt / (2.0 * max(params.hbar, 1e-6));
   let cosP = cos(phase);
   let sinP = sin(phase);
 

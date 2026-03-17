@@ -13,14 +13,8 @@ export type { SkyboxMode, SkyboxEffects, SkyboxShaderConfig } from './types'
 export { SKYBOX_BIND_GROUPS, SKYBOX_BINDINGS } from './types'
 
 // Core modules
-export {
-  constantsBlock,
-} from './core/constants.wgsl'
-export {
-  uniformStructBlock,
-  uniformBindingsBlock,
-  uniformAliasesBlock,
-} from './core/uniforms.wgsl'
+export { constantsBlock } from './core/constants.wgsl'
+export { uniformStructBlock, uniformBindingsBlock, uniformAliasesBlock } from './core/uniforms.wgsl'
 export {
   generateVertexOutputStruct,
   fragmentOutputStruct,

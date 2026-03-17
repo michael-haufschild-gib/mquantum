@@ -1,5 +1,5 @@
 import type { ObjectType } from '@/lib/geometry/types'
-import type { SavedScene, SavedStyle } from '../presetManagerStore'
+import type { SavedScene, SavedStyle } from './presetTypes'
 
 /**
  * Mapping from ObjectType to the config key in the extended object store.
@@ -141,6 +141,9 @@ export const TRANSIENT_FIELDS = new Set([
   'basisY',
   'basisZ',
   'origin',
+
+  // Legacy absorber strength — replaced by auto-computed σ_max from pmlTargetReflection
+  'absorberStrength',
 ])
 
 function warnDroppedNonFinitePresetValue(path: string, value: number): void {
@@ -195,12 +198,12 @@ function sanitizeFiniteLoadedValue(value: unknown, path: string): unknown | unde
 export const serializeState = <T extends object>(state: T): Record<string, unknown> => {
   // 1. Create a shallow copy first to filter functions and transient fields
   const clean: Record<string, unknown> = {}
-  for (const key in state) {
+  for (const key of Object.keys(state)) {
     // Skip functions
-    if (typeof state[key] === 'function') continue
+    if (typeof (state as Record<string, unknown>)[key] === 'function') continue
     // Skip transient fields that shouldn't be persisted
     if (TRANSIENT_FIELDS.has(key)) continue
-    clean[key] = state[key]
+    clean[key] = (state as Record<string, unknown>)[key]
   }
 
   // 2. Deep clone via JSON to break references
@@ -263,7 +266,7 @@ export const serializeExtendedState = <T extends object>(
   // Filter transient fields from the nested config before cloning
   const configRecord = config as Record<string, unknown>
   const filtered: Record<string, unknown> = {}
-  for (const key in configRecord) {
+  for (const key of Object.keys(configRecord)) {
     if (typeof configRecord[key] === 'function') continue
     if (TRANSIENT_FIELDS.has(key)) continue
     const val = configRecord[key]
@@ -271,7 +274,7 @@ export const serializeExtendedState = <T extends object>(
     if (val && typeof val === 'object' && !Array.isArray(val)) {
       const nested = val as Record<string, unknown>
       const cleanNested: Record<string, unknown> = {}
-      for (const nk in nested) {
+      for (const nk of Object.keys(nested)) {
         if (typeof nested[nk] === 'function') continue
         if (TRANSIENT_FIELDS.has(nk)) continue
         cleanNested[nk] = nested[nk]
@@ -313,7 +316,9 @@ export const sanitizeLoadedState = <T extends Record<string, unknown>>(state: T)
     return sanitized as T
   }
 
-  return {} as T
+  // All values were non-finite — return the cleaned state with transient fields stripped
+  // (which is at least structurally valid, unlike a bare `{}`)
+  return clean as T
 }
 
 /**

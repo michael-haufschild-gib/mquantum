@@ -3,10 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { KSpaceVizConfig } from '@/lib/geometry/extended/types'
 import { PASSTHROUGH_KSPACE_VIZ, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/extended/types'
 import type { KSpaceRawData } from '@/lib/physics/freeScalar/kSpaceOccupation'
-import {
-  computeRawKSpaceData,
-  OUTPUT_GRID_SIZE,
-} from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
   projectToDisplayGrid,
   applyExposureTransfer,
@@ -110,8 +107,9 @@ describe('projectToDisplayGrid — FFT shift', () => {
     const offset = Math.floor((OUTPUT_GRID_SIZE - N) / 2)
     const shiftedCenterX = offset + Math.floor(N / 2) // DC for dim 0
     const shiftedCenterY = offset + Math.floor(N / 2) // DC for dim 1
-    const shiftedPeakZ = offset + 5                    // (1 + 4) % 8 = 5 for dim 2
-    const idx = (shiftedPeakZ * OUTPUT_GRID_SIZE + shiftedCenterY) * OUTPUT_GRID_SIZE + shiftedCenterX
+    const shiftedPeakZ = offset + 5 // (1 + 4) % 8 = 5 for dim 2
+    const idx =
+      (shiftedPeakZ * OUTPUT_GRID_SIZE + shiftedCenterY) * OUTPUT_GRID_SIZE + shiftedCenterX
 
     // The value at the shifted position should be non-zero
     expect(grid.nk[idx]).toBeGreaterThan(0)
@@ -121,7 +119,10 @@ describe('projectToDisplayGrid — FFT shift', () => {
     const raw = makeTestRawData(8)
 
     const noShift = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: false })
-    const withShift = projectToDisplayGrid(raw, { ...PASSTHROUGH_KSPACE_VIZ, fftShiftEnabled: true })
+    const withShift = projectToDisplayGrid(raw, {
+      ...PASSTHROUGH_KSPACE_VIZ,
+      fftShiftEnabled: true,
+    })
 
     let sumNoShift = 0
     let sumShift = 0
@@ -185,8 +186,8 @@ describe('projectToDisplayGrid — FFT shift', () => {
     // kNorm = ((1*1 + 3*3) / 4) / 60
     expect(grid.nk[idx]).toBeCloseTo(4, 12)
     expect(grid.nkOmega[idx]).toBeCloseTo(10, 12)
-    expect(grid.omegaNorm[idx]).toBeCloseTo((10 / 4) / 200, 12)
-    expect(grid.kNorm[idx]).toBeCloseTo((10 / 4) / 60, 12)
+    expect(grid.omegaNorm[idx]).toBeCloseTo(10 / 4 / 200, 12)
+    expect(grid.kNorm[idx]).toBeCloseTo(10 / 4 / 60, 12)
   })
 })
 

@@ -62,7 +62,14 @@ export function float32ToFloat16(val: number): number {
 }
 
 /** Pack 4 floats as rgba16float into a Uint16Array at the given pixel offset. */
-export function packRGBA16F(out: Uint16Array, pixelIdx: number, r: number, g: number, b: number, a: number): void {
+export function packRGBA16F(
+  out: Uint16Array,
+  pixelIdx: number,
+  r: number,
+  g: number,
+  b: number,
+  a: number
+): void {
   const base = pixelIdx * 4
   out[base] = float32ToFloat16(r)
   out[base + 1] = float32ToFloat16(g)
@@ -186,9 +193,7 @@ export function computeRawKSpaceData(
   latticeDim: number
 ): KSpaceRawData {
   if (!Number.isInteger(latticeDim) || latticeDim < 1 || latticeDim > gridSize.length) {
-    throw new Error(
-      `latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`
-    )
+    throw new Error(`latticeDim must be an integer in [1, ${gridSize.length}], got ${latticeDim}`)
   }
 
   const activeDims = gridSize.slice(0, latticeDim)

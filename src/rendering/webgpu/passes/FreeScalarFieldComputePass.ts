@@ -15,6 +15,7 @@
  */
 
 import type { FreeScalarConfig } from '@/lib/geometry/extended/types'
+import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import { useFsfDiagnosticsStore } from '@/stores/fsfDiagnosticsStore'
 // k-space FFT + display pipeline runs in a Web Worker (kSpaceWorker.ts)
 import { estimateVacuumMaxPhi, sampleVacuumSpectrum } from '@/lib/physics/freeScalar/vacuumSpectrum'
@@ -28,17 +29,17 @@ import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScal
 import { freeScalarUpdatePiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarUpdatePhiBlock } from '../shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
 import { freeScalarWriteGridBlock } from '../shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'
+import { freeScalarAbsorberBlock } from '../shaders/schroedinger/compute/freeScalarAbsorber.wgsl'
+import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import {
+  DENSITY_GRID_SIZE,
+  GRID_WG as GRID_WORKGROUP_SIZE,
+  LINEAR_WG as LINEAR_WORKGROUP_SIZE,
+  MAX_DIM,
+} from './computePassUtils'
 
-/** Uniform buffer size: FreeScalarUniforms struct = 496 bytes */
-const UNIFORM_SIZE = 496
-/** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
-const LINEAR_WORKGROUP_SIZE = 64
-/** 3D dispatch workgroup size for write-grid pass (must match WGSL @workgroup_size) */
-const GRID_WORKGROUP_SIZE = 4
-/** Density grid texture resolution (matches existing density grid) */
-const DENSITY_GRID_SIZE = 96
-/** Maximum number of dimensions in uniform arrays */
-const MAX_DIM = 12
+/** Uniform buffer size: FreeScalarUniforms struct = 512 bytes (added PML absorber fields) */
+const UNIFORM_SIZE = 512
 /** Byte offset of the `dt` field in the uniform buffer */
 const DT_BYTE_OFFSET = 12
 
@@ -56,10 +57,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
   private analysisTexture: GPUTexture | null = null
   private analysisTextureView: GPUTextureView | null = null
 
-  // Pipelines (4 separate compute pipelines)
+  // Pipelines (5 separate compute pipelines)
   private initPipeline: GPUComputePipeline | null = null
   private updatePiPipeline: GPUComputePipeline | null = null
   private updatePhiPipeline: GPUComputePipeline | null = null
+  private absorberPipeline: GPUComputePipeline | null = null
   private writeGridPipeline: GPUComputePipeline | null = null
 
   // Bind groups
@@ -343,6 +345,19 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       'free-scalar-init'
     )
 
+    // === PML absorber pipeline (reuses init bind group layout: uniform + phi + pi) ===
+    const absorberShader = this.createShaderModule(
+      device,
+      uniformsAndIndex + pmlProfileBlock + freeScalarAbsorberBlock,
+      'free-scalar-absorber'
+    )
+    this.absorberPipeline = this.createComputePipeline(
+      device,
+      absorberShader,
+      [this.initBindGroupLayout],
+      'free-scalar-absorber'
+    )
+
     // === Update Pi pipeline (phi read-only, pi read_write) ===
     const updatePiShader = this.createShaderModule(
       device,
@@ -437,7 +452,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
    * @param device - GPU device
    */
   private rebuildBindGroups(device: GPUDevice): void {
-    if (!this.uniformBuffer || !this.phiBuffer || !this.piBuffer || !this.densityTextureView || !this.analysisTextureView) return
+    if (
+      !this.uniformBuffer ||
+      !this.phiBuffer ||
+      !this.piBuffer ||
+      !this.densityTextureView ||
+      !this.analysisTextureView
+    )
+      return
 
     // Init bind group (phi + pi read-write)
     if (this.initBindGroupLayout) {
@@ -511,7 +533,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
   /**
    * Write the uniform buffer with current config values.
-   * Layout matches the N-D FreeScalarUniforms struct (480 bytes).
+   * Layout matches the N-D FreeScalarUniforms struct (512 bytes).
    * @param device - GPU device
    * @param config - Free scalar field configuration
    * @param basisX - Basis vector X (length = dimension, up to 11)
@@ -553,10 +575,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     const strides = this.computeStrides(config)
 
     // Scalars (offset 0-15, 4 u32s)
-    u32[0] = config.latticeDim        // offset 0
-    u32[1] = this.totalSites          // offset 4
-    f32[2] = config.mass              // offset 8
-    f32[3] = config.dt                // offset 12
+    u32[0] = config.latticeDim // offset 0
+    u32[1] = this.totalSites // offset 4
+    f32[2] = config.mass // offset 8
+    f32[3] = config.dt // offset 12
 
     // gridSize: array<u32, 12> (offset 16, indices 4-15)
     for (let d = 0; d < config.latticeDim; d++) {
@@ -574,14 +596,14 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
 
     // Init/display scalars (offset 160-191, indices 40-47)
-    u32[40] = initConditionMap[config.initialCondition] ?? 2  // offset 160
-    u32[41] = fieldViewMap[config.fieldView] ?? 0             // offset 164
-    u32[42] = config.stepsPerFrame                            // offset 168
-    f32[43] = config.packetWidth                              // offset 172
-    f32[44] = config.packetAmplitude                          // offset 176
+    u32[40] = initConditionMap[config.initialCondition] ?? 2 // offset 160
+    u32[41] = fieldViewMap[config.fieldView] ?? 0 // offset 164
+    u32[42] = config.stepsPerFrame // offset 168
+    f32[43] = config.packetWidth // offset 172
+    f32[44] = config.packetAmplitude // offset 176
     this.maxFieldValue = this.estimateMaxFieldValue(config)
-    f32[45] = this.maxFieldValue                              // offset 180
-    f32[46] = boundingRadius ?? 2.0                           // offset 184
+    f32[45] = this.maxFieldValue // offset 180
+    f32[46] = boundingRadius ?? 2.0 // offset 184
     // analysisMode at index 47 (offset 188): 0=off, 1=hamiltonian/character, 2=flux, 3=kSpace
     // Derived from the numeric color algorithm: 12/13 → mode 1, 14 → mode 2, 15 → mode 3
     const alg = colorAlgorithm ?? 0
@@ -634,10 +656,25 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     }
 
     // Self-interaction params (offset 480, indices 120-123)
-    u32[120] = config.selfInteractionEnabled ? 1 : 0  // offset 480
-    f32[121] = config.selfInteractionLambda            // offset 484
-    f32[122] = config.selfInteractionVev               // offset 488
-    u32[123] = 0                                        // offset 492 (padding)
+    u32[120] = config.selfInteractionEnabled ? 1 : 0 // offset 480
+    f32[121] = config.selfInteractionLambda // offset 484
+    f32[122] = config.selfInteractionVev // offset 488
+    u32[123] = config.absorberEnabled ? 1 : 0 // offset 492 (absorberEnabled)
+
+    // PML absorber parameters (offset 496-511, indices 124-127)
+    f32[124] = config.absorberWidth ?? 0.2 // offset 496
+    f32[125] = config.absorberEnabled // offset 500 (σ_max)
+      ? computePMLSigmaMaxND(
+          config.pmlTargetReflection ?? 1e-6,
+          config.absorberWidth ?? 0.2,
+          config.gridSize,
+          config.dt,
+          3, // cubic grading (hardcoded to match WGSL shader)
+          config.latticeDim
+        )
+      : 0
+    u32[126] = 0 // offset 504 (padding)
+    u32[127] = 0 // offset 508 (padding)
 
     device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformData)
   }
@@ -743,13 +780,21 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         { texture: this.densityTexture },
         density.buffer,
         { offset: density.byteOffset, bytesPerRow, rowsPerImage },
-        { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE }
+        {
+          width: DENSITY_GRID_SIZE,
+          height: DENSITY_GRID_SIZE,
+          depthOrArrayLayers: DENSITY_GRID_SIZE,
+        }
       )
       device.queue.writeTexture(
         { texture: this.analysisTexture },
         analysis.buffer,
         { offset: analysis.byteOffset, bytesPerRow, rowsPerImage },
-        { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE }
+        {
+          width: DENSITY_GRID_SIZE,
+          height: DENSITY_GRID_SIZE,
+          depthOrArrayLayers: DENSITY_GRID_SIZE,
+        }
       )
       this.pendingKSpaceData = null
     }
@@ -909,6 +954,18 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
           linearWorkgroups
         )
         piPass.end()
+
+        // Step 3: PML absorber (damp phi and pi near boundaries)
+        if (config.absorberEnabled && this.absorberPipeline && this.initBindGroup) {
+          const absPass = encoder.beginComputePass({ label: `free-scalar-absorber-${step}` })
+          this.dispatchCompute(
+            absPass,
+            this.absorberPipeline,
+            [this.initBindGroup], // reuses init bind group: uniform + phi + pi
+            linearWorkgroups
+          )
+          absPass.end()
+        }
       }
     }
 
@@ -926,31 +983,55 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       )
       gridPass.end()
     } else {
-      console.warn(`[FreeScalarFieldComputePass] writeGrid skipped: pipeline=${!!this.writeGridPipeline}, bindGroup=${!!this.writeGridBindGroup}`)
+      console.warn(
+        `[FreeScalarFieldComputePass] writeGrid skipped: pipeline=${!!this.writeGridPipeline}, bindGroup=${!!this.writeGridBindGroup}`
+      )
     }
 
     // k-Space occupation: async CPU readback → FFT → texture upload
     const analysisMode = this.uniformU32[47]!
 
     // Clear textures on transition into k-space mode to avoid showing stale position-space data
-    if (analysisMode === 3 && this.lastAnalysisMode !== 3 && this.densityTexture && this.analysisTexture) {
+    if (
+      analysisMode === 3 &&
+      this.lastAnalysisMode !== 3 &&
+      this.densityTexture &&
+      this.analysisTexture
+    ) {
       const bytesPerTexel = 8 // rgba16float = 4 × 2
       const bytesPerRow = DENSITY_GRID_SIZE * bytesPerTexel
       const rowsPerImage = DENSITY_GRID_SIZE
       const totalBytes = bytesPerRow * rowsPerImage * DENSITY_GRID_SIZE
       const zeros = new Uint8Array(totalBytes)
-      const texSize = { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE }
-      device.queue.writeTexture({ texture: this.densityTexture }, zeros, { bytesPerRow, rowsPerImage }, texSize)
-      device.queue.writeTexture({ texture: this.analysisTexture }, zeros, { bytesPerRow, rowsPerImage }, texSize)
+      const texSize = {
+        width: DENSITY_GRID_SIZE,
+        height: DENSITY_GRID_SIZE,
+        depthOrArrayLayers: DENSITY_GRID_SIZE,
+      }
+      device.queue.writeTexture(
+        { texture: this.densityTexture },
+        zeros,
+        { bytesPerRow, rowsPerImage },
+        texSize
+      )
+      device.queue.writeTexture(
+        { texture: this.analysisTexture },
+        zeros,
+        { bytesPerRow, rowsPerImage },
+        texSize
+      )
     }
     this.lastAnalysisMode = analysisMode
 
     if (analysisMode === 3 && this.initialized) {
       this.kSpaceFrameCounter++
       if (
-        !this.kSpacePending && this.kSpaceFrameCounter >= this.K_SPACE_UPDATE_INTERVAL &&
-        this.phiBuffer && this.piBuffer &&
-        this.phiReadbackBuffer && this.piReadbackBuffer
+        !this.kSpacePending &&
+        this.kSpaceFrameCounter >= this.K_SPACE_UPDATE_INTERVAL &&
+        this.phiBuffer &&
+        this.piBuffer &&
+        this.phiReadbackBuffer &&
+        this.piReadbackBuffer
       ) {
         this.kSpaceFrameCounter = 0
         // Encode copies on the main encoder so they execute after this frame's
@@ -1012,7 +1093,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     return this.kSpaceWorker
   }
 
-  private async readbackAndComputeKSpace(device: GPUDevice, config: FreeScalarConfig): Promise<void> {
+  private async readbackAndComputeKSpace(
+    device: GPUDevice,
+    config: FreeScalarConfig
+  ): Promise<void> {
     const phiReadbackBuffer = this.phiReadbackBuffer
     const piReadbackBuffer = this.piReadbackBuffer
     const readbackEpoch = this.kSpaceReadbackEpoch
@@ -1095,7 +1179,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
 
     try {
       await device.queue.onSubmittedWorkDone()
-      if (epoch !== this.kSpaceReadbackEpoch) { this.diagMappingInFlight = false; return }
+      if (epoch !== this.kSpaceReadbackEpoch) {
+        this.diagMappingInFlight = false
+        return
+      }
 
       await phiBuf.mapAsync(GPUMapMode.READ)
       await piBuf.mapAsync(GPUMapMode.READ)
@@ -1109,7 +1196,11 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       for (let d = 0; d < config.latticeDim; d++) dV *= config.spacing[d]!
 
       // Single pass: accumulate all statistics
-      let sumPhi = 0, sumPhi2 = 0, sumPi2 = 0, maxPhi = 0, maxPi = 0
+      let sumPhi = 0,
+        sumPhi2 = 0,
+        sumPi2 = 0,
+        maxPhi = 0,
+        maxPi = 0
 
       for (let i = 0; i < N; i++) {
         const p = phi[i]!
@@ -1124,9 +1215,9 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
       }
 
       // Gradient energy: sum_d (phi[i+1] - phi[i])^2 / (2 * a_d^2) * dV
-      // Compute for first 3 dims only (higher dims use slice positions)
+      // All dimensions contribute to total energy (including slice dims d>=3)
       let gradEnergy = 0
-      const dimsForGrad = Math.min(config.latticeDim, 3)
+      const dimsForGrad = config.latticeDim
       const strides = this.computeStrides(config)
       for (let d = 0; d < dimsForGrad; d++) {
         const stride = strides[d]!
@@ -1135,9 +1226,10 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
         const invA2 = 1 / (a * a)
         for (let i = 0; i < N; i++) {
           const iNext = i + stride
-          // Periodic boundary: wrap around
           const dimPos = Math.floor((i / stride) % Nd)
-          const jNext = dimPos === Nd - 1 ? i - stride * (Nd - 1) : iNext
+          // With PML, boundaries are absorbing — don't wrap gradients across faces
+          const jNext =
+            dimPos === Nd - 1 ? (config.absorberEnabled ? -1 : i - stride * (Nd - 1)) : iNext
           if (jNext >= 0 && jNext < N) {
             const diff = phi[jNext]! - phi[i]!
             gradEnergy += diff * diff * invA2
@@ -1225,6 +1317,7 @@ export class FreeScalarFieldComputePass extends WebGPUBaseComputePass {
     this.kSpaceWorker = null
 
     this.initPipeline = null
+    this.absorberPipeline = null
     this.updatePiPipeline = null
     this.updatePhiPipeline = null
     this.writeGridPipeline = null

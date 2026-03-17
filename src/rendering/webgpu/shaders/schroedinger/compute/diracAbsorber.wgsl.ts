@@ -1,15 +1,16 @@
 /**
- * Dirac Complex Absorbing Potential (CAP) Compute Shader
+ * Dirac PML Absorber Compute Shader
  *
- * Applies absorbing boundary conditions after each Strang step to all
+ * Applies PML absorbing boundary conditions after each Strang step to all
  * spinor components:
- *   ψ_c(x) *= exp(-alpha * (d/W)^2)
- * where d is the distance from the domain boundary, W is the absorber width,
- * and c indexes the spinor component.
+ *   ψ_c(x) *= exp(-σ(x) · dt)
  *
- * Prevents spurious reflections from the periodic boundary.
+ * Uses cubic polynomial grading (p=3) via the shared computePMLSigma()
+ * function, with additive damping across dimensions for correct corner
+ * treatment.
  *
- * Requires diracUniformsBlock + freeScalarNDIndexBlock to be prepended.
+ * Requires diracUniformsBlock + freeScalarNDIndexBlock + pmlProfileBlock
+ * to be prepended.
  *
  * @workgroup_size(64)
  * @module
@@ -31,33 +32,18 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+  let sigma = computePMLSigma(coords, params.gridSize, params.latticeDim,
+                              params.absorberWidth, params.absorberStrength);
 
-  // Compute maximum damping factor across all dimensions
-  var maxDamp: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let N = f32(params.gridSize[d]);
-    let W = params.absorberWidth * N; // absorber width in grid points
-    let pos = f32(coords[d]);
-
-    // Distance from nearest boundary (in grid points)
-    let distFromEdge = min(pos, N - 1.0 - pos);
-
-    if (distFromEdge < W) {
-      let ratio = (W - distFromEdge) / W;
-      let damp = params.absorberStrength * ratio * ratio;
-      maxDamp = max(maxDamp, damp);
-    }
-  }
-
-  if (maxDamp > 0.0) {
-    let factor = exp(-maxDamp);
+  if (sigma > 0.0) {
+    let dampFactor = exp(-sigma * params.dt);
     let S = params.spinorSize;
     let T = params.totalSites;
     // Apply to all spinor components
     for (var c: u32 = 0u; c < S; c++) {
       let bufIdx = c * T + idx;
-      spinorRe[bufIdx] *= factor;
-      spinorIm[bufIdx] *= factor;
+      spinorRe[bufIdx] *= dampFactor;
+      spinorIm[bufIdx] *= dampFactor;
     }
   }
 }

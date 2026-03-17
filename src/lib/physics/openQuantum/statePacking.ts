@@ -53,7 +53,7 @@ export function packForGPU(
   rho: DensityMatrix,
   metrics: OpenQuantumMetrics,
   out: Float32Array,
-  activeK?: number,
+  activeK?: number
 ): void {
   const K = rho.K
   const el = rho.elements
@@ -96,11 +96,7 @@ export function packForGPU(
  * @param minK - Floor for the returned K to preserve coherence effects (default 2)
  * @returns Effective K ∈ [minK, rho.K]
  */
-export function computeActiveK(
-  rho: DensityMatrix,
-  populationThreshold = 0.01,
-  minK = 2,
-): number {
+export function computeActiveK(rho: DensityMatrix, populationThreshold = 0.01, minK = 2): number {
   const K = rho.K
   const el = rho.elements
 

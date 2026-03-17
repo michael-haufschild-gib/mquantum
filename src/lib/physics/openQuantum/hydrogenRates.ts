@@ -98,7 +98,7 @@ export function thermalOccupation(omega: number, temperature: number): number {
 export function buildTransitionRates(
   basis: readonly HydrogenBasisState[],
   temperature: number,
-  couplingScale: number = 1.0,
+  couplingScale: number = 1.0
 ): TransitionRate[] {
   const rates: TransitionRate[] = []
   const K = basis.length
@@ -128,7 +128,7 @@ export function buildTransitionRates(
 
       rates.push({
         from: j, // higher energy
-        to: i,   // lower energy
+        to: i, // lower energy
         gammaDown,
         gammaUp,
         omega,

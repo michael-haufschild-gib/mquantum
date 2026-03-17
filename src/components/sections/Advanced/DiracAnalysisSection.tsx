@@ -29,13 +29,12 @@ import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
  * ```
  */
 export const DiracAnalysisContent: React.FC = React.memo(() => {
-  const { dirac, setDiagnosticsInterval } =
-    useExtendedObjectStore(
-      useShallow((s) => ({
-        dirac: s.schroedinger.dirac,
-        setDiagnosticsInterval: s.setDiracDiagnosticsInterval,
-      })),
-    )
+  const { dirac, setDiagnosticsInterval } = useExtendedObjectStore(
+    useShallow((s) => ({
+      dirac: s.schroedinger.dirac,
+      setDiagnosticsInterval: s.setDiracDiagnosticsInterval,
+    }))
+  )
 
   return (
     <>
@@ -114,33 +113,60 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
 
     return (
       <div className="mt-2" data-testid="dirac-dispersion">
-        <p className="text-[10px] text-text-secondary mb-1">Dirac Dispersion E(k) = ±√((ck)² + (mc²)²)</p>
+        <p className="text-[10px] text-text-secondary mb-1">
+          Dirac Dispersion E(k) = ±√((ck)² + (mc²)²)
+        </p>
         <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
           <svg width="100%" viewBox={`0 0 ${DISP_WIDTH} ${DISP_HEIGHT}`} className="block">
             {/* Zero energy line */}
             <line
-              x1={DISP_PX} y1={zeroY} x2={DISP_PX + DISP_PW} y2={zeroY}
-              stroke="var(--text-tertiary)" strokeWidth={0.5} strokeDasharray="2,2"
+              x1={DISP_PX}
+              y1={zeroY}
+              x2={DISP_PX + DISP_PW}
+              y2={zeroY}
+              stroke="var(--text-tertiary)"
+              strokeWidth={0.5}
+              strokeDasharray="2,2"
             />
 
             {/* Mass gap lines ±mc² */}
             <line
-              x1={DISP_PX} y1={mc2Y} x2={DISP_PX + DISP_PW} y2={mc2Y}
-              stroke="var(--theme-accent)" strokeWidth={0.5} strokeDasharray="3,3" opacity={0.5}
+              x1={DISP_PX}
+              y1={mc2Y}
+              x2={DISP_PX + DISP_PW}
+              y2={mc2Y}
+              stroke="var(--theme-accent)"
+              strokeWidth={0.5}
+              strokeDasharray="3,3"
+              opacity={0.5}
             />
             <line
-              x1={DISP_PX} y1={negMc2Y} x2={DISP_PX + DISP_PW} y2={negMc2Y}
-              stroke="var(--theme-accent)" strokeWidth={0.5} strokeDasharray="3,3" opacity={0.5}
+              x1={DISP_PX}
+              y1={negMc2Y}
+              x2={DISP_PX + DISP_PW}
+              y2={negMc2Y}
+              stroke="var(--theme-accent)"
+              strokeWidth={0.5}
+              strokeDasharray="3,3"
+              opacity={0.5}
             />
 
             {/* Klein threshold */}
             <line
-              x1={DISP_PX} y1={kleinY} x2={DISP_PX + DISP_PW} y2={kleinY}
-              stroke="var(--color-warning)" strokeWidth={1} strokeDasharray="4,3"
+              x1={DISP_PX}
+              y1={kleinY}
+              x2={DISP_PX + DISP_PW}
+              y2={kleinY}
+              stroke="var(--color-warning)"
+              strokeWidth={1}
+              strokeDasharray="4,3"
             />
             <text
-              x={DISP_PX + DISP_PW + 2} y={kleinY + 3}
-              fill="var(--color-warning)" fontSize={7} fontFamily="monospace"
+              x={DISP_PX + DISP_PW + 2}
+              y={kleinY + 3}
+              fill="var(--color-warning)"
+              fontSize={7}
+              fontFamily="monospace"
             >
               V_K
             </text>
@@ -148,40 +174,60 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
             {/* Positive energy branch (particle) */}
             <polyline
               points={posPoints}
-              fill="none" stroke="var(--dirac-particle)" strokeWidth={2} strokeLinejoin="round"
+              fill="none"
+              stroke="var(--dirac-particle)"
+              strokeWidth={2}
+              strokeLinejoin="round"
             />
 
             {/* Negative energy branch (antiparticle) */}
             <polyline
               points={negPoints}
-              fill="none" stroke="var(--dirac-antiparticle)" strokeWidth={2} strokeLinejoin="round"
+              fill="none"
+              stroke="var(--dirac-antiparticle)"
+              strokeWidth={2}
+              strokeLinejoin="round"
             />
 
             {/* Mass gap label */}
             <text
-              x={DISP_PX + 2} y={(mc2Y + negMc2Y) / 2 + 3}
-              fill="var(--text-tertiary)" fontSize={7} fontFamily="monospace"
+              x={DISP_PX + 2}
+              y={(mc2Y + negMc2Y) / 2 + 3}
+              fill="var(--text-tertiary)"
+              fontSize={7}
+              fontFamily="monospace"
             >
               2mc²
             </text>
 
             {/* Axes */}
             <line
-              x1={DISP_PX + DISP_PW / 2} y1={DISP_PY}
-              x2={DISP_PX + DISP_PW / 2} y2={DISP_PY + DISP_PH}
-              stroke="var(--text-secondary)" strokeWidth={0.5}
+              x1={DISP_PX + DISP_PW / 2}
+              y1={DISP_PY}
+              x2={DISP_PX + DISP_PW / 2}
+              y2={DISP_PY + DISP_PH}
+              stroke="var(--text-secondary)"
+              strokeWidth={0.5}
             />
 
             {/* Axis labels */}
             <text
-              x={DISP_PX + DISP_PW / 2} y={DISP_HEIGHT - 2}
-              textAnchor="middle" fill="var(--text-tertiary)" fontSize={8} fontFamily="monospace"
+              x={DISP_PX + DISP_PW / 2}
+              y={DISP_HEIGHT - 2}
+              textAnchor="middle"
+              fill="var(--text-tertiary)"
+              fontSize={8}
+              fontFamily="monospace"
             >
               k
             </text>
             <text
-              x={4} y={DISP_PY + DISP_PH / 2}
-              textAnchor="middle" fill="var(--text-tertiary)" fontSize={8} fontFamily="monospace"
+              x={4}
+              y={DISP_PY + DISP_PH / 2}
+              textAnchor="middle"
+              fill="var(--text-tertiary)"
+              fontSize={8}
+              fontFamily="monospace"
               transform={`rotate(-90, 4, ${DISP_PY + DISP_PH / 2})`}
             >
               E(k)
@@ -190,7 +236,7 @@ const DiracDispersionDiagram: React.FC<DiracDispersionDiagramProps> = React.memo
         </div>
       </div>
     )
-  },
+  }
 )
 
 DiracDispersionDiagram.displayName = 'DiracDispersionDiagram'
@@ -221,7 +267,7 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
       comptonWavelength: s.comptonWavelength,
       zitterbewegungFreq: s.zitterbewegungFreq,
       kleinThreshold: s.kleinThreshold,
-    })),
+    }))
   )
 
   return (
@@ -240,7 +286,8 @@ const DiracDiagnosticsInline: React.FC = React.memo(() => {
               <div className="flex gap-3">
                 <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
                 <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
-                  Δ={normDrift >= 0 ? '+' : ''}{(normDrift * 100).toFixed(2)}%
+                  Δ={normDrift >= 0 ? '+' : ''}
+                  {(normDrift * 100).toFixed(2)}%
                 </span>
               </div>
               <div className="flex gap-3">

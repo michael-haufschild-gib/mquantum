@@ -68,11 +68,7 @@ export {
 } from './dipoleElements'
 
 export type { TransitionRate } from './hydrogenRates'
-export {
-  einsteinA,
-  thermalOccupation,
-  buildTransitionRates,
-} from './hydrogenRates'
+export { einsteinA, thermalOccupation, buildTransitionRates } from './hydrogenRates'
 
 export { buildHydrogenChannels } from './hydrogenChannels'
 
@@ -91,11 +87,7 @@ export {
 
 export { buildLiouvillian } from './liouvillian'
 
-export {
-  computePropagator,
-  applyPropagator,
-  evolvePropagatorStep,
-} from './propagator'
+export { computePropagator, applyPropagator, evolvePropagatorStep } from './propagator'
 
 export type { ValidationResult } from './validation'
 export {

@@ -13,10 +13,7 @@ import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { Switch } from '@/components/ui/Switch'
 import { ToggleGroup } from '@/components/ui/ToggleGroup'
-import type {
-  FreeScalarFieldView,
-  FreeScalarInitialCondition,
-} from '@/lib/geometry/extended/types'
+import type { FreeScalarFieldView, FreeScalarInitialCondition } from '@/lib/geometry/extended/types'
 import React, { useCallback, useMemo } from 'react'
 import type { FreeScalarFieldControlsProps } from './types'
 
@@ -73,7 +70,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
       setAutoScale,
       setVacuumSeed,
       setSlicePosition,
-      resetField,
       setSelfInteractionEnabled,
       setSelfInteractionLambda,
       setSelfInteractionVev,
@@ -83,36 +79,30 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
     const latticeDim = fs.latticeDim
 
     // Initial condition options
-    const initConditionOptions = useMemo(
-      () => {
-        const opts = [
-          { value: 'vacuumNoise', label: 'Exact Vacuum' },
-          { value: 'singleMode', label: 'Single Mode' },
-          { value: 'gaussianPacket', label: 'Gaussian Packet' },
-        ]
-        if (fs.selfInteractionEnabled) {
-          opts.push({ value: 'kinkProfile', label: 'Kink (tanh)' })
-        }
-        return opts
-      },
-      [fs.selfInteractionEnabled]
-    )
+    const initConditionOptions = useMemo(() => {
+      const opts = [
+        { value: 'vacuumNoise', label: 'Exact Vacuum' },
+        { value: 'singleMode', label: 'Single Mode' },
+        { value: 'gaussianPacket', label: 'Gaussian Packet' },
+      ]
+      if (fs.selfInteractionEnabled) {
+        opts.push({ value: 'kinkProfile', label: 'Kink (tanh)' })
+      }
+      return opts
+    }, [fs.selfInteractionEnabled])
 
     // Field view options
-    const fieldViewOptions = useMemo(
-      () => {
-        const opts = [
-          { value: 'phi', label: '\u03C6' },
-          { value: 'pi', label: '\u03C0' },
-          { value: 'energyDensity', label: '\u03B5' },
-        ]
-        if (fs.selfInteractionEnabled) {
-          opts.push({ value: 'wallDensity', label: 'V(\u03C6)' })
-        }
-        return opts
-      },
-      [fs.selfInteractionEnabled]
-    )
+    const fieldViewOptions = useMemo(() => {
+      const opts = [
+        { value: 'phi', label: '\u03C6' },
+        { value: 'pi', label: '\u03C0' },
+        { value: 'energyDensity', label: '\u03B5' },
+      ]
+      if (fs.selfInteractionEnabled) {
+        opts.push({ value: 'wallDensity', label: 'V(\u03C6)' })
+      }
+      return opts
+    }, [fs.selfInteractionEnabled])
 
     // Power-of-2 grid size handler (from Select)
     const handlePow2GridSize = useCallback(
@@ -274,9 +264,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
         {/* Slice Positions for extra dimensions (d > 3) */}
         {latticeDim > 3 && (
           <div className="space-y-2 border-t border-border-subtle pt-3">
-            <div className="text-xs text-text-secondary font-medium">
-              Extra-Dimension Slice
-            </div>
+            <div className="text-xs text-text-secondary font-medium">Extra-Dimension Slice</div>
             {Array.from({ length: latticeDim - 3 }, (_, i) => {
               const dimIdx = i + 3
               const halfExtent =
@@ -324,9 +312,7 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
                 onChange={setSelfInteractionVev}
                 showValue
               />
-              <div className="text-xs text-text-tertiary">
-                V(φ) = λ(φ² − v²)², minima at φ = ±v
-              </div>
+              <div className="text-xs text-text-tertiary">V(φ) = λ(φ² − v²)², minima at φ = ±v</div>
             </>
           )}
         </div>
@@ -432,15 +418,6 @@ export const FreeScalarFieldControls: React.FC<FreeScalarFieldControlsProps> = R
               ))}
             </div>
           )}
-
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={resetField}
-            data-testid="reset-field-button"
-          >
-            Reset Field
-          </Button>
         </div>
 
         {/* Field View */}

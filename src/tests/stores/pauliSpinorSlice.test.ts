@@ -129,7 +129,8 @@ describe('pauliSpinorSlice', () => {
   // === Lifecycle ===
 
   it('resetPauliField restores defaults and sets needsReset', () => {
-    const { setPauliFieldStrength, setPauliFieldType, resetPauliField } = useExtendedObjectStore.getState()
+    const { setPauliFieldStrength, setPauliFieldType, resetPauliField } =
+      useExtendedObjectStore.getState()
     setPauliFieldStrength(42)
     setPauliFieldType('quadrupole')
     resetPauliField()
@@ -157,5 +158,24 @@ describe('pauliSpinorSlice', () => {
     expect(state.potentialType).toBe('barrier')
     // Other fields unchanged
     expect(state.dt).toBe(DEFAULT_PAULI_CONFIG.dt)
+  })
+
+  it('setPauliPmlTargetReflection clamps to (1e-12, 0.999)', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setPauliPmlTargetReflection(0.5)
+    expect(useExtendedObjectStore.getState().pauliSpinor.pmlTargetReflection).toBe(0.5)
+
+    store.setPauliPmlTargetReflection(-1)
+    expect(useExtendedObjectStore.getState().pauliSpinor.pmlTargetReflection).toBe(1e-12)
+
+    store.setPauliPmlTargetReflection(0)
+    expect(useExtendedObjectStore.getState().pauliSpinor.pmlTargetReflection).toBe(1e-12)
+
+    store.setPauliPmlTargetReflection(1)
+    expect(useExtendedObjectStore.getState().pauliSpinor.pmlTargetReflection).toBe(0.999)
+
+    store.setPauliPmlTargetReflection(5)
+    expect(useExtendedObjectStore.getState().pauliSpinor.pmlTargetReflection).toBe(0.999)
   })
 })

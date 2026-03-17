@@ -22,8 +22,8 @@ const PB = 16
 const PW = WIDTH - PX_L - PX_R
 const PH = HEIGHT - PY - PB
 
-/** Blue secondary color for radial curve (matches --dirac-particle) */
-const WAVE_COLOR = 'oklch(0.7 0.15 220)'
+/** Blue secondary color for radial curve — uses theme token */
+const WAVE_COLOR = 'var(--dirac-particle)'
 
 /** Spectroscopic notation for l values */
 const L_LABELS = ['s', 'p', 'd', 'f', 'g', 'h']
@@ -70,7 +70,7 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
     useShallow((s) => ({
       n: s.schroedinger.principalQuantumNumber,
       l: s.schroedinger.azimuthalQuantumNumber,
-    })),
+    }))
   )
 
   const chart = useMemo(() => {
@@ -118,7 +118,7 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
       const R0 = laguerre(n - l - 1, 2 * l + 1, rho0)
       const R1 = laguerre(n - l - 1, 2 * l + 1, rho1)
       if (R0 * R1 < 0 && r0 > 0) {
-        nodes.push(r0 - R0 * (r1 - r0) / (R1 - R0))
+        nodes.push(r0 - (R0 * (r1 - r0)) / (R1 - R0))
       }
     }
 
@@ -126,8 +126,11 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
     const classicalR = n * n * (1 + Math.sqrt(Math.max(0, 1 - (l * (l + 1)) / (n * n))))
 
     return {
-      energyLevels, toEnergyY, maxN,
-      radialPoints, nodes: nodes.map(toX),
+      energyLevels,
+      toEnergyY,
+      maxN,
+      radialPoints,
+      nodes: nodes.map(toX),
       zeroY: toRadialY(0),
       classicalTurnX: toX(classicalR),
     }
@@ -142,15 +145,20 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Ionization threshold (E=0) */}
           <line
-            x1={PX_L} y1={chart.toEnergyY(0)} x2={PX_L + PW} y2={chart.toEnergyY(0)}
-            stroke="var(--text-tertiary)" strokeWidth={0.5} strokeDasharray="2,2"
+            x1={PX_L}
+            y1={chart.toEnergyY(0)}
+            x2={PX_L + PW}
+            y2={chart.toEnergyY(0)}
+            stroke="var(--text-tertiary)"
+            strokeWidth={0.5}
+            strokeDasharray="2,2"
           />
 
           {/* Energy levels with sublevel lines */}
           {chart.energyLevels.map((lvl) => {
             const y = chart.toEnergyY(lvl.energy)
             const subCount = lvl.sublevels.length
-            const subWidth = Math.min(PW * 0.5 / subCount, 24)
+            const subWidth = Math.min((PW * 0.5) / subCount, 24)
             const totalWidth = subCount * subWidth
             const startX = PX_L + (PW - totalWidth) / 2
 
@@ -165,16 +173,21 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
                   return (
                     <g key={li}>
                       <line
-                        x1={sx} y1={y} x2={ex} y2={y}
+                        x1={sx}
+                        y1={y}
+                        x2={ex}
+                        y2={y}
                         stroke={isActive ? 'var(--theme-accent)' : 'var(--theme-accent)'}
                         strokeWidth={isActive ? 2 : 0.5}
                         opacity={isActive ? 0.9 : 0.15}
                       />
                       <text
-                        x={(sx + ex) / 2} y={y + 8}
+                        x={(sx + ex) / 2}
+                        y={y + 8}
                         textAnchor="middle"
                         fill={isActive ? 'var(--theme-accent)' : 'var(--text-tertiary)'}
-                        fontSize={5} fontFamily="monospace"
+                        fontSize={5}
+                        fontFamily="monospace"
                         opacity={isActive ? 1 : 0.4}
                       >
                         {L_LABELS[li] ?? li}
@@ -185,8 +198,11 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
 
                 {/* Energy value on right */}
                 <text
-                  x={PX_L + PW + 3} y={y + 3}
-                  fill="var(--text-tertiary)" fontSize={6} fontFamily="monospace"
+                  x={PX_L + PW + 3}
+                  y={y + 3}
+                  fill="var(--text-tertiary)"
+                  fontSize={6}
+                  fontFamily="monospace"
                 >
                   {lvl.energy.toFixed(1)}
                 </text>
@@ -196,9 +212,13 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
 
           {/* Classical turning point */}
           <line
-            x1={chart.classicalTurnX} y1={PY}
-            x2={chart.classicalTurnX} y2={PY + PH}
-            stroke="var(--text-tertiary)" strokeWidth={0.5} strokeDasharray="1,3"
+            x1={chart.classicalTurnX}
+            y1={PY}
+            x2={chart.classicalTurnX}
+            y2={PY + PH}
+            stroke="var(--text-tertiary)"
+            strokeWidth={0.5}
+            strokeDasharray="1,3"
             opacity={0.4}
           />
 
@@ -206,25 +226,41 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
           {chart.nodes.map((nx, i) => (
             <line
               key={i}
-              x1={nx} y1={chart.zeroY - 4} x2={nx} y2={chart.zeroY + 4}
-              stroke={WAVE_COLOR} strokeWidth={1} opacity={0.5}
+              x1={nx}
+              y1={chart.zeroY - 4}
+              x2={nx}
+              y2={chart.zeroY + 4}
+              stroke={WAVE_COLOR}
+              strokeWidth={1}
+              opacity={0.5}
             />
           ))}
 
           {/* Radial probability curve (blue) */}
           <polyline
             points={chart.radialPoints}
-            fill="none" stroke={WAVE_COLOR} strokeWidth={1.5} strokeLinejoin="round"
+            fill="none"
+            stroke={WAVE_COLOR}
+            strokeWidth={1.5}
+            strokeLinejoin="round"
           />
 
           {/* Left Y-axis (radial probability) */}
           <line
-            x1={PX_L} y1={PY} x2={PX_L} y2={PY + PH}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={PX_L}
+            y1={PY}
+            x2={PX_L}
+            y2={PY + PH}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
           <text
-            x={4} y={PY + PH / 2}
-            textAnchor="middle" fill={WAVE_COLOR} fontSize={8} fontFamily="monospace"
+            x={4}
+            y={PY + PH / 2}
+            textAnchor="middle"
+            fill={WAVE_COLOR}
+            fontSize={8}
+            fontFamily="monospace"
             transform={`rotate(-90, 4, ${PY + PH / 2})`}
           >
             r²|R|²
@@ -232,12 +268,21 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
 
           {/* Right Y-axis (energy) */}
           <line
-            x1={PX_L + PW} y1={PY} x2={PX_L + PW} y2={PY + PH}
-            stroke="var(--theme-accent)" strokeWidth={0.5} opacity={0.4}
+            x1={PX_L + PW}
+            y1={PY}
+            x2={PX_L + PW}
+            y2={PY + PH}
+            stroke="var(--theme-accent)"
+            strokeWidth={0.5}
+            opacity={0.4}
           />
           <text
-            x={WIDTH - 2} y={PY + PH / 2}
-            textAnchor="middle" fill="var(--theme-accent)" fontSize={8} fontFamily="monospace"
+            x={WIDTH - 2}
+            y={PY + PH / 2}
+            textAnchor="middle"
+            fill="var(--theme-accent)"
+            fontSize={8}
+            fontFamily="monospace"
             transform={`rotate(90, ${WIDTH - 2}, ${PY + PH / 2})`}
           >
             E (eV)
@@ -245,16 +290,23 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
 
           {/* X-axis label */}
           <text
-            x={PX_L + PW / 2} y={HEIGHT - 3}
-            textAnchor="middle" fill="var(--text-tertiary)" fontSize={8} fontFamily="monospace"
+            x={PX_L + PW / 2}
+            y={HEIGHT - 3}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
           >
             r (a₀)
           </text>
 
           {/* State label */}
           <text
-            x={PX_L + 4} y={PY + 10}
-            fill="var(--text-secondary)" fontSize={7} fontFamily="monospace"
+            x={PX_L + 4}
+            y={PY + 10}
+            fill="var(--text-secondary)"
+            fontSize={7}
+            fontFamily="monospace"
           >
             n={n}, l={l}
           </text>

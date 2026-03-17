@@ -63,7 +63,7 @@ export function hydrogenEnergy(n: number): number {
  */
 export function extraDimEnergy(
   extraDimN: readonly number[],
-  extraDimOmega: readonly number[],
+  extraDimOmega: readonly number[]
 ): number {
   let sum = 0
   for (let i = 0; i < extraDimN.length; i++) {
@@ -96,7 +96,7 @@ export function extraDimEnergy(
 export function buildHydrogenBasis(
   maxN: number,
   dimension: number,
-  extraDimOmega: readonly number[] = [],
+  extraDimOmega: readonly number[] = []
 ): HydrogenBasisState[] {
   const states: HydrogenBasisState[] = []
 

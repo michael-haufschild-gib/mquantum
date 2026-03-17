@@ -8,7 +8,6 @@ import { useGeometryStore } from '@/stores/geometryStore'
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
-
 export const SharedAdvancedControls: React.FC = React.memo(() => {
   const { dimension, objectType } = useGeometryStore(
     useShallow((state) => ({ dimension: state.dimension, objectType: state.objectType }))
@@ -57,60 +56,59 @@ export const SharedAdvancedControls: React.FC = React.memo(() => {
     <div className="space-y-4 mb-4 pb-4">
       {/* Subsurface Scattering (volumetric only, 3D+) */}
       {(isPauli || (!isoEnabled && dimension > 2 && representation !== 'wigner')) && (
-      <ControlGroup
-        title="Subsurface Scattering"
-        collapsible
-        defaultOpen={false}
-        rightElement={
-          <Switch
-            checked={sssEnabled}
-            onCheckedChange={setSssEnabled}
-            data-testid="global-sss-toggle"
+        <ControlGroup
+          title="Subsurface Scattering"
+          collapsible
+          defaultOpen={false}
+          rightElement={
+            <Switch
+              checked={sssEnabled}
+              onCheckedChange={setSssEnabled}
+              data-testid="global-sss-toggle"
+            />
+          }
+        >
+          <Slider
+            label="Intensity"
+            min={0.0}
+            max={2.0}
+            step={0.1}
+            value={sssIntensity}
+            onChange={setSssIntensity}
+            showValue
+            data-testid="global-sss-intensity"
           />
-        }
-      >
-        <Slider
-          label="Intensity"
-          min={0.0}
-          max={2.0}
-          step={0.1}
-          value={sssIntensity}
-          onChange={setSssIntensity}
-          showValue
-          data-testid="global-sss-intensity"
-        />
-        <div className="flex items-center justify-between">
-          <label className="text-xs text-[var(--text-secondary)]">SSS Tint</label>
-          <ColorPicker
-            value={sssColor}
-            onChange={handleSssColorChange}
-            disableAlpha={true}
-            className="w-24"
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-[var(--text-secondary)]">SSS Tint</label>
+            <ColorPicker
+              value={sssColor}
+              onChange={handleSssColorChange}
+              disableAlpha={true}
+              className="w-24"
+            />
+          </div>
+          <Slider
+            label="Thickness"
+            min={0.1}
+            max={5.0}
+            step={0.1}
+            value={sssThickness}
+            onChange={setSssThickness}
+            showValue
+            data-testid="global-sss-thickness"
           />
-        </div>
-        <Slider
-          label="Thickness"
-          min={0.1}
-          max={5.0}
-          step={0.1}
-          value={sssThickness}
-          onChange={setSssThickness}
-          showValue
-          data-testid="global-sss-thickness"
-        />
-        <Slider
-          label="Sample Jitter"
-          min={0.0}
-          max={1.0}
-          step={0.05}
-          value={sssJitter}
-          onChange={setSssJitter}
-          showValue
-          data-testid="global-sss-jitter"
-        />
-      </ControlGroup>
+          <Slider
+            label="Sample Jitter"
+            min={0.0}
+            max={1.0}
+            step={0.05}
+            value={sssJitter}
+            onChange={setSssJitter}
+            showValue
+            data-testid="global-sss-jitter"
+          />
+        </ControlGroup>
       )}
-
     </div>
   )
 })

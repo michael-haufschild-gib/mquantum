@@ -5,7 +5,7 @@
 
 import { getRotationPlanes } from '@/lib/math/rotation'
 import { create } from 'zustand'
-import { MAX_DIMENSION, MIN_DIMENSION } from './geometryStore'
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 
 /**
  * Cache for valid plane names by dimension.

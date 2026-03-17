@@ -88,13 +88,7 @@ describe('getAvailableColorAlgorithms — phase-dependent exclusion in DM mode',
     'relativePhase',
   ] as const
 
-  const densityOnlyAlgos = [
-    'lch',
-    'multiSource',
-    'radial',
-    'blackbody',
-    'radialDistance',
-  ] as const
+  const densityOnlyAlgos = ['lch', 'multiSource', 'radial', 'blackbody', 'radialDistance'] as const
 
   it('excludes phase-dependent algorithms when openQuantumEnabled is true', () => {
     const algos = getAvailableColorAlgorithms('harmonicOscillator', true)

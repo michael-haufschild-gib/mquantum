@@ -33,14 +33,12 @@ import { useShallow } from 'zustand/react/shallow'
  * @returns React component, or null when open quantum is disabled
  */
 export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
-  const enabled = useExtendedObjectStore(
-    (s) => {
-      const oq = s.schroedinger.openQuantum?.enabled ?? false
-      const mode = s.schroedinger.quantumMode
-      const repr = s.schroedinger.representation
-      return oq && (mode === 'harmonicOscillator' || mode === 'hydrogenND') && repr !== 'wigner'
-    }
-  )
+  const enabled = useExtendedObjectStore((s) => {
+    const oq = s.schroedinger.openQuantum?.enabled ?? false
+    const mode = s.schroedinger.quantumMode
+    const repr = s.schroedinger.representation
+    return oq && (mode === 'harmonicOscillator' || mode === 'hydrogenND') && repr !== 'wigner'
+  })
 
   const metrics = useOpenQuantumDiagnosticsStore(
     useShallow((s) => ({
@@ -118,11 +116,7 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
             State Populations
           </span>
           {populationData.basisLabels.map((label, i) => (
-            <PopulationBar
-              key={label}
-              label={label}
-              value={populationData.populations[i] ?? 0}
-            />
+            <PopulationBar key={label} label={label} value={populationData.populations[i] ?? 0} />
           ))}
         </div>
       )}
@@ -144,8 +138,12 @@ export const OpenQuantumDiagnosticsSection: React.FC = React.memo(() => {
             <p>Purity = Tr(\u03C1\u00B2) \u2208 [1/K, 1]</p>
             <p>Linear Entropy = 1 \u2212 Tr(\u03C1\u00B2)</p>
             <p>von Neumann S = \u2212Tr(\u03C1 ln \u03C1)</p>
-            <p>Coherence = \u03A3<sub>k\u2260l</sub> |\u03C1<sub>kl</sub>|</p>
-            <p>Ground Pop. = Re(\u03C1<sub>00</sub>)</p>
+            <p>
+              Coherence = \u03A3<sub>k\u2260l</sub> |\u03C1<sub>kl</sub>|
+            </p>
+            <p>
+              Ground Pop. = Re(\u03C1<sub>00</sub>)
+            </p>
           </div>
         )}
       </div>
@@ -160,9 +158,7 @@ function MetricRow({ label, value, digits }: { label: string; value: number; dig
   return (
     <div className="flex items-center justify-between text-xs">
       <span className="text-text-secondary">{label}</span>
-      <span className="text-text-primary font-mono tabular-nums">
-        {value.toFixed(digits)}
-      </span>
+      <span className="text-text-primary font-mono tabular-nums">{value.toFixed(digits)}</span>
     </div>
   )
 }

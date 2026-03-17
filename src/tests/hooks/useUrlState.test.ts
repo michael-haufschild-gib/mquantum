@@ -87,7 +87,9 @@ describe('useUrlState', () => {
   })
 
   it('loads scene examples when scene parameter is present', async () => {
-    const hasHydratedSpy = vi.spyOn(usePresetManagerStore.persist, 'hasHydrated').mockReturnValue(true)
+    const hasHydratedSpy = vi
+      .spyOn(usePresetManagerStore.persist, 'hasHydrated')
+      .mockReturnValue(true)
     mockedParseCurrentUrl.mockReturnValue({ scene: 'schroedinger bloom' })
     mockedFindSceneByName.mockReturnValue({ id: 'schroedinger-bloom', source: 'example' })
 

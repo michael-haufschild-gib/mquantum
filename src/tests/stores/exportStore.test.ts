@@ -200,7 +200,8 @@ describe('exportStore', () => {
           fontWeight: 950,
           padding: -15,
           fontSize: Number.POSITIVE_INFINITY,
-          verticalPlacement: 'invalid-placement' as unknown as TextOverlaySettings['verticalPlacement'],
+          verticalPlacement:
+            'invalid-placement' as unknown as TextOverlaySettings['verticalPlacement'],
         } as unknown as TextOverlaySettings,
       })
 
@@ -352,7 +353,9 @@ describe('exportStore', () => {
       expect(settings.textOverlay.opacity).toBe(0)
       expect(settings.textOverlay.fontWeight).toBe(900)
       expect(settings.textOverlay.verticalPlacement).toBe(defaults.textOverlay.verticalPlacement)
-      expect(settings.textOverlay.horizontalPlacement).toBe(defaults.textOverlay.horizontalPlacement)
+      expect(settings.textOverlay.horizontalPlacement).toBe(
+        defaults.textOverlay.horizontalPlacement
+      )
 
       expect(settings.crop.enabled).toBe(defaults.crop.enabled)
       expect(settings.crop.x).toBe(defaults.crop.x)

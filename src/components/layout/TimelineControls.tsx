@@ -15,7 +15,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore, type GeometryState } from '@/stores/geometryStore'
 import { useUIStore } from '@/stores/uiStore'
 import { AnimatePresence, m } from 'motion/react'
-import { useEffect, useMemo, useState, type FC } from 'react'
+import { useCallback, useMemo, useState, type FC } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { PauliAnimationDrawer } from './TimelineControls/PauliAnimationDrawer'
 import { SchroedingerAnimationDrawer } from './TimelineControls/SchroedingerAnimationDrawer'
@@ -69,6 +69,18 @@ export const TimelineControls: FC = () => {
   // Extended object configs for animation state checking
   const schroedingerConfig = useExtendedObjectStore((state) => state.schroedinger)
 
+  // Reset actions for unified restart button
+  const resetActions = useExtendedObjectStore(
+    useShallow((state) => ({
+      resetSchroedingerParameters: state.resetSchroedingerParameters,
+      resetFreeScalarField: state.resetFreeScalarField,
+      resetTdseField: state.resetTdseField,
+      resetBecField: state.resetBecField,
+      setDiracNeedsReset: state.setDiracNeedsReset,
+      setPauliNeedsReset: state.setPauliNeedsReset,
+    }))
+  )
+
   const planes = useMemo(() => getRotationPlanes(dimension), [dimension])
   // Count active animations for Schroedinger
   const activeAnimationCount = useMemo(() => {
@@ -103,16 +115,37 @@ export const TimelineControls: FC = () => {
       schroedingerConfig.quantumMode === 'hydrogenND') &&
     schroedingerConfig.representation !== 'wigner'
 
+  const handleReset = useCallback(() => {
+    if (isPauliSpinor) {
+      resetActions.setPauliNeedsReset()
+      return
+    }
+    switch (schroedingerConfig.quantumMode) {
+      case 'harmonicOscillator':
+      case 'hydrogenND':
+        resetActions.resetSchroedingerParameters()
+        break
+      case 'freeScalarField':
+        resetActions.resetFreeScalarField()
+        break
+      case 'tdseDynamics':
+        resetActions.resetTdseField()
+        break
+      case 'becDynamics':
+        resetActions.resetBecField()
+        break
+      case 'diracEquation':
+        resetActions.setDiracNeedsReset()
+        break
+    }
+  }, [isPauliSpinor, schroedingerConfig.quantumMode, resetActions])
+
   const [showRotation, setShowRotation] = useState(false)
   const [showAnimDrawer, setShowAnimDrawer] = useState(false)
   const [showOpenQDrawer, setShowOpenQDrawer] = useState(false)
 
-  // Close open quantum drawer when controls become unavailable
-  useEffect(() => {
-    if (showOpenQDrawer && !supportsOpenQuantumControls) {
-      setShowOpenQDrawer(false)
-    }
-  }, [showOpenQDrawer, supportsOpenQuantumControls])
+  // Derive effective drawer visibility — drawer auto-hides when controls become unavailable
+  const effectiveShowOpenQDrawer = showOpenQDrawer && supportsOpenQuantumControls
 
   return (
     <div className="flex flex-col w-full h-full relative">
@@ -187,7 +220,6 @@ export const TimelineControls: FC = () => {
                   )
                 })}
               </div>
-
             </div>
           </m.div>
         )}
@@ -203,7 +235,7 @@ export const TimelineControls: FC = () => {
         )}
 
         {/* Schroedinger Open Quantum Drawer */}
-        {showOpenQDrawer && supportsOpenQuantumControls && (
+        {effectiveShowOpenQDrawer && (
           <SchroedingerOpenQuantumDrawer onClose={() => setShowOpenQDrawer(false)} />
         )}
       </AnimatePresence>
@@ -212,6 +244,16 @@ export const TimelineControls: FC = () => {
       <div className="h-14 flex items-center px-4 gap-4 shrink-0 overflow-x-auto overflow-y-hidden scrollbar-none relative glass-panel rounded-t-xl sm:rounded-xl">
         {/* Playback Controls */}
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="primary"
+            size="icon"
+            onClick={handleReset}
+            ariaLabel="Reset wavefunction"
+            className="w-9 h-9 rounded-full"
+          >
+            <Icon name="reset" size={14} />
+          </Button>
+
           <Button
             variant={isPlaying ? 'primary' : 'secondary'}
             size="icon"

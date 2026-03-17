@@ -10,7 +10,6 @@
 import React, { useMemo } from 'react'
 import { Slider } from '@/components/ui/Slider'
 import { Select } from '@/components/ui/Select'
-import { Switch } from '@/components/ui/Switch'
 
 const AXIS_LABELS = ['x', 'y', 'z', 'w', 'v', 'u', 't', 's', 'r', 'q', 'p']
 
@@ -33,22 +32,16 @@ interface PauliGridControlsProps {
   stepsPerFrame: number
   hbar: number
   mass: number
-  absorberEnabled: boolean
-  absorberWidth: number
-  absorberStrength: number
   onGridSizeChange: (size: number[]) => void
   onSpacingChange: (spacing: number[]) => void
   onDtChange: (dt: number) => void
   onStepsPerFrameChange: (steps: number) => void
   onHbarChange: (hbar: number) => void
   onMassChange: (mass: number) => void
-  onAbsorberEnabledChange: (enabled: boolean) => void
-  onAbsorberWidthChange: (width: number) => void
-  onAbsorberStrengthChange: (strength: number) => void
 }
 
 /**
- * Grid, time-stepping, and absorber controls for Pauli spinor.
+ * Grid, time-stepping, and physical constant controls for Pauli spinor.
  *
  * @param props - Grid parameters and change handlers
  * @returns Grid controls panel
@@ -62,18 +55,12 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
     stepsPerFrame,
     hbar,
     mass,
-    absorberEnabled,
-    absorberWidth,
-    absorberStrength,
     onGridSizeChange,
     onSpacingChange,
     onDtChange,
     onStepsPerFrameChange,
     onHbarChange,
     onMassChange,
-    onAbsorberEnabledChange,
-    onAbsorberWidthChange,
-    onAbsorberStrengthChange,
   }) => {
     const gridSizeOptions = useMemo(() => {
       const maxPerDim = Math.floor(Math.pow(PAULI_MAX_TOTAL_SITES, 1 / latticeDim))
@@ -151,35 +138,6 @@ export const PauliGridControls: React.FC<PauliGridControlsProps> = React.memo(
           max={10}
           step={0.01}
         />
-
-        {/* Absorbing boundary */}
-        <Switch
-          label="Absorbing Boundary"
-          checked={absorberEnabled}
-          onCheckedChange={onAbsorberEnabledChange}
-        />
-
-        {absorberEnabled && (
-          <>
-            <Slider
-              label="Absorber Width"
-              value={absorberWidth}
-              onChange={onAbsorberWidthChange}
-              min={0.01}
-              max={0.5}
-              step={0.01}
-            />
-
-            <Slider
-              label="Absorber Strength"
-              value={absorberStrength}
-              onChange={onAbsorberStrengthChange}
-              min={0.1}
-              max={50}
-              step={0.1}
-            />
-          </>
-        )}
       </div>
     )
   }

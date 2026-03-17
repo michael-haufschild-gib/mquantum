@@ -1,16 +1,11 @@
-import {
-  DEFAULT_PAULI_CONFIG,
-  type PauliConfig,
-} from '@/lib/geometry/extended/types'
+import { DEFAULT_PAULI_CONFIG, type PauliConfig } from '@/lib/geometry/extended/types'
 import { StateCreator } from 'zustand'
 import { ExtendedObjectSlice, PauliSpinorSlice } from './types'
 
-export const createPauliSpinorSlice: StateCreator<
-  ExtendedObjectSlice,
-  [],
-  [],
-  PauliSpinorSlice
-> = (set, get) => {
+export const createPauliSpinorSlice: StateCreator<ExtendedObjectSlice, [], [], PauliSpinorSlice> = (
+  set,
+  get
+) => {
   const isFinite = (value: number): boolean => Number.isFinite(value)
 
   /** Wrapped setter that auto-increments pauliSpinorVersion on state changes. */
@@ -60,7 +55,8 @@ export const createPauliSpinorSlice: StateCreator<
       setPauliField('fieldDirection', direction)
     },
     setPauliGradientStrength: (strength) => setPauliClamped('gradientStrength', strength, 0, 20),
-    setPauliRotatingFrequency: (frequency) => setPauliClamped('rotatingFrequency', frequency, 0.01, 50),
+    setPauliRotatingFrequency: (frequency) =>
+      setPauliClamped('rotatingFrequency', frequency, 0.01, 50),
 
     // === Initial Spin State ===
     setPauliInitialSpinDirection: (direction) => {
@@ -87,7 +83,11 @@ export const createPauliSpinorSlice: StateCreator<
     setPauliPacketWidth: (width) => {
       if (!isFinite(width)) return
       setWithVersion((state) => ({
-        pauliSpinor: { ...state.pauliSpinor, packetWidth: Math.max(0.05, Math.min(5, width)), needsReset: true },
+        pauliSpinor: {
+          ...state.pauliSpinor,
+          packetWidth: Math.max(0.05, Math.min(5, width)),
+          needsReset: true,
+        },
       }))
     },
     setPauliPacketMomentum: (dimIndex, value) => {
@@ -147,8 +147,8 @@ export const createPauliSpinorSlice: StateCreator<
 
     // === Absorber ===
     setPauliAbsorberEnabled: (enabled) => setPauliField('absorberEnabled', enabled),
-    setPauliAbsorberWidth: (width) => setPauliClamped('absorberWidth', width, 0.01, 0.5),
-    setPauliAbsorberStrength: (strength) => setPauliClamped('absorberStrength', strength, 0.1, 50),
+    setPauliAbsorberWidth: (width) => setPauliClamped('absorberWidth', width, 0.05, 0.5),
+    setPauliPmlTargetReflection: (r) => setPauliClamped('pmlTargetReflection', r, 1e-12, 0.999),
 
     // === Diagnostics ===
     setPauliDiagnosticsEnabled: (enabled) => setPauliField('diagnosticsEnabled', enabled),
@@ -177,7 +177,7 @@ export const createPauliSpinorSlice: StateCreator<
     initializePauliForDimension: (dimension) => {
       setWithVersion((state) => {
         const dim = Math.max(2, Math.min(11, dimension))
-        const gridSize = Array.from({ length: dim }, () => dim <= 3 ? 64 : dim <= 5 ? 32 : 16)
+        const gridSize = Array.from({ length: dim }, () => (dim <= 3 ? 64 : dim <= 5 ? 32 : 16))
         const spacing = Array.from({ length: dim }, () => 0.15)
         const packetCenter = Array.from({ length: 11 }, () => 0)
         const packetMomentum = Array.from({ length: 11 }, () => 0)

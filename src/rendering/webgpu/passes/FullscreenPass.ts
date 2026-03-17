@@ -1,4 +1,3 @@
-/* global GPUBindGroupEntry, GPUBindGroupLayoutEntry, GPUBlendState, GPULoadOp */
 /**
  * WebGPU Fullscreen Pass
  *
@@ -306,7 +305,11 @@ export class FullscreenPass extends WebGPUBasePass {
     })
 
     // Create uniform buffer
-    this.uniformBuffer = this.createUniformBuffer(device, this.totalUniformSize, `${this.id}-uniforms`)
+    this.uniformBuffer = this.createUniformBuffer(
+      device,
+      this.totalUniformSize,
+      `${this.id}-uniforms`
+    )
 
     // Create sampler
     this.sampler = device.createSampler({
@@ -387,7 +390,8 @@ export class FullscreenPass extends WebGPUBasePass {
     }
 
     // PERF: Cache bind group, invalidate only when input texture views change
-    const viewsChanged = inputViews.length !== this.cachedInputViews.length ||
+    const viewsChanged =
+      inputViews.length !== this.cachedInputViews.length ||
       inputViews.some((v, i) => v !== this.cachedInputViews[i])
     if (!this.cachedBindGroup || viewsChanged) {
       const bindGroupEntries: GPUBindGroupEntry[] = []

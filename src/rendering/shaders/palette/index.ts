@@ -18,7 +18,6 @@
  * const color = getCosinePaletteColorTS(0.5, a, b, c, d, 1.0, 1.0, 0.0);
  * ```
  *
- * @see docs/prd/advanced-color-system.md
  */
 
 // Legacy palette functions (still used for 'legacy' algorithm)

@@ -1,4 +1,3 @@
-/* global GPUComputePassDescriptor, GPURenderPassDescriptor, GPUSamplerDescriptor, GPUTextureFormat, GPUTextureUsageFlags */
 /**
  * WebGPU Type Definitions
  *

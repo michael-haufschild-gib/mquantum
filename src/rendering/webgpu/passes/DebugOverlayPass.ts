@@ -1,4 +1,3 @@
-/* global GPUBlendState */
 /**
  * WebGPU Debug Overlay Pass
  *
@@ -196,12 +195,7 @@ export class DebugOverlayPass extends WebGPUBasePass {
       return
     }
 
-    if (
-      !this.device ||
-      !this.renderPipeline ||
-      !this.passBindGroupLayout ||
-      !this.sampler
-    ) {
+    if (!this.device || !this.renderPipeline || !this.passBindGroupLayout || !this.sampler) {
       return
     }
 

@@ -1,4 +1,3 @@
-/* global GPUColorTargetState, GPUTextureFormat */
 /**
  * WebGPU Temporal Cloud Pass
  *
@@ -763,9 +762,7 @@ export class TemporalCloudPass extends WebGPUBasePass {
 
     // Get accumulation buffers (ping-pong)
     const accumColorReadView = ctx.getReadTextureView(this.passConfig.accumulationColorBuffer)
-    const accumPositionReadView = ctx.getReadTextureView(
-      this.passConfig.accumulationPositionBuffer
-    )
+    const accumPositionReadView = ctx.getReadTextureView(this.passConfig.accumulationPositionBuffer)
     const accumColorWriteView = ctx.getWriteTarget(this.passConfig.accumulationColorBuffer)
     const accumPositionWriteView = ctx.getWriteTarget(this.passConfig.accumulationPositionBuffer)
 
@@ -894,7 +891,9 @@ export class TemporalCloudPass extends WebGPUBasePass {
         ],
       })
 
-      this.renderFullscreen(reprojPassEncoder, this.reprojectionPipeline, [this.reprojectionBindGroup!])
+      this.renderFullscreen(reprojPassEncoder, this.reprojectionPipeline, [
+        this.reprojectionBindGroup!,
+      ])
       reprojPassEncoder.end()
     }
 
@@ -984,7 +983,9 @@ export class TemporalCloudPass extends WebGPUBasePass {
       ],
     })
 
-    this.renderFullscreen(reconPassEncoder, this.reconstructionPipeline, [this.reconstructionBindGroup!])
+    this.renderFullscreen(reconPassEncoder, this.reconstructionPipeline, [
+      this.reconstructionBindGroup!,
+    ])
     reconPassEncoder.end()
 
     // Update state for next frame

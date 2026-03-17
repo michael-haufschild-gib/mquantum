@@ -112,9 +112,8 @@ function createGraphHarness() {
 describe('WebGPUScene mode-switch rebuild strategy', () => {
   it('forces full rebuild when switching into or out of free scalar mode', async () => {
     ensureGpuTextureUsageConstants()
-    const { shouldForceFullRebuildForQuantumModeTransition } = await import(
-      '@/rendering/webgpu/WebGPUScene'
-    )
+    const { shouldForceFullRebuildForQuantumModeTransition } =
+      await import('@/rendering/webgpu/WebGPUScene')
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
@@ -133,9 +132,8 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
   it('forces full rebuild when switching objectType between schroedinger and pauliSpinor', async () => {
     ensureGpuTextureUsageConstants()
-    const { shouldForceFullRebuildForQuantumModeTransition } = await import(
-      '@/rendering/webgpu/WebGPUScene'
-    )
+    const { shouldForceFullRebuildForQuantumModeTransition } =
+      await import('@/rendering/webgpu/WebGPUScene')
 
     // schroedinger → pauliSpinor
     expect(
@@ -156,9 +154,8 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
 
   it('keeps warm-swap eligibility for non-free-scalar transitions', async () => {
     ensureGpuTextureUsageConstants()
-    const { shouldForceFullRebuildForQuantumModeTransition } = await import(
-      '@/rendering/webgpu/WebGPUScene'
-    )
+    const { shouldForceFullRebuildForQuantumModeTransition } =
+      await import('@/rendering/webgpu/WebGPUScene')
 
     expect(
       shouldForceFullRebuildForQuantumModeTransition(
@@ -175,10 +172,10 @@ describe('WebGPUScene mode-switch rebuild strategy', () => {
     ).toBe(false)
 
     expect(
-      shouldForceFullRebuildForQuantumModeTransition(
-        null,
-        { quantumMode: 'freeScalarField', objectType: 'schroedinger' }
-      )
+      shouldForceFullRebuildForQuantumModeTransition(null, {
+        quantumMode: 'freeScalarField',
+        objectType: 'schroedinger',
+      })
     ).toBe(false)
   })
 })
@@ -402,7 +399,9 @@ describe('WebGPUScene temporal reprojection wiring', () => {
     )
 
     const scenePass = passes.find((pass) => pass.id === 'scene') as
-      | ({ getClearColor?: () => { r: number; g: number; b: number; a: number } } & WebGPURenderPass)
+      | ({
+          getClearColor?: () => { r: number; g: number; b: number; a: number }
+        } & WebGPURenderPass)
       | undefined
     expect(scenePass).toBeDefined()
     expect(typeof scenePass?.getClearColor).toBe('function')

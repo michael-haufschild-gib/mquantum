@@ -128,9 +128,9 @@ describe('WebGPUScene CAS sharpening', () => {
 
     expect(typeof sceneModule['computeCasSharpnessFromRenderScale']).toBe('function')
 
-    const computeCasSharpnessFromRenderScale = sceneModule['computeCasSharpnessFromRenderScale'] as (
-      scale: number
-    ) => number
+    const computeCasSharpnessFromRenderScale = sceneModule[
+      'computeCasSharpnessFromRenderScale'
+    ] as (scale: number) => number
 
     expect(computeCasSharpnessFromRenderScale(1.0)).toBe(0)
     expect(computeCasSharpnessFromRenderScale(0.95)).toBe(0)

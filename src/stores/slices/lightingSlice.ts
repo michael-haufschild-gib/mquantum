@@ -74,7 +74,6 @@ export interface LightingSliceState {
   transformMode: TransformMode
   showLightGizmos: boolean
   isDraggingLight: boolean
-
 }
 
 /**
@@ -147,7 +146,6 @@ export const LIGHTING_INITIAL_STATE: LightingSliceState = {
   transformMode: DEFAULT_TRANSFORM_MODE,
   showLightGizmos: DEFAULT_SHOW_LIGHT_GIZMOS,
   isDraggingLight: false,
-
 }
 
 function isValidLightingNumber(value: number): boolean {
@@ -301,10 +299,16 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
 
         if (import.meta.env.DEV) {
           if (hasInvalidIntensity) {
-            console.warn('[lightingSlice] Ignoring non-finite light intensity update:', updates.intensity)
+            console.warn(
+              '[lightingSlice] Ignoring non-finite light intensity update:',
+              updates.intensity
+            )
           }
           if (hasInvalidConeAngle) {
-            console.warn('[lightingSlice] Ignoring non-finite cone angle update:', updates.coneAngle)
+            console.warn(
+              '[lightingSlice] Ignoring non-finite cone angle update:',
+              updates.coneAngle
+            )
           }
           if (hasInvalidPenumbra) {
             console.warn('[lightingSlice] Ignoring non-finite penumbra update:', updates.penumbra)
@@ -344,13 +348,9 @@ export const createLightingSlice: StateCreator<LightingSlice, [], [], LightingSl
               ? clampPenumbra(sanitizedUpdates.penumbra)
               : light.penumbra,
           range:
-            sanitizedUpdates.range !== undefined
-              ? clampRange(sanitizedUpdates.range)
-              : light.range,
+            sanitizedUpdates.range !== undefined ? clampRange(sanitizedUpdates.range) : light.range,
           decay:
-            sanitizedUpdates.decay !== undefined
-              ? clampDecay(sanitizedUpdates.decay)
-              : light.decay,
+            sanitizedUpdates.decay !== undefined ? clampDecay(sanitizedUpdates.decay) : light.decay,
           rotation:
             sanitizedUpdates.rotation !== undefined
               ? normalizeRotationTupleSigned(sanitizedUpdates.rotation)

@@ -131,7 +131,9 @@ describe('extendedObjectStore — free scalar field actions', () => {
 
   it('setFreeScalarFieldView updates field view', () => {
     useExtendedObjectStore.getState().setFreeScalarFieldView('energyDensity')
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.fieldView).toBe('energyDensity')
+    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.fieldView).toBe(
+      'energyDensity'
+    )
   })
 
   it('setFreeScalarPacketWidth updates packet width and triggers reset', () => {
@@ -167,7 +169,9 @@ describe('extendedObjectStore — free scalar field actions', () => {
 
   it('setFreeScalarSpacing updates spacing', () => {
     useExtendedObjectStore.getState().setFreeScalarSpacing([0.2, 0.2, 0.2])
-    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.spacing).toEqual([0.2, 0.2, 0.2])
+    expect(useExtendedObjectStore.getState().schroedinger.freeScalar.spacing).toEqual([
+      0.2, 0.2, 0.2,
+    ])
   })
 
   it('setFreeScalarPacketCenter updates center and triggers reset', () => {

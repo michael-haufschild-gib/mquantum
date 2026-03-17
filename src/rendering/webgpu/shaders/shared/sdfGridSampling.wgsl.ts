@@ -144,4 +144,3 @@ fn GetDistWithOrbital(p: vec3f) -> vec2f {
   return GetDistWithOrbitalFromGrid(p);
 }
 `
-

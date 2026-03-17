@@ -35,8 +35,7 @@ export const BuffersTabContent = React.memo(function BuffersTabContent() {
   })
 
   // Temporal preview availability
-  const temporalPreviewAvailable =
-    temporalReprojectionEnabled && objectType === 'schroedinger'
+  const temporalPreviewAvailable = temporalReprojectionEnabled && objectType === 'schroedinger'
 
   // Graceful handling: turn off temporal preview when object type changes to unsupported
   useEffect(() => {

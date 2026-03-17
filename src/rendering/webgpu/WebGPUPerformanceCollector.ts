@@ -244,10 +244,9 @@ export class WebGPUStatsCollector {
     this.accumulated.cpuHistory.shift()
     this.accumulated.cpuHistory.push(avgCpuTime)
 
-    // Get heap memory (if available)
+    // Get heap memory (Chrome-only non-standard API)
     let heapMB = 0
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const perfMemory = (performance as any).memory
+    const perfMemory = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
     if (perfMemory) {
       heapMB = perfMemory.usedJSHeapSize / (1024 * 1024)
     }

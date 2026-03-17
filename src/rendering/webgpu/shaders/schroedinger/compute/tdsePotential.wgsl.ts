@@ -110,7 +110,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   } else if (params.potentialType == 7u) {
     // Periodic lattice: directional — V = V0 * cos^2(pi * x / a) along axis 0
-    let phase = 3.14159265 * pos0 / params.latticePeriod;
+    let phase = 3.14159265 * pos0 / max(params.latticePeriod, 1e-6);
     let c = cos(phase);
     V = params.latticeDepth * c * c;
   } else if (params.potentialType == 8u) {

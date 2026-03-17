@@ -96,7 +96,10 @@ export function computeRadialShells(raw: KSpaceRawData, binCount: number): Radia
  * @param config - Visualization config
  * @returns 64^3 display grid colored by radial shell
  */
-export function buildRadialDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConfig): KSpaceDisplayGrid {
+export function buildRadialDisplayGrid(
+  raw: KSpaceRawData,
+  config: KSpaceVizConfig
+): KSpaceDisplayGrid {
   const G = OUTPUT_GRID_SIZE
   const outputTotal = G ** 3
   const nk = new Float64Array(outputTotal)
@@ -109,11 +112,7 @@ export function buildRadialDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConf
   const shift = config.fftShiftEnabled
   const omegaScale = Math.max(raw.omegaMax, 1e-10)
 
-  const gridDims = [
-    activeDims[0] ?? 1,
-    activeDims[1] ?? 1,
-    activeDims[2] ?? 1,
-  ]
+  const gridDims = [activeDims[0] ?? 1, activeDims[1] ?? 1, activeDims[2] ?? 1]
 
   let gridNkMax = 0
 
@@ -153,7 +152,10 @@ export function buildRadialDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConf
         if (!valid) continue
 
         const kMagVal = Math.sqrt(kSq)
-        const bin = Math.min(shells.binCount - 1, Math.floor((kMagVal / shells.kMax) * (shells.binCount - 1)))
+        const bin = Math.min(
+          shells.binCount - 1,
+          Math.floor((kMagVal / shells.kMax) * (shells.binCount - 1))
+        )
 
         const n = shells.shellMeanNk[bin]!
         nk[outIdx] = n

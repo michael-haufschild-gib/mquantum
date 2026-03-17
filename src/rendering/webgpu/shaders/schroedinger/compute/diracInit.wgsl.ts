@@ -51,7 +51,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   let sigma = params.packetWidth;
   let invFourSigma2 = 1.0 / (4.0 * sigma * sigma);
   let envelope = exp(-r2 * invFourSigma2);
-  let phase = kdotx / params.hbar;
+  // packetMomentum stores wavevector k₀ (units 1/length); phase = k₀·x
+  let phase = kdotx;
   let cosP = cos(phase);
   let sinP = sin(phase);
 
@@ -111,7 +112,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       kdotx2 += -params.packetMomentum[d2] * pos2;
     }
     let env2 = 0.7071 * exp(-r2b * invFourSigma2);
-    let phase2 = kdotx2 / params.hbar;
+    let phase2 = kdotx2;
     let cosP2 = cos(phase2);
     let sinP2 = sin(phase2);
 

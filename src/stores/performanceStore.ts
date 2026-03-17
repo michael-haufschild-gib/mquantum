@@ -4,7 +4,6 @@
  * Manages performance optimization settings for rendering.
  * These settings are device-specific and NOT included in share URLs.
  *
- * @see docs/prd/mandelbulb_performance.md
  */
 
 import type { DeviceCapabilities, GPUTier } from '@/lib/deviceCapabilities'

@@ -31,6 +31,9 @@ function makeConfig(overrides: Partial<FreeScalarConfig> = {}): FreeScalarConfig
     selfInteractionEnabled: false,
     selfInteractionLambda: 0.5,
     selfInteractionVev: 1.0,
+    absorberEnabled: false,
+    absorberWidth: 0.2,
+    pmlTargetReflection: 1e-6,
     diagnosticsEnabled: false,
     diagnosticsInterval: 60,
     ...overrides,
@@ -107,7 +110,9 @@ describe('sampleVacuumSpectrum', () => {
     const config = makeConfig({ gridSize: [8, 8, 8] })
     const { phi } = sampleVacuumSpectrum(config, 42)
 
-    const nx = 8, ny = 8, nz = 8
+    const nx = 8,
+      ny = 8,
+      nz = 8
     const total = nx * ny * nz
 
     // Forward 3D FFT on the real-valued phi to check Hermitian structure
@@ -188,7 +193,9 @@ describe('sampleVacuumSpectrum', () => {
     // and <|pi_k|^2> ~ N*omega_k/2
     const nSeeds = 300
     const config = makeConfig({ gridSize: [8, 8, 8], mass: 1.0 })
-    const nx = 8, ny = 8, nz = 8
+    const nx = 8,
+      ny = 8,
+      nz = 8
     const total = nx * ny * nz
 
     // Accumulators for |phi_k|^2 and |pi_k|^2

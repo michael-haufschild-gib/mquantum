@@ -103,7 +103,10 @@ export const Sparkline: React.FC<SparklineProps> = React.memo(
       // Closed fill path: line points → bottom-right → bottom-left
       const fill =
         `M ${pts[0]} ` +
-        pts.slice(1).map((p) => `L ${p}`).join(' ') +
+        pts
+          .slice(1)
+          .map((p) => `L ${p}`)
+          .join(' ') +
         ` L ${(padding + usableWidth).toFixed(1)},${(padding + usableHeight).toFixed(1)}` +
         ` L ${padding.toFixed(1)},${(padding + usableHeight).toFixed(1)} Z`
 

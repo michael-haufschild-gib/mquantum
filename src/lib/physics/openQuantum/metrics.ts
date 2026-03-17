@@ -123,7 +123,7 @@ export function groundPopulation(rho: DensityMatrix): number {
 export function computeMetrics(
   rho: DensityMatrix,
   includeVonNeumann: boolean = true,
-  previousVonNeumann: number = 0,
+  previousVonNeumann: number = 0
 ): OpenQuantumMetrics {
   const p = purity(rho)
   return {

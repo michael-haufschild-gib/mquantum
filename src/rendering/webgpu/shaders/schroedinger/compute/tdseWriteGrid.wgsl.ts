@@ -48,6 +48,12 @@ fn getPotentialScale() -> f32 {
   } else if (params.potentialType == 9u) {
     let r = params.boundingRadius * 0.5;
     return max(0.5 * params.mass * params.harmonicOmega * params.harmonicOmega * r * r, 1.0);
+  } else if (params.potentialType == 10u) {
+    // Radial double well: V(r) = λ(r−r₁)²(r−r₂)² − ε·r
+    // Barrier peak between minima ≈ λ·((r₂−r₁)/2)⁴
+    let halfDr = (params.radialWellOuter - params.radialWellInner) * 0.5;
+    let h4 = halfDr * halfDr * halfDr * halfDr;
+    return max(params.radialWellDepth * h4, 1.0);
   }
   return 1.0;
 }
@@ -236,38 +242,72 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   } else if (params.fieldView == 1u) {
     displayScalar = phase / (2.0 * 3.14159265) * densityGate;
   } else if (params.fieldView == 2u) {
-    // current magnitude via central differences (NN)
+    // current magnitude via central differences (NN) with PML-aware boundaries
     var currentMagSq: f32 = 0.0;
     let hbarOverM = params.hbar / max(params.mass, 1e-6);
+    let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       if (params.gridSize[d] <= 1u) {
         continue;
       }
       let stride = params.strides[d];
       let coord = nnCoords[d];
-      let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
-      let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
+      let Nd = params.gridSize[d];
       let invDx = 0.5 / params.spacing[d];
-      let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-      let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      let atLo = coord == 0u;
+      let atHi = coord == Nd - 1u;
+
+      var dRe: f32;
+      var dIm: f32;
+      if (hasPML && atLo) {
+        let fIdx = idx + stride;
+        dRe = (psiRe[fIdx] - re) / params.spacing[d];
+        dIm = (psiIm[fIdx] - im) / params.spacing[d];
+      } else if (hasPML && atHi) {
+        let bIdx = idx - stride;
+        dRe = (re - psiRe[bIdx]) / params.spacing[d];
+        dIm = (im - psiIm[bIdx]) / params.spacing[d];
+      } else {
+        let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+        let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+        dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+        dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      }
       let jd = hbarOverM * (re * dIm - im * dRe);
       currentMagSq += jd * jd;
     }
     displayScalar = (1.0 - exp(-sqrt(currentMagSq))) * densityGate;
   } else if (params.fieldView == 4u) {
-    // superfluid velocity magnitude (NN)
+    // superfluid velocity magnitude (NN) with PML-aware boundaries
     let hbarOverM = params.hbar / max(params.mass, 1e-6);
     var vsqMag: f32 = 0.0;
     let densitySafe = max(density, 1e-20);
+    let hasPML4 = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       if (params.gridSize[d] <= 1u) { continue; }
       let stride = params.strides[d];
       let coord = nnCoords[d];
-      let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
-      let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
+      let Nd = params.gridSize[d];
       let invDx = 0.5 / params.spacing[d];
-      let dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
-      let dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      let atLo = coord == 0u;
+      let atHi = coord == Nd - 1u;
+
+      var dRe: f32;
+      var dIm: f32;
+      if (hasPML4 && atLo) {
+        let fIdx = idx + stride;
+        dRe = (psiRe[fIdx] - re) / params.spacing[d];
+        dIm = (psiIm[fIdx] - im) / params.spacing[d];
+      } else if (hasPML4 && atHi) {
+        let bIdx = idx - stride;
+        dRe = (re - psiRe[bIdx]) / params.spacing[d];
+        dIm = (im - psiIm[bIdx]) / params.spacing[d];
+      } else {
+        let fwdIdx = select(idx + stride, idx - stride * (Nd - 1u), atHi);
+        let bwdIdx = select(idx - stride, idx + stride * (Nd - 1u), atLo);
+        dRe = (psiRe[fwdIdx] - psiRe[bwdIdx]) * invDx;
+        dIm = (psiIm[fwdIdx] - psiIm[bwdIdx]) * invDx;
+      }
       let jd = hbarOverM * (re * dIm - im * dRe);
       let vsd = jd / densitySafe;
       vsqMag += vsd * vsd;

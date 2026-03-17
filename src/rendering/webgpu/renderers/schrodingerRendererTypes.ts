@@ -1,0 +1,297 @@
+/**
+ * Types, constants, and helper functions for the Schrödinger renderer.
+ *
+ * Extracted from WebGPUSchrodingerRenderer to reduce file size and
+ * isolate the pure-data / pure-function layer from the stateful renderer.
+ *
+ * @module rendering/webgpu/renderers/schrodingerRendererTypes
+ */
+
+import type { WebGPURenderContext } from '../core/types'
+import type { QuantumModeForShader } from '../shaders/schroedinger/compose'
+import type { ColorAlgorithm as WGSLColorAlgorithm } from '../shaders/types'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+import type { packLightingUniforms } from '../utils/lighting'
+import type { HydrogenBasisState } from '@/lib/physics/openQuantum'
+import type { AppearanceStoreState } from '@/stores/appearanceStore'
+import type { AnimationState } from '@/stores/animationStore'
+import type { GeometryState } from '@/stores/geometryStore'
+import type { RotationState } from '@/stores/rotationStore'
+import type { PBRSliceState } from '@/stores/slices/visual/pbrSlice'
+
+// ---------------------------------------------------------------------------
+// Uniform buffer size
+// ---------------------------------------------------------------------------
+
+/** Total byte size of the SchroedingerUniforms GPU buffer */
+export const SCHROEDINGER_UNIFORM_SIZE = 1520
+
+// ---------------------------------------------------------------------------
+// Temporal jitter pattern
+// ---------------------------------------------------------------------------
+
+/** Bayer pattern offsets for 4-frame temporal jitter cycle */
+export const BAYER_OFFSETS: [number, number][] = [
+  [0, 0],
+  [1, 1],
+  [1, 0],
+  [0, 1],
+]
+
+// ---------------------------------------------------------------------------
+// String → integer enum maps for GPU uniform packing
+// ---------------------------------------------------------------------------
+
+/** Maps quantum mode names to the integer values expected by WGSL shaders */
+export const QUANTUM_MODE_MAP: Record<string, number> = {
+  harmonicOscillator: 0,
+  hydrogenND: 1,
+  freeScalarField: 2,
+  tdseDynamics: 3,
+  becDynamics: 4,
+  diracEquation: 5,
+}
+
+/** Maps color algorithm names to shader integer constants */
+export const COLOR_ALGORITHM_MAP: Record<string, number> = {
+  lch: 0,
+  multiSource: 1,
+  radial: 2,
+  phase: 3,
+  mixed: 4,
+  blackbody: 5,
+  phaseCyclicUniform: 6,
+  phaseDiverging: 7,
+  domainColoringPsi: 8,
+  diverging: 9,
+  relativePhase: 10,
+  radialDistance: 11,
+  hamiltonianDecomposition: 12,
+  modeCharacter: 13,
+  energyFlux: 14,
+  kSpaceOccupation: 15,
+  purityMap: 16,
+  entropyMap: 17,
+  coherenceMap: 18,
+  viridis: 19,
+  inferno: 20,
+  densityContours: 21,
+  phaseDensity: 22,
+  particleAntiparticle: 23,
+  pauliSpinDensity: 24,
+  pauliSpinExpectation: 25,
+  pauliCoherence: 26,
+}
+
+/** Maps nodal line definition names to shader integer constants */
+export const NODAL_DEFINITION_MAP: Record<string, number> = {
+  psiAbs: 0,
+  realPart: 1,
+  imagPart: 2,
+  complexIntersection: 3,
+}
+
+/** Maps nodal family names to shader integer constants */
+export const NODAL_FAMILY_MAP: Record<string, number> = {
+  all: 0,
+  radial: 1,
+  angular: 2,
+}
+
+/** Maps nodal render mode names to shader integer constants */
+export const NODAL_RENDER_MODE_MAP: Record<string, number> = {
+  band: 0,
+  surface: 1,
+}
+
+/** Maps cross-section composite mode names to shader integer constants */
+export const CROSS_SECTION_COMPOSITE_MODE_MAP: Record<string, number> = {
+  overlay: 0,
+  sliceOnly: 1,
+}
+
+/** Maps cross-section scalar names to shader integer constants */
+export const CROSS_SECTION_SCALAR_MAP: Record<string, number> = {
+  density: 0,
+  real: 1,
+  imag: 2,
+}
+
+/** Maps probability current style names to shader integer constants */
+export const PROBABILITY_CURRENT_STYLE_MAP: Record<string, number> = {
+  magnitude: 0,
+  arrows: 1,
+  surfaceLIC: 2,
+  streamlines: 3,
+}
+
+/** Maps probability current placement names to shader integer constants */
+export const PROBABILITY_CURRENT_PLACEMENT_MAP: Record<string, number> = {
+  isosurface: 0,
+  volume: 1,
+}
+
+/** Maps probability current color mode names to shader integer constants */
+export const PROBABILITY_CURRENT_COLOR_MODE_MAP: Record<string, number> = {
+  magnitude: 0,
+  direction: 1,
+  circulationSign: 2,
+}
+
+/** Maps representation mode names to shader integer constants */
+export const REPRESENTATION_MODE_MAP: Record<string, number> = {
+  position: 0,
+  momentum: 1,
+  wigner: 2,
+}
+
+/** Maps momentum display mode names to shader integer constants */
+export const MOMENTUM_DISPLAY_MODE_MAP: Record<string, number> = {
+  k: 0,
+  p: 1,
+}
+
+// ---------------------------------------------------------------------------
+// Snapshot interfaces for store data
+// ---------------------------------------------------------------------------
+
+/** Camera matrix container */
+export type CameraMatrix = { elements: ArrayLike<number> }
+
+/** Camera state snapshot from the frame context */
+export interface CameraSnapshot {
+  viewMatrix?: CameraMatrix
+  projectionMatrix?: CameraMatrix
+  viewProjectionMatrix?: CameraMatrix
+  inverseViewMatrix?: CameraMatrix
+  inverseProjectionMatrix?: CameraMatrix
+  position?: { x: number; y: number; z: number }
+  target?: { x: number; y: number; z: number }
+  near?: number
+  far?: number
+  fov?: number
+}
+
+/** Extended store snapshot (Schrödinger + Pauli config) */
+export interface ExtendedStoreSnapshot {
+  schroedinger?: Partial<SchroedingerConfig>
+  schroedingerVersion?: number
+  clearFreeScalarNeedsReset?: () => void
+  clearTdseNeedsReset?: () => void
+  clearBecNeedsReset?: () => void
+  clearDiracNeedsReset?: () => void
+  pauliSpinor?: import('@/lib/geometry/extended/types').PauliConfig
+  pauliSpinorVersion?: number
+  clearPauliNeedsReset?: () => void
+}
+
+/** Object transform snapshot */
+export interface TransformSnapshot {
+  uniformScale?: number
+  position?: number[]
+}
+
+/** Performance/quality snapshot */
+export interface PerformanceSnapshot {
+  qualityMultiplier?: number
+  isInteracting?: boolean
+  sceneTransitioning?: boolean
+  refinementStage?: string
+}
+
+/** Lighting snapshot type (inferred from packLightingUniforms) */
+export type LightingSnapshot = Parameters<typeof packLightingUniforms>[1]
+
+// Re-export store types used by the renderer for convenience
+export type { AppearanceStoreState, AnimationState, GeometryState, RotationState, PBRSliceState }
+
+// ---------------------------------------------------------------------------
+// Renderer configuration
+// ---------------------------------------------------------------------------
+
+/** Configuration for the Schrödinger quantum renderer */
+export interface SchrodingerRendererConfig {
+  dimension?: number
+  isosurface?: boolean
+  quantumMode?:
+    | QuantumModeForShader
+    | 'freeScalarField'
+    | 'tdseDynamics'
+    | 'becDynamics'
+    | 'diracEquation'
+  termCount?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
+  /** Compile-time color module selection (0-11) */
+  colorAlgorithm?: WGSLColorAlgorithm
+  /** Enable temporal accumulation for volumetric mode */
+  temporal?: boolean
+  /** Compile-time specialization flag for nodal calculations. */
+  nodalEnabled?: boolean
+  /** Compile-time specialization flag for phase materiality. */
+  phaseMaterialityEnabled?: boolean
+  /** Compile-time specialization flag for interference. */
+  interferenceEnabled?: boolean
+  /** Compile-time specialization flag for uncertainty boundary emphasis. */
+  uncertaintyBoundaryEnabled?: boolean
+  /** Whether eigenfunction caching is enabled (compile-time shader specialization). */
+  eigenfunctionCacheEnabled?: boolean
+  /** Whether analytical gradient path is enabled when cache is active (HO only). */
+  analyticalGradientEnabled?: boolean
+  /** Whether the fast eigencache interpolation path is enabled (legacy Catmull-Rom). */
+  fastEigenInterpolationEnabled?: boolean
+  /** Wavefunction representation — triggers pipeline rebuild when changed. */
+  representation?: 'position' | 'momentum' | 'wigner'
+  /** Open quantum system — density matrix + Lindblad evolution. */
+  openQuantumEnabled?: boolean
+  /** Whether this renderer is configured for Pauli Spinor mode. */
+  isPauli?: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
+
+/**
+ * Type-safe store snapshot accessor from the frame context.
+ */
+export function getStoreSnapshot<T>(ctx: WebGPURenderContext, key: string): T | undefined {
+  const snapshot = ctx.frame?.stores?.[key]
+  return snapshot as T | undefined
+}
+
+/**
+ * Pack hydrogen basis states into an ArrayBuffer matching HydrogenBasisUniforms layout.
+ *
+ * Layout (704 bytes):
+ * - quantumNumbers: array<vec4<i32>, 39> (624 bytes) — 14 states × 11 dims packed 4-per-vec
+ * - energies: array<vec4f, 4> (64 bytes) — 14 energies packed 4-per-vec
+ * - basisCount: u32 + 3×u32 padding (16 bytes)
+ */
+export function packHydrogenBasisForGPU(
+  basis: HydrogenBasisState[],
+  dimension: number
+): ArrayBuffer {
+  const buffer = new ArrayBuffer(704)
+  const i32View = new Int32Array(buffer, 0, 156) // 39 vec4i = 156 ints
+  const f32View = new Float32Array(buffer, 624, 16) // 4 vec4f = 16 floats
+  const u32View = new Uint32Array(buffer, 688, 4) // basisCount + 3 padding
+
+  const maxDims = 11
+  for (let k = 0; k < basis.length; k++) {
+    const state = basis[k]!
+    // dim 0=n, 1=l, 2=m, 3+=extraDimN[i]
+    const flatBase = k * maxDims
+    i32View[flatBase + 0] = state.n
+    i32View[flatBase + 1] = state.l
+    i32View[flatBase + 2] = state.m
+    const extraCount = Math.min(dimension - 3, state.extraDimN.length)
+    for (let d = 0; d < extraCount; d++) {
+      i32View[flatBase + 3 + d] = state.extraDimN[d]!
+    }
+
+    // Energy
+    f32View[k] = state.energy
+  }
+
+  u32View[0] = basis.length
+  return buffer
+}

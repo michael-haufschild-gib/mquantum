@@ -10,7 +10,11 @@ import { SkyboxEffects, SkyboxMode } from './types'
  * @param effects - Which post-processing effects are enabled
  * @returns WGSL main function code
  */
-export function generateMain(mode: SkyboxMode, effects: SkyboxEffects, options?: { mrt?: boolean }): string {
+export function generateMain(
+  mode: SkyboxMode,
+  effects: SkyboxEffects,
+  options?: { mrt?: boolean }
+): string {
   const useMRT = options?.mrt !== false
   let modeCall = ''
   switch (mode) {

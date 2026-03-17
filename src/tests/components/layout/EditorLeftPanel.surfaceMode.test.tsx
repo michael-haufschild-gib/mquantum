@@ -3,7 +3,13 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/hooks/useToast', () => ({
+  useToast: () => ({
+    addToast: vi.fn(),
+  }),
+}))
 
 describe('EditorLeftPanel surface mode selector', () => {
   beforeEach(() => {
@@ -39,8 +45,16 @@ describe('EditorLeftPanel surface mode selector', () => {
     expect(screen.queryByTestId('schroedinger-iso-threshold')).not.toBeInTheDocument()
   })
 
-  it('hides mode selector in 2D', () => {
+  it('shows mode selector in 2D (isolines are the 2D equivalent of isosurface)', () => {
     useGeometryStore.getState().setDimension(2)
+
+    render(<EditorLeftPanel />)
+
+    expect(screen.getByTestId('surface-mode-selector')).toBeInTheDocument()
+  })
+
+  it('hides mode selector in Wigner representation', () => {
+    useExtendedObjectStore.getState().setSchroedingerRepresentation('wigner')
 
     render(<EditorLeftPanel />)
 

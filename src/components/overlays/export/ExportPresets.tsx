@@ -1,10 +1,7 @@
 import { useMemo } from 'react'
 import { useExportStore } from '@/stores/exportStore'
 import { usePerformanceStore } from '@/stores/performanceStore'
-import {
-  ExportPresetCard,
-  type ExportPresetCardId,
-} from '@/components/ui/ExportPresetCard'
+import { ExportPresetCard, type ExportPresetCardId } from '@/components/ui/ExportPresetCard'
 import { soundManager } from '@/lib/audio/SoundManager'
 import type { ExportSettings } from '@/stores/exportStore'
 
@@ -19,7 +16,14 @@ interface PresetMatch {
   expected: Partial<
     Pick<
       ExportSettings,
-      'format' | 'codec' | 'resolution' | 'customWidth' | 'customHeight' | 'fps' | 'duration' | 'bitrate'
+      | 'format'
+      | 'codec'
+      | 'resolution'
+      | 'customWidth'
+      | 'customHeight'
+      | 'fps'
+      | 'duration'
+      | 'bitrate'
     >
   >
   cropEnabled: boolean

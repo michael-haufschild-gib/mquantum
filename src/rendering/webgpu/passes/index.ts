@@ -44,7 +44,12 @@ export { ToScreenPass } from './ToScreenPass'
 export type { ToScreenPassConfig } from './ToScreenPass'
 
 export { BufferPreviewPass } from './BufferPreviewPass'
-export type { BufferPreviewPassConfig, BufferPreviewStoreConfig, BufferType, DepthMode } from './BufferPreviewPass'
+export type {
+  BufferPreviewPassConfig,
+  BufferPreviewStoreConfig,
+  BufferType,
+  DepthMode,
+} from './BufferPreviewPass'
 
 export { DebugOverlayPass } from './DebugOverlayPass'
 export type { DebugOverlayPassConfig } from './DebugOverlayPass'

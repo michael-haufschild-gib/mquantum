@@ -54,9 +54,7 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
     } = useSchroedingerActions()
 
     const dimension = useGeometryStore((state) => state.dimension)
-    const isoEnabled = useExtendedObjectStore(
-      (state) => state.schroedinger?.isoEnabled ?? false
-    )
+    const isoEnabled = useExtendedObjectStore((state) => state.schroedinger?.isoEnabled ?? false)
 
     const isHydrogenNDMode = config.quantumMode === 'hydrogenND'
     const isFreeScalarField = config.quantumMode === 'freeScalarField'
@@ -125,7 +123,8 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
               {config.representation === 'momentum' && (
                 <p className="text-xs text-text-tertiary">
-                  Internal momentum rendering uses k-space; display units affect interpretation only.
+                  Internal momentum rendering uses k-space; display units affect interpretation
+                  only.
                 </p>
               )}
             </div>
@@ -133,7 +132,14 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
         )}
 
         {/* Quantum State / Field Config Section */}
-        <Section title={isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation ? 'Field Configuration' : 'Quantum State'} defaultOpen={true}>
+        <Section
+          title={
+            isFreeScalarField || isTdseDynamics || isBecDynamics || isDiracEquation
+              ? 'Field Configuration'
+              : 'Quantum State'
+          }
+          defaultOpen={true}
+        >
           {isDiracEquation ? (
             <DiracControls config={config} dimension={dimension} actions={diracActions} />
           ) : isBecDynamics ? (
@@ -141,7 +147,11 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
           ) : isTdseDynamics ? (
             <TDSEControls config={config} dimension={dimension} actions={tdseActions} />
           ) : isFreeScalarField ? (
-            <FreeScalarFieldControls config={config} dimension={dimension} actions={freeScalarActions} />
+            <FreeScalarFieldControls
+              config={config}
+              dimension={dimension}
+              actions={freeScalarActions}
+            />
           ) : isHydrogenNDMode ? (
             <HydrogenNDControls config={config} dimension={dimension} actions={hydrogenNDActions} />
           ) : (
@@ -155,28 +165,36 @@ export const SchroedingerControls: React.FC<SchroedingerControlsProps> = React.m
 
         {/* Render Mode Info */}
         <div className="px-4 py-2 text-xs text-text-secondary border-t border-border-subtle">
-          <p>Rendering: {isoEnabled ? 'Isosurface (Marching Cubes)' : 'Volumetric (Beer-Lambert)'}</p>
+          <p>
+            Rendering: {isoEnabled ? 'Isosurface (Marching Cubes)' : 'Volumetric (Beer-Lambert)'}
+          </p>
           {isHydrogenNDMode && (
             <p className="text-text-tertiary mt-1">{dimension}D hydrogen atom viewed in 3D space</p>
           )}
           {isFreeScalarField && (
             <p className="text-text-tertiary mt-1">
-              {config.freeScalar.latticeDim}D lattice, {config.freeScalar.gridSize.slice(0, config.freeScalar.latticeDim).join('\u00D7')} sites
+              {config.freeScalar.latticeDim}D lattice,{' '}
+              {config.freeScalar.gridSize.slice(0, config.freeScalar.latticeDim).join('\u00D7')}{' '}
+              sites
             </p>
           )}
           {isTdseDynamics && (
             <p className="text-text-tertiary mt-1">
-              {config.tdse.latticeDim}D TDSE, {config.tdse.gridSize.slice(0, config.tdse.latticeDim).join('\u00D7')} sites
+              {config.tdse.latticeDim}D TDSE,{' '}
+              {config.tdse.gridSize.slice(0, config.tdse.latticeDim).join('\u00D7')} sites
             </p>
           )}
           {isBecDynamics && (
             <p className="text-text-tertiary mt-1">
-              {config.bec.latticeDim}D BEC (GPE), {config.bec.gridSize.slice(0, config.bec.latticeDim).join('\u00D7')} sites
+              {config.bec.latticeDim}D BEC (GPE),{' '}
+              {config.bec.gridSize.slice(0, config.bec.latticeDim).join('\u00D7')} sites
             </p>
           )}
           {isDiracEquation && (
             <p className="text-text-tertiary mt-1">
-              {config.dirac.latticeDim}D Dirac, {config.dirac.gridSize.slice(0, config.dirac.latticeDim).join('\u00D7')} sites, S={Math.pow(2, Math.floor((config.dirac.latticeDim + 1) / 2))} spinor
+              {config.dirac.latticeDim}D Dirac,{' '}
+              {config.dirac.gridSize.slice(0, config.dirac.latticeDim).join('\u00D7')} sites, S=
+              {Math.pow(2, Math.floor((config.dirac.latticeDim + 1) / 2))} spinor
             </p>
           )}
         </div>

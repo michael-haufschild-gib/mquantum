@@ -18,6 +18,8 @@ vi.mock('@/lib/audio/SoundManager', () => ({
     playHover: vi.fn(),
     playClick: vi.fn(),
     toggle: vi.fn(),
+    subscribe: vi.fn(() => () => {}),
+    getSnapshot: vi.fn(() => true),
   },
 }))
 

@@ -36,7 +36,9 @@ describe('Schroedinger cross-section WGSL composition', () => {
     })
 
     expect(isoWgsl).toContain('let crossSection = evaluateCrossSectionSample(')
-    expect(isoWgsl).toContain('schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY')
+    expect(isoWgsl).toContain(
+      'schroedinger.crossSectionCompositeMode == CROSS_SECTION_COMPOSITE_SLICE_ONLY'
+    )
     expect(temporalWgsl).toContain('let crossSection = evaluateCrossSectionSample(')
     expect(temporalWgsl).toContain('output.color = vec4f(finalColor, finalAlpha);')
   })

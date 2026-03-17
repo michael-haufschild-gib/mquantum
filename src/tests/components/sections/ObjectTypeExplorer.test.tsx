@@ -15,7 +15,11 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
   })
 
   it('shows Harmonic Oscillator and Hydrogen Orbitals and switches to hydrogenND', () => {
-    render(<ToastProvider><ObjectTypeExplorer /></ToastProvider>)
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
 
     expect(screen.getByText('Harmonic Oscillator')).toBeInTheDocument()
     expect(screen.getByText('Hydrogen Orbitals')).toBeInTheDocument()
@@ -27,7 +31,11 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
   })
 
   it('switches objectType to pauliSpinor when clicking the Pauli card', () => {
-    render(<ToastProvider><ObjectTypeExplorer /></ToastProvider>)
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
 
     expect(screen.getByText('Pauli Spinor')).toBeInTheDocument()
 
@@ -37,7 +45,11 @@ describe('ObjectTypeExplorer quantum mode entries', () => {
 
   it('returns objectType to schroedinger when selecting a quantum mode after Pauli', () => {
     useGeometryStore.getState().setObjectType('pauliSpinor')
-    render(<ToastProvider><ObjectTypeExplorer /></ToastProvider>)
+    render(
+      <ToastProvider>
+        <ObjectTypeExplorer />
+      </ToastProvider>
+    )
 
     // Click Harmonic Oscillator to switch back
     fireEvent.click(screen.getByTestId('object-type-harmonicOscillator'))

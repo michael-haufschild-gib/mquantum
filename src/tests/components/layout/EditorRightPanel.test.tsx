@@ -14,7 +14,7 @@ describe('EditorRightPanel object tab layout', () => {
   it('renders analysis section above quantum effects section above advanced rendering section', () => {
     render(<EditorRightPanel />)
 
-    const analysis = screen.getByTestId('cross-section-slice-section')
+    const analysis = screen.getByTestId('analysis-section')
     const quantumEffects = screen.getByTestId('quantum-effects-section')
     const advanced = screen.getByTestId('advanced-object-controls')
     const analysisToQuantum = analysis.compareDocumentPosition(quantumEffects)

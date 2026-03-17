@@ -7,10 +7,7 @@
  * @module rendering/webgpu/shaders/schroedinger/compute
  */
 
-export {
-  gridParamsBlock,
-  densityGridComputeBlock,
-} from './densityGrid.wgsl'
+export { gridParamsBlock, densityGridComputeBlock } from './densityGrid.wgsl'
 
 export {
   composeDensityGridComputeShader,

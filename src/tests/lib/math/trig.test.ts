@@ -35,7 +35,7 @@ describe('fsin', () => {
   })
 
   it('normalizes negative inputs correctly', () => {
-    const x = -7 * Math.PI / 3
+    const x = (-7 * Math.PI) / 3
     expect(Math.abs(fsin(x) - Math.sin(x))).toBeLessThan(0.06)
   })
 

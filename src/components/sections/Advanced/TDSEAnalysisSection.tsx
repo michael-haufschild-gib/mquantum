@@ -42,13 +42,12 @@ const PLOT_H = HEIGHT - 2 * PADDING_Y
  * ```
  */
 export const TDSEAnalysisContent: React.FC = React.memo(() => {
-  const { tdse, setDiagnosticsInterval } =
-    useExtendedObjectStore(
-      useShallow((s) => ({
-        tdse: s.schroedinger.tdse,
-        setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
-      })),
-    )
+  const { tdse, setDiagnosticsInterval } = useExtendedObjectStore(
+    useShallow((s) => ({
+      tdse: s.schroedinger.tdse,
+      setDiagnosticsInterval: s.setTdseDiagnosticsInterval,
+    }))
+  )
 
   return (
     <>
@@ -91,7 +90,7 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
       totalNorm: s.totalNorm,
       normDrift: s.normDrift,
       hasData: s.hasData,
-    })),
+    }))
   )
 
   const profile = useMemo(() => samplePotentialProfile(tdse, 200), [tdse])
@@ -139,23 +138,33 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Zero line */}
           <line
-            x1={PADDING_X} y1={zeroY}
-            x2={PADDING_X + PLOT_W} y2={zeroY}
-            stroke="var(--text-tertiary)" strokeWidth={0.5} strokeDasharray="2,2"
+            x1={PADDING_X}
+            y1={zeroY}
+            x2={PADDING_X + PLOT_W}
+            y2={zeroY}
+            stroke="var(--text-tertiary)"
+            strokeWidth={0.5}
+            strokeDasharray="2,2"
           />
 
           {/* Y-axis ticks */}
           {yTicks.map((tick, i) => (
             <g key={i}>
               <line
-                x1={PADDING_X - 3} y1={tick.y}
-                x2={PADDING_X} y2={tick.y}
-                stroke="var(--text-tertiary)" strokeWidth={0.5}
+                x1={PADDING_X - 3}
+                y1={tick.y}
+                x2={PADDING_X}
+                y2={tick.y}
+                stroke="var(--text-tertiary)"
+                strokeWidth={0.5}
               />
               <text
-                x={PADDING_X - 5} y={tick.y + 3}
-                textAnchor="end" fill="var(--text-tertiary)"
-                fontSize={8} fontFamily="monospace"
+                x={PADDING_X - 5}
+                y={tick.y + 3}
+                textAnchor="end"
+                fill="var(--text-tertiary)"
+                fontSize={8}
+                fontFamily="monospace"
               >
                 {tick.label}
               </text>
@@ -169,7 +178,8 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
               `${toSvgX(xMax).toFixed(1)},${zeroY.toFixed(1)}`,
               `${toSvgX(xMin).toFixed(1)},${zeroY.toFixed(1)}`,
             ].join(' ')}
-            fill="var(--theme-accent)" fillOpacity={0.15}
+            fill="var(--theme-accent)"
+            fillOpacity={0.15}
             stroke="none"
           />
 
@@ -184,41 +194,60 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
 
           {/* Kinetic energy level */}
           <line
-            x1={PADDING_X} y1={eLineY}
-            x2={PADDING_X + PLOT_W} y2={eLineY}
-            stroke="var(--color-warning)" strokeWidth={1} strokeDasharray="4,3"
+            x1={PADDING_X}
+            y1={eLineY}
+            x2={PADDING_X + PLOT_W}
+            y2={eLineY}
+            stroke="var(--color-warning)"
+            strokeWidth={1}
+            strokeDasharray="4,3"
           />
           <text
-            x={PADDING_X + PLOT_W + 2} y={eLineY + 3}
-            fill="var(--color-warning)" fontSize={8} fontFamily="monospace"
+            x={PADDING_X + PLOT_W + 2}
+            y={eLineY + 3}
+            fill="var(--color-warning)"
+            fontSize={8}
+            fontFamily="monospace"
           >
             E
           </text>
 
           {/* Axes */}
           <line
-            x1={PADDING_X} y1={PADDING_Y}
-            x2={PADDING_X} y2={PADDING_Y + PLOT_H}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={PADDING_X}
+            y1={PADDING_Y}
+            x2={PADDING_X}
+            y2={PADDING_Y + PLOT_H}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
           <line
-            x1={PADDING_X} y1={PADDING_Y + PLOT_H}
-            x2={PADDING_X + PLOT_W} y2={PADDING_Y + PLOT_H}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={PADDING_X}
+            y1={PADDING_Y + PLOT_H}
+            x2={PADDING_X + PLOT_W}
+            y2={PADDING_Y + PLOT_H}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
 
           {/* Axis labels */}
           <text
-            x={PADDING_X + PLOT_W / 2} y={HEIGHT - 2}
-            textAnchor="middle" fill="var(--text-tertiary)"
-            fontSize={8} fontFamily="monospace"
+            x={PADDING_X + PLOT_W / 2}
+            y={HEIGHT - 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
           >
             x
           </text>
           <text
-            x={4} y={PADDING_Y + PLOT_H / 2}
-            textAnchor="middle" fill="var(--text-tertiary)"
-            fontSize={8} fontFamily="monospace"
+            x={4}
+            y={PADDING_Y + PLOT_H / 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
             transform={`rotate(-90, 4, ${PADDING_Y + PLOT_H / 2})`}
           >
             V(x)
@@ -229,10 +258,15 @@ const EnergyDiagramInline: React.FC<EnergyDiagramInlineProps> = React.memo(({ td
         <div className="px-2 pb-1.5 flex gap-3 text-[9px] font-mono leading-tight text-text-secondary">
           {hasData ? (
             <>
-              <span>{isScattering ? `R=${R.toFixed(3)} T=${T.toFixed(3)}` : `P(L)=${R.toFixed(3)} P(R)=${T.toFixed(3)}`}</span>
+              <span>
+                {isScattering
+                  ? `R=${R.toFixed(3)} T=${T.toFixed(3)}`
+                  : `P(L)=${R.toFixed(3)} P(R)=${T.toFixed(3)}`}
+              </span>
               <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
               <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
-                Δ={normDrift >= 0 ? '+' : ''}{(normDrift * 100).toFixed(2)}%
+                Δ={normDrift >= 0 ? '+' : ''}
+                {(normDrift * 100).toFixed(2)}%
               </span>
             </>
           ) : (

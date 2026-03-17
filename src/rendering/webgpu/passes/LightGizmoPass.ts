@@ -5,7 +5,7 @@
  * into a transparent debug texture. The DebugOverlayPass composites this
  * onto the canvas after all post-processing.
  *
- * Visual elements per light type (matching the original Three.js gizmos):
+ * Visual elements per light type (matching standard light gizmo conventions):
  * - Point: wireframe icosahedron
  * - Directional: wireframe octahedron + yellow direction arrow
  * - Spot: wireframe sphere apex + wireframe cone
@@ -41,7 +41,7 @@ import {
 // Constants
 // ==========================================================================
 
-/** Base gizmo size (matches Three.js BASE_GIZMO_SIZE) */
+/** Base gizmo size  */
 const BASE_GIZMO_SIZE = 0.3
 
 /** Minimum camera-distance scale */
@@ -169,7 +169,7 @@ function quaternionFromDefaultToDirection(
 
 /**
  * Compute camera-distance-based scale factor.
- * Matches the original Three.js formula: clamp(distance * 0.1, MIN, MAX) * BASE_SIZE.
+ * Size formula: clamp(distance * 0.1, MIN, MAX) * BASE_SIZE.
  */
 function computeGizmoScale(
   lightPos: [number, number, number],
@@ -462,17 +462,26 @@ export class LightGizmoPass extends WebGPUBasePass {
         if (groundHit) {
           // Dashed ray from light to ground
           const dashVerts = generateDashedLine(
-            pos[0], pos[1], pos[2],
-            groundHit[0], groundHit[1], groundHit[2],
-            groundColor, groundAlpha
+            pos[0],
+            pos[1],
+            pos[2],
+            groundHit[0],
+            groundHit[1],
+            groundHit[2],
+            groundColor,
+            groundAlpha
           )
           for (let i = 0; i < dashVerts.length; i++) allVertices.push(dashVerts[i]!)
 
           // Spot: cone ellipse on ground
           if (light.type === 'spot') {
             const ellipseVerts = generateGroundEllipse(
-              pos, dir, light.coneAngle, groundHit,
-              groundColor, light.enabled ? 0.8 : 0.4
+              pos,
+              dir,
+              light.coneAngle,
+              groundHit,
+              groundColor,
+              light.enabled ? 0.8 : 0.4
             )
             for (let i = 0; i < ellipseVerts.length; i++) allVertices.push(ellipseVerts[i]!)
           }
@@ -480,7 +489,12 @@ export class LightGizmoPass extends WebGPUBasePass {
           // Draggable ground target
           const targetColor = isSelected ? '#00ff00' : groundColor
           const targetAlpha = isSelected ? 0.7 : 0.5
-          const targetVerts = generateGroundTarget(groundHit[0], groundHit[2], targetColor, targetAlpha)
+          const targetVerts = generateGroundTarget(
+            groundHit[0],
+            groundHit[2],
+            targetColor,
+            targetAlpha
+          )
           for (let i = 0; i < targetVerts.length; i++) allVertices.push(targetVerts[i]!)
         }
       } else if (light.type === 'point') {
@@ -489,8 +503,11 @@ export class LightGizmoPass extends WebGPUBasePass {
         if (sphereHit) {
           // Circle outline on ground
           const circleVerts = generateGroundCircle(
-            sphereHit.center[0], sphereHit.center[2], sphereHit.radius,
-            groundColor, light.enabled ? 0.8 : 0.4
+            sphereHit.center[0],
+            sphereHit.center[2],
+            sphereHit.radius,
+            groundColor,
+            light.enabled ? 0.8 : 0.4
           )
           for (let i = 0; i < circleVerts.length; i++) allVertices.push(circleVerts[i]!)
 
@@ -498,7 +515,10 @@ export class LightGizmoPass extends WebGPUBasePass {
           const targetColor = isSelected ? '#00ff00' : groundColor
           const targetAlpha = isSelected ? 0.7 : 0.5
           const targetVerts = generateGroundTarget(
-            sphereHit.center[0], sphereHit.center[2], targetColor, targetAlpha
+            sphereHit.center[0],
+            sphereHit.center[2],
+            targetColor,
+            targetAlpha
           )
           for (let i = 0; i < targetVerts.length; i++) allVertices.push(targetVerts[i]!)
         }
@@ -513,9 +533,31 @@ export class LightGizmoPass extends WebGPUBasePass {
       const mode = lighting.transformMode ?? 'translate'
 
       if (mode === 'translate') {
-        transformAndAppend(translateGizmoTemplate, allVertices, selScale, 0, 0, 0, 1, sp[0], sp[1], sp[2])
+        transformAndAppend(
+          translateGizmoTemplate,
+          allVertices,
+          selScale,
+          0,
+          0,
+          0,
+          1,
+          sp[0],
+          sp[1],
+          sp[2]
+        )
       } else if (mode === 'rotate') {
-        transformAndAppend(rotateGizmoTemplate, allVertices, selScale, 0, 0, 0, 1, sp[0], sp[1], sp[2])
+        transformAndAppend(
+          rotateGizmoTemplate,
+          allVertices,
+          selScale,
+          0,
+          0,
+          0,
+          1,
+          sp[0],
+          sp[1],
+          sp[2]
+        )
       }
     }
 
@@ -529,7 +571,13 @@ export class LightGizmoPass extends WebGPUBasePass {
       // Truncate if somehow too large
       this.vertexCount = Math.floor(MAX_VERTEX_BUFFER_BYTES / VERTEX_STRIDE_BYTES)
     }
-    this.device.queue.writeBuffer(this.vertexBuffer, 0, vertexData, 0, this.vertexCount * VERTEX_STRIDE)
+    this.device.queue.writeBuffer(
+      this.vertexBuffer,
+      0,
+      vertexData,
+      0,
+      this.vertexCount * VERTEX_STRIDE
+    )
 
     // Upload VP matrix
     const vpData = new Float32Array(16)

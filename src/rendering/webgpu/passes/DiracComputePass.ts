@@ -20,11 +20,26 @@
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
+import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import { spinorSize } from '@/lib/physics/dirac/cliffordAlgebraFallback'
 import { DiracAlgebraBridge } from '@/lib/physics/dirac/diracAlgebra'
 import { useDiracDiagnosticsStore } from '@/stores/diracDiagnosticsStore'
-import { comptonWavelength, zitterbewegungFrequency, kleinThreshold } from '@/lib/physics/dirac/scales'
+import {
+  comptonWavelength,
+  zitterbewegungFrequency,
+  kleinThreshold,
+} from '@/lib/physics/dirac/scales'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import {
+  DENSITY_GRID_SIZE,
+  DIAG_DECIMATION,
+  FFT_UNIFORM_SIZE,
+  GRID_WG,
+  LINEAR_WG,
+  MAX_DIM,
+  PACK_UNIFORM_SIZE,
+  nearestPow2,
+} from './computePassUtils'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { diracUniformsBlock } from '../shaders/schroedinger/compute/diracUniforms.wgsl'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
@@ -34,38 +49,28 @@ import { diracKineticBlock } from '../shaders/schroedinger/compute/diracKinetic.
 import { diracWriteGridBlock } from '../shaders/schroedinger/compute/diracWriteGrid.wgsl'
 import { diracPotentialBlock } from '../shaders/schroedinger/compute/diracPotential.wgsl'
 import { diracAbsorberBlock } from '../shaders/schroedinger/compute/diracAbsorber.wgsl'
-import { diracDiagNormReduceBlock, diracDiagNormFinalizeBlock } from '../shaders/schroedinger/compute/diracDiagnostics.wgsl'
-import { tdseComplexPackBlock, tdseComplexUnpackBlock } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import { tdseFFTStageUniformsBlock, tdseStockhamFFTBlock } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import {
+  diracDiagNormReduceBlock,
+  diracDiagNormFinalizeBlock,
+} from '../shaders/schroedinger/compute/diracDiagnostics.wgsl'
+import {
+  tdseComplexPackBlock,
+  tdseComplexUnpackBlock,
+} from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import {
+  tdseFFTStageUniformsBlock,
+  tdseStockhamFFTBlock,
+} from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 
 /** DiracUniforms struct size in bytes (544) */
 const UNIFORM_SIZE = 544
-/** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
-const LINEAR_WG = 64
-/** 3D dispatch workgroup size for write-grid pass */
-const GRID_WG = 4
-/** Density grid texture resolution */
-const DENSITY_GRID_SIZE = 96
-/** Maximum supported dimensions */
-const MAX_DIM = 12
-/** FFTStageUniforms struct size (32 bytes) */
-const FFT_UNIFORM_SIZE = 32
-/** PackUniforms struct size (16 bytes) */
-const PACK_UNIFORM_SIZE = 16
 /** Diagnostics workgroup size */
 const DIAG_WG = 256
 /** DiracDiagUniforms struct size (16 bytes: totalSites, numWorkgroups, spinorSize, pad) */
 const DIAG_UNIFORM_SIZE = 16
 /** Number of f32 values in diagnostic result buffer */
 const DIAG_RESULT_COUNT = 4
-/** Run diagnostics every N frames */
-const DIAG_DECIMATION = 5
-
-/** Snap a value to the nearest power of 2 (minimum 4) for FFT compatibility */
-function nearestPow2(v: number): number {
-  const p = Math.max(2, 2 ** Math.round(Math.log2(Math.max(1, v))))
-  return Math.min(128, p)
-}
 
 /**
  * Compute pass for Dirac equation split-operator dynamics.
@@ -109,9 +114,9 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private potentialHalfPipeline: GPUComputePipeline | null = null
   private packPipeline: GPUComputePipeline | null = null
   private unpackPipeline: GPUComputePipeline | null = null
-  private absorberPipeline: GPUComputePipeline | null = null
   private fftStagePipeline: GPUComputePipeline | null = null
   private kineticPipeline: GPUComputePipeline | null = null
+  private absorberPipeline: GPUComputePipeline | null = null
   private writeGridPipeline: GPUComputePipeline | null = null
 
   // Bind group layouts
@@ -120,7 +125,6 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private potentialHalfBGL: GPUBindGroupLayout | null = null
   private packBGL: GPUBindGroupLayout | null = null
   private unpackBGL: GPUBindGroupLayout | null = null
-  private absorberBGL: GPUBindGroupLayout | null = null
   private fftStageBGL: GPUBindGroupLayout | null = null
   private kineticBGL: GPUBindGroupLayout | null = null
   private writeGridBGL: GPUBindGroupLayout | null = null
@@ -129,7 +133,6 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private initBG: GPUBindGroup | null = null
   private potentialBG: GPUBindGroup | null = null
   private potentialHalfBG: GPUBindGroup | null = null
-  private absorberBG: GPUBindGroup | null = null
   private fftStageABBG: GPUBindGroup | null = null
   private fftStageBABG: GPUBindGroup | null = null
   private kineticBG: GPUBindGroup | null = null
@@ -192,22 +195,39 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     if (this.densityTexture) return
     this.densityTexture = device.createTexture({
       label: 'dirac-density-grid',
-      size: { width: DENSITY_GRID_SIZE, height: DENSITY_GRID_SIZE, depthOrArrayLayers: DENSITY_GRID_SIZE },
+      size: {
+        width: DENSITY_GRID_SIZE,
+        height: DENSITY_GRID_SIZE,
+        depthOrArrayLayers: DENSITY_GRID_SIZE,
+      },
       format: 'rgba16float',
       dimension: '3d',
-      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
+      usage:
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_SRC,
     })
-    this.densityTextureView = this.densityTexture.createView({ label: 'dirac-density-view', dimension: '3d' })
+    this.densityTextureView = this.densityTexture.createView({
+      label: 'dirac-density-view',
+      dimension: '3d',
+    })
   }
 
-  getDensityTextureView(): GPUTextureView | null { return this.densityTextureView }
-  getDensityTexture(): GPUTexture | null { return this.densityTexture }
+  getDensityTextureView(): GPUTextureView | null {
+    return this.densityTextureView
+  }
+  getDensityTexture(): GPUTexture | null {
+    return this.densityTexture
+  }
 
   private sanitizeGridSizes(config: DiracConfig): DiracConfig {
     let needsFix = false
     for (let d = 0; d < config.latticeDim; d++) {
       const g = config.gridSize[d]!
-      if ((g & (g - 1)) !== 0 || g < 2) { needsFix = true; break }
+      if ((g & (g - 1)) !== 0 || g < 2) {
+        needsFix = true
+        break
+      }
     }
     if (!needsFix) return config
     const fixed = config.gridSize.map((g) => nearestPow2(g))
@@ -265,56 +285,69 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     // Spinor buffers: S × totalSites floats each
     const spinorBytes = S * this.totalSites * 4
     this.spinorReBuffer = device.createBuffer({
-      label: 'dirac-spinorRe', size: spinorBytes,
+      label: 'dirac-spinorRe',
+      size: spinorBytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     })
     this.spinorImBuffer = device.createBuffer({
-      label: 'dirac-spinorIm', size: spinorBytes,
+      label: 'dirac-spinorIm',
+      size: spinorBytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     })
 
     // Potential buffer (scalar, one per site)
     const siteBytes = this.totalSites * 4
     this.potentialBuffer = device.createBuffer({
-      label: 'dirac-potential', size: siteBytes,
+      label: 'dirac-potential',
+      size: siteBytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     })
 
     // Gamma matrices buffer: (N+1) matrices × S×S×2 floats
     const gammaFloats = (config.latticeDim + 1) * S * S * 2
     this.gammaBuffer = device.createBuffer({
-      label: 'dirac-gamma-matrices', size: gammaFloats * 4,
+      label: 'dirac-gamma-matrices',
+      size: gammaFloats * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     })
     this.gammaDataReady = false
 
     // Request gamma matrices from web worker (async)
     const requestEpoch = ++this.gammaRequestEpoch
-    this.algebraBridge.generateMatrices(config.latticeDim).then(({ gammaData }) => {
-      if (requestEpoch !== this.gammaRequestEpoch) return // stale response from previous dimension
-      // The packed format has a leading u32 spinor_size — skip it for GPU upload
-      this.gammaPendingUpload = gammaData.subarray(1)
-      this.gammaDataReady = true
-    }).catch((err) => {
-      if (requestEpoch !== this.gammaRequestEpoch) return
-      console.error('[Dirac] Failed to generate gamma matrices:', err)
-    })
+    this.algebraBridge
+      .generateMatrices(config.latticeDim)
+      .then(({ gammaData }) => {
+        if (requestEpoch !== this.gammaRequestEpoch) return // stale response from previous dimension
+        // The packed format has a leading u32 spinor_size — skip it for GPU upload
+        this.gammaPendingUpload = gammaData.subarray(1)
+        this.gammaDataReady = true
+      })
+      .catch((err) => {
+        if (requestEpoch !== this.gammaRequestEpoch) return
+        console.error('[Dirac] Failed to generate gamma matrices:', err)
+      })
 
     // FFT scratch buffers (used for one component at a time)
     const complexBytes = this.totalSites * 8
     this.fftScratchA = device.createBuffer({
-      label: 'dirac-fft-scratch-a', size: complexBytes,
+      label: 'dirac-fft-scratch-a',
+      size: complexBytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     })
     this.fftScratchB = device.createBuffer({
-      label: 'dirac-fft-scratch-b', size: complexBytes,
+      label: 'dirac-fft-scratch-b',
+      size: complexBytes,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     })
 
     // Uniform buffers
     this.uniformBuffer = this.createUniformBuffer(device, UNIFORM_SIZE, 'dirac-uniforms')
     this.fftUniformBuffer = this.createUniformBuffer(device, FFT_UNIFORM_SIZE, 'dirac-fft-uniforms')
-    this.packUniformBuffer = this.createUniformBuffer(device, PACK_UNIFORM_SIZE, 'dirac-pack-uniforms')
+    this.packUniformBuffer = this.createUniformBuffer(
+      device,
+      PACK_UNIFORM_SIZE,
+      'dirac-pack-uniforms'
+    )
 
     // FFT staging buffer
     this.fwdStageCount = 0
@@ -339,39 +372,53 @@ export class DiracComputePass extends WebGPUBaseComputePass {
     device.queue.writeBuffer(this.packUniformBuffer, 0, packData)
 
     // Pack uniforms WITHOUT normalization (invN=1.0 for forward FFT unpack)
-    this.packUniformBufferNoNorm = this.createUniformBuffer(device, PACK_UNIFORM_SIZE, 'dirac-pack-uniforms-no-norm')
+    this.packUniformBufferNoNorm = this.createUniformBuffer(
+      device,
+      PACK_UNIFORM_SIZE,
+      'dirac-pack-uniforms-no-norm'
+    )
     const noNormData = new ArrayBuffer(PACK_UNIFORM_SIZE)
     const nnu32 = new Uint32Array(noNormData)
     const nnf32 = new Float32Array(noNormData)
     nnu32[0] = this.totalSites
-    nnf32[1] = 1.0  // No normalization for forward FFT
+    nnf32[1] = 1.0 // No normalization for forward FFT
     device.queue.writeBuffer(this.packUniformBufferNoNorm, 0, noNormData)
 
     // Diagnostics
     this.diagNumWorkgroups = Math.ceil(this.totalSites / DIAG_WG)
-    this.diagUniformBuffer = this.createUniformBuffer(device, DIAG_UNIFORM_SIZE, 'dirac-diag-uniforms')
+    this.diagUniformBuffer = this.createUniformBuffer(
+      device,
+      DIAG_UNIFORM_SIZE,
+      'dirac-diag-uniforms'
+    )
     this.diagPartialNormBuffer = device.createBuffer({
-      label: 'dirac-diag-partial-norm', size: this.diagNumWorkgroups * 4,
+      label: 'dirac-diag-partial-norm',
+      size: this.diagNumWorkgroups * 4,
       usage: GPUBufferUsage.STORAGE,
     })
     this.diagPartialMaxBuffer = device.createBuffer({
-      label: 'dirac-diag-partial-max', size: this.diagNumWorkgroups * 4,
+      label: 'dirac-diag-partial-max',
+      size: this.diagNumWorkgroups * 4,
       usage: GPUBufferUsage.STORAGE,
     })
     this.diagPartialParticleBuffer = device.createBuffer({
-      label: 'dirac-diag-partial-particle', size: this.diagNumWorkgroups * 4,
+      label: 'dirac-diag-partial-particle',
+      size: this.diagNumWorkgroups * 4,
       usage: GPUBufferUsage.STORAGE,
     })
     this.diagPartialAntiBuffer = device.createBuffer({
-      label: 'dirac-diag-partial-anti', size: this.diagNumWorkgroups * 4,
+      label: 'dirac-diag-partial-anti',
+      size: this.diagNumWorkgroups * 4,
       usage: GPUBufferUsage.STORAGE,
     })
     this.diagResultBuffer = device.createBuffer({
-      label: 'dirac-diag-result', size: DIAG_RESULT_COUNT * 4,
+      label: 'dirac-diag-result',
+      size: DIAG_RESULT_COUNT * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     })
     this.diagStagingBuffer = device.createBuffer({
-      label: 'dirac-diag-staging', size: DIAG_RESULT_COUNT * 4,
+      label: 'dirac-diag-staging',
+      size: DIAG_RESULT_COUNT * 4,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     })
     useDiracDiagnosticsStore.getState().reset()
@@ -391,39 +438,70 @@ export class DiracComputePass extends WebGPUBaseComputePass {
 
     // Init: uniforms + spinorRe + spinorIm
     this.initBGL = device.createBindGroupLayout({
-      label: 'dirac-init-bgl', entries: [
+      label: 'dirac-init-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
-    this.initPipeline = this.createComputePipeline(device,
+    this.initPipeline = this.createComputePipeline(
+      device,
       this.createShaderModule(device, unifAndIndex + diracInitBlock, 'dirac-init'),
-      [this.initBGL], 'dirac-init')
+      [this.initBGL],
+      'dirac-init'
+    )
 
     // Potential fill: uniforms + potential
     this.potentialBGL = device.createBindGroupLayout({
-      label: 'dirac-potential-bgl', entries: [
+      label: 'dirac-potential-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
-    this.potentialPipeline = this.createComputePipeline(device,
+    this.potentialPipeline = this.createComputePipeline(
+      device,
       this.createShaderModule(device, unifAndIndex + diracPotentialBlock, 'dirac-potential'),
-      [this.potentialBGL], 'dirac-potential')
+      [this.potentialBGL],
+      'dirac-potential'
+    )
 
     // Potential half-step: uniforms + spinorRe + spinorIm + potential(read)
     this.potentialHalfBGL = device.createBindGroupLayout({
-      label: 'dirac-potential-half-bgl', entries: [
+      label: 'dirac-potential-half-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
       ],
     })
-    this.potentialHalfPipeline = this.createComputePipeline(device,
-      this.createShaderModule(device, diracUniformsBlock + diracPotentialHalfBlock, 'dirac-potential-half'),
-      [this.potentialHalfBGL], 'dirac-potential-half')
+    this.potentialHalfPipeline = this.createComputePipeline(
+      device,
+      this.createShaderModule(
+        device,
+        unifAndIndex + diracPotentialHalfBlock,
+        'dirac-potential-half'
+      ),
+      [this.potentialHalfBGL],
+      'dirac-potential-half'
+    )
+
+    // Absorber (separate pass after Strang step — NOT merged into potential half-step).
+    // Running absorption after the FFT kinetic step prevents the FFT from scattering
+    // the spatially-modulated absorber profile across k-space.
+    // Reuses initBGL layout (uniform + spinorRe + spinorIm).
+    this.absorberPipeline = this.createComputePipeline(
+      device,
+      this.createShaderModule(
+        device,
+        unifAndIndex + pmlProfileBlock + diracAbsorberBlock,
+        'dirac-absorber'
+      ),
+      [this.initBGL],
+      'dirac-absorber'
+    )
 
     // Pack/Unpack (reuse TDSE shaders — they operate on totalSites elements)
     const packUnifBlock = /* wgsl */ `
@@ -435,86 +513,113 @@ struct PackUniforms {
 }
 `
     this.packBGL = device.createBindGroupLayout({
-      label: 'dirac-pack-bgl', entries: [
+      label: 'dirac-pack-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
-    this.packPipeline = this.createComputePipeline(device,
-      this.createShaderModule(device, packUnifBlock + tdseComplexPackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''), 'dirac-pack'),
-      [this.packBGL], 'dirac-pack')
+    this.packPipeline = this.createComputePipeline(
+      device,
+      this.createShaderModule(
+        device,
+        packUnifBlock + tdseComplexPackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
+        'dirac-pack'
+      ),
+      [this.packBGL],
+      'dirac-pack'
+    )
 
     this.unpackBGL = device.createBindGroupLayout({
-      label: 'dirac-unpack-bgl', entries: [
+      label: 'dirac-unpack-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
-    this.unpackPipeline = this.createComputePipeline(device,
-      this.createShaderModule(device, packUnifBlock + tdseComplexUnpackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''), 'dirac-unpack'),
-      [this.unpackBGL], 'dirac-unpack')
-
-    // Absorber: uniforms + spinorRe + spinorIm
-    this.absorberBGL = device.createBindGroupLayout({
-      label: 'dirac-absorber-bgl', entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-      ],
-    })
-    this.absorberPipeline = this.createComputePipeline(device,
-      this.createShaderModule(device, unifAndIndex + diracAbsorberBlock, 'dirac-absorber'),
-      [this.absorberBGL], 'dirac-absorber')
+    this.unpackPipeline = this.createComputePipeline(
+      device,
+      this.createShaderModule(
+        device,
+        packUnifBlock + tdseComplexUnpackBlock.replace(/struct PackUniforms[\s\S]*?\}/, ''),
+        'dirac-unpack'
+      ),
+      [this.unpackBGL],
+      'dirac-unpack'
+    )
 
     // FFT stage (reuse TDSE FFT shader)
     this.fftStageBGL = device.createBindGroupLayout({
-      label: 'dirac-fft-bgl', entries: [
+      label: 'dirac-fft-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
-    this.fftStagePipeline = this.createComputePipeline(device,
-      this.createShaderModule(device, tdseFFTStageUniformsBlock + tdseStockhamFFTBlock, 'dirac-fft-stage'),
-      [this.fftStageBGL], 'dirac-fft-stage')
+    this.fftStagePipeline = this.createComputePipeline(
+      device,
+      this.createShaderModule(
+        device,
+        tdseFFTStageUniformsBlock + tdseStockhamFFTBlock,
+        'dirac-fft-stage'
+      ),
+      [this.fftStageBGL],
+      'dirac-fft-stage'
+    )
 
     // Kinetic propagator: uniforms + spinorRe + spinorIm + gammaMatrices(read)
     this.kineticBGL = device.createBindGroupLayout({
-      label: 'dirac-kinetic-bgl', entries: [
+      label: 'dirac-kinetic-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
       ],
     })
-    this.kineticPipeline = this.createComputePipeline(device,
+    this.kineticPipeline = this.createComputePipeline(
+      device,
       this.createShaderModule(device, unifAndIndex + diracKineticBlock, 'dirac-kinetic'),
-      [this.kineticBGL], 'dirac-kinetic')
+      [this.kineticBGL],
+      'dirac-kinetic'
+    )
 
     // Write grid: uniforms + spinorRe + spinorIm + potential + gamma + outputTex
     this.writeGridBGL = device.createBindGroupLayout({
-      label: 'dirac-write-grid-bgl', entries: [
+      label: 'dirac-write-grid-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 5, visibility: GPUShaderStage.COMPUTE, storageTexture: {
-          access: 'write-only', format: 'rgba16float', viewDimension: '3d',
-        } },
+        {
+          binding: 5,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: {
+            access: 'write-only',
+            format: 'rgba16float',
+            viewDimension: '3d',
+          },
+        },
       ],
     })
-    this.writeGridPipeline = this.createComputePipeline(device,
+    this.writeGridPipeline = this.createComputePipeline(
+      device,
       this.createShaderModule(device, unifAndIndex + diracWriteGridBlock, 'dirac-write-grid'),
-      [this.writeGridBGL], 'dirac-write-grid')
+      [this.writeGridBGL],
+      'dirac-write-grid'
+    )
 
     // Diagnostics: reduce (pass 1)
     this.diagReduceBGL = device.createBindGroupLayout({
-      label: 'dirac-diag-reduce-bgl', entries: [
+      label: 'dirac-diag-reduce-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
@@ -524,13 +629,17 @@ struct PackUniforms {
         { binding: 6, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
       ],
     })
-    this.diagReducePipeline = this.createComputePipeline(device,
+    this.diagReducePipeline = this.createComputePipeline(
+      device,
       this.createShaderModule(device, diracDiagNormReduceBlock, 'dirac-diag-reduce'),
-      [this.diagReduceBGL], 'dirac-diag-reduce')
+      [this.diagReduceBGL],
+      'dirac-diag-reduce'
+    )
 
     // Diagnostics: finalize (pass 2)
     this.diagFinalizeBGL = device.createBindGroupLayout({
-      label: 'dirac-diag-finalize-bgl', entries: [
+      label: 'dirac-diag-finalize-bgl',
+      entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
@@ -539,40 +648,61 @@ struct PackUniforms {
         { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
       ],
     })
-    this.diagFinalizePipeline = this.createComputePipeline(device,
+    this.diagFinalizePipeline = this.createComputePipeline(
+      device,
       this.createShaderModule(device, diracDiagNormFinalizeBlock, 'dirac-diag-finalize'),
-      [this.diagFinalizeBGL], 'dirac-diag-finalize')
+      [this.diagFinalizeBGL],
+      'dirac-diag-finalize'
+    )
   }
 
   private rebuildBindGroups(device: GPUDevice): void {
-    if (!this.uniformBuffer || !this.spinorReBuffer || !this.spinorImBuffer ||
-        !this.potentialBuffer || !this.gammaBuffer || !this.fftScratchA ||
-        !this.fftScratchB || !this.densityTextureView || !this.fftUniformBuffer ||
-        !this.packUniformBuffer) return
+    if (
+      !this.uniformBuffer ||
+      !this.spinorReBuffer ||
+      !this.spinorImBuffer ||
+      !this.potentialBuffer ||
+      !this.gammaBuffer ||
+      !this.fftScratchA ||
+      !this.fftScratchB ||
+      !this.densityTextureView ||
+      !this.fftUniformBuffer ||
+      !this.packUniformBuffer
+    )
+      return
 
-    if (this.initBGL) this.initBG = device.createBindGroup({ label: 'dirac-init-bg', layout: this.initBGL, entries: [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: { buffer: this.spinorReBuffer } },
-      { binding: 2, resource: { buffer: this.spinorImBuffer } },
-    ] })
+    if (this.initBGL)
+      this.initBG = device.createBindGroup({
+        label: 'dirac-init-bg',
+        layout: this.initBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: { buffer: this.spinorReBuffer } },
+          { binding: 2, resource: { buffer: this.spinorImBuffer } },
+        ],
+      })
 
-    if (this.potentialBGL) this.potentialBG = device.createBindGroup({ label: 'dirac-potential-bg', layout: this.potentialBGL, entries: [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: { buffer: this.potentialBuffer } },
-    ] })
+    if (this.potentialBGL)
+      this.potentialBG = device.createBindGroup({
+        label: 'dirac-potential-bg',
+        layout: this.potentialBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: { buffer: this.potentialBuffer } },
+        ],
+      })
 
-    if (this.potentialHalfBGL) this.potentialHalfBG = device.createBindGroup({ label: 'dirac-potential-half-bg', layout: this.potentialHalfBGL, entries: [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: { buffer: this.spinorReBuffer } },
-      { binding: 2, resource: { buffer: this.spinorImBuffer } },
-      { binding: 3, resource: { buffer: this.potentialBuffer } },
-    ] })
-
-    if (this.absorberBGL) this.absorberBG = device.createBindGroup({ label: 'dirac-absorber-bg', layout: this.absorberBGL, entries: [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: { buffer: this.spinorReBuffer } },
-      { binding: 2, resource: { buffer: this.spinorImBuffer } },
-    ] })
+    if (this.potentialHalfBGL)
+      this.potentialHalfBG = device.createBindGroup({
+        label: 'dirac-potential-half-bg',
+        layout: this.potentialHalfBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: { buffer: this.spinorReBuffer } },
+          { binding: 2, resource: { buffer: this.spinorImBuffer } },
+          { binding: 3, resource: { buffer: this.potentialBuffer } },
+        ],
+      })
 
     // Pack: uses portion of spinor buffer for one component at a time
     // We'll create per-component bind groups dynamically in the execute method
@@ -580,58 +710,96 @@ struct PackUniforms {
 
     // FFT bind groups
     if (this.fftStageBGL) {
-      this.fftStageABBG = device.createBindGroup({ label: 'dirac-fft-ab-bg', layout: this.fftStageBGL, entries: [
-        { binding: 0, resource: { buffer: this.fftUniformBuffer } },
-        { binding: 1, resource: { buffer: this.fftScratchA } },
-        { binding: 2, resource: { buffer: this.fftScratchB } },
-      ] })
-      this.fftStageBABG = device.createBindGroup({ label: 'dirac-fft-ba-bg', layout: this.fftStageBGL, entries: [
-        { binding: 0, resource: { buffer: this.fftUniformBuffer } },
-        { binding: 1, resource: { buffer: this.fftScratchB } },
-        { binding: 2, resource: { buffer: this.fftScratchA } },
-      ] })
+      this.fftStageABBG = device.createBindGroup({
+        label: 'dirac-fft-ab-bg',
+        layout: this.fftStageBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.fftUniformBuffer } },
+          { binding: 1, resource: { buffer: this.fftScratchA } },
+          { binding: 2, resource: { buffer: this.fftScratchB } },
+        ],
+      })
+      this.fftStageBABG = device.createBindGroup({
+        label: 'dirac-fft-ba-bg',
+        layout: this.fftStageBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.fftUniformBuffer } },
+          { binding: 1, resource: { buffer: this.fftScratchB } },
+          { binding: 2, resource: { buffer: this.fftScratchA } },
+        ],
+      })
     }
 
-    if (this.kineticBGL) this.kineticBG = device.createBindGroup({ label: 'dirac-kinetic-bg', layout: this.kineticBGL, entries: [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: { buffer: this.spinorReBuffer } },
-      { binding: 2, resource: { buffer: this.spinorImBuffer } },
-      { binding: 3, resource: { buffer: this.gammaBuffer } },
-    ] })
+    if (this.kineticBGL)
+      this.kineticBG = device.createBindGroup({
+        label: 'dirac-kinetic-bg',
+        layout: this.kineticBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: { buffer: this.spinorReBuffer } },
+          { binding: 2, resource: { buffer: this.spinorImBuffer } },
+          { binding: 3, resource: { buffer: this.gammaBuffer } },
+        ],
+      })
 
-    if (this.writeGridBGL) this.writeGridBG = device.createBindGroup({ label: 'dirac-write-grid-bg', layout: this.writeGridBGL, entries: [
-      { binding: 0, resource: { buffer: this.uniformBuffer } },
-      { binding: 1, resource: { buffer: this.spinorReBuffer } },
-      { binding: 2, resource: { buffer: this.spinorImBuffer } },
-      { binding: 3, resource: { buffer: this.potentialBuffer } },
-      { binding: 4, resource: { buffer: this.gammaBuffer } },
-      { binding: 5, resource: this.densityTextureView },
-    ] })
+    if (this.writeGridBGL)
+      this.writeGridBG = device.createBindGroup({
+        label: 'dirac-write-grid-bg',
+        layout: this.writeGridBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: { buffer: this.spinorReBuffer } },
+          { binding: 2, resource: { buffer: this.spinorImBuffer } },
+          { binding: 3, resource: { buffer: this.potentialBuffer } },
+          { binding: 4, resource: { buffer: this.gammaBuffer } },
+          { binding: 5, resource: this.densityTextureView },
+        ],
+      })
 
     // Diagnostics bind groups
-    if (this.diagReduceBGL && this.diagUniformBuffer && this.diagPartialNormBuffer &&
-        this.diagPartialMaxBuffer && this.diagPartialParticleBuffer && this.diagPartialAntiBuffer) {
-      this.diagReduceBG = device.createBindGroup({ label: 'dirac-diag-reduce-bg', layout: this.diagReduceBGL, entries: [
-        { binding: 0, resource: { buffer: this.diagUniformBuffer } },
-        { binding: 1, resource: { buffer: this.spinorReBuffer } },
-        { binding: 2, resource: { buffer: this.spinorImBuffer } },
-        { binding: 3, resource: { buffer: this.diagPartialNormBuffer } },
-        { binding: 4, resource: { buffer: this.diagPartialMaxBuffer } },
-        { binding: 5, resource: { buffer: this.diagPartialParticleBuffer } },
-        { binding: 6, resource: { buffer: this.diagPartialAntiBuffer } },
-      ] })
+    if (
+      this.diagReduceBGL &&
+      this.diagUniformBuffer &&
+      this.diagPartialNormBuffer &&
+      this.diagPartialMaxBuffer &&
+      this.diagPartialParticleBuffer &&
+      this.diagPartialAntiBuffer
+    ) {
+      this.diagReduceBG = device.createBindGroup({
+        label: 'dirac-diag-reduce-bg',
+        layout: this.diagReduceBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.diagUniformBuffer } },
+          { binding: 1, resource: { buffer: this.spinorReBuffer } },
+          { binding: 2, resource: { buffer: this.spinorImBuffer } },
+          { binding: 3, resource: { buffer: this.diagPartialNormBuffer } },
+          { binding: 4, resource: { buffer: this.diagPartialMaxBuffer } },
+          { binding: 5, resource: { buffer: this.diagPartialParticleBuffer } },
+          { binding: 6, resource: { buffer: this.diagPartialAntiBuffer } },
+        ],
+      })
     }
-    if (this.diagFinalizeBGL && this.diagUniformBuffer && this.diagPartialNormBuffer &&
-        this.diagPartialMaxBuffer && this.diagResultBuffer && this.diagPartialParticleBuffer &&
-        this.diagPartialAntiBuffer) {
-      this.diagFinalizeBG = device.createBindGroup({ label: 'dirac-diag-finalize-bg', layout: this.diagFinalizeBGL, entries: [
-        { binding: 0, resource: { buffer: this.diagUniformBuffer } },
-        { binding: 1, resource: { buffer: this.diagPartialNormBuffer } },
-        { binding: 2, resource: { buffer: this.diagPartialMaxBuffer } },
-        { binding: 3, resource: { buffer: this.diagResultBuffer } },
-        { binding: 4, resource: { buffer: this.diagPartialParticleBuffer } },
-        { binding: 5, resource: { buffer: this.diagPartialAntiBuffer } },
-      ] })
+    if (
+      this.diagFinalizeBGL &&
+      this.diagUniformBuffer &&
+      this.diagPartialNormBuffer &&
+      this.diagPartialMaxBuffer &&
+      this.diagResultBuffer &&
+      this.diagPartialParticleBuffer &&
+      this.diagPartialAntiBuffer
+    ) {
+      this.diagFinalizeBG = device.createBindGroup({
+        label: 'dirac-diag-finalize-bg',
+        layout: this.diagFinalizeBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.diagUniformBuffer } },
+          { binding: 1, resource: { buffer: this.diagPartialNormBuffer } },
+          { binding: 2, resource: { buffer: this.diagPartialMaxBuffer } },
+          { binding: 3, resource: { buffer: this.diagResultBuffer } },
+          { binding: 4, resource: { buffer: this.diagPartialParticleBuffer } },
+          { binding: 5, resource: { buffer: this.diagPartialAntiBuffer } },
+        ],
+      })
     }
 
     // Build cached per-component pack/unpack bind groups
@@ -657,7 +825,7 @@ struct PackUniforms {
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
-    boundingRadius?: number,
+    boundingRadius?: number
   ): void {
     if (!this.uniformBuffer) return
     const u32 = this.uniformU32
@@ -667,11 +835,28 @@ struct PackUniforms {
     const strides = this.computeStrides(config)
     const S = this.currentSpinorSize
 
-    const initMap: Record<string, number> = { gaussianPacket: 0, planeWave: 1, standingWave: 2, zitterbewegung: 3 }
-    const potMap: Record<string, number> = { none: 0, step: 1, barrier: 2, well: 3, harmonicTrap: 4, coulomb: 5 }
+    const initMap: Record<string, number> = {
+      gaussianPacket: 0,
+      planeWave: 1,
+      standingWave: 2,
+      zitterbewegung: 3,
+    }
+    const potMap: Record<string, number> = {
+      none: 0,
+      step: 1,
+      barrier: 2,
+      well: 3,
+      harmonicTrap: 4,
+      coulomb: 5,
+    }
     const viewMap: Record<string, number> = {
-      totalDensity: 0, particleDensity: 1, antiparticleDensity: 2,
-      particleAntiparticleSplit: 3, spinDensity: 4, currentDensity: 5, phase: 6,
+      totalDensity: 0,
+      particleDensity: 1,
+      antiparticleDensity: 2,
+      particleAntiparticleSplit: 3,
+      spinDensity: 4,
+      currentDensity: 5,
+      phase: 6,
     }
 
     // gridSize (offset 0, indices 0-11)
@@ -716,17 +901,30 @@ struct PackUniforms {
     f32[78] = this.simTime
     u32[79] = config.absorberEnabled ? 1 : 0
 
-    // Absorber (offset 320, indices 80-81)
+    // PML absorber (offset 320, indices 80-81)
     f32[80] = config.absorberWidth
-    f32[81] = config.absorberStrength
+    // Auto-compute σ_max from PML target reflection coefficient
+    f32[81] = config.absorberEnabled
+      ? computePMLSigmaMaxND(
+          config.pmlTargetReflection ?? 1e-6,
+          config.absorberWidth,
+          config.gridSize,
+          config.dt,
+          3, // cubic grading (hardcoded to match WGSL shader)
+          config.latticeDim
+        )
+      : 0
 
     // slicePositions (offset 328, indices 82-93)
     // Store array is 0-indexed (i=0 → dim 3), WGSL reads slicePositions[d] where d >= 3
-    for (let i = 0; i < config.slicePositions.length; i++) f32[82 + 3 + i] = config.slicePositions[i]!
+    for (let i = 0; i < config.slicePositions.length; i++)
+      f32[82 + 3 + i] = config.slicePositions[i]!
 
     // Basis vectors (offset 376, indices 94-105, 106-117, 118-129)
     const writeBasis = (offset: number, b?: Float32Array) => {
-      if (b) { for (let d = 0; d < Math.min(b.length, MAX_DIM); d++) f32[offset + d] = b[d]! }
+      if (b) {
+        for (let d = 0; d < Math.min(b.length, MAX_DIM); d++) f32[offset + d] = b[d]!
+      }
     }
     writeBasis(94, basisX)
     if (!basisX) f32[94] = 1.0
@@ -784,25 +982,29 @@ struct PackUniforms {
     return data
   }
 
-  private dispatchFFTAxis(
-    encoder: GPUCommandEncoder,
-    axisDim: number,
-    slotOffset: number,
-  ): number {
-    if (!this.fftStagePipeline || !this.fftStageABBG || !this.fftStageBABG ||
-        !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
+  private dispatchFFTAxis(encoder: GPUCommandEncoder, axisDim: number, slotOffset: number): number {
+    if (
+      !this.fftStagePipeline ||
+      !this.fftStageABBG ||
+      !this.fftStageBABG ||
+      !this.fftUniformBuffer ||
+      !this.fftStagingBuffer
+    )
+      return slotOffset
 
     const stages = Math.log2(axisDim)
     const halfTotal = this.totalSites / 2
 
     for (let s = 0; s < stages; s++) {
       encoder.copyBufferToBuffer(
-        this.fftStagingBuffer, (slotOffset + s) * FFT_UNIFORM_SIZE,
-        this.fftUniformBuffer, 0,
-        FFT_UNIFORM_SIZE,
+        this.fftStagingBuffer,
+        (slotOffset + s) * FFT_UNIFORM_SIZE,
+        this.fftUniformBuffer,
+        0,
+        FFT_UNIFORM_SIZE
       )
 
-      const bg = (s % 2 === 0) ? this.fftStageABBG : this.fftStageBABG
+      const bg = s % 2 === 0 ? this.fftStageABBG : this.fftStageBABG
       const pass = encoder.beginComputePass({ label: `dirac-fft-stage-${s}` })
       this.dispatchCompute(pass, this.fftStagePipeline, [bg], Math.ceil(halfTotal / LINEAR_WG))
       pass.end()
@@ -825,15 +1027,29 @@ struct PackUniforms {
    * that bind at the correct buffer offset.
    */
   private createComponentPackBG(device: GPUDevice, componentIdx: number): GPUBindGroup | null {
-    if (!this.packBGL || !this.packUniformBuffer || !this.spinorReBuffer ||
-        !this.spinorImBuffer || !this.fftScratchA) return null
+    if (
+      !this.packBGL ||
+      !this.packUniformBuffer ||
+      !this.spinorReBuffer ||
+      !this.spinorImBuffer ||
+      !this.fftScratchA
+    )
+      return null
     const byteOffset = componentIdx * this.totalSites * 4
     const byteSize = this.totalSites * 4
     return device.createBindGroup({
-      label: `dirac-pack-c${componentIdx}`, layout: this.packBGL, entries: [
+      label: `dirac-pack-c${componentIdx}`,
+      layout: this.packBGL,
+      entries: [
         { binding: 0, resource: { buffer: this.packUniformBuffer } },
-        { binding: 1, resource: { buffer: this.spinorReBuffer, offset: byteOffset, size: byteSize } },
-        { binding: 2, resource: { buffer: this.spinorImBuffer, offset: byteOffset, size: byteSize } },
+        {
+          binding: 1,
+          resource: { buffer: this.spinorReBuffer, offset: byteOffset, size: byteSize },
+        },
+        {
+          binding: 2,
+          resource: { buffer: this.spinorImBuffer, offset: byteOffset, size: byteSize },
+        },
         { binding: 3, resource: { buffer: this.fftScratchA } },
       ],
     })
@@ -843,16 +1059,30 @@ struct PackUniforms {
    * Create unpack bind group WITH 1/N normalization (for inverse FFT).
    */
   private createComponentUnpackBG(device: GPUDevice, componentIdx: number): GPUBindGroup | null {
-    if (!this.unpackBGL || !this.packUniformBuffer || !this.spinorReBuffer ||
-        !this.spinorImBuffer || !this.fftScratchA) return null
+    if (
+      !this.unpackBGL ||
+      !this.packUniformBuffer ||
+      !this.spinorReBuffer ||
+      !this.spinorImBuffer ||
+      !this.fftScratchA
+    )
+      return null
     const byteOffset = componentIdx * this.totalSites * 4
     const byteSize = this.totalSites * 4
     return device.createBindGroup({
-      label: `dirac-unpack-c${componentIdx}`, layout: this.unpackBGL, entries: [
+      label: `dirac-unpack-c${componentIdx}`,
+      layout: this.unpackBGL,
+      entries: [
         { binding: 0, resource: { buffer: this.packUniformBuffer } },
         { binding: 1, resource: { buffer: this.fftScratchA } },
-        { binding: 2, resource: { buffer: this.spinorReBuffer, offset: byteOffset, size: byteSize } },
-        { binding: 3, resource: { buffer: this.spinorImBuffer, offset: byteOffset, size: byteSize } },
+        {
+          binding: 2,
+          resource: { buffer: this.spinorReBuffer, offset: byteOffset, size: byteSize },
+        },
+        {
+          binding: 3,
+          resource: { buffer: this.spinorImBuffer, offset: byteOffset, size: byteSize },
+        },
       ],
     })
   }
@@ -861,17 +1091,34 @@ struct PackUniforms {
    * Create unpack bind group WITHOUT normalization (for forward FFT).
    * Uses packUniformBufferNoNorm which has invN=1.0.
    */
-  private createComponentUnpackBGNoNorm(device: GPUDevice, componentIdx: number): GPUBindGroup | null {
-    if (!this.unpackBGL || !this.packUniformBufferNoNorm || !this.spinorReBuffer ||
-        !this.spinorImBuffer || !this.fftScratchA) return null
+  private createComponentUnpackBGNoNorm(
+    device: GPUDevice,
+    componentIdx: number
+  ): GPUBindGroup | null {
+    if (
+      !this.unpackBGL ||
+      !this.packUniformBufferNoNorm ||
+      !this.spinorReBuffer ||
+      !this.spinorImBuffer ||
+      !this.fftScratchA
+    )
+      return null
     const byteOffset = componentIdx * this.totalSites * 4
     const byteSize = this.totalSites * 4
     return device.createBindGroup({
-      label: `dirac-fwd-unpack-c${componentIdx}`, layout: this.unpackBGL, entries: [
+      label: `dirac-fwd-unpack-c${componentIdx}`,
+      layout: this.unpackBGL,
+      entries: [
         { binding: 0, resource: { buffer: this.packUniformBufferNoNorm } },
         { binding: 1, resource: { buffer: this.fftScratchA } },
-        { binding: 2, resource: { buffer: this.spinorReBuffer, offset: byteOffset, size: byteSize } },
-        { binding: 3, resource: { buffer: this.spinorImBuffer, offset: byteOffset, size: byteSize } },
+        {
+          binding: 2,
+          resource: { buffer: this.spinorReBuffer, offset: byteOffset, size: byteSize },
+        },
+        {
+          binding: 3,
+          resource: { buffer: this.spinorImBuffer, offset: byteOffset, size: byteSize },
+        },
       ],
     })
   }
@@ -885,7 +1132,7 @@ struct PackUniforms {
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
-    boundingRadius?: number,
+    boundingRadius?: number
   ): void {
     const config = this.sanitizeGridSizes(rawConfig)
     const { device, encoder } = ctx
@@ -905,7 +1152,11 @@ struct PackUniforms {
 
     // Upload gamma matrices if ready
     if (this.gammaDataReady && this.gammaPendingUpload && this.gammaBuffer) {
-      device.queue.writeBuffer(this.gammaBuffer, 0, this.gammaPendingUpload as Float32Array<ArrayBuffer>)
+      device.queue.writeBuffer(
+        this.gammaBuffer,
+        0,
+        this.gammaPendingUpload as Float32Array<ArrayBuffer>
+      )
       this.gammaPendingUpload = null
     }
 
@@ -916,14 +1167,24 @@ struct PackUniforms {
       // Initialize spinor wavepacket
       if (this.initPipeline && this.initBG) {
         const pass = encoder.beginComputePass({ label: 'dirac-init-pass' })
-        this.dispatchCompute(pass, this.initPipeline, [this.initBG], Math.ceil(this.totalSites / LINEAR_WG))
+        this.dispatchCompute(
+          pass,
+          this.initPipeline,
+          [this.initBG],
+          Math.ceil(this.totalSites / LINEAR_WG)
+        )
         pass.end()
       }
 
       // Fill potential buffer
       if (this.potentialPipeline && this.potentialBG) {
         const pass = encoder.beginComputePass({ label: 'dirac-potential-fill' })
-        this.dispatchCompute(pass, this.potentialPipeline, [this.potentialBG], Math.ceil(this.totalSites / LINEAR_WG))
+        this.dispatchCompute(
+          pass,
+          this.potentialPipeline,
+          [this.potentialBG],
+          Math.ceil(this.totalSites / LINEAR_WG)
+        )
         pass.end()
       }
 
@@ -1031,10 +1292,13 @@ struct PackUniforms {
           p.end()
         }
 
-        // 7. Absorber (if enabled)
-        if (config.absorberEnabled && this.absorberPipeline && this.absorberBG) {
+        // 7. Absorber (separate pass AFTER the Strang step)
+        // Applied once per step, after the FFT kinetic step has completed.
+        // This prevents the FFT from seeing the absorber's spatial modulation
+        // and scattering it across k-space (which creates spurious emission artifacts).
+        if (this.absorberPipeline && this.initBG) {
           const p = encoder.beginComputePass({ label: `dirac-absorber-${step}` })
-          this.dispatchCompute(p, this.absorberPipeline, [this.absorberBG], linearWG)
+          this.dispatchCompute(p, this.absorberPipeline, [this.initBG], linearWG)
           p.end()
         }
 
@@ -1053,7 +1317,7 @@ struct PackUniforms {
     // Diagnostics
     this.diagFrameCounter++
     const interval = config.diagnosticsEnabled
-      ? (config.diagnosticsInterval || DIAG_DECIMATION)
+      ? config.diagnosticsInterval || DIAG_DECIMATION
       : DIAG_DECIMATION
     if (this.diagFrameCounter >= interval) {
       this.diagFrameCounter = 0
@@ -1061,10 +1325,21 @@ struct PackUniforms {
     }
   }
 
-  private dispatchDiagnostics(encoder: GPUCommandEncoder, device: GPUDevice, config: DiracConfig): void {
-    if (!this.diagReducePipeline || !this.diagReduceBG ||
-        !this.diagFinalizePipeline || !this.diagFinalizeBG ||
-        !this.diagResultBuffer || !this.diagStagingBuffer || !this.diagUniformBuffer) return
+  private dispatchDiagnostics(
+    encoder: GPUCommandEncoder,
+    device: GPUDevice,
+    config: DiracConfig
+  ): void {
+    if (
+      !this.diagReducePipeline ||
+      !this.diagReduceBG ||
+      !this.diagFinalizePipeline ||
+      !this.diagFinalizeBG ||
+      !this.diagResultBuffer ||
+      !this.diagStagingBuffer ||
+      !this.diagUniformBuffer
+    )
+      return
 
     // Write diagnostic uniforms
     const diagData = new ArrayBuffer(DIAG_UNIFORM_SIZE)
@@ -1076,7 +1351,12 @@ struct PackUniforms {
 
     // Pass 1: reduce
     const reducePass = encoder.beginComputePass({ label: 'dirac-diag-reduce' })
-    this.dispatchCompute(reducePass, this.diagReducePipeline, [this.diagReduceBG], this.diagNumWorkgroups)
+    this.dispatchCompute(
+      reducePass,
+      this.diagReducePipeline,
+      [this.diagReduceBG],
+      this.diagNumWorkgroups
+    )
     reducePass.end()
 
     // Pass 2: finalize
@@ -1087,65 +1367,81 @@ struct PackUniforms {
     // Async readback
     if (!this.diagMappingInFlight) {
       encoder.copyBufferToBuffer(
-        this.diagResultBuffer, 0,
-        this.diagStagingBuffer, 0,
-        DIAG_RESULT_COUNT * 4,
+        this.diagResultBuffer,
+        0,
+        this.diagStagingBuffer,
+        0,
+        DIAG_RESULT_COUNT * 4
       )
       this.diagMappingInFlight = true
       const staging = this.diagStagingBuffer
 
-      device.queue.onSubmittedWorkDone().then(() => {
-        if (!staging || staging.mapState !== 'unmapped' || this.diagStagingBuffer !== staging) {
-          this.diagMappingInFlight = false
-          return
-        }
-        staging.mapAsync(GPUMapMode.READ).then(() => {
-          const data = new Float32Array(staging.getMappedRange())
-          const totalNorm = data[0]!
-          const maxDens = data[1]!
-          const particleNorm = data[2]!
-          const antiNorm = data[3]!
-          staging.unmap()
-
-          // Asymmetric maxDensity smoothing
-          if (maxDens > 0) {
-            if (this.maxDensity <= 0 || maxDens >= this.maxDensity) {
-              this.maxDensity = maxDens
-            } else {
-              this.maxDensity += 0.4 * (maxDens - this.maxDensity)
-            }
+      device.queue
+        .onSubmittedWorkDone()
+        .then(() => {
+          if (!staging || staging.mapState !== 'unmapped' || this.diagStagingBuffer !== staging) {
+            this.diagMappingInFlight = false
+            return
           }
+          staging
+            .mapAsync(GPUMapMode.READ)
+            .then(() => {
+              const data = new Float32Array(staging.getMappedRange())
+              const totalNorm = data[0]!
+              const maxDens = data[1]!
+              const particleNorm = data[2]!
+              const antiNorm = data[3]!
+              staging.unmap()
 
-          if (this.initialNorm < 0) {
-            this.initialNorm = totalNorm
-          }
+              // Asymmetric maxDensity smoothing
+              if (maxDens > 0) {
+                if (this.maxDensity <= 0 || maxDens >= this.maxDensity) {
+                  this.maxDensity = maxDens
+                } else {
+                  this.maxDensity += 0.4 * (maxDens - this.maxDensity)
+                }
+              }
 
-          // Update diagnostics store
-          if (config.diagnosticsEnabled) {
-            const norm0 = this.initialNorm > 0 ? this.initialNorm : totalNorm
-            const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
-            const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
-            const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
+              if (this.initialNorm < 0) {
+                this.initialNorm = totalNorm
+              }
 
-            useDiracDiagnosticsStore.getState().update({
-              totalNorm,
-              normDrift,
-              maxDensity: maxDens,
-              particleFraction: pFrac,
-              antiparticleFraction: aFrac,
-              comptonWavelength: comptonWavelength(config.hbar, config.mass, config.speedOfLight),
-              zitterbewegungFreq: zitterbewegungFrequency(config.mass, config.speedOfLight, config.hbar),
-              kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
+              // Update diagnostics store
+              if (config.diagnosticsEnabled) {
+                const norm0 = this.initialNorm > 0 ? this.initialNorm : totalNorm
+                const normDrift = norm0 > 0 ? (totalNorm - norm0) / norm0 : 0
+                const pFrac = totalNorm > 0 ? particleNorm / totalNorm : 0
+                const aFrac = totalNorm > 0 ? antiNorm / totalNorm : 0
+
+                useDiracDiagnosticsStore.getState().update({
+                  totalNorm,
+                  normDrift,
+                  maxDensity: maxDens,
+                  particleFraction: pFrac,
+                  antiparticleFraction: aFrac,
+                  comptonWavelength: comptonWavelength(
+                    config.hbar,
+                    config.mass,
+                    config.speedOfLight
+                  ),
+                  zitterbewegungFreq: zitterbewegungFrequency(
+                    config.mass,
+                    config.speedOfLight,
+                    config.hbar
+                  ),
+                  kleinThreshold: kleinThreshold(config.mass, config.speedOfLight),
+                })
+              }
+
+              this.diagMappingInFlight = false
             })
-          }
-
-          this.diagMappingInFlight = false
-        }).catch(() => {
+            .catch(() => {
+              this.diagMappingInFlight = false
+            })
+        })
+        .catch(() => {
           this.diagMappingInFlight = false
         })
-      }).catch(() => {
-        this.diagMappingInFlight = false
-      })
     }
   }
 
@@ -1196,8 +1492,11 @@ struct PackUniforms {
     this.diagResultBuffer = null
     this.diagStagingBuffer = null
 
+    this.absorberPipeline = null
+
     this.algebraBridge.dispose()
     this.initialized = false
     this.lastConfigHash = ''
+    super.dispose()
   }
 }

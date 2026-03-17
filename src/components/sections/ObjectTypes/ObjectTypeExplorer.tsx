@@ -9,7 +9,10 @@ import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 /** Per-mode metadata */
-const MODE_FEATURES: Record<SchroedingerQuantumMode, { minDim: number; category: 'analytic' | 'compute' }> = {
+const MODE_FEATURES: Record<
+  SchroedingerQuantumMode,
+  { minDim: number; category: 'analytic' | 'compute' }
+> = {
   harmonicOscillator: { minDim: 1, category: 'analytic' },
   hydrogenND: { minDim: 3, category: 'analytic' },
   freeScalarField: { minDim: 1, category: 'compute' },
@@ -67,7 +70,8 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       {
         value: 'diracEquation' as SchroedingerQuantumMode,
         label: 'Dirac',
-        description: 'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
+        description:
+          'Relativistic Dirac equation: spinor dynamics, Zitterbewegung, Klein tunneling.',
       },
     ],
     []
@@ -173,9 +177,13 @@ export const ObjectTypeExplorer: React.FC = React.memo(() => {
       initial="hidden"
       animate="show"
     >
-      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1">Analytic</div>
+      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1">
+        Analytic
+      </div>
       {analyticModes.map(renderCard)}
-      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">Compute (GPU)</div>
+      <div className="text-[9px] font-bold uppercase tracking-widest text-text-tertiary px-1 mt-2">
+        Compute (GPU)
+      </div>
       {computeModes.map(renderCard)}
 
       {/* Pauli Spinor — separate object type */}

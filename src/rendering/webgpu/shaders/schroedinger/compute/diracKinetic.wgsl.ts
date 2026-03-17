@@ -140,7 +140,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Apply matrix exponential using H² = E²·I identity:
   //   exp(-iH·dt/ℏ)·ψ = cos(E·dt/ℏ)·ψ - i·sin(E·dt/ℏ)·(H·ψ)/E
-  let arg = E * params.dt / params.hbar;
+  let arg = E * params.dt / max(params.hbar, 1e-6);
   let cosArg = cos(arg);
   let sinArg = sin(arg);
   // Precompute sin(arg)/E to avoid per-component multiply

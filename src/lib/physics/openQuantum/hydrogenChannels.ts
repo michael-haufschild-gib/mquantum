@@ -31,7 +31,7 @@ export function buildHydrogenChannels(
   basis: readonly HydrogenBasisState[],
   rates: readonly TransitionRate[],
   dephasingRate: number,
-  dephasingEnabled: boolean,
+  dephasingEnabled: boolean
 ): LindbladChannel[] {
   const channels: LindbladChannel[] = []
   const K = basis.length

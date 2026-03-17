@@ -34,7 +34,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let fwdIdx = select(idx + stride, idx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
     let bwdIdx = select(idx - stride, idx + stride * (params.gridSize[d] - 1u), coord == 0u);
 
-    let a2 = params.spacing[d] * params.spacing[d];
+    let a2 = max(params.spacing[d] * params.spacing[d], 1e-12);
     laplacian += (phi[fwdIdx] - 2.0 * phiCenter + phi[bwdIdx]) / a2;
   }
 

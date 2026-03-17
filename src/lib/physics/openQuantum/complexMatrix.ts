@@ -70,11 +70,14 @@ export function complexMatMul(
   A: ComplexMatrix,
   B: ComplexMatrix,
   out: ComplexMatrix,
-  N: number,
+  N: number
 ): void {
-  const Ar = A.real, Ai = A.imag
-  const Br = B.real, Bi = B.imag
-  const Or = out.real, Oi = out.imag
+  const Ar = A.real,
+    Ai = A.imag
+  const Br = B.real,
+    Bi = B.imag
+  const Or = out.real,
+    Oi = out.imag
 
   Or.fill(0)
   Oi.fill(0)
@@ -108,7 +111,7 @@ export function complexMatAdd(
   A: ComplexMatrix,
   B: ComplexMatrix,
   out: ComplexMatrix,
-  N: number,
+  N: number
 ): void {
   const size = N * N
   for (let i = 0; i < size; i++) {
@@ -131,7 +134,7 @@ export function complexMatScale(
   scalarRe: number,
   scalarIm: number,
   out: ComplexMatrix,
-  N: number,
+  N: number
 ): void {
   const size = N * N
   for (let i = 0; i < size; i++) {
@@ -149,11 +152,7 @@ export function complexMatScale(
  * @param dst - Destination matrix
  * @param N - Matrix dimension
  */
-export function complexMatCopy(
-  src: ComplexMatrix,
-  dst: ComplexMatrix,
-  N: number,
-): void {
+export function complexMatCopy(src: ComplexMatrix, dst: ComplexMatrix, N: number): void {
   const size = N * N
   dst.real.set(src.real.subarray(0, size))
   dst.imag.set(src.imag.subarray(0, size))
@@ -192,11 +191,7 @@ export function complexMatNorm1(A: ComplexMatrix, N: number): number {
  * @param N - System dimension
  * @returns Solution matrix X
  */
-export function solveLinearSystem(
-  Q: ComplexMatrix,
-  P: ComplexMatrix,
-  N: number,
-): ComplexMatrix {
+export function solveLinearSystem(Q: ComplexMatrix, P: ComplexMatrix, N: number): ComplexMatrix {
   // Augmented matrix: [A | B] where A = Q, B = P
   // Work on copies
   const Ar = new Float64Array(Q.real)
@@ -225,10 +220,18 @@ export function solveLinearSystem(
         const m = maxRow * N + j
         let tmp: number
 
-        tmp = Ar[c]!; Ar[c] = Ar[m]!; Ar[m] = tmp
-        tmp = Ai[c]!; Ai[c] = Ai[m]!; Ai[m] = tmp
-        tmp = Br[c]!; Br[c] = Br[m]!; Br[m] = tmp
-        tmp = Bi[c]!; Bi[c] = Bi[m]!; Bi[m] = tmp
+        tmp = Ar[c]!
+        Ar[c] = Ar[m]!
+        Ar[m] = tmp
+        tmp = Ai[c]!
+        Ai[c] = Ai[m]!
+        Ai[m] = tmp
+        tmp = Br[c]!
+        Br[c] = Br[m]!
+        Br[m] = tmp
+        tmp = Bi[c]!
+        Bi[c] = Bi[m]!
+        Bi[m] = tmp
       }
     }
 
@@ -298,9 +301,8 @@ export function solveLinearSystem(
 
 /** Padé(13,13) coefficients b_k */
 const PADE_COEFFS_13 = [
-  64764752532480000, 32382376266240000, 7771770303897600, 1187353796428800,
-  129060195264000, 10559470521600, 670442572800, 33522128640,
-  1323241920, 40840800, 960960, 16380, 182, 1,
+  64764752532480000, 32382376266240000, 7771770303897600, 1187353796428800, 129060195264000,
+  10559470521600, 670442572800, 33522128640, 1323241920, 40840800, 960960, 16380, 182, 1,
 ]
 
 /**
@@ -358,11 +360,17 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
   const Uinner = complexMatZero(N)
   for (let i = 0; i < size; i++) {
     Uinner.real[i] =
-      A6Wu.real[i]! + b[7]! * A6.real[i]! + b[5]! * A4.real[i]! +
-      b[3]! * A2.real[i]! + b[1]! * I.real[i]!
+      A6Wu.real[i]! +
+      b[7]! * A6.real[i]! +
+      b[5]! * A4.real[i]! +
+      b[3]! * A2.real[i]! +
+      b[1]! * I.real[i]!
     Uinner.imag[i] =
-      A6Wu.imag[i]! + b[7]! * A6.imag[i]! + b[5]! * A4.imag[i]! +
-      b[3]! * A2.imag[i]! + b[1]! * I.imag[i]!
+      A6Wu.imag[i]! +
+      b[7]! * A6.imag[i]! +
+      b[5]! * A4.imag[i]! +
+      b[3]! * A2.imag[i]! +
+      b[1]! * I.imag[i]!
   }
 
   const U = complexMatZero(N)
@@ -382,11 +390,17 @@ export function matrixExponentialPade(A: ComplexMatrix, N: number): ComplexMatri
   const V = complexMatZero(N)
   for (let i = 0; i < size; i++) {
     V.real[i] =
-      A6Wv.real[i]! + b[6]! * A6.real[i]! + b[4]! * A4.real[i]! +
-      b[2]! * A2.real[i]! + b[0]! * I.real[i]!
+      A6Wv.real[i]! +
+      b[6]! * A6.real[i]! +
+      b[4]! * A4.real[i]! +
+      b[2]! * A2.real[i]! +
+      b[0]! * I.real[i]!
     V.imag[i] =
-      A6Wv.imag[i]! + b[6]! * A6.imag[i]! + b[4]! * A4.imag[i]! +
-      b[2]! * A2.imag[i]! + b[0]! * I.imag[i]!
+      A6Wv.imag[i]! +
+      b[6]! * A6.imag[i]! +
+      b[4]! * A4.imag[i]! +
+      b[2]! * A2.imag[i]! +
+      b[0]! * I.imag[i]!
   }
 
   // Solve (V - U) · X = (V + U)

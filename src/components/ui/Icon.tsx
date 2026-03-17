@@ -23,6 +23,7 @@ import PencilIcon from '@/assets/icons/pencil.svg?react'
 import PlayIcon from '@/assets/icons/play3.svg?react'
 import PlusIcon from '@/assets/icons/plus.svg?react'
 import RedoIcon from '@/assets/icons/redo.svg?react'
+import ResetIcon from '@/assets/icons/reset.svg?react'
 import SparklesIcon from '@/assets/icons/sparkles.svg?react'
 import SphereIcon from '@/assets/icons/sphere.svg?react'
 import StopIcon from '@/assets/icons/stop2.svg?react'
@@ -44,6 +45,7 @@ const icons = {
   stop: StopIcon,
   undo: UndoIcon,
   redo: RedoIcon,
+  reset: ResetIcon,
   menu: MenuIcon,
   'arrow-left': ArrowLeftIcon,
   'arrow-right': ArrowRightIcon,

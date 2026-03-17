@@ -1,4 +1,3 @@
-/* global GPUTextureFormat */
 /**
  * WebGPU Temporal Position Capture Pass
  *

@@ -306,7 +306,10 @@ fn evaluateNodalScalarField(pos: vec3f, t: f32, uniforms: SchroedingerUniforms) 
     return NodalScalarSample(psi.y, psi.y, psiAbs, NODAL_DEFINITION_IMAG);
   }
   if (surfaceDefinition == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
-    let value = max(abs(psi.x), abs(psi.y));
+    // Use Re*Im product: sign-changing at EITHER Re(ψ)=0 or Im(ψ)=0.
+    // The previous max(|Re|,|Im|) was nonneg, preventing bisection convergence.
+    // Re*Im gives proper sign changes for robust ray-hit detection.
+    let value = psi.x * psi.y;
     return NodalScalarSample(value, psi.x, psiAbs, NODAL_DEFINITION_COMPLEX_INTERSECTION);
   }
 
@@ -379,17 +382,21 @@ fn findNodalSurfaceHit(
         continue;
       }
       let gradDelta = max(stepLen * 0.5, 0.01);
+      let invTwoGradDelta = 0.5 / gradDelta;
 
-      let fx0 = evaluateNodalScalarField(hitPos - vec3f(gradDelta, 0.0, 0.0), animTime, uniforms).value;
-      let fx1 = evaluateNodalScalarField(hitPos + vec3f(gradDelta, 0.0, 0.0), animTime, uniforms).value;
-      let fy0 = evaluateNodalScalarField(hitPos - vec3f(0.0, gradDelta, 0.0), animTime, uniforms).value;
-      let fy1 = evaluateNodalScalarField(hitPos + vec3f(0.0, gradDelta, 0.0), animTime, uniforms).value;
-      let fz0 = evaluateNodalScalarField(hitPos - vec3f(0.0, 0.0, gradDelta), animTime, uniforms).value;
-      let fz1 = evaluateNodalScalarField(hitPos + vec3f(0.0, 0.0, gradDelta), animTime, uniforms).value;
-      let grad = vec3f(fx1 - fx0, fy1 - fy0, fz1 - fz0) / (2.0 * gradDelta);
+      let dxOff = vec3f(gradDelta, 0.0, 0.0);
+      let dyOff = vec3f(0.0, gradDelta, 0.0);
+      let dzOff = vec3f(0.0, 0.0, gradDelta);
+      let fx0 = evaluateNodalScalarField(hitPos - dxOff, animTime, uniforms).value;
+      let fx1 = evaluateNodalScalarField(hitPos + dxOff, animTime, uniforms).value;
+      let fy0 = evaluateNodalScalarField(hitPos - dyOff, animTime, uniforms).value;
+      let fy1 = evaluateNodalScalarField(hitPos + dyOff, animTime, uniforms).value;
+      let fz0 = evaluateNodalScalarField(hitPos - dzOff, animTime, uniforms).value;
+      let fz1 = evaluateNodalScalarField(hitPos + dzOff, animTime, uniforms).value;
+      let grad = vec3f(fx1 - fx0, fy1 - fy0, fz1 - fz0) * invTwoGradDelta;
 
       var normal = normalize(grad);
-      if (length(grad) < 1e-5) {
+      if (dot(grad, grad) < 1e-10) {
         if (USE_ANALYTICAL_GRADIENT) {
           normal = normalize(computeAnalyticalGradient(hitPos, animTime, uniforms));
         } else {

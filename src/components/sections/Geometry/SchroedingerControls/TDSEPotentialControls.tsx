@@ -16,10 +16,7 @@ import type {
   TdsePotentialType,
   TdseDriveWaveform,
 } from '@/lib/geometry/extended/types'
-import {
-  ALL_POTENTIAL_TYPE_OPTIONS,
-  DRIVE_WAVEFORM_OPTIONS,
-} from './tdseControlsConstants'
+import { ALL_POTENTIAL_TYPE_OPTIONS, DRIVE_WAVEFORM_OPTIONS } from './tdseControlsConstants'
 
 /** Props for TDSEPotentialControls. */
 interface TDSEPotentialControlsProps {
@@ -38,7 +35,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
   ({ td, activeDims, actions }) => {
     const potentialTypeOptions = useMemo(
       () => ALL_POTENTIAL_TYPE_OPTIONS.filter((o) => !o.minDims || activeDims >= o.minDims),
-      [activeDims],
+      [activeDims]
     )
 
     const showBarrierControls = td.potentialType === 'barrier' || td.potentialType === 'driven'
@@ -66,80 +63,140 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           {showBarrierControls && (
             <>
               <Slider
-                label="Barrier Height" min={0} max={100} step={0.5}
-                value={td.barrierHeight} onChange={actions.setBarrierHeight}
-                showValue data-testid="tdse-barrier-height"
+                label="Barrier Height"
+                min={0}
+                max={100}
+                step={0.5}
+                value={td.barrierHeight}
+                onChange={actions.setBarrierHeight}
+                showValue
+                data-testid="tdse-barrier-height"
               />
               <Slider
-                label="Barrier Width" min={0.01} max={5} step={0.01}
-                value={td.barrierWidth} onChange={actions.setBarrierWidth}
-                showValue data-testid="tdse-barrier-width"
+                label="Barrier Width"
+                min={0.01}
+                max={5}
+                step={0.01}
+                value={td.barrierWidth}
+                onChange={actions.setBarrierWidth}
+                showValue
+                data-testid="tdse-barrier-width"
               />
               <Slider
-                label="Barrier Center" min={-10} max={10} step={0.1}
-                value={td.barrierCenter} onChange={actions.setBarrierCenter}
-                showValue data-testid="tdse-barrier-center"
+                label="Barrier Center"
+                min={-10}
+                max={10}
+                step={0.1}
+                value={td.barrierCenter}
+                onChange={actions.setBarrierCenter}
+                showValue
+                data-testid="tdse-barrier-center"
               />
             </>
           )}
 
           {showStepControls && (
             <Slider
-              label="Step Height" min={0} max={100} step={0.5}
-              value={td.stepHeight} onChange={actions.setStepHeight}
-              showValue data-testid="tdse-step-height"
+              label="Step Height"
+              min={0}
+              max={100}
+              step={0.5}
+              value={td.stepHeight}
+              onChange={actions.setStepHeight}
+              showValue
+              data-testid="tdse-step-height"
             />
           )}
 
           {showWellControls && (
             <>
               <Slider
-                label="Well Depth" min={0} max={100} step={0.5}
-                value={td.wellDepth} onChange={actions.setWellDepth}
-                showValue data-testid="tdse-well-depth"
+                label="Well Depth"
+                min={0}
+                max={100}
+                step={0.5}
+                value={td.wellDepth}
+                onChange={actions.setWellDepth}
+                showValue
+                data-testid="tdse-well-depth"
               />
               <Slider
-                label="Well Width" min={0.1} max={10} step={0.1}
-                value={td.wellWidth} onChange={actions.setWellWidth}
-                showValue data-testid="tdse-well-width"
+                label="Well Width"
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={td.wellWidth}
+                onChange={actions.setWellWidth}
+                showValue
+                data-testid="tdse-well-width"
               />
             </>
           )}
 
           {showHarmonicControls && (
             <Slider
-              label="Omega" min={0.01} max={10} step={0.01}
-              value={td.harmonicOmega} onChange={actions.setHarmonicOmega}
-              showValue data-testid="tdse-harmonic-omega"
+              label="Omega"
+              min={0.01}
+              max={10}
+              step={0.01}
+              value={td.harmonicOmega}
+              onChange={actions.setHarmonicOmega}
+              showValue
+              data-testid="tdse-harmonic-omega"
             />
           )}
 
           {showSlitControls && (
             <>
               <Slider
-                label="Wall Position" min={-10} max={10} step={0.1}
-                value={td.barrierCenter} onChange={actions.setBarrierCenter}
-                showValue data-testid="tdse-slit-wall-position"
+                label="Wall Position"
+                min={-10}
+                max={10}
+                step={0.1}
+                value={td.barrierCenter}
+                onChange={actions.setBarrierCenter}
+                showValue
+                data-testid="tdse-slit-wall-position"
               />
               <Slider
-                label="Slit Separation" min={0.1} max={10} step={0.1}
-                value={td.slitSeparation} onChange={actions.setSlitSeparation}
-                showValue data-testid="tdse-slit-separation"
+                label="Slit Separation"
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={td.slitSeparation}
+                onChange={actions.setSlitSeparation}
+                showValue
+                data-testid="tdse-slit-separation"
               />
               <Slider
-                label="Slit Width" min={0.05} max={5} step={0.05}
-                value={td.slitWidth} onChange={actions.setSlitWidth}
-                showValue data-testid="tdse-slit-width"
+                label="Slit Width"
+                min={0.05}
+                max={5}
+                step={0.05}
+                value={td.slitWidth}
+                onChange={actions.setSlitWidth}
+                showValue
+                data-testid="tdse-slit-width"
               />
               <Slider
-                label="Wall Thickness" min={0.05} max={3} step={0.05}
-                value={td.wallThickness} onChange={actions.setWallThickness}
-                showValue data-testid="tdse-wall-thickness"
+                label="Wall Thickness"
+                min={0.05}
+                max={3}
+                step={0.05}
+                value={td.wallThickness}
+                onChange={actions.setWallThickness}
+                showValue
+                data-testid="tdse-wall-thickness"
               />
               <Slider
-                label="Wall Height" min={1} max={500} step={1}
-                value={td.wallHeight} onChange={actions.setWallHeight}
-                showValue data-testid="tdse-wall-height"
+                label="Wall Height"
+                min={1}
+                max={500}
+                step={1}
+                value={td.wallHeight}
+                onChange={actions.setWallHeight}
+                showValue
+                data-testid="tdse-wall-height"
               />
             </>
           )}
@@ -147,14 +204,24 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           {showLatticeControls && (
             <>
               <Slider
-                label="Lattice Depth" min={0.1} max={100} step={0.1}
-                value={td.latticeDepth} onChange={actions.setLatticeDepth}
-                showValue data-testid="tdse-lattice-depth"
+                label="Lattice Depth"
+                min={0.1}
+                max={100}
+                step={0.1}
+                value={td.latticeDepth}
+                onChange={actions.setLatticeDepth}
+                showValue
+                data-testid="tdse-lattice-depth"
               />
               <Slider
-                label="Lattice Period" min={0.1} max={10} step={0.1}
-                value={td.latticePeriod} onChange={actions.setLatticePeriod}
-                showValue data-testid="tdse-lattice-period"
+                label="Lattice Period"
+                min={0.1}
+                max={10}
+                step={0.1}
+                value={td.latticePeriod}
+                onChange={actions.setLatticePeriod}
+                showValue
+                data-testid="tdse-lattice-period"
               />
             </>
           )}
@@ -162,19 +229,34 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           {showDoubleWellControls && (
             <>
               <Slider
-                label="Coupling (\u03BB)" min={0.1} max={100} step={0.1}
-                value={td.doubleWellLambda} onChange={actions.setDoubleWellLambda}
-                showValue data-testid="tdse-double-well-lambda"
+                label="Coupling (\u03BB)"
+                min={0.1}
+                max={100}
+                step={0.1}
+                value={td.doubleWellLambda}
+                onChange={actions.setDoubleWellLambda}
+                showValue
+                data-testid="tdse-double-well-lambda"
               />
               <Slider
-                label="Well Separation (a)" min={0.1} max={5} step={0.05}
-                value={td.doubleWellSeparation} onChange={actions.setDoubleWellSeparation}
-                showValue data-testid="tdse-double-well-separation"
+                label="Well Separation (a)"
+                min={0.1}
+                max={5}
+                step={0.05}
+                value={td.doubleWellSeparation}
+                onChange={actions.setDoubleWellSeparation}
+                showValue
+                data-testid="tdse-double-well-separation"
               />
               <Slider
-                label="Asymmetry (\u03B5)" min={0} max={50} step={0.1}
-                value={td.doubleWellAsymmetry} onChange={actions.setDoubleWellAsymmetry}
-                showValue data-testid="tdse-double-well-asymmetry"
+                label="Asymmetry (\u03B5)"
+                min={0}
+                max={50}
+                step={0.1}
+                value={td.doubleWellAsymmetry}
+                onChange={actions.setDoubleWellAsymmetry}
+                showValue
+                data-testid="tdse-double-well-asymmetry"
               />
             </>
           )}
@@ -182,24 +264,44 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
           {showRadialDoubleWellControls && (
             <>
               <Slider
-                label="Inner Radius (r\u2081)" min={0.01} max={5} step={0.01}
-                value={td.radialWellInner} onChange={actions.setRadialWellInner}
-                showValue data-testid="tdse-radial-well-inner"
+                label="Inner Radius (r\u2081)"
+                min={0.01}
+                max={5}
+                step={0.01}
+                value={td.radialWellInner}
+                onChange={actions.setRadialWellInner}
+                showValue
+                data-testid="tdse-radial-well-inner"
               />
               <Slider
-                label="Outer Radius (r\u2082)" min={0.01} max={10} step={0.01}
-                value={td.radialWellOuter} onChange={actions.setRadialWellOuter}
-                showValue data-testid="tdse-radial-well-outer"
+                label="Outer Radius (r\u2082)"
+                min={0.01}
+                max={10}
+                step={0.01}
+                value={td.radialWellOuter}
+                onChange={actions.setRadialWellOuter}
+                showValue
+                data-testid="tdse-radial-well-outer"
               />
               <Slider
-                label="Well Depth (\u03BB)" min={0.1} max={500} step={0.5}
-                value={td.radialWellDepth} onChange={actions.setRadialWellDepth}
-                showValue data-testid="tdse-radial-well-depth"
+                label="Well Depth (\u03BB)"
+                min={0.1}
+                max={500}
+                step={0.5}
+                value={td.radialWellDepth}
+                onChange={actions.setRadialWellDepth}
+                showValue
+                data-testid="tdse-radial-well-depth"
               />
               <Slider
-                label="Tilt (\u03B5)" min={0} max={50} step={0.1}
-                value={td.radialWellTilt} onChange={actions.setRadialWellTilt}
-                showValue data-testid="tdse-radial-well-tilt"
+                label="Tilt (\u03B5)"
+                min={0}
+                max={50}
+                step={0.1}
+                value={td.radialWellTilt}
+                onChange={actions.setRadialWellTilt}
+                showValue
+                data-testid="tdse-radial-well-tilt"
               />
             </>
           )}
@@ -224,14 +326,24 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
                   data-testid="tdse-drive-waveform"
                 />
                 <Slider
-                  label="Frequency" min={0.01} max={10} step={0.01}
-                  value={td.driveFrequency} onChange={actions.setDriveFrequency}
-                  showValue data-testid="tdse-drive-frequency"
+                  label="Frequency"
+                  min={0.01}
+                  max={10}
+                  step={0.01}
+                  value={td.driveFrequency}
+                  onChange={actions.setDriveFrequency}
+                  showValue
+                  data-testid="tdse-drive-frequency"
                 />
                 <Slider
-                  label="Amplitude" min={0} max={50} step={0.1}
-                  value={td.driveAmplitude} onChange={actions.setDriveAmplitude}
-                  showValue data-testid="tdse-drive-amplitude"
+                  label="Amplitude"
+                  min={0}
+                  max={50}
+                  step={0.1}
+                  value={td.driveAmplitude}
+                  onChange={actions.setDriveAmplitude}
+                  showValue
+                  data-testid="tdse-drive-amplitude"
                 />
               </>
             )}
@@ -239,7 +351,7 @@ export const TDSEPotentialControls: React.FC<TDSEPotentialControlsProps> = React
         )}
       </>
     )
-  },
+  }
 )
 
 TDSEPotentialControls.displayName = 'TDSEPotentialControls'

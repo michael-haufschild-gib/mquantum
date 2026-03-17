@@ -15,15 +15,19 @@ import {
   SKYBOX_BIND_GROUPS,
   type SkyboxMode as ShaderSkyboxMode,
 } from '../shaders/skybox'
-import type { SkyboxProceduralSettings, SkyboxMode, SkyboxTexture } from '@/stores/defaults/visualDefaults'
+import type {
+  SkyboxProceduralSettings,
+  SkyboxMode,
+  SkyboxTexture,
+} from '@/stores/defaults/visualDefaults'
 
 /**
  * Resolved URLs for skybox face PNG images (eagerly loaded by Vite).
- * Used to load classic cubemap textures for WebGPU without Three.js.
+ * Used to load classic cubemap textures for the WebGPU skybox pipeline.
  */
 const skyboxFaceAssets = import.meta.glob<string>(
   '/src/assets/skyboxes/*/{right,left,top,bottom,front,back}.png',
-  { eager: true, import: 'default', query: '?url' },
+  { eager: true, import: 'default', query: '?url' }
 )
 
 /**
@@ -196,10 +200,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
    * @param device
    * @param mode
    */
-  private async createPipelineForMode(
-    device: GPUDevice,
-    mode: ShaderSkyboxMode
-  ): Promise<void> {
+  private async createPipelineForMode(device: GPUDevice, mode: ShaderSkyboxMode): Promise<void> {
     // Compose shaders (non-MRT: single color output for skybox)
     const effects = { sun: this.skyboxConfig.sun, vignette: this.skyboxConfig.vignette }
     const { wgsl: fragmentShader } = composeSkyboxFragmentShader({
@@ -337,7 +338,11 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
    * @param textureName - Skybox texture identifier (e.g. 'space_blue')
    * @param highQuality - Whether to generate mipmaps for higher quality rendering
    */
-  private async loadCubeTexture(device: GPUDevice, textureName: string, highQuality: boolean): Promise<void> {
+  private async loadCubeTexture(
+    device: GPUDevice,
+    textureName: string,
+    highQuality: boolean
+  ): Promise<void> {
     // Face names in WebGPU cubemap layer order: +X, -X, +Y, -Y, +Z, -Z
     const faceNames = ['right', 'left', 'top', 'bottom', 'front', 'back'] as const
 
@@ -359,14 +364,12 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
         const response = await fetch(url)
         const blob = await response.blob()
         return createImageBitmap(blob, { colorSpaceConversion: 'none' })
-      }),
+      })
     )
 
     const width = bitmaps[0]!.width
     const height = bitmaps[0]!.height
-    const mipLevelCount = highQuality
-      ? Math.floor(Math.log2(Math.max(width, height))) + 1
-      : 1
+    const mipLevelCount = highQuality ? Math.floor(Math.log2(Math.max(width, height))) + 1 : 1
 
     // Create cube texture
     const cubeTexture = device.createTexture({
@@ -385,7 +388,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
       device.queue.copyExternalImageToTexture(
         { source: bitmaps[i]! },
         { texture: cubeTexture, origin: { x: 0, y: 0, z: i } },
-        { width, height },
+        { width, height }
       )
     }
 
@@ -406,7 +409,7 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
           device.queue.copyExternalImageToTexture(
             { source: mipBitmap },
             { texture: cubeTexture, origin: { x: 0, y: 0, z: face }, mipLevel: level },
-            { width: mipW, height: mipH },
+            { width: mipW, height: mipH }
           )
           mipBitmap.close()
         }
@@ -433,7 +436,9 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     }
 
     if (import.meta.env.DEV) {
-      console.log(`[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height}, mips: ${mipLevelCount})`)
+      console.log(
+        `[WebGPU Skybox] Loaded cube texture: ${textureName} (${width}x${height}, mips: ${mipLevelCount})`
+      )
     }
   }
 
@@ -448,23 +453,119 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     // Cube vertices (position only) - 36 vertices (6 faces x 2 triangles x 3 vertices)
     const vertices = new Float32Array([
       // Front face
-      -size, -size, size, size, -size, size, size, size, size,
-      -size, -size, size, size, size, size, -size, size, size,
+      -size,
+      -size,
+      size,
+      size,
+      -size,
+      size,
+      size,
+      size,
+      size,
+      -size,
+      -size,
+      size,
+      size,
+      size,
+      size,
+      -size,
+      size,
+      size,
       // Back face
-      size, -size, -size, -size, -size, -size, -size, size, -size,
-      size, -size, -size, -size, size, -size, size, size, -size,
+      size,
+      -size,
+      -size,
+      -size,
+      -size,
+      -size,
+      -size,
+      size,
+      -size,
+      size,
+      -size,
+      -size,
+      -size,
+      size,
+      -size,
+      size,
+      size,
+      -size,
       // Top face
-      -size, size, size, size, size, size, size, size, -size,
-      -size, size, size, size, size, -size, -size, size, -size,
+      -size,
+      size,
+      size,
+      size,
+      size,
+      size,
+      size,
+      size,
+      -size,
+      -size,
+      size,
+      size,
+      size,
+      size,
+      -size,
+      -size,
+      size,
+      -size,
       // Bottom face
-      -size, -size, -size, size, -size, -size, size, -size, size,
-      -size, -size, -size, size, -size, size, -size, -size, size,
+      -size,
+      -size,
+      -size,
+      size,
+      -size,
+      -size,
+      size,
+      -size,
+      size,
+      -size,
+      -size,
+      -size,
+      size,
+      -size,
+      size,
+      -size,
+      -size,
+      size,
       // Right face
-      size, -size, size, size, -size, -size, size, size, -size,
-      size, -size, size, size, size, -size, size, size, size,
+      size,
+      -size,
+      size,
+      size,
+      -size,
+      -size,
+      size,
+      size,
+      -size,
+      size,
+      -size,
+      size,
+      size,
+      size,
+      -size,
+      size,
+      size,
+      size,
       // Left face
-      -size, -size, -size, -size, -size, size, -size, size, size,
-      -size, -size, -size, -size, size, size, -size, size, -size,
+      -size,
+      -size,
+      -size,
+      -size,
+      -size,
+      size,
+      -size,
+      size,
+      size,
+      -size,
+      -size,
+      -size,
+      -size,
+      size,
+      size,
+      -size,
+      size,
+      -size,
     ])
 
     this.vertexBuffer = device.createBuffer({
@@ -519,20 +620,24 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     if (!this.device || !this.uniformBuffer) return
 
     // Access stores from frame context
-    const env = ctx.frame?.stores?.['environment'] as {
-      skyboxMode?: SkyboxMode
-      skyboxTexture?: SkyboxTexture
-      skyboxIntensity?: number
-      skyboxRotation?: number
-      skyboxAnimationMode?: string
-      skyboxAnimationSpeed?: number
-      skyboxHighQuality?: boolean
-      proceduralSettings?: SkyboxProceduralSettings
-    } | undefined
+    const env = ctx.frame?.stores?.['environment'] as
+      | {
+          skyboxMode?: SkyboxMode
+          skyboxTexture?: SkyboxTexture
+          skyboxIntensity?: number
+          skyboxRotation?: number
+          skyboxAnimationMode?: string
+          skyboxAnimationSpeed?: number
+          skyboxHighQuality?: boolean
+          proceduralSettings?: SkyboxProceduralSettings
+        }
+      | undefined
 
-    const anim = ctx.frame?.stores?.['animation'] as {
-      isPlaying?: boolean
-    } | undefined
+    const anim = ctx.frame?.stores?.['animation'] as
+      | {
+          isPlaying?: boolean
+        }
+      | undefined
 
     // Get current mode and check for mode changes
     const storeMode = env?.skyboxMode ?? 'procedural_aurora'
@@ -582,9 +687,8 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
     if (isPlaying && delta > 0 && delta < 0.1) {
       // For classic mode with animation: use skyboxAnimationSpeed as multiplier
       // For procedural modes: use timeScale (no special speed multiplier)
-      const speed = storeMode === 'classic' && skyboxAnimationMode !== 'none'
-        ? skyboxAnimationSpeed
-        : 1.0
+      const speed =
+        storeMode === 'classic' && skyboxAnimationMode !== 'none' ? skyboxAnimationSpeed : 1.0
       this.skyboxTime += delta * speed
     }
 
@@ -729,14 +833,18 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   private updateVertexUniforms(ctx: WebGPURenderContext): void {
     if (!this.device || !this.uniformBuffer) return
 
-    const camera = ctx.frame?.stores?.['camera'] as {
-      viewMatrix?: { elements: number[] }
-      projectionMatrix?: { elements: number[] }
-    } | undefined
+    const camera = ctx.frame?.stores?.['camera'] as
+      | {
+          viewMatrix?: { elements: number[] }
+          projectionMatrix?: { elements: number[] }
+        }
+      | undefined
 
-    const env = ctx.frame?.stores?.['environment'] as {
-      skyboxRotation?: number
-    } | undefined
+    const env = ctx.frame?.stores?.['environment'] as
+      | {
+          skyboxRotation?: number
+        }
+      | undefined
 
     const baseRotation = env?.skyboxRotation ?? 0
 
@@ -846,7 +954,13 @@ export class WebGPUSkyboxRenderer extends WebGPUBasePass {
   }
 
   execute(ctx: WebGPURenderContext): void {
-    if (!this.device || !this.renderPipeline || !this.uniformBindGroup || !this.textureBindGroup || !this.vertexBuffer) {
+    if (
+      !this.device ||
+      !this.renderPipeline ||
+      !this.uniformBindGroup ||
+      !this.textureBindGroup ||
+      !this.vertexBuffer
+    ) {
       return
     }
 

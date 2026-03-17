@@ -170,7 +170,8 @@ export function generateQuantumPreset(
 export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   groundState: {
     name: 'Ground State',
-    description: 'The lowest energy eigenstate |0,0,0\u27E9 \u2014 a Gaussian probability density centered at the origin',
+    description:
+      'The lowest energy eigenstate |0,0,0\u27E9 \u2014 a Gaussian probability density centered at the origin',
     seed: 13,
     termCount: 1,
     maxN: 1,
@@ -178,7 +179,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   firstExcited: {
     name: 'First Excited State',
-    description: 'A single excited mode |0,0,1\u27E9 showing one nodal plane where the wavefunction changes sign',
+    description:
+      'A single excited mode |0,0,1\u27E9 showing one nodal plane where the wavefunction changes sign',
     seed: 4,
     termCount: 1,
     maxN: 1,
@@ -186,7 +188,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   quantumBeat: {
     name: 'Quantum Beat',
-    description: 'Two energy eigenstates with different eigenvalues, creating visible time-dependent probability oscillation',
+    description:
+      'Two energy eigenstates with different eigenvalues, creating visible time-dependent probability oscillation',
     seed: 314,
     termCount: 2,
     maxN: 2,
@@ -194,7 +197,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   groundExcitedBeat: {
     name: 'Ground vs Excited Beat',
-    description: 'Superposition of |0,0,0\u27E9 and |0,3,0\u27E9 \u2014 a textbook example of quantum beating between ground and third excited state',
+    description:
+      'Superposition of |0,0,0\u27E9 and |0,3,0\u27E9 \u2014 a textbook example of quantum beating between ground and third excited state',
     seed: 50,
     termCount: 2,
     maxN: 3,
@@ -202,7 +206,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   highEnergy: {
     name: 'Excited Interference',
-    description: 'Four-term superposition with moderate quantum numbers creating complex interference fringes',
+    description:
+      'Four-term superposition with moderate quantum numbers creating complex interference fringes',
     seed: 137,
     termCount: 4,
     maxN: 5,
@@ -210,7 +215,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   excitedTriad: {
     name: 'Excited Triad',
-    description: 'Three excited terms with varied quantum numbers producing rich, asymmetric probability density',
+    description:
+      'Three excited terms with varied quantum numbers producing rich, asymmetric probability density',
     seed: 2718,
     termCount: 3,
     maxN: 4,
@@ -218,7 +224,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   nearDegenerate: {
     name: 'Near-Degenerate Trio',
-    description: 'Three terms where two share nearly equal energies, producing slowly evolving structure alongside fast oscillation',
+    description:
+      'Three terms where two share nearly equal energies, producing slowly evolving structure alongside fast oscillation',
     seed: 1618,
     termCount: 3,
     maxN: 6,
@@ -226,7 +233,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   isotropic: {
     name: 'Isotropic Oscillator',
-    description: 'Zero frequency spread creates exact energy degeneracies \u2014 degenerate terms form time-independent combinations',
+    description:
+      'Zero frequency spread creates exact energy degeneracies \u2014 degenerate terms form time-independent combinations',
     seed: 777,
     termCount: 3,
     maxN: 3,
@@ -234,7 +242,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   nodalStructure: {
     name: 'Nodal Structure',
-    description: 'Single highly-excited term |6,2,2\u27E9 with many nodal surfaces \u2014 shows the rich spatial structure of high quantum numbers',
+    description:
+      'Single highly-excited term |6,2,2\u27E9 with many nodal surfaces \u2014 shows the rich spatial structure of high quantum numbers',
     seed: 102,
     termCount: 1,
     maxN: 6,
@@ -242,7 +251,8 @@ export const SCHROEDINGER_NAMED_PRESETS: Record<string, NamedPresetConfig> = {
   },
   richSuperposition: {
     name: 'Rich Superposition',
-    description: 'Five-term superposition producing complex, evolving probability dynamics with multiple beating frequencies',
+    description:
+      'Five-term superposition producing complex, evolving probability dynamics with multiple beating frequencies',
     seed: 666,
     termCount: 5,
     maxN: 6,

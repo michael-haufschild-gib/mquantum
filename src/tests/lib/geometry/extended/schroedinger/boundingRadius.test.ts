@@ -156,7 +156,14 @@ describe('computeBoundingRadius (dispatch)', () => {
   it('dispatches to momentum HO when representation is momentum', () => {
     const preset = generateQuantumPreset(42, 3, 1, 3, 0.01)
     const R_mom = computeBoundingRadius(
-      'harmonicOscillator', preset, 3, 2, 1.0, undefined, undefined, 'momentum'
+      'harmonicOscillator',
+      preset,
+      3,
+      2,
+      1.0,
+      undefined,
+      undefined,
+      'momentum'
     )
     // For omega≈1 these should be similar to position-space; test that momentum path runs
     expect(R_mom).toBeGreaterThanOrEqual(2.0)
@@ -165,7 +172,14 @@ describe('computeBoundingRadius (dispatch)', () => {
   it('dispatches to momentum hydrogen when representation is momentum', () => {
     const R_pos = computeBoundingRadius('hydrogenND', null, 3, 4, 1.0)
     const R_mom = computeBoundingRadius(
-      'hydrogenND', null, 3, 4, 1.0, undefined, undefined, 'momentum'
+      'hydrogenND',
+      null,
+      3,
+      4,
+      1.0,
+      undefined,
+      undefined,
+      'momentum'
     )
     // Momentum should be much smaller for n=4
     expect(R_pos).toBeGreaterThan(40)
@@ -178,15 +192,7 @@ describe('computeBoundingRadius (dispatch)', () => {
     const extraDimN = [0, 0, 0, 0, 0, 0, 0, 6]
     const extraDimOmega = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.1]
 
-    const R = computeBoundingRadius(
-      'hydrogenND',
-      null,
-      4,
-      2,
-      1.0,
-      extraDimN,
-      extraDimOmega
-    )
+    const R = computeBoundingRadius('hydrogenND', null, 4, 2, 1.0, extraDimN, extraDimOmega)
 
     // Active physics is n=2 hydrogen core + one extra dim in ground state.
     // Radius should be dominated by hydrogen core: 2^2 * 1.0 * 3.0 = 12.

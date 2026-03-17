@@ -19,21 +19,13 @@ import { usePostProcessingStore } from '@/stores/postProcessingStore'
 import { useUIStore } from '@/stores/uiStore'
 
 if (import.meta.env.DEV) {
-  // @ts-expect-error - Dev-only debug store access
   window.__GEOMETRY_STORE__ = useGeometryStore
-  // @ts-expect-error - Dev-only debug store access
   window.__UI_STORE__ = useUIStore
-  // @ts-expect-error - Dev-only debug store access
   window.__ENVIRONMENT_STORE__ = useEnvironmentStore
-  // @ts-expect-error - Dev-only debug store access
   window.__APPEARANCE_STORE__ = useAppearanceStore
-  // @ts-expect-error - Dev-only debug store access
   window.__LAYOUT_STORE__ = useLayoutStore
-  // @ts-expect-error - Dev-only debug store access
   window.__POST_PROCESSING_STORE__ = usePostProcessingStore
-  // @ts-expect-error - Dev-only debug store access
   window.__EXTENDED_OBJECT_STORE__ = useExtendedObjectStore
-
 }
 
 const rootElement = document.getElementById('root')

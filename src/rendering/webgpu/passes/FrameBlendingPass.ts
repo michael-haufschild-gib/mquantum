@@ -1,4 +1,3 @@
-/* global GPUTextureFormat */
 /**
  * WebGPU Frame Blending Pass
  *
@@ -264,7 +263,10 @@ export class FrameBlendingPass extends WebGPUBasePass {
       label: 'frame-blending-history',
       size: { width, height },
       format: this.textureFormat,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_DST,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.COPY_DST,
     })
 
     this.historyView = this.historyTexture.createView({
@@ -287,7 +289,6 @@ export class FrameBlendingPass extends WebGPUBasePass {
   setBlendFactor(value: number): void {
     this.blendFactor = value
   }
-
 
   /**
    * Update pass properties from Zustand stores.

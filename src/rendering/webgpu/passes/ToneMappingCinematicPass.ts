@@ -19,7 +19,7 @@ import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import type { WebGPUSetupContext, WebGPURenderContext } from '../core/types'
 
 /**
- * Tone mapping mode enumeration (matches Three.js constants).
+ * Tone mapping mode enumeration .
  */
 export enum ToneMappingMode {
   None = 0,
@@ -405,7 +405,12 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     this.exposure = clampFiniteOrFallback(config.exposure, MIN_EXPOSURE, MAX_EXPOSURE, 1.0)
 
     // Cinematic settings
-    this.aberration = clampFiniteOrFallback(config.aberration, MIN_ABERRATION, MAX_ABERRATION, 0.005)
+    this.aberration = clampFiniteOrFallback(
+      config.aberration,
+      MIN_ABERRATION,
+      MAX_ABERRATION,
+      0.005
+    )
     this.vignette = clampFiniteOrFallback(config.vignette, MIN_VIGNETTE, MAX_VIGNETTE, 1.2)
     this.vignetteOffset = 1.0
     this.grain = clampFiniteOrFallback(config.grain, MIN_GRAIN, MAX_GRAIN, 0.05)
@@ -531,7 +536,6 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
     }
   }
 
-
   /**
    * Update pass properties from Zustand stores.
    * @param ctx
@@ -582,7 +586,11 @@ export class ToneMappingCinematicPass extends WebGPUBasePass {
         }
       }
       if (postProcessing?.cinematicAberration !== undefined) {
-        const clamped = clampFinite(postProcessing.cinematicAberration, MIN_ABERRATION, MAX_ABERRATION)
+        const clamped = clampFinite(
+          postProcessing.cinematicAberration,
+          MIN_ABERRATION,
+          MAX_ABERRATION
+        )
         if (clamped !== null) {
           this.aberration = clamped
         }

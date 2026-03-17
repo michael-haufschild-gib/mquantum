@@ -59,9 +59,15 @@ describe('complexMatMul', () => {
     const N = 3
     const I = complexMatIdentity(N)
     const A = mat(N, [
-      [1, 2], [3, 4], [5, 6],
-      [7, 8], [9, 10], [11, 12],
-      [13, 14], [15, 16], [17, 18],
+      [1, 2],
+      [3, 4],
+      [5, 6],
+      [7, 8],
+      [9, 10],
+      [11, 12],
+      [13, 14],
+      [15, 16],
+      [17, 18],
     ])
     const out = complexMatZero(N)
     complexMatMul(I, A, out, N)
@@ -73,12 +79,16 @@ describe('complexMatMul', () => {
     // symmetric result), which would hide ordering bugs.
     const N = 2
     const A = mat(N, [
-      [1, 0], [2, 0],
-      [3, 0], [4, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [4, 0],
     ])
     const B = mat(N, [
-      [0, 0], [1, 0],
-      [1, 0], [0, 0],
+      [0, 0],
+      [1, 0],
+      [1, 0],
+      [0, 0],
     ])
 
     const AB = complexMatZero(N)
@@ -89,8 +99,10 @@ describe('complexMatMul', () => {
     // AB = [[2,1],[4,3]], BA = [[3,4],[1,2]] — these differ
     let identical = true
     for (let i = 0; i < N * N; i++) {
-      if (Math.abs(AB.real[i]! - BA.real[i]!) > 1e-15 ||
-          Math.abs(AB.imag[i]! - BA.imag[i]!) > 1e-15) {
+      if (
+        Math.abs(AB.real[i]! - BA.real[i]!) > 1e-15 ||
+        Math.abs(AB.imag[i]! - BA.imag[i]!) > 1e-15
+      ) {
         identical = false
         break
       }
@@ -110,12 +122,16 @@ describe('complexMatAdd', () => {
     // Bug caught: addition uses wrong indexing or mixes real/imag parts.
     const N = 2
     const A = mat(N, [
-      [1, 2], [3, 4],
-      [5, 6], [7, 8],
+      [1, 2],
+      [3, 4],
+      [5, 6],
+      [7, 8],
     ])
     const B = mat(N, [
-      [10, 20], [30, 40],
-      [50, 60], [70, 80],
+      [10, 20],
+      [30, 40],
+      [50, 60],
+      [70, 80],
     ])
     const out = complexMatZero(N)
     complexMatAdd(A, B, out, N)
@@ -137,8 +153,10 @@ describe('complexMatScale', () => {
     // (e.g., forgetting cross terms or wrong sign on imaginary part).
     const N = 2
     const A = mat(N, [
-      [1, 3], [5, 7],
-      [2, 4], [6, 8],
+      [1, 3],
+      [5, 7],
+      [2, 4],
+      [6, 8],
     ])
     const out = complexMatZero(N)
     complexMatScale(A, 2, 0, out, N)
@@ -154,8 +172,10 @@ describe('complexMatScale', () => {
     // (a + bi) * (0 + i) = -b + ai
     const N = 2
     const A = mat(N, [
-      [3, 4], [0, 0],
-      [0, 0], [1, -2],
+      [3, 4],
+      [0, 0],
+      [0, 0],
+      [1, -2],
     ])
     const out = complexMatZero(N)
     complexMatScale(A, 0, 1, out, N)
@@ -179,8 +199,10 @@ describe('complexMatNorm1', () => {
     // 1-norm = max(5, 1) = 5
     const N = 2
     const A = mat(N, [
-      [3, 4], [0, 0],
-      [0, 0], [1, 0],
+      [3, 4],
+      [0, 0],
+      [0, 0],
+      [1, 0],
     ])
     expect(complexMatNorm1(A, N)).toBeCloseTo(5, 10)
   })
@@ -193,8 +215,10 @@ describe('complexMatNorm1', () => {
     // 1-norm = 6
     const N = 2
     const A = mat(N, [
-      [1, 0], [0, 0],
-      [3, 4], [2, 0],
+      [1, 0],
+      [0, 0],
+      [3, 4],
+      [2, 0],
     ])
     expect(complexMatNorm1(A, N)).toBeCloseTo(6, 10)
   })
@@ -217,8 +241,8 @@ describe('matrixExponentialPade', () => {
     const a = 0.5
     const b = -1.3
     const D = complexMatZero(N)
-    D.real[0] = a  // (0,0)
-    D.real[3] = b  // (1,1)
+    D.real[0] = a // (0,0)
+    D.real[3] = b // (1,1)
 
     const result = matrixExponentialPade(D, N)
 
@@ -243,8 +267,8 @@ describe('matrixExponentialPade', () => {
     const N = 2
     const M = complexMatZero(N)
     // i*t*sigma_z: diagonal with (0, t) and (0, -t)
-    M.imag[0] = t    // (0,0) = i*t
-    M.imag[3] = -t   // (1,1) = -i*t
+    M.imag[0] = t // (0,0) = i*t
+    M.imag[3] = -t // (1,1) = -i*t
 
     const result = matrixExponentialPade(M, N)
 
@@ -283,9 +307,15 @@ describe('solveLinearSystem', () => {
     const N = 3
     const I = complexMatIdentity(N)
     const B = mat(N, [
-      [1, 2], [3, 4], [5, 6],
-      [7, 8], [9, 10], [11, 12],
-      [13, 14], [15, 16], [17, 18],
+      [1, 2],
+      [3, 4],
+      [5, 6],
+      [7, 8],
+      [9, 10],
+      [11, 12],
+      [13, 14],
+      [15, 16],
+      [17, 18],
     ])
 
     const X = solveLinearSystem(I, B, N)
@@ -298,12 +328,16 @@ describe('solveLinearSystem', () => {
     // Q * X = P → X = I (since Q = P)
     const N = 2
     const Q = mat(N, [
-      [1, 1], [0, 0],
-      [0, 0], [2, -1],
+      [1, 1],
+      [0, 0],
+      [0, 0],
+      [2, -1],
     ])
     const P = mat(N, [
-      [1, 1], [0, 0],
-      [0, 0], [2, -1],
+      [1, 1],
+      [0, 0],
+      [0, 0],
+      [2, -1],
     ])
 
     const X = solveLinearSystem(Q, P, N)
@@ -319,12 +353,16 @@ describe('solveLinearSystem', () => {
     // X = 1/5 * [[15, -7], [-5, 14]] = [[3, -1.4], [-1, 2.8]]
     const N = 2
     const Q = mat(N, [
-      [2, 0], [1, 0],
-      [1, 0], [3, 0],
+      [2, 0],
+      [1, 0],
+      [1, 0],
+      [3, 0],
     ])
     const P = mat(N, [
-      [5, 0], [0, 0],
-      [0, 0], [7, 0],
+      [5, 0],
+      [0, 0],
+      [0, 0],
+      [7, 0],
     ])
 
     const X = solveLinearSystem(Q, P, N)

@@ -5,7 +5,6 @@
  * Based on Inigo Quilez's cosine palette technique.
  *
  * @see https://iquilezles.org/articles/palettes/
- * @see docs/prd/advanced-color-system.md
  */
 
 import type { ColorAlgorithm, CosineCoefficients, DistributionSettings } from './types'

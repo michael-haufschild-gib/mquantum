@@ -4,7 +4,6 @@
  * Central registry defining all object types with their capabilities,
  * constraints, and configurations.
  *
- * @see docs/plans/object-type-registry.md for architecture details
  */
 
 import type { ObjectType } from '../types'
@@ -71,7 +70,6 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
               },
             },
           },
-
         },
       },
 
@@ -94,14 +92,16 @@ export const OBJECT_TYPE_REGISTRY: ObjectTypeRegistry = new Map<ObjectType, Obje
     {
       type: 'pauliSpinor',
       name: 'Pauli Spinor',
-      description: 'Two-component spinor wavefunction in a magnetic field. Visualizes spin precession and Stern-Gerlach splitting.',
+      description:
+        'Two-component spinor wavefunction in a magnetic field. Visualizes spin precession and Stern-Gerlach splitting.',
       category: 'fractal',
 
       dimensions: {
         min: 2,
         max: 11,
         recommended: 3,
-        recommendedReason: '3D provides intuitive spin dynamics with magnetic field in physical space',
+        recommendedReason:
+          '3D provides intuitive spin dynamics with magnetic field in physical space',
       },
 
       rendering: {

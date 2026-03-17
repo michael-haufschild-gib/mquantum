@@ -4,7 +4,6 @@
  * Type definitions for the advanced lighting system supporting up to 4
  * dynamic light sources of different types (Point, Directional, Spot).
  *
- * @see docs/prd/advanced-lighting-system.md
  */
 
 /**

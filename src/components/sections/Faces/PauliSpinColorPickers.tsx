@@ -16,11 +16,7 @@ import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 
 /** Convert 0-1 RGB tuple to hex string for ColorPicker. */
 function tupleToHex(c: [number, number, number]): string {
-  return rgbToHex(
-    Math.round(c[0] * 255),
-    Math.round(c[1] * 255),
-    Math.round(c[2] * 255),
-  )
+  return rgbToHex(Math.round(c[0] * 255), Math.round(c[1] * 255), Math.round(c[2] * 255))
 }
 
 /** Parse hex string to 0-1 RGB tuple. */
@@ -42,28 +38,24 @@ function hexToTuple(hex: string): [number, number, number] {
  * @returns Color picker pair for spin-up and spin-down channels
  */
 export const PauliSpinColorPickers: React.FC = React.memo(() => {
-  const {
-    spinUpColor,
-    spinDownColor,
-    setPauliSpinUpColor,
-    setPauliSpinDownColor,
-  } = useExtendedObjectStore(
-    useShallow((s) => ({
-      spinUpColor: s.pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor,
-      spinDownColor: s.pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor,
-      setPauliSpinUpColor: s.setPauliSpinUpColor,
-      setPauliSpinDownColor: s.setPauliSpinDownColor,
-    }))
-  )
+  const { spinUpColor, spinDownColor, setPauliSpinUpColor, setPauliSpinDownColor } =
+    useExtendedObjectStore(
+      useShallow((s) => ({
+        spinUpColor: s.pauliSpinor?.spinUpColor ?? DEFAULT_PAULI_CONFIG.spinUpColor,
+        spinDownColor: s.pauliSpinor?.spinDownColor ?? DEFAULT_PAULI_CONFIG.spinDownColor,
+        setPauliSpinUpColor: s.setPauliSpinUpColor,
+        setPauliSpinDownColor: s.setPauliSpinDownColor,
+      }))
+    )
 
   const handleSpinUpColor = useCallback(
     (hex: string) => setPauliSpinUpColor(hexToTuple(hex)),
-    [setPauliSpinUpColor],
+    [setPauliSpinUpColor]
   )
 
   const handleSpinDownColor = useCallback(
     (hex: string) => setPauliSpinDownColor(hexToTuple(hex)),
-    [setPauliSpinDownColor],
+    [setPauliSpinDownColor]
   )
 
   return (

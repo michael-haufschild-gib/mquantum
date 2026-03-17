@@ -262,7 +262,11 @@ export class BufferPreviewPass extends WebGPUBasePass {
     })
 
     // Create fragment shader module
-    const fragmentModule = this.createShaderModule(device, BUFFER_PREVIEW_SHADER, 'buffer-preview-fragment')
+    const fragmentModule = this.createShaderModule(
+      device,
+      BUFFER_PREVIEW_SHADER,
+      'buffer-preview-fragment'
+    )
 
     // Create pipeline targeting canvas format (direct-to-screen)
     this.renderPipeline = this.createFullscreenPipeline(
@@ -337,12 +341,7 @@ export class BufferPreviewPass extends WebGPUBasePass {
    * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
-    if (
-      !this.device ||
-      !this.renderPipeline ||
-      !this.uniformBuffer ||
-      !this.passBindGroupLayout
-    ) {
+    if (!this.device || !this.renderPipeline || !this.uniformBuffer || !this.passBindGroupLayout) {
       return
     }
 

@@ -10,12 +10,7 @@ import type { HydrogenBasisState } from '@/lib/physics/openQuantum/hydrogenBasis
 // Helper: construct a minimal basis state for selection rule tests
 // ---------------------------------------------------------------------------
 
-function state(
-  n: number,
-  l: number,
-  m: number,
-  extraDimN: number[] = [],
-): HydrogenBasisState {
+function state(n: number, l: number, m: number, extraDimN: number[] = []): HydrogenBasisState {
   return { index: 0, n, l, m, extraDimN, energy: 0 }
 }
 
@@ -108,34 +103,24 @@ describe('isAllowedE1', () => {
 
   describe('extra dimension constraint', () => {
     it('states with identical extraDimN and valid Δl/Δm are allowed', () => {
-      expect(
-        isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [0, 0])),
-      ).toBe(true)
+      expect(isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [0, 0]))).toBe(true)
     })
 
     it('states differing in first extra dim are forbidden', () => {
-      expect(
-        isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [1, 0])),
-      ).toBe(false)
+      expect(isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [1, 0]))).toBe(false)
     })
 
     it('states differing in second extra dim are forbidden', () => {
-      expect(
-        isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [0, 1])),
-      ).toBe(false)
+      expect(isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [0, 1]))).toBe(false)
     })
 
     it('states differing in all extra dims are forbidden', () => {
-      expect(
-        isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [1, 1])),
-      ).toBe(false)
+      expect(isAllowedE1(state(1, 0, 0, [0, 0]), state(2, 1, 0, [1, 1]))).toBe(false)
     })
 
     it('3D states (empty extraDimN) bypass extra-dim check', () => {
       // Both have empty arrays — no extra dims to compare
-      expect(
-        isAllowedE1(state(1, 0, 0, []), state(2, 1, 0, [])),
-      ).toBe(true)
+      expect(isAllowedE1(state(1, 0, 0, []), state(2, 1, 0, []))).toBe(true)
     })
   })
 })

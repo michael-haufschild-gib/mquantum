@@ -1,7 +1,7 @@
 /**
  * Render Layer Constants
  *
- * Defines Three.js render layers for separating main objects from environment.
+ * Defines render layers for separating main objects from environment.
  * Used by PostProcessing to render object-only depth for depth-aware effects.
  *
  * Layer 0: Environment (gizmos, helpers, axes) - always visible
@@ -24,10 +24,9 @@ export const RENDER_LAYERS = {
   /**
    * Debug/Gizmo layer - rendered AFTER all post-processing via DebugOverlayPass.
    *
-   * Objects on this layer bypass MRT rendering entirely, so they can use
-   * standard Three.js materials (MeshBasicMaterial, LineBasicMaterial,
-   * ArrowHelper, TransformControls, Line from drei, etc.) WITHOUT needing
-   * custom shaders that output to 3 MRT color attachments.
+   * Objects on this layer bypass MRT rendering entirely and are drawn
+   * directly as a final overlay pass WITHOUT needing custom shaders
+   * that output to 3 MRT color attachments.
    *
    * Use this layer for:
    * - Light gizmos (icons, direction arrows, cones)
@@ -76,9 +75,7 @@ export function needsVolumetricSeparation(state: {
  * @param state.temporalReprojectionEnabled
  * @returns True if object-only depth pass should be rendered
  */
-export function needsObjectOnlyDepth(state: {
-  temporalReprojectionEnabled?: boolean
-}): boolean {
+export function needsObjectOnlyDepth(state: { temporalReprojectionEnabled?: boolean }): boolean {
   // Temporal reprojection needs depth for raymarching acceleration
   if (state.temporalReprojectionEnabled) {
     return true

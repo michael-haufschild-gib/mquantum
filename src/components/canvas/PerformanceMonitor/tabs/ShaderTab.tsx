@@ -28,7 +28,7 @@ export const ShaderTabContent = React.memo(function ShaderTabContent() {
       ? selectedShaderKeyState
       : shaderKeys.includes('object')
         ? 'object'
-        : shaderKeys[0] ?? null
+        : (shaderKeys[0] ?? null)
 
   const activeShaderInfo = selectedShaderKey ? shaderDebugInfos[selectedShaderKey] : null
 

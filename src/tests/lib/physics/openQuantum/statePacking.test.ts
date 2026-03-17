@@ -85,8 +85,12 @@ describe('packForGPU / unpackFromGPU round-trip', () => {
   it('packs activeK into buffer when provided', () => {
     const rho = densityMatrixFromCoefficients([1], [0], 1)
     const metrics: OpenQuantumMetrics = {
-      purity: 1, linearEntropy: 0, vonNeumannEntropy: 0,
-      coherenceMagnitude: 0, groundPopulation: 1, trace: 1,
+      purity: 1,
+      linearEntropy: 0,
+      vonNeumannEntropy: 0,
+      coherenceMagnitude: 0,
+      groundPopulation: 1,
+      trace: 1,
     }
     const buf = createPackedBuffer()
     packForGPU(rho, metrics, buf, 5)

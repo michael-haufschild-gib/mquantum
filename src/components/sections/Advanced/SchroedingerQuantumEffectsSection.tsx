@@ -40,288 +40,298 @@ export interface SchroedingerQuantumEffectsSectionProps {
   defaultOpen?: boolean
 }
 
-export const SchroedingerQuantumEffectsSection: React.FC<
-  SchroedingerQuantumEffectsSectionProps
-> = React.memo(({ defaultOpen = true }) => {
-  const objectType = useGeometryStore((state) => state.objectType)
-  const dimension = useGeometryStore((state) => state.dimension)
+export const SchroedingerQuantumEffectsSection: React.FC<SchroedingerQuantumEffectsSectionProps> =
+  React.memo(({ defaultOpen = true }) => {
+    const objectType = useGeometryStore((state) => state.objectType)
+    const dimension = useGeometryStore((state) => state.dimension)
 
-  const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
-    config: state.schroedinger,
-    setNodalEnabled: state.setSchroedingerNodalEnabled,
-    setNodalColor: state.setSchroedingerNodalColor,
-    setNodalStrength: state.setSchroedingerNodalStrength,
-    setNodalDefinition: state.setSchroedingerNodalDefinition,
-    setNodalTolerance: state.setSchroedingerNodalTolerance,
-    setNodalFamilyFilter: state.setSchroedingerNodalFamilyFilter,
-    setNodalRenderMode: state.setSchroedingerNodalRenderMode,
-    setNodalLobeColoringEnabled: state.setSchroedingerNodalLobeColoringEnabled,
-    setNodalColorReal: state.setSchroedingerNodalColorReal,
-    setNodalColorImag: state.setSchroedingerNodalColorImag,
-    setNodalColorPositive: state.setSchroedingerNodalColorPositive,
-    setNodalColorNegative: state.setSchroedingerNodalColorNegative,
+    const extendedObjectSelector = useShallow((state: ExtendedObjectState) => ({
+      config: state.schroedinger,
+      setNodalEnabled: state.setSchroedingerNodalEnabled,
+      setNodalColor: state.setSchroedingerNodalColor,
+      setNodalStrength: state.setSchroedingerNodalStrength,
+      setNodalDefinition: state.setSchroedingerNodalDefinition,
+      setNodalTolerance: state.setSchroedingerNodalTolerance,
+      setNodalFamilyFilter: state.setSchroedingerNodalFamilyFilter,
+      setNodalRenderMode: state.setSchroedingerNodalRenderMode,
+      setNodalLobeColoringEnabled: state.setSchroedingerNodalLobeColoringEnabled,
+      setNodalColorReal: state.setSchroedingerNodalColorReal,
+      setNodalColorImag: state.setSchroedingerNodalColorImag,
+      setNodalColorPositive: state.setSchroedingerNodalColorPositive,
+      setNodalColorNegative: state.setSchroedingerNodalColorNegative,
 
-    setUncertaintyBoundaryEnabled: state.setSchroedingerUncertaintyBoundaryEnabled,
-    setUncertaintyBoundaryStrength: state.setSchroedingerUncertaintyBoundaryStrength,
-    setUncertaintyConfidenceMass: state.setSchroedingerUncertaintyConfidenceMass,
-    setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
-    setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
-    setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
-  }))
-  const {
-    config,
-    setNodalEnabled,
-    setNodalColor,
-    setNodalStrength,
-    setNodalDefinition,
-    setNodalTolerance,
-    setNodalFamilyFilter,
-    setNodalRenderMode,
-    setNodalLobeColoringEnabled,
-    setNodalColorReal,
-    setNodalColorImag,
-    setNodalColorPositive,
-    setNodalColorNegative,
+      setUncertaintyBoundaryEnabled: state.setSchroedingerUncertaintyBoundaryEnabled,
+      setUncertaintyBoundaryStrength: state.setSchroedingerUncertaintyBoundaryStrength,
+      setUncertaintyConfidenceMass: state.setSchroedingerUncertaintyConfidenceMass,
+      setUncertaintyBoundaryWidth: state.setSchroedingerUncertaintyBoundaryWidth,
+      setPhaseMaterialityEnabled: state.setSchroedingerPhaseMaterialityEnabled,
+      setPhaseMaterialityStrength: state.setSchroedingerPhaseMaterialityStrength,
+    }))
+    const {
+      config,
+      setNodalEnabled,
+      setNodalColor,
+      setNodalStrength,
+      setNodalDefinition,
+      setNodalTolerance,
+      setNodalFamilyFilter,
+      setNodalRenderMode,
+      setNodalLobeColoringEnabled,
+      setNodalColorReal,
+      setNodalColorImag,
+      setNodalColorPositive,
+      setNodalColorNegative,
 
-    setUncertaintyBoundaryEnabled,
-    setUncertaintyBoundaryStrength,
-    setUncertaintyConfidenceMass,
-    setUncertaintyBoundaryWidth,
-    setPhaseMaterialityEnabled,
-    setPhaseMaterialityStrength,
-  } = useExtendedObjectStore(extendedObjectSelector)
+      setUncertaintyBoundaryEnabled,
+      setUncertaintyBoundaryStrength,
+      setUncertaintyConfidenceMass,
+      setUncertaintyBoundaryWidth,
+      setPhaseMaterialityEnabled,
+      setPhaseMaterialityStrength,
+    } = useExtendedObjectStore(extendedObjectSelector)
 
-  if (objectType !== 'schroedinger') {
-    return null
-  }
-  // Quantum effects are 3D volumetric shader features — hide for 2D, Wigner, and freeScalar modes.
-  // Free scalar field uses density-grid raymarching; these shader features are disabled in
-  // extractSchrodingerConfig and would have no visual effect.
-  if (dimension <= 2 || config.representation === 'wigner' || config.quantumMode === 'freeScalarField' || config.quantumMode === 'tdseDynamics' || config.quantumMode === 'becDynamics' || config.quantumMode === 'diracEquation') {
-    const reason = dimension <= 2
-      ? 'Requires 3D or higher'
-      : config.representation === 'wigner'
-        ? 'Not available in Wigner representation'
-        : 'Available in Harmonic Oscillator and Hydrogen modes'
-    return <UnavailableSection title="Quantum Effects" reason={reason} />
-  }
+    if (objectType !== 'schroedinger') {
+      return null
+    }
+    // Quantum effects are 3D volumetric shader features — hide for 2D, Wigner, and freeScalar modes.
+    // Free scalar field uses density-grid raymarching; these shader features are disabled in
+    // extractSchrodingerConfig and would have no visual effect.
+    if (
+      dimension <= 2 ||
+      config.representation === 'wigner' ||
+      config.quantumMode === 'freeScalarField' ||
+      config.quantumMode === 'tdseDynamics' ||
+      config.quantumMode === 'becDynamics' ||
+      config.quantumMode === 'diracEquation'
+    ) {
+      const reason =
+        dimension <= 2
+          ? 'Requires 3D or higher'
+          : config.representation === 'wigner'
+            ? 'Not available in Wigner representation'
+            : 'Available in Harmonic Oscillator and Hydrogen modes'
+      return <UnavailableSection title="Quantum Effects" reason={reason} />
+    }
 
-  return (
-    <Section title="Quantum Effects" defaultOpen={defaultOpen} data-testid="quantum-effects-section">
-      <div className="space-y-2">
-        <div className="space-y-1">
-          <Switch
-            label="Nodal Surfaces"
-            checked={config.nodalEnabled ?? false}
-            onCheckedChange={(checked) => setNodalEnabled(checked)}
-            data-testid="schroedinger-nodal-toggle"
-          />
-          {config.nodalEnabled && (
-            <div className="ps-2 border-s border-border-default space-y-2">
-              <Slider
-                label="Strength"
-                min={0.0}
-                max={2.0}
-                step={0.1}
-                value={config.nodalStrength ?? 1.0}
-                onChange={setNodalStrength}
-                showValue
-                data-testid="schroedinger-nodal-strength"
-              />
-
-              <Select
-                label="Rendering Mode"
-                options={NODAL_RENDER_MODE_OPTIONS}
-                value={config.nodalRenderMode ?? 'band'}
-                onChange={setNodalRenderMode}
-                data-testid="schroedinger-nodal-render-mode"
-              />
-
-              <Select
-                label="Definition"
-                options={NODAL_DEFINITION_OPTIONS}
-                value={config.nodalDefinition ?? 'psiAbs'}
-                onChange={setNodalDefinition}
-                data-testid="schroedinger-nodal-definition"
-              />
-
-              <Slider
-                label="Zero Tolerance ε"
-                min={0.00001}
-                max={0.5}
-                step={0.001}
-                value={config.nodalTolerance ?? 0.02}
-                onChange={setNodalTolerance}
-                showValue
-                formatValue={(value) => value.toFixed(4)}
-                data-testid="schroedinger-nodal-tolerance"
-              />
-
-              <Select
-                label="Hydrogen Node Family"
-                options={NODAL_FAMILY_OPTIONS}
-                value={config.nodalFamilyFilter ?? 'all'}
-                onChange={setNodalFamilyFilter}
-                disabled={config.quantumMode !== 'hydrogenND'}
-                data-testid="schroedinger-nodal-family-filter"
-              />
-              {config.quantumMode !== 'hydrogenND' && (
-                <p className="text-xs text-text-tertiary">
-                  Family filtering is available in Hydrogen ND mode.
-                </p>
-              )}
-
-              <Switch
-                label="Lobe Sign Colors"
-                checked={config.nodalLobeColoringEnabled ?? false}
-                onCheckedChange={(checked) => setNodalLobeColoringEnabled(checked)}
-                data-testid="schroedinger-nodal-lobe-toggle"
-              />
-
-              {config.nodalLobeColoringEnabled ? (
-                <>
-                  <div
-                    className="flex items-center justify-between"
-                    data-testid="schroedinger-nodal-color-positive"
-                  >
-                    <label className="text-xs text-text-secondary">Positive Lobe</label>
-                    <ColorPicker
-                      value={
-                        config.nodalColorPositive ??
-                        DEFAULT_SCHROEDINGER_CONFIG.nodalColorPositive
-                      }
-                      onChange={setNodalColorPositive}
-                      disableAlpha={true}
-                      className="w-24"
-                    />
-                  </div>
-                  <div
-                    className="flex items-center justify-between"
-                    data-testid="schroedinger-nodal-color-negative"
-                  >
-                    <label className="text-xs text-text-secondary">Negative Lobe</label>
-                    <ColorPicker
-                      value={
-                        config.nodalColorNegative ??
-                        DEFAULT_SCHROEDINGER_CONFIG.nodalColorNegative
-                      }
-                      onChange={setNodalColorNegative}
-                      disableAlpha={true}
-                      className="w-24"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div
-                    className="flex items-center justify-between"
-                    data-testid="schroedinger-nodal-color-abs"
-                  >
-                    <label className="text-xs text-text-secondary">|ψ| Color</label>
-                    <ColorPicker
-                      value={config.nodalColor ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColor}
-                      onChange={setNodalColor}
-                      disableAlpha={true}
-                      className="w-24"
-                    />
-                  </div>
-                  <div
-                    className="flex items-center justify-between"
-                    data-testid="schroedinger-nodal-color-real"
-                  >
-                    <label className="text-xs text-text-secondary">Re(ψ) Color</label>
-                    <ColorPicker
-                      value={config.nodalColorReal ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorReal}
-                      onChange={setNodalColorReal}
-                      disableAlpha={true}
-                      className="w-24"
-                    />
-                  </div>
-                  <div
-                    className="flex items-center justify-between"
-                    data-testid="schroedinger-nodal-color-imag"
-                  >
-                    <label className="text-xs text-text-secondary">Im(ψ) Color</label>
-                    <ColorPicker
-                      value={config.nodalColorImag ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorImag}
-                      onChange={setNodalColorImag}
-                      disableAlpha={true}
-                      className="w-24"
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-1 mt-2">
-          <Switch
-            label="Uncertainty Boundary"
-            checked={config.uncertaintyBoundaryEnabled ?? false}
-            onCheckedChange={(checked) => setUncertaintyBoundaryEnabled(checked)}
-            data-testid="schroedinger-uncertainty-boundary-toggle"
-          />
-          {config.uncertaintyBoundaryEnabled && (
-            <div className="ps-2 border-s border-border-default space-y-2">
-              <Slider
-                label="Strength"
-                min={0.0}
-                max={1.0}
-                step={0.05}
-                value={config.uncertaintyBoundaryStrength ?? 0.5}
-                onChange={setUncertaintyBoundaryStrength}
-                showValue
-                data-testid="schroedinger-uncertainty-boundary-strength"
-              />
-              <Slider
-                label="Confidence Mass"
-                min={0.5}
-                max={0.99}
-                step={0.01}
-                value={config.uncertaintyConfidenceMass ?? 0.68}
-                onChange={setUncertaintyConfidenceMass}
-                showValue
-                data-testid="schroedinger-uncertainty-confidence"
-              />
-              <Slider
-                label="Boundary Width"
-                min={0.05}
-                max={1.0}
-                step={0.05}
-                value={config.uncertaintyBoundaryWidth ?? 0.3}
-                onChange={setUncertaintyBoundaryWidth}
-                showValue
-                data-testid="schroedinger-uncertainty-boundary-width"
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-1 mt-2">
-          <Switch
-            label="Phase Materiality"
-            checked={config.phaseMaterialityEnabled ?? false}
-            onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
-            data-testid="schroedinger-phase-materiality-toggle"
-          />
-          {config.phaseMaterialityEnabled && (
-            <Slider
-              label="Strength"
-              min={0}
-              max={1}
-              step={0.05}
-              value={config.phaseMaterialityStrength ?? 1.0}
-              onChange={setPhaseMaterialityStrength}
-              showValue
-              data-testid="schroedinger-phase-materiality-strength"
+    return (
+      <Section
+        title="Quantum Effects"
+        defaultOpen={defaultOpen}
+        data-testid="quantum-effects-section"
+      >
+        <div className="space-y-2">
+          <div className="space-y-1">
+            <Switch
+              label="Nodal Surfaces"
+              checked={config.nodalEnabled ?? false}
+              onCheckedChange={(checked) => setNodalEnabled(checked)}
+              data-testid="schroedinger-nodal-toggle"
             />
-          )}
-        </div>
+            {config.nodalEnabled && (
+              <div className="ps-2 border-s border-border-default space-y-2">
+                <Slider
+                  label="Strength"
+                  min={0.0}
+                  max={2.0}
+                  step={0.1}
+                  value={config.nodalStrength ?? 1.0}
+                  onChange={setNodalStrength}
+                  showValue
+                  data-testid="schroedinger-nodal-strength"
+                />
 
-      </div>
-    </Section>
-  )
-})
+                <Select
+                  label="Rendering Mode"
+                  options={NODAL_RENDER_MODE_OPTIONS}
+                  value={config.nodalRenderMode ?? 'band'}
+                  onChange={setNodalRenderMode}
+                  data-testid="schroedinger-nodal-render-mode"
+                />
+
+                <Select
+                  label="Definition"
+                  options={NODAL_DEFINITION_OPTIONS}
+                  value={config.nodalDefinition ?? 'psiAbs'}
+                  onChange={setNodalDefinition}
+                  data-testid="schroedinger-nodal-definition"
+                />
+
+                <Slider
+                  label="Zero Tolerance ε"
+                  min={0.00001}
+                  max={0.5}
+                  step={0.001}
+                  value={config.nodalTolerance ?? 0.02}
+                  onChange={setNodalTolerance}
+                  showValue
+                  formatValue={(value) => value.toFixed(4)}
+                  data-testid="schroedinger-nodal-tolerance"
+                />
+
+                <Select
+                  label="Hydrogen Node Family"
+                  options={NODAL_FAMILY_OPTIONS}
+                  value={config.nodalFamilyFilter ?? 'all'}
+                  onChange={setNodalFamilyFilter}
+                  disabled={config.quantumMode !== 'hydrogenND'}
+                  data-testid="schroedinger-nodal-family-filter"
+                />
+                {config.quantumMode !== 'hydrogenND' && (
+                  <p className="text-xs text-text-tertiary">
+                    Family filtering is available in Hydrogen ND mode.
+                  </p>
+                )}
+
+                <Switch
+                  label="Lobe Sign Colors"
+                  checked={config.nodalLobeColoringEnabled ?? false}
+                  onCheckedChange={(checked) => setNodalLobeColoringEnabled(checked)}
+                  data-testid="schroedinger-nodal-lobe-toggle"
+                />
+
+                {config.nodalLobeColoringEnabled ? (
+                  <>
+                    <div
+                      className="flex items-center justify-between"
+                      data-testid="schroedinger-nodal-color-positive"
+                    >
+                      <label className="text-xs text-text-secondary">Positive Lobe</label>
+                      <ColorPicker
+                        value={
+                          config.nodalColorPositive ??
+                          DEFAULT_SCHROEDINGER_CONFIG.nodalColorPositive
+                        }
+                        onChange={setNodalColorPositive}
+                        disableAlpha={true}
+                        className="w-24"
+                      />
+                    </div>
+                    <div
+                      className="flex items-center justify-between"
+                      data-testid="schroedinger-nodal-color-negative"
+                    >
+                      <label className="text-xs text-text-secondary">Negative Lobe</label>
+                      <ColorPicker
+                        value={
+                          config.nodalColorNegative ??
+                          DEFAULT_SCHROEDINGER_CONFIG.nodalColorNegative
+                        }
+                        onChange={setNodalColorNegative}
+                        disableAlpha={true}
+                        className="w-24"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div
+                      className="flex items-center justify-between"
+                      data-testid="schroedinger-nodal-color-abs"
+                    >
+                      <label className="text-xs text-text-secondary">|ψ| Color</label>
+                      <ColorPicker
+                        value={config.nodalColor ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColor}
+                        onChange={setNodalColor}
+                        disableAlpha={true}
+                        className="w-24"
+                      />
+                    </div>
+                    <div
+                      className="flex items-center justify-between"
+                      data-testid="schroedinger-nodal-color-real"
+                    >
+                      <label className="text-xs text-text-secondary">Re(ψ) Color</label>
+                      <ColorPicker
+                        value={config.nodalColorReal ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorReal}
+                        onChange={setNodalColorReal}
+                        disableAlpha={true}
+                        className="w-24"
+                      />
+                    </div>
+                    <div
+                      className="flex items-center justify-between"
+                      data-testid="schroedinger-nodal-color-imag"
+                    >
+                      <label className="text-xs text-text-secondary">Im(ψ) Color</label>
+                      <ColorPicker
+                        value={config.nodalColorImag ?? DEFAULT_SCHROEDINGER_CONFIG.nodalColorImag}
+                        onChange={setNodalColorImag}
+                        disableAlpha={true}
+                        className="w-24"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1 mt-2">
+            <Switch
+              label="Uncertainty Boundary"
+              checked={config.uncertaintyBoundaryEnabled ?? false}
+              onCheckedChange={(checked) => setUncertaintyBoundaryEnabled(checked)}
+              data-testid="schroedinger-uncertainty-boundary-toggle"
+            />
+            {config.uncertaintyBoundaryEnabled && (
+              <div className="ps-2 border-s border-border-default space-y-2">
+                <Slider
+                  label="Strength"
+                  min={0.0}
+                  max={1.0}
+                  step={0.05}
+                  value={config.uncertaintyBoundaryStrength ?? 0.5}
+                  onChange={setUncertaintyBoundaryStrength}
+                  showValue
+                  data-testid="schroedinger-uncertainty-boundary-strength"
+                />
+                <Slider
+                  label="Confidence Mass"
+                  min={0.5}
+                  max={0.99}
+                  step={0.01}
+                  value={config.uncertaintyConfidenceMass ?? 0.68}
+                  onChange={setUncertaintyConfidenceMass}
+                  showValue
+                  data-testid="schroedinger-uncertainty-confidence"
+                />
+                <Slider
+                  label="Boundary Width"
+                  min={0.05}
+                  max={1.0}
+                  step={0.05}
+                  value={config.uncertaintyBoundaryWidth ?? 0.3}
+                  onChange={setUncertaintyBoundaryWidth}
+                  showValue
+                  data-testid="schroedinger-uncertainty-boundary-width"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-1 mt-2">
+            <Switch
+              label="Phase Materiality"
+              checked={config.phaseMaterialityEnabled ?? false}
+              onCheckedChange={(checked) => setPhaseMaterialityEnabled(checked)}
+              data-testid="schroedinger-phase-materiality-toggle"
+            />
+            {config.phaseMaterialityEnabled && (
+              <Slider
+                label="Strength"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.phaseMaterialityStrength ?? 1.0}
+                onChange={setPhaseMaterialityStrength}
+                showValue
+                data-testid="schroedinger-phase-materiality-strength"
+              />
+            )}
+          </div>
+        </div>
+      </Section>
+    )
+  })
 
 SchroedingerQuantumEffectsSection.displayName = 'SchroedingerQuantumEffectsSection'

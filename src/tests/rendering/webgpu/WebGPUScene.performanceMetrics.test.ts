@@ -69,10 +69,7 @@ describe('WebGPUScene frame metric collection', () => {
       recordFrame: vi.fn(),
     } as unknown as WebGPUStatsCollector
 
-    const nowSpy = vi
-      .spyOn(performance, 'now')
-      .mockReturnValueOnce(1000)
-      .mockReturnValueOnce(1018)
+    const nowSpy = vi.spyOn(performance, 'now').mockReturnValueOnce(1000).mockReturnValueOnce(1018)
 
     const result = executeFrameAndCollectMetrics({
       graph,

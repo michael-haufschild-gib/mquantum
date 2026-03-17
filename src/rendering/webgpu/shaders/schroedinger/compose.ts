@@ -78,11 +78,7 @@ import {
   getHOUnrolledBlocks,
   generateHODispatchBlock,
 } from './quantum/hoSuperpositionVariants.wgsl'
-import {
-  psiBlockDynamicHarmonic,
-  psiBlockHarmonic,
-  psiBlockHydrogenND,
-} from './quantum/psi.wgsl'
+import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from './quantum/psi.wgsl'
 import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from './quantum/density.wgsl'
 
 // Wigner phase-space blocks
@@ -135,8 +131,17 @@ import {
   densityGridSamplingBlock,
   analysisTextureSamplingBlock,
 } from './volume/densityGridSampling.wgsl'
-import { generateEmissionPreBlock, generateComputeBaseColor, emissionPostBlock, COLOR_ALG_NAMES } from './volume/emission.wgsl'
-import { volumeGradientBlock, volumeIntegrationBlock, volumeRaymarchGridBlock } from './volume/integration.wgsl'
+import {
+  generateEmissionPreBlock,
+  generateComputeBaseColor,
+  emissionPostBlock,
+  COLOR_ALG_NAMES,
+} from './volume/emission.wgsl'
+import {
+  volumeGradientBlock,
+  volumeIntegrationBlock,
+  volumeRaymarchGridBlock,
+} from './volume/integration.wgsl'
 import { radialProbabilityBlock, radialProbabilityStubBlock } from './volume/radialProbability.wgsl'
 
 import type { ColorAlgorithm } from '../types'
@@ -376,16 +381,16 @@ export function composeSchroedingerShader(config: SchroedingerWGSLShaderConfig):
   const selectedMainBlock = isWigner
     ? generateMainBlockWigner2D(useWignerCache)
     : is2D
-    ? isosurface
-      ? generateMainBlock2DIsolines()
-      : generateMainBlock2D()
-    : isosurface
-      ? enableTemporal
-        ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
-        : generateMainBlockIsosurface({ useDensityGrid })
-      : enableTemporal
-        ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix })
-        : generateMainBlockVolumetric({ useDensityGrid })
+      ? isosurface
+        ? generateMainBlock2DIsolines()
+        : generateMainBlock2D()
+      : isosurface
+        ? enableTemporal
+          ? generateMainBlockIsosurfaceTemporal({ bayerJitter: true, useDensityGrid })
+          : generateMainBlockIsosurface({ useDensityGrid })
+        : enableTemporal
+          ? generateMainBlockTemporal({ bayerJitter: true, useDensityGrid, useDensityMatrix })
+          : generateMainBlockVolumetric({ useDensityGrid })
 
   // Get dimension-specific blocks
   const hoNDBlockMap: Record<number, string> = {
@@ -463,7 +468,8 @@ struct VertexOutput {
         generateObjectBindGroup(2, 'BasisVectors', 'basis', 1) +
         (useCache ? '\n' + eigenfunctionCacheBindingsBlock : '') +
         (isWigner && useWignerCache
-          ? '\n' + /* wgsl */ `
+          ? '\n' +
+            /* wgsl */ `
 // Wigner cache texture + sampler (pre-computed W(x,p) grid)
 @group(2) @binding(2) var wignerCacheTexture: texture_2d<f32>;
 @group(2) @binding(3) var wignerCacheSampler: sampler;`
@@ -482,15 +488,33 @@ struct VertexOutput {
     { name: 'HO 1D Eigenfunction', content: ho1dBlock },
 
     // Eigenfunction cache lookup (must come before hoND variants that use it)
-    { name: 'Eigenfunction Cache Lookup', content: eigenfunctionCacheLookupBlock, condition: useCache },
+    {
+      name: 'Eigenfunction Cache Lookup',
+      content: eigenfunctionCacheLookupBlock,
+      condition: useCache,
+    },
 
     // HO ND dimension-specific variant (only ONE is included based on actualDim)
     // When cache is enabled, use cached variants that call ho1DCached() instead of ho1D()
-    { name: `HO ND ${actualDim}D`, content: useCache ? generateHoNDCachedBlock(actualDim) : hoNDBlock, condition: includeHarmonic },
-    { name: 'HO ND Dispatch', content: useCache ? generateHoNDCachedDispatchBlock(actualDim) : generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
+    {
+      name: `HO ND ${actualDim}D`,
+      content: useCache ? generateHoNDCachedBlock(actualDim) : hoNDBlock,
+      condition: includeHarmonic,
+    },
+    {
+      name: 'HO ND Dispatch',
+      content: useCache
+        ? generateHoNDCachedDispatchBlock(actualDim)
+        : generateHoNDDispatchBlock(actualDim),
+      condition: includeHarmonic,
+    },
 
     // Hydrogen orbital basis functions (conditionally included)
-    { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen || isWigner },
+    {
+      name: 'Laguerre Polynomials',
+      content: laguerreBlock,
+      condition: includeHydrogen || isWigner,
+    },
     { name: 'Legendre Polynomials', content: legendreBlock, condition: includeHydrogen },
     { name: 'Spherical Harmonics', content: sphericalHarmonicsBlock, condition: includeHydrogen },
     { name: 'Hydrogen Radial', content: hydrogenRadialBlock, condition: includeHydrogen },
@@ -504,11 +528,16 @@ struct VertexOutput {
     // Included for HO mode (full marginal) and hydrogen ND (extra dim single Fock)
     { name: 'Wigner HO', content: wignerHOBlock, condition: isWigner },
     // Wigner phase-space evaluation (hydrogen numerical quadrature — needs hydrogenRadial)
-    { name: 'Wigner Hydrogen', content: wignerHydrogenBlock, condition: isWigner && includeHydrogen },
+    {
+      name: 'Wigner Hydrogen',
+      content: wignerHydrogenBlock,
+      condition: isWigner && includeHydrogen,
+    },
     // Stub for wignerHydrogenRadial when hydrogen isn't included (WGSL requires all symbols)
     {
       name: 'Wigner Hydrogen Stub',
-      content: '// Stub: hydrogen Wigner unavailable in HO mode\nfn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> f32 { return 0.0; }',
+      content:
+        '// Stub: hydrogen Wigner unavailable in HO mode\nfn wignerHydrogenRadial(r: f32, pr: f32, n: i32, l: i32, a0: f32, nPts: i32) -> f32 { return 0.0; }',
       condition: isWigner && !includeHydrogen,
     },
 
@@ -528,9 +557,10 @@ struct VertexOutput {
     },
     {
       name: 'Hydrogen ND Dispatch',
-      content: useCache && hydrogenNDDimension > 3
-        ? generateHydrogenNDCachedDispatchBlock(hydrogenNDDimension)
-        : generateHydrogenNDDispatchBlock(hydrogenNDDimension),
+      content:
+        useCache && hydrogenNDDimension > 3
+          ? generateHydrogenNDCachedDispatchBlock(hydrogenNDDimension)
+          : generateHydrogenNDDispatchBlock(hydrogenNDDimension),
       condition: includeHydrogenND,
     },
 
@@ -604,7 +634,11 @@ struct VertexOutput {
     { name: 'Volume Emission (Color)', content: generateComputeBaseColor(colorAlgorithm) },
     { name: 'Volume Emission (Post)', content: emissionPostBlock, condition: !is2D },
     { name: 'Cross-Section Slice', content: crossSectionBlock, condition: !is2D },
-    { name: 'Radial Probability Overlay', content: includeHydrogen && !is2D ? radialProbabilityBlock : radialProbabilityStubBlock, condition: !is2D },
+    {
+      name: 'Radial Probability Overlay',
+      content: includeHydrogen && !is2D ? radialProbabilityBlock : radialProbabilityStubBlock,
+      condition: !is2D,
+    },
     { name: 'Volume Gradient', content: volumeGradientBlock, condition: !is2D },
     // Analytical gradient from eigenfunction cache (replaces tetrahedral in integration loop)
     // Always included when cache is present (WGSL requires symbol resolution even in dead branches).
@@ -658,7 +692,11 @@ struct VertexOutput {
     },
 
     // ===== 2D-SPECIFIC BLOCKS =====
-    { name: '2D Nodal Lines', content: is2D ? nodalLines2DBlock : nodalLines2DStubBlock, condition: is2D || nodal },
+    {
+      name: '2D Nodal Lines',
+      content: is2D ? nodalLines2DBlock : nodalLines2DStubBlock,
+      condition: is2D || nodal,
+    },
     { name: '2D Isolines', content: is2D ? isolines2DBlock : isolines2DStubBlock, condition: is2D },
 
     // ===== GEOMETRY =====

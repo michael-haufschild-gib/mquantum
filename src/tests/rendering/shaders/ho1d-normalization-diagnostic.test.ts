@@ -19,19 +19,36 @@ import { generateQuantumPreset } from '@/lib/geometry/extended/schroedinger/pres
 /** Hermite polynomial H_n(u) - matches hermite.wgsl.ts */
 function hermite(n: number, u: number): number {
   switch (n) {
-    case 0: return 1
-    case 1: return 2 * u
-    case 2: return 4 * u * u - 2
-    case 3: return 8 * u * u * u - 12 * u
-    case 4: { const u2 = u * u; return 16 * u2 * u2 - 48 * u2 + 12 }
-    case 5: { const u2 = u * u; return 32 * u2 * u2 * u - 160 * u2 * u + 120 * u }
-    case 6: { const u2 = u * u; return 64 * u2 * u2 * u2 - 480 * u2 * u2 + 720 * u2 - 120 }
-    default: return 0
+    case 0:
+      return 1
+    case 1:
+      return 2 * u
+    case 2:
+      return 4 * u * u - 2
+    case 3:
+      return 8 * u * u * u - 12 * u
+    case 4: {
+      const u2 = u * u
+      return 16 * u2 * u2 - 48 * u2 + 12
+    }
+    case 5: {
+      const u2 = u * u
+      return 32 * u2 * u2 * u - 160 * u2 * u + 120 * u
+    }
+    case 6: {
+      const u2 = u * u
+      return 64 * u2 * u2 * u2 - 480 * u2 * u2 + 720 * u2 - 120
+    }
+    default:
+      return 0
   }
 }
 
 const INV_PI = 1 / Math.PI
-const HO_NORM = [1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.0510310363080, 0.0161374306092, 0.00465847495312]
+const HO_NORM = [
+  1.0, 0.707106781187, 0.353553390593, 0.144337567297, 0.051031036308, 0.0161374306092,
+  0.00465847495312,
+]
 
 /** Canonical normalization: (α²/π)^{1/4} = (ω/π)^{1/4}, matches ho1d.wgsl.ts */
 function ho1D_canonical(n: number, x: number, omega: number): number {
@@ -57,7 +74,10 @@ function ho1D_visual(n: number, x: number, omega: number): number {
 
 /** Compute 3D density: rho = |Sigma_k c_k * prod_j phi(n_kj, x_j, omega_j) * exp(-i E_k t)|^2 */
 function computeDensity3D(
-  x: number, y: number, z: number, t: number,
+  x: number,
+  y: number,
+  z: number,
+  t: number,
   preset: ReturnType<typeof generateQuantumPreset>,
   omega: number[],
   ho1DFunc: (n: number, x: number, omega: number) => number
@@ -71,9 +91,10 @@ function computeDensity3D(
     const E = preset.energies[k]!
 
     // Product of 1D eigenfunctions
-    const phi = ho1DFunc(qn[0]!, x, omega[0]!)
-               * ho1DFunc(qn[1]!, y, omega[1]!)
-               * ho1DFunc(qn[2]!, z, omega[2]!)
+    const phi =
+      ho1DFunc(qn[0]!, x, omega[0]!) *
+      ho1DFunc(qn[1]!, y, omega[1]!) *
+      ho1DFunc(qn[2]!, z, omega[2]!)
 
     // Time factor: e^{-iEt}
     const cosEt = Math.cos(E * t)
@@ -157,7 +178,10 @@ describe('HO1D Normalization Diagnostic', () => {
     console.log('Peak density (canonical/NEW):', peakCanonical.toExponential(4))
     console.log('Peak density (visual/OLD):   ', peakVisual.toExponential(4))
     console.log('Ratio (new/old):             ', (peakCanonical / peakVisual).toFixed(4))
-    console.log('Peak position:               ', peakPos.map(v => v.toFixed(2)))
+    console.log(
+      'Peak position:               ',
+      peakPos.map((v) => v.toFixed(2))
+    )
 
     // Both should produce non-zero density
     expect(peakCanonical).toBeGreaterThan(0)
@@ -186,8 +210,8 @@ describe('HO1D Normalization Diagnostic', () => {
       accColorCanonical += transmittanceCanonical * alphaC
       accColorVisual += transmittanceVisual * alphaV
 
-      transmittanceCanonical *= (1 - alphaC)
-      transmittanceVisual *= (1 - alphaV)
+      transmittanceCanonical *= 1 - alphaC
+      transmittanceVisual *= 1 - alphaV
     }
 
     const totalAlphaCanonical = 1 - transmittanceCanonical
@@ -201,8 +225,14 @@ describe('HO1D Normalization Diagnostic', () => {
     console.log('')
 
     // Discard threshold in shader is alpha < 0.01
-    console.log('Would be DISCARDED (canonical)?', totalAlphaCanonical < 0.01 ? 'YES - INVISIBLE!' : 'no - visible')
-    console.log('Would be DISCARDED (visual)?   ', totalAlphaVisual < 0.01 ? 'YES - INVISIBLE!' : 'no - visible')
+    console.log(
+      'Would be DISCARDED (canonical)?',
+      totalAlphaCanonical < 0.01 ? 'YES - INVISIBLE!' : 'no - visible'
+    )
+    console.log(
+      'Would be DISCARDED (visual)?   ',
+      totalAlphaVisual < 0.01 ? 'YES - INVISIBLE!' : 'no - visible'
+    )
 
     // The canonical normalization should still produce visible output
     // If this fails, the normalization change is the root cause
@@ -230,7 +260,9 @@ describe('HO1D Normalization Diagnostic', () => {
         peakV = Math.max(peakV, Math.abs(ho1D_visual(n, x, 1.0)))
       }
       const ratio = peakC / peakV
-      console.log(`${n} | ${peakC.toExponential(4).padStart(14)} | ${peakV.toExponential(4).padStart(11)} | ${ratio.toFixed(4)}`)
+      console.log(
+        `${n} | ${peakC.toExponential(4).padStart(14)} | ${peakV.toExponential(4).padStart(11)} | ${ratio.toFixed(4)}`
+      )
     }
   })
 
@@ -252,7 +284,8 @@ describe('HO1D Normalization Diagnostic', () => {
     console.log('-----------------|------------|------------|-------------')
 
     for (const { label, x, y } of offsets) {
-      let transC = 1.0, transV = 1.0
+      let transC = 1.0,
+        transV = 1.0
       let t = -BOUND_R
 
       // Simulate sphere intersection
@@ -293,8 +326,8 @@ describe('HO1D Normalization Diagnostic', () => {
         const alphaC = computeAlpha(rhoC, adaptStepC, DENSITY_GAIN)
         const alphaV = computeAlpha(rhoV, adaptStepV, DENSITY_GAIN)
 
-        transC *= (1 - alphaC)
-        transV *= (1 - alphaV)
+        transC *= 1 - alphaC
+        transV *= 1 - alphaV
 
         // Use canonical adaptive step for stepping (shader uses one path)
         t += adaptStepC
@@ -304,7 +337,9 @@ describe('HO1D Normalization Diagnostic', () => {
       const totalC = 1 - transC
       const totalV = 1 - transV
       const visC = totalC < 0.01 ? 'DISCARDED' : `visible (${totalC.toFixed(3)})`
-      console.log(`${label.padEnd(17)}| ${totalC.toFixed(6).padStart(10)} | ${totalV.toFixed(6).padStart(10)} | ${visC}`)
+      console.log(
+        `${label.padEnd(17)}| ${totalC.toFixed(6).padStart(10)} | ${totalV.toFixed(6).padStart(10)} | ${visC}`
+      )
     }
   })
 
@@ -329,7 +364,7 @@ describe('HO1D Normalization Diagnostic', () => {
 
     // Theoretical canonical peak for ground state (0,0,0) with ω=1:
     // |ψ_0(0)|^2 = [(ω/π)^{1/4}]^6 = (1/π)^{3/2} ≈ 0.1795 (3D product, each dim contributes (ω/π)^{1/4})
-    console.log('Theoretical canonical:', Math.pow(1/Math.PI, 1.5).toExponential(6))
+    console.log('Theoretical canonical:', Math.pow(1 / Math.PI, 1.5).toExponential(6))
   })
 
   it('should verify auto-compensation restores visual density', () => {
@@ -348,7 +383,10 @@ describe('HO1D Normalization Diagnostic', () => {
       for (let k = 0; k < p.termCount; k++) {
         const [cRe, cIm] = p.coefficients[k]!
         const mag = cRe * cRe + cIm * cIm
-        if (mag > maxMag) { maxMag = mag; dominantIdx = k }
+        if (mag > maxMag) {
+          maxMag = mag
+          dominantIdx = k
+        }
       }
 
       const qn = p.quantumNumbers[dominantIdx]!
@@ -388,8 +426,8 @@ describe('HO1D Normalization Diagnostic', () => {
       const alphaCompensated = computeAlpha(rhoC, stepLen, effectiveDensityGain)
       const alphaOld = computeAlpha(rhoV, stepLen, userDensityGain)
 
-      transCompensated *= (1 - alphaCompensated)
-      transOld *= (1 - alphaOld)
+      transCompensated *= 1 - alphaCompensated
+      transOld *= 1 - alphaOld
     }
 
     const totalCompensated = 1 - transCompensated

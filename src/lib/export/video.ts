@@ -65,7 +65,10 @@ export class VideoRecorder {
       }
 
       const safeWidth = Math.max(2, Math.round(validatePositiveFinite('width', this.options.width)))
-      const safeHeight = Math.max(2, Math.round(validatePositiveFinite('height', this.options.height)))
+      const safeHeight = Math.max(
+        2,
+        Math.round(validatePositiveFinite('height', this.options.height))
+      )
       const safeFps = validatePositiveFinite('fps', this.options.fps)
       const safeBitrate = validatePositiveFinite('bitrate', this.options.bitrate)
       const safeFormat = this.options.format === 'webm' ? 'webm' : 'mp4'
@@ -188,7 +191,8 @@ export class VideoRecorder {
       // Ensure resources are cleaned up on initialization failure
       this.dispose()
       throw new Error(
-        `Video initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Video initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { cause: error }
       )
     }
   }
@@ -383,7 +387,8 @@ export class VideoRecorder {
       }
     } catch (error) {
       throw new Error(
-        `Frame capture failed at ${timestamp.toFixed(2)}s: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Frame capture failed at ${timestamp.toFixed(2)}s: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { cause: error }
       )
     }
   }
@@ -433,7 +438,8 @@ export class VideoRecorder {
       return null
     } catch (error) {
       throw new Error(
-        `Video finalization failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Video finalization failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        { cause: error }
       )
     }
   }

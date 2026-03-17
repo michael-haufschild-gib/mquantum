@@ -293,7 +293,9 @@ describe('animationStore', () => {
 
       expect(() => useAnimationStore.getState().setDimension(4.2)).not.toThrow()
       expect(() => useAnimationStore.getState().setDimension(Number.NaN)).not.toThrow()
-      expect(() => useAnimationStore.getState().setDimension(Number.POSITIVE_INFINITY)).not.toThrow()
+      expect(() =>
+        useAnimationStore.getState().setDimension(Number.POSITIVE_INFINITY)
+      ).not.toThrow()
 
       expect(useAnimationStore.getState().animatingPlanes).toEqual(before)
     })

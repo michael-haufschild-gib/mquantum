@@ -40,7 +40,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Phase rotation: exp(-i * hbar * k^2 * dt / (2*m))
-  let phase = -params.hbar * k2 * params.dt / (2.0 * params.mass);
+  let phase = -params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
   let cosP = cos(phase);
   let sinP = sin(phase);
 

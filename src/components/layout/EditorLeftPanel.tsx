@@ -86,7 +86,7 @@ export const EditorLeftPanel: React.FC = React.memo(() => {
           <div className="px-4 py-2">
             <DimensionSelector />
           </div>
-          {dimension > 2 && representation !== 'wigner' && objectType !== 'pauliSpinor' && (
+          {dimension >= 2 && representation !== 'wigner' && objectType !== 'pauliSpinor' && (
             <div className="px-4 pb-2">
               <div className="space-y-1">
                 <ToggleGroup

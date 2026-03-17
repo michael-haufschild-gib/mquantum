@@ -1,4 +1,3 @@
-/* global GPUBindGroupEntry, GPUBlendState, GPUColorTargetState, GPUTextureFormat, GPUVertexBufferLayout */
 /**
  * WebGPU Base Pass
  *
@@ -87,6 +86,16 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
     this.device = null
   }
 
+  /**
+   * Destroy static GPU resources shared across all passes.
+   * Must be called on device loss or render graph disposal to prevent VRAM leaks
+   * and stale references to destroyed GPU objects.
+   */
+  static clearStaticResources(): void {
+    WebGPUBasePass.fullscreenVertexBuffer?.destroy()
+    WebGPUBasePass.fullscreenVertexBuffer = null
+  }
+
   // ===========================================================================
   // Utility Methods
   // ===========================================================================
@@ -106,22 +115,30 @@ export abstract class WebGPUBasePass implements WebGPURenderPass {
     })
 
     // Check for shader compilation errors asynchronously
-    module.getCompilationInfo().then((info) => {
-      for (const message of info.messages) {
-        const type = message.type === 'error' ? 'ERROR' : message.type === 'warning' ? 'WARN' : 'INFO'
-        console.log(`[WGSL ${type}] ${shaderLabel}: ${message.message}`)
-        if (message.lineNum) {
-          console.log(`  at line ${message.lineNum}, col ${message.linePos}`)
-          // Log the offending line from source
-          const lines = code.split('\n')
-          if (lines[message.lineNum - 1]) {
-            console.log(`  > ${lines[message.lineNum - 1]}`)
+    module
+      .getCompilationInfo()
+      .then((info) => {
+        for (const message of info.messages) {
+          if (message.type === 'error') {
+            console.error(`[WGSL ERROR] ${shaderLabel}: ${message.message}`)
+          } else if (message.type === 'warning') {
+            console.warn(`[WGSL WARN] ${shaderLabel}: ${message.message}`)
+          } else if (import.meta.env.DEV) {
+            console.log(`[WGSL INFO] ${shaderLabel}: ${message.message}`)
+          }
+          if (message.lineNum && (message.type !== 'info' || import.meta.env.DEV)) {
+            const logger = message.type === 'error' ? console.error : console.warn
+            logger(`  at line ${message.lineNum}, col ${message.linePos}`)
+            const lines = code.split('\n')
+            if (lines[message.lineNum - 1]) {
+              logger(`  > ${lines[message.lineNum - 1]}`)
+            }
           }
         }
-      }
-    }).catch((error) => {
-      console.warn(`[WGSL] Failed to get compilation info for ${shaderLabel}:`, error)
-    })
+      })
+      .catch((error) => {
+        console.warn(`[WGSL] Failed to get compilation info for ${shaderLabel}:`, error)
+      })
 
     return module
   }

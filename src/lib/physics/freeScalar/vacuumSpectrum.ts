@@ -106,7 +106,9 @@ function validateVacuumConfig(
   for (let d = 0; d < latticeDim; d++) {
     const n = gridSize[d]!
     if (!isPowerOf2(n)) {
-      throw new Error(`Exact vacuum requires power-of-2 grid sizes, but dimension ${d} has size ${n}`)
+      throw new Error(
+        `Exact vacuum requires power-of-2 grid sizes, but dimension ${d} has size ${n}`
+      )
     }
     const a = spacing[d]!
     if (!Number.isFinite(a) || a <= 0) {

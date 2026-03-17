@@ -51,13 +51,12 @@ const MetricRow: React.FC<{
  * ```
  */
 export const FSFAnalysisContent: React.FC = React.memo(() => {
-  const { fsf, setDiagnosticsInterval } =
-    useExtendedObjectStore(
-      useShallow((s) => ({
-        fsf: s.schroedinger.freeScalar,
-        setDiagnosticsInterval: s.setFreeScalarDiagnosticsInterval,
-      })),
-    )
+  const { fsf, setDiagnosticsInterval } = useExtendedObjectStore(
+    useShallow((s) => ({
+      fsf: s.schroedinger.freeScalar,
+      setDiagnosticsInterval: s.setFreeScalarDiagnosticsInterval,
+    }))
+  )
 
   return (
     <>
@@ -113,35 +112,27 @@ const SparklineRow: React.FC<{
 )
 
 const SparklineCharts: React.FC = React.memo(() => {
-  const { hasData, historyEnergy, historyNorm, historyHead, historyCount } =
-    useFsfDiagnosticsStore(
-      useShallow((s) => ({
-        hasData: s.hasData,
-        historyEnergy: s.historyEnergy,
-        historyNorm: s.historyNorm,
-        historyHead: s.historyHead,
-        historyCount: s.historyCount,
-      })),
-    )
+  const { hasData, historyEnergy, historyNorm, historyHead, historyCount } = useFsfDiagnosticsStore(
+    useShallow((s) => ({
+      hasData: s.hasData,
+      historyEnergy: s.historyEnergy,
+      historyNorm: s.historyNorm,
+      historyHead: s.historyHead,
+      historyCount: s.historyCount,
+    }))
+  )
 
   if (!hasData) {
     return (
       <div className="px-1 py-3 text-center">
-        <p className="text-[10px] text-text-tertiary italic">
-          Waiting for first readback...
-        </p>
+        <p className="text-[10px] text-text-tertiary italic">Waiting for first readback...</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-2 px-1">
-      <SparklineRow
-        label="Energy"
-        data={historyEnergy}
-        head={historyHead}
-        count={historyCount}
-      />
+      <SparklineRow label="Energy" data={historyEnergy} head={historyHead} count={historyCount} />
       <SparklineRow
         label="Norm"
         data={historyNorm}
@@ -197,23 +188,40 @@ const KGDispersionDiagram: React.FC<{ mass: number }> = React.memo(({ mass }) =>
 
   return (
     <div data-testid="kg-dispersion">
-      <p className="text-[10px] text-text-secondary mb-1">Klein-Gordon Dispersion ω(k) = √(k² + m²)</p>
+      <p className="text-[10px] text-text-secondary mb-1">
+        Klein-Gordon Dispersion ω(k) = √(k² + m²)
+      </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${KG_WIDTH} ${KG_HEIGHT}`} className="block">
           {/* Zero line */}
           <line
-            x1={KG_PX} y1={curvePoints.zeroY} x2={KG_PX + KG_PW} y2={curvePoints.zeroY}
-            stroke="var(--text-tertiary)" strokeWidth={0.5} strokeDasharray="2,2"
+            x1={KG_PX}
+            y1={curvePoints.zeroY}
+            x2={KG_PX + KG_PW}
+            y2={curvePoints.zeroY}
+            stroke="var(--text-tertiary)"
+            strokeWidth={0.5}
+            strokeDasharray="2,2"
           />
 
           {/* Mass gap line ω = m */}
           <line
-            x1={KG_PX} y1={curvePoints.massGapY} x2={KG_PX + KG_PW} y2={curvePoints.massGapY}
-            stroke="var(--theme-accent)" strokeWidth={0.5} strokeDasharray="3,3" opacity={0.5}
+            x1={KG_PX}
+            y1={curvePoints.massGapY}
+            x2={KG_PX + KG_PW}
+            y2={curvePoints.massGapY}
+            stroke="var(--theme-accent)"
+            strokeWidth={0.5}
+            strokeDasharray="3,3"
+            opacity={0.5}
           />
           <text
-            x={KG_PX + KG_PW + 2} y={curvePoints.massGapY + 3}
-            fill="var(--theme-accent)" fontSize={7} fontFamily="monospace" opacity={0.7}
+            x={KG_PX + KG_PW + 2}
+            y={curvePoints.massGapY + 3}
+            fill="var(--theme-accent)"
+            fontSize={7}
+            fontFamily="monospace"
+            opacity={0.7}
           >
             m
           </text>
@@ -221,26 +229,40 @@ const KGDispersionDiagram: React.FC<{ mass: number }> = React.memo(({ mass }) =>
           {/* Dispersion curve */}
           <polyline
             points={curvePoints.points}
-            fill="none" stroke="var(--theme-accent)" strokeWidth={2} strokeLinejoin="round"
+            fill="none"
+            stroke="var(--theme-accent)"
+            strokeWidth={2}
+            strokeLinejoin="round"
           />
 
           {/* Vertical k-axis */}
           <line
-            x1={curvePoints.midX} y1={KG_PY}
-            x2={curvePoints.midX} y2={KG_PY + KG_PH}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={curvePoints.midX}
+            y1={KG_PY}
+            x2={curvePoints.midX}
+            y2={KG_PY + KG_PH}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
 
           {/* Axis labels */}
           <text
-            x={KG_PX + KG_PW / 2} y={KG_HEIGHT - 2}
-            textAnchor="middle" fill="var(--text-tertiary)" fontSize={8} fontFamily="monospace"
+            x={KG_PX + KG_PW / 2}
+            y={KG_HEIGHT - 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
           >
             k
           </text>
           <text
-            x={4} y={KG_PY + KG_PH / 2}
-            textAnchor="middle" fill="var(--text-tertiary)" fontSize={8} fontFamily="monospace"
+            x={4}
+            y={KG_PY + KG_PH / 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
             transform={`rotate(-90, 4, ${KG_PY + KG_PH / 2})`}
           >
             ω(k)
@@ -258,27 +280,19 @@ KGDispersionDiagram.displayName = 'KGDispersionDiagram'
 /* ────────────────────────────────────────────────────────────── */
 
 const MetricsDisplay: React.FC = React.memo(() => {
-  const {
-    hasData,
-    totalEnergy,
-    totalNorm,
-    maxPhi,
-    maxPi,
-    energyDrift,
-    meanPhi,
-    variancePhi,
-  } = useFsfDiagnosticsStore(
-    useShallow((s) => ({
-      hasData: s.hasData,
-      totalEnergy: s.totalEnergy,
-      totalNorm: s.totalNorm,
-      maxPhi: s.maxPhi,
-      maxPi: s.maxPi,
-      energyDrift: s.energyDrift,
-      meanPhi: s.meanPhi,
-      variancePhi: s.variancePhi,
-    }))
-  )
+  const { hasData, totalEnergy, totalNorm, maxPhi, maxPi, energyDrift, meanPhi, variancePhi } =
+    useFsfDiagnosticsStore(
+      useShallow((s) => ({
+        hasData: s.hasData,
+        totalEnergy: s.totalEnergy,
+        totalNorm: s.totalNorm,
+        maxPhi: s.maxPhi,
+        maxPi: s.maxPi,
+        energyDrift: s.energyDrift,
+        meanPhi: s.meanPhi,
+        variancePhi: s.variancePhi,
+      }))
+    )
 
   if (!hasData) return null
 

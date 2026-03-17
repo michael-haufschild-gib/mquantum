@@ -16,6 +16,18 @@ export default defineConfig({
       '**/dist/**',
       '**/scripts/playwright/**', // Playwright tests run separately
     ],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text-summary', 'lcov'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/tests/**',
+        'src/**/*.d.ts',
+        'src/vite-env.d.ts',
+        'src/wasm/**/pkg/**',
+      ],
+    },
   },
   resolve: {
     alias: {
@@ -29,6 +41,5 @@ export default defineConfig({
       // Mock WASM module for tests (Vite import analysis runs before vitest mocks)
       'mdimension-core': path.resolve(import.meta.dirname, './src/tests/__mocks__/mdimension-core.ts'),
     },
-    dedupe: ['three'],
   },
 })

@@ -129,7 +129,11 @@ describe('rendering/webgpu/utils/lighting', () => {
     it('writes lightCount at the typed-array-local offset when data has a byte offset', () => {
       const backingBuffer = new ArrayBuffer(Float32Array.BYTES_PER_ELEMENT * 200)
       const prefixFloats = 16
-      const data = new Float32Array(backingBuffer, prefixFloats * Float32Array.BYTES_PER_ELEMENT, 144)
+      const data = new Float32Array(
+        backingBuffer,
+        prefixFloats * Float32Array.BYTES_PER_ELEMENT,
+        144
+      )
 
       const lights = [
         {

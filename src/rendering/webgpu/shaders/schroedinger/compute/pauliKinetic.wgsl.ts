@@ -53,7 +53,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   // Kinetic phase: e^{-i ℏ k² dt / (2m)}  — negative sign for forward time evolution
-  let phase = -params.hbar * k2 * params.dt / (2.0 * params.mass);
+  let phase = -params.hbar * k2 * params.dt / (2.0 * max(params.mass, 1e-6));
   let cosP = cos(phase);
   let sinP = sin(phase);
 

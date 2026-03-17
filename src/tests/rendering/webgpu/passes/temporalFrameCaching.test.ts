@@ -64,7 +64,9 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
+    expect(
+      (device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup
+    ).toHaveBeenCalledTimes(1)
   })
 
   it('reuses TemporalCloud reprojection/reconstruction bind groups across frames', () => {
@@ -97,7 +99,8 @@ describe('pass resource caching', () => {
     ;(pass as unknown as Record<string, unknown>).reprojectionUniformBuffer = {} as GPUBuffer
     ;(pass as unknown as Record<string, unknown>).reconstructionUniformBuffer = {} as GPUBuffer
     ;(pass as unknown as Record<string, unknown>).passBindGroupLayout = {} as GPUBindGroupLayout
-    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout =
+      {} as GPUBindGroupLayout
     ;(pass as unknown as Record<string, unknown>).sampler = {} as GPUSampler
     ;(pass as unknown as Record<string, unknown>).hasValidHistory = true
     ;(pass as unknown as Record<string, unknown>).frameIndex = 0
@@ -125,11 +128,15 @@ describe('pass resource caching', () => {
         if (id === 'reprojValidity') return reprojValidityView
         return null
       }),
-      getResource: vi.fn((id: string) => (id === 'cloudColor' ? { width: 400, height: 300 } : null)),
+      getResource: vi.fn((id: string) =>
+        id === 'cloudColor' ? { width: 400, height: 300 } : null
+      ),
       frame: {
         stores: {
           camera: {
-            viewProjectionMatrix: { elements: Array.from({ length: 16 }, (_, i) => (i % 5 === 0 ? 1 : 0)) },
+            viewProjectionMatrix: {
+              elements: Array.from({ length: 16 }, (_, i) => (i % 5 === 0 ? 1 : 0)),
+            },
             position: [0, 0, 0],
           },
         },
@@ -139,7 +146,9 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(2)
+    expect(
+      (device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup
+    ).toHaveBeenCalledTimes(2)
   })
 
   it('reuses WebGPUTemporalCloud bind groups across ping-pong frames', () => {
@@ -167,10 +176,14 @@ describe('pass resource caching', () => {
     ;(pass as unknown as Record<string, unknown>).device = device
     ;(pass as unknown as Record<string, unknown>).reprojectionPipeline = {} as GPURenderPipeline
     ;(pass as unknown as Record<string, unknown>).reconstructionPipeline = {} as GPURenderPipeline
-    ;(pass as unknown as Record<string, unknown>).reprojectionBindGroupLayout0 = {} as GPUBindGroupLayout
-    ;(pass as unknown as Record<string, unknown>).reprojectionBindGroupLayout1 = {} as GPUBindGroupLayout
-    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout0 = {} as GPUBindGroupLayout
-    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout1 = {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reprojectionBindGroupLayout0 =
+      {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reprojectionBindGroupLayout1 =
+      {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout0 =
+      {} as GPUBindGroupLayout
+    ;(pass as unknown as Record<string, unknown>).reconstructionBindGroupLayout1 =
+      {} as GPUBindGroupLayout
     ;(pass as unknown as Record<string, unknown>).temporalUniformBuffer = {} as GPUBuffer
     ;(pass as unknown as Record<string, unknown>).linearSampler = {} as GPUSampler
     ;(pass as unknown as Record<string, unknown>).nearestSampler = {} as GPUSampler
@@ -194,7 +207,9 @@ describe('pass resource caching', () => {
         return null
       }),
       getWriteTarget: vi.fn((id: string) => (id === 'temporalOut' ? outputView : null)),
-      getResource: vi.fn((id: string) => (id === 'temporalOut' ? { texture: outputTexture } : null)),
+      getResource: vi.fn((id: string) =>
+        id === 'temporalOut' ? { texture: outputTexture } : null
+      ),
       frame: {
         stores: {
           camera: {
@@ -213,7 +228,9 @@ describe('pass resource caching', () => {
 
     // 1x reprojection uniforms + 2x reprojection ping-pong variants +
     // 1x reconstruction uniforms + 1x reconstruction textures.
-    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(5)
+    expect(
+      (device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup
+    ).toHaveBeenCalledTimes(5)
   })
 
   it('reuses TemporalCloudDepth bind groups when input view is unchanged', () => {
@@ -247,7 +264,9 @@ describe('pass resource caching', () => {
           camera: {
             near: 0.1,
             far: 1000,
-            viewProjectionMatrix: { elements: Array.from({ length: 16 }, (_, i) => (i % 5 === 0 ? 1 : 0)) },
+            viewProjectionMatrix: {
+              elements: Array.from({ length: 16 }, (_, i) => (i % 5 === 0 ? 1 : 0)),
+            },
           },
         },
       },
@@ -256,7 +275,9 @@ describe('pass resource caching', () => {
     pass.execute(renderContext)
     pass.execute(renderContext)
 
-    expect((device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup).toHaveBeenCalledTimes(1)
+    expect(
+      (device as unknown as { createBindGroup: ReturnType<typeof vi.fn> }).createBindGroup
+    ).toHaveBeenCalledTimes(1)
   })
 
   it('uses one render pass plus texture copy in TemporalDepthCapture execution', () => {

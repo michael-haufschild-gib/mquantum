@@ -168,12 +168,7 @@ export class EnvironmentCompositePass extends WebGPUBasePass {
    * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
-    if (
-      !this.device ||
-      !this.renderPipeline ||
-      !this.passBindGroupLayout ||
-      !this.sampler
-    ) {
+    if (!this.device || !this.renderPipeline || !this.passBindGroupLayout || !this.sampler) {
       return
     }
 

@@ -58,7 +58,8 @@ export const Section: React.FC<SectionProps> = React.memo(
     }, [isOpen, storageKey])
 
     // Sync open state to parent when callback identity changes
-    // (covers initial mount AND quantum mode switches)
+    // (covers initial mount AND quantum mode switches).
+    // `isOpen` is intentionally omitted: toggling fires in handleToggle, not here.
     useEffect(() => {
       onOpenChange?.(isOpen)
       // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,4 +1,3 @@
-/* global GPURenderPassDepthStencilAttachment */
 /**
  * WebGPU Scene Pass
  *
@@ -131,9 +130,10 @@ export class ScenePass extends WebGPUBasePass {
 
   constructor(config: ScenePassConfig) {
     // Build inputs based on mode
-    const inputs = config.mode === 'passthrough' && config.sourceResource
-      ? [{ resourceId: config.sourceResource, access: 'read' as const, binding: 0 }]
-      : []
+    const inputs =
+      config.mode === 'passthrough' && config.sourceResource
+        ? [{ resourceId: config.sourceResource, access: 'read' as const, binding: 0 }]
+        : []
 
     // Build outputs
     const outputs = [{ resourceId: config.outputResource, access: 'write' as const, binding: 0 }]

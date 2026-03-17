@@ -46,7 +46,6 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
       setFrequencySpread,
       setFieldScale,
       setSchroedingerParameterValue,
-      resetSchroedingerParameters,
     } = actions
 
     return (
@@ -145,7 +144,6 @@ export const HarmonicOscillatorControls: React.FC<HarmonicOscillatorControlsProp
           <Section
             title={`Cross Section (${dimension - 3} dim${dimension > 4 ? 's' : ''})`}
             defaultOpen={true}
-            onReset={() => resetSchroedingerParameters()}
           >
             {Array.from({ length: dimension - 3 }, (_, i) => (
               <Slider

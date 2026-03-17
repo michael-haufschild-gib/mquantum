@@ -146,20 +146,16 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     (f32(gid.z) + 0.5) / f32(texDims.z) * 2.0 * bound - bound
   );
 
-  // Project into N-D lattice space via basis vectors (dims 0-2)
-  // and slice positions (dims 3+)
+  // Project into N-D lattice space via basis vectors (all dims)
+  // Extra dims (d >= 3) get basis contribution + slice position offset
   var ndWorldPos: array<f32, 12>;
-  if (params.latticeDim > 0u) {
-    ndWorldPos[0u] = modelPos.x * params.basisXx + modelPos.y * params.basisYx + modelPos.z * params.basisZx;
-  }
-  if (params.latticeDim > 1u) {
-    ndWorldPos[1u] = modelPos.x * params.basisXy + modelPos.y * params.basisYy + modelPos.z * params.basisZy;
-  }
-  if (params.latticeDim > 2u) {
-    ndWorldPos[2u] = modelPos.x * params.basisXz + modelPos.y * params.basisYz + modelPos.z * params.basisZz;
-  }
-  for (var d: u32 = 3u; d < params.latticeDim; d++) {
-    ndWorldPos[d] = params.slicePositions[d];
+  for (var d: u32 = 0u; d < params.latticeDim; d++) {
+    ndWorldPos[d] = modelPos.x * params.basisX[d]
+                  + modelPos.y * params.basisY[d]
+                  + modelPos.z * params.basisZ[d];
+    if (d >= 3u) {
+      ndWorldPos[d] += params.slicePositions[d];
+    }
   }
 
   var coordsLo: array<u32, 12>;
@@ -172,19 +168,14 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     return;
   }
 
-  // Perpendicular falloff for low-dimensional lattices
+  // Perpendicular falloff for low-dimensional lattices (1D → tube, 2D → sheet)
   var perpFalloff: f32 = 1.0;
   if (params.latticeDim < 3u) {
     var projSq: f32 = 0.0;
-    if (params.latticeDim > 0u) {
-      let v0 = vec3f(params.basisXx, params.basisYx, params.basisZx);
-      let p0 = dot(modelPos, v0);
-      projSq += p0 * p0;
-    }
-    if (params.latticeDim > 1u) {
-      let v1 = vec3f(params.basisXy, params.basisYy, params.basisZy);
-      let p1 = dot(modelPos, v1);
-      projSq += p1 * p1;
+    for (var d: u32 = 0u; d < params.latticeDim; d++) {
+      let v = vec3f(params.basisX[d], params.basisY[d], params.basisZ[d]);
+      let proj = dot(modelPos, v);
+      projSq += proj * proj;
     }
     let perpDist2 = max(dot(modelPos, modelPos) - projSq, 0.0);
     let perpSigma = bound * 0.06;
@@ -328,7 +319,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       for (var d: u32 = 0u; d < params.latticeDim; d++) {
         r2pot += ndWorldPos[d] * ndWorldPos[d];
       }
-      let W2 = params.wellWidth * params.wellWidth;
+      let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
       V = params.wellDepth * (1.0 - exp(-r2pot / W2));
     }
     // Normalize to [0, 1] using wellDepth or harmonicOmega as characteristic scale

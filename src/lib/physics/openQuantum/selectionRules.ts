@@ -21,10 +21,7 @@ import type { HydrogenBasisState } from './hydrogenBasis'
  * @param stateJ - Final state
  * @returns true if the transition is dipole-allowed
  */
-export function isAllowedE1(
-  stateI: HydrogenBasisState,
-  stateJ: HydrogenBasisState,
-): boolean {
+export function isAllowedE1(stateI: HydrogenBasisState, stateJ: HydrogenBasisState): boolean {
   // Δl = ±1
   if (Math.abs(stateI.l - stateJ.l) !== 1) return false
 

@@ -1204,7 +1204,10 @@ describe('presetManagerStore', () => {
 
       usePresetManagerStore.getState().loadScene(saved!.id)
 
-      const schroedinger = useExtendedObjectStore.getState().schroedinger as unknown as Record<string, unknown>
+      const schroedinger = useExtendedObjectStore.getState().schroedinger as unknown as Record<
+        string,
+        unknown
+      >
       expect(schroedinger.termCount).toBe(4)
       expect(schroedinger.mysteryExtended).toBeUndefined()
     })

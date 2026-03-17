@@ -11,7 +11,6 @@
 import React, { useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Section } from '@/components/sections/Section'
-import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { Slider } from '@/components/ui/Slider'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
@@ -47,9 +46,7 @@ const PRESET_OPTIONS = [
 export const PauliSpinorControls: React.FC = React.memo(() => {
   const dimension = useGeometryStore((s) => s.dimension)
 
-  const pauli = useExtendedObjectStore(
-    useShallow((s) => s.pauliSpinor)
-  )
+  const pauli = useExtendedObjectStore(useShallow((s) => s.pauliSpinor))
 
   const actions = useExtendedObjectStore(
     useShallow((s) => ({
@@ -78,7 +75,7 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       setPauliMass: s.setPauliMass,
       setPauliAbsorberEnabled: s.setPauliAbsorberEnabled,
       setPauliAbsorberWidth: s.setPauliAbsorberWidth,
-      setPauliAbsorberStrength: s.setPauliAbsorberStrength,
+      setPauliPmlTargetReflection: s.setPauliPmlTargetReflection,
       // Visualization
       setPauliFieldView: s.setPauliFieldView,
       setPauliAutoScale: s.setPauliAutoScale,
@@ -88,8 +85,6 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       // Slice positions
       setPauliSlicePosition: s.setPauliSlicePosition,
       // Lifecycle
-      setPauliNeedsReset: s.setPauliNeedsReset,
-      resetPauliField: s.resetPauliField,
       setPauliConfig: s.setPauliConfig,
     }))
   )
@@ -109,25 +104,20 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
         }
       }
     },
-    [actions],
+    [actions]
   )
 
-  const handleReset = useCallback(() => {
-    actions.setPauliNeedsReset()
-  }, [actions])
-
-  const handleFullReset = useCallback(() => {
-    actions.resetPauliField()
-  }, [actions])
-
   /** Sync fieldView toggle with color algorithm so the renderer encodes matching channels. */
-  const handleFieldViewChange = useCallback((view: PauliFieldView) => {
-    actions.setPauliFieldView(view)
-    const algo = FIELD_VIEW_TO_COLOR_ALGO[view]
-    if (algo) {
-      useAppearanceStore.getState().setColorAlgorithm(algo)
-    }
-  }, [actions])
+  const handleFieldViewChange = useCallback(
+    (view: PauliFieldView) => {
+      actions.setPauliFieldView(view)
+      const algo = FIELD_VIEW_TO_COLOR_ALGO[view]
+      if (algo) {
+        useAppearanceStore.getState().setColorAlgorithm(algo)
+      }
+    },
+    [actions]
+  )
 
   const latticeDim = pauli.latticeDim ?? dimension
 
@@ -168,7 +158,9 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       {/* Wavepacket Position & Momentum */}
       <Section title="Wavepacket" defaultOpen={false}>
         <div className="space-y-3">
-          <p className="text-[10px] text-text-tertiary uppercase tracking-widest font-bold">Center</p>
+          <p className="text-[10px] text-text-tertiary uppercase tracking-widest font-bold">
+            Center
+          </p>
           {Array.from({ length: latticeDim }, (_, d) => (
             <Slider
               key={`center-${d}`}
@@ -181,7 +173,9 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
               showValue
             />
           ))}
-          <p className="text-[10px] text-text-tertiary uppercase tracking-widest font-bold mt-2">Momentum</p>
+          <p className="text-[10px] text-text-tertiary uppercase tracking-widest font-bold mt-2">
+            Momentum
+          </p>
           {Array.from({ length: latticeDim }, (_, d) => (
             <Slider
               key={`momentum-${d}`}
@@ -262,18 +256,12 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
           stepsPerFrame={pauli.stepsPerFrame}
           hbar={pauli.hbar}
           mass={pauli.mass}
-          absorberEnabled={pauli.absorberEnabled}
-          absorberWidth={pauli.absorberWidth}
-          absorberStrength={pauli.absorberStrength}
           onGridSizeChange={actions.setPauliGridSize}
           onSpacingChange={actions.setPauliSpacing}
           onDtChange={actions.setPauliDt}
           onStepsPerFrameChange={actions.setPauliStepsPerFrame}
           onHbarChange={actions.setPauliHbar}
           onMassChange={actions.setPauliMass}
-          onAbsorberEnabledChange={actions.setPauliAbsorberEnabled}
-          onAbsorberWidthChange={actions.setPauliAbsorberWidth}
-          onAbsorberStrengthChange={actions.setPauliAbsorberStrength}
         />
       </Section>
 
@@ -283,14 +271,6 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
           {latticeDim}D Pauli, {pauli.gridSize.slice(0, latticeDim).join('\u00D7')} sites
           {' \u00B7 '}2-component spinor
         </p>
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={handleReset}>
-            Re-initialize
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleFullReset}>
-            Reset All
-          </Button>
-        </div>
       </div>
     </div>
   )

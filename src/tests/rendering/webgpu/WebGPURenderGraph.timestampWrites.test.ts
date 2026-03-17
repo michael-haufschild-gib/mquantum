@@ -1,4 +1,3 @@
-/* global GPUComputePassDescriptor, GPURenderPassDescriptor, GPUTextureFormat */
 import { describe, expect, it, vi } from 'vitest'
 import type {
   WebGPURenderPass,

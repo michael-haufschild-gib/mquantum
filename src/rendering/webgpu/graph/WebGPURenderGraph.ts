@@ -1,4 +1,3 @@
-/* global GPUComputePassDescriptor, GPUComputePassTimestampWrites, GPURenderPassDescriptor, GPURenderPassTimestampWrites, GPUSamplerDescriptor, GPUTextureFormat */
 /**
  * WebGPU Render Graph
  *
@@ -741,8 +740,13 @@ export class WebGPURenderGraph {
     const canvasTextureView = canvasTexture.createView()
 
     // Detect canvas texture vs graph dimension mismatch (dev-only)
-    if (import.meta.env.DEV && (canvasTexture.width !== this.width || canvasTexture.height !== this.height)) {
-      console.warn(`[RenderGraph] Dimension mismatch: canvasTexture ${canvasTexture.width}×${canvasTexture.height}, graph ${this.width}×${this.height}`)
+    if (
+      import.meta.env.DEV &&
+      (canvasTexture.width !== this.width || canvasTexture.height !== this.height)
+    ) {
+      console.warn(
+        `[RenderGraph] Dimension mismatch: canvasTexture ${canvasTexture.width}×${canvasTexture.height}, graph ${this.width}×${this.height}`
+      )
     }
 
     // Create command encoder

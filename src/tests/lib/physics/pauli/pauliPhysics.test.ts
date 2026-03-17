@@ -75,7 +75,9 @@ describe('Pauli physics config constraints', () => {
     const latticeDim = DEFAULT_PAULI_CONFIG.latticeDim
     let maxExtent = 0
     for (let d = 0; d < latticeDim; d++) {
-      const Ld = DEFAULT_PAULI_CONFIG.gridSize[d] * DEFAULT_PAULI_CONFIG.spacing[d]
+      const gridN = DEFAULT_PAULI_CONFIG.gridSize[d] ?? 0
+      const sp = DEFAULT_PAULI_CONFIG.spacing[d] ?? 0
+      const Ld = gridN * sp
       if (Ld > maxExtent) maxExtent = Ld
     }
     // Must produce a positive bounding radius
@@ -91,8 +93,9 @@ describe('Pauli physics config constraints', () => {
     expect(DEFAULT_PAULI_CONFIG.absorberWidth).toBeLessThanOrEqual(1)
   })
 
-  it('absorberStrength is non-negative', () => {
-    expect(DEFAULT_PAULI_CONFIG.absorberStrength).toBeGreaterThanOrEqual(0)
+  it('pmlTargetReflection is in valid range (0, 1)', () => {
+    expect(DEFAULT_PAULI_CONFIG.pmlTargetReflection).toBeGreaterThan(0)
+    expect(DEFAULT_PAULI_CONFIG.pmlTargetReflection).toBeLessThan(1)
   })
 
   // === Spin colors ===

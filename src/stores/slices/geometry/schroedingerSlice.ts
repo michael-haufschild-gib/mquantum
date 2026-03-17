@@ -1,8 +1,5 @@
 import {
   DEFAULT_SCHROEDINGER_CONFIG,
-  DEFAULT_OPEN_QUANTUM_CONFIG,
-  DEFAULT_TDSE_CONFIG,
-  DEFAULT_BEC_CONFIG,
   type BecConfig,
   type DiracConfig,
   type FreeScalarConfig,
@@ -18,13 +15,16 @@ import {
 import { SCHROEDINGER_PALETTE_DEFINITIONS } from '@/lib/geometry/extended/schroedinger/palettes'
 import { SCHROEDINGER_NAMED_PRESETS } from '@/lib/geometry/extended/schroedinger/presets'
 import { getHydrogenNDPreset } from '@/lib/geometry/extended/schroedinger/hydrogenNDPresets'
-import { getTdsePreset } from '@/lib/physics/tdse/presets'
-import { thomasFermiMuND, thomasFermiRadius } from '@/lib/physics/bec/chemicalPotential'
-import { maxStableDt } from '@/lib/physics/dirac/scales'
 import { StateCreator } from 'zustand'
 import { useGeometryStore } from '@/stores/geometryStore'
-import { useBecDiagnosticsStore } from '@/stores/becDiagnosticsStore'
 import { ExtendedObjectSlice, SchroedingerSlice } from './types'
+import type { SetterContext } from './setters/sliceSetterUtils'
+import { clampDtWithCfl } from './setters/sliceSetterUtils'
+import { createTdseSetters, resizeTdseArrays } from './setters/tdseSetters'
+import { createFreeScalarSetters, resizeFreeScalarArrays } from './setters/freeScalarSetters'
+import { createDiracSetters, resizeDiracArrays } from './setters/diracSetters'
+import { createBecSetters, resizeBecArrays } from './setters/becSetters'
+import { createOpenQuantumSetters } from './setters/openQuantumSetters'
 
 export const createSchroedingerSlice: StateCreator<
   ExtendedObjectSlice,
@@ -111,258 +111,20 @@ export const createSchroedingerSlice: StateCreator<
     return [x / length, y / length, z / length]
   }
 
-  /**
-   * Compute the CFL stability limit for the lattice Klein-Gordon field.
-   * For a leapfrog integrator the maximum eigenfrequency is:
-   *   omega_max^2 = m^2 + sum_i (2/a_i)^2
-   * and the stability condition is dt * omega_max < 2, giving:
-   *   dt_max = 2 / sqrt(m^2 + sum_i (2/a_i)^2)
-   * @param spacing - Lattice spacing per dimension [ax, ay, az]
-   * @param latticeDim - Active spatial dimensions (1, 2, or 3)
-   * @param mass - Klein-Gordon mass parameter
-   */
-  const computeCflLimit = (spacing: number[], latticeDim: number, mass: number): number => {
-    let sumInvA2 = 0
-    for (let i = 0; i < latticeDim; i++) {
-      const a = spacing[i]!
-      const twoOverA = 2 / a
-      sumInvA2 += twoOverA * twoOverA
-    }
-    const omegaMax = Math.sqrt(mass * mass + sumInvA2)
-    return 2 / omegaMax
-  }
-
-  /** Maximum total lattice sites for memory budget (~8MB for phi+pi buffers) */
-  const MAX_TOTAL_SITES = 1048576
-
-  /**
-   * Compute default per-dimension grid size for a given dimensionality.
-   * Ensures total sites stays within MAX_TOTAL_SITES budget.
-   * @param d - Number of spatial dimensions
-   */
-  const defaultGridPerDim = (d: number): number => {
-    const raw = Math.round(Math.pow(MAX_TOTAL_SITES, 1 / d))
-    // Round down to nearest power-of-2 so exact vacuum always has a valid grid size
-    let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-    pow2 = Math.max(2, Math.min(128, pow2))
-    // Verify total budget: if pow2^d exceeds budget, halve until it fits
-    while (pow2 > 2 && Math.pow(pow2, d) > MAX_TOTAL_SITES) {
-      pow2 = pow2 / 2
-    }
-    return pow2
-  }
-
-  /**
-   * Resize free scalar arrays to match a new latticeDim, preserving existing values
-   * where possible and filling new dimensions with defaults.
-   */
-  const resizeFreeScalarArrays = (
-    prev: FreeScalarConfig,
-    newDim: number
-  ): Partial<FreeScalarConfig> => {
-    const gridDefault = defaultGridPerDim(newDim)
-    // Always use dimension-appropriate grid size. When dimension decreases,
-    // the per-axis budget increases and old shrunken values should not persist.
-    const gridSize = Array.from({ length: newDim }, () => gridDefault)
-    const spacing = Array.from({ length: newDim }, (_, i) =>
-      i < prev.spacing.length ? prev.spacing[i]! : 0.1
-    )
-    const packetCenter = Array.from({ length: newDim }, (_, i) =>
-      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
-    )
-    const modeK = Array.from({ length: newDim }, (_, i) =>
-      i < prev.modeK.length ? prev.modeK[i]! : 0
-    )
-    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
-      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
-    )
-    return { latticeDim: newDim, gridSize, spacing, packetCenter, modeK, slicePositions }
-  }
-
-  /** Maximum total TDSE lattice sites — FFT needs power-of-2 per axis */
-  const TDSE_MAX_TOTAL_SITES = 262144 // 64^3
-
-  /**
-   * Compute default per-dimension grid size for a given TDSE dimensionality.
-   * TDSE requires power-of-2 per axis for FFT. Ensures total sites within budget.
-   */
-  const defaultTdseGridPerDim = (d: number): number => {
-    const raw = Math.round(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / d))
-    // Round down to nearest power-of-2 (min 2 for valid FFT)
-    let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-    pow2 = Math.max(2, Math.min(128, pow2))
-    // Verify total budget: if pow2^d exceeds budget, halve until it fits
-    while (pow2 > 2 && Math.pow(pow2, d) > TDSE_MAX_TOTAL_SITES) {
-      pow2 = pow2 / 2
-    }
-    return pow2
-  }
-
-  /**
-   * Resize TDSE arrays to match a new latticeDim, preserving existing values
-   * where possible and filling new dimensions with defaults.
-   */
-  const resizeTdseArrays = (
-    prev: TdseConfig,
-    newDim: number
-  ): Partial<TdseConfig> => {
-    const gridDefault = defaultTdseGridPerDim(newDim)
-    // Always use dimension-appropriate grid size. When dimension decreases,
-    // the per-axis budget increases and old shrunken values should not persist.
-    const gridSize = Array.from({ length: newDim }, () => gridDefault)
-    // Scale spacing to preserve the physical domain extent when grid shrinks/grows.
-    // oldExtent = oldGrid * oldSpacing; newSpacing = oldExtent / newGrid
-    const spacing = Array.from({ length: newDim }, (_, i) => {
-      if (i < prev.spacing.length && i < prev.gridSize.length) {
-        const oldExtent = prev.gridSize[i]! * prev.spacing[i]!
-        return Math.max(0.01, Math.min(1.0, oldExtent / gridDefault))
-      }
-      return 0.1
-    })
-    const packetCenter = Array.from({ length: newDim }, (_, i) =>
-      i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
-    )
-    const packetMomentum = Array.from({ length: newDim }, (_, i) =>
-      i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
-    )
-    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
-      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
-    )
-    // Scale potential geometry so features stay resolved on the (possibly coarser) grid.
-    // Minimum feature size = 2 grid cells so the potential is never sub-grid.
-    const minFeature0 = 2 * spacing[0]!
-    const minFeature1 = newDim >= 2 ? 2 * spacing[1]! : minFeature0
-    const wallThickness = Math.max(prev.wallThickness, minFeature0)
-    const barrierWidth = Math.max(prev.barrierWidth, minFeature0)
-    const slitWidth = Math.max(prev.slitWidth, minFeature1)
-    const packetWidth = Math.max(prev.packetWidth, minFeature0)
-    // Ensure slits don't merge: separation must exceed slitWidth + 1 grid cell gap
-    const slitSeparation = Math.max(prev.slitSeparation, slitWidth + minFeature1)
-
-    // Clamp dt to CFL limit for the new spacing/dimension
-    const newDt = clampDtWithCfl(prev.dt, spacing, newDim, prev.mass)
-    return {
-      latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions,
-      dt: newDt, wallThickness, barrierWidth, slitWidth, slitSeparation, packetWidth,
-    }
-  }
-
-  const resizeBecArrays = (
-    prev: BecConfig,
-    newDim: number
-  ): Partial<BecConfig> => {
-    const gridDefault = defaultTdseGridPerDim(newDim)
-    // Always use the dimension-appropriate grid size. Old per-axis values become
-    // meaningless when the site budget changes (e.g. 64→8 at D=5, 8→64 at D=3).
-    const gridSize = Array.from({ length: newDim }, () => gridDefault)
-
-    const trapAnisotropy = Array.from({ length: newDim }, (_, i) =>
-      i < prev.trapAnisotropy.length ? prev.trapAnisotropy[i]! : 1.0
-    )
-
-    // Compute per-axis spacing so the grid covers the Thomas-Fermi condensate.
-    // Each axis has effective ω_d = ω * anisotropy[d], giving per-axis R_TF.
-    const g = prev.interactionStrength ?? 500
-    const omega = prev.trapOmega ?? 1.0
-    const mass = prev.mass ?? 1.0
-    const mu = g > 0 ? thomasFermiMuND(newDim, g, omega) : 0
-    const COVERAGE = 1.3
-    const spacing = Array.from({ length: newDim }, (_, i) => {
-      const effectiveOmega = omega * (trapAnisotropy[i] ?? 1.0)
-      const Rtf = mu > 0 ? thomasFermiRadius(mu, mass, effectiveOmega) : 2.0
-      return Math.max(0.05, (2 * Rtf * COVERAGE) / gridDefault)
-    })
-
-    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
-      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
-    )
-    // Clamp dt to CFL limit for the new spacing/dimension (use smallest spacing)
-    const newDt = clampDtWithCfl(prev.dt, spacing, newDim, mass)
-    return { latticeDim: newDim, gridSize, spacing, trapAnisotropy, slicePositions, dt: newDt }
-  }
-
-  /** Maximum total Dirac lattice sites — FFT needs power-of-2 per axis */
-  const DIRAC_MAX_TOTAL_SITES = 262144 // 64^3
-
-  /**
-   * Compute default per-dimension grid size for a given Dirac dimensionality.
-   * Dirac requires power-of-2 per axis for FFT. Ensures total sites within budget.
-   */
-  const defaultDiracGridPerDim = (d: number): number => {
-    const raw = Math.round(Math.pow(DIRAC_MAX_TOTAL_SITES, 1 / d))
-    let pow2 = 2 ** Math.floor(Math.log2(Math.max(2, raw)))
-    pow2 = Math.max(2, Math.min(128, pow2))
-    while (pow2 > 2 && Math.pow(pow2, d) > DIRAC_MAX_TOTAL_SITES) {
-      pow2 = pow2 / 2
-    }
-    return pow2
-  }
-
-  /**
-   * Resize Dirac arrays to match a new latticeDim, preserving existing values
-   * where possible and filling new dimensions with defaults.
-   */
-  const resizeDiracArrays = (
-    prev: DiracConfig,
-    newDim: number
-  ): Partial<DiracConfig> => {
-    const gridDefault = defaultDiracGridPerDim(newDim)
-    const gridSize = Array.from({ length: newDim }, () => gridDefault)
-    const spacing = Array.from({ length: newDim }, (_, i) =>
-      i < prev.spacing.length ? prev.spacing[i]! : 0.15
-    )
-
-    // Compute lattice half-extent per dimension for clamping
-    const halfExtent = (d: number) => gridSize[d]! * spacing[d]! * 0.5
-
-    // Clamp packetCenter to lie within lattice bounds (with 10% margin)
-    const packetCenter = Array.from({ length: newDim }, (_, i) => {
-      const raw = i < prev.packetCenter.length ? prev.packetCenter[i]! : 0
-      const limit = halfExtent(i) * 0.9
-      return Math.max(-limit, Math.min(limit, raw))
-    })
-
-    // Clamp packetMomentum to Nyquist limit: |k| ≤ π/spacing
-    const packetMomentum = Array.from({ length: newDim }, (_, i) => {
-      const raw = i < prev.packetMomentum.length ? prev.packetMomentum[i]! : 0
-      const kMax = Math.PI / spacing[i]!
-      return Math.max(-kMax, Math.min(kMax, raw))
-    })
-
-    // Scale packetWidth to fit within the new lattice: at most 40% of
-    // the smallest lattice half-extent, at least one grid spacing (but
-    // never larger than the max sigma to avoid exceeding the lattice)
-    const minHalfExtent = Math.min(...gridSize.map((g, i) => g * spacing[i]! * 0.5))
-    const maxSigma = minHalfExtent * 0.4
-    const newPacketWidth = Math.min(maxSigma, prev.packetWidth)
-
-    const slicePositions = Array.from({ length: Math.max(0, newDim - 3) }, (_, i) =>
-      i < prev.slicePositions.length ? prev.slicePositions[i]! : 0
-    )
-    // Clamp dt to Dirac CFL limit for the new spacing
-    const dtMax = maxStableDt(spacing, prev.speedOfLight)
-    const newDt = Math.max(0.0001, Math.min(dtMax * 0.9, prev.dt))
-    return { latticeDim: newDim, gridSize, spacing, packetCenter, packetMomentum, slicePositions, dt: newDt, packetWidth: newPacketWidth }
-  }
-
-  /**
-   * Clamp dt to be within [0.001, min(0.1, CFL limit * safety factor)].
-   * Uses a 0.9 safety factor to stay well within the stable region.
-   * @param dt - Requested time step
-   * @param spacing - Lattice spacing
-   * @param latticeDim - Active dimensions
-   * @param mass - Klein-Gordon mass parameter
-   */
-  const clampDtWithCfl = (dt: number, spacing: number[], latticeDim: number, mass: number): number => {
-    const cflLimit = computeCflLimit(spacing, latticeDim, mass)
-    const maxDt = Math.min(0.1, cflLimit * 0.9)
-    return Math.max(0.001, Math.min(maxDt, dt))
-  }
-
   const axisToNormal = (axis: 'x' | 'y' | 'z'): [number, number, number] => {
     if (axis === 'x') return [1, 0, 0]
     if (axis === 'y') return [0, 1, 0]
     return [0, 0, 1]
+  }
+
+  // Build the shared context for extracted setter factories
+  const ctx: SetterContext = {
+    setWithVersion,
+    set,
+    get,
+    isFinite: isFiniteSchroedingerInput,
+    hasOnlyFinite: hasOnlyFiniteNumbers,
+    warnNonFinite: warnNonFiniteSchroedingerInput,
   }
 
   return {
@@ -527,9 +289,7 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quantum State Configuration ===
     setSchroedingerPresetName: (name: SchroedingerPresetName) => {
-      // If selecting a named preset, apply its parameters to the state
-      // This keeps the UI sliders in sync with the visual preset
-      let updates = {}
+      let updates: Partial<SchroedingerConfig> = {}
       if (name !== 'custom') {
         const preset = SCHROEDINGER_NAMED_PRESETS[name]
         if (preset) {
@@ -611,23 +371,18 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Quantum Mode Selection ===
     setSchroedingerQuantumMode: (mode) => {
-      // Most compute modes require volumetric 3D rendering — enforce dimension >= 3
-      // Free scalar field supports 1D+ (1D→tube, 2D→sheet via perpendicular falloff)
       if (COMPUTE_MODES_3D.has(mode) && useGeometryStore.getState().dimension < 3) {
         useGeometryStore.getState().setDimension(3)
       }
       setWithVersion((state) => {
         const updates: Partial<SchroedingerConfig> = { quantumMode: mode }
         if (mode === 'freeScalarField') {
-          // Free scalar field doesn't support Wigner or momentum representation
           if (state.schroedinger.representation !== 'position') {
             updates.representation = 'position'
           }
-          // Cross-section calls evalPsi() (HO wavefunction), not the actual scalar field
           if (state.schroedinger.crossSectionEnabled) {
             updates.crossSectionEnabled = false
           }
-          // Sync latticeDim to current global dimension and resize arrays
           const dim = useGeometryStore.getState().dimension
           const prev = state.schroedinger.freeScalar
           if (prev.latticeDim !== dim) {
@@ -638,41 +393,33 @@ export const createSchroedingerSlice: StateCreator<
           }
         }
         if (mode === 'tdseDynamics') {
-          // TDSE doesn't support Wigner or momentum representation
           if (state.schroedinger.representation !== 'position') {
             updates.representation = 'position'
           }
-          // Cross-section uses analytic wavefunctions, not TDSE grid
           if (state.schroedinger.crossSectionEnabled) {
             updates.crossSectionEnabled = false
           }
-          // Sync latticeDim to current global dimension and resize arrays
           const dim = useGeometryStore.getState().dimension
           const prev = state.schroedinger.tdse
           if (prev.latticeDim !== dim) {
             const resized = resizeTdseArrays(prev, dim)
-            // Downgrade doubleSlit to barrier at D=1 (slits require axis 1)
             const potentialType =
               dim < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
             updates.tdse = { ...prev, ...resized, potentialType, needsReset: true }
           }
         }
         if (mode === 'becDynamics') {
-          // BEC doesn't support Wigner or momentum representation
           if (state.schroedinger.representation !== 'position') {
             updates.representation = 'position'
           }
-          // Cross-section uses analytic wavefunctions, not density grid
           if (state.schroedinger.crossSectionEnabled) {
             updates.crossSectionEnabled = false
           }
-          // BEC requires volumetric 3D rendering — enforce minimum dimension
           let dim = useGeometryStore.getState().dimension
           if (dim < 3) {
             useGeometryStore.getState().setDimension(3)
             dim = 3
           }
-          // Sync latticeDim to current global dimension and resize arrays
           const prev = state.schroedinger.bec
           if (prev.latticeDim !== dim) {
             const resized = resizeBecArrays(prev, dim)
@@ -680,15 +427,12 @@ export const createSchroedingerSlice: StateCreator<
           }
         }
         if (mode === 'diracEquation') {
-          // Dirac doesn't support Wigner or momentum representation
           if (state.schroedinger.representation !== 'position') {
             updates.representation = 'position'
           }
-          // Cross-section uses analytic wavefunctions, not Dirac spinor grid
           if (state.schroedinger.crossSectionEnabled) {
             updates.crossSectionEnabled = false
           }
-          // Sync latticeDim to current global dimension and resize arrays
           const dim = useGeometryStore.getState().dimension
           const prev = state.schroedinger.dirac
           if (prev.latticeDim !== dim) {
@@ -700,7 +444,6 @@ export const createSchroedingerSlice: StateCreator<
       })
     },
     setSchroedingerRepresentation: (value: 'position' | 'momentum' | 'wigner') => {
-      // Compute modes only support position representation — reject silently
       if (value !== 'position' && COMPUTE_MODES.has(get().schroedinger.quantumMode)) {
         return
       }
@@ -720,10 +463,7 @@ export const createSchroedingerSlice: StateCreator<
       const clamped = Math.max(1, Math.min(7, Math.floor(n)))
       const currentL = get().schroedinger.azimuthalQuantumNumber
       const currentM = get().schroedinger.magneticQuantumNumber
-
-      // Enforce l < n constraint
       const newL = Math.min(currentL, clamped - 1)
-      // Enforce |m| <= l constraint
       const newM = Math.max(-newL, Math.min(newL, currentM))
 
       setWithVersion((state) => ({
@@ -744,10 +484,7 @@ export const createSchroedingerSlice: StateCreator<
       }
       const currentN = get().schroedinger.principalQuantumNumber
       const currentM = get().schroedinger.magneticQuantumNumber
-
-      // Enforce l < n and l >= 0 constraints
       const clamped = Math.max(0, Math.min(currentN - 1, Math.floor(l)))
-      // Enforce |m| <= l constraint
       const newM = Math.max(-clamped, Math.min(clamped, currentM))
 
       setWithVersion((state) => ({
@@ -766,7 +503,6 @@ export const createSchroedingerSlice: StateCreator<
         return
       }
       const currentL = get().schroedinger.azimuthalQuantumNumber
-      // Enforce |m| <= l constraint
       const clamped = Math.max(-currentL, Math.min(currentL, Math.floor(m)))
 
       setWithVersion((state) => ({
@@ -804,7 +540,6 @@ export const createSchroedingerSlice: StateCreator<
 
     // === Hydrogen ND Configuration ===
     setSchroedingerHydrogenNDPreset: (preset: HydrogenNDPresetName) => {
-      // For 'custom', only update the preset name - preserve existing values
       if (preset === 'custom') {
         setWithVersion((state) => ({
           schroedinger: {
@@ -814,20 +549,16 @@ export const createSchroedingerSlice: StateCreator<
         }))
         return
       }
-
-      // For named presets, apply all preset values
       const presetData = getHydrogenNDPreset(preset)
       setWithVersion((state) => ({
         schroedinger: {
           ...state.schroedinger,
           hydrogenNDPreset: preset,
-          // Update 3D hydrogen quantum numbers
           principalQuantumNumber: presetData.n,
           azimuthalQuantumNumber: presetData.l,
           magneticQuantumNumber: presetData.m,
           useRealOrbitals: presetData.useReal,
           bohrRadiusScale: presetData.bohrRadiusScale,
-          // Update extra dimension configuration
           extraDimQuantumNumbers: [...presetData.extraDimN],
           extraDimOmega: [...presetData.extraDimOmega],
         },
@@ -899,7 +630,11 @@ export const createSchroedingerSlice: StateCreator<
       }
       const clamped = Math.max(0, Math.min(0.5, spread))
       setWithVersion((state) => ({
-        schroedinger: { ...state.schroedinger, extraDimFrequencySpread: clamped, presetName: 'custom' },
+        schroedinger: {
+          ...state.schroedinger,
+          extraDimFrequencySpread: clamped,
+          presetName: 'custom',
+        },
       }))
     },
 
@@ -916,12 +651,19 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerScatteringAnisotropy: clampedSetter('scatteringAnisotropy', -0.9, 0.9),
     setSchroedingerRoughness: clampedSetter('roughness', 0.0, 1.0),
     setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => {
-      // Update both raymarchQuality and sampleCount for consistency.
-      // Note: The mesh reads raymarchQuality directly via RAYMARCH_QUALITY_TO_SAMPLES mapping.
-      // sampleCount is kept in sync for backward compatibility with any code that reads it directly.
       const sampleCount = RAYMARCH_QUALITY_TO_SAMPLES[quality]
       setWithVersion((state) => ({
         schroedinger: { ...state.schroedinger, raymarchQuality: quality, sampleCount },
+      }))
+    },
+
+    // === PML Absorbing Boundary (shared) ===
+    setSchroedingerAbsorberEnabled: valueSetter('absorberEnabled'),
+    setSchroedingerAbsorberWidth: clampedSetter('absorberWidth', 0.05, 0.5),
+    setSchroedingerPmlTargetReflection: (r: number) => {
+      if (!isFiniteSchroedingerInput(r) || r <= 0 || r >= 1) return
+      setWithVersion((state) => ({
+        schroedinger: { ...state.schroedinger, pmlTargetReflection: r },
       }))
     },
 
@@ -1136,2001 +878,12 @@ export const createSchroedingerSlice: StateCreator<
     setSchroedingerSqLayerSqueezeR: clampedSetter('sqLayerSqueezeR', 0, 3),
     setSchroedingerSqLayerSqueezeTheta: clampedSetter('sqLayerSqueezeTheta', 0, 2 * Math.PI),
 
-    // === Free Scalar Field ===
-    setFreeScalarLatticeDim: (dim) => {
-      if (!isFiniteSchroedingerInput(dim)) {
-        warnNonFiniteSchroedingerInput('freeScalar.latticeDim', dim)
-        return
-      }
-      const clamped = Math.max(1, Math.min(11, Math.floor(dim)))
-      setWithVersion((state) => {
-        const prev = state.schroedinger.freeScalar
-        const resized = resizeFreeScalarArrays(prev, clamped)
-        const newSpacing = resized.spacing ?? prev.spacing
-        const newDt = clampDtWithCfl(prev.dt, newSpacing, clamped, prev.mass)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...prev, ...resized, dt: newDt, needsReset: true },
-          },
-        }
-      })
-    },
-    setFreeScalarGridSize: (size) => {
-      if (!hasOnlyFiniteNumbers(size)) {
-        warnNonFiniteSchroedingerInput('freeScalar.gridSize', size)
-        return
-      }
-      setWithVersion((state) => {
-        const { latticeDim, initialCondition } = state.schroedinger.freeScalar
-        const needsPow2 = initialCondition === 'vacuumNoise'
-        const maxPerDim = defaultGridPerDim(latticeDim)
-        const snap = (v: number, min: number, max: number) => {
-          const clamped = Math.max(min, Math.min(max, Math.round(v)))
-          if (!needsPow2) return clamped
-          const log2 = Math.round(Math.log2(clamped))
-          return Math.max(min, Math.min(max, 2 ** log2))
-        }
-        const clamped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < size.length ? size[i]! : 1
-          return i < latticeDim ? snap(s, 2, maxPerDim) : 1
-        })
-        // Enforce total site budget — halve the largest axis until within budget
-        while (clamped.reduce((a, b) => a * b, 1) > MAX_TOTAL_SITES) {
-          let maxIdx = 0
-          for (let j = 1; j < clamped.length; j++) {
-            if (clamped[j]! > clamped[maxIdx]!) maxIdx = j
-          }
-          if (clamped[maxIdx]! <= 2) break
-          clamped[maxIdx] = needsPow2 ? clamped[maxIdx]! / 2 : Math.max(2, clamped[maxIdx]! - 1)
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...state.schroedinger.freeScalar, gridSize: clamped, needsReset: true },
-          },
-        }
-      })
-    },
-    setFreeScalarSpacing: (spacing) => {
-      if (!hasOnlyFiniteNumbers(spacing)) {
-        warnNonFiniteSchroedingerInput('freeScalar.spacing', spacing)
-        return
-      }
-      setWithVersion((state) => {
-        const fs = state.schroedinger.freeScalar
-        const clamped = Array.from({ length: fs.latticeDim }, (_, i) =>
-          Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
-        )
-        const newDt = clampDtWithCfl(fs.dt, clamped, fs.latticeDim, fs.mass)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...fs, spacing: clamped, dt: newDt, needsReset: true },
-          },
-        }
-      })
-    },
-    setFreeScalarMass: (mass) => {
-      if (!isFiniteSchroedingerInput(mass)) {
-        warnNonFiniteSchroedingerInput('freeScalar.mass', mass)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(10.0, mass))
-      setWithVersion((state) => {
-        const fs = state.schroedinger.freeScalar
-        // Re-clamp dt to respect CFL limit with new mass
-        const newDt = clampDtWithCfl(fs.dt, fs.spacing, fs.latticeDim, clamped)
-        // Vacuum noise spectrum depends on mass — trigger re-initialization.
-        // Preserve any pending reset from another setter (e.g. setFreeScalarLatticeDim).
-        const needsReset = fs.needsReset || fs.initialCondition === 'vacuumNoise'
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...fs, mass: clamped, dt: newDt, needsReset },
-          },
-        }
-      })
-    },
-    setFreeScalarDt: (dt) => {
-      if (!isFiniteSchroedingerInput(dt)) {
-        warnNonFiniteSchroedingerInput('freeScalar.dt', dt)
-        return
-      }
-      setWithVersion((state) => {
-        const fs = state.schroedinger.freeScalar
-        const clamped = clampDtWithCfl(dt, fs.spacing, fs.latticeDim, fs.mass)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...fs, dt: clamped },
-          },
-        }
-      })
-    },
-    setFreeScalarStepsPerFrame: (steps) => {
-      if (!isFiniteSchroedingerInput(steps)) {
-        warnNonFiniteSchroedingerInput('freeScalar.stepsPerFrame', steps)
-        return
-      }
-      const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, stepsPerFrame: clamped },
-        },
-      }))
-    },
-    setFreeScalarInitialCondition: (condition) => {
-      setWithVersion((state) => {
-        const fs = state.schroedinger.freeScalar
-        let gridSize = fs.gridSize
-
-        // Snap grid sizes to power-of-2 when switching to vacuumNoise
-        if (condition === 'vacuumNoise') {
-          const maxPerDim = defaultGridPerDim(fs.latticeDim)
-          gridSize = gridSize.map((s) => {
-            const clamped = Math.max(2, Math.min(maxPerDim, s))
-            const log2 = Math.round(Math.log2(clamped))
-            return Math.max(2, Math.min(maxPerDim, 2 ** log2))
-          })
-        }
-
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...fs, initialCondition: condition, gridSize, needsReset: true },
-          },
-        }
-      })
-    },
-    setFreeScalarFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, fieldView: view },
-        },
-      }))
-    },
-
-    setFreeScalarPacketCenter: (center) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetCenter: center, needsReset: true },
-        },
-      }))
-    },
-    setFreeScalarPacketWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) {
-        warnNonFiniteSchroedingerInput('freeScalar.packetWidth', width)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(5.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetWidth: clamped, needsReset: true },
-        },
-      }))
-    },
-    setFreeScalarPacketAmplitude: (amplitude) => {
-      if (!isFiniteSchroedingerInput(amplitude)) {
-        warnNonFiniteSchroedingerInput('freeScalar.packetAmplitude', amplitude)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, amplitude))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, packetAmplitude: clamped, needsReset: true },
-        },
-      }))
-    },
-    setFreeScalarModeK: (k) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, modeK: k, needsReset: true },
-        },
-      }))
-    },
-    setFreeScalarAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, autoScale },
-        },
-      }))
-    },
-
-    setFreeScalarVacuumSeed: (seed) => {
-      if (!isFiniteSchroedingerInput(seed)) {
-        warnNonFiniteSchroedingerInput('freeScalar.vacuumSeed', seed)
-        return
-      }
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, vacuumSeed: Math.round(seed), needsReset: true },
-        },
-      }))
-    },
-    resetFreeScalarField: () => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, needsReset: true },
-        },
-      }))
-    },
-    setFreeScalarSelfInteractionEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionEnabled: enabled },
-        },
-      }))
-    },
-    setFreeScalarSelfInteractionLambda: (lambda) => {
-      if (!isFiniteSchroedingerInput(lambda)) {
-        warnNonFiniteSchroedingerInput('freeScalar.selfInteractionLambda', lambda)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, lambda))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionLambda: clamped },
-        },
-      }))
-    },
-    setFreeScalarSelfInteractionVev: (vev) => {
-      if (!isFiniteSchroedingerInput(vev)) {
-        warnNonFiniteSchroedingerInput('freeScalar.selfInteractionVev', vev)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(5.0, vev))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, selfInteractionVev: clamped },
-        },
-      }))
-    },
-    setFreeScalarSlicePosition: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.slicePositions', value)
-        return
-      }
-      setWithVersion((state) => {
-        const fs = state.schroedinger.freeScalar
-        const slicePositions = [...fs.slicePositions]
-        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
-          const halfExtent = (fs.gridSize[dimIndex + 3] ?? 1) * (fs.spacing[dimIndex + 3] ?? 0.1) * 0.5
-          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: { ...fs, slicePositions },
-          },
-        }
-      })
-    },
-
-    clearFreeScalarNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, needsReset: false },
-        },
-      }))
-    },
-
-    // === Diagnostics ===
-    setFreeScalarDiagnosticsEnabled: (enabled) => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setFreeScalarDiagnosticsInterval: (interval) => {
-      const clamped = Math.max(1, Math.min(120, Math.round(interval)))
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: { ...state.schroedinger.freeScalar, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-
-    // === k-Space Visualization Display Transforms ===
-    setFreeScalarKSpaceDisplayMode: (mode) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, displayMode: mode },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceFftShift: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, fftShiftEnabled: enabled },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceExposureMode: (mode) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, exposureMode: mode },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceLowPercentile: (value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.lowPercentile', value)
-        return
-      }
-      setWithVersion((state) => {
-        const viz = state.schroedinger.freeScalar.kSpaceViz
-        const clamped = Math.max(0, Math.min(viz.highPercentile - 0.5, value))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: {
-              ...state.schroedinger.freeScalar,
-              kSpaceViz: { ...viz, lowPercentile: clamped },
-            },
-          },
-        }
-      })
-    },
-    setFreeScalarKSpaceHighPercentile: (value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.highPercentile', value)
-        return
-      }
-      setWithVersion((state) => {
-        const viz = state.schroedinger.freeScalar.kSpaceViz
-        const clamped = Math.max(viz.lowPercentile + 0.5, Math.min(100, value))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            freeScalar: {
-              ...state.schroedinger.freeScalar,
-              kSpaceViz: { ...viz, highPercentile: clamped },
-            },
-          },
-        }
-      })
-    },
-    setFreeScalarKSpaceGamma: (value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.gamma', value)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(3.0, value))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, gamma: clamped },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceBroadeningEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, broadeningEnabled: enabled },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceBroadeningRadius: (value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.broadeningRadius', value)
-        return
-      }
-      const clamped = Math.max(1, Math.min(5, Math.round(value)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, broadeningRadius: clamped },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceBroadeningSigma: (value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.broadeningSigma', value)
-        return
-      }
-      const clamped = Math.max(0.5, Math.min(3.0, value))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, broadeningSigma: clamped },
-          },
-        },
-      }))
-    },
-    setFreeScalarKSpaceRadialBinCount: (value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('freeScalar.kSpaceViz.radialBinCount', value)
-        return
-      }
-      const clamped = Math.max(16, Math.min(128, Math.round(value)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          freeScalar: {
-            ...state.schroedinger.freeScalar,
-            kSpaceViz: { ...state.schroedinger.freeScalar.kSpaceViz, radialBinCount: clamped },
-          },
-        },
-      }))
-    },
-
-    // === TDSE (Time-Dependent Schroedinger Equation) ===
-    setTdseLatticeDim: (dim) => {
-      if (!isFiniteSchroedingerInput(dim)) {
-        warnNonFiniteSchroedingerInput('tdse.latticeDim', dim)
-        return
-      }
-      const clamped = Math.max(1, Math.min(11, Math.floor(dim)))
-      setWithVersion((state) => {
-        const prev = state.schroedinger.tdse
-        const resized = resizeTdseArrays(prev, clamped)
-        // Downgrade doubleSlit to barrier at D=1 (slits require axis 1)
-        const potentialType =
-          clamped < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : prev.potentialType
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            tdse: { ...prev, ...resized, potentialType, needsReset: true },
-          },
-        }
-      })
-    },
-    setTdseGridSize: (size) => {
-      if (!hasOnlyFiniteNumbers(size)) {
-        warnNonFiniteSchroedingerInput('tdse.gridSize', size)
-        return
-      }
-      setWithVersion((state) => {
-        const { latticeDim } = state.schroedinger.tdse
-        const minGrid = Math.max(2, defaultTdseGridPerDim(latticeDim))
-        // Snap each axis to power-of-2 within [2, 128], then check total budget
-        const snapped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < size.length ? size[i]! : minGrid
-          const val = Math.max(2, Math.min(128, Math.round(s)))
-          const log2 = Math.round(Math.log2(val))
-          return Math.max(2, Math.min(128, 2 ** log2))
-        })
-        // Verify total sites within budget; if over, reduce the largest axes first
-        const reduceToFit = (grid: number[]): number[] => {
-          const result = [...grid]
-          while (result.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
-            let maxIdx = 0
-            for (let i = 1; i < result.length; i++) {
-              if (result[i]! > result[maxIdx]!) maxIdx = i
-            }
-            if (result[maxIdx]! <= 2) break
-            result[maxIdx] = result[maxIdx]! / 2
-          }
-          return result
-        }
-        const clamped = reduceToFit(snapped)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            tdse: { ...state.schroedinger.tdse, gridSize: clamped, needsReset: true },
-          },
-        }
-      })
-    },
-    setTdseSpacing: (spacing) => {
-      if (!hasOnlyFiniteNumbers(spacing)) {
-        warnNonFiniteSchroedingerInput('tdse.spacing', spacing)
-        return
-      }
-      setWithVersion((state) => {
-        const td = state.schroedinger.tdse
-        const clamped = Array.from({ length: td.latticeDim }, (_, i) =>
-          Math.max(0.01, Math.min(1.0, i < spacing.length ? spacing[i]! : 0.1))
-        )
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            tdse: { ...td, spacing: clamped, needsReset: true },
-          },
-        }
-      })
-    },
-    setTdseMass: (mass) => {
-      if (!isFiniteSchroedingerInput(mass)) {
-        warnNonFiniteSchroedingerInput('tdse.mass', mass)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100.0, mass))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, mass: clamped },
-        },
-      }))
-    },
-    setTdseHbar: (hbar) => {
-      if (!isFiniteSchroedingerInput(hbar)) {
-        warnNonFiniteSchroedingerInput('tdse.hbar', hbar)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, hbar))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, hbar: clamped },
-        },
-      }))
-    },
-    setTdseDt: (dt) => {
-      if (!isFiniteSchroedingerInput(dt)) {
-        warnNonFiniteSchroedingerInput('tdse.dt', dt)
-        return
-      }
-      const clamped = Math.max(0.0001, Math.min(0.05, dt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, dt: clamped },
-        },
-      }))
-    },
-    setTdseStepsPerFrame: (steps) => {
-      if (!isFiniteSchroedingerInput(steps)) {
-        warnNonFiniteSchroedingerInput('tdse.stepsPerFrame', steps)
-        return
-      }
-      const clamped = Math.max(1, Math.min(16, Math.floor(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stepsPerFrame: clamped },
-        },
-      }))
-    },
-    setTdseInitialCondition: (condition) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, initialCondition: condition, needsReset: true },
-        },
-      }))
-    },
-    setTdsePacketCenter: (center) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, packetCenter: center, needsReset: true },
-        },
-      }))
-    },
-    setTdsePacketWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) {
-        warnNonFiniteSchroedingerInput('tdse.packetWidth', width)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(5.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, packetWidth: clamped, needsReset: true },
-        },
-      }))
-    },
-    setTdsePacketAmplitude: (amplitude) => {
-      if (!isFiniteSchroedingerInput(amplitude)) {
-        warnNonFiniteSchroedingerInput('tdse.packetAmplitude', amplitude)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, amplitude))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, packetAmplitude: clamped, needsReset: true },
-        },
-      }))
-    },
-    setTdsePacketMomentum: (momentum) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, packetMomentum: momentum, needsReset: true },
-        },
-      }))
-    },
-    setTdsePotentialType: (type) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, potentialType: type },
-        },
-      }))
-    },
-    setTdseBarrierHeight: (height) => {
-      if (!isFiniteSchroedingerInput(height)) {
-        warnNonFiniteSchroedingerInput('tdse.barrierHeight', height)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, height))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierHeight: clamped },
-        },
-      }))
-    },
-    setTdseBarrierWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) {
-        warnNonFiniteSchroedingerInput('tdse.barrierWidth', width)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(5.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierWidth: clamped },
-        },
-      }))
-    },
-    setTdseBarrierCenter: (center) => {
-      if (!isFiniteSchroedingerInput(center)) {
-        warnNonFiniteSchroedingerInput('tdse.barrierCenter', center)
-        return
-      }
-      const clamped = Math.max(-10.0, Math.min(10.0, center))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, barrierCenter: clamped },
-        },
-      }))
-    },
-    setTdseWellDepth: (depth) => {
-      if (!isFiniteSchroedingerInput(depth)) {
-        warnNonFiniteSchroedingerInput('tdse.wellDepth', depth)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wellDepth: clamped },
-        },
-      }))
-    },
-    setTdseWellWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) {
-        warnNonFiniteSchroedingerInput('tdse.wellWidth', width)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wellWidth: clamped },
-        },
-      }))
-    },
-    setTdseHarmonicOmega: (omega) => {
-      if (!isFiniteSchroedingerInput(omega)) {
-        warnNonFiniteSchroedingerInput('tdse.harmonicOmega', omega)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100.0, omega))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, harmonicOmega: clamped },
-        },
-      }))
-    },
-    setTdseStepHeight: (height) => {
-      if (!isFiniteSchroedingerInput(height)) {
-        warnNonFiniteSchroedingerInput('tdse.stepHeight', height)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, height))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, stepHeight: clamped },
-        },
-      }))
-    },
-    setTdseSlitSeparation: (separation) => {
-      if (!isFiniteSchroedingerInput(separation)) {
-        warnNonFiniteSchroedingerInput('tdse.slitSeparation', separation)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(10.0, separation))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, slitSeparation: clamped },
-        },
-      }))
-    },
-    setTdseSlitWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) {
-        warnNonFiniteSchroedingerInput('tdse.slitWidth', width)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(5.0, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, slitWidth: clamped },
-        },
-      }))
-    },
-    setTdseWallThickness: (thickness) => {
-      if (!isFiniteSchroedingerInput(thickness)) {
-        warnNonFiniteSchroedingerInput('tdse.wallThickness', thickness)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(3.0, thickness))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wallThickness: clamped },
-        },
-      }))
-    },
-    setTdseWallHeight: (height) => {
-      if (!isFiniteSchroedingerInput(height)) {
-        warnNonFiniteSchroedingerInput('tdse.wallHeight', height)
-        return
-      }
-      const clamped = Math.max(1.0, Math.min(500.0, height))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, wallHeight: clamped },
-        },
-      }))
-    },
-    setTdseLatticeDepth: (depth) => {
-      if (!isFiniteSchroedingerInput(depth)) {
-        warnNonFiniteSchroedingerInput('tdse.latticeDepth', depth)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(100.0, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, latticeDepth: clamped },
-        },
-      }))
-    },
-    setTdseLatticePeriod: (period) => {
-      if (!isFiniteSchroedingerInput(period)) {
-        warnNonFiniteSchroedingerInput('tdse.latticePeriod', period)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(10.0, period))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, latticePeriod: clamped },
-        },
-      }))
-    },
-    setTdseDoubleWellLambda: (lambda) => {
-      if (!isFiniteSchroedingerInput(lambda)) {
-        warnNonFiniteSchroedingerInput('tdse.doubleWellLambda', lambda)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(100.0, lambda))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellLambda: clamped },
-        },
-      }))
-    },
-    setTdseDoubleWellSeparation: (separation) => {
-      if (!isFiniteSchroedingerInput(separation)) {
-        warnNonFiniteSchroedingerInput('tdse.doubleWellSeparation', separation)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(5.0, separation))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellSeparation: clamped },
-        },
-      }))
-    },
-    setTdseDoubleWellAsymmetry: (asymmetry) => {
-      if (!isFiniteSchroedingerInput(asymmetry)) {
-        warnNonFiniteSchroedingerInput('tdse.doubleWellAsymmetry', asymmetry)
-        return
-      }
-      const clamped = Math.max(0, Math.min(50.0, asymmetry))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, doubleWellAsymmetry: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellInner: (r) => {
-      if (!isFiniteSchroedingerInput(r)) {
-        warnNonFiniteSchroedingerInput('tdse.radialWellInner', r)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(5.0, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellInner: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellOuter: (r) => {
-      if (!isFiniteSchroedingerInput(r)) {
-        warnNonFiniteSchroedingerInput('tdse.radialWellOuter', r)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, r))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellOuter: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellDepth: (depth) => {
-      if (!isFiniteSchroedingerInput(depth)) {
-        warnNonFiniteSchroedingerInput('tdse.radialWellDepth', depth)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(500.0, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellDepth: clamped },
-        },
-      }))
-    },
-    setTdseRadialWellTilt: (tilt) => {
-      if (!isFiniteSchroedingerInput(tilt)) {
-        warnNonFiniteSchroedingerInput('tdse.radialWellTilt', tilt)
-        return
-      }
-      const clamped = Math.max(0, Math.min(50.0, tilt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, radialWellTilt: clamped },
-        },
-      }))
-    },
-    setTdseDriveEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveEnabled: enabled },
-        },
-      }))
-    },
-    setTdseDriveWaveform: (waveform) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveWaveform: waveform },
-        },
-      }))
-    },
-    setTdseDriveFrequency: (frequency) => {
-      if (!isFiniteSchroedingerInput(frequency)) {
-        warnNonFiniteSchroedingerInput('tdse.driveFrequency', frequency)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100.0, frequency))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveFrequency: clamped },
-        },
-      }))
-    },
-    setTdseDriveAmplitude: (amplitude) => {
-      if (!isFiniteSchroedingerInput(amplitude)) {
-        warnNonFiniteSchroedingerInput('tdse.driveAmplitude', amplitude)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(100.0, amplitude))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, driveAmplitude: clamped },
-        },
-      }))
-    },
-    setTdseAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setTdseAbsorberWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) {
-        warnNonFiniteSchroedingerInput('tdse.absorberWidth', width)
-        return
-      }
-      const clamped = Math.max(0.05, Math.min(0.3, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberWidth: clamped },
-        },
-      }))
-    },
-    setTdseAbsorberStrength: (strength) => {
-      if (!isFiniteSchroedingerInput(strength)) {
-        warnNonFiniteSchroedingerInput('tdse.absorberStrength', strength)
-        return
-      }
-      const clamped = Math.max(0.0, Math.min(50.0, strength))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, absorberStrength: clamped },
-        },
-      }))
-    },
-    setTdseFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, fieldView: view },
-        },
-      }))
-    },
-    setTdseAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoScale },
-        },
-      }))
-    },
-    setTdseShowPotential: (showPotential) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, showPotential },
-        },
-      }))
-    },
-    setTdseAutoLoop: (autoLoop) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, autoLoop },
-        },
-      }))
-    },
-    setTdseDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setTdseDiagnosticsInterval: (interval) => {
-      if (!isFiniteSchroedingerInput(interval)) {
-        warnNonFiniteSchroedingerInput('tdse.diagnosticsInterval', interval)
-        return
-      }
-      const clamped = Math.max(1, Math.min(60, Math.floor(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-    setTdseSlicePosition: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) {
-        warnNonFiniteSchroedingerInput('tdse.slicePositions', value)
-        return
-      }
-      setWithVersion((state) => {
-        const td = state.schroedinger.tdse
-        const slicePositions = [...td.slicePositions]
-        if (dimIndex >= 0 && dimIndex < slicePositions.length) {
-          const halfExtent = (td.gridSize[dimIndex + 3] ?? 1) * (td.spacing[dimIndex + 3] ?? 0.1) * 0.5
-          slicePositions[dimIndex] = Math.max(-halfExtent, Math.min(halfExtent, value))
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            tdse: { ...td, slicePositions },
-          },
-        }
-      })
-    },
-    applyTdsePreset: (presetId) => {
-      const preset = getTdsePreset(presetId)
-      if (!preset) return
-      setWithVersion((state) => {
-        const globalDim = useGeometryStore.getState().dimension
-        // Strip latticeDim — always use global dimension.
-        // Keep array overrides (packetCenter, packetMomentum, spacing) as they carry
-        // preset physics; resizeTdseArrays preserves existing values and extends for D>3.
-        const { latticeDim: _presetDim, ...safeOverrides } = preset.overrides
-        const base = {
-          ...DEFAULT_TDSE_CONFIG,
-          ...safeOverrides,
-          slicePositions: state.schroedinger.tdse.slicePositions,
-          needsReset: true,
-        }
-        // Always resize arrays to match global dimension — gridSize is recomputed
-        // for the dimension's site budget, while packetCenter/momentum are extended.
-        const resized = resizeTdseArrays(base, globalDim)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            tdse: { ...base, ...resized, needsReset: true },
-          },
-        }
-      })
-    },
-    resetTdseField: () => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, needsReset: true },
-        },
-      }))
-    },
-    clearTdseNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          tdse: { ...state.schroedinger.tdse, needsReset: false },
-        },
-      }))
-    },
-
-    // === BEC (Gross-Pitaevskii) ===
-    setBecInteractionStrength: (g) => {
-      if (!isFiniteSchroedingerInput(g)) {
-        warnNonFiniteSchroedingerInput('bec.interactionStrength', g)
-        return
-      }
-      const clamped = Math.max(-1000, Math.min(10000, g))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, interactionStrength: clamped },
-        },
-      }))
-    },
-    setBecTrapOmega: (omega) => {
-      if (!isFiniteSchroedingerInput(omega)) {
-        warnNonFiniteSchroedingerInput('bec.trapOmega', omega)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(10.0, omega))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, trapOmega: clamped },
-        },
-      }))
-    },
-    setBecTrapAnisotropy: (dimIndex, ratio) => {
-      if (!isFiniteSchroedingerInput(ratio)) {
-        warnNonFiniteSchroedingerInput('bec.trapAnisotropy', ratio)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(10.0, ratio))
-      setWithVersion((state) => {
-        const arr = [...state.schroedinger.bec.trapAnisotropy]
-        if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = clamped
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, trapAnisotropy: arr },
-          },
-        }
-      })
-    },
-    setBecInitialCondition: (condition) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, initialCondition: condition, needsReset: true },
-        },
-      }))
-    },
-    setBecFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, fieldView: view },
-        },
-      }))
-    },
-    setBecVortexCharge: (charge) => {
-      const clamped = Math.max(-4, Math.min(4, Math.round(charge)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, vortexCharge: clamped, needsReset: true },
-        },
-      }))
-    },
-    setBecVortexLatticeCount: (count) => {
-      const clamped = Math.max(1, Math.min(16, Math.round(count)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, vortexLatticeCount: clamped, needsReset: true },
-        },
-      }))
-    },
-    setBecSolitonDepth: (depth) => {
-      if (!isFiniteSchroedingerInput(depth)) return
-      const clamped = Math.max(0, Math.min(1, depth))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, solitonDepth: clamped, needsReset: true },
-        },
-      }))
-    },
-    setBecSolitonVelocity: (velocity) => {
-      if (!isFiniteSchroedingerInput(velocity)) return
-      const clamped = Math.max(-1, Math.min(1, velocity))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, solitonVelocity: clamped, needsReset: true },
-        },
-      }))
-    },
-    setBecAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, autoScale },
-        },
-      }))
-    },
-    setBecAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setBecAbsorberWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) return
-      const clamped = Math.max(0.05, Math.min(0.3, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberWidth: clamped },
-        },
-      }))
-    },
-    setBecAbsorberStrength: (strength) => {
-      if (!isFiniteSchroedingerInput(strength)) return
-      const clamped = Math.max(0.1, Math.min(50, strength))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, absorberStrength: clamped },
-        },
-      }))
-    },
-    setBecDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setBecDiagnosticsInterval: (interval) => {
-      const clamped = Math.max(1, Math.min(60, Math.round(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-    setBecDt: (dt) => {
-      if (!isFiniteSchroedingerInput(dt)) {
-        warnNonFiniteSchroedingerInput('bec.dt', dt)
-        return
-      }
-      setWithVersion((state) => {
-        const { spacing, latticeDim, mass } = state.schroedinger.bec
-        const cflLimit = computeCflLimit(spacing, latticeDim, mass)
-        const maxDt = Math.min(0.05, cflLimit * 0.9)
-        const clamped = Math.max(0.0001, Math.min(maxDt, dt))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, dt: clamped },
-          },
-        }
-      })
-    },
-    setBecStepsPerFrame: (steps) => {
-      const clamped = Math.max(1, Math.min(16, Math.round(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, stepsPerFrame: clamped },
-        },
-      }))
-    },
-    setBecMass: (mass) => {
-      if (!isFiniteSchroedingerInput(mass)) return
-      const clamped = Math.max(0.1, Math.min(10, mass))
-      setWithVersion((state) => {
-        const { spacing, latticeDim, dt } = state.schroedinger.bec
-        const newDt = clampDtWithCfl(dt, spacing, latticeDim, clamped)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, mass: clamped, dt: newDt },
-          },
-        }
-      })
-    },
-    setBecHbar: (hbar) => {
-      if (!isFiniteSchroedingerInput(hbar)) return
-      const clamped = Math.max(0.1, Math.min(10, hbar))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, hbar: clamped },
-        },
-      }))
-    },
-    setBecGridSize: (size) => {
-      if (!hasOnlyFiniteNumbers(size)) {
-        warnNonFiniteSchroedingerInput('bec.gridSize', size)
-        return
-      }
-      setWithVersion((state) => {
-        const { latticeDim } = state.schroedinger.bec
-        const gridDefault = defaultTdseGridPerDim(latticeDim)
-        const minGrid = Math.max(2, gridDefault)
-        const snapped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < size.length ? size[i]! : minGrid
-          const val = Math.max(2, Math.min(128, Math.round(s)))
-          const log2 = Math.round(Math.log2(val))
-          return Math.max(2, Math.min(gridDefault, 2 ** log2))
-        })
-        // Enforce total site budget — halve the largest axis until within budget
-        while (snapped.reduce((a, b) => a * b, 1) > TDSE_MAX_TOTAL_SITES) {
-          let maxIdx = 0
-          for (let i = 1; i < snapped.length; i++) {
-            if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
-          }
-          if (snapped[maxIdx]! <= 2) break
-          snapped[maxIdx] = snapped[maxIdx]! / 2
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, gridSize: snapped, needsReset: true },
-          },
-        }
-      })
-    },
-    setBecSpacing: (spacing) => {
-      if (!hasOnlyFiniteNumbers(spacing)) {
-        warnNonFiniteSchroedingerInput('bec.spacing', spacing)
-        return
-      }
-      setWithVersion((state) => {
-        const { latticeDim, mass, dt } = state.schroedinger.bec
-        const clamped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < spacing.length ? spacing[i]! : 0.15
-          return Math.max(0.01, Math.min(1.0, s))
-        })
-        const newDt = clampDtWithCfl(dt, clamped, latticeDim, mass)
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, spacing: clamped, dt: newDt, needsReset: true },
-          },
-        }
-      })
-    },
-    setBecSlicePosition: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) return
-      setWithVersion((state) => {
-        const arr = [...state.schroedinger.bec.slicePositions]
-        if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            bec: { ...state.schroedinger.bec, slicePositions: arr },
-          },
-        }
-      })
-    },
-    applyBecPreset: (presetId) => {
-      // Dynamically import to avoid circular dependency
-      import('@/lib/physics/bec/presets').then(({ BEC_SCENARIO_PRESETS }) => {
-        const preset = BEC_SCENARIO_PRESETS.find((p) => p.id === presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const globalDim = useGeometryStore.getState().dimension
-          // Apply preset overrides but strip latticeDim and array-valued fields —
-          // these are dimension-dependent and resizeBecArrays will recompute them.
-          const {
-            latticeDim: _presetDim,
-            gridSize: _presetGrid,
-            spacing: _presetSpacing,
-            trapAnisotropy: _presetAniso,
-            slicePositions: _presetSlice,
-            ...safeOverrides
-          } = preset.overrides
-          const merged = { ...DEFAULT_BEC_CONFIG, ...safeOverrides, needsReset: true }
-          // Always resize arrays to match global dimension — preset scalar physics
-          // params (interactionStrength, trapOmega, etc.) feed into resizeBecArrays
-          // which computes dimension-appropriate grid sizes and TF-aware spacing.
-          const resized = resizeBecArrays(merged, globalDim)
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              bec: { ...merged, ...resized, needsReset: true },
-            },
-          }
-        })
-        useBecDiagnosticsStore.getState().reset()
-      })
-    },
-    resetBecField: () => {
-      useBecDiagnosticsStore.getState().reset()
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, needsReset: true },
-        },
-      }))
-    },
-    clearBecNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          bec: { ...state.schroedinger.bec, needsReset: false },
-        },
-      }))
-    },
-
-    // === Dirac Equation ===
-    setDiracMass: (mass) => {
-      if (!isFiniteSchroedingerInput(mass)) return
-      const clamped = Math.max(0.01, Math.min(10, mass))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, mass: clamped },
-        },
-      }))
-    },
-    setDiracSpeedOfLight: (c) => {
-      if (!isFiniteSchroedingerInput(c)) return
-      const clamped = Math.max(0.01, Math.min(10, c))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, speedOfLight: clamped },
-        },
-      }))
-    },
-    setDiracHbar: (hbar) => {
-      if (!isFiniteSchroedingerInput(hbar)) return
-      const clamped = Math.max(0.01, Math.min(10, hbar))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, hbar: clamped },
-        },
-      }))
-    },
-    setDiracDt: (dt) => {
-      if (!isFiniteSchroedingerInput(dt)) {
-        warnNonFiniteSchroedingerInput('dirac.dt', dt)
-        return
-      }
-      setWithVersion((state) => {
-        const { spacing, speedOfLight } = state.schroedinger.dirac
-        const dtMax = maxStableDt(spacing, speedOfLight)
-        const clamped = Math.max(0.0001, Math.min(dtMax * 0.9, dt))
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, dt: clamped },
-          },
-        }
-      })
-    },
-    setDiracStepsPerFrame: (steps) => {
-      const clamped = Math.max(1, Math.min(16, Math.round(steps)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, stepsPerFrame: clamped },
-        },
-      }))
-    },
-    setDiracPotentialType: (type) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialType: type, needsReset: true },
-        },
-      }))
-    },
-    setDiracPotentialStrength: (strength) => {
-      if (!isFiniteSchroedingerInput(strength)) return
-      const clamped = Math.max(-100, Math.min(100, strength))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialStrength: clamped },
-        },
-      }))
-    },
-    setDiracPotentialWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) return
-      const clamped = Math.max(0.01, Math.min(10, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialWidth: clamped },
-        },
-      }))
-    },
-    setDiracPotentialCenter: (center) => {
-      if (!isFiniteSchroedingerInput(center)) return
-      const clamped = Math.max(-10, Math.min(10, center))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, potentialCenter: clamped },
-        },
-      }))
-    },
-    setDiracHarmonicOmega: (omega) => {
-      if (!isFiniteSchroedingerInput(omega)) return
-      const clamped = Math.max(0.01, Math.min(10, omega))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, harmonicOmega: clamped },
-        },
-      }))
-    },
-    setDiracCoulombZ: (z) => {
-      if (!isFiniteSchroedingerInput(z)) return
-      const clamped = Math.max(1, Math.min(137, Math.round(z)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, coulombZ: clamped },
-        },
-      }))
-    },
-    setDiracInitialCondition: (condition) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, initialCondition: condition, needsReset: true },
-        },
-      }))
-    },
-    setDiracPacketWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) return
-      const clamped = Math.max(0.05, Math.min(5, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, packetWidth: clamped, needsReset: true },
-        },
-      }))
-    },
-    setDiracPositiveEnergyFraction: (fraction) => {
-      if (!isFiniteSchroedingerInput(fraction)) return
-      const clamped = Math.max(0, Math.min(1, fraction))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, positiveEnergyFraction: clamped, needsReset: true },
-        },
-      }))
-    },
-    setDiracFieldView: (view) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, fieldView: view },
-        },
-      }))
-    },
-    setDiracAutoScale: (autoScale) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, autoScale },
-        },
-      }))
-    },
-    setDiracShowPotential: (showPotential) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, showPotential },
-        },
-      }))
-    },
-    setDiracAbsorberEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, absorberEnabled: enabled },
-        },
-      }))
-    },
-    setDiracAbsorberWidth: (width) => {
-      if (!isFiniteSchroedingerInput(width)) return
-      const clamped = Math.max(0.05, Math.min(0.3, width))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, absorberWidth: clamped },
-        },
-      }))
-    },
-    setDiracAbsorberStrength: (strength) => {
-      if (!isFiniteSchroedingerInput(strength)) return
-      const clamped = Math.max(0.1, Math.min(50, strength))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, absorberStrength: clamped },
-        },
-      }))
-    },
-    setDiracGridSize: (size) => {
-      if (!hasOnlyFiniteNumbers(size)) {
-        warnNonFiniteSchroedingerInput('dirac.gridSize', size)
-        return
-      }
-      setWithVersion((state) => {
-        const { latticeDim } = state.schroedinger.dirac
-        const gridDefault = defaultDiracGridPerDim(latticeDim)
-        const snapped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < size.length ? size[i]! : gridDefault
-          const val = Math.max(2, Math.min(128, Math.round(s)))
-          const log2 = Math.round(Math.log2(val))
-          return Math.max(2, Math.min(gridDefault, 2 ** log2))
-        })
-        // Enforce total site budget
-        while (snapped.reduce((a, b) => a * b, 1) > DIRAC_MAX_TOTAL_SITES) {
-          let maxIdx = 0
-          for (let i = 1; i < snapped.length; i++) {
-            if (snapped[i]! > snapped[maxIdx]!) maxIdx = i
-          }
-          if (snapped[maxIdx]! <= 2) break
-          snapped[maxIdx] = snapped[maxIdx]! / 2
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, gridSize: snapped, needsReset: true },
-          },
-        }
-      })
-    },
-    setDiracSpacing: (spacing) => {
-      if (!hasOnlyFiniteNumbers(spacing)) {
-        warnNonFiniteSchroedingerInput('dirac.spacing', spacing)
-        return
-      }
-      setWithVersion((state) => {
-        const { latticeDim } = state.schroedinger.dirac
-        const clamped = Array.from({ length: latticeDim }, (_, i) => {
-          const s = i < spacing.length ? spacing[i]! : 0.15
-          return Math.max(0.01, Math.min(1.0, s))
-        })
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, spacing: clamped, needsReset: true },
-          },
-        }
-      })
-    },
-    setDiracPacketCenter: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) return
-      setWithVersion((state) => {
-        const arr = [...state.schroedinger.dirac.packetCenter]
-        if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, packetCenter: arr, needsReset: true },
-          },
-        }
-      })
-    },
-    setDiracPacketMomentum: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) return
-      setWithVersion((state) => {
-        const arr = [...state.schroedinger.dirac.packetMomentum]
-        if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, packetMomentum: arr, needsReset: true },
-          },
-        }
-      })
-    },
-    setDiracSpinDirection: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) return
-      setWithVersion((state) => {
-        const arr = [...state.schroedinger.dirac.spinDirection]
-        if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, spinDirection: arr, needsReset: true },
-          },
-        }
-      })
-    },
-    setDiracParticleColor: (color) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, particleColor: color },
-        },
-      }))
-    },
-    setDiracAntiparticleColor: (color) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, antiparticleColor: color },
-        },
-      }))
-    },
-    setDiracDiagnosticsEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, diagnosticsEnabled: enabled },
-        },
-      }))
-    },
-    setDiracDiagnosticsInterval: (interval) => {
-      const clamped = Math.max(1, Math.min(60, Math.round(interval)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, diagnosticsInterval: clamped },
-        },
-      }))
-    },
-    setDiracNeedsReset: () => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, needsReset: true },
-        },
-      }))
-    },
-    clearDiracNeedsReset: () => {
-      set((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          dirac: { ...state.schroedinger.dirac, needsReset: false },
-        },
-      }))
-    },
-    setDiracSlicePosition: (dimIndex, value) => {
-      if (!isFiniteSchroedingerInput(value)) return
-      setWithVersion((state) => {
-        const arr = [...state.schroedinger.dirac.slicePositions]
-        if (dimIndex >= 0 && dimIndex < arr.length) {
-          arr[dimIndex] = value
-        }
-        return {
-          schroedinger: {
-            ...state.schroedinger,
-            dirac: { ...state.schroedinger.dirac, slicePositions: arr },
-          },
-        }
-      })
-    },
-
-    applyDiracPreset: (presetId) => {
-      import('@/lib/physics/dirac/presets').then(({ DIRAC_SCENARIO_PRESETS }) => {
-        const preset = DIRAC_SCENARIO_PRESETS.find((p) => p.id === presetId)
-        if (!preset) return
-        setWithVersion((state) => {
-          const prev = state.schroedinger.dirac
-          const dim = prev.latticeDim
-
-          // Strip dimension-dependent fields — presets must not override dimension
-          const { latticeDim: _ld, gridSize: _gs, ...safeOverrides } = preset.overrides
-
-          const merged = { ...prev, ...safeOverrides, needsReset: true }
-
-          // Pad/replicate spacing to match current latticeDim.
-          // If preset provides a shorter spacing array, replicate the first element.
-          if (safeOverrides.spacing) {
-            const srcSpacing = safeOverrides.spacing
-            merged.spacing = Array.from({ length: dim }, (_, i) =>
-              i < srcSpacing.length ? srcSpacing[i]! : srcSpacing[0]!
-            )
-          }
-
-          // Pad packetCenter / packetMomentum to match latticeDim, clamped to lattice bounds
-          const gs = merged.gridSize
-          const sp = merged.spacing
-          if (safeOverrides.packetCenter) {
-            const src = safeOverrides.packetCenter
-            merged.packetCenter = Array.from({ length: dim }, (_, i) => {
-              const raw = i < src.length ? src[i]! : 0
-              const limit = (gs[i] ?? 4) * (sp[i] ?? 0.15) * 0.5 * 0.9
-              return Math.max(-limit, Math.min(limit, raw))
-            })
-          }
-          if (safeOverrides.packetMomentum) {
-            const src = safeOverrides.packetMomentum
-            merged.packetMomentum = Array.from({ length: dim }, (_, i) => {
-              const raw = i < src.length ? src[i]! : 0
-              const kMax = Math.PI / (sp[i] ?? 0.15)
-              return Math.max(-kMax, Math.min(kMax, raw))
-            })
-          }
-
-          // Clamp packetWidth to lattice extent
-          const minHalfExt = Math.min(...gs.map((g, i) => g * (sp[i] ?? 0.15) * 0.5))
-          merged.packetWidth = Math.min(minHalfExt * 0.4, merged.packetWidth)
-
-          // Clamp dt to CFL limit for the new spacing
-          const dtMax = maxStableDt(merged.spacing, merged.speedOfLight)
-          merged.dt = Math.max(0.0001, Math.min(dtMax * 0.9, merged.dt))
-
-          return {
-            schroedinger: {
-              ...state.schroedinger,
-              dirac: merged,
-            },
-          }
-        })
-      })
-    },
-
-    // === Open Quantum System ===
-    setOpenQuantumEnabled: (enabled) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, enabled },
-        },
-      }))
-    },
-    setOpenQuantumDephasingRate: (rate) => {
-      if (!isFiniteSchroedingerInput(rate)) {
-        warnNonFiniteSchroedingerInput('openQuantum.dephasingRate', rate)
-        return
-      }
-      const clamped = Math.max(0, Math.min(5, rate))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, dephasingRate: clamped },
-        },
-      }))
-    },
-    setOpenQuantumRelaxationRate: (rate) => {
-      if (!isFiniteSchroedingerInput(rate)) {
-        warnNonFiniteSchroedingerInput('openQuantum.relaxationRate', rate)
-        return
-      }
-      const clamped = Math.max(0, Math.min(5, rate))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, relaxationRate: clamped },
-        },
-      }))
-    },
-    setOpenQuantumThermalUpRate: (rate) => {
-      if (!isFiniteSchroedingerInput(rate)) {
-        warnNonFiniteSchroedingerInput('openQuantum.thermalUpRate', rate)
-        return
-      }
-      const clamped = Math.max(0, Math.min(5, rate))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, thermalUpRate: clamped },
-        },
-      }))
-    },
-    setOpenQuantumDt: (dt) => {
-      if (!isFiniteSchroedingerInput(dt)) {
-        warnNonFiniteSchroedingerInput('openQuantum.dt', dt)
-        return
-      }
-      const clamped = Math.max(0.001, Math.min(0.1, dt))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, dt: clamped },
-        },
-      }))
-    },
-    setOpenQuantumSubsteps: (n) => {
-      if (!isFiniteSchroedingerInput(n)) {
-        warnNonFiniteSchroedingerInput('openQuantum.substeps', n)
-        return
-      }
-      const clamped = Math.max(1, Math.min(10, Math.floor(n)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, substeps: clamped },
-        },
-      }))
-    },
-    setOpenQuantumChannelEnabled: (channel, enabled) => {
-      const keyMap = {
-        dephasing: 'dephasingEnabled',
-        relaxation: 'relaxationEnabled',
-        thermal: 'thermalEnabled',
-      } as const
-      const key = keyMap[channel]
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, [key]: enabled },
-        },
-      }))
-    },
-    setOpenQuantumVisualizationMode: (mode) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, visualizationMode: mode },
-        },
-      }))
-    },
-    requestOpenQuantumStateReset: () => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: {
-            ...state.schroedinger.openQuantum,
-            resetToken: (state.schroedinger.openQuantum.resetToken ?? 0) + 1,
-          },
-        },
-      }))
-    },
-    resetOpenQuantumToDefault: () => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...DEFAULT_OPEN_QUANTUM_CONFIG },
-        },
-      }))
-    },
-    setOpenQuantumBathTemperature: (T) => {
-      if (!isFiniteSchroedingerInput(T)) {
-        warnNonFiniteSchroedingerInput('openQuantum.bathTemperature', T)
-        return
-      }
-      const clamped = Math.max(0.1, Math.min(100000, T))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, bathTemperature: clamped },
-        },
-      }))
-    },
-    setOpenQuantumCouplingScale: (s) => {
-      if (!isFiniteSchroedingerInput(s)) {
-        warnNonFiniteSchroedingerInput('openQuantum.couplingScale', s)
-        return
-      }
-      const clamped = Math.max(0.01, Math.min(100, s))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, couplingScale: clamped },
-        },
-      }))
-    },
-    setOpenQuantumHydrogenBasisMaxN: (n) => {
-      if (!isFiniteSchroedingerInput(n)) {
-        warnNonFiniteSchroedingerInput('openQuantum.hydrogenBasisMaxN', n)
-        return
-      }
-      const clamped = Math.max(1, Math.min(3, Math.floor(n)))
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, hydrogenBasisMaxN: clamped },
-        },
-      }))
-    },
-    setOpenQuantumDephasingModel: (model) => {
-      setWithVersion((state) => ({
-        schroedinger: {
-          ...state.schroedinger,
-          openQuantum: { ...state.schroedinger.openQuantum, dephasingModel: model },
-        },
-      }))
-    },
+    // === Extracted Domain Setters ===
+    ...createFreeScalarSetters(ctx),
+    ...createTdseSetters(ctx),
+    ...createBecSetters(ctx),
+    ...createDiracSetters(ctx),
+    ...createOpenQuantumSetters(ctx),
 
     // === Config Operations ===
     setSchroedingerConfig: (config) => {
@@ -3141,46 +894,26 @@ export const createSchroedingerSlice: StateCreator<
 
     initializeSchroedingerForDimension: (dimension) => {
       const paramCount = Math.max(0, dimension - 3)
-
-      // Default color mode for quantum visualization
       const colorMode: SchroedingerColorMode = 'mixed'
-
-      // Extent: standard volume size
       const extent = 2.0
-
-      // Center at origin for all dimensions
       const center = new Array(dimension).fill(0)
 
-      // Scale densityGain with dimension to compensate for
-      // product of Hermite polynomials at slice positions.
-      // Higher dimensions need more gain to remain visible.
-      // Base gain of 2.0 works well for 3D-4D, scale up for higher.
-      // 2D needs less gain since there's no volumetric integration loss.
       const baseDensityGain = dimension === 2 ? 1.0 : 2.0
       const dimensionBoost = dimension > 4 ? 1.0 + (dimension - 4) * 0.4 : 1.0
-      const densityGain = Math.min(baseDensityGain * dimensionBoost, 5.0) // Clamp to max
+      const densityGain = Math.min(baseDensityGain * dimensionBoost, 5.0)
 
-      // For 2D hydrogen mode: auto-adjust quantum numbers to ensure visibility.
-      // The 2D view is a z=0 cross-section, so orbitals with cos(θ) dependence
-      // (e.g. pz: l=1,m=0) are exactly zero at z=0. Default to l=0 (s orbital)
-      // which is spherically symmetric and always visible.
       const hydrogenUpdate: Record<string, number> = {}
       if (dimension === 2) {
         const current = get().schroedinger
         if (current.quantumMode === 'hydrogenND') {
           const currentL = current.azimuthalQuantumNumber
           const currentM = current.magneticQuantumNumber
-          // If current orbital would be invisible at z=0 (m=0 with l>0 → cos(θ)^l factor)
-          // Specifically: Y_l^0 ∝ P_l(cosθ), and P_l(0) = 0 for odd l.
-          // For even l>0 with m=0, there IS some density at θ=π/2 but it can be weak.
-          // Safest fix: if m=0 and l>0, switch to m=1 (real orbital → px/dxy etc.)
           if (currentM === 0 && currentL > 0) {
             hydrogenUpdate.magneticQuantumNumber = 1
           }
         }
       }
 
-      // Sync free scalar latticeDim to global dimension when in free scalar mode
       const currentState = get().schroedinger
       let freeScalarUpdate: Partial<FreeScalarConfig> | undefined
       if (currentState.quantumMode === 'freeScalarField') {
@@ -3193,12 +926,10 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
-      // Sync TDSE latticeDim to global dimension when in TDSE mode
       let tdseUpdate: Partial<TdseConfig> | undefined
       if (currentState.quantumMode === 'tdseDynamics') {
         const prev = currentState.tdse
         if (prev.latticeDim !== dimension) {
-          // Downgrade doubleSlit to barrier at D=1 (slits require axis 1)
           const potentialType =
             dimension < 2 && prev.potentialType === 'doubleSlit' ? 'barrier' : undefined
           tdseUpdate = {
@@ -3209,7 +940,6 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
-      // Sync BEC latticeDim to global dimension when in BEC mode
       let becUpdate: Partial<BecConfig> | undefined
       if (currentState.quantumMode === 'becDynamics') {
         const prev = currentState.bec
@@ -3218,7 +948,6 @@ export const createSchroedingerSlice: StateCreator<
         }
       }
 
-      // Sync Dirac latticeDim to global dimension when in Dirac mode
       let diracUpdate: Partial<DiracConfig> | undefined
       if (currentState.quantumMode === 'diracEquation') {
         const prev = currentState.dirac
@@ -3236,7 +965,6 @@ export const createSchroedingerSlice: StateCreator<
           colorMode,
           extent,
           densityGain,
-          // Clamp SQ layer mode index to valid dimension range
           sqLayerSelectedModeIndex: Math.min(
             state.schroedinger.sqLayerSelectedModeIndex,
             Math.max(0, dimension - 1)
@@ -3245,15 +973,9 @@ export const createSchroedingerSlice: StateCreator<
           ...(freeScalarUpdate
             ? { freeScalar: { ...state.schroedinger.freeScalar, ...freeScalarUpdate } }
             : {}),
-          ...(tdseUpdate
-            ? { tdse: { ...state.schroedinger.tdse, ...tdseUpdate } }
-            : {}),
-          ...(becUpdate
-            ? { bec: { ...state.schroedinger.bec, ...becUpdate } }
-            : {}),
-          ...(diracUpdate
-            ? { dirac: { ...state.schroedinger.dirac, ...diracUpdate } }
-            : {}),
+          ...(tdseUpdate ? { tdse: { ...state.schroedinger.tdse, ...tdseUpdate } } : {}),
+          ...(becUpdate ? { bec: { ...state.schroedinger.bec, ...becUpdate } } : {}),
+          ...(diracUpdate ? { dirac: { ...state.schroedinger.dirac, ...diracUpdate } } : {}),
         },
       }))
     },

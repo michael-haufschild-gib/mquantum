@@ -5,10 +5,7 @@
  */
 
 import { Select } from '@/components/ui/Select'
-import {
-  getAvailableColorAlgorithms,
-  type ColorAlgorithm,
-} from '@/rendering/shaders/palette'
+import { getAvailableColorAlgorithms, type ColorAlgorithm } from '@/rendering/shaders/palette'
 import { useAppearanceStore, type AppearanceSlice } from '@/stores/appearanceStore'
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -41,7 +38,9 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       }))
     )
     const effectiveOpenQuantumEnabled =
-      openQuantumEnabled && (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') && representation !== 'wigner'
+      openQuantumEnabled &&
+      (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') &&
+      representation !== 'wigner'
 
     const availableOptions = useMemo(
       () => getAvailableColorAlgorithms(quantumMode, effectiveOpenQuantumEnabled, objectType),
@@ -57,7 +56,12 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
       [availableOptions]
     )
 
-    const isComputeMode = objectType === 'pauliSpinor' || quantumMode === 'tdseDynamics' || quantumMode === 'freeScalarField' || quantumMode === 'becDynamics' || quantumMode === 'diracEquation'
+    const isComputeMode =
+      objectType === 'pauliSpinor' ||
+      quantumMode === 'tdseDynamics' ||
+      quantumMode === 'freeScalarField' ||
+      quantumMode === 'becDynamics' ||
+      quantumMode === 'diracEquation'
 
     // Auto-switch away from unavailable algorithm when mode changes
     useEffect(() => {
@@ -75,7 +79,12 @@ export const ColorAlgorithmSelector: React.FC<ColorAlgorithmSelectorProps> = Rea
     // if the current algorithm is spatially misleading (radialDistance, radial, lch).
     // These color by geometric position, not by field value, producing false structure.
     useEffect(() => {
-      const misleadingForCompute = new Set<string>(['radialDistance', 'radial', 'lch', 'multiSource'])
+      const misleadingForCompute = new Set<string>([
+        'radialDistance',
+        'radial',
+        'lch',
+        'multiSource',
+      ])
       if (isComputeMode && misleadingForCompute.has(colorAlgorithm)) {
         setColorAlgorithm(objectType === 'pauliSpinor' ? 'pauliSpinDensity' : 'blackbody')
       }

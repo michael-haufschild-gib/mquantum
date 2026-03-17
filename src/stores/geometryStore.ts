@@ -5,6 +5,7 @@
  * Schroedinger quantum wavefunction visualizer.
  */
 
+import { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 import {
   getRecommendedDimension,
   getUnavailabilityReason,
@@ -42,11 +43,8 @@ function scheduleTransitionComplete(): void {
   })
 }
 
-/** Minimum supported dimension */
-export const MIN_DIMENSION = 2
-
-/** Maximum supported dimension */
-export const MAX_DIMENSION = 11
+// Re-export dimension constants for backward compatibility
+export { MAX_DIMENSION, MIN_DIMENSION } from '@/constants/dimension'
 
 /** Default dimension (3D) */
 export const DEFAULT_DIMENSION = 3

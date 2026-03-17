@@ -130,10 +130,7 @@ function getDiscontinuityEdges(config: TdseConfig): number[] {
  * @param numSamples - Number of uniform sample points (default 200)
  * @returns Sampled profile with x and V(x) arrays plus bounds
  */
-export function samplePotentialProfile(
-  config: TdseConfig,
-  numSamples = 200,
-): PotentialProfile1D {
+export function samplePotentialProfile(config: TdseConfig, numSamples = 200): PotentialProfile1D {
   const gridSize0 = config.gridSize[0] ?? 64
   const spacing0 = config.spacing[0] ?? 0.1
   const halfExtent = gridSize0 * spacing0 * 0.5

@@ -40,13 +40,6 @@ export default defineConfig((_env) => ({
       })),
     }),
   ],
-  esbuild: {
-    // REMOVED: keepNames: true
-    // This was breaking Three.js KTX2Loader - esbuild's keepNames helper function `c()`
-    // is defined at module scope, but KTX2Loader extracts worker code via substring,
-    // missing the helper and causing "c is not defined" in production.
-    // See: docs/bugfixing/log/blobktx2.md
-  },
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),
@@ -84,10 +77,30 @@ export default defineConfig((_env) => ({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          zustand: ['zustand'],
-          motion: ['motion'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'react-vendor'
+          }
+          if (id.includes('node_modules/zustand')) return 'zustand'
+          if (id.includes('node_modules/motion')) return 'motion'
+          if (id.includes('node_modules/')) return 'vendor'
+          // Split shaders by subdomain
+          if (id.includes('/rendering/webgpu/shaders/schroedinger/')) return 'shaders-schroedinger'
+          if (id.includes('/rendering/webgpu/shaders/')) return 'shaders'
+          // Split rendering passes into own chunk
+          if (id.includes('/rendering/webgpu/passes/')) return 'render-passes'
+          // Split rendering core + renderers
+          if (
+            id.includes('/rendering/webgpu/core/') ||
+            id.includes('/rendering/webgpu/renderers/') ||
+            id.includes('/rendering/webgpu/graph/')
+          ) {
+            return 'render-core'
+          }
+          // Split physics/math
+          if (id.includes('/lib/physics/') || id.includes('/lib/math/')) return 'physics'
+          // Split stores
+          if (id.includes('/stores/')) return 'stores'
         },
       },
     },

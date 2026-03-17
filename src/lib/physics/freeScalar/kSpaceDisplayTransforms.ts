@@ -51,7 +51,10 @@ export interface KSpaceDisplayGrid {
  * @param config - Display configuration
  * @returns 64^3 display grid
  */
-export function projectToDisplayGrid(raw: KSpaceRawData, config: KSpaceVizConfig): KSpaceDisplayGrid {
+export function projectToDisplayGrid(
+  raw: KSpaceRawData,
+  config: KSpaceVizConfig
+): KSpaceDisplayGrid {
   const G = OUTPUT_GRID_SIZE
   const outputTotal = G ** 3
   const nk = new Float64Array(outputTotal)
@@ -96,11 +99,7 @@ function projectDirect3D(
   const activeDims = raw.gridSize
   const shift = config.fftShiftEnabled
 
-  const gridDims = [
-    activeDims[0] ?? 1,
-    activeDims[1] ?? 1,
-    activeDims[2] ?? 1,
-  ]
+  const gridDims = [activeDims[0] ?? 1, activeDims[1] ?? 1, activeDims[2] ?? 1]
 
   // Pre-compute offsets and centers (invariant across voxels)
   const offsets = [0, 0, 0]
@@ -133,7 +132,9 @@ function projectDirect3D(
           if (outCoords0 !== centers[0]!) valid = false
         } else {
           let kIdx = outCoords0 - offsets[0]!
-          if (kIdx < 0 || kIdx >= N0) { valid = false } else {
+          if (kIdx < 0 || kIdx >= N0) {
+            valid = false
+          } else {
             if (shift) kIdx = (kIdx + halfN[0]!) % N0
             kCoords[0] = kIdx
           }
@@ -147,7 +148,9 @@ function projectDirect3D(
             if (outCoords1 !== centers[1]!) valid = false
           } else {
             let kIdx = outCoords1 - offsets[1]!
-            if (kIdx < 0 || kIdx >= N1) { valid = false } else {
+            if (kIdx < 0 || kIdx >= N1) {
+              valid = false
+            } else {
               if (shift) kIdx = (kIdx + halfN[1]!) % N1
               kCoords[1] = kIdx
             }
@@ -162,7 +165,9 @@ function projectDirect3D(
             if (outCoords2 !== centers[2]!) valid = false
           } else {
             let kIdx = outCoords2 - offsets[2]!
-            if (kIdx < 0 || kIdx >= N2) { valid = false } else {
+            if (kIdx < 0 || kIdx >= N2) {
+              valid = false
+            } else {
               if (shift) kIdx = (kIdx + halfN[2]!) % N2
               kCoords[2] = kIdx
             }
@@ -399,7 +404,7 @@ export function applyBroadening(
   let kernelSum = 0
   for (let i = 0; i < kernelWidth; i++) {
     const x = i - radius
-    kernel[i] = Math.exp(-0.5 * (x * x) / (sigma * sigma))
+    kernel[i] = Math.exp((-0.5 * (x * x)) / (sigma * sigma))
     kernelSum += kernel[i]!
   }
   // Normalize
@@ -489,7 +494,13 @@ export function applyBroadening(
  * @param G - Grid size (64)
  * @param axis - 0=X, 1=Y, 2=Z
  */
-function blurAxis(data: Float64Array, kernel: Float64Array, radius: number, G: number, axis: number): void {
+function blurAxis(
+  data: Float64Array,
+  kernel: Float64Array,
+  radius: number,
+  G: number,
+  axis: number
+): void {
   const temp = new Float64Array(G)
 
   // For each line along the axis

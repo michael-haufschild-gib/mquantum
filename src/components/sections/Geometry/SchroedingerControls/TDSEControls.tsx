@@ -3,7 +3,7 @@
  *
  * Configuration panel for time-dependent Schroedinger equation dynamics.
  * Provides controls for wavepacket initialization, potential selection,
- * drive parameters, absorber boundaries, and numerical settings.
+ * drive parameters, and numerical settings.
  *
  * @module components/sections/Geometry/SchroedingerControls/TDSEControls
  */
@@ -12,7 +12,6 @@ import React, { useCallback, useMemo } from 'react'
 import { Slider } from '@/components/ui/Slider'
 import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
-import { Button } from '@/components/ui/Button'
 import type { TdseControlsProps } from './types'
 import type { TdseInitialCondition, TdseFieldView } from '@/lib/geometry/extended/types'
 import { TDSEPotentialControls } from './TDSEPotentialControls'
@@ -46,7 +45,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         newGrid[dimIdx] = value
         actions.setGridSize(newGrid)
       },
-      [td.gridSize, actions],
+      [td.gridSize, actions]
     )
 
     const handleSpacingChange = useCallback(
@@ -55,7 +54,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         newSpacing[dimIdx] = value
         actions.setSpacing(newSpacing)
       },
-      [td.spacing, actions],
+      [td.spacing, actions]
     )
 
     const handlePacketCenterChange = useCallback(
@@ -64,7 +63,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         newCenter[dimIdx] = value
         actions.setPacketCenter(newCenter)
       },
-      [td.packetCenter, actions],
+      [td.packetCenter, actions]
     )
 
     const handlePacketMomentumChange = useCallback(
@@ -73,7 +72,7 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         newMom[dimIdx] = value
         actions.setPacketMomentum(newMom)
       },
-      [td.packetMomentum, actions],
+      [td.packetMomentum, actions]
     )
 
     const activeDims = useMemo(() => td.latticeDim, [td.latticeDim])
@@ -81,18 +80,18 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
     // Filter grid options by budget: at high D, large grid sizes exceed TDSE_MAX_TOTAL_SITES
     const maxGridPerDim = useMemo(
       () => Math.floor(Math.pow(TDSE_MAX_TOTAL_SITES, 1 / activeDims)),
-      [activeDims],
+      [activeDims]
     )
     const gridSizeOptions = useMemo(
       () => ALL_GRID_SIZE_OPTIONS.filter((o) => parseInt(o.value, 10) <= maxGridPerDim),
-      [maxGridPerDim],
+      [maxGridPerDim]
     )
 
     const handlePresetChange = useCallback(
       (value: string) => {
         if (value) actions.applyPreset(value)
       },
-      [actions],
+      [actions]
     )
 
     return (
@@ -168,40 +167,6 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
         </div>
 
         <TDSEPotentialControls td={td} activeDims={activeDims} actions={actions} />
-
-        {/* Absorber */}
-        <div className="border-t border-border-subtle pt-3 space-y-3">
-          <Switch
-            label="Absorbing Boundary"
-            checked={td.absorberEnabled}
-            onCheckedChange={actions.setAbsorberEnabled}
-            data-testid="tdse-absorber-enabled"
-          />
-          {td.absorberEnabled && (
-            <>
-              <Slider
-                label="Absorber Width"
-                min={0.05}
-                max={0.3}
-                step={0.01}
-                value={td.absorberWidth}
-                onChange={actions.setAbsorberWidth}
-                showValue
-                data-testid="tdse-absorber-width"
-              />
-              <Slider
-                label="Absorber Strength"
-                min={0.1}
-                max={10}
-                step={0.1}
-                value={td.absorberStrength}
-                onChange={actions.setAbsorberStrength}
-                showValue
-                data-testid="tdse-absorber-strength"
-              />
-            </>
-          )}
-        </div>
 
         {/* Display */}
         <div className="border-t border-border-subtle pt-3 space-y-3">
@@ -326,21 +291,9 @@ export const TDSEControls: React.FC<TdseControlsProps> = React.memo(
             })}
           </div>
         )}
-
-        {/* Reset */}
-        <div className="border-t border-border-subtle pt-3">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={actions.resetField}
-            data-testid="tdse-reset"
-          >
-            Reset Wavefunction
-          </Button>
-        </div>
       </div>
     )
-  },
+  }
 )
 
 TDSEControls.displayName = 'TDSEControls'

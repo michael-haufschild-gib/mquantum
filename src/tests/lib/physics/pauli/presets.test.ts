@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { PAULI_SCENARIO_PRESETS, type PauliScenarioPreset } from '@/lib/physics/pauli/presets'
+import { PAULI_SCENARIO_PRESETS } from '@/lib/physics/pauli/presets'
 import { DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'
 
 describe('PAULI_SCENARIO_PRESETS', () => {

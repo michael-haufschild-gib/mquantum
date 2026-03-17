@@ -6,7 +6,11 @@ import { cosinePaletteBlock } from '../shared/color/cosine-palette.wgsl'
 
 import { constantsBlock } from './core/constants.wgsl'
 import { uniformStructBlock, uniformBindingsBlock } from './core/uniforms.wgsl'
-import { generateVertexOutputStruct, fragmentOutputStruct, fragmentOutputStructSingle } from './core/varyings.wgsl'
+import {
+  generateVertexOutputStruct,
+  fragmentOutputStruct,
+  fragmentOutputStructSingle,
+} from './core/varyings.wgsl'
 
 import { colorBlock } from './utils/color.wgsl'
 import { noiseBlock } from './utils/noise.wgsl'
@@ -94,10 +98,14 @@ export function composeSkyboxFragmentShader(config: SkyboxShaderConfig): {
     { name: 'Vignette Effect', content: vignetteBlock, condition: useVignette },
     {
       name: 'Main',
-      content: generateMain(mode, {
-        sun: useSun,
-        vignette: useVignette,
-      }, { mrt }),
+      content: generateMain(
+        mode,
+        {
+          sun: useSun,
+          vignette: useVignette,
+        },
+        { mrt }
+      ),
     },
   ]
 

@@ -16,7 +16,10 @@
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { composeEigenfunctionCacheComputeShader } from '../shaders/schroedinger/compute/composeEigenCache'
-import { EIGEN_CACHE_SAMPLES, MAX_EIGEN_FUNCS } from '../shaders/schroedinger/quantum/eigenfunctionCache.wgsl'
+import {
+  EIGEN_CACHE_SAMPLES,
+  MAX_EIGEN_FUNCS,
+} from '../shaders/schroedinger/quantum/eigenfunctionCache.wgsl'
 
 // SchroedingerUniforms byte offsets (must match uniforms.wgsl.ts and renderer)
 const OFFSET_TERM_COUNT = 4 // i32 at byte 4

@@ -204,17 +204,11 @@ export class MainObjectMRTPass extends WebGPUBasePass {
     }
 
     // Build render pass descriptor
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const renderPassDescriptor: any = {
-      label: `${this.id}-render`,
-      colorAttachments,
-    }
-
-    // Add depth attachment if configured
+    let depthStencilAttachment: GPURenderPassDepthStencilAttachment | undefined
     if (this.passConfig.depthAttachment) {
       const depthView = ctx.getWriteTarget(this.passConfig.depthAttachment)
       if (depthView) {
-        renderPassDescriptor.depthStencilAttachment = {
+        depthStencilAttachment = {
           view: depthView,
           depthLoadOp: this.clearDepth ? 'clear' : 'load',
           depthStoreOp: 'store' as const,
@@ -223,10 +217,14 @@ export class MainObjectMRTPass extends WebGPUBasePass {
       }
     }
 
-    // Begin render pass
-    // Note: In a full implementation, this would coordinate with object
-    // renderers to draw the scene. For now, we begin and immediately end
-    // the pass to clear the targets to their initial values.
+    const renderPassDescriptor: GPURenderPassDescriptor = {
+      label: `${this.id}-render`,
+      colorAttachments,
+      ...(depthStencilAttachment ? { depthStencilAttachment } : {}),
+    }
+
+    // Begin render pass — clears targets to their initial values.
+    // Actual scene rendering is handled by dedicated renderers.
     const passEncoder = ctx.beginRenderPass(renderPassDescriptor)
 
     // End pass - actual scene rendering is handled by dedicated renderers
@@ -333,22 +331,23 @@ export class MainObjectMRTPass extends WebGPUBasePass {
     }
 
     // Build descriptor with optional depth attachment
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const descriptor: any = {
-      label: `${this.id}-external`,
-      colorAttachments,
-    }
-
+    let depthStencilAttachment: GPURenderPassDepthStencilAttachment | undefined
     if (this.passConfig.depthAttachment) {
       const depthView = ctx.getWriteTarget(this.passConfig.depthAttachment)
       if (depthView) {
-        descriptor.depthStencilAttachment = {
+        depthStencilAttachment = {
           view: depthView,
           depthLoadOp: this.clearDepth ? 'clear' : 'load',
           depthStoreOp: 'store' as const,
           depthClearValue: this.depthClearValue,
         }
       }
+    }
+
+    const descriptor: GPURenderPassDescriptor = {
+      label: `${this.id}-external`,
+      colorAttachments,
+      ...(depthStencilAttachment ? { depthStencilAttachment } : {}),
     }
 
     return descriptor

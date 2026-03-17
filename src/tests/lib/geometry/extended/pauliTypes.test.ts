@@ -5,7 +5,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEFAULT_PAULI_CONFIG,
-  type PauliConfig,
   type PauliFieldType,
   type PauliFieldView,
   type PauliInitialCondition,
@@ -74,12 +73,22 @@ describe('PauliConfig type constraints', () => {
   })
 
   it('fieldView values are valid', () => {
-    const validViews: PauliFieldView[] = ['spinDensity', 'totalDensity', 'spinExpectation', 'coherence']
+    const validViews: PauliFieldView[] = [
+      'spinDensity',
+      'totalDensity',
+      'spinExpectation',
+      'coherence',
+    ]
     expect(validViews).toContain(DEFAULT_PAULI_CONFIG.fieldView)
   })
 
   it('initialCondition values are valid', () => {
-    const validConditions: PauliInitialCondition[] = ['gaussianSpinUp', 'gaussianSpinDown', 'gaussianSuperposition', 'planeWaveSpinor']
+    const validConditions: PauliInitialCondition[] = [
+      'gaussianSpinUp',
+      'gaussianSpinDown',
+      'gaussianSuperposition',
+      'planeWaveSpinor',
+    ]
     expect(validConditions).toContain(DEFAULT_PAULI_CONFIG.initialCondition)
   })
 

@@ -12,11 +12,7 @@
  * @module rendering/webgpu/passes/WebGPUTemporalCloudPass
  */
 
-import type {
-  WebGPURenderContext,
-  WebGPURenderPassConfig,
-  WebGPUSetupContext,
-} from '../core/types'
+import type { WebGPURenderContext, WebGPURenderPassConfig, WebGPUSetupContext } from '../core/types'
 import { WebGPUBasePass } from '../core/WebGPUBasePass'
 import { temporalReprojectionShader } from '../shaders/temporal/reprojection.wgsl'
 import { temporalReconstructionShader } from '../shaders/temporal/reconstruction.wgsl'
@@ -92,7 +88,9 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
   // PERF: Pre-allocated matrix buffers to avoid per-frame GC pressure
   private _viewProjectionMatrix = new Float32Array(16)
   private _inverseViewProjectionMatrix = new Float32Array(16)
-  private _fallbackIdentityMatrix = new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1])
+  private _fallbackIdentityMatrix = new Float32Array([
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+  ])
   private hasValidHistory = false
   // Static scene detection: freeze Bayer cycling when nothing changes
   private prevAnimationTime = Number.NaN
@@ -777,9 +775,7 @@ export class WebGPUTemporalCloudPass extends WebGPUBasePass {
 
     // Detect whether the scene has changed since the last frame.
     // When static, freeze the Bayer offset cycle to prevent per-frame jitter.
-    const animation = ctx.frame?.stores?.['animation'] as
-      | { accumulatedTime?: number }
-      | undefined
+    const animation = ctx.frame?.stores?.['animation'] as { accumulatedTime?: number } | undefined
     const currentAnimTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
     const animTimeChanged = currentAnimTime !== this.prevAnimationTime
     const cameraChanged = !this.matricesEqual(viewProjectionMatrix, this.prevViewProjectionMatrix)

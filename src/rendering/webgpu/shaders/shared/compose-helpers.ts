@@ -61,11 +61,7 @@ export interface FeatureFlags {
  * @param config
  */
 export function processFeatureFlags(config: WGSLShaderConfig): FeatureFlags {
-  const {
-    dimension,
-    temporal = false,
-    sss = false,
-  } = config
+  const { dimension, temporal = false, sss = false } = config
 
   const defines: string[] = [
     `const DIMENSION: i32 = ${dimension};`,

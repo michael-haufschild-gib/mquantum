@@ -123,7 +123,7 @@ describe('serializeExtendedState — pauliSpinor', () => {
         autoScale: false,
         absorberEnabled: true,
         absorberWidth: 0.1,
-        absorberStrength: 5.0,
+        pmlTargetReflection: 1e-6,
         diagnosticsEnabled: true,
         diagnosticsInterval: 5,
         needsReset: true,

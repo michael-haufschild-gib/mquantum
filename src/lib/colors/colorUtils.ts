@@ -53,7 +53,8 @@ export const parseColorToHsv = (input: string): HSVA => {
 
   const isValidRgbChannel = (value: number): boolean =>
     Number.isInteger(value) && value >= 0 && value <= 255
-  const isValidAlpha = (value: number): boolean => Number.isFinite(value) && value >= 0 && value <= 1
+  const isValidAlpha = (value: number): boolean =>
+    Number.isFinite(value) && value >= 0 && value <= 1
 
   // 2. Try strict RGB
   const rgbMatch = normalizedInput.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)

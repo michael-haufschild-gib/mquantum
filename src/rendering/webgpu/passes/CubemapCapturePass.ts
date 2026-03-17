@@ -1,4 +1,3 @@
-/* global GPUTextureFormat */
 /**
  * WebGPU Cubemap Capture Pass
  *
@@ -198,7 +197,11 @@ export class CubemapCapturePass extends WebGPUBasePass {
     this.proceduralBindGroupLayout = device.createBindGroupLayout({
       label: 'cubemap-capture-procedural-bgl',
       entries: [
-        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' as const } },
+        {
+          binding: 0,
+          visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' as const },
+        },
       ],
     })
 
@@ -442,10 +445,22 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
     // Column-major mat4x4 (for WebGPU/WGSL)
     return new Float32Array([
-      xAxis[0]!, yAxis[0]!, zAxis[0]!, 0,
-      xAxis[1]!, yAxis[1]!, zAxis[1]!, 0,
-      xAxis[2]!, yAxis[2]!, zAxis[2]!, 0,
-      0, 0, 0, 1,
+      xAxis[0]!,
+      yAxis[0]!,
+      zAxis[0]!,
+      0,
+      xAxis[1]!,
+      yAxis[1]!,
+      zAxis[1]!,
+      0,
+      xAxis[2]!,
+      yAxis[2]!,
+      zAxis[2]!,
+      0,
+      0,
+      0,
+      0,
+      1,
     ])
   }
 
@@ -461,10 +476,22 @@ export class CubemapCapturePass extends WebGPUBasePass {
 
     // Column-major perspective matrix
     return new Float32Array([
-      f, 0, 0, 0,
-      0, f, 0, 0,
-      0, 0, (far + near) * nf, -1,
-      0, 0, 2 * far * near * nf, 0,
+      f,
+      0,
+      0,
+      0,
+      0,
+      f,
+      0,
+      0,
+      0,
+      0,
+      (far + near) * nf,
+      -1,
+      0,
+      0,
+      2 * far * near * nf,
+      0,
     ])
   }
 
@@ -475,11 +502,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
     const b0 = b[0] ?? 0
     const b1 = b[1] ?? 0
     const b2 = b[2] ?? 0
-    return [
-      a1 * b2 - a2 * b1,
-      a2 * b0 - a0 * b2,
-      a0 * b1 - a1 * b0,
-    ]
+    return [a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0]
   }
 
   private normalize(v: [number, number, number]): void {
@@ -496,11 +519,7 @@ export class CubemapCapturePass extends WebGPUBasePass {
    * @param ctx
    */
   execute(ctx: WebGPURenderContext): void {
-    if (
-      !this.device ||
-      !this.proceduralPipeline ||
-      !this.uniformBuffer
-    ) {
+    if (!this.device || !this.proceduralPipeline || !this.uniformBuffer) {
       return
     }
 
@@ -508,12 +527,14 @@ export class CubemapCapturePass extends WebGPUBasePass {
     this.didCaptureThisFrame = false
 
     // Get environment state for smart capture throttling
-    const env = ctx.frame?.stores?.environment as {
-      skyboxMode?: string
-      skyboxAnimationMode?: string
-      skyboxAnimationSpeed?: number
-      proceduralSettings?: { timeScale?: number }
-    } | undefined
+    const env = ctx.frame?.stores?.environment as
+      | {
+          skyboxMode?: string
+          skyboxAnimationMode?: string
+          skyboxAnimationSpeed?: number
+          proceduralSettings?: { timeScale?: number }
+        }
+      | undefined
 
     const currentSkyboxMode = env?.skyboxMode ?? null
 
@@ -556,12 +577,14 @@ export class CubemapCapturePass extends WebGPUBasePass {
    * @param isPlaying
    */
   private isSkyboxAnimating(
-    env: {
-      skyboxMode?: string
-      skyboxAnimationMode?: string
-      skyboxAnimationSpeed?: number
-      proceduralSettings?: { timeScale?: number }
-    } | undefined,
+    env:
+      | {
+          skyboxMode?: string
+          skyboxAnimationMode?: string
+          skyboxAnimationSpeed?: number
+          proceduralSettings?: { timeScale?: number }
+        }
+      | undefined,
     isPlaying: boolean
   ): boolean {
     if (!env) return true

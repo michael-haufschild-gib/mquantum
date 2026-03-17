@@ -67,11 +67,7 @@ describe('densityMatrixFromCoefficients', () => {
 
 describe('evolveStep', () => {
   it('preserves trace after 100 steps with dephasing', () => {
-    const rho = densityMatrixFromCoefficients(
-      [1 / Math.sqrt(2), 1 / Math.sqrt(2)],
-      [0, 0],
-      2
-    )
+    const rho = densityMatrixFromCoefficients([1 / Math.sqrt(2), 1 / Math.sqrt(2)], [0, 0], 2)
     const energies = new Float64Array([0.5, 1.5])
     const config: OpenQuantumConfig = {
       ...DEFAULT_OPEN_QUANTUM_CONFIG,

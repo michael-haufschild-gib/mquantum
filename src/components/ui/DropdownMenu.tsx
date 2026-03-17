@@ -184,7 +184,9 @@ const MenuItemButton = React.memo(
       >
         <span className="flex items-center gap-2">
           {item.checked !== undefined && (
-            <span className={`text-[10px] ${item.checked ? 'text-accent' : 'opacity-0'}`}>✓</span>
+            <span className={`text-[10px] ${item.checked ? 'text-accent' : 'opacity-0'}`}>
+              {'\u2022'}
+            </span>
           )}
           {item.label}
         </span>
@@ -490,7 +492,9 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
     useEffect(() => {
       if (!isOpen || !menuRef.current) return
       const timer = requestAnimationFrame(() => {
-        const firstItem = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not(:disabled)')
+        const firstItem = menuRef.current?.querySelector<HTMLElement>(
+          '[role="menuitem"]:not(:disabled)'
+        )
         firstItem?.focus()
       })
       return () => cancelAnimationFrame(timer)
@@ -502,7 +506,9 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = React.memo(
         const menu = menuRef.current
         if (!menu) return
 
-        const items = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)'))
+        const items = Array.from(
+          menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)')
+        )
         const currentIndex = items.indexOf(document.activeElement as HTMLElement)
 
         switch (e.key) {

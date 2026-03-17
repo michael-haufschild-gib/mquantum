@@ -52,6 +52,9 @@ function makeConfig(): FreeScalarConfig {
     selfInteractionEnabled: false,
     selfInteractionLambda: 0.5,
     selfInteractionVev: 1.0,
+    absorberEnabled: false,
+    absorberWidth: 0.2,
+    pmlTargetReflection: 1e-6,
     diagnosticsEnabled: false,
     diagnosticsInterval: 60,
     slicePositions: [],
@@ -98,7 +101,10 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
     const pass = new FreeScalarFieldComputePass() as unknown as {
       phiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
       piReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
-      readbackAndComputeKSpace: (device: { queue: { onSubmittedWorkDone: () => Promise<void> } }, config: FreeScalarConfig) => Promise<void>
+      readbackAndComputeKSpace: (
+        device: { queue: { onSubmittedWorkDone: () => Promise<void> } },
+        config: FreeScalarConfig
+      ) => Promise<void>
     }
 
     const oldPhi = makeReadbackBuffer([1, 2, 3, 4])
@@ -135,7 +141,10 @@ describe('FreeScalarFieldComputePass k-space readback', () => {
       pendingKSpaceData: { density: Uint16Array; analysis: Uint16Array } | null
       phiReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
       piReadbackBuffer: ReturnType<typeof makeReadbackBuffer> | null
-      readbackAndComputeKSpace: (device: { queue: { onSubmittedWorkDone: () => Promise<void> } }, config: FreeScalarConfig) => Promise<void>
+      readbackAndComputeKSpace: (
+        device: { queue: { onSubmittedWorkDone: () => Promise<void> } },
+        config: FreeScalarConfig
+      ) => Promise<void>
     }
 
     pass.kSpaceReadbackEpoch = 0

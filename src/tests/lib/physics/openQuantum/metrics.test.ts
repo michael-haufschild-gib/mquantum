@@ -9,7 +9,10 @@ import {
   groundPopulation,
   computeMetrics,
 } from '@/lib/physics/openQuantum/metrics'
-import { densityMatrixFromCoefficients, createDensityMatrix } from '@/lib/physics/openQuantum/integrator'
+import {
+  densityMatrixFromCoefficients,
+  createDensityMatrix,
+} from '@/lib/physics/openQuantum/integrator'
 
 describe('purity', () => {
   it('returns 1 for a pure state', () => {

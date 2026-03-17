@@ -13,7 +13,7 @@
 /**
  * Uniform struct for free scalar field parameters.
  * N-D capable layout with per-dimension arrays of 12 elements each.
- * WGSL alignment: total 496 bytes.
+ * WGSL alignment: total 512 bytes.
  */
 export const freeScalarUniformsBlock = /* wgsl */ `
 struct FreeScalarUniforms {
@@ -52,7 +52,13 @@ struct FreeScalarUniforms {
   selfInteractionEnabled: u32,  // offset 480
   selfInteractionLambda: f32,   // offset 484
   selfInteractionVev: f32,      // offset 488
-  _padSI: u32,                  // offset 492 (pad to 16-byte boundary)
+  absorberEnabled: u32,         // offset 492 (was _padSI)
+
+  // PML absorber parameters (16 bytes)
+  absorberWidth: f32,           // offset 496
+  absorberStrength: f32,        // offset 500 (σ_max, auto-computed from R_target)
+  _padPML0: u32,                // offset 504 (pad to 16-byte boundary)
+  _padPML1: u32,                // offset 508
 }
 `
 

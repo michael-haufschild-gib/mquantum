@@ -16,10 +16,7 @@
  */
 
 import { StateCreator } from 'zustand'
-import {
-  DEFAULT_FACE_PBR,
-  type PBRConfig,
-} from '@/stores/defaults/visualDefaults'
+import { DEFAULT_FACE_PBR, type PBRConfig } from '@/stores/defaults/visualDefaults'
 
 // ============================================================================
 // Types
@@ -193,7 +190,10 @@ export const createPBRSlice: StateCreator<PBRSlice, [], [], PBRSlice> = (set) =>
         if (isFinitePBRInput(config.reflectance)) {
           nextFace.reflectance = clampReflectance(config.reflectance)
         } else if (import.meta.env.DEV) {
-          console.warn('[pbrSlice] Ignoring non-finite reflectance in setFacePBR:', config.reflectance)
+          console.warn(
+            '[pbrSlice] Ignoring non-finite reflectance in setFacePBR:',
+            config.reflectance
+          )
         }
       }
 

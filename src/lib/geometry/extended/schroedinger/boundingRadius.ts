@@ -190,13 +190,11 @@ export function computeHydrogenMomentumBoundingRadius(
  * @param diracConfig - Dirac lattice configuration
  * @returns Bounding radius in object-space units
  */
-export function computeDiracBoundingRadius(
-  dimension: number,
-  diracConfig: DiracConfig
-): number {
+export function computeDiracBoundingRadius(dimension: number, diracConfig: DiracConfig): number {
   const maxExtent = Math.max(
-    ...Array.from({ length: Math.min(dimension, 3) }, (_, d) =>
-      (diracConfig.gridSize[d] ?? 64) * (diracConfig.spacing[d] ?? 0.15) * 0.5
+    ...Array.from(
+      { length: Math.min(dimension, 3) },
+      (_, d) => (diracConfig.gridSize[d] ?? 64) * (diracConfig.spacing[d] ?? 0.15) * 0.5
     )
   )
   return Math.max(maxExtent * 1.1, MIN_BOUND_R)

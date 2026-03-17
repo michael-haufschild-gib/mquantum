@@ -6,7 +6,6 @@
  * controls for remapping input values.
  *
  * @see https://iquilezles.org/articles/palettes/
- * @see docs/prd/advanced-color-system.md
  */
 
 /**

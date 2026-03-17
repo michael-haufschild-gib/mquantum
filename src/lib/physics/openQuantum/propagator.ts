@@ -12,11 +12,7 @@
  */
 
 import type { ComplexMatrix } from './complexMatrix'
-import {
-  complexMatScale,
-  complexMatZero,
-  matrixExponentialPade,
-} from './complexMatrix'
+import { complexMatScale, complexMatZero, matrixExponentialPade } from './complexMatrix'
 import { eigenvalueFloor, MAX_K } from './integrator'
 import type { DensityMatrix } from './types'
 
@@ -38,7 +34,7 @@ const outImScratch = new Float64Array(MAX_N)
 export function computePropagator(
   liouvillian: ComplexMatrix,
   dt: number,
-  K: number,
+  K: number
 ): ComplexMatrix {
   const N = K * K
 
@@ -60,10 +56,7 @@ export function computePropagator(
  * @param propagator - K²×K² propagator from computePropagator()
  * @param rho - Density matrix (mutated in place)
  */
-export function applyPropagator(
-  propagator: ComplexMatrix,
-  rho: DensityMatrix,
-): void {
+export function applyPropagator(propagator: ComplexMatrix, rho: DensityMatrix): void {
   const K = rho.K
   const N = K * K
   const el = rho.elements
@@ -116,10 +109,7 @@ export function applyPropagator(
  * @param propagator - Cached propagator
  * @param rho - Density matrix (mutated in place)
  */
-export function evolvePropagatorStep(
-  propagator: ComplexMatrix,
-  rho: DensityMatrix,
-): void {
+export function evolvePropagatorStep(propagator: ComplexMatrix, rho: DensityMatrix): void {
   applyPropagator(propagator, rho)
 
   // Physicality guards (same as split-step integrator)

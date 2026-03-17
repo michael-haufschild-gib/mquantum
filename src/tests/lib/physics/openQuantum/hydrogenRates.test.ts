@@ -139,8 +139,7 @@ describe('buildTransitionRates', () => {
 
     const forbidden = rates.find(
       (r) =>
-        (r.from === s1.index && r.to === s2.index) ||
-        (r.from === s2.index && r.to === s1.index),
+        (r.from === s1.index && r.to === s2.index) || (r.from === s2.index && r.to === s1.index)
     )
     expect(forbidden).toBeUndefined()
   })

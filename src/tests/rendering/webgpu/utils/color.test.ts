@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { parseHexColorToLinearRgb, parseHexColorToSrgbRgb, srgbToLinearChannel } from '@/rendering/webgpu/utils/color'
+import {
+  parseHexColorToLinearRgb,
+  parseHexColorToSrgbRgb,
+  srgbToLinearChannel,
+} from '@/rendering/webgpu/utils/color'
 
 describe('rendering/webgpu/utils/color', () => {
   describe('srgbToLinearChannel', () => {

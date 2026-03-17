@@ -11,16 +11,22 @@
  */
 
 import type { DiracAlgebraRequest, DiracAlgebraResponse } from './diracAlgebraWorker'
-import { generateDiracMatricesFallback, spinorSize as computeSpinorSize } from './cliffordAlgebraFallback'
+import {
+  generateDiracMatricesFallback,
+  spinorSize as computeSpinorSize,
+} from './cliffordAlgebraFallback'
 
 /** Main-thread bridge to the Dirac algebra web worker for gamma matrix generation. */
 export class DiracAlgebraBridge {
   private worker: Worker | null = null
   private epoch = 0
-  private pending: Map<number, {
-    resolve: (r: { gammaData: Float32Array; spinorSize: number }) => void
-    reject: (e: Error) => void
-  }> = new Map()
+  private pending: Map<
+    number,
+    {
+      resolve: (r: { gammaData: Float32Array; spinorSize: number }) => void
+      reject: (e: Error) => void
+    }
+  > = new Map()
   private workerFailed = false
 
   private ensureWorker(): Worker | null {
@@ -28,10 +34,9 @@ export class DiracAlgebraBridge {
     if (this.worker) return this.worker
 
     try {
-      this.worker = new Worker(
-        new URL('./diracAlgebraWorker.ts', import.meta.url),
-        { type: 'module' },
-      )
+      this.worker = new Worker(new URL('./diracAlgebraWorker.ts', import.meta.url), {
+        type: 'module',
+      })
       this.worker.onmessage = (e: MessageEvent<DiracAlgebraResponse>) => {
         const { epoch, gammaData, spinorSize } = e.data
         const p = this.pending.get(epoch)

@@ -50,7 +50,8 @@ describe('generateDiracMatricesFallback', () => {
     const c = new Float32Array(s * s * 2)
     for (let i = 0; i < s; i++) {
       for (let j = 0; j < s; j++) {
-        let re = 0, im = 0
+        let re = 0,
+          im = 0
         for (let k = 0; k < s; k++) {
           const [aR, aI] = getEntry(a, s, i, k)
           const [bR, bI] = getEntry(b, s, k, j)

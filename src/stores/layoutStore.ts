@@ -134,10 +134,7 @@ export function clampSidebarWidth(width: number, viewportWidth: number): number 
   const safeViewportWidth = Number.isFinite(viewportWidth) ? viewportWidth : SIDE_BY_SIDE_BREAKPOINT
   const max = getMaxSidebarWidth(safeViewportWidth)
   if (!Number.isFinite(width)) {
-    return Math.max(
-      MIN_SIDEBAR_WIDTH,
-      Math.min(max, getDefaultSidebarWidth(safeViewportWidth))
-    )
+    return Math.max(MIN_SIDEBAR_WIDTH, Math.min(max, getDefaultSidebarWidth(safeViewportWidth)))
   }
   return Math.max(MIN_SIDEBAR_WIDTH, Math.min(max, width))
 }

@@ -831,7 +831,6 @@ export class PaperTexturePass extends WebGPUBasePass {
     this.seed = value
   }
 
-
   /**
    * Update pass properties from Zustand stores.
    * @param ctx

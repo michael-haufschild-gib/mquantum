@@ -12,7 +12,10 @@ import {
   DEFAULT_OPEN_QUANTUM_CONFIG,
 } from '@/lib/physics/openQuantum/types'
 
-export type { OpenQuantumConfig, OpenQuantumVisualizationMode } from '@/lib/physics/openQuantum/types'
+export type {
+  OpenQuantumConfig,
+  OpenQuantumVisualizationMode,
+} from '@/lib/physics/openQuantum/types'
 export { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 
 // ============================================================================
@@ -106,7 +109,13 @@ export type SchroedingerRenderStyle = 'rayMarching'
  * - hydrogenND: N-dimensional hydrogen orbital (hybrid: Y_lm for first 3D + HO for extra dims)
  * - freeScalarField: Real Klein-Gordon scalar field on a 1D-3D spatial lattice with leapfrog evolution
  */
-export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics' | 'diracEquation'
+export type SchroedingerQuantumMode =
+  | 'harmonicOscillator'
+  | 'hydrogenND'
+  | 'freeScalarField'
+  | 'tdseDynamics'
+  | 'becDynamics'
+  | 'diracEquation'
 
 /**
  * Which field quantity to visualize for the free scalar field mode
@@ -117,7 +126,6 @@ export type SchroedingerQuantumMode = 'harmonicOscillator' | 'hydrogenND' | 'fre
  */
 export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity' | 'wallDensity'
 
-
 /**
  * Initial condition type for the free scalar field
  * - vacuumNoise: Hash-based pseudo-random Gaussian noise
@@ -125,7 +133,11 @@ export type FreeScalarFieldView = 'phi' | 'pi' | 'energyDensity' | 'wallDensity'
  * - gaussianPacket: Gaussian wave packet A*exp(-|x-x0|^2/(2*sigma^2))*cos(k.x)
  * - kinkProfile: Domain wall kink phi = v*tanh((x-x0)/w) for self-interaction potential
  */
-export type FreeScalarInitialCondition = 'vacuumNoise' | 'singleMode' | 'gaussianPacket' | 'kinkProfile'
+export type FreeScalarInitialCondition =
+  | 'vacuumNoise'
+  | 'singleMode'
+  | 'gaussianPacket'
+  | 'kinkProfile'
 
 // ============================================================================
 // k-Space Visualization Config
@@ -244,6 +256,14 @@ export interface FreeScalarConfig {
   /** Vacuum expectation value v (field minima at phi = +/-v) */
   selfInteractionVev: number
 
+  // === Absorber (PML) ===
+  /** Enable absorbing boundary (PML) — prevents periodic wrap-around */
+  absorberEnabled: boolean
+  /** PML layer width (fraction of grid per side) */
+  absorberWidth: number
+  /** Target round-trip reflection coefficient for PML */
+  pmlTargetReflection: number
+
   // === Diagnostics ===
   /** Enable diagnostic readback (norm, energy, field statistics) */
   diagnosticsEnabled: boolean
@@ -277,6 +297,9 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
   selfInteractionEnabled: false,
   selfInteractionLambda: 0.5,
   selfInteractionVev: 1.0,
+  absorberEnabled: true,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
   diagnosticsEnabled: false,
   diagnosticsInterval: 10,
 }
@@ -292,7 +315,13 @@ export const DEFAULT_FREE_SCALAR_CONFIG: FreeScalarConfig = {
  * - current: Probability current j = Im(psi* grad psi) / m
  * - potential: External potential V(x)
  */
-export type TdseFieldView = 'density' | 'phase' | 'current' | 'potential' | 'superfluidVelocity' | 'healingLength'
+export type TdseFieldView =
+  | 'density'
+  | 'phase'
+  | 'current'
+  | 'potential'
+  | 'superfluidVelocity'
+  | 'healingLength'
 
 /**
  * Initial condition type for the TDSE wavepacket
@@ -300,7 +329,14 @@ export type TdseFieldView = 'density' | 'phase' | 'current' | 'potential' | 'sup
  * - planeWave: Plane wave exp(i*k0.x) with Gaussian envelope
  * - superposition: Sum of two Gaussian wavepackets
  */
-export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superposition' | 'thomasFermi' | 'vortexImprint' | 'vortexLattice' | 'darkSoliton'
+export type TdseInitialCondition =
+  | 'gaussianPacket'
+  | 'planeWave'
+  | 'superposition'
+  | 'thomasFermi'
+  | 'vortexImprint'
+  | 'vortexLattice'
+  | 'darkSoliton'
 
 /**
  * External potential type for the TDSE
@@ -316,7 +352,18 @@ export type TdseInitialCondition = 'gaussianPacket' | 'planeWave' | 'superpositi
  * - becTrap: BEC anisotropic harmonic trap (per-dimension ω ratios via trapAnisotropy)
  * - radialDoubleWell: Radial double well V(r) = λ(r−r₁)²(r−r₂)² − εr (bubble nucleation)
  */
-export type TdsePotentialType = 'free' | 'barrier' | 'step' | 'finiteWell' | 'harmonicTrap' | 'driven' | 'doubleSlit' | 'periodicLattice' | 'doubleWell' | 'becTrap' | 'radialDoubleWell'
+export type TdsePotentialType =
+  | 'free'
+  | 'barrier'
+  | 'step'
+  | 'finiteWell'
+  | 'harmonicTrap'
+  | 'driven'
+  | 'doubleSlit'
+  | 'periodicLattice'
+  | 'doubleWell'
+  | 'becTrap'
+  | 'radialDoubleWell'
 
 /**
  * Drive waveform type for time-dependent potentials
@@ -418,12 +465,12 @@ export interface TdseConfig {
   /** Drive oscillation amplitude */
   driveAmplitude: number
 
-  /** Enable complex absorbing potential (CAP) at domain boundaries */
+  /** Enable absorbing boundary (PML) at domain boundaries */
   absorberEnabled: boolean
-  /** CAP absorption region width (fraction of domain, 0.05-0.3) */
+  /** PML absorption region width (fraction of domain per side, 0.05-0.5) */
   absorberWidth: number
-  /** CAP absorption strength */
-  absorberStrength: number
+  /** Target round-trip reflection coefficient for PML (e.g. 1e-6) */
+  pmlTargetReflection: number
 
   /** Which field quantity to render */
   fieldView: TdseFieldView
@@ -512,8 +559,8 @@ export const DEFAULT_TDSE_CONFIG: TdseConfig = {
   driveAmplitude: 1.0,
 
   absorberEnabled: true,
-  absorberWidth: 0.1,
-  absorberStrength: 5.0,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
 
   fieldView: 'density',
   autoScale: true,
@@ -551,7 +598,13 @@ export type BecInitialCondition =
  * - superfluidVelocity: v_s = (ℏ/m) ∇arg(ψ), shows vortex flow
  * - healingLength: local ξ(x) = ℏ/√(2m·g·|ψ|²)
  */
-export type BecFieldView = 'density' | 'phase' | 'current' | 'potential' | 'superfluidVelocity' | 'healingLength'
+export type BecFieldView =
+  | 'density'
+  | 'phase'
+  | 'current'
+  | 'potential'
+  | 'superfluidVelocity'
+  | 'healingLength'
 
 /**
  * Configuration for the BEC (Gross-Pitaevskii) solver.
@@ -604,10 +657,11 @@ export interface BecConfig {
   /** Auto-scale density normalization */
   autoScale: boolean
 
-  // === Absorber ===
+  // === Absorber (PML) ===
   absorberEnabled: boolean
   absorberWidth: number
-  absorberStrength: number
+  /** Target round-trip reflection coefficient for PML */
+  pmlTargetReflection: number
 
   // === Diagnostics ===
   diagnosticsEnabled: boolean
@@ -639,8 +693,8 @@ export const DEFAULT_BEC_CONFIG: BecConfig = {
   fieldView: 'density',
   autoScale: true,
   absorberEnabled: false,
-  absorberWidth: 0.1,
-  absorberStrength: 5.0,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
   needsReset: true,
@@ -692,13 +746,7 @@ export type DiracFieldView =
  * - harmonicTrap: Harmonic oscillator potential (Dirac oscillator)
  * - coulomb: Coulomb 1/r potential (relativistic hydrogen-like)
  */
-export type DiracPotentialType =
-  | 'none'
-  | 'step'
-  | 'barrier'
-  | 'well'
-  | 'harmonicTrap'
-  | 'coulomb'
+export type DiracPotentialType = 'none' | 'step' | 'barrier' | 'well' | 'harmonicTrap' | 'coulomb'
 
 /**
  * Configuration for the Dirac equation solver.
@@ -770,10 +818,11 @@ export interface DiracConfig {
   /** Show potential V(x) as a faint overlay in the 3D volume */
   showPotential: boolean
 
-  // === Absorber ===
+  // === Absorber (PML) ===
   absorberEnabled: boolean
   absorberWidth: number
-  absorberStrength: number
+  /** Target round-trip reflection coefficient for PML */
+  pmlTargetReflection: number
 
   // === Diagnostics ===
   diagnosticsEnabled: boolean
@@ -801,7 +850,7 @@ export const DEFAULT_DIRAC_CONFIG: DiracConfig = {
   harmonicOmega: 1.0,
   coulombZ: 1.0,
   initialCondition: 'gaussianPacket',
-  packetCenter: [-2.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  packetCenter: [-1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   packetWidth: 0.5,
   packetMomentum: [5.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   spinDirection: [0, 0],
@@ -812,8 +861,8 @@ export const DEFAULT_DIRAC_CONFIG: DiracConfig = {
   autoScale: true,
   showPotential: false,
   absorberEnabled: true,
-  absorberWidth: 0.1,
-  absorberStrength: 5.0,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,
   needsReset: true,
@@ -1037,6 +1086,14 @@ export interface SchroedingerConfig {
   scatteringAnisotropy: number
   /** Surface roughness for specular highlights (0.0-1.0) */
   roughness: number
+
+  // === PML Absorbing Boundary (shared across all dynamic modes) ===
+  /** Enable PML absorbing boundary layer */
+  absorberEnabled: boolean
+  /** PML layer width as fraction of grid (0.05-0.50) */
+  absorberWidth: number
+  /** Per-step damping at outer edge — exp(-σ_max·dt) = pmlTargetReflection */
+  pmlTargetReflection: number
 
   // === Raymarching Quality ===
   /** Unified raymarching quality preset (affects sample count) */
@@ -1348,6 +1405,11 @@ export const DEFAULT_SCHROEDINGER_CONFIG: SchroedingerConfig = {
   scatteringAnisotropy: 0.0,
   roughness: 0.3,
 
+  // PML Absorbing Boundary
+  absorberEnabled: true,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
+
   // Raymarching Quality
   raymarchQuality: 'balanced',
 
@@ -1506,7 +1568,11 @@ export type PauliFieldView = 'spinDensity' | 'totalDensity' | 'spinExpectation' 
  * - gaussianSuperposition: Gaussian packet with equal spin-up/down superposition
  * - planeWaveSpinor: Plane wave with specified spin polarization
  */
-export type PauliInitialCondition = 'gaussianSpinUp' | 'gaussianSpinDown' | 'gaussianSuperposition' | 'planeWaveSpinor'
+export type PauliInitialCondition =
+  | 'gaussianSpinUp'
+  | 'gaussianSpinDown'
+  | 'gaussianSuperposition'
+  | 'planeWaveSpinor'
 
 /**
  * Scalar potential types available in Pauli mode.
@@ -1590,13 +1656,13 @@ export interface PauliConfig {
   /** Auto-scale density normalization */
   autoScale: boolean
 
-  // === Absorber ===
-  /** Enable absorbing boundary */
+  // === Absorber (PML) ===
+  /** Enable absorbing boundary (PML) */
   absorberEnabled: boolean
-  /** Absorber layer width (fraction of grid) */
+  /** PML layer width (fraction of grid per side) */
   absorberWidth: number
-  /** Absorber damping strength */
-  absorberStrength: number
+  /** Target round-trip reflection coefficient for PML */
+  pmlTargetReflection: number
 
   // === Diagnostics ===
   /** Enable diagnostic readback */
@@ -1657,8 +1723,8 @@ export const DEFAULT_PAULI_CONFIG: PauliConfig = {
   autoScale: true,
 
   absorberEnabled: true,
-  absorberWidth: 0.15,
-  absorberStrength: 10.0,
+  absorberWidth: 0.2,
+  pmlTargetReflection: 1e-6,
 
   diagnosticsEnabled: true,
   diagnosticsInterval: 5,

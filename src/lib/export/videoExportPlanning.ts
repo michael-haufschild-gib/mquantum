@@ -128,10 +128,12 @@ export function computeSegmentDurationFrames({
   targetSegmentMB = 50,
   minSegmentSeconds = 5,
 }: ComputeSegmentDurationFramesArgs): number {
-  const safeDurationSeconds = Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 0
+  const safeDurationSeconds =
+    Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 0
   const safeFps = Number.isFinite(fps) && fps > 0 ? fps : 1
   const safeBitrateMbps = Number.isFinite(bitrateMbps) && bitrateMbps > 0 ? bitrateMbps : 0
-  const safeTargetSegmentMB = Number.isFinite(targetSegmentMB) && targetSegmentMB > 0 ? targetSegmentMB : 50
+  const safeTargetSegmentMB =
+    Number.isFinite(targetSegmentMB) && targetSegmentMB > 0 ? targetSegmentMB : 50
   const safeMinSegmentSeconds =
     Number.isFinite(minSegmentSeconds) && minSegmentSeconds > 0 ? minSegmentSeconds : 1
 
@@ -143,9 +145,7 @@ export function computeSegmentDurationFrames({
   const targetSizeBytes = safeTargetSegmentMB * 1024 * 1024
   const bitrateBps = safeBitrateMbps * 1024 * 1024
   const calculatedSegmentSeconds =
-    targetSizeBytes > 0 && bitrateBps > 0
-      ? (targetSizeBytes * 8) / bitrateBps
-      : safeDurationSeconds
+    targetSizeBytes > 0 && bitrateBps > 0 ? (targetSizeBytes * 8) / bitrateBps : safeDurationSeconds
 
   const segmentSeconds = Math.max(
     safeMinSegmentSeconds,

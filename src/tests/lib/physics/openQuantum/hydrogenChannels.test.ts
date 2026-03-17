@@ -12,7 +12,7 @@ function buildTestChannels(
   maxN: number,
   temperature: number,
   dephasingRate: number,
-  dephasingEnabled: boolean,
+  dephasingEnabled: boolean
 ) {
   const basis = buildHydrogenBasis(maxN, 3)
   const rates = buildTransitionRates(basis, temperature)
@@ -68,7 +68,7 @@ describe('buildHydrogenChannels', () => {
     // Verify each absorption channel goes from lower to higher energy state
     for (const ch of absorptionChannels) {
       const fromState = basis[ch.col]! // bra index (lower energy)
-      const toState = basis[ch.row]!   // ket index (higher energy)
+      const toState = basis[ch.row]! // ket index (higher energy)
       expect(toState.energy).toBeGreaterThan(fromState.energy)
     }
   })
@@ -146,9 +146,7 @@ describe('buildHydrogenChannels', () => {
 
     // For each emission channel, find its paired absorption channel
     for (const emCh of emissionChannels) {
-      const abCh = absorptionChannels.find(
-        (a) => a.row === emCh.col && a.col === emCh.row,
-      )
+      const abCh = absorptionChannels.find((a) => a.row === emCh.col && a.col === emCh.row)
       // amplitude² = rate, so emission amplitude > absorption amplitude
       if (abCh) {
         expect(emCh.amplitudeRe).toBeGreaterThan(abCh.amplitudeRe)

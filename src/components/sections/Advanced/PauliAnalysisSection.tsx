@@ -29,13 +29,12 @@ import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
  * ```
  */
 export const PauliAnalysisContent: React.FC = React.memo(() => {
-  const { diagnosticsInterval, setDiagnosticsInterval } =
-    useExtendedObjectStore(
-      useShallow((s) => ({
-        diagnosticsInterval: s.pauliSpinor.diagnosticsInterval,
-        setDiagnosticsInterval: s.setPauliDiagnosticsInterval,
-      })),
-    )
+  const { diagnosticsInterval, setDiagnosticsInterval } = useExtendedObjectStore(
+    useShallow((s) => ({
+      diagnosticsInterval: s.pauliSpinor.diagnosticsInterval,
+      setDiagnosticsInterval: s.setPauliDiagnosticsInterval,
+    }))
+  )
 
   return (
     <>
@@ -83,7 +82,7 @@ const PauliDiagnosticsInline: React.FC = React.memo(() => {
       spinExpectationZ: s.spinExpectationZ,
       coherenceMagnitude: s.coherenceMagnitude,
       larmorFrequency: s.larmorFrequency,
-    })),
+    }))
   )
 
   return (
@@ -94,21 +93,27 @@ const PauliDiagnosticsInline: React.FC = React.memo(() => {
             <>
               {/* Spin component fractions */}
               <div className="flex gap-3">
-                <span>↑={( spinUpFraction * 100).toFixed(1)}%</span>
-                <span>↓={( spinDownFraction * 100).toFixed(1)}%</span>
+                <span>↑={(spinUpFraction * 100).toFixed(1)}%</span>
+                <span>↓={(spinDownFraction * 100).toFixed(1)}%</span>
               </div>
 
               {/* Spin expectation and coherence */}
               <div className="flex gap-3">
-                <span>⟨σ_z⟩={spinExpectationZ >= 0 ? '+' : ''}{spinExpectationZ.toFixed(3)}</span>
+                <span>
+                  ⟨σ_z⟩={spinExpectationZ >= 0 ? '+' : ''}
+                  {spinExpectationZ.toFixed(3)}
+                </span>
                 <span>|ρ_↑↓|={coherenceMagnitude.toFixed(3)}</span>
               </div>
 
               {/* Norm and density */}
               <div className="flex gap-3">
                 <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
-                <span className={Math.abs(normDrift) > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
-                  Δ={normDrift >= 0 ? '+' : ''}{(normDrift * 100).toFixed(2)}%
+                <span
+                  className={Math.abs(normDrift) > 0.01 ? 'text-red-400' : 'text-text-tertiary'}
+                >
+                  Δ={normDrift >= 0 ? '+' : ''}
+                  {(normDrift * 100).toFixed(2)}%
                 </span>
               </div>
               <div className="flex gap-3">

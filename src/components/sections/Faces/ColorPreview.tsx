@@ -205,7 +205,9 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
         } else if (colorAlgorithm === 'diverging') {
           // Zero-centered diverging map for signed Re/Im(psi) component.
           const signCarrier =
-            divergingPsi.component === 'imag' ? Math.sin(t * Math.PI * 2) : Math.cos(t * Math.PI * 2)
+            divergingPsi.component === 'imag'
+              ? Math.sin(t * Math.PI * 2)
+              : Math.cos(t * Math.PI * 2)
           const signStrength = Math.abs(signCarrier)
           const neutral = hexToRgb(divergingPsi.neutralColor)
           const positiveWing = hexToRgb(divergingPsi.positiveColor)
@@ -220,8 +222,7 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           // Domain coloring: hue = arg(psi), lightness = log-modulus.
           // Mode 0 (log|psi|^2): modulusValue = t  -> full [0,1] range
           // Mode 1 (log|psi|):   modulusValue = 0.5 + 0.5*t -> brighter [0.5,1] range
-          const modulusValue =
-            domainColoring.modulusMode === 'logPsiAbs' ? 0.5 + 0.5 * t : t
+          const modulusValue = domainColoring.modulusMode === 'logPsiAbs' ? 0.5 + 0.5 * t : t
           const phaseNorm = t
           const lightness = Math.max(0, Math.min(1, 0.08 + 0.82 * modulusValue))
           ;[r, g, b] = hslToRgb(phaseNorm, 0.85, lightness)
@@ -230,15 +231,14 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             const contourDensity = Math.max(1, domainColoring.contourDensity)
             const contourWidth = Math.max(0.005, Math.min(0.25, domainColoring.contourWidth))
             const contourStrength = Math.max(0, Math.min(1, domainColoring.contourStrength))
-            const logModulus =
-              domainColoring.modulusMode === 'logPsiAbs'
-                ? -4 + 4 * t
-                : -8 + 8 * t
-            const contourPhase = ((logModulus * contourDensity) % 1 + 1) % 1
+            const logModulus = domainColoring.modulusMode === 'logPsiAbs' ? -4 + 4 * t : -8 + 8 * t
+            const contourPhase = (((logModulus * contourDensity) % 1) + 1) % 1
             const lineDistance = Math.min(contourPhase, 1 - contourPhase)
             const edgeWidth = Math.max(0.001, contourWidth * 0.5)
             const lineMask =
-              lineDistance <= edgeWidth ? 1 : Math.max(0, 1 - (lineDistance - edgeWidth) / edgeWidth)
+              lineDistance <= edgeWidth
+                ? 1
+                : Math.max(0, 1 - (lineDistance - edgeWidth) / edgeWidth)
             const darken = 1 - contourStrength * lineMask * 0.85
             r *= darken
             g *= darken
@@ -264,13 +264,13 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             if (tk <= 66) {
               r = 1.0
             } else {
-              r = 329.698727446 * Math.pow(tk - 60, -0.1332047592) / 255
+              r = (329.698727446 * Math.pow(tk - 60, -0.1332047592)) / 255
             }
             // Green
             if (tk <= 66) {
               g = (99.4708025861 * Math.log(tk) - 161.1195681661) / 255
             } else {
-              g = 288.1221695283 * Math.pow(tk - 60, -0.0755148492) / 255
+              g = (288.1221695283 * Math.pow(tk - 60, -0.0755148492)) / 255
             }
             // Blue
             if (tk >= 66) {
@@ -318,16 +318,24 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           // Viridis 5-stop piecewise linear (matches WGSL algo 19/21)
           if (t < 0.25) {
             const u = t / 0.25
-            r = 0.267 + (0.282 - 0.267) * u; g = 0.004 + (0.140 - 0.004) * u; b = 0.329 + (0.457 - 0.329) * u
+            r = 0.267 + (0.282 - 0.267) * u
+            g = 0.004 + (0.14 - 0.004) * u
+            b = 0.329 + (0.457 - 0.329) * u
           } else if (t < 0.5) {
             const u = (t - 0.25) / 0.25
-            r = 0.282 + (0.127 - 0.282) * u; g = 0.140 + (0.566 - 0.140) * u; b = 0.457 + (0.550 - 0.457) * u
+            r = 0.282 + (0.127 - 0.282) * u
+            g = 0.14 + (0.566 - 0.14) * u
+            b = 0.457 + (0.55 - 0.457) * u
           } else if (t < 0.75) {
             const u = (t - 0.5) / 0.25
-            r = 0.127 + (0.741 - 0.127) * u; g = 0.566 + (0.873 - 0.566) * u; b = 0.550 + (0.150 - 0.550) * u
+            r = 0.127 + (0.741 - 0.127) * u
+            g = 0.566 + (0.873 - 0.566) * u
+            b = 0.55 + (0.15 - 0.55) * u
           } else {
             const u = (t - 0.75) / 0.25
-            r = 0.741 + (0.993 - 0.741) * u; g = 0.873 + (0.906 - 0.873) * u; b = 0.150 + (0.144 - 0.150) * u
+            r = 0.741 + (0.993 - 0.741) * u
+            g = 0.873 + (0.906 - 0.873) * u
+            b = 0.15 + (0.144 - 0.15) * u
           }
           // Contour overlay for densityContours
           if (colorAlgorithm === 'densityContours') {
@@ -335,22 +343,32 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
             const lineDistance = Math.min(contourT, 1 - contourT)
             const lineMask = lineDistance < 0.06 ? 1 - lineDistance / 0.06 : 0
             const darken = 1 - 0.7 * lineMask
-            r *= darken; g *= darken; b *= darken
+            r *= darken
+            g *= darken
+            b *= darken
           }
         } else if (colorAlgorithm === 'inferno') {
           // Inferno 5-stop piecewise linear (matches WGSL algo 20)
           if (t < 0.25) {
             const u = t / 0.25
-            r = 0.001 + (0.258 - 0.001) * u; g = 0.000 + (0.039 - 0.000) * u; b = 0.014 + (0.406 - 0.014) * u
+            r = 0.001 + (0.258 - 0.001) * u
+            g = 0.0 + (0.039 - 0.0) * u
+            b = 0.014 + (0.406 - 0.014) * u
           } else if (t < 0.5) {
             const u = (t - 0.25) / 0.25
-            r = 0.258 + (0.865 - 0.258) * u; g = 0.039 + (0.138 - 0.039) * u; b = 0.406 + (0.082 - 0.406) * u
+            r = 0.258 + (0.865 - 0.258) * u
+            g = 0.039 + (0.138 - 0.039) * u
+            b = 0.406 + (0.082 - 0.406) * u
           } else if (t < 0.75) {
             const u = (t - 0.5) / 0.25
-            r = 0.865 + (0.987 - 0.865) * u; g = 0.138 + (0.645 - 0.138) * u; b = 0.082 + (0.040 - 0.082) * u
+            r = 0.865 + (0.987 - 0.865) * u
+            g = 0.138 + (0.645 - 0.138) * u
+            b = 0.082 + (0.04 - 0.082) * u
           } else {
             const u = (t - 0.75) / 0.25
-            r = 0.987 + (0.988 - 0.987) * u; g = 0.645 + (0.998 - 0.645) * u; b = 0.040 + (0.645 - 0.040) * u
+            r = 0.987 + (0.988 - 0.987) * u
+            g = 0.645 + (0.998 - 0.645) * u
+            b = 0.04 + (0.645 - 0.04) * u
           }
         } else if (colorAlgorithm === 'particleAntiparticle') {
           // Upper/Lower spinor: particle (blue-cyan) → antiparticle (red-magenta)
@@ -374,14 +392,20 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           const upDensity = Math.max(0, 1 - 2 * t)
           const downDensity = Math.max(0, 2 * t - 1)
           const overlap = 1 - Math.abs(2 * t - 1)
-          r = pauliSpinUpColor[0] * (upDensity + 0.5 * overlap) + pauliSpinDownColor[0] * (downDensity + 0.5 * overlap)
-          g = pauliSpinUpColor[1] * (upDensity + 0.5 * overlap) + pauliSpinDownColor[1] * (downDensity + 0.5 * overlap)
-          b = pauliSpinUpColor[2] * (upDensity + 0.5 * overlap) + pauliSpinDownColor[2] * (downDensity + 0.5 * overlap)
+          r =
+            pauliSpinUpColor[0] * (upDensity + 0.5 * overlap) +
+            pauliSpinDownColor[0] * (downDensity + 0.5 * overlap)
+          g =
+            pauliSpinUpColor[1] * (upDensity + 0.5 * overlap) +
+            pauliSpinDownColor[1] * (downDensity + 0.5 * overlap)
+          b =
+            pauliSpinUpColor[2] * (upDensity + 0.5 * overlap) +
+            pauliSpinDownColor[2] * (downDensity + 0.5 * overlap)
         } else if (colorAlgorithm === 'pauliSpinExpectation') {
           // Pauli Spin Expectation ⟨σ_z⟩: diverging blue → neutral → red
           // t=0 → full spin-down (red), t=0.5 → neutral, t=1 → full spin-up (blue)
           const blueWing: [number, number, number] = [0.15, 0.35, 0.95]
-          const redWing: [number, number, number] = [0.95, 0.20, 0.15]
+          const redWing: [number, number, number] = [0.95, 0.2, 0.15]
           const neutral: [number, number, number] = [0.85, 0.85, 0.85]
           const sigmaZ = 2 * t - 1 // -1 to +1
           const wing = sigmaZ >= 0 ? blueWing : redWing
@@ -392,9 +416,9 @@ export const ColorPreview: React.FC<ColorPreviewProps> = React.memo(
           b = (neutral[2] * (1 - strength) + wing[2] * strength) * brightness
         } else if (colorAlgorithm === 'pauliCoherence') {
           // Pauli Coherence: dim → vivid cyan-teal ramp (matches shader algo 26)
-          const hue = 0.48 + 0.04 * t       // 0.48 → 0.52
-          const sat = 0.4 + 0.55 * t         // 0.4  → 0.95
-          const lit = 0.08 + 0.42 * t         // 0.08 → 0.50
+          const hue = 0.48 + 0.04 * t // 0.48 → 0.52
+          const sat = 0.4 + 0.55 * t // 0.4  → 0.95
+          const lit = 0.08 + 0.42 * t // 0.08 → 0.50
           ;[r, g, b] = hslToRgb(hue, sat, lit)
         } else {
           // Cosine palette (multiSource, radial)

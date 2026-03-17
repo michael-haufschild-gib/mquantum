@@ -15,7 +15,6 @@
  * - Probability Current (j): Physical current-density field overlay controls
  * - Slice Animation: 4D+ only, animates the 4D slice position
  *
- * @see docs/prd/ndimensional-visualizer.md
  */
 
 import React from 'react'
@@ -109,7 +108,8 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
       setProbabilityCurrentColorMode: state.setSchroedingerProbabilityCurrentColorMode,
       setProbabilityCurrentScale: state.setSchroedingerProbabilityCurrentScale,
       setProbabilityCurrentSpeed: state.setSchroedingerProbabilityCurrentSpeed,
-      setProbabilityCurrentDensityThreshold: state.setSchroedingerProbabilityCurrentDensityThreshold,
+      setProbabilityCurrentDensityThreshold:
+        state.setSchroedingerProbabilityCurrentDensityThreshold,
       setProbabilityCurrentMagnitudeThreshold:
         state.setSchroedingerProbabilityCurrentMagnitudeThreshold,
       setProbabilityCurrentLineDensity: state.setSchroedingerProbabilityCurrentLineDensity,
@@ -176,281 +176,294 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
               Animation effects are not available in this mode.
             </p>
             <p className="text-[10px] text-text-tertiary mt-1">
-              These effects use inline wavefunction evaluation, which requires Harmonic Oscillator or Hydrogen mode.
+              These effects use inline wavefunction evaluation, which requires Harmonic Oscillator
+              or Hydrogen mode.
             </p>
           </div>
         )}
         {/* Time Evolution — not applicable for free scalar field or TDSE (uses its own dt/stepsPerFrame) */}
-        {!isFreeScalarField && !isTdse && !isBec && !isDirac && <div className="space-y-4" data-testid="animation-panel-timeEvolution">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Time Evolution
-            </label>
-          </div>
-          <div className="space-y-3">
-            <Slider
-              label="Time Scale"
-              min={0.1}
-              max={2.0}
-              step={0.1}
-              value={config.timeScale}
-              onChange={setTimeScale}
-              showValue
-            />
-          </div>
-        </div>}
-
-        {/* TDSE Auto-Loop — reinitialize wavefunction when norm decays */}
-        {isTdse && <div className="space-y-4" data-testid="animation-panel-tdseAutoLoop">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Auto-Loop
-            </label>
-            <ToggleButton
-              pressed={config.tdse?.autoLoop ?? true}
-              onToggle={() => setTdseAutoLoop(!(config.tdse?.autoLoop ?? true))}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle TDSE auto-loop"
-            >
-              {(config.tdse?.autoLoop ?? true) ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <p className="text-xs text-text-tertiary">
-            Automatically restarts the simulation when the wavefunction is mostly absorbed.
-          </p>
-        </div>}
-
-        {/* Interference Fringing — not applicable for compute modes (requires inline wavefunction) */}
-        {!isComputeMode && <div className="space-y-4" data-testid="animation-panel-interference">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Interference Fringing
-            </label>
-            <ToggleButton
-              pressed={config.interferenceEnabled}
-              onToggle={() => setInterferenceEnabled(!config.interferenceEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle interference fringing"
-            >
-              {config.interferenceEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <div
-            className={`space-y-3 ${!config.interferenceEnabled ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Slider
-              label="Amplitude"
-              min={0}
-              max={1}
-              step={0.05}
-              value={config.interferenceAmp ?? 0.5}
-              onChange={setInterferenceAmp}
-              showValue
-            />
-            <Slider
-              label="Frequency"
-              min={1}
-              max={50}
-              step={1}
-              value={config.interferenceFreq ?? 10.0}
-              onChange={setInterferenceFreq}
-              showValue
-            />
-            <Slider
-              label="Speed"
-              min={0}
-              max={10}
-              step={0.5}
-              value={config.interferenceSpeed ?? 1.0}
-              onChange={setInterferenceSpeed}
-              showValue
-            />
-          </div>
-        </div>}
-
-        {/* Phase-coherent quantum texture — not applicable for compute modes */}
-        {!isComputeMode && <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
-          <div className="flex items-center justify-between">
-            <label
-              className="text-xs font-bold text-text-secondary uppercase tracking-widest"
-              title="Phase-coherent texture: noise patterns aligned with the wavefunction's phase structure. Highlights nodal surfaces for real eigenstates; flows with wavefronts for complex/superposition states."
-            >
-              Quantum Texture
-            </label>
-            <ToggleButton
-              pressed={config.probabilityFlowEnabled}
-              onToggle={() => setProbabilityFlowEnabled(!config.probabilityFlowEnabled)}
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle probability current flow"
-            >
-              {config.probabilityFlowEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <div
-            className={`space-y-3 ${!config.probabilityFlowEnabled ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Slider
-              label="Strength"
-              min={0}
-              max={1}
-              step={0.05}
-              value={config.probabilityFlowStrength ?? 0.3}
-              onChange={setProbabilityFlowStrength}
-              showValue
-            />
-            <Slider
-              label="Speed"
-              min={0.1}
-              max={5}
-              step={0.1}
-              value={config.probabilityFlowSpeed ?? 1.0}
-              onChange={setProbabilityFlowSpeed}
-              showValue
-            />
-          </div>
-        </div>}
-
-        {/* Probability Current (j-field) — not applicable for compute modes (requires inline wavefunction) */}
-        {!isComputeMode && <div className="space-y-4" data-testid="animation-panel-probabilityCurrent">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
-              Probability Current (j)
-            </label>
-            <ToggleButton
-              pressed={config.probabilityCurrentEnabled ?? false}
-              onToggle={() =>
-                setProbabilityCurrentEnabled(!(config.probabilityCurrentEnabled ?? false))
-              }
-              className="text-xs px-2 py-1 h-auto"
-              ariaLabel="Toggle probability current field"
-              data-testid="schroedinger-probability-current-toggle"
-            >
-              {config.probabilityCurrentEnabled ? 'ON' : 'OFF'}
-            </ToggleButton>
-          </div>
-          <div
-            className={`space-y-3 ${!config.probabilityCurrentEnabled ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Select
-              label="Style"
-              options={PROBABILITY_CURRENT_STYLE_OPTIONS}
-              value={config.probabilityCurrentStyle ?? 'magnitude'}
-              onChange={setProbabilityCurrentStyle}
-              data-testid="schroedinger-probability-current-style"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <Select
-                label="Placement"
-                options={PROBABILITY_CURRENT_PLACEMENT_OPTIONS}
-                value={config.probabilityCurrentPlacement ?? 'isosurface'}
-                onChange={setProbabilityCurrentPlacement}
-                data-testid="schroedinger-probability-current-placement"
-              />
-              <Select
-                label="Color Mode"
-                options={PROBABILITY_CURRENT_COLOR_MODE_OPTIONS}
-                value={config.probabilityCurrentColorMode ?? 'magnitude'}
-                onChange={setProbabilityCurrentColorMode}
-                data-testid="schroedinger-probability-current-color-mode"
+        {!isFreeScalarField && !isTdse && !isBec && !isDirac && (
+          <div className="space-y-4" data-testid="animation-panel-timeEvolution">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Time Evolution
+              </label>
+            </div>
+            <div className="space-y-3">
+              <Slider
+                label="Time Scale"
+                min={0.1}
+                max={2.0}
+                step={0.1}
+                value={config.timeScale}
+                onChange={setTimeScale}
+                showValue
               />
             </div>
-            <Slider
-              label="Scale"
-              min={0.0}
-              max={5.0}
-              step={0.05}
-              value={config.probabilityCurrentScale ?? 1.0}
-              onChange={setProbabilityCurrentScale}
-              showValue
-              data-testid="schroedinger-probability-current-scale"
-            />
-            <Slider
-              label="Speed"
-              min={0.0}
-              max={10.0}
-              step={0.1}
-              value={config.probabilityCurrentSpeed ?? 1.0}
-              onChange={setProbabilityCurrentSpeed}
-              showValue
-              data-testid="schroedinger-probability-current-speed"
-            />
-            <Slider
-              label="Density Threshold"
-              min={0.0}
-              max={1.0}
-              step={0.001}
-              value={config.probabilityCurrentDensityThreshold ?? 0.01}
-              onChange={setProbabilityCurrentDensityThreshold}
-              showValue
-              data-testid="schroedinger-probability-current-density-threshold"
-            />
-            <Slider
-              label="Current Threshold"
-              min={0.0}
-              max={10.0}
-              step={0.01}
-              value={config.probabilityCurrentMagnitudeThreshold ?? 0.0}
-              onChange={setProbabilityCurrentMagnitudeThreshold}
-              showValue
-              data-testid="schroedinger-probability-current-magnitude-threshold"
-            />
+          </div>
+        )}
+
+        {/* TDSE Auto-Loop — reinitialize wavefunction when norm decays */}
+        {isTdse && (
+          <div className="space-y-4" data-testid="animation-panel-tdseAutoLoop">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Auto-Loop
+              </label>
+              <ToggleButton
+                pressed={config.tdse?.autoLoop ?? true}
+                onToggle={() => setTdseAutoLoop(!(config.tdse?.autoLoop ?? true))}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle TDSE auto-loop"
+              >
+                {(config.tdse?.autoLoop ?? true) ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
             <p className="text-xs text-text-tertiary">
-              Flow is physically zero for many real stationary states. Use complex states (for
-              example, Hydrogen with real orbitals OFF and m ≠ 0, or oscillator superpositions) to
-              see circulation.
+              Automatically restarts the simulation when the wavefunction is mostly absorbed.
             </p>
-            {config.probabilityCurrentStyle === 'magnitude' && (
-              <p className="text-xs text-text-tertiary">Colors the local |j| magnitude directly.</p>
-            )}
-            {config.probabilityCurrentStyle === 'arrows' && (
+          </div>
+        )}
+
+        {/* Interference Fringing — not applicable for compute modes (requires inline wavefunction) */}
+        {!isComputeMode && (
+          <div className="space-y-4" data-testid="animation-panel-interference">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Interference Fringing
+              </label>
+              <ToggleButton
+                pressed={config.interferenceEnabled}
+                onToggle={() => setInterferenceEnabled(!config.interferenceEnabled)}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle interference fringing"
+              >
+                {config.interferenceEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+            <div
+              className={`space-y-3 ${!config.interferenceEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+            >
               <Slider
-                label="Arrow Opacity"
+                label="Amplitude"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.interferenceAmp ?? 0.5}
+                onChange={setInterferenceAmp}
+                showValue
+              />
+              <Slider
+                label="Frequency"
+                min={1}
+                max={50}
+                step={1}
+                value={config.interferenceFreq ?? 10.0}
+                onChange={setInterferenceFreq}
+                showValue
+              />
+              <Slider
+                label="Speed"
+                min={0}
+                max={10}
+                step={0.5}
+                value={config.interferenceSpeed ?? 1.0}
+                onChange={setInterferenceSpeed}
+                showValue
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Phase-coherent quantum texture — not applicable for compute modes */}
+        {!isComputeMode && (
+          <div className="space-y-4" data-testid="animation-panel-probabilityFlow">
+            <div className="flex items-center justify-between">
+              <label
+                className="text-xs font-bold text-text-secondary uppercase tracking-widest"
+                title="Phase-coherent texture: noise patterns aligned with the wavefunction's phase structure. Highlights nodal surfaces for real eigenstates; flows with wavefronts for complex/superposition states."
+              >
+                Quantum Texture
+              </label>
+              <ToggleButton
+                pressed={config.probabilityFlowEnabled}
+                onToggle={() => setProbabilityFlowEnabled(!config.probabilityFlowEnabled)}
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle probability current flow"
+              >
+                {config.probabilityFlowEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+            <div
+              className={`space-y-3 ${!config.probabilityFlowEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <Slider
+                label="Strength"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.probabilityFlowStrength ?? 0.3}
+                onChange={setProbabilityFlowStrength}
+                showValue
+              />
+              <Slider
+                label="Speed"
+                min={0.1}
+                max={5}
+                step={0.1}
+                value={config.probabilityFlowSpeed ?? 1.0}
+                onChange={setProbabilityFlowSpeed}
+                showValue
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Probability Current (j-field) — not applicable for compute modes (requires inline wavefunction) */}
+        {!isComputeMode && (
+          <div className="space-y-4" data-testid="animation-panel-probabilityCurrent">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">
+                Probability Current (j)
+              </label>
+              <ToggleButton
+                pressed={config.probabilityCurrentEnabled ?? false}
+                onToggle={() =>
+                  setProbabilityCurrentEnabled(!(config.probabilityCurrentEnabled ?? false))
+                }
+                className="text-xs px-2 py-1 h-auto"
+                ariaLabel="Toggle probability current field"
+                data-testid="schroedinger-probability-current-toggle"
+              >
+                {config.probabilityCurrentEnabled ? 'ON' : 'OFF'}
+              </ToggleButton>
+            </div>
+            <div
+              className={`space-y-3 ${!config.probabilityCurrentEnabled ? 'opacity-50 pointer-events-none' : ''}`}
+            >
+              <Select
+                label="Style"
+                options={PROBABILITY_CURRENT_STYLE_OPTIONS}
+                value={config.probabilityCurrentStyle ?? 'magnitude'}
+                onChange={setProbabilityCurrentStyle}
+                data-testid="schroedinger-probability-current-style"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  label="Placement"
+                  options={PROBABILITY_CURRENT_PLACEMENT_OPTIONS}
+                  value={config.probabilityCurrentPlacement ?? 'isosurface'}
+                  onChange={setProbabilityCurrentPlacement}
+                  data-testid="schroedinger-probability-current-placement"
+                />
+                <Select
+                  label="Color Mode"
+                  options={PROBABILITY_CURRENT_COLOR_MODE_OPTIONS}
+                  value={config.probabilityCurrentColorMode ?? 'magnitude'}
+                  onChange={setProbabilityCurrentColorMode}
+                  data-testid="schroedinger-probability-current-color-mode"
+                />
+              </div>
+              <Slider
+                label="Scale"
+                min={0.0}
+                max={5.0}
+                step={0.05}
+                value={config.probabilityCurrentScale ?? 1.0}
+                onChange={setProbabilityCurrentScale}
+                showValue
+                data-testid="schroedinger-probability-current-scale"
+              />
+              <Slider
+                label="Speed"
+                min={0.0}
+                max={10.0}
+                step={0.1}
+                value={config.probabilityCurrentSpeed ?? 1.0}
+                onChange={setProbabilityCurrentSpeed}
+                showValue
+                data-testid="schroedinger-probability-current-speed"
+              />
+              <Slider
+                label="Density Threshold"
                 min={0.0}
                 max={1.0}
-                step={0.01}
-                value={config.probabilityCurrentOpacity ?? 0.7}
-                onChange={setProbabilityCurrentOpacity}
+                step={0.001}
+                value={config.probabilityCurrentDensityThreshold ?? 0.01}
+                onChange={setProbabilityCurrentDensityThreshold}
                 showValue
-                data-testid="schroedinger-probability-current-opacity"
+                data-testid="schroedinger-probability-current-density-threshold"
               />
-            )}
-            {(config.probabilityCurrentStyle === 'surfaceLIC' ||
-              config.probabilityCurrentStyle === 'streamlines') && (
-              <>
+              <Slider
+                label="Current Threshold"
+                min={0.0}
+                max={10.0}
+                step={0.01}
+                value={config.probabilityCurrentMagnitudeThreshold ?? 0.0}
+                onChange={setProbabilityCurrentMagnitudeThreshold}
+                showValue
+                data-testid="schroedinger-probability-current-magnitude-threshold"
+              />
+              <p className="text-xs text-text-tertiary">
+                Flow is physically zero for many real stationary states. Use complex states (for
+                example, Hydrogen with real orbitals OFF and m ≠ 0, or oscillator superpositions) to
+                see circulation.
+              </p>
+              {config.probabilityCurrentStyle === 'magnitude' && (
+                <p className="text-xs text-text-tertiary">
+                  Colors the local |j| magnitude directly.
+                </p>
+              )}
+              {config.probabilityCurrentStyle === 'arrows' && (
                 <Slider
-                  label="Line Density"
-                  min={1.0}
-                  max={64.0}
-                  step={0.5}
-                  value={config.probabilityCurrentLineDensity ?? 8.0}
-                  onChange={setProbabilityCurrentLineDensity}
+                  label="Arrow Opacity"
+                  min={0.0}
+                  max={1.0}
+                  step={0.01}
+                  value={config.probabilityCurrentOpacity ?? 0.7}
+                  onChange={setProbabilityCurrentOpacity}
                   showValue
-                  data-testid="schroedinger-probability-current-line-density"
+                  data-testid="schroedinger-probability-current-opacity"
                 />
-                <Slider
-                  label="Integration Step"
-                  min={0.005}
-                  max={0.2}
-                  step={0.005}
-                  value={config.probabilityCurrentStepSize ?? 0.04}
-                  onChange={setProbabilityCurrentStepSize}
-                  showValue
-                  data-testid="schroedinger-probability-current-step-size"
-                />
-                <Slider
-                  label="Integration Steps"
-                  min={4}
-                  max={64}
-                  step={1}
-                  value={config.probabilityCurrentSteps ?? 20}
-                  onChange={setProbabilityCurrentSteps}
-                  showValue
-                  data-testid="schroedinger-probability-current-steps"
-                />
-              </>
-            )}
+              )}
+              {(config.probabilityCurrentStyle === 'surfaceLIC' ||
+                config.probabilityCurrentStyle === 'streamlines') && (
+                <>
+                  <Slider
+                    label="Line Density"
+                    min={1.0}
+                    max={64.0}
+                    step={0.5}
+                    value={config.probabilityCurrentLineDensity ?? 8.0}
+                    onChange={setProbabilityCurrentLineDensity}
+                    showValue
+                    data-testid="schroedinger-probability-current-line-density"
+                  />
+                  <Slider
+                    label="Integration Step"
+                    min={0.005}
+                    max={0.2}
+                    step={0.005}
+                    value={config.probabilityCurrentStepSize ?? 0.04}
+                    onChange={setProbabilityCurrentStepSize}
+                    showValue
+                    data-testid="schroedinger-probability-current-step-size"
+                  />
+                  <Slider
+                    label="Integration Steps"
+                    min={4}
+                    max={64}
+                    step={1}
+                    value={config.probabilityCurrentSteps ?? 20}
+                    onChange={setProbabilityCurrentSteps}
+                    showValue
+                    data-testid="schroedinger-probability-current-steps"
+                  />
+                </>
+              )}
+            </div>
           </div>
-        </div>}
+        )}
 
         {/* Slice Animation - 4D+ only */}
         {dimension >= 4 && (
@@ -516,7 +529,6 @@ export const SchroedingerAnimationDrawer: React.FC<SchroedingerAnimationDrawerPr
             </p>
           </div>
         )}
-
       </AnimationDrawerContainer>
     )
   }

@@ -91,7 +91,9 @@ describe('ifft (1D inverse)', () => {
 
 describe('ifft3d', () => {
   it('roundtrips a 4x4x4 signal through 3D FFT/IFFT', () => {
-    const nx = 4, ny = 4, nz = 4
+    const nx = 4,
+      ny = 4,
+      nz = 4
     const total = nx * ny * nz
     const original = new Float64Array(2 * total)
 
@@ -133,7 +135,7 @@ describe('fftNd (N-dimensional forward)', () => {
     for (let iz = 0; iz < 4; iz++) {
       for (let iy = 0; iy < 4; iy++) {
         for (let ix = 0; ix < 4; ix++) {
-          const idx = (iz * 16 + iy * 4 + ix)
+          const idx = iz * 16 + iy * 4 + ix
           original[idx * 2] = Math.sin((2 * Math.PI * ix) / 4) * Math.cos((2 * Math.PI * iy) / 4)
           original[idx * 2 + 1] = 0
         }

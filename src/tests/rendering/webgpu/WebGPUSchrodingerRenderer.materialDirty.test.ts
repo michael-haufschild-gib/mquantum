@@ -162,7 +162,9 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
       schroedinger: { quantumMode: 'harmonicOscillator' },
     }
 
-    renderer.updateSchroedingerUniforms(ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0])
+    renderer.updateSchroedingerUniforms(
+      ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
+    )
 
     expect((renderer['schroedingerIntView'] as Int32Array)[940 / 4]).toBe(9)
   })
@@ -181,7 +183,9 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
       schroedinger: { quantumMode: 'freeScalarField' },
     }
 
-    renderer.updateSchroedingerUniforms(ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0])
+    renderer.updateSchroedingerUniforms(
+      ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
+    )
 
     expect((renderer['schroedingerIntView'] as Int32Array)[940 / 4]).toBe(15)
   })
@@ -220,10 +224,9 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
     )
 
-    expect((renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread).toBeCloseTo(
-      0.01,
-      6
-    )
+    expect(
+      (renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread
+    ).toBeCloseTo(0.01, 6)
 
     ctx.frame.stores.extended.schroedingerVersion = 2
     ;(ctx.frame.stores.extended.schroedinger as Record<string, unknown>).frequencySpread = 0.0101
@@ -232,10 +235,9 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
       ctx as unknown as Parameters<WebGPUSchrodingerRenderer['updateSchroedingerUniforms']>[0]
     )
 
-    expect((renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread).toBeCloseTo(
-      0.0101,
-      6
-    )
+    expect(
+      (renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread
+    ).toBeCloseTo(0.0101, 6)
   })
 })
 
@@ -253,8 +255,12 @@ describe('WebGPUSchrodingerRenderer fast eigen interpolation semantics', () => {
       fastEigenInterpolationEnabled: false,
     }) as WebGPUSchrodingerRenderer & { [key: string]: unknown }
 
-    const fastShaderConfig = fastRenderer['shaderConfig'] as { useRobustEigenInterpolation?: boolean }
-    const robustShaderConfig = robustRenderer['shaderConfig'] as { useRobustEigenInterpolation?: boolean }
+    const fastShaderConfig = fastRenderer['shaderConfig'] as {
+      useRobustEigenInterpolation?: boolean
+    }
+    const robustShaderConfig = robustRenderer['shaderConfig'] as {
+      useRobustEigenInterpolation?: boolean
+    }
 
     expect(fastShaderConfig.useRobustEigenInterpolation).toBe(false)
     expect(robustShaderConfig.useRobustEigenInterpolation).toBe(true)

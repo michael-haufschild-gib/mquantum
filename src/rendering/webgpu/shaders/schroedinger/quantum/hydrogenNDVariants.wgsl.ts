@@ -21,10 +21,7 @@ const EXTRA_DIM_THRESHOLD = 18.0
  * @param dimension
  */
 function generateCoordExtraction(dimension: number): string {
-  const coords = Array.from(
-    { length: dimension },
-    (_, i) => `  let x${i} = xND[${i}];`
-  ).join('\n')
+  const coords = Array.from({ length: dimension }, (_, i) => `  let x${i} = xND[${i}];`).join('\n')
   return coords
 }
 
@@ -51,10 +48,9 @@ function generateExtraDimEarlyExit(dimension: number): string {
   ).join('\n')
 
   // Generate distSq sum for extra dimensions
-  const distSqTerms = Array.from(
-    { length: extraDimCount },
-    (_, i) => `u_ed${i}*u_ed${i}`
-  ).join(' + ')
+  const distSqTerms = Array.from({ length: extraDimCount }, (_, i) => `u_ed${i}*u_ed${i}`).join(
+    ' + '
+  )
 
   return `
   // EARLY EXIT 1: Check extra dimensions (unrolled, no loops)
@@ -144,7 +140,7 @@ function generateExtraDimEnergy(dimension: number): string {
   }
   const terms = Array.from(
     { length: extraDimCount },
-    (_, i) => `getExtraDimOmega(uniforms, ${i}) * (f32(getExtraDimN(uniforms, ${i})) + 0.5)`,
+    (_, i) => `getExtraDimOmega(uniforms, ${i}) * (f32(getExtraDimN(uniforms, ${i})) + 0.5)`
   )
   return `
   // Extra-dimensional HO energy: Σ ω_j(n_j + 0.5)
@@ -287,9 +283,10 @@ export function generateHydrogenNDCachedBlock(dimension: number): string {
   const coordExtraction = generateCoordExtraction(dimension)
   const extraDimEarlyExit = generateExtraDimEarlyExit(dimension)
   const radiusCalc = generateRadiusCalculation(dimension)
-  const extraDimProduct = extraDimCount > 0
-    ? generateExtraDimProductCached(dimension)
-    : generateExtraDimProduct(dimension)
+  const extraDimProduct =
+    extraDimCount > 0
+      ? generateExtraDimProductCached(dimension)
+      : generateExtraDimProduct(dimension)
   const extraDimEnergy = generateExtraDimEnergy(dimension)
 
   return `

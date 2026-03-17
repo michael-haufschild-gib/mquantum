@@ -1,10 +1,14 @@
 /**
- * Pauli Half-Step Potential + Zeeman SU(2) Rotation Compute Shader
+ * Pauli Half-Step Potential + Zeeman SU(2) Rotation
  *
  * Applies the combined scalar-potential phase and Zeeman magnetic-field
  * rotation in a single half-step of the Strang splitting:
  *
  *   U_half = exp(-i [V(x) + μ_B σ·B(x)] dt/(2ℏ))
+ *
+ * PML absorber damping is applied in a SEPARATE pass after the full
+ * Strang step to prevent the FFT kinetic step from scattering the
+ * absorber's spatial modulation across k-space.
  *
  * The 2×2 matrix exponential factors exactly as:
  *
@@ -17,12 +21,6 @@
  *        n̂ = B / |B|
  *        σ·n̂ = [[nz, nx - i·ny], [nx + i·ny, -nz]]
  *        U = cos(θ_B)·I - i·sin(θ_B)·σ·n̂
- *
- *        U components:
- *          U_00 = (cos θ_B,          -sin θ_B · nz)   [re, im]
- *          U_01 = (-sin θ_B · ny,    -sin θ_B · nx)
- *          U_10 = ( sin θ_B · ny,    -sin θ_B · nx)
- *          U_11 = (cos θ_B,           sin θ_B · nz)
  *
  * Magnetic field models (fieldType):
  *   0 uniform:    B = B₀ (sin θ_d cos φ_d, sin θ_d sin φ_d, cos θ_d)
@@ -85,13 +83,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       r2 += pos[d] * pos[d];
     }
-    let W2 = params.wellWidth * params.wellWidth;
+    let W2 = max(params.wellWidth * params.wellWidth, 1e-12);
     V = params.wellDepth * (1.0 - exp(-r2 / W2));
   }
 
   // ---- Scalar potential phase rotation ----
   // φ_V = -V dt / (2ℏ)
-  let phiV = -V * params.dt / (2.0 * params.hbar);
+  let phiV = -V * params.dt / (2.0 * max(params.hbar, 1e-6));
   let cosPV = cos(phiV);
   let sinPV = sin(phiV);
 
@@ -153,7 +151,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let ny = By / Bmag;
     let nz = Bz / Bmag;
 
-    let thetaB = Bmag * params.dt / (2.0 * params.hbar);
+    let thetaB = Bmag * params.dt / (2.0 * max(params.hbar, 1e-6));
     let cosB = cos(thetaB);
     let sinB = sin(thetaB);
 
@@ -163,9 +161,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     // New ψ_up   = U_00 ψ_up + U_01 ψ_down
     // New ψ_down = U_10 ψ_up + U_11 ψ_down
 
-    // U_00 applied to (re0_v, im0_v):
-    //   re part: cosB · re0_v - (-sinB·nz) · im0_v = cosB·re0 + sinB·nz·im0
-    //   im part: cosB · im0_v + (-sinB·nz) · re0_v = cosB·im0 - sinB·nz·re0
     let a00Re = cosB;
     let a00Im = -sinB * nz;
     let a01Re = -sinB * ny;
@@ -186,6 +181,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     re1_out = new_re1;
     im1_out = new_im1;
   }
+
+  // Absorber is a SEPARATE pass after the full Strang step — not here.
+  // This prevents the FFT kinetic step from scattering the absorber's
+  // spatial modulation across k-space.
 
   spinorRe[idx] = re0_out;
   spinorIm[idx] = im0_out;

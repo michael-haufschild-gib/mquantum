@@ -5,6 +5,10 @@
  * physically interesting initial configuration. Presets are
  * dimension-agnostic — they do NOT set latticeDim or gridSize.
  * The user controls dimensions separately.
+ *
+ * Spacing values are chosen to resolve the Compton wavelength
+ * λ_C = ℏ/(mc) with at least 10 grid points, while keeping the
+ * physical domain large enough for the 20% PML absorber.
  */
 
 import type { DiracConfig } from '@/lib/geometry/extended/types'
@@ -21,16 +25,17 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
   {
     id: 'kleinParadox',
     name: 'Klein Paradox',
-    description: 'Wavepacket hitting a supercritical step potential (V₀ > 2mc²) — pair creation at the barrier',
+    description:
+      'Wavepacket hitting a supercritical step potential (V₀ > 2mc²) — pair creation at the barrier',
     overrides: {
-      spacing: [0.05],
+      spacing: [0.1],
       mass: 1.0,
       speedOfLight: 1.0,
       potentialType: 'step',
       potentialStrength: 3.0,
       potentialCenter: 0.0,
       initialCondition: 'gaussianPacket',
-      packetCenter: [-3.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      packetCenter: [-1.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       packetWidth: 0.5,
       packetMomentum: [5.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
       positiveEnergyFraction: 1.0,
@@ -44,7 +49,7 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
     name: 'Zitterbewegung',
     description: 'Trembling motion from positive/negative energy interference at frequency 2mc²/ℏ',
     overrides: {
-      spacing: [0.05],
+      spacing: [0.1],
       mass: 1.0,
       speedOfLight: 0.5,
       potentialType: 'none',
@@ -58,9 +63,10 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
   {
     id: 'diracBarrierTunneling',
     name: 'Barrier Tunneling',
-    description: 'Relativistic tunneling through a potential barrier — compare transmission with Schrödinger',
+    description:
+      'Relativistic tunneling through a potential barrier — compare transmission with Schrödinger',
     overrides: {
-      spacing: [0.05],
+      spacing: [0.1],
       potentialType: 'barrier',
       potentialStrength: 1.5,
       potentialWidth: 1.0,
@@ -88,9 +94,10 @@ export const DIRAC_SCENARIO_PRESETS: DiracScenarioPreset[] = [
   {
     id: 'diracOscillator',
     name: 'Dirac Oscillator',
-    description: 'Harmonic trap for a relativistic particle — energy levels Eₙ = mc²√(1 + 2nℏω/mc²)',
+    description:
+      'Harmonic trap for a relativistic particle — energy levels Eₙ = mc²√(1 + 2nℏω/mc²)',
     overrides: {
-      spacing: [0.08],
+      spacing: [0.1],
       potentialType: 'harmonicTrap',
       harmonicOmega: 1.0,
       initialCondition: 'gaussianPacket',

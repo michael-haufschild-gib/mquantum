@@ -8,8 +8,10 @@
  */
 
 import React, { useEffect, useRef, useCallback, useState } from 'react'
+import { WebGPUBasePass } from './core/WebGPUBasePass'
 import { WebGPUDevice } from './core/WebGPUDevice'
 import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
+import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
 import { useRendererStore } from '@/stores/rendererStore'
 import { WebGPUContext, type WebGPUCanvasContext } from './WebGPUContext'
 
@@ -131,6 +133,9 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         // Register device lost handler (store unsubscribe for cleanup)
         unsubDeviceLost = deviceManager.onDeviceLost((reason) => {
           console.error('[WebGPUCanvas] Device lost:', reason)
+          // Clear static GPU resources that hold references to the destroyed device
+          WebGPUBasePass.clearStaticResources()
+          WebGPUSchrodingerRenderer.clearPipelineCache()
           handleDeviceLost(reason)
         })
 
@@ -184,9 +189,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       graph.setSize(width, height)
 
       // Update context size
-      setContext((prev) =>
-        prev ? { ...prev, size: { width, height } } : null
-      )
+      setContext((prev) => (prev ? { ...prev, size: { width, height } } : null))
     }
   }, [dpr])
 
@@ -226,9 +229,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       >
         <div style={{ textAlign: 'center', padding: '20px' }}>
           <p>WebGPU initialization failed</p>
-          <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>
-            {initError.message}
-          </p>
+          <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>{initError.message}</p>
         </div>
       </div>
     )
@@ -256,9 +257,7 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
         }}
       />
       {isInitialized && context && (
-        <WebGPUContext.Provider value={context}>
-          {children}
-        </WebGPUContext.Provider>
+        <WebGPUContext.Provider value={context}>{children}</WebGPUContext.Provider>
       )}
     </div>
   )

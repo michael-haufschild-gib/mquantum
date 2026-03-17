@@ -274,10 +274,7 @@ export const createPostProcessingSlice: StateCreator<
   setCinematicAberration: (intensity: number) => {
     if (!isFinitePostProcessingInput(intensity)) {
       if (import.meta.env.DEV) {
-        console.warn(
-          '[postProcessingSlice] Ignoring non-finite cinematic aberration:',
-          intensity
-        )
+        console.warn('[postProcessingSlice] Ignoring non-finite cinematic aberration:', intensity)
       }
       return
     }
@@ -449,10 +446,7 @@ export const createPostProcessingSlice: StateCreator<
   setFrameBlendingFactor: (factor: number) => {
     if (!isFinitePostProcessingInput(factor)) {
       if (import.meta.env.DEV) {
-        console.warn(
-          '[postProcessingSlice] Ignoring non-finite frame blending factor:',
-          factor
-        )
+        console.warn('[postProcessingSlice] Ignoring non-finite frame blending factor:', factor)
       }
       return
     }

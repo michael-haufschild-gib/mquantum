@@ -15,6 +15,13 @@ vi.mock('@/stores/geometryStore', () => ({
 
 const mockRandomizePlanes = vi.fn()
 
+const mockResetSchroedingerParameters = vi.fn()
+const mockResetFreeScalarField = vi.fn()
+const mockResetTdseField = vi.fn()
+const mockResetBecField = vi.fn()
+const mockSetDiracNeedsReset = vi.fn()
+const mockSetPauliNeedsReset = vi.fn()
+
 const mockExtendedState = {
   schroedinger: {
     quantumMode: 'harmonicOscillator',
@@ -24,6 +31,12 @@ const mockExtendedState = {
     probabilityFlowEnabled: false,
     probabilityCurrentEnabled: false,
   },
+  resetSchroedingerParameters: mockResetSchroedingerParameters,
+  resetFreeScalarField: mockResetFreeScalarField,
+  resetTdseField: mockResetTdseField,
+  resetBecField: mockResetBecField,
+  setDiracNeedsReset: mockSetDiracNeedsReset,
+  setPauliNeedsReset: mockSetPauliNeedsReset,
 }
 
 vi.mock('@/stores/animationStore', () => ({
@@ -94,6 +107,12 @@ describe('TimelineControls', () => {
     mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
     mockExtendedState.schroedinger.representation = 'position'
     mockRandomizePlanes.mockClear()
+    mockResetSchroedingerParameters.mockClear()
+    mockResetFreeScalarField.mockClear()
+    mockResetTdseField.mockClear()
+    mockResetBecField.mockClear()
+    mockSetDiracNeedsReset.mockClear()
+    mockSetPauliNeedsReset.mockClear()
   })
 
   it('toggles Rotate drawer when button is clicked', async () => {
@@ -187,7 +206,7 @@ describe('TimelineControls', () => {
     render(<TimelineControls />)
 
     const animButton = screen.getByRole('button', { name: /toggle animations drawer/i })
-    expect((animButton.textContent ?? '').replace(/\s+/g, '')).toContain('Anim1')
+    expect((animButton.textContent ?? '').replace(/\s+/g, '')).toContain('Effects1')
   })
 
   it('shows an Open Q drawer toggle for schroedinger mode', () => {
@@ -209,5 +228,71 @@ describe('TimelineControls', () => {
     expect(
       screen.queryByRole('button', { name: /toggle open quantum drawer/i })
     ).not.toBeInTheDocument()
+  })
+
+  it('renders restart button before play/pause', () => {
+    render(<TimelineControls />)
+
+    const resetButton = screen.getByRole('button', { name: /reset wavefunction/i })
+    expect(resetButton).toBeInTheDocument()
+  })
+
+  it('calls resetSchroedingerParameters when restart clicked in HO mode', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'harmonicOscillator'
+
+    render(<TimelineControls />)
+
+    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+    expect(mockResetSchroedingerParameters).toHaveBeenCalledOnce()
+  })
+
+  it('calls resetTdseField when restart clicked in TDSE mode', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'tdseDynamics'
+
+    render(<TimelineControls />)
+
+    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+    expect(mockResetTdseField).toHaveBeenCalledOnce()
+  })
+
+  it('calls setPauliNeedsReset when restart clicked in Pauli mode', () => {
+    mockGeometryState.objectType = 'pauliSpinor'
+
+    render(<TimelineControls />)
+
+    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+    expect(mockSetPauliNeedsReset).toHaveBeenCalledOnce()
+  })
+
+  it('calls resetFreeScalarField when restart clicked in FSF mode', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'freeScalarField'
+
+    render(<TimelineControls />)
+
+    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+    expect(mockResetFreeScalarField).toHaveBeenCalledOnce()
+  })
+
+  it('calls resetBecField when restart clicked in BEC mode', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'becDynamics'
+
+    render(<TimelineControls />)
+
+    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+    expect(mockResetBecField).toHaveBeenCalledOnce()
+  })
+
+  it('calls setDiracNeedsReset when restart clicked in Dirac mode', () => {
+    mockGeometryState.objectType = 'schroedinger'
+    mockExtendedState.schroedinger.quantumMode = 'diracEquation'
+
+    render(<TimelineControls />)
+
+    fireEvent.click(screen.getByRole('button', { name: /reset wavefunction/i }))
+    expect(mockSetDiracNeedsReset).toHaveBeenCalledOnce()
   })
 })

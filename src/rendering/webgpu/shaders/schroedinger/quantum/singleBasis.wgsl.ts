@@ -23,7 +23,7 @@
  */
 export function generateSingleBasisBlock(
   quantumMode: 'harmonicOscillator' | 'hydrogenND',
-  dimension?: number,
+  dimension?: number
 ): string {
   if (quantumMode === 'hydrogenND') {
     const dim = Math.min(Math.max(dimension ?? 3, 3), 11)

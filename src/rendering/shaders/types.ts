@@ -4,7 +4,6 @@
  * Defines shader types and per-shader settings interfaces.
  * Default values are centralized in @/stores/appearanceStore.ts to avoid conflicts.
  *
- * @see docs/prd/enhanced-visuals-rendering-pipeline.md
  */
 
 /** Available shader types for polytope rendering */

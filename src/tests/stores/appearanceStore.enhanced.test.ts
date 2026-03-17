@@ -80,7 +80,9 @@ describe('Enhanced Features Stores (invariants)', () => {
       expect(next.divergingPsi.intensityFloor).toBe(0)
 
       next.setDivergingPsiSettings({ intensityFloor: 2 })
-      expect((useAppearanceStore.getState() as unknown as typeof appearance).divergingPsi.intensityFloor).toBe(1)
+      expect(
+        (useAppearanceStore.getState() as unknown as typeof appearance).divergingPsi.intensityFloor
+      ).toBe(1)
     })
 
     it('keeps signed phase diverging palette independent from Re/Im diverging settings', () => {

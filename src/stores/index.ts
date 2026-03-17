@@ -51,10 +51,7 @@ export {
   selectTemporalReprojection,
   usePerformanceStore,
 } from './performanceStore'
-export type {
-  RefinementStage,
-  SampleQualityLevel,
-} from './performanceStore'
+export type { RefinementStage, SampleQualityLevel } from './performanceStore'
 export { useCameraStore } from './cameraStore'
 export { useExportStore } from './exportStore'
 export { useDismissedDialogsStore, DIALOG_IDS } from './dismissedDialogsStore'

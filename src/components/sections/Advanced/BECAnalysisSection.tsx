@@ -37,13 +37,12 @@ const PLOT_H = HEIGHT - 2 * PADDING_Y
  * ```
  */
 export const BECAnalysisContent: React.FC = React.memo(() => {
-  const { bec, setDiagnosticsInterval } =
-    useExtendedObjectStore(
-      useShallow((s) => ({
-        bec: s.schroedinger.bec,
-        setDiagnosticsInterval: s.setBecDiagnosticsInterval,
-      })),
-    )
+  const { bec, setDiagnosticsInterval } = useExtendedObjectStore(
+    useShallow((s) => ({
+      bec: s.schroedinger.bec,
+      setDiagnosticsInterval: s.setBecDiagnosticsInterval,
+    }))
+  )
 
   return (
     <>
@@ -94,7 +93,7 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
       healingLength: s.healingLength,
       soundSpeed: s.soundSpeed,
       thomasFermiRadius: s.thomasFermiRadius,
-    })),
+    }))
   )
 
   // Compute trap potential profile for SVG (x-axis cross-section with anisotropy)
@@ -136,14 +135,20 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
 
   return (
     <div className="mt-2" data-testid="bec-analysis-inline">
-      <p className="text-[10px] text-text-secondary mb-1">Harmonic Trap V(x) & Chemical Potential</p>
+      <p className="text-[10px] text-text-secondary mb-1">
+        Harmonic Trap V(x) & Chemical Potential
+      </p>
       <div className="rounded-md overflow-hidden bg-[var(--bg-surface)]">
         <svg width="100%" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="block">
           {/* Zero line */}
           <line
-            x1={PADDING_X} y1={zeroY}
-            x2={PADDING_X + PLOT_W} y2={zeroY}
-            stroke="var(--text-tertiary)" strokeWidth={0.5} strokeDasharray="2,2"
+            x1={PADDING_X}
+            y1={zeroY}
+            x2={PADDING_X + PLOT_W}
+            y2={zeroY}
+            stroke="var(--text-tertiary)"
+            strokeWidth={0.5}
+            strokeDasharray="2,2"
           />
 
           {/* V(x) fill */}
@@ -153,7 +158,8 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
               `${toSvgX(xMax).toFixed(1)},${zeroY.toFixed(1)}`,
               `${toSvgX(xMin).toFixed(1)},${zeroY.toFixed(1)}`,
             ].join(' ')}
-            fill="var(--theme-accent)" fillOpacity={0.12}
+            fill="var(--theme-accent)"
+            fillOpacity={0.12}
             stroke="none"
           />
 
@@ -170,13 +176,20 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
           {hasData && (
             <>
               <line
-                x1={PADDING_X} y1={muLineY}
-                x2={PADDING_X + PLOT_W} y2={muLineY}
-                stroke="var(--color-warning)" strokeWidth={1} strokeDasharray="4,3"
+                x1={PADDING_X}
+                y1={muLineY}
+                x2={PADDING_X + PLOT_W}
+                y2={muLineY}
+                stroke="var(--color-warning)"
+                strokeWidth={1}
+                strokeDasharray="4,3"
               />
               <text
-                x={PADDING_X + PLOT_W + 2} y={muLineY + 3}
-                fill="var(--color-warning)" fontSize={8} fontFamily="monospace"
+                x={PADDING_X + PLOT_W + 2}
+                y={muLineY + 3}
+                fill="var(--color-warning)"
+                fontSize={8}
+                fontFamily="monospace"
               >
                 μ
               </text>
@@ -185,31 +198,46 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
 
           {/* Axes */}
           <line
-            x1={PADDING_X} y1={PADDING_Y}
-            x2={PADDING_X} y2={PADDING_Y + PLOT_H}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={PADDING_X}
+            y1={PADDING_Y}
+            x2={PADDING_X}
+            y2={PADDING_Y + PLOT_H}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
           <line
-            x1={PADDING_X} y1={PADDING_Y + PLOT_H}
-            x2={PADDING_X + PLOT_W} y2={PADDING_Y + PLOT_H}
-            stroke="var(--text-secondary)" strokeWidth={0.5}
+            x1={PADDING_X}
+            y1={PADDING_Y + PLOT_H}
+            x2={PADDING_X + PLOT_W}
+            y2={PADDING_Y + PLOT_H}
+            stroke="var(--text-secondary)"
+            strokeWidth={0.5}
           />
 
           {/* Axis labels */}
           <text
-            x={PADDING_X + PLOT_W / 2} y={HEIGHT - 2}
-            textAnchor="middle" fill="var(--text-tertiary)"
-            fontSize={8} fontFamily="monospace"
+            x={PADDING_X + PLOT_W / 2}
+            y={HEIGHT - 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
           >
             x
           </text>
           <text
-            x={4} y={PADDING_Y + PLOT_H / 2}
-            textAnchor="middle" fill="var(--text-tertiary)"
-            fontSize={8} fontFamily="monospace"
+            x={4}
+            y={PADDING_Y + PLOT_H / 2}
+            textAnchor="middle"
+            fill="var(--text-tertiary)"
+            fontSize={8}
+            fontFamily="monospace"
             transform={`rotate(-90, 4, ${PADDING_Y + PLOT_H / 2})`}
           >
-            V(x){(bec.trapAnisotropy[0] ?? 1.0) !== 1.0 ? ` [ω×${(bec.trapAnisotropy[0] ?? 1.0).toFixed(1)}]` : ''}
+            V(x)
+            {(bec.trapAnisotropy[0] ?? 1.0) !== 1.0
+              ? ` [ω×${(bec.trapAnisotropy[0] ?? 1.0).toFixed(1)}]`
+              : ''}
           </text>
         </svg>
 
@@ -229,7 +257,8 @@ const BECDiagnosticsInline: React.FC<BECDiagnosticsInlineProps> = React.memo(({ 
               <div className="flex gap-3">
                 <span className="text-text-tertiary">||ψ||²={totalNorm.toFixed(4)}</span>
                 <span className={normDrift > 0.01 ? 'text-red-400' : 'text-text-tertiary'}>
-                  Δ={normDrift >= 0 ? '+' : ''}{(normDrift * 100).toFixed(2)}%
+                  Δ={normDrift >= 0 ? '+' : ''}
+                  {(normDrift * 100).toFixed(2)}%
                 </span>
               </div>
             </>

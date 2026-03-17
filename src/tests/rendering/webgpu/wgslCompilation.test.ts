@@ -134,9 +134,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     it(`composes WGSL fragment shader for dimension ${dimension}`, () => {
       const { wgsl, features } = composeSchroedingerShader({
         dimension,
-  
+
         temporal: true,
-  
+
         sss: false,
         quantumMode: 'hydrogenND',
       })
@@ -159,9 +159,9 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     for (const quantumMode of modes) {
       const { wgsl } = composeSchroedingerShader({
         dimension: 4,
-  
+
         temporal: false,
-  
+
         sss: false,
         quantumMode,
       })
@@ -497,7 +497,6 @@ describe('WGSL Shader Compilation - Schroedinger', () => {
     expect(wgsl).toContain('fn intersectBox(')
     expect(wgsl).toContain('tSphere = intersectSphere(ro, rd, schroedinger.boundingRadius);')
   })
-
 })
 
 describe('WGSL Color Algorithm Specialization', () => {
@@ -768,7 +767,7 @@ describe('WGSL Color Algorithm Specialization', () => {
       quantumMode: 'harmonicOscillator',
     })
 
-    expect(features.some(f => f.startsWith('Color:'))).toBe(true)
+    expect(features.some((f) => f.startsWith('Color:'))).toBe(true)
   })
 
   it('splits emission into 3 blocks in modules list', () => {
@@ -927,7 +926,6 @@ describe('WGSL Shader Compilation - Schroedinger Density Grid Compute', () => {
       expect(features).toContain(`HO ${termCount}-term unrolled`)
     }
   })
-
 })
 
 describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
@@ -1121,7 +1119,15 @@ describe('WGSL Shader Compilation - Eigenfunction Cache', () => {
 })
 
 describe('WGSL Shader Compilation - Skybox', () => {
-  const modes = ['aurora', 'nebula', 'crystalline', 'horizon', 'ocean', 'twilight', 'classic'] as const
+  const modes = [
+    'aurora',
+    'nebula',
+    'crystalline',
+    'horizon',
+    'ocean',
+    'twilight',
+    'classic',
+  ] as const
 
   for (const mode of modes) {
     it(`composes WGSL fragment shader for ${mode} mode`, () => {

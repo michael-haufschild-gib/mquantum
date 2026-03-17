@@ -10,8 +10,7 @@
 import React, { useEffect, useRef, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useWebGPU } from './WebGPUContext'
-import { WebGPURenderGraph } from './graph/WebGPURenderGraph'
-import type { WebGPUFrameStats, WebGPURenderPass } from './core/types'
+// WebGPURenderGraph type flows through useWebGPU() and scenePassSetup imports
 import { WebGPUCamera } from './core/WebGPUCamera'
 import { WebGPUStatsCollector } from './WebGPUPerformanceCollector'
 
@@ -31,22 +30,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { useScreenshotCaptureStore } from '@/stores/screenshotCaptureStore'
 import { useCameraStore } from '@/stores/cameraStore'
 
-// Passes (import as needed for the pipeline)
-import { ScenePass } from './passes/ScenePass'
-import { BloomPass } from './passes/BloomPass'
-import { ToneMappingCinematicPass } from './passes/ToneMappingCinematicPass'
-import { FXAAPass } from './passes/FXAAPass'
-import { SMAAPass } from './passes/SMAAPass'
-import { ToScreenPass } from './passes/ToScreenPass'
-import { EnvironmentCompositePass } from './passes/EnvironmentCompositePass'
-import { PaperTexturePass } from './passes/PaperTexturePass'
-import { FrameBlendingPass } from './passes/FrameBlendingPass'
-// CinematicPass merged into ToneMappingCinematicPass
-import { BufferPreviewPass } from './passes/BufferPreviewPass'
-import { LightGizmoPass } from './passes/LightGizmoPass'
-import { DebugOverlayPass } from './passes/DebugOverlayPass'
-import { WebGPUTemporalCloudPass } from './passes/WebGPUTemporalCloudPass'
-import { parseHexColorToLinearRgb } from './utils/color'
+// Pass imports removed — now in scenePassSetup.ts
 import { evaluateFpsLimit } from './utils/fpsLimiter'
 import { WebGPUCanvasCapture } from './utils/WebGPUCanvasCapture'
 import { VideoRecorder } from '@/lib/export/video'
@@ -56,370 +40,47 @@ import {
   ensureEvenDimensions,
   resolveExportDimensions,
 } from '@/lib/export/videoExportPlanning'
-import { useExportStore, type ExportMode, type ExportSettings } from '@/stores/exportStore'
+import { useExportStore, type ExportSettings } from '@/stores/exportStore'
 
-/**
- * Wait for the browser to complete at least one paint cycle.
- * Double-rAF guarantees the DOM has been painted (first rAF fires
- * before next paint, second fires after that paint completes).
- */
-function waitForPaint(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve())
-    })
-  })
-}
+// Export runtime types and helpers extracted to sceneExportRuntime.ts
+import {
+  type ExportRuntimeState,
+  isExportRuntimeActive,
+  createInitialExportLoopState,
+  createInitialExportRuntimeState,
+  cloneExportSettings,
+  resolveRuntimeExportMode,
+  waitForPaint,
+} from './sceneExportRuntime'
+// Re-export for backward compat (tests import from this module path)
+export { isExportRuntimeActive }
 
-// Object Renderers
-import { WebGPUSchrodingerRenderer } from './renderers/WebGPUSchrodingerRenderer'
-import { WebGPUSkyboxRenderer } from './renderers/WebGPUSkyboxRenderer'
 import type { ObjectType } from '@/lib/geometry/types'
 import type { SkyboxMode } from '@/stores/defaults/visualDefaults'
-import {
-  COLOR_ALGORITHM_TO_INT,
-  getAvailableColorAlgorithms,
-  type ColorAlgorithm as PaletteColorAlgorithm,
-} from '@/rendering/shaders/palette/types'
-import type { ColorAlgorithm as WGSLColorAlgorithm } from './shaders/types'
 
 // Rotation hooks for Schroedinger basis vectors
 import { useRotationUpdates } from '@/rendering/renderers/base'
 
 // Light direction utilities for gizmo interaction
-import {
-  rotationToDirection,
-  directionToRotation,
-} from '@/rendering/lights/types'
-import {
-  calculateGroundIntersection,
-  calculateSphereGroundIntersection,
-} from './passes/gizmoGeometry'
+import { directionToRotation } from '@/rendering/lights/types'
 
 // Animation bias
 import { getRotationPlanes } from '@/lib/math/rotation'
 import { getPlaneMultiplier } from '@/lib/animation/biasCalculation'
 
-// ============================================================================
-// Gizmo Click-to-Select Math Utilities
-// ============================================================================
+// Math utilities extracted to utils/sceneMath.ts
+import { multiplyMat4, invertMat4, transformPoint } from './utils/sceneMath'
 
-/**
- * Multiply two column-major 4x4 matrices.
- */
-function multiplyMat4(a: Float32Array, b: Float32Array): Float32Array {
-  const r = new Float32Array(16)
-  for (let col = 0; col < 4; col++) {
-    for (let row = 0; row < 4; row++) {
-      let sum = 0
-      for (let k = 0; k < 4; k++) {
-        sum += (a[row + k * 4] ?? 0) * (b[k + col * 4] ?? 0)
-      }
-      r[row + col * 4] = sum
-    }
-  }
-  return r
-}
-
-/**
- * Invert a column-major 4x4 matrix. Returns null if singular.
- */
-function invertMat4(m: Float32Array): Float32Array | null {
-  const inv = new Float32Array(16)
-  const m0 = m[0]!, m1 = m[1]!, m2 = m[2]!, m3 = m[3]!
-  const m4 = m[4]!, m5 = m[5]!, m6 = m[6]!, m7 = m[7]!
-  const m8 = m[8]!, m9 = m[9]!, m10 = m[10]!, m11 = m[11]!
-  const m12 = m[12]!, m13 = m[13]!, m14 = m[14]!, m15 = m[15]!
-
-  inv[0] = m5*m10*m15 - m5*m11*m14 - m9*m6*m15 + m9*m7*m14 + m13*m6*m11 - m13*m7*m10
-  inv[4] = -m4*m10*m15 + m4*m11*m14 + m8*m6*m15 - m8*m7*m14 - m12*m6*m11 + m12*m7*m10
-  inv[8] = m4*m9*m15 - m4*m11*m13 - m8*m5*m15 + m8*m7*m13 + m12*m5*m11 - m12*m7*m9
-  inv[12] = -m4*m9*m14 + m4*m10*m13 + m8*m5*m14 - m8*m6*m13 - m12*m5*m10 + m12*m6*m9
-  inv[1] = -m1*m10*m15 + m1*m11*m14 + m9*m2*m15 - m9*m3*m14 - m13*m2*m11 + m13*m3*m10
-  inv[5] = m0*m10*m15 - m0*m11*m14 - m8*m2*m15 + m8*m3*m14 + m12*m2*m11 - m12*m3*m10
-  inv[9] = -m0*m9*m15 + m0*m11*m13 + m8*m1*m15 - m8*m3*m13 - m12*m1*m11 + m12*m3*m9
-  inv[13] = m0*m9*m14 - m0*m10*m13 - m8*m1*m14 + m8*m2*m13 + m12*m1*m10 - m12*m2*m9
-  inv[2] = m1*m6*m15 - m1*m7*m14 - m5*m2*m15 + m5*m3*m14 + m13*m2*m7 - m13*m3*m6
-  inv[6] = -m0*m6*m15 + m0*m7*m14 + m4*m2*m15 - m4*m3*m14 - m12*m2*m7 + m12*m3*m6
-  inv[10] = m0*m5*m15 - m0*m7*m13 - m4*m1*m15 + m4*m3*m13 + m12*m1*m7 - m12*m3*m5
-  inv[14] = -m0*m5*m14 + m0*m6*m13 + m4*m1*m14 - m4*m2*m13 - m12*m1*m6 + m12*m2*m5
-  inv[3] = -m1*m6*m11 + m1*m7*m10 + m5*m2*m11 - m5*m3*m10 - m9*m2*m7 + m9*m3*m6
-  inv[7] = m0*m6*m11 - m0*m7*m10 - m4*m2*m11 + m4*m3*m10 + m8*m2*m7 - m8*m3*m6
-  inv[11] = -m0*m5*m11 + m0*m7*m9 + m4*m1*m11 - m4*m3*m9 - m8*m1*m7 + m8*m3*m5
-  inv[15] = m0*m5*m10 - m0*m6*m9 - m4*m1*m10 + m4*m2*m9 + m8*m1*m6 - m8*m2*m5
-
-  const det = m0 * inv[0]! + m1 * inv[4]! + m2 * inv[8]! + m3 * inv[12]!
-  if (Math.abs(det) < 1e-10) return null
-
-  const invDet = 1.0 / det
-  const result = new Float32Array(16)
-  for (let i = 0; i < 16; i++) result[i] = inv[i]! * invDet
-  return result
-}
-
-/**
- * Transform a 3D point by a column-major 4x4 matrix (perspective divide).
- */
-function transformPoint(m: Float32Array, p: [number, number, number]): [number, number, number] {
-  const x = m[0]!*p[0] + m[4]!*p[1] + m[8]!*p[2] + m[12]!
-  const y = m[1]!*p[0] + m[5]!*p[1] + m[9]!*p[2] + m[13]!
-  const z = m[2]!*p[0] + m[6]!*p[1] + m[10]!*p[2] + m[14]!
-  const w = m[3]!*p[0] + m[7]!*p[1] + m[11]!*p[2] + m[15]!
-  const invW = w !== 0 ? 1 / w : 1
-  return [x * invW, y * invW, z * invW]
-}
-
-// ============================================================================
-// Gizmo Interaction Helpers
-// ============================================================================
-
-/** Gizmo scale formula (matches LightGizmoPass) */
-const GIZMO_BASE_SIZE = 0.3
-function gizmoScale(lightPos: [number, number, number], camPos: [number, number, number]): number {
-  const dx = lightPos[0] - camPos[0]
-  const dy = lightPos[1] - camPos[1]
-  const dz = lightPos[2] - camPos[2]
-  return Math.max(0.1, Math.min(2.0, Math.sqrt(dx * dx + dy * dy + dz * dz) * 0.1)) * GIZMO_BASE_SIZE
-}
-
-/** Translate gizmo shaft length (matches generateTranslateGizmo default) */
-const TRANSLATE_SHAFT = 3.0
-/** Rotate gizmo ring radius (matches generateRotateGizmo default) */
-const ROTATE_RING_RADIUS = 2.5
-/** Hit threshold in world units (before scaling) */
-const AXIS_HIT_THRESHOLD = 0.4
-/** Ground target hit radius */
-const GROUND_TARGET_RADIUS = 0.5
-
-type GizmoDragKind =
-  | 'translate-x' | 'translate-y' | 'translate-z'
-  | 'rotate-x' | 'rotate-y' | 'rotate-z'
-  | 'ground-target'
-
-interface GizmoDragState {
-  kind: GizmoDragKind
-  lightId: string
-  startLightPos: [number, number, number]
-  startLightRot: [number, number, number]
-  /** For translate: initial parameter along grabbed axis */
-  startAxisT: number
-  /** For rotate: initial angle on the ring */
-  startAngle: number
-  /** For ground-target: initial ground intersection pos */
-  startGroundPos: [number, number, number]
-  /** Light type, needed for ground target behavior */
-  lightType: 'point' | 'directional' | 'spot'
-}
-
-/**
- * Compute a world-space mouse ray from screen coordinates.
- */
-function computeMouseRay(
-  clientX: number,
-  clientY: number,
-  rect: DOMRect,
-  matrices: {
-    projectionMatrix: Float32Array
-    viewMatrix: Float32Array
-    cameraPosition: { x: number; y: number; z: number }
-  }
-): { origin: [number, number, number]; dir: [number, number, number] } | null {
-  const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
-  const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
-
-  const invVP = invertMat4(multiplyMat4(matrices.projectionMatrix, matrices.viewMatrix))
-  if (!invVP) return null
-
-  // WebGPU clip z is [0, 1] (not [-1, 1] like OpenGL)
-  const near = transformPoint(invVP, [ndcX, ndcY, 0])
-  const far = transformPoint(invVP, [ndcX, ndcY, 1])
-
-  const dx = far[0] - near[0]
-  const dy = far[1] - near[1]
-  const dz = far[2] - near[2]
-  const len = Math.sqrt(dx * dx + dy * dy + dz * dz)
-  if (len < 0.0001) return null
-
-  const cp = matrices.cameraPosition
-  return {
-    origin: [cp.x, cp.y, cp.z],
-    dir: [dx / len, dy / len, dz / len],
-  }
-}
-
-/**
- * Find the closest parameter t on an axis line to a ray, and the minimum distance.
- * Axis: P + t * A, Ray: O + s * D
- * @returns [t, minDist]
- */
-function rayAxisClosest(
-  rayO: [number, number, number],
-  rayD: [number, number, number],
-  axisP: [number, number, number],
-  axisA: [number, number, number]
-): [number, number] {
-  const wx = rayO[0] - axisP[0]
-  const wy = rayO[1] - axisP[1]
-  const wz = rayO[2] - axisP[2]
-
-  const a = rayD[0] * rayD[0] + rayD[1] * rayD[1] + rayD[2] * rayD[2]
-  const b = rayD[0] * axisA[0] + rayD[1] * axisA[1] + rayD[2] * axisA[2]
-  const c = axisA[0] * axisA[0] + axisA[1] * axisA[1] + axisA[2] * axisA[2]
-  const d = rayD[0] * wx + rayD[1] * wy + rayD[2] * wz
-  const e = axisA[0] * wx + axisA[1] * wy + axisA[2] * wz
-
-  const denom = a * c - b * b
-  if (Math.abs(denom) < 1e-10) return [0, Infinity]
-
-  const t = (a * e - b * d) / denom
-  const s = (b * e - c * d) / denom
-
-  // Closest point on axis: axisP + t * axisA
-  // Closest point on ray: rayO + s * rayD
-  const cpx = axisP[0] + t * axisA[0] - (rayO[0] + s * rayD[0])
-  const cpy = axisP[1] + t * axisA[1] - (rayO[1] + s * rayD[1])
-  const cpz = axisP[2] + t * axisA[2] - (rayO[2] + s * rayD[2])
-  const dist = Math.sqrt(cpx * cpx + cpy * cpy + cpz * cpz)
-
-  return [t, dist]
-}
-
-/**
- * Intersect ray with a plane. Returns the intersection point or null.
- * Plane defined by a normal and a point on the plane.
- */
-function rayPlaneIntersect(
-  rayO: [number, number, number],
-  rayD: [number, number, number],
-  planeN: [number, number, number],
-  planeP: [number, number, number]
-): [number, number, number] | null {
-  const denom = planeN[0] * rayD[0] + planeN[1] * rayD[1] + planeN[2] * rayD[2]
-  if (Math.abs(denom) < 1e-10) return null
-
-  const px = planeP[0] - rayO[0]
-  const py = planeP[1] - rayO[1]
-  const pz = planeP[2] - rayO[2]
-  const t = (planeN[0] * px + planeN[1] * py + planeN[2] * pz) / denom
-  if (t < 0) return null
-
-  return [rayO[0] + t * rayD[0], rayO[1] + t * rayD[1], rayO[2] + t * rayD[2]]
-}
-
-/**
- * Test if a mouse ray hits any transform gizmo axis or ring for the selected light.
- * Returns the drag kind and initial parameters, or null if no hit.
- */
-function testGizmoHit(
-  ray: { origin: [number, number, number]; dir: [number, number, number] },
-  lightPos: [number, number, number],
-  scale: number,
-  mode: 'translate' | 'rotate'
-): { kind: GizmoDragKind; axisT: number; angle: number } | null {
-  const axes: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-  const axisNames: GizmoDragKind[] =
-    mode === 'translate'
-      ? ['translate-x', 'translate-y', 'translate-z']
-      : ['rotate-x', 'rotate-y', 'rotate-z']
-
-  if (mode === 'translate') {
-    let bestDist = Infinity
-    let bestKind: GizmoDragKind | null = null
-    let bestT = 0
-
-    for (let i = 0; i < 3; i++) {
-      const [t, dist] = rayAxisClosest(ray.origin, ray.dir, lightPos, axes[i]!)
-      // Only hit if within the shaft length and close enough
-      if (t > 0 && t < TRANSLATE_SHAFT * scale && dist < AXIS_HIT_THRESHOLD * scale && dist < bestDist) {
-        bestDist = dist
-        bestKind = axisNames[i]!
-        bestT = t
-      }
-    }
-    if (bestKind) return { kind: bestKind, axisT: bestT, angle: 0 }
-  } else {
-    // Rotate mode: test ray against each ring's plane
-    const ringRadius = ROTATE_RING_RADIUS * scale
-    const tolerance = AXIS_HIT_THRESHOLD * scale
-    let bestDist = Infinity
-    let bestKind: GizmoDragKind | null = null
-    let bestAngle = 0
-
-    const normals: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-
-    for (let i = 0; i < 3; i++) {
-      const hit = rayPlaneIntersect(ray.origin, ray.dir, normals[i]!, lightPos)
-      if (!hit) continue
-
-      const dx = hit[0] - lightPos[0]
-      const dy = hit[1] - lightPos[1]
-      const dz = hit[2] - lightPos[2]
-      const distFromCenter = Math.sqrt(dx * dx + dy * dy + dz * dz)
-
-      const ringError = Math.abs(distFromCenter - ringRadius)
-      if (ringError < tolerance && ringError < bestDist) {
-        bestDist = ringError
-        bestKind = axisNames[i]!
-        // Compute angle on the ring
-        if (i === 0) bestAngle = Math.atan2(dz, dy) // X ring: YZ plane
-        else if (i === 1) bestAngle = Math.atan2(dx, dz) // Y ring: XZ plane
-        else bestAngle = Math.atan2(dy, dx) // Z ring: XY plane
-      }
-    }
-    if (bestKind) return { kind: bestKind, axisT: 0, angle: bestAngle }
-  }
-
-  return null
-}
-
-/**
- * Test if a mouse ray hits any ground target.
- * Returns the light ID if hit, null otherwise.
- */
-function testGroundTargetHit(
-  ray: { origin: [number, number, number]; dir: [number, number, number] },
-  lights: Array<{ id: string; type: string; position: [number, number, number]; rotation: [number, number, number]; range: number }>
-): string | null {
-  // Intersect ray with ground plane
-  const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
-  if (!groundHit) return null
-
-  let closestDist = Infinity
-  let closestId: string | null = null
-
-  for (const light of lights) {
-    let targetX: number | undefined
-    let targetZ: number | undefined
-
-    if (light.type === 'spot' || light.type === 'directional') {
-      const dir = rotationToDirection(light.rotation as [number, number, number])
-      const gi = calculateGroundIntersection(light.position, dir)
-      if (gi) {
-        targetX = gi[0]
-        targetZ = gi[2]
-      }
-    } else if (light.type === 'point') {
-      const si = calculateSphereGroundIntersection(light.position, light.range)
-      if (si) {
-        targetX = si.center[0]
-        targetZ = si.center[2]
-      }
-    }
-
-    if (targetX === undefined || targetZ === undefined) continue
-
-    const dx = groundHit[0] - targetX
-    const dz = groundHit[2] - targetZ
-    const dist = Math.sqrt(dx * dx + dz * dz)
-
-    if (dist < GROUND_TARGET_RADIUS && dist < closestDist) {
-      closestDist = dist
-      closestId = light.id
-    }
-  }
-
-  return closestId
-}
+// Gizmo interaction helpers extracted to utils/gizmoHitTesting.ts
+import {
+  type GizmoDragState,
+  gizmoScale,
+  computeMouseRay,
+  rayAxisClosest,
+  rayPlaneIntersect,
+  testGizmoHit,
+  testGroundTargetHit,
+} from './utils/gizmoHitTesting'
 
 // ============================================================================
 // Types
@@ -472,22 +133,23 @@ const postProcessingSelector = (state: ReturnType<typeof usePostProcessingStore.
 const schroedingerIsoSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
   state.schroedinger?.isoEnabled ?? false
 
-const schroedingerCompileSelector = (
-  state: ReturnType<typeof useExtendedObjectStore.getState>
-) => {
+const schroedingerCompileSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) => {
   const quantumMode = state.schroedinger?.quantumMode ?? 'harmonicOscillator'
   const representation = (state.schroedinger?.representation ?? 'position') as
     | 'position'
     | 'momentum'
     | 'wigner'
   const openQuantumEnabled = state.schroedinger?.openQuantum?.enabled ?? false
-  const openQuantumSupported = (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') && representation !== 'wigner'
+  const openQuantumSupported =
+    (quantumMode === 'harmonicOscillator' || quantumMode === 'hydrogenND') &&
+    representation !== 'wigner'
 
   // Dirac particleAntiparticleSplit field view uses dual-channel grid encoding
   // (R=particle, G=antiparticle) which requires color algorithm 23 at compile time.
-  const diracFieldView = quantumMode === 'diracEquation'
-    ? (state.schroedinger?.dirac?.fieldView ?? 'totalDensity')
-    : undefined
+  const diracFieldView =
+    quantumMode === 'diracEquation'
+      ? (state.schroedinger?.dirac?.fieldView ?? 'totalDensity')
+      : undefined
 
   // Pauli field view is now derived from the color algorithm at config build time
   // (kept here for backwards compat but overridden in fullConfig construction)
@@ -512,146 +174,6 @@ const schroedingerCompileSelector = (
 const EMPTY_PARAM_VALUES: number[] = []
 const schroedingerSelector = (state: ReturnType<typeof useExtendedObjectStore.getState>) =>
   state.schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
-
-type ExportPhase = 'warmup' | 'preview' | 'recording'
-type RuntimeExportMode = Exclude<ExportMode, 'auto'>
-
-interface ExportLoopState {
-  phase: ExportPhase
-  frameId: number
-  warmupFrame: number
-  startTime: number
-  totalFrames: number
-  frameDuration: number
-  exportStartTime: number
-  lastEtaUpdate: number
-  mainStreamHandle?: FileSystemFileHandle
-  segmentDurationFrames: number
-  currentSegment: number
-  framesInCurrentSegment: number
-  segmentStartTimeVideo: number
-}
-
-interface ExportPerformanceSnapshot {
-  progressiveRefinementEnabled: boolean
-  fractalAnimationLowQuality: boolean
-  renderResolutionScale: number
-}
-
-interface ExportRuntimeState {
-  starting: boolean
-  started: boolean
-  processing: boolean
-  finishing: boolean
-  canceling: boolean
-  abortRequested: boolean
-  mode: RuntimeExportMode | null
-  settings: ExportSettings | null
-  recorder: VideoRecorder | null
-  rotationSnapshot: Map<string, number> | null
-  originalCanvasWidth: number
-  originalCanvasHeight: number
-  originalCameraAspect: number
-  exportWidth: number
-  exportHeight: number
-  renderWidth: number
-  renderHeight: number
-  originalPerf: ExportPerformanceSnapshot
-  loop: ExportLoopState
-}
-
-/**
- *
- */
-export function isExportRuntimeActive(
-  runtime: Pick<
-    ExportRuntimeState,
-    'starting' | 'started' | 'processing' | 'finishing' | 'canceling'
-  >
-): boolean {
-  return (
-    runtime.starting ||
-    runtime.started ||
-    runtime.processing ||
-    runtime.finishing ||
-    runtime.canceling
-  )
-}
-
-function createInitialExportLoopState(): ExportLoopState {
-  return {
-    phase: 'warmup',
-    frameId: 0,
-    warmupFrame: 0,
-    startTime: 0,
-    totalFrames: 0,
-    frameDuration: 0,
-    exportStartTime: 0,
-    lastEtaUpdate: 0,
-    mainStreamHandle: undefined,
-    segmentDurationFrames: 0,
-    currentSegment: 0,
-    framesInCurrentSegment: 0,
-    segmentStartTimeVideo: 0,
-  }
-}
-
-function createInitialExportRuntimeState(): ExportRuntimeState {
-  return {
-    starting: false,
-    started: false,
-    processing: false,
-    finishing: false,
-    canceling: false,
-    abortRequested: false,
-    mode: null,
-    settings: null,
-    recorder: null,
-    rotationSnapshot: null,
-    originalCanvasWidth: 0,
-    originalCanvasHeight: 0,
-    originalCameraAspect: 1,
-    exportWidth: 0,
-    exportHeight: 0,
-    renderWidth: 0,
-    renderHeight: 0,
-    originalPerf: {
-      progressiveRefinementEnabled: true,
-      fractalAnimationLowQuality: true,
-      renderResolutionScale: 1,
-    },
-    loop: createInitialExportLoopState(),
-  }
-}
-
-function cloneExportSettings(settings: ExportSettings): ExportSettings {
-  return {
-    ...settings,
-    textOverlay: { ...settings.textOverlay },
-    crop: { ...settings.crop },
-  }
-}
-
-function estimateExportSizeMb(settings: ExportSettings): number {
-  return (settings.duration * settings.bitrate) / 8
-}
-
-function resolveRuntimeExportMode(
-  mode: ExportMode,
-  browserType: ReturnType<typeof useExportStore.getState>['browserType'],
-  settings: ExportSettings
-): RuntimeExportMode {
-  if (mode !== 'auto') {
-    return mode
-  }
-
-  const estimatedSizeMb = estimateExportSizeMb(settings)
-  if (estimatedSizeMb < 100) {
-    return 'in-memory'
-  }
-
-  return browserType === 'chromium-capable' ? 'stream' : 'segmented'
-}
 
 // ============================================================================
 // Component
@@ -701,7 +223,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     return () => {
       useCameraStore.getState().registerCamera(null)
     }
-  }, [])  
+  }, [])
 
   // Camera control state
   const isDraggingRef = useRef(false)
@@ -736,40 +258,71 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   }, [INTERACTION_RESTORE_DELAY])
 
   // Camera control handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
-    lastMouseRef.current = { x: e.clientX, y: e.clientY }
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      mouseDownPosRef.current = { x: e.clientX, y: e.clientY }
+      lastMouseRef.current = { x: e.clientX, y: e.clientY }
 
-    // Test gizmo hit before entering camera drag
-    if (cameraRef.current && overlayRef.current) {
-      const lighting = useLightingStore.getState()
-      if (lighting.showLightGizmos && lighting.lights.length) {
-        const rect = overlayRef.current.getBoundingClientRect()
-        const matrices = cameraRef.current.getMatrices()
-        const ray = computeMouseRay(e.clientX, e.clientY, rect, matrices)
+      // Test gizmo hit before entering camera drag
+      if (cameraRef.current && overlayRef.current) {
+        const lighting = useLightingStore.getState()
+        if (lighting.showLightGizmos && lighting.lights.length) {
+          const rect = overlayRef.current.getBoundingClientRect()
+          const matrices = cameraRef.current.getMatrices()
+          const ray = computeMouseRay(e.clientX, e.clientY, rect, matrices)
 
-        if (ray) {
-          const cp = matrices.cameraPosition
-          const camPos: [number, number, number] = [cp.x, cp.y, cp.z]
+          if (ray) {
+            const cp = matrices.cameraPosition
+            const camPos: [number, number, number] = [cp.x, cp.y, cp.z]
 
-          // Test transform gizmo on selected light
-          if (lighting.selectedLightId) {
-            const selLight = lighting.lights.find((l) => l.id === lighting.selectedLightId)
-            if (selLight) {
-              const scale = gizmoScale(selLight.position, camPos)
-              const mode = lighting.transformMode || 'translate'
-              const hit = testGizmoHit(ray, selLight.position, scale, mode)
+            // Test transform gizmo on selected light
+            if (lighting.selectedLightId) {
+              const selLight = lighting.lights.find((l) => l.id === lighting.selectedLightId)
+              if (selLight) {
+                const scale = gizmoScale(selLight.position, camPos)
+                const mode = lighting.transformMode || 'translate'
+                const hit = testGizmoHit(ray, selLight.position, scale, mode)
 
-              if (hit) {
+                if (hit) {
+                  gizmoDragRef.current = {
+                    kind: hit.kind,
+                    lightId: selLight.id,
+                    startLightPos: [...selLight.position],
+                    startLightRot: [...selLight.rotation],
+                    startAxisT: hit.axisT,
+                    startAngle: hit.angle,
+                    startGroundPos: [0, 0, 0],
+                    lightType: selLight.type,
+                  }
+                  lighting.setIsDraggingLight(true)
+                  startInteraction()
+                  return // Don't enter camera drag mode
+                }
+              }
+            }
+
+            // Test ground target hit
+            const groundHitId = testGroundTargetHit(ray, lighting.lights)
+            if (groundHitId) {
+              const hitLight = lighting.lights.find((l) => l.id === groundHitId)
+              if (hitLight) {
+                // Select the light if not already selected
+                if (lighting.selectedLightId !== groundHitId) {
+                  lighting.selectLight(groundHitId)
+                }
+
+                // Compute initial ground intersection
+                const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
+
                 gizmoDragRef.current = {
-                  kind: hit.kind,
-                  lightId: selLight.id,
-                  startLightPos: [...selLight.position],
-                  startLightRot: [...selLight.rotation],
-                  startAxisT: hit.axisT,
-                  startAngle: hit.angle,
-                  startGroundPos: [0, 0, 0],
-                  lightType: selLight.type,
+                  kind: 'ground-target',
+                  lightId: groundHitId,
+                  startLightPos: [...hitLight.position],
+                  startLightRot: [...hitLight.rotation],
+                  startAxisT: 0,
+                  startAngle: 0,
+                  startGroundPos: groundHit ?? [0, 0, 0],
+                  lightType: hitLight.type,
                 }
                 lighting.setIsDraggingLight(true)
                 startInteraction()
@@ -777,134 +330,111 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
               }
             }
           }
-
-          // Test ground target hit
-          const groundHitId = testGroundTargetHit(ray, lighting.lights)
-          if (groundHitId) {
-            const hitLight = lighting.lights.find((l) => l.id === groundHitId)
-            if (hitLight) {
-              // Select the light if not already selected
-              if (lighting.selectedLightId !== groundHitId) {
-                lighting.selectLight(groundHitId)
-              }
-
-              // Compute initial ground intersection
-              const groundHit = rayPlaneIntersect(ray.origin, ray.dir, [0, 1, 0], [0, 0, 0])
-
-              gizmoDragRef.current = {
-                kind: 'ground-target',
-                lightId: groundHitId,
-                startLightPos: [...hitLight.position],
-                startLightRot: [...hitLight.rotation],
-                startAxisT: 0,
-                startAngle: 0,
-                startGroundPos: groundHit ?? [0, 0, 0],
-                lightType: hitLight.type,
-              }
-              lighting.setIsDraggingLight(true)
-              startInteraction()
-              return // Don't enter camera drag mode
-            }
-          }
         }
       }
-    }
 
-    isDraggingRef.current = true
-    startInteraction()
-  }, [startInteraction])
+      isDraggingRef.current = true
+      startInteraction()
+    },
+    [startInteraction]
+  )
 
-  const handleMouseUp = useCallback((e: React.MouseEvent) => {
-    // End gizmo drag if active
-    if (gizmoDragRef.current) {
-      const wasGizmoClick =
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      // End gizmo drag if active
+      if (gizmoDragRef.current) {
+        const wasGizmoClick =
+          Math.abs(e.clientX - mouseDownPosRef.current.x) < 5 &&
+          Math.abs(e.clientY - mouseDownPosRef.current.y) < 5
+
+        // If it was just a click on a ground target, select the light
+        if (wasGizmoClick && gizmoDragRef.current.kind === 'ground-target') {
+          useLightingStore.getState().selectLight(gizmoDragRef.current.lightId)
+        }
+
+        gizmoDragRef.current = null
+        useLightingStore.getState().setIsDraggingLight(false)
+        scheduleEndInteraction()
+        return
+      }
+
+      const wasClick =
         Math.abs(e.clientX - mouseDownPosRef.current.x) < 5 &&
         Math.abs(e.clientY - mouseDownPosRef.current.y) < 5
 
-      // If it was just a click on a ground target, select the light
-      if (wasGizmoClick && gizmoDragRef.current.kind === 'ground-target') {
-        useLightingStore.getState().selectLight(gizmoDragRef.current.lightId)
-      }
-
-      gizmoDragRef.current = null
-      useLightingStore.getState().setIsDraggingLight(false)
+      isDraggingRef.current = false
       scheduleEndInteraction()
-      return
-    }
 
-    const wasClick =
-      Math.abs(e.clientX - mouseDownPosRef.current.x) < 5 &&
-      Math.abs(e.clientY - mouseDownPosRef.current.y) < 5
+      // Click-to-select light gizmo
+      if (wasClick && cameraRef.current && overlayRef.current) {
+        const lighting = useLightingStore.getState()
+        if (!lighting.showLightGizmos || !lighting.lights.length) return
 
-    isDraggingRef.current = false
-    scheduleEndInteraction()
+        const rect = overlayRef.current.getBoundingClientRect()
+        const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1
+        const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
 
-    // Click-to-select light gizmo
-    if (wasClick && cameraRef.current && overlayRef.current) {
-      const lighting = useLightingStore.getState()
-      if (!lighting.showLightGizmos || !lighting.lights.length) return
+        const matrices = cameraRef.current.getMatrices()
+        const invVP = invertMat4(multiplyMat4(matrices.projectionMatrix, matrices.viewMatrix))
+        if (!invVP) return
 
-      const rect = overlayRef.current.getBoundingClientRect()
-      const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1
-      const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1)
+        // Unproject near and far points to world space (WebGPU clip z = [0, 1])
+        const nearWorld = transformPoint(invVP, [ndcX, ndcY, 0])
+        const farWorld = transformPoint(invVP, [ndcX, ndcY, 1])
 
-      const matrices = cameraRef.current.getMatrices()
-      const invVP = invertMat4(multiplyMat4(matrices.projectionMatrix, matrices.viewMatrix))
-      if (!invVP) return
+        const rayDir: [number, number, number] = [
+          farWorld[0] - nearWorld[0],
+          farWorld[1] - nearWorld[1],
+          farWorld[2] - nearWorld[2],
+        ]
+        const rayLen = Math.sqrt(rayDir[0] ** 2 + rayDir[1] ** 2 + rayDir[2] ** 2)
+        if (rayLen < 0.0001) return
+        rayDir[0] /= rayLen
+        rayDir[1] /= rayLen
+        rayDir[2] /= rayLen
 
-      // Unproject near and far points to world space (WebGPU clip z = [0, 1])
-      const nearWorld = transformPoint(invVP, [ndcX, ndcY, 0])
-      const farWorld = transformPoint(invVP, [ndcX, ndcY, 1])
+        const cp = matrices.cameraPosition
+        const camPosX = cp.x,
+          camPosY = cp.y,
+          camPosZ = cp.z
 
-      const rayDir: [number, number, number] = [
-        farWorld[0] - nearWorld[0],
-        farWorld[1] - nearWorld[1],
-        farWorld[2] - nearWorld[2],
-      ]
-      const rayLen = Math.sqrt(rayDir[0] ** 2 + rayDir[1] ** 2 + rayDir[2] ** 2)
-      if (rayLen < 0.0001) return
-      rayDir[0] /= rayLen
-      rayDir[1] /= rayLen
-      rayDir[2] /= rayLen
+        // Test ray-sphere intersection against each light
+        let closestDist = Infinity
+        let closestId: string | null = null
+        const hitRadius = 0.5 // World-space hit radius (generous for easy clicking)
 
-      const cp = matrices.cameraPosition
-      const camPosX = cp.x, camPosY = cp.y, camPosZ = cp.z
+        for (const light of lighting.lights) {
+          const lp = light.position
+          // Vector from ray origin to sphere center
+          const ocX = lp[0] - camPosX
+          const ocY = lp[1] - camPosY
+          const ocZ = lp[2] - camPosZ
+          // Project onto ray direction
+          const tca = ocX * rayDir[0] + ocY * rayDir[1] + ocZ * rayDir[2]
+          if (tca < 0) continue // Behind camera
+          // Perpendicular distance squared
+          const ocLenSq = ocX ** 2 + ocY ** 2 + ocZ ** 2
+          const d2 = ocLenSq - tca * tca
+          // Scale hit radius by camera distance
+          const dist = Math.sqrt(ocLenSq)
+          const scaledRadius = Math.max(hitRadius, dist * 0.05)
+          if (d2 > scaledRadius * scaledRadius) continue // Miss
+          if (tca < closestDist) {
+            closestDist = tca
+            closestId = light.id
+          }
+        }
 
-      // Test ray-sphere intersection against each light
-      let closestDist = Infinity
-      let closestId: string | null = null
-      const hitRadius = 0.5 // World-space hit radius (generous for easy clicking)
-
-      for (const light of lighting.lights) {
-        const lp = light.position
-        // Vector from ray origin to sphere center
-        const ocX = lp[0] - camPosX
-        const ocY = lp[1] - camPosY
-        const ocZ = lp[2] - camPosZ
-        // Project onto ray direction
-        const tca = ocX * rayDir[0] + ocY * rayDir[1] + ocZ * rayDir[2]
-        if (tca < 0) continue // Behind camera
-        // Perpendicular distance squared
-        const ocLenSq = ocX ** 2 + ocY ** 2 + ocZ ** 2
-        const d2 = ocLenSq - tca * tca
-        // Scale hit radius by camera distance
-        const dist = Math.sqrt(ocLenSq)
-        const scaledRadius = Math.max(hitRadius, dist * 0.05)
-        if (d2 > scaledRadius * scaledRadius) continue // Miss
-        if (tca < closestDist) {
-          closestDist = tca
-          closestId = light.id
+        if (closestId) {
+          lighting.selectLight(closestId)
+        } else {
+          // Click on empty space deselects
+          lighting.selectLight(null)
         }
       }
-
-      if (closestId) {
-        lighting.selectLight(closestId)
-      } else {
-        // Click on empty space deselects
-        lighting.selectLight(null)
-      }
-    }
-  }, [scheduleEndInteraction])
+    },
+    [scheduleEndInteraction]
+  )
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Handle gizmo dragging
@@ -1138,12 +668,13 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       phaseMaterialityEnabled: schroedingerCompile.phaseMaterialityEnabled,
       interferenceEnabled: schroedingerCompile.interferenceEnabled,
       uncertaintyBoundaryEnabled: schroedingerCompile.uncertaintyBoundaryEnabled,
-      temporalReprojectionEnabled: (
+      temporalReprojectionEnabled:
         schroedingerCompile.quantumMode === 'freeScalarField' ||
         schroedingerCompile.quantumMode === 'tdseDynamics' ||
         schroedingerCompile.quantumMode === 'becDynamics' ||
         schroedingerCompile.quantumMode === 'diracEquation'
-      ) ? false : performance_.temporalReprojectionEnabled,
+          ? false
+          : performance_.temporalReprojectionEnabled,
       eigenfunctionCacheEnabled: performance_.eigenfunctionCacheEnabled,
       analyticalGradientEnabled: performance_.analyticalGradientEnabled,
       fastEigenInterpolationEnabled: performance_.fastEigenInterpolationEnabled,
@@ -1152,9 +683,10 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       diracFieldView: schroedingerCompile.diracFieldView,
       // Derive Pauli fieldView from the color algorithm so the writeGrid shader
       // encodes density channels to match the selected emission algorithm.
-      pauliFieldView: objectType === 'pauliSpinor'
-        ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
-        : schroedingerCompile.pauliFieldView,
+      pauliFieldView:
+        objectType === 'pauliSpinor'
+          ? pauliFieldViewForColorAlgorithm(appearance.colorAlgorithm)
+          : schroedingerCompile.pauliFieldView,
       representation: schroedingerCompile.representation,
       openQuantumEnabled: schroedingerCompile.openQuantumEnabled,
       skyboxEnabled: environment.skyboxEnabled,
@@ -1296,7 +828,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           cameraRef.current.setAspect(w / h)
         }
       }
-
     }
 
     const setupTask = setupPasses().catch((err) => {
@@ -1493,8 +1024,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
   const restoreRuntimeState = useCallback(() => {
     const runtime = exportRuntimeRef.current
 
-    const restoreWidth =
-      runtime.originalCanvasWidth > 0 ? runtime.originalCanvasWidth : size.width
+    const restoreWidth = runtime.originalCanvasWidth > 0 ? runtime.originalCanvasWidth : size.width
     const restoreHeight =
       runtime.originalCanvasHeight > 0 ? runtime.originalCanvasHeight : size.height
 
@@ -1552,10 +1082,9 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
           const totalPlanes = planeList.length
 
           for (const plane of animatingPlanes) {
-            const planeIndex = planeList.findIndex(p => p.name === plane)
-            const multiplier = bias > 0 && planeIndex >= 0
-              ? getPlaneMultiplier(planeIndex, totalPlanes, bias)
-              : 1.0
+            const planeIndex = planeList.findIndex((p) => p.name === plane)
+            const multiplier =
+              bias > 0 && planeIndex >= 0 ? getPlaneMultiplier(planeIndex, totalPlanes, bias) : 1.0
             const currentAngle = rotationState.rotations.get(plane) ?? 0
             updates.set(plane, currentAngle + rotationDelta * multiplier)
           }
@@ -1576,7 +1105,8 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 
         // Compute rotated origin from parameterValues (extra-dimension slice positions)
         // parameterValues[i] maps to dimension i+3 (dimensions 4+)
-        const paramValues = useExtendedObjectStore.getState().schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
+        const paramValues =
+          useExtendedObjectStore.getState().schroedinger?.parameterValues ?? EMPTY_PARAM_VALUES
         const originValues = originValuesWorkRef.current
         originValues.fill(0)
         for (let i = 3; i < dimension; i++) {
@@ -1726,7 +1256,6 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
         })
         exportStore.setStatus('completed')
       }
-
     } catch (error) {
       handledError = true
       await handleExportError(error)
@@ -1974,7 +1503,16 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     } finally {
       runtime.starting = false
     }
-  }, [canvas, device, graph, handleExportError, resetExportRuntime, restoreRuntimeState, size.height, size.width])
+  }, [
+    canvas,
+    device,
+    graph,
+    handleExportError,
+    resetExportRuntime,
+    restoreRuntimeState,
+    size.height,
+    size.width,
+  ])
 
   const processExportBatch = useCallback(async () => {
     const runtime = exportRuntimeRef.current
@@ -2203,7 +1741,14 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
     } finally {
       runtime.processing = false
     }
-  }, [advanceSceneStateByDelta, canvas, executeSceneFrame, finishExport, handleExportError, triggerSegmentDownload])
+  }, [
+    advanceSceneStateByDelta,
+    canvas,
+    executeSceneFrame,
+    finishExport,
+    handleExportError,
+    triggerSegmentDownload,
+  ])
 
   // Animation loop
   const renderFrame = useCallback(() => {
@@ -2218,11 +1763,7 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
       !runtime.started
     ) {
       void startExport()
-    } else if (
-      !exportStore.isExporting &&
-      runtimeActive &&
-      !runtime.canceling
-    ) {
+    } else if (!exportStore.isExporting && runtimeActive && !runtime.canceling) {
       void cancelExport()
     }
 
@@ -2314,930 +1855,41 @@ export const WebGPUScene: React.FC<WebGPUSceneProps> = ({ objectType, dimension,
 // Pass Setup
 // ============================================================================
 
-interface FrameMetricsArgs {
-  graph: WebGPURenderGraph
-  collector: WebGPUStatsCollector
-  deltaTime: number
-  size: { width: number; height: number }
-  dpr: number
+// Pass setup, config types, and lifecycle extracted to scenePassSetup.ts
+import {
+  type PassConfig,
+  type SchrodingerPassConfig,
+  type PPPassConfig,
+  executeFrameAndCollectMetrics,
+  extractSchrodingerConfig,
+  extractPPConfig,
+  shallowEqual,
+  shouldForceFullRebuildForQuantumModeTransition,
+  computeCasSharpnessFromRenderScale,
+  updateScenePassBackgroundColor,
+  updateToScreenPassSharpness,
+  setupSharedResources,
+  setupSchrodingerPasses,
+  setupPPPasses,
+  warmSwapSchrodingerPasses,
+  cleanupSchrodingerPasses,
+  cleanupPPPasses,
+  ensureTemporalResources,
+  removeStaleTemporalResources,
+  setupRenderPasses,
+  createObjectRenderer,
+  pauliFieldViewForColorAlgorithm,
+} from './scenePassSetup'
+// Re-export for backward compat (tests import from this module path)
+export {
+  executeFrameAndCollectMetrics,
+  shouldForceFullRebuildForQuantumModeTransition,
+  computeCasSharpnessFromRenderScale,
+  updateScenePassBackgroundColor,
+  updateToScreenPassSharpness,
+  setupRenderPasses,
+  createObjectRenderer,
 }
-
-/**
- * Execute one render-graph frame and publish the resulting metrics to the
- * performance monitor store.
- */
-export function executeFrameAndCollectMetrics({
-  graph,
-  collector,
-  deltaTime,
-  size,
-  dpr,
-}: FrameMetricsArgs): WebGPUFrameStats {
-  const cpuStartMs = performance.now()
-  const frameStats = graph.execute(deltaTime)
-  const cpuTimeMs = performance.now() - cpuStartMs
-  collector.recordFrame(cpuTimeMs, frameStats, graph, size, dpr)
-  return frameStats
-}
-
-/**
- *
- */
-export interface PassConfig {
-  objectType: ObjectType
-  dimension: number
-  bloomEnabled: boolean
-  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
-  // Paper texture overlay
-  paperEnabled: boolean
-  // Frame blending for smoother motion
-  frameBlendingEnabled: boolean
-  // Schrodinger isosurface mode (compile-time shader selection)
-  isosurface: boolean
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics' | 'diracEquation'
-  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  nodalEnabled: boolean
-  phaseMaterialityEnabled: boolean
-  interferenceEnabled: boolean
-  uncertaintyBoundaryEnabled: boolean
-  temporalReprojectionEnabled: boolean
-  eigenfunctionCacheEnabled: boolean
-  analyticalGradientEnabled: boolean
-  fastEigenInterpolationEnabled: boolean
-  renderResolutionScale?: number
-  colorAlgorithm: PaletteColorAlgorithm
-  // Dirac field view — drives compile-time color algorithm override for dual-channel encoding
-  diracFieldView?: string
-  // Pauli field view — drives compile-time color algorithm for spin-resolved rendering
-  pauliFieldView?: string
-  // Wavefunction representation (compile-time: momentum mode uses density grid, wigner uses 2D pipeline)
-  representation: 'position' | 'momentum' | 'wigner'
-  // Open quantum system (density matrix + Lindblad) — requires shader recompilation
-  openQuantumEnabled: boolean
-  // Skybox settings
-  skyboxEnabled: boolean
-  skyboxMode: SkyboxMode
-  backgroundColor: string
-}
-
-// ============================================================================
-// Selective Rebuild Types
-// ============================================================================
-
-/** Fields that require Schrodinger renderer rebuild when changed */
-interface SchrodingerPassConfig {
-  objectType: ObjectType
-  dimension: number
-  quantumMode: 'harmonicOscillator' | 'hydrogenND' | 'freeScalarField' | 'tdseDynamics' | 'becDynamics' | 'diracEquation'
-  termCount: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8
-  colorAlgorithm: PaletteColorAlgorithm
-  isosurface: boolean
-  nodalEnabled: boolean
-  phaseMaterialityEnabled: boolean
-  interferenceEnabled: boolean
-  uncertaintyBoundaryEnabled: boolean
-  representation: 'position' | 'momentum' | 'wigner'
-  eigenfunctionCacheEnabled: boolean
-  analyticalGradientEnabled: boolean
-  fastEigenInterpolationEnabled: boolean
-  temporalReprojectionEnabled: boolean
-  openQuantumEnabled: boolean
-}
-
-/** Fields that require post-processing pass rebuild when changed */
-interface PPPassConfig {
-  bloomEnabled: boolean
-  antiAliasingMethod: 'none' | 'fxaa' | 'smaa'
-  paperEnabled: boolean
-  frameBlendingEnabled: boolean
-  skyboxEnabled: boolean
-  skyboxMode: SkyboxMode
-  temporalReprojectionEnabled: boolean
-}
-
-/** Map a color algorithm to the Pauli writeGrid fieldView that encodes matching channels. */
-function pauliFieldViewForColorAlgorithm(algo: string): string {
-  switch (algo) {
-    case 'pauliSpinDensity': return 'spinDensity'
-    case 'pauliSpinExpectation': return 'spinExpectation'
-    case 'pauliCoherence': return 'coherence'
-    default: return 'totalDensity' // blackbody, viridis, inferno, densityContours, etc.
-  }
-}
-
-function normalizeColorAlgorithmForQuantumMode(
-  quantumMode: PassConfig['quantumMode'],
-  colorAlgorithm: PaletteColorAlgorithm,
-  openQuantumEnabled: boolean = false,
-  diracFieldView?: string,
-  pauliFieldView?: string,
-  objectType: string = 'schroedinger',
-): PaletteColorAlgorithm {
-  // Dirac particleAntiparticleSplit uses dual-channel encoding (R=particle, G=antiparticle)
-  // that ONLY algorithm 23 (particleAntiparticle) can render correctly.
-  if (quantumMode === 'diracEquation' && diracFieldView === 'particleAntiparticleSplit') {
-    return 'particleAntiparticle'
-  }
-
-  // Pauli: the user's color algorithm selection drives both the emission shader
-  // and the writeGrid fieldView. No override needed — the dropdown already
-  // restricts to Pauli-compatible algorithms.
-
-  const isAvailable = getAvailableColorAlgorithms(quantumMode, openQuantumEnabled, objectType).some(
-    (option) => option.value === colorAlgorithm
-  )
-  if (isAvailable) return colorAlgorithm
-
-  // Fallback: pick a sensible default for the current mode.
-  if (openQuantumEnabled) return 'purityMap'
-  if (objectType === 'pauliSpinor') return 'pauliSpinDensity'
-  // Compute modes (TDSE, BEC, Dirac, free scalar) render into density grids —
-  // 'radialDistance' is position-based and invalid. Use 'phaseDensity' which reads
-  // R (density) + B (phase) from the grid and works for all compute modes.
-  if (quantumMode === 'tdseDynamics' || quantumMode === 'becDynamics' ||
-      quantumMode === 'freeScalarField' || quantumMode === 'diracEquation') {
-    return 'phaseDensity'
-  }
-  return 'radialDistance'
-}
-
-function extractSchrodingerConfig(config: PassConfig): SchrodingerPassConfig {
-  const isFreeScalar = config.quantumMode === 'freeScalarField'
-  const isTdse = config.quantumMode === 'tdseDynamics'
-  const isBec = config.quantumMode === 'becDynamics'
-  const isDirac = config.quantumMode === 'diracEquation'
-  // Free scalar, TDSE, BEC, and Dirac use GPU compute pipelines with density grid output,
-  // so they disable analytic-only features and force position representation.
-  const isPauli = config.objectType === 'pauliSpinor'
-  const isComputeMode = isFreeScalar || isTdse || isBec || isDirac || isPauli
-  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
-    config.quantumMode,
-    config.colorAlgorithm,
-    config.openQuantumEnabled,
-    config.diracFieldView,
-    isPauli ? config.pauliFieldView : undefined,
-    config.objectType,
-  )
-  return {
-    objectType: config.objectType,
-    // Compute modes force dimension >= 3 and disable features unsupported by their pipeline.
-    // Normalize these values here so toggling them in the UI while in compute mode
-    // does not trigger wasteful renderer rebuilds.
-    dimension: isComputeMode ? Math.max(config.dimension, 3) : config.dimension,
-    quantumMode: config.quantumMode,
-    termCount: isComputeMode ? 1 : config.termCount,
-    colorAlgorithm: normalizedColorAlgorithm,
-    isosurface: config.isosurface,
-    // Disable inline-dependent features in compute modes and open quantum mode.
-    // In OQ mode, the density grid stores Tr(ρ|x⟩⟨x|) from the full density matrix;
-    // nodal/phase/interference features use inline single-wavefunction evalPsi which
-    // is physically incorrect for mixed states.
-    nodalEnabled: (isComputeMode || config.openQuantumEnabled) ? false : config.nodalEnabled,
-    phaseMaterialityEnabled: (isComputeMode || config.openQuantumEnabled) ? false : config.phaseMaterialityEnabled,
-    interferenceEnabled: (isComputeMode || config.openQuantumEnabled) ? false : config.interferenceEnabled,
-    uncertaintyBoundaryEnabled: isComputeMode ? false : config.uncertaintyBoundaryEnabled,
-    representation: isComputeMode ? 'position' : config.representation,
-    eigenfunctionCacheEnabled: isComputeMode ? false : config.eigenfunctionCacheEnabled,
-    analyticalGradientEnabled: isComputeMode ? false : config.analyticalGradientEnabled,
-    fastEigenInterpolationEnabled: isComputeMode ? false : config.fastEigenInterpolationEnabled,
-    temporalReprojectionEnabled: isComputeMode ? false : config.temporalReprojectionEnabled,
-    openQuantumEnabled: isComputeMode ? false : config.openQuantumEnabled,
-  }
-}
-
-function extractPPConfig(config: PassConfig): PPPassConfig {
-  return {
-    bloomEnabled: config.bloomEnabled,
-    antiAliasingMethod: config.antiAliasingMethod,
-    paperEnabled: config.paperEnabled,
-    frameBlendingEnabled: config.frameBlendingEnabled,
-    skyboxEnabled: config.skyboxEnabled,
-    skyboxMode: config.skyboxMode,
-    temporalReprojectionEnabled: config.temporalReprojectionEnabled,
-  }
-}
-
-function shallowEqual<T extends object>(a: T | null, b: T): boolean {
-  if (!a) return false
-  const keys = Object.keys(b) as (keyof T)[]
-  return keys.every((k) => a[k] === b[k])
-}
-
-/**
- * Free-scalar mode has a distinct rendering data path (lattice compute grid).
- * Warm-swapping between free-scalar and non-free-scalar keeps stale visuals visible
- * during async compilation, so these transitions should force a cold rebuild.
- */
-export function shouldForceFullRebuildForQuantumModeTransition(
-  previous: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'> | null,
-  next: Pick<SchrodingerPassConfig, 'quantumMode' | 'objectType'>
-): boolean {
-  if (!previous) return false
-
-  // objectType change (e.g. schroedinger ↔ pauliSpinor) changes render graph outputs
-  if (previous.objectType !== next.objectType) return true
-
-  if (previous.quantumMode === next.quantumMode) return false
-
-  const computeModes = new Set(['freeScalarField', 'tdseDynamics', 'becDynamics', 'diracEquation'])
-  return computeModes.has(previous.quantumMode) || computeModes.has(next.quantumMode)
-}
-
-interface ScenePassBackgroundColorUpdateArgs {
-  graph: Pick<WebGPURenderGraph, 'getPass'>
-  skyboxEnabled: boolean
-  backgroundColor: string
-}
-
-interface ToScreenPassSharpnessUpdateArgs {
-  graph: Pick<WebGPURenderGraph, 'getPass'>
-  renderResolutionScale: number
-}
-
-/**
- * Compute CAS sharpening intensity from render resolution scale.
- *
- * Below 95% render scale, sharpening increases as scale decreases:
- * `min(0.7, (1 - scale) * 1.5)`.
- */
-export function computeCasSharpnessFromRenderScale(renderResolutionScale: number): number {
-  const normalizedScale = Number.isFinite(renderResolutionScale)
-    ? Math.max(0, Math.min(1, renderResolutionScale))
-    : 1
-
-  if (normalizedScale >= 0.95) return 0
-
-  return Math.min(0.7, (1 - normalizedScale) * 1.5)
-}
-
-/**
- * Update ScenePass clear color at runtime without rebuilding passes/pipelines.
- */
-export function updateScenePassBackgroundColor({
-  graph,
-  skyboxEnabled,
-  backgroundColor,
-}: ScenePassBackgroundColorUpdateArgs): void {
-  if (skyboxEnabled) return
-
-  const scenePass = graph.getPass('scene')
-  if (!(scenePass instanceof ScenePass)) return
-
-  const backgroundLinear = parseHexColorToLinearRgb(backgroundColor, [0, 0, 0])
-  scenePass.setClearColor({
-    r: backgroundLinear[0],
-    g: backgroundLinear[1],
-    b: backgroundLinear[2],
-    a: 1,
-  })
-}
-
-/**
- * Update ToScreen CAS sharpness at runtime without rebuilding passes/pipelines.
- */
-export function updateToScreenPassSharpness({
-  graph,
-  renderResolutionScale,
-}: ToScreenPassSharpnessUpdateArgs): void {
-  const toScreenPass = graph.getPass('toScreen')
-  if (!(toScreenPass instanceof ToScreenPass)) return
-
-  toScreenPass.setSharpness(computeCasSharpnessFromRenderScale(renderResolutionScale))
-}
-
-/**
- * Set up render passes for the WebGPU pipeline.
- *
- * Pass order:
- * 1. Object Renderer - Render main object to MRT (color, normal, depth/quarter buffers)
- * 2. Temporal Cloud Accumulation (optional) - Reconstruct full-res object-color from quarter-res
- * 3. ScenePass - Render environment/clear target
- * 4. EnvironmentCompositePass - Composite environment with main object
- * 5. BloomPass (optional) - Bloom effect
- * 6. FrameBlendingPass (optional) - Temporal smoothing
- * 7. ToneMappingCinematicPass - HDR→LDR + cinematic effects (vignette, aberration, grain)
- * 8. PaperTexturePass (optional) - Paper texture overlay
- * 9. FXAA/SMAAPass (optional) - Anti-aliasing
- * 10. ToScreenPass - Copy to canvas
- */
-/** Safely add a pass -- logs and continues on failure instead of aborting the pipeline. */
-async function safeAddPass(
-  graph: WebGPURenderGraph,
-  pass: WebGPURenderPass,
-  label: string,
-  shouldAbort?: () => boolean
-): Promise<boolean> {
-  if (shouldAbort?.()) return false
-
-  const graphLike = graph as unknown as {
-    getPass?: (id: string) => WebGPURenderPass | undefined
-    removePass?: (id: string) => void
-  }
-  const getPass = typeof graphLike.getPass === 'function' ? graphLike.getPass.bind(graphLike) : null
-  const removePass =
-    typeof graphLike.removePass === 'function' ? graphLike.removePass.bind(graphLike) : null
-
-  try {
-    // Replace any existing pass with the same id to make setup deterministic.
-    const existing = getPass?.(pass.id)
-    if (existing && removePass) {
-      removePass(pass.id)
-      if (shouldAbort?.()) return false
-    }
-
-    await graph.addPass(pass)
-
-    if (shouldAbort?.()) {
-      if (getPass && removePass && getPass(pass.id) === pass) {
-        removePass(pass.id)
-      }
-      return false
-    }
-
-    return getPass ? getPass(pass.id) === pass : true
-  } catch (err) {
-    console.error(`[WebGPU setupRenderPasses] Failed to add pass '${label}':`, err)
-    return false
-  }
-}
-
-/**
- * Register always-present GPU resources needed by both pass groups.
- * Called once on initial setup or after a full rebuild.
- */
-function setupSharedResources(graph: WebGPURenderGraph, config: PassConfig): void {
-  const useTemporalCloudAccumulation =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-
-  graph.addResource('scene-render', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  // Always include COPY_SRC to avoid resource recreation on temporal toggle
-  graph.addResource('object-color', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage:
-      GPUTextureUsage.RENDER_ATTACHMENT |
-      GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.COPY_SRC,
-  })
-
-  if (useTemporalCloudAccumulation) {
-    graph.addResource('quarter-color', {
-      type: 'texture',
-      size: { mode: 'fraction', fraction: 0.5 },
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-    graph.addResource('quarter-position', {
-      type: 'texture',
-      size: { mode: 'fraction', fraction: 0.5 },
-      format: 'rgba32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-  }
-
-  graph.addResource('hdr-color', {
-    type: 'texture',
-    format: 'rgba16float',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  graph.addResource('depth-buffer', {
-    type: 'texture',
-    format: 'depth24plus',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  graph.addResource('ldr-color', {
-    type: 'texture',
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  graph.addResource('final-color', {
-    type: 'texture',
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-}
-
-/**
- * Set up Schrodinger-group passes: object renderer + temporal cloud accumulation.
- */
-async function setupSchrodingerPasses(
-  graph: WebGPURenderGraph,
-  config: PassConfig,
-  shouldAbort?: () => boolean
-): Promise<void> {
-  if (shouldAbort?.()) return
-
-  const useTemporalCloudAccumulation =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-
-  // 1. Object renderer
-  const objectRenderer = createObjectRenderer(config.objectType, config)
-  if (objectRenderer) {
-    await safeAddPass(graph, objectRenderer, `object-renderer(${config.objectType})`, shouldAbort)
-  }
-
-  // 2. Temporal cloud accumulation (optional)
-  if (useTemporalCloudAccumulation) {
-    await safeAddPass(
-      graph,
-      new WebGPUTemporalCloudPass({
-        quarterColorInput: 'quarter-color',
-        quarterPositionInput: 'quarter-position',
-        outputResource: 'object-color',
-      }),
-      'temporal-cloud',
-      shouldAbort
-    )
-  }
-}
-
-/**
- * Warm swap: pre-initialize Schrodinger passes while old passes keep rendering,
- * then atomically swap them in. Eliminates visible freeze during shader compilation.
- */
-async function warmSwapSchrodingerPasses(
-  graph: WebGPURenderGraph,
-  config: PassConfig,
-  shouldAbort?: () => boolean
-): Promise<void> {
-  if (shouldAbort?.()) return
-
-  const setupCtx = graph.getSetupContext()
-  if (!setupCtx) {
-    // Fallback to cold swap if setup context unavailable
-    await setupSchrodingerPasses(graph, config, shouldAbort)
-    return
-  }
-
-  const useTemporalCloudAccumulation =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-
-  // 1. Create new passes (fast — just constructors)
-  const newRenderer = createObjectRenderer(config.objectType, config)
-  const newTemporalPass = useTemporalCloudAccumulation
-    ? new WebGPUTemporalCloudPass({
-        quarterColorInput: 'quarter-color',
-        quarterPositionInput: 'quarter-position',
-        outputResource: 'object-color',
-      })
-    : null
-
-  // 2. Initialize passes in background (SLOW: shader compilation happens here).
-  //    The old passes remain in the graph and keep rendering during this await.
-  try {
-    if (newRenderer) {
-      await newRenderer.initialize(setupCtx)
-      if (shouldAbort?.()) {
-        newRenderer.dispose()
-        newTemporalPass?.dispose()
-        return
-      }
-    }
-    if (newTemporalPass) {
-      await newTemporalPass.initialize(setupCtx)
-      if (shouldAbort?.()) {
-        newRenderer?.dispose()
-        newTemporalPass.dispose()
-        return
-      }
-    }
-  } catch (err) {
-    console.error('[WebGPU warmSwap] Pass pre-initialization failed:', err)
-    newRenderer?.dispose()
-    newTemporalPass?.dispose()
-    throw err
-  }
-
-  // 3. Atomic swap: remove old, insert new (fast — no compilation)
-  if (newRenderer) {
-    graph.addInitializedPass(newRenderer)
-  }
-  if (newTemporalPass) {
-    graph.addInitializedPass(newTemporalPass)
-  }
-}
-
-/**
- * Set up post-processing passes: skybox/scene, environment composite, bloom,
- * frame blending, tonemapping, paper, AA, to-screen, buffer preview.
- */
-async function setupPPPasses(
-  graph: WebGPURenderGraph,
-  config: PassConfig,
-  shouldAbort?: () => boolean
-): Promise<void> {
-  if (shouldAbort?.()) return
-
-  const useTemporalCloudAccumulation =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-  const backgroundLinear = parseHexColorToLinearRgb(config.backgroundColor, [0, 0, 0])
-
-  // 3. Skybox or scene clear pass
-  if (config.skyboxEnabled) {
-    await safeAddPass(
-      graph,
-      new WebGPUSkyboxRenderer({
-        mode: config.skyboxMode,
-        sun: false,
-        vignette: false,
-      }),
-      'skybox',
-      shouldAbort
-    )
-  } else {
-    await safeAddPass(
-      graph,
-      new ScenePass({
-        outputResource: 'scene-render',
-        depthResource: 'depth-buffer',
-        mode: 'clear',
-        clearColor: {
-          r: backgroundLinear[0],
-          g: backgroundLinear[1],
-          b: backgroundLinear[2],
-          a: 1,
-        },
-      }),
-      'scene-pass',
-      shouldAbort
-    )
-  }
-
-  // 4. Environment composite
-  await safeAddPass(
-    graph,
-    new EnvironmentCompositePass({
-      lensedEnvironmentInput: 'scene-render',
-      mainObjectInput: 'object-color',
-      mainObjectDepthInput: 'depth-buffer',
-      outputResource: 'hdr-color',
-    }),
-    'environment-composite',
-    shouldAbort
-  )
-
-  // Track HDR buffer chain through optional passes
-  let currentHDRBuffer = 'hdr-color'
-
-  // 5. Bloom (optional)
-  if (config.bloomEnabled) {
-    graph.addResource('bloom-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new BloomPass({
-        inputResource: currentHDRBuffer,
-        bloomInputResource: 'object-color',
-        outputResource: 'bloom-output',
-      }),
-      'bloom',
-      shouldAbort
-    )
-    if (ok) currentHDRBuffer = 'bloom-output'
-  }
-
-  // 6. Frame Blending (optional)
-  if (config.frameBlendingEnabled) {
-    graph.addResource('frame-blend-output', {
-      type: 'texture',
-      format: 'rgba16float',
-      usage:
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.TEXTURE_BINDING |
-        GPUTextureUsage.COPY_SRC,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new FrameBlendingPass({
-        colorInput: currentHDRBuffer,
-        outputResource: 'frame-blend-output',
-        blendFactor: 0.15,
-      }),
-      'frame-blending',
-      shouldAbort
-    )
-    if (ok) currentHDRBuffer = 'frame-blend-output'
-  }
-
-  // 7. Tone mapping + cinematic (always required)
-  await safeAddPass(
-    graph,
-    new ToneMappingCinematicPass({
-      colorInput: currentHDRBuffer,
-      outputResource: 'ldr-color',
-    }),
-    'tonemapping-cinematic',
-    shouldAbort
-  )
-
-  let currentLDRBuffer = 'ldr-color'
-
-  // 8. Paper Texture (optional)
-  if (config.paperEnabled) {
-    graph.addResource('paper-output', {
-      type: 'texture',
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-
-    const ok = await safeAddPass(
-      graph,
-      new PaperTexturePass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'paper-output',
-      }),
-      'paper-texture',
-      shouldAbort
-    )
-    if (ok) currentLDRBuffer = 'paper-output'
-  }
-
-  // 9. Anti-aliasing (optional)
-  if (config.antiAliasingMethod === 'fxaa') {
-    const ok = await safeAddPass(
-      graph,
-      new FXAAPass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'final-color',
-        subpixelQuality: 0.75,
-      }),
-      'fxaa',
-      shouldAbort
-    )
-    if (ok) currentLDRBuffer = 'final-color'
-  } else if (config.antiAliasingMethod === 'smaa') {
-    const ok = await safeAddPass(
-      graph,
-      new SMAAPass({
-        colorInput: currentLDRBuffer,
-        outputResource: 'final-color',
-        threshold: 0.1,
-        maxSearchSteps: 16,
-      }),
-      'smaa',
-      shouldAbort
-    )
-    if (ok) currentLDRBuffer = 'final-color'
-  }
-
-  // 10. Copy to screen (always required)
-  await safeAddPass(
-    graph,
-    new ToScreenPass({
-      inputResource: currentLDRBuffer,
-      gammaCorrection: true,
-      sharpness: computeCasSharpnessFromRenderScale(config.renderResolutionScale ?? 1),
-    }),
-    'to-screen',
-    shouldAbort
-  )
-
-  // 11. Buffer preview (debug visualization)
-  const bufferPreviewInputs = ['depth-buffer']
-  if (useTemporalCloudAccumulation) {
-    bufferPreviewInputs.push('quarter-position')
-  }
-  await safeAddPass(
-    graph,
-    new BufferPreviewPass({
-      bufferInput: 'depth-buffer',
-      additionalInputs: bufferPreviewInputs.length > 1 ? bufferPreviewInputs.slice(1) : undefined,
-      bufferType: 'depth',
-      depthMode: 'linear',
-    }),
-    'buffer-preview',
-    shouldAbort
-  )
-
-  // 12. Light gizmos → debug overlay (renders after all post-processing)
-  graph.addResource('gizmo-texture', {
-    type: 'texture',
-    format: 'rgba8unorm',
-    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-  })
-
-  await safeAddPass(
-    graph,
-    new LightGizmoPass({ outputResource: 'gizmo-texture' }),
-    'light-gizmo',
-    shouldAbort
-  )
-
-  await safeAddPass(
-    graph,
-    new DebugOverlayPass({ debugInput: 'gizmo-texture' }),
-    'debug-overlay',
-    shouldAbort
-  )
-}
-
-/** Remove Schrodinger-group passes that should no longer exist */
-function cleanupSchrodingerPasses(graph: WebGPURenderGraph, config: PassConfig): void {
-  // Temporal cloud is only used for schroedinger + temporal enabled
-  const useTemporalCloud = config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-  if (!useTemporalCloud) {
-    if (graph.getPass('temporal-cloud')) graph.removePass('temporal-cloud')
-  }
-}
-
-/** Remove PP-group passes and resources that should no longer exist */
-function cleanupPPPasses(graph: WebGPURenderGraph, config: PassConfig): void {
-  if (!config.bloomEnabled) {
-    if (graph.getPass('bloom')) graph.removePass('bloom')
-    graph.removeResource('bloom-output')
-  }
-  if (!config.frameBlendingEnabled) {
-    if (graph.getPass('frame-blending')) graph.removePass('frame-blending')
-    graph.removeResource('frame-blend-output')
-  }
-  if (!config.paperEnabled) {
-    if (graph.getPass('paper-texture')) graph.removePass('paper-texture')
-    graph.removeResource('paper-output')
-  }
-  if (config.antiAliasingMethod !== 'fxaa' && graph.getPass('fxaa')) {
-    graph.removePass('fxaa')
-  }
-  if (config.antiAliasingMethod !== 'smaa' && graph.getPass('smaa')) {
-    graph.removePass('smaa')
-  }
-  if (config.skyboxEnabled && graph.getPass('scene')) {
-    graph.removePass('scene')
-  }
-  if (!config.skyboxEnabled && graph.getPass('skybox')) {
-    graph.removePass('skybox')
-  }
-}
-
-/**
- * Pre-swap phase: only ADD temporal resources if the new config requires them.
- * Safe to call before warm swap — old passes don't reference new resources.
- * Never removes resources here, because old passes may still be rendering
- * to them during the warm swap await.
- */
-function ensureTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
-  const needsTemporal =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-
-  if (needsTemporal) {
-    graph.addResource('quarter-color', {
-      type: 'texture',
-      size: { mode: 'fraction', fraction: 0.5 },
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-    graph.addResource('quarter-position', {
-      type: 'texture',
-      size: { mode: 'fraction', fraction: 0.5 },
-      format: 'rgba32float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })
-  }
-}
-
-/**
- * Post-swap phase: remove temporal resources if no longer needed.
- * Only call AFTER the new pass has been swapped in, so no pass
- * references the removed resources.
- */
-function removeStaleTemporalResources(graph: WebGPURenderGraph, config: PassConfig): void {
-  const needsTemporal =
-    config.objectType === 'schroedinger' && config.temporalReprojectionEnabled
-
-  if (!needsTemporal) {
-    graph.removeResource('quarter-color')
-    graph.removeResource('quarter-position')
-  }
-}
-
-/**
- * Set up render passes for the WebGPU pipeline.
- *
- * Pass order:
- * 1. Object Renderer - Render main object to MRT (color, normal, depth/quarter buffers)
- * 2. Temporal Cloud Accumulation (optional) - Reconstruct full-res object-color from quarter-res
- * 3. ScenePass - Render environment/clear target
- * 4. EnvironmentCompositePass - Composite environment with main object
- * 5. BloomPass (optional) - Bloom effect
- * 6. FrameBlendingPass (optional) - Temporal smoothing
- * 7. ToneMappingCinematicPass - HDR→LDR + cinematic effects (vignette, aberration, grain)
- * 8. PaperTexturePass (optional) - Paper texture overlay
- * 9. FXAA/SMAAPass (optional) - Anti-aliasing
- * 10. ToScreenPass - Copy to canvas
- */
-export async function setupRenderPasses(
-  graph: WebGPURenderGraph,
-  config: PassConfig,
-  shouldAbort?: () => boolean
-): Promise<void> {
-  if (shouldAbort?.()) return
-
-  setupSharedResources(graph, config)
-  if (shouldAbort?.()) return
-
-  await setupSchrodingerPasses(graph, config, shouldAbort)
-  if (shouldAbort?.()) return
-
-  await setupPPPasses(graph, config, shouldAbort)
-}
-
-/**
- * Create the appropriate object renderer based on object type.
- *
- * Only Schroedinger is supported. For any other object type, a warning
- * is logged and null is returned.
- *
- * @param objectType - The type of object to render
- * @param config - Pass configuration including shader feature flags from stores
- * @returns The Schroedinger renderer pass or null if not supported
- */
-export function createObjectRenderer(objectType: ObjectType, config: PassConfig) {
-  const {
-    dimension,
-    isosurface,
-    quantumMode,
-    termCount,
-    nodalEnabled,
-    phaseMaterialityEnabled,
-    interferenceEnabled,
-    uncertaintyBoundaryEnabled,
-  } = config
-  const normalizedColorAlgorithm = normalizeColorAlgorithmForQuantumMode(
-    quantumMode,
-    config.colorAlgorithm,
-    config.openQuantumEnabled,
-    config.diracFieldView,
-    config.objectType === 'pauliSpinor' ? config.pauliFieldView : undefined,
-    config.objectType,
-  )
-  const colorAlgorithm = COLOR_ALGORITHM_TO_INT[normalizedColorAlgorithm] as
-    | WGSLColorAlgorithm
-    | undefined
-  const useTemporalCloudAccumulation =
-    objectType === 'schroedinger' && config.temporalReprojectionEnabled
-
-  switch (objectType) {
-    case 'schroedinger':
-      // SchrodingerRendererConfig: dimension, isosurface, quantumMode, termCount, temporal
-      // Note: Schrodinger uses volume rendering, not PBR
-      return new WebGPUSchrodingerRenderer({
-        dimension,
-        isosurface,
-        quantumMode,
-        termCount,
-        colorAlgorithm,
-        nodalEnabled,
-        phaseMaterialityEnabled,
-        interferenceEnabled,
-        uncertaintyBoundaryEnabled,
-        temporal: useTemporalCloudAccumulation,
-        eigenfunctionCacheEnabled: config.eigenfunctionCacheEnabled,
-        analyticalGradientEnabled: config.analyticalGradientEnabled,
-        fastEigenInterpolationEnabled: config.fastEigenInterpolationEnabled,
-        representation: config.representation,
-        openQuantumEnabled: config.openQuantumEnabled,
-      })
-
-    case 'pauliSpinor':
-      // Pauli Spinor reuses the Schrodinger volume renderer with spin-density color mode.
-      // Compute pass (PauliComputePass) handles the physics; rendering uses the same pipeline.
-      return new WebGPUSchrodingerRenderer({
-        dimension,
-        isosurface: false,
-        quantumMode: 'tdseDynamics', // Use TDSE-like rendering path (compute-driven density grid)
-        termCount: 1,
-        colorAlgorithm,
-        nodalEnabled: false,
-        phaseMaterialityEnabled: false,
-        interferenceEnabled: false,
-        uncertaintyBoundaryEnabled: false,
-        temporal: false,
-        eigenfunctionCacheEnabled: false,
-        analyticalGradientEnabled: false,
-        fastEigenInterpolationEnabled: false,
-        representation: 'position',
-        openQuantumEnabled: false,
-        isPauli: true,
-      })
-
-    default:
-      console.warn(
-        `WebGPU: No renderer for object type '${objectType}'`
-      )
-      return null
-  }
-}
+export type { PassConfig }
 
 export default WebGPUScene

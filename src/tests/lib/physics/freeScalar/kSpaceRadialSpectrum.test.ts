@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { PASSTHROUGH_KSPACE_VIZ, DEFAULT_KSPACE_VIZ } from '@/lib/geometry/extended/types'
+import { computeRawKSpaceData, OUTPUT_GRID_SIZE } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import {
-  computeRawKSpaceData,
-  OUTPUT_GRID_SIZE,
-} from '@/lib/physics/freeScalar/kSpaceOccupation'
-import { computeRadialShells, buildRadialDisplayGrid } from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
+  computeRadialShells,
+  buildRadialDisplayGrid,
+} from '@/lib/physics/freeScalar/kSpaceRadialSpectrum'
 
 // ============================================================================
 // Helpers
@@ -23,9 +23,10 @@ function makeIsotropicRawData(N: number) {
     for (let iy = 0; iy < N; iy++) {
       for (let ix = 0; ix < N; ix++) {
         const idx = (iz * N + iy) * N + ix
-        phi[idx] = Math.cos((2 * Math.PI * ix) / N)
-          + Math.cos((2 * Math.PI * iy) / N)
-          + Math.cos((2 * Math.PI * iz) / N)
+        phi[idx] =
+          Math.cos((2 * Math.PI * ix) / N) +
+          Math.cos((2 * Math.PI * iy) / N) +
+          Math.cos((2 * Math.PI * iz) / N)
       }
     }
   }

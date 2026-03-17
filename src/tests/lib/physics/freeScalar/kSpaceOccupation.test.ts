@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { fftNd } from '@/lib/math/fft'
-import {
-  computeRawKSpaceData,
-  float32ToFloat16,
-} from '@/lib/physics/freeScalar/kSpaceOccupation'
+import { computeRawKSpaceData, float32ToFloat16 } from '@/lib/physics/freeScalar/kSpaceOccupation'
 import { computeOmegaK } from '@/lib/physics/freeScalar/vacuumSpectrum'
 
 describe('float32ToFloat16', () => {
@@ -68,7 +65,7 @@ describe('k-space energy conservation', () => {
         const iyp = (iy + 1) % N
         const dPhiX = phi[iy * N + ixp]! - f
         const dPhiY = phi[iyp * N + ix]! - f
-        realEnergy += 0.5 * (dPhiX * dPhiX + dPhiY * dPhiY) / (spacing[0]! * spacing[0]!)
+        realEnergy += (0.5 * (dPhiX * dPhiX + dPhiY * dPhiY)) / (spacing[0]! * spacing[0]!)
       }
     }
 

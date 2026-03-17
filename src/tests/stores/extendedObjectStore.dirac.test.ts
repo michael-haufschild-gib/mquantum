@@ -57,7 +57,9 @@ describe('Dirac store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('particleDensity')
 
     store.setDiracFieldView('antiparticleDensity')
-    expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe('antiparticleDensity')
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.fieldView).toBe(
+      'antiparticleDensity'
+    )
   })
 
   it('setDiracInitialCondition changes condition', () => {
@@ -139,5 +141,24 @@ describe('Dirac store slice', () => {
     const store = useExtendedObjectStore.getState()
     store.setSchroedingerQuantumMode('diracEquation')
     expect(useExtendedObjectStore.getState().schroedinger.representation).toBe('position')
+  })
+
+  it('setDiracPmlTargetReflection clamps to (1e-12, 0.999)', () => {
+    const store = useExtendedObjectStore.getState()
+
+    store.setDiracPmlTargetReflection(0.5)
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.pmlTargetReflection).toBe(0.5)
+
+    store.setDiracPmlTargetReflection(-1)
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.pmlTargetReflection).toBe(1e-12)
+
+    store.setDiracPmlTargetReflection(0)
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.pmlTargetReflection).toBe(1e-12)
+
+    store.setDiracPmlTargetReflection(1)
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.pmlTargetReflection).toBe(0.999)
+
+    store.setDiracPmlTargetReflection(5)
+    expect(useExtendedObjectStore.getState().schroedinger.dirac.pmlTargetReflection).toBe(0.999)
   })
 })

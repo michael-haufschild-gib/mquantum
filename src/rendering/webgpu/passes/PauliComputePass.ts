@@ -23,13 +23,30 @@
  */
 
 import type { PauliConfig } from '@/lib/geometry/extended/types'
+import { computePMLSigmaMaxND } from '@/lib/physics/pml/profile'
 import { usePauliDiagnosticsStore } from '@/stores/pauliDiagnosticsStore'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
+import {
+  DENSITY_GRID_SIZE,
+  DIAG_DECIMATION,
+  FFT_UNIFORM_SIZE,
+  GRID_WG,
+  LINEAR_WG,
+  MAX_DIM,
+  PACK_UNIFORM_SIZE,
+  nearestPow2,
+} from './computePassUtils'
 import type { WebGPURenderContext } from '../core/types'
 
 // Reuse FFT and pack/unpack infrastructure from Dirac/TDSE
-import { tdseComplexPackBlock, tdseComplexUnpackBlock } from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
-import { tdseFFTStageUniformsBlock, tdseStockhamFFTBlock } from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
+import {
+  tdseComplexPackBlock,
+  tdseComplexUnpackBlock,
+} from '../shaders/schroedinger/compute/tdseComplexPack.wgsl'
+import {
+  tdseFFTStageUniformsBlock,
+  tdseStockhamFFTBlock,
+} from '../shaders/schroedinger/compute/tdseStockhamFFT.wgsl'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 
 // Pauli-specific shaders
@@ -38,36 +55,20 @@ import { pauliInitBlock } from '../shaders/schroedinger/compute/pauliInit.wgsl'
 import { pauliPotentialHalfBlock } from '../shaders/schroedinger/compute/pauliPotentialHalf.wgsl'
 import { pauliKineticBlock } from '../shaders/schroedinger/compute/pauliKinetic.wgsl'
 import { pauliAbsorberBlock } from '../shaders/schroedinger/compute/pauliAbsorber.wgsl'
+import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
 import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteGrid.wgsl'
-import { pauliDiagReduceBlock, pauliDiagFinalizeBlock } from '../shaders/schroedinger/compute/pauliDiagnostics.wgsl'
+import {
+  pauliDiagReduceBlock,
+  pauliDiagFinalizeBlock,
+} from '../shaders/schroedinger/compute/pauliDiagnostics.wgsl'
 
-/** PauliUniforms struct size in bytes */
-const UNIFORM_SIZE = 512
-/** Linear dispatch workgroup size (must match WGSL @workgroup_size) */
-const LINEAR_WG = 64
-/** 3D dispatch workgroup size for write-grid pass */
-const GRID_WG = 4
-/** Density grid texture resolution */
-const DENSITY_GRID_SIZE = 96
-/** Maximum supported dimensions */
-const MAX_DIM = 12
-/** FFTStageUniforms struct size (32 bytes) */
-const FFT_UNIFORM_SIZE = 32
-/** PackUniforms struct size (16 bytes) */
-const PACK_UNIFORM_SIZE = 16
+/** PauliUniforms struct size in bytes (592 = 148 indices × 4) */
+const UNIFORM_SIZE = 592
 /** Diagnostics workgroup size — must match @workgroup_size in pauliDiagnostics.wgsl.ts */
 const DIAG_WG = 64
 /** Number of f32 values in diagnostic result buffer:
  *  totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad */
 const DIAG_RESULT_COUNT = 8
-/** Run diagnostics every N frames when diagnosticsEnabled is false */
-const DIAG_DECIMATION = 5
-
-/** Snap a value to the nearest power of 2 (minimum 4) for FFT compatibility */
-function nearestPow2(v: number): number {
-  const p = Math.max(2, 2 ** Math.round(Math.log2(Math.max(1, v))))
-  return Math.min(128, p)
-}
 
 /**
  * Compute pass for Pauli equation split-operator dynamics.
@@ -100,13 +101,13 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private potentialHalfPipeline: GPUComputePipeline | null = null
   private packPipeline: GPUComputePipeline | null = null
   private unpackPipeline: GPUComputePipeline | null = null
-  private absorberPipeline: GPUComputePipeline | null = null
   private fftStagePipeline: GPUComputePipeline | null = null
   private kineticPipeline: GPUComputePipeline | null = null
+  private absorberPipeline: GPUComputePipeline | null = null
   private writeGridPipeline: GPUComputePipeline | null = null
 
   // Bind group layouts
-  // init, potentialHalf, kinetic, absorber all share one layout: uniform + spinorRe(rw) + spinorIm(rw)
+  // init, potentialHalf, kinetic all share one layout: uniform + spinorRe(rw) + spinorIm(rw)
   private spinorBGL: GPUBindGroupLayout | null = null
   private packBGL: GPUBindGroupLayout | null = null
   private unpackBGL: GPUBindGroupLayout | null = null
@@ -114,7 +115,7 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private writeGridBGL: GPUBindGroupLayout | null = null
 
   // Bind groups
-  // Shared BG for init/potentialHalf/kinetic/absorber (same buffers, different pipelines)
+  // Shared BG for init/potentialHalf/kinetic (same buffers, different pipelines)
   private spinorBG: GPUBindGroup | null = null
   private fftStageABBG: GPUBindGroup | null = null
   private fftStageBABG: GPUBindGroup | null = null
@@ -170,7 +171,9 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   }
 
   /** Pipeline creation is managed by buildPipelines() during executePauli */
-  protected async createPipeline(): Promise<void> { /* no-op */ }
+  protected async createPipeline(): Promise<void> {
+    /* no-op */
+  }
 
   /** Returns the density texture for the renderer to sample */
   getDensityTexture(): GPUTexture | null {
@@ -198,12 +201,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
     return { ...config, gridSize }
   }
 
-  /** Compute linear strides from grid dimensions */
+  /** Compute linear strides from grid dimensions (C-order: last-dim-fastest) */
   private computeStrides(gridSize: number[]): number[] {
-    const strides = new Array(gridSize.length)
-    strides[0] = 1
-    for (let d = 1; d < gridSize.length; d++) {
-      strides[d] = strides[d - 1]! * gridSize[d - 1]!
+    const dim = gridSize.length
+    const strides = new Array(MAX_DIM).fill(0)
+    if (dim > 0) {
+      strides[dim - 1] = 1
+      for (let d = dim - 2; d >= 0; d--) {
+        strides[d] = strides[d + 1]! * gridSize[d + 1]!
+      }
     }
     return strides
   }
@@ -288,13 +294,15 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     })
 
-    // Write pack uniforms
-    const packData = new Float32Array(PACK_UNIFORM_SIZE / 4)
-    packData[0] = this.totalSites
-    packData[1] = 1.0 / this.totalSites // normalization factor
-    device.queue.writeBuffer(this.packUniformBuffer, 0, packData)
-    packData[1] = 1.0 // no normalization
-    device.queue.writeBuffer(this.packUniformBufferNoNorm, 0, packData)
+    // Write pack uniforms (dual views: u32 for totalElements, f32 for invN)
+    const packBuf = new ArrayBuffer(PACK_UNIFORM_SIZE)
+    const packU32 = new Uint32Array(packBuf)
+    const packF32 = new Float32Array(packBuf)
+    packU32[0] = this.totalSites
+    packF32[1] = 1.0 / this.totalSites // normalization factor
+    device.queue.writeBuffer(this.packUniformBuffer, 0, packBuf)
+    packF32[1] = 1.0 // no normalization
+    device.queue.writeBuffer(this.packUniformBufferNoNorm, 0, packBuf)
 
     // Density texture — constant size, only create once
     if (!this.densityTexture) {
@@ -373,14 +381,14 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         for (let s = 0; s < stages; s++) {
           const offset = slotIdx * FFT_UNIFORM_SIZE
           const view = new DataView(data, offset, FFT_UNIFORM_SIZE)
-          view.setUint32(0, axisDim, true)                    // axisDim: u32
-          view.setUint32(4, s, true)                           // stage: u32
-          view.setFloat32(8, direction, true)                  // direction: f32
-          view.setUint32(12, this.totalSites, true)            // totalElements: u32
-          view.setUint32(16, axisStride, true)                 // axisStride: u32
-          view.setUint32(20, this.totalSites / axisDim, true)  // batchCount: u32
-          view.setFloat32(24, 1.0 / axisDim, true)             // invN: f32
-          view.setUint32(28, 0, true)                          // _pad0: u32
+          view.setUint32(0, axisDim, true) // axisDim: u32
+          view.setUint32(4, s, true) // stage: u32
+          view.setFloat32(8, direction, true) // direction: f32
+          view.setUint32(12, this.totalSites, true) // totalElements: u32
+          view.setUint32(16, axisStride, true) // axisStride: u32
+          view.setUint32(20, this.totalSites / axisDim, true) // batchCount: u32
+          view.setFloat32(24, 1.0 / axisDim, true) // invN: f32
+          view.setUint32(28, 0, true) // _pad0: u32
           slotIdx++
         }
         axisStride *= axisDim
@@ -406,7 +414,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       size: [DENSITY_GRID_SIZE, DENSITY_GRID_SIZE, DENSITY_GRID_SIZE],
       format: 'rgba16float',
       dimension: '3d',
-      usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+      usage:
+        GPUTextureUsage.STORAGE_BINDING |
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_SRC,
     })
     this.densityTextureView = this.densityTexture.createView({
       label: 'pauli-density-view',
@@ -449,7 +460,26 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       label: 'pauli-potential-half-pipeline',
       layout: spinorLayout,
       compute: {
-        module: device.createShaderModule({ label: 'pauli-potential-half', code: preamble + pauliPotentialHalfBlock }),
+        module: device.createShaderModule({
+          label: 'pauli-potential-half',
+          code: preamble + pauliPotentialHalfBlock,
+        }),
+        entryPoint: 'main',
+      },
+    })
+
+    // Absorber (separate pass after Strang step — NOT merged into potential half-step).
+    // Running absorption after the FFT kinetic step prevents the FFT from scattering
+    // the spatially-modulated absorber profile across k-space.
+    // Reuses spinorBGL layout (uniform + spinorRe + spinorIm).
+    this.absorberPipeline = device.createComputePipeline({
+      label: 'pauli-absorber-pipeline',
+      layout: spinorLayout,
+      compute: {
+        module: device.createShaderModule({
+          label: 'pauli-absorber',
+          code: preamble + pmlProfileBlock + pauliAbsorberBlock,
+        }),
         entryPoint: 'main',
       },
     })
@@ -459,17 +489,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       label: 'pauli-kinetic-pipeline',
       layout: spinorLayout,
       compute: {
-        module: device.createShaderModule({ label: 'pauli-kinetic', code: preamble + pauliKineticBlock }),
-        entryPoint: 'main',
-      },
-    })
-
-    // Absorber pipeline
-    this.absorberPipeline = device.createComputePipeline({
-      label: 'pauli-absorber-pipeline',
-      layout: spinorLayout,
-      compute: {
-        module: device.createShaderModule({ label: 'pauli-absorber', code: preamble + pauliAbsorberBlock }),
+        module: device.createShaderModule({
+          label: 'pauli-kinetic',
+          code: preamble + pauliKineticBlock,
+        }),
         entryPoint: 'main',
       },
     })
@@ -481,14 +504,21 @@ export class PauliComputePass extends WebGPUBaseComputePass {
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' } },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.COMPUTE,
+          storageTexture: { access: 'write-only', format: 'rgba16float', viewDimension: '3d' },
+        },
       ],
     })
     this.writeGridPipeline = device.createComputePipeline({
       label: 'pauli-write-grid-pipeline',
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.writeGridBGL] }),
       compute: {
-        module: device.createShaderModule({ label: 'pauli-write-grid', code: preamble + pauliWriteGridBlock }),
+        module: device.createShaderModule({
+          label: 'pauli-write-grid',
+          code: preamble + pauliWriteGridBlock,
+        }),
         entryPoint: 'main',
       },
     })
@@ -587,7 +617,10 @@ ${tdseStockhamFFTBlock}
       label: 'pauli-diag-reduce-pipeline',
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.diagReduceBGL] }),
       compute: {
-        module: device.createShaderModule({ label: 'pauli-diag-reduce', code: pauliDiagReduceBlock }),
+        module: device.createShaderModule({
+          label: 'pauli-diag-reduce',
+          code: pauliDiagReduceBlock,
+        }),
         entryPoint: 'main',
       },
     })
@@ -605,7 +638,10 @@ ${tdseStockhamFFTBlock}
       label: 'pauli-diag-finalize-pipeline',
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.diagFinalizeBGL] }),
       compute: {
-        module: device.createShaderModule({ label: 'pauli-diag-finalize', code: pauliDiagFinalizeBlock }),
+        module: device.createShaderModule({
+          label: 'pauli-diag-finalize',
+          code: pauliDiagFinalizeBlock,
+        }),
         entryPoint: 'main',
       },
     })
@@ -653,17 +689,35 @@ ${tdseStockhamFFTBlock}
     this.cachedUnpackBGs = []
     this.cachedUnpackBGsNoNorm = []
     for (let c = 0; c < 2; c++) {
-      if (this.packBGL && this.packUniformBufferNoNorm && this.spinorReBuffer && this.spinorImBuffer && this.fftScratchA) {
+      if (
+        this.packBGL &&
+        this.packUniformBufferNoNorm &&
+        this.spinorReBuffer &&
+        this.spinorImBuffer &&
+        this.fftScratchA
+      ) {
         this.cachedPackBGs.push(this.createComponentPackBG(device, c))
       }
-      if (this.unpackBGL && this.packUniformBuffer && this.fftScratchA && this.spinorReBuffer && this.spinorImBuffer) {
+      if (
+        this.unpackBGL &&
+        this.packUniformBuffer &&
+        this.fftScratchA &&
+        this.spinorReBuffer &&
+        this.spinorImBuffer
+      ) {
         this.cachedUnpackBGs.push(this.createComponentUnpackBG(device, c, true))
         this.cachedUnpackBGsNoNorm.push(this.createComponentUnpackBG(device, c, false))
       }
     }
 
     // Write-grid bind group
-    if (this.writeGridBGL && this.uniformBuffer && this.spinorReBuffer && this.spinorImBuffer && this.densityTextureView) {
+    if (
+      this.writeGridBGL &&
+      this.uniformBuffer &&
+      this.spinorReBuffer &&
+      this.spinorImBuffer &&
+      this.densityTextureView
+    ) {
       this.writeGridBG = device.createBindGroup({
         label: 'pauli-write-grid-bg',
         layout: this.writeGridBGL,
@@ -677,7 +731,13 @@ ${tdseStockhamFFTBlock}
     }
 
     // Diagnostics bind groups
-    if (this.diagReduceBGL && this.diagUniformBuffer && this.spinorReBuffer && this.spinorImBuffer && this.diagPartialBuffer) {
+    if (
+      this.diagReduceBGL &&
+      this.diagUniformBuffer &&
+      this.spinorReBuffer &&
+      this.spinorImBuffer &&
+      this.diagPartialBuffer
+    ) {
       this.diagReduceBG = device.createBindGroup({
         label: 'pauli-diag-reduce-bg',
         layout: this.diagReduceBGL,
@@ -689,7 +749,12 @@ ${tdseStockhamFFTBlock}
         ],
       })
     }
-    if (this.diagFinalizeBGL && this.diagUniformBuffer && this.diagPartialBuffer && this.diagResultBuffer) {
+    if (
+      this.diagFinalizeBGL &&
+      this.diagUniformBuffer &&
+      this.diagPartialBuffer &&
+      this.diagResultBuffer
+    ) {
       this.diagFinalizeBG = device.createBindGroup({
         label: 'pauli-diag-finalize-bg',
         layout: this.diagFinalizeBGL,
@@ -719,7 +784,11 @@ ${tdseStockhamFFTBlock}
   }
 
   /** Create an unpack bind group for a specific spinor component */
-  private createComponentUnpackBG(device: GPUDevice, component: number, normalize: boolean): GPUBindGroup {
+  private createComponentUnpackBG(
+    device: GPUDevice,
+    component: number,
+    normalize: boolean
+  ): GPUBindGroup {
     const offset = component * this.totalSites * Float32Array.BYTES_PER_ELEMENT
     const size = this.totalSites * Float32Array.BYTES_PER_ELEMENT
     const uniformBuf = normalize ? this.packUniformBuffer! : this.packUniformBufferNoNorm!
@@ -746,7 +815,7 @@ ${tdseStockhamFFTBlock}
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
-    boundingRadius?: number,
+    boundingRadius?: number
   ): void {
     if (!this.uniformBuffer) return
 
@@ -773,7 +842,12 @@ ${tdseStockhamFFTBlock}
 
     // Magnetic field (offset 30*4 = 120)
     o = 30
-    const fieldTypeMap: Record<string, number> = { uniform: 0, gradient: 1, rotating: 2, quadrupole: 3 }
+    const fieldTypeMap: Record<string, number> = {
+      uniform: 0,
+      gradient: 1,
+      rotating: 2,
+      quadrupole: 3,
+    }
     u32[o++] = fieldTypeMap[config.fieldType] ?? 0
     f32[o++] = config.fieldStrength
     f32[o++] = config.fieldDirection[0] // theta
@@ -789,7 +863,12 @@ ${tdseStockhamFFTBlock}
 
     // Initial condition (offset 40*4 = 160)
     o = 40
-    const icMap: Record<string, number> = { gaussianSpinUp: 0, gaussianSpinDown: 1, gaussianSuperposition: 2, planeWaveSpinor: 3 }
+    const icMap: Record<string, number> = {
+      gaussianSpinUp: 0,
+      gaussianSpinDown: 1,
+      gaussianSuperposition: 2,
+      planeWaveSpinor: 3,
+    }
     u32[o++] = icMap[config.initialCondition] ?? 0
     f32[o++] = config.packetWidth
     for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.packetCenter[d] ?? 0
@@ -797,23 +876,44 @@ ${tdseStockhamFFTBlock}
 
     // Potential (offset 67*4 = 268)
     o = 67
-    const potMap: Record<string, number> = { none: 0, harmonicTrap: 1, harmonic: 1, barrier: 2, doubleWell: 3 }
+    const potMap: Record<string, number> = {
+      none: 0,
+      harmonicTrap: 1,
+      harmonic: 1,
+      barrier: 2,
+      doubleWell: 3,
+    }
     u32[o++] = potMap[config.potentialType] ?? 0
     f32[o++] = config.harmonicOmega
     f32[o++] = config.wellDepth
     f32[o++] = config.wellWidth
     u32[o++] = config.showPotential ? 1 : 0
 
-    // Absorber (offset 72*4 = 288)
+    // PML absorber (offset 72*4 = 288)
     o = 72
     u32[o++] = config.absorberEnabled ? 1 : 0
     f32[o++] = config.absorberWidth
-    f32[o++] = config.absorberStrength
+    // Auto-compute σ_max from PML target reflection coefficient
+    f32[o++] = config.absorberEnabled
+      ? computePMLSigmaMaxND(
+          config.pmlTargetReflection ?? 1e-6,
+          config.absorberWidth,
+          config.gridSize,
+          config.dt,
+          3, // cubic grading (hardcoded to match WGSL shader)
+          config.latticeDim
+        )
+      : 0
     o++ // pad
 
     // Display (offset 76*4 = 304)
     o = 76
-    const fvMap: Record<string, number> = { spinDensity: 0, totalDensity: 1, spinExpectation: 2, coherence: 3 }
+    const fvMap: Record<string, number> = {
+      spinDensity: 0,
+      totalDensity: 1,
+      spinExpectation: 2,
+      coherence: 3,
+    }
     u32[o++] = fvMap[config.fieldView] ?? 0
     u32[o++] = config.autoScale ? 1 : 0
     f32[o++] = config.spinUpColor[0]
@@ -829,22 +929,34 @@ ${tdseStockhamFFTBlock}
     f32[o++] = this.maxDensity
     o += 2 // pad
 
-    // Basis vectors (offset 88*4 = 352)
+    // Basis vectors — N-D arrays for proper higher-dim rotation (offset 88*4 = 352)
     o = 88
-    if (basisX) { f32[o] = basisX[0]!; f32[o + 1] = basisX[1]!; f32[o + 2] = basisX[2]! }
-    o += 4 // vec3f + pad
-    if (basisY) { f32[o] = basisY[0]!; f32[o + 1] = basisY[1]!; f32[o + 2] = basisY[2]! }
-    o += 4
-    if (basisZ) { f32[o] = basisZ[0]!; f32[o + 1] = basisZ[1]!; f32[o + 2] = basisZ[2]! }
-    o += 4
+    if (basisX) {
+      for (let d = 0; d < Math.min(basisX.length, MAX_DIM); d++) f32[o + d] = basisX[d]!
+    } else {
+      f32[o] = 1.0
+    }
+    o += MAX_DIM // array<f32, 12>
+    if (basisY) {
+      for (let d = 0; d < Math.min(basisY.length, MAX_DIM); d++) f32[o + d] = basisY[d]!
+    } else {
+      f32[o + 1] = 1.0
+    }
+    o += MAX_DIM
+    if (basisZ) {
+      for (let d = 0; d < Math.min(basisZ.length, MAX_DIM); d++) f32[o + d] = basisZ[d]!
+    } else {
+      f32[o + 2] = 1.0
+    }
+    o += MAX_DIM
 
-    // Spacing (offset 100*4 = 400)
-    o = 100
+    // Spacing (offset 124*4 = 496)
+    o = 124
     for (let d = 0; d < MAX_DIM; d++) f32[o++] = config.spacing[d] ?? 0.1
 
-    // Slice positions (offset 112*4 = 448)
+    // Slice positions (offset 136*4 = 544)
     // Apply slice animation for dims >= 3 when enabled (4D+ only)
-    o = 112
+    o = 136
     for (let d = 0; d < MAX_DIM; d++) {
       let pos = config.slicePositions[d] ?? 0
       if (config.sliceAnimationEnabled && d >= 3 && d < config.latticeDim) {
@@ -873,20 +985,28 @@ ${tdseStockhamFFTBlock}
    * @returns Next slot offset for subsequent axis dispatches.
    */
   private dispatchFFTAxis(encoder: GPUCommandEncoder, axisDim: number, slotOffset: number): number {
-    if (!this.fftStagePipeline || !this.fftStageABBG || !this.fftStageBABG ||
-        !this.fftUniformBuffer || !this.fftStagingBuffer) return slotOffset
+    if (
+      !this.fftStagePipeline ||
+      !this.fftStageABBG ||
+      !this.fftStageBABG ||
+      !this.fftUniformBuffer ||
+      !this.fftStagingBuffer
+    )
+      return slotOffset
 
     const stages = Math.round(Math.log2(axisDim))
     const halfTotal = this.totalSites / 2
 
     for (let s = 0; s < stages; s++) {
       encoder.copyBufferToBuffer(
-        this.fftStagingBuffer, (slotOffset + s) * FFT_UNIFORM_SIZE,
-        this.fftUniformBuffer, 0,
-        FFT_UNIFORM_SIZE,
+        this.fftStagingBuffer,
+        (slotOffset + s) * FFT_UNIFORM_SIZE,
+        this.fftUniformBuffer,
+        0,
+        FFT_UNIFORM_SIZE
       )
 
-      const bg = (s % 2 === 0) ? this.fftStageABBG : this.fftStageBABG
+      const bg = s % 2 === 0 ? this.fftStageABBG : this.fftStageBABG
       const pass = encoder.beginComputePass({ label: `pauli-fft-stage-${s}` })
       this.dispatchCompute(pass, this.fftStagePipeline, [bg], Math.ceil(halfTotal / LINEAR_WG))
       pass.end()
@@ -921,7 +1041,7 @@ ${tdseStockhamFFTBlock}
     basisX?: Float32Array,
     basisY?: Float32Array,
     basisZ?: Float32Array,
-    boundingRadius?: number,
+    boundingRadius?: number
   ): void {
     const config = this.sanitizeGridSizes(rawConfig)
     const { device, encoder } = ctx
@@ -945,7 +1065,12 @@ ${tdseStockhamFFTBlock}
     if (!this.initialized || config.needsReset) {
       if (this.initPipeline && this.spinorBG) {
         const pass = encoder.beginComputePass({ label: 'pauli-init-pass' })
-        this.dispatchCompute(pass, this.initPipeline, [this.spinorBG], Math.ceil(this.totalSites / LINEAR_WG))
+        this.dispatchCompute(
+          pass,
+          this.initPipeline,
+          [this.spinorBG],
+          Math.ceil(this.totalSites / LINEAR_WG)
+        )
         pass.end()
       }
 
@@ -1035,8 +1160,11 @@ ${tdseStockhamFFTBlock}
           p.end()
         }
 
-        // 7. Absorber (if enabled)
-        if (config.absorberEnabled && this.absorberPipeline && this.spinorBG) {
+        // 7. Absorber (separate pass AFTER the Strang step)
+        // Applied once per step, after the FFT kinetic step has completed.
+        // This prevents the FFT from seeing the absorber's spatial modulation
+        // and scattering it across k-space (which creates spurious emission artifacts).
+        if (this.absorberPipeline && this.spinorBG) {
           const p = encoder.beginComputePass({ label: `pauli-absorber-${step}` })
           this.dispatchCompute(p, this.absorberPipeline, [this.spinorBG], linearWG)
           p.end()
@@ -1054,16 +1182,18 @@ ${tdseStockhamFFTBlock}
       pass.end()
     }
 
-    // Diagnostics — only run when explicitly enabled
-    if (config.diagnosticsEnabled) {
-      this.diagFrameCounter++
-      const interval = config.diagnosticsInterval || DIAG_DECIMATION
-      if (this.diagFrameCounter >= interval) {
-        this.diagFrameCounter = 0
-        this.cachedFieldStrength = config.fieldStrength
-        this.cachedHbar = config.hbar
-        this.dispatchDiagnostics(encoder, device)
-      }
+    // Always run decimated diagnostics to keep maxDensity updated for
+    // display normalization. Without this, a spreading wavepacket fades to
+    // invisible because maxDensity stays at the initial value.
+    this.diagFrameCounter++
+    const interval = config.diagnosticsEnabled
+      ? config.diagnosticsInterval || DIAG_DECIMATION
+      : DIAG_DECIMATION
+    if (this.diagFrameCounter >= interval) {
+      this.diagFrameCounter = 0
+      this.cachedFieldStrength = config.fieldStrength
+      this.cachedHbar = config.hbar
+      this.dispatchDiagnostics(encoder, device)
     }
   }
 
@@ -1076,7 +1206,12 @@ ${tdseStockhamFFTBlock}
     // Reduce phase
     if (this.diagReducePipeline && this.diagReduceBG) {
       const pass = encoder.beginComputePass({ label: 'pauli-diag-reduce' })
-      this.dispatchCompute(pass, this.diagReducePipeline, [this.diagReduceBG], this.diagNumWorkgroups)
+      this.dispatchCompute(
+        pass,
+        this.diagReducePipeline,
+        [this.diagReduceBG],
+        this.diagNumWorkgroups
+      )
       pass.end()
     }
 
@@ -1094,60 +1229,62 @@ ${tdseStockhamFFTBlock}
         0,
         this.diagStagingBuffer,
         0,
-        DIAG_RESULT_COUNT * Float32Array.BYTES_PER_ELEMENT,
+        DIAG_RESULT_COUNT * Float32Array.BYTES_PER_ELEMENT
       )
       this.diagMappingInFlight = true
 
       // Map and read after GPU completes
       device.queue.onSubmittedWorkDone().then(() => {
         if (!this.diagStagingBuffer) return
-        this.diagStagingBuffer.mapAsync(GPUMapMode.READ).then(() => {
-          if (!this.diagStagingBuffer) return
-          const data = new Float32Array(this.diagStagingBuffer.getMappedRange())
-          if (data.length >= DIAG_RESULT_COUNT) {
-            // data layout: [totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad]
-            const totalNorm = data[0]!
-            const normUp = data[1]!
-            const normDown = data[2]!
-            const sigmaX = data[3]!
-            const sigmaY = data[4]!
-            const sigmaZ = data[5]!
-            this.maxDensity = Math.max(0.001, data[6]!)
+        this.diagStagingBuffer
+          .mapAsync(GPUMapMode.READ)
+          .then(() => {
+            if (!this.diagStagingBuffer) return
+            const data = new Float32Array(this.diagStagingBuffer.getMappedRange())
+            if (data.length >= DIAG_RESULT_COUNT) {
+              // data layout: [totalNorm, normUp, normDown, sigmaX, sigmaY, sigmaZ, maxDensity, pad]
+              const totalNorm = data[0]!
+              const normUp = data[1]!
+              const normDown = data[2]!
+              const sigmaX = data[3]!
+              const sigmaY = data[4]!
+              const sigmaZ = data[5]!
+              this.maxDensity = Math.max(0.001, data[6]!)
 
-            const safeTotalNorm = totalNorm > 0 ? totalNorm : 1
-            const spinUpFraction = normUp / safeTotalNorm
-            const spinDownFraction = normDown / safeTotalNorm
-            const spinExpectationZ = sigmaZ / safeTotalNorm
-            const coherenceMagnitude = Math.sqrt(
-              (sigmaX * sigmaX + sigmaY * sigmaY) / (safeTotalNorm * safeTotalNorm),
-            )
-            const larmorFrequency = this.cachedFieldStrength / this.cachedHbar
+              const safeTotalNorm = totalNorm > 0 ? totalNorm : 1
+              const spinUpFraction = normUp / safeTotalNorm
+              const spinDownFraction = normDown / safeTotalNorm
+              const spinExpectationZ = sigmaZ / safeTotalNorm
+              const coherenceMagnitude = Math.sqrt(
+                (sigmaX * sigmaX + sigmaY * sigmaY) / (safeTotalNorm * safeTotalNorm)
+              )
+              const larmorFrequency = this.cachedFieldStrength / this.cachedHbar
 
-            // Track initial norm for relative drift calculation
-            if (this.initialNorm === 0 && totalNorm > 0) {
-              this.initialNorm = totalNorm
+              // Track initial norm for relative drift calculation
+              if (this.initialNorm === 0 && totalNorm > 0) {
+                this.initialNorm = totalNorm
+              }
+              const normDrift =
+                this.initialNorm > 0 ? (totalNorm - this.initialNorm) / this.initialNorm : 0
+
+              usePauliDiagnosticsStore.getState().update({
+                totalNorm,
+                normDrift,
+                maxDensity: this.maxDensity,
+                spinUpFraction,
+                spinDownFraction,
+                spinExpectationZ,
+                coherenceMagnitude,
+                larmorFrequency,
+              })
             }
-            const normDrift = this.initialNorm > 0
-              ? (totalNorm - this.initialNorm) / this.initialNorm
-              : 0
 
-            usePauliDiagnosticsStore.getState().update({
-              totalNorm,
-              normDrift,
-              maxDensity: this.maxDensity,
-              spinUpFraction,
-              spinDownFraction,
-              spinExpectationZ,
-              coherenceMagnitude,
-              larmorFrequency,
-            })
-          }
-
-          this.diagStagingBuffer.unmap()
-          this.diagMappingInFlight = false
-        }).catch(() => {
-          this.diagMappingInFlight = false
-        })
+            this.diagStagingBuffer.unmap()
+            this.diagMappingInFlight = false
+          })
+          .catch(() => {
+            this.diagMappingInFlight = false
+          })
       })
     }
   }
@@ -1171,6 +1308,7 @@ ${tdseStockhamFFTBlock}
     this.diagPartialBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
+    this.absorberPipeline = null
     super.dispose()
   }
 }

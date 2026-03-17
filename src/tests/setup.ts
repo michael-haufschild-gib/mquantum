@@ -1,4 +1,3 @@
-/* global GPUBufferMapState, GPUQueryType, GPUTextureDimension, GPUTextureFormat */
 import { expect, afterEach, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
@@ -14,16 +13,9 @@ const originalWarn = console.warn
 const originalError = console.error
 
 // Patterns to suppress (these are expected in tests)
-const suppressedWarnPatterns = [
-  'Multiple instances of Three.js', // Expected when tests import Three.js and @react-three/fiber
-]
+const suppressedWarnPatterns: string[] = []
 
-const suppressedErrorPatterns = [
-  'is using incorrect casing', // R3F custom elements appear as lowercase in tests
-  'is unrecognized in this browser', // R3F custom elements not recognized outside Canvas
-  'for a non-boolean attribute', // R3F material props passed as booleans
-  'React does not recognize the', // R3F material props like alphaToCoverage, depthTest
-]
+const suppressedErrorPatterns: string[] = []
 
 console.warn = (...args) => {
   if (typeof args[0] === 'string' && suppressedWarnPatterns.some((p) => args[0].includes(p))) {
@@ -39,7 +31,7 @@ console.error = (...args) => {
   originalError.apply(console, args)
 }
 
-// Mock ResizeObserver for Three.js components
+// Mock ResizeObserver (not provided by happy-dom)
 class MockResizeObserver {
   observe = vi.fn()
   unobserve = vi.fn()
@@ -91,7 +83,7 @@ Object.defineProperty(window, 'sessionStorage', {
   value: storageMock,
 })
 
-// Comprehensive WebGL2 mock for Three.js support
+// Comprehensive WebGL2 mock for GPU capability detection
 const createWebGL2ContextMock = () => {
   const canvas = document.createElement('canvas')
 
@@ -206,7 +198,7 @@ const createWebGL2ContextMock = () => {
 
     // Extension support
     getExtension: vi.fn((name: string) => {
-      // Return mock extensions that Three.js commonly checks for
+      // Return mock extensions commonly checked by GPU detection libraries
       const extensions: Record<string, object | null> = {
         EXT_color_buffer_float: {},
         EXT_color_buffer_half_float: {},
@@ -610,41 +602,43 @@ const createWebGPUMock = () => {
   }
 
   // Mock GPURenderPassEncoder
-  const createMockRenderPassEncoder = (): GPURenderPassEncoder => ({
-    label: '',
-    setPipeline: vi.fn(),
-    setBindGroup: vi.fn(),
-    setVertexBuffer: vi.fn(),
-    setIndexBuffer: vi.fn(),
-    draw: vi.fn(),
-    drawIndexed: vi.fn(),
-    drawIndirect: vi.fn(),
-    drawIndexedIndirect: vi.fn(),
-    setViewport: vi.fn(),
-    setScissorRect: vi.fn(),
-    setBlendConstant: vi.fn(),
-    setStencilReference: vi.fn(),
-    beginOcclusionQuery: vi.fn(),
-    endOcclusionQuery: vi.fn(),
-    executeBundles: vi.fn(),
-    end: vi.fn(),
-    pushDebugGroup: vi.fn(),
-    popDebugGroup: vi.fn(),
-    insertDebugMarker: vi.fn(),
-  }) as unknown as GPURenderPassEncoder
+  const createMockRenderPassEncoder = (): GPURenderPassEncoder =>
+    ({
+      label: '',
+      setPipeline: vi.fn(),
+      setBindGroup: vi.fn(),
+      setVertexBuffer: vi.fn(),
+      setIndexBuffer: vi.fn(),
+      draw: vi.fn(),
+      drawIndexed: vi.fn(),
+      drawIndirect: vi.fn(),
+      drawIndexedIndirect: vi.fn(),
+      setViewport: vi.fn(),
+      setScissorRect: vi.fn(),
+      setBlendConstant: vi.fn(),
+      setStencilReference: vi.fn(),
+      beginOcclusionQuery: vi.fn(),
+      endOcclusionQuery: vi.fn(),
+      executeBundles: vi.fn(),
+      end: vi.fn(),
+      pushDebugGroup: vi.fn(),
+      popDebugGroup: vi.fn(),
+      insertDebugMarker: vi.fn(),
+    }) as unknown as GPURenderPassEncoder
 
   // Mock GPUComputePassEncoder
-  const createMockComputePassEncoder = (): GPUComputePassEncoder => ({
-    label: '',
-    setPipeline: vi.fn(),
-    setBindGroup: vi.fn(),
-    dispatchWorkgroups: vi.fn(),
-    dispatchWorkgroupsIndirect: vi.fn(),
-    end: vi.fn(),
-    pushDebugGroup: vi.fn(),
-    popDebugGroup: vi.fn(),
-    insertDebugMarker: vi.fn(),
-  }) as unknown as GPUComputePassEncoder
+  const createMockComputePassEncoder = (): GPUComputePassEncoder =>
+    ({
+      label: '',
+      setPipeline: vi.fn(),
+      setBindGroup: vi.fn(),
+      dispatchWorkgroups: vi.fn(),
+      dispatchWorkgroupsIndirect: vi.fn(),
+      end: vi.fn(),
+      pushDebugGroup: vi.fn(),
+      popDebugGroup: vi.fn(),
+      insertDebugMarker: vi.fn(),
+    }) as unknown as GPUComputePassEncoder
 
   // Mock GPUCommandEncoder
   const createMockCommandEncoder = (): GPUCommandEncoder => {

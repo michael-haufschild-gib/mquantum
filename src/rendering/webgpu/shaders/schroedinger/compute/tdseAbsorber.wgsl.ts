@@ -1,13 +1,16 @@
 /**
- * TDSE Complex Absorbing Potential (CAP) Compute Shader
+ * TDSE PML Absorber Compute Shader
  *
- * Applies absorbing boundary conditions after each Strang step:
- *   psi *= exp(-alpha * (d/W)^2)
- * where d is the distance from the domain boundary and W is the absorber width.
+ * Applies PML absorbing boundary conditions after each Strang step:
+ *   ψ(x) *= exp(-σ(x) · dt)
  *
- * This prevents spurious reflections from the periodic boundary.
+ * Uses cubic polynomial grading (p=3) via the shared computePMLSigma()
+ * function, with additive damping across dimensions for correct corner
+ * treatment. σ_max is auto-computed on the CPU from the target reflection
+ * coefficient.
  *
- * Requires tdseUniformsBlock + freeScalarNDIndexBlock to be prepended.
+ * Requires tdseUniformsBlock + freeScalarNDIndexBlock + pmlProfileBlock
+ * to be prepended.
  *
  * @workgroup_size(64)
  * @module
@@ -29,28 +32,13 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
   }
 
   let coords = linearToND(idx, params.strides, params.gridSize, params.latticeDim);
+  let sigma = computePMLSigma(coords, params.gridSize, params.latticeDim,
+                              params.absorberWidth, params.absorberStrength);
 
-  // Compute maximum damping factor across all dimensions
-  var maxDamp: f32 = 0.0;
-  for (var d: u32 = 0u; d < params.latticeDim; d++) {
-    let N = f32(params.gridSize[d]);
-    let W = params.absorberWidth * N; // absorber width in grid points
-    let pos = f32(coords[d]);
-
-    // Distance from nearest boundary (in grid points)
-    let distFromEdge = min(pos, N - 1.0 - pos);
-
-    if (distFromEdge < W) {
-      let ratio = (W - distFromEdge) / W;
-      let damp = params.absorberStrength * ratio * ratio;
-      maxDamp = max(maxDamp, damp);
-    }
-  }
-
-  if (maxDamp > 0.0) {
-    let factor = exp(-maxDamp);
-    psiRe[idx] *= factor;
-    psiIm[idx] *= factor;
+  if (sigma > 0.0) {
+    let dampFactor = exp(-sigma * params.dt);
+    psiRe[idx] *= dampFactor;
+    psiIm[idx] *= dampFactor;
   }
 }
 `

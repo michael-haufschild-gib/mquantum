@@ -28,13 +28,17 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('amplitude: f32')
     expect(wgsl).toContain('let minAmplitudeScale = mix(5.5, 2.0, strengthT);')
     expect(wgsl).toContain('let minAmplitudeFloor = mix(8e-4, 2e-4, strengthT);')
-    expect(wgsl).toContain('let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor);')
+    expect(wgsl).toContain(
+      'let minAmplitude = max(uniforms.nodalTolerance * minAmplitudeScale, minAmplitudeFloor);'
+    )
     expect(wgsl).toContain('if (max(prevSample.amplitude, currSample.amplitude) < minAmplitude)')
     expect(wgsl).toContain(
       'if (uniforms.nodalDefinition == NODAL_DEFINITION_PSI_ABS) {\n    return NODAL_DEFINITION_REAL;'
     )
     expect(wgsl).toContain('fn nodalCrossingMask(')
-    expect(wgsl).toContain('hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);')
+    expect(wgsl).toContain(
+      'hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);'
+    )
     expect(wgsl).toContain('let signedDistance = abs(value) / gradMag;')
     expect(wgsl).toContain('let nodalScattered = mix(nodalColor, nodalColor * ambientLight, 0.35);')
     expect(wgsl).toContain('transmittance *= (1.0 - nodalAlpha * 0.6);')
@@ -43,7 +47,9 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).toContain('intensity = nodalBandMask(psiCenter.y, gradIm, eps) * crossingIm;')
     expect(wgsl).toContain('let crossingAny = max(max(crossingRe, crossingIm), crossingAbs);')
     expect(wgsl).toContain('intensity = nodalBandMask(psiAbsCenter, gradAbs, eps) * crossingAny;')
-    expect(wgsl).toContain('let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, maxAbsPsi);')
+    expect(wgsl).toContain(
+      'let envelopeWeight = smoothstep(envelopeFloor, envelopeCeil, maxAbsPsi);'
+    )
 
     expect(wgsl).not.toContain('fn computeNodalIntensity(')
     expect(wgsl).not.toContain('lowDensityMask = 1.0 - smoothstep(1e-5, 2e-3, rho)')
@@ -75,7 +81,9 @@ describe('Schroedinger nodal WGSL composition', () => {
     })
 
     expect(wgsl).toContain('let localSpan = stepLen * mix(3.0, 8.0, surfaceStrengthT);')
-    expect(wgsl).toContain('findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger)')
+    expect(wgsl).toContain(
+      'findNodalSurfaceHit(ro, rd, localNear, localFar, animTime, schroedinger)'
+    )
     expect(wgsl).toContain('computePhysicalNodalField(p, animTime, schroedinger)')
     expect(wgsl).toContain('schroedinger.nodalRenderMode == NODAL_RENDER_MODE_SURFACE')
     expect(wgsl).not.toContain('let nodalSurfaceModeActive =')

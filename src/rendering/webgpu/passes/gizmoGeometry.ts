@@ -907,9 +907,18 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
   ]
 
   const perps: [[number, number, number], [number, number, number]][] = [
-    [[0, 1, 0], [0, 0, 1]], // X axis perps
-    [[1, 0, 0], [0, 0, 1]], // Y axis perps
-    [[1, 0, 0], [0, 1, 0]], // Z axis perps
+    [
+      [0, 1, 0],
+      [0, 0, 1],
+    ], // X axis perps
+    [
+      [1, 0, 0],
+      [0, 0, 1],
+    ], // Y axis perps
+    [
+      [1, 0, 0],
+      [0, 1, 0],
+    ], // Z axis perps
   ]
 
   for (let a = 0; a < 3; a++) {
@@ -930,27 +939,55 @@ export function generateTranslateGizmo(alpha = 1.0, shaftLength = 3.0): Float32A
 
     pushLine(
       out,
-      tipX, tipY, tipZ,
-      baseX + perpA[0] * headW, baseY + perpA[1] * headW, baseZ + perpA[2] * headW,
-      r, g, b, alpha
+      tipX,
+      tipY,
+      tipZ,
+      baseX + perpA[0] * headW,
+      baseY + perpA[1] * headW,
+      baseZ + perpA[2] * headW,
+      r,
+      g,
+      b,
+      alpha
     )
     pushLine(
       out,
-      tipX, tipY, tipZ,
-      baseX - perpA[0] * headW, baseY - perpA[1] * headW, baseZ - perpA[2] * headW,
-      r, g, b, alpha
+      tipX,
+      tipY,
+      tipZ,
+      baseX - perpA[0] * headW,
+      baseY - perpA[1] * headW,
+      baseZ - perpA[2] * headW,
+      r,
+      g,
+      b,
+      alpha
     )
     pushLine(
       out,
-      tipX, tipY, tipZ,
-      baseX + perpB[0] * headW, baseY + perpB[1] * headW, baseZ + perpB[2] * headW,
-      r, g, b, alpha
+      tipX,
+      tipY,
+      tipZ,
+      baseX + perpB[0] * headW,
+      baseY + perpB[1] * headW,
+      baseZ + perpB[2] * headW,
+      r,
+      g,
+      b,
+      alpha
     )
     pushLine(
       out,
-      tipX, tipY, tipZ,
-      baseX - perpB[0] * headW, baseY - perpB[1] * headW, baseZ - perpB[2] * headW,
-      r, g, b, alpha
+      tipX,
+      tipY,
+      tipZ,
+      baseX - perpB[0] * headW,
+      baseY - perpB[1] * headW,
+      baseZ - perpB[2] * headW,
+      r,
+      g,
+      b,
+      alpha
     )
   }
 
@@ -974,9 +1011,16 @@ export function generateRotateGizmo(alpha = 1.0, radius = 2.5, segments = 48): F
     const a1 = ((i + 1) / segments) * Math.PI * 2
     pushLine(
       out,
-      0, Math.cos(a0) * radius, Math.sin(a0) * radius,
-      0, Math.cos(a1) * radius, Math.sin(a1) * radius,
-      AXIS_COLORS[0]![0], AXIS_COLORS[0]![1], AXIS_COLORS[0]![2], alpha
+      0,
+      Math.cos(a0) * radius,
+      Math.sin(a0) * radius,
+      0,
+      Math.cos(a1) * radius,
+      Math.sin(a1) * radius,
+      AXIS_COLORS[0]![0],
+      AXIS_COLORS[0]![1],
+      AXIS_COLORS[0]![2],
+      alpha
     )
   }
 
@@ -986,9 +1030,16 @@ export function generateRotateGizmo(alpha = 1.0, radius = 2.5, segments = 48): F
     const a1 = ((i + 1) / segments) * Math.PI * 2
     pushLine(
       out,
-      Math.cos(a0) * radius, 0, Math.sin(a0) * radius,
-      Math.cos(a1) * radius, 0, Math.sin(a1) * radius,
-      AXIS_COLORS[1]![0], AXIS_COLORS[1]![1], AXIS_COLORS[1]![2], alpha
+      Math.cos(a0) * radius,
+      0,
+      Math.sin(a0) * radius,
+      Math.cos(a1) * radius,
+      0,
+      Math.sin(a1) * radius,
+      AXIS_COLORS[1]![0],
+      AXIS_COLORS[1]![1],
+      AXIS_COLORS[1]![2],
+      alpha
     )
   }
 
@@ -998,9 +1049,16 @@ export function generateRotateGizmo(alpha = 1.0, radius = 2.5, segments = 48): F
     const a1 = ((i + 1) / segments) * Math.PI * 2
     pushLine(
       out,
-      Math.cos(a0) * radius, Math.sin(a0) * radius, 0,
-      Math.cos(a1) * radius, Math.sin(a1) * radius, 0,
-      AXIS_COLORS[2]![0], AXIS_COLORS[2]![1], AXIS_COLORS[2]![2], alpha
+      Math.cos(a0) * radius,
+      Math.sin(a0) * radius,
+      0,
+      Math.cos(a1) * radius,
+      Math.sin(a1) * radius,
+      0,
+      AXIS_COLORS[2]![0],
+      AXIS_COLORS[2]![1],
+      AXIS_COLORS[2]![2],
+      alpha
     )
   }
 

@@ -28,7 +28,7 @@ import type { DensityMatrix, LindbladChannel } from './types'
 export function applyDissipator(
   ch: LindbladChannel,
   rho: DensityMatrix,
-  dRho: DensityMatrix,
+  dRho: DensityMatrix
 ): void {
   const { row: r, col: c, amplitudeRe: aRe, amplitudeIm: aIm } = ch
   const K = rho.K
@@ -82,7 +82,7 @@ export function applyDissipator(
 export function computeDissipator(
   channels: readonly LindbladChannel[],
   rho: DensityMatrix,
-  dRho: DensityMatrix,
+  dRho: DensityMatrix
 ): void {
   for (let j = 0; j < channels.length; j++) {
     applyDissipator(channels[j]!, rho, dRho)

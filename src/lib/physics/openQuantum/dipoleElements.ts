@@ -89,9 +89,7 @@ function laguerreAssoc(p: number, alpha: number, x: number): number {
  */
 function hydrogenRadialWavefunction(n: number, l: number, r: number): number {
   const rho = (2 * r) / n
-  const norm = Math.sqrt(
-    (8 / (n * n * n)) * (factorial(n - l - 1) / (2 * n * factorial(n + l))),
-  )
+  const norm = Math.sqrt((8 / (n * n * n)) * (factorial(n - l - 1) / (2 * n * factorial(n + l))))
   const polyDegree = n - l - 1
   const polyAlpha = 2 * l + 1
   const L = laguerreAssoc(polyDegree, polyAlpha, rho)
@@ -109,25 +107,22 @@ function hydrogenRadialWavefunction(n: number, l: number, r: number): number {
  * These are sufficient for hydrogen integrals up to n_max ~ 7.
  */
 const GL_NODES_32 = [
-  0.044489365833267, 0.234526109519619, 0.576884629301886, 1.072448753818169,
-  1.722408776444645, 2.528336706425796, 3.492213273021994, 4.616456769749767,
-  5.903958504174244, 7.358126733186241, 8.982940924212595, 10.783018632539973,
-  12.763745476369854, 14.93139172381829, 17.292454336715313, 19.855860940336054,
-  22.631308194205726, 25.63026585149836, 28.86628922345678, 32.35502641111809,
-  36.11493729849849, 40.16884211322846, 44.54503571004595, 49.280735826498685,
-  54.42560359353923, 60.04681630621912, 66.23824489808752, 73.13251352473051,
-  80.93076563148772, 89.97355467168613, 100.9025383828994, 115.56587606289106,
+  0.044489365833267, 0.234526109519619, 0.576884629301886, 1.072448753818169, 1.722408776444645,
+  2.528336706425796, 3.492213273021994, 4.616456769749767, 5.903958504174244, 7.358126733186241,
+  8.982940924212595, 10.783018632539973, 12.763745476369854, 14.93139172381829, 17.292454336715313,
+  19.855860940336054, 22.631308194205726, 25.63026585149836, 28.86628922345678, 32.35502641111809,
+  36.11493729849849, 40.16884211322846, 44.54503571004595, 49.280735826498685, 54.42560359353923,
+  60.04681630621912, 66.23824489808752, 73.13251352473051, 80.93076563148772, 89.97355467168613,
+  100.9025383828994, 115.56587606289106,
 ]
 
 const GL_WEIGHTS_32 = [
-  0.109218341952385, 0.210443107938813, 0.235213229669848, 0.195903335972881,
-  0.129983786286072, 0.070578623704689, 0.031760912509176, 0.011886432183018,
-  0.003700805036954, 0.000957926194539, 0.000205328257529, 0.000036294699788,
-  0.000005242299438, 0.000000612506834, 0.000000057140738, 0.000000004183995,
-  0.000000000237067, 0.000000000010211, 0.000000000000326, 0.000000000000007,
-  1.12e-16, 1.14e-18, 7.23e-21, 2.72e-23,
-  5.68e-26, 5.90e-29, 2.65e-32, 4.19e-36,
-  1.64e-40, 8.82e-46, 1.65e-52, 1.57e-61,
+  0.109218341952385, 0.210443107938813, 0.235213229669848, 0.195903335972881, 0.129983786286072,
+  0.070578623704689, 0.031760912509176, 0.011886432183018, 0.003700805036954, 0.000957926194539,
+  0.000205328257529, 0.000036294699788, 0.000005242299438, 0.000000612506834, 0.000000057140738,
+  0.000000004183995, 0.000000000237067, 0.000000000010211, 0.000000000000326, 0.000000000000007,
+  1.12e-16, 1.14e-18, 7.23e-21, 2.72e-23, 5.68e-26, 5.9e-29, 2.65e-32, 4.19e-36, 1.64e-40, 8.82e-46,
+  1.65e-52, 1.57e-61,
 ]
 
 /**
@@ -142,12 +137,7 @@ const GL_WEIGHTS_32 = [
  * @param l2 - Azimuthal quantum number of state 2
  * @returns Radial dipole integral in atomic units (a₀)
  */
-export function radialDipoleIntegral(
-  n1: number,
-  l1: number,
-  n2: number,
-  l2: number,
-): number {
+export function radialDipoleIntegral(n1: number, l1: number, n2: number, l2: number): number {
   // Scale factor: map Gauss-Laguerre range to hydrogen radial scale
   const scale = Math.max(n1, n2) * 0.5
 
@@ -199,7 +189,7 @@ export function wigner3j(
   j3: number,
   m1: number,
   m2: number,
-  m3: number,
+  m3: number
 ): number {
   // Selection rules: m1 + m2 + m3 = 0
   if (m1 + m2 + m3 !== 0) return 0
@@ -213,7 +203,7 @@ export function wigner3j(
   // Racah formula
   const triCoeff = Math.sqrt(
     (factorial(j1 + j2 - j3) * factorial(j1 - j2 + j3) * factorial(-j1 + j2 + j3)) /
-      factorial(j1 + j2 + j3 + 1),
+      factorial(j1 + j2 + j3 + 1)
   )
 
   const preFactor =
@@ -224,7 +214,7 @@ export function wigner3j(
         factorial(j2 + m2) *
         factorial(j2 - m2) *
         factorial(j3 + m3) *
-        factorial(j3 - m3),
+        factorial(j3 - m3)
     )
 
   // Sum over t
@@ -264,18 +254,11 @@ export function wigner3j(
  * @param q - Spherical component (-1, 0, or +1)
  * @returns Angular factor value
  */
-export function angularFactor(
-  l1: number,
-  m1: number,
-  l2: number,
-  m2: number,
-  q: number,
-): number {
+export function angularFactor(l1: number, m1: number, l2: number, m2: number, q: number): number {
   // Selection rule: q = m1 - m2 (from m conservation in 3j: -m1 + q + m2 = 0)
   if (q !== m1 - m2) return 0
 
-  const prefactor =
-    Math.pow(-1, m1) * Math.sqrt(((2 * l1 + 1) * 3 * (2 * l2 + 1)) / (4 * Math.PI))
+  const prefactor = Math.pow(-1, m1) * Math.sqrt(((2 * l1 + 1) * 3 * (2 * l2 + 1)) / (4 * Math.PI))
 
   const w3j_1 = wigner3j(l1, 1, l2, 0, 0, 0)
   const w3j_2 = wigner3j(l1, 1, l2, -m1, q, m2)
@@ -304,11 +287,10 @@ const dipoleCache = new Map<string, number>()
  */
 export function dipoleMatrixElementSquared(
   stateI: HydrogenBasisState,
-  stateJ: HydrogenBasisState,
+  stateJ: HydrogenBasisState
 ): number {
   // Cache key (symmetric: |⟨j|r|i⟩|² = |⟨i|r|j⟩|²)
-  const [a, b] =
-    stateI.index < stateJ.index ? [stateI, stateJ] : [stateJ, stateI]
+  const [a, b] = stateI.index < stateJ.index ? [stateI, stateJ] : [stateJ, stateI]
   const key = `${a.n},${a.l},${a.m}-${b.n},${b.l},${b.m}`
 
   const cached = dipoleCache.get(key)

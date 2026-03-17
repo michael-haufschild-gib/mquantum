@@ -1,8 +1,8 @@
 /**
  * Main Application Component
- * N-Dimensional Object Visualizer
+ * N-Dimensional Quantum Physics Visualizer
  *
- * Renders Schroedinger quantum objects using WebGPU.
+ * Renders Schroedinger quantum wavefunctions using WebGPU.
  */
 
 import { PerformanceMonitor } from '@/components/canvas/PerformanceMonitor'
@@ -112,7 +112,6 @@ function AppContent() {
         <MsgBox />
 
         {showPerfMonitor && <PerformanceMonitor />}
-
 
         {/* Screenshot Preview Modal */}
         <ScreenshotModal />

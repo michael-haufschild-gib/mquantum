@@ -14,10 +14,7 @@ import { Slider } from '@/components/ui/Slider'
 import { Select } from '@/components/ui/Select'
 import { ToggleButton } from '@/components/ui/ToggleButton'
 import { Button } from '@/components/ui/Button'
-import {
-  useExtendedObjectStore,
-  type ExtendedObjectState,
-} from '@/stores/extendedObjectStore'
+import { useExtendedObjectStore, type ExtendedObjectState } from '@/stores/extendedObjectStore'
 import { useShallow } from 'zustand/react/shallow'
 import { AnimationDrawerContainer } from './AnimationDrawerContainer'
 

@@ -40,7 +40,7 @@ import type { LindbladChannel } from './types'
 export function buildLiouvillian(
   energies: Float64Array,
   channels: readonly LindbladChannel[],
-  K: number,
+  K: number
 ): ComplexMatrix {
   const N = K * K
   const L = complexMatZero(N)

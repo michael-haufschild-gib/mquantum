@@ -99,17 +99,13 @@ export const PauliAnimationDrawer: React.FC<PauliAnimationDrawerProps> = React.m
               Field Reset
             </label>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={resetField}
-            className="w-full"
-          >
+          <Button variant="secondary" size="sm" onClick={resetField} className="w-full">
             <Icon name="redo" size={12} className="mr-2" />
             Reinitialize Spinor
           </Button>
           <p className="text-xs text-text-tertiary">
-            Resets the wavefunction to its initial Gaussian wavepacket with the current spin and field settings.
+            Resets the wavefunction to its initial Gaussian wavepacket with the current spin and
+            field settings.
           </p>
         </div>
 

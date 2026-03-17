@@ -87,7 +87,7 @@ describe('TDSE store slice', () => {
     store.setTdseDriveFrequency(2.5)
     store.setTdseDriveAmplitude(1.2)
     store.setTdseAbsorberWidth(0.12)
-    store.setTdseAbsorberStrength(10)
+    store.setTdsePmlTargetReflection(1e-8)
     store.setTdseDiagnosticsInterval(9)
     store.setTdseSlicePosition(0, 0.4)
 
@@ -110,7 +110,6 @@ describe('TDSE store slice', () => {
     store.setTdseDriveFrequency(Number.POSITIVE_INFINITY)
     store.setTdseDriveAmplitude(Number.NaN)
     store.setTdseAbsorberWidth(Number.POSITIVE_INFINITY)
-    store.setTdseAbsorberStrength(Number.NaN)
     store.setTdseDiagnosticsInterval(Number.NaN)
     store.setTdseSlicePosition(0, Number.NaN)
 
@@ -132,7 +131,7 @@ describe('TDSE store slice', () => {
     expect(after.driveFrequency).toBe(before.driveFrequency)
     expect(after.driveAmplitude).toBe(before.driveAmplitude)
     expect(after.absorberWidth).toBe(before.absorberWidth)
-    expect(after.absorberStrength).toBe(before.absorberStrength)
+    expect(after.pmlTargetReflection).toBe(before.pmlTargetReflection)
     expect(after.diagnosticsInterval).toBe(before.diagnosticsInterval)
     expect(after.slicePositions).toEqual(before.slicePositions)
   })
@@ -226,12 +225,21 @@ describe('TDSE store slice', () => {
     expect(useExtendedObjectStore.getState().schroedinger.tdse.initialCondition).toBe('planeWave')
 
     store.setTdseInitialCondition('superposition')
-    expect(useExtendedObjectStore.getState().schroedinger.tdse.initialCondition).toBe('superposition')
+    expect(useExtendedObjectStore.getState().schroedinger.tdse.initialCondition).toBe(
+      'superposition'
+    )
   })
 
   it('setTdsePotentialType accepts valid values', () => {
     const store = useExtendedObjectStore.getState()
-    for (const type of ['free', 'barrier', 'step', 'finiteWell', 'harmonicTrap', 'driven'] as const) {
+    for (const type of [
+      'free',
+      'barrier',
+      'step',
+      'finiteWell',
+      'harmonicTrap',
+      'driven',
+    ] as const) {
       store.setTdsePotentialType(type)
       expect(useExtendedObjectStore.getState().schroedinger.tdse.potentialType).toBe(type)
     }

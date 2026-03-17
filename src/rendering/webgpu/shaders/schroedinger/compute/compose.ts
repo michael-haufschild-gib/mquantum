@@ -36,12 +36,12 @@ import {
   getHOUnrolledBlocks,
   generateHODispatchBlock,
 } from '../quantum/hoSuperpositionVariants.wgsl'
+import { psiBlockDynamicHarmonic, psiBlockHarmonic, psiBlockHydrogenND } from '../quantum/psi.wgsl'
 import {
-  psiBlockDynamicHarmonic,
-  psiBlockHarmonic,
-  psiBlockHydrogenND,
-} from '../quantum/psi.wgsl'
-import { densityPreMapBlock, generateMapPosToND, densityPostMapBlock } from '../quantum/density.wgsl'
+  densityPreMapBlock,
+  generateMapPosToND,
+  densityPostMapBlock,
+} from '../quantum/density.wgsl'
 
 // Hydrogen blocks (shared by hydrogen ND mode)
 import { laguerreBlock } from '../quantum/laguerre.wgsl'
@@ -233,21 +233,31 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Schrödinger Uniforms', content: schroedingerUniformsBlock },
 
     // Open quantum uniforms struct (always include struct definition for type completeness)
-    { name: 'Open Quantum Uniforms', content: openQuantumUniformsBlock, condition: useDensityMatrix },
+    {
+      name: 'Open Quantum Uniforms',
+      content: openQuantumUniformsBlock,
+      condition: useDensityMatrix,
+    },
 
     // Hydrogen basis uniforms struct (density matrix + hydrogen mode)
-    { name: 'Hydrogen Basis Uniforms', content: hydrogenBasisUniformsBlock,
-      condition: useDensityMatrix && isHydrogenFamily },
+    {
+      name: 'Hydrogen Basis Uniforms',
+      content: hydrogenBasisUniformsBlock,
+      condition: useDensityMatrix && isHydrogenFamily,
+    },
 
     // Grid params struct
     { name: 'Grid Params', content: gridParamsBlock },
 
     // Compute shader bindings
-    { name: 'Compute Bindings', content: useDensityMatrix
-        ? (isHydrogenFamily
-            ? generateDensityGridBindingsWithHydrogenBasisBlock(storageFormat)
-            : generateDensityGridBindingsWithOpenQuantumBlock(storageFormat))
-        : generateDensityGridBindingsBlock(storageFormat) },
+    {
+      name: 'Compute Bindings',
+      content: useDensityMatrix
+        ? isHydrogenFamily
+          ? generateDensityGridBindingsWithHydrogenBasisBlock(storageFormat)
+          : generateDensityGridBindingsWithOpenQuantumBlock(storageFormat)
+        : generateDensityGridBindingsBlock(storageFormat),
+    },
 
     // ===== QUANTUM MATH MODULES (order matters!) =====
 
@@ -260,7 +270,11 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
 
     // HO ND dimension-specific variant
     { name: `HO ND ${actualDim}D`, content: hoNDBlock, condition: includeHarmonic },
-    { name: 'HO ND Dispatch', content: generateHoNDDispatchBlock(actualDim), condition: includeHarmonic },
+    {
+      name: 'HO ND Dispatch',
+      content: generateHoNDDispatchBlock(actualDim),
+      condition: includeHarmonic,
+    },
 
     // Hydrogen orbital basis functions
     { name: 'Laguerre Polynomials', content: laguerreBlock, condition: includeHydrogen },
@@ -312,15 +326,24 @@ export function composeDensityGridComputeShader(config: DensityGridComputeConfig
     { name: 'Density Post-Map', content: densityPostMapBlock },
 
     // Single basis function evaluation (density matrix mode only)
-    { name: 'Single Basis', content: generateSingleBasisBlock(
-      quantumMode as 'harmonicOscillator' | 'hydrogenND',
-      actualDim,
-    ), condition: useDensityMatrix },
+    {
+      name: 'Single Basis',
+      content: generateSingleBasisBlock(
+        quantumMode as 'harmonicOscillator' | 'hydrogenND',
+        actualDim
+      ),
+      condition: useDensityMatrix,
+    },
 
     // ===== COMPUTE SHADER ENTRY POINT =====
-    { name: 'Compute Main', content: useDensityMatrix
+    {
+      name: 'Compute Main',
+      content: useDensityMatrix
         ? densityMatrixComputeBlock
-        : (storageFormat === 'rgba16float' ? densityGridWithPhaseComputeBlock : densityGridComputeBlock) },
+        : storageFormat === 'rgba16float'
+          ? densityGridWithPhaseComputeBlock
+          : densityGridComputeBlock,
+    },
   ]
 
   // Assemble shader

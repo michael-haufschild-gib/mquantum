@@ -29,10 +29,7 @@ export const createAdvancedRenderingSlice: StateCreator<
   setSssIntensity: (sssIntensity) => {
     if (!isFiniteAdvancedRenderingInput(sssIntensity)) {
       if (import.meta.env.DEV) {
-        console.warn(
-          '[advancedRenderingSlice] Ignoring non-finite SSS intensity:',
-          sssIntensity
-        )
+        console.warn('[advancedRenderingSlice] Ignoring non-finite SSS intensity:', sssIntensity)
       }
       return
     }
@@ -42,10 +39,7 @@ export const createAdvancedRenderingSlice: StateCreator<
   setSssThickness: (sssThickness) => {
     if (!isFiniteAdvancedRenderingInput(sssThickness)) {
       if (import.meta.env.DEV) {
-        console.warn(
-          '[advancedRenderingSlice] Ignoring non-finite SSS thickness:',
-          sssThickness
-        )
+        console.warn('[advancedRenderingSlice] Ignoring non-finite SSS thickness:', sssThickness)
       }
       return
     }

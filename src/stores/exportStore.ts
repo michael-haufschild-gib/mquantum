@@ -170,7 +170,8 @@ const clampToRange = (value: number, min: number, max: number): number =>
 
 const clampMin = (value: number, min: number): number => Math.max(min, value)
 
-const isExportFormat = (value: unknown): value is ExportFormat => value === 'mp4' || value === 'webm'
+const isExportFormat = (value: unknown): value is ExportFormat =>
+  value === 'mp4' || value === 'webm'
 
 const isVideoCodec = (value: unknown): value is VideoCodec =>
   value === 'avc' || value === 'hevc' || value === 'vp9' || value === 'av1'
@@ -181,9 +182,7 @@ const isExportResolution = (value: unknown): value is ExportResolution =>
 const isBitrateMode = (value: unknown): value is ExportSettings['bitrateMode'] =>
   value === 'constant' || value === 'variable'
 
-const isHardwareAcceleration = (
-  value: unknown
-): value is ExportSettings['hardwareAcceleration'] =>
+const isHardwareAcceleration = (value: unknown): value is ExportSettings['hardwareAcceleration'] =>
   value === 'no-preference' || value === 'prefer-hardware' || value === 'prefer-software'
 
 const isRotation = (value: unknown): value is ExportSettings['rotation'] =>
@@ -264,7 +263,9 @@ const sanitizeHydratedCrop = (rawCrop: unknown): CropSettings => {
   return crop
 }
 
-const sanitizeHydratedSettings = (rawPersistedSettings: Partial<ExportSettings> | undefined): ExportSettings => {
+const sanitizeHydratedSettings = (
+  rawPersistedSettings: Partial<ExportSettings> | undefined
+): ExportSettings => {
   const persistedSettings =
     rawPersistedSettings && typeof rawPersistedSettings === 'object' ? rawPersistedSettings : {}
   const merged = { ...DEFAULT_SETTINGS, ...persistedSettings }
@@ -272,7 +273,9 @@ const sanitizeHydratedSettings = (rawPersistedSettings: Partial<ExportSettings> 
   return {
     format: isExportFormat(merged.format) ? merged.format : DEFAULT_SETTINGS.format,
     codec: isVideoCodec(merged.codec) ? merged.codec : DEFAULT_SETTINGS.codec,
-    resolution: isExportResolution(merged.resolution) ? merged.resolution : DEFAULT_SETTINGS.resolution,
+    resolution: isExportResolution(merged.resolution)
+      ? merged.resolution
+      : DEFAULT_SETTINGS.resolution,
     customWidth:
       isFiniteNumber(merged.customWidth) && merged.customWidth > 0
         ? clampToRange(Math.round(merged.customWidth), 2, 8192)
@@ -283,12 +286,16 @@ const sanitizeHydratedSettings = (rawPersistedSettings: Partial<ExportSettings> 
         : DEFAULT_SETTINGS.customHeight,
     fps: isFiniteNumber(merged.fps) && merged.fps > 0 ? merged.fps : DEFAULT_SETTINGS.fps,
     duration:
-      isFiniteNumber(merged.duration) && merged.duration > 0 ? merged.duration : DEFAULT_SETTINGS.duration,
+      isFiniteNumber(merged.duration) && merged.duration > 0
+        ? merged.duration
+        : DEFAULT_SETTINGS.duration,
     bitrate:
       isFiniteNumber(merged.bitrate) && merged.bitrate > 0
         ? clampToRange(merged.bitrate, 2, 100)
         : DEFAULT_SETTINGS.bitrate,
-    bitrateMode: isBitrateMode(merged.bitrateMode) ? merged.bitrateMode : DEFAULT_SETTINGS.bitrateMode,
+    bitrateMode: isBitrateMode(merged.bitrateMode)
+      ? merged.bitrateMode
+      : DEFAULT_SETTINGS.bitrateMode,
     hardwareAcceleration: isHardwareAcceleration(merged.hardwareAcceleration)
       ? merged.hardwareAcceleration
       : DEFAULT_SETTINGS.hardwareAcceleration,
@@ -386,8 +393,7 @@ export const getRecommendedBitrate = (
   }
 
   const safeFps = Number.isFinite(fps) && fps > 0 ? fps : 30
-  const safeResolution: ExportResolution =
-    resolution in baseBitrates ? resolution : '1080p'
+  const safeResolution: ExportResolution = resolution in baseBitrates ? resolution : '1080p'
   let baseBitrate = baseBitrates[safeResolution]
 
   // For custom resolution, scale based on pixel count relative to 1080p
@@ -548,14 +554,20 @@ export const useExportStore = create<ExportStore>()(
 
         if (newSettings.resolution !== undefined && !isExportResolution(newSettings.resolution)) {
           if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring invalid resolution update:', newSettings.resolution)
+            console.warn(
+              '[exportStore] Ignoring invalid resolution update:',
+              newSettings.resolution
+            )
           }
           delete newSettings.resolution
         }
 
         if (newSettings.bitrateMode !== undefined && !isBitrateMode(newSettings.bitrateMode)) {
           if (import.meta.env.DEV) {
-            console.warn('[exportStore] Ignoring invalid bitrateMode update:', newSettings.bitrateMode)
+            console.warn(
+              '[exportStore] Ignoring invalid bitrateMode update:',
+              newSettings.bitrateMode
+            )
           }
           delete newSettings.bitrateMode
         }
@@ -587,13 +599,7 @@ export const useExportStore = create<ExportStore>()(
           const clampMin = (value: number, min: number): number => Math.max(min, value)
 
           const sanitizeFiniteNumber = (
-            key:
-              | 'fontSize'
-              | 'fontWeight'
-              | 'letterSpacing'
-              | 'opacity'
-              | 'shadowBlur'
-              | 'padding'
+            key: 'fontSize' | 'fontWeight' | 'letterSpacing' | 'opacity' | 'shadowBlur' | 'padding'
           ): number | undefined => {
             const value = textPatch[key]
             if (value === undefined) {
@@ -652,7 +658,10 @@ export const useExportStore = create<ExportStore>()(
           for (const key of ['text', 'fontFamily', 'color', 'shadowColor'] as const) {
             if (key in textPatch && typeof textPatch[key] !== 'string') {
               if (import.meta.env.DEV) {
-                console.warn(`[exportStore] Ignoring invalid textOverlay.${key} update:`, textPatch[key])
+                console.warn(
+                  `[exportStore] Ignoring invalid textOverlay.${key} update:`,
+                  textPatch[key]
+                )
               }
               delete textPatch[key]
             }

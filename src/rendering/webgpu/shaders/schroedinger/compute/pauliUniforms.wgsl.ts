@@ -7,10 +7,9 @@
  * for N-D to 3D projection.
  *
  * Flat layout — all arrays use stride-4 scalars to avoid WGSL alignment
- * surprises. Vec3f fields are stored as three separate f32 fields with an
- * explicit f32 pad.
+ * surprises. Basis vectors use array<f32, 12> for full N-D rotation support.
  *
- * Total size: 124 × 4 = 496 bytes (fits in 512-byte aligned slot).
+ * Total size: 148 × 4 = 592 bytes.
  *
  * Offset map (in units of u32/f32 = 4 bytes):
  *   [0]       latticeDim
@@ -57,11 +56,11 @@
  *   [85]      densityScale
  *   [86]      _pad4
  *   [87]      _pad5
- *   [88]      basisXx, basisXy, basisXz, _padBx
- *   [92]      basisYx, basisYy, basisYz, _padBy
- *   [96]      basisZx, basisZy, basisZz, _padBz
- *   [100..111] spacing[12]
- *   [112..123] slicePositions[12]
+ *   [88..99]  basisX[12]
+ *   [100..111] basisY[12]
+ *   [112..123] basisZ[12]
+ *   [124..135] spacing[12]
+ *   [136..147] slicePositions[12]
  *
  * @module
  */
@@ -129,22 +128,13 @@ struct PauliUniforms {
   _pad4: u32,                       // [86]
   _pad5: u32,                       // [87]
 
-  // Basis vectors (each stored as 3 scalars + pad)
-  basisXx: f32,                     // [88]
-  basisXy: f32,                     // [89]
-  basisXz: f32,                     // [90]
-  _padBx: f32,                      // [91]
-  basisYx: f32,                     // [92]
-  basisYy: f32,                     // [93]
-  basisYz: f32,                     // [94]
-  _padBy: f32,                      // [95]
-  basisZx: f32,                     // [96]
-  basisZy: f32,                     // [97]
-  basisZz: f32,                     // [98]
-  _padBz: f32,                      // [99]
+  // Basis vectors for N-D -> 3D projection (48 bytes each)
+  basisX: array<f32, 12>,           // [88..99]
+  basisY: array<f32, 12>,           // [100..111]
+  basisZ: array<f32, 12>,           // [112..123]
 
   // Lattice spacing and slice positions
-  spacing: array<f32, 12>,          // [100..111]
-  slicePositions: array<f32, 12>,   // [112..123]
+  spacing: array<f32, 12>,          // [124..135]
+  slicePositions: array<f32, 12>,   // [136..147]
 }
 `

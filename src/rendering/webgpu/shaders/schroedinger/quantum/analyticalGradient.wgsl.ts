@@ -27,8 +27,9 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
 
   // Generate unrolled phi loading for all dims
   function genLoadPhis(kExpr: string): string {
-    return Array.from({ length: dim }, (_, j) =>
-      `    let lk_${j} = lookupEigenfunction(getEigenFuncIdx(${kExpr}, ${j}), xND[${j}]);`
+    return Array.from(
+      { length: dim },
+      (_, j) => `    let lk_${j} = lookupEigenfunction(getEigenFuncIdx(${kExpr}, ${j}), xND[${j}]);`
     ).join('\n')
   }
 
@@ -39,9 +40,9 @@ export function generateAnalyticalGradientBlock(dimension: number, termCount?: n
 
   // Generate partial product for gradient component j (φ_j replaced by φ'_j)
   function genPartialProduct(gradJ: number): string {
-    return Array.from({ length: dim }, (_, i) =>
-      i === gradJ ? `lk_${i}.y` : `lk_${i}.x`
-    ).join(' * ')
+    return Array.from({ length: dim }, (_, i) => (i === gradJ ? `lk_${i}.y` : `lk_${i}.x`)).join(
+      ' * '
+    )
   }
 
   // For the unrolled path, generate one complete term block

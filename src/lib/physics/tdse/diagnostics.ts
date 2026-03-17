@@ -56,11 +56,9 @@ export function normDriftFromHistory(history: TdseDiagnosticsSnapshot[]): number
 export function computeReflectionTransmission(
   normLeft: number,
   normRight: number,
-  initialNorm?: number,
+  initialNorm?: number
 ): { R: number; T: number } {
-  const denom = initialNorm != null && initialNorm > 0
-    ? initialNorm
-    : normLeft + normRight
+  const denom = initialNorm != null && initialNorm > 0 ? initialNorm : normLeft + normRight
   if (denom === 0) return { R: 0, T: 0 }
   return {
     R: normLeft / denom,
@@ -77,9 +75,7 @@ export class TdseDiagnosticsHistory {
   private readonly capacity: number
 
   constructor(capacity = 300) {
-    const normalizedCapacity = Number.isFinite(capacity)
-      ? Math.max(0, Math.floor(capacity))
-      : 300
+    const normalizedCapacity = Number.isFinite(capacity) ? Math.max(0, Math.floor(capacity)) : 300
     this.capacity = normalizedCapacity
   }
 

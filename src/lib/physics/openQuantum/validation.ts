@@ -47,7 +47,7 @@ export interface ValidationResult {
  */
 export function validateDensityMatrix(
   rho: DensityMatrix,
-  tolerance: number = 1e-6,
+  tolerance: number = 1e-6
 ): ValidationResult {
   const K = rho.K
   const el = rho.elements
@@ -98,9 +98,7 @@ export function validateDensityMatrix(
     if (gershgorinMin < minEigenvalue) minEigenvalue = gershgorinMin
   }
   if (minEigenvalue < -tolerance) {
-    violations.push(
-      `Negative eigenvalue bound: ${minEigenvalue.toExponential(2)} (Gershgorin)`,
-    )
+    violations.push(`Negative eigenvalue bound: ${minEigenvalue.toExponential(2)} (Gershgorin)`)
   }
 
   return {
@@ -128,7 +126,7 @@ export function validateDensityMatrix(
 export function validateDetailedBalance(
   rates: readonly TransitionRate[],
   temperature: number,
-  tolerance: number = 1e-4,
+  tolerance: number = 1e-4
 ): boolean {
   const KB_ATOMIC = 3.1668115634556e-6
 
@@ -162,7 +160,7 @@ export function validateDetailedBalance(
  */
 export function validateSelectionRules(
   channels: readonly LindbladChannel[],
-  basis: readonly HydrogenBasisState[],
+  basis: readonly HydrogenBasisState[]
 ): boolean {
   for (const ch of channels) {
     // Skip dephasing channels (row === col)

@@ -1,4 +1,3 @@
-/* global GPUTextureFormat */
 /**
  * WebGPU SMAA Pass
  *
@@ -466,7 +465,11 @@ export class SMAAPass extends WebGPUBasePass {
     this.neighborhoodUniformData[1] = height
     this.neighborhoodUniformData[2] = 0
     this.neighborhoodUniformData[3] = 0
-    this.writeUniformBuffer(this.device, this.neighborhoodUniformBuffer, this.neighborhoodUniformData)
+    this.writeUniformBuffer(
+      this.device,
+      this.neighborhoodUniformBuffer,
+      this.neighborhoodUniformData
+    )
 
     if (!this.neighborhoodBindGroup || this.neighborhoodBindGroupInputView !== inputView) {
       this.neighborhoodBindGroup = this.createBindGroup(

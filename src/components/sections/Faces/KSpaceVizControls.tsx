@@ -77,9 +77,7 @@ export const KSpaceVizControls: React.FC = React.memo(() => {
 
   return (
     <div className="space-y-3 border-t border-border-subtle pt-3">
-      <div className="text-xs text-text-secondary font-medium">
-        k-Space Visualization
-      </div>
+      <div className="text-xs text-text-secondary font-medium">k-Space Visualization</div>
 
       <ToggleGroup
         options={DISPLAY_MODE_OPTIONS}

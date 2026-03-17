@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { freeScalarInitBlock, freeScalarUniformsBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl'
+import {
+  freeScalarInitBlock,
+  freeScalarUniformsBlock,
+} from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarInit.wgsl'
 import { freeScalarUpdatePiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePi.wgsl'
 import { freeScalarUpdatePhiBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarUpdatePhi.wgsl'
 import { freeScalarWriteGridBlock } from '@/rendering/webgpu/shaders/schroedinger/compute/freeScalarWriteGrid.wgsl'

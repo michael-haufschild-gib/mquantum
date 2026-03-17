@@ -391,7 +391,9 @@ export function flattenVertices(vertices: VectorND[]): Float64Array {
   for (let i = 0; i < vertices.length; i++) {
     const v = vertices[i]!
     if (v.length !== dimension) {
-      throw new Error(`Vertex dimension mismatch at index ${i}: expected ${dimension}, got ${v.length}`)
+      throw new Error(
+        `Vertex dimension mismatch at index ${i}: expected ${dimension}, got ${v.length}`
+      )
     }
 
     const offset = i * dimension

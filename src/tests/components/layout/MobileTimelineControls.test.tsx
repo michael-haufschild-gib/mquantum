@@ -114,9 +114,12 @@ vi.mock('@/lib/audio/SoundManager', () => ({
   },
 }))
 
-// TODO: These tests need refactoring - the EditorLayout renders many
-// components using useShallow, and the mock strategy doesn't handle
-// this well. Skip until proper mocking solution is implemented.
+// SKIP REASON: EditorLayout uses Zustand useShallow selectors across
+// 10+ child components. The WeakMap-based mock cache strategy cannot
+// maintain referential stability for useShallow results, causing
+// infinite re-renders during test. Fix requires either:
+// (a) extracting mobile timeline visibility logic to a testable hook, or
+// (b) switching to component-level testing with a real Zustand store.
 describe.skip('MobileTimelineControls', () => {
   beforeEach(() => {
     cleanup()

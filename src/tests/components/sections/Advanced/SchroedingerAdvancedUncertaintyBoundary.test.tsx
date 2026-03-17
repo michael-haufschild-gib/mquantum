@@ -14,7 +14,10 @@ describe('SchroedingerQuantumEffectsSection uncertainty boundary controls', () =
     const toggle = screen.getByTestId('schroedinger-uncertainty-boundary-toggle')
     fireEvent.click(toggle)
 
-    const state = useExtendedObjectStore.getState().schroedinger as unknown as Record<string, unknown>
+    const state = useExtendedObjectStore.getState().schroedinger as unknown as Record<
+      string,
+      unknown
+    >
     expect(state.uncertaintyBoundaryEnabled).toBe(true)
 
     expect(screen.getByTestId('schroedinger-uncertainty-boundary-strength')).toBeInTheDocument()

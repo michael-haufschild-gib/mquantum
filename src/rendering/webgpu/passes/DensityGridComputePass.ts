@@ -1,4 +1,3 @@
-/* global GPUBindGroupEntry, GPUBindGroupLayoutEntry, GPUTextureViewDimension */
 /**
  * Density Grid Compute Pass
  *
@@ -302,7 +301,10 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     })
 
     // Check pipeline cache before compiling
-    const cacheKey = DensityGridComputePass.computeCacheKey(this.passConfig, this.densityTextureFormat)
+    const cacheKey = DensityGridComputePass.computeCacheKey(
+      this.passConfig,
+      this.densityTextureFormat
+    )
     const cached = DensityGridComputePass.pipelineCache.get(cacheKey)
 
     if (cached) {
@@ -319,7 +321,9 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
         'density-grid-compute'
       )
       // Store in cache with LRU eviction
-      if (DensityGridComputePass.pipelineCache.size >= DensityGridComputePass.MAX_PIPELINE_CACHE_SIZE) {
+      if (
+        DensityGridComputePass.pipelineCache.size >= DensityGridComputePass.MAX_PIPELINE_CACHE_SIZE
+      ) {
         const oldest = DensityGridComputePass.pipelineCache.keys().next().value!
         DensityGridComputePass.pipelineCache.delete(oldest)
       }
@@ -327,9 +331,7 @@ export class DensityGridComputePass extends WebGPUBaseComputePass {
     }
   }
 
-  private async selectGridTextureFormat(
-    device: GPUDevice
-  ): Promise<'r16float' | 'rgba16float'> {
+  private async selectGridTextureFormat(device: GPUDevice): Promise<'r16float' | 'rgba16float'> {
     // Density matrix mode requires rgba16float for coherence fraction in channel B
     if (this.passConfig.useDensityMatrix) return 'rgba16float'
     if (this.passConfig.forceRgba) return 'rgba16float'

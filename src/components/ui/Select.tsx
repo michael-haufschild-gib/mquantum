@@ -119,5 +119,4 @@ export const Select = React.memo(
     )
   }
 ) as <T extends string = string>(props: SelectProps<T>) => React.ReactElement
-
 ;(Select as React.FC).displayName = 'Select'

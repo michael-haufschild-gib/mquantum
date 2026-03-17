@@ -1,4 +1,3 @@
-/* global GPUTextureFormat */
 /**
  * WebGPU Resource Pool
  *
@@ -66,7 +65,6 @@ export class WebGPUResourcePool {
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     })
-
   }
 
   /**

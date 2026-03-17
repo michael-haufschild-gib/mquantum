@@ -17,9 +17,7 @@ function allDisabledConfig(): OpenQuantumConfig {
 }
 
 /** Helper: config with specific channels enabled and nonzero rates */
-function configWith(
-  overrides: Partial<OpenQuantumConfig>,
-): OpenQuantumConfig {
+function configWith(overrides: Partial<OpenQuantumConfig>): OpenQuantumConfig {
   return { ...allDisabledConfig(), ...overrides }
 }
 
@@ -210,10 +208,10 @@ describe('buildLindbladChannels', () => {
       const channels = buildLindbladChannels(cfg, 2)
       // K=2: 2 dephasing + 1 relaxation + 1 thermal = 4
       expect(channels).toHaveLength(4)
-      expect(channels[0]!.amplitudeRe).toBeCloseTo(0.5, 12)   // sqrt(0.25)
-      expect(channels[1]!.amplitudeRe).toBeCloseTo(0.5, 12)   // sqrt(0.25)
-      expect(channels[2]!.amplitudeRe).toBeCloseTo(2.0, 12)   // sqrt(4.0)
-      expect(channels[3]!.amplitudeRe).toBeCloseTo(1.0, 12)   // sqrt(1.0)
+      expect(channels[0]!.amplitudeRe).toBeCloseTo(0.5, 12) // sqrt(0.25)
+      expect(channels[1]!.amplitudeRe).toBeCloseTo(0.5, 12) // sqrt(0.25)
+      expect(channels[2]!.amplitudeRe).toBeCloseTo(2.0, 12) // sqrt(4.0)
+      expect(channels[3]!.amplitudeRe).toBeCloseTo(1.0, 12) // sqrt(1.0)
     })
   })
 })

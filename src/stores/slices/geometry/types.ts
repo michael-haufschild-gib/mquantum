@@ -117,6 +117,11 @@ export interface SchroedingerSliceActions {
   setSchroedingerScatteringAnisotropy: (anisotropy: number) => void
   setSchroedingerRoughness: (roughness: number) => void
 
+  // PML Absorbing Boundary (shared)
+  setSchroedingerAbsorberEnabled: (enabled: boolean) => void
+  setSchroedingerAbsorberWidth: (width: number) => void
+  setSchroedingerPmlTargetReflection: (r: number) => void
+
   // Raymarching Quality
   setSchroedingerRaymarchQuality: (quality: RaymarchQuality) => void
 
@@ -254,14 +259,23 @@ export interface SchroedingerSliceActions {
   setFreeScalarSelfInteractionLambda: (lambda: number) => void
   setFreeScalarSelfInteractionVev: (vev: number) => void
 
+  // PML Absorber
+  setFreeScalarAbsorberEnabled: (enabled: boolean) => void
+  setFreeScalarAbsorberWidth: (width: number) => void
+  setFreeScalarPmlTargetReflection: (r: number) => void
+
   // Diagnostics
   setFreeScalarDiagnosticsEnabled: (enabled: boolean) => void
   setFreeScalarDiagnosticsInterval: (interval: number) => void
 
   // k-Space Visualization Display Transforms
-  setFreeScalarKSpaceDisplayMode: (mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode) => void
+  setFreeScalarKSpaceDisplayMode: (
+    mode: import('@/lib/geometry/extended/types').KSpaceDisplayMode
+  ) => void
   setFreeScalarKSpaceFftShift: (enabled: boolean) => void
-  setFreeScalarKSpaceExposureMode: (mode: import('@/lib/geometry/extended/types').KSpaceExposureMode) => void
+  setFreeScalarKSpaceExposureMode: (
+    mode: import('@/lib/geometry/extended/types').KSpaceExposureMode
+  ) => void
   setFreeScalarKSpaceLowPercentile: (value: number) => void
   setFreeScalarKSpaceHighPercentile: (value: number) => void
   setFreeScalarKSpaceGamma: (value: number) => void
@@ -310,7 +324,7 @@ export interface SchroedingerSliceActions {
   setTdseDriveAmplitude: (amplitude: number) => void
   setTdseAbsorberEnabled: (enabled: boolean) => void
   setTdseAbsorberWidth: (width: number) => void
-  setTdseAbsorberStrength: (strength: number) => void
+  setTdsePmlTargetReflection: (r: number) => void
   setTdseFieldView: (view: TdseFieldView) => void
   setTdseAutoScale: (autoScale: boolean) => void
   setTdseShowPotential: (show: boolean) => void
@@ -335,7 +349,7 @@ export interface SchroedingerSliceActions {
   setBecAutoScale: (autoScale: boolean) => void
   setBecAbsorberEnabled: (enabled: boolean) => void
   setBecAbsorberWidth: (width: number) => void
-  setBecAbsorberStrength: (strength: number) => void
+  setBecPmlTargetReflection: (r: number) => void
   setBecDiagnosticsEnabled: (enabled: boolean) => void
   setBecDiagnosticsInterval: (interval: number) => void
   setBecDt: (dt: number) => void
@@ -369,7 +383,7 @@ export interface SchroedingerSliceActions {
   setDiracShowPotential: (showPotential: boolean) => void
   setDiracAbsorberEnabled: (enabled: boolean) => void
   setDiracAbsorberWidth: (width: number) => void
-  setDiracAbsorberStrength: (strength: number) => void
+  setDiracPmlTargetReflection: (r: number) => void
   setDiracGridSize: (size: number[]) => void
   setDiracSpacing: (spacing: number[]) => void
   setDiracPacketCenter: (dimIndex: number, value: number) => void
@@ -393,7 +407,7 @@ export interface SchroedingerSliceActions {
   setOpenQuantumSubsteps: (n: number) => void
   setOpenQuantumChannelEnabled: (
     channel: 'dephasing' | 'relaxation' | 'thermal',
-    enabled: boolean,
+    enabled: boolean
   ) => void
   setOpenQuantumVisualizationMode: (mode: OpenQuantumVisualizationMode) => void
   requestOpenQuantumStateReset: () => void
@@ -418,10 +432,12 @@ export type SchroedingerSlice = SchroedingerSliceState & SchroedingerSliceAction
 // Pauli Spinor Slice
 // ============================================================================
 
+/** Pauli spinor state — holds the full PauliConfig for 2-component spinor evolution. */
 export interface PauliSpinorSliceState {
   pauliSpinor: PauliConfig
 }
 
+/** Actions for mutating Pauli spinor configuration (physics, magnetic field, visualization, grid). */
 export interface PauliSpinorSliceActions {
   // Physics
   setPauliDt: (dt: number) => void
@@ -463,10 +479,10 @@ export interface PauliSpinorSliceActions {
   setPauliSpacing: (spacing: number[]) => void
   setPauliSlicePosition: (dimIndex: number, value: number) => void
 
-  // Absorber
+  // Absorber (PML)
   setPauliAbsorberEnabled: (enabled: boolean) => void
   setPauliAbsorberWidth: (width: number) => void
-  setPauliAbsorberStrength: (strength: number) => void
+  setPauliPmlTargetReflection: (r: number) => void
 
   // Diagnostics
   setPauliDiagnosticsEnabled: (enabled: boolean) => void
@@ -486,18 +502,21 @@ export interface PauliSpinorSliceActions {
   getPauliConfig: () => PauliConfig
 }
 
+/** Combined Pauli spinor slice type (state + actions). */
 export type PauliSpinorSlice = PauliSpinorSliceState & PauliSpinorSliceActions
 
 // ============================================================================
 // Combined Extended Object Slice
 // ============================================================================
 
-export type ExtendedObjectSlice = SchroedingerSlice & PauliSpinorSlice & {
-  /** Version counter for schroedinger state changes (dirty-flag tracking) */
-  schroedingerVersion: number
-  /** Version counter for pauli spinor state changes (dirty-flag tracking) */
-  pauliSpinorVersion: number
-  /** Manually bump all version counters (used after direct setState calls) */
-  bumpAllVersions: () => void
-  reset: () => void
-}
+/** Combined extended-object slice: Schroedinger + Pauli with version tracking and reset. */
+export type ExtendedObjectSlice = SchroedingerSlice &
+  PauliSpinorSlice & {
+    /** Version counter for schroedinger state changes (dirty-flag tracking) */
+    schroedingerVersion: number
+    /** Version counter for pauli spinor state changes (dirty-flag tracking) */
+    pauliSpinorVersion: number
+    /** Manually bump all version counters (used after direct setState calls) */
+    bumpAllVersions: () => void
+    reset: () => void
+  }

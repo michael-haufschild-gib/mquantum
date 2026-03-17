@@ -80,13 +80,22 @@ export const createColorSlice: StateCreator<AppearanceSlice, [], [], ColorSlice>
 
           if (import.meta.env.DEV) {
             if (!isFiniteColorInput(values[0])) {
-              console.warn(`[colorSlice] Ignoring non-finite cosine coefficient ${key}[0]:`, values[0])
+              console.warn(
+                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[0]:`,
+                values[0]
+              )
             }
             if (!isFiniteColorInput(values[1])) {
-              console.warn(`[colorSlice] Ignoring non-finite cosine coefficient ${key}[1]:`, values[1])
+              console.warn(
+                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[1]:`,
+                values[1]
+              )
             }
             if (!isFiniteColorInput(values[2])) {
-              console.warn(`[colorSlice] Ignoring non-finite cosine coefficient ${key}[2]:`, values[2])
+              console.warn(
+                `[colorSlice] Ignoring non-finite cosine coefficient ${key}[2]:`,
+                values[2]
+              )
             }
           }
         }

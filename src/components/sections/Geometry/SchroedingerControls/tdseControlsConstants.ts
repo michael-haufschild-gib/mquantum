@@ -78,10 +78,19 @@ export function detectActivePreset(config: TdseConfig): string {
   for (const preset of TDSE_SCENARIO_PRESETS) {
     let matches = true
     for (const [key, expected] of Object.entries(preset.overrides)) {
+      // Skip latticeDim — presets define a default but applyTdsePreset strips it,
+      // so the runtime dim may differ from the preset's original value.
+      if (key === 'latticeDim') continue
       const actual = config[key as keyof TdseConfig]
       if (Array.isArray(expected)) {
-        if (!Array.isArray(actual) || expected.length !== actual.length ||
-            expected.some((v, i) => v !== (actual as number[])[i])) {
+        // Compare only the overlapping prefix — arrays are resized to match
+        // the current dimension, so lengths may differ from the preset's original.
+        if (!Array.isArray(actual)) {
+          matches = false
+          break
+        }
+        const len = Math.min(expected.length, (actual as number[]).length)
+        if (expected.slice(0, len).some((v, i) => v !== (actual as number[])[i])) {
           matches = false
           break
         }

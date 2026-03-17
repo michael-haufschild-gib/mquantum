@@ -7,11 +7,10 @@ interface SimulationArgs {
   durationSeconds: number
 }
 
-function runLimiterSimulation({
-  maxFps,
-  displayFps,
-  durationSeconds,
-}: SimulationArgs): { renderedFrames: number; achievedFps: number } {
+function runLimiterSimulation({ maxFps, displayFps, durationSeconds }: SimulationArgs): {
+  renderedFrames: number
+  achievedFps: number
+} {
   const tickMs = 1000 / displayFps
   const durationMs = durationSeconds * 1000
 

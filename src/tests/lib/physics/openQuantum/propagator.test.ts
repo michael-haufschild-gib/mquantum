@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  complexMatIdentity,
-  complexMatZero,
-} from '@/lib/physics/openQuantum/complexMatrix'
+import { complexMatIdentity, complexMatZero } from '@/lib/physics/openQuantum/complexMatrix'
 import { densityMatrixFromCoefficients } from '@/lib/physics/openQuantum/integrator'
 import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
 import { computePropagator, evolvePropagatorStep } from '@/lib/physics/openQuantum/propagator'
@@ -172,9 +169,7 @@ describe('evolvePropagatorStep', () => {
     const K = 2
     const energies = new Float64Array([-1, -0.25])
     // Strong emission from state 1 → state 0
-    const channels: LindbladChannel[] = [
-      { row: 0, col: 1, amplitudeRe: 0.5, amplitudeIm: 0 },
-    ]
+    const channels: LindbladChannel[] = [{ row: 0, col: 1, amplitudeRe: 0.5, amplitudeIm: 0 }]
 
     const L = buildLiouvillian(energies, channels, K)
     const P = computePropagator(L, 0.01, K)
@@ -314,9 +309,7 @@ describe('buildLiouvillian', () => {
     const energies = new Float64Array([0, 0])
     const amp = 0.4
     const ampSq = amp * amp
-    const channels: LindbladChannel[] = [
-      { row: 0, col: 1, amplitudeRe: amp, amplitudeIm: 0 },
-    ]
+    const channels: LindbladChannel[] = [{ row: 0, col: 1, amplitudeRe: amp, amplitudeIm: 0 }]
 
     const L = buildLiouvillian(energies, channels, K)
 

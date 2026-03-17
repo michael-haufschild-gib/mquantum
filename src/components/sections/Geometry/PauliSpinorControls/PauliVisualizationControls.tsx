@@ -33,12 +33,7 @@ interface PauliVisualizationControlsProps {
  * @returns Visualization controls panel
  */
 export const PauliVisualizationControls: React.FC<PauliVisualizationControlsProps> = React.memo(
-  ({
-    fieldView,
-    autoScale,
-    onFieldViewChange,
-    onAutoScaleChange,
-  }) => {
+  ({ fieldView, autoScale, onFieldViewChange, onAutoScaleChange }) => {
     return (
       <div className="space-y-3">
         <ToggleGroup

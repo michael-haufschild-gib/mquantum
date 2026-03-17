@@ -88,7 +88,8 @@ fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniform
     return vec4f(0.0);
   }
 
-  // Determine nodal color based on lobe coloring and sign
+  // Determine nodal color based on lobe coloring, definition mode, and sign.
+  // Matches 3D selectPhysicalNodalColor() logic for visual consistency.
   var nodalCol: vec3f;
   if (uniforms.nodalLobeColoringEnabled != 0u) {
     if (f_c > 0.0) {
@@ -96,6 +97,12 @@ fn evaluateNodalLines2D(pos: vec3f, animTime: f32, uniforms: SchroedingerUniform
     } else {
       nodalCol = uniforms.nodalColorNegative;
     }
+  } else if (def == NODAL_DEFINITION_REAL) {
+    nodalCol = uniforms.nodalColorReal;
+  } else if (def == NODAL_DEFINITION_IMAG) {
+    nodalCol = uniforms.nodalColorImag;
+  } else if (def == NODAL_DEFINITION_COMPLEX_INTERSECTION) {
+    nodalCol = 0.5 * (uniforms.nodalColorReal + uniforms.nodalColorImag);
   } else {
     nodalCol = uniforms.nodalColor;
   }

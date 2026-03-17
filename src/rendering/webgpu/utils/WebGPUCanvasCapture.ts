@@ -51,7 +51,11 @@ export class WebGPUCanvasCapture {
     this.device = device
   }
 
-  private ensureReadbackBuffer(width: number, height: number, format: CanvasCaptureTextureFormat): void {
+  private ensureReadbackBuffer(
+    width: number,
+    height: number,
+    format: CanvasCaptureTextureFormat
+  ): void {
     const bytesPerRowUnaligned = width * BYTES_PER_PIXEL
     const bytesPerRow = alignTo(bytesPerRowUnaligned, COPY_BYTES_PER_ROW_ALIGNMENT)
     const bufferSize = bytesPerRow * height
@@ -194,12 +198,11 @@ export class WebGPUCanvasCapture {
         }
       })
       .catch((error) => {
-        const message =
-          this.disposed
-            ? 'Screenshot capture canceled.'
-            : error instanceof Error
-              ? error.message
-              : 'Screenshot readback failed'
+        const message = this.disposed
+          ? 'Screenshot capture canceled.'
+          : error instanceof Error
+            ? error.message
+            : 'Screenshot readback failed'
         onError(message, requestId)
       })
       .finally(() => {

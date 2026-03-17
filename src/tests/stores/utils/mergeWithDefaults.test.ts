@@ -116,15 +116,9 @@ describe('mergeExtendedObjectState', () => {
       expect(schroedinger.cosineParams.a).toEqual([0.3, 0.3, 0.3])
 
       // Missing nested values should get defaults
-      expect(schroedinger.cosineParams.b).toEqual(
-        DEFAULT_SCHROEDINGER_CONFIG.cosineParams.b
-      )
-      expect(schroedinger.cosineParams.c).toEqual(
-        DEFAULT_SCHROEDINGER_CONFIG.cosineParams.c
-      )
-      expect(schroedinger.cosineParams.d).toEqual(
-        DEFAULT_SCHROEDINGER_CONFIG.cosineParams.d
-      )
+      expect(schroedinger.cosineParams.b).toEqual(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.b)
+      expect(schroedinger.cosineParams.c).toEqual(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.c)
+      expect(schroedinger.cosineParams.d).toEqual(DEFAULT_SCHROEDINGER_CONFIG.cosineParams.d)
     })
   })
 

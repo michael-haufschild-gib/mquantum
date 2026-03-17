@@ -25,10 +25,7 @@ import type { ColorAlgorithm } from '../../types'
  * - blackbody(): referenced in main.wgsl.ts / main2D.wgsl.ts behind
  *   FEATURE_PHASE_MATERIALITY guards (WGSL requires symbol resolution in dead branches)
  */
-export function generateEmissionPreBlock(
-  colorAlgorithm: ColorAlgorithm,
-  is2D: boolean,
-): string {
+export function generateEmissionPreBlock(colorAlgorithm: ColorAlgorithm, is2D: boolean): string {
   const parts: string[] = [
     /* wgsl */ `
 // ============================================
@@ -520,7 +517,7 @@ export function generateComputeBaseColor(colorAlgorithm: ColorAlgorithm): string
 fn computeBaseColor(rho: f32, s: f32, phase: f32, pos: vec3f, uniforms: SchroedingerUniforms) -> vec3f {
   // Normalize log-density to [0, 1] range for color mapping
   let normalized = clamp((s + 8.0) / 8.0, 0.0, 1.0);
-${needsBaseHSL ? '\n  // Get base color from material\'s base color\n  var baseHSL = rgb2hsl(material.baseColor.rgb);\n' : ''}
+${needsBaseHSL ? "\n  // Get base color from material's base color\n  var baseHSL = rgb2hsl(material.baseColor.rgb);\n" : ''}
   var col = vec3f(0.0);
 `
 

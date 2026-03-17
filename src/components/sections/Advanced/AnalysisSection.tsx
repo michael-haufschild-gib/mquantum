@@ -57,9 +57,12 @@ const MODE_LABELS: Record<string, string> = {
 export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
   ({ defaultOpen = true }) => {
     const {
-      quantumMode, representation,
-      setFsfDiagnosticsEnabled, setTdseDiagnosticsEnabled,
-      setBecDiagnosticsEnabled, setDiracDiagnosticsEnabled,
+      quantumMode,
+      representation,
+      setFsfDiagnosticsEnabled,
+      setTdseDiagnosticsEnabled,
+      setBecDiagnosticsEnabled,
+      setDiracDiagnosticsEnabled,
       setPauliDiagnosticsEnabled,
     } = useExtendedObjectStore(
       useShallow((s) => ({
@@ -70,7 +73,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         setBecDiagnosticsEnabled: s.setBecDiagnosticsEnabled,
         setDiracDiagnosticsEnabled: s.setDiracDiagnosticsEnabled,
         setPauliDiagnosticsEnabled: s.setPauliDiagnosticsEnabled,
-      })),
+      }))
     )
     const objectType = useGeometryStore((s) => s.objectType)
     const dimension = useGeometryStore((s) => s.dimension)
@@ -79,13 +82,27 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
     const handleOpenChange = useCallback(
       (isOpen: boolean) => {
         switch (quantumMode) {
-          case 'freeScalarField': setFsfDiagnosticsEnabled(isOpen); break
-          case 'tdseDynamics': setTdseDiagnosticsEnabled(isOpen); break
-          case 'becDynamics': setBecDiagnosticsEnabled(isOpen); break
-          case 'diracEquation': setDiracDiagnosticsEnabled(isOpen); break
+          case 'freeScalarField':
+            setFsfDiagnosticsEnabled(isOpen)
+            break
+          case 'tdseDynamics':
+            setTdseDiagnosticsEnabled(isOpen)
+            break
+          case 'becDynamics':
+            setBecDiagnosticsEnabled(isOpen)
+            break
+          case 'diracEquation':
+            setDiracDiagnosticsEnabled(isOpen)
+            break
         }
       },
-      [quantumMode, setFsfDiagnosticsEnabled, setTdseDiagnosticsEnabled, setBecDiagnosticsEnabled, setDiracDiagnosticsEnabled],
+      [
+        quantumMode,
+        setFsfDiagnosticsEnabled,
+        setTdseDiagnosticsEnabled,
+        setBecDiagnosticsEnabled,
+        setDiracDiagnosticsEnabled,
+      ]
     )
 
     const isPauli = objectType === 'pauliSpinor'
@@ -126,7 +143,7 @@ export const AnalysisSection: React.FC<AnalysisSectionProps> = React.memo(
         {quantumMode === 'diracEquation' && <DiracAnalysisContent />}
       </Section>
     )
-  },
+  }
 )
 
 AnalysisSection.displayName = 'AnalysisSection'

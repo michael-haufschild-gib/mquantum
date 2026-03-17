@@ -1,7 +1,7 @@
 /**
  * Canvas Error Boundary
  *
- * Catches rendering errors in the Three.js/WebGL canvas and displays
+ * Catches rendering errors in the WebGPU canvas and displays
  * a user-friendly error message with recovery options.
  *
  * This prevents the entire application from crashing when a WebGL
@@ -21,9 +21,9 @@ interface CanvasErrorBoundaryState {
 }
 
 /**
- * Error boundary component for catching and handling Canvas/WebGL errors.
+ * Error boundary component for catching and handling Canvas/WebGPU errors.
  * Displays a user-friendly error message with recovery options when a
- * rendering error occurs in the Three.js/WebGL canvas.
+ * rendering error occurs in the WebGPU canvas.
  */
 export class CanvasErrorBoundary extends Component<
   CanvasErrorBoundaryProps,

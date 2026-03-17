@@ -37,11 +37,7 @@ import { SignedPhaseDivergingControls } from './SignedPhaseDivergingControls'
 const USES_COSINE_PALETTE = new Set(['radial', 'multiSource'])
 
 /** Algorithms that use distribution controls (power, cycles, offset) */
-const USES_DISTRIBUTION = new Set([
-  'lch',
-  'multiSource',
-  'radial',
-])
+const USES_DISTRIBUTION = new Set(['lch', 'multiSource', 'radial'])
 
 /** Algorithms that use the base/face color (HSL-based) */
 const USES_BASE_COLOR = new Set(['phase', 'mixed'])
@@ -127,7 +123,8 @@ export const FacesSection: React.FC<FacesSectionProps> = React.memo(({ defaultOp
 
   // Material tab only enabled in isosurface mode and 3D+ (PBR has no effect on volumetric clouds, 2D, or Wigner).
   // Pauli spinor always uses volumetric rendering — no isosurface, no material tab.
-  const materialTabEnabled = objectType !== 'pauliSpinor' && isoEnabled && dimension > 2 && representation !== 'wigner'
+  const materialTabEnabled =
+    objectType !== 'pauliSpinor' && isoEnabled && dimension > 2 && representation !== 'wigner'
 
   // Reset to colors tab if material tab becomes disabled while selected
   React.useEffect(() => {

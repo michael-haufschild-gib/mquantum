@@ -141,7 +141,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
         if (onChangeAlpha) {
           onChangeAlpha(safeHsv.a)
           // Convention: if onChangeAlpha is present, assume parent handles them separately
-          // So we output Hex6 to onChange to keep Three.js happy.
+          // So we output Hex6 to onChange (no alpha channel).
           output = hsvToHex(safeHsv.h, safeHsv.s, safeHsv.v)
         } else {
           // Standard mode: Combine them
@@ -162,9 +162,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = React.memo(
 
     const handleHsvChange = useCallback(
       (newHsv: HSVA) => {
-        const safeHsv = disableAlpha
-          ? { ...newHsv, a: 1 }
-          : { ...newHsv, a: clampAlpha(newHsv.a) }
+        const safeHsv = disableAlpha ? { ...newHsv, a: 1 } : { ...newHsv, a: clampAlpha(newHsv.a) }
         setHsv(safeHsv)
         updateExternal(safeHsv)
 

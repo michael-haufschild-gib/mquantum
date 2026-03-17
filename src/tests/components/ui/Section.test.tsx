@@ -71,5 +71,4 @@ describe('Section', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByTestId('section-content')).not.toBeInTheDocument()
   })
-
 })

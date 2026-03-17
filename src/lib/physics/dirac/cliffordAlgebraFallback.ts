@@ -33,13 +33,25 @@ function getEntry(m: Float32Array, s: number, row: number, col: number): [number
   return [m[idx]!, m[idx + 1]!]
 }
 
-function setEntry(m: Float32Array, s: number, row: number, col: number, re: number, im: number): void {
+function setEntry(
+  m: Float32Array,
+  s: number,
+  row: number,
+  col: number,
+  re: number,
+  im: number
+): void {
   const idx = (row * s + col) * 2
   m[idx] = re
   m[idx + 1] = im
 }
 
-function kroneckerProduct(a: Float32Array, aSize: number, b: Float32Array, bSize: number): Float32Array {
+function kroneckerProduct(
+  a: Float32Array,
+  aSize: number,
+  b: Float32Array,
+  bSize: number
+): Float32Array {
   const outSize = aSize * bSize
   const result = complexZeros(outSize)
   for (let ar = 0; ar < aSize; ar++) {
@@ -135,7 +147,10 @@ function permuteMatrix(m: Float32Array, s: number, perm: number[]): Float32Array
   return result
 }
 
-function generateDiracMatricesInternal(spatialDim: number): { alphas: Float32Array[]; beta: Float32Array } {
+function generateDiracMatricesInternal(spatialDim: number): {
+  alphas: Float32Array[]
+  beta: Float32Array
+} {
   if (spatialDim === 1) {
     return { alphas: [sigma1()], beta: sigma3() }
   }
@@ -161,7 +176,7 @@ function generateDiracMatricesInternal(spatialDim: number): { alphas: Float32Arr
     const idOld = complexIdentity(oldS)
 
     // Extend existing alphas: αⱼ → αⱼ ⊗ σ₃
-    allAlphas = allAlphas.map(alpha => kroneckerProduct(alpha, oldS, s3, 2))
+    allAlphas = allAlphas.map((alpha) => kroneckerProduct(alpha, oldS, s3, 2))
 
     // New alpha for dimension 2k-1: I ⊗ σ₁
     allAlphas.push(kroneckerProduct(idOld, oldS, s1, 2))
@@ -183,7 +198,7 @@ function generateDiracMatricesInternal(spatialDim: number): { alphas: Float32Arr
   // which interleaves +1 and -1 eigenvalues. The permutation groups all +1
   // eigenvalues (even popcount) into the first S/2 indices.
   const perm = standardFormPermutation(currentS)
-  allAlphas = allAlphas.map(alpha => permuteMatrix(alpha, currentS, perm))
+  allAlphas = allAlphas.map((alpha) => permuteMatrix(alpha, currentS, perm))
   beta = permuteMatrix(beta, currentS, perm)
 
   return { alphas: allAlphas, beta }

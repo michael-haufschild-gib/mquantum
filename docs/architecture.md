@@ -15,6 +15,7 @@
 | `src/components/controls/` | Domain controls (export, share) | `PascalCase.tsx` |
 | `src/components/overlays/` | Modals and notifications | `PascalCase.tsx` |
 | `src/components/presets/` | Scene/style preset managers | `PascalCase.tsx` |
+| `src/constants/` | Shared constants (dimension limits, z-index) | `camelCase.ts` |
 | `src/hooks/` | React hooks | `useCamelCase.ts` |
 | `src/stores/` | Zustand stores | `camelCaseStore.ts` |
 | `src/stores/slices/` | Store slices | `camelCaseSlice.ts` |

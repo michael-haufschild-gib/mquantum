@@ -251,7 +251,14 @@ export class ToScreenPass extends WebGPUBasePass {
   }
 
   execute(ctx: WebGPURenderContext): void {
-    if (!this.device || !this.renderPipeline || !this.passBindGroupLayout || !this.sampler || !this.uniformBuffer) return
+    if (
+      !this.device ||
+      !this.renderPipeline ||
+      !this.passBindGroupLayout ||
+      !this.sampler ||
+      !this.uniformBuffer
+    )
+      return
 
     const sourceView = ctx.getTextureView(this.passConfig.inputResource)
     if (!sourceView) {

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 describe('PerformanceMonitor utils', () => {
   it('formats non-finite FPS bounds as placeholders', async () => {
-    const utilsModule = (await import('@/components/canvas/PerformanceMonitor/utils')) as unknown as Record<
-      string,
-      unknown
-    >
+    const utilsModule =
+      (await import('@/components/canvas/PerformanceMonitor/utils')) as unknown as Record<
+        string,
+        unknown
+      >
 
     expect(typeof utilsModule['formatFpsBound']).toBe('function')
 

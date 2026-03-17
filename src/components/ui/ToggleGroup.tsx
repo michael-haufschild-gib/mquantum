@@ -124,5 +124,4 @@ export const ToggleGroup = React.memo(
     )
   }
 ) as <T extends string = string>(props: ToggleGroupProps<T>) => React.ReactElement
-
 ;(ToggleGroup as React.FC).displayName = 'ToggleGroup'

@@ -193,6 +193,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     piVal = pi[idx];
   }
 
+  // Cache NN field values once (avoids redundant buffer reads across fieldView/analysis branches)
+  let nnPhiVal = phi[nnIdx];
+  let nnPiVal = pi[nnIdx];
+
   var fieldValue: f32 = 0.0;
 
   // Compute gradient energy (for energy density view and analysis modes)
@@ -201,17 +205,36 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   let needGrad = params.fieldView == 2u || params.analysisMode > 0u;
   if (needGrad) {
-    let nnPhiVal = phi[nnIdx];
+    let hasPML = params.absorberEnabled != 0u;
     for (var d: u32 = 0u; d < params.latticeDim; d++) {
       gradPhi[d] = 0.0;
       if (params.gridSize[d] <= 1u) { continue; }
 
       let stride = params.strides[d];
       let coord = nnCoords[d];
-      let fwdIdx = select(nnIdx + stride, nnIdx - stride * (params.gridSize[d] - 1u), coord == params.gridSize[d] - 1u);
-      let dPhi = phi[fwdIdx] - nnPhiVal;
+      let Nd = params.gridSize[d];
       let invA = 1.0 / params.spacing[d];
-      gradPhi[d] = dPhi * invA;
+
+      // Centered difference (second-order): (phi[i+1] - phi[i-1]) / (2a)
+      // At boundaries with PML: one-sided difference to avoid periodic wrap
+      let atLoBound = coord == 0u;
+      let atHiBound = coord == Nd - 1u;
+
+      if (hasPML && atLoBound) {
+        // Forward one-sided: (phi[i+1] - phi[i]) / a
+        let fwdIdx = nnIdx + stride;
+        gradPhi[d] = (phi[fwdIdx] - nnPhiVal) * invA;
+      } else if (hasPML && atHiBound) {
+        // Backward one-sided: (phi[i] - phi[i-1]) / a
+        let bwdIdx = nnIdx - stride;
+        gradPhi[d] = (nnPhiVal - phi[bwdIdx]) * invA;
+      } else {
+        // Interior or periodic: centered difference
+        let fwdIdx = select(nnIdx + stride, nnIdx - stride * (Nd - 1u), atHiBound);
+        let bwdIdx = select(nnIdx - stride, nnIdx + stride * (Nd - 1u), atLoBound);
+        gradPhi[d] = (phi[fwdIdx] - phi[bwdIdx]) * (0.5 * invA);
+      }
+
       gradEnergy += gradPhi[d] * gradPhi[d];
     }
   }
@@ -222,14 +245,11 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     fieldValue = piVal;
   } else if (params.fieldView == 3u) {
     // Wall density: V(phi) = lambda*(phi^2 - v^2)^2 — zero at vacua, peaks at domain walls
-    let nnPhiVal = phi[nnIdx];
     let wdV2 = params.selfInteractionVev * params.selfInteractionVev;
     let wdPhi2 = nnPhiVal * nnPhiVal;
     let wdDiff = wdPhi2 - wdV2;
     fieldValue = params.selfInteractionLambda * wdDiff * wdDiff;
   } else {
-    let nnPiVal = pi[nnIdx];
-    let nnPhiVal = phi[nnIdx];
     fieldValue = 0.5 * (nnPiVal * nnPiVal + params.mass * params.mass * nnPhiVal * nnPhiVal + gradEnergy);
     // Self-interaction potential energy: V(phi) = lambda*(phi^2 - v^2)^2
     if (params.selfInteractionEnabled != 0u) {
@@ -249,8 +269,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
 
   // Analysis texture output (educational color modes)
   if (params.analysisMode == 1u) {
-    let nnPiVal = pi[nnIdx];
-    let nnPhiVal = phi[nnIdx];
     let K = 0.5 * nnPiVal * nnPiVal;
     let G = 0.5 * gradEnergy;
     var V = 0.5 * params.mass * params.mass * nnPhiVal * nnPhiVal;
@@ -263,7 +281,6 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     let E = K + G + V;
     textureStore(analysisTex, gid, vec4f(K, G, V, E));
   } else if (params.analysisMode == 2u) {
-    let nnPiVal = pi[nnIdx];
     var Sx: f32 = 0.0;
     var Sy: f32 = 0.0;
     var Sz: f32 = 0.0;

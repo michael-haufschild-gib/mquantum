@@ -9,6 +9,7 @@
  */
 import { SkyboxSelection } from '@/stores/defaults/visualDefaults'
 import { useEnvironmentStore, type EnvironmentStore } from '@/stores/environmentStore'
+import { Button } from '@/components/ui/Button'
 import React, { useCallback, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { AuroraControls } from './skybox/AuroraControls'
@@ -26,10 +27,8 @@ interface SkyboxOption {
   type: 'none' | 'classic' | 'procedural'
 }
 
-const spaceBlueThumb = new URL(
-  '../../../assets/skyboxes/space_blue/thumbnail.png',
-  import.meta.url
-).href
+const spaceBlueThumb = new URL('../../../assets/skyboxes/space_blue/thumbnail.png', import.meta.url)
+  .href
 const spaceLightBlueThumb = new URL(
   '../../../assets/skyboxes/space_lightblue/thumbnail.png',
   import.meta.url
@@ -183,12 +182,13 @@ export const SkyboxControls: React.FC = React.memo(() => {
         {ALL_SKYBOX_OPTIONS.map((option) => {
           const isSelected = skyboxSelection === option.id
           return (
-            <button
+            <Button
               key={option.id}
+              variant="ghost"
               data-testid={`skybox-option-${option.id}`}
               onClick={() => handleSkyboxSelect(option.id)}
               className={`
-                group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer
+                !p-0 group relative aspect-square rounded-xl overflow-hidden border-2 cursor-pointer
                 transition-[transform,border-color,box-shadow] duration-200 ease-out
                 hover:scale-105 hover:shadow-lg
                 ${
@@ -216,7 +216,7 @@ export const SkyboxControls: React.FC = React.memo(() => {
               <div className="absolute bottom-0 left-0 right-0 p-1 bg-[var(--bg-overlay)] text-center backdrop-blur-sm">
                 <span className="text-[10px] font-medium text-white block">{option.name}</span>
               </div>
-            </button>
+            </Button>
           )
         })}
       </div>

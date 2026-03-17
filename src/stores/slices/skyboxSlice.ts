@@ -117,7 +117,11 @@ function warnInvalidProceduralSetting(path: string, value: unknown): void {
   }
 }
 
-function sanitizeProceduralValue(value: unknown, schema: unknown, path: string): unknown | undefined {
+function sanitizeProceduralValue(
+  value: unknown,
+  schema: unknown,
+  path: string
+): unknown | undefined {
   if (typeof schema === 'number') {
     if (typeof value === 'number' && Number.isFinite(value)) {
       return value
@@ -358,8 +362,7 @@ export const createSkyboxSlice: StateCreator<SkyboxSlice, [], [], SkyboxSlice> =
         proceduralSettings: mergeProceduralSettings(state.proceduralSettings, sanitizedSettings),
       }
     }),
-  setClassicCubeTexture: (texture: unknown | null) =>
-    set({ classicCubeTexture: texture }),
+  setClassicCubeTexture: (texture: unknown | null) => set({ classicCubeTexture: texture }),
   setBackgroundColor: (color: string) => set({ backgroundColor: color }),
   resetSkyboxSettings: () =>
     set({

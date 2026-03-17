@@ -131,5 +131,4 @@ export const MultiToggleGroup = React.memo(
     )
   }
 ) as <T extends string = string>(props: MultiToggleGroupProps<T>) => React.ReactElement
-
 ;(MultiToggleGroup as React.FC).displayName = 'MultiToggleGroup'

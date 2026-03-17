@@ -37,4 +37,3 @@ describe('ExportPresets', () => {
     expect(screen.queryAllByTestId('icon-check')).toHaveLength(1)
   })
 })
-

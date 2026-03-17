@@ -16,15 +16,17 @@ fn ndToLinear(coords: array<u32, 12>, strides: array<u32, 12>, dim: u32) -> u32 
   return idx;
 }
 
-// Convert linear buffer index to N-D lattice coordinates using stride table
-// Uses the same first-axis-fastest convention as ndToLinear: strides[0]=1.
+// Convert linear buffer index to N-D lattice coordinates.
+// Decomposes via repeated mod/div by gridSize (C-order, last-axis-fastest).
+// The strides parameter is accepted for call-site compatibility but unused;
+// only gridSize is needed for the modular decomposition.
 fn linearToND(idx: u32, strides: array<u32, 12>, gridSize: array<u32, 12>, dim: u32) -> array<u32, 12> {
   var coords: array<u32, 12>;
   var remaining = idx;
   for (var d: i32 = i32(dim) - 1; d >= 0; d--) {
     let ud = u32(d);
-    coords[ud] = remaining / strides[ud];
-    remaining = remaining % strides[ud];
+    coords[ud] = remaining % gridSize[ud];
+    remaining = remaining / gridSize[ud];
   }
   return coords;
 }

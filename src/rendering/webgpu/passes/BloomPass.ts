@@ -105,7 +105,9 @@ export class BloomPass extends WebGPUBasePass {
   private prefilterBindGroup: GPUBindGroup | null = null
   private prefilterBindGroupInputView: GPUTextureView | null = null
   private downsampleBindGroups: (GPUBindGroup | null)[] = new Array(NUM_DOWN_MIPS - 1).fill(null)
-  private downsampleBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_DOWN_MIPS - 1).fill(null)
+  private downsampleBindGroupInputViews: (GPUTextureView | null)[] = new Array(
+    NUM_DOWN_MIPS - 1
+  ).fill(null)
   private upsampleBindGroups: (GPUBindGroup | null)[] = new Array(NUM_UP_MIPS).fill(null)
   private upsampleBindGroupInputViews: (GPUTextureView | null)[] = new Array(NUM_UP_MIPS).fill(null)
   private compositeBindGroup: GPUBindGroup | null = null
@@ -154,7 +156,8 @@ export class BloomPass extends WebGPUBasePass {
     if (options?.gain !== undefined) this.gain = clamp(options.gain, 0, 3)
     if (options?.threshold !== undefined) this.threshold = clamp(options.threshold, 0, 5)
     if (options?.knee !== undefined) this.knee = clamp(options.knee, 0, 5)
-    if (options?.filterRadius !== undefined) this.filterRadius = clamp(options.filterRadius, 0.25, 4)
+    if (options?.filterRadius !== undefined)
+      this.filterRadius = clamp(options.filterRadius, 0.25, 4)
   }
 
   private updateFromStores(ctx: WebGPURenderContext): void {
@@ -241,29 +244,65 @@ export class BloomPass extends WebGPUBasePass {
 
     // --- Pipelines ---
 
-    const prefilterModule = this.createShaderModule(device, bloomPrefilterShader, 'bloom-prefilter-shader')
+    const prefilterModule = this.createShaderModule(
+      device,
+      bloomPrefilterShader,
+      'bloom-prefilter-shader'
+    )
     this.prefilterPipeline = this.createFullscreenPipeline(
-      device, prefilterModule, [this.prefilterBGL], 'rgba16float', { label: 'bloom-prefilter' }
+      device,
+      prefilterModule,
+      [this.prefilterBGL],
+      'rgba16float',
+      { label: 'bloom-prefilter' }
     )
 
-    const downsampleModule = this.createShaderModule(device, bloomDownsampleShader, 'bloom-downsample-shader')
+    const downsampleModule = this.createShaderModule(
+      device,
+      bloomDownsampleShader,
+      'bloom-downsample-shader'
+    )
     this.downsamplePipeline = this.createFullscreenPipeline(
-      device, downsampleModule, [this.downsampleBGL], 'rgba16float', { label: 'bloom-downsample' }
+      device,
+      downsampleModule,
+      [this.downsampleBGL],
+      'rgba16float',
+      { label: 'bloom-downsample' }
     )
 
-    const upsampleModule = this.createShaderModule(device, bloomUpsampleShader, 'bloom-upsample-shader')
+    const upsampleModule = this.createShaderModule(
+      device,
+      bloomUpsampleShader,
+      'bloom-upsample-shader'
+    )
     this.upsamplePipeline = this.createFullscreenPipeline(
-      device, upsampleModule, [this.upsampleBGL], 'rgba16float', { label: 'bloom-upsample' }
+      device,
+      upsampleModule,
+      [this.upsampleBGL],
+      'rgba16float',
+      { label: 'bloom-upsample' }
     )
 
-    const compositeModule = this.createShaderModule(device, bloomCompositeShader, 'bloom-composite-shader')
+    const compositeModule = this.createShaderModule(
+      device,
+      bloomCompositeShader,
+      'bloom-composite-shader'
+    )
     this.compositePipeline = this.createFullscreenPipeline(
-      device, compositeModule, [this.compositeBGL], 'rgba16float', { label: 'bloom-composite' }
+      device,
+      compositeModule,
+      [this.compositeBGL],
+      'rgba16float',
+      { label: 'bloom-composite' }
     )
 
     const copyModule = this.createShaderModule(device, bloomCopyShader, 'bloom-copy-shader')
     this.copyPipeline = this.createFullscreenPipeline(
-      device, copyModule, [this.copyBGL], 'rgba16float', { label: 'bloom-copy' }
+      device,
+      copyModule,
+      [this.copyBGL],
+      'rgba16float',
+      { label: 'bloom-copy' }
     )
   }
 
@@ -432,12 +471,14 @@ export class BloomPass extends WebGPUBasePass {
 
     const prefilterPass = ctx.beginRenderPass({
       label: 'bloom-prefilter',
-      colorAttachments: [{
-        view: this.downMipViews[0]!,
-        loadOp: 'clear',
-        storeOp: 'store',
-        clearValue: { r: 0, g: 0, b: 0, a: 0 },
-      }],
+      colorAttachments: [
+        {
+          view: this.downMipViews[0]!,
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 0 },
+        },
+      ],
     })
     this.renderFullscreen(prefilterPass, this.prefilterPipeline, [this.prefilterBindGroup])
     prefilterPass.end()
@@ -457,12 +498,14 @@ export class BloomPass extends WebGPUBasePass {
 
       const dsPass = ctx.beginRenderPass({
         label: `bloom-downsample-${i}`,
-        colorAttachments: [{
-          view: dstView,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        }],
+        colorAttachments: [
+          {
+            view: dstView,
+            loadOp: 'clear',
+            storeOp: 'store',
+            clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          },
+        ],
       })
       this.renderFullscreen(dsPass, this.downsamplePipeline, [this.downsampleBindGroups[i]!])
       dsPass.end()
@@ -491,12 +534,14 @@ export class BloomPass extends WebGPUBasePass {
 
       const usPass = ctx.beginRenderPass({
         label: `bloom-upsample-${i}`,
-        colorAttachments: [{
-          view: dstView,
-          loadOp: 'clear',
-          storeOp: 'store',
-          clearValue: { r: 0, g: 0, b: 0, a: 0 },
-        }],
+        colorAttachments: [
+          {
+            view: dstView,
+            loadOp: 'clear',
+            storeOp: 'store',
+            clearValue: { r: 0, g: 0, b: 0, a: 0 },
+          },
+        ],
       })
       this.renderFullscreen(usPass, this.upsamplePipeline, [this.upsampleBindGroups[i]!])
       usPass.end()
@@ -516,12 +561,14 @@ export class BloomPass extends WebGPUBasePass {
 
     const compositePass = ctx.beginRenderPass({
       label: 'bloom-composite',
-      colorAttachments: [{
-        view: outputView,
-        loadOp: 'clear',
-        storeOp: 'store',
-        clearValue: { r: 0, g: 0, b: 0, a: 1 },
-      }],
+      colorAttachments: [
+        {
+          view: outputView,
+          loadOp: 'clear',
+          storeOp: 'store',
+          clearValue: { r: 0, g: 0, b: 0, a: 1 },
+        },
+      ],
     })
     this.renderFullscreen(compositePass, this.compositePipeline, [this.compositeBindGroup])
     compositePass.end()

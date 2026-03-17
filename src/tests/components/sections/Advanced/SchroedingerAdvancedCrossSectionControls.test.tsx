@@ -72,7 +72,9 @@ describe('CrossSectionAnalysisContent controls', () => {
 
     expect(screen.getByTestId('schroedinger-cross-section-plane-color')).toBeInTheDocument()
     expect(
-      screen.getByText('Slice scalar colors use the active Faces color algorithm and palette settings.')
+      screen.getByText(
+        'Slice scalar colors use the active Faces color algorithm and palette settings.'
+      )
     ).toBeInTheDocument()
   })
 })

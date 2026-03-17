@@ -3,7 +3,6 @@
  *
  * Manages parameters for Schroedinger and Pauli Spinor quantum objects.
  *
- * @see docs/prd/extended-objects.md
  */
 
 import { DEFAULT_SCHROEDINGER_CONFIG, DEFAULT_PAULI_CONFIG } from '@/lib/geometry/extended/types'

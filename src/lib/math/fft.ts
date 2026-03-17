@@ -275,7 +275,7 @@ export function ifftNd(data: FFTArray, gridSize: readonly number[]): void {
 
     const fiberStride = strides[d]!
     const fiberCount = totalSites / n
-    const fiber = new (data.constructor as { new(length: number): FFTArray })(2 * n)
+    const fiber = new (data.constructor as { new (length: number): FFTArray })(2 * n)
 
     // Collect dimensions to iterate (all except d), in reverse for decomposition
     const otherDims: number[] = []
@@ -343,7 +343,7 @@ export function fftNd(data: FFTArray, gridSize: readonly number[]): void {
 
     const fiberStride = strides[d]!
     const fiberCount = totalSites / n
-    const fiber = new (data.constructor as { new(length: number): FFTArray })(2 * n)
+    const fiber = new (data.constructor as { new (length: number): FFTArray })(2 * n)
 
     // Collect dimensions to iterate (all except d), in reverse for decomposition
     const otherDims: number[] = []
