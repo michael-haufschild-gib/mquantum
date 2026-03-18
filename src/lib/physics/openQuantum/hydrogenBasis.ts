@@ -53,6 +53,25 @@ export function hydrogenEnergy(n: number): number {
 }
 
 /**
+ * D-dimensional hydrogen energy in atomic units (Hartree).
+ *
+ * E_n(D) = -0.5 / n_eff² where n_eff = n + (D-3)/2
+ *
+ * The effective principal quantum number shifts with dimension because
+ * the D-dimensional Coulomb Schrödinger equation has a modified centrifugal
+ * barrier. At D=3, n_eff = n and this reduces to hydrogenEnergy(n).
+ *
+ * @param n - Principal quantum number (≥ 1)
+ * @param l - Azimuthal quantum number (0 ≤ l < n)
+ * @param dim - Spatial dimension D (≥ 3)
+ * @returns Energy in Hartree atomic units
+ */
+export function hydrogenEnergyND(n: number, l: number, dim: number): number {
+  const nEff = n + (dim - 3) / 2
+  return -0.5 / (nEff * nEff)
+}
+
+/**
  * Harmonic oscillator energy contribution for extra dimensions.
  *
  * E = Σ_j ω_j · (n_j + 0.5)
@@ -112,7 +131,7 @@ export function buildHydrogenBasis(
   for (let n = 1; n <= maxN; n++) {
     for (let l = 0; l < n; l++) {
       for (let m = -l; m <= l; m++) {
-        const e3D = hydrogenEnergy(n)
+        const e3D = dimension > 3 ? hydrogenEnergyND(n, l, dimension) : hydrogenEnergy(n)
         const eExtra = numExtra > 0 ? extraDimEnergy(extraN, extraDimOmega) : 0
         states.push({
           index: 0, // assigned after sorting

@@ -195,8 +195,8 @@ describe('computeBoundingRadius (dispatch)', () => {
 
     const R = computeBoundingRadius('hydrogenND', null, 4, 2, 1.0, extraDimN, extraDimOmega)
 
-    // Active physics is n=2 hydrogen core + one extra dim in ground state.
-    // Radius should be dominated by hydrogen core: 2^2 * 1.0 * 3.0 = 12.
-    expect(R).toBeCloseTo(12, 6)
+    // Active physics is n=2, D=4 hydrogen core + one extra dim in ground state.
+    // n_eff = 2 + (4-3)/2 = 2.5, radius = 2.5^2 * 1.0 * 3.0 = 18.75.
+    expect(R).toBeCloseTo(18.75, 6)
   })
 })

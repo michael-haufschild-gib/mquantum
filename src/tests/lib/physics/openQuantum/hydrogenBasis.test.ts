@@ -209,11 +209,13 @@ describe('buildHydrogenBasis', () => {
       expect(basis[0]!.extraDimN).toEqual([0, 0])
     })
 
-    it('5D energy includes extra-dimension zero-point contribution', () => {
+    it('5D energy includes ND radial correction + extra-dimension zero-point', () => {
       const omega = [2, 3]
       const basis = buildHydrogenBasis(1, 5, omega)
-      // E = -0.5/1² + 2*(0+0.5) + 3*(0+0.5) = -0.5 + 1 + 1.5 = 2.0
-      expect(basis[0]!.energy).toBeCloseTo(2.0, 10)
+      // D=5, n=1, l=0: n_eff = 1 + (5-3)/2 = 2, E_hydrogen = -0.5/4 = -0.125
+      // Extra dims: 2*(0+0.5) + 3*(0+0.5) = 1 + 1.5 = 2.5
+      // Total: -0.125 + 2.5 = 2.375
+      expect(basis[0]!.energy).toBeCloseTo(2.375, 10)
     })
 
     it('7D states have extraDimN of length 4', () => {

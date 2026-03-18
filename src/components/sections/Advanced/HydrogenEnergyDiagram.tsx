@@ -12,6 +12,7 @@ import React, { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { useExtendedObjectStore } from '@/stores/extendedObjectStore'
+import { useGeometryStore } from '@/stores/geometryStore'
 
 /* ── SVG layout constants ── */
 const WIDTH = 260
@@ -70,13 +71,16 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
       l: s.schroedinger.azimuthalQuantumNumber,
     }))
   )
+  const dimension = useGeometryStore((s) => s.dimension)
 
   const chart = useMemo(() => {
     // ── Energy diagram data ──
     const maxN = Math.max(n + 1, 4)
     const energyLevels: { n: number; energy: number }[] = []
     for (let ni = 1; ni <= maxN; ni++) {
-      energyLevels.push({ n: ni, energy: -13.6 / (ni * ni) })
+      // D-dimensional energy: E = -13.6 / n_eff² where n_eff = n + (D-3)/2
+      const nEff = ni + (dimension - 3) / 2
+      energyLevels.push({ n: ni, energy: -13.6 / (nEff * nEff) })
     }
 
     const eMin = energyLevels[0]!.energy * 1.15
@@ -84,7 +88,8 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
     const toEnergyY = (e: number) => PY + (1 - (e - eMin) / (eMax - eMin)) * PH
 
     // ── Radial probability data ──
-    const rMax = n * n * 2.5 + 2
+    const nEffRadial = n + (dimension - 3) / 2
+    const rMax = nEffRadial * nEffRadial * 2.5 + 2
     const nSamples = 150
 
     let maxP = 0
@@ -117,8 +122,11 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
       }
     }
 
-    // Classical turning point
-    const classicalR = n * n * (1 + Math.sqrt(Math.max(0, 1 - (l * (l + 1)) / (n * n))))
+    // Classical turning point (uses n_eff for D-dimensional extent)
+    const classicalR =
+      nEffRadial *
+      nEffRadial *
+      (1 + Math.sqrt(Math.max(0, 1 - (l * (l + 1)) / (nEffRadial * nEffRadial))))
 
     return {
       energyLevels,
@@ -129,7 +137,7 @@ export const HydrogenEnergyDiagram: React.FC = React.memo(() => {
       zeroY: toRadialY(0),
       classicalTurnX: toX(classicalR),
     }
-  }, [n, l])
+  }, [n, l, dimension])
 
   return (
     <div data-testid="hydrogen-energy-diagram">

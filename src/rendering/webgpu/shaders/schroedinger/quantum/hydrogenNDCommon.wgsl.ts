@@ -162,4 +162,32 @@ fn hydrogenNDTimeEvolution(psi0: vec2f, n: i32, extraEnergy: f32, t: f32) -> vec
   let s = sin(phase);
   return vec2f(psi0.x * c - psi0.y * s, psi0.x * s + psi0.y * c);
 }
+
+/**
+ * Apply time evolution using D-dimensional hydrogen energy.
+ *
+ * E_total = E_D + E_extra where:
+ *   E_D = -0.5 / n_eff² with n_eff = n + (D-3)/2
+ *   E_extra = Σ ω_j(n_j + 0.5) for extra dimensions
+ *
+ * At D=3, n_eff = n and this is identical to hydrogenNDTimeEvolution.
+ *
+ * @param psi0 - Complex wavefunction at t=0 as vec2f(re, im)
+ * @param n - Principal quantum number
+ * @param extraEnergy - Extra-dimensional HO energy contribution
+ * @param t - Time
+ * @param dim - Spatial dimension D (3-11)
+ * @return vec2f(re, im) of time-evolved wavefunction
+ */
+fn hydrogenNDTimeEvolutionND(psi0: vec2f, n: i32, extraEnergy: f32, t: f32, dim: i32) -> vec2f {
+  if (n < 1) {
+    return psi0;
+  }
+  let nEff = f32(n) + f32(dim - 3) * 0.5;
+  let E = -0.5 / (nEff * nEff) + extraEnergy;
+  let phase = -E * t;
+  let c = cos(phase);
+  let s = sin(phase);
+  return vec2f(psi0.x * c - psi0.y * s, psi0.x * s + psi0.y * c);
+}
 `
