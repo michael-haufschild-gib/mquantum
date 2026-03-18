@@ -1,0 +1,490 @@
+/**
+ * Schrödinger renderer per-frame state computations.
+ *
+ * Pure-computation functions extracted from WebGPUSchrodingerRenderer.
+ * These functions mutate pre-allocated typed arrays and state objects
+ * but perform no GPU buffer writes — the caller handles GPU operations.
+ *
+ * @module rendering/webgpu/renderers/schrodingerFrameUpdate
+ */
+
+import { computeBoundingRadius } from '@/lib/geometry/extended/schroedinger/boundingRadius'
+import {
+  flattenPresetForUniforms,
+  generateQuantumPreset,
+  getNamedPreset,
+  type QuantumPreset,
+} from '@/lib/geometry/extended/schroedinger/presets'
+import type { SchroedingerConfig } from '@/lib/geometry/extended/types'
+
+import type { WebGPURenderContext } from '../core/types'
+import {
+  type AnimationState,
+  type AppearanceStoreState,
+  BAYER_OFFSETS,
+  type CameraSnapshot,
+  COLOR_ALGORITHM_MAP,
+  type ExtendedStoreSnapshot,
+  type GeometryState,
+  getStoreSnapshot,
+  type PBRSliceState,
+  type PerformanceSnapshot,
+  QUANTUM_MODE_MAP,
+  type RotationState,
+  type SchrodingerRendererConfig,
+  type TransformSnapshot,
+} from './schrodingerRendererTypes'
+import {
+  isBasisDirty,
+  isSchroedingerDirty,
+  updateBasisVersions,
+  updateSchroedingerVersions,
+  type VersionTracker,
+} from './stateDiffing'
+import { computeLatticeBoundingRadius } from './strategies/computeGridUtils'
+import type { QuantumModeStrategy, SchroedingerSnapshot } from './strategies/types'
+import {
+  applyHOMomentumTransform,
+  computeCanonicalCompensation,
+  packBasisVectors,
+  packCameraUniforms,
+  packSchroedingerUniforms,
+} from './uniformPacking'
+
+/** Byte offset of the time field in the SchroedingerUniforms buffer. */
+export const TIME_FIELD_OFFSET = 908
+
+/** Byte offset of the uncertainty log-rho threshold in SchroedingerUniforms. */
+export const UNCERTAINTY_THRESHOLD_OFFSET = 1180
+
+const BOUND_RADIUS_QUANT_STEP = 0.05
+const BOUND_RADIUS_REBUILD_THRESHOLD = 0.05
+
+/** Mutable per-frame state shared across update functions. */
+export interface SchrodingerFrameState {
+  versions: VersionTracker
+
+  // Temporal Bayer tracking (camera)
+  temporalBayerIndex: number
+  prevTemporalAnimTime: number
+  prevTemporalVPMatrix: Float32Array
+  completedTemporalCycle: boolean
+
+  // Quantum preset caching
+  cachedPreset: QuantumPreset | null
+  cachedPresetConfig: {
+    presetName: string
+    seed: number
+    termCount: number
+    maxQuantumNumber: number
+    frequencySpread: number
+    dimension: number
+  } | null
+  flattenedPreset: {
+    omega: Float32Array
+    quantum: Int32Array
+    coeff: Float32Array
+    energy: Float32Array
+  } | null
+
+  // Auto-compensation
+  canonicalDensityCompensation: number
+  cachedPeakDensity: number
+
+  // Bounding geometry
+  boundingRadius: number
+}
+
+/** Quantize a raw bounding radius; returns new value if rebuild needed, null otherwise. */
+export function quantizeBoundingRadius(rawBoundR: number, currentBoundR: number): number | null {
+  const quantized = Math.ceil(rawBoundR / BOUND_RADIUS_QUANT_STEP) * BOUND_RADIUS_QUANT_STEP
+  if (Math.abs(quantized - currentBoundR) >= BOUND_RADIUS_REBUILD_THRESHOLD) {
+    return quantized
+  }
+  return null
+}
+
+/**
+ * Compute camera uniform data and advance temporal Bayer tracking.
+ * Mutates `state` (temporal fields) and `data` (uniform array).
+ */
+export function computeCameraUpdate(
+  ctx: WebGPURenderContext,
+  config: SchrodingerRendererConfig,
+  state: SchrodingerFrameState,
+  data: Float32Array,
+  dataView: DataView
+): void {
+  const camera = getStoreSnapshot<CameraSnapshot>(ctx, 'camera')
+  if (!camera) return
+
+  const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+  const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+  const is2D = (config.dimension ?? 3) === 2 || config.representation === 'wigner'
+
+  // Temporal Bayer offset: advance only when scene content changes
+  const animTimeChanged = animationTime !== state.prevTemporalAnimTime
+  let cameraChanged = false
+  if (camera.viewProjectionMatrix?.elements) {
+    const vpElems = camera.viewProjectionMatrix.elements
+    for (let i = 0; i < 16; i++) {
+      if (vpElems[i] !== state.prevTemporalVPMatrix[i]) {
+        cameraChanged = true
+        break
+      }
+    }
+    state.prevTemporalVPMatrix.set(vpElems)
+  }
+  const sceneChanged = animTimeChanged || cameraChanged
+
+  if (sceneChanged) {
+    state.temporalBayerIndex = (state.temporalBayerIndex + 1) % 4
+    state.completedTemporalCycle = false
+  } else if (!state.completedTemporalCycle) {
+    const nextIndex = (state.temporalBayerIndex + 1) % 4
+    state.temporalBayerIndex = nextIndex
+    if (nextIndex === 0) {
+      state.completedTemporalCycle = true
+    }
+  }
+  state.prevTemporalAnimTime = animationTime
+
+  const transform = is2D ? undefined : getStoreSnapshot<TransformSnapshot>(ctx, 'transform')
+
+  packCameraUniforms(data, dataView, {
+    camera,
+    animationTime,
+    is2D,
+    transform,
+    bayerOffset: BAYER_OFFSETS[state.temporalBayerIndex]!,
+    size: ctx.size,
+    frameDelta: ctx.frame?.delta || 0.016,
+    frameNumber: ctx.frame?.frameNumber || 0,
+  })
+}
+
+/**
+ * Compute basis vector data if dirty.
+ * @returns true if the buffer should be written to GPU.
+ */
+export function computeBasisUpdate(
+  ctx: WebGPURenderContext,
+  config: SchrodingerRendererConfig,
+  state: SchrodingerFrameState,
+  data: Float32Array
+): boolean {
+  const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+  const schroedinger = extended?.schroedinger
+  const schroedingerVersion = extended?.schroedingerVersion ?? 0
+  const rotation = getStoreSnapshot<RotationState>(ctx, 'rotation')
+  const rotationVersion = rotation?.version ?? 0
+  const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+  const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+  const accumulatedTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+  const dimension = geometry?.dimension ?? config.dimension ?? 4
+
+  const sliceAnimationEnabled = schroedinger?.sliceAnimationEnabled ?? false
+  const sliceSpeed = schroedinger?.sliceSpeed ?? 0.02
+  const sliceAmplitude = schroedinger?.sliceAmplitude ?? 0.3
+  const requiresTimeDrivenBasis = sliceAnimationEnabled && dimension > 3
+
+  const basisVersions = {
+    rotationVersion,
+    schroedingerVersion,
+    dimension,
+    accumulatedTime,
+    requiresTimeDrivenBasis,
+  }
+
+  if (!isBasisDirty(state.versions, basisVersions)) return false
+
+  packBasisVectors(data, {
+    dimension,
+    basisX: schroedinger?.basisX as Float32Array | undefined,
+    basisY: schroedinger?.basisY as Float32Array | undefined,
+    basisZ: schroedinger?.basisZ as Float32Array | undefined,
+    origin: schroedinger?.origin as Float32Array | undefined,
+    sliceAnimationEnabled,
+    sliceSpeed,
+    sliceAmplitude,
+    accumulatedTime,
+  })
+
+  updateBasisVersions(state.versions, basisVersions)
+  return true
+}
+
+/** Result of the Schrödinger uniform computation. */
+export interface SchroedingerUpdateResult {
+  /** 'partial' = only time/uncertainty changed, 'full' = complete rewrite. */
+  writeMode: 'partial' | 'full'
+  /** For partial: animation time to write at TIME_FIELD_OFFSET. */
+  partialTime?: number
+  /** For partial: uncertainty threshold to write at UNCERTAINTY_THRESHOLD_OFFSET. */
+  partialUncertaintyThreshold?: number
+  /** New raw bounding radius requiring geometry rebuild, or undefined if unchanged. */
+  newBoundingRadius?: number
+}
+
+/**
+ * Compute Schrödinger uniform data.
+ * Mutates `state` (preset cache, compensation, bounding radius) and typed arrays.
+ * @returns Information about what GPU buffer writes are needed.
+ */
+export function computeSchroedingerUpdate(
+  ctx: WebGPURenderContext,
+  config: SchrodingerRendererConfig,
+  strategy: QuantumModeStrategy,
+  state: SchrodingerFrameState,
+  floatView: Float32Array,
+  intView: Int32Array
+): SchroedingerUpdateResult {
+  const extended = getStoreSnapshot<ExtendedStoreSnapshot>(ctx, 'extended')
+  const schroedinger = extended?.schroedinger
+  const schroedingerVersion = extended?.schroedingerVersion ?? 0
+  const pbr = getStoreSnapshot<PBRSliceState>(ctx, 'pbr')
+  const appearance = getStoreSnapshot<AppearanceStoreState>(ctx, 'appearance')
+  const animation = getStoreSnapshot<AnimationState>(ctx, 'animation')
+  const animationTime = animation?.accumulatedTime ?? ctx.frame?.time ?? 0
+
+  const uncertaintyConfidenceMass = schroedinger?.uncertaintyConfidenceMass ?? 0.68
+  const uncertaintyBoundaryWidth = schroedinger?.uncertaintyBoundaryWidth ?? 0.3
+  let uncertaintyLogRhoThreshold = -2.0
+  if (strategy.setUncertaintyConfidenceMass) {
+    const threshold = strategy.setUncertaintyConfidenceMass(uncertaintyConfidenceMass)
+    if (threshold !== null) {
+      uncertaintyLogRhoThreshold = threshold
+    }
+  }
+
+  // === DIRTY-FLAG OPTIMIZATION ===
+  const storeVersions = {
+    schroedingerVersion,
+    appearanceVersion: appearance?.appearanceVersion ?? 0,
+    pbrVersion: pbr?.pbrVersion ?? 0,
+    pauliSpinorVersion: extended?.pauliSpinorVersion ?? 0,
+  }
+
+  if (!isSchroedingerDirty(state.versions, storeVersions)) {
+    return {
+      writeMode: 'partial',
+      partialTime: animationTime,
+      partialUncertaintyThreshold: uncertaintyLogRhoThreshold,
+    }
+  }
+
+  updateSchroedingerVersions(state.versions, storeVersions)
+
+  const geometry = getStoreSnapshot<GeometryState>(ctx, 'geometry')
+  const dimension = geometry?.dimension ?? config.dimension ?? 3
+  const quantumModeStr = schroedinger?.quantumMode ?? 'harmonicOscillator'
+  const quantumModeInt = QUANTUM_MODE_MAP[quantumModeStr] ?? 0
+  const isUniformComputeMode =
+    quantumModeStr === 'freeScalarField' ||
+    quantumModeStr === 'tdseDynamics' ||
+    quantumModeStr === 'becDynamics' ||
+    quantumModeStr === 'diracEquation'
+
+  // --- Quantum preset generation ---
+  const needsPresetRegen = maybeRegeneratePreset(state, strategy, schroedinger, dimension)
+
+  // --- Momentum scale ---
+  const isPSpace = schroedinger?.momentumDisplayUnits === 'p'
+  const hbar = isPSpace ? Math.max(schroedinger?.momentumHbar ?? 1.0, 1e-4) : 1.0
+  const effectiveMomentumScale = (schroedinger?.momentumScale ?? 1.0) / hbar
+
+  // --- Bounding radius ---
+  const newBoundR = computeNewBoundingRadius(
+    state,
+    config,
+    strategy,
+    schroedinger,
+    extended,
+    dimension,
+    quantumModeStr,
+    isUniformComputeMode,
+    effectiveMomentumScale
+  )
+
+  // --- Canonical compensation ---
+  if (strategy.isComputeMode) {
+    state.canonicalDensityCompensation = 1.0
+    state.cachedPeakDensity = 1.0
+  } else if (needsPresetRegen && state.cachedPreset) {
+    const result = computeCanonicalCompensation(state.cachedPreset, dimension, state.boundingRadius)
+    state.canonicalDensityCompensation = result.compensation
+    state.cachedPeakDensity = result.peakDensity
+  }
+
+  // --- Derived values for packing ---
+  const performance = getStoreSnapshot<PerformanceSnapshot>(ctx, 'performance')
+  const qualityMultiplier = performance?.qualityMultiplier ?? 1.0
+  const fastMode = qualityMultiplier < 0.75
+  const defaultSampleCount = fastMode ? 32 : 64
+  const baseSampleCount = schroedinger?.sampleCount ?? defaultSampleCount
+  const radiusScale = state.boundingRadius / 2.0
+  const effectiveSampleCount = Math.min(Math.max(8, Math.ceil(baseSampleCount * radiusScale)), 96)
+
+  const colorAlgorithm =
+    config.colorAlgorithm ??
+    COLOR_ALGORITHM_MAP[appearance?.colorAlgorithm ?? 'radialDistance'] ??
+    11
+
+  const isDensityMatrixMode = config.openQuantumEnabled ?? false
+
+  // --- Pack uniform buffer ---
+  packSchroedingerUniforms(floatView, intView, {
+    quantumModeInt,
+    quantumModeStr,
+    isUniformComputeMode,
+    isDensityMatrixMode,
+    dimension,
+    presetTermCount: state.cachedPreset?.termCount ?? 1,
+    presetData: state.flattenedPreset,
+    boundingRadius: state.boundingRadius,
+    canonicalDensityCompensation: state.canonicalDensityCompensation,
+    cachedPeakDensity: state.cachedPeakDensity,
+    colorAlgorithm,
+    effectiveSampleCount,
+    effectiveMomentumScale,
+    hbar,
+    animationTime,
+    uncertaintyLogRhoThreshold,
+    uncertaintyConfidenceMass,
+    uncertaintyBoundaryWidth,
+    schroedinger,
+    appearance,
+    pbr,
+    pauliSpinor: extended?.pauliSpinor,
+    rendererOpenQuantumEnabled: config.openQuantumEnabled ?? false,
+    rendererQuantumMode: config.quantumMode ?? 'harmonicOscillator',
+    rendererTermCount: config.termCount,
+  })
+
+  // HO momentum transform (in-place on already-packed buffer)
+  const isHOMomentum =
+    !isUniformComputeMode &&
+    schroedinger?.representation === 'momentum' &&
+    quantumModeStr !== 'hydrogenND'
+  if (isHOMomentum) {
+    applyHOMomentumTransform(floatView, intView, dimension, hbar)
+  }
+
+  return {
+    writeMode: 'full',
+    newBoundingRadius: newBoundR ?? undefined,
+  }
+}
+
+function maybeRegeneratePreset(
+  state: SchrodingerFrameState,
+  strategy: QuantumModeStrategy,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  dimension: number
+): boolean {
+  const presetName = schroedinger?.presetName ?? 'custom'
+  const seed = schroedinger?.seed ?? 42
+  const termCount = schroedinger?.termCount ?? 1
+  const maxQuantumNumber = schroedinger?.maxQuantumNumber ?? 6
+  const frequencySpread = schroedinger?.frequencySpread ?? 0.01
+  const currentConfig = {
+    presetName,
+    seed,
+    termCount,
+    maxQuantumNumber,
+    frequencySpread,
+    dimension,
+  }
+
+  const frequencySpreadChanged =
+    !state.cachedPresetConfig ||
+    Math.abs(state.cachedPresetConfig.frequencySpread - currentConfig.frequencySpread) > 1e-6
+  const needsRegen =
+    !state.cachedPresetConfig ||
+    state.cachedPresetConfig.presetName !== currentConfig.presetName ||
+    state.cachedPresetConfig.seed !== currentConfig.seed ||
+    state.cachedPresetConfig.termCount !== currentConfig.termCount ||
+    state.cachedPresetConfig.maxQuantumNumber !== currentConfig.maxQuantumNumber ||
+    frequencySpreadChanged ||
+    state.cachedPresetConfig.dimension !== currentConfig.dimension
+
+  if (!needsRegen) return false
+
+  let preset: QuantumPreset
+  if (presetName === 'custom') {
+    preset = generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
+  } else {
+    preset =
+      getNamedPreset(presetName, dimension) ??
+      generateQuantumPreset(seed, dimension, termCount, maxQuantumNumber, frequencySpread)
+  }
+  state.cachedPreset = preset
+  state.cachedPresetConfig = { ...currentConfig }
+  state.flattenedPreset = flattenPresetForUniforms(preset)
+  strategy.resetOpenQuantumState?.()
+  return true
+}
+
+function computeNewBoundingRadius(
+  state: SchrodingerFrameState,
+  config: SchrodingerRendererConfig,
+  strategy: QuantumModeStrategy,
+  schroedinger: Partial<SchroedingerConfig> | undefined,
+  extended: ExtendedStoreSnapshot | undefined,
+  dimension: number,
+  quantumModeStr: string,
+  isUniformComputeMode: boolean,
+  effectiveMomentumScale: number
+): number | null {
+  const strategyBoundR = strategy.computeBoundingRadius(
+    (schroedinger as SchroedingerSnapshot) ?? {},
+    dimension,
+    config
+  )
+
+  let rawBoundR: number | null = null
+
+  if (strategyBoundR === null && config.isPauli) {
+    const pauliCfg = extended?.pauliSpinor
+    if (pauliCfg) {
+      rawBoundR = computeLatticeBoundingRadius(
+        pauliCfg.latticeDim ?? 3,
+        pauliCfg.gridSize ?? [64],
+        pauliCfg.spacing ?? [0.15]
+      )
+    }
+  } else if (strategyBoundR !== null) {
+    rawBoundR = strategyBoundR
+  } else if (state.cachedPreset) {
+    const oqCfg = schroedinger?.openQuantum
+    const effectiveN =
+      config.openQuantumEnabled && oqCfg?.enabled && quantumModeStr === 'hydrogenND'
+        ? Math.max(schroedinger?.principalQuantumNumber ?? 2, oqCfg.hydrogenBasisMaxN ?? 2)
+        : (schroedinger?.principalQuantumNumber ?? 2)
+    const rawBR = computeBoundingRadius(
+      quantumModeStr,
+      state.cachedPreset,
+      dimension,
+      effectiveN,
+      schroedinger?.bohrRadiusScale ?? 1.0,
+      schroedinger?.extraDimQuantumNumbers as number[] | undefined,
+      schroedinger?.extraDimOmega as number[] | undefined,
+      !isUniformComputeMode && schroedinger?.representation === 'momentum'
+        ? 'momentum'
+        : 'position',
+      effectiveMomentumScale
+    )
+    const fieldScale = schroedinger?.fieldScale ?? 1.0
+    rawBoundR = rawBR / Math.max(fieldScale, 1e-4)
+  }
+
+  if (rawBoundR !== null) {
+    const quantized = quantizeBoundingRadius(rawBoundR, state.boundingRadius)
+    if (quantized !== null) {
+      state.boundingRadius = quantized
+      return quantized
+    }
+  }
+
+  return null
+}

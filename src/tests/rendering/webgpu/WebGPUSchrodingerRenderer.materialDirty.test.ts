@@ -142,9 +142,12 @@ describe('WebGPUSchrodingerRenderer color algorithm uniform consistency', () => 
     renderer: WebGPUSchrodingerRenderer
   ): WebGPUSchrodingerRenderer & { [key: string]: unknown } {
     const mutable = renderer as WebGPUSchrodingerRenderer & { [key: string]: unknown }
-    mutable['device'] = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+    const mockBuffer = { destroy: vi.fn() }
+    mutable['device'] = {
+      queue: { writeBuffer: vi.fn() },
+      createBuffer: vi.fn(() => mockBuffer),
+    } as unknown as GPUDevice
     mutable['schroedingerUniformBuffer'] = {} as unknown as GPUBuffer
-    mutable['createBoundingGeometry'] = vi.fn()
     return mutable
   }
 
@@ -196,9 +199,12 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
     renderer: WebGPUSchrodingerRenderer
   ): WebGPUSchrodingerRenderer & { [key: string]: unknown } {
     const mutable = renderer as WebGPUSchrodingerRenderer & { [key: string]: unknown }
-    mutable['device'] = { queue: { writeBuffer: vi.fn() } } as unknown as GPUDevice
+    const mockBuffer = { destroy: vi.fn() }
+    mutable['device'] = {
+      queue: { writeBuffer: vi.fn() },
+      createBuffer: vi.fn(() => mockBuffer),
+    } as unknown as GPUDevice
     mutable['schroedingerUniformBuffer'] = {} as unknown as GPUBuffer
-    mutable['createBoundingGeometry'] = vi.fn()
     return mutable
   }
 
@@ -225,7 +231,8 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
     )
 
     expect(
-      (renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread
+      (renderer['frameState'] as { cachedPresetConfig: { frequencySpread: number } })
+        .cachedPresetConfig.frequencySpread
     ).toBeCloseTo(0.01, 6)
 
     ctx.frame.stores.extended.schroedingerVersion = 2
@@ -236,7 +243,8 @@ describe('WebGPUSchrodingerRenderer HO preset regeneration', () => {
     )
 
     expect(
-      (renderer['cachedPresetConfig'] as { frequencySpread: number }).frequencySpread
+      (renderer['frameState'] as { cachedPresetConfig: { frequencySpread: number } })
+        .cachedPresetConfig.frequencySpread
     ).toBeCloseTo(0.0101, 6)
   })
 })
