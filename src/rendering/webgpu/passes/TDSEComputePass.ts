@@ -34,6 +34,7 @@ import type { WebGPURenderContext, WebGPUSetupContext } from '../core/types'
 import { WebGPUBaseComputePass } from '../core/WebGPUBasePass'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
 import { tdseAbsorberBlock } from '../shaders/schroedinger/compute/tdseAbsorber.wgsl'
 import { tdseApplyKineticBlock } from '../shaders/schroedinger/compute/tdseApplyKinetic.wgsl'
 import { tdseApplyPotentialHalfBlock } from '../shaders/schroedinger/compute/tdseApplyPotentialHalf.wgsl'
@@ -100,6 +101,10 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
   private initPipeline: GPUComputePipeline | null = null
   private potentialPipeline: GPUComputePipeline | null = null
   private potentialHalfPipeline: GPUComputePipeline | null = null
+  private renormalizePipeline: GPUComputePipeline | null = null
+  private renormalizeBGL: GPUBindGroupLayout | null = null
+  private renormalizeBG: GPUBindGroup | null = null
+  private renormalizeUniformBuffer: GPUBuffer | null = null
   private absorberPipeline: GPUComputePipeline | null = null
   private packPipeline: GPUComputePipeline | null = null
   private unpackPipeline: GPUComputePipeline | null = null
@@ -460,6 +465,26 @@ export class TDSEComputePass extends WebGPUBaseComputePass {
       'tdse-absorber'
     )
 
+    // Renormalization: reads diagResult[0] (totalNorm) and scales ψ by 1/√(totalNorm).
+    // Layout: uniform(totalElements) + diagResult(read) + psiRe(rw) + psiIm(rw)
+    this.renormalizeBGL = device.createBindGroupLayout({
+      label: 'tdse-renormalize-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    })
+    this.renormalizePipeline = device.createComputePipeline({
+      label: 'tdse-renormalize-pipeline',
+      layout: device.createPipelineLayout({ bindGroupLayouts: [this.renormalizeBGL] }),
+      compute: {
+        module: device.createShaderModule({ label: 'tdse-renormalize', code: renormalizeBlock }),
+        entryPoint: 'main',
+      },
+    })
+
     // Pack
     const packUnifBlock = /* wgsl */ `
 struct PackUniforms {
@@ -769,6 +794,32 @@ struct PackUniforms {
           { binding: 3, resource: { buffer: this.diagResultBuffer } },
           { binding: 4, resource: { buffer: this.diagPartialLeftBuffer } },
           { binding: 5, resource: { buffer: this.diagPartialRightBuffer } },
+        ],
+      })
+    }
+
+    // Renormalization bind group
+    if (this.renormalizeBGL && this.diagResultBuffer && this.psiReBuffer && this.psiImBuffer) {
+      this.renormalizeUniformBuffer?.destroy()
+      this.renormalizeUniformBuffer = device.createBuffer({
+        label: 'tdse-renormalize-uniforms',
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+      // TDSE has 1 component; BEC also has 1 component (shared pass)
+      // targetNorm (f32 at offset 4) starts at 0; updated when initialNorm is captured
+      const renormBuf = new ArrayBuffer(16)
+      new Uint32Array(renormBuf)[0] = this.totalSites
+      new Float32Array(renormBuf)[1] = 0 // targetNorm = 0 → shader skips until set
+      device.queue.writeBuffer(this.renormalizeUniformBuffer, 0, renormBuf)
+      this.renormalizeBG = device.createBindGroup({
+        label: 'tdse-renormalize-bg',
+        layout: this.renormalizeBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.renormalizeUniformBuffer } },
+          { binding: 1, resource: { buffer: this.diagResultBuffer } },
+          { binding: 2, resource: { buffer: this.psiReBuffer } },
+          { binding: 3, resource: { buffer: this.psiImBuffer } },
         ],
       })
     }
@@ -1218,6 +1269,34 @@ struct PackUniforms {
         }
 
         this.simTime += config.dt
+
+        // 9. Periodic renormalization: counteract f32 norm drift.
+        // Once per frame (last substep), run GPU norm reduction + rescale.
+        if (
+          step === stepsThisFrame - 1 &&
+          this.diagReducePipeline &&
+          this.diagReduceBG &&
+          this.diagFinalizePipeline &&
+          this.diagFinalizeBG &&
+          this.renormalizePipeline &&
+          this.renormalizeBG
+        ) {
+          const rPass = encoder.beginComputePass({ label: `tdse-renorm-reduce-${step}` })
+          this.dispatchCompute(
+            rPass,
+            this.diagReducePipeline,
+            [this.diagReduceBG],
+            this.diagNumWorkgroups
+          )
+          rPass.end()
+          const fPass = encoder.beginComputePass({ label: `tdse-renorm-finalize-${step}` })
+          this.dispatchCompute(fPass, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
+          fPass.end()
+          const sPass = encoder.beginComputePass({ label: `tdse-renorm-scale-${step}` })
+          const renormWG = Math.ceil(this.totalSites / LINEAR_WG)
+          this.dispatchCompute(sPass, this.renormalizePipeline, [this.renormalizeBG], renormWG)
+          sPass.end()
+        }
       }
     }
 
@@ -1349,6 +1428,11 @@ struct PackUniforms {
               const autoLoop = this.currentAutoLoop
               if (this.initialNorm < 0) {
                 this.initialNorm = totalNorm
+                // Upload targetNorm to renormalize uniform buffer
+                if (this.renormalizeUniformBuffer) {
+                  const buf = new Float32Array([totalNorm])
+                  device.queue.writeBuffer(this.renormalizeUniformBuffer, 4, buf)
+                }
               } else if (this.initialNorm > 0) {
                 // Reset on norm decay (wavepacket absorbed / left the domain)
                 if (autoLoop && totalNorm < this.initialNorm * 0.001) {
@@ -1417,6 +1501,7 @@ struct PackUniforms {
     this.diagPartialRightBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
+    this.renormalizeUniformBuffer?.destroy()
 
     this.psiReBuffer = null
     this.psiImBuffer = null

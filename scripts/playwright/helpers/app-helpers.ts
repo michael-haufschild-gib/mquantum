@@ -84,8 +84,19 @@ export async function gotoMode(page: Page, mode: string, dim = 3): Promise<void>
   await waitForAppLoaded(page)
 }
 
-/** Check whether WebGPU is available. Use in beforeEach to skip tests. */
+/**
+ * Check whether WebGPU is available. Use in beforeEach to skip tests.
+ *
+ * IMPORTANT: WebGPU requires a secure context (https: or localhost).
+ * This function navigates to baseURL first if the page is on about:blank,
+ * because navigator.gpu is undefined on insecure/blank origins.
+ */
 export async function hasWebGPU(page: Page): Promise<boolean> {
+  // WebGPU needs a secure context — about:blank won't have navigator.gpu
+  if (page.url() === 'about:blank') {
+    await page.goto('/')
+    await waitForAppLoaded(page)
+  }
   return page.evaluate(async () => {
     if (!navigator.gpu) return false
     return !!(await navigator.gpu.requestAdapter())
@@ -164,6 +175,133 @@ export function collectPageErrors(page: Page): string[] {
  */
 export function filterBenignErrors(errors: string[]): string[] {
   return errors.filter((e) => !e.includes('ResizeObserver'))
+}
+
+// ─── Diagnostic Store Readers ────────────────────────────────────────────────
+
+/** Read TDSE diagnostics from the running app (GPU readback values). */
+export async function readTdseDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/tdseDiagnosticsStore.ts')
+    const s = mod.useTdseDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      R: s.R,
+      T: s.T,
+      maxDensity: s.maxDensity,
+      simTime: s.simTime,
+    }
+  })
+}
+
+/** Read Pauli spinor diagnostics from the running app (GPU readback values). */
+export async function readPauliDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/pauliDiagnosticsStore.ts')
+    const s = mod.usePauliDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      spinUpFraction: s.spinUpFraction,
+      spinDownFraction: s.spinDownFraction,
+      spinExpectationZ: s.spinExpectationZ,
+      coherenceMagnitude: s.coherenceMagnitude,
+      larmorFrequency: s.larmorFrequency,
+      maxDensity: s.maxDensity,
+    }
+  })
+}
+
+/** Read BEC diagnostics from the running app (GPU readback values). */
+export async function readBecDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/becDiagnosticsStore.ts')
+    const s = mod.useBecDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      chemicalPotential: s.chemicalPotential,
+      healingLength: s.healingLength,
+      soundSpeed: s.soundSpeed,
+      thomasFermiRadius: s.thomasFermiRadius,
+      maxDensity: s.maxDensity,
+    }
+  })
+}
+
+/** Read Dirac diagnostics from the running app (GPU readback values). */
+export async function readDiracDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/diracDiagnosticsStore.ts')
+    const s = mod.useDiracDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      totalNorm: s.totalNorm,
+      normDrift: s.normDrift,
+      particleFraction: s.particleFraction,
+      antiparticleFraction: s.antiparticleFraction,
+      maxDensity: s.maxDensity,
+    }
+  })
+}
+
+/** Read free scalar field diagnostics from the running app (GPU readback values). */
+export async function readFsfDiagnostics(page: Page) {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/fsfDiagnosticsStore.ts')
+    const s = mod.useFsfDiagnosticsStore.getState()
+    return {
+      hasData: s.hasData,
+      totalEnergy: s.totalEnergy,
+      totalNorm: s.totalNorm,
+      energyDrift: s.energyDrift,
+      maxPhi: s.maxPhi,
+    }
+  })
+}
+
+/**
+ * Wait for a diagnostic store to report hasData === true.
+ * Diagnostics are decimated (every 5-60 frames), so this may take a few seconds.
+ */
+export async function waitForDiagnostics(
+  page: Page,
+  storeModule: string,
+  timeout = 30_000
+): Promise<void> {
+  await page.waitForFunction(
+    async (modulePath: string) => {
+      const mod = await import(/* @vite-ignore */ modulePath)
+      const storeExports = Object.values(mod) as Array<{ getState: () => { hasData: boolean } }>
+      const store = storeExports.find((v) => typeof v === 'object' && v !== null && 'getState' in v)
+      return store?.getState().hasData === true
+    },
+    storeModule,
+    { timeout }
+  )
+}
+
+/**
+ * Wait for the simulation to render at least `minFrames` frames.
+ * For compute modes, simulation steps = frames × stepsPerFrame.
+ */
+export async function waitForSimulationFrames(
+  page: Page,
+  minFrames = 120,
+  timeout = 60_000
+): Promise<void> {
+  await page.waitForFunction(
+    (min: number) => {
+      const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+      return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > min
+    },
+    minFrames,
+    { timeout }
+  )
 }
 
 // ─── Shader Compilation ──────────────────────────────────────────────────────
@@ -279,6 +417,34 @@ export async function expectCanvasNotBlank(page: Page): Promise<void> {
       expect(uniqueColors, 'Canvas must have >1 color — proves scene rendered').toBeGreaterThan(1)
     }
   }
+}
+
+// ─── Performance Metrics ─────────────────────────────────────────────────────
+
+/** Snapshot of performance metrics from the running app. */
+export interface PerfMetricsSnapshot {
+  fps: number
+  frameTime: number
+  cpuTime: number
+  vramMB: number
+  fpsHistory: number[]
+  cpuHistory: number[]
+}
+
+/** Read a performance metrics snapshot from the performanceMetricsStore. */
+export async function getPerformanceMetrics(page: Page): Promise<PerfMetricsSnapshot> {
+  return page.evaluate(async () => {
+    const mod = await import('/src/stores/performanceMetricsStore.ts')
+    const s = mod.usePerformanceMetricsStore.getState()
+    return {
+      fps: s.fps,
+      frameTime: s.frameTime,
+      cpuTime: s.cpuTime,
+      vramMB: s.vram.total,
+      fpsHistory: [...s.history.fps],
+      cpuHistory: [...s.history.cpu],
+    }
+  })
 }
 
 // ─── Differential Pixel Assertions ───────────────────────────────────────────

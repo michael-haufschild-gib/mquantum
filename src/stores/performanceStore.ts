@@ -481,6 +481,11 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
       }
       return
     }
+    // 0 = uncapped (transient, not persisted). Used by benchmarks/profiling.
+    if (fps === 0) {
+      set({ maxFps: 0 })
+      return
+    }
     const clampedFps = Math.max(MIN_MAX_FPS, Math.min(MAX_MAX_FPS, fps))
     set({ maxFps: clampedFps })
     persistMaxFps(clampedFps)

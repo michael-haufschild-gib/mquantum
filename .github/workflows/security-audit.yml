@@ -1,0 +1,28 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Only audit production dependencies — dev-dependency advisories
+      # (e.g. in test tooling) are noise for a client-side SPA.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig } from '@playwright/test'
 
 const devServerPort = Number(process.env.PLAYWRIGHT_DEV_SERVER_PORT ?? 3100)
 
@@ -9,24 +9,25 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'line',
+
   use: {
     baseURL: `http://localhost:${devServerPort}`,
     trace: 'on-first-retry',
-  },
-  projects: [
-    {
-      name: 'chromium',
-      use: {
-        // Use system Chrome — Playwright's bundled Chromium does not include WebGPU.
-        // This project is a WebGPU renderer; tests that skip GPU are worthless.
-        channel: 'chrome',
-        viewport: { width: 1280, height: 800 },
-        launchOptions: {
-          args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'],
-        },
-      },
+    browserName: 'chromium',
+    // channel:'chrome' uses installed Google Chrome with real new headless
+    // implementation (not the stripped-down headless shell).
+    channel: 'chrome',
+    viewport: { width: 1280, height: 800 },
+    launchOptions: {
+      args: [
+        '--enable-gpu', // required: stop headless from forcing software rendering
+        '--enable-unsafe-webgpu', // required: enable WebGPU API
+        '--ignore-gpu-blocklist', // required: bypass driver blocklists
+        '--use-angle', // macOS arm64: selects Metal backend in headless
+      ],
     },
-  ],
+  },
+
   webServer: {
     command: `npm run dev -- --port ${devServerPort} --strictPort`,
     url: `http://localhost:${devServerPort}`,

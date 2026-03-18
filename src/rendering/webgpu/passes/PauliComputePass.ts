@@ -41,6 +41,7 @@ import { pauliPotentialHalfBlock } from '../shaders/schroedinger/compute/pauliPo
 import { pauliUniformsBlock } from '../shaders/schroedinger/compute/pauliUniforms.wgsl'
 import { pauliWriteGridBlock } from '../shaders/schroedinger/compute/pauliWriteGrid.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
 // Reuse FFT and pack/unpack infrastructure from Dirac/TDSE
 import {
   tdseComplexPackBlock,
@@ -103,6 +104,10 @@ export class PauliComputePass extends WebGPUBaseComputePass {
   private unpackPipeline: GPUComputePipeline | null = null
   private fftStagePipeline: GPUComputePipeline | null = null
   private kineticPipeline: GPUComputePipeline | null = null
+  private renormalizePipeline: GPUComputePipeline | null = null
+  private renormalizeBGL: GPUBindGroupLayout | null = null
+  private renormalizeBG: GPUBindGroup | null = null
+  private renormalizeUniformBuffer: GPUBuffer | null = null
   private absorberPipeline: GPUComputePipeline | null = null
   private writeGridPipeline: GPUComputePipeline | null = null
 
@@ -500,6 +505,30 @@ export class PauliComputePass extends WebGPUBaseComputePass {
       },
     })
 
+    // Renormalization pipeline: reads totalNorm from diagResultBuffer,
+    // scales ψ by 1/√(totalNorm) to counteract f32 norm drift.
+    // Layout: uniform(totalElements) + diagResult(read) + spinorRe(rw) + spinorIm(rw)
+    this.renormalizeBGL = device.createBindGroupLayout({
+      label: 'pauli-renormalize-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    })
+    this.renormalizePipeline = device.createComputePipeline({
+      label: 'pauli-renormalize-pipeline',
+      layout: device.createPipelineLayout({ bindGroupLayouts: [this.renormalizeBGL] }),
+      compute: {
+        module: device.createShaderModule({
+          label: 'pauli-renormalize',
+          code: renormalizeBlock,
+        }),
+        entryPoint: 'main',
+      },
+    })
+
     // Write-grid pipeline: uniform + spinorRe(read) + spinorIm(read) + texture_storage_3d(write)
     this.writeGridBGL = device.createBindGroupLayout({
       label: 'pauli-write-grid-bgl',
@@ -683,6 +712,36 @@ ${tdseStockhamFFTBlock}
           { binding: 0, resource: { buffer: this.fftUniformBuffer } },
           { binding: 1, resource: { buffer: this.fftScratchB } },
           { binding: 2, resource: { buffer: this.fftScratchA } },
+        ],
+      })
+    }
+
+    // Renormalization bind group: diagResult(read) + spinorRe(rw) + spinorIm(rw)
+    if (
+      this.renormalizeBGL &&
+      this.diagResultBuffer &&
+      this.spinorReBuffer &&
+      this.spinorImBuffer
+    ) {
+      this.renormalizeUniformBuffer?.destroy()
+      this.renormalizeUniformBuffer = device.createBuffer({
+        label: 'pauli-renormalize-uniforms',
+        size: 16, // RenormUniforms: totalElements(u32) + 3 pad
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+      // targetNorm (f32 at offset 4) starts at 0; updated when initialNorm is captured
+      const renormBuf = new ArrayBuffer(16)
+      new Uint32Array(renormBuf)[0] = 2 * this.totalSites
+      new Float32Array(renormBuf)[1] = 0 // targetNorm = 0 → shader skips
+      device.queue.writeBuffer(this.renormalizeUniformBuffer, 0, renormBuf)
+      this.renormalizeBG = device.createBindGroup({
+        label: 'pauli-renormalize-bg',
+        layout: this.renormalizeBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.renormalizeUniformBuffer } },
+          { binding: 1, resource: { buffer: this.diagResultBuffer } },
+          { binding: 2, resource: { buffer: this.spinorReBuffer } },
+          { binding: 3, resource: { buffer: this.spinorImBuffer } },
         ],
       })
     }
@@ -1174,6 +1233,38 @@ ${tdseStockhamFFTBlock}
         }
 
         this.simTime += config.dt
+
+        // 8. Periodic renormalization: counteract f32 norm drift.
+        // Once per frame (last substep), run a GPU norm reduction + rescale.
+        // Cost: one parallel reduction (same as diagnostics) + one linear
+        // pass over spinor buffers. Negligible vs the 2×FFT per step.
+        if (
+          step === stepsThisFrame - 1 &&
+          this.diagReducePipeline &&
+          this.diagReduceBG &&
+          this.diagFinalizePipeline &&
+          this.diagFinalizeBG &&
+          this.renormalizePipeline &&
+          this.renormalizeBG
+        ) {
+          // Reduction: compute totalNorm → diagResultBuffer[0]
+          const rPass = encoder.beginComputePass({ label: `pauli-renorm-reduce-${step}` })
+          this.dispatchCompute(
+            rPass,
+            this.diagReducePipeline,
+            [this.diagReduceBG],
+            this.diagNumWorkgroups
+          )
+          rPass.end()
+          const fPass = encoder.beginComputePass({ label: `pauli-renorm-finalize-${step}` })
+          this.dispatchCompute(fPass, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
+          fPass.end()
+          // Scale: ψ *= 1/√(totalNorm)
+          const sPass = encoder.beginComputePass({ label: `pauli-renorm-scale-${step}` })
+          const renormWG = Math.ceil((2 * this.totalSites) / LINEAR_WG)
+          this.dispatchCompute(sPass, this.renormalizePipeline, [this.renormalizeBG], renormWG)
+          sPass.end()
+        }
       }
     }
 
@@ -1263,9 +1354,16 @@ ${tdseStockhamFFTBlock}
               )
               const larmorFrequency = this.cachedFieldStrength / this.cachedHbar
 
-              // Track initial norm for relative drift calculation
+              // Track initial norm for relative drift calculation.
+              // Also upload targetNorm to the renormalize uniform buffer
+              // so the GPU shader knows what norm to restore to.
               if (this.initialNorm === 0 && totalNorm > 0) {
                 this.initialNorm = totalNorm
+                if (this.renormalizeUniformBuffer) {
+                  const buf = new Float32Array([0]) // targetNorm at byte offset 4
+                  buf[0] = totalNorm
+                  device.queue.writeBuffer(this.renormalizeUniformBuffer, 4, buf)
+                }
               }
               const normDrift =
                 this.initialNorm > 0 ? (totalNorm - this.initialNorm) / this.initialNorm : 0
@@ -1311,6 +1409,7 @@ ${tdseStockhamFFTBlock}
     this.diagPartialBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
+    this.renormalizeUniformBuffer?.destroy()
     this.absorberPipeline = null
     super.dispose()
   }

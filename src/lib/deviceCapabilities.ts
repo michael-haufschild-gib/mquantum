@@ -95,8 +95,7 @@ export function isWebGL2Supported(): boolean {
  */
 export async function detectGPUTier(): Promise<TierResult> {
   return getGPUTier({
-    // Use default benchmarks from CDN
-    // Can be overridden to self-host benchmark data
+    benchmarksURL: '/gpu-benchmarks',
     failIfMajorPerformanceCaveat: false,
   })
 }

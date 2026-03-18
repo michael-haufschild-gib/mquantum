@@ -46,6 +46,7 @@ import { diracUniformsBlock } from '../shaders/schroedinger/compute/diracUniform
 import { diracWriteGridBlock } from '../shaders/schroedinger/compute/diracWriteGrid.wgsl'
 import { freeScalarNDIndexBlock } from '../shaders/schroedinger/compute/freeScalarNDIndex.wgsl'
 import { pmlProfileBlock } from '../shaders/schroedinger/compute/pmlProfile.wgsl'
+import { renormalizeBlock } from '../shaders/schroedinger/compute/renormalize.wgsl'
 import {
   tdseComplexPackBlock,
   tdseComplexUnpackBlock,
@@ -119,6 +120,10 @@ export class DiracComputePass extends WebGPUBaseComputePass {
   private unpackPipeline: GPUComputePipeline | null = null
   private fftStagePipeline: GPUComputePipeline | null = null
   private kineticPipeline: GPUComputePipeline | null = null
+  private renormalizePipeline: GPUComputePipeline | null = null
+  private renormalizeBGL: GPUBindGroupLayout | null = null
+  private renormalizeBG: GPUBindGroup | null = null
+  private renormalizeUniformBuffer: GPUBuffer | null = null
   private absorberPipeline: GPUComputePipeline | null = null
   private writeGridPipeline: GPUComputePipeline | null = null
 
@@ -502,6 +507,25 @@ export class DiracComputePass extends WebGPUBaseComputePass {
       'dirac-absorber'
     )
 
+    // Renormalization
+    this.renormalizeBGL = device.createBindGroupLayout({
+      label: 'dirac-renormalize-bgl',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    })
+    this.renormalizePipeline = device.createComputePipeline({
+      label: 'dirac-renormalize-pipeline',
+      layout: device.createPipelineLayout({ bindGroupLayouts: [this.renormalizeBGL] }),
+      compute: {
+        module: device.createShaderModule({ label: 'dirac-renormalize', code: renormalizeBlock }),
+        entryPoint: 'main',
+      },
+    })
+
     // Pack/Unpack (reuse TDSE shaders — they operate on totalSites elements)
     const packUnifBlock = /* wgsl */ `
 struct PackUniforms {
@@ -797,6 +821,36 @@ struct PackUniforms {
           { binding: 3, resource: { buffer: this.diagResultBuffer } },
           { binding: 4, resource: { buffer: this.diagPartialParticleBuffer } },
           { binding: 5, resource: { buffer: this.diagPartialAntiBuffer } },
+        ],
+      })
+    }
+
+    // Renormalization bind group (S-component spinor)
+    if (
+      this.renormalizeBGL &&
+      this.diagResultBuffer &&
+      this.spinorReBuffer &&
+      this.spinorImBuffer
+    ) {
+      this.renormalizeUniformBuffer?.destroy()
+      this.renormalizeUniformBuffer = device.createBuffer({
+        label: 'dirac-renormalize-uniforms',
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      })
+      // Dirac has S components: totalElements = S * totalSites
+      const renormBuf = new ArrayBuffer(16)
+      new Uint32Array(renormBuf)[0] = this.currentSpinorSize * this.totalSites
+      new Float32Array(renormBuf)[1] = 0 // targetNorm = 0 → shader skips until set
+      device.queue.writeBuffer(this.renormalizeUniformBuffer, 0, renormBuf)
+      this.renormalizeBG = device.createBindGroup({
+        label: 'dirac-renormalize-bg',
+        layout: this.renormalizeBGL,
+        entries: [
+          { binding: 0, resource: { buffer: this.renormalizeUniformBuffer } },
+          { binding: 1, resource: { buffer: this.diagResultBuffer } },
+          { binding: 2, resource: { buffer: this.spinorReBuffer } },
+          { binding: 3, resource: { buffer: this.spinorImBuffer } },
         ],
       })
     }
@@ -1302,6 +1356,33 @@ struct PackUniforms {
         }
 
         this.simTime += config.dt
+
+        // Periodic renormalization: counteract f32 norm drift.
+        if (
+          step === stepsThisFrame - 1 &&
+          this.diagReducePipeline &&
+          this.diagReduceBG &&
+          this.diagFinalizePipeline &&
+          this.diagFinalizeBG &&
+          this.renormalizePipeline &&
+          this.renormalizeBG
+        ) {
+          const rPass = encoder.beginComputePass({ label: `dirac-renorm-reduce-${step}` })
+          this.dispatchCompute(
+            rPass,
+            this.diagReducePipeline,
+            [this.diagReduceBG],
+            this.diagNumWorkgroups
+          )
+          rPass.end()
+          const fPass = encoder.beginComputePass({ label: `dirac-renorm-finalize-${step}` })
+          this.dispatchCompute(fPass, this.diagFinalizePipeline, [this.diagFinalizeBG], 1)
+          fPass.end()
+          const sPass = encoder.beginComputePass({ label: `dirac-renorm-scale-${step}` })
+          const renormWG = Math.ceil((this.currentSpinorSize * this.totalSites) / LINEAR_WG)
+          this.dispatchCompute(sPass, this.renormalizePipeline, [this.renormalizeBG], renormWG)
+          sPass.end()
+        }
       }
     }
 
@@ -1403,6 +1484,10 @@ struct PackUniforms {
 
               if (this.initialNorm < 0) {
                 this.initialNorm = totalNorm
+                if (this.renormalizeUniformBuffer) {
+                  const buf = new Float32Array([totalNorm])
+                  device.queue.writeBuffer(this.renormalizeUniformBuffer, 4, buf)
+                }
               }
 
               // Update diagnostics store
@@ -1468,6 +1553,7 @@ struct PackUniforms {
     this.diagPartialAntiBuffer?.destroy()
     this.diagResultBuffer?.destroy()
     this.diagStagingBuffer?.destroy()
+    this.renormalizeUniformBuffer?.destroy()
 
     this.spinorReBuffer = null
     this.spinorImBuffer = null
