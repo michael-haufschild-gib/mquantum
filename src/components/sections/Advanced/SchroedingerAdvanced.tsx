@@ -1,9 +1,8 @@
-import React, { useCallback, useMemo } from 'react'
+import React from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { ControlGroup } from '@/components/ui/ControlGroup'
 import { Slider } from '@/components/ui/Slider'
-import { Switch } from '@/components/ui/Switch'
 import { type AppearanceSlice, useAppearanceStore } from '@/stores/appearanceStore'
 import { type ExtendedObjectState, useExtendedObjectStore } from '@/stores/extendedObjectStore'
 import { useGeometryStore } from '@/stores/geometryStore'
@@ -20,30 +19,9 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
     setDensityContrast: state.setSchroedingerDensityContrast,
     setPowderScale: state.setSchroedingerPowderScale,
     setScatteringAnisotropy: state.setSchroedingerScatteringAnisotropy,
-    setAbsorberEnabled: state.setSchroedingerAbsorberEnabled,
-    setAbsorberWidth: state.setSchroedingerAbsorberWidth,
-    setPmlTargetReflection: state.setSchroedingerPmlTargetReflection,
   }))
-  const {
-    config,
-    setDensityGain,
-    setDensityContrast,
-    setPowderScale,
-    setScatteringAnisotropy,
-    setAbsorberEnabled,
-    setAbsorberWidth,
-    setPmlTargetReflection,
-  } = useExtendedObjectStore(extendedObjectSelector)
-
-  // Log-scale slider for PML target reflection: slider operates on -log10(R)
-  const logReflection = useMemo(
-    () => -Math.log10(Math.max(1e-12, config.pmlTargetReflection)),
-    [config.pmlTargetReflection]
-  )
-  const handleLogReflectionChange = useCallback(
-    (v: number) => setPmlTargetReflection(Math.pow(10, -v)),
-    [setPmlTargetReflection]
-  )
+  const { config, setDensityGain, setDensityContrast, setPowderScale, setScatteringAnisotropy } =
+    useExtendedObjectStore(extendedObjectSelector)
 
   // Emission settings from appearance store
   const emissionSelector = useShallow((state: AppearanceSlice) => ({
@@ -147,39 +125,6 @@ export const SchroedingerAdvanced: React.FC = React.memo(() => {
           showValue
           data-testid="schroedinger-density-contrast"
         />
-      </ControlGroup>
-
-      {/* Boundary Absorption */}
-      <ControlGroup title="Boundary Absorption" collapsible defaultOpen>
-        <Switch
-          label="PML Boundary"
-          checked={config.absorberEnabled}
-          onCheckedChange={setAbsorberEnabled}
-        />
-        {config.absorberEnabled && (
-          <>
-            <Slider
-              label="PML Width"
-              value={config.absorberWidth}
-              onChange={setAbsorberWidth}
-              min={0.05}
-              max={0.5}
-              step={0.01}
-              showValue
-              data-testid="schroedinger-pml-width"
-            />
-            <Slider
-              label={`Reflection 10⁻${Math.round(logReflection)}`}
-              value={logReflection}
-              onChange={handleLogReflectionChange}
-              min={3}
-              max={10}
-              step={1}
-              showValue
-              data-testid="schroedinger-pml-reflection"
-            />
-          </>
-        )}
       </ControlGroup>
     </div>
   )

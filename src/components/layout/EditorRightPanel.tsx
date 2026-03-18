@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 
 // Import existing sidebar sections
+import { AbsorptionSection } from '@/components/sections/Absorption/AbsorptionSection'
 import { AdvancedObjectControls } from '@/components/sections/Advanced/AdvancedObjectControls'
 import { AnalysisSection } from '@/components/sections/Advanced/AnalysisSection'
 import { OpenQuantumDiagnosticsSection } from '@/components/sections/Advanced/OpenQuantumDiagnosticsSection'
@@ -19,6 +20,7 @@ const ObjectTabContent: React.FC = React.memo(() => {
   return (
     <div>
       <FacesSection defaultOpen={true} />
+      <AbsorptionSection defaultOpen={true} />
       <AnalysisSection defaultOpen={true} />
       <SchroedingerQuantumEffectsSection defaultOpen={true} />
       <AdvancedObjectControls />

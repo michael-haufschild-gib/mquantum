@@ -74,9 +74,6 @@ export const PauliSpinorControls: React.FC = React.memo(() => {
       setPauliStepsPerFrame: s.setPauliStepsPerFrame,
       setPauliHbar: s.setPauliHbar,
       setPauliMass: s.setPauliMass,
-      setPauliAbsorberEnabled: s.setPauliAbsorberEnabled,
-      setPauliAbsorberWidth: s.setPauliAbsorberWidth,
-      setPauliPmlTargetReflection: s.setPauliPmlTargetReflection,
       // Visualization
       setPauliFieldView: s.setPauliFieldView,
       setPauliAutoScale: s.setPauliAutoScale,
