@@ -34,13 +34,14 @@ export const absorptionBlock = /* wgsl */ `
  * @return Local opacity [0, 1]
  */
 fn computeAlpha(rho: f32, stepLen: f32, sigma: f32) -> f32 {
-  // Clamp density to prevent extreme values
+  // Density ceiling: at σ=10 (max densityGain), step≈0.02 → exponent = -10·10·0.02 = -2.
+  // exp(-2)=0.14, well within f32 range. Prevents extreme values from unstable grids.
   let clampedRho = min(rho, 10.0);
 
   // Beer-Lambert: alpha = 1 - e^{-sigma*rho*delta_l}
   var exponent = -sigma * clampedRho * stepLen;
 
-  // Clamp exponent to prevent underflow/overflow
+  // exp(-20)≈2e-9: below f32 mantissa precision for alpha accumulation. Pure underflow guard.
   exponent = max(exponent, -20.0);
 
   return 1.0 - exp(exponent);

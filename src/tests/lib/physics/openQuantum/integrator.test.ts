@@ -11,8 +11,10 @@ import {
   evolveMultiStep,
   evolveStep,
 } from '@/lib/physics/openQuantum/integrator'
+import { buildLiouvillian } from '@/lib/physics/openQuantum/liouvillian'
 import { linearEntropy, purity, vonNeumannEntropy } from '@/lib/physics/openQuantum/metrics'
-import type { OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
+import { computePropagator, evolvePropagatorStep } from '@/lib/physics/openQuantum/propagator'
+import type { DensityMatrix, OpenQuantumConfig } from '@/lib/physics/openQuantum/types'
 import { DEFAULT_OPEN_QUANTUM_CONFIG } from '@/lib/physics/openQuantum/types'
 
 describe('createDensityMatrix', () => {
@@ -370,5 +372,138 @@ describe('physical invariants under Lindblad evolution', () => {
     )
 
     expect(offDiagAfter).toBeCloseTo(offDiagBefore, 6)
+  })
+})
+
+// ============================================================================
+// Euler vs Propagator convergence — decision tests
+// ============================================================================
+
+/** Frobenius norm ||A - B||_F for two density matrices */
+function frobeniusDiff(a: DensityMatrix, b: DensityMatrix): number {
+  const el_a = a.elements
+  const el_b = b.elements
+  let sum = 0
+  for (let i = 0; i < el_a.length; i++) {
+    const d = el_a[i]! - el_b[i]!
+    sum += d * d
+  }
+  return Math.sqrt(sum)
+}
+
+describe('Euler vs propagator convergence', () => {
+  it('Euler path matches propagator within visual tolerance at production dt', () => {
+    // Production parameters: K=2, dt=0.01, dephasing γ=1.0
+    const K = 2
+    const c = 1 / Math.sqrt(2)
+    const energies = new Float64Array([0.5, 1.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 1.0,
+    }
+    const channels = buildLindbladChannels(config, K)
+    const dt = 0.01
+    const steps = 100 // T_final = 1.0
+
+    // Propagator path (reference)
+    const rhoProp = densityMatrixFromCoefficients([c, c], [0, 0], K)
+    const liouvillian = buildLiouvillian(energies, channels, K)
+    const P = computePropagator(liouvillian, dt, K)
+    for (let i = 0; i < steps; i++) {
+      evolvePropagatorStep(P, rhoProp)
+    }
+
+    // Euler path (under test)
+    const rhoEuler = densityMatrixFromCoefficients([c, c], [0, 0], K)
+    evolveMultiStep(rhoEuler, energies, channels, dt, steps)
+
+    const error = frobeniusDiff(rhoEuler, rhoProp)
+    // Visual tolerance: 1% Frobenius error is below perceptual threshold
+    // for density matrix → wavefunction coefficient → color mapping
+    expect(error).toBeLessThan(0.01)
+  })
+
+  it('Euler convergence rate is first-order in dt', () => {
+    const K = 2
+    const c = 1 / Math.sqrt(2)
+    const energies = new Float64Array([0.5, 1.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 1.0,
+    }
+    const channels = buildLindbladChannels(config, K)
+    const tFinal = 0.5
+
+    // Reference: propagator at finest dt
+    const liouvillian = buildLiouvillian(energies, channels, K)
+
+    const errors: number[] = []
+    for (const dt of [0.02, 0.01, 0.005]) {
+      const steps = Math.round(tFinal / dt)
+
+      // Propagator reference for this dt (machine-precision per step)
+      const rhoProp = densityMatrixFromCoefficients([c, c], [0, 0], K)
+      const P = computePropagator(liouvillian, dt, K)
+      for (let i = 0; i < steps; i++) {
+        evolvePropagatorStep(P, rhoProp)
+      }
+
+      // Euler
+      const rhoEuler = densityMatrixFromCoefficients([c, c], [0, 0], K)
+      evolveMultiStep(rhoEuler, energies, channels, dt, steps)
+
+      errors.push(frobeniusDiff(rhoEuler, rhoProp))
+    }
+
+    // First-order: halving dt should halve the error → ratio ≈ 2.0
+    const ratio1 = errors[0]! / errors[1]!
+    const ratio2 = errors[1]! / errors[2]!
+
+    expect(ratio1).toBeGreaterThan(1.5)
+    expect(ratio1).toBeLessThan(2.5)
+    expect(ratio2).toBeGreaterThan(1.5)
+    expect(ratio2).toBeLessThan(2.5)
+  })
+
+  it('Euler path at worst-case parameters (high γ, large dt)', () => {
+    // Stress test: parameters beyond production range
+    const K = 4
+    const c = 1 / Math.sqrt(K)
+    const coeffsRe = Array.from({ length: K }, () => c)
+    const coeffsIm = Array.from({ length: K }, () => 0)
+    const energies = new Float64Array([0.5, 1.5, 2.5, 3.5])
+    const config: OpenQuantumConfig = {
+      ...DEFAULT_OPEN_QUANTUM_CONFIG,
+      enabled: true,
+      dephasingEnabled: true,
+      dephasingRate: 5.0,
+      relaxationEnabled: true,
+      relaxationRate: 2.0,
+    }
+    const channels = buildLindbladChannels(config, K)
+    const dt = 0.05
+    const steps = 10 // T_final = 0.5
+
+    // Propagator reference
+    const rhoProp = densityMatrixFromCoefficients(coeffsRe, coeffsIm, K)
+    const liouvillian = buildLiouvillian(energies, channels, K)
+    const P = computePropagator(liouvillian, dt, K)
+    for (let i = 0; i < steps; i++) {
+      evolvePropagatorStep(P, rhoProp)
+    }
+
+    // Euler
+    const rhoEuler = densityMatrixFromCoefficients(coeffsRe, coeffsIm, K)
+    evolveMultiStep(rhoEuler, energies, channels, dt, steps)
+
+    const error = frobeniusDiff(rhoEuler, rhoProp)
+    // This test documents the error at worst-case parameters.
+    // If error > 5%, the Euler integrator is inadequate for this regime.
+    // Current expectation: Euler diverges at high γ*dt products.
+    expect(error).toBeLessThan(0.05)
   })
 })

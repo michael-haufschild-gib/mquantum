@@ -115,6 +115,16 @@ function unitaryStep(rho: DensityMatrix, energies: Float64Array, dt: number): vo
 /**
  * Apply dissipative Lindblad evolution: ρ'' = ρ' + dt · Σ_j D[L_j](ρ')
  *
+ * Uses forward Euler (first-order). Convergence analysis (see integrator.test.ts
+ * "Euler vs propagator convergence"):
+ * - At production dt=0.01, γ≤1: Frobenius error vs exact propagator < 1%.
+ * - At stress dt=0.05, γ=5, K=4: error < 5%.
+ * - Measured convergence order: O(dt) with ratio ≈ 2× per halving.
+ *
+ * The physicality guards (Hermitianize + trace-normalize + eigenvalue floor)
+ * in evolveStep() absorb the Euler truncation error, keeping ρ physical.
+ * For hydrogen open quantum mode, the Padé propagator path is used instead.
+ *
  * @param rho - Density matrix (mutated in place)
  * @param channels - Lindblad channels
  * @param dt - Timestep

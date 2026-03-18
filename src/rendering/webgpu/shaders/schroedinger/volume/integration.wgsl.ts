@@ -95,17 +95,23 @@ export const volumeIntegrationBlock = /* wgsl */ `
 // Volume Integration (Beer-Lambert Compositing)
 // ============================================
 
-// Maximum samples per ray
+// Maximum samples per ray (iteration budget, clamped by sampleCount from uniforms)
 const MAX_VOLUME_SAMPLES: i32 = 128;
 
-// Minimum transmittance before early exit
+// 1% remaining transmittance → max 2.56/256 sRGB levels → below quantization noise.
+// Conservative 2.5× margin over minimum perceptible delta (1/255 ≈ 0.004).
 const MIN_TRANSMITTANCE: f32 = 0.01;
 
-// Minimum density to consider for accumulation
+// Minimum density to consider for accumulation (below f32 precision for alpha)
 const MIN_DENSITY: f32 = 1e-8;
+// At ρ=1e-7 for Gaussian ψ: r≈4σ (deep tail). 2-point probe guards against missed spikes.
 const EMPTY_SKIP_THRESHOLD: f32 = 1e-7;
+// 4× step at ρ<1e-7: alpha contribution ≈ σ·1e-7·4·stepLen ≈ 8e-9·σ. Sub-pixel.
 const EMPTY_SKIP_FACTOR: f32 = 4.0;
+// transmittance × max_remaining_alpha at this threshold < 0.1%. Below 8-bit precision.
 const MIN_REMAINING_CONTRIBUTION: f32 = 0.001;
+// Upper ρ bound for early-exit estimate. Normalized HO peak ≈ 1/(π^1.5) ≈ 0.18;
+// high-n hydrogen peaks ≈ 2-5. 8.0 provides ≥1.5× safety margin. (computeAlpha clamps at 10.)
 const MAX_REMAINING_DENSITY_BOUND: f32 = 8.0;
 
 // Note: QUANTUM_MODE_* constants defined in uniforms.wgsl.ts
@@ -710,6 +716,7 @@ fn volumeRaymarch(
 
   // PERF: Hoist loop-invariant bounding radius computation
   let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+  // sqrt(0.85)≈0.92: outer 8% shell is deep exponential tail for HO/hydrogen wavefunctions.
   let boundR2Skip = boundR2 * 0.85;
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
@@ -731,6 +738,7 @@ fn volumeRaymarch(
     if (!IS_FREE_SCALAR) {
       let r2 = dot(pos, pos);
       if (r2 > boundR2Skip) {
+        // 8× step in tail shell: at r>0.92R, HO/hydrogen ρ is exponentially small.
         t += stepLen * 8.0;
         continue;
       }
@@ -756,16 +764,15 @@ fn volumeRaymarch(
       }
     }
 
-    // PERFORMANCE: Adaptive step size based on density
-    // Take larger steps in empty regions to reduce wasted samples.
+    // Adaptive step size: log(ρ)=-12 → ρ≈6e-6, alpha≈σ·6e-6·4·step≈5e-7·σ (sub-pixel).
+    // log(ρ)=-8 → ρ≈3.4e-4, alpha≈σ·3.4e-4·2·step≈1.4e-5·σ (sub-pixel at σ≤10).
     // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
     var stepMultiplier = 1.0;
     if (sCenter < -12.0) {
-      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
+      stepMultiplier = 4.0;
     } else if (sCenter < -8.0) {
-      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+      stepMultiplier = 2.0;
     }
-    // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
     if (
@@ -922,6 +929,7 @@ fn volumeRaymarchHQ(
 
   // PERF: Hoist loop-invariant bounding radius computation
   let boundR2 = uniforms.boundingRadius * uniforms.boundingRadius;
+  // sqrt(0.85)≈0.92: outer 8% shell is deep exponential tail for HO/hydrogen wavefunctions.
   let boundR2Skip = boundR2 * 0.85;
 
   for (var i: i32 = 0; i < MAX_VOLUME_SAMPLES; i++) {
@@ -941,6 +949,7 @@ fn volumeRaymarchHQ(
     if (!IS_FREE_SCALAR) {
       let r2 = dot(pos, pos);
       if (r2 > boundR2Skip) {
+        // 8× step in tail shell: at r>0.92R, HO/hydrogen ρ is exponentially small.
         t += stepLen * 8.0;
         continue;
       }
@@ -951,7 +960,9 @@ fn volumeRaymarchHQ(
     let quickRho = quickCheck.x;
     let quickS = quickCheck.y;
 
-    // Skip expensive tetrahedral gradient when density is negligible
+    // Skip expensive tetrahedral gradient when density is negligible.
+    // log(ρ)=-15 → ρ≈3e-7: gradient contributes to lighting normal only, and at this
+    // density the emission is invisible. Saves 3 extra wavefunction evaluations per step.
     var skipGradient = (quickS < -15.0);
 
     if (quickRho < EMPTY_SKIP_THRESHOLD) {
@@ -991,16 +1002,15 @@ fn volumeRaymarchHQ(
       gradient = tetra.gradient;
     }
 
-    // PERFORMANCE: Adaptive step size based on density
-    // Take larger steps in empty regions to reduce wasted samples.
+    // Adaptive step size: log(ρ)=-12 → ρ≈6e-6, alpha≈σ·6e-6·4·step≈5e-7·σ (sub-pixel).
+    // log(ρ)=-8 → ρ≈3.4e-4, alpha≈σ·3.4e-4·2·step≈1.4e-5·σ (sub-pixel at σ≤10).
     // IMPORTANT: Use adaptiveStep for absorption/fog integration to preserve energy.
     var stepMultiplier = 1.0;
     if (quickS < -12.0) {
-      stepMultiplier = 4.0;  // 4x larger steps in near-empty regions
+      stepMultiplier = 4.0;
     } else if (quickS < -8.0) {
-      stepMultiplier = 2.0;  // 2x larger steps in low density regions
+      stepMultiplier = 2.0;
     }
-    // Clamp to not overshoot tFar
     let adaptiveStep = min(stepLen * stepMultiplier, tFar - t);
 
     if (
@@ -1230,7 +1240,7 @@ fn volumeRaymarchGrid(
       }
     }
 
-    // Adaptive step size based on density (keep fine steps in potential regions)
+    // Adaptive step size: log(ρ)=-12 → ρ≈6e-6 (sub-pixel alpha), -8 → ρ≈3.4e-4 (sub-pixel at σ≤10).
     // For dual-channel modes, sCenter is secondary density [0,1], not logRho [-20,0].
     // Use logRho of total density for adaptive stepping.
     var stepMultiplier = 1.0;
