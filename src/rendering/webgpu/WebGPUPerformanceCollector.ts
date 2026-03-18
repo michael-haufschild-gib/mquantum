@@ -10,13 +10,15 @@
 
 import {
   type BufferStats,
+  type CpuBreakdown,
   type GPUStats,
   GRAPH_POINTS,
+  type PassTimingEntry,
   usePerformanceMetricsStore,
 } from '@/stores/performanceMetricsStore'
 import { useUIStore } from '@/stores/uiStore'
 
-import type { WebGPUFrameStats } from './core/types'
+import type { WebGPUFrameStats, WebGPUPassTiming } from './core/types'
 import type { WebGPURenderGraph } from './graph/WebGPURenderGraph'
 
 // ============================================================================
@@ -92,6 +94,10 @@ export class WebGPUStatsCollector {
   private lastPublishTime = 0
   private lastFrameTime = 0
   private smoothedFps: number | null = null
+
+  // Latest per-pass timing snapshot (published at 2Hz, not accumulated)
+  private latestPassTimings: WebGPUPassTiming[] = []
+  private latestCpuBreakdown: CpuBreakdown = { setupMs: 0, passesMs: 0, submitMs: 0 }
 
   private accumulated: AccumulatedStats = {
     frameCount: 0,
@@ -195,13 +201,20 @@ export class WebGPUStatsCollector {
     this.accumulated.minFps = Math.min(this.accumulated.minFps, fps)
     this.accumulated.maxFps = Math.max(this.accumulated.maxFps, fps)
 
-    // Full stats mode: accumulate draw stats
-    if (this.measurementTier === TIER_FULL_STATS && frameStats.drawStats) {
-      this.accumulated.drawCalls += frameStats.drawStats.calls
-      this.accumulated.triangles += frameStats.drawStats.triangles
-      this.accumulated.vertices += frameStats.drawStats.vertices
-      this.accumulated.lines += frameStats.drawStats.lines
-      this.accumulated.points += frameStats.drawStats.points
+    // Full stats mode: accumulate draw stats + capture per-pass timing
+    if (this.measurementTier === TIER_FULL_STATS) {
+      if (frameStats.drawStats) {
+        this.accumulated.drawCalls += frameStats.drawStats.calls
+        this.accumulated.triangles += frameStats.drawStats.triangles
+        this.accumulated.vertices += frameStats.drawStats.vertices
+        this.accumulated.lines += frameStats.drawStats.lines
+        this.accumulated.points += frameStats.drawStats.points
+      }
+
+      // Store latest pass timings snapshot (not accumulated — GPU timestamps
+      // are already from the most recent resolved readback)
+      this.latestPassTimings = frameStats.passTiming
+      this.latestCpuBreakdown = frameStats.cpuBreakdown
     }
 
     // Check if it's time to publish (2Hz)
@@ -224,8 +237,13 @@ export class WebGPUStatsCollector {
     size: { width: number; height: number },
     dpr: number
   ): void {
-    const { updateMetrics, updateBufferStats, updateSceneGpu } =
-      usePerformanceMetricsStore.getState()
+    const {
+      updateMetrics,
+      updateBufferStats,
+      updateSceneGpu,
+      updatePassTimings,
+      updateCpuBreakdown,
+    } = usePerformanceMetricsStore.getState()
 
     const frameCount = this.accumulated.frameCount || 1
 
@@ -306,6 +324,24 @@ export class WebGPUStatsCollector {
         screen: { width: size.width, height: size.height },
       }
       updateBufferStats(bufferStats)
+
+      // Publish per-pass timing data
+      if (this.latestPassTimings.length > 0) {
+        let totalGpuMs = 0
+        const entries: PassTimingEntry[] = this.latestPassTimings.map((pt) => {
+          totalGpuMs += pt.gpuTimeMs
+          return {
+            passId: pt.passId,
+            gpuTimeMs: pt.gpuTimeMs,
+            cpuTimeMs: pt.cpuTimeMs,
+            skipped: pt.skipped,
+          }
+        })
+        updatePassTimings(entries, totalGpuMs)
+      }
+
+      // Publish CPU breakdown
+      updateCpuBreakdown(this.latestCpuBreakdown)
     }
 
     // Reset accumulators
@@ -328,6 +364,8 @@ export class WebGPUStatsCollector {
     this.lastPublishTime = 0
     this.lastFrameTime = 0
     this.smoothedFps = null
+    this.latestPassTimings = []
+    this.latestCpuBreakdown = { setupMs: 0, passesMs: 0, submitMs: 0 }
     this.accumulated = {
       frameCount: 0,
       totalCpuTimeMs: 0,

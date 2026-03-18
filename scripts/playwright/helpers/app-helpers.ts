@@ -421,6 +421,14 @@ export async function expectCanvasNotBlank(page: Page): Promise<void> {
 
 // ─── Performance Metrics ─────────────────────────────────────────────────────
 
+/** Per-pass timing entry from the performance metrics store. */
+export interface PassTimingSnapshot {
+  passId: string
+  gpuTimeMs: number
+  cpuTimeMs: number
+  skipped: boolean
+}
+
 /** Snapshot of performance metrics from the running app. */
 export interface PerfMetricsSnapshot {
   fps: number
@@ -429,6 +437,8 @@ export interface PerfMetricsSnapshot {
   vramMB: number
   fpsHistory: number[]
   cpuHistory: number[]
+  passTimings: PassTimingSnapshot[]
+  totalGpuTimeMs: number
 }
 
 /** Read a performance metrics snapshot from the performanceMetricsStore. */
@@ -443,6 +453,13 @@ export async function getPerformanceMetrics(page: Page): Promise<PerfMetricsSnap
       vramMB: s.vram.total,
       fpsHistory: [...s.history.fps],
       cpuHistory: [...s.history.cpu],
+      passTimings: s.passTimings.map((p) => ({
+        passId: p.passId,
+        gpuTimeMs: p.gpuTimeMs,
+        cpuTimeMs: p.cpuTimeMs,
+        skipped: p.skipped,
+      })),
+      totalGpuTimeMs: s.totalGpuTimeMs,
     }
   })
 }

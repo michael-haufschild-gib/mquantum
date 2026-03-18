@@ -116,6 +116,26 @@
     --health-low-stroke: var(--token-red-400);
 
     /* ═══════════════════════════════════════════════════════════════════
+       CHART: PASS TIMING
+       Distinct colors for per-pass GPU timing bars and table indicators.
+       ═══════════════════════════════════════════════════════════════════ */
+    --chart-pass-1: oklch(0.75 0.18 145);
+    --chart-pass-2: oklch(0.72 0.18 250);
+    --chart-pass-3: oklch(0.75 0.17 55);
+    --chart-pass-4: oklch(0.7 0.19 310);
+    --chart-pass-5: oklch(0.78 0.16 95);
+    --chart-pass-6: oklch(0.68 0.17 200);
+    --chart-pass-7: oklch(0.72 0.2 25);
+    --chart-pass-8: oklch(0.74 0.14 170);
+
+    --chart-cpu-setup: oklch(0.72 0.18 250);
+    --chart-cpu-passes: oklch(0.75 0.18 145);
+    --chart-cpu-submit: oklch(0.75 0.17 55);
+
+    --chart-cost-hot: oklch(0.72 0.2 25);
+    --chart-cost-warm: oklch(0.75 0.17 55);
+
+    /* ═══════════════════════════════════════════════════════════════════
        PHYSICS: DIRAC DISPERSION
        Particle and antiparticle branch colors for dispersion diagrams.
        ═══════════════════════════════════════════════════════════════════ */

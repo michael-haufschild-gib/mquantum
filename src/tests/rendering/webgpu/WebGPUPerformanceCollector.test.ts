@@ -30,6 +30,9 @@ function resetMetricsStore(): void {
       mem: new Array(GRAPH_POINTS).fill(0),
     },
     gpuName: 'Unknown GPU',
+    passTimings: [],
+    totalGpuTimeMs: 0,
+    cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
   })
 }
 
@@ -46,6 +49,7 @@ function createFrameStats(overrides?: Partial<WebGPUFrameStats>): WebGPUFrameSta
       lines: 0,
       points: 0,
     },
+    cpuBreakdown: { setupMs: 0.1, passesMs: 3.5, submitMs: 0.4 },
     ...overrides,
   }
 }

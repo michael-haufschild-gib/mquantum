@@ -388,6 +388,7 @@ export interface CachedComputePipeline {
 export interface WebGPUPassTiming {
   passId: string
   gpuTimeMs: number
+  cpuTimeMs: number
   skipped: boolean
 }
 
@@ -426,6 +427,19 @@ export interface WebGPUFrameDrawStats {
 /**
  * Frame statistics from graph execution.
  */
+/** CPU time breakdown for the three phases of frame execution. */
+export interface WebGPUCpuBreakdown {
+  /** Store captures + context creation */
+  setupMs: number
+  /** Pass execution loop */
+  passesMs: number
+  /** Command buffer submit + post-frame hooks + stat aggregation */
+  submitMs: number
+}
+
+/**
+ *
+ */
 export interface WebGPUFrameStats {
   totalTimeMs: number
   passTiming: WebGPUPassTiming[]
@@ -433,4 +447,6 @@ export interface WebGPUFrameStats {
   vramUsage: number
   /** Aggregated draw statistics for the frame */
   drawStats: WebGPUFrameDrawStats
+  /** CPU time breakdown by frame phase */
+  cpuBreakdown: WebGPUCpuBreakdown
 }

@@ -44,6 +44,21 @@ export interface BufferStats {
   screen: BufferDimensions
 }
 
+/** Per-pass timing data surfaced from the render graph. */
+export interface PassTimingEntry {
+  passId: string
+  gpuTimeMs: number
+  cpuTimeMs: number
+  skipped: boolean
+}
+
+/** CPU time breakdown for the three phases of frame execution. */
+export interface CpuBreakdown {
+  setupMs: number
+  passesMs: number
+  submitMs: number
+}
+
 /** Aggregated performance metrics store state. */
 export interface PerformanceMetricsState {
   fps: number
@@ -59,6 +74,9 @@ export interface PerformanceMetricsState {
   buffers: BufferStats
   history: GraphData
   gpuName: string
+  passTimings: PassTimingEntry[]
+  totalGpuTimeMs: number
+  cpuBreakdown: CpuBreakdown
 
   // Actions
   updateMetrics: (metrics: Partial<PerformanceMetricsState>) => void
@@ -66,6 +84,8 @@ export interface PerformanceMetricsState {
   updateBufferStats: (buffers: BufferStats) => void
   /** Update scene-only GPU stats (excludes post-processing passes) */
   updateSceneGpu: (stats: GPUStats) => void
+  updatePassTimings: (timings: PassTimingEntry[], totalGpuMs: number) => void
+  updateCpuBreakdown: (breakdown: CpuBreakdown) => void
 }
 
 export const GRAPH_POINTS = 40
@@ -94,9 +114,15 @@ export const usePerformanceMetricsStore = create<PerformanceMetricsState>((set) 
     mem: new Array(GRAPH_POINTS).fill(0),
   },
   gpuName: 'Unknown GPU',
+  passTimings: [],
+  totalGpuTimeMs: 0,
+  cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
 
   updateMetrics: (metrics) => set((state) => ({ ...state, ...metrics })),
   setGpuName: (name) => set({ gpuName: name }),
   updateBufferStats: (buffers) => set({ buffers }),
   updateSceneGpu: (stats) => set({ sceneGpu: stats }),
+  updatePassTimings: (timings, totalGpuMs) =>
+    set({ passTimings: timings, totalGpuTimeMs: totalGpuMs }),
+  updateCpuBreakdown: (breakdown) => set({ cpuBreakdown: breakdown }),
 }))

@@ -22,7 +22,7 @@ import {
 // ============================================================================
 
 /** Active tab in the performance monitor */
-export type PerfMonitorTab = 'perf' | 'sys' | 'shader' | 'buffers'
+export type PerfMonitorTab = 'perf' | 'sys' | 'shader' | 'buffers' | 'passes'
 
 // ============================================================================
 // State Interface

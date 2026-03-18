@@ -1,4 +1,5 @@
 export { BuffersTabContent } from './BuffersTab'
+export { PassesTabContent } from './PassesTab'
 export { ShaderTabContent } from './ShaderTab'
 export { StatsTabContent } from './StatsTab'
 export { SystemTabContent } from './SystemTab'

@@ -282,8 +282,13 @@ export class WebGPURenderGraph {
   private _frameWrittenByEnabledPass: Set<string> = new Set()
   private _framePassEnabledMemo: Map<string, boolean> = new Map()
   private _frameTimedPassIds: string[] = []
-  private _framePassTimingResult: Array<{ passId: string; gpuTimeMs: number; skipped: boolean }> =
-    []
+  private _frameCpuPassTimings: Map<string, number> = new Map()
+  private _framePassTimingResult: Array<{
+    passId: string
+    gpuTimeMs: number
+    cpuTimeMs: number
+    skipped: boolean
+  }> = []
   private beforeSubmitHooks: Map<string, (context: WebGPUBeforeSubmitHookContext) => void> =
     new Map()
 
@@ -721,6 +726,7 @@ export class WebGPURenderGraph {
         commandBufferCount: 0,
         vramUsage: 0,
         drawStats: { calls: 0, triangles: 0, vertices: 0, lines: 0, points: 0 },
+        cpuBreakdown: { setupMs: 0, passesMs: 0, submitMs: 0 },
       }
     }
 
@@ -728,6 +734,8 @@ export class WebGPURenderGraph {
     if (!this.compiled) {
       this.compile()
     }
+
+    const cpuSetupStart = performance.now()
 
     this.elapsedTime += delta
     this.frameNumber++
@@ -771,8 +779,13 @@ export class WebGPURenderGraph {
 
     // Execute passes
     // PERF: Reuse per-frame collections instead of allocating new ones each frame
+    const cpuPassesStart = performance.now()
+    const cpuSetupMs = cpuPassesStart - cpuSetupStart
+
     const passTimings = this._framePassTimings
     passTimings.clear()
+    const cpuPassTimings = this._frameCpuPassTimings
+    cpuPassTimings.clear()
     let timestampIndex = 0
     const timedPassIds = this._frameTimedPassIds
     timedPassIds.length = 0
@@ -925,11 +938,13 @@ export class WebGPURenderGraph {
       }
 
       // Execute pass
+      const passCpuStart = performance.now()
       try {
         pass.execute(ctx)
       } catch (e) {
         logger.error(`[WebGPU RenderGraph] Error executing pass '${passId}':`, e)
       } finally {
+        cpuPassTimings.set(passId, performance.now() - passCpuStart)
         if (canCollectGpuTimings) {
           const usedTimestampWrites = ctx.consumePassUsedTimestampWrites()
           ctx.clearPassTimestampWrites()
@@ -940,6 +955,9 @@ export class WebGPURenderGraph {
         }
       }
     }
+
+    const cpuSubmitStart = performance.now()
+    const cpuPassesMs = cpuSubmitStart - cpuPassesStart
 
     const resolvedTimestampCount = timestampIndex * 2
     // Resolve timestamps
@@ -1019,6 +1037,8 @@ export class WebGPURenderGraph {
       }
     }
 
+    const cpuSubmitMs = performance.now() - cpuSubmitStart
+
     // Build frame stats
     return {
       totalTimeMs: delta * 1000,
@@ -1033,6 +1053,11 @@ export class WebGPURenderGraph {
         lines: totalLines,
         points: totalPoints,
       },
+      cpuBreakdown: {
+        setupMs: cpuSetupMs,
+        passesMs: cpuPassesMs,
+        submitMs: cpuSubmitMs,
+      },
     }
   }
 
@@ -1041,13 +1066,13 @@ export class WebGPURenderGraph {
    */
   private buildPassTimingResult(
     passEnabledMemo: Map<string, boolean>
-  ): Array<{ passId: string; gpuTimeMs: number; skipped: boolean }> {
+  ): Array<{ passId: string; gpuTimeMs: number; cpuTimeMs: number; skipped: boolean }> {
     const result = this._framePassTimingResult
     const passCount = this.passOrder.length
 
     // Resize array if pass count changed
     while (result.length < passCount) {
-      result.push({ passId: '', gpuTimeMs: 0, skipped: false })
+      result.push({ passId: '', gpuTimeMs: 0, cpuTimeMs: 0, skipped: false })
     }
     if (result.length > passCount) {
       result.length = passCount
@@ -1059,6 +1084,7 @@ export class WebGPURenderGraph {
       const entry = result[i]!
       entry.passId = id
       entry.gpuTimeMs = this.lastPassTimings.get(id) ?? 0
+      entry.cpuTimeMs = this._frameCpuPassTimings.get(id) ?? 0
       entry.skipped = !(passEnabledMemo.get(id) ?? true)
     }
 

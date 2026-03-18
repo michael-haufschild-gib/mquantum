@@ -82,6 +82,8 @@ interface BenchmarkResult {
   p95FrameMs: number
   meanCpuMs: number
   vramMB: number
+  totalGpuMs: number
+  passTimings: Record<string, number>
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -129,21 +131,62 @@ function fmt(value: number, decimals = 1): string {
   return value.toFixed(decimals)
 }
 
+/** Format top-3 heaviest passes as a compact string. */
+function formatTopPasses(passTimings: Record<string, number>): string {
+  const sorted = Object.entries(passTimings).sort(([, a], [, b]) => b - a)
+  return sorted
+    .slice(0, 3)
+    .map(([id, ms]) => `${id}:${fmt(ms)}`)
+    .join(', ')
+}
+
 /** Print the results table to stdout. */
 function printResultsTable(results: BenchmarkResult[]): void {
   const header =
-    '| Mode | Dim | Mean FPS | Mean Frame (ms) | P95 Frame (ms) | Mean CPU (ms) | VRAM (MB) |'
-  const separator = '|-|-|-|-|-|-|-|'
+    '| Mode | Dim | Mean FPS | Mean Frame (ms) | P95 Frame (ms) | Mean CPU (ms) | GPU Total (ms) | VRAM (MB) | Top Passes |'
+  const separator = '|-|-|-|-|-|-|-|-|-|'
 
   const rows = results.map(
     (r) =>
-      `| ${r.label.padEnd(16)} | ${String(r.dim).padStart(3)} | ${fmt(r.meanFps).padStart(8)} | ${fmt(r.meanFrameMs).padStart(15)} | ${fmt(r.p95FrameMs).padStart(14)} | ${fmt(r.meanCpuMs).padStart(13)} | ${fmt(r.vramMB).padStart(9)} |`
+      `| ${r.label.padEnd(16)} | ${String(r.dim).padStart(3)} | ${fmt(r.meanFps).padStart(8)} | ${fmt(r.meanFrameMs).padStart(15)} | ${fmt(r.p95FrameMs).padStart(14)} | ${fmt(r.meanCpuMs).padStart(13)} | ${fmt(r.totalGpuMs).padStart(14)} | ${fmt(r.vramMB).padStart(9)} | ${formatTopPasses(r.passTimings)} |`
   )
 
   const table = ['\n## Performance Scaling Table\n', header, separator, ...rows, ''].join('\n')
 
   // eslint-disable-next-line no-console
   console.log(table)
+
+  // Print per-pass breakdown matrix
+  const allPasses = new Set<string>()
+  for (const r of results) {
+    for (const passId of Object.keys(r.passTimings)) {
+      allPasses.add(passId)
+    }
+  }
+
+  if (allPasses.size > 0) {
+    const passIds = [...allPasses].sort()
+    const passHeader = `| Mode | ${passIds.join(' | ')} |`
+    const passSep = `|-|${passIds.map(() => '-').join('|')}|`
+    const passRows = results.map((r) => {
+      const cells = passIds.map((id) => {
+        const ms = r.passTimings[id]
+        return ms !== undefined ? fmt(ms).padStart(id.length) : '—'.padStart(id.length)
+      })
+      return `| ${r.label.padEnd(16)} | ${cells.join(' | ')} |`
+    })
+
+    const passTable = [
+      '\n## Per-Pass GPU Timing Matrix (ms)\n',
+      passHeader,
+      passSep,
+      ...passRows,
+      '',
+    ].join('\n')
+
+    // eslint-disable-next-line no-console
+    console.log(passTable)
+  }
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -190,6 +233,14 @@ test.describe('performance benchmark', () => {
       const fpsValues = samples.map((s) => s.fps).filter((f) => f > 0)
       const lastSample = samples[samples.length - 1]!
 
+      // Capture per-pass GPU timing from the last sample
+      const passTimings: Record<string, number> = {}
+      for (const pt of lastSample.passTimings) {
+        if (!pt.skipped && pt.gpuTimeMs > 0) {
+          passTimings[pt.passId] = pt.gpuTimeMs
+        }
+      }
+
       const result: BenchmarkResult = {
         label,
         mode,
@@ -199,6 +250,8 @@ test.describe('performance benchmark', () => {
         p95FrameMs: p95(frameTimes),
         meanCpuMs: mean(cpuTimes),
         vramMB: lastSample.vramMB,
+        totalGpuMs: lastSample.totalGpuTimeMs,
+        passTimings,
       }
 
       results.push(result)

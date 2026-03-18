@@ -7,7 +7,13 @@ import { useUIStore } from '@/stores/uiStore'
 
 import { Icons } from './icons'
 import { Sparkline } from './subcomponents'
-import { BuffersTabContent, ShaderTabContent, StatsTabContent, SystemTabContent } from './tabs'
+import {
+  BuffersTabContent,
+  PassesTabContent,
+  ShaderTabContent,
+  StatsTabContent,
+  SystemTabContent,
+} from './tabs'
 import { formatFpsBound, getHealthColor } from './utils'
 
 // ============================================================================
@@ -91,6 +97,7 @@ export const ExpandedContent = React.memo(function ExpandedContent({
 
   const tabs = [
     { id: 'perf', label: 'Stats', content: <StatsTabContent /> },
+    { id: 'passes', label: 'Passes', content: <PassesTabContent /> },
     { id: 'sys', label: 'System', content: <SystemTabContent /> },
     { id: 'shader', label: 'Shader', content: <ShaderTabContent /> },
     { id: 'buffers', label: 'Buffers', content: <BuffersTabContent /> },
@@ -125,7 +132,9 @@ export const ExpandedContent = React.memo(function ExpandedContent({
           variant="minimal"
           fullWidth
           value={perfMonitorTab}
-          onChange={(id) => setPerfMonitorTab(id as 'perf' | 'sys' | 'shader' | 'buffers')}
+          onChange={(id) =>
+            setPerfMonitorTab(id as 'perf' | 'passes' | 'sys' | 'shader' | 'buffers')
+          }
           tabs={tabs}
           className="h-full border-b border-border-subtle text-[10px]"
           contentClassName="h-full"
