@@ -1,189 +1,150 @@
 /**
- * Quantum rendering smoke tests.
+ * Quantum rendering tests with pixel verification.
  *
- * Verifies that each quantum mode produces non-blank pixels on the WebGPU
- * canvas. These catch shader compilation failures, pipeline creation errors,
- * render graph cycles, and blank-canvas regressions that unit tests with
- * mocked GPU cannot detect.
+ * Verifies that each quantum mode:
+ * 1. Initializes the WebGPU renderer (data-renderer-state="ready")
+ * 2. Produces rendered frames (data-frame-count > 0)
+ * 3. Emits no fatal GPU errors
+ * 4. Actually renders visible content (pixel readback shows >1 color)
  *
- * Uses pixel sampling — not screenshots — to determine if the renderer
- * produced visible content.
+ * Pixel verification uses the app's own GPU buffer readback
+ * (captureScreenshotAsync) — the only reliable way to read a WebGPU canvas.
  *
  * Bugs caught:
  * - Shader compilation error for a specific quantum mode
  * - Pipeline workgroup size exceeds device limit
- * - Render graph produces blank output after mode switch
+ * - Render loop runs but produces blank frames (clear color only)
  * - Dimension change triggers crash in shader recompilation
+ * - Renderer stuck in "initializing" (async init never resolves)
+ * - Fatal GPU errors (render graph cycles, device lost)
+ * - Mode switch leaves stale pipeline producing wrong output
  */
 
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
-test.setTimeout(60_000)
+import {
+  collectFatalGpuErrors,
+  expectCanvasNotBlank,
+  getFrameCount,
+  gotoMode,
+  hasWebGPU,
+  waitForFirstFrame,
+  waitForFrameAdvance,
+  waitForRendererReady,
+  waitForRendererSettled,
+  waitForShaderCompilation,
+} from './helpers/app-helpers'
 
-/**
- * Sample center of the WebGPU canvas and count non-background pixels.
- * Returns 0 if canvas not found or all pixels are background.
- */
-async function countNonBgPixels(page: Page): Promise<number> {
-  return page.evaluate(() => {
-    const canvas = document.querySelector(
-      '[data-testid="webgpu-canvas"]'
-    ) as HTMLCanvasElement | null
-    if (!canvas || canvas.width === 0 || canvas.height === 0) return 0
-
-    const offscreen = document.createElement('canvas')
-    offscreen.width = canvas.width
-    offscreen.height = canvas.height
-    const ctx = offscreen.getContext('2d')
-    if (!ctx) return 0
-
-    ctx.drawImage(canvas, 0, 0)
-
-    const cx = Math.floor(canvas.width / 2)
-    const cy = Math.floor(canvas.height / 2)
-    const radius = 200
-    const x0 = Math.max(0, cx - radius)
-    const y0 = Math.max(0, cy - radius)
-    const w = Math.min(canvas.width, cx + radius) - x0
-    const h = Math.min(canvas.height, cy + radius) - y0
-    if (w <= 0 || h <= 0) return 0
-
-    const data = ctx.getImageData(x0, y0, w, h).data
-    const BG_TOL = 15
-    let count = 0
-    for (let i = 0; i < data.length; i += 32) {
-      // every 8th pixel
-      const r = data[i]!,
-        g = data[i + 1]!,
-        b = data[i + 2]!
-      const isBlack = r <= BG_TOL && g <= BG_TOL && b <= BG_TOL
-      const isSceneBg =
-        Math.abs(r - 35) <= BG_TOL && Math.abs(g - 35) <= BG_TOL && Math.abs(b - 35) <= BG_TOL
-      if (!isBlack && !isSceneBg) count++
-    }
-    return count
-  })
-}
-
-/**
- * Wait until the canvas has rendered visible content, or timeout.
- */
-async function waitForPixels(page: Page, timeoutMs = 20_000): Promise<number> {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    const n = await countNonBgPixels(page)
-    if (n >= 20) return n
-    await page.waitForTimeout(500)
-  }
-  return countNonBgPixels(page)
-}
-
-/** Navigate to a quantum mode and wait for the app to be ready. */
-async function gotoMode(page: Page, mode: string, dim = 3): Promise<void> {
-  await page.goto(`/?t=schroedinger&d=${dim}&qm=${mode}`)
-  await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 15_000 })
-}
+test.setTimeout(90_000)
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 test.describe('quantum mode rendering', () => {
   test.beforeEach(async ({ page }) => {
-    // Check WebGPU availability AND device capability
     await page.goto('/')
-    const gpuInfo = await page.evaluate(async () => {
-      if (!navigator.gpu) return { available: false, reason: 'no navigator.gpu' }
-      const adapter = await navigator.gpu.requestAdapter()
-      if (!adapter) return { available: false, reason: 'no adapter' }
-      return { available: true, reason: '' }
+    test.skip(!(await hasWebGPU(page)), 'WebGPU not available')
+  })
+
+  const modes = [
+    { mode: 'harmonicOscillator', dim: 3, label: 'HO 3D' },
+    { mode: 'harmonicOscillator', dim: 5, label: 'HO 5D' },
+    { mode: 'hydrogenND', dim: 3, label: 'Hydrogen 3D' },
+    { mode: 'hydrogenND', dim: 4, label: 'Hydrogen 4D' },
+    { mode: 'freeScalarField', dim: 3, label: 'Free Scalar Field' },
+    { mode: 'tdseDynamics', dim: 3, label: 'TDSE' },
+    { mode: 'becDynamics', dim: 3, label: 'BEC' },
+    { mode: 'diracEquation', dim: 3, label: 'Dirac' },
+    { mode: 'harmonicOscillator', dim: 11, label: 'HO 11D (max dim)' },
+  ] as const
+
+  for (const { mode, dim, label } of modes) {
+    test(`${label}: renders non-blank pixels with no fatal errors`, async ({ page }) => {
+      const gpuErrors = collectFatalGpuErrors(page)
+
+      await gotoMode(page, mode, dim)
+      await waitForRendererReady(page)
+
+      // Wait for shader compilation to finish AND at least one frame
+      // rendered with the new pipeline. This is critical: the render loop
+      // keeps showing the old graph during compilation, so pixel checks
+      // before this point would measure the wrong configuration.
+      await waitForShaderCompilation(page)
+
+      // Verify actual pixels were rendered (not just blank clear color)
+      await expectCanvasNotBlank(page)
+
+      expect(gpuErrors, `${label}: no fatal GPU errors`).toEqual([])
     })
-    test.skip(!gpuInfo.available, `GPU not capable: ${gpuInfo.reason}`)
+  }
+
+  test('switching modes: renderer recovers and renders each mode', async ({ page }) => {
+    const gpuErrors = collectFatalGpuErrors(page)
+
+    for (const mode of ['harmonicOscillator', 'hydrogenND', 'harmonicOscillator'] as const) {
+      await gotoMode(page, mode, 3)
+      await waitForRendererReady(page)
+      await waitForShaderCompilation(page)
+      await expectCanvasNotBlank(page)
+    }
+
+    expect(gpuErrors).toEqual([])
   })
 
-  test('harmonic oscillator 3D', async ({ page }) => {
+  test('animation loop: frame count increases over time', async ({ page }) => {
     await gotoMode(page, 'harmonicOscillator', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page)
-    expect(pixels, 'HO 3D should render non-blank pixels').toBeGreaterThanOrEqual(20)
+    await waitForRendererReady(page)
+    await waitForFirstFrame(page)
+
+    const count1 = await getFrameCount(page)
+    const count2 = await waitForFrameAdvance(page, count1)
+
+    expect(count2, 'Frame count should increase').toBeGreaterThan(count1)
   })
 
-  test('harmonic oscillator 5D', async ({ page }) => {
-    await gotoMode(page, 'harmonicOscillator', 5)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page)
-    expect(pixels, 'HO 5D should render non-blank pixels').toBeGreaterThanOrEqual(20)
+  test('renderer settles to ready or error, never stuck at initializing', async ({ page }) => {
+    await page.goto('/')
+    const state = await waitForRendererSettled(page)
+    expect(['ready', 'error']).toContain(state)
   })
 
-  test('hydrogen orbital 3D', async ({ page }) => {
-    await gotoMode(page, 'hydrogenND', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page)
-    expect(pixels, 'hydrogen 3D should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('hydrogen orbital 4D', async ({ page }) => {
-    await gotoMode(page, 'hydrogenND', 4)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page)
-    expect(pixels, 'hydrogen 4D should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('free scalar field', async ({ page }) => {
-    await gotoMode(page, 'freeScalarField', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page, 30_000) // compute modes need more time
-    expect(pixels, 'FSF should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('TDSE dynamics', async ({ page }) => {
-    await gotoMode(page, 'tdseDynamics', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page, 30_000)
-    expect(pixels, 'TDSE should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('BEC dynamics', async ({ page }) => {
-    await gotoMode(page, 'becDynamics', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page, 30_000)
-    expect(pixels, 'BEC should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('Dirac equation', async ({ page }) => {
-    await gotoMode(page, 'diracEquation', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page, 30_000)
-    expect(pixels, 'Dirac should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('dimension 11 (max) renders', async ({ page }) => {
-    await gotoMode(page, 'harmonicOscillator', 11)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    const pixels = await waitForPixels(page)
-    expect(pixels, 'HO 11D should render non-blank pixels').toBeGreaterThanOrEqual(20)
-  })
-
-  test('switching modes preserves rendering', async ({ page }) => {
-    // HO → hydrogen → back to HO
-    await gotoMode(page, 'harmonicOscillator', 3)
-    await expect(page.getByTestId('webgpu-canvas')).toBeVisible({ timeout: 10_000 })
-    let pixels = await waitForPixels(page)
-    expect(pixels, 'initial HO should render').toBeGreaterThanOrEqual(20)
-
-    await gotoMode(page, 'hydrogenND', 3)
-    pixels = await waitForPixels(page)
-    expect(pixels, 'hydrogen after switch should render').toBeGreaterThanOrEqual(20)
+  test('dimension change does not crash renderer and renders new dimension', async ({ page }) => {
+    const gpuErrors = collectFatalGpuErrors(page)
 
     await gotoMode(page, 'harmonicOscillator', 3)
-    pixels = await waitForPixels(page)
-    expect(pixels, 'HO after round-trip should render').toBeGreaterThanOrEqual(20)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+
+    await gotoMode(page, 'harmonicOscillator', 7)
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await expectCanvasNotBlank(page)
+
+    expect(gpuErrors).toEqual([])
+  })
+
+  test('rapid mode switching does not crash renderer', async ({ page }) => {
+    const gpuErrors = collectFatalGpuErrors(page)
+
+    // Quick succession — only the last navigation's shader needs to compile
+    const modeSequence = ['harmonicOscillator', 'tdseDynamics', 'becDynamics', 'hydrogenND']
+
+    for (const mode of modeSequence) {
+      await gotoMode(page, mode, 3)
+    }
+
+    // After the last navigation, wait for full pipeline compilation
+    await waitForRendererReady(page)
+    await waitForShaderCompilation(page)
+    await expectCanvasNotBlank(page)
+
+    expect(gpuErrors).toEqual([])
   })
 })
 
 test.describe('WebGPU fallback', () => {
   test('shows fallback message when WebGPU unavailable', async ({ page }) => {
     await page.goto('/')
-    const hasGPU = await page.evaluate(() => !!navigator.gpu)
-    test.skip(hasGPU, 'WebGPU is available — fallback not triggered')
+    test.skip(await hasWebGPU(page), 'WebGPU is available — fallback not triggered')
 
     await expect(page.getByText('WebGPU Required')).toBeVisible({ timeout: 15_000 })
   })

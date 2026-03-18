@@ -125,6 +125,76 @@ Every assertion must answer: "What specific bug would make this test fail?"
 | `expect(config.timeout).toBe(3000)` | Tests a default, not behavior | Test the behavior that depends on the config |
 | `expect(typeof fn).toBe('function')` | Tests existence, not functionality | Call the function, assert the output |
 
+## E2E Test Infrastructure (Playwright)
+
+### Testability Attributes
+
+The following `data-*` and `aria-*` attributes are added to production components specifically for e2e test automation. Do not remove them.
+
+| Attribute | Element | Purpose |
+|-----------|---------|---------|
+| `data-testid="webgpu-canvas"` | `<canvas>` in WebGPUCanvas | Locate the main render canvas |
+| `data-testid="webgpu-container"` | Container `<div>` in WebGPUCanvas | Locate the renderer wrapper |
+| `data-renderer-state` | `webgpu-container` | Values: `initializing`, `ready`, `error`. Tests wait for `ready` instead of polling. |
+| `data-renderer-error` | `webgpu-container` (error state only) | Contains the init error message |
+| `data-frame-count` | `webgpu-canvas` | Incremented each rendered frame. Tests wait for `> 0` to confirm first frame rendered. Written sparsely (first 10 frames + every 60th) to avoid DOM thrashing. |
+| `data-testid="left-panel"` | Left panel `<m.div>` in EditorLayout | Locate the left panel wrapper |
+| `data-testid="right-panel"` | Right panel `<m.div>` in EditorLayout | Locate the right panel wrapper |
+| `aria-expanded` | `toggle-left-panel` button | Reflects `showLeftPanel` store state |
+| `aria-expanded` | `toggle-right-panel` button | Reflects right panel open state |
+
+### E2E Test Patterns
+
+**Wait for renderer ready** — never use arbitrary `waitForTimeout`:
+```typescript
+// Wait for WebGPU init to complete
+await expect(
+  page.locator('[data-testid="webgpu-container"][data-renderer-state="ready"]')
+).toBeVisible({ timeout: 15_000 })
+
+// Wait for first frame
+await page.waitForFunction(() => {
+  const canvas = document.querySelector('[data-testid="webgpu-canvas"]')
+  return parseInt(canvas?.getAttribute('data-frame-count') ?? '0', 10) > 0
+}, { timeout: 20_000 })
+```
+
+**Check panel state** — use `aria-expanded`, not child element visibility:
+```typescript
+const toggle = page.getByTestId('toggle-left-panel')
+await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+```
+
+**Read store state** — use `page.evaluate` with dynamic import:
+```typescript
+const dim = await page.evaluate(async () => {
+  const mod = await import('/src/stores/geometryStore.ts')
+  return mod.useGeometryStore.getState().dimension
+})
+```
+
+**Animated elements** — Motion/Framer animations cause DOM instability during panel entrance. Use `{ force: true }` for tab clicks inside animated panels, or wait for the animation to complete via a stable child element.
+
+### E2E Spec Files
+
+| File | What it tests |
+|------|---------------|
+| `app-loads.spec.ts` | App loads, canvas visible, no fatal GPU errors |
+| `panels.spec.ts` | Left/right panel toggle via aria-expanded |
+| `keyboard.spec.ts` | Arrow keys, cinematic mode, shortcuts overlay |
+| `rendering.spec.ts` | All quantum modes render frames + pixels |
+| `screenshot-export.spec.ts` | File > Export → preview → crop → download |
+| `url-state.spec.ts` | URL params → store, reload persistence, invalid params |
+
+### Playwright Constraints
+
+| Rule | Detail |
+|------|--------|
+| Workers | `--workers=1` recommended locally (GPU contention) |
+| GPU skip | Tests that need rendering skip when `navigator.gpu` unavailable or adapter request fails |
+| Tab clicks in animated panels | Use `{ force: true }` — Motion panel entrance animation causes element instability |
+| No `waitForTimeout` | Wait for conditions: `data-renderer-state="ready"`, `data-frame-count > 0`, `aria-expanded`, `toBeVisible` |
+
 ## Quality Gate
 
 Before claiming tests pass:

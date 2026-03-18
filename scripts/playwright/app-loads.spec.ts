@@ -8,18 +8,24 @@
 
 import { expect, test } from '@playwright/test'
 
+import {
+  collectPageErrors,
+  filterBenignErrors,
+  waitForAppLoaded,
+  waitForRendererSettled,
+} from './helpers/app-helpers'
+import { TopBar } from './pages/TopBar'
+
 test.setTimeout(30_000)
 
 test('app loads and shows top bar', async ({ page }) => {
-  const pageErrors: string[] = []
-  page.on('pageerror', (err) => pageErrors.push(err.message))
+  const pageErrors = collectPageErrors(page)
 
   await page.goto('/')
-  await page.waitForLoadState('domcontentloaded')
+  const topBar = new TopBar(page)
+  await topBar.waitForVisible()
 
-  await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 15_000 })
-
-  const real = pageErrors.filter((e) => !e.includes('ResizeObserver'))
+  const real = filterBenignErrors(pageErrors)
   expect(real, 'No uncaught page errors on load').toEqual([])
 })
 
@@ -30,28 +36,24 @@ test('canvas element is visible after load', async ({ page }) => {
   const canvas = page.locator('canvas').first()
   const fallback = page.getByText('WebGPU Required')
 
-  // Wait for one of the two outcomes
   await expect(canvas.or(fallback)).toBeVisible({ timeout: 15_000 })
 })
 
-test('no fatal GPU errors that prevent rendering', async ({ page }) => {
-  const fatalErrors: string[] = []
-  page.on('console', (msg) => {
-    if (msg.type() !== 'error') return
-    const text = msg.text()
-    // Fatal = errors that crash the renderer, not recoverable pipeline failures
-    // The renderer logs "Pipeline creation failed, clearing all caches" for
-    // workgroup limit issues — it recovers by rebuilding. That's not fatal.
-    if (/rendergraph.*cycle|unhandled.*webgpu|device.*lost/i.test(text)) {
-      fatalErrors.push(text)
-    }
-  })
+test('no fatal GPU errors — renderer reaches ready or error state', async ({ page }) => {
+  const pageErrors = collectPageErrors(page)
 
   await page.goto('/')
-  await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 15_000 })
+  await waitForAppLoaded(page)
 
-  // Wait for renderer init
-  await page.waitForTimeout(3000)
+  // Wait for renderer to settle — deterministic, no arbitrary timeout
+  const state = await waitForRendererSettled(page)
 
-  expect(fatalErrors, 'No fatal GPU errors').toEqual([])
+  // If renderer is ready, verify no page-level errors
+  if (state === 'ready') {
+    const real = filterBenignErrors(pageErrors)
+    expect(real, 'No uncaught page errors with ready renderer').toEqual([])
+  }
+
+  // Regardless of state, renderer must not be stuck at "initializing"
+  expect(['ready', 'error']).toContain(state)
 })

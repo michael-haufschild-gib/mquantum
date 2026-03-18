@@ -17,13 +17,12 @@ export default defineConfig({
     {
       name: 'chromium',
       use: {
-        ...devices['Desktop Chrome'],
+        // Use system Chrome — Playwright's bundled Chromium does not include WebGPU.
+        // This project is a WebGPU renderer; tests that skip GPU are worthless.
+        channel: 'chrome',
+        viewport: { width: 1280, height: 800 },
         launchOptions: {
-          args: [
-            // Enable WebGPU in headless mode
-            '--enable-unsafe-webgpu',
-            '--enable-features=Vulkan',
-          ],
+          args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'],
         },
       },
     },

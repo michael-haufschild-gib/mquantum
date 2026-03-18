@@ -139,6 +139,10 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
     [objectType, dimension, schroedingerRotation, schroedingerBasisCacheRef]
   )
 
+  // E2E testability: frame counter exposed as data-frame-count on the canvas.
+  // Tests wait for data-frame-count > 0 to confirm the renderer produced output.
+  const frameCountRef = useRef(0)
+
   const executeSceneFrame = useCallback(
     (deltaTime: number) => {
       const exporting = isExportRuntimeActive(exportRuntimeRef.current)
@@ -177,6 +181,13 @@ export function useSceneFrameCallbacks(deps: SceneFrameCallbackDeps): SceneFrame
         size: frameSize,
         dpr: effectiveDpr,
       })
+
+      // Update frame counter attribute for e2e test automation.
+      // Written sparsely (first 10 frames + every 60th) to avoid DOM thrashing.
+      frameCountRef.current++
+      if (frameCountRef.current <= 10 || frameCountRef.current % 60 === 0) {
+        canvas.setAttribute('data-frame-count', String(frameCountRef.current))
+      }
 
       onFrame?.(deltaTime)
     },

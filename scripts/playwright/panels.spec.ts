@@ -12,51 +12,60 @@
 
 import { expect, test } from '@playwright/test'
 
+import { waitForAppLoaded } from './helpers/app-helpers'
+import { TopBar } from './pages/TopBar'
+
 test.setTimeout(30_000)
 
 test('left panel is open by default, toggle closes it', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 15_000 })
+  await waitForAppLoaded(page)
+
+  const topBar = new TopBar(page)
 
   // Left panel defaults to open (showLeftPanel: true in layoutStore)
-  const toggle = page.getByTestId('toggle-left-panel')
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(topBar.leftPanelToggle).toHaveAttribute('aria-expanded', 'true')
   await expect(page.getByTestId('left-panel')).toBeVisible()
 
   // Click closes it
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await topBar.toggleLeftPanel()
+  await expect(topBar.leftPanelToggle).toHaveAttribute('aria-expanded', 'false')
   await expect(page.getByTestId('left-panel')).not.toBeVisible({ timeout: 5000 })
 
   // Click reopens it
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await topBar.toggleLeftPanel()
+  await expect(topBar.leftPanelToggle).toHaveAttribute('aria-expanded', 'true')
   await expect(page.getByTestId('left-panel')).toBeVisible({ timeout: 5000 })
 })
 
 test('right panel toggle opens and closes', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByTestId('top-bar')).toBeVisible({ timeout: 15_000 })
+  await waitForAppLoaded(page)
 
-  const toggle = page.getByTestId('toggle-right-panel')
+  const topBar = new TopBar(page)
 
-  // Check initial state from aria-expanded
-  const initialExpanded = await toggle.getAttribute('aria-expanded')
-
-  if (initialExpanded === 'true') {
-    // Already open — close it first
-    await toggle.click()
-    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    await expect(page.getByTestId('right-panel')).not.toBeVisible({ timeout: 5000 })
-  }
+  // Ensure panel is closed first
+  await topBar.closeRightPanel()
 
   // Open it
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await topBar.toggleRightPanel()
+  await expect(topBar.rightPanelToggle).toHaveAttribute('aria-expanded', 'true')
   await expect(page.getByTestId('right-panel')).toBeVisible({ timeout: 5000 })
 
   // Close it
-  await toggle.click()
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await topBar.toggleRightPanel()
+  await expect(topBar.rightPanelToggle).toHaveAttribute('aria-expanded', 'false')
   await expect(page.getByTestId('right-panel')).not.toBeVisible({ timeout: 5000 })
+})
+
+test('both panels can be open simultaneously', async ({ page }) => {
+  await page.goto('/')
+  await waitForAppLoaded(page)
+
+  const topBar = new TopBar(page)
+  await topBar.openLeftPanel()
+  await topBar.openRightPanel()
+
+  await expect(page.getByTestId('left-panel')).toBeVisible()
+  await expect(page.getByTestId('right-panel')).toBeVisible()
 })

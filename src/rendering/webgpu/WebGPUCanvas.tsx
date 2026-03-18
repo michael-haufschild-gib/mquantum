@@ -88,6 +88,10 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
   const [isInitialized, setIsInitialized] = useState(false)
   const [initError, setInitError] = useState<Error | null>(null)
 
+  // Derive renderer state for e2e test automation.
+  // Tests use data-renderer-state to wait for "ready" deterministically.
+  const rendererState = initError ? 'error' : isInitialized ? 'ready' : 'initializing'
+
   // Initialize WebGPU — runs once on mount, not on prop/callback changes.
   useEffect(() => {
     const canvas = canvasRef.current
@@ -224,6 +228,9 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
       <div
         ref={containerRef}
         className={className}
+        data-testid="webgpu-container"
+        data-renderer-state="error"
+        data-renderer-error={initError.message}
         style={{
           ...style,
           display: 'flex',
@@ -244,6 +251,8 @@ export const WebGPUCanvas: React.FC<WebGPUCanvasProps> = ({
     <div
       ref={containerRef}
       className={className}
+      data-testid="webgpu-container"
+      data-renderer-state={rendererState}
       style={{
         position: 'relative',
         width: '100%',
