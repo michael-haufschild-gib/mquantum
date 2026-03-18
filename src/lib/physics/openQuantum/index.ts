@@ -68,6 +68,7 @@ export {
   buildHydrogenBasis,
   extraDimEnergy,
   hydrogenEnergy,
+  hydrogenEnergyND,
 } from './hydrogenBasis'
 export { buildHydrogenChannels } from './hydrogenChannels'
 export type { TransitionRate } from './hydrogenRates'

@@ -66,8 +66,8 @@ export function computeHOBoundingRadius(
 /**
  * Compute bounding radius for a hydrogen orbital (3D or N-D).
  *
- * For the 3D hydrogen radial part, the peak probability is at r ~ n^2 * a0,
- * and the tail extends ~3x beyond that.
+ * Uses n_eff = n + (D-3)/2 from the D-dimensional Coulomb problem.
+ * The radial extent scales as n_eff² × a₀ × 3.0. At D=3, n_eff = n.
  *
  * For extra dimensions (4D+), each uses harmonic oscillator bounds.
  *
@@ -75,16 +75,20 @@ export function computeHOBoundingRadius(
  * @param bohrRadius - Bohr radius scale factor
  * @param extraDimN - Quantum numbers for extra dimensions (4D-11D)
  * @param extraDimOmega - Frequencies for extra dimensions
+ * @param dimension - Spatial dimension D (default 3)
  * @returns Bounding radius in object-space units
  */
 export function computeHydrogenBoundingRadius(
   principalN: number,
   bohrRadius: number,
   extraDimN?: number[],
-  extraDimOmega?: number[]
+  extraDimOmega?: number[],
+  dimension: number = 3
 ): number {
-  // Hydrogen radial extent: peak at n^2 * a0, tail extends ~3x beyond
-  const hydrogenR = principalN * principalN * bohrRadius * 3.0
+  // D-dimensional effective principal quantum number
+  const nEff = principalN + (dimension - 3) / 2
+  // Hydrogen radial extent: peak at n_eff^2 * a0, tail extends ~3x beyond
+  const hydrogenR = nEff * nEff * bohrRadius * 3.0
   let maxR = Math.max(MIN_BOUND_R, hydrogenR)
 
   // Extra dimensions use HO formula
@@ -137,12 +141,9 @@ export function computeHOMomentumBoundingRadius(
 /**
  * Compute bounding radius for a hydrogen orbital in momentum (k-) space.
  *
- * The Fock momentum-space radial wavefunction decays as
- *   R̃_nl(k) ∝ (na₀k)^l / (1+(na₀k)²)^{l+2}
- * which has effective support up to k ≈ few / (n·a₀).
- *
- * Safety factor 6.0 keeps the sharp peak and first few oscillations visible
- * (the algebraic tail falls off fast as 1/k^{2l+4}).
+ * Uses n_eff = n + (D-3)/2 for the D-dimensional momentum extent.
+ * The Fock momentum-space radial wavefunction has effective support
+ * up to k ≈ 6 / (n_eff·a₀). At D=3, n_eff = n.
  *
  * Extra dimensions (4D+) use HO momentum-space bounds.
  *
@@ -151,6 +152,7 @@ export function computeHOMomentumBoundingRadius(
  * @param momentumScale - Reciprocal-space zoom factor; default 1.0
  * @param extraDimN - Quantum numbers for extra dimensions (4D-11D)
  * @param extraDimOmega - Frequencies for extra dimensions
+ * @param dimension - Spatial dimension D (default 3)
  * @returns Bounding radius in coordinate-space units (pre-scale)
  */
 export function computeHydrogenMomentumBoundingRadius(
@@ -158,11 +160,13 @@ export function computeHydrogenMomentumBoundingRadius(
   bohrRadius: number,
   momentumScale: number = 1.0,
   extraDimN?: number[],
-  extraDimOmega?: number[]
+  extraDimOmega?: number[],
+  dimension: number = 3
 ): number {
   const kScale = Math.max(momentumScale, 0.01)
-  const na0 = Math.max(principalN * bohrRadius, 0.01)
-  // Momentum-space extent: peak at k~1/(n·a₀), significant out to ~6/(n·a₀)
+  const nEff = principalN + (dimension - 3) / 2
+  const na0 = Math.max(nEff * bohrRadius, 0.01)
+  // Momentum-space extent: peak at k~1/(n_eff·a₀), significant out to ~6/(n_eff·a₀)
   const hydrogenK = 6.0 / na0
   let maxR = Math.max(MIN_BOUND_R, hydrogenK / kScale)
 
@@ -246,7 +250,8 @@ export function computeBoundingRadius(
         bohrRadius,
         momentumScale,
         activeExtraDimN,
-        activeExtraDimOmega
+        activeExtraDimOmega,
+        dimension
       )
     }
     // Harmonic oscillator momentum space
@@ -267,7 +272,8 @@ export function computeBoundingRadius(
       principalN,
       bohrRadius,
       activeExtraDimN,
-      activeExtraDimOmega
+      activeExtraDimOmega,
+      dimension
     )
   }
 

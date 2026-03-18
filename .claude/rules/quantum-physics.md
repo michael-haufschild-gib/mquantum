@@ -12,7 +12,7 @@ There are NO other object types in this codebase. Do not reference, create, or a
 |------|-----------|-------|----------------|
 | Harmonic Oscillator | 1D-11D | Hermite polynomials | Superposition up to 8 terms, per-dimension frequencies (`omega`) |
 | Hydrogen Orbital | 3D only | Laguerre polynomials + spherical harmonics | Quantum numbers `n`, `l`, `m`; real orbital variants |
-| Hydrogen N-Dimensional | 4D-11D | 3D hydrogen radial core + independent HO for extra dims | Same as above + extra-dimension HO quantum numbers |
+| Hydrogen N-Dimensional | 4D-11D | D-dimensional Coulomb radial R_nl^(D) + 3D angular Y_lm + independent HO for extra dims | Same as above + extra-dimension HO quantum numbers; n_eff = n + (D-3)/2 |
 
 ## Physics Accuracy Requirements
 

@@ -206,9 +206,10 @@ function packHydrogenAndExtraDims(
   }
   floatView[600 / 4] = hydrogenBoost * normCompensation
 
-  // hydrogenRadialThreshold
+  // hydrogenRadialThreshold — uses D-dimensional n_eff = n + (D-3)/2
   const hydrogenFieldScale = schroedinger?.fieldScale ?? 1.0
-  floatView[604 / 4] = 25.0 * validN * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
+  const nEff = validN + (dimension - 3) / 2
+  floatView[604 / 4] = 25.0 * nEff * bohrRadius * (1.0 + 0.1 * validL) * hydrogenFieldScale
 
   // extraDimN array (offset 608, 2 vec4i = 8 ints)
   const extraDimQuantumNumbers = schroedinger?.extraDimQuantumNumbers as number[] | undefined
@@ -499,7 +500,12 @@ function packRepresentationAndColorOverlays(
   floatView[1348 / 4] = schroedinger?.radialProbabilityOpacity ?? 0.6
   floatView[1352 / 4] =
     radialProbEnabled && quantumModeStr !== 'harmonicOscillator'
-      ? computeRadialProbabilityNorm(hydrogen.validN, hydrogen.validL, hydrogen.bohrRadius)
+      ? computeRadialProbabilityNorm(
+          hydrogen.validN,
+          hydrogen.validL,
+          hydrogen.bohrRadius,
+          p.dimension
+        )
       : 1.0
   floatView[1356 / 4] = 0.0
   packColorRgba(floatView, 1360 / 4, schroedinger?.radialProbabilityColor ?? '#44aaff')

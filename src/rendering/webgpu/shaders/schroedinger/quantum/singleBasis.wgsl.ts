@@ -72,8 +72,9 @@ fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniform
   // 3D radius
   let r3D = sqrt(xND[0]*xND[0] + xND[1]*xND[1] + xND[2]*xND[2]);
 
-  // Radial threshold (per-basis, computed inline)
-  let threshold = 25.0 * f32(n_k) * uniforms.bohrRadius * (1.0 + 0.1 * f32(l_k));
+  // Radial threshold with D-dimensional n_eff (per-basis, computed inline)
+  let nEff_k = f32(n_k) + f32(${dim} - 3) * 0.5;
+  let threshold = 25.0 * nEff_k * uniforms.bohrRadius * (1.0 + 0.1 * f32(l_k));
   if (r3D > threshold) { return vec2f(0.0, 0.0); }
 
   // Cartesian unit direction for angular evaluation
@@ -82,8 +83,8 @@ fn evaluateSingleBasis(pos: vec3f, t: f32, k: u32, uniforms: SchroedingerUniform
   let ny = xND[1] * invR;
   let nz = xND[2] * invR;
 
-  // Radial part: R_nl(r) — parameterized by per-basis (n, l)
-  let R = hydrogenRadial(n_k, l_k, r3D, uniforms.bohrRadius);
+  // Radial part: R_nl^(D)(r) with D-dimensional effective potential
+  let R = hydrogenRadialND(n_k, l_k, r3D, uniforms.bohrRadius, ${dim});
 
   // Angular part: Y_lm as vec2f(re, im) — parameterized by per-basis (l, m)
   // evalHydrogenNDAngularCartesian now returns full complex Y_lm for both real

@@ -2,15 +2,19 @@
  * Hydrogen ND presets for Schrödinger visualization
  *
  * Extends hydrogen orbitals to N dimensions using a hybrid approach:
- * - First 3 dimensions: Standard spherical harmonics Y_lm(θ,φ) for angular shape
- * - Extra dimensions (4+): Harmonic oscillator basis φ_n(x) for each extra dim
- * - Radial decay: Uses 3D hydrogen core radius r₃ = √(x₁² + x₂² + x₃²)
+ * - Radial part: D-dimensional Coulomb radial wavefunction R_nl^(D)(r₃)
+ *   with effective angular momentum λ = l + (D-3)/2 and n_eff = n + (D-3)/2
+ * - Angular part: Standard 3D spherical harmonics Y_lm(θ,φ) (projected)
+ * - Extra dimensions (4+): Independent harmonic oscillator basis φ_n(x)
  *
  * The wavefunction formula is:
- * ψ_ND = R_nl(r₃) × Y_lm(θ,φ) × ∏_{j=4}^{D} φ_{nj}(xj)
+ * ψ_ND = R_nl^(D)(r₃) × Y_lm(θ,φ) × ∏_{j=4}^{D} φ_{nj}(xj)
  *
- * This gives a physically meaningful visualization of "what would a hydrogen
- * atom look like if the electron could move in D spatial dimensions".
+ * The radial part uses the exact D-dimensional Coulomb solution, giving
+ * physically correct energy levels E = -0.5/n_eff² and radial structure.
+ * The angular factorization (3D harmonics × HO) is an approximation —
+ * the true N-D hydrogen uses hyperspherical harmonics — but the radial
+ * correction captures the dominant dimension-dependent physics.
  */
 
 import { HydrogenNDPresetName } from '../types'

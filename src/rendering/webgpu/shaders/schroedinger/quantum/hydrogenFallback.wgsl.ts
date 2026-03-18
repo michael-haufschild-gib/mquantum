@@ -24,4 +24,12 @@ fn evalHydrogenNDAngularCartesian(l: i32, m: i32, nx: f32, ny: f32, nz: f32, use
 fn hydrogenRadial(n: i32, l: i32, r: f32, a0: f32) -> f32 {
   return 0.0;
 }
+
+fn hydrogenRadialND(n: i32, l: i32, r: f32, a0: f32, dim: i32) -> f32 {
+  return 0.0;
+}
+
+fn hydrogenRadialEarlyExitND(r: f32, n: i32, l: i32, a0: f32, dim: i32) -> bool {
+  return true;
+}
 `

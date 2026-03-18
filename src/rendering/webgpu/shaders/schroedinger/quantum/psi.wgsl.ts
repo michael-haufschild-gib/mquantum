@@ -10,7 +10,9 @@
  *
  * 2. HYDROGEN ND (quantum_mode == 1):
  *    Evaluates an N-dimensional hydrogen-like wavefunction:
- *      ψ_ND = R_nl(r_D) × Y_lm(θ,φ) × ∏_{j=4}^{D} φ_{nj}(xj)
+ *      ψ_ND = R_nl^(D)(r_3D) × Y_lm(θ,φ) × ∏_{j=4}^{D} φ_{nj}(xj)
+ *    The radial part R_nl^(D) uses the D-dimensional Coulomb solution
+ *    with effective angular momentum λ = l + (D-3)/2 and n_eff = n + (D-3)/2.
  *
  * Port of GLSL quantum/psi.glsl to WGSL.
  *
@@ -124,9 +126,10 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     // Phase animation: compute time-dependent phase rotation when enabled
     var outputPhase = spatialPhase;
     if (uniforms.phaseAnimationEnabled != 0u) {
-      // Use simplified hydrogen energy (extra dimension contributions are small)
+      // D-dimensional hydrogen energy: E = -0.5/n_eff² with n_eff = n + (D-3)/2
       let nf = f32(uniforms.principalN);
-      let E = -0.5 / (nf * nf);
+      let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
+      let E = -0.5 / (nEff * nEff);
 
       // phase(t) = phase_spatial - E * t
       outputPhase = spatialPhase - E * t;
@@ -229,7 +232,8 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
     var outputPhase = spatialPhase;
     if (uniforms.phaseAnimationEnabled != 0u) {
       let nf = f32(uniforms.principalN);
-      let E = -0.5 / (nf * nf);
+      let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
+      let E = -0.5 / (nEff * nEff);
       outputPhase = spatialPhase - E * t;
     }
     let relativePhase = outputPhase - spatialPhase;
@@ -403,11 +407,12 @@ fn evalHydrogenNDMomentumSpatial(
   let ny = ky * invR;
   let nz = kz * invR;
 
-  let radial = hydrogenRadialMomentum(
+  let radial = hydrogenRadialMomentumND(
     uniforms.principalN,
     uniforms.azimuthalL,
     r3D,
-    uniforms.bohrRadius
+    uniforms.bohrRadius,
+    ACTUAL_DIM
   );
   let angular = evalHydrogenNDAngularCartesian(
     uniforms.azimuthalL,
@@ -438,7 +443,8 @@ fn evalHydrogenNDMomentumSpatial(
 fn evalHydrogenNDMomentumPsi(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUniforms) -> vec2f {
   let psiSpatial = evalHydrogenNDMomentumSpatial(xND, uniforms);
   let nf = f32(max(uniforms.principalN, 1));
-  let energy = -0.5 / (nf * nf);
+  let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
+  let energy = -0.5 / (nEff * nEff);
   return cmul(psiSpatial, cexp_i(-energy * t));
 }
 
@@ -477,7 +483,8 @@ fn evalPsiWithSpatialPhase(xND: array<f32, 11>, t: f32, uniforms: SchroedingerUn
   var outputPhase = spatialPhase;
   if (uniforms.phaseAnimationEnabled != 0u) {
     let nf = f32(uniforms.principalN);
-    let E = -0.5 / (nf * nf);
+    let nEff = nf + f32(ACTUAL_DIM - 3) * 0.5;
+    let E = -0.5 / (nEff * nEff);
     outputPhase = spatialPhase - E * t;
   }
 

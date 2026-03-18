@@ -5,7 +5,9 @@
  * Following the hoNDVariants pattern: ALL code is generated at JavaScript level
  * to eliminate runtime loops and enable maximum GPU compiler optimization.
  *
- * Port of GLSL quantum/hydrogenNDVariants.glsl to WGSL.
+ * Uses the N-dimensional radial correction: the effective angular momentum
+ * λ = l + (D-3)/2 shifts the radial wavefunction, energy levels, and
+ * orbital extent. At D=3, λ=l and everything reduces to standard hydrogen.
  *
  * @module rendering/webgpu/shaders/schroedinger/quantum/hydrogenNDVariants.wgsl
  */
@@ -167,6 +169,7 @@ function generateHydrogenNDBlock(dimension: number): string {
 // ============================================
 // Hydrogen ND - ${dimension}D (Fully Unrolled)
 // Extra dimensions: ${extraDimCount}
+// N-D radial correction: λ = l + ${(dimension - 3) / 2}, n_eff = n + ${(dimension - 3) / 2}
 // Generated at JavaScript level for maximum optimization
 // ============================================
 
@@ -174,8 +177,8 @@ fn evalHydrogenNDPsi${dimension}D(xND: array<f32, 11>, t: f32, uniforms: Schroed
   // Extract coordinates (unrolled)
 ${coordExtraction}
 ${extraDimEarlyExit}${radiusCalc}
-  // EARLY EXIT 2: Check hydrogen radial threshold
-  if (hydrogenRadialEarlyExit(r3D, uniforms)) {
+  // EARLY EXIT 2: Check hydrogen radial threshold (D-dimensional n_eff)
+  if (hydrogenRadialEarlyExitND(r3D, uniforms.principalN, uniforms.azimuthalL, uniforms.bohrRadius, ${dimension})) {
     return vec2f(0.0, 0.0);
   }
 
@@ -185,8 +188,8 @@ ${extraDimEarlyExit}${radiusCalc}
   let ny = x1 * invR;
   let nz = x2 * invR;
 
-  // Radial part: R_nl(r_3D) from the 3D hydrogen core
-  let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
+  // Radial part: R_nl^(D)(r_3D) with D-dimensional effective potential
+  let R = hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension});
 
   // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
@@ -195,8 +198,8 @@ ${extraDimProduct}
   let scale = R * extraProduct;
   let psi0 = vec2f(scale * Y.x, scale * Y.y);
 ${extraDimEnergy}
-  // Time evolution (includes extra-dimensional energy)
-  return hydrogenNDTimeEvolution(psi0, uniforms.principalN, extraEnergy, t);
+  // Time evolution with D-dimensional energy: E = -0.5/n_eff²
+  return hydrogenNDTimeEvolutionND(psi0, uniforms.principalN, extraEnergy, t, ${dimension});
 }
 `
 }
@@ -293,6 +296,7 @@ export function generateHydrogenNDCachedBlock(dimension: number): string {
 // ============================================
 // Hydrogen ND - ${dimension}D (Cached Extra Dimensions)
 // Extra dimensions: ${extraDimCount} (using eigenfunction cache)
+// N-D radial correction: λ = l + ${(dimension - 3) / 2}, n_eff = n + ${(dimension - 3) / 2}
 // Generated at JavaScript level for maximum optimization
 // ============================================
 
@@ -300,8 +304,8 @@ fn evalHydrogenNDPsi${dimension}DCached(xND: array<f32, 11>, t: f32, uniforms: S
   // Extract coordinates (unrolled)
 ${coordExtraction}
 ${extraDimEarlyExit}${radiusCalc}
-  // EARLY EXIT 2: Check hydrogen radial threshold
-  if (hydrogenRadialEarlyExit(r3D, uniforms)) {
+  // EARLY EXIT 2: Check hydrogen radial threshold (D-dimensional n_eff)
+  if (hydrogenRadialEarlyExitND(r3D, uniforms.principalN, uniforms.azimuthalL, uniforms.bohrRadius, ${dimension})) {
     return vec2f(0.0, 0.0);
   }
 
@@ -311,8 +315,8 @@ ${extraDimEarlyExit}${radiusCalc}
   let ny = x1 * invR;
   let nz = x2 * invR;
 
-  // Radial part: R_nl(r_3D) from the 3D hydrogen core
-  let R = hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius);
+  // Radial part: R_nl^(D)(r_3D) with D-dimensional effective potential
+  let R = hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, ${dimension});
 
   // Angular part: Y_lm as complex vec2f(re, im) from Cartesian direction
   let Y = evalHydrogenNDAngularCartesian(uniforms.azimuthalL, uniforms.magneticM, nx, ny, nz, uniforms.useRealOrbitals != 0u);
@@ -321,8 +325,8 @@ ${extraDimProduct}
   let scale = R * extraProduct;
   let psi0 = vec2f(scale * Y.x, scale * Y.y);
 ${extraDimEnergy}
-  // Time evolution (includes extra-dimensional energy)
-  return hydrogenNDTimeEvolution(psi0, uniforms.principalN, extraEnergy, t);
+  // Time evolution with D-dimensional energy: E = -0.5/n_eff²
+  return hydrogenNDTimeEvolutionND(psi0, uniforms.principalN, extraEnergy, t, ${dimension});
 }
 `
 }

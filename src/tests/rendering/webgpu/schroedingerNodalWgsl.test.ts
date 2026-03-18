@@ -59,19 +59,23 @@ describe('Schroedinger nodal WGSL composition', () => {
     expect(wgsl).not.toContain('fn nodalSliceMask(')
   })
 
-  it('uses 3D hydrogen radial core in hydrogen-ND wavefunction evaluation', () => {
+  it('uses D-dimensional hydrogen radial in hydrogen-ND wavefunction evaluation', () => {
     const { wgsl } = composeSchroedingerShader({
       dimension: 7,
       quantumMode: 'hydrogenND',
       isosurface: false,
     })
 
-    expect(wgsl).toContain('if (hydrogenRadialEarlyExit(r3D, uniforms))')
-    expect(wgsl).toContain('R_nl(r_3D) from the 3D hydrogen core')
-    expect(wgsl).not.toContain('hydrogenRadialEarlyExit(rND, uniforms)')
-    expect(wgsl).not.toContain(
-      'hydrogenRadial(uniforms.principalN, uniforms.azimuthalL, rND, uniforms.bohrRadius);'
+    // Should use ND radial functions with baked-in dimension
+    expect(wgsl).toContain(
+      'hydrogenRadialEarlyExitND(r3D, uniforms.principalN, uniforms.azimuthalL, uniforms.bohrRadius, 7)'
     )
+    expect(wgsl).toContain(
+      'hydrogenRadialND(uniforms.principalN, uniforms.azimuthalL, r3D, uniforms.bohrRadius, 7)'
+    )
+    // Should NOT use old 3D-only radial
+    expect(wgsl).not.toContain('if (hydrogenRadialEarlyExit(r3D, uniforms))')
+    expect(wgsl).not.toContain('R_nl(r_3D) from the 3D hydrogen core')
   })
 
   it('keeps nodal controls active in isosurface mode', () => {
